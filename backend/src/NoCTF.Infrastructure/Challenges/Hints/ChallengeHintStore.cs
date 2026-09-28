@@ -12,18 +12,18 @@ namespace NoCTF.Infrastructure.Challenges.Hints;
 
 public sealed class ChallengeHintStore(
     NoCtfDbContext db,
-    ITransactionalMessageOutbox outbox,
+    IPostCommitMessagePublisher outbox,
     TeamChallengeCriticalSection criticalSection,
     ICompetitionEventRecorder? eventRecorder = null) : IChallengeHintStore
 {
     public ChallengeHintStore(
         NoCtfDbContext db,
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         ICompetitionEventRecorder? eventRecorder = null)
         : this(
             db,
             outbox,
-            new TeamChallengeCriticalSection(new AsyncKeyedLock.AsyncKeyedLocker<string>()),
+            new TeamChallengeCriticalSection(),
             eventRecorder)
     { }
 
@@ -92,6 +92,7 @@ public sealed class ChallengeHintStore(
                 Id = requestedId
             };
             challenge.Hints.Add(hint);
+            db.Entry(hint).State = EntityState.Added;
         }
         var wasPublished = hint.PublishedAt is { } previousPublishedAt
             && previousPublishedAt <= command.Now;
@@ -110,7 +111,7 @@ public sealed class ChallengeHintStore(
                 wasPublished,
                 ct);
             await transaction.CommitAsync(ct);
-            await outbox.FlushOutgoingMessagesAsync();
+            await outbox.FlushCommittedMessagesAsync();
             return new(Map(hint, challenge.Id, challenge.UpdatedAt));
         }
         catch (DbUpdateException) when (command.IsCreate)
@@ -141,7 +142,7 @@ public sealed class ChallengeHintStore(
         challenge!.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        await outbox.FlushOutgoingMessagesAsync();
+        await outbox.FlushCommittedMessagesAsync();
         return true;
     }
 
@@ -175,7 +176,7 @@ public sealed class ChallengeHintStore(
             wasPublished: false,
             ct);
         await transaction.CommitAsync(ct);
-        await outbox.FlushOutgoingMessagesAsync();
+        await outbox.FlushCommittedMessagesAsync();
         return true;
     }
 
@@ -187,7 +188,8 @@ public sealed class ChallengeHintStore(
         DateTimeOffset now,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await db.Database.BeginTransactionAsync(
+            System.Data.IsolationLevel.Serializable, ct);
         var competitionIsRunning = await db.Competitions.AsNoTracking().AnyAsync(
             competition => competition.Id == competitionId
                 && competition.Status == CompetitionStatus.Running,
@@ -197,12 +199,15 @@ public sealed class ChallengeHintStore(
         var teamId = await db.Teams.AsNoTracking()
             .Where(team =>
                 team.CompetitionId == competitionId &&
-                team.MemberIds.Contains(userId) &&
+                team.Members.Any(member => member.UserId == userId) &&
                 team.RegistrationStatus == TeamRegistrationStatus.Approved &&
                 !team.IsBanned)
             .Select(team => (Guid?)team.Id)
             .SingleOrDefaultAsync(ct);
         if (teamId is null)
+            return HintUnlockAttempt.Failed(HintUnlockFailure.NotFound);
+        if (!await new NoCTF.Infrastructure.Competitions.Progression.ProgressionChallengeAccess(db)
+                .IsActiveAsync(competitionId, competitionChallengeId, teamId, ct))
             return HintUnlockAttempt.Failed(HintUnlockFailure.NotFound);
         using var unlockLease = await criticalSection.AcquireAsync(
             db,
@@ -238,14 +243,13 @@ public sealed class ChallengeHintStore(
             return HintUnlockAttempt.Success(new(existingId, false));
 
         var gameplayFactId = Guid.CreateVersion7(now);
-        db.GameplayFacts.Add(new GameplayFact
+        db.GameplayFacts.Add(new HintUnlockGameplayFact
         {
             Id = gameplayFactId,
             CompetitionId = competitionId,
             CompetitionChallengeId = competitionChallengeId,
             TeamId = teamId.Value,
             ActorUserId = userId,
-            Kind = GameplayFactKind.HintUnlock,
             ReferenceKind = GameplayFactReferenceKind.Hint,
             ReferenceId = hintId,
             OccurredAt = now,
@@ -255,7 +259,7 @@ public sealed class ChallengeHintStore(
         await outbox.PublishAsync(new EvaluateGameplayFact(gameplayFactId));
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        await outbox.FlushOutgoingMessagesAsync();
+        await outbox.FlushCommittedMessagesAsync();
         return HintUnlockAttempt.Success(new(gameplayFactId, true));
     }
 

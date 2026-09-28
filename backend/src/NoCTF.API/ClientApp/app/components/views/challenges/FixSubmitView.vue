@@ -3,12 +3,12 @@ import { toRefs } from 'vue'
 import type { FixSubmitViewState } from '~/features/challenges/useFixSubmit'
 
 const viewProps = defineProps<{ state: FixSubmitViewState }>()
-const { file, pendingAction, targetCreating, canUpload, validating, recycling, patchWaitingForTarget, targetFailed, completedAndRecycled, canRequest, onFileChange, requestTarget, uploadFix, competitionChallengeId } = toRefs(viewProps.state)
+const { file, pendingAction, targetCreating, canUpload, validating, recycling, patchWaitingForTarget, targetFailed, completedAndRecycled, canRequest, onFileChange, requestTarget, uploadFix, competitionChallengeId, ctfPatchVerification } = toRefs(viewProps.state)
 </script>
 
 <template>
   <section class="flex flex-col gap-4" aria-labelledby="fix-submit-title">
-    <h3 id="fix-submit-title" class="text-sm font-semibold">{{ $t('ui.defenseVerification') }}</h3>
+    <h3 id="fix-submit-title" class="text-sm font-semibold">{{ ctfPatchVerification ? $t('ui.patchVerification') : $t('ui.defenseVerification') }}</h3>
     <div class="flex flex-col gap-4">
       <UiForm v-if="canUpload" class="flex flex-col gap-4" @submit.prevent="uploadFix">
         <p class="flex items-start gap-2 text-sm text-muted-foreground" role="status" aria-live="polite">
@@ -62,7 +62,11 @@ const { file, pendingAction, targetCreating, canUpload, validating, recycling, p
 
       <Button v-if="canRequest" :disabled="pendingAction !== null" @click="requestTarget">
         <Spinner v-if="pendingAction === 'request'" data-icon="inline-start" />
-        {{ pendingAction === 'request' ? $t('ui.requesting') : completedAndRecycled || targetFailed ? $t('ui.requestDefenseAgain') : $t('ui.requestDefenseEnvironment') }}
+        {{ pendingAction === 'request'
+          ? $t('ui.requesting')
+          : ctfPatchVerification
+            ? completedAndRecycled || targetFailed ? $t('ui.requestPatchVerificationAgain') : $t('ui.requestPatchVerificationTarget')
+            : completedAndRecycled || targetFailed ? $t('ui.requestDefenseAgain') : $t('ui.requestDefenseEnvironment') }}
       </Button>
     </div>
   </section>

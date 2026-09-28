@@ -262,8 +262,21 @@ public sealed class LeaderboardOpenApiTests
         var challengeProperties = challenge.GetProperty("properties");
         await Assert.That(challengeProperties.TryGetProperty("baseScore", out _)).IsFalse();
         await Assert.That(challengeProperties.TryGetProperty("title", out _)).IsTrue();
-        await Assert.That(challengeProperties.TryGetProperty("description", out _)).IsTrue();
-        await Assert.That(challengeProperties.TryGetProperty("urls", out _)).IsTrue();
+        await Assert.That(challengeProperties.TryGetProperty("description", out _)).IsFalse();
+        await Assert.That(challengeProperties.TryGetProperty("accesses", out _)).IsFalse();
+        var detail = ResolveSchema(
+            root,
+            root.GetProperty("paths")
+                .GetProperty("/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}")
+                .GetProperty("get")
+                .GetProperty("responses")
+                .GetProperty("200")
+                .GetProperty("content")
+                .GetProperty("application/json")
+                .GetProperty("schema"));
+        var detailProperties = detail.GetProperty("properties");
+        await Assert.That(detailProperties.TryGetProperty("description", out _)).IsTrue();
+        await Assert.That(detailProperties.TryGetProperty("accesses", out _)).IsTrue();
     }
 
     private static string[] PropertyNames(JsonElement schema) =>

@@ -3,19 +3,18 @@ import { toRefs } from 'vue'
 import type { KohPanelViewState } from '~/features/challenges/panels/useKohPanel'
 
 const viewProps = defineProps<{ state: KohPanelViewState }>()
-const { Copy, publicGatewayFailure, copyControlFlag, RuntimeAccessUrl, challenge } = toRefs(viewProps.state)
+const { Copy, copyControlFlag, RuntimeAccessUrl, challenge } = toRefs(viewProps.state)
 </script>
 
 <template>
   <div class="grid gap-6 md:grid-cols-2 md:gap-0 md:divide-x">
     <section class="flex flex-col gap-4 md:pr-6" aria-labelledby="koh-hill-title">
         <h3 id="koh-hill-title" class="text-sm font-semibold">{{ $t('ui.hillEntrance') }}</h3>
-        <Alert v-if="challenge.publicAccessFailure"><AlertDescription>{{ publicGatewayFailure(challenge.publicAccessFailure) }}</AlertDescription></Alert>
-        <div v-else-if="challenge.urls?.length" class="flex flex-col gap-1">
+        <div v-if="challenge.accesses?.length" class="flex flex-col gap-1">
           <component :is="RuntimeAccessUrl"
-            v-for="url in challenge.urls"
-            :key="url"
-            :url="url"
+            v-for="access in challenge.accesses"
+            :key="`${access.directAddress}:${access.webSocketAddress}`"
+            :access="access"
           />
         </div>
         <p v-else class="text-sm text-muted-foreground">{{ $t('ui.theEntranceToTheMountainIsNotYetOpenPlease') }}</p>

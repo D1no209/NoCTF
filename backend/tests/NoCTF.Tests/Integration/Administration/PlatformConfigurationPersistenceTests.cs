@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using NoCTF.Domain.Storage;
 using NoCTF.Infrastructure.Administration;
@@ -28,6 +29,8 @@ public sealed class PlatformConfigurationPersistenceTests
             var options = new DbContextOptionsBuilder<NoCtfDbContext>()
                 .UseNpgsql(postgres.GetConnectionString())
                 .UseSnakeCaseNamingConvention()
+                .ConfigureWarnings(warnings => warnings.Throw(
+                    RelationalEventId.MultipleCollectionIncludeWarning))
                 .Options;
             var now = DateTimeOffset.UtcNow;
             var logoFileId = Guid.CreateVersion7(now);

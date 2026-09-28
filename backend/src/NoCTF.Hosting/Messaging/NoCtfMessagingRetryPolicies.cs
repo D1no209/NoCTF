@@ -1,6 +1,6 @@
 using JasperFx;
 using JasperFx.CodeGeneration;
-using Npgsql;
+using System.Data.Common;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.Messaging;
 using Wolverine;
@@ -41,6 +41,18 @@ public static class NoCtfMessagingRetryPolicies
         TimeSpan.FromMinutes(2)
     };
 
+    private static readonly TimeSpan[] WebhookRetryDelays =
+    {
+        TimeSpan.FromSeconds(5),
+        TimeSpan.FromSeconds(30),
+        TimeSpan.FromMinutes(2),
+        TimeSpan.FromMinutes(10),
+        TimeSpan.FromMinutes(30),
+        TimeSpan.FromHours(2),
+        TimeSpan.FromHours(8),
+        TimeSpan.FromHours(24)
+    };
+
     private static readonly TimeSpan[] RunnerRetryDelays =
     {
         TimeSpan.FromSeconds(1),
@@ -60,6 +72,7 @@ public static class NoCtfMessagingRetryPolicies
             WorkerQueue.Gameplay => GameplayRetryDelays,
             WorkerQueue.Projection => ProjectionRetryDelays,
             WorkerQueue.Background => BackgroundRetryDelays,
+            WorkerQueue.Webhook => WebhookRetryDelays,
             _ => throw new ArgumentOutOfRangeException(nameof(queue), queue, null)
         };
 
@@ -75,7 +88,7 @@ public static class NoCtfMessagingRetryPolicies
             .RetryWithCooldown(TimeSpan.FromMilliseconds(250))
             .Then.ScheduleRetry(RunnerRetryDelays)
             .WithFullJitter();
-        options.Policies.OnException<NpgsqlException>()
+        options.Policies.OnException<DbException>()
             .RetryWithCooldown(TimeSpan.FromMilliseconds(250))
             .Then.ScheduleRetry(RunnerRetryDelays)
             .WithFullJitter();
@@ -108,7 +121,7 @@ public static class NoCtfMessagingRetryPolicies
                     .RetryWithCooldown(TimeSpan.FromMilliseconds(250))
                     .Then.ScheduleRetry(delays)
                     .WithFullJitter();
-                chain.OnException<NpgsqlException>()
+                chain.OnException<DbException>()
                     .RetryWithCooldown(TimeSpan.FromMilliseconds(250))
                     .Then.ScheduleRetry(delays)
                     .WithFullJitter();
@@ -138,9 +151,11 @@ public static class NoCtfMessagingRetryPolicies
             endpointName switch
             {
                 CompetitionEventFanoutQueueNames.Realtime =>
-                    "nats://subject/noctf.events.realtime",
+                    "nats://subject/noctf.v2.events.realtime",
                 CompetitionEventFanoutQueueNames.Leaderboard =>
-                    "nats://subject/noctf.events.leaderboard",
+                    "nats://subject/noctf.v2.events.leaderboard",
+                CompetitionEventFanoutQueueNames.Webhook =>
+                    "nats://subject/noctf.v2.events.webhook",
                 _ => $"nats://subject/noctf.{endpointName.Replace("-", ".", StringComparison.Ordinal)}"
             };
     }

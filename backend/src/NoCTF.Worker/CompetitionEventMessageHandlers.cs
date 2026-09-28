@@ -6,12 +6,14 @@ using NoCTF.Domain.Competitions.Events;
 using NoCTF.Infrastructure.Competitions.Events;
 using NoCTF.Infrastructure.Messaging;
 using Wolverine.Attributes;
+using NoCTF.Application.Competitions.Webhooks;
+using Wolverine;
 
 namespace NoCTF.Worker;
 
 [StickyHandler(CompetitionEventFanoutQueueNames.Realtime)]
 public sealed class CompetitionEventRealtimeMessageHandler(
-    RedisCompetitionEventRefreshPublisher publisher)
+    ICompetitionEventRefreshPublisher publisher)
 {
     public Task Handle(
         CompetitionEventCommitted message,
@@ -78,4 +80,13 @@ public sealed class CompetitionEventLeaderboardMessageHandler(
             or CompetitionEventKind.AwdpFixResolved => true,
         _ => false
     };
+}
+
+[StickyHandler(CompetitionEventFanoutQueueNames.Webhook)]
+public sealed class CompetitionEventWebhookMessageHandler(IMessageBus bus)
+{
+    public ValueTask Handle(CompetitionEventCommitted message) =>
+        bus.PublishAsync(new DispatchCompetitionWebhooks(
+            message.CompetitionId,
+            message.EventId));
 }

@@ -17,7 +17,8 @@ public enum TeamMembershipFailure
     MemberNotFound,
     MembershipNotFound,
     CaptainMustTransfer,
-    CaptainOnly
+    CaptainOnly,
+    TrackSsoIdentityRequired
 }
 
 public interface ITeamMembershipStore
@@ -72,16 +73,6 @@ public sealed class RotateTeamInvitation(ITeamMembershipStore store)
         var result = await store.RotateInvitationAsync(competitionId, teamId, actorId, token, ct);
         return result.Token is not null ? OperationResult<string, TeamMembershipFailure>.Success(result.Token) : OperationResult<string, TeamMembershipFailure>.Failure(result.Failure!.Value, "Invitation could not be rotated.");
     }
-}
-
-public static class TeamMembershipPolicy
-{
-    public static bool IsInvitationJoinLocked(
-        CompetitionStatus status,
-        bool allowTeamRegistrationWhileRunning) =>
-        status is CompetitionStatus.Paused or CompetitionStatus.Finished
-        || status == CompetitionStatus.Running && !allowTeamRegistrationWhileRunning;
-
 }
 
 public sealed class RemoveTeamMember(ITeamMembershipStore store)

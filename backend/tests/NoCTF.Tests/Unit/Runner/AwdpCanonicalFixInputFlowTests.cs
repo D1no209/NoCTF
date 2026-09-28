@@ -44,7 +44,6 @@ public sealed class AwdpCanonicalFixInputFlowTests
         await Assert.That(http.RequestCount).IsEqualTo(1);
         await Assert.That(sandbox.CopyCalls).IsEqualTo(1);
         await Assert.That(checker.InputCalls).IsEqualTo(1);
-        await Assert.That(checker.LegacyCalls).IsEqualTo(0);
         await Assert.That(sandbox.ArchiveStream).IsNotNull();
         await Assert.That(checker.ArchiveStream).IsNotNull();
         await Assert.That(ReferenceEquals(
@@ -297,25 +296,18 @@ public sealed class AwdpCanonicalFixInputFlowTests
 
     private sealed class RecordingChecker : IAwdpCheckerExecutor
     {
-        public int LegacyCalls { get; private set; }
         public int InputCalls { get; private set; }
         public Stream? ArchiveStream { get; private set; }
         public byte[]? ArchiveBytes { get; private set; }
         public Exception? InputFailure { get; init; }
 
-        public Task<AwdpCheckerExecutionOutcome> ExecuteAsync(
-            AwdpCheckerWork work,
-            CancellationToken cancellationToken)
-        {
-            LegacyCalls++;
-            return Task.FromResult(AwdpCheckerExecutionOutcome.Completed);
-        }
-
         public async Task<AwdpCheckerExecutionOutcome> ExecuteAsync(
             AwdpCheckerWork work,
-            OneShotInputArchive input,
+            OneShotInputArchive? input,
             CancellationToken cancellationToken)
         {
+            if (input is null)
+                throw new InvalidOperationException("The canonical Fix flow requires checker input.");
             InputCalls++;
             ArchiveStream = input.Archive;
             if (InputFailure is not null)
@@ -327,7 +319,7 @@ public sealed class AwdpCanonicalFixInputFlowTests
         }
     }
 
-    private sealed class RecordingOutbox : ITransactionalMessageOutbox
+    private sealed class RecordingOutbox : IPostCommitMessagePublisher
     {
         public List<object> Messages { get; } = [];
         public ValueTask PublishAsync<T>(T message)

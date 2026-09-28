@@ -4,6 +4,7 @@ import { Megaphone } from '@lucide/vue'
 import { listCompetitionEvents } from '../../api'
 import type { NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse } from '../../api'
 import { createTrailingRefresh } from '../../lib/latest-page-refresh'
+import { motionAttributes } from '../../motion/presets'
 
 type CompetitionEvent = NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse
 
@@ -25,7 +26,36 @@ export function useCompetitionBroadcastPanel(props: Readonly<Omit<{
 
   const initialized = ref(false)
 
+  const enteringIdentities = ref<ReadonlySet<string>>(new Set())
+
   let latestNotifiedAt = 0
+  let clearEnteringTimer: ReturnType<typeof setTimeout> | undefined
+
+  function markInsertions(
+    previous: readonly CompetitionEvent[],
+    next: readonly CompetitionEvent[],
+  ): void {
+    const existing = new Set(previous.map(competitionBroadcastIdentity))
+    const inserted = next
+      .map(competitionBroadcastIdentity)
+      .filter(identity => !existing.has(identity))
+    if (inserted.length === 0) return
+    enteringIdentities.value = new Set([
+      ...enteringIdentities.value,
+      ...inserted,
+    ])
+    if (clearEnteringTimer) clearTimeout(clearEnteringTimer)
+    clearEnteringTimer = setTimeout(() => {
+      enteringIdentities.value = new Set()
+      clearEnteringTimer = undefined
+    }, 240)
+  }
+
+  function broadcastMotionAttributes(event: CompetitionEvent) {
+    return enteringIdentities.value.has(competitionBroadcastIdentity(event))
+      ? motionAttributes('list-enter')
+      : undefined
+  }
 
   async function load(): Promise<void> {
     const competition = ctx.competition.value
@@ -56,7 +86,9 @@ export function useCompetitionBroadcastPanel(props: Readonly<Omit<{
         from: queryWindow.from,
         to: queryWindow.to,
         kinds: competitionBroadcastKinds,
+        offset: 0,
         limit: 10,
+        desc: true,
       },
     })
     if (requestError || !data) {
@@ -65,7 +97,9 @@ export function useCompetitionBroadcastPanel(props: Readonly<Omit<{
       loading.value = false
       return
     }
-    items.value = mergeCompetitionBroadcasts(items.value, data.items ?? [])
+    const merged = mergeCompetitionBroadcasts(items.value, data.items ?? [])
+    if (!initialLoad) markInsertions(items.value, merged)
+    items.value = merged
     initialized.value = true
     loading.value = false
     error.value = null
@@ -95,7 +129,10 @@ export function useCompetitionBroadcastPanel(props: Readonly<Omit<{
     })
   })
 
-  onUnmounted(() => unwatch?.())
+  onUnmounted(() => {
+    unwatch?.()
+    if (clearEnteringTimer) clearTimeout(clearEnteringTimer)
+  })
 
   return {
       ...toRefs(props),
@@ -103,6 +140,7 @@ export function useCompetitionBroadcastPanel(props: Readonly<Omit<{
       items,
       loading,
       error,
+      broadcastMotionAttributes,
       refreshLatest
     }
 }

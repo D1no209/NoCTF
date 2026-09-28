@@ -3,8 +3,10 @@ import { markRaw, toRefs } from 'vue'
 import { toast } from 'vue-sonner'
 import { createRuntime, extendRuntimeEndpoint, getRuntimeEndpoint, stopRuntimeEndpoint } from '../../api'
 import type { NoCtfapiEndpointsRuntimeRuntimeResponse } from '../../api'
-import { publicGatewayFailure, publicGatewayState } from '../../utils/public-gateway'
+import { runnerFailureLabel } from '../shared/runner-capacity'
 import { classifyPlayerRuntimeLookup, normalizePlayerRuntime, shouldPollPlayerRuntime, type PlayerRuntimeLookupOutcome } from '../../utils/player-runtime'
+import { RUNTIME_STOP_POLL_DELAYS_MS, RUNTIME_STOP_POLL_MAX_INTERVAL_MS, RUNTIME_STOP_POLL_TIMEOUT_MS } from '../../lib/runtime-stop-polling'
+import { createRuntimeExtensionRequest, parseRuntimeExtensionMinutes } from '../../lib/runtime-extension'
 import RuntimeAccessUrlComponent from './RuntimeAccessUrl.vue'
 import { useHumanVerification } from '~/features/security/useHumanVerification'
 
@@ -23,7 +25,7 @@ export function useRuntimeCard(props: Readonly<Omit<{
     /** full = CTF 全操作;reset-only = AWD 仅重置;readonly = 只显示最终状态 */
     controls?: 'full' | 'reset-only' | 'readonly'
     dockTarget?: string
-  }, "controls" | "dockTarget">>>) {
+  }, "controls" | "dockTarget">>>, emit: { (event: 'changed'): void }) {
   const runtime = ref<Runtime | null>(null)
   const { request: requestHumanVerification } = useHumanVerification()
 
@@ -35,11 +37,13 @@ export function useRuntimeCard(props: Readonly<Omit<{
 
   const commandAttempt = createCommandAttempt()
 
-  const extendMinutes = ref(30)
+  const extendMinutes = ref<number | string>(30)
 
   const now = ref(Date.now())
 
   const forceUntilStopped = ref(false)
+
+  let hasLoaded = false
 
   async function load(): Promise<PlayerRuntimeLookupOutcome> {
     const { data, error, response } = await getRuntimeEndpoint({
@@ -47,8 +51,11 @@ export function useRuntimeCard(props: Readonly<Omit<{
     })
     const outcome = classifyPlayerRuntimeLookup(response?.status, Boolean(error), Boolean(data))
     if (outcome === 'missing') {
+      const hadRuntime = runtime.value !== null
       runtime.value = null
       loadError.value = null
+      if (hasLoaded && hadRuntime) emit('changed')
+      hasLoaded = true
       return outcome
     }
     if (outcome === 'failed') {
@@ -56,8 +63,14 @@ export function useRuntimeCard(props: Readonly<Omit<{
       return outcome
     }
 
+    const previous = runtime.value
     runtime.value = normalizePlayerRuntime(data ?? null)
     loadError.value = null
+    if (hasLoaded && previous && runtime.value
+      && (previous.id !== runtime.value.id
+        || previous.state !== runtime.value.state
+        || previous.expiresAt !== runtime.value.expiresAt)) emit('changed')
+    hasLoaded = true
     return outcome
   }
 
@@ -79,7 +92,12 @@ export function useRuntimeCard(props: Readonly<Omit<{
       }
       return outcome === 'failed' || !shouldPollPlayerRuntime(runtime.value, now.value)
     },
-    { interval: 2000, timeout: 120_000 },
+    {
+      interval: 2_000,
+      maxInterval: RUNTIME_STOP_POLL_MAX_INTERVAL_MS,
+      timeout: RUNTIME_STOP_POLL_TIMEOUT_MS,
+      delays: RUNTIME_STOP_POLL_DELAYS_MS,
+    },
   )
 
   async function refreshUntilStopped(): Promise<void> {
@@ -111,6 +129,7 @@ export function useRuntimeCard(props: Readonly<Omit<{
   async function act(
     action: (humanVerificationHeaders: Record<string, string>) => Promise<{ error?: unknown }>,
     failMessage: string,
+    onAccepted?: () => void,
   ) {
     if (acting.value) return
     acting.value = true
@@ -123,6 +142,7 @@ export function useRuntimeCard(props: Readonly<Omit<{
       return
     }
     commandAttempt.completed()
+    onAccepted?.()
     toast.success(translate("ui.theOperationHasBeenAcceptedAndTheEnvironmentStatusIs"))
     startPolling()
     } catch (e) { toast.error(parseApiError(e, failMessage).message) }
@@ -140,10 +160,17 @@ export function useRuntimeCard(props: Readonly<Omit<{
     headers: { ...commandAttempt.headers({ ...path.value, action: 'start' }), ...verificationHeaders },
   }), translate("ui.failedToStartEnvironment"))
 
-  const stop = () => runtime.value && act(verificationHeaders => stopRuntimeEndpoint({
-    path: { ...path.value, runtimeInstanceId: runtime.value!.id! },
-    headers: { ...commandAttempt.headers({ ...path.value, action: 'stop' }), ...verificationHeaders },
-  }), translate("ui.stopEnvironmentFailed"))
+  const stop = () => {
+    const current = runtime.value
+    if (!current?.id) return
+    return act(verificationHeaders => stopRuntimeEndpoint({
+      path: { ...path.value, runtimeInstanceId: current.id! },
+      headers: { ...commandAttempt.headers({ ...path.value, action: 'stop' }), ...verificationHeaders },
+    }), translate("ui.stopEnvironmentFailed"), () => {
+      if (runtime.value?.id === current.id)
+        runtime.value = { ...runtime.value, state: 'Stopping' }
+    })
+  }
 
   const reset = () => runtime.value && act(verificationHeaders => createRuntime({
     path: path.value,
@@ -151,27 +178,22 @@ export function useRuntimeCard(props: Readonly<Omit<{
     headers: { ...commandAttempt.headers({ ...path.value, action: 'reset' }), ...verificationHeaders },
   }), translate("ui.failedToResetEnvironment"))
 
-  const extend = () =>
-    act(
-      verificationHeaders =>
-        extendRuntimeEndpoint({
-          headers: { ...commandAttempt.headers({ ...path.value, action: 'extend', minutes: extendMinutes.value }), ...verificationHeaders },
-          path: { ...path.value, runtimeInstanceId: runtime.value!.id! },
-          body: {
-            expiresAt: new Date(
-              new Date(runtime.value!.expiresAt!).getTime()
-              + Math.max(60, Math.round(extendMinutes.value * 60)) * 1000,
-            ).toISOString(),
-          },
-        }),
+  const extend = () => {
+    const current = runtime.value
+    const extension = createRuntimeExtensionRequest(
+      current?.expiresAt, Date.now(), extendMinutes.value, 720)
+    if (current?.state !== 'Running' || !current.id || extension === null) return
+    return act(
+      verificationHeaders => extendRuntimeEndpoint({
+        headers: { ...commandAttempt.headers({ ...path.value, action: 'extend', minutes: extension.minutes }), ...verificationHeaders },
+        path: { ...path.value, runtimeInstanceId: current.id! },
+        body: { expiresAt: extension.expiresAt },
+      }),
       translate("ui.renewalFailed"),
     )
+  }
 
   let timer: ReturnType<typeof setInterval> | undefined
-
-  let publicTimer: ReturnType<typeof setInterval> | undefined
-
-  let publicRefreshing = false
 
   onMounted(() => {
     timer = setInterval(() => {
@@ -179,21 +201,8 @@ export function useRuntimeCard(props: Readonly<Omit<{
     }, 1000)
   })
 
-  watch(() => runtime.value?.access?.route === 'Gateway' && runtime.value.state === 'Running', (needsPublicRefresh) => {
-    if (publicTimer) clearInterval(publicTimer)
-    publicTimer = undefined
-    if (!needsPublicRefresh) return
-    publicTimer = setInterval(async () => {
-      if (publicRefreshing || acting.value || polling.value || runtime.value?.access?.route !== 'Gateway' || runtime.value.state !== 'Running') return
-      publicRefreshing = true
-      try { await load() }
-      finally { publicRefreshing = false }
-    }, 5000)
-  })
-
   onUnmounted(() => {
     if (timer) clearInterval(timer)
-    if (publicTimer) clearInterval(publicTimer)
   })
 
   const ttl = computed(() => {
@@ -203,8 +212,17 @@ export function useRuntimeCard(props: Readonly<Omit<{
   })
 
   const isRunning = computed(() => runtime.value?.state === 'Running')
+  const canStop = computed(() => runtime.value && ['Running', 'Queued', 'Provisioning'].includes(runtime.value.state ?? ''))
+  const stopDisabled = computed(() => acting.value || runtime.value?.state === 'Stopping')
 
   const busy = computed(() => acting.value || polling.value)
+  const extendMinutesInvalid = computed(() =>
+    parseRuntimeExtensionMinutes(extendMinutes.value, 720) === null)
+  const canExtend = computed(() => runtime.value?.state === 'Running'
+    && !!runtime.value.id
+    && !busy.value
+    && createRuntimeExtensionRequest(
+      runtime.value.expiresAt, now.value, extendMinutes.value, 720) !== null)
 
   const stateVariant = computed(() => {
     switch (runtime.value?.state) {
@@ -223,12 +241,15 @@ export function useRuntimeCard(props: Readonly<Omit<{
 
   return {
       ...toRefs(props),
-      publicGatewayFailure,
-      publicGatewayState,
+      runnerFailureLabel,
+      canStop,
+      stopDisabled,
       runtime,
       loading,
       loadError,
       extendMinutes,
+      extendMinutesInvalid,
+      canExtend,
       polling,
       timedOut,
       refreshUntilStopped,

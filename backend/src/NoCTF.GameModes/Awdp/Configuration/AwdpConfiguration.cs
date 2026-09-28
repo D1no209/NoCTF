@@ -7,7 +7,6 @@ using NoCTF.GameModes.Scoring;
 namespace NoCTF.GameModes.Awdp.Configuration;
 
 public sealed record AwdpConfiguration(
-    int SchemaVersion,
     int RoundDurationSeconds,
     ScoreCurveConfiguration Break,
     ScoreCurveConfiguration Fix,
@@ -19,12 +18,9 @@ public sealed record AwdpConfiguration(
     int MaxFixSubmissions = 10,
     EvaluationDispatchMode EvaluationDispatchMode = EvaluationDispatchMode.Automatic,
     PerTeamFlagTemplate? FlagTemplate = null)
-{
-    public const int CurrentSchemaVersion = 4;
-}
+;
 
 public sealed record AwdpChallengeConfiguration(
-    int SchemaVersion,
     ScoreCurveConfiguration? Break,
     ScoreCurveConfiguration? Fix,
     bool? RequireBreakBeforeFix,
@@ -45,7 +41,12 @@ public sealed record AwdpChallengeConfiguration(
     bool CheckerFixInput = false,
     bool CheckerAllowRoot = false)
 {
-    public const int CurrentSchemaVersion = 4;
+    public static AwdpChallengeConfiguration Empty { get; } = new(
+        null,
+        null,
+        null,
+        null,
+        null);
 }
 
 public sealed record AwdpEffectiveConfiguration(

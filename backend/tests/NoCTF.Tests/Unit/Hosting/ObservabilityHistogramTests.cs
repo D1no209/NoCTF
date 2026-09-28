@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using NoCTF.Application.Observability;
 using NoCTF.Domain.Gameplay;
@@ -26,7 +27,7 @@ public sealed class ObservabilityHistogramTests
         foreach (var sample in new[] { 0.001, 0.002, 0.004, 0.012, 0.04 })
         {
             NoCtfTelemetry.RecordApiRequest("histogram-test", "success", sample);
-            NoCtfTelemetry.RecordRedisOperation("histogram-test", "success", sample);
+            NoCtfTelemetry.RecordNatsOperation("histogram-test", "success", sample);
         }
         NoCtfTelemetry.RecordSignalRPublish("histogram-test", "success", 0.012);
         NoCtfTelemetry.RecordRunnerClaim("histogram-test", "success", 2, 0.012);
@@ -51,11 +52,24 @@ public sealed class ObservabilityHistogramTests
             GameplayFactState.PlatformFailed,
             null,
             0.8);
+        NoCtfTelemetry.RecordGameplayFactStage(
+            GameplayFactPerformanceStage.ChallengeAttemptStateRead, 0.012);
+        NoCtfTelemetry.RecordGameplayFactStage(
+            GameplayFactPerformanceStage.AdmissionLoad, 0.04);
+        NoCtfTelemetry.RecordRuntimeDispatchStage(
+            RuntimeDispatchPerformanceStage.TargetRead, 0.012);
+        NoCtfTelemetry.RecordWebhookQueueAge(0.012);
+        NoCtfTelemetry.RecordWebhookProjectionWait(0.012);
+        NoCtfTelemetry.RecordWebhookHttpAttempt(0.012, "delivered");
+        using var db = new DbContext(new DbContextOptionsBuilder<DbContext>()
+            .UseNpgsql("Host=localhost;Database=telemetry_test;Username=unused;Password=unused")
+            .Options);
+        _ = db.ChangeTracker.HasChanges();
         app.Services.GetRequiredService<MeterProvider>().ForceFlush();
         using var client = app.GetTestClient();
         var exported = await client.GetStringAsync("/metrics");
 
-        foreach (var prefix in new[] { "api_request", "redis_operation", "signalr_publish", "runner_claim",
+        foreach (var prefix in new[] { "api_request", "nats_operation", "signalr_publish", "runner_claim",
             "leaderboard_projection", "scheduler_rebuild", "scheduler_dispatch" })
         {
             var suffix = prefix == "scheduler_dispatch" ? "lateness" : "duration";
@@ -64,7 +78,7 @@ public sealed class ObservabilityHistogramTests
             await Assert.That(buckets.Keys).Contains(0.05);
             await Assert.That(buckets.Keys).Contains(0.8);
             await Assert.That(buckets.Keys).Contains(300);
-            if (prefix is "api_request" or "redis_operation")
+            if (prefix is "api_request" or "nats_operation")
             {
                 await Assert.That(buckets[0.005]).IsEqualTo(3);
                 await Assert.That(buckets[0.05]).IsEqualTo(5);
@@ -72,6 +86,19 @@ public sealed class ObservabilityHistogramTests
                     .IsBetween(40, 50);
             }
             else await Assert.That(buckets[0.025]).IsEqualTo(1);
+        }
+        foreach (var metric in new[]
+                 {
+                     "noctf_webhook_queue_age_seconds",
+                     "noctf_webhook_projection_wait_seconds",
+                     "noctf_webhook_http_attempt_duration_seconds"
+                 })
+        {
+            var buckets = Buckets(exported, metric, requiredLabelValue: null);
+            await Assert.That(buckets.Keys).Contains(0.05);
+            await Assert.That(buckets.Keys).Contains(0.8);
+            await Assert.That(buckets.Keys).Contains(300);
+            await Assert.That(buckets[0.025]).IsEqualTo(1);
         }
         // Count histograms must not inherit the second-based view.
         await Assert.That(exported.Split('\n').Any(line => line.StartsWith("noctf_leaderboard_projection_teams", StringComparison.Ordinal)
@@ -104,13 +131,25 @@ public sealed class ObservabilityHistogramTests
             StringComparison.Ordinal))).IsTrue();
         await Assert.That(exported).Contains(
             "noctf_gameplay_fact_processing_duration_seconds_bucket");
+        await Assert.That(exported.Split('\n').Any(line =>
+            line.StartsWith("noctf_gameplay_fact_stage_duration_seconds_bucket{", StringComparison.Ordinal)
+            && line.Contains("stage=\"ChallengeAttemptStateRead\"", StringComparison.Ordinal))).IsTrue();
+        await Assert.That(exported.Split('\n').Any(line =>
+            line.StartsWith("noctf_runtime_dispatch_stage_duration_seconds_bucket{", StringComparison.Ordinal)
+            && line.Contains("stage=\"TargetRead\"", StringComparison.Ordinal))).IsTrue();
+        await Assert.That(exported).Contains(
+            "microsoft_entityframeworkcore_active_dbcontexts");
     }
 
-    private static SortedDictionary<double, double> Buckets(string text, string metric)
+    private static SortedDictionary<double, double> Buckets(
+        string text,
+        string metric,
+        string? requiredLabelValue = "histogram-test")
     {
         var result = new SortedDictionary<double, double>();
         foreach (var line in text.Split('\n').Where(line => line.StartsWith(metric + "_bucket{", StringComparison.Ordinal)
-            && line.Contains("histogram-test", StringComparison.Ordinal)))
+            && (requiredLabelValue is null
+                || line.Contains(requiredLabelValue, StringComparison.Ordinal))))
         {
             var boundary = Regex.Match(line, "le=\"([^\"]+)\"").Groups[1].Value;
             var value = double.Parse(line[(line.IndexOf('}') + 1)..].Trim().Split(' ')[0], CultureInfo.InvariantCulture);

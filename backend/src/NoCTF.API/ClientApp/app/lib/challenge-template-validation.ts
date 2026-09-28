@@ -1,21 +1,21 @@
 import type { NoCtfapiEndpointsCompetitionsGameModeProtocol } from '../api'
-import type { RunnerJobModel } from '../utils/game-config'
+import type { DefinitionModel, RunnerJobModel } from '../utils/game-config'
 import {
+  CtfInteraction,
   FlagSource,
   HARD_MAXIMUM_PATCH_UPLOAD_BYTES,
-  parseDefinition,
   RuntimeAllocation,
   UrlExposure,
 } from '../utils/game-config'
 import { translate } from '../utils/i18n'
 
 const environmentNamePattern = /^[A-Za-z_][A-Za-z0-9_]*$/
-const awdpPatchEntrypointPlaceholder = '{entrypoint}'
-const maximumAwdpPatchTimeoutSeconds = 300
-const maximumAwdpPatchCommandArguments = 64
-const maximumAwdpPatchCommandArgumentLength = 4096
-const awdpFixExecutionOverheadSeconds = 120
-const awdpFixHandlerTimeoutSeconds = 2400
+const patchEntrypointPlaceholder = '{entrypoint}'
+const maximumPatchTimeoutSeconds = 300
+const maximumPatchCommandArguments = 64
+const maximumPatchCommandArgumentLength = 4096
+const patchVerificationExecutionOverheadSeconds = 120
+const patchVerificationHandlerTimeoutSeconds = 2400
 
 function addIssue(issues: string[], issue: string): void {
   if (!issues.includes(issue)) issues.push(issue)
@@ -64,11 +64,56 @@ function validateAccessDisplayTemplate(issues: string[], template: string): void
   }
 }
 
+function validatePatchSettings(issues: string[], model: DefinitionModel): void {
+  if (model.patchEntrypoint) {
+    const segments = model.patchEntrypoint.split(/[\\/]/)
+    if (model.patchEntrypoint.length > 256)
+      addIssue(issues, translate("ui.thePatchEntrypointCannotExceed256Characters"))
+    else if (/^[A-Za-z]:[\\/]|^[\\/]/.test(model.patchEntrypoint)
+      || segments.some(segment => segment === '.' || segment === '..'))
+      addIssue(issues, translate("ui.thePatchEntrypointMustBeASafeRelativePath"))
+  }
+  if (model.patchCommand.length > 0) {
+    if (model.patchCommand.length > maximumPatchCommandArguments)
+      addIssue(issues, translate("ui.thePatchCommandCanContainAtMost64Arguments"))
+    if (model.patchCommand.some(argument => !argument.trim()))
+      addIssue(issues, translate("ui.thePatchCommandCannotContainBlankArguments"))
+    if (model.patchCommand.some(argument => argument.length > maximumPatchCommandArgumentLength))
+      addIssue(issues, translate("ui.eachPatchCommandArgumentCanContainAtMost4096Characters"))
+    if (model.patchCommand.filter(argument => argument === patchEntrypointPlaceholder).length !== 1)
+      addIssue(issues, translate("ui.aNonEmptyPatchCommandMustContainExactlyOneStandalone"))
+  }
+  if (model.patchTimeoutSeconds !== null
+    && (model.patchTimeoutSeconds < 1
+      || model.patchTimeoutSeconds > maximumPatchTimeoutSeconds)) {
+    addIssue(issues, translate("ui.patchTimeoutMustBeBetween1And300Seconds"))
+  }
+  if (model.readyTimeoutSeconds !== null && model.readyTimeoutSeconds <= 0)
+    addIssue(issues, translate("ui.readyTimeoutMustBePositive"))
+  if (model.checkerJob) {
+    const checkerTimeout = model.checkerJob.timeoutSeconds ?? 60
+    const readyTimeout = model.readyTimeoutSeconds ?? 30
+    const patchTimeout = model.patchTimeoutSeconds ?? 60
+    if (readyTimeout > checkerTimeout)
+      addIssue(issues, translate("ui.theReadinessTimeoutCannotExceedTheCheckerTimeout"))
+    if (patchTimeout > 0 && checkerTimeout > 0
+      && patchTimeout + checkerTimeout + patchVerificationExecutionOverheadSeconds
+      >= patchVerificationHandlerTimeoutSeconds) {
+      addIssue(issues, translate("ui.theTotalFixExecutionBudgetMustRemainBelowTheDedicated"))
+    }
+  }
+  if (model.maximumPatchUploadBytes !== null
+    && (model.maximumPatchUploadBytes <= 0
+      || model.maximumPatchUploadBytes > HARD_MAXIMUM_PATCH_UPLOAD_BYTES)) {
+    addIssue(issues, translate("ui.theFixArchiveUploadLimitMustBePositiveAndNo"))
+  }
+}
+
 export interface ChallengeTemplateDraft {
   mode: NoCtfapiEndpointsCompetitionsGameModeProtocol
   title: string
   direction: string
-  definitionJson: string
+  definition: DefinitionModel
 }
 
 /** Mirrors the save-time invariants that can be checked without server state. */
@@ -81,15 +126,14 @@ export function validateChallengeTemplateDraft(draft: ChallengeTemplateDraft): s
   if (!direction) addIssue(issues, translate("ui.directionIsRequired"))
   else if (direction.length > 96) addIssue(issues, translate("ui.directionCannotExceed96Characters"))
 
-  const model = parseDefinition(draft.definitionJson, draft.mode)
-  if (!model) {
-    addIssue(issues, translate("ui.theChallengeDefinitionCannotBeParsedResetOrCorrectIt"))
-    return issues
-  }
+  const model = draft.definition
   if (draft.mode === 'Awdp' && model.checkerFixInput && !model.checkerJob)
     addIssue(issues, translate("ui.enableTheCheckerBeforeProvidingItWithTheFixPackage"))
+  const usesPatchChecker = draft.mode === 'Awdp'
+    || draft.mode === 'Ctf'
+      && model.interactionKind === CtfInteraction.PatchVerification
   if (model.checkerAllowRoot
-    && ((draft.mode === 'Awd' && !model.checker) || (draft.mode === 'Awdp' && !model.checkerJob)))
+    && ((draft.mode === 'Awd' && !model.checker) || (usesPatchChecker && !model.checkerJob)))
     addIssue(issues, translate("ui.enableTheCheckerBeforeAllowingItToRunAsRoot"))
   const runtime = model.runtime
   if (!runtime) {
@@ -139,9 +183,14 @@ export function validateChallengeTemplateDraft(draft: ChallengeTemplateDraft): s
         addIssue(issues, translate("ui.theFlagEnvironmentVariableNameCannotUseTheNoctfPrefix"))
     }
   }
-  else {
+  else if (definition.kind === 'compose') {
     if (!definition.composeYaml.trim()) addIssue(issues, translate("ui.dockerComposeContentIsRequired"))
     validateEnvironment(issues, definition.environment, translate("ui.runtimeEnvironment"))
+  }
+  else {
+    if (!definition.sourceUrl.trim()) addIssue(issues, 'OVA URL is required.')
+    if (!/^[a-f0-9]{64}$/i.test(definition.sha256.trim()))
+      addIssue(issues, 'OVA SHA-256 must contain 64 hexadecimal characters.')
   }
 
   for (const binding of runtime.urlBindings) {
@@ -160,8 +209,20 @@ export function validateChallengeTemplateDraft(draft: ChallengeTemplateDraft): s
     case 'Ctf':
       if (runtime.allocation !== RuntimeAllocation.PerTeam)
         addIssue(issues, translate("ui.ctfRuntimesMustUsePerTeamAllocation"))
-      if (runtime.flagSource !== FlagSource.PerTeam)
+      if (model.interactionKind === CtfInteraction.PatchVerification) {
+        if (runtime.flagSource !== FlagSource.Static)
+          addIssue(issues, translate("ui.ctfPatchVerificationRuntimesCannotInjectFlags"))
+        if (definition.kind !== 'container')
+          addIssue(issues, translate("ui.ctfPatchVerificationOnlySupportsSingleContainerRuntimes"))
+        if (internalPorts.length !== 1)
+          addIssue(issues, translate("ui.ctfPatchVerificationRequiresExactlyOneInternalPort"))
+        validateRunnerJob(issues, model.checkerJob, translate('Checker'))
+        validatePatchSettings(issues, model)
+      }
+      else if (runtime.flagSource !== FlagSource.Static
+        && runtime.flagSource !== FlagSource.PerTeam) {
         addIssue(issues, translate("ui.ctfContainerChallengesMustUsePerTeamFlags"))
+      }
       if (runtime.urlBindings.some(binding => binding.exposure !== UrlExposure.OwnerOnly))
         addIssue(issues, translate("ui.ctfAccessUrlsMustBeVisibleOnlyToTheirOwning"))
       break
@@ -210,48 +271,7 @@ export function validateChallengeTemplateDraft(draft: ChallengeTemplateDraft): s
         && runtime.urlBindings.some(binding => binding.containerPort !== internalPorts[0]))
         addIssue(issues, translate("ui.theAwdpAccessUrlPortMustMatchTheInternalPort"))
       validateRunnerJob(issues, model.checkerJob, translate('Checker'))
-      if (model.patchEntrypoint) {
-        const segments = model.patchEntrypoint.split(/[\\/]/)
-        if (model.patchEntrypoint.length > 256)
-          addIssue(issues, translate("ui.thePatchEntrypointCannotExceed256Characters"))
-        else if (/^[A-Za-z]:[\\/]|^[\\/]/.test(model.patchEntrypoint)
-          || segments.some(segment => segment === '.' || segment === '..'))
-          addIssue(issues, translate("ui.thePatchEntrypointMustBeASafeRelativePath"))
-      }
-      if (model.patchCommand.length > 0) {
-        if (model.patchCommand.length > maximumAwdpPatchCommandArguments)
-          addIssue(issues, translate("ui.thePatchCommandCanContainAtMost64Arguments"))
-        if (model.patchCommand.some(argument => !argument.trim()))
-          addIssue(issues, translate("ui.thePatchCommandCannotContainBlankArguments"))
-        if (model.patchCommand.some(argument => argument.length > maximumAwdpPatchCommandArgumentLength))
-          addIssue(issues, translate("ui.eachPatchCommandArgumentCanContainAtMost4096Characters"))
-        if (model.patchCommand.filter(argument => argument === awdpPatchEntrypointPlaceholder).length !== 1)
-          addIssue(issues, translate("ui.aNonEmptyPatchCommandMustContainExactlyOneStandalone"))
-      }
-      if (model.patchTimeoutSeconds !== null
-        && (model.patchTimeoutSeconds < 1
-          || model.patchTimeoutSeconds > maximumAwdpPatchTimeoutSeconds)) {
-        addIssue(issues, translate("ui.patchTimeoutMustBeBetween1And300Seconds"))
-      }
-      if (model.readyTimeoutSeconds !== null && model.readyTimeoutSeconds <= 0)
-        addIssue(issues, translate("ui.readyTimeoutMustBePositive"))
-      if (model.checkerJob) {
-        const checkerTimeout = model.checkerJob.timeoutSeconds ?? 60
-        const readyTimeout = model.readyTimeoutSeconds ?? 30
-        const patchTimeout = model.patchTimeoutSeconds ?? 60
-        if (readyTimeout > checkerTimeout)
-          addIssue(issues, translate("ui.theReadinessTimeoutCannotExceedTheCheckerTimeout"))
-        if (patchTimeout > 0 && checkerTimeout > 0
-          && patchTimeout + checkerTimeout + awdpFixExecutionOverheadSeconds
-          >= awdpFixHandlerTimeoutSeconds) {
-          addIssue(issues, translate("ui.theTotalFixExecutionBudgetMustRemainBelowTheDedicated"))
-        }
-      }
-      if (model.maximumPatchUploadBytes !== null
-        && (model.maximumPatchUploadBytes <= 0
-          || model.maximumPatchUploadBytes > HARD_MAXIMUM_PATCH_UPLOAD_BYTES)) {
-        addIssue(issues, translate("ui.theFixArchiveUploadLimitMustBePositiveAndNo"))
-      }
+      validatePatchSettings(issues, model)
       break
     case 'Koh':
       if (runtime.allocation !== RuntimeAllocation.Shared)

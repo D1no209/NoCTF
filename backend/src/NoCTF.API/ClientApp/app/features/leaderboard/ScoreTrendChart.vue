@@ -9,12 +9,13 @@ const props = withDefaults(
   defineProps<{
     title?: string
     series: TrendSeries[]
+    revision?: string | number | null
     /** 时间轴范围(ISO);没有数据的队伍画一条 0 分平线。 */
     rangeStart?: string | null
     rangeEnd?: string | null
     height?: string
   }>(),
-  { title: '', rangeStart: null, rangeEnd: null, height: '400px' },
+  { title: '', revision: null, rangeStart: null, rangeEnd: null, height: '400px' },
 )
 const state = bindViewState(useScoreTrendChart(props))
 

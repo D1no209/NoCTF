@@ -1,4 +1,5 @@
 using FluentStorage.Storage;
+using NoCTF.Application.Teams.Registration;
 
 namespace NoCTF.Application.Storage;
 
@@ -7,7 +8,8 @@ public enum BusinessFileReferenceState
     Updated,
     Cleared,
     NotFound,
-    Forbidden
+    Forbidden,
+    Conflict
 }
 
 public sealed record BusinessFileReference(
@@ -18,7 +20,8 @@ public sealed record BusinessFileReference(
 
 public sealed record BusinessFileReferenceResult(
     BusinessFileReferenceState State,
-    BusinessFileReference? File = null);
+    BusinessFileReference? File = null,
+    TeamRegistrationFailure? Failure = null);
 
 public interface IBusinessFileReferenceStore
 {

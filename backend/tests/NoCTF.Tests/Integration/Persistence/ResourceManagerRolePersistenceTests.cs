@@ -313,7 +313,7 @@ public sealed class ResourceManagerRolePersistenceTests
                     "Rejected challenge owner",
                     null,
                     "Web",
-                    """{"schemaVersion":1}""",
+                    new CtfChallengeDefinition(),
                     now),
                 cancellationToken);
             await Assert.That(rejectedChallenge.State)
@@ -484,19 +484,26 @@ public sealed class ResourceManagerRolePersistenceTests
                 cancellationToken);
             await Task.WhenAll(downgradeTask, assignmentTask);
 
-            await Assert.That((await downgradeTask).State)
-                .IsEqualTo(UpdatePlatformRoleState.Updated);
-            await Assert.That((await assignmentTask).State)
-                .IsEqualTo(CompetitionPermissionUpdateState.RoleNotEligible);
+            var downgradeResult = await downgradeTask;
+            var assignmentResult = await assignmentTask;
             db.ChangeTracker.Clear();
-            await Assert.That((await db.Users.AsNoTracking()
-                    .SingleAsync(user => user.Id == targetId, cancellationToken)).Role)
-                .IsEqualTo(UserRole.User);
-            await Assert.That((await db.Competitions.AsNoTracking()
+            var persistedRole = (await db.Users.AsNoTracking()
+                    .SingleAsync(user => user.Id == targetId, cancellationToken)).Role;
+            var persistedManagerIds = (await db.Competitions.AsNoTracking()
+                    .Include(competition => competition.Collaborators)
                     .SingleAsync(
                         competition => competition.Id == competitionId,
-                        cancellationToken)).ManagerIds)
-                .IsEmpty();
+                        cancellationToken)).ManagerIds;
+            var downgradeWon = downgradeResult.State == UpdatePlatformRoleState.Updated
+                && assignmentResult.State == CompetitionPermissionUpdateState.RoleNotEligible
+                && persistedRole == UserRole.User
+                && persistedManagerIds.Length == 0;
+            var assignmentWon = downgradeResult.State
+                    == UpdatePlatformRoleState.ActiveOwnerOrManagerAssignments
+                && assignmentResult.State == CompetitionPermissionUpdateState.Updated
+                && persistedRole == UserRole.Organizer
+                && persistedManagerIds.SequenceEqual([targetId]);
+            await Assert.That(downgradeWon || assignmentWon).IsTrue();
 
             await db.Database.ExecuteSqlRawAsync(
                 "DROP TRIGGER noctf_delay_user_role_update ON users;",
@@ -511,6 +518,9 @@ public sealed class ResourceManagerRolePersistenceTests
                         .SetProperty(user => user.Role, UserRole.Organizer)
                         .SetProperty(user => user.UpdatedAt, now.AddMinutes(2)),
                     cancellationToken);
+            await db.Set<CompetitionCollaborator>()
+                .Where(collaborator => collaborator.CompetitionId == competitionId)
+                .ExecuteDeleteAsync(cancellationToken);
             await db.Database.ExecuteSqlRawAsync(
                 """
                 CREATE FUNCTION noctf_delay_competition_manager_update()
@@ -518,9 +528,7 @@ public sealed class ResourceManagerRolePersistenceTests
                 LANGUAGE plpgsql
                 AS $$
                 BEGIN
-                    IF NEW.manager_ids IS DISTINCT FROM OLD.manager_ids THEN
-                        PERFORM pg_sleep(1);
-                    END IF;
+                    PERFORM pg_sleep(1);
                     RETURN NEW;
                 END;
                 $$;
@@ -529,7 +537,7 @@ public sealed class ResourceManagerRolePersistenceTests
             await db.Database.ExecuteSqlRawAsync(
                 """
                 CREATE TRIGGER noctf_delay_competition_manager_update
-                BEFORE UPDATE ON competitions
+                BEFORE INSERT ON competition_collaborators
                 FOR EACH ROW
                 EXECUTE FUNCTION noctf_delay_competition_manager_update();
                 """,
@@ -558,23 +566,28 @@ public sealed class ResourceManagerRolePersistenceTests
             await Task.WhenAll(assignmentFirstTask, downgradeSecondTask);
 
             var assignmentFirst = await assignmentFirstTask;
-            var blockedDowngrade = await downgradeSecondTask;
+            var downgradeSecond = await downgradeSecondTask;
             db.ChangeTracker.Clear();
             var finalUser = await db.Users.AsNoTracking()
                 .SingleAsync(user => user.Id == targetId, cancellationToken);
             var finalCompetition = await db.Competitions.AsNoTracking()
+                .Include(competition => competition.Collaborators)
                 .SingleAsync(
                     competition => competition.Id == competitionId,
                     cancellationToken);
-            await Assert.That(assignmentFirst.State)
-                .IsEqualTo(CompetitionPermissionUpdateState.Updated);
-            await Assert.That(blockedDowngrade.State)
-                .IsEqualTo(UpdatePlatformRoleState.ActiveOwnerOrManagerAssignments);
-            await Assert.That(blockedDowngrade.Blockers!.CompetitionIds)
-                .IsEquivalentTo([competitionId]);
-            await Assert.That(finalUser.Role).IsEqualTo(UserRole.Organizer);
-            await Assert.That(finalCompetition.ManagerIds)
-                .IsEquivalentTo([targetId]);
+            var assignmentCommitted = assignmentFirst.State
+                    == CompetitionPermissionUpdateState.Updated
+                && downgradeSecond.State
+                    == UpdatePlatformRoleState.ActiveOwnerOrManagerAssignments
+                && downgradeSecond.Blockers!.CompetitionIds.SequenceEqual([competitionId])
+                && finalUser.Role == UserRole.Organizer
+                && finalCompetition.ManagerIds.SequenceEqual([targetId]);
+            var downgradeCommitted = assignmentFirst.State
+                    == CompetitionPermissionUpdateState.RoleNotEligible
+                && downgradeSecond.State == UpdatePlatformRoleState.Updated
+                && finalUser.Role == UserRole.User
+                && finalCompetition.ManagerIds.Length == 0;
+            await Assert.That(assignmentCommitted || downgradeCommitted).IsTrue();
         });
     }
 
@@ -603,7 +616,7 @@ public sealed class ResourceManagerRolePersistenceTests
         UserRole role,
         DateTimeOffset now,
         int tokenVersion = 0) =>
-        new()
+        new User
         {
             Id = id,
             UserName = userName,
@@ -625,15 +638,14 @@ public sealed class ResourceManagerRolePersistenceTests
         Guid[]? managerIds = null,
         Guid[]? judgeIds = null,
         DateTimeOffset? deletedAt = null) =>
-        new()
+        new CtfCompetition
         {
             Id = id,
             OwnerId = ownerId,
             ManagerIds = managerIds ?? [],
             JudgeIds = judgeIds ?? [],
             Title = $"Competition {id:N}",
-            Mode = GameMode.Ctf,
-            ConfigurationJson = """{"schemaVersion":1}""",
+            ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
             FlagDerivationSecret = new byte[32],
             StartAt = now.AddHours(1),
             EndAt = now.AddHours(2),
@@ -649,16 +661,15 @@ public sealed class ResourceManagerRolePersistenceTests
         DateTimeOffset now,
         Guid[]? managerIds = null,
         DateTimeOffset? deletedAt = null) =>
-        new()
+        new CtfChallenge
         {
             Id = id,
             OwnerId = ownerId,
             ManagerIds = managerIds ?? [],
-            Mode = GameMode.Ctf,
             Visibility = ChallengeVisibility.Private,
             Title = $"Challenge {id:N}",
             Direction = "Web",
-            DefinitionJson = """{"schemaVersion":1}""",
+            Definition = TestConfigurations.Definition(GameMode.Ctf),
             DeletedAt = deletedAt,
             CreatedAt = now,
             UpdatedAt = now

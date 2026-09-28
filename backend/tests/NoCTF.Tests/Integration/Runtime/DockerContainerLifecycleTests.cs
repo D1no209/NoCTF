@@ -1,6 +1,6 @@
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using System.Security.Cryptography;
 using Docker.DotNet;
 using Docker.DotNet.Models;
 using DotNet.Testcontainers.Builders;
@@ -18,6 +18,203 @@ namespace NoCTF.Tests.Integration.Runtime;
 [NotInParallel]
 public sealed class DockerContainerLifecycleTests
 {
+    [Test]
+    [Timeout(300_000)]
+    public async Task Wsrx_only_runtime_has_no_host_binding_and_gateway_uses_runtime_network(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var imageProbe = new ContainerBuilder("busybox:1.36.1")
+                .WithCommand("true")
+                .Build();
+            await imageProbe.StartAsync(cancellationToken);
+            await using var gateway = new ContainerBuilder("busybox:1.36.1")
+                .WithCommand("sleep", "300")
+                .WithLabel("noctf.io/runtime-proxy-gateway", "true")
+                .Build();
+            await gateway.StartAsync(cancellationToken);
+            using var docker = new DockerClientBuilder()
+                .WithEndpoint(new Uri(DockerEndpoint()))
+                .Build();
+            var operationId = Guid.NewGuid();
+            var network = await docker.Networks.CreateNetworkAsync(
+                new NetworksCreateParameters
+                {
+                    Name = $"noctf-wsrx-it-{operationId:N}",
+                    Labels = new Dictionary<string, string>
+                    {
+                        ["noctf.io/managed"] = "true",
+                        ["noctf.io/runtime-instance-id"] = operationId.ToString("D")
+                    }
+                },
+                cancellationToken);
+            using var lifecycle = new DockerContainerLifecycle(new DockerRuntimeOptions(
+                Endpoint: DockerEndpoint(),
+                ProxyContainerName: gateway.Id));
+            ContainerReceipt? receipt = null;
+            try
+            {
+                var request = new ContainerRequest(
+                    operationId,
+                    RuntimeProvider.Docker,
+                    "busybox:1.36.1",
+                    [
+                        "/bin/sh",
+                        "-c",
+                        "mkdir -p /www && echo wsrx > /www/index.html && exec httpd -f -p 8080 -h /www"
+                    ],
+                    new Dictionary<string, string>(),
+                    new Dictionary<string, string>
+                    {
+                        ["noctf.io/managed"] = "true",
+                        ["noctf.io/job-kind"] = "persistent-runtime",
+                        ["noctf.io/runtime-instance-id"] = operationId.ToString("D")
+                    },
+                    new Dictionary<int, int>(),
+                    new RuntimeResourceLimits(67_108_864, 100_000_000, 64),
+                    new ContainerSecurityPolicy(true, false, false, ["ALL"], []),
+                    TimeSpan.FromMinutes(5),
+                    NetworkName: network.ID,
+                    InternalPorts: [8080],
+                    RuntimeInstanceId: operationId,
+                    AccessMode: RuntimeAccessMode.WsrxOnly);
+                receipt = await lifecycle.CreateAsync(request, cancellationToken);
+
+                await Assert.That(receipt.PortMappings).IsEmpty();
+                await Assert.That(receipt.InternalHost).IsNotNull().And.IsNotEmpty();
+                var target = await docker.Containers.InspectContainerAsync(
+                    receipt.ResourceId,
+                    cancellationToken);
+                await Assert.That(target.HostConfig?.PortBindings?.Values
+                    .SelectMany(bindings => bindings)
+                    .Any()).IsFalse();
+                var attached = await docker.Networks.InspectNetworkAsync(
+                    network.ID,
+                    cancellationToken);
+                await Assert.That(attached.Containers.Keys).Contains(gateway.Id);
+                var probe = await gateway.ExecAsync(
+                    [
+                        "/bin/sh",
+                        "-c",
+                        $"wget -T 5 -q -O- http://{receipt.InternalHost}:8080 | grep -q wsrx"
+                    ],
+                    cancellationToken);
+                await Assert.That(probe.ExitCode).IsEqualTo(0);
+
+                await docker.Networks.DisconnectNetworkAsync(
+                    network.ID,
+                    new NetworkDisconnectParameters
+                    {
+                        Container = gateway.Id,
+                        Force = true
+                    },
+                    cancellationToken);
+                var replay = await lifecycle.EnsureRunningAsync(
+                    request,
+                    cancellationToken);
+                await Assert.That(replay.ResourceId).IsEqualTo(receipt.ResourceId);
+                await Assert.That(replay.InternalHost).IsEqualTo(receipt.InternalHost);
+                attached = await docker.Networks.InspectNetworkAsync(
+                    network.ID,
+                    cancellationToken);
+                await Assert.That(attached.Containers.Keys).Contains(gateway.Id);
+
+                await lifecycle.DestroyAsync(
+                    receipt with { NetworkId = network.ID },
+                    cancellationToken);
+                receipt = null;
+                var detached = await docker.Networks.InspectNetworkAsync(
+                    network.ID,
+                    cancellationToken);
+                await Assert.That(detached.Containers.Keys).DoesNotContain(gateway.Id);
+            }
+            finally
+            {
+                if (receipt is not null)
+                {
+                    await lifecycle.DestroyAsync(
+                        receipt with { NetworkId = network.ID },
+                        CancellationToken.None);
+                }
+                await docker.Networks.DeleteNetworkAsync(network.ID, CancellationToken.None);
+            }
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Container_that_ignores_sigterm_is_force_removed_within_the_cleanup_budget(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var imageProbe = new ContainerBuilder("busybox:1.36.1")
+                .WithCommand("true")
+                .Build();
+            await imageProbe.StartAsync(cancellationToken);
+            using var lifecycle = CreateLifecycle();
+            var operationId = Guid.NewGuid();
+            var networkName = $"noctf-stop-it-{operationId:N}";
+            using var docker = new DockerClientBuilder()
+                .WithEndpoint(new Uri(DockerEndpoint()))
+                .Build();
+            var network = await docker.Networks.CreateNetworkAsync(
+                new NetworksCreateParameters { Name = networkName },
+                cancellationToken);
+            ContainerReceipt? receipt = null;
+            try
+            {
+                receipt = await lifecycle.CreateAsync(new ContainerRequest(
+                    operationId,
+                    RuntimeProvider.Docker,
+                    "busybox:1.36.1",
+                    ["/bin/sh", "-c", "trap '' TERM; while true; do sleep 1; done"],
+                    new Dictionary<string, string>(),
+                    new Dictionary<string, string>
+                    {
+                        ["noctf.io/managed"] = "true",
+                        ["noctf.io/runtime-instance-id"] = operationId.ToString("D")
+                    },
+                    new Dictionary<int, int>(),
+                    new RuntimeResourceLimits(128 * 1024 * 1024, 100_000_000, 64),
+                    new ContainerSecurityPolicy(true, false, false, ["ALL"], []),
+                    TimeSpan.FromMinutes(1),
+                    NetworkName: networkName,
+                    RuntimeInstanceId: operationId), cancellationToken);
+                var started = System.Diagnostics.Stopwatch.GetTimestamp();
+
+                await lifecycle.DestroyAsync(
+                    receipt,
+                    RuntimeTerminationMode.GracefulThenForce,
+                    new RuntimeTerminationPolicy(
+                        TimeSpan.FromSeconds(2),
+                        TimeSpan.FromSeconds(8),
+                        TimeSpan.FromSeconds(5),
+                        TimeSpan.FromSeconds(3)),
+                    cancellationToken);
+
+                await Assert.That(System.Diagnostics.Stopwatch.GetElapsedTime(started))
+                    .IsLessThan(TimeSpan.FromSeconds(8));
+                await Assert.That(await lifecycle.GetAsync(
+                    RuntimeProvider.Docker,
+                    receipt.ResourceId,
+                    cancellationToken)).IsNull();
+                receipt = null;
+            }
+            finally
+            {
+                if (receipt is not null)
+                    await lifecycle.DestroyAsync(
+                        receipt,
+                        RuntimeTerminationMode.Force,
+                        RuntimeTerminationPolicy.Default,
+                        CancellationToken.None);
+                await docker.Networks.DeleteNetworkAsync(network.ID, CancellationToken.None);
+            }
+        });
+    }
+
     [Test]
     [Timeout(300_000)]
     public async Task One_shot_output_is_bounded_per_stream(
@@ -47,7 +244,7 @@ public sealed class DockerContainerLifecycleTests
                 new ContainerSecurityPolicy(true, false, false, ["ALL"], []),
                 TimeSpan.FromMinutes(2),
                 NetworkName: "none",
-                NetworkPurpose: ContainerNetworkPurpose.AwdpVerification), cancellationToken);
+                NetworkPurpose: ContainerNetworkPurpose.AwdpVerification), null, cancellationToken);
 
             await Assert.That(result.ExitCode).IsEqualTo(0);
             await Assert.That(result.StandardOutput).IsEqualTo(new string('A', outputLimit));
@@ -63,7 +260,7 @@ public sealed class DockerContainerLifecycleTests
         await DockerIntegrationTest.RunAsync(async () =>
         {
             var operationId = Guid.NewGuid();
-            const string image = "busybox:1.37.0-glibc";
+            const string image = "docker.m.daocloud.io/library/busybox:1.37.0-glibc";
             await using (var sourceProbe = new ContainerBuilder(image)
                 .WithCommand("true")
                 .Build())
@@ -81,7 +278,9 @@ public sealed class DockerContainerLifecycleTests
                 _ = await docker.Images.InspectImageAsync(image, cancellationToken);
             await Assert.That(inspectMissing).Throws<DockerImageNotFoundException>();
 
-            using var lifecycle = CreateLifecycle();
+            using var lifecycle = CreateLifecycle(Path.Combine(
+                Path.GetTempPath(),
+                $"noctf-empty-docker-config-{operationId:N}"));
             ContainerReceipt? receipt = null;
             try
             {
@@ -401,7 +600,7 @@ public sealed class DockerContainerLifecycleTests
                     new DockerOnlyProviderCatalog(lifecycle),
                     identity,
                     RuntimeProvider.Docker,
-                    JsonSerializer.Serialize(receipt),
+                    ContainerRuntimeReceiptData.From(receipt),
                     cancellationToken);
 
                 var remaining = await lifecycle.GetAsync(
@@ -595,11 +794,11 @@ public sealed class DockerContainerLifecycleTests
                             "http://{HOST}:{PORT}/",
                             RuntimeExposure.OwnerOnly,
                             ContainerPort: 8080)]);
-                    await Assert.That(expanded.Urls.Single())
+                    await Assert.That(expanded.DirectAddresses.Single())
                         .IsEqualTo($"http://127.0.0.1:{receipt.PortMappings[8080]}/");
                     var response = await GetEventuallyAsync(
                         http,
-                        expanded.Urls.Single(),
+                        expanded.DirectAddresses.Single(),
                         cancellationToken);
                     await Assert.That(response.Trim()).IsEqualTo("target");
                 }
@@ -982,7 +1181,10 @@ public sealed class DockerContainerLifecycleTests
         });
     }
 
-    private static DockerContainerLifecycle CreateLifecycle() => new(new DockerRuntimeOptions(DockerEndpoint()));
+    private static DockerContainerLifecycle CreateLifecycle(
+        string? registryConfigDirectory = null) => new(new DockerRuntimeOptions(
+        DockerEndpoint(),
+        RegistryConfigDirectory: registryConfigDirectory));
 
     private static async Task<string> GetEventuallyAsync(
         HttpClient client,

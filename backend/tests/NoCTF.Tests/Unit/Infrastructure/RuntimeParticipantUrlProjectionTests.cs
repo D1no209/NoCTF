@@ -1,5 +1,6 @@
-using System.Text.Json;
 using NoCTF.Application.Runtime.Provisioning;
+using NoCTF.Application.Runtime.Instances;
+using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.GameModes.Ctf.Configuration;
 using NoCTF.GameModes.Registration;
@@ -13,7 +14,11 @@ public sealed class RuntimeParticipantUrlProjectionTests
     public async Task Participant_urls_are_filtered_from_the_latest_definition()
     {
         var catalog = new ChallengeRuntimeTemplateCatalog();
-        var urls = new[] { "tcp://host:30001", "tcp://host:30002" };
+        var endpoints = new[]
+        {
+            new RuntimeAccessEndpointView(0, "tcp://host:30001", null, null),
+            new RuntimeAccessEndpointView(1, "tcp://host:30002", null, null)
+        };
         var original = Definition(
             new("tcp://{HOST}:{PORT}", RuntimeExposure.OwnerOnly, 31337),
             new("tcp://{HOST}:{PORT}", RuntimeExposure.Participants, 31338));
@@ -23,28 +28,37 @@ public sealed class RuntimeParticipantUrlProjectionTests
 
         var before = RuntimeParticipantUrlProjection.Filter(
             catalog,
-            GameMode.Ctf,
             original,
-            urls);
+            endpoints);
         var after = RuntimeParticipantUrlProjection.Filter(
             catalog,
-            GameMode.Ctf,
             updated,
-            urls);
+            endpoints);
 
-        await Assert.That(before).IsEquivalentTo([urls[1]]);
-        await Assert.That(after).IsEquivalentTo([urls[0]]);
+        await Assert.That(before.Select(endpoint => endpoint.DirectAddress).OfType<string>())
+            .IsEquivalentTo(["tcp://host:30002"]);
+        await Assert.That(after.Select(endpoint => endpoint.DirectAddress).OfType<string>())
+            .IsEquivalentTo(["tcp://host:30001"]);
     }
 
-    private static string Definition(params RuntimeUrlBinding[] bindings) =>
-        JsonSerializer.Serialize(
-            new CtfChallengeConfiguration(
-                CtfChallengeConfiguration.CurrentSchemaVersion,
-                null,
-                null,
-                Runtime: new ChallengeRuntimeTemplate(
-                    RuntimeAllocation.PerTeam,
-                    new ContainerRuntimeDefinition("example.invalid/runtime:test"),
-                    UrlBindings: bindings)),
-            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+    private static ChallengeDefinition Definition(params RuntimeUrlBinding[] bindings) =>
+        new CtfChallengeDefinition
+        {
+            Runtime = new ContainerChallengeRuntimeTemplate
+            {
+                Allocation = PersistedRuntimeAllocation.PerTeam,
+                Image = "example.invalid/runtime:test",
+                Capabilities = [new() { Add = false, Name = "ALL" }],
+                UrlBindings = bindings.Select((binding, position) => new ChallengeRuntimeUrlBinding
+                {
+                    Position = position,
+                    UrlTemplate = binding.UrlTemplate,
+                    Exposure = (PersistedRuntimeExposure)binding.Exposure,
+                    ContainerPort = binding.ContainerPort,
+                    ServiceName = binding.ServiceName,
+                    VmId = binding.VmId,
+                    GuestPort = binding.GuestPort
+                }).ToList()
+            }
+        };
 }

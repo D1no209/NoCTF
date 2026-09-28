@@ -1,5 +1,6 @@
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Gameplay;
+using NoCTF.Domain.Challenges;
 
 namespace NoCTF.Application.GameplayFacts.Intake;
 
@@ -8,8 +9,8 @@ public sealed record GameplayFactAdmissionSnapshot(
     Guid TeamId,
     Guid CompetitionChallengeId,
     GameMode Mode,
-    string CompetitionConfigurationJson,
-    string ChallengeConfigurationJson,
+    CompetitionModeConfiguration CompetitionConfiguration,
+    CompetitionChallengeRules ChallengeRules,
     int AcceptedFlagAttempts,
     int AcceptedFixAttempts,
     CompetitionStatus CompetitionStatus,
@@ -27,7 +28,8 @@ public sealed record GameplayFactAdmissionSnapshot(
     bool HasCorrectFlag = false,
     DateTimeOffset? OfficialEndAt = null,
     bool PracticeModeEnabled = false,
-    PracticeRuntimeAdmissionState PracticeRuntimeState = PracticeRuntimeAdmissionState.NotRequired);
+    PracticeRuntimeAdmissionState PracticeRuntimeState = PracticeRuntimeAdmissionState.NotRequired,
+    ChallengeDefinition? ChallengeDefinition = null);
 
 public enum PracticeRuntimeAdmissionState
 {
@@ -48,8 +50,9 @@ public interface IGameplayFactAdmissionModePolicy
 {
     GameplayFactAdmissionRules GetRules(
         GameMode mode,
-        string competitionConfigurationJson,
-        string challengeConfigurationJson);
+        CompetitionModeConfiguration competitionConfiguration,
+        CompetitionChallengeRules challengeRules,
+        ChallengeDefinition? challengeDefinition = null);
 }
 
 public enum GameplayFactAcceptanceState

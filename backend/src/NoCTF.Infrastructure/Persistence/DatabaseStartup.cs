@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Npgsql;
+using System.Data.Common;
 
 namespace NoCTF.Infrastructure.Persistence;
 
@@ -42,7 +42,7 @@ public static class DatabaseStartup
                 logger.LogInformation("Database migrations and administrator bootstrap completed.");
                 return;
             }
-            catch (Exception exception) when (exception is NpgsqlException { IsTransient: true } or TimeoutException)
+            catch (Exception exception) when (exception is DbException { IsTransient: true } or TimeoutException)
             {
                 // No credentials or connection strings are written to the startup log.
                 logger.LogWarning("Database is not ready ({FailureType}); retrying startup initialization.", exception.GetType().Name);

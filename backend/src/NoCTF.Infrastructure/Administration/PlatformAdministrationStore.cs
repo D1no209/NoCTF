@@ -24,8 +24,55 @@ public sealed class PlatformAdministrationStore(
             .Select(user => new PlatformUserView(
                 user.Id, user.UserName, user.Email, user.Kind, user.Role, user.AccountStatus,
                 user.TokenVersion,
-                user.EmailVerifiedAt != null, user.CreatedAt, user.UpdatedAt))
+                user.EmailVerifiedAt != null, user.CreatedAt, user.UpdatedAt,
+                user.ExternalIdentity == null ? null : user.ExternalIdentity.ProviderId,
+                user.ExternalIdentity == null ? null : user.ExternalIdentity.Protocol,
+                user.ExternalIdentity == null ? null : user.ExternalIdentity.Subject,
+                user.ExternalIdentity == null ? null : user.ExternalIdentity.BoundAt))
             .ToListAsync(ct);
+
+    public async Task<PlatformUserListPage> ListUsersPageAsync(
+        PlatformUserListQuery query,
+        CancellationToken ct)
+    {
+        var source = db.Users.AsNoTracking();
+        var keyword = string.IsNullOrWhiteSpace(query.Keyword) ? null : query.Keyword.Trim();
+        if (keyword is not null)
+        {
+            var normalized = keyword.ToUpperInvariant();
+            source = source.Where(user =>
+                user.NormalizedUserName.Contains(normalized)
+                || user.NormalizedEmail.Contains(normalized)
+                || user.ExternalIdentity != null
+                    && user.ExternalIdentity.NormalizedSubject.Contains(normalized));
+        }
+        if (query.Kind is not null)
+            source = source.Where(user => user.Kind == query.Kind);
+        if (query.Role is not null)
+            source = source.Where(user => user.Role == query.Role);
+        if (query.SsoProviderId is not null)
+            source = source.Where(user =>
+                user.ExternalIdentity != null
+                && user.ExternalIdentity.ProviderId == query.SsoProviderId);
+
+        var total = await source.CountAsync(ct);
+        var ordered = query.Desc
+            ? source.OrderByDescending(user => user.CreatedAt).ThenByDescending(user => user.Id)
+            : source.OrderBy(user => user.CreatedAt).ThenBy(user => user.Id);
+        var items = await ordered
+            .Skip(query.Offset)
+            .Take(query.Limit)
+            .Select(user => new PlatformUserView(
+                user.Id, user.UserName, user.Email, user.Kind, user.Role, user.AccountStatus,
+                user.TokenVersion,
+                user.EmailVerifiedAt != null, user.CreatedAt, user.UpdatedAt,
+                user.ExternalIdentity == null ? null : user.ExternalIdentity.ProviderId,
+                user.ExternalIdentity == null ? null : user.ExternalIdentity.Protocol,
+                user.ExternalIdentity == null ? null : user.ExternalIdentity.Subject,
+                user.ExternalIdentity == null ? null : user.ExternalIdentity.BoundAt))
+            .ToListAsync(ct);
+        return new(items, total);
+    }
 
     public Task<PlatformUserView?> FindUserAsync(Guid userId, CancellationToken ct) =>
         db.Users.AsNoTracking()
@@ -33,7 +80,11 @@ public sealed class PlatformAdministrationStore(
             .Select(user => new PlatformUserView(
                 user.Id, user.UserName, user.Email, user.Kind, user.Role, user.AccountStatus,
                 user.TokenVersion,
-                user.EmailVerifiedAt != null, user.CreatedAt, user.UpdatedAt))
+                user.EmailVerifiedAt != null, user.CreatedAt, user.UpdatedAt,
+                user.ExternalIdentity == null ? null : user.ExternalIdentity.ProviderId,
+                user.ExternalIdentity == null ? null : user.ExternalIdentity.Protocol,
+                user.ExternalIdentity == null ? null : user.ExternalIdentity.Subject,
+                user.ExternalIdentity == null ? null : user.ExternalIdentity.BoundAt))
             .SingleOrDefaultAsync(ct);
 
     public async Task<CreateBotResult> CreateBotAsync(
@@ -81,16 +132,37 @@ public sealed class PlatformAdministrationStore(
         DateTimeOffset now,
         CancellationToken ct)
     {
-        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                return await UpdateRoleOnceAsync(userId, role, now, ct);
+            }
+            catch (Exception exception) when (attempt < 2
+                && RelationalRetry.IsTransientConcurrency(exception))
+            {
+                db.ChangeTracker.Clear();
+                await Task.Delay(TimeSpan.FromMilliseconds(Random.Shared.Next(5, 31)), ct);
+            }
+        }
+    }
+
+    private async Task<UpdatePlatformRoleResult> UpdateRoleOnceAsync(
+        Guid userId,
+        UserRole role,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(
+            db, System.Data.IsolationLevel.Serializable, ct);
         await ActiveHumanAdministratorMutationGuard.AcquireAsync(db, ct);
         await ResourceManagerRoleGuard.AcquireAsync(db, [userId], ct);
         var user = await db.Users.SingleOrDefaultAsync(item => item.Id == userId, ct);
         if (user is null)
             return new(UpdatePlatformRoleState.UserNotFound);
-        if (user.Kind == UserKind.Bot && role == UserRole.Administrator)
-            return new(UpdatePlatformRoleState.InvalidBotRole);
-        if (ActiveHumanAdministratorMutationGuard.Contains(user)
-            && role != UserRole.Administrator
+        var removesActiveAdministrator = ActiveHumanAdministratorMutationGuard.Contains(user)
+            && role != UserRole.Administrator;
+        if (removesActiveAdministrator
             && await ActiveHumanAdministratorMutationGuard.CountAsync(db, ct) <= 1)
         {
             return new(UpdatePlatformRoleState.LastAdministratorProtected);
@@ -100,14 +172,14 @@ public sealed class PlatformAdministrationStore(
             var competitionIds = await db.Competitions.AsNoTracking()
                 .Where(competition =>
                     competition.OwnerId == userId ||
-                    competition.ManagerIds.Contains(userId))
+                    competition.Collaborators.Any(collaborator => collaborator.Role == NoCTF.Domain.Competitions.CompetitionCollaboratorRole.Manager && collaborator.UserId == userId))
                 .OrderBy(competition => competition.Id)
                 .Select(competition => competition.Id)
                 .ToArrayAsync(ct);
             var challengeIds = await db.Challenges.AsNoTracking()
                 .Where(challenge =>
                     challenge.OwnerId == userId ||
-                    challenge.ManagerIds.Contains(userId))
+                    challenge.Managers.Any(manager => manager.UserId == userId))
                 .OrderBy(challenge => challenge.Id)
                 .Select(challenge => challenge.Id)
                 .ToArrayAsync(ct);
@@ -219,12 +291,6 @@ public sealed class PlatformAdministrationStore(
             db.ChangeTracker.Clear();
             return new(PatchPlatformUserState.AnonymizedAccountImmutable);
         }
-        if (user.Kind == UserKind.Bot && user.Role == UserRole.Administrator)
-        {
-            db.ChangeTracker.Clear();
-            return new(PatchPlatformUserState.InvalidBotRole);
-        }
-
         var removesActiveAdministrator = user.Kind == UserKind.Human
             && originalRole == UserRole.Administrator
             && originalStatus == UserAccountStatus.Active
@@ -241,13 +307,13 @@ public sealed class PlatformAdministrationStore(
         {
             var competitionIds = await db.Competitions.AsNoTracking()
                 .Where(competition => competition.OwnerId == userId
-                    || competition.ManagerIds.Contains(userId))
+                    || competition.Collaborators.Any(collaborator => collaborator.Role == NoCTF.Domain.Competitions.CompetitionCollaboratorRole.Manager && collaborator.UserId == userId))
                 .OrderBy(competition => competition.Id)
                 .Select(competition => competition.Id)
                 .ToArrayAsync(ct);
             var challengeIds = await db.Challenges.AsNoTracking()
                 .Where(challenge => challenge.OwnerId == userId
-                    || challenge.ManagerIds.Contains(userId))
+                    || challenge.Managers.Any(manager => manager.UserId == userId))
                 .OrderBy(challenge => challenge.Id)
                 .Select(challenge => challenge.Id)
                 .ToArrayAsync(ct);
@@ -284,144 +350,6 @@ public sealed class PlatformAdministrationStore(
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         return new(PatchPlatformUserState.Updated, Map(user));
-    }
-
-    public async Task RecordTokenIssuedAsync(
-        Guid actorUserId,
-        PlatformUserTokenAuditFact fact,
-        DateTimeOffset now,
-        CancellationToken ct)
-    {
-        RecordTokenAudit(
-            actorUserId,
-            fact,
-            fact.JwtId ?? Guid.CreateVersion7(now),
-            EntityReferenceKind.User,
-            fact.TargetUserId,
-            now);
-        await db.SaveChangesAsync(ct);
-    }
-
-    public async Task<IReadOnlyList<AdminIssuedAccessTokenView>> ListIssuedTokensAsync(
-        Guid actorUserId,
-        Guid targetUserId,
-        DateTimeOffset now,
-        CancellationToken ct)
-    {
-        var target = await db.Users.AsNoTracking()
-            .Where(user => user.Id == targetUserId)
-            .Select(user => new { user.AccountStatus, user.TokenVersion })
-            .SingleOrDefaultAsync(ct);
-        if (target is null || target.AccountStatus != UserAccountStatus.Active)
-            return [];
-
-        var earliestIssuedAt = now.AddSeconds(-ManagePlatform.MaximumIssuedTokenLifetimeSeconds);
-        var issuanceRecords = await db.Notifications.AsNoTracking()
-            .Where(notification =>
-                notification.Kind == NotificationKind.PlatformUserAccessTokenIssued
-                && notification.SourceType == NotificationSourceType.User
-                && notification.SourceId == actorUserId
-                && notification.RelatedType == EntityReferenceKind.User
-                && notification.RelatedId == targetUserId
-                && notification.SentAt >= earliestIssuedAt)
-            .OrderByDescending(notification => notification.SentAt)
-            .ThenByDescending(notification => notification.Id)
-            .ToArrayAsync(ct);
-        var issuances = issuanceRecords
-            .Select(notification => new
-            {
-                Notification = notification,
-                Fact = DeserializeTokenAudit(notification)
-            })
-            .Where(item =>
-                item.Fact.Action == PlatformUserTokenAdministrationAction.AccessTokenIssued
-                && item.Fact.JwtId == item.Notification.Id
-                && item.Fact.ExpiresAt > now
-                && item.Fact.TokenVersion == target.TokenVersion)
-            .ToArray();
-        if (issuances.Length == 0)
-            return [];
-
-        var jwtIds = issuances.Select(item => item.Notification.Id).ToArray();
-        var revokedIds = (await db.Notifications.AsNoTracking()
-                .Where(notification =>
-                    notification.Kind == NotificationKind.PlatformUserAccessTokenRevoked
-                    && notification.RelatedType == EntityReferenceKind.Notification
-                    && notification.RelatedId != null
-                    && jwtIds.Contains(notification.RelatedId.Value))
-                .Select(notification => notification.RelatedId!.Value)
-                .ToArrayAsync(ct))
-            .ToHashSet();
-        return issuances
-            .Where(item => !revokedIds.Contains(item.Notification.Id))
-            .Select(item => new AdminIssuedAccessTokenView(
-                item.Notification.Id,
-                item.Fact.TargetUserId,
-                item.Fact.TargetUserName,
-                item.Notification.SentAt,
-                item.Fact.ExpiresAt!.Value,
-                item.Fact.Reason!))
-            .ToArray();
-    }
-
-    public async Task<RevokeAdminIssuedAccessTokenState> RevokeIssuedTokenAsync(
-        Guid actorUserId,
-        Guid targetUserId,
-        Guid jwtId,
-        DateTimeOffset now,
-        CancellationToken ct)
-    {
-        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
-        var issuance = await PlatformUserTokenCriticalSection.AcquireIssuanceAsync(
-            db,
-            jwtId,
-            ct);
-        if (issuance is null
-            || issuance.Kind != NotificationKind.PlatformUserAccessTokenIssued
-            || issuance.SourceType != NotificationSourceType.User
-            || issuance.SourceId != actorUserId
-            || issuance.RelatedType != EntityReferenceKind.User
-            || issuance.RelatedId != targetUserId)
-            return RevokeAdminIssuedAccessTokenState.NotFound;
-        var fact = DeserializeTokenAudit(issuance);
-        var target = await db.Users.AsNoTracking().SingleOrDefaultAsync(
-            user => user.Id == targetUserId,
-            ct);
-        if (fact.Action != PlatformUserTokenAdministrationAction.AccessTokenIssued
-            || fact.JwtId != jwtId
-            || fact.ExpiresAt <= now
-            || target is null
-            || target.AccountStatus != UserAccountStatus.Active
-            || target.TokenVersion != fact.TokenVersion)
-        {
-            return RevokeAdminIssuedAccessTokenState.NotFound;
-        }
-
-        var alreadyRevoked = await db.Notifications.AsNoTracking().AnyAsync(notification =>
-            notification.Kind == NotificationKind.PlatformUserAccessTokenRevoked
-            && notification.RelatedType == EntityReferenceKind.Notification
-            && notification.RelatedId == jwtId,
-            ct);
-        if (alreadyRevoked)
-        {
-            await transaction.CommitAsync(ct);
-            return RevokeAdminIssuedAccessTokenState.Revoked;
-        }
-
-        RecordTokenAudit(
-            actorUserId,
-            fact with
-            {
-                Action = PlatformUserTokenAdministrationAction.AccessTokenRevoked,
-                Reason = null
-            },
-            Guid.CreateVersion7(now),
-            EntityReferenceKind.Notification,
-            jwtId,
-            now);
-        await db.SaveChangesAsync(ct);
-        await transaction.CommitAsync(ct);
-        return RevokeAdminIssuedAccessTokenState.Revoked;
     }
 
     public async Task<PlatformUserView?> InvalidateTokensAsync(
@@ -461,7 +389,11 @@ public sealed class PlatformAdministrationStore(
         new(
             user.Id, user.UserName, user.Email, user.Kind, user.Role, user.AccountStatus,
             user.TokenVersion,
-            user.EmailVerifiedAt != null, user.CreatedAt, user.UpdatedAt);
+            user.EmailVerifiedAt != null, user.CreatedAt, user.UpdatedAt,
+            user.ExternalIdentityProviderId,
+            user.ExternalIdentityProtocol,
+            user.ExternalIdentitySubject,
+            user.ExternalIdentityBoundAt);
 
     private void RecordAccountStatusChange(
         User user,
@@ -477,28 +409,25 @@ public sealed class PlatformAdministrationStore(
             _ => throw new InvalidOperationException(
                 $"Account status {accountStatus} cannot be assigned by an administrator.")
         };
-        db.Notifications.Add(new Notification
+        db.Notifications.Add(new UserAccountLifecycleChangedNotification
         {
             Id = Guid.CreateVersion7(occurredAt),
             SourceType = NotificationSourceType.User,
             SourceId = actorUserId,
             TargetType = NotificationTargetType.PlatformAdministrators,
             TargetId = Notification.PlatformAdministratorsTargetId,
-            Kind = NotificationKind.UserAccountLifecycleChanged,
-            ContentJson = JsonSerializer.Serialize(new UserAccountLifecycleFact(
-                1,
-                user.Id,
-                user.UserName,
-                action,
-                accountStatus switch
-                {
-                    UserAccountStatus.Active => "manual_activate",
-                    UserAccountStatus.Banned => "manual_ban",
-                    UserAccountStatus.Disabled => "manual_disable",
-                    _ => throw new InvalidOperationException(
-                        $"Unsupported account status {accountStatus}.")
-                },
-                false), JsonOptions),
+            UserId = user.Id,
+            UserName = user.UserName,
+            UserLifecycleAction = action,
+            Reason = accountStatus switch
+            {
+                UserAccountStatus.Active => "manual_activate",
+                UserAccountStatus.Banned => "manual_ban",
+                UserAccountStatus.Disabled => "manual_disable",
+                _ => throw new InvalidOperationException(
+                    $"Unsupported account status {accountStatus}.")
+            },
+            Automatic = false,
             RelatedType = EntityReferenceKind.User,
             RelatedId = user.Id,
             SentAt = occurredAt
@@ -511,23 +440,20 @@ public sealed class PlatformAdministrationStore(
         bool emailVerified,
         DateTimeOffset occurredAt)
     {
-        db.Notifications.Add(new Notification
+        db.Notifications.Add(new UserAccountLifecycleChangedNotification
         {
             Id = Guid.CreateVersion7(occurredAt),
             SourceType = NotificationSourceType.User,
             SourceId = actorUserId,
             TargetType = NotificationTargetType.PlatformAdministrators,
             TargetId = Notification.PlatformAdministratorsTargetId,
-            Kind = NotificationKind.UserAccountLifecycleChanged,
-            ContentJson = JsonSerializer.Serialize(new UserAccountLifecycleFact(
-                1,
-                user.Id,
-                user.UserName,
-                emailVerified
-                    ? UserAccountLifecycleAction.EmailVerified
-                    : UserAccountLifecycleAction.EmailUnverified,
-                emailVerified ? "manual_verify_email" : "manual_unverify_email",
-                false), JsonOptions),
+            UserId = user.Id,
+            UserName = user.UserName,
+            UserLifecycleAction = emailVerified
+                ? UserAccountLifecycleAction.EmailVerified
+                : UserAccountLifecycleAction.EmailUnverified,
+            Reason = emailVerified ? "manual_verify_email" : "manual_unverify_email",
+            Automatic = false,
             RelatedType = EntityReferenceKind.User,
             RelatedId = user.Id,
             SentAt = occurredAt
@@ -542,36 +468,33 @@ public sealed class PlatformAdministrationStore(
         Guid relatedId,
         DateTimeOffset occurredAt)
     {
-        db.Notifications.Add(new Notification
+        var notification = NotificationGeneratedCatalog.Create(fact.Action switch
         {
-            Id = notificationId,
-            SourceType = NotificationSourceType.User,
-            SourceId = actorUserId,
-            TargetType = NotificationTargetType.PlatformAdministrators,
-            TargetId = Notification.PlatformAdministratorsTargetId,
-            Kind = fact.Action switch
-            {
-                PlatformUserTokenAdministrationAction.AccessTokenIssued =>
-                    NotificationKind.PlatformUserAccessTokenIssued,
-                PlatformUserTokenAdministrationAction.AccessTokenRevoked =>
-                    NotificationKind.PlatformUserAccessTokenRevoked,
-                PlatformUserTokenAdministrationAction.TokensInvalidated =>
-                    NotificationKind.PlatformUserTokensInvalidated,
-                _ => throw new InvalidOperationException(
-                    $"Unsupported platform token action {fact.Action}.")
-            },
-            ContentJson = JsonSerializer.Serialize(fact, JsonOptions),
-            RelatedType = relatedType,
-            RelatedId = relatedId,
-            SentAt = occurredAt
+            PlatformUserTokenAdministrationAction.AccessTokenIssued =>
+                NotificationKind.PlatformUserAccessTokenIssued,
+            PlatformUserTokenAdministrationAction.AccessTokenRevoked =>
+                NotificationKind.PlatformUserAccessTokenRevoked,
+            PlatformUserTokenAdministrationAction.TokensInvalidated =>
+                NotificationKind.PlatformUserTokensInvalidated,
+            _ => throw new InvalidOperationException(
+                $"Unsupported platform token action {fact.Action}.")
         });
+        notification.Id = notificationId;
+        notification.SourceType = NotificationSourceType.User;
+        notification.SourceId = actorUserId;
+        notification.TargetType = NotificationTargetType.PlatformAdministrators;
+        notification.TargetId = Notification.PlatformAdministratorsTargetId;
+        notification.UserId = fact.TargetUserId;
+        notification.UserName = fact.TargetUserName;
+        notification.ActionValue = (int)fact.Action;
+        notification.JwtId = fact.JwtId;
+        notification.PayloadExpiresAt = fact.ExpiresAt;
+        notification.Reason = fact.Reason;
+        notification.Count = fact.TokenVersion;
+        notification.RelatedType = relatedType;
+        notification.RelatedId = relatedId;
+        notification.SentAt = occurredAt;
+        db.Notifications.Add(notification);
     }
-
-    private static PlatformUserTokenAuditFact DeserializeTokenAudit(
-        Notification notification) =>
-        JsonSerializer.Deserialize<PlatformUserTokenAuditFact>(
-            notification.ContentJson,
-            JsonOptions) ?? throw new InvalidOperationException(
-            $"Notification {notification.Id} has no platform token audit payload.");
 
 }

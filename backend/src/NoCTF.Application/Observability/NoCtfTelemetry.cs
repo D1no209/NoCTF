@@ -5,6 +5,54 @@ using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.Application.Observability;
 
+public enum GameplayFactPerformanceStage
+{
+    ChallengeAttemptStateRead,
+    AdmissionLoad,
+    AdmissionRecheck,
+    PersistenceCommit,
+    MessagePublish,
+    DispatchAge,
+    WorkerEvaluation,
+    WorkerCompletion
+}
+
+public enum RuntimeDispatchPerformanceStage
+{
+    TargetRead,
+    DefinitionPreparation,
+    CapacityClaim,
+    Persistence,
+    TransactionCommit,
+    PostCommitPublish
+}
+
+public enum RunnerCapacityTransactionOperation
+{
+    Claim,
+    Release
+}
+
+public enum RuntimeOperationMetricKind
+{
+    Flag,
+    FixRequest,
+    FixUpload,
+    PlayerCreate,
+    PlayerExtend,
+    PlayerStop,
+    SharedCreate,
+    SharedStop,
+    TeamCreate,
+    TeamExtend,
+    TeamStop,
+    TestCreate,
+    TestExtend,
+    TestStop,
+    Terminate,
+    ForceTerminate
+}
+
 public static class NoCtfTelemetry
 {
     public const string MeterName = "NoCTF";
@@ -27,16 +75,36 @@ public static class NoCtfTelemetry
         "noctf.signalr.publish.duration", unit: "s");
     private static readonly Counter<long> SignalRPublishes = Meter.CreateCounter<long>(
         "noctf.signalr.publishes", unit: "{message}");
-    private static readonly Histogram<double> RedisOperationDuration = Meter.CreateHistogram<double>(
-        "noctf.redis.operation.duration", unit: "s");
-    private static readonly Counter<long> RedisFailures = Meter.CreateCounter<long>(
-        "noctf.redis.failures", unit: "{operation}");
+    private static readonly Histogram<double> NatsOperationDuration = Meter.CreateHistogram<double>(
+        "noctf.nats.operation.duration", unit: "s");
+    private static readonly Counter<long> NatsFailures = Meter.CreateCounter<long>(
+        "noctf.nats.failures", unit: "{operation}");
+    private static readonly Counter<long> PlatformLogLiveDrops = Meter.CreateCounter<long>(
+        "noctf.platform_log.live_drops", unit: "{log}");
     private static readonly Histogram<double> RunnerClaimDuration = Meter.CreateHistogram<double>(
         "noctf.runner.claim.duration", unit: "s");
     private static readonly Counter<long> RunnerClaimAttempts = Meter.CreateCounter<long>(
         "noctf.runner.claim.attempts", unit: "{attempt}");
+    private static readonly Counter<long> RunnerCapacityTransactionRetries =
+        Meter.CreateCounter<long>(
+            "noctf.runner.capacity.transaction_retries", unit: "{retry}");
+    private static readonly Counter<long> RunnerCapacityTransactionExhaustions =
+        Meter.CreateCounter<long>(
+            "noctf.runner.capacity.transaction_exhaustions", unit: "{exhaustion}");
     private static readonly Counter<long> RuntimeOperations = Meter.CreateCounter<long>(
         "noctf.runtime.operations", unit: "{operation}");
+    private static readonly Counter<long> RuntimeMutationFailures = Meter.CreateCounter<long>(
+        "noctf.runtime.mutation.failures", unit: "{failure}");
+    private static readonly Histogram<double> RuntimeStopDuration = Meter.CreateHistogram<double>(
+        "noctf.runtime.stop.duration", unit: "s");
+    private static readonly Histogram<double> RuntimeDispatchStageDuration = Meter.CreateHistogram<double>(
+        "noctf.runtime.dispatch.stage.duration", unit: "s");
+    private static readonly Histogram<double> RuntimeStopQueueDelay = Meter.CreateHistogram<double>(
+        "noctf.runtime.stop.queue_delay", unit: "s");
+    private static readonly Counter<long> RuntimeStopForces = Meter.CreateCounter<long>(
+        "noctf.runtime.stop.force_total", unit: "{operation}");
+    private static readonly Counter<long> RuntimeStopResourcesRemaining = Meter.CreateCounter<long>(
+        "noctf.runtime.stop.resources_remaining_total", unit: "{operation}");
     private static readonly Counter<long> GameplayFactSubmissions = Meter.CreateCounter<long>(
         "noctf.gameplay_fact.submissions", unit: "{submission}");
     private static readonly Counter<long> GameplayFactProcessing = Meter.CreateCounter<long>(
@@ -45,6 +113,8 @@ public static class NoCtfTelemetry
         Meter.CreateHistogram<double>(
             "noctf.gameplay_fact.processing.duration",
             unit: "s");
+    private static readonly Histogram<double> GameplayFactStageDuration =
+        Meter.CreateHistogram<double>("noctf.gameplay_fact.stage.duration", unit: "s");
     private static readonly Histogram<double> LeaderboardProjectionDuration = Meter.CreateHistogram<double>(
         "noctf.leaderboard.projection.duration", unit: "s");
     private static readonly Histogram<long> LeaderboardProjectionFacts = Meter.CreateHistogram<long>(
@@ -61,6 +131,8 @@ public static class NoCtfTelemetry
         "noctf.leaderboard.merge.dispatches", unit: "{projection}");
     private static readonly Counter<long> LeaderboardCacheMissRebuilds = Meter.CreateCounter<long>(
         "noctf.leaderboard.cache_miss.rebuilds", unit: "{rebuild}");
+    private static readonly Counter<long> FusionCacheReads = Meter.CreateCounter<long>(
+        "noctf.fusion_cache.reads", unit: "{read}");
     private static readonly Counter<long> SchedulerTakeovers = Meter.CreateCounter<long>(
         "noctf.scheduler.takeovers", unit: "{takeover}");
     private static readonly Histogram<double> SchedulerRebuildDuration = Meter.CreateHistogram<double>(
@@ -77,21 +149,29 @@ public static class NoCtfTelemetry
         "noctf.account_notification.issuances", unit: "{issuance}");
     private static readonly Counter<long> AccountNotificationDeliveries = Meter.CreateCounter<long>(
         "noctf.account_notification.deliveries", unit: "{delivery}");
-    private static long _waitingRuntimeCount;
-    private static long _oldestWaitingRuntimeAgeSeconds;
+    private static readonly Histogram<double> WebhookQueueAge = Meter.CreateHistogram<double>(
+        "noctf.webhook.queue.age", unit: "s");
+    private static readonly Histogram<double> WebhookProjectionWait = Meter.CreateHistogram<double>(
+        "noctf.webhook.projection.wait", unit: "s");
+    private static readonly Histogram<double> WebhookHttpAttemptDuration = Meter.CreateHistogram<double>(
+        "noctf.webhook.http.attempt.duration", unit: "s");
+    private static readonly Counter<long> WebhookRetries = Meter.CreateCounter<long>(
+        "noctf.webhook.retries", unit: "{retry}");
+    private static readonly Counter<long> WebhookDeadLetters = Meter.CreateCounter<long>(
+        "noctf.webhook.dead_letters", unit: "{delivery}");
+    private static readonly Counter<long> WebhookMaterializationRaces =
+        Meter.CreateCounter<long>(
+            "noctf.webhook.materialization_races", unit: "{race}");
     private static readonly ConcurrentDictionary<string, RunnerCapacitySnapshot> RunnerCapacitySnapshots =
         new(StringComparer.Ordinal);
+    private static long runtimeWaitingCount;
+    private static long runtimeWaitingOldestAgeSeconds;
+    private static long webhookPendingCount;
+    private static long webhookOldestPendingAgeSeconds;
+    private static long webhookConsumerLag;
 
     static NoCtfTelemetry()
     {
-        Meter.CreateObservableGauge(
-            "noctf.runtime.waiting",
-            () => Interlocked.Read(ref _waitingRuntimeCount),
-            unit: "{runtime}");
-        Meter.CreateObservableGauge(
-            "noctf.runtime.waiting.oldest_age",
-            () => Interlocked.Read(ref _oldestWaitingRuntimeAgeSeconds),
-            unit: "s");
         Meter.CreateObservableGauge(
             "noctf.runner.online",
             ObserveRunnerOnline,
@@ -102,7 +182,50 @@ public static class NoCtfTelemetry
         Meter.CreateObservableGauge(
             "noctf.runner.capacity.total",
             ObserveRunnerCapacityTotal);
+        Meter.CreateObservableGauge("noctf.runtime.waiting",
+            () => Volatile.Read(ref runtimeWaitingCount), unit: "{runtime}");
+        Meter.CreateObservableGauge("noctf.runtime.waiting.oldest_age",
+            () => Volatile.Read(ref runtimeWaitingOldestAgeSeconds), unit: "s");
+        Meter.CreateObservableGauge("noctf.webhook.pending",
+            () => Volatile.Read(ref webhookPendingCount), unit: "{delivery}");
+        Meter.CreateObservableGauge("noctf.webhook.oldest_pending.age",
+            () => Volatile.Read(ref webhookOldestPendingAgeSeconds), unit: "s");
+        Meter.CreateObservableGauge("noctf.webhook.consumer.lag",
+            () => Volatile.Read(ref webhookConsumerLag), unit: "{event}");
     }
+
+    public static void SetRuntimeWaitingSnapshot(long count, long oldestAgeSeconds)
+    {
+        Volatile.Write(ref runtimeWaitingCount, Math.Max(0, count));
+        Volatile.Write(ref runtimeWaitingOldestAgeSeconds, Math.Max(0, oldestAgeSeconds));
+    }
+
+    public static void SetWebhookPendingSnapshot(
+        long count, long oldestAgeSeconds, long consumerLag)
+    {
+        Volatile.Write(ref webhookPendingCount, Math.Max(0, count));
+        Volatile.Write(ref webhookOldestPendingAgeSeconds, Math.Max(0, oldestAgeSeconds));
+        Volatile.Write(ref webhookConsumerLag, Math.Max(0, consumerLag));
+    }
+
+    public static void RecordWebhookQueueAge(double seconds) =>
+        WebhookQueueAge.Record(Math.Max(0, seconds));
+
+    public static void RecordWebhookProjectionWait(double seconds) =>
+        WebhookProjectionWait.Record(Math.Max(0, seconds));
+
+    public static void RecordWebhookHttpAttempt(double seconds, string outcome) =>
+        WebhookHttpAttemptDuration.Record(Math.Max(0, seconds),
+            new TagList { { "outcome", outcome } });
+
+    public static void RecordWebhookRetry(string stage) =>
+        WebhookRetries.Add(1, new TagList { { "stage", stage } });
+
+    public static void RecordWebhookDeadLetter(string reason) =>
+        WebhookDeadLetters.Add(1, new TagList { { "reason", reason } });
+
+    public static void RecordWebhookMaterializationRace() =>
+        WebhookMaterializationRaces.Add(1);
 
     public static void RecordApiRequest(string endpoint, string outcome, double elapsedSeconds, ApiRequestKind kind = ApiRequestKind.Rest)
     {
@@ -135,14 +258,6 @@ public static class NoCtfTelemetry
         SignalRPublishDuration.Record(elapsedSeconds, tags);
     }
 
-    public static void RecordRedisOperation(string endpoint, string outcome, double elapsedSeconds)
-    {
-        var tags = new TagList { { "endpoint", endpoint }, { "outcome", outcome } };
-        RedisOperationDuration.Record(elapsedSeconds, tags);
-        if (!string.Equals(outcome, "success", StringComparison.Ordinal))
-            RedisFailures.Add(1, tags);
-    }
-
     public static void RecordRunnerClaim(string pool, string outcome, int attempts, double elapsedSeconds)
     {
         var tags = new TagList { { "pool", pool }, { "outcome", outcome } };
@@ -150,8 +265,72 @@ public static class NoCtfTelemetry
         RunnerClaimDuration.Record(elapsedSeconds, tags);
     }
 
-    public static void RecordRuntimeOperation(string endpoint, string outcome) =>
-        RuntimeOperations.Add(1, new TagList { { "endpoint", endpoint }, { "outcome", outcome } });
+    public static void RecordRunnerCapacityTransactionRetry(
+        RunnerCapacityTransactionOperation operation) =>
+        RunnerCapacityTransactionRetries.Add(1,
+            new TagList { { "operation", MetricName(operation) } });
+
+    public static void RecordRunnerCapacityTransactionExhaustion(
+        RunnerCapacityTransactionOperation operation) =>
+        RunnerCapacityTransactionExhaustions.Add(1,
+            new TagList { { "operation", MetricName(operation) } });
+
+    public static void RecordRuntimeOperation(
+        RuntimeOperationMetricKind operation,
+        string outcome) =>
+        RuntimeOperations.Add(1, new TagList
+        {
+            { "operation", MetricName(operation) },
+            { "outcome", outcome }
+        });
+
+    public static void RecordRuntimeMutationFailure<TFailure>(
+        RuntimeOperationMetricKind operation,
+        TFailure failure)
+        where TFailure : struct, Enum =>
+        RuntimeMutationFailures.Add(1, new TagList
+        {
+            { "operation", MetricName(operation) },
+            { "failure", MetricName(failure) }
+        });
+
+    public static void RecordRuntimeStopDuration(
+        string provider,
+        string kind,
+        string stage,
+        string outcome,
+        double elapsedSeconds) =>
+        RuntimeStopDuration.Record(Math.Max(0, elapsedSeconds), new TagList
+        {
+            { "provider", provider.ToLowerInvariant() },
+            { "kind", kind.ToLowerInvariant() },
+            { "stage", stage },
+            { "outcome", outcome }
+        });
+
+    public static void RecordRuntimeStopQueueDelay(
+        string provider,
+        string kind,
+        double elapsedSeconds) =>
+        RuntimeStopQueueDelay.Record(Math.Max(0, elapsedSeconds), new TagList
+        {
+            { "provider", provider.ToLowerInvariant() },
+            { "kind", kind.ToLowerInvariant() }
+        });
+
+    public static void RecordRuntimeStopForce(string provider, string reason) =>
+        RuntimeStopForces.Add(1, new TagList
+        {
+            { "provider", provider.ToLowerInvariant() },
+            { "reason", reason }
+        });
+
+    public static void RecordRuntimeStopResourcesRemaining(string provider, string kind) =>
+        RuntimeStopResourcesRemaining.Add(1, new TagList
+        {
+            { "provider", provider.ToLowerInvariant() },
+            { "kind", kind.ToLowerInvariant() }
+        });
 
     public static void RecordGameplayFactSubmissions(
         GameplayFactKind kind,
@@ -167,6 +346,16 @@ public static class NoCtfTelemetry
                 new TagList { { "kind", submissionKind } });
         }
     }
+
+    public static void RecordNatsOperation(string operation, string outcome, double elapsedSeconds)
+    {
+        var tags = new TagList { { "operation", operation }, { "outcome", outcome } };
+        NatsOperationDuration.Record(elapsedSeconds, tags);
+        if (!string.Equals(outcome, "success", StringComparison.Ordinal))
+            NatsFailures.Add(1, tags);
+    }
+
+    public static void RecordPlatformLogLiveDrop() => PlatformLogLiveDrops.Add(1);
 
     public static void RecordGameplayFactProcessing(
         GameplayFactKind kind,
@@ -197,6 +386,20 @@ public static class NoCtfTelemetry
         GameplayFactProcessingDuration.Record(Math.Max(0, elapsedSeconds), tags);
     }
 
+    public static void RecordGameplayFactStage(
+        GameplayFactPerformanceStage stage,
+        double elapsedSeconds) =>
+        GameplayFactStageDuration.Record(
+            Math.Max(0, elapsedSeconds),
+            new TagList { { "stage", stage.ToString() } });
+
+    public static void RecordRuntimeDispatchStage(
+        RuntimeDispatchPerformanceStage stage,
+        double elapsedSeconds) =>
+        RuntimeDispatchStageDuration.Record(
+            Math.Max(0, elapsedSeconds),
+            new TagList { { "stage", stage.ToString() } });
+
     private static string? SubmissionKind(GameplayFactKind kind) => kind switch
     {
         GameplayFactKind.FlagAttempt => "flag",
@@ -204,6 +407,9 @@ public static class NoCtfTelemetry
         GameplayFactKind.FixAttempt => "fix",
         _ => null
     };
+
+    private static string MetricName<T>(T value) where T : struct, Enum =>
+        System.Text.Json.JsonNamingPolicy.SnakeCaseLower.ConvertName(value.ToString());
 
     public static void RecordLeaderboardProjection(
         string mode,
@@ -235,6 +441,14 @@ public static class NoCtfTelemetry
 
     public static void RecordLeaderboardCacheMissRebuild(string outcome) =>
         LeaderboardCacheMissRebuilds.Add(1, new TagList { { "outcome", outcome } });
+
+    public static void RecordFusionCacheRead(string cache, string tier, bool hit) =>
+        FusionCacheReads.Add(1, new TagList
+        {
+            { "cache", cache },
+            { "tier", tier },
+            { "result", hit ? "hit" : "miss" }
+        });
 
     public static void RecordSchedulerTakeover() => SchedulerTakeovers.Add(1);
 
@@ -278,16 +492,6 @@ public static class NoCtfTelemetry
             { "kind", kind },
             { "outcome", outcome }
         });
-
-    public static void UpdateOperationalSnapshot(
-        long waitingRuntimeCount,
-        TimeSpan oldestWaitingRuntimeAge)
-    {
-        Interlocked.Exchange(ref _waitingRuntimeCount, Math.Max(0, waitingRuntimeCount));
-        Interlocked.Exchange(
-            ref _oldestWaitingRuntimeAgeSeconds,
-            Math.Max(0, (long)oldestWaitingRuntimeAge.TotalSeconds));
-    }
 
     public static void UpdateRunnerCapacitySnapshot(
         string pool,

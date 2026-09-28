@@ -22,7 +22,10 @@ describe('frontend architecture', () => {
     expect(cardSurface).toContain('border: 0')
     expect(cardSurface).toContain('background: color-mix(in oklch, var(--card) var(--card-opacity), transparent)')
     expect(cardSurface).toContain('backdrop-filter: blur(var(--card-blur))')
+    expect(cardSurface).toContain('isolation: isolate')
     expect(css).toContain('--card-blur: 12px')
+    expect(css).toContain('4px 6px 16px -5px')
+    expect(css).toContain('6px 10px 24px -6px')
     expect(css).toContain("outline: none; box-shadow: 0 0 14px color-mix(in oklch, var(--ring) 28%, transparent)")
   })
 

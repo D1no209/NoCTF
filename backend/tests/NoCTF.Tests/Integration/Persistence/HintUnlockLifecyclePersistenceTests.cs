@@ -60,13 +60,12 @@ public sealed class HintUnlockLifecyclePersistenceTests
                     CreatedAt = now,
                     UpdatedAt = now
                 });
-                setup.Competitions.Add(new Competition
+                setup.Competitions.Add(new CtfCompetition
                 {
                     Id = competitionId,
                     OwnerId = userId,
                     Title = "Hint lifecycle",
-                    Mode = GameMode.Ctf,
-                    ConfigurationJson = """{"schemaVersion":1}""",
+                    ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
                     FlagDerivationSecret = new byte[32],
                     StartAt = now.AddMinutes(-5),
                     EndAt = now.AddHours(1),
@@ -74,25 +73,24 @@ public sealed class HintUnlockLifecyclePersistenceTests
                     CreatedAt = now,
                     UpdatedAt = now
                 });
-                setup.Challenges.Add(new Challenge
+                setup.Challenges.Add(new CtfChallenge
                 {
                     Id = challengeId,
                     OwnerId = userId,
-                    Mode = GameMode.Ctf,
                     Visibility = ChallengeVisibility.Private,
                     Title = "Hint challenge",
                     Direction = "Web",
-                    DefinitionJson = """{"schemaVersion":1}""",
+                    Definition = TestConfigurations.Definition(GameMode.Ctf),
                     CreatedAt = now,
                     UpdatedAt = now
                 });
-                setup.CompetitionChallenges.Add(new CompetitionChallenge
+                setup.CompetitionChallenges.Add(new CtfCompetitionChallenge
                 {
                     Id = competitionChallengeId,
                     CompetitionId = competitionId,
                     ChallengeId = challengeId,
                     IsPublished = true,
-                    RulesJson = """{"schemaVersion":1}""",
+                    Rules = TestConfigurations.Rules(GameMode.Ctf),
                     UpdatedAt = now,
                     Hints =
                     [
@@ -130,7 +128,7 @@ public sealed class HintUnlockLifecyclePersistenceTests
                         status), cancellationToken);
                 var attempt = await new ChallengeHintStore(
                         notRunningDb,
-                        Substitute.For<ITransactionalMessageOutbox>())
+                        Substitute.For<IPostCommitMessagePublisher>())
                     .UnlockAsync(
                         competitionId,
                         competitionChallengeId,
@@ -154,7 +152,7 @@ public sealed class HintUnlockLifecyclePersistenceTests
                         CompetitionStatus.Running), cancellationToken);
                 var attempt = await new ChallengeHintStore(
                         runningDb,
-                        Substitute.For<ITransactionalMessageOutbox>())
+                        Substitute.For<IPostCommitMessagePublisher>())
                     .UnlockAsync(
                         competitionId,
                         competitionChallengeId,
@@ -181,14 +179,15 @@ public sealed class HintUnlockLifecyclePersistenceTests
                 var admissionPolicy = Substitute.For<IGameplayFactAdmissionModePolicy>();
                 admissionPolicy.GetRules(
                         Arg.Any<GameMode>(),
-                        Arg.Any<string>(),
-                        Arg.Any<string>())
+                        Arg.Any<CompetitionModeConfiguration>(),
+                        Arg.Any<CompetitionChallengeRules>(),
+                        Arg.Any<ChallengeDefinition?>())
                     .Returns(new GameplayFactAdmissionRules(false, false, null, null));
                 var processor = new GameplayFactProcessor(
                     processingDb,
                     Substitute.For<IGameplayFactEvaluatorCatalog>(),
                     admissionPolicy,
-                    Substitute.For<ITransactionalMessageOutbox>(),
+                    Substitute.For<IPostCommitMessagePublisher>(),
                     Substitute.For<ILeaderboardSnapshotFactory>());
 
                 await processor.ProcessAsync(gameplayFactId, cancellationToken);

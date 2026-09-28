@@ -10,16 +10,16 @@ namespace NoCTF.Tests.Unit.Runner;
 public sealed class AwdpCheckerFixInputTests
 {
     [Test]
-    public async Task ExecuteAsync_WithoutInput_UsesLegacyOverloadAndReadonlyRoot()
+    public async Task ExecuteAsync_WithoutInput_UsesCurrentContractAndReadonlyRoot()
     {
         var runner = new RecordingOneShotRunner();
         var executor = new AwdpCheckerExecutor(new RecordingCatalog(runner));
 
-        var outcome = await executor.ExecuteAsync(Work(), CancellationToken.None);
+        var outcome = await executor.ExecuteAsync(Work(), null, CancellationToken.None);
 
         await Assert.That(outcome).IsEqualTo(AwdpCheckerExecutionOutcome.Completed);
-        await Assert.That(runner.LegacyCalls).IsEqualTo(1);
-        await Assert.That(runner.InputCalls).IsEqualTo(0);
+        await Assert.That(runner.InputCalls).IsEqualTo(1);
+        await Assert.That(runner.Input).IsNull();
         await Assert.That(runner.Request!.Security.ReadonlyRootfs).IsTrue();
     }
 
@@ -37,7 +37,6 @@ public sealed class AwdpCheckerFixInputTests
         var outcome = await executor.ExecuteAsync(Work() with { AllowRoot = allowRoot }, input, CancellationToken.None);
 
         await Assert.That(outcome).IsEqualTo(AwdpCheckerExecutionOutcome.Completed);
-        await Assert.That(runner.LegacyCalls).IsEqualTo(0);
         await Assert.That(runner.InputCalls).IsEqualTo(1);
         await Assert.That(runner.Input).IsSameReferenceAs(input);
         await Assert.That(runner.Input!.Archive).IsSameReferenceAs(stream);
@@ -45,7 +44,7 @@ public sealed class AwdpCheckerFixInputTests
         await Assert.That(runner.Request!.Security.ReadonlyRootfs).IsFalse();
         await Assert.That(runner.Request.Security.RunAsNonRoot).IsEqualTo(!allowRoot);
         await Assert.That(runner.Request.Security.NoNewPrivileges).IsTrue();
-        await Assert.That(runner.Request.Security.CapDrop).IsEquivalentTo(["ALL"]);
+        await Assert.That(runner.Request.Security.CapDrop).IsEmpty();
         await Assert.That(runner.Request.Security.CapAdd).IsEmpty();
     }
 
@@ -153,21 +152,11 @@ public sealed class AwdpCheckerFixInputTests
 
     private sealed class RecordingOneShotRunner : IOneShotJobRunner
     {
-        public int LegacyCalls { get; private set; }
         public int InputCalls { get; private set; }
         public ContainerRequest? Request { get; private set; }
         public OneShotInputArchive? Input { get; private set; }
         public Exception? InputFailure { get; init; }
         public bool WaitForInputCancellation { get; init; }
-
-        public Task<OneShotResult> RunAsync(
-            ContainerRequest request,
-            CancellationToken cancellationToken)
-        {
-            LegacyCalls++;
-            Request = request;
-            return Task.FromResult(Result());
-        }
 
         public async Task<OneShotResult> RunAsync(
             ContainerRequest request,

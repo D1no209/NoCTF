@@ -12,45 +12,49 @@ internal sealed class NotificationConfiguration : IEntityTypeConfiguration<Notif
         builder.HasKey(notification => notification.Id);
         builder.Property(notification => notification.SourceType).HasConversion<short>();
         builder.Property(notification => notification.TargetType).HasConversion<short>();
-        builder.Property(notification => notification.Kind).HasConversion<short>();
+        var discriminator = builder.HasDiscriminator(notification => notification.Kind);
+        foreach (var entry in NotificationGeneratedCatalog.Entries)
+            discriminator.HasValue(entry.Leaf, entry.Kind);
         builder.Property(notification => notification.RelatedType).HasConversion<short>();
-        builder.Property(notification => notification.ContentJson).HasColumnType("jsonb");
+        builder.Property(notification => notification.QuestionSubject).HasConversion<short>();
+        builder.Property(notification => notification.QuestionStatus).HasConversion<short>();
+        builder.Property(notification => notification.PreviousQuestionStatus).HasConversion<short>();
+        builder.Property(notification => notification.QuestionActorRole).HasConversion<short>();
+        builder.Property(notification => notification.UserLifecycleAction).HasConversion<short>();
+        builder.Property(notification => notification.SsoProtocol).HasConversion<short>();
+        builder.Property(notification => notification.RuntimeState).HasConversion<short>();
+        builder.Property(notification => notification.GameplayFactState).HasConversion<short>();
+        builder.Property(notification => notification.GameplayFactResult).HasConversion<short>();
+        builder.Property(notification => notification.GameplayFactFailureCode).HasConversion<short>();
+        builder.HasMany(notification => notification.ReferenceCounts)
+            .WithOne()
+            .HasForeignKey(reference => reference.NotificationId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(notification => notification.ReferenceCounts).AutoInclude();
         builder.HasIndex(notification => new
             { notification.TargetType, notification.TargetId, notification.SentAt, notification.Id });
         builder.HasIndex(notification => new
-            { notification.SourceType, notification.SourceId, notification.SentAt, notification.Id })
-            .HasFilter("source_id IS NOT NULL");
+            { notification.SourceType, notification.SourceId, notification.SentAt, notification.Id });
         builder.HasIndex(notification => new
-            { notification.RelatedType, notification.RelatedId, notification.SentAt, notification.Id })
-            .HasFilter("related_type IS NOT NULL");
+            { notification.RelatedType, notification.RelatedId, notification.SentAt, notification.Id });
         builder.HasIndex(notification => new
-            { notification.ThreadRootId, notification.SentAt, notification.Id })
-            .HasFilter("thread_root_id IS NOT NULL");
-        builder.HasIndex(notification => notification.ReplyToId)
-            .HasFilter("reply_to_id IS NOT NULL");
+            { notification.ThreadRootId, notification.SentAt, notification.Id });
+        builder.HasIndex(notification => notification.ReplyToId);
         builder.HasOne<Notification>().WithMany()
             .HasForeignKey(notification => notification.ThreadRootId)
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Notification>().WithMany()
             .HasForeignKey(notification => notification.ReplyToId)
             .OnDelete(DeleteBehavior.Restrict);
-        builder.ToTable(table =>
-        {
-            table.HasCheckConstraint(
-                "ck_notifications_source",
-                "(source_type IN (0, 4) AND source_id IS NULL) OR (source_type IN (1, 2, 3) AND source_id IS NOT NULL)");
-            table.HasCheckConstraint(
-                "ck_notifications_related_reference",
-                "(related_type IS NULL) = (related_id IS NULL)");
-            table.HasCheckConstraint(
-                "ck_notifications_thread_root",
-                "thread_root_id IS NULL OR thread_root_id <> id");
-            table.HasCheckConstraint(
-                "ck_notifications_platform_administrators_target",
-                "target_type <> 4 OR target_id = 'ffffffff-ffff-ffff-ffff-ffffffffffff'::uuid");
-            table.HasCheckConstraint(
-                "ck_notifications_content",
-                "jsonb_typeof(content_json) = 'object' AND content_json ? 'schemaVersion'");
-        });
+    }
+}
+
+internal sealed class NotificationReferenceCountConfiguration
+    : IEntityTypeConfiguration<NotificationReferenceCount>
+{
+    public void Configure(EntityTypeBuilder<NotificationReferenceCount> builder)
+    {
+        builder.ToTable("notification_reference_counts");
+        builder.HasKey(reference => new { reference.NotificationId, reference.ReferenceKind });
     }
 }

@@ -185,7 +185,8 @@ export function useCompetitionsByIdAwdpLivePage() {
   }
 
   function progressPlayback(now: number): void {
-    playbackProgress.value = Math.min(100, Math.max(0, (now - playbackStartedAt) / PLAYBACK_DURATION_MS * 100))
+    const nextProgress = Math.floor(Math.min(100, Math.max(0, (now - playbackStartedAt) / PLAYBACK_DURATION_MS * 100)))
+    if (playbackProgress.value !== nextProgress) playbackProgress.value = nextProgress
     if (activeEvent.value) playbackFrame = requestAnimationFrame(progressPlayback)
   }
 
@@ -225,7 +226,7 @@ export function useCompetitionsByIdAwdpLivePage() {
     do {
       const result = await listCompetitionEvents({
         path: { competitionId },
-        query: { from, to, kinds: [...awdpControlEventKinds], cursor, limit: 200 },
+        query: { from, to, kinds: [...awdpControlEventKinds], cursor, offset: 0, limit: 200, desc: true },
       })
       if (result.error || !result.data) return { data: null, error: result.error }
       items.push(...(result.data.items ?? []))

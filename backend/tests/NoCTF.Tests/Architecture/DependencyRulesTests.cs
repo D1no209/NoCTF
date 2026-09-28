@@ -35,8 +35,8 @@ public class DependencyRulesTests
     [Test]
     public async Task GameModes_are_compile_time_catalog_entries()
     {
-        await Assert.That(GameModeCatalog.All).Count().IsEqualTo(4);
-        await Assert.That(typeof(GameModeCatalog).Assembly.GetReferencedAssemblies().Select(reference => reference.Name))
+        await Assert.That(Enum.GetValues<NoCTF.Domain.Competitions.GameMode>()).Count().IsEqualTo(4);
+        await Assert.That(typeof(TypedGameModeConfiguration).Assembly.GetReferencedAssemblies().Select(reference => reference.Name))
             .DoesNotContain("Marten");
     }
 
@@ -67,7 +67,7 @@ public class DependencyRulesTests
             .LoadAssemblies(
                 typeof(User).Assembly,
                 typeof(SubmitFlag).Assembly,
-                typeof(GameModeCatalog).Assembly)
+                typeof(TypedGameModeConfiguration).Assembly)
             .Build();
 
         await Assert.That(architecture).IsNotNull();

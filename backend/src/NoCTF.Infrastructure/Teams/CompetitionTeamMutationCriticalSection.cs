@@ -10,22 +10,10 @@ internal static class CompetitionTeamMutationCriticalSection
         NoCtfDbContext db,
         Guid competitionId,
         CancellationToken cancellationToken)
-    {
-        if (!db.Database.IsRelational())
-        {
-            return db.Competitions.SingleOrDefaultAsync(
-                competition => competition.Id == competitionId,
-                cancellationToken);
-        }
-
-        return db.Competitions
-            .FromSqlInterpolated($"""
-                SELECT *
-                FROM competitions
-                WHERE id = {competitionId}
-                    AND deleted_at IS NULL
-                FOR NO KEY UPDATE
-                """)
-            .SingleOrDefaultAsync(cancellationToken);
-    }
+        => db.Competitions.IgnoreAutoIncludes()
+            .Include(competition => competition.Tracks)
+            .AsSplitQuery()
+            .SingleOrDefaultAsync(
+            competition => competition.Id == competitionId,
+            cancellationToken);
 }

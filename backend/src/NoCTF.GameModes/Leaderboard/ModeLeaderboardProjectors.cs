@@ -1,13 +1,14 @@
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Gameplay;
-using System.Text.Json;
 using NoCTF.GameModes.Ctf.Configuration;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Awd.Scheduling;
 using NoCTF.GameModes.Koh.Configuration;
 using NoCTF.GameModes.Scoring;
 using System.Globalization;
+using NoCTF.Domain.Challenges;
+using NoCTF.GameModes.Registration;
 
 namespace NoCTF.GameModes.Leaderboard;
 
@@ -21,7 +22,6 @@ public sealed class CtfLeaderboardProjector : IGameModeLeaderboardProjector
 
 internal static class CtfLeaderboardProjection
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly ScoreCurveEvaluator ScoreCurve = new();
 
     public static GameModeLeaderboardProjection Project(LeaderboardProjectionInput input)
@@ -37,26 +37,28 @@ internal static class CtfLeaderboardProjection
         ProjectCore(LeaderboardProjectionInput input)
     {
         var activeTeams = input.Teams
-            .Where(team => !team.IsBanned && !team.IsDeleted)
+            .Where(CtfCompletionEligibility.IsActive)
             .ToDictionary(team => team.Id);
         var validTeams = activeTeams.Values
-            .Where(team => !team.IsBanned && !team.IsDeleted && team.EarnsScore)
+            .Where(CtfCompletionEligibility.EarnsScore)
             .ToDictionary(team => team.Id);
         var dynamicTeams = activeTeams.Values
-            .Where(team => team.AffectsDynamicChallengeScore)
+            .Where(CtfCompletionEligibility.AffectsDynamicScore)
             .Select(team => team.Id)
             .ToHashSet();
         var challenges = (input.Challenges ?? []).Where(challenge => !challenge.IsDeleted).ToDictionary(challenge => challenge.Id);
-        var defaults = ParseCompetition(input.CompetitionConfigurationJson);
+        var defaults = ParseCompetition(input.CompetitionConfiguration);
         var challengeConfigurations = challenges.ToDictionary(
             pair => pair.Key,
-            pair => ParseChallenge(pair.Value.ConfigurationJson));
+            pair => ParseChallenge(pair.Value.Rules));
         var defaultChallengeConfiguration = ParseChallenge(null);
         var solves = input.GameplayFacts
             .Where(fact => fact.TeamId is Guid teamId && activeTeams.ContainsKey(teamId)
-                          && fact.Kind == GameplayFactKind.FlagAttempt
                           && fact.Result == GameplayFactResult.Correct
                           && fact.CompetitionChallengeId is not null
+                          && (challenges.Count == 0
+                              ? fact.Kind == GameplayFactKind.FlagAttempt
+                              : IsInteractionFact(fact, challenges))
                           && (challenges.Count == 0 || challenges.ContainsKey(fact.CompetitionChallengeId.Value)))
             .OrderBy(fact => fact.OccurredAt)
             .ThenBy(fact => fact.GameplayFactId)
@@ -115,7 +117,9 @@ internal static class CtfLeaderboardProjection
 
         var wrongFacts = input.GameplayFacts
             .Where(fact => fact.TeamId is Guid teamId && validTeams.ContainsKey(teamId)
-                && fact.Kind == GameplayFactKind.FlagAttempt
+                && (challenges.Count == 0
+                    ? fact.Kind == GameplayFactKind.FlagAttempt
+                    : IsInteractionFact(fact, challenges))
                 && fact.Result == GameplayFactResult.Wrong)
             .Select(fact =>
                 (TeamId: fact.TeamId!.Value,
@@ -200,22 +204,28 @@ internal static class CtfLeaderboardProjection
         return checked((long)Math.Round(basis, MidpointRounding.AwayFromZero));
     }
 
-    private static CtfConfiguration ParseCompetition(string? json) =>
-        TryParse<CtfConfiguration>(json) ?? new(
-            CtfConfiguration.CurrentSchemaVersion,
-            ScoreCurveConfiguration.Default,
-            []);
+    private static CtfConfiguration ParseCompetition(CompetitionModeConfiguration? value) =>
+        value is CtfCompetitionModeConfiguration ctf
+            ? TypedGameModeConfiguration.Ctf(ctf)
+            : TypedGameModeConfiguration.Ctf(
+                (CtfCompetitionModeConfiguration)CompetitionModeConfigurationDefaults.Create(
+                    GameMode.Ctf, Guid.Empty));
 
-    private static CtfChallengeConfiguration ParseChallenge(string? json) =>
-        TryParse<CtfChallengeConfiguration>(json)
-        ?? new(CtfChallengeConfiguration.CurrentSchemaVersion, null, null);
-
-    private static T? TryParse<T>(string? json) where T : class
+    private static bool IsInteractionFact(
+        LeaderboardGameplayFact fact,
+        IReadOnlyDictionary<Guid, LeaderboardChallengeFact> challenges)
     {
-        if (string.IsNullOrWhiteSpace(json)) return null;
-        try { return JsonSerializer.Deserialize<T>(json, JsonOptions); }
-        catch (JsonException) { return null; }
+        if (fact.CompetitionChallengeId is not Guid challengeId)
+            return false;
+        var interaction = challenges.GetValueOrDefault(challengeId)?.InteractionKind
+            ?? CtfInteractionKind.FlagSubmission;
+        return CtfCompletionEligibility.Matches(fact.Kind, interaction);
     }
+
+    private static CtfChallengeConfiguration ParseChallenge(CompetitionChallengeRules? value) =>
+        value is CtfCompetitionChallengeRules ctf
+            ? TypedGameModeConfiguration.Ctf(ctf)
+            : new(null, null);
 
     private sealed record CtfRankedEntry(
         LeaderboardEntry Entry,
@@ -236,12 +246,11 @@ public sealed class AwdLeaderboardProjector : IGameModeLeaderboardProjector
 
 internal static class AwdLeaderboardProjection
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
     public static (IReadOnlyList<LeaderboardEntry> Entries, IReadOnlyList<LeaderboardCellFact> Cells) Project(LeaderboardProjectionInput input)
     {
-        var configuration = TryParse(input.CompetitionConfigurationJson)
-            ?? AwdConfiguration.Default;
+        var configuration = input.CompetitionConfiguration is AwdCompetitionModeConfiguration awd
+            ? TypedGameModeConfiguration.Awd(awd)
+            : AwdConfiguration.Default;
         var challenges = (input.Challenges ?? [])
             .Where(challenge => !challenge.IsDeleted)
             .ToDictionary(challenge => challenge.Id);
@@ -255,7 +264,7 @@ internal static class AwdLeaderboardProjection
             return ProjectAggregates(input, challenges, teams);
         var settingsByChallenge = challenges.ToDictionary(
             pair => pair.Key,
-            pair => Effective(configuration, pair.Value.ConfigurationJson));
+            pair => Effective(configuration, pair.Value.Rules));
         var values = teams.Keys.ToDictionary(team => team, _ => 0L);
         var cellScores = new Dictionary<(Guid TeamId, Guid ChallengeId), long>();
         var cellSolves = new Dictionary<(Guid TeamId, Guid ChallengeId), (DateTimeOffset At, string? SolverName)>();
@@ -544,29 +553,19 @@ internal static class AwdLeaderboardProjection
         return low == 0 ? null : transitions[low - 1];
     }
 
-    private static AwdConfiguration? TryParse(string? json)
+    private static AwdScoringSettings Effective(
+        AwdConfiguration competition,
+        CompetitionChallengeRules? rules)
     {
-        if (string.IsNullOrWhiteSpace(json)) return null;
-        try { return JsonSerializer.Deserialize<AwdConfiguration>(json!, JsonOptions); }
-        catch (JsonException) { return null; }
-    }
-
-    private static AwdScoringSettings Effective(AwdConfiguration competition, string? challengeJson)
-    {
-        var challenge = TryParseChallenge(challengeJson);
+        var challenge = rules is AwdCompetitionChallengeRules awd
+            ? TypedGameModeConfiguration.Awd(awd)
+            : null;
         return new(
             challenge?.AttackRewardMode ?? competition.AttackRewardMode,
             challenge?.AttackPoints ?? competition.AttackPoints,
             challenge?.VictimDefensePoolPoints ?? competition.VictimDefensePoolPoints,
             challenge?.ServiceHealthyPoints ?? competition.ServiceHealthyPoints,
             challenge?.ServiceUnhealthyPenalty ?? competition.ServiceUnhealthyPenalty);
-    }
-
-    private static AwdChallengeConfiguration? TryParseChallenge(string? json)
-    {
-        if (string.IsNullOrWhiteSpace(json)) return null;
-        try { return JsonSerializer.Deserialize<AwdChallengeConfiguration>(json, JsonOptions); }
-        catch (JsonException) { return null; }
     }
 
     private sealed record AwdScoringSettings(
@@ -608,11 +607,9 @@ public sealed class KohLeaderboardProjector : IGameModeLeaderboardProjector
 
 internal static class KohLeaderboardProjection
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
     public static (IReadOnlyList<LeaderboardEntry> Entries, IReadOnlyList<LeaderboardCellFact> Cells) Project(LeaderboardProjectionInput input)
     {
-        var configuration = ParseCompetition(input.CompetitionConfigurationJson);
+        var configuration = ParseCompetition(input.CompetitionConfiguration);
         var activeTeams = input.Teams
             .Where(team => !team.IsBanned && !team.IsDeleted)
             .ToDictionary(team => team.Id);
@@ -627,7 +624,7 @@ internal static class KohLeaderboardProjection
             .ToDictionary(challenge => challenge.Id);
         var challengePoints = challenges.ToDictionary(
             item => item.Key,
-            item => PointsFor(configuration, item.Value.ConfigurationJson));
+            item => PointsFor(configuration, item.Value.Rules));
         var rawObservations = input.GameplayFacts
             .Where(fact => fact is
             {
@@ -725,8 +722,8 @@ internal static class KohLeaderboardProjection
         return (entries, cells);
     }
 
-    private static long PointsFor(KohConfiguration competition, string? challengeJson) =>
-        ParseChallenge(challengeJson).ControlPointsPerInterval
+    private static long PointsFor(KohConfiguration competition, CompetitionChallengeRules? rules) =>
+        ParseChallenge(rules).ControlPointsPerInterval
         ?? competition.ControlPointsPerInterval;
 
     private static long PointsForObservation(
@@ -735,34 +732,15 @@ internal static class KohLeaderboardProjection
         Guid challengeId) =>
         challengePoints.GetValueOrDefault(challengeId, competitionDefault);
 
-    private static KohConfiguration ParseCompetition(string? json)
-    {
-        if (string.IsNullOrWhiteSpace(json)) return new(1, 5, 10);
-        try
-        {
-            return JsonSerializer.Deserialize<KohConfiguration>(json, JsonOptions)
-                ?? new(1, 5, 10);
-        }
-        catch (JsonException)
-        {
-            return new(1, 5, 10);
-        }
-    }
+    private static KohConfiguration ParseCompetition(CompetitionModeConfiguration? value) =>
+        value is KohCompetitionModeConfiguration koh
+            ? TypedGameModeConfiguration.Koh(koh)
+            : new(5, 10);
 
-    private static KohChallengeConfiguration ParseChallenge(string? json)
-    {
-        if (string.IsNullOrWhiteSpace(json))
-            return new(KohChallengeConfiguration.CurrentSchemaVersion);
-        try
-        {
-            return JsonSerializer.Deserialize<KohChallengeConfiguration>(json, JsonOptions)
-                ?? new(KohChallengeConfiguration.CurrentSchemaVersion);
-        }
-        catch (JsonException)
-        {
-            return new(KohChallengeConfiguration.CurrentSchemaVersion);
-        }
-    }
+    private static KohChallengeConfiguration ParseChallenge(CompetitionChallengeRules? value) =>
+        value is KohCompetitionChallengeRules koh
+            ? TypedGameModeConfiguration.Koh(koh)
+            : new();
 
     private sealed record KohRankedEntry(
         LeaderboardEntry Entry,

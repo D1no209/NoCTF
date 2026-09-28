@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.AspNetCore.Authorization;
 using NoCTF.API.Endpoints.Competitions;
 using NoCTF.API.Endpoints.Competitions.Events;
 using NoCTF.API.SignalR.Hubs;
@@ -15,6 +16,7 @@ public sealed class SignalRContractTests
         var methods = typeof(ICompetitionHubClient)
             .GetMethods()
             .Concat(typeof(IPlatformLogHubClient).GetMethods())
+            .Concat(typeof(INotificationHubClient).GetMethods())
             .ToArray();
 
         await Assert.That(methods.Select(method =>
@@ -27,7 +29,8 @@ public sealed class SignalRContractTests
                 "competitionLifecycleChanged",
                 "competitionEventChanged",
                 "gameplayFactStateChanged",
-                "platformLogReceived"
+                "platformLogReceived",
+                "notificationChanged"
             ]);
         await Assert.That(methods.All(method => method.ReturnType == typeof(Task))).IsTrue();
         await Assert.That(methods.All(method =>
@@ -66,5 +69,19 @@ public sealed class SignalRContractTests
         await Assert.That(scoreboard).Contains("\"version\":\"9007199254740993\"");
         await Assert.That(scoreboard).Contains("\"schemaRevision\":\"7\"");
         await Assert.That(scoreboard).Contains("\"challengeCatalogRevision\":\"11\"");
+    }
+
+    [Test]
+    public async Task Notification_hub_requires_authentication_and_accepts_realtime_bearer_tokens()
+    {
+        await Assert.That(typeof(NotificationHub)
+            .IsDefined(typeof(AuthorizeAttribute), inherit: true)).IsTrue();
+        var root = new DirectoryInfo(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "AGENTS.md")))
+            root = root.Parent;
+        await Assert.That(root).IsNotNull();
+        var authentication = await File.ReadAllTextAsync(Path.Combine(root!.FullName,
+            "backend", "src", "NoCTF.API", "Composition", "AuthenticationRegistration.cs"));
+        await Assert.That(authentication).Contains("/hubs/v1/notifications");
     }
 }

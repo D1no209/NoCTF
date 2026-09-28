@@ -1,22 +1,18 @@
-import type { NoCtfapiEndpointsCompetitionsGameModeProtocol } from '../api'
+import type {
+  NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract,
+  NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeContract,
+  NoCtfapiEndpointsAdministrationCompetitionsBloodRewardPolicyProtocol,
+  NoCtfapiEndpointsAdministrationCompetitionsEvaluationDispatchModeProtocol,
+  NoCtfapiEndpointsAdministrationCompetitionsScoreDecayModeProtocol,
+  NoCtfapiEndpointsCompetitionsGameModeProtocol,
+} from '../api'
 import { translate } from './i18n'
 
-/**
- * 游戏模式专属配置 JSON 的前端模型。
- * 对应后端 NoCTF.GameModes 各 *Configuration record:
- * 配置 JSON 使用 camelCase、枚举默认序列化为整数,唯一例外是 AWD 的
- * attackRewardMode(PascalCase 字符串)。schemaVersion 必须等于当前版本。
- * 参考:GameModeChallengeConfigurationCatalog / GameModeCompetitionConfigurationValidator。
- */
+/** Strongly typed editor models for the OpenAPI game-mode contracts. */
 
 export type GameModeValue = NoCtfapiEndpointsCompetitionsGameModeProtocol
 
-/** 各 JSON 区域当前的 schemaVersion(更高的版本或无 upgrader 的旧版本会被后端拒绝)。 */
-export const DEFINITION_SCHEMA_VERSION = { Ctf: 2, Awd: 4, Awdp: 4, Koh: 1 } as const
-export const COMPETITION_CONFIG_SCHEMA_VERSION: Record<GameModeValue, number> = { Ctf: 2, Awd: 2, Awdp: 4, Koh: 1 }
-export const CHALLENGE_RULES_SCHEMA_VERSION: Record<GameModeValue, number> = { Ctf: 2, Awd: 4, Awdp: 4, Koh: 1 }
-
-// ---------- 配置 JSON 内的整数枚举 ----------
+// ---------- Editor enums ----------
 
 export const RuntimeAllocation = { Shared: 0, PerTeam: 1 } as const
 export const EgressPolicy = { Isolated: 0, InternetOnly: 1 } as const
@@ -37,6 +33,22 @@ export const ScoreDecayMode = {
   Custom: 5,
 } as const
 export const EvaluationDispatch = { Automatic: 0, ManualBatch: 1 } as const
+export const CtfInteraction = { FlagSubmission: 0, PatchVerification: 1 } as const
+
+const scoreDecayProtocols = [
+  'Fixed', 'Linear', 'Quadratic', 'Exponential', 'Logarithmic', 'Custom',
+] as const satisfies readonly NoCtfapiEndpointsAdministrationCompetitionsScoreDecayModeProtocol[]
+const bloodRewardProtocols = [
+  'FixedPoints', 'InitialPointsPercentage', 'SolveTimePointsPercentage', 'CurrentPointsPercentage',
+] as const satisfies readonly NoCtfapiEndpointsAdministrationCompetitionsBloodRewardPolicyProtocol[]
+const evaluationDispatchProtocols = [
+  'Automatic', 'Manual',
+] as const satisfies readonly NoCtfapiEndpointsAdministrationCompetitionsEvaluationDispatchModeProtocol[]
+
+function protocolIndex(value: unknown, names: readonly string[], fallback: number): number {
+  const index = names.indexOf(value as string)
+  return index < 0 ? fallback : index
+}
 
 export const ATTACK_REWARD_MODES = [
   { value: 'FixedPerAttack', label: "ui.fixedScoreForEachAttack" },
@@ -117,7 +129,13 @@ export interface ComposeDefinitionModel {
   flagEnvironmentVariables: Record<string, string>
 }
 
-export type RuntimeDefinitionModel = ContainerDefinitionModel | ComposeDefinitionModel
+export interface OvaDefinitionModel {
+  kind: 'ova'
+  sourceUrl: string
+  sha256: string
+}
+
+export type RuntimeDefinitionModel = ContainerDefinitionModel | ComposeDefinitionModel | OvaDefinitionModel
 
 export interface RuntimeTemplateModel {
   allocation: number
@@ -150,6 +168,7 @@ export interface FlagInjectionModel {
 }
 
 export interface DefinitionModel {
+  interactionKind: number
   runtime: RuntimeTemplateModel | null
   /** AWD:checker(包装 job + targetServiceName)。 */
   checker: { job: RunnerJobModel; targetServiceName: string } | null
@@ -167,6 +186,7 @@ export interface DefinitionModel {
 }
 
 export const DEFAULT_MAXIMUM_PATCH_UPLOAD_BYTES = 256 * 1024 * 1024
+export const DEFAULT_CTF_PATCH_UPLOAD_BYTES = 64 * 1024 * 1024
 export const HARD_MAXIMUM_PATCH_UPLOAD_BYTES = 1024 * 1024 * 1024
 export const DEFAULT_RUNTIME_MEMORY_BYTES = 256 * 1024 * 1024
 export const DEFAULT_RUNTIME_NANO_CPUS = 500_000_000
@@ -175,16 +195,6 @@ export const DEFAULT_RUNTIME_TTL_SECONDS = 3600
 export const DEFAULT_RUNTIME_OPERATION_TIMEOUT_SECONDS = 60
 
 export function defaultContainerSecurity(): SecurityModel {
-  return {
-    noNewPrivileges: true,
-    readonlyRootfs: false,
-    runAsNonRoot: false,
-    capDrop: ['ALL'],
-    capAdd: [],
-  }
-}
-
-function compatibilityContainerSecurity(): SecurityModel {
   return {
     noNewPrivileges: false,
     readonlyRootfs: false,
@@ -209,7 +219,7 @@ export function emptyContainerDefinition(withFlagInjection = false): ContainerDe
     command: [],
     environment: {},
     labels: {},
-    containerPorts: [],
+    containerPorts: [null],
     security: defaultContainerSecurity(),
     flagEnvironmentVariableName: withFlagInjection ? 'FLAG' : '',
     internalPorts: [],
@@ -225,13 +235,17 @@ export function emptyUrlBinding(): UrlBindingModel {
 }
 
 export function emptyRuntimeTemplate(mode: GameModeValue): RuntimeTemplateModel {
+  const accessBinding = emptyUrlBinding()
+  accessBinding.exposure = mode === 'Ctf' || mode === 'Awdp'
+    ? UrlExposure.OwnerOnly
+    : UrlExposure.Participants
   return {
     allocation: mode === 'Koh' ? RuntimeAllocation.Shared : RuntimeAllocation.PerTeam,
     definition: emptyContainerDefinition(mode === 'Ctf' || mode === 'Awdp'),
     limits: defaultRuntimeLimits(),
     ttlSeconds: DEFAULT_RUNTIME_TTL_SECONDS,
     operationTimeoutSeconds: DEFAULT_RUNTIME_OPERATION_TIMEOUT_SECONDS,
-    urlBindings: [],
+    urlBindings: [accessBinding],
     flagSource: mode === 'Ctf' || mode === 'Awdp'
       ? FlagSource.PerTeam
       : mode === 'Awd'
@@ -251,6 +265,7 @@ export function emptyFlagTemplate(): FlagTemplateModel {
 
 export function emptyDefinition(mode: GameModeValue): DefinitionModel {
   return {
+    interactionKind: CtfInteraction.FlagSubmission,
     runtime: null,
     checker: null,
     checkerJob: null,
@@ -304,88 +319,17 @@ function asStringMap(value: unknown): Record<string, string> {
   return result
 }
 
-export function parseJsonObject(json: string | null | undefined): JsonObject | null {
-  if (!json) return {}
-  try {
-    return asObject(JSON.parse(json))
-  }
-  catch {
-    return null
-  }
-}
-
-// ---------- Definition 解析 ----------
-
-function parseSecurity(raw: unknown): SecurityModel {
-  const obj = asObject(raw)
-  // Omitted security on a legacy template remains omitted after a read/write
-  // cycle. Secure defaults are applied only when creating a new container draft.
-  const defaults = compatibilityContainerSecurity()
-  return {
-    noNewPrivileges: typeof obj?.noNewPrivileges === 'boolean' ? obj.noNewPrivileges : defaults.noNewPrivileges,
-    readonlyRootfs: typeof obj?.readonlyRootfs === 'boolean' ? obj.readonlyRootfs : defaults.readonlyRootfs,
-    runAsNonRoot: typeof obj?.runAsNonRoot === 'boolean' ? obj.runAsNonRoot : defaults.runAsNonRoot,
-    capDrop: Array.isArray(obj?.capDrop) ? asStringArray(obj.capDrop) : defaults.capDrop,
-    capAdd: Array.isArray(obj?.capAdd) ? asStringArray(obj.capAdd) : defaults.capAdd,
-  }
-}
+// ---------- Definition mapping ----------
 
 function parseUrlBinding(raw: unknown): UrlBindingModel {
   const obj = asObject(raw) ?? {}
   return {
     urlTemplate: asString(obj.urlTemplate),
-    exposure: asNumber(obj.exposure) ?? UrlExposure.Participants,
+    exposure: obj.exposure === 'OwnerOnly'
+      ? UrlExposure.OwnerOnly
+      : UrlExposure.Participants,
     containerPort: asNumber(obj.containerPort),
     serviceName: asString(obj.serviceName),
-  }
-}
-
-function parseRuntimeDefinition(raw: unknown): RuntimeDefinitionModel {
-  const obj = asObject(raw) ?? {}
-  if (obj.kind === 'compose') {
-    const serviceResources: ComposeServiceResourceModel[] = []
-    const resources = asObject(obj.serviceResources)
-    if (resources) {
-      for (const [service, value] of Object.entries(resources)) {
-        const r = asObject(value) ?? {}
-        serviceResources.push({
-          service,
-          memoryBytes: asNumber(r.memoryBytes),
-          nanoCpus: asNumber(r.nanoCpus),
-          pidsLimit: asNumber(r.pidsLimit),
-        })
-      }
-    }
-    return {
-      kind: 'compose',
-      composeYaml: asString(obj.composeYaml),
-      serviceResources,
-      environment: asStringMap(obj.environment),
-      labels: asStringMap(obj.labels),
-      flagEnvironmentVariables: asStringMap(obj.flagEnvironmentVariables),
-    }
-  }
-  const portMappings = asObject(obj.portMappings) ?? {}
-  return {
-    kind: 'container',
-    image: asString(obj.image),
-    command: asStringArray(obj.command),
-    environment: asStringMap(obj.environment),
-    labels: asStringMap(obj.labels),
-    containerPorts: Object.keys(portMappings).map(Number).filter(n => Number.isInteger(n) && n > 0),
-    security: parseSecurity(obj.security),
-    flagEnvironmentVariableName: asString(obj.flagEnvironmentVariableName),
-    internalPorts: asNumberArray(obj.internalPorts),
-  }
-}
-
-function parseRunnerJob(raw: unknown): RunnerJobModel {
-  const obj = asObject(raw) ?? {}
-  return {
-    image: asString(obj.image),
-    command: asStringArray(obj.command),
-    environment: asStringMap(obj.environment),
-    timeoutSeconds: asNumber(obj.timeoutSeconds),
   }
 }
 
@@ -398,247 +342,193 @@ function parseFlagTemplate(raw: unknown): FlagTemplateModel {
   }
 }
 
-function parseRuntimeTemplate(raw: unknown): RuntimeTemplateModel {
-  const obj = asObject(raw) ?? {}
-  const limits = asObject(obj.limits) ?? {}
-  const defaultLimits = defaultRuntimeLimits()
-  return {
-    allocation: asNumber(obj.allocation) ?? RuntimeAllocation.PerTeam,
-    definition: parseRuntimeDefinition(obj.definition),
-    limits: {
-      memoryBytes: asNumber(limits.memoryBytes) ?? defaultLimits.memoryBytes,
-      nanoCpus: asNumber(limits.nanoCpus) ?? defaultLimits.nanoCpus,
-      pidsLimit: asNumber(limits.pidsLimit) ?? defaultLimits.pidsLimit,
-    },
-    ttlSeconds: asNumber(obj.ttlSeconds) ?? DEFAULT_RUNTIME_TTL_SECONDS,
-    operationTimeoutSeconds: asNumber(obj.operationTimeoutSeconds) ?? DEFAULT_RUNTIME_OPERATION_TIMEOUT_SECONDS,
-    urlBindings: Array.isArray(obj.urlBindings) ? obj.urlBindings.map(parseUrlBinding) : [],
-    flagSource: asNumber(obj.flagSource) ?? FlagSource.Static,
-    controlCheckUrlBinding: obj.controlCheckUrlBinding ? parseUrlBinding(obj.controlCheckUrlBinding) : null,
-  }
-}
-
-/** 解析模板 definitionJson 为当前模式的编辑模型;JSON 非法时返回 null。 */
-export function parseDefinition(
-  json: string | null | undefined,
-  mode: GameModeValue = 'Ctf',
-): DefinitionModel | null {
-  const obj = parseJsonObject(json)
-  if (!obj) return null
-  const model = emptyDefinition(mode)
-  if (mode === 'Awd' || mode === 'Awdp')
-    model.checkerAllowRoot = obj.checkerAllowRoot === true
-  model.runtime = obj.runtime ? parseRuntimeTemplate(obj.runtime) : null
-  if (mode === 'Awd' && obj.checker) {
-    const checker = asObject(obj.checker) ?? {}
-    if ('job' in checker) {
-      model.checker = {
-        job: parseRunnerJob(checker.job),
-        targetServiceName: asString(checker.targetServiceName),
-      }
-    }
-  }
-  if (mode === 'Awdp' && obj.checker) {
-    const checker = asObject(obj.checker) ?? {}
-    if (!('job' in checker)) model.checkerJob = parseRunnerJob(checker)
-  }
-  if (mode === 'Awd' && obj.flagInjection) {
-    const injection = asObject(obj.flagInjection) ?? {}
-    if (!('kind' in injection)) {
-      model.flagInjection = {
-        command: asString(injection.command),
-        timeoutSeconds: asNumber(injection.timeoutSeconds),
-        serviceName: asString(injection.serviceName),
-      }
-    }
-  }
-  if (mode === 'Ctf' || mode === 'Awd')
-    model.flagTemplate = obj.flagTemplate ? parseFlagTemplate(obj.flagTemplate) : null
-  if (mode === 'Awdp') {
-    model.patchEntrypoint = asString(obj.patchEntrypoint)
-    model.patchCommand = asStringArray(obj.patchCommand)
-    model.patchTimeoutSeconds = asNumber(obj.patchTimeoutSeconds)
-    model.readyTimeoutSeconds = asNumber(obj.readyTimeoutSeconds)
-    model.maximumPatchUploadBytes = asNumber(obj.maximumPatchUploadBytes)
-      ?? DEFAULT_MAXIMUM_PATCH_UPLOAD_BYTES
-    model.checkerFixInput = obj.checkerFixInput === true
-  }
-  return model
-}
-
-// ---------- Definition 序列化 ----------
+// ---------- Definition mapping ----------
 
 function putNumber(obj: JsonObject, key: string, value: number | null): void {
   if (value !== null && value !== undefined) obj[key] = value
 }
 
-function putString(obj: JsonObject, key: string, value: string): void {
-  if (value.trim()) obj[key] = value.trim()
+
+export function emptyOvaDefinition(): OvaDefinitionModel {
+  return { kind: 'ova', sourceUrl: '', sha256: '' }
 }
 
-function putStringArray(obj: JsonObject, key: string, value: string[]): void {
-  const items = value.map(v => v.trim()).filter(Boolean)
-  if (items.length > 0) obj[key] = items
+function protocolAllocation(value: unknown): number {
+  return value === 'Shared' ? RuntimeAllocation.Shared : RuntimeAllocation.PerTeam
 }
 
-function putNumberArray(obj: JsonObject, key: string, value: Array<number | null>): void {
-  const items = value.filter((item): item is number => item !== null)
-  if (items.length > 0) obj[key] = items
+function protocolFlagSource(value: unknown): number {
+  return value === 'PerTeam'
+    ? FlagSource.PerTeam
+    : value === 'AwdRotation'
+      ? FlagSource.AwdRotation
+      : FlagSource.Static
 }
 
-function putStringMap(obj: JsonObject, key: string, value: Record<string, string>): void {
-  const entries = Object.entries(value).filter(([k]) => k.trim())
-  if (entries.length > 0) obj[key] = Object.fromEntries(entries)
-}
-
-function serializeUrlBinding(binding: UrlBindingModel): JsonObject {
-  const obj: JsonObject = { urlTemplate: binding.urlTemplate.trim(), exposure: binding.exposure }
-  putNumber(obj, 'containerPort', binding.containerPort)
-  putString(obj, 'serviceName', binding.serviceName)
-  return obj
-}
-
-function serializeSecurity(security: SecurityModel): JsonObject | null {
-  const capDrop = security.capDrop.map(value => value.trim()).filter(Boolean)
-  const capAdd = security.capAdd.map(value => value.trim()).filter(Boolean)
-  const hasExplicitSecurity = security.noNewPrivileges
-    || security.readonlyRootfs
-    || security.runAsNonRoot
-    || capDrop.length > 0
-    || capAdd.length > 0
-  if (!hasExplicitSecurity) return null
-
-  // The backend accepts an explicit security object only when the complete
-  // capability baseline is present. Keep the compatibility default omitted,
-  // but make every explicitly configured security draft valid by construction.
-  if (!capDrop.some(value => value.toUpperCase() === 'ALL')) capDrop.unshift('ALL')
-
-  const obj: JsonObject = {}
-  if (security.noNewPrivileges) obj.noNewPrivileges = true
-  if (security.readonlyRootfs) obj.readonlyRootfs = true
-  if (security.runAsNonRoot) obj.runAsNonRoot = true
-  putStringArray(obj, 'capDrop', capDrop)
-  putStringArray(obj, 'capAdd', capAdd)
-  return obj
-}
-
-function serializeRuntimeDefinition(definition: RuntimeDefinitionModel): JsonObject {
-  if (definition.kind === 'compose') {
-    const obj: JsonObject = { kind: 'compose', composeYaml: definition.composeYaml }
-    if (definition.serviceResources.length > 0) {
-      const resources: JsonObject = {}
-      for (const r of definition.serviceResources) {
-        if (!r.service.trim()) continue
-        const limits: JsonObject = {}
-        putNumber(limits, 'memoryBytes', r.memoryBytes)
-        putNumber(limits, 'nanoCpus', r.nanoCpus)
-        putNumber(limits, 'pidsLimit', r.pidsLimit)
-        resources[r.service.trim()] = limits
-      }
-      obj.serviceResources = resources
+function definitionContractRuntime(
+  runtime: NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeContract,
+): RuntimeTemplateModel {
+  const value = runtime as Record<string, unknown>
+  let definition: RuntimeDefinitionModel
+  if (runtime.kind === 'Compose') {
+    const compose = asObject(runtime.compose)
+    if (!compose || runtime.container || runtime.ova) throw new Error('Invalid Compose Runtime contract.')
+    definition = {
+      kind: 'compose',
+      composeYaml: asString(compose.composeYaml),
+      serviceResources: Array.isArray(compose.serviceResources)
+        ? compose.serviceResources.map((entry) => {
+            const item = asObject(entry) ?? {}
+            const limits = asObject(item.limits) ?? {}
+            return {
+              service: asString(item.serviceName),
+              memoryBytes: asNumber(limits.memoryBytes),
+              nanoCpus: asNumber(limits.nanoCpus),
+              pidsLimit: asNumber(limits.pidsLimit),
+            }
+          })
+        : [],
+      environment: asStringMap(compose.environment),
+      labels: asStringMap(compose.labels),
+      flagEnvironmentVariables: asStringMap(compose.flagEnvironmentVariables),
     }
-    putStringMap(obj, 'environment', definition.environment)
-    putStringMap(obj, 'labels', definition.labels)
-    putStringMap(obj, 'flagEnvironmentVariables', definition.flagEnvironmentVariables)
-    return obj
   }
-  const obj: JsonObject = { kind: 'container', image: definition.image.trim() }
-  putStringArray(obj, 'command', definition.command)
-  putStringMap(obj, 'environment', definition.environment)
-  putStringMap(obj, 'labels', definition.labels)
-  const containerPorts = definition.containerPorts.filter((port): port is number => port !== null)
-  if (containerPorts.length > 0) {
-    obj.portMappings = Object.fromEntries(containerPorts.map(port => [String(port), 0]))
+  else if (runtime.kind === 'Ova') {
+    const ova = asObject(runtime.ova)
+    if (!ova || runtime.container || runtime.compose) throw new Error('Invalid Ova Runtime contract.')
+    definition = {
+      kind: 'ova',
+      sourceUrl: asString(ova.sourceUrl),
+      sha256: asString(ova.sha256),
+    }
   }
-  const security = serializeSecurity(definition.security)
-  if (security) obj.security = security
-  putString(obj, 'flagEnvironmentVariableName', definition.flagEnvironmentVariableName)
-  // 可移植模板只声明隔离网络(0)；InternetOnly 会被后端拒绝。
-  obj.egressPolicy = EgressPolicy.Isolated
-  putNumberArray(obj, 'internalPorts', definition.internalPorts)
-  return obj
-}
-
-function serializeRuntimeTemplate(runtime: RuntimeTemplateModel): JsonObject {
-  const definition = serializeRuntimeDefinition(runtime.definition)
-  // 后端仅允许 PerTeam/AwdRotation 配置 Flag 注入环境变量。
-  if (runtime.flagSource === FlagSource.Static) {
-    delete definition.flagEnvironmentVariableName
-    delete definition.flagEnvironmentVariables
+  else if (runtime.kind === 'Container') {
+    const container = asObject(runtime.container)
+    if (!container || runtime.compose || runtime.ova) throw new Error('Invalid Container Runtime contract.')
+    const security = asObject(container.security) ?? {}
+    definition = {
+      kind: 'container',
+      image: asString(container.image),
+      command: asStringArray(container.command),
+      environment: asStringMap(container.environment),
+      labels: asStringMap(container.labels),
+      containerPorts: Array.isArray(container.portMappings)
+        ? container.portMappings.map(entry => asNumber(asObject(entry)?.containerPort))
+        : [],
+      security: {
+        noNewPrivileges: asBool(security.noNewPrivileges),
+        readonlyRootfs: asBool(security.readonlyRootfs),
+        runAsNonRoot: asBool(security.runAsNonRoot),
+        capDrop: asStringArray(security.capDrop),
+        capAdd: asStringArray(security.capAdd),
+      },
+      flagEnvironmentVariableName: asString(container.flagEnvironmentVariableName),
+      internalPorts: asNumberArray(container.internalPorts),
+    }
   }
-  const obj: JsonObject = {
-    allocation: runtime.allocation,
+  else throw new Error('Unknown Runtime kind.')
+  const limits = asObject(value.limits) ?? {}
+  const bindings = Array.isArray(value.urlBindings) ? value.urlBindings : []
+  return {
+    allocation: protocolAllocation(value.allocation),
     definition,
+    limits: {
+      memoryBytes: asNumber(limits.memoryBytes),
+      nanoCpus: asNumber(limits.nanoCpus),
+      pidsLimit: asNumber(limits.pidsLimit),
+    },
+    ttlSeconds: asNumber(value.ttlSeconds),
+    operationTimeoutSeconds: asNumber(value.operationTimeoutSeconds),
+    urlBindings: bindings.filter(item => asObject(item)?.isControlCheck !== true).map(parseUrlBinding),
+    flagSource: protocolFlagSource(value.flagSource),
+    controlCheckUrlBinding: bindings.find(item => asObject(item)?.isControlCheck === true)
+      ? parseUrlBinding(bindings.find(item => asObject(item)?.isControlCheck === true))
+      : null,
   }
-  const defaultLimits = defaultRuntimeLimits()
-  const limits: JsonObject = {}
-  putNumber(limits, 'memoryBytes', runtime.limits.memoryBytes ?? defaultLimits.memoryBytes)
-  putNumber(limits, 'nanoCpus', runtime.limits.nanoCpus ?? defaultLimits.nanoCpus)
-  putNumber(limits, 'pidsLimit', runtime.limits.pidsLimit ?? defaultLimits.pidsLimit)
-  obj.limits = limits
-  putNumber(obj, 'ttlSeconds', runtime.ttlSeconds ?? DEFAULT_RUNTIME_TTL_SECONDS)
-  putNumber(obj, 'operationTimeoutSeconds', runtime.operationTimeoutSeconds ?? DEFAULT_RUNTIME_OPERATION_TIMEOUT_SECONDS)
-  const bindings = runtime.urlBindings
-    .filter(b => b.urlTemplate.trim())
-    .map(serializeUrlBinding)
-  if (bindings.length > 0) obj.urlBindings = bindings
-  obj.flagSource = runtime.flagSource
-  if (runtime.controlCheckUrlBinding && runtime.controlCheckUrlBinding.urlTemplate.trim()) {
-    obj.controlCheckUrlBinding = serializeUrlBinding(runtime.controlCheckUrlBinding)
-  }
-  return obj
 }
 
-function serializeRunnerJob(job: RunnerJobModel): JsonObject {
-  const obj: JsonObject = { image: job.image.trim() }
-  putStringArray(obj, 'command', job.command)
-  putStringMap(obj, 'environment', job.environment)
-  putNumber(obj, 'timeoutSeconds', job.timeoutSeconds)
-  return obj
-}
-
-/** 按模式白名单序列化编辑模型为 definitionJson。 */
-export function serializeDefinition(mode: GameModeValue, model: DefinitionModel): string {
-  const obj: JsonObject = { schemaVersion: DEFINITION_SCHEMA_VERSION[mode] }
-  if (mode === 'Awd' || mode === 'Awdp')
-    obj.checkerAllowRoot = model.checkerAllowRoot
-  if (model.runtime) obj.runtime = serializeRuntimeTemplate(model.runtime)
-  if (mode === 'Awd') {
-    if (model.checker) {
-      const checker: JsonObject = { job: serializeRunnerJob(model.checker.job) }
-      putString(checker, 'targetServiceName', model.checker.targetServiceName)
-      obj.checker = checker
+export function definitionContractToModel(
+  contract: NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract,
+  mode: GameModeValue,
+): DefinitionModel {
+  if (contract.mode !== mode) throw new Error('Challenge definition mode does not match the editor.')
+  const selected = mode === 'Ctf' ? contract.ctf : mode === 'Awd' ? contract.awd : mode === 'Awdp' ? contract.awdp : contract.koh
+  if (!selected || [contract.ctf, contract.awd, contract.awdp, contract.koh].filter(Boolean).length !== 1)
+    throw new Error('Invalid challenge definition branch.')
+  const model = emptyDefinition(mode)
+  model.flagTemplate = contract.flagTemplate ? parseFlagTemplate(contract.flagTemplate) : null
+  model.interactionKind = contract.ctf?.interactionKind === 'PatchVerification'
+    ? CtfInteraction.PatchVerification
+    : CtfInteraction.FlagSubmission
+  model.runtime = contract.runtime ? definitionContractRuntime(contract.runtime) : null
+  const checker = asObject(contract.checker)
+  if (checker) {
+    const job = {
+      image: asString(checker.image),
+      command: asStringArray(checker.command),
+      environment: asStringMap(checker.environment),
+      timeoutSeconds: asNumber(checker.timeoutSeconds),
     }
-    if (model.flagInjection) {
-      const injection: JsonObject = { command: model.flagInjection.command }
-      putNumber(injection, 'timeoutSeconds', model.flagInjection.timeoutSeconds)
-      putString(injection, 'serviceName', model.flagInjection.serviceName)
-      obj.flagInjection = injection
+    if (mode === 'Awd') {
+      model.checker = {
+        job,
+        targetServiceName: asString(checker.targetServiceName),
+      }
+    }
+    else {
+      model.checkerJob = job
     }
   }
-  if (mode === 'Awdp') {
-    putString(obj, 'patchEntrypoint', model.patchEntrypoint)
-    putStringArray(obj, 'patchCommand', model.patchCommand)
-    putNumber(obj, 'patchTimeoutSeconds', model.patchTimeoutSeconds)
-    if (model.checkerJob) obj.checker = serializeRunnerJob(model.checkerJob)
-    putNumber(obj, 'readyTimeoutSeconds', model.readyTimeoutSeconds)
-    putNumber(obj, 'maximumPatchUploadBytes', model.maximumPatchUploadBytes)
-    obj.checkerFixInput = model.checkerFixInput
+  const injection = asObject(contract.awd?.flagInjection)
+  if (mode === 'Awd' && injection) {
+    model.flagInjection = {
+      command: asString(injection.command),
+      timeoutSeconds: asNumber(injection.timeoutSeconds),
+      serviceName: asString(injection.serviceName),
+    }
   }
-  return JSON.stringify(obj, null, 2)
+  model.patchEntrypoint = asString(contract.patchEntrypoint)
+  model.patchCommand = asStringArray(contract.patchCommand)
+  model.patchTimeoutSeconds = asNumber(contract.patchTimeoutSeconds)
+  model.readyTimeoutSeconds = asNumber(contract.readyTimeoutSeconds)
+  model.maximumPatchUploadBytes = asNumber(contract.maximumPatchUploadBytes)
+  model.checkerFixInput = contract.checkerFixInput === true
+  model.checkerAllowRoot = contract.checkerAllowRoot === true
+  return model
 }
 
-/** 创建或切换模式时使用的完整、可提交默认定义。 */
-export function defaultDefinitionJson(mode: GameModeValue): string {
-  return serializeDefinition(mode, emptyDefinition(mode))
+export function applyCtfInteraction(
+  model: DefinitionModel,
+  interactionKind: number,
+): void {
+  model.interactionKind = interactionKind
+  if (interactionKind === CtfInteraction.PatchVerification) {
+    model.runtime ??= emptyRuntimeTemplate('Ctf')
+    if (model.runtime.definition.kind !== 'container')
+      model.runtime.definition = emptyContainerDefinition(false)
+    model.runtime.flagSource = FlagSource.Static
+    model.runtime.definition.flagEnvironmentVariableName = ''
+    model.checkerJob ??= emptyRunnerJob()
+    model.maximumPatchUploadBytes ??= DEFAULT_CTF_PATCH_UPLOAD_BYTES
+    model.flagTemplate = null
+    return
+  }
+  model.patchEntrypoint = ''
+  model.patchCommand = []
+  model.patchTimeoutSeconds = null
+  model.readyTimeoutSeconds = null
+  model.maximumPatchUploadBytes = null
+  model.checkerJob = null
+  model.checkerFixInput = false
+  model.checkerAllowRoot = false
+  if (model.runtime) {
+    model.runtime.flagSource = FlagSource.PerTeam
+    if (model.runtime.definition.kind === 'container')
+      model.runtime.definition.flagEnvironmentVariableName = 'FLAG'
+  }
 }
 
-export function normalizeDefinitionJson(mode: GameModeValue, json: string): string | null {
-  const model = parseDefinition(json, mode)
-  return model ? serializeDefinition(mode, model) : null
-}
-
-// ---------- 通用「按字段描述」配置(竞赛配置 / 题目规则) ----------
+// ---------- Field-driven competition and challenge configuration ----------
 
 export type ConfigFieldType =
   | 'int'
@@ -752,8 +642,8 @@ export function competitionConfigFields(mode: GameModeValue): ConfigFieldDef[] {
     case 'Awdp':
       return [
         { key: 'roundDurationSeconds', label: translate("ui.roundDurationSeconds"), type: 'int', min: 1, defaultValue: 300 },
-        { key: 'break', label: translate("ui.breakScoreCurve"), type: 'pointsCurve', defaultValue: POINTS_CURVE_DEFAULT, description: translate("ui.settleEachRoundIndependentlyFromThatRoundSSuccessfulAttacking") },
-        { key: 'fix', label: translate("ui.fixScoreCurve"), type: 'pointsCurve', defaultValue: POINTS_CURVE_DEFAULT, description: translate("ui.settleEachRoundIndependentlyFromThatRoundSSuccessfulFixing") },
+        { key: 'breakScoreCurve', label: translate("ui.breakScoreCurve"), type: 'pointsCurve', defaultValue: POINTS_CURVE_DEFAULT, description: translate("ui.settleEachRoundIndependentlyFromThatRoundSSuccessfulAttacking") },
+        { key: 'fixScoreCurve', label: translate("ui.fixScoreCurve"), type: 'pointsCurve', defaultValue: POINTS_CURVE_DEFAULT, description: translate("ui.settleEachRoundIndependentlyFromThatRoundSSuccessfulFixing") },
         { key: 'requireBreakBeforeFix', label: translate("ui.requireBreakBeforeFix"), type: 'bool', defaultValue: false },
         { key: 'maxBreakSubmissions', label: translate("ui.breakMaximumNumberOfSubmissions"), type: 'int', min: 1, defaultValue: 10 },
         { key: 'maxFixSubmissions', label: translate("ui.fixMaximumNumberOfSubmissions"), type: 'int', min: 1, defaultValue: 10 },
@@ -771,7 +661,7 @@ export function competitionConfigFields(mode: GameModeValue): ConfigFieldDef[] {
   }
 }
 
-/** 题目规则(rulesJson):全部为可空,null = 继承竞赛默认。 */
+/** Challenge rule fields are nullable; null means inheriting the competition value. */
 export function challengeRuleFields(mode: GameModeValue): ConfigFieldDef[] {
   switch (mode) {
     case 'Ctf':
@@ -779,6 +669,7 @@ export function challengeRuleFields(mode: GameModeValue): ConfigFieldDef[] {
         { key: 'scoreCurve', label: translate("ui.scoreCurve"), type: 'pointsCurve' },
         { key: 'bloodRewards', label: translate("ui.bloodListReward"), type: 'bloodRewards', description: translate("ui.upTo3Items") },
         { key: 'maxFlagAttempts', label: translate("ui.flagMaximumNumberOfSubmissions"), type: 'int', min: 1 },
+        { key: 'maxPatchAttempts', label: translate("ui.patchMaximumNumberOfSubmissions"), type: 'int', min: 1, defaultValue: 10 },
         { key: 'wrongSubmissionPenalty', label: translate("ui.pointsDeductedForIncorrectSubmission"), type: 'int', min: 0 },
         { key: 'flagTemplate', label: translate("ui.dynamicFlagTemplate"), type: 'flagTemplate', description: translate("ui.usedOnlyForFuturePerTeamRuntimeFlagsGeneratedFor") },
       ]
@@ -794,8 +685,8 @@ export function challengeRuleFields(mode: GameModeValue): ConfigFieldDef[] {
       ]
     case 'Awdp':
       return [
-        { key: 'break', label: translate("ui.breakScoreCurve"), type: 'pointsCurve' },
-        { key: 'fix', label: translate("ui.fixScoreCurve"), type: 'pointsCurve' },
+        { key: 'breakScoreCurve', label: translate("ui.breakScoreCurve"), type: 'pointsCurve' },
+        { key: 'fixScoreCurve', label: translate("ui.fixScoreCurve"), type: 'pointsCurve' },
         { key: 'requireBreakBeforeFix', label: translate("ui.requireBreakBeforeFix"), type: 'bool' },
         { key: 'maxBreakSubmissions', label: translate("ui.breakMaximumNumberOfSubmissions"), type: 'int', min: 1 },
         { key: 'maxFixSubmissions', label: translate("ui.fixMaximumNumberOfSubmissions"), type: 'int', min: 1 },
@@ -819,7 +710,7 @@ function parsePointsCurve(raw: unknown): PointsCurveValue {
     initialPoints: asNumber(obj.initialPoints),
     minimumPoints: asNumber(obj.minimumPoints),
     decayTeamCount: asNumber(obj.decayTeamCount),
-    decayMode: asNumber(obj.decayMode) ?? ScoreDecayMode.Quadratic,
+    decayMode: protocolIndex(obj.decayMode, scoreDecayProtocols, ScoreDecayMode.Quadratic),
     customExpression: asString(obj.customExpression),
   }
 }
@@ -829,7 +720,7 @@ function parseBloodRewards(raw: unknown): BloodRewardValue[] {
   return raw.map((item) => {
     const obj = asObject(item) ?? {}
     return {
-      policy: asNumber(obj.policy) ?? BloodRewardPolicy.FixedPoints,
+      policy: protocolIndex(obj.policy, bloodRewardProtocols, BloodRewardPolicy.FixedPoints),
       value: asNumber(obj.value),
     }
   })
@@ -875,6 +766,8 @@ function readFieldValue(field: ConfigFieldDef, raw: unknown): unknown {
     case 'bool':
       return asBool(raw)
     case 'select':
+      if (field.key === 'evaluationDispatchMode')
+        return protocolIndex(raw, evaluationDispatchProtocols, EvaluationDispatch.Automatic)
       return typeof raw === 'string' || typeof raw === 'number' ? raw : (field.options?.[0]?.value ?? '')
     case 'pointsCurve':
       return parsePointsCurve(raw)
@@ -885,22 +778,188 @@ function readFieldValue(field: ConfigFieldDef, raw: unknown): unknown {
   }
 }
 
-/**
- * 解析配置 JSON 为字段值表。
- * overridden[key] = 该字段在 JSON 中显式出现(题目规则里用于区分「继承」与「覆盖」)。
- */
-export function parseConfigValues(
-  json: string | null | undefined,
+function runtimeModelToContract(
+  runtime: RuntimeTemplateModel,
+): NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeContract {
+  const common = {
+    allocation: runtime.allocation === RuntimeAllocation.Shared ? 'Shared' as const : 'PerTeam' as const,
+    limits: {
+      memoryBytes: runtime.limits.memoryBytes ?? 0,
+      nanoCpus: runtime.limits.nanoCpus ?? 0,
+      pidsLimit: runtime.limits.pidsLimit ?? 0,
+    },
+    ttlSeconds: runtime.ttlSeconds,
+    operationTimeoutSeconds: runtime.operationTimeoutSeconds,
+    flagSource: runtime.flagSource === FlagSource.PerTeam
+      ? 'PerTeam' as const
+      : runtime.flagSource === FlagSource.AwdRotation
+        ? 'AwdRotation' as const
+        : 'Static' as const,
+    egressPolicy: 'Isolated' as const,
+    urlBindings: [
+      ...runtime.urlBindings.map(binding => ({
+        urlTemplate: binding.urlTemplate,
+        exposure: binding.exposure === UrlExposure.OwnerOnly ? 'OwnerOnly' as const : 'Participants' as const,
+        containerPort: binding.containerPort,
+        serviceName: binding.serviceName || null,
+        vmId: null,
+        guestPort: null,
+        isControlCheck: false,
+      })),
+      ...(runtime.controlCheckUrlBinding
+        ? [{
+            urlTemplate: runtime.controlCheckUrlBinding.urlTemplate,
+            exposure: runtime.controlCheckUrlBinding.exposure === UrlExposure.OwnerOnly
+              ? 'OwnerOnly' as const
+              : 'Participants' as const,
+            containerPort: runtime.controlCheckUrlBinding.containerPort,
+            serviceName: runtime.controlCheckUrlBinding.serviceName || null,
+            vmId: null,
+            guestPort: null,
+            isControlCheck: true,
+          }]
+        : []),
+    ],
+  }
+  if (runtime.definition.kind === 'compose') {
+    return {
+      kind: 'Compose',
+      ...common,
+      compose: {
+        composeYaml: runtime.definition.composeYaml,
+        environment: runtime.definition.environment,
+        labels: runtime.definition.labels,
+        flagEnvironmentVariables: runtime.definition.flagEnvironmentVariables,
+        serviceResources: runtime.definition.serviceResources.map(item => ({
+          serviceName: item.service,
+          limits: {
+            memoryBytes: item.memoryBytes ?? 0,
+            nanoCpus: item.nanoCpus ?? 0,
+            pidsLimit: item.pidsLimit ?? 0,
+          },
+        })),
+      },
+    }
+  }
+  if (runtime.definition.kind === 'ova') {
+    return {
+      kind: 'Ova',
+      ...common,
+      ova: { sourceUrl: runtime.definition.sourceUrl, sha256: runtime.definition.sha256 },
+    }
+  }
+  return {
+    kind: 'Container',
+    ...common,
+    container: {
+      image: runtime.definition.image,
+      command: runtime.definition.command,
+      environment: runtime.definition.environment,
+      labels: runtime.definition.labels,
+      portMappings: runtime.definition.containerPorts
+        .filter((port): port is number => port !== null)
+        .map(port => ({ containerPort: port, hostPort: 0 })),
+      security: {
+        noNewPrivileges: runtime.definition.security.noNewPrivileges,
+        readonlyRootfs: runtime.definition.security.readonlyRootfs,
+        runAsNonRoot: runtime.definition.security.runAsNonRoot,
+        capDrop: runtime.definition.security.capDrop,
+        capAdd: runtime.definition.security.capAdd,
+      },
+      flagEnvironmentVariableName: runtime.definition.flagEnvironmentVariableName || null,
+      internalPorts: runtime.definition.internalPorts
+        .filter((port): port is number => port !== null),
+    },
+  }
+}
+
+function runnerJobContract(job: RunnerJobModel, targetServiceName: string | null = null) {
+  return {
+    image: job.image,
+    command: job.command,
+    environment: job.environment,
+    timeoutSeconds: job.timeoutSeconds ?? 60,
+    targetServiceName,
+  }
+}
+
+export function definitionModelToContract(
+  mode: GameModeValue,
+  model: DefinitionModel,
+): NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract {
+  const common = {
+    flagTemplate: model.flagTemplate ? {
+      header: model.flagTemplate.header,
+      bodyTemplate: model.flagTemplate.bodyTemplate,
+      leetLiteralText: model.flagTemplate.leetLiteralText,
+    } : null,
+    runtime: model.runtime ? runtimeModelToContract(model.runtime) : null,
+    checker: mode === 'Awd' && model.checker
+      ? runnerJobContract(model.checker.job, model.checker.targetServiceName || null)
+      : model.checkerJob
+        ? runnerJobContract(model.checkerJob)
+        : null,
+    patchEntrypoint: model.patchEntrypoint || null,
+    patchCommand: model.patchCommand,
+    patchTimeoutSeconds: model.patchTimeoutSeconds,
+    readyTimeoutSeconds: model.readyTimeoutSeconds,
+    maximumPatchUploadBytes: model.maximumPatchUploadBytes,
+    checkerFixInput: model.checkerFixInput,
+    checkerAllowRoot: model.checkerAllowRoot,
+  }
+  switch (mode) {
+    case 'Ctf':
+      return {
+        mode,
+        ...common,
+        ctf: { interactionKind: model.interactionKind === CtfInteraction.PatchVerification
+          ? 'PatchVerification'
+          : 'FlagSubmission' },
+      }
+    case 'Awd':
+      return {
+        mode,
+        ...common,
+        awd: { flagInjection: model.flagInjection
+          ? {
+              command: model.flagInjection.command,
+              timeoutSeconds: model.flagInjection.timeoutSeconds ?? 30,
+              serviceName: model.flagInjection.serviceName || null,
+            }
+          : null },
+      }
+    case 'Awdp':
+      return { mode, ...common, awdp: {} }
+    case 'Koh':
+      return { mode, ...common, koh: {} }
+  }
+}
+
+export function defaultDefinition(mode: GameModeValue): NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract {
+  return definitionModelToContract(mode, emptyDefinition(mode))
+}
+
+export function readConfigValues(
+  configuration: Record<string, unknown> | null | undefined,
   fields: ConfigFieldDef[],
+  options: { rules: boolean },
 ): { values: ConfigValues; overridden: Record<string, boolean> } | null {
-  const obj = parseJsonObject(json)
-  if (!obj) return null
+  if (!configuration) return null
+  const mode = configuration.mode
+  if (mode !== 'Ctf' && mode !== 'Awd' && mode !== 'Awdp' && mode !== 'Koh') return null
+  if (!options.rules && !asObject(configuration.flagTemplate)) return null
+  const branchName = mode.toLowerCase()
+  const branch = asObject(configuration[branchName])
+  if (!branch || ['ctf', 'awd', 'awdp', 'koh'].filter(key => configuration[key] != null).length !== 1)
+    return null
   const values: ConfigValues = {}
   const overridden: Record<string, boolean> = {}
   for (const field of fields) {
-    if (field.key in obj) {
-      values[field.key] = readFieldValue(field, obj[field.key])
-      overridden[field.key] = true
+    const source = !options.rules && field.key === 'flagTemplate' ? configuration : branch
+    const key = !options.rules && field.key === 'scoreCurve' ? 'defaultScoreCurve' : field.key
+    if (key in source) {
+      values[field.key] = readFieldValue(field, source[key])
+      overridden[field.key] = source[key] !== null
     }
     else {
       values[field.key] = fieldDefaultValue(field)
@@ -927,6 +986,10 @@ function writeFieldValue(out: JsonObject, field: ConfigFieldDef, value: unknown)
       return
     }
     case 'select': {
+      if (field.key === 'evaluationDispatchMode') {
+        out[field.key] = evaluationDispatchProtocols[value as number] ?? evaluationDispatchProtocols[EvaluationDispatch.Automatic]
+        return
+      }
       if (typeof value === 'string' || typeof value === 'number') out[field.key] = value
       return
     }
@@ -936,7 +999,8 @@ function writeFieldValue(out: JsonObject, field: ConfigFieldDef, value: unknown)
       putNumber(obj, 'initialPoints', curve?.initialPoints ?? null)
       putNumber(obj, 'minimumPoints', curve?.minimumPoints ?? null)
       putNumber(obj, 'decayTeamCount', curve?.decayTeamCount ?? null)
-      obj.decayMode = curve?.decayMode ?? ScoreDecayMode.Quadratic
+      obj.decayMode = scoreDecayProtocols[curve?.decayMode ?? ScoreDecayMode.Quadratic]
+        ?? scoreDecayProtocols[ScoreDecayMode.Quadratic]
       if (curve?.decayMode === ScoreDecayMode.Custom && curve.customExpression?.trim())
         obj.customExpression = curve.customExpression.trim()
       if (Object.keys(obj).length > 0) out[field.key] = obj
@@ -944,7 +1008,10 @@ function writeFieldValue(out: JsonObject, field: ConfigFieldDef, value: unknown)
     }
     case 'bloodRewards': {
       const rewards = (value as BloodRewardValue[]) ?? []
-      out[field.key] = rewards.map(r => ({ policy: r.policy, ...(r.value !== null ? { value: r.value } : {}) }))
+      out[field.key] = rewards.map(r => ({
+        policy: bloodRewardProtocols[r.policy] ?? bloodRewardProtocols[BloodRewardPolicy.FixedPoints],
+        ...(r.value !== null ? { value: r.value } : {}),
+      }))
       return
     }
     case 'flagTemplate': {
@@ -960,23 +1027,21 @@ function writeFieldValue(out: JsonObject, field: ConfigFieldDef, value: unknown)
   }
 }
 
-/**
- * 序列化字段值表为配置 JSON。
- * rules 模式下只写入 overridden 的字段(其余继承竞赛默认)。
- */
-export function serializeConfigValues(
+export function buildConfigValues(
   mode: GameModeValue,
   fields: ConfigFieldDef[],
   values: ConfigValues,
   options: { rules: boolean; overridden?: Record<string, boolean> },
-): string {
-  const version = options.rules ? CHALLENGE_RULES_SCHEMA_VERSION[mode] : COMPETITION_CONFIG_SCHEMA_VERSION[mode]
-  const out: JsonObject = { schemaVersion: version }
+): Record<string, unknown> {
+  const branch: JsonObject = {}
+  const out: JsonObject = { mode, [mode.toLowerCase()]: branch }
   for (const field of fields) {
     if (options.rules && !options.overridden?.[field.key]) continue
-    writeFieldValue(out, field, values[field.key])
+    writeFieldValue(!options.rules && field.key === 'flagTemplate' ? out : branch, field, values[field.key])
   }
-  return JSON.stringify(out, null, 2)
+  if (!options.rules && !out.flagTemplate)
+    writeFieldValue(out, { key: 'flagTemplate', label: '', type: 'flagTemplate' }, emptyFlagTemplate())
+  return out
 }
 
 // ---------- 编辑辅助 ----------

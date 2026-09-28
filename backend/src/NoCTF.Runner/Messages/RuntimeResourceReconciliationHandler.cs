@@ -7,6 +7,9 @@ using NoCTF.Domain.Runtime;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Runner.Composition;
 using Wolverine.Attributes;
+using NoCTF.Infrastructure.Runtime.Capacity;
+using NoCTF.Application.Messaging;
+using System.Text.Json;
 
 namespace NoCTF.Runner.Messages;
 
@@ -17,12 +20,14 @@ public sealed class RuntimeResourceReconciliationHandler(
     IEnumerable<IRuntimeManagedResourceReconciler> reconcilers,
     IOptions<RunnerOptions> runnerOptions,
     IRunnerCapacityGate capacity,
-    IRuntimeProviderCatalog? providers = null)
+    IRuntimeProviderCatalog? providers = null,
+    NoCTF.Infrastructure.Runtime.Capacity.RunnerResourceMutationCoordinator? mutations = null)
 {
     public async Task Handle(
         ReconcileRuntimeResources message,
         CancellationToken cancellationToken)
     {
+        using var mutation = mutations is null ? null : await mutations.EnterAsync(cancellationToken);
         var configuredPool = runnerOptions.Value.Pool;
         var configuredRunnerId = runnerOptions.Value.Id;
         RunnerNodeAssignmentGuard.Validate(
@@ -36,6 +41,33 @@ public sealed class RuntimeResourceReconciliationHandler(
                 candidate.Provider == configuredProvider)
             ?? throw new InvalidOperationException(
                 $"Runtime resource reconciliation is unavailable for '{configuredProvider}'.");
+        if (reconciler is IRuntimeProxyNetworkReconciler proxyNetworks)
+        {
+            var proxyRuntimes = await db.RuntimeInstances.AsNoTracking()
+                .Where(runtime => runtime.RunnerId == configuredRunnerId
+                    && runtime.RuntimeProvider == configuredProvider
+                    && runtime.State == RuntimeState.Running
+                    && (runtime.AccessMode == RuntimeAccessMode.DirectAndWsrx
+                        || runtime.AccessMode == RuntimeAccessMode.WsrxOnly)
+                    && runtime.ProviderReceipt != null)
+                .Select(runtime => new
+                {
+                    runtime.Id,
+                    runtime.RuntimeKind,
+                    ProviderReceipt = runtime.ProviderReceipt!
+                })
+                .AsSplitQuery()
+                .ToArrayAsync(cancellationToken);
+            foreach (var runtime in proxyRuntimes)
+            {
+                await proxyNetworks.EnsureProxyNetworkAsync(
+                    runtime.Id,
+                    runtime.RuntimeKind,
+                    runtime.ProviderReceipt.ToData(),
+                    cancellationToken);
+            }
+        }
+        await ReconcileAuxiliaryAsync(reconciler, configuredRunnerId, cancellationToken);
         var managed = await reconciler.ListManagedAsync(cancellationToken);
 
         var failedAssignments = await db.RuntimeInstances
@@ -43,6 +75,7 @@ public sealed class RuntimeResourceReconciliationHandler(
                 && instance.RuntimeProvider == configuredProvider
                 && instance.RunnerId == message.RunnerId)
             .OrderBy(instance => instance.Id)
+            .AsSplitQuery()
             .ToListAsync(cancellationToken);
         var failedIdentities = failedAssignments
             .Select(instance => new RuntimeResourceIdentity(instance.Id))
@@ -50,7 +83,7 @@ public sealed class RuntimeResourceReconciliationHandler(
         foreach (var instance in failedAssignments)
         {
             var identity = new RuntimeResourceIdentity(instance.Id);
-            if (instance.ProviderReceiptJson is { } providerReceiptJson)
+            if (instance.ProviderReceipt is { } providerReceipt)
             {
                 var catalog = providers
                     ?? throw new InvalidOperationException(
@@ -60,7 +93,7 @@ public sealed class RuntimeResourceReconciliationHandler(
                     instance.RuntimeKind,
                     identity,
                     instance.RuntimeProvider,
-                    providerReceiptJson,
+                    providerReceipt.ToData(),
                     cancellationToken);
             }
             else
@@ -75,11 +108,11 @@ public sealed class RuntimeResourceReconciliationHandler(
                 instance.Id,
                 message.RunnerId,
                 cancellationToken);
-            if (release == RunnerCapacityReleaseOutcome.OwnerMismatch)
+            if (release is RunnerCapacityReleaseOutcome.OwnerMismatch or RunnerCapacityReleaseOutcome.RecoveryRequired)
                 throw new InvalidOperationException(
                     "Failed Runtime capacity belongs to a different Runner assignment.");
 
-            instance.ProviderReceiptJson = null;
+            instance.ProviderReceipt = null;
             instance.RunnerId = null;
             await db.SaveChangesAsync(cancellationToken);
         }
@@ -129,7 +162,7 @@ public sealed class RuntimeResourceReconciliationHandler(
                         resource.RuntimeInstanceId,
                         message.RunnerId,
                         cancellationToken);
-                    if (release == RunnerCapacityReleaseOutcome.OwnerMismatch)
+                    if (release is RunnerCapacityReleaseOutcome.OwnerMismatch or RunnerCapacityReleaseOutcome.RecoveryRequired)
                         throw new InvalidOperationException(
                             "Orphaned Runtime capacity belongs to a different Runner assignment.");
                 }
@@ -147,6 +180,38 @@ public sealed class RuntimeResourceReconciliationHandler(
         if (failures > 0)
             throw new InvalidOperationException(
                 $"{failures} orphaned Runtime resource groups could not be removed.");
+    }
+
+    private async Task ReconcileAuxiliaryAsync(IRuntimeManagedResourceReconciler reconciler, string runnerId, CancellationToken ct)
+    {
+        if (providers is null || !db.Database.IsRelational()) return;
+        var rows = await db.RuntimeInstances.AsNoTracking()
+            .Where(runtime => runtime.RuntimeProvider == reconciler.Provider
+                && runtime.CapacityAllocationEntries.Any(allocation =>
+                    allocation.RunnerId == runnerId
+                    && (allocation.WorkloadKind == RuntimeWorkloadKind.AwdChecker
+                        || allocation.WorkloadKind == RuntimeWorkloadKind.PatchChecker)))
+            .OrderBy(runtime => runtime.Id)
+            .Take(500)
+            .AsSplitQuery()
+            .ToArrayAsync(ct);
+        foreach (var runtime in rows.Where(row => row.RuntimeProvider == reconciler.Provider))
+        foreach (var allocation in runtime.CapacityAllocations.Items.Where(item => item.Identity.IsAuxiliary && item.RunnerId == runnerId))
+        {
+            if (mutations?.IsActive(allocation.Identity) == true) continue;
+            var processing = await db.GameplayFacts.AnyAsync(fact => fact.Id == allocation.GameplayFactId
+                && fact.State == NoCTF.Domain.Gameplay.GameplayFactState.Processing, ct);
+            if (processing && runtime.State is RuntimeState.Running or RuntimeState.Provisioning) continue;
+            if (await reconciler.WorkloadExistsAsync(allocation.Identity, ct) == true)
+            {
+                var receipt = new ContainerReceipt(allocation.Identity.OperationId, runtime.RuntimeProvider,
+                    $"noctf-{allocation.Identity.OperationId:N}", RuntimeStatus.Stopped,
+                    new Dictionary<int, int>(), null, null, RuntimeInstanceId: runtime.Id);
+                await providers.Containers(runtime.RuntimeProvider).DestroyAsync(receipt, ct);
+            }
+            if (await reconciler.WorkloadExistsAsync(allocation.Identity, ct) == false)
+                await capacity.ReleaseWorkloadAsync(allocation.Identity, runnerId, ct);
+        }
     }
 
     private static bool CanReleaseOrphanCapacity(

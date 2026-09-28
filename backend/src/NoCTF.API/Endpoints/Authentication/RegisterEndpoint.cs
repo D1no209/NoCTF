@@ -53,7 +53,7 @@ public sealed class RegisterValidator : Validator<RegisterRequest>
     {
         RuleFor(request => request.UserName)
             .NotEmpty().MinimumLength(3).MaximumLength(64)
-            .Matches("^[A-Za-z0-9_-]+$");
+            .Matches(@"^[\p{L}\p{N}_-]+$");
         RuleFor(request => request.Email).NotEmpty().EmailAddress().MaximumLength(320);
         RuleFor(request => request.Password).NotEmpty().MinimumLength(8).MaximumLength(1024);
     }

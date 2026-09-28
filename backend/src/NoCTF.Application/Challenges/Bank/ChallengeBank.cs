@@ -14,11 +14,42 @@ public sealed record ChallengeTemplateView(
     string Title,
     string? Description,
     string Direction,
-    string DefinitionJson,
+    ChallengeDefinition Definition,
     DateTimeOffset? DeletedAt,
     int ActiveCompetitionReferenceCount,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt)
+{
+    public CtfInteractionKind InteractionKind => Definition is CtfChallengeDefinition ctf
+        ? ctf.InteractionKind
+        : CtfInteractionKind.FlagSubmission;
+}
+
+public sealed record ChallengeTemplateSummaryView(
+    Guid Id,
+    GameMode Mode,
+    ChallengeVisibility Visibility,
+    string Title,
+    string Direction,
+    DateTimeOffset? DeletedAt,
+    int ActiveCompetitionReferenceCount,
+    DateTimeOffset UpdatedAt,
+    CtfInteractionKind InteractionKind);
+
+public sealed record ChallengeTemplateListQuery(
+    Guid ActorId,
+    bool IsAdministrator,
+    bool IncludeDeleted,
+    string? Keyword,
+    string? Direction,
+    int Offset,
+    int Limit,
+    bool Desc);
+
+public sealed record ChallengeTemplateListPage(
+    IReadOnlyList<ChallengeTemplateSummaryView> Items,
+    int Total,
+    IReadOnlyList<string> Directions);
 
 public enum ChallengeTemplateWriteState
 {
@@ -31,7 +62,9 @@ public enum ChallengeTemplateWriteState
     ActiveRuntimeDefinitionConflict,
     OwnerIncludedInManagerSet,
     UserNotFound,
-    RoleNotEligible
+    RoleNotEligible,
+    ExperimentalFeatureDisabled,
+    InteractionKindConflict
 }
 
 public sealed record ChallengeTemplateWriteResult(
@@ -51,7 +84,7 @@ public sealed record CreateChallengeTemplateCommand(
     string Title,
     string? Description,
     string Direction,
-    string DefinitionJson,
+    ChallengeDefinition Definition,
     DateTimeOffset CreatedAt);
 
 public sealed record UpdateChallengeTemplateCommand(
@@ -63,7 +96,7 @@ public sealed record UpdateChallengeTemplateCommand(
     string Title,
     string? Description,
     string Direction,
-    string DefinitionJson,
+    ChallengeDefinition Definition,
     DateTimeOffset UpdatedAt);
 
 public interface IChallengeBankStore
@@ -71,10 +104,8 @@ public interface IChallengeBankStore
     Task<ChallengeTemplateWriteResult> CreateAsync(
         CreateChallengeTemplateCommand command,
         CancellationToken cancellationToken);
-    Task<IReadOnlyList<ChallengeTemplateView>> ListAsync(
-        Guid actorId,
-        bool isAdministrator,
-        bool includeDeleted,
+    Task<ChallengeTemplateListPage> ListPageAsync(
+        ChallengeTemplateListQuery query,
         CancellationToken cancellationToken);
     Task<ChallengeTemplateView?> FindAsync(Guid challengeId, Guid actorId, bool isAdministrator, bool includeDeleted, CancellationToken cancellationToken);
     Task<ChallengeTemplateWriteResult> UpdateAsync(
@@ -134,7 +165,7 @@ public static class ChallengeTemplateValidation
         GameMode mode,
         string title,
         string direction,
-        string definitionJson)
+        ChallengeDefinition definition)
     {
         if (!Enum.IsDefined(mode))
             return OperationResult<ChallengeTemplateValidationFailureCode>.Failure(
@@ -147,30 +178,28 @@ public static class ChallengeTemplateValidation
             return OperationResult<ChallengeTemplateValidationFailureCode>.Failure(
                 ChallengeTemplateValidationFailureCode.InvalidDirection,
                 "Direction is required and must be at most 96 characters.");
-        if (string.IsNullOrWhiteSpace(definitionJson))
+        if (definition is null || definition.Mode != mode)
             return OperationResult<ChallengeTemplateValidationFailureCode>.Failure(
                 ChallengeTemplateValidationFailureCode.InvalidDefinition,
-                "DefinitionJson is required.");
+                "The challenge definition type must match its mode.");
         return OperationResult<ChallengeTemplateValidationFailureCode>.Success();
     }
 }
 
 public sealed class CreateChallengeTemplate(
     IChallengeBankStore store,
-    IChallengeConfigurationCatalog configurations)
+    IChallengeConfigurationCatalog configurations,
+    IExperimentalFeatureReader? experimentalFeatures = null)
 {
     public async Task<ChallengeTemplateWriteResult> ExecuteAsync(
         CreateChallengeTemplateCommand command,
         CancellationToken ct = default)
     {
-        var definitionJson = string.IsNullOrWhiteSpace(command.DefinitionJson)
-            ? configurations.GetDefaultDefinitionJson(command.Mode)
-            : command.DefinitionJson;
         var validation = ChallengeTemplateValidation.Validate(
             command.Mode,
             command.Title,
             command.Direction,
-            definitionJson);
+            command.Definition);
         if (!validation.Succeeded)
         {
             return new(
@@ -179,42 +208,83 @@ public sealed class CreateChallengeTemplate(
         }
         var definitionErrors = configurations.ValidateDefinition(
             command.Mode,
-            definitionJson);
+            command.Definition);
         if (definitionErrors.Count > 0)
         {
             return new(
                 ChallengeTemplateWriteState.InvalidDefinition,
                 Detail: string.Join(" ", definitionErrors));
         }
+        if (IsPatchVerification(command.Definition)
+            && !(await IsPatchVerificationEnabledAsync(ct)))
+        {
+            return new(
+                ChallengeTemplateWriteState.ExperimentalFeatureDisabled,
+                Detail: "CTF PatchVerification is disabled in platform settings.");
+        }
         return await store.CreateAsync(command with
         {
             Title = command.Title.Trim(),
             Description = command.Description?.Trim(),
             Direction = command.Direction.Trim(),
-            DefinitionJson = definitionJson
+            Definition = command.Definition
         }, ct);
     }
+
+    private Task<bool> IsPatchVerificationEnabledAsync(CancellationToken ct) =>
+        experimentalFeatures?.IsCtfPatchVerificationEnabledAsync(ct)
+        ?? Task.FromResult(false);
+
+    private static bool IsPatchVerification(ChallengeDefinition definition) =>
+        definition is CtfChallengeDefinition
+            { InteractionKind: CtfInteractionKind.PatchVerification };
 }
 
-public sealed class ListChallengeTemplates(IChallengeBankStore store)
+public sealed class ListChallengeTemplates(
+    IChallengeBankStore store,
+    IExperimentalFeatureReader? experimentalFeatures = null)
 {
-    public Task<IReadOnlyList<ChallengeTemplateView>> ExecuteAsync(
-        Guid actorId,
-        bool isAdministrator,
-        bool includeDeleted = false,
-        CancellationToken ct = default) =>
-        store.ListAsync(actorId, isAdministrator, includeDeleted, ct);
+    public async Task<ChallengeTemplateListPage> ExecutePageAsync(
+        ChallengeTemplateListQuery query,
+        CancellationToken ct = default)
+    {
+        var page = await store.ListPageAsync(query, ct);
+        if (query.IsAdministrator || await IsEnabledAsync(ct))
+            return page;
+
+        var visible = page.Items
+            .Where(item => item.InteractionKind != CtfInteractionKind.PatchVerification)
+            .ToArray();
+        return page with { Items = visible };
+    }
+
+    private Task<bool> IsEnabledAsync(CancellationToken ct) =>
+        experimentalFeatures?.IsCtfPatchVerificationEnabledAsync(ct)
+        ?? Task.FromResult(false);
 }
 
-public sealed class GetChallengeTemplate(IChallengeBankStore store)
+public sealed class GetChallengeTemplate(
+    IChallengeBankStore store,
+    IExperimentalFeatureReader? experimentalFeatures = null)
 {
-    public Task<ChallengeTemplateView?> ExecuteAsync(
+    public async Task<ChallengeTemplateView?> ExecuteAsync(
         Guid challengeId,
         Guid actorId,
         bool isAdministrator,
         bool includeDeleted = false,
-        CancellationToken ct = default) =>
-        store.FindAsync(challengeId, actorId, isAdministrator, includeDeleted, ct);
+        CancellationToken ct = default)
+    {
+        var item = await store.FindAsync(challengeId, actorId, isAdministrator, includeDeleted, ct);
+        if (item is null || isAdministrator
+            || item.InteractionKind != CtfInteractionKind.PatchVerification
+            || await IsEnabledAsync(ct))
+            return item;
+        return null;
+    }
+
+    private Task<bool> IsEnabledAsync(CancellationToken ct) =>
+        experimentalFeatures?.IsCtfPatchVerificationEnabledAsync(ct)
+        ?? Task.FromResult(false);
 }
 
 public sealed class UpdateChallengeTemplate(
@@ -225,14 +295,11 @@ public sealed class UpdateChallengeTemplate(
         UpdateChallengeTemplateCommand command,
         CancellationToken ct = default)
     {
-        var definitionJson = string.IsNullOrWhiteSpace(command.DefinitionJson)
-            ? configurations.GetDefaultDefinitionJson(command.Mode)
-            : command.DefinitionJson;
         var validation = ChallengeTemplateValidation.Validate(
             command.Mode,
             command.Title,
             command.Direction,
-            definitionJson);
+            command.Definition);
         if (!validation.Succeeded)
         {
             return new(
@@ -241,7 +308,7 @@ public sealed class UpdateChallengeTemplate(
         }
         var definitionErrors = configurations.ValidateDefinition(
             command.Mode,
-            definitionJson);
+            command.Definition);
         if (definitionErrors.Count > 0)
         {
             return new(
@@ -253,9 +320,10 @@ public sealed class UpdateChallengeTemplate(
             Title = command.Title.Trim(),
             Description = command.Description?.Trim(),
             Direction = command.Direction.Trim(),
-            DefinitionJson = definitionJson
+            Definition = command.Definition
         }, ct);
     }
+
 }
 
 public sealed class DeleteChallengeTemplate(IChallengeBankStore store)

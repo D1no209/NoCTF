@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { ScoreboardTeamDetailDialogViewState } from '~/features/leaderboard/useScoreboardTeamDetailDialog'
 
 const viewProps = defineProps<{ state: ScoreboardTeamDetailDialogViewState }>()
-const { ChartSpline, Flag, ShieldCheck, Target, Trophy, scoreboardRankingStateLabel, emit, open, isAwdp, scoreLabel, memberContributionSlices, memberContributionPercent, memberContributionPieOption, rows, directionGroups, radarOption, flagLabel, mode, team, trendSeries, trendLoading, trendError, trendRangeStart, trendRangeEnd, LazyScoreTrendChart } = toRefs(viewProps.state)
+const { ChartSpline, Flag, ShieldCheck, Target, Trophy, scoreboardRankingStateLabel, emit, open, isAwdp, scoreLabel, memberContributionSlices, memberContributionRows, memberContributionPieOption, rows, directionGroups, radarOption, flagLabel, mode, team, trendSeries, trendLoading, trendError, trendRangeStart, trendRangeEnd, trendRevision, LazyScoreTrendChart } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -39,6 +39,7 @@ const { ChartSpline, Flag, ShieldCheck, Target, Trophy, scoreboardRankingStateLa
           <component :is="LazyScoreTrendChart"
             v-else-if="trendSeries?.length"
             :series="trendSeries"
+            :revision="`${trendRevision ?? 'none'}:${team.teamId}`"
             :range-start="trendRangeStart"
             :range-end="trendRangeEnd"
             height="280px"
@@ -64,16 +65,20 @@ const { ChartSpline, Flag, ShieldCheck, Target, Trophy, scoreboardRankingStateLa
                 <p class="text-xs text-muted-foreground">{{ $t('ui.basedOnPositivePointsAttributableToIndividualMembers') }}</p>
               </div>
             </div>
-            <MiniChart v-if="memberContributionSlices.length" :option="memberContributionPieOption" height="360px" />
+            <MiniChart v-if="memberContributionSlices.length" :option="memberContributionPieOption" height="260px" />
             <p v-else class="py-10 text-center text-sm text-muted-foreground">{{ $t('ui.noMemberAttributedScoreYet') }}</p>
+            <ul v-if="memberContributionRows.length" class="mt-2 space-y-1.5">
+              <li v-for="row in memberContributionRows" :key="`${row.userId}:${row.name}`" class="flex items-start gap-3 text-sm">
+                <span class="mt-1 size-2.5 shrink-0 rounded-full" :style="{ backgroundColor: row.color }" aria-hidden="true" />
+                <span class="min-w-0 flex-1 break-words font-medium text-foreground">{{ row.name }}</span>
+                <span class="shrink-0 whitespace-nowrap font-mono font-semibold tabular-nums text-foreground">
+                  {{ row.value }} {{ $t('ui.pts4') }} · {{ row.percent }}%
+                </span>
+              </li>
+            </ul>
             <p class="text-xs leading-5 text-muted-foreground">
               {{ $t('ui.automatedSettlementHistoricalWindowsAndOtherPointsWithoutAnIndividual') }}
             </p>
-            <ul class="sr-only">
-              <li v-for="slice in memberContributionSlices" :key="`${slice.userId}:${slice.name}`">
-                {{ slice.name }}：{{ slice.value }} {{ $t('ui.pts4') }}{{ memberContributionPercent(slice.value) }}%
-              </li>
-            </ul>
           </section>
         </div>
 

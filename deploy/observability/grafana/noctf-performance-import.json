@@ -1,0 +1,437 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [{ "asDropdown": false, "icon": "external link", "includeVars": false, "keepTime": true, "tags": [], "targetBlank": false, "title": "日志诊断", "tooltip": "打开同一时间范围的日志", "type": "link", "url": "/d/noctf-logs" }],
+  "panels": [
+    {
+      "id": 1, "type": "stat", "title": "NoCTF 在线", "description": "1 表示 Prometheus 最近一次抓取 NoCTF 成功；0 表示目标不可达。",
+      "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] } } },
+      "targets": [{ "refId": "A", "expr": "max(up{job=\"noctf\"})" }]
+    },
+    {
+      "id": 2, "type": "stat", "title": "请求速率", "description": "按所选路由与统计窗口计算 REST 请求/秒。",
+      "gridPos": { "x": 4, "y": 0, "w": 4, "h": 4 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [{ "refId": "A", "expr": "sum(rate(noctf_api_requests_total{request_kind=\"rest\",endpoint=~\"${route:regex}\"}[$window])) or vector(0)" }]
+    },
+    {
+      "id": 3, "type": "stat", "title": "5xx 比例", "description": "仅统计服务端错误；预期中的 Runtime 404 不计入 5xx。样本数见右侧。",
+      "gridPos": { "x": 8, "y": 0, "w": 4, "h": 4 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 0.01 }, { "color": "red", "value": 0.02 }] } } },
+      "targets": [{ "refId": "A", "expr": "(sum(rate(noctf_api_requests_total{request_kind=\"rest\",outcome=\"server_error\",endpoint=~\"${route:regex}\"}[$window])) or vector(0)) / clamp_min((sum(rate(noctf_api_requests_total{request_kind=\"rest\",endpoint=~\"${route:regex}\"}[$window])) or vector(0)), 0.001)" }]
+    },
+    {
+      "id": 4, "type": "stat", "title": "接口 P95", "description": "服务端请求耗时的直方图估算；低样本窗口不可作为稳定结论。",
+      "gridPos": { "x": 12, "y": 0, "w": 4, "h": 4 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 0.25 }, { "color": "red", "value": 0.8 }] } } },
+      "targets": [{ "refId": "A", "expr": "histogram_quantile(0.95, sum by (le) (rate(noctf_api_request_duration_seconds_bucket{request_kind=\"rest\",endpoint=~\"${route:regex}\"}[$window])))" }]
+    },
+    {
+      "id": 5, "type": "stat", "title": "接口 P99", "description": "服务端请求耗时尾部；须结合样本数和错误率阅读。",
+      "gridPos": { "x": 16, "y": 0, "w": 4, "h": 4 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 0.8 }, { "color": "red", "value": 2 }] } } },
+      "targets": [{ "refId": "A", "expr": "histogram_quantile(0.99, sum by (le) (rate(noctf_api_request_duration_seconds_bucket{request_kind=\"rest\",endpoint=~\"${route:regex}\"}[$window])))" }]
+    },
+    {
+      "id": 6, "type": "stat", "title": "窗口样本数", "description": "所选路由在统计窗口内的近似请求数；样本太少时不要解读 P95/P99。",
+      "gridPos": { "x": 20, "y": 0, "w": 4, "h": 4 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "orange", "value": 20 }, { "color": "green", "value": 100 }] } } },
+      "targets": [{ "refId": "A", "expr": "sum(increase(noctf_api_request_duration_seconds_count{request_kind=\"rest\",endpoint=~\"${route:regex}\"}[$window])) or vector(0)" }]
+    },
+    {
+      "id": 7, "type": "timeseries", "title": "所选路由延迟趋势", "description": "选“全部”时为 REST 总体分布；选定路由后为该路由的 P50/P95/P99。单位为秒。",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        { "refId": "A", "expr": "histogram_quantile(0.50, sum by (le) (rate(noctf_api_request_duration_seconds_bucket{request_kind=\"rest\",endpoint=~\"${route:regex}\"}[$window])))", "legendFormat": "P50" },
+        { "refId": "B", "expr": "histogram_quantile(0.95, sum by (le) (rate(noctf_api_request_duration_seconds_bucket{request_kind=\"rest\",endpoint=~\"${route:regex}\"}[$window])))", "legendFormat": "P95" },
+        { "refId": "C", "expr": "histogram_quantile(0.99, sum by (le) (rate(noctf_api_request_duration_seconds_bucket{request_kind=\"rest\",endpoint=~\"${route:regex}\"}[$window])))", "legendFormat": "P99" }
+      ]
+    },
+    {
+      "id": 8, "type": "table", "title": "最慢路由 Top 10（P95）", "description": "当前统计窗口内至少 3 次请求的路由快照；即时表格避免时序 TopK 产生系列漂移。",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [{ "refId": "A", "expr": "topk(10, (histogram_quantile(0.95, sum by (le, endpoint) (rate(noctf_api_request_duration_seconds_bucket{request_kind=\"rest\",endpoint=~\"${route:regex}\"}[$window]))) > 0) and on (endpoint) (sum by (endpoint) (increase(noctf_api_request_duration_seconds_count{request_kind=\"rest\",endpoint=~\"${route:regex}\"}[$window])) >= 3))", "format": "table", "instant": true, "range": false }]
+    },
+    {
+      "id": 9, "type": "table", "title": "每路由请求速率 Top 10", "description": "当前统计窗口最繁忙的 10 条规范路由；即时表格避免排名变化累积成过多系列。",
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [{ "refId": "A", "expr": "topk(10, sum by (endpoint) (rate(noctf_api_requests_total{request_kind=\"rest\",endpoint=~\"${route:regex}\"}[$window])))", "format": "table", "instant": true, "range": false }]
+    },
+    {
+      "id": 10, "type": "timeseries", "title": "4xx / 5xx 速率", "description": "client_error 包含预期的 404；server_error 才是 5xx。按路由与结果分开显示。",
+      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [{ "refId": "A", "expr": "sum by (endpoint, outcome) (rate(noctf_api_requests_total{request_kind=\"rest\",endpoint=~\"${route:regex}\",outcome=~\"client_error|server_error\"}[$window]))", "legendFormat": "{{endpoint}} · {{outcome}}" }]
+    },
+    {
+      "id": 11, "type": "table", "title": "路由样本数 Top 25", "description": "Prometheus increase 估算值。低样本路由可能没有可信的分位数。",
+      "gridPos": { "x": 0, "y": 20, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 } },
+      "targets": [{ "refId": "A", "expr": "topk(25, sum by (endpoint) (increase(noctf_api_request_duration_seconds_count{request_kind=\"rest\",endpoint=~\"${route:regex}\"}[$window])))", "format": "table", "instant": true, "range": false }]
+    },
+    {
+      "id": 12, "type": "timeseries", "title": "Flag 处理阶段 P95", "description": "AdmissionLoad、AdmissionRecheck、PersistenceCommit、MessagePublish、DispatchAge、WorkerEvaluation、WorkerCompletion。没有自然提交时为空。",
+      "gridPos": { "x": 12, "y": 20, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [{ "refId": "A", "expr": "histogram_quantile(0.95, sum by (le, stage) (rate(noctf_gameplay_fact_stage_duration_seconds_bucket[$window])))", "legendFormat": "{{stage}}" }]
+    },
+    {
+      "id": 13, "type": "timeseries", "title": "Flag / Break 完成耗时 P95", "description": "从 GameplayFact 受理到首次终态；不同 kind 单独显示，重判不计入。",
+      "gridPos": { "x": 0, "y": 28, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [{ "refId": "A", "expr": "histogram_quantile(0.95, sum by (le, kind) (rate(noctf_gameplay_fact_processing_duration_seconds_bucket[$window])))", "legendFormat": "{{kind}}" }]
+    },
+    {
+      "id": 14, "type": "timeseries", "title": "JetStream 待处理与重投", "description": "当前 NOCTF_V2 流的 pending、ack pending 和 redelivered；队列积压可解释评测可见延迟。",
+      "gridPos": { "x": 12, "y": 28, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "targets": [
+        { "refId": "A", "expr": "noctf:jetstream_pending:sum", "legendFormat": "pending" },
+        { "refId": "B", "expr": "noctf:jetstream_ack_pending:sum", "legendFormat": "ack pending" },
+        { "refId": "C", "expr": "noctf:jetstream_redelivered:sum", "legendFormat": "redelivered" }
+      ]
+    },
+    {
+      "id": 15, "type": "timeseries", "title": "NATS 协调 P99", "description": "NATS KV 与轻量通知操作耗时的 P99；与排队和数据库提交耗时对照。",
+      "gridPos": { "x": 0, "y": 36, "w": 6, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [{ "refId": "A", "expr": "histogram_quantile(0.99, sum by (le) (rate(noctf_nats_operation_duration_seconds_bucket[$window])))" }]
+    },
+    {
+      "id": 16, "type": "timeseries", "title": "NATS 协调错误速率", "description": "NATS KV 与轻量通知失败/秒；与 JetStream 和 ThreadPool 指标对照。",
+      "gridPos": { "x": 6, "y": 36, "w": 6, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [{ "refId": "A", "expr": "sum(rate(noctf_nats_failures_total[$window])) or vector(0)" }]
+    },
+    {
+      "id": 17, "type": "timeseries", "title": "Runtime 排队数", "description": "数据库事实中的 Queued Runtime 数量；不把等待时间与数量放在同一坐标轴。",
+      "gridPos": { "x": 12, "y": 36, "w": 6, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "targets": [{ "refId": "A", "expr": "noctf:runtime_waiting:count" }]
+    },
+    {
+      "id": 18, "type": "timeseries", "title": "最久 Runtime 排队", "description": "最老 Queued Runtime 等待秒数。",
+      "gridPos": { "x": 18, "y": 36, "w": 6, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [{ "refId": "A", "expr": "noctf:runtime_waiting_oldest_age:seconds" }]
+    },
+    {
+      "id": 19, "type": "timeseries", "title": "NoCTF CPU 核心用量", "description": "System.Runtime 进程 CPU 时间增长率，按 user/system 显示占用核心数；不是宿主机 CPU 百分比。",
+      "gridPos": { "x": 0, "y": 44, "w": 6, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "targets": [{ "refId": "A", "expr": "rate(dotnet_process_cpu_time_seconds_total{job=\"noctf\"}[$window])", "legendFormat": "{{cpu_mode}}" }]
+    },
+    {
+      "id": 20, "type": "timeseries", "title": ".NET ThreadPool 排队", "description": "排队工作项数。上升且 CPU 不高时，优先排查阻塞、同步等待或依赖延迟。",
+      "gridPos": { "x": 6, "y": 44, "w": 6, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "targets": [{ "refId": "A", "expr": "dotnet_thread_pool_queue_length_total{job=\"noctf\"}" }]
+    },
+    {
+      "id": 21, "type": "timeseries", "title": ".NET GC 暂停占比", "description": "单位时间 GC 暂停秒数的百分比；高分配时与 CPU 和 P99 对照。",
+      "gridPos": { "x": 12, "y": 44, "w": 6, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percent" } },
+      "targets": [{ "refId": "A", "expr": "100 * rate(dotnet_gc_pause_time_seconds_total{job=\"noctf\"}[$window])" }]
+    },
+    {
+      "id": 22, "type": "timeseries", "title": "PostgreSQL 连接占比", "description": "已用连接数 / max_connections；不能直接推断单条 SQL 的耗时。",
+      "gridPos": { "x": 18, "y": 44, "w": 6, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percent" } },
+      "targets": [{ "refId": "A", "expr": "100 * noctf:postgres_connections:ratio" }]
+    },
+    {
+      "id": 23, "type": "table", "title": "采集目标状态", "description": "1 为可抓取、0 为失败；exporter 可抓取不等于依赖内部业务一定健康。",
+      "gridPos": { "x": 0, "y": 52, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "up{job=~\"noctf|postgres|redis|nats|node|blackbox-exporter|blackbox|loki\"}", "format": "table", "instant": true, "range": false }]
+    },
+    {
+      "id": 24, "type": "timeseries", "title": "宿主磁盘可用率", "description": "所有非临时文件系统中最低的可用比例；数据目录满盘时优先检查。",
+      "gridPos": { "x": 12, "y": 52, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percent", "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "orange", "value": 15 }, { "color": "green", "value": 25 }] } } },
+      "targets": [{ "refId": "A", "expr": "100 * noctf:disk_available:ratio" }]
+    },
+    {
+      "id": 25, "type": "table", "title": "Wolverine Handler 执行 P95 Top 10", "description": "当前统计窗口按消息类型聚合的最慢 10 类；即时表格避免排名变化累积成过多系列。",
+      "gridPos": { "x": 0, "y": 60, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ms" } },
+      "targets": [{ "refId": "A", "expr": "topk(10, histogram_quantile(0.95, sum by (le, message_type) (rate(wolverine_execution_time_Milliseconds_bucket[$window]))))", "format": "table", "instant": true, "range": false }]
+    },
+    {
+      "id": 26, "type": "table", "title": "Wolverine 有效耗时 P95 Top 10", "description": "当前统计窗口按消息类型查看 effective-time；与执行耗时对照识别排队和处理差距。",
+      "gridPos": { "x": 12, "y": 60, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ms" } },
+      "targets": [{ "refId": "A", "expr": "topk(10, histogram_quantile(0.95, sum by (le, message_type) (rate(wolverine_effective_time_Milliseconds_bucket[$window]))))", "format": "table", "instant": true, "range": false }]
+    },
+    {
+      "id": 27, "type": "timeseries", "title": "Wolverine 消息吞吐", "description": "发送、接收与成功处理的消息/秒；重投时接收数可能高于发送数。",
+      "gridPos": { "x": 0, "y": 68, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [
+        { "refId": "A", "expr": "sum(rate(wolverine_messages_sent_Messages_total[$window])) or vector(0)", "legendFormat": "sent" },
+        { "refId": "B", "expr": "sum(rate(wolverine_messages_received_Messages_total[$window])) or vector(0)", "legendFormat": "received" },
+        { "refId": "C", "expr": "sum(rate(wolverine_messages_succeeded_Messages_total[$window])) or vector(0)", "legendFormat": "succeeded" }
+      ]
+    },
+    {
+      "id": 28, "type": "timeseries", "title": "JetStream 每消费者积压", "description": "读取当前 NOCTF_V2 流的 consumer pending；与 Wolverine 有效耗时共同定位队列等待。",
+      "gridPos": { "x": 12, "y": 68, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "targets": [{ "refId": "A", "expr": "max by (stream_name, consumer_name) (jetstream_consumer_num_pending{is_consumer_leader=\"true\",stream_name=~\"NOCTF_V2_.*\"})", "legendFormat": "{{stream_name}} / {{consumer_name}}" }]
+    },
+    {
+      "id": 29, "type": "timeseries", "title": "Npgsql 命令 P95 / P99", "description": "数据库命令执行耗时，不包括 EF Core 将全部结果行物化后的时间；不采集 SQL 文本或参数。",
+      "gridPos": { "x": 0, "y": 76, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        { "refId": "A", "expr": "histogram_quantile(0.95, sum by (le) (rate(db_client_operation_duration_seconds_bucket{job=\"noctf\"}[$window])))", "legendFormat": "P95" },
+        { "refId": "B", "expr": "histogram_quantile(0.99, sum by (le) (rate(db_client_operation_duration_seconds_bucket{job=\"noctf\"}[$window])))", "legendFormat": "P99" }
+      ]
+    },
+    {
+      "id": 30, "type": "timeseries", "title": "Npgsql 命令失败速率", "description": "数据库命令异常/秒；结合 Postgres 连接占比和 API 5xx 诊断。",
+      "gridPos": { "x": 12, "y": 76, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [{ "refId": "A", "expr": "sum(rate(db_client_operation_failed_total{job=\"noctf\"}[$window])) or vector(0)" }]
+    },
+    {
+      "id": 31, "type": "timeseries", "title": "PostgreSQL 事务速率", "description": "生产 noctf 数据库的 commit/rollback 次数每秒；仅反映数据库负载，不定位单条 SQL。",
+      "gridPos": { "x": 0, "y": 84, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [
+        { "refId": "A", "expr": "rate(pg_stat_database_xact_commit{datname=\"noctf\"}[$window])", "legendFormat": "commit" },
+        { "refId": "B", "expr": "rate(pg_stat_database_xact_rollback{datname=\"noctf\"}[$window])", "legendFormat": "rollback" }
+      ]
+    },
+    {
+      "id": 32, "type": "timeseries", "title": "PostgreSQL 缓冲命中率", "description": "noctf 数据库的 blks_hit / (blks_hit + blks_read)；低命中率须结合实际查询与缓存状态分析。",
+      "gridPos": { "x": 12, "y": 84, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percentunit" } },
+      "targets": [{ "refId": "A", "expr": "sum(rate(pg_stat_database_blks_hit{datname=\"noctf\"}[$window])) / clamp_min(sum(rate(pg_stat_database_blks_hit{datname=\"noctf\"}[$window])) + sum(rate(pg_stat_database_blks_read{datname=\"noctf\"}[$window])), 0.001)" }]
+    },
+    {
+      "id": 33, "type": "timeseries", "title": "EF Core 查询速率", "description": "EF Core 内置 Meter 的 queries/秒；从 alpha.42 开始采集，不含 SQL 文本。",
+      "gridPos": { "x": 0, "y": 92, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [{ "refId": "A", "expr": "sum(rate(microsoft_entityframeworkcore_queries_total[$window])) or vector(0)" }]
+    },
+    {
+      "id": 34, "type": "timeseries", "title": "EF Core 编译查询缓存命中率", "description": "hits / (hits + misses)；稳定热态若持续低于 100%，检查动态 LINQ 形状与频繁重新编译。",
+      "gridPos": { "x": 12, "y": 92, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percentunit" } },
+      "targets": [{ "refId": "A", "expr": "(sum(rate(microsoft_entityframeworkcore_compiled_query_cache_hits_total[$window])) or vector(0)) / clamp_min((sum(rate(microsoft_entityframeworkcore_compiled_query_cache_hits_total[$window])) or vector(0)) + (sum(rate(microsoft_entityframeworkcore_compiled_query_cache_misses_total[$window])) or vector(0)), 0.001)" }]
+    },
+    {
+      "id": 35, "type": "timeseries", "title": "EF Core 活跃 DbContext", "description": "当前活跃 DbContext 数；趋势上升但吞吐不变时检查生命周期与请求堆积。",
+      "gridPos": { "x": 0, "y": 100, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "targets": [{ "refId": "A", "expr": "sum(microsoft_entityframeworkcore_active_dbcontexts) or vector(0)" }]
+    },
+    {
+      "id": 36, "type": "timeseries", "title": "EF Core 乐观并发冲突", "description": "保存前并发冲突/秒；突增时结合写入流量与重试策略分析。",
+      "gridPos": { "x": 12, "y": 100, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [{ "refId": "A", "expr": "sum(rate(microsoft_entityframeworkcore_optimistic_concurrency_failures_total[$window])) or vector(0)" }]
+    },
+    {
+      "id": 37, "type": "timeseries", "title": "Redis 服务端命令速率", "description": "Redis exporter 的 processed commands/秒，覆盖应用之外的 Redis 命令。",
+      "gridPos": { "x": 0, "y": 108, "w": 6, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [{ "refId": "A", "expr": "rate(redis_commands_processed_total[$window])" }]
+    },
+    {
+      "id": 38, "type": "timeseries", "title": "Redis 已用内存", "description": "Redis 服务端内存字节数；与客户端延迟及淘汰事件分开判断。",
+      "gridPos": { "x": 6, "y": 108, "w": 6, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "bytes" } },
+      "targets": [{ "refId": "A", "expr": "redis_memory_used_bytes" }]
+    },
+    {
+      "id": 39, "type": "timeseries", "title": "PostgreSQL 死锁速率", "description": "生产数据库 deadlocks/秒；为零是正常值，突增时查事务范围与并发写入。",
+      "gridPos": { "x": 12, "y": 108, "w": 6, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [{ "refId": "A", "expr": "rate(pg_stat_database_deadlocks{datname=\"noctf\"}[$window])" }]
+    },
+    {
+      "id": 40, "type": "timeseries", "title": "EF Core SaveChanges 速率", "description": "每秒 SaveChanges 调用数；一次调用可能保存多条记录，不等于 SQL 命令数。",
+      "gridPos": { "x": 18, "y": 108, "w": 6, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [{ "refId": "A", "expr": "sum(rate(microsoft_entityframeworkcore_savechanges_total[$window])) or vector(0)" }]
+    },
+    {
+      "id": 41, "type": "timeseries", "title": "题目状态与 Flag 准入 P95", "description": "详情页尝试状态读取与实际 Flag 准入分开计量；不可把页面读取当作提交耗时。",
+      "gridPos": { "x": 0, "y": 116, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [{ "refId": "A", "expr": "histogram_quantile(0.95, sum by (le, stage) (rate(noctf_gameplay_fact_stage_duration_seconds_bucket{stage=~\"ChallengeAttemptStateRead|AdmissionLoad|AdmissionRecheck\"}[$window])))", "legendFormat": "{{stage}}" }]
+    },
+    {
+      "id": 42, "type": "timeseries", "title": "Runtime 派发阶段 P95", "description": "成功派发路径的目标读取、定义准备、容量 Claim、持久化、提交和发布；请先核对各阶段样本数。",
+      "gridPos": { "x": 12, "y": 116, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [{ "refId": "A", "expr": "histogram_quantile(0.95, sum by (le, stage) (rate(noctf_runtime_dispatch_stage_duration_seconds_bucket[$window])))", "legendFormat": "{{stage}}" }]
+    },
+    {
+      "id": 43, "type": "timeseries", "title": "题目状态与 Flag 阶段样本数", "description": "统计窗口内每个阶段的调用数；低样本 P95 只用于定位，不用于验收。",
+      "gridPos": { "x": 0, "y": 124, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "targets": [{ "refId": "A", "expr": "sum by (stage) (increase(noctf_gameplay_fact_stage_duration_seconds_count{stage=~\"ChallengeAttemptStateRead|AdmissionLoad|AdmissionRecheck\"}[$window]))", "legendFormat": "{{stage}}" }]
+    },
+    {
+      "id": 44, "type": "timeseries", "title": "Runtime 派发阶段样本数", "description": "每个阶段的样本数可能不同：提前退出、失败或重试不会到达后续阶段。",
+      "gridPos": { "x": 12, "y": 124, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "targets": [{ "refId": "A", "expr": "sum by (stage) (increase(noctf_runtime_dispatch_stage_duration_seconds_count[$window]))", "legendFormat": "{{stage}}" }]
+    },
+    {
+      "id": 45, "type": "timeseries", "title": "FusionCache 命中率", "description": "按固定缓存用途和内存/分布式层区分；层级 Miss 可在同一次读取中连续发生，不等于业务请求失败。",
+      "gridPos": { "x": 0, "y": 132, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percentunit" } },
+      "targets": [{ "refId": "A", "expr": "sum by (cache, tier) (rate(noctf_fusion_cache_reads_total{result=\"hit\"}[$window])) / clamp_min(sum by (cache, tier) (rate(noctf_fusion_cache_reads_total[$window])), 0.001)", "legendFormat": "{{cache}} / {{tier}}" }]
+    },
+    {
+      "id": 46, "type": "timeseries", "title": "FusionCache 读取速率", "description": "固定 cache/tier/result 标签；不记录缓存 key，辅助判断失效后是否持续穿透。",
+      "gridPos": { "x": 12, "y": 132, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [{ "refId": "A", "expr": "sum by (cache, tier, result) (rate(noctf_fusion_cache_reads_total[$window]))", "legendFormat": "{{cache}} / {{tier}} / {{result}}" }]
+    },
+    {
+      "id": 47, "type": "timeseries", "title": "Webhook 首次投递延迟", "description": "从公开事件发生到首次 HTTP 尝试的 P50/P95/P99；低样本窗口须结合右侧样本数判断。",
+      "gridPos": { "x": 0, "y": 140, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        { "refId": "A", "expr": "histogram_quantile(0.50, sum by (le) (rate(noctf_webhook_queue_age_seconds_bucket[$window])))", "legendFormat": "P50" },
+        { "refId": "B", "expr": "histogram_quantile(0.95, sum by (le) (rate(noctf_webhook_queue_age_seconds_bucket[$window])))", "legendFormat": "P95" },
+        { "refId": "C", "expr": "histogram_quantile(0.99, sum by (le) (rate(noctf_webhook_queue_age_seconds_bucket[$window])))", "legendFormat": "P99" }
+      ]
+    },
+    {
+      "id": 48, "type": "timeseries", "title": "Webhook HTTP 尝试 P95 与样本", "description": "按投递结果显示外部 HTTP 尝试耗时；样本量为当前统计窗口近似值。",
+      "gridPos": { "x": 12, "y": 140, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [{ "matcher": { "id": "byName", "options": "样本数" }, "properties": [{ "id": "unit", "value": "short" }] }] },
+      "targets": [
+        { "refId": "A", "expr": "histogram_quantile(0.95, sum by (le, outcome) (rate(noctf_webhook_http_attempt_duration_seconds_bucket[$window])))", "legendFormat": "{{outcome}} P95" },
+        { "refId": "B", "expr": "sum(increase(noctf_webhook_http_attempt_duration_seconds_count[$window])) or vector(0)", "legendFormat": "样本数" }
+      ]
+    },
+    {
+      "id": 49, "type": "timeseries", "title": "Webhook 积压", "description": "数据库 pending、恢复扫描 consumer lag 与 Webhook JetStream consumer pending；三者应共同回落到零。",
+      "gridPos": { "x": 0, "y": 148, "w": 8, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "targets": [
+        { "refId": "A", "expr": "max(noctf_webhook_pending) or vector(0)", "legendFormat": "database pending" },
+        { "refId": "B", "expr": "sum(noctf_webhook_consumer_lag) or vector(0)", "legendFormat": "scanner lag" },
+        { "refId": "C", "expr": "sum(max by (consumer_name) (jetstream_consumer_num_pending{is_consumer_leader=\"true\",stream_name=\"NOCTF_V2_WEBHOOK\"})) or vector(0)", "legendFormat": "JetStream pending" }
+      ]
+    },
+    {
+      "id": 50, "type": "timeseries", "title": "Webhook 最老待投递", "description": "最老 pending/in-flight 投递的年龄；持续超过 10 秒表示恢复或外部投递受阻。",
+      "gridPos": { "x": 8, "y": 148, "w": 8, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 5 }, { "color": "red", "value": 10 }] } } },
+      "targets": [{ "refId": "A", "expr": "max(noctf_webhook_oldest_pending_age_seconds) or vector(0)" }]
+    },
+    {
+      "id": 51, "type": "timeseries", "title": "Webhook 重试速率", "description": "按 projection、delivery 等阶段显示重试/秒；与投递积压和日志对照。",
+      "gridPos": { "x": 16, "y": 148, "w": 8, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [{ "refId": "A", "expr": "sum by (stage) (rate(noctf_webhook_retries_total[$window]))", "legendFormat": "{{stage}}" }]
+    },
+    {
+      "id": 52, "type": "timeseries", "title": ".NET 工作集内存", "description": "NoCTF 进程当前工作集；持续增长且业务吞吐不变时检查缓存、对象保留和大文件路径。",
+      "gridPos": { "x": 0, "y": 156, "w": 8, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "bytes" } },
+      "targets": [{ "refId": "A", "expr": "dotnet_process_memory_working_set_bytes{job=\"noctf\"}" }]
+    },
+    {
+      "id": 53, "type": "timeseries", "title": ".NET 分配速率", "description": "托管堆累计分配字节的增长率；与 GC 暂停、CPU 和工作集一起判断分配压力。",
+      "gridPos": { "x": 8, "y": 156, "w": 8, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "Bps" } },
+      "targets": [{ "refId": "A", "expr": "rate(dotnet_gc_heap_total_allocated_bytes_total{job=\"noctf\"}[$window])" }]
+    },
+    {
+      "id": 54, "type": "table", "title": ".NET 异常类型 Top 10", "description": "运行时创建的异常包含已处理异常，不等于请求失败；用于发现类型趋势并跳转日志核对。",
+      "gridPos": { "x": 16, "y": 156, "w": 8, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [{ "refId": "A", "expr": "topk(10, sum by (error_type) (rate(dotnet_exceptions_total{job=\"noctf\"}[$window])))", "format": "table", "instant": true, "range": false }]
+    },
+    {
+      "id": 55, "type": "timeseries", "title": "排行榜投影耗时", "description": "按 mode/outcome 显示 P95，并与五分钟总体均值对照；样本不足时不触发慢投影告警。",
+      "gridPos": { "x": 0, "y": 164, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        { "refId": "A", "expr": "histogram_quantile(0.95, sum by (le, mode, outcome) (rate(noctf_leaderboard_projection_duration_seconds_bucket[$window])))", "legendFormat": "{{mode}} / {{outcome}} P95" },
+        { "refId": "B", "expr": "sum by (mode, outcome) (rate(noctf_leaderboard_projection_duration_seconds_sum[$window])) / clamp_min(sum by (mode, outcome) (rate(noctf_leaderboard_projection_duration_seconds_count[$window])), 0.001)", "legendFormat": "{{mode}} / {{outcome}} mean" }
+      ]
+    },
+    {
+      "id": 56, "type": "timeseries", "title": "排行榜投影样本", "description": "按 mode/outcome 显示统计窗口内投影次数；至少 3 个五分钟样本才参与慢投影告警。",
+      "gridPos": { "x": 12, "y": 164, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 } },
+      "targets": [{ "refId": "A", "expr": "sum by (mode, outcome) (increase(noctf_leaderboard_projection_duration_seconds_count[$window]))", "legendFormat": "{{mode}} / {{outcome}}" }]
+    },
+    {
+      "id": 57, "type": "timeseries", "title": "Runtime 容量事务重试", "description": "按 claim/release 显示恢复的数据库事务重试与耗尽；耗尽必须保持为零。",
+      "gridPos": { "x": 0, "y": 172, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [
+        { "refId": "A", "expr": "sum by (operation) (rate(noctf_runner_capacity_transaction_retries_total[$window]))", "legendFormat": "{{operation}} retries" },
+        { "refId": "B", "expr": "sum by (operation) (rate(noctf_runner_capacity_transaction_exhaustions_total[$window]))", "legendFormat": "{{operation}} exhausted" }
+      ]
+    },
+    {
+      "id": 58, "type": "table", "title": "Runtime 受控失败分类", "description": "当前统计窗口按 operation/failure 汇总受控失败；用于解释 503，而不是替代总 5xx。",
+      "gridPos": { "x": 12, "y": 172, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 } },
+      "targets": [{ "refId": "A", "expr": "topk(20, sum by (operation, failure) (increase(noctf_runtime_mutation_failures_total[$window])))", "format": "table", "instant": true, "range": false }]
+    },
+    {
+      "id": 59, "type": "stat", "title": "24 小时数据库失败", "description": "Npgsql 报告的数据库命令失败近似数；须结合 Loki 分类判断可恢复竞争或真实故障。",
+      "gridPos": { "x": 0, "y": 180, "w": 8, "h": 5 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 1 }, { "color": "red", "value": 5 }] } } },
+      "targets": [{ "refId": "A", "expr": "sum(increase(db_client_operation_failed_total{job=\"noctf\"}[24h])) or vector(0)", "instant": true, "range": false }]
+    },
+    {
+      "id": 60, "type": "stat", "title": "24 小时 Webhook 幂等竞争", "description": "数据库唯一约束成功吸收的 delivery materialization race；少量非零可接受，持续增长需查重复派发。",
+      "gridPos": { "x": 8, "y": 180, "w": 8, "h": 5 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 } },
+      "targets": [{ "refId": "A", "expr": "sum(increase(noctf_webhook_materialization_races_total[24h])) or vector(0)", "instant": true, "range": false }]
+    },
+    {
+      "id": 61, "type": "stat", "title": "24 小时 Runtime 受控失败", "description": "返回稳定 failure code 的 Runtime mutation 失败；与总 5xx 和容量事务耗尽对照。",
+      "gridPos": { "x": 16, "y": 180, "w": 8, "h": 5 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 } },
+      "targets": [{ "refId": "A", "expr": "sum(increase(noctf_runtime_mutation_failures_total[24h])) or vector(0)", "instant": true, "range": false }]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 41,
+  "tags": ["NoCTF", "performance", "production"],
+  "templating": {
+    "list": [
+      {
+        "name": "route", "label": "接口路由", "type": "query", "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": "label_values(noctf_api_request_duration_seconds_count{request_kind=\"rest\"}, endpoint)",
+        "definition": "label_values(noctf_api_request_duration_seconds_count{request_kind=\"rest\"}, endpoint)",
+        "includeAll": true, "allValue": ".*", "multi": true, "refresh": 1, "sort": 1,
+        "current": { "selected": true, "text": "All", "value": "$__all" }
+      },
+      {
+        "name": "window", "label": "统计窗口", "type": "custom", "query": "5m,15m,1h", "multi": false,
+        "current": { "selected": true, "text": "15m", "value": "15m" },
+        "options": [
+          { "selected": false, "text": "5m", "value": "5m" },
+          { "selected": true, "text": "15m", "value": "15m" },
+          { "selected": false, "text": "1h", "value": "1h" }
+        ]
+      }
+    ]
+  },
+  "time": { "from": "now-6h", "to": "now" },
+  "timezone": "browser",
+  "title": "NoCTF · 性能分析（导入版）",
+  "uid": null,
+  "version": 0
+}

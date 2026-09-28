@@ -3,57 +3,104 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdSubmissionsPageViewState } from '~/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdSubmissionsPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdSubmissionsPageViewState }>()
-const { Download, canWrite, canJudge, isAdministrator, canDownloadPatch, patchDownloading, patchErrors, downloadPatch, gameplayFactKindOptions, gameplayFactStateOptions, gameplayFactResultOptions, challengeOptions, teamOptions, teamName, challengeTitle, filterChallenge, filterTeam, filterKind, filterState, filterResult, filterFlag, previewItems, previewCursor, previewLoading, previewError, previewInitialized, differenceLabels, bloodRankLabel, loadPreview, items, loading, listError, hasMore, loadMore, initialized, applyFilters, detail, detailOpen, detailLoading, detailError, openDetail, actionPending, rejudgeOne, batchTarget, rejudgeBatch, queueEvaluation, flagDialog, flagResult, flagError, flagPending, openFlagAccess, closeFlagAccess, accessFlag, onClickFilterChallenge, onUpdateOpenChange } = toRefs(viewProps.state)
+const { previewIncludeInformational, previewScanned, previewCounts, evidenceOpen, evidenceTarget, evidenceRows, evidenceCursor, evidenceLoading, evidenceError, openEvidence, loadEvidence, adjudicationSeverity, adjudicationSeverityLabel, adjudicationClassificationLabel, adjudicationCompletenessLabel, adjudicationEventLabel, adjudicationVariant, Download, canWrite, canJudge, isAdministrator, canDownloadPatch, patchDownloading, patchErrors, downloadPatch, gameplayFactKindOptions, gameplayFactStateOptions, gameplayFactResultOptions, challengeOptions, teamOptions, teamName, challengeTitle, filterChallenge, filterTeam, filterKind, filterState, filterResult, filterFlag, previewItems, previewCursor, previewLoading, previewError, previewInitialized, differenceLabels, bloodRankLabel, loadPreview, items, loading, listError, hasMore, loadMore, initialized, applyFilters, detail, detailOpen, detailLoading, detailError, openDetail, actionPending, rejudgeOne, batchTarget, rejudgeBatch, queueEvaluation, flagDialog, flagResult, flagError, flagPending, openFlagAccess, closeFlagAccess, accessFlag, onClickFilterChallenge, onUpdateOpenChange } = toRefs(viewProps.state)
 </script>
 
 <template>
   <div class="flex flex-col gap-4">
     <Card>
       <CardHeader class="flex flex-row items-start justify-between gap-4">
-        <div class="space-y-1">
+        <div class="flex flex-col gap-1">
           <CardTitle>{{ $t('ui.historicalAdjudicationDifferencePreview') }}</CardTitle>
           <CardDescription>{{ $t('ui.thisPreviewAnalyzesCtfFlagFactsAndAwdpBreakFacts') }}</CardDescription>
         </div>
         <Button variant="outline" size="sm" :disabled="previewLoading" @click="loadPreview(true)">
-          <Spinner v-if="previewLoading" data-icon="inline-start" /> {{ $t('ui.analyzeAgain') }}
+          <Spinner v-if="previewLoading" data-icon="inline-start" />{{ $t(previewInitialized ? 'ui.analyzeAgain' : 'adjudication.analyze') }}
         </Button>
       </CardHeader>
       <CardContent class="flex flex-col gap-3">
-        <Alert v-if="previewError" variant="destructive">
-          <AlertDescription>{{ $message(previewError) }}</AlertDescription>
-        </Alert>
+        <Field orientation="horizontal">
+          <Switch id="preview-information" v-model="previewIncludeInformational" :disabled="previewLoading" />
+          <FieldLabel for="preview-information">{{ $t('adjudication.showInformation') }}</FieldLabel>
+        </Field>
+        <div v-if="previewInitialized" class="flex flex-wrap gap-2">
+          <Badge variant="destructive">{{ $t('adjudication.anomaly') }} {{ previewCounts.Error }}</Badge>
+          <Badge variant="outline">{{ $t('adjudication.review') }} {{ previewCounts.Warning }}</Badge>
+          <Badge variant="secondary">{{ $t('adjudication.information') }} {{ previewCounts.Information }}</Badge>
+          <span class="text-sm text-muted-foreground">{{ $t('adjudication.scanned') }} {{ previewScanned ?? '—' }}</span>
+        </div>
+        <Alert v-if="previewError" variant="destructive"><AlertDescription>{{ $message(previewError) }}</AlertDescription></Alert>
         <Skeleton v-else-if="previewLoading && !previewInitialized" class="h-24 w-full" />
-        <Alert v-else-if="previewInitialized && previewItems.length === 0">
-          <AlertDescription>{{ $t('ui.noAdjudicationOrBloodAwardDifferencesWereFoundInThe') }}</AlertDescription>
-        </Alert>
-        <div v-for="item in previewItems" :key="item.gameplayFactId" class="rounded-lg border p-4">
+        <Empty v-else-if="previewInitialized && !previewLoading && previewItems.length === 0">{{ $t('ui.noAdjudicationOrBloodAwardDifferencesWereFoundInThe') }}</Empty>
+        <div v-for="item in previewItems" :key="item.gameplayFactId" class="flex flex-col gap-3 py-4">
           <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p class="font-medium">{{ item.challengeTitle }} · {{ item.teamName ?? '-' }}</p>
+              <p class="font-medium">{{ item.challengeTitle }} · {{ item.teamName ?? '—' }}</p>
               <p class="mt-1 font-mono text-xs text-muted-foreground">{{ item.gameplayFactId }} · {{ adminFormatDateTime(item.occurredAt) }}</p>
             </div>
-            <div class="flex flex-wrap gap-1">
-              <Badge v-for="difference in item.differences" :key="`${difference.kind}-${difference.certainty}`" :variant="difference.certainty === 'Deterministic' ? 'destructive' : 'secondary'">
-                {{ difference.certainty === 'Deterministic' ? $t('ui.deterministicDifference') : $t('ui.needsManualReview') }}
-              </Badge>
-            </div>
+            <Badge :variant="adjudicationVariant(adjudicationSeverity(item))">{{ adjudicationSeverityLabel(adjudicationSeverity(item)) }}</Badge>
           </div>
-          <div class="mt-3 grid gap-2 text-sm sm:grid-cols-3">
-            <p><span class="text-muted-foreground">{{ $t('ui.currentResult') }}：</span>{{ item.currentResult ? enumLabel(GameplayFactResultLabel, item.currentResult) : '-' }}</p>
-            <p><span class="text-muted-foreground">{{ $t('ui.deterministicExpectation') }}：</span>{{ item.deterministicExpectedResult ? enumLabel(GameplayFactResultLabel, item.deterministicExpectedResult) : '-' }}</p>
-            <p><span class="text-muted-foreground">{{ $t('ui.recordedBloodAwards') }}：</span>{{ item.recordedBloodRanks?.map(bloodRankLabel).join('、') || '-' }}</p>
+          <div class="grid gap-2 text-sm sm:grid-cols-2 xl:grid-cols-4">
+            <p><span class="text-muted-foreground">{{ $t('ui.currentResult') }}: </span>{{ enumLabel(GameplayFactStateLabel, item.currentState) }} / {{ item.currentResult ? enumLabel(GameplayFactResultLabel, item.currentResult) : '—' }}</p>
+            <p><span class="text-muted-foreground">{{ $t('adjudication.latestBusiness') }}: </span>{{ item.latestEffectiveAdjudication?.result ? enumLabel(GameplayFactResultLabel, item.latestEffectiveAdjudication.result) : '—' }}</p>
+            <p><span class="text-muted-foreground">{{ $t('adjudication.currentBlood') }}: </span>{{ bloodRankLabel(item.currentProjectedBloodRank) }}</p>
+            <p><span class="text-muted-foreground">{{ $t('ui.recordedBloodAwards') }}: </span>{{ item.recordedBloodRanks?.map(bloodRankLabel).join(' / ') || '—' }}</p>
           </div>
-          <ul class="mt-3 list-disc space-y-1 pl-5 text-sm">
-            <li v-for="difference in item.differences" :key="difference.kind">
-              {{ $t(differenceLabels[difference.kind!]) }}
+          <FieldDescription>{{ adjudicationCompletenessLabel(item.evidenceCompleteness) }} · {{ $t('adjudication.changes') }} {{ item.resultChangeCount ?? '—' }}</FieldDescription>
+          <ul class="flex list-disc flex-col gap-2 pl-5 text-sm">
+            <li v-for="difference in item.differences" :key="[difference.kind, difference.classification, difference.severity].join(':')">
+              <span>{{ adjudicationClassificationLabel(difference.classification) }}</span>
+              <p class="text-muted-foreground">{{ $t(differenceLabels[difference.kind!]) }}</p>
             </li>
           </ul>
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <FieldDescription v-if="item.eligibilityEvents?.length">{{ $t('adjudication.adjustments') }}: {{ item.eligibilityEvents.length }}</FieldDescription>
+            <Button variant="outline" size="sm" @click="openEvidence(item)">{{ $t('adjudication.evidence') }}</Button>
+          </div>
+          <Separator />
         </div>
         <Button v-if="previewCursor" variant="outline" :disabled="previewLoading" @click="loadPreview(false)">
-          <Spinner v-if="previewLoading" data-icon="inline-start" /> {{ $t('ui.continueScanningOlderRecords') }}
+          <Spinner v-if="previewLoading" data-icon="inline-start" />{{ $t('ui.continueScanningOlderRecords') }}
         </Button>
       </CardContent>
     </Card>
+
+    <Dialog v-model:open="evidenceOpen">
+      <DialogScrollContent class="max-w-5xl">
+        <DialogHeader>
+          <DialogTitle>{{ $t('adjudication.evidenceTitle') }}</DialogTitle>
+          <DialogDescription>{{ $t('adjudication.readOnly') }}</DialogDescription>
+        </DialogHeader>
+        <p class="break-all font-mono text-xs">{{ evidenceTarget?.gameplayFactId }}</p>
+        <FieldDescription v-if="evidenceTarget?.latestProcessingEvent">{{ $t('adjudication.latestProcessing') }}: {{ enumLabel(GameplayFactStateLabel, evidenceTarget.latestProcessingEvent.state) }} · {{ adminFormatDateTime(evidenceTarget.latestProcessingEvent.occurredAt) }}</FieldDescription>
+        <Alert v-if="evidenceError" variant="destructive"><AlertDescription>{{ $message(evidenceError.message) }}</AlertDescription></Alert>
+        <Skeleton v-else-if="evidenceLoading && evidenceRows.length === 0" class="h-28 w-full" />
+        <Empty v-else-if="!evidenceLoading && evidenceRows.length === 0">{{ $t('adjudication.emptyEvidence') }}</Empty>
+        <Table v-if="evidenceRows.length">
+          <TableHeader><TableRow>
+            <TableHead>{{ $t('adjudication.eventTime') }}</TableHead><TableHead>{{ $t('adjudication.event') }}</TableHead>
+            <TableHead>{{ $t('adjudication.eventState') }}</TableHead><TableHead>{{ $t('adjudication.eventResult') }}</TableHead>
+            <TableHead>{{ $t('adjudication.eventIdentity') }}</TableHead><TableHead>{{ $t('adjudication.parentEvent') }}</TableHead>
+          </TableRow></TableHeader>
+          <TableBody><TableRow v-for="event in evidenceRows" :key="event.eventId">
+            <TableCell>{{ adminFormatDateTime(event.occurredAt) }}</TableCell><TableCell>{{ adjudicationEventLabel(event.kind) }}</TableCell>
+            <TableCell>{{ event.state ? enumLabel(GameplayFactStateLabel, event.state) : '—' }}</TableCell>
+            <TableCell>{{ event.result ? enumLabel(GameplayFactResultLabel, event.result) : '—' }}</TableCell>
+            <TableCell class="break-all font-mono text-xs">{{ event.eventId }}</TableCell><TableCell class="break-all font-mono text-xs">{{ event.parentEventId ?? '—' }}</TableCell>
+          </TableRow></TableBody>
+        </Table>
+        <Button v-if="evidenceCursor || evidenceError" variant="outline" :disabled="evidenceLoading" @click="loadEvidence">
+          <Spinner v-if="evidenceLoading" data-icon="inline-start" />{{ $t(evidenceError ? 'ui.refresh' : 'adjudication.moreEvidence') }}
+        </Button>
+        <template v-if="evidenceTarget?.eligibilityEvents?.length">
+          <Separator /><p>{{ $t('adjudication.adjustments') }}</p>
+          <ul class="flex flex-col gap-2 text-sm"><li v-for="event in evidenceTarget.eligibilityEvents" :key="event.eventId">
+            {{ adjudicationEventLabel(event.kind) }} · {{ adminFormatDateTime(event.occurredAt) }}
+            <p class="break-all font-mono text-xs text-muted-foreground">{{ event.eventId }}</p>
+          </li></ul>
+        </template>
+      </DialogScrollContent>
+    </Dialog>
 
     <Card>
       <CardContent class="flex flex-col gap-3 pt-6">

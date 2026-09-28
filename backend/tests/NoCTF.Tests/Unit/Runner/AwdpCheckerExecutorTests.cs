@@ -32,7 +32,7 @@ public sealed class AwdpCheckerExecutorTests
             TimeSpan.FromSeconds(20),
             AllowRoot: allowRoot);
 
-        var outcome = await executor.ExecuteAsync(work, CancellationToken.None);
+        var outcome = await executor.ExecuteAsync(work, null, CancellationToken.None);
 
         var request = runner.Request!;
         await Assert.That(request.NetworkName).IsEqualTo("network-1");
@@ -45,7 +45,7 @@ public sealed class AwdpCheckerExecutorTests
         await Assert.That(request.Security.RunAsNonRoot).IsEqualTo(!allowRoot);
         await Assert.That(request.Security.NoNewPrivileges).IsTrue();
         await Assert.That(request.Security.ReadonlyRootfs).IsTrue();
-        await Assert.That(request.Security.CapDrop).IsEquivalentTo(["ALL"]);
+        await Assert.That(request.Security.CapDrop).IsEmpty();
         await Assert.That(request.Security.CapAdd).IsEmpty();
         await Assert.That(request.NetworkPurpose)
             .IsEqualTo(ContainerNetworkPurpose.AwdpVerification);
@@ -60,7 +60,7 @@ public sealed class AwdpCheckerExecutorTests
         var runner = new RecordingOneShotRunner { ExitCode = 17 };
         var executor = new AwdpCheckerExecutor(new RecordingCatalog(runner));
 
-        var outcome = await executor.ExecuteAsync(Work(), CancellationToken.None);
+        var outcome = await executor.ExecuteAsync(Work(), null, CancellationToken.None);
 
         await Assert.That(outcome).IsEqualTo(AwdpCheckerExecutionOutcome.AbnormalExit);
     }
@@ -72,7 +72,7 @@ public sealed class AwdpCheckerExecutorTests
         var executor = new AwdpCheckerExecutor(new RecordingCatalog(runner));
         var work = Work() with { Timeout = TimeSpan.FromMilliseconds(50) };
 
-        var outcome = await executor.ExecuteAsync(work, CancellationToken.None);
+        var outcome = await executor.ExecuteAsync(work, null, CancellationToken.None);
 
         await Assert.That(outcome).IsEqualTo(AwdpCheckerExecutionOutcome.TimedOut);
         await Assert.That(runner.ObservedCancellation).IsTrue();
@@ -121,6 +121,7 @@ public sealed class AwdpCheckerExecutorTests
 
         public async Task<OneShotResult> RunAsync(
             ContainerRequest request,
+            OneShotInputArchive? input,
             CancellationToken cancellationToken)
         {
             Request = request;

@@ -1,10 +1,15 @@
 import { markRaw } from 'vue'
 
 import { Bell, Database, Flag, ShieldAlert } from '@lucide/vue'
+import PlatformGearIconComponent from '../../components/ui/icons/PlatformGearIcon.vue'
 import AccountPanelComponent from '../account/AccountPanel.vue'
 import LanguageToggleComponent from '../LanguageToggle.vue'
 import ThemeToggleComponent from '../ThemeToggle.vue'
 import ThemePalettePanelComponent from '../theme/ThemePalettePanel.vue'
+import { showNotificationNotice } from '../notifications/showNotificationNotice'
+import { watchNotifications } from '../../composables/useNotificationHub'
+import { createTrailingRefresh } from '../../lib/latest-page-refresh'
+import { newNotificationNotices } from '../../composables/useNotificationUnread'
 
 /** Owns state, effects and commands for DefaultLayout. */
 export function useDefaultLayout() {
@@ -22,6 +27,7 @@ export function useDefaultLayout() {
 
   const route = useRoute()
   const isHome = computed(() => route.path === '/')
+  const routePath = computed(() => route.path)
   const {
     wallpaperActive,
     wallpaperStyle,
@@ -42,10 +48,42 @@ export function useDefaultLayout() {
   })
 
   let notificationTimer: ReturnType<typeof setInterval> | undefined
+  let unwatchNotifications: (() => void) | undefined
+  let notificationBaselineReady = false
+  let lastNotificationId: string | null = null
+
+  async function refreshNotifications(showNotice: boolean): Promise<void> {
+    const notifications = await refreshUnread()
+    if (notifications === undefined) return
+    const latestId = notifications[0]?.id ?? null
+    if (showNotice && notificationBaselineReady && latestId !== lastNotificationId)
+      for (const notification of newNotificationNotices(notifications, lastNotificationId))
+        showNotificationNotice(notification)
+    lastNotificationId = latestId
+    notificationBaselineReady = true
+  }
+
+  const refreshOnSignal = createTrailingRefresh(() => refreshNotifications(true))
+
+  function refreshWhenVisible(): void {
+    if (document.visibilityState === 'visible') void refreshOnSignal()
+  }
+
+  function subscribeNotifications(): void {
+    unwatchNotifications?.()
+    unwatchNotifications = user.value?.userId
+      ? watchNotifications({
+          notificationChanged: () => void refreshOnSignal(),
+          onReconnected: () => void refreshOnSignal(),
+        })
+      : undefined
+  }
 
   const navItems = computed(() => [
-    { to: '/competitions', label: t("ui.competitions"), icon: Flag, show: true },
-    { to: '/admin/challenges', label: t("ui.challengeLibrary2"), icon: Database, show: canOrganize.value },
+    { to: '/competitions', label: t("ui.competitions"), icon: Flag, show: true, unread: false },
+    { to: '/admin/challenges', label: t("ui.challengeLibrary2"), icon: Database, show: canOrganize.value, unread: false },
+    { to: '/admin/platform', label: t("ui.platformAdmin"), icon: markRaw(PlatformGearIconComponent), show: isLoggedIn.value && isAdministrator.value, unread: false },
+    { to: '/notifications', label: t("ui.notifications"), icon: Bell, show: isLoggedIn.value, unread: hasUnread.value },
   ])
 
   function isActive(to: string) {
@@ -53,13 +91,22 @@ export function useDefaultLayout() {
   }
 
   onMounted(() => {
-    void refreshUnread()
-    notificationTimer = setInterval(() => void refreshUnread(), 20_000)
+    void refreshNotifications(false)
+    subscribeNotifications()
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+    window.addEventListener('focus', refreshWhenVisible)
+    // SignalR is best-effort; reconcile missed changes after long disconnects.
+    notificationTimer = setInterval(() => void refreshOnSignal(), 300_000)
   })
 
   watch(
     () => user.value?.userId,
-    () => void refreshUnread(),
+    () => {
+      notificationBaselineReady = false
+      lastNotificationId = null
+      void refreshNotifications(false)
+      subscribeNotifications()
+    },
   )
 
   watch(
@@ -70,6 +117,9 @@ export function useDefaultLayout() {
 
   onBeforeUnmount(() => {
     if (notificationTimer) clearInterval(notificationTimer)
+    document.removeEventListener('visibilitychange', refreshWhenVisible)
+    window.removeEventListener('focus', refreshWhenVisible)
+    unwatchNotifications?.()
     clearWallpaper()
   })
 
@@ -80,13 +130,12 @@ export function useDefaultLayout() {
   const AccountPanel = markRaw(AccountPanelComponent)
 
   return {
-      Bell,
       ShieldAlert,
       isHome,
+      routePath,
       wallpaperActive,
       wallpaperStyle,
       isLoggedIn,
-      isAdministrator,
       impersonation,
       impersonationEnding,
       impersonationExpiresAt,
@@ -95,7 +144,6 @@ export function useDefaultLayout() {
       platformError,
       platformLoading,
       ensureLoaded,
-      hasUnread,
       t,
       navItems,
       isActive,

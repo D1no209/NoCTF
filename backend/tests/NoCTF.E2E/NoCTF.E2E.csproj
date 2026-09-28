@@ -10,6 +10,6 @@
     <PackageReference Include="TUnit.Assertions" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../../src/NoCTF.API/NoCTF.API.csproj" />
+    <ProjectReference Include="../../src/NoCTF.Host/NoCTF.Host.csproj" />
   </ItemGroup>
 </Project>

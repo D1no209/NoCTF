@@ -17,6 +17,8 @@ namespace NoCTF.API.Endpoints.Teams;
 public sealed class TeamProfilePatchRequest
 {
     public required string Name { get; set; }
+    public string? TrackKey { get; set; }
+    public string? TrackInvitationCode { get; set; }
 }
 
 public sealed class TeamMembershipPatchRequest
@@ -28,6 +30,7 @@ public sealed class TeamMembershipPatchRequest
 public sealed class TeamRegistrationPatchRequest
 {
     public required TeamRegistrationStatusProtocol Status { get; set; }
+    public string? TrackInvitationCode { get; set; }
 }
 
 public sealed class TeamAdministrationPatchRequest
@@ -75,6 +78,10 @@ public sealed class PatchTeamValidator : Validator<PatchTeamRequest>
             .WithMessage("At least one team section is required.");
         RuleFor(request => request.Profile!.Name).NotEmpty().MaximumLength(128)
             .When(request => request.Profile is not null);
+        RuleFor(request => request.Profile!.TrackKey).MaximumLength(64)
+            .When(request => request.Profile?.TrackKey is not null);
+        RuleFor(request => request.Profile!.TrackInvitationCode).MaximumLength(128)
+            .When(request => request.Profile?.TrackInvitationCode is not null);
         RuleFor(request => request.Membership!.CaptainId).NotEmpty()
             .When(request => request.Membership is not null);
         RuleFor(request => request.Membership!.MemberIds).NotEmpty()
@@ -91,7 +98,9 @@ public sealed class PatchTeamValidator : Validator<PatchTeamRequest>
         RuleFor(request => request.Registration!.Status)
             .Equal(TeamRegistrationStatusProtocol.Pending)
             .When(request => request.Registration is not null)
-            .WithMessage("Captain registration updates can only resubmit a rejected team as Pending.");
+            .WithMessage("Captain registration updates use Pending to submit the current team draft.");
+        RuleFor(request => request.Registration!.TrackInvitationCode).MaximumLength(128)
+            .When(request => request.Registration?.TrackInvitationCode is not null);
         RuleFor(request => request.Ban!.Reason).NotEmpty().MaximumLength(512)
             .When(request => request.Ban?.IsBanned == true);
     }
@@ -104,6 +113,8 @@ public sealed class PatchTeamValidator : Validator<PatchTeamRequest>
 public static partial class TeamPatchMapper
 {
     [MapperIgnoreTarget(nameof(Team.Id))]
+    [MapperIgnoreTarget(nameof(Team.Members))]
+    [MapperIgnoreTarget(nameof(Team.ConcurrencyStamp))]
     [MapperIgnoreTarget(nameof(Team.CompetitionId))]
     [MapperIgnoreTarget(nameof(Team.TrackKey))]
     [MapperIgnoreTarget(nameof(Team.AvatarFileId))]
@@ -123,11 +134,17 @@ public static partial class TeamPatchMapper
     [MapperIgnoreTarget(nameof(Team.BannedById))]
     [MapperIgnoreTarget(nameof(Team.BanReason))]
     [MapperIgnoreTarget(nameof(Team.DeletedAt))]
+    [MapperIgnoreSource(nameof(TeamProfilePatchRequest.TrackKey))]
+    [MapperIgnoreSource(nameof(TeamProfilePatchRequest.TrackInvitationCode))]
+    [MapperIgnoreTarget(nameof(Team.NormalizedName))]
+    [MapperIgnoreTarget(nameof(Team.CaptainMembership))]
     public static partial void ApplyProfileAsCaptain(
         TeamProfilePatchRequest request,
         [MappingTarget] Team target);
 
     [MapperIgnoreTarget(nameof(Team.Id))]
+    [MapperIgnoreTarget(nameof(Team.Members))]
+    [MapperIgnoreTarget(nameof(Team.ConcurrencyStamp))]
     [MapperIgnoreTarget(nameof(Team.CompetitionId))]
     [MapperIgnoreTarget(nameof(Team.TrackKey))]
     [MapperIgnoreTarget(nameof(Team.Name))]
@@ -146,12 +163,16 @@ public static partial class TeamPatchMapper
     [MapperIgnoreTarget(nameof(Team.BannedById))]
     [MapperIgnoreTarget(nameof(Team.BanReason))]
     [MapperIgnoreTarget(nameof(Team.DeletedAt))]
+    [MapperIgnoreTarget(nameof(Team.NormalizedName))]
+    [MapperIgnoreTarget(nameof(Team.CaptainMembership))]
     public static partial void ApplyMembershipAsCaptain(
         TeamMembershipPatchRequest request,
         [MappingTarget] Team target);
 
     [MapProperty(nameof(TeamRegistrationPatchRequest.Status), nameof(Team.RegistrationStatus))]
     [MapperIgnoreTarget(nameof(Team.Id))]
+    [MapperIgnoreTarget(nameof(Team.Members))]
+    [MapperIgnoreTarget(nameof(Team.ConcurrencyStamp))]
     [MapperIgnoreTarget(nameof(Team.CompetitionId))]
     [MapperIgnoreTarget(nameof(Team.TrackKey))]
     [MapperIgnoreTarget(nameof(Team.Name))]
@@ -171,6 +192,9 @@ public static partial class TeamPatchMapper
     [MapperIgnoreTarget(nameof(Team.BannedById))]
     [MapperIgnoreTarget(nameof(Team.BanReason))]
     [MapperIgnoreTarget(nameof(Team.DeletedAt))]
+    [MapperIgnoreSource(nameof(TeamRegistrationPatchRequest.TrackInvitationCode))]
+    [MapperIgnoreTarget(nameof(Team.NormalizedName))]
+    [MapperIgnoreTarget(nameof(Team.CaptainMembership))]
     public static partial void ApplyRegistrationAsCaptain(
         TeamRegistrationPatchRequest request,
         [MappingTarget] Team target);
@@ -178,6 +202,8 @@ public static partial class TeamPatchMapper
     [MapProperty(nameof(TeamAdministrationPatchRequest.RegistrationStatus),
         nameof(Team.RegistrationStatus))]
     [MapperIgnoreTarget(nameof(Team.Id))]
+    [MapperIgnoreTarget(nameof(Team.Members))]
+    [MapperIgnoreTarget(nameof(Team.ConcurrencyStamp))]
     [MapperIgnoreTarget(nameof(Team.CompetitionId))]
     [MapperIgnoreTarget(nameof(Team.Name))]
     [MapperIgnoreTarget(nameof(Team.AvatarFileId))]
@@ -196,6 +222,8 @@ public static partial class TeamPatchMapper
     [MapperIgnoreTarget(nameof(Team.BannedById))]
     [MapperIgnoreTarget(nameof(Team.BanReason))]
     [MapperIgnoreTarget(nameof(Team.DeletedAt))]
+    [MapperIgnoreTarget(nameof(Team.NormalizedName))]
+    [MapperIgnoreTarget(nameof(Team.CaptainMembership))]
     public static partial void ApplyAdministrationAsModerator(
         TeamAdministrationPatchRequest request,
         [MappingTarget] Team target);
@@ -203,6 +231,8 @@ public static partial class TeamPatchMapper
     [MapProperty(nameof(TeamBanPatchRequest.Reason), nameof(Team.BanReason))]
     [MapperIgnoreSource(nameof(TeamBanPatchRequest.AnnouncePublicly))]
     [MapperIgnoreTarget(nameof(Team.Id))]
+    [MapperIgnoreTarget(nameof(Team.Members))]
+    [MapperIgnoreTarget(nameof(Team.ConcurrencyStamp))]
     [MapperIgnoreTarget(nameof(Team.CompetitionId))]
     [MapperIgnoreTarget(nameof(Team.TrackKey))]
     [MapperIgnoreTarget(nameof(Team.Name))]
@@ -221,6 +251,8 @@ public static partial class TeamPatchMapper
     [MapperIgnoreTarget(nameof(Team.BannedAt))]
     [MapperIgnoreTarget(nameof(Team.BannedById))]
     [MapperIgnoreTarget(nameof(Team.DeletedAt))]
+    [MapperIgnoreTarget(nameof(Team.NormalizedName))]
+    [MapperIgnoreTarget(nameof(Team.CaptainMembership))]
     public static partial void ApplyBanAsJudge(
         TeamBanPatchRequest request,
         [MappingTarget] Team target);
@@ -228,6 +260,8 @@ public static partial class TeamPatchMapper
     [MapProperty(nameof(TeamBanPatchRequest.Reason), nameof(Team.BanReason))]
     [MapperIgnoreSource(nameof(TeamBanPatchRequest.AnnouncePublicly))]
     [MapperIgnoreTarget(nameof(Team.Id))]
+    [MapperIgnoreTarget(nameof(Team.Members))]
+    [MapperIgnoreTarget(nameof(Team.ConcurrencyStamp))]
     [MapperIgnoreTarget(nameof(Team.CompetitionId))]
     [MapperIgnoreTarget(nameof(Team.TrackKey))]
     [MapperIgnoreTarget(nameof(Team.Name))]
@@ -246,6 +280,8 @@ public static partial class TeamPatchMapper
     [MapperIgnoreTarget(nameof(Team.BannedAt))]
     [MapperIgnoreTarget(nameof(Team.BannedById))]
     [MapperIgnoreTarget(nameof(Team.DeletedAt))]
+    [MapperIgnoreTarget(nameof(Team.NormalizedName))]
+    [MapperIgnoreTarget(nameof(Team.CaptainMembership))]
     public static partial void ApplyUnbanAsModerator(
         TeamBanPatchRequest request,
         [MappingTarget] Team target);
@@ -260,7 +296,7 @@ public sealed class PatchTeamEndpoint(
     TransferTeamCaptain transferCaptain,
     RemoveTeamMember removeMember,
     ReviewTeamRegistration reviewRegistration,
-    ResubmitTeamRegistration resubmitRegistration,
+    SubmitTeamRegistration submitRegistration,
     AssignTeamTrack assignTrack,
     ModerateTeam moderate,
     IAtomicAggregatePatch atomicPatch,
@@ -270,7 +306,8 @@ public sealed class PatchTeamEndpoint(
     LinkGenerator links,
     TimeProvider timeProvider)
     : Endpoint<PatchTeamRequest,
-        Results<Ok<TeamResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>>
+        Results<Ok<TeamResponse>, NotFound, ForbidHttpResult,
+            Conflict<TeamRegistrationFailureResponse>, ProblemHttpResult>>
 {
     public override void Configure()
     {
@@ -281,7 +318,9 @@ public sealed class PatchTeamEndpoint(
     }
 
     public override async Task<Results<Ok<TeamResponse>, NotFound, ForbidHttpResult,
-        ProblemHttpResult>> ExecuteAsync(PatchTeamRequest request, CancellationToken ct)
+        Conflict<TeamRegistrationFailureResponse>, ProblemHttpResult>> ExecuteAsync(
+        PatchTeamRequest request,
+        CancellationToken ct)
     {
         var competitionId = Route<Guid>("competitionId");
         var teamId = Route<Guid>("teamId");
@@ -339,7 +378,7 @@ public sealed class PatchTeamEndpoint(
         }
 
         if ((sections & TeamPatchSection.Membership) != 0
-            && (!target.MemberIds.Contains(target.CaptainId)
+            && (!target.Members.Any(member => member.UserId == target.CaptainId)
                 || target.MemberIds.Except(current.MemberIds).Any()))
         {
             return Conflict("Team membership update is invalid.");
@@ -347,12 +386,20 @@ public sealed class PatchTeamEndpoint(
         return await atomicPatch.ExecuteAsync(ApplyAsync, ct);
 
         async Task<AtomicAggregatePatchDecision<Results<Ok<TeamResponse>, NotFound,
-            ForbidHttpResult, ProblemHttpResult>>> ApplyAsync(CancellationToken transactionCt)
+            ForbidHttpResult, Conflict<TeamRegistrationFailureResponse>, ProblemHttpResult>>>
+            ApplyAsync(CancellationToken transactionCt)
         {
             if ((sections & TeamPatchSection.Profile) != 0)
             {
                 var result = await update.ExecuteAsync(
-                    new UpdateTeamCommand(competitionId, teamId, target.Name),
+                    new UpdateTeamCommand(
+                        competitionId,
+                        teamId,
+                        target.Name,
+                        request.Profile!.TrackKey,
+                        request.Profile.TrackInvitationCode,
+                        user.UserId,
+                        timeProvider.GetUtcNow()),
                     transactionCt);
                 if (!result.Succeeded)
                     return Reject(MapFailure(result.FailureCode, result.ErrorMessage));
@@ -392,10 +439,11 @@ public sealed class PatchTeamEndpoint(
             }
             if ((sections & TeamPatchSection.Registration) != 0)
             {
-                var result = await resubmitRegistration.ExecuteAsync(
+                var result = await submitRegistration.ExecuteAsync(
                     competitionId,
                     teamId,
                     user.UserId,
+                    request.Registration!.TrackInvitationCode,
                     transactionCt);
                 if (!result.Succeeded)
                     return Reject(MapFailure(result.FailureCode, result.ErrorMessage));
@@ -413,21 +461,16 @@ public sealed class PatchTeamEndpoint(
                     if (!result.Succeeded)
                     {
                         return Reject(Conflict(
-                            result.ErrorMessage ?? "Team track was not updated."));
+                            result.ErrorMessage ?? "Team track was not updated.",
+                            result.FailureCode?.ToString()));
                     }
                 }
                 if (target.RegistrationStatus != current.RegistrationStatus)
                 {
-                    if (target.RegistrationStatus is not (
-                        TeamRegistrationStatus.Approved or TeamRegistrationStatus.Rejected))
-                    {
-                        return Reject(Conflict(
-                            "Moderators can only approve or reject team registration."));
-                    }
                     var result = await reviewRegistration.ExecuteAsync(
                         competitionId,
                         teamId,
-                        target.RegistrationStatus == TeamRegistrationStatus.Approved,
+                        target.RegistrationStatus,
                         transactionCt);
                     if (!result.Succeeded)
                         return Reject(MapFailure(result.FailureCode, result.ErrorMessage));
@@ -456,25 +499,33 @@ public sealed class PatchTeamEndpoint(
                 includePending: true,
                 includeInternal: true,
                 transactionCt);
-            Results<Ok<TeamResponse>, NotFound, ForbidHttpResult, ProblemHttpResult> outcome =
+            Results<Ok<TeamResponse>, NotFound, ForbidHttpResult,
+                Conflict<TeamRegistrationFailureResponse>, ProblemHttpResult> outcome =
                 refreshed is null
                     ? TypedResults.NotFound()
                     : TypedResults.Ok(TeamMapper.ToResponse(refreshed, links, HttpContext));
             return AtomicAggregatePatchDecision<Results<Ok<TeamResponse>, NotFound,
-                ForbidHttpResult, ProblemHttpResult>>.Commit(outcome);
+                ForbidHttpResult, Conflict<TeamRegistrationFailureResponse>,
+                ProblemHttpResult>>.Commit(outcome);
         }
 
         static AtomicAggregatePatchDecision<Results<Ok<TeamResponse>, NotFound,
-            ForbidHttpResult, ProblemHttpResult>> Reject(
-            Results<Ok<TeamResponse>, NotFound, ForbidHttpResult, ProblemHttpResult> failure) =>
+            ForbidHttpResult, Conflict<TeamRegistrationFailureResponse>,
+            ProblemHttpResult>> Reject(
+            Results<Ok<TeamResponse>, NotFound, ForbidHttpResult,
+                Conflict<TeamRegistrationFailureResponse>, ProblemHttpResult> failure) =>
             AtomicAggregatePatchDecision<Results<Ok<TeamResponse>, NotFound,
-                ForbidHttpResult, ProblemHttpResult>>.Rollback(failure);
+                ForbidHttpResult, Conflict<TeamRegistrationFailureResponse>,
+                ProblemHttpResult>>.Rollback(failure);
     }
 
-    private static ProblemHttpResult Conflict(string detail) => TypedResults.Problem(
+    private static ProblemHttpResult Conflict(string detail, string? code = null) => TypedResults.Problem(
         statusCode: StatusCodes.Status409Conflict,
         title: "Team was not updated.",
-        detail: detail);
+        detail: detail,
+        extensions: code is null
+            ? null
+            : new Dictionary<string, object?> { ["code"] = code });
 
     private static TeamPatchSection ResolveSections(PatchTeamRequest request) =>
         (request.Profile is null ? TeamPatchSection.None : TeamPatchSection.Profile)
@@ -483,15 +534,19 @@ public sealed class PatchTeamEndpoint(
         | (request.Administration is null ? TeamPatchSection.None : TeamPatchSection.Administration)
         | (request.Ban is null ? TeamPatchSection.None : TeamPatchSection.Ban);
 
-    private static Results<Ok<TeamResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>
+    private static Results<Ok<TeamResponse>, NotFound, ForbidHttpResult,
+        Conflict<TeamRegistrationFailureResponse>, ProblemHttpResult>
         MapFailure(TeamRegistrationFailure? failure, string? detail) =>
         failure switch
         {
             TeamRegistrationFailure.TeamNotFound => TypedResults.NotFound(),
-            _ => Conflict(detail ?? "Team was not updated.")
+            _ => TypedResults.Conflict(new TeamRegistrationFailureResponse(
+                TeamMapper.ToProtocol(failure ?? TeamRegistrationFailure.TeamConflict),
+                detail ?? "Team was not updated."))
         };
 
-    private static Results<Ok<TeamResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>
+    private static Results<Ok<TeamResponse>, NotFound, ForbidHttpResult,
+        Conflict<TeamRegistrationFailureResponse>, ProblemHttpResult>
         MapMembershipFailure(TeamMembershipFailure? failure, string? detail) =>
         failure switch
         {

@@ -20,23 +20,32 @@ export function useDefinitionContainer(props: Readonly<Omit<{
 }, "flagSource" | "disabled">>>) {
   const isAwdp = computed(() => props.mode === 'Awdp')
 
-  const flagEnvDisabled = computed(() => props.disabled || props.flagSource === FlagSource.Static)
+  const showFlagEnvironmentVariable = computed(() => props.flagSource !== FlagSource.Static)
 
   const hasMetadata = computed(() =>
     Object.keys(props.definition.environment).length > 0 || Object.keys(props.definition.labels).length > 0,
   )
 
+  const hasAdvanced = computed(() => {
+    const expectedFlagEnvironment = props.flagSource === FlagSource.Static ? '' : 'FLAG'
+    return props.definition.command.length > 0
+      || props.definition.internalPorts.length > 0 && !isAwdp.value
+      || props.definition.flagEnvironmentVariableName !== expectedFlagEnvironment
+  })
+
   const hasSecurity = computed(() => {
     const security = props.definition.security
     return security.noNewPrivileges || security.readonlyRootfs || security.runAsNonRoot
-      || security.capDrop.length > 0 || security.capAdd.length > 0
+      || security.capDrop.length > 0
+      || security.capAdd.length > 0
   })
 
   const viewBindings = {
       ...toRefs(props),
       FlagSource,
       isAwdp,
-      flagEnvDisabled,
+      showFlagEnvironmentVariable,
+      hasAdvanced,
       hasMetadata,
       hasSecurity
     }

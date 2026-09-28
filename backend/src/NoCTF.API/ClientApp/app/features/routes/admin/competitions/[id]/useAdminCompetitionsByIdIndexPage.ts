@@ -275,6 +275,9 @@ export function useAdminCompetitionsByIdIndexPage() {
     TeamWriteUp: "writeUp.teamWriteUpFiles",
     ActiveRuntimeResource: "ui.message9",
     NotificationScopeConflict: "ui.crossScopeOrUnprovenNotificationReferences",
+    ProgressionGraph: 'progression.referenceGraph',
+    Badge: 'progression.referenceBadge',
+    BadgeGrant: 'progression.referenceBadgeGrant',
   }
 
   function hardDeleteReferenceLabel(code?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode) {

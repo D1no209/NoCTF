@@ -11,7 +11,7 @@ public static class ChallengeTemplateCriticalSection
         Guid challengeId,
         CancellationToken cancellationToken) =>
         db.Challenges
-            .FromSqlInterpolated($"SELECT * FROM challenges WHERE id = {challengeId} FOR UPDATE")
             .IgnoreQueryFilters()
-            .SingleOrDefaultAsync(cancellationToken);
+            .AsSplitQuery()
+            .SingleOrDefaultAsync(challenge => challenge.Id == challengeId, cancellationToken);
 }

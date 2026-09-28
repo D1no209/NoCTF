@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { ChallengeTestRuntimePanelViewState } from '~/features/admin/useChallengeTestRuntimePanel'
 
 const viewProps = defineProps<{ state: ChallengeTestRuntimePanelViewState }>()
-const { Check, Clipboard, FlaskConical, RefreshCw, publicGatewayFailure, runtime, loading, loadError, copied, extendMinutes, timedOut, retryLoad, start, stop, reset, extend, copyTestFlag, active, canStart, busy, ttl, canExtend, stateVariant, flagVariant, flagStateLabel, RuntimeAccessUrl, definitionDirty } = toRefs(viewProps.state)
+const { Check, Clipboard, FlaskConical, RefreshCw, runtime, loading, loadError, copied, extendMinutes, extendMinutesInvalid, validExtension, timedOut, retryLoad, start, stop, reset, extend, copyTestFlag, active, canStart, busy, ttl, canExtend, stateVariant, flagVariant, flagStateLabel, RuntimeAccessUrl, definitionDirty } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -49,7 +49,6 @@ const { Check, Clipboard, FlaskConical, RefreshCw, publicGatewayFailure, runtime
     </Alert>
 
     <template v-if="!loading && !loadError">
-      <Alert v-if="runtime?.publicAccessFailure"><AlertDescription>{{ publicGatewayFailure(runtime.publicAccessFailure) }}</AlertDescription></Alert>
       <div v-if="runtime" class="grid gap-3 text-sm sm:grid-cols-2">
         <div class="grid gap-1">
           <span class="text-muted-foreground">{{ $t('ui.placement') }}</span>
@@ -66,9 +65,9 @@ const { Check, Clipboard, FlaskConical, RefreshCw, publicGatewayFailure, runtime
           <span class="text-muted-foreground">{{ $t('ui.failureReason') }}</span>
           <span class="text-destructive">{{ enumLabel(RuntimeFailureCodeLabel, runtime.failureCode) }}</span>
         </div>
-        <div v-if="runtime.state === 'Running' && runtime.urls?.length" class="grid gap-2 sm:col-span-2">
+        <div v-if="runtime.state === 'Running' && runtime.accesses?.length" class="grid gap-2 sm:col-span-2">
           <span class="text-muted-foreground">{{ $t('ui.accessAddress') }}</span>
-          <component :is="RuntimeAccessUrl" v-for="url in runtime.urls" :key="url" :url="url" />
+          <component :is="RuntimeAccessUrl" v-for="access in runtime.accesses" :key="`${access.directAddress}:${access.webSocketAddress}`" :access="access" />
         </div>
         <div v-if="runtime.testFlag" class="grid gap-2 sm:col-span-2">
           <span class="text-muted-foreground">{{ $t('ui.testFlagForThisInstance') }}</span>
@@ -111,9 +110,14 @@ const { Check, Clipboard, FlaskConical, RefreshCw, publicGatewayFailure, runtime
         >
           <Spinner v-if="busy" data-icon="inline-start" />{{ $t('ui.resetTestContainer') }}
         </Button>
-        <div v-if="canExtend" class="flex items-center gap-2">
-          <NumberInput v-model.number="extendMinutes"  min="1" max="1440" class="w-20" :aria-label="$t('ui.renewalMinutes2')" />
-          <Button type="button" variant="outline" :disabled="busy" @click="extend">{{ $t('ui.renewalMinutes') }}</Button>
+        <div v-if="canExtend" class="flex items-start gap-2">
+          <Field class="w-36 shrink-0" :data-invalid="extendMinutesInvalid">
+            <FieldLabel :for="`test-runtime-extend-${runtime?.id}`" class="sr-only">{{ $t('ui.renewalMinutes2') }}</FieldLabel>
+            <NumberInput :id="`test-runtime-extend-${runtime?.id}`" v-model="extendMinutes"
+              min="1" max="1440" required class="w-full" :aria-invalid="extendMinutesInvalid" />
+            <FieldDescription v-if="extendMinutesInvalid">{{ $t('ui.renewalMinutesRange', { max: 1440 }) }}</FieldDescription>
+          </Field>
+          <Button type="button" variant="outline" :disabled="!validExtension" @click="extend">{{ $t('ui.renewalMinutes') }}</Button>
         </div>
       </div>
     </template>

@@ -20,7 +20,7 @@ public class TeamRegistrationTests
     }
 
     [Test]
-    public async Task CreateTeam_AutoApproveCreatesCaptainTeam()
+    public async Task CreateTeam_Creates_an_unregistered_editable_team()
     {
         var store = new Store(new(CompetitionStatus.Published, true, false));
         var command = new CreateTeamCommand(Guid.NewGuid(), Guid.NewGuid(), "alpha", DateTimeOffset.UtcNow, "default");
@@ -28,7 +28,7 @@ public class TeamRegistrationTests
         var result = await new CreateTeam(store).ExecuteAsync(command);
 
         await Assert.That(result.Succeeded).IsTrue();
-        await Assert.That(store.Status).IsEqualTo(TeamRegistrationStatus.Approved);
+        await Assert.That(store.Status).IsEqualTo(TeamRegistrationStatus.Unregistered);
         await Assert.That(result.Value!.CaptainId).IsEqualTo(command.UserId);
     }
 
@@ -57,13 +57,13 @@ public class TeamRegistrationTests
             "default"));
 
         await Assert.That(result.Succeeded).IsTrue();
-        await Assert.That(store.Status).IsEqualTo(TeamRegistrationStatus.Pending);
+        await Assert.That(store.Status).IsEqualTo(TeamRegistrationStatus.Unregistered);
     }
 
     [Test]
     public async Task CreateTeam_Requires_an_explicit_publicly_selectable_track()
     {
-        var configuration = new CompetitionTrackConfiguration(1,
+        var configuration = new CompetitionTrackConfiguration(
         [
             Track("formal", isDefault: true, publicSelectable: true),
             Track("invite", publicSelectable: false),
@@ -74,7 +74,7 @@ public class TeamRegistrationTests
             AutoApprove: true,
             CompetitionDeleted: false,
             Mode: GameMode.Ctf,
-            TrackConfigurationJson: CompetitionTrackConfiguration.Serialize(configuration),
+            Tracks: CompetitionTrackConfiguration.ToPersisted(configuration),
             TracksEnabled: true);
         var store = new Store(policy);
         var create = new CreateTeam(store);
@@ -97,9 +97,9 @@ public class TeamRegistrationTests
     }
 
     [Test]
-    public async Task CreateTeam_Requires_valid_invitation_code_for_protected_track()
+    public async Task CreateTeam_Defers_protected_track_requirements_until_submission()
     {
-        var configuration = new CompetitionTrackConfiguration(1,
+        var configuration = new CompetitionTrackConfiguration(
         [
             Track("formal", isDefault: true),
             Track("invite", invitationCode: "let-me-in")
@@ -109,7 +109,7 @@ public class TeamRegistrationTests
             AutoApprove: true,
             CompetitionDeleted: false,
             Mode: GameMode.Ctf,
-            TrackConfigurationJson: CompetitionTrackConfiguration.Serialize(configuration),
+            Tracks: CompetitionTrackConfiguration.ToPersisted(configuration),
             TracksEnabled: true);
         var store = new Store(policy);
         var create = new CreateTeam(store);
@@ -121,8 +121,8 @@ public class TeamRegistrationTests
         var valid = await create.ExecuteAsync(new(
             Guid.NewGuid(), Guid.NewGuid(), "valid", DateTimeOffset.UtcNow, "invite", " let-me-in "));
 
-        await Assert.That(missing.FailureCode).IsEqualTo(TeamRegistrationFailure.TrackInvitationRequired);
-        await Assert.That(invalid.FailureCode).IsEqualTo(TeamRegistrationFailure.TrackInvitationInvalid);
+        await Assert.That(missing.Succeeded).IsTrue();
+        await Assert.That(invalid.Succeeded).IsTrue();
         await Assert.That(valid.Succeeded).IsTrue();
         await Assert.That(valid.Value!.TrackKey).IsEqualTo("invite");
     }
@@ -130,7 +130,7 @@ public class TeamRegistrationTests
     [Test]
     public async Task CreateTeam_Disabled_tracks_allow_omitted_track_and_ignore_invitation_data()
     {
-        var configuration = new CompetitionTrackConfiguration(1,
+        var configuration = new CompetitionTrackConfiguration(
         [
             Track("formal", isDefault: true),
             Track("invite", invitationCode: "let-me-in")
@@ -140,7 +140,7 @@ public class TeamRegistrationTests
             AutoApprove: true,
             CompetitionDeleted: false,
             Mode: GameMode.Ctf,
-            TrackConfigurationJson: CompetitionTrackConfiguration.Serialize(configuration),
+            Tracks: CompetitionTrackConfiguration.ToPersisted(configuration),
             TracksEnabled: false));
 
         var result = await new CreateTeam(store).ExecuteAsync(new(
@@ -161,10 +161,45 @@ public class TeamRegistrationTests
     {
         var store = new Store(new(CompetitionStatus.Finished, true, false));
 
-        var result = await new ReviewTeamRegistration(store).ExecuteAsync(Guid.NewGuid(), Guid.NewGuid(), true);
+        var result = await new ReviewTeamRegistration(store).ExecuteAsync(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            TeamRegistrationStatus.Approved);
 
         await Assert.That(result.FailureCode).IsEqualTo(TeamRegistrationFailure.CompetitionFinished);
         await Assert.That(store.ReviewWriteCount).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task ReviewTeamRegistration_Allows_moderator_to_return_team_to_pending()
+    {
+        var store = new Store(new(CompetitionStatus.Published, true, false));
+
+        var result = await new ReviewTeamRegistration(store).ExecuteAsync(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            TeamRegistrationStatus.Pending);
+
+        await Assert.That(result.Succeeded).IsTrue();
+        await Assert.That(store.Status).IsEqualTo(TeamRegistrationStatus.Pending);
+    }
+
+    [Test]
+    [Arguments(CompetitionStatus.Draft, false, false)]
+    [Arguments(CompetitionStatus.Visible, false, true)]
+    [Arguments(CompetitionStatus.Published, false, true)]
+    [Arguments(CompetitionStatus.Running, false, false)]
+    [Arguments(CompetitionStatus.Running, true, true)]
+    [Arguments(CompetitionStatus.Paused, true, false)]
+    [Arguments(CompetitionStatus.Finished, true, false)]
+    public async Task Participant_organization_changes_follow_the_registration_window(
+        CompetitionStatus status,
+        bool allowWhileRunning,
+        bool expected)
+    {
+        await Assert.That(ParticipantTeamMutationPolicy.CanChangeOrganization(
+            status,
+            allowWhileRunning)).IsEqualTo(expected);
     }
 
     [Test]
@@ -177,8 +212,21 @@ public class TeamRegistrationTests
         await Assert.That(store.LastFindForUserIncludedPending).IsTrue();
     }
 
-    private sealed class Store(TeamRegistrationPolicy policy) : ITeamRegistrationStore
+    private sealed class Store : ITeamRegistrationStore
     {
+        private readonly TeamRegistrationPolicy policy;
+
+        public Store(TeamRegistrationPolicy policy)
+        {
+            this.policy = policy.Tracks is null or { Count: 0 }
+                ? policy with
+                {
+                    Tracks = CompetitionTrackConfiguration.ToPersisted(
+                        CompetitionTrackConfiguration.DefaultFor(policy.Mode))
+                }
+                : policy;
+        }
+
         public TeamRegistrationStatus? Status { get; private set; }
         public int ReviewWriteCount { get; private set; }
         public bool? LastFindForUserIncludedPending { get; private set; }
@@ -207,6 +255,7 @@ public class TeamRegistrationTests
         public Task<TeamReviewStoreResult> SetStatusAsync(Guid competitionId, Guid teamId, TeamRegistrationStatus status, CancellationToken cancellationToken)
         {
             ReviewWriteCount++;
+            Status = status;
             return Task.FromResult(new TeamReviewStoreResult(true));
         }
         public Task<TeamView?> FindAsync(Guid competitionId, Guid teamId, bool includePending, CancellationToken cancellationToken) => Task.FromResult<TeamView?>(null);

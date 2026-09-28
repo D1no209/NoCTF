@@ -36,7 +36,8 @@ public sealed class UploadTeamAvatarEndpoint(
     FileUploadLimits uploadLimits,
     TimeProvider timeProvider)
     : Endpoint<UploadTeamAvatarRequest,
-        Results<Ok<TeamAvatarResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>>
+        Results<Ok<TeamAvatarResponse>, NotFound, ForbidHttpResult,
+            Conflict<TeamRegistrationFailureResponse>, ProblemHttpResult>>
 {
     public override void Configure()
     {
@@ -54,7 +55,8 @@ public sealed class UploadTeamAvatarEndpoint(
         Summary(summary => summary.Summary = "Replaces a team's avatar with an immutable File reference.");
     }
 
-    public override async Task<Results<Ok<TeamAvatarResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>>
+    public override async Task<Results<Ok<TeamAvatarResponse>, NotFound, ForbidHttpResult,
+        Conflict<TeamRegistrationFailureResponse>, ProblemHttpResult>>
         ExecuteAsync(UploadTeamAvatarRequest request, CancellationToken ct)
     {
         if (request.File.Length > uploadLimits.MaximumAvatarBytes)
@@ -83,6 +85,10 @@ public sealed class UploadTeamAvatarEndpoint(
                 new TeamAvatarResponse(result.File!.FileId, result.File.ContentType)),
             BusinessFileReferenceState.NotFound => TypedResults.NotFound(),
             BusinessFileReferenceState.Forbidden => TypedResults.Forbid(),
+            BusinessFileReferenceState.Conflict => TypedResults.Conflict(
+                new TeamRegistrationFailureResponse(
+                    TeamMapper.ToProtocol(result.Failure!.Value),
+                    "Team avatar was not updated.")),
             _ => throw new InvalidOperationException($"Unexpected avatar state {result.State}.")
         };
     }

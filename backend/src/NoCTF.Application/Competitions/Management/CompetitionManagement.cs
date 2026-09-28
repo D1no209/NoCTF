@@ -1,6 +1,7 @@
 using NoCTF.Application.Common;
 using NoCTF.Domain.Competitions;
 using NoCTF.Application.Competitions.Lifecycle;
+using NoCTF.Domain.Runtime;
 
 namespace NoCTF.Application.Competitions.Management;
 
@@ -21,7 +22,10 @@ public sealed record CreateCompetitionCommand(
     bool AllowChallengeOwnersToHandleQuestions = true,
     bool PracticeModeEnabled = false,
     bool TracksEnabled = false,
-    CompetitionAccessMode AccessMode = CompetitionAccessMode.Public);
+    CompetitionAccessMode AccessMode = CompetitionAccessMode.Public,
+    RuntimeAccessMode RuntimeAccessMode = RuntimeAccessMode.Direct,
+    bool TrafficCaptureEnabled = false,
+    long? TrafficCaptureLimitBytes = null);
 
 public sealed record CompetitionView(
     Guid Id,
@@ -47,7 +51,10 @@ public sealed record CompetitionView(
     bool TracksEnabled = false,
     CompetitionAccessMode AccessMode = CompetitionAccessMode.Public,
     bool WriteUpSubmissionRequired = false,
-    int WriteUpSubmissionDeadlineHours = 0);
+    int WriteUpSubmissionDeadlineHours = 0,
+    RuntimeAccessMode RuntimeAccessMode = RuntimeAccessMode.Direct,
+    bool TrafficCaptureEnabled = false,
+    long? TrafficCaptureLimitBytes = null);
 
 public enum CompetitionCreationState
 {
@@ -95,7 +102,10 @@ public sealed record UpdateCompetitionCommand(
     bool PracticeModeEnabled = false,
     CompetitionAccessMode AccessMode = CompetitionAccessMode.Public,
     bool WriteUpSubmissionRequired = false,
-    int WriteUpSubmissionDeadlineHours = 0);
+    int WriteUpSubmissionDeadlineHours = 0,
+    RuntimeAccessMode RuntimeAccessMode = RuntimeAccessMode.Direct,
+    bool TrafficCaptureEnabled = false,
+    long? TrafficCaptureLimitBytes = null);
 
 public interface ICompetitionManagementStore
 {
@@ -168,6 +178,15 @@ public sealed class CreateCompetition(ICompetitionManagementStore store)
                 CompetitionCreationState.InvalidRequest,
                 Detail: "Competition access mode is invalid."));
         }
+        if (!RuntimeAccessPolicy.IsValid(
+                command.RuntimeAccessMode,
+                command.TrafficCaptureEnabled,
+                command.TrafficCaptureLimitBytes))
+        {
+            return Task.FromResult(new CompetitionCreationResult(
+                CompetitionCreationState.InvalidRequest,
+                Detail: RuntimeAccessPolicy.ValidationMessage));
+        }
         var schedule = CompetitionLifecyclePolicy.ValidateSchedule(command.StartTime, command.EndTime);
         if (!schedule.Succeeded)
         {
@@ -232,6 +251,15 @@ public sealed class UpdateCompetition(ICompetitionManagementStore store)
             return OperationResult<CompetitionView, CompetitionManagementFailureCode>.Failure(
                 CompetitionManagementFailureCode.CompetitionConflict,
                 "Competition access mode is invalid.");
+        if (!RuntimeAccessPolicy.IsValid(
+                command.RuntimeAccessMode,
+                command.TrafficCaptureEnabled,
+                command.TrafficCaptureLimitBytes))
+        {
+            return OperationResult<CompetitionView, CompetitionManagementFailureCode>.Failure(
+                CompetitionManagementFailureCode.CompetitionConflict,
+                RuntimeAccessPolicy.ValidationMessage);
+        }
         var schedule = CompetitionLifecyclePolicy.ValidateSchedule(command.StartTime, command.EndTime);
         if (!schedule.Succeeded)
             return OperationResult<CompetitionView, CompetitionManagementFailureCode>.Failure(
@@ -246,6 +274,29 @@ public sealed class UpdateCompetition(ICompetitionManagementStore store)
                 "Competition could not be updated in its current state.")
             : OperationResult<CompetitionView, CompetitionManagementFailureCode>.Success(updated);
     }
+}
+
+public static class RuntimeAccessPolicy
+{
+    public const long MinimumCaptureLimitBytes = 1_048_576;
+    public const long MaximumCaptureLimitBytes = 4_294_967_296;
+    public const string ValidationMessage =
+        "Runtime access and traffic capture configuration is invalid.";
+
+    public static bool SupportsWsrx(RuntimeAccessMode mode) =>
+        mode is RuntimeAccessMode.DirectAndWsrx or RuntimeAccessMode.WsrxOnly;
+
+    public static bool PublishesDirect(RuntimeAccessMode mode) =>
+        mode is RuntimeAccessMode.Direct or RuntimeAccessMode.DirectAndWsrx;
+
+    public static bool IsValid(
+        RuntimeAccessMode mode,
+        bool trafficCaptureEnabled,
+        long? trafficCaptureLimitBytes) =>
+        Enum.IsDefined(mode)
+        && (!trafficCaptureEnabled || SupportsWsrx(mode))
+        && (trafficCaptureLimitBytes is null
+            || trafficCaptureLimitBytes is >= MinimumCaptureLimitBytes and <= MaximumCaptureLimitBytes);
 }
 
 public sealed class DeleteCompetition(ICompetitionManagementStore store)

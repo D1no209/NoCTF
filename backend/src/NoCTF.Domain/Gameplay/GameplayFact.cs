@@ -1,11 +1,16 @@
 using System.ComponentModel.DataAnnotations;
+using NoCTF.Domain.Shared;
 
 namespace NoCTF.Domain.Gameplay;
 
 /// <summary>A player, administrator, or system fact together with its current authoritative result.</summary>
-public sealed class GameplayFact
+[PersistentHierarchy]
+[GeneratePersistentLeaves(typeof(GameplayFactKind), "GameplayFact")]
+public abstract class GameplayFact : IConcurrencyTracked
 {
+    protected GameplayFact(GameplayFactKind kind) => Kind = kind;
     public Guid Id { get; set; }
+    public Guid ConcurrencyStamp { get; set; } = Guid.NewGuid();
     public Guid CompetitionId { get; set; }
     public Guid CompetitionChallengeId { get; set; }
     public Guid? TeamId { get; set; }
@@ -13,7 +18,7 @@ public sealed class GameplayFact
     public Guid? ActorUserId { get; set; }
     [System.ComponentModel.DataAnnotations.MaxLength(45), System.Text.Json.Serialization.JsonIgnore]
     public string? SourceIpAddress { get; set; }
-    public GameplayFactKind Kind { get; set; }
+    public GameplayFactKind Kind { get; private set; }
     public DateTimeOffset OccurredAt { get; set; }
     public GameplayFactReferenceKind? ReferenceKind { get; set; }
     public Guid? ReferenceId { get; set; }
@@ -104,9 +109,12 @@ public enum GameplayFactFailureCode : short
     AwdpPatchFailed,
     AwdpPatchTimeout,
     AwdpServiceAbnormal,
-    AwdpViolation,
     ForeignTeamFlagDetected,
     InsufficientScore,
     HintUnavailable,
-    AwdpPlatformFailed
+    AwdpPlatformFailed,
+    PatchStillExploitable,
+    PatchExecutionFailed,
+    PatchServiceAbnormal,
+    PatchVerificationPlatformFailed
 }

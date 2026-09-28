@@ -41,28 +41,28 @@ internal sealed class CompetitionForceDeleteFixture
         db.Files.AddRange(File(FileId), File(WriteUpFileId), File(SharedFileId));
         db.Files.AddRange(AdditionalPatchFileIds.Select(File));
         db.Competitions.AddRange(Competition(Id, "Delete fixture", FileId), Competition(OtherId, "Keep fixture", SharedFileId));
-        db.Challenges.Add(new Challenge
+        db.Challenges.Add(new AwdpChallenge
         {
-            Id = TemplateId, OwnerId = OwnerId, Mode = GameMode.Awdp, Visibility = ChallengeVisibility.Private,
-            Title = "Global template", Direction = "Pwn", DefinitionJson = "{}", CreatedAt = Now, UpdatedAt = Now
+            Id = TemplateId, OwnerId = OwnerId, Visibility = ChallengeVisibility.Private,
+            Title = "Global template", Direction = "Pwn", Definition = TestConfigurations.Definition(GameMode.Awdp), CreatedAt = Now, UpdatedAt = Now
         });
         db.Set<ChallengeAttachment>().Add(new ChallengeAttachment
         {
             Id = Guid.NewGuid(), ChallengeId = TemplateId, FileId = SharedFileId, CreatedAt = Now
         });
-        db.ChallengeFlags.Add(new ChallengeFlag
+        db.ChallengeFlags.Add(new TemplateChallengeFlag
         {
             Id = Guid.NewGuid(), ChallengeId = TemplateId, Flag = "flag{keep}", FlagSha256 = new byte[32], CreatedAt = Now
         });
         var challenge = Guid.NewGuid();
         var team = Guid.NewGuid();
-        db.CompetitionChallenges.Add(new CompetitionChallenge
+        db.CompetitionChallenges.Add(new AwdpCompetitionChallenge
         {
-            Id = challenge, CompetitionId = Id, ChallengeId = TemplateId, RulesJson = "{}", UpdatedAt = Now
+            Id = challenge, CompetitionId = Id, ChallengeId = TemplateId, Rules = TestConfigurations.Rules(GameMode.Awdp), UpdatedAt = Now
         });
-        db.CompetitionChallenges.Add(new CompetitionChallenge
+        db.CompetitionChallenges.Add(new AwdpCompetitionChallenge
         {
-            Id = Guid.NewGuid(), CompetitionId = OtherId, ChallengeId = TemplateId, RulesJson = "{}", UpdatedAt = Now
+            Id = Guid.NewGuid(), CompetitionId = OtherId, ChallengeId = TemplateId, Rules = TestConfigurations.Rules(GameMode.Awdp), UpdatedAt = Now
         });
         db.Teams.Add(new Team
         {
@@ -75,17 +75,17 @@ internal sealed class CompetitionForceDeleteFixture
         {
             var factId = Guid.NewGuid();
             var patchId = Guid.NewGuid();
-            db.GameplayFacts.Add(new GameplayFact
+            db.GameplayFacts.Add(new FixAttemptGameplayFact
             {
                 Id = factId, CompetitionId = Id, CompetitionChallengeId = challenge, TeamId = team,
-                ActorUserId = OwnerId, Kind = GameplayFactKind.FixAttempt, State = GameplayFactState.Completed,
+                ActorUserId = OwnerId, State = GameplayFactState.Completed,
                 Result = GameplayFactResult.Wrong, ReferenceKind = GameplayFactReferenceKind.PatchUpload,
                 ReferenceId = patchId, OccurredAt = Now, UpdatedAt = Now
             });
-            db.RuntimeInstances.Add(new RuntimeInstance
+            db.RuntimeInstances.Add(new AwdpTargetRuntimeInstance
             {
                 Id = runtimeId, CompetitionId = Id, CompetitionChallengeId = challenge, TeamId = team,
-                GameplayFactId = factId, Purpose = RuntimePurpose.AwdpTarget, RuntimeKind = RuntimeKind.Container,
+                GameplayFactId = factId, RuntimeKind = RuntimeKind.Container,
                 RuntimeProvider = RuntimeProvider.Docker, State = RuntimeState.Stopped, CreatedAt = Now, StoppedAt = Now
             });
             db.PatchUploads.Add(new PatchUpload
@@ -103,18 +103,27 @@ internal sealed class CompetitionForceDeleteFixture
         db.ChangeTracker.Clear();
     }
 
-    public Notification Notification(Guid id, Guid? competitionId) => new()
+    public Notification Notification(
+        Guid id,
+        Guid? competitionId,
+        NotificationKind kind = NotificationKind.Message)
     {
-        Id = id, SourceType = NotificationSourceType.User, SourceId = OwnerId,
-        TargetType = NotificationTargetType.User, TargetId = OwnerId, Kind = NotificationKind.Message,
-        RelatedType = competitionId.HasValue ? EntityReferenceKind.Competition : null,
-        RelatedId = competitionId, SentAt = Now
-    };
+        var notification = NotificationGeneratedCatalog.Create(kind);
+        notification.Id = id;
+        notification.SourceType = NotificationSourceType.User;
+        notification.SourceId = OwnerId;
+        notification.TargetType = NotificationTargetType.User;
+        notification.TargetId = OwnerId;
+        notification.RelatedType = competitionId.HasValue ? EntityReferenceKind.Competition : null;
+        notification.RelatedId = competitionId;
+        notification.SentAt = Now;
+        return notification;
+    }
 
-    private Competition Competition(Guid id, string title, Guid poster) => new()
+    private Competition Competition(Guid id, string title, Guid poster) => new AwdpCompetition
     {
-        Id = id, OwnerId = OwnerId, Title = title, Mode = GameMode.Awdp, PosterFileId = poster,
-        ConfigurationJson = "{\"schemaVersion\":1}", FlagDerivationSecret = new byte[32],
+        Id = id, OwnerId = OwnerId, Title = title, PosterFileId = poster,
+        ModeConfiguration = TestConfigurations.Competition(GameMode.Awdp), FlagDerivationSecret = new byte[32],
         StartAt = Now.AddHours(-2), EndAt = Now.AddHours(-1), Status = CompetitionStatus.Finished,
         CreatedAt = Now, UpdatedAt = Now
     };

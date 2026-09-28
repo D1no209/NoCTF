@@ -8,8 +8,6 @@ public interface IUserContext
     Guid UserId { get; }
     bool IsAdministrator { get; }
     bool IsHuman => true;
-    Guid? ImpersonatorUserId => null;
-    bool IsImpersonating => ImpersonatorUserId is not null;
 }
 
 public sealed class HttpUserContext(IHttpContextAccessor accessor) : IUserContext
@@ -27,10 +25,4 @@ public sealed class HttpUserContext(IHttpContextAccessor accessor) : IUserContex
         accessor.HttpContext?.User.FindFirstValue("user_kind"),
         "Human",
         StringComparison.Ordinal);
-
-    public Guid? ImpersonatorUserId =>
-        Guid.TryParse(accessor.HttpContext?.User.FindFirstValue(
-            AccessTokenClaims.ImpersonatorId), out var userId)
-            ? userId
-            : null;
 }

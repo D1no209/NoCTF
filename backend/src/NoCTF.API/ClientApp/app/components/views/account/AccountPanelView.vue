@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AccountPanelViewState } from '~/features/account/useAccountPanel'
 
 const viewProps = defineProps<{ state: AccountPanelViewState }>()
-const { UserRound, LockKeyhole, ShieldCheck, ImageIcon, LogOut, user, isImpersonating, fetchMe, open, activeSection, setOpen, selectSection, signOut, description, profilePending, profileError, profileSuccess, profileDirty, saveProfile, avatarInput, avatarPending, avatarEditorOpen, avatarSourceFile, avatarRequirements, selectAvatar, setAvatarEditorOpen, uploadAvatar, reportAvatarError, setAvatarInputRef, wallpaperInput, wallpaperPending, wallpaperUrl, wallpaperRequirements, selectWallpaper, setWallpaperEnabled, setWallpaperInputRef, fullName, studentNumber, identityLoading, identityLoaded, identityPending, identityError, identitySuccess, identityDirty, identityFieldError, loadIdentity, saveIdentity, emailPending, emailMessage, emailError, resendEmail, currentPassword, newPassword, confirmNewPassword, passwordPending, passwordError, changePassword, logoutAll, AvatarCropDialog } = toRefs(viewProps.state)
+const { UserRound, LockKeyhole, ShieldCheck, ImageIcon, LogOut, user, wideAccountPanel, isImpersonating, fetchMe, open, activeSection, setOpen, selectSection, signOut, description, profilePending, profileError, profileSuccess, profileDirty, saveProfile, avatarInput, avatarPending, avatarEditorOpen, avatarSourceFile, selectAvatar, setAvatarEditorOpen, uploadAvatar, reportAvatarError, setAvatarInputRef, wallpaperInput, wallpaperPending, wallpaperUrl, selectWallpaper, setWallpaperEnabled, setWallpaperInputRef, fullName, studentNumber, identityLoading, identityLoaded, identityPending, identityError, identitySuccess, identityDirty, identityFieldError, loadIdentity, saveIdentity, emailPending, emailMessage, emailError, resendEmail, ssoConfiguration, ssoLoading, ssoLoaded, ssoPending, ssoError, ssoProviderId, loadSsoBinding, beginSsoBinding, unbindSsoIdentity, currentPassword, newPassword, confirmNewPassword, passwordPending, passwordError, changePassword, logoutAll, AvatarCropDialog, AdminDateTime } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -16,20 +16,33 @@ const { UserRound, LockKeyhole, ShieldCheck, ImageIcon, LogOut, user, isImperson
         </Avatar>
       </Button>
     </PopoverTrigger>
-    <PopoverContent align="end" side="bottom" :side-offset="12" class="account-panel-popover w-[min(26rem,calc(100vw-2rem))] max-w-none p-0">
-      <Card size="sm" data-slot="account-panel-menu" class="shrink-0 gap-3 py-4">
-        <div class="flex min-w-0 items-center gap-3 px-4">
-          <Avatar class="size-11 shrink-0 after:border-0">
-            <AvatarImage v-if="user?.avatarUrl" :src="user.avatarUrl" :alt="user?.userName ?? ''" />
-            <AvatarFallback>{{ user?.userName?.slice(0, 2) ?? '?' }}</AvatarFallback>
-          </Avatar>
-          <div class="min-w-0 flex-1">
-            <p class="truncate font-semibold">{{ user?.userName ?? '-' }}</p>
-            <p class="truncate text-xs text-muted-foreground">{{ user?.email ?? '-' }}</p>
-          </div>
+    <PopoverContent
+      :align="wideAccountPanel ? 'center' : 'end'"
+      side="bottom"
+      :side-offset="12"
+      :collision-padding="wideAccountPanel ? 0 : 12"
+      class="account-panel-popover w-[min(20rem,calc(100vw-1rem))] max-w-none p-0"
+    >
+      <Card size="sm" data-slot="account-panel-menu" class="h-[min(20rem,calc(100vw-1rem))] w-full shrink-0 justify-between gap-3 overflow-hidden py-4">
+        <Button v-if="user?.userId" variant="ghost" class="mx-3 h-auto justify-start gap-3 px-2 py-2" as-child>
+          <NuxtLink :to="`/users/${user.userId}`" :aria-label="$t('profile.openProfile')" @click="setOpen(false)">
+            <Avatar class="size-11 shrink-0 after:border-0">
+              <AvatarImage v-if="user.avatarUrl" :src="user.avatarUrl" :alt="user.userName ?? ''" />
+              <AvatarFallback>{{ user.userName?.slice(0, 2) ?? '?' }}</AvatarFallback>
+            </Avatar>
+            <span class="min-w-0 flex-1 text-left">
+              <span class="block truncate font-semibold">{{ user.userName ?? '-' }}</span>
+              <span class="block truncate text-xs font-normal text-muted-foreground">{{ user.email ?? '-' }}</span>
+            </span>
+          </NuxtLink>
+        </Button>
+
+        <div v-else class="flex min-w-0 items-center gap-3 px-4">
+          <Avatar class="size-11 shrink-0 after:border-0"><AvatarFallback>?</AvatarFallback></Avatar>
+          <span class="truncate font-semibold">-</span>
         </div>
 
-        <div class="grid grid-cols-4 gap-1.5 px-4">
+        <div class="grid min-h-0 flex-1 grid-cols-2 grid-rows-2 gap-2 px-4">
           <Button
             type="button"
             variant="ghost"
@@ -83,7 +96,7 @@ const { UserRound, LockKeyhole, ShieldCheck, ImageIcon, LogOut, user, isImperson
         </Button>
       </Card>
 
-      <Card v-if="activeSection" size="sm" data-slot="account-panel-detail" class="noctf-motion-detail-enter min-h-0 gap-0 py-0">
+      <Card v-if="activeSection" size="sm" data-slot="account-panel-detail" class="noctf-motion-detail-enter min-h-0 w-full gap-0 py-0">
         <header class="shrink-0 px-5 py-4">
           <h2 class="font-semibold">
             {{ activeSection === 'profile' ? $t('ui.publicProfile') : activeSection === 'identity' ? $t('accountPanel.accountInformation') : activeSection === 'wallpaper' ? $t('accountPanel.customWallpaper') : $t('ui.accountSecurity') }}
@@ -105,12 +118,10 @@ const { UserRound, LockKeyhole, ShieldCheck, ImageIcon, LogOut, user, isImperson
                       <Spinner v-if="avatarPending" data-icon="inline-start" />{{ $t('ui.selectAndCropAvatar') }}
                     </Button>
                   </div>
-                  <FieldDescription>{{ avatarRequirements }}</FieldDescription>
                 </Field>
                 <Field>
                   <FieldLabel for="account-panel-description">{{ $t('ui.profile') }}</FieldLabel>
                   <Textarea id="account-panel-description" v-model="description" :disabled="profilePending" maxlength="500" rows="4" :placeholder="$t('ui.introduceYourselfOptional')" />
-                  <FieldDescription>{{ description.length }} {{ $t('ui.500') }}</FieldDescription>
                 </Field>
               </FieldGroup>
               <Alert v-if="profileError" variant="destructive"><AlertDescription>{{ $message(profileError) }}</AlertDescription></Alert>
@@ -152,6 +163,8 @@ const { UserRound, LockKeyhole, ShieldCheck, ImageIcon, LogOut, user, isImperson
                   v-if="wallpaperUrl"
                   :src="wallpaperUrl"
                   :alt="$t('accountPanel.wallpaperPreview')"
+                  loading="lazy"
+                  decoding="async"
                   class="size-full object-cover"
                 >
                 <div v-else class="flex size-full items-center justify-center px-8 text-center text-sm text-muted-foreground">
@@ -162,9 +175,6 @@ const { UserRound, LockKeyhole, ShieldCheck, ImageIcon, LogOut, user, isImperson
               <div class="flex items-center justify-between gap-4 rounded-xl border p-4">
                 <div class="min-w-0">
                   <Label for="account-panel-wallpaper-enabled" class="font-medium">{{ $t('accountPanel.wallpaperSwitch') }}</Label>
-                  <p class="mt-1 text-xs leading-relaxed text-muted-foreground">
-                    {{ user?.wallpaperRevision ? $t('accountPanel.wallpaperSwitchDescription') : $t('accountPanel.uploadWallpaperFirst') }}
-                  </p>
                 </div>
                 <Switch
                   id="account-panel-wallpaper-enabled"
@@ -180,7 +190,6 @@ const { UserRound, LockKeyhole, ShieldCheck, ImageIcon, LogOut, user, isImperson
                   <Spinner v-if="wallpaperPending" data-icon="inline-start" />
                   {{ user?.wallpaperRevision ? $t('accountPanel.replaceWallpaper') : $t('accountPanel.chooseWallpaper') }}
                 </Button>
-                <p class="text-xs leading-relaxed text-muted-foreground">{{ wallpaperRequirements }}</p>
               </div>
             </section>
 
@@ -199,6 +208,59 @@ const { UserRound, LockKeyhole, ShieldCheck, ImageIcon, LogOut, user, isImperson
               </section>
 
               <Separator />
+              <section v-if="!isImpersonating" class="flex flex-col gap-4">
+                <h3 class="text-sm font-semibold">{{ $t('sso.externalIdentity') }}</h3>
+                <Skeleton v-if="ssoLoading" class="h-24 w-full" />
+                <Alert v-else-if="ssoError" variant="destructive"><AlertDescription>{{ $message(ssoError) }}</AlertDescription></Alert>
+                <template v-if="ssoLoaded && ssoConfiguration?.binding">
+                  <div class="flex items-center gap-3 rounded-xl border p-4">
+                    <img
+                      v-if="ssoConfiguration.binding.providerIconUrl"
+                      :src="ssoConfiguration.binding.providerIconUrl"
+                      class="size-9 shrink-0 rounded-lg object-contain"
+                      alt=""
+                      aria-hidden="true"
+                      decoding="async"
+                      referrerpolicy="no-referrer"
+                    >
+                    <div class="min-w-0">
+                      <p class="font-medium">{{ ssoConfiguration.binding.providerName }}</p>
+                      <p class="mt-1 break-all text-xs text-muted-foreground">{{ ssoConfiguration.binding.subject }}</p>
+                      <div class="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        <Badge variant="outline">{{ ssoConfiguration.binding.protocol }}</Badge>
+                        <span>{{ $t('sso.boundAt') }}</span>
+                        <component :is="AdminDateTime" :value="ssoConfiguration.binding.boundAt" />
+                      </div>
+                    </div>
+                  </div>
+                  <Button type="button" variant="destructive" size="sm" class="self-start" :disabled="ssoPending" @click="unbindSsoIdentity">
+                    <Spinner v-if="ssoPending" data-icon="inline-start" />{{ $t('sso.unbind') }}
+                  </Button>
+                </template>
+                <template v-else-if="ssoLoaded && ssoConfiguration?.providers?.length">
+                  <Field>
+                    <FieldLabel for="account-panel-sso-provider">{{ $t('sso.identityProvider') }}</FieldLabel>
+                    <Select v-model="ssoProviderId" :disabled="ssoPending">
+                      <SelectTrigger id="account-panel-sso-provider"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem v-for="provider in ssoConfiguration.providers" :key="provider.id" :value="provider.id!">
+                          <span class="flex items-center gap-2">
+                            <img v-if="provider.iconUrl" :src="provider.iconUrl" class="size-4 object-contain" alt="" aria-hidden="true" decoding="async" referrerpolicy="no-referrer">
+                            <span>{{ provider.name }}</span>
+                          </span>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <Button type="button" variant="outline" size="sm" class="self-start" :disabled="ssoPending || !ssoProviderId" @click="beginSsoBinding">
+                    <Spinner v-if="ssoPending" data-icon="inline-start" />{{ $t('sso.bind') }}
+                  </Button>
+                </template>
+                <p v-else-if="ssoLoaded" class="text-sm text-muted-foreground">{{ $t('sso.noBindableProviders') }}</p>
+                <Button v-if="!ssoLoaded && !ssoLoading" type="button" variant="outline" size="sm" class="self-start" @click="loadSsoBinding">{{ $t('ui.retry') }}</Button>
+              </section>
+
+              <Separator v-if="!isImpersonating" />
               <UiForm class="flex flex-col gap-4" @submit.prevent="changePassword">
                 <h3 class="text-sm font-semibold">{{ $t('ui.changePassword') }}</h3>
                 <FieldGroup>

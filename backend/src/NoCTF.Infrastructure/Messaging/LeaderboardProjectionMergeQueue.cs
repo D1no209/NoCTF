@@ -3,8 +3,8 @@ using System.Collections.Concurrent;
 namespace NoCTF.Infrastructure.Messaging;
 
 /// <summary>
-/// Process-local merge window owned by the Wolverine leader. The sticky leaderboard
-/// event listener and the Singular Agent are pinned to the same leader process.
+/// Process-local merge window drained by the Worker instance that receives a
+/// JetStream leaderboard event.
 /// </summary>
 public sealed class LeaderboardProjectionMergeQueue
 {

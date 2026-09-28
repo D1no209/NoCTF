@@ -4,6 +4,7 @@ import { competitionWorkspaceNavigationKey } from '../app/workspace-nav'
 import CompetitionBroadcastPanelComponent from './CompetitionBroadcastPanel.vue'
 import CompetitionChallengeNavigatorComponent from './CompetitionChallengeNavigator.vue'
 import CompetitionWorkspaceNavigationComponent from './CompetitionWorkspaceNavigation.vue'
+import { competitionChallengePath } from '../../utils/app-routes'
 
 /** Owns state, effects and commands for CompetitionParticipantWorkspace. */
 export function useCompetitionParticipantWorkspace(props: Readonly<Omit<{
@@ -29,10 +30,7 @@ emit: { (event: "selectChallenge", ...args: [challengeId: string]): void }) {
       emit('selectChallenge', challengeId)
       return
     }
-    await router.push({
-      path: `/competitions/${props.competitionId}/challenges`,
-      query: { challenge: challengeId },
-    })
+    await router.push(competitionChallengePath(props.competitionId, challengeId))
   }
 
   function handleReady(challengeId: string | null): void {

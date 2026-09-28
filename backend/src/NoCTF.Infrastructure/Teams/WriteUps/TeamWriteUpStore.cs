@@ -15,7 +15,7 @@ namespace NoCTF.Infrastructure.Teams.WriteUps;
 
 public sealed class TeamWriteUpStore(
     NoCtfDbContext db,
-    ITransactionalMessageOutbox outbox,
+    IPostCommitMessagePublisher outbox,
     ICompetitionEventRecorder events,
     FileReferenceLock fileLock) : ITeamWriteUpStore
 {
@@ -26,7 +26,7 @@ public sealed class TeamWriteUpStore(
     {
         return db.Teams.AsNoTracking()
             .Where(team => team.CompetitionId == competitionId
-                && team.MemberIds.Contains(actorUserId)
+                && team.Members.Any(member => member.UserId == actorUserId)
                 && team.RegistrationStatus == TeamRegistrationStatus.Approved
                 && !team.IsBanned)
             .Join(
@@ -55,7 +55,7 @@ public sealed class TeamWriteUpStore(
             cancellationToken);
         if (team is null)
             return new(TeamWriteUpSubmissionState.NotFound);
-        if (!team.MemberIds.Contains(actorUserId)
+        if (!team.Members.Any(member => member.UserId == actorUserId)
             || team.RegistrationStatus != TeamRegistrationStatus.Approved
             || team.IsBanned)
         {
@@ -197,7 +197,7 @@ public sealed class TeamWriteUpStore(
                 && team.WriteUpSubmittedByUserId != null
                 && team.WriteUpSubmittedAt != null);
         if (memberId is { } userId)
-            teams = teams.Where(team => team.MemberIds.Contains(userId));
+            teams = teams.Where(team => team.Members.Any(member => member.UserId == userId));
         if (teamId is { } selectedTeamId)
             teams = teams.Where(team => team.Id == selectedTeamId);
         return teams.Join(
@@ -207,7 +207,7 @@ public sealed class TeamWriteUpStore(
                 (team, file) => new ReferenceRow(
                     team.Id,
                     team.Name,
-                    team.MemberIds,
+                    team.Members.Select(member => member.UserId).ToArray(),
                     file.Id,
                     file.ObjectKey,
                     file.FileName,

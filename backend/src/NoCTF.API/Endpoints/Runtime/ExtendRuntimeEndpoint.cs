@@ -32,6 +32,9 @@ public sealed class ExtendRuntimeEndpoint(
         AuthSchemes("Bearer");
         Options(builder => builder.WithMetadata(new NoCTF.API.Security.ProtectedEntryMetadata(NoCTF.API.Security.ProtectedEntry.RuntimeCommand)));
         Options(builder => builder.WithMetadata(new HumanVerificationMetadata(HumanVerificationAction.Runtime)));
+        Options(builder => builder.WithMetadata(
+            new NoCTF.Hosting.Observability.RuntimeOperationMetricsMetadata(
+                NoCTF.Application.Observability.RuntimeOperationMetricKind.PlayerExtend)));
         Options(options => options
             .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
                 StatusCodes.Status409Conflict)
@@ -69,10 +72,19 @@ public sealed class ExtendRuntimeEndpoint(
                     ["code"] = result.FailureCode.Value.ToString()
                 });
         if (!result.Succeeded)
+        {
+            if (result.FailureCode is { } failure)
+            {
+                NoCTF.Application.Observability.NoCtfTelemetry
+                    .RecordRuntimeMutationFailure(
+                        NoCTF.Application.Observability.RuntimeOperationMetricKind.PlayerExtend,
+                        failure);
+            }
             return TypedResults.Problem(
                 statusCode: StatusCodes.Status503ServiceUnavailable,
                 title: "Runtime could not be extended.",
                 detail: result.ErrorMessage);
+        }
         var accepted = RuntimeEndpointMapping.ToAccepted(result.Value!);
         return TypedResults.Accepted(accepted.StatusUrl, accepted);
     }

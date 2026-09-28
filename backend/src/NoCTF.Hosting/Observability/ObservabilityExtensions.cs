@@ -4,10 +4,20 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using NoCTF.Application.Observability;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using OpenTelemetry.Logs;
+using OpenTelemetry.Exporter;
+using NoCTF.Application.Administration.PlatformLogs;
+using NoCTF.Infrastructure.Observability;
+using NoCTF.Infrastructure.Caching;
+using ZiggyCreatures.Caching.Fusion;
+using NoCTF.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace NoCTF.Hosting.Observability;
 
@@ -20,6 +30,12 @@ public static class ObservabilityExtensions
     {
         if (!configuration.GetValue("Observability:Enabled", true))
             return services;
+        services.TryAddSingleton(TimeProvider.System);
+        if (services.Any(descriptor => descriptor.ServiceType == typeof(IFusionCacheProvider)))
+            services.AddHostedService<FusionCacheMetricsAgent>();
+        if (services.Any(descriptor => descriptor.ServiceType
+                == typeof(IDbContextFactory<NoCtfDbContext>)))
+            services.AddHostedService<RuntimeWaitingMetricsAgent>();
         var openTelemetry = services.AddOpenTelemetry()
             .ConfigureResource(resource => resource
                 .AddService(serviceName, serviceVersion: ThisAssemblyVersion.Value)
@@ -32,6 +48,7 @@ public static class ObservabilityExtensions
                 .AddNoCtfDurationViews()
                 .AddMeter("Wolverine*")
                 .AddMeter("Npgsql")
+                .AddMeter("Microsoft.EntityFrameworkCore")
                 .AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()
                 .AddRuntimeInstrumentation()
@@ -52,19 +69,74 @@ public static class ObservabilityExtensions
         if (!string.IsNullOrWhiteSpace(configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]))
             openTelemetry.WithTracing(tracing => tracing.AddOtlpExporter());
 
+        var lokiBaseUrl = configuration["Observability:LokiBaseUrl"];
+        if (string.IsNullOrWhiteSpace(lokiBaseUrl))
+        {
+            if (configuration.GetValue("Observability:RequireLoki", false))
+                throw new InvalidOperationException("Observability:LokiBaseUrl is required.");
+            return services;
+        }
+        if (!Uri.TryCreate(lokiBaseUrl, UriKind.Absolute, out var loki)
+            || loki.Scheme != Uri.UriSchemeHttp
+            || loki.UserInfo.Length > 0 || loki.Query.Length > 0
+            || loki.Fragment.Length > 0 || loki.AbsolutePath != "/")
+            throw new InvalidOperationException("Observability:LokiBaseUrl must be a private HTTP origin.");
+
+        var defaultService = serviceName.EndsWith("-api", StringComparison.Ordinal)
+            ? PlatformLogService.Api
+            : serviceName.EndsWith("-worker", StringComparison.Ordinal)
+                ? PlatformLogService.Worker
+                : serviceName.EndsWith("-runner", StringComparison.Ordinal)
+                    ? PlatformLogService.Runner : PlatformLogService.Host;
+        services.AddSingleton<PlatformLogBroadcastQueue>();
+        services.TryAddSingleton<PlatformLogUserIdProtector>();
+        services.AddHostedService<PlatformLogBroadcastAgent>();
+        services.Configure<OpenTelemetryLoggerOptions>(options =>
+        {
+            options.IncludeFormattedMessage = true;
+            options.ParseStateValues = true;
+            options.IncludeScopes = false;
+        });
+        services.AddLogging(logging => logging.AddFilter<OpenTelemetryLoggerProvider>(
+            ShouldExportPlatformLog));
+        openTelemetry.WithLogging(logging => logging
+            .AddProcessor(provider => new RedactedPlatformLogProcessor(
+                provider.GetRequiredService<PlatformLogBroadcastQueue>(), defaultService,
+                provider.GetRequiredService<PlatformLogUserIdProtector>()))
+            .AddOtlpExporter((exporter, processor) =>
+            {
+                exporter.Endpoint = new Uri(loki, "otlp/v1/logs");
+                exporter.Protocol = OtlpExportProtocol.HttpProtobuf;
+                processor.ExportProcessorType = OpenTelemetry.ExportProcessorType.Batch;
+                processor.BatchExportProcessorOptions.MaxQueueSize = 4096;
+                processor.BatchExportProcessorOptions.MaxExportBatchSize = 512;
+            }));
+
         return services;
     }
+
+    internal static bool ShouldExportPlatformLog(string? category, LogLevel level) =>
+        level >= LogLevel.Warning
+        || category is not null
+            && category.StartsWith("NoCTF.", StringComparison.Ordinal)
+            && level >= LogLevel.Information;
 
     internal static MeterProviderBuilder AddNoCtfDurationViews(this MeterProviderBuilder metrics)
     {
         // Instrument names, not the names rewritten by the Prometheus exporter. All values are seconds.
         foreach (var name in new[]
         {
-            "noctf.api.request.duration", "noctf.redis.operation.duration",
+            "noctf.api.request.duration",
+            "noctf.nats.operation.duration",
             "noctf.signalr.publish.duration", "noctf.runner.claim.duration",
             "noctf.leaderboard.projection.duration", "noctf.scheduler.rebuild.duration",
             "noctf.scheduler.dispatch.lateness",
-            "noctf.gameplay_fact.processing.duration"
+            "noctf.gameplay_fact.processing.duration",
+            "noctf.gameplay_fact.stage.duration",
+            "noctf.runtime.dispatch.stage.duration",
+            "noctf.webhook.queue.age",
+            "noctf.webhook.projection.wait",
+            "noctf.webhook.http.attempt.duration"
         })
         {
             var view = new ExplicitBucketHistogramConfiguration
@@ -117,6 +189,9 @@ public static class ObservabilityExtensions
 
             var started = Stopwatch.GetTimestamp();
             var outcome = "success";
+            var route = (context.GetEndpoint() as RouteEndpoint)?.RoutePattern.RawText
+                ?? "unmatched";
+            Activity.Current?.SetTag("noctf.endpoint", route);
             try
             {
                 await next();
@@ -134,15 +209,13 @@ public static class ObservabilityExtensions
             }
             finally
             {
-                var route = (context.GetEndpoint() as RouteEndpoint)?.RoutePattern.RawText
-                    ?? "unmatched";
                 if (ClassifyRequest(context) is { } kind)
                     NoCtfTelemetry.RecordApiRequest(route, outcome, Stopwatch.GetElapsedTime(started).TotalSeconds, kind);
-                if (TryClassifyRuntimeOperation(
-                        context.Request.Method,
-                        route,
-                        out var operation))
-                    NoCtfTelemetry.RecordRuntimeOperation(operation, outcome);
+                var operation = context.GetEndpoint()?.Metadata
+                    .GetMetadata<RuntimeOperationMetricsMetadata>()?.Operation
+                    ?? ClassifyGameplayOperation(context.Request.Method, route);
+                if (operation is not null)
+                    NoCtfTelemetry.RecordRuntimeOperation(operation.Value, outcome);
             }
         });
         app.UseOpenTelemetryPrometheusScrapingEndpoint(context =>
@@ -167,65 +240,35 @@ public static class ObservabilityExtensions
         return context.GetEndpoint()?.Metadata.GetMetadata<ApiRequestMetricsMetadata>()?.Kind ?? ApiRequestKind.Rest;
     }
 
-    internal static bool TryClassifyRuntimeOperation(
+    internal static RuntimeOperationMetricKind? ClassifyGameplayOperation(
         string method,
-        string route,
-        out string operation)
+        string route)
     {
         if (!HttpMethods.IsPost(method))
-        {
-            operation = string.Empty;
-            return false;
-        }
+            return null;
 
         if (route.EndsWith("/flag-submissions", StringComparison.OrdinalIgnoreCase)
             || route.EndsWith("/awdp-break-flag-judgement", StringComparison.OrdinalIgnoreCase))
         {
-            operation = "flag";
-            return true;
+            return RuntimeOperationMetricKind.Flag;
         }
         if (route.EndsWith("/awdp-defense-targets", StringComparison.OrdinalIgnoreCase))
         {
-            operation = "fix_request";
-            return true;
+            return RuntimeOperationMetricKind.FixRequest;
         }
         if (route.Contains("/awdp-defense-targets/", StringComparison.OrdinalIgnoreCase)
             && route.EndsWith("/fix", StringComparison.OrdinalIgnoreCase))
         {
-            operation = "fix_upload";
-            return true;
+            return RuntimeOperationMetricKind.FixUpload;
         }
 
-        var runtimeAction = RuntimeActions.FirstOrDefault(action =>
-            route.EndsWith(action.Suffix, StringComparison.OrdinalIgnoreCase));
-        if (runtimeAction is not null)
-        {
-            operation = runtimeAction.Operation;
-            return true;
-        }
-
-        operation = string.Empty;
-        return false;
+        return null;
     }
-
-    private static readonly RuntimeAction[] RuntimeActions =
-    [
-        new("/test-runtime/start", "runtime_test_start"),
-        new("/test-runtime/stop", "runtime_test_stop"),
-        new("/test-runtime/reset", "runtime_test_reset"),
-        new("/test-runtime/extend", "runtime_test_extend"),
-        new("/runtime/start", "runtime_start"),
-        new("/runtime/stop", "runtime_stop"),
-        new("/runtime/reset", "runtime_reset"),
-        new("/runtime/extend", "runtime_extend"),
-        new("/force-terminate", "runtime_force_terminate"),
-        new("/terminate", "runtime_terminate")
-    ];
-
-    private sealed record RuntimeAction(string Suffix, string Operation);
 }
 
 public sealed record ApiRequestMetricsMetadata(ApiRequestKind Kind);
+
+public sealed record RuntimeOperationMetricsMetadata(RuntimeOperationMetricKind Operation);
 
 file static class ThisAssemblyVersion
 {

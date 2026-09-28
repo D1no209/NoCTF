@@ -1,4 +1,3 @@
-using System.Text.Json;
 using FastEndpoints;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
@@ -57,32 +56,29 @@ internal static partial class NotificationProtocolMapper
 {
     [MapEnum(EnumMappingStrategy.ByName)]
     [MapperIgnoreSourceValue(NotificationKind.AuthenticationSecurityActivity)]
-    [MapperIgnoreSourceValue(NotificationKind.HttpCommandReceipt)]
     [MapperIgnoreSourceValue(NotificationKind.PlatformUserAccessTokenIssued)]
     [MapperIgnoreSourceValue(NotificationKind.PlatformUserAccessTokenRevoked)]
     [MapperIgnoreSourceValue(NotificationKind.PlatformUserTokensInvalidated)]
+    [MapperIgnoreSourceValue(NotificationKind.SsoProviderConfigurationChanged)]
+    [MapperIgnoreSourceValue(NotificationKind.SsoExternalIdentityBindingChanged)]
     public static partial NotificationKindProtocol ToProtocol(NotificationKind value);
 
     [MapEnum(EnumMappingStrategy.ByName)]
     public static partial NotificationReadScope ToDomain(NotificationListScopeProtocol value);
 }
 
-public sealed class ListNotificationsRequest
+public sealed class ListNotificationsRequest : PaginationRequest
 {
     [QueryParam]
     public Guid? CompetitionId { get; set; }
     [QueryParam]
     public NotificationListScopeProtocol Scope { get; set; } = NotificationListScopeProtocol.All;
-    [QueryParam]
-    public string? Cursor { get; set; }
-    [QueryParam]
-    public int Limit { get; set; } = 50;
 }
 
 public sealed class ListNotificationsValidator : Validator<ListNotificationsRequest>
 {
     public ListNotificationsValidator() =>
-        RuleFor(request => request.Limit).InclusiveBetween(1, 200);
+        PaginationRules.Add(this);
 }
 
 public sealed record NotificationResponse(
@@ -92,7 +88,7 @@ public sealed record NotificationResponse(
     NotificationTargetType TargetType,
     Guid TargetId,
     NotificationKindProtocol Kind,
-    JsonElement Content,
+    NotificationContent Content,
     EntityReferenceKind? RelatedType,
     Guid? RelatedId,
     Guid? ThreadRootId,
@@ -100,19 +96,19 @@ public sealed record NotificationResponse(
     DateTimeOffset SentAt,
     string? SourceDisplayName);
 
-public sealed record NotificationListResponse(
-    IReadOnlyList<NotificationResponse> Items,
-    string? NextCursor);
+public sealed class NotificationListResponse : ArrayResult<NotificationResponse>
+{
+    public NotificationListResponse() { }
+
+    public NotificationListResponse(NotificationResponse[] items, int total)
+        : base(items, total) { }
+}
 
 public sealed class ListNotificationsEndpoint(
     ListNotifications list,
-    SignedKeysetCursor cursors,
     IUserContext user)
-    : Endpoint<ListNotificationsRequest,
-        Results<Ok<NotificationListResponse>, ProblemHttpResult>>
+    : Endpoint<ListNotificationsRequest, Ok<NotificationListResponse>>
 {
-    private const string CursorEndpoint = "notifications.list";
-
     public override void Configure()
     {
         Get("/notifications");
@@ -124,62 +120,32 @@ public sealed class ListNotificationsEndpoint(
         });
     }
 
-    public override async Task<
-        Results<Ok<NotificationListResponse>, ProblemHttpResult>> ExecuteAsync(
+    public override async Task<Ok<NotificationListResponse>> ExecuteAsync(
         ListNotificationsRequest request,
         CancellationToken ct)
     {
-        if (!cursors.TryDecode(
-                request.Cursor,
-                CursorEndpoint,
-                CursorScope(user.UserId, request.CompetitionId, request.Scope),
-                out var position))
-            return TypedResults.Problem(
-                statusCode: StatusCodes.Status400BadRequest,
-                title: "Invalid cursor.",
-                extensions: new Dictionary<string, object?>
-                {
-                    ["code"] = NotificationFailureCode.CursorInvalid
-                });
-
-        var items = await list.ExecuteAsync(
+        var page = await list.ExecutePageAsync(
             user.UserId,
             request.CompetitionId,
-            position?.CreatedAt,
-            position?.Id,
+            request.Offset,
             request.Limit,
+            request.Desc,
             NotificationProtocolMapper.ToDomain(request.Scope),
             ct);
-        var response = items.Select(item => new NotificationResponse(
+        var response = page.Items.Select(item => new NotificationResponse(
             item.Id,
             item.SourceType,
             item.SourceId,
             item.TargetType,
             item.TargetId,
             NotificationProtocolMapper.ToProtocol(item.Kind),
-            JsonSerializer.Deserialize<JsonElement>(item.ContentJson),
+            item.Content,
             item.RelatedType,
             item.RelatedId,
             item.ThreadRootId,
             item.ReplyToId,
             item.SentAt,
             item.SourceDisplayName)).ToArray();
-        var next = items.Count == request.Limit
-            ? cursors.Encode(
-                CursorEndpoint,
-                CursorScope(user.UserId, request.CompetitionId, request.Scope),
-                new(items[^1].SentAt, items[^1].Id))
-            : null;
-        return TypedResults.Ok(new NotificationListResponse(response, next));
+        return TypedResults.Ok(new NotificationListResponse(response, page.Total));
     }
-
-    private static string CursorScope(
-        Guid userId,
-        Guid? competitionId,
-        NotificationListScopeProtocol scope) =>
-        string.Join(
-            '|',
-            userId.ToString("N"),
-            competitionId?.ToString("N") ?? "all",
-            scope);
 }

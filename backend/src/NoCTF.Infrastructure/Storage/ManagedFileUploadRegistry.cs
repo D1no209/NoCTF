@@ -10,7 +10,7 @@ namespace NoCTF.Infrastructure.Storage;
 
 public sealed class ManagedFileUploadRegistry(
     NoCtfDbContext db,
-    ITransactionalMessageOutbox outbox,
+    IPostCommitMessagePublisher outbox,
     ILogger<ManagedFileUploadRegistry> logger) : IManagedFileUploadRegistry
 {
     private static readonly TimeSpan CleanupLease = TimeSpan.FromHours(24);
@@ -34,6 +34,7 @@ public sealed class ManagedFileUploadRegistry(
         await outbox.ScheduleAsync(new CleanupFile(file.FileId), createdAt.Add(CleanupLease));
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        await outbox.FlushCommittedMessagesAsync();
     }
 
     public async Task AbandonAsync(Guid fileId, CancellationToken cancellationToken)
@@ -54,7 +55,7 @@ public sealed class ManagedFileUploadRegistry(
     {
         try
         {
-            await outbox.FlushOutgoingMessagesAsync();
+            await outbox.FlushCommittedMessagesAsync();
         }
         catch (Exception exception)
         {
@@ -73,15 +74,10 @@ public sealed class FileReferenceLock
         Guid fileId,
         CancellationToken cancellationToken)
     {
-        var transaction = db.Database.CurrentTransaction
-            ?? throw new InvalidOperationException("A transaction is required to lock a file reference.");
-        await using var command = db.Database.GetDbConnection().CreateCommand();
-        command.Transaction = transaction.GetDbTransaction();
-        command.CommandText = "SELECT 1 FROM files WHERE id = @file_id FOR UPDATE";
-        var parameter = command.CreateParameter();
-        parameter.ParameterName = "file_id";
-        parameter.Value = fileId;
-        command.Parameters.Add(parameter);
-        return await command.ExecuteScalarAsync(cancellationToken) is not null;
+        _ = db.Database.CurrentTransaction
+            ?? throw new InvalidOperationException("A transaction is required to protect a file reference.");
+        return await db.Files.AsNoTracking().AnyAsync(
+            file => file.Id == fileId,
+            cancellationToken);
     }
 }

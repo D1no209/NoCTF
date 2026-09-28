@@ -71,8 +71,10 @@ docker compose up -d
 ```
 
 Migration runs inside NoCTF at startup; image health checks are in the Dockerfile.
-Telemetry/exporters and proxy configuration are not deployed. Read
-[deployment instructions](deploy/README.md) before migrating an existing installation:
+Telemetry/exporters and proxy configuration are not part of the core deployment.
+Use the independent [Prometheus/Grafana stack](deploy/observability/README.md) when
+operational monitoring is required. Read [deployment instructions](deploy/README.md)
+before migrating an existing installation:
 never replace an existing named volume with an empty directory.
 
 ## Repository layout
@@ -87,7 +89,10 @@ backend/
     NoCTF.Host/            configurable unified process
     NoCTF.Domain/          domain model and policies
     NoCTF.Application/     capability-oriented use cases
-    NoCTF.Infrastructure/  persistence and infrastructure adapters
+    NoCTF.Infrastructure/  provider-neutral relational model and infrastructure adapters
+    NoCTF.Persistence.PostgreSql/ production provider and EF-generated InitialBaseline
+    NoCTF.Persistence.Sqlite/     isolated test-only provider
+    NoCTF.Modeling.Generators/    TPH leaf/catalog compile-time generation and diagnostics
   tests/NoCTF.Tests/       unit, architecture, and integration tests
 deploy/                    local Compose and Kubernetes manifests
 docs/                      authoritative product and engineering specifications

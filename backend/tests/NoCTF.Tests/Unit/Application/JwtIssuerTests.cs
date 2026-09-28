@@ -64,33 +64,29 @@ public class JwtIssuerTests
     }
 
     [Test]
-    public async Task Issue_WithAdministratorContext_ContainsImpersonationProvenance()
+    [Arguments(UserKind.Human, UserRole.User)]
+    [Arguments(UserKind.Bot, UserRole.Organizer)]
+    [Arguments(UserKind.Bot, UserRole.Administrator)]
+    public async Task Issue_ContainsEmailVerificationAndJwtIdClaims(UserKind kind, UserRole role)
     {
         var options = Options.Create(new AuthenticationTokenOptions
         {
             SigningKey = "test-signing-key-with-at-least-32-bytes!"
         });
-        var administratorId = Guid.NewGuid();
         var user = new AuthenticatedUser(
             Guid.NewGuid(),
             "target",
-            UserRole.User,
-            UserKind.Human,
+            role,
+            kind,
             9,
             EmailVerified: false);
 
         var issued = new JwtIssuer(options, TimeProvider.System).Issue(
             user,
             DateTimeOffset.UtcNow,
-            TimeSpan.FromMinutes(10),
-            administratorId);
+            TimeSpan.FromMinutes(10));
         var token = new JwtSecurityTokenHandler().ReadJwtToken(issued.Token);
 
-        await Assert.That(token.Claims.Single(claim =>
-            claim.Type == AccessTokenClaims.Impersonation).Value).IsEqualTo("true");
-        await Assert.That(token.Claims.Single(claim =>
-            claim.Type == AccessTokenClaims.ImpersonatorId).Value)
-            .IsEqualTo(administratorId.ToString());
         await Assert.That(token.Claims.Single(claim => claim.Type == "email_verified").Value)
             .IsEqualTo("false");
         await Assert.That(Guid.Parse(token.Id)).IsEqualTo(issued.JwtId);
@@ -120,7 +116,7 @@ public class JwtIssuerTests
         });
         var user = new AuthenticatedUser(
             Guid.NewGuid(), "alice", UserRole.Administrator, UserKind.Human, 7);
-        var now = DateTimeOffset.Parse("2026-08-28T00:00:00Z");
+        var now = TimeProvider.System.GetUtcNow();
         var issuer = new JwtIssuer(options, new FakeTimeProvider(now));
         var issued = issuer.IssueRefresh(user);
         var token = new JwtSecurityTokenHandler().ReadJwtToken(issued.Token);

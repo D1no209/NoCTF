@@ -3,12 +3,12 @@ import { toRefs } from 'vue'
 import type { DefinitionContainerViewState } from '~/features/admin/useDefinitionContainer'
 
 const viewProps = defineProps<{ state: DefinitionContainerViewState }>()
-const { FlagSource, isAwdp, flagEnvDisabled, hasMetadata, hasSecurity, definition, flagSource, disabled, onUpdateModelValueDefinitionCommand, onUpdateModelValueDefinitionContainerPorts, onUpdateModelValueDefinitionInternalPorts, onUpdateModelValueDefinitionEnvironment, onUpdateModelValueDefinitionLabels, onUpdateModelValueDefinitionSecurityCapDrop, onUpdateModelValueDefinitionSecurityCapAdd } = toRefs(viewProps.state)
+const { isAwdp, showFlagEnvironmentVariable, hasAdvanced, hasMetadata, hasSecurity, definition, disabled, onUpdateModelValueDefinitionCommand, onUpdateModelValueDefinitionContainerPorts, onUpdateModelValueDefinitionInternalPorts, onUpdateModelValueDefinitionEnvironment, onUpdateModelValueDefinitionLabels, onUpdateModelValueDefinitionSecurityCapDrop, onUpdateModelValueDefinitionSecurityCapAdd } = toRefs(viewProps.state)
 </script>
 
 <template>
   <FieldGroup>
-    <DefinitionSection :title="$t('ui.basics')"  :collapsible="false">
+    <DefinitionSection :title="$t('ui.basics')" :collapsible="false" accent-title>
       <Field>
         <FieldLabel>{{ $t('ui.mirror') }}</FieldLabel>
         <Input
@@ -17,34 +17,11 @@ const { FlagSource, isAwdp, flagEnvDisabled, hasMetadata, hasSecurity, definitio
           class="font-mono text-sm"
           :disabled="disabled"
         />
-        <FieldDescription>{{ $t('ui.containerImageAddressUpTo512Characters') }}</FieldDescription>
-      </Field>
-      <Field>
-        <FieldLabel>{{ $t('ui.startCommand') }}</FieldLabel>
-        <StringListEditor
-          :model-value="definition.command"
-          :placeholder="$t('ui.parametersSuchAsPort')"
-          :add-label="$t('ui.addParameters')"
-          :disabled="disabled"
-          @update:model-value="onUpdateModelValueDefinitionCommand"
-        />
-        <FieldDescription>{{ $t('ui.leaveItBlankToUseTheDefaultEntryOfThe') }}</FieldDescription>
-      </Field>
-      <Field>
-        <FieldLabel>{{ $t('ui.flagEnvironmentVariableName') }}</FieldLabel>
-        <Input
-          v-model="definition.flagEnvironmentVariableName"
-          :placeholder="$t('ui.flag')"
-          class="font-mono text-sm sm:max-w-xs"
-          :disabled="flagEnvDisabled"
-        />
-        <FieldDescription v-if="flagSource === FlagSource.Static"> {{ $t('ui.itCanOnlyBeConfiguredWhenIndependentFlagForEach') }} </FieldDescription>
-        <FieldDescription v-else>{{ $t('ui.theEnvironmentVariableNameUsedWhenInjectingFlagByTeam') }}</FieldDescription>
       </Field>
     </DefinitionSection>
 
-    <DefinitionSection :title="$t('ui.network')"  :collapsible="false">
-      <div class="grid gap-4 sm:grid-cols-2">
+    <DefinitionSection :title="$t('ui.network')" :collapsible="false" accent-title>
+      <div class="grid gap-4" :class="isAwdp ? 'sm:grid-cols-2' : ''">
         <Field>
           <FieldLabel>{{ $t('ui.externalPort') }}</FieldLabel>
           <NumberListEditor
@@ -54,10 +31,9 @@ const { FlagSource, isAwdp, flagEnvDisabled, hasMetadata, hasSecurity, definitio
             :disabled="disabled"
             @update:model-value="onUpdateModelValueDefinitionContainerPorts"
           />
-          <FieldDescription>{{ $t('ui.theHostPortIsRandomlyAssignedByDockerAndPlayers') }}</FieldDescription>
         </Field>
-        <Field>
-          <FieldLabel>{{ isAwdp ? $t('ui.internalPort') : $t('ui.internalPortOptional') }}</FieldLabel>
+        <Field v-if="isAwdp">
+          <FieldLabel>{{ $t('ui.internalPort') }}</FieldLabel>
           <NumberListEditor
             :model-value="definition.internalPorts"
             :placeholder="$t('ui.onlyPortsReachableWithinThePlatform')"
@@ -65,17 +41,43 @@ const { FlagSource, isAwdp, flagEnvDisabled, hasMetadata, hasSecurity, definitio
             :disabled="disabled"
             @update:model-value="onUpdateModelValueDefinitionInternalPorts"
           />
-          <FieldDescription v-if="isAwdp">{{ $t('ui.awdpRequiresExactly1InternalPortThroughWhichTheChecker') }}</FieldDescription>
-          <FieldDescription v-else>{{ $t('ui.aPortThatIsNotExposedToPlayersAndIs') }}</FieldDescription>
         </Field>
       </div>
     </DefinitionSection>
 
-    <DefinitionSection :title="$t('ui.environmentMetadata')"
+    <DefinitionSection :title="$t('ui.advancedSettings')" :default-open="hasAdvanced" accent-title>
+      <Field>
+        <FieldLabel>{{ $t('ui.startCommand') }}</FieldLabel>
+        <StringListEditor
+          :model-value="definition.command"
+          :placeholder="$t('ui.parametersSuchAsPort')"
+          :add-label="$t('ui.addParameters')"
+          :disabled="disabled"
+          @update:model-value="onUpdateModelValueDefinitionCommand"
+        />
+      </Field>
+      <Field v-if="showFlagEnvironmentVariable">
+        <FieldLabel>{{ $t('ui.flagEnvironmentVariableName') }}</FieldLabel>
+        <Input
+          v-model="definition.flagEnvironmentVariableName"
+          :placeholder="$t('ui.flag')"
+          class="font-mono text-sm sm:max-w-xs"
+          :disabled="disabled"
+        />
+      </Field>
+      <Field v-if="!isAwdp">
+        <FieldLabel>{{ $t('ui.internalPortOptional') }}</FieldLabel>
+        <NumberListEditor
+          :model-value="definition.internalPorts"
+          :placeholder="$t('ui.onlyPortsReachableWithinThePlatform')"
+          :add-label="$t('ui.addInternalPort')"
+          :disabled="disabled"
+          @update:model-value="onUpdateModelValueDefinitionInternalPorts"
+        />
+      </Field>
+    </DefinitionSection>
 
-      :hint="$t('ui.environmentVariablesAndLabelsMostChallengesDoNotNeedThese')"
-      :default-open="hasMetadata"
-    >
+    <DefinitionSection :title="$t('ui.environmentMetadata')" :default-open="hasMetadata" accent-title>
       <Field>
         <FieldLabel>{{ $t('ui.environmentVariables') }}</FieldLabel>
         <KeyValueEditor
@@ -100,11 +102,7 @@ const { FlagSource, isAwdp, flagEnvDisabled, hasMetadata, hasSecurity, definitio
       </Field>
     </DefinitionSection>
 
-    <DefinitionSection :title="$t('ui.securityOptions')"
-
-      :hint="$t('ui.privilegeEscalationIsDisabledAndAllLinuxCapabilitiesAreDropped')"
-      :default-open="hasSecurity"
-    >
+    <DefinitionSection :title="$t('ui.securityOptions')" :default-open="hasSecurity" accent-title>
       <div class="grid gap-3 sm:grid-cols-3">
         <Field orientation="horizontal">
           <Switch id="sec-no-new-privileges" v-model="definition.security.noNewPrivileges" :disabled="disabled" />
@@ -129,7 +127,6 @@ const { FlagSource, isAwdp, flagEnvDisabled, hasMetadata, hasSecurity, definitio
             :disabled="disabled"
             @update:model-value="onUpdateModelValueDefinitionSecurityCapDrop"
           />
-          <FieldDescription>{{ $t('ui.allIsIncludedByDefaultRestoreOnlyTheCapabilitiesThe') }}</FieldDescription>
         </Field>
         <Field>
           <FieldLabel>{{ $t('ui.addedCapabilitiesCapAdd') }}</FieldLabel>

@@ -1,10 +1,9 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using NoCTF.Application.Competitions.Lifecycle;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Competitions;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Registration;
+using NoCTF.Domain.Challenges;
 
 namespace NoCTF.Tests.Unit.GameModes;
 
@@ -18,13 +17,13 @@ public sealed class AwdStartGateTests
         var secondChallengeId = Guid.CreateVersion7();
         var configurations = new GameModeChallengeConfigurationCatalog();
         var definition = CompleteDefinition();
-        var rules = configurations.GetDefaultJson(GameMode.Awd);
+        var rules = configurations.CreateDefaultRulesForTest(GameMode.Awd);
         var gate = new CompetitionStartGate(
             new Store(new(
                 competitionId,
                 GameMode.Awd,
                 CompetitionStatus.Published,
-                GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Awd),
+                CompetitionModeConfigurationDefaults.Create(GameMode.Awd, competitionId),
                 [
                     new(firstChallengeId, GameMode.Awd, rules, definition, true, []),
                     new(secondChallengeId, GameMode.Awd, rules, definition, true, [])
@@ -43,30 +42,36 @@ public sealed class AwdStartGateTests
             .IsFalse();
     }
 
-    private static string CompleteDefinition() =>
-        JsonSerializer.Serialize(
-            new AwdChallengeConfiguration(
-                AwdChallengeConfiguration.CurrentSchemaVersion,
-                Runtime: new ChallengeRuntimeTemplate(
-                    RuntimeAllocation.PerTeam,
-                    new ContainerRuntimeDefinition(
-                        "registry.example/awd:v1",
-                        PortMappings: new Dictionary<int, int> { [8080] = 0 }),
-                    new RuntimeResourceLimits(67_108_864, 100_000_000, 64),
-                    UrlBindings:
-                    [
-                        new(
-                            "nc {HOST} {PORT}",
-                            RuntimeExposure.Participants,
-                            ContainerPort: 8080)
-                    ],
-                    FlagSource: RuntimeFlagSource.AwdRotation),
-                FlagInjection: new AwdFlagInjectionConfiguration(
-                    "printf '%s' '${FLAG}' > /dev/shm/flag")),
-            new JsonSerializerOptions(JsonSerializerDefaults.Web)
+    private static ChallengeDefinition CompleteDefinition() =>
+        new AwdChallengeDefinition
+        {
+            FlagInjectionCommand = "printf '%s' '${FLAG}' > /dev/shm/flag",
+            FlagInjectionTimeoutSeconds = 30,
+            Runtime = new ContainerChallengeRuntimeTemplate
             {
-                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-            });
+                Allocation = PersistedRuntimeAllocation.PerTeam,
+                Limits = new()
+                {
+                    MemoryBytes = 67_108_864,
+                    NanoCpus = 100_000_000,
+                    PidsLimit = 64
+                },
+                HasExplicitLimits = true,
+                FlagSource = PersistedRuntimeFlagSource.AwdRotation,
+                Image = "registry.example/awd:v1",
+                Capabilities = [new() { Name = "ALL" }],
+                PortMappings = [new() { ContainerPort = 8080, HostPort = 0 }],
+                UrlBindings =
+                [
+                    new()
+                    {
+                        UrlTemplate = "nc {HOST} {PORT}",
+                        Exposure = PersistedRuntimeExposure.Participants,
+                        ContainerPort = 8080
+                    }
+                ]
+            }
+        };
 
     private sealed class Store(CompetitionStartGateSnapshot snapshot)
         : ICompetitionStartGateStore

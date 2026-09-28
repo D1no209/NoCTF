@@ -1,9 +1,11 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
 using NSubstitute;
 using NoCTF.Application.GameplayFacts.Processing;
 using NoCTF.Application.Messaging;
 using NoCTF.Infrastructure.GameplayFacts.Processing;
+using NoCTF.Infrastructure.Persistence;
 using NoCTF.Runner;
 using NoCTF.Runner.Composition;
 using NoCTF.Runner.Messages;
@@ -26,9 +28,6 @@ public sealed class RunnerAwdpFixRegistrationTests
                 ["Runner:Provider"] = "Docker",
                 ["Runner:Pool"] = "runner-pool",
                 ["Runner:Id"] = "runner-1",
-                ["Runner:Capacity:MemoryBytes"] = "1073741824",
-                ["Runner:Capacity:NanoCpus"] = "1000000000",
-                ["Runner:Capacity:PidsLimit"] = "512",
                 ["Runner:Heartbeat:IntervalSeconds"] = "5",
                 ["Runner:Heartbeat:TtlSeconds"] = "15"
             })
@@ -36,16 +35,21 @@ public sealed class RunnerAwdpFixRegistrationTests
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddSingleton<IConfiguration>(configuration);
+        services.AddDbContext<NoCtfDbContext>(options =>
+                options.UseInMemoryDatabase("runner-awdp-fix-registration"),
+            optionsLifetime: ServiceLifetime.Singleton);
+        services.AddDbContextFactory<NoCtfDbContext>(options =>
+            options.UseInMemoryDatabase("runner-awdp-fix-registration"));
         services.AddNoCtfRunner(configuration);
         services.AddNoCtfStandaloneRunnerPersistence(configuration);
-        services.AddScoped(_ => Substitute.For<ITransactionalMessageOutbox>());
+        services.AddScoped(_ => Substitute.For<IPostCommitMessagePublisher>());
         await using var provider = services.BuildServiceProvider(validateScopes: true);
         await using var scope = provider.CreateAsyncScope();
 
         var fence = scope.ServiceProvider.GetRequiredService<IAwdpFixExecutionFence>();
         var reader = scope.ServiceProvider.GetRequiredService<IAwdpFixWorkReader>();
 
-        await Assert.That(fence).IsTypeOf<PostgresAwdpFixExecutionFence>();
+        await Assert.That(fence).IsTypeOf<AwdpFixExecutionFence>();
         await Assert.That(reader).IsTypeOf<AwdpFixWorkReader>();
     }
 }

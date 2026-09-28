@@ -1,0 +1,61 @@
+groups:
+  - name: noctf-recording
+    rules:
+      - record: noctf:api_requests:rate5m
+        expr: sum(rate(noctf_api_requests_total{request_kind="rest"}[5m]))
+      - record: noctf:api_request_duration:p95_5m
+        expr: histogram_quantile(0.95, sum by (le) (rate(noctf_api_request_duration_seconds_bucket{request_kind="rest"}[5m])))
+      - record: noctf:api_server_error:ratio5m
+        expr: (sum(rate(noctf_api_requests_total{request_kind="rest",outcome="server_error"}[5m])) or vector(0)) / clamp_min(sum(rate(noctf_api_requests_total{request_kind="rest"}[5m])), 0.001)
+      - record: noctf:api_rate_limit_rejections:rate5m
+        expr: sum(rate(noctf_api_rate_limit_rejections_total[5m])) or vector(0)
+      - record: noctf:gameplay_submissions:rate5m
+        expr: sum by (kind) (rate(noctf_gameplay_fact_submissions_total[5m]))
+      - record: noctf:gameplay_processing_duration:p95_5m
+        expr: histogram_quantile(0.95, sum by (le,kind) (rate(noctf_gameplay_fact_processing_duration_seconds_bucket[5m])))
+      - record: noctf:gameplay_correct:ratio5m
+        expr: sum(increase(noctf_gameplay_fact_processing_total{kind=~"flag|break",outcome="correct"}[5m])) / clamp_min(sum(increase(noctf_gameplay_fact_processing_total{kind=~"flag|break",outcome=~"correct|incorrect"}[5m])), 1)
+      - record: noctf:gameplay_platform_error:ratio5m
+        expr: sum(increase(noctf_gameplay_fact_processing_total{kind=~"flag|break",outcome="platform_error"}[5m])) / clamp_min(sum(increase(noctf_gameplay_fact_processing_total{kind=~"flag|break"}[5m])), 1)
+      - record: noctf:human_verification_unavailable:rate5m
+        expr: sum(rate(noctf_api_human_verification_total{outcome="unavailable"}[5m])) or vector(0)
+      - record: noctf:jetstream_pending:sum
+        expr: sum(max by (stream_name,consumer_name) (jetstream_consumer_num_pending{is_consumer_leader="true",stream_name=~"NOCTF_V2_.*"})) or vector(0)
+      - record: noctf:jetstream_ack_pending:sum
+        expr: sum(max by (stream_name,consumer_name) (jetstream_consumer_num_ack_pending{is_consumer_leader="true",stream_name=~"NOCTF_V2_.*"})) or vector(0)
+      - record: noctf:jetstream_redelivered:sum
+        expr: sum(max by (stream_name,consumer_name) (jetstream_consumer_num_redelivered{is_consumer_leader="true",stream_name=~"NOCTF_V2_.*"})) or vector(0)
+      - record: noctf:leaderboard_projection_duration:p95_5m
+        expr: histogram_quantile(0.95, sum by (le) (rate(noctf_leaderboard_projection_duration_seconds_bucket[5m])))
+      - record: noctf:leaderboard_projection_duration:mean_5m
+        expr: sum(rate(noctf_leaderboard_projection_duration_seconds_sum[5m])) / clamp_min(sum(rate(noctf_leaderboard_projection_duration_seconds_count[5m])), 0.001)
+      - record: noctf:leaderboard_projection_samples:count5m
+        expr: sum(increase(noctf_leaderboard_projection_duration_seconds_count[5m])) or vector(0)
+      - record: noctf:webhook_queue_age:p50_5m
+        expr: histogram_quantile(0.50, sum by (le) (rate(noctf_webhook_queue_age_seconds_bucket[5m])))
+      - record: noctf:webhook_queue_age:p95_5m
+        expr: histogram_quantile(0.95, sum by (le) (rate(noctf_webhook_queue_age_seconds_bucket[5m])))
+      - record: noctf:webhook_queue_age:p99_5m
+        expr: histogram_quantile(0.99, sum by (le) (rate(noctf_webhook_queue_age_seconds_bucket[5m])))
+      - record: noctf:webhook_oldest_pending_age:seconds
+        expr: max(noctf_webhook_oldest_pending_age_seconds) or vector(0)
+      - record: noctf:webhook_consumer_lag:count
+        expr: sum(noctf_webhook_consumer_lag) or vector(0)
+      - record: noctf:webhook_jetstream_pending:count
+        expr: sum(max by (consumer_name) (jetstream_consumer_num_pending{is_consumer_leader="true",stream_name="NOCTF_V2_WEBHOOK"})) or vector(0)
+      - record: noctf:leaderboard_failures:rate5m
+        expr: (sum(rate(noctf_leaderboard_publish_failures_total[5m])) or vector(0)) + (sum(rate(noctf_leaderboard_merge_dispatches_total{outcome="failure"}[5m])) or vector(0)) + (sum(rate(noctf_leaderboard_cache_miss_rebuilds_total{outcome="failure"}[5m])) or vector(0)) + (sum(rate(noctf_signalr_publishes_total{endpoint="leaderboard",outcome="failure"}[5m])) or vector(0))
+      - record: noctf:runner_online:sum
+        expr: sum(noctf_runner_online) or vector(0)
+      - record: noctf:runner_capacity_available:ratio
+        expr: sum by (pool,resource) (noctf_runner_capacity_available) / clamp_min(sum by (pool,resource) (noctf_runner_capacity_total), 1)
+      - record: noctf:postgres_connections:ratio
+        expr: sum(pg_stat_activity_count) / clamp_min(max(pg_settings_max_connections), 1)
+      - record: noctf:nats_operation_duration:p99_5m
+        expr: histogram_quantile(0.99, sum by (le) (rate(noctf_nats_operation_duration_seconds_bucket[5m])))
+      - record: noctf:runtime_waiting:count
+        expr: max(noctf_runtime_waiting) or vector(0)
+      - record: noctf:runtime_waiting_oldest_age:seconds
+        expr: max(noctf_runtime_waiting_oldest_age_seconds) or vector(0)
+      - record: noctf:disk_available:ratio
+        expr: min(node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"})

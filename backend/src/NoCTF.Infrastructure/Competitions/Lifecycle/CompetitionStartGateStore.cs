@@ -13,35 +13,29 @@ public sealed class CompetitionStartGateStore(NoCtfDbContext db)
         CancellationToken ct)
     {
         var competition = await db.Competitions.AsNoTracking()
-            .Where(item => item.Id == competitionId && item.DeletedAt == null)
-            .Select(item => new
-            {
-                item.Id,
-                item.Mode,
-                item.Status,
-                item.ConfigurationJson,
-                item.TracksEnabled,
-                item.TrackConfigurationJson,
-                item.MaxConcurrentRuntimeInstancesPerTeam
-            })
-            .SingleOrDefaultAsync(ct);
-        if (competition is null)
+            .AsSplitQuery()
+            .SingleOrDefaultAsync(item => item.Id == competitionId && item.DeletedAt == null, ct);
+        if (competition?.ModeConfiguration is null)
             return null;
-        var challenges = await db.CompetitionChallenges.AsNoTracking()
+        var challengeRows = await db.CompetitionChallenges.AsNoTracking()
             .Where(item => item.CompetitionId == competitionId
                 && item.DeletedAt == null)
             .Join(
                 db.Challenges.AsNoTracking(),
                 item => item.ChallengeId,
                 template => template.Id,
-                (item, template) => new StartGateChallenge(
-                    item.Id,
-                    template.Mode,
-                    item.RulesJson,
-                    template.DefinitionJson,
-                    item.IsPublished,
-                    item.Hints.Select(hint => hint.Cost).ToArray()))
+                (item, template) => new { Instance = item, Template = template })
+            .AsSplitQuery()
             .ToArrayAsync(ct);
+        var challenges = challengeRows.Select(row => new StartGateChallenge(
+            row.Instance.Id,
+            row.Template.Mode,
+            row.Instance.Rules ?? throw new InvalidOperationException(
+                $"Competition challenge {row.Instance.Id} has no rules."),
+            row.Template.Definition ?? throw new InvalidOperationException(
+                $"Challenge {row.Template.Id} has no definition."),
+            row.Instance.IsPublished,
+            row.Instance.Hints.Select(hint => hint.Cost).ToArray())).ToArray();
         var teamTracks = await db.Teams.AsNoTracking()
             .Where(
             team => team.CompetitionId == competitionId
@@ -54,11 +48,11 @@ public sealed class CompetitionStartGateStore(NoCtfDbContext db)
             competition.Id,
             competition.Mode,
             competition.Status,
-            competition.ConfigurationJson,
+            competition.ModeConfiguration,
             challenges,
             teamTracks.Length,
             competition.MaxConcurrentRuntimeInstancesPerTeam,
-            competition.TrackConfigurationJson,
+            competition.Tracks,
             teamTracks,
             competition.TracksEnabled);
     }

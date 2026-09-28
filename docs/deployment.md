@@ -12,15 +12,14 @@ S3-compatible object storage（LocalFileSystem 仅非 HA）
 Frontend/reverse proxy
 ```
 
-三个角色可以分别运行在兼容入口中，也可以由 `NoCTF.Host` 以任意非空组合承载。
-`NoCTF.Host` 缺省启用全部角色；使用 `Hosting__Roles__0=Api`、
+`NoCTF.Host` 是唯一可执行入口，并能以任意非空组合承载三个角色。它缺省启用全部角色；使用 `Hosting__Roles__0=Api`、
 `Hosting__Roles__1=Worker`、`Hosting__Roles__2=Runner` 明确配置。角色集合在进程启动后
 不可热切换。
 
 单机部署只提供 `deploy/docker-compose.yml`：五个服务为统一 Host、PostgreSQL、Redis、NATS、Registry。
 使用 CI 预构建镜像、目录 bind mount、分服务 `.env`；无宿主端口发布、Compose expose、迁移容器或
-exporter。HTTP 服务加入既有 `1panel-network`，代理由运维配置。完整目录与升级流程见
-[单机生产部署](../deploy/README.md)。代码与 Kubernetes 仍支持角色拆分；此处不再提供重复 Compose 拓扑。
+exporter。HTTP 服务加入既有 `1panel-network`，代理由运维配置。完整目录与部署流程见
+[单机生产部署](../deploy/README.md)。Kubernetes 角色拆分同样只运行 Host 镜像。
 
 ## CI 容器镜像
 
@@ -57,9 +56,9 @@ GHCR 使用工作流内置的 `GITHUB_TOKEN`。若仓库配置了以下 Actions 
 
 ## 进程权限
 
-- API：业务 DB、Wolverine Outbox、Redis、ObjectStorage、公开/内部 HTTP；无 Docker/Kubernetes/Libvirt 权限。
-- Worker：业务 DB、Wolverine queues、Redis、ObjectStorage；无宿主 Runtime socket。
-- Runner：所需业务表和 Wolverine runner queues、Redis heartbeat、内部 archive 读取 API，以及特定 Provider 权限；数据库 role 不授予 User/认证配置写权限，也不需要对象存储通用凭据。
+- API：业务 DB、NATS JetStream、Redis、ObjectStorage、公开/内部 HTTP；无 Docker/Kubernetes/Libvirt 权限。
+- Worker：业务 DB、NATS JetStream/KV、Redis、ObjectStorage；无宿主 Runtime socket。
+- Runner：所需业务表、NATS runner subjects/KV、schema 3 heartbeat、内部 archive 读取 API，以及特定 Provider 权限；数据库 role 不授予 User/认证配置写权限，也不需要对象存储通用凭据。
 - Host：权限是其全部启用角色权限的并集。包含 Runner 的组合进程必须获得 Provider 权限，
   因此全合一适合本地或受控小型部署；需要最小权限隔离时应拆分角色。
 
@@ -104,21 +103,22 @@ membership；heartbeat 过期的节点不会收到新审计，节点以相同 Ru
 `Runner__Provider` 必须与该 Pool 的 Runtime 配置一致。不要通过复用 RunnerId 把同一
 Docker/Kubernetes 节点或 Libvirt node CIDR 同时交给两个宿主。
 
-每个 Runner 节点必须配置稳定唯一的 `Runner__Id`、`Runner__Capacity__MemoryBytes`、
-`Runner__Capacity__NanoCpus`、`Runner__Capacity__PidsLimit`、
+每个 Runner 节点必须配置稳定唯一的 `Runner__Id`、
 `Runner__Heartbeat__IntervalSeconds`、`Runner__Heartbeat__TtlSeconds` 和
-`Runner__ProviderFailureHoldSeconds`。所有容量值和周期必须为正，心跳 TTL 必须大于刷新周期。
+`Runner__ProviderFailureHoldSeconds`。周期必须为正，心跳 TTL 必须大于刷新周期。
+Docker/Libvirt 根据可信宿主/cgroup 实际观测自动使用整个执行资源域；不要配置
+Runner 容量完全来自实际资源观测；不得配置人工容量上限。Kubernetes 使用 Node Allocatable 与 Metrics API。
 Provider 创建资源被拒绝、超时或清理失败时，Runner 会在最后一次失败后的 hold 窗口内让
 readiness 失败、停止发布可接单 heartbeat，并记录不含题目配置或凭据的结构化 Warning；成功的
 Provider 创建会立即恢复，hold 到期后也会重新开放一次探测机会，默认窗口为 120 秒。Runner
-只刷新已初始化的可用容量，不会覆盖已扣减值；
-Redis 容量状态丢失且 PostgreSQL 仍有该节点活跃 assignment 时，节点保持离线，直到
-assignment 收敛后才从部署配置重建容量。
+每份新鲜观测都会重算实际空闲、安全余量和启动临时预留；Running Runtime 的声明上限
+不作为长期容量负债。Redis 容量状态丢失且 PostgreSQL 仍有该节点活跃 assignment 时，
+节点保持离线并对照 Provider 清单原地恢复所有权，完成对账和新鲜观测后再开放准入。
 
 Kubernetes 清单使用 StatefulSet Pod 名作为 RunnerId，使副本扩缩容和重启保持稳定身份。
 其他编排环境也必须为每个 Runner 副本提供唯一且可恢复的 RunnerId；不得让多个活动副本共享身份。
 
-`Runtime__Kubernetes__PodPidsLimit` 是 Runner 的容量与兼容校验值，必须与该 Pool
+`Runtime__Kubernetes__PodPidsLimit` 是 Runner 的容量与配置校验值，必须与该 Pool
 kubelet 实际统一配置的 `PodPidsLimit` 完全一致；应用配置本身不会修改 kubelet。运维核验节点配置后，
 必须给允许承载题目工作负载的节点设置精确的 `noctf.io/pod-pids-limit=<数值>` 标签。Runner 启动时以
 只读 Node 权限确认至少一个同值、Ready 且可调度的节点；所有单容器与 Compose Runtime Pod 同时强制
@@ -166,7 +166,7 @@ NoCTF 继续让 Kestrel 的全局 `MaxRequestBodySize=null`、multipart `Multipa
 
 ## 配置/Secret
 
-JWT signing key 可供 Access/Refresh/Internal 使用，但 audience/Scheme 隔离。PostgreSQL、Redis、S3 credentials、SMTP、FlagDerivationSecret 不写日志。FlagDerivationSecret 是每 Competition 数据，不是部署 Secret。`EmailVerification:EncryptionKey` 必须是独立的 Base64 32-byte 部署 Secret，仅用于加密数据库中的 SMTP 密码；API 永不返回该密码。
+JWT signing key 可供 Access/Refresh/Internal 使用，但 audience/Scheme 隔离。PostgreSQL、Redis、S3 credentials、SMTP、SSO Client Secret、FlagDerivationSecret 不写日志。FlagDerivationSecret 是每 Competition 数据，不是部署 Secret。`EmailVerification:EncryptionKey` 必须是独立的 Base64 32-byte 部署 Secret，用途隔离地保护 SMTP 密码、人机验证 Secret、SSO Client Secret 与共享 Data Protection 密钥环；API 永不返回这些密钥。
 
 Runner Pool/Provider/resource max、Redis、NATS JetStream transport、S3、CORS/Origin、Cookie Secure 是强类型 IOptions 并在进程启动时 ValidateOnStart。邮箱验证开关、密码找回有效期/冷却/账号限额、公开 URL 与 SMTP 投递参数由管理员页面写入数据库，API/Worker 动态读取；SMTP 密码只能整体替换，前端不回填也不持久化。SMTP 测试只读取已保存且已启用的配置，表单存在未保存修改时前端不允许发送，避免把单次 SMTP 可达误认为注册验证已经启用。密码找回不依赖注册邮箱验证开关，但没有完整 SMTP 投递配置时不会签发重置令牌。
 
@@ -184,11 +184,12 @@ Liveness 只表示进程事件循环；Readiness 检查进程所需 PostgreSQL�
 不可用报告为降级；Worker 和 Runner 将 Redis 视为必要依赖，因为排行榜投影、通知、平台日志及
 Runner 容量事实均依赖 Redis。Runtime 题目本身不使用平台 Health Probe。
 
-优雅关闭先停止接收/claim 新消息，等待当前短事务/Provider 操作到部署超时；未完成消息依 Wolverine lease 恢复。不得依赖内存 drain 状态。
+优雅关闭先停止接收新消息并停止续租，等待当前短事务/Provider 操作到部署超时；未 ack 消息依 JetStream 重投，resource-domain 由新 fencing revision 接管。不得依赖内存 drain 状态。
 
 ## 运维边界
 
 平台进程和管理后台不实现数据库/对象备份或恢复 API；由外部运维负责。仓库提供强制停写、age
 加密、完整保留 JetStream 持久卷与 stream/consumer 配置、对象元数据和恢复后校验的外部工具及隔离演练，见
 [备份恢复](backup-recovery.md)。当前工具生成离散恢复点，不是 PITR。Redis 可丢失并重建。
-QQBot 不部署。
+外部通知接收方不属于 NoCTF 部署拓扑。赛事 Webhook 默认只连接公开 HTTPS 地址；需要访问
+内网接收方时，运维必须通过 `Webhooks__PrivateNetworkAllowList` 精确放行主机、IP 或 CIDR。

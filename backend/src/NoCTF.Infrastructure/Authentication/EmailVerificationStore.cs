@@ -15,7 +15,7 @@ namespace NoCTF.Infrastructure.Authentication;
 public sealed class EmailVerificationStore(
     NoCtfDbContext db,
     IEmailVerificationConfigurationStore configuration,
-    ITransactionalMessageOutbox outbox,
+    IPostCommitMessagePublisher outbox,
     ILogger<EmailVerificationStore>? logger = null) : IEmailVerificationStore
 {
     public async Task<bool> IsRequiredAsync(CancellationToken ct) =>
@@ -45,9 +45,8 @@ public sealed class EmailVerificationStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(
-            IsolationLevel.ReadCommitted,
+            IsolationLevel.Serializable,
             ct);
-        await AcquireUserLockAsync(userId, ct);
 
         var user = await db.Users.SingleOrDefaultAsync(item => item.Id == userId, ct);
         if (user is null)
@@ -82,30 +81,46 @@ public sealed class EmailVerificationStore(
         if (sentRecently)
             return Observe(EmailVerificationState.RateLimited, userId);
 
-        await db.AccountTokens
-            .Where(item => item.UserId == userId
-                && item.Kind == AccountTokenKind.EmailVerification
-                && item.ConsumedAt == null
-                && item.InvalidatedAt == null)
-            .ExecuteUpdateAsync(
-                setters => setters.SetProperty(item => item.ExpiresAt, now),
-                ct);
-
         var bytes = RandomNumberGenerator.GetBytes(32);
         var token = Microsoft.AspNetCore.WebUtilities.WebEncoders.Base64UrlEncode(bytes);
-        db.AccountTokens.Add(new AccountToken
+        try
         {
-            Id = Guid.CreateVersion7(now),
-            UserId = userId,
-            Kind = AccountTokenKind.EmailVerification,
-            TokenSha256 = SHA256.HashData(Encoding.UTF8.GetBytes(token)),
-            CreatedAt = now,
-            ExpiresAt = now.AddMinutes(settings.TokenLifetimeMinutes)
-        });
+            await db.AccountTokens
+                .Where(item => item.UserId == userId
+                    && item.Kind == AccountTokenKind.EmailVerification
+                    && item.ConsumedAt == null
+                    && item.InvalidatedAt == null)
+                .ExecuteUpdateAsync(
+                    setters => setters.SetProperty(item => item.ExpiresAt, now),
+                    ct);
+
+            db.AccountTokens.Add(new AccountToken
+            {
+                Id = Guid.CreateVersion7(now),
+                UserId = userId,
+                Kind = AccountTokenKind.EmailVerification,
+                TokenSha256 = SHA256.HashData(Encoding.UTF8.GetBytes(token)),
+                CreatedAt = now,
+                ExpiresAt = now.AddMinutes(settings.TokenLifetimeMinutes)
+            });
+            await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+        }
+        catch (Exception exception) when (TransactionFailureClassifier.IsRetryable(exception))
+        {
+            try
+            {
+                await transaction.RollbackAsync(ct);
+            }
+            catch (InvalidOperationException)
+            {
+                // A provider may have completed a failed serializable transaction.
+            }
+            db.ChangeTracker.Clear();
+            return Observe(EmailVerificationState.RateLimited, userId);
+        }
         await outbox.PublishAsync(new SendEmailVerification(userId, token));
-        await db.SaveChangesAsync(ct);
-        await transaction.CommitAsync(ct);
-        await outbox.FlushOutgoingMessagesAsync();
+        await outbox.FlushCommittedMessagesAsync();
         return Observe(EmailVerificationState.Issued, userId);
     }
 
@@ -134,19 +149,6 @@ public sealed class EmailVerificationStore(
         user.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
         return EmailVerificationState.Verified;
-    }
-
-    private async Task AcquireUserLockAsync(Guid userId, CancellationToken ct)
-    {
-        if (!db.Database.IsRelational())
-        {
-            _ = await db.Users.SingleOrDefaultAsync(item => item.Id == userId, ct);
-            return;
-        }
-
-        _ = await db.Users
-            .FromSqlInterpolated($"SELECT * FROM users WHERE id = {userId} FOR UPDATE")
-            .SingleOrDefaultAsync(ct);
     }
 
     private EmailVerificationState Observe(

@@ -35,6 +35,10 @@ public sealed record GameplayFactListItem(
     DateTimeOffset OccurredAt,
     DateTimeOffset UpdatedAt);
 
+public sealed record GameplayFactListPage(
+    IReadOnlyList<GameplayFactListItem> Items,
+    int Total);
+
 public sealed record PlayerGameplayFactValue(
     Guid GameplayFactId,
     GameplayFactKind Kind,
@@ -42,6 +46,23 @@ public sealed record PlayerGameplayFactValue(
 
 public interface IGameplayFactManagementStore
 {
+    Task<GameplayFactListPage> ListAdminPageAsync(
+        GameplayFactListFilter filter,
+        int offset,
+        int limit,
+        bool desc,
+        CancellationToken cancellationToken);
+
+    Task<GameplayFactListPage?> ListPlayerPageAsync(
+        Guid competitionId,
+        Guid userId,
+        Guid? competitionChallengeId,
+        GameplayFactKind? kind,
+        int offset,
+        int limit,
+        bool desc,
+        CancellationToken cancellationToken);
+
     Task<IReadOnlyList<GameplayFactListItem>> ListAdminAsync(
         GameplayFactListFilter filter,
         DateTimeOffset? beforeOccurredAt,
@@ -87,6 +108,26 @@ public sealed class ReadPlayerGameplayFactValue(IGameplayFactManagementStore sto
 
 public sealed class ListGameplayFacts(IGameplayFactManagementStore store)
 {
+    public Task<GameplayFactListPage> AdminPageAsync(
+        GameplayFactListFilter filter,
+        int offset,
+        int limit,
+        bool desc,
+        CancellationToken ct = default) =>
+        store.ListAdminPageAsync(filter, offset, limit, desc, ct);
+
+    public Task<GameplayFactListPage?> PlayerPageAsync(
+        Guid competitionId,
+        Guid userId,
+        Guid? competitionChallengeId,
+        GameplayFactKind? kind,
+        int offset,
+        int limit,
+        bool desc,
+        CancellationToken ct = default) =>
+        store.ListPlayerPageAsync(
+            competitionId, userId, competitionChallengeId, kind, offset, limit, desc, ct);
+
     public Task<IReadOnlyList<GameplayFactListItem>> AdminAsync(
         GameplayFactListFilter filter,
         DateTimeOffset? beforeOccurredAt,

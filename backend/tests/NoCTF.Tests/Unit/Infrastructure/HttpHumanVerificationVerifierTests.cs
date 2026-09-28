@@ -54,6 +54,26 @@ public sealed class HttpHumanVerificationVerifierTests
     }
 
     [Test]
+    public async Task Cap_uses_the_backend_endpoint_when_it_is_configured()
+    {
+        var handler = new RecordingHandler(_ => Json(
+            HttpStatusCode.OK,
+            """{"success":true}"""));
+        using var client = new HttpClient(handler);
+        var options = CapOptions();
+        options.Cap.BackendServerUrl = "http://noctf-cap:3000";
+
+        var result = await CreateVerifier(client).VerifyAsync(
+            Runtime(options),
+            new("cap-token", HumanVerificationAction.Login, null),
+            default);
+
+        await Assert.That(result).IsEqualTo(HumanVerificationResult.Verified);
+        await Assert.That(handler.RequestUri?.AbsoluteUri)
+            .IsEqualTo("http://noctf-cap:3000/site-key/siteverify");
+    }
+
+    [Test]
     public async Task Turnstile_sends_remote_ip_and_requires_matching_action_and_hostname()
     {
         var handler = new RecordingHandler(_ => Json(

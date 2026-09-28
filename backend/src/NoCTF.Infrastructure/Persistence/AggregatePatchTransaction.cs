@@ -8,7 +8,7 @@ namespace NoCTF.Infrastructure.Persistence;
 
 internal sealed class AggregatePatchTransaction(
     NoCtfDbContext db,
-    ITransactionalMessageOutbox outbox,
+    IPostCommitMessagePublisher outbox,
     AggregatePatchPostCommitActions? postCommitActions = null) : IAtomicAggregatePatch
 {
     public async Task<TResult> ExecuteAsync<TResult>(
@@ -86,6 +86,11 @@ internal sealed class AggregateCompatibleTransaction : IAsyncDisposable
 
     public Task CommitAsync(CancellationToken cancellationToken) =>
         transaction?.CommitAsync(cancellationToken) ?? Task.CompletedTask;
+
+    public Task FlushMessagesAsync(IPostCommitMessagePublisher publisher) =>
+        transaction is null
+            ? publisher.FlushOutgoingMessagesAsync()
+            : publisher.FlushCommittedMessagesAsync();
 
     public Task RollbackAsync(CancellationToken cancellationToken) =>
         transaction?.RollbackAsync(cancellationToken) ?? Task.CompletedTask;

@@ -10,6 +10,8 @@ using NoCTF.Infrastructure.Persistence;
 using NoCTF.Domain.Shared;
 using NoCTF.Application.Competitions.Management;
 using NoCTF.Application.Exports;
+using NoCTF.Application.Authentication.Sso;
+using NoCTF.Infrastructure.Authentication;
 
 namespace NoCTF.Infrastructure.Administration;
 
@@ -154,7 +156,9 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
                     || notification.Kind == NotificationKind.PlatformAuditExported
                     || notification.Kind == NotificationKind.PlatformUserAccessTokenIssued
                     || notification.Kind == NotificationKind.PlatformUserAccessTokenRevoked
-                    || notification.Kind == NotificationKind.PlatformUserTokensInvalidated)
+                    || notification.Kind == NotificationKind.PlatformUserTokensInvalidated
+                    || notification.Kind == NotificationKind.SsoProviderConfigurationChanged
+                    || notification.Kind == NotificationKind.SsoExternalIdentityBindingChanged)
                 && notification.TargetType == NotificationTargetType.PlatformAdministrators);
             auditFacts = query.Kind switch
             {
@@ -164,7 +168,9 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
                     notification.Kind == NotificationKind.PlatformAuditExported
                     || notification.Kind == NotificationKind.PlatformUserAccessTokenIssued
                     || notification.Kind == NotificationKind.PlatformUserAccessTokenRevoked
-                    || notification.Kind == NotificationKind.PlatformUserTokensInvalidated),
+                    || notification.Kind == NotificationKind.PlatformUserTokensInvalidated
+                    || notification.Kind == NotificationKind.SsoProviderConfigurationChanged
+                    || notification.Kind == NotificationKind.SsoExternalIdentityBindingChanged),
                 PlatformAuditKind.CompetitionAdministration => auditFacts.Where(notification =>
                     notification.Kind == NotificationKind.CompetitionForceDeleted),
                 _ => auditFacts
@@ -221,17 +227,104 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
 
     private static PlatformAuditView ToAuditView(Notification notification)
     {
+        if (notification.Kind == NotificationKind.SsoExternalIdentityBindingChanged)
+        {
+            var bindingAction = (SsoBindingAuditAction)(notification.ActionValue
+                ?? throw new InvalidOperationException(
+                    $"Notification {notification.Id} has no SSO binding audit action."));
+            return new(
+                Id: notification.Id,
+                Kind: PlatformAuditKind.PlatformAdministration,
+                SubjectId: notification.UserId!.Value,
+                CompetitionId: null,
+                ActorId: notification.SourceId,
+                FromCompetitionStatus: null,
+                ToCompetitionStatus: null,
+                FromLeaderboardVisibility: null,
+                ToLeaderboardVisibility: null,
+                UserAccountAction: null,
+                PlatformAdministrationAction: bindingAction switch
+                {
+                    SsoBindingAuditAction.Bound =>
+                        PlatformAdministrationAction.SsoExternalIdentityBound,
+                    SsoBindingAuditAction.Unbound =>
+                        PlatformAdministrationAction.SsoExternalIdentityUnbound,
+                    _ => throw new InvalidOperationException(
+                        $"Unsupported SSO binding audit action {bindingAction}.")
+                },
+                CompetitionEventKind: null,
+                CompetitionEventLevel: null,
+                CompetitionEventVisibility: null,
+                RelatedUserId: notification.UserId,
+                TeamId: null,
+                CompetitionChallengeId: null,
+                RuntimeInstanceId: null,
+                GameplayFactId: null,
+                QuestionId: null,
+                GameplayFactKind: null,
+                GameplayFactState: null,
+                GameplayFactResult: null,
+                SubjectDisplayName: notification.ProviderName,
+                Reason: null,
+                Automatic: false,
+                OccurredAt: notification.SentAt);
+        }
+        if (notification.Kind == NotificationKind.SsoProviderConfigurationChanged)
+        {
+            var ssoAction = (SsoProviderAuditAction)(notification.ActionValue
+                ?? throw new InvalidOperationException(
+                    $"Notification {notification.Id} has no SSO provider audit action."));
+            return new(
+                Id: notification.Id,
+                Kind: PlatformAuditKind.PlatformAdministration,
+                SubjectId: notification.SsoProviderId ?? Notification.PlatformAdministratorsTargetId,
+                CompetitionId: null,
+                ActorId: notification.SourceId,
+                FromCompetitionStatus: null,
+                ToCompetitionStatus: null,
+                FromLeaderboardVisibility: null,
+                ToLeaderboardVisibility: null,
+                UserAccountAction: null,
+                PlatformAdministrationAction: ssoAction switch
+                {
+                    SsoProviderAuditAction.GlobalConfigurationUpdated =>
+                        PlatformAdministrationAction.SsoGlobalConfigurationUpdated,
+                    SsoProviderAuditAction.ProviderCreated =>
+                        PlatformAdministrationAction.SsoProviderCreated,
+                    SsoProviderAuditAction.ProviderUpdated =>
+                        PlatformAdministrationAction.SsoProviderUpdated,
+                    SsoProviderAuditAction.ProviderSecretReplaced =>
+                        PlatformAdministrationAction.SsoProviderSecretReplaced,
+                    _ => throw new InvalidOperationException(
+                        $"Unsupported SSO audit action {ssoAction}.")
+                },
+                CompetitionEventKind: null,
+                CompetitionEventLevel: null,
+                CompetitionEventVisibility: null,
+                RelatedUserId: null,
+                TeamId: null,
+                CompetitionChallengeId: null,
+                RuntimeInstanceId: null,
+                GameplayFactId: null,
+                QuestionId: null,
+                GameplayFactKind: null,
+                GameplayFactState: null,
+                GameplayFactResult: null,
+                SubjectDisplayName: notification.ProviderName ?? "Single sign-on",
+                Reason: null,
+                Automatic: false,
+                OccurredAt: notification.SentAt);
+        }
         if (notification.Kind == NotificationKind.CompetitionForceDeleted)
         {
-            var deletionFact = JsonSerializer.Deserialize<CompetitionForceDeletionFact>(
-                notification.ContentJson,
-                JsonOptions) ?? throw new InvalidOperationException(
-                $"Notification {notification.Id} has no competition force-deletion payload.");
+            var competitionId = notification.CompetitionId
+                ?? throw new InvalidOperationException(
+                    $"Notification {notification.Id} has no deleted competition id.");
             return new(
                 Id: notification.Id,
                 Kind: PlatformAuditKind.CompetitionAdministration,
-                SubjectId: deletionFact.CompetitionId,
-                CompetitionId: deletionFact.CompetitionId,
+                SubjectId: competitionId,
+                CompetitionId: competitionId,
                 ActorId: notification.SourceId,
                 FromCompetitionStatus: null,
                 ToCompetitionStatus: null,
@@ -251,22 +344,18 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
                 GameplayFactKind: null,
                 GameplayFactState: null,
                 GameplayFactResult: null,
-                SubjectDisplayName: deletionFact.CompetitionTitle,
-                Reason: deletionFact.Reason,
+                SubjectDisplayName: notification.Title,
+                Reason: notification.Reason,
                 Automatic: false,
                 OccurredAt: notification.SentAt);
         }
         if (notification.Kind == NotificationKind.PlatformAuditExported)
         {
-            var exportFact = JsonSerializer.Deserialize<PlatformAuditArchiveExportedFact>(
-                notification.ContentJson,
-                JsonOptions) ?? throw new InvalidOperationException(
-                $"Notification {notification.Id} has no platform audit-export payload.");
             return new(
                 Id: notification.Id,
                 Kind: PlatformAuditKind.PlatformAdministration,
                 SubjectId: Notification.PlatformAdministratorsTargetId,
-                CompetitionId: exportFact.CompetitionId,
+                CompetitionId: notification.CompetitionId,
                 ActorId: notification.SourceId,
                 FromCompetitionStatus: null,
                 ToCompetitionStatus: null,
@@ -277,7 +366,7 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
                 CompetitionEventKind: null,
                 CompetitionEventLevel: CompetitionEventLevel.Information,
                 CompetitionEventVisibility: CompetitionEventVisibility.Staff,
-                RelatedUserId: exportFact.ActorId,
+                RelatedUserId: notification.ActorUserId,
                 TeamId: null,
                 CompetitionChallengeId: null,
                 RuntimeInstanceId: null,
@@ -295,14 +384,13 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
             or NotificationKind.PlatformUserAccessTokenRevoked
             or NotificationKind.PlatformUserTokensInvalidated)
         {
-            var tokenFact = JsonSerializer.Deserialize<PlatformUserTokenAuditFact>(
-                notification.ContentJson,
-                JsonOptions) ?? throw new InvalidOperationException(
-                $"Notification {notification.Id} has no platform token audit payload.");
+            var tokenAction = (PlatformUserTokenAdministrationAction)(notification.ActionValue
+                ?? throw new InvalidOperationException(
+                    $"Notification {notification.Id} has no token audit action."));
             return new(
                 Id: notification.Id,
                 Kind: PlatformAuditKind.PlatformAdministration,
-                SubjectId: tokenFact.TargetUserId,
+                SubjectId: notification.UserId!.Value,
                 CompetitionId: null,
                 ActorId: notification.SourceId,
                 FromCompetitionStatus: null,
@@ -310,7 +398,7 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
                 FromLeaderboardVisibility: null,
                 ToLeaderboardVisibility: null,
                 UserAccountAction: null,
-                PlatformAdministrationAction: tokenFact.Action switch
+                PlatformAdministrationAction: tokenAction switch
                 {
                     PlatformUserTokenAdministrationAction.AccessTokenIssued =>
                         PlatformAdministrationAction.UserAccessTokenIssued,
@@ -319,12 +407,12 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
                     PlatformUserTokenAdministrationAction.TokensInvalidated =>
                         PlatformAdministrationAction.UserTokensInvalidated,
                     _ => throw new InvalidOperationException(
-                        $"Unsupported platform token action {tokenFact.Action}.")
+                        $"Unsupported platform token action {tokenAction}.")
                 },
                 CompetitionEventKind: null,
                 CompetitionEventLevel: null,
                 CompetitionEventVisibility: null,
-                RelatedUserId: tokenFact.TargetUserId,
+                RelatedUserId: notification.UserId,
                 TeamId: null,
                 CompetitionChallengeId: null,
                 RuntimeInstanceId: null,
@@ -333,34 +421,36 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
                 GameplayFactKind: null,
                 GameplayFactState: null,
                 GameplayFactResult: null,
-                SubjectDisplayName: tokenFact.TargetUserName,
-                Reason: tokenFact.Reason,
+                SubjectDisplayName: notification.UserName,
+                Reason: notification.Reason,
                 Automatic: false,
                 OccurredAt: notification.SentAt,
-                JwtId: tokenFact.JwtId,
-                TokenExpiresAt: tokenFact.ExpiresAt,
-                TokenVersion: tokenFact.TokenVersion);
+                JwtId: notification.JwtId,
+                TokenExpiresAt: notification.PayloadExpiresAt,
+                TokenVersion: notification.Count);
         }
-        var fact = JsonSerializer.Deserialize<UserAccountLifecycleFact>(
-            notification.ContentJson,
-            JsonOptions) ?? throw new InvalidOperationException(
-            $"Notification {notification.Id} has no user lifecycle payload.");
+        var targetUserId = notification.UserId
+            ?? throw new InvalidOperationException(
+                $"Notification {notification.Id} has no target user id.");
+        var lifecycleAction = notification.UserLifecycleAction
+            ?? throw new InvalidOperationException(
+                $"Notification {notification.Id} has no lifecycle action.");
         return new(
             Id: notification.Id,
             Kind: PlatformAuditKind.UserAccountLifecycle,
-            SubjectId: fact.TargetUserId,
+            SubjectId: targetUserId,
             CompetitionId: null,
             ActorId: notification.SourceId,
             FromCompetitionStatus: null,
             ToCompetitionStatus: null,
             FromLeaderboardVisibility: null,
             ToLeaderboardVisibility: null,
-            UserAccountAction: fact.Action,
+            UserAccountAction: lifecycleAction,
             PlatformAdministrationAction: null,
             CompetitionEventKind: null,
             CompetitionEventLevel: null,
             CompetitionEventVisibility: null,
-            RelatedUserId: fact.TargetUserId,
+            RelatedUserId: targetUserId,
             TeamId: null,
             CompetitionChallengeId: null,
             RuntimeInstanceId: null,
@@ -369,9 +459,9 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
             GameplayFactKind: null,
             GameplayFactState: null,
             GameplayFactResult: null,
-            SubjectDisplayName: fact.TargetUserName,
-            Reason: fact.Reason,
-            Automatic: fact.Automatic,
+            SubjectDisplayName: notification.UserName,
+            Reason: notification.Reason,
+            Automatic: notification.Automatic ?? false,
             OccurredAt: notification.SentAt);
     }
 

@@ -10,6 +10,13 @@ public enum CompetitionLeaderboardVisibility : short
 
 public static class CompetitionLeaderboardVisibilityPolicy
 {
+    public static bool CanAnnounceBlood(
+        DateTimeOffset? frozenStartAt,
+        DateTimeOffset? hiddenStartAt,
+        DateTimeOffset occurredAt) =>
+        EffectiveAt(frozenStartAt, hiddenStartAt, occurredAt)
+            != CompetitionLeaderboardVisibility.Blackout;
+
     public static CompetitionLeaderboardVisibility EffectiveAt(
         DateTimeOffset? frozenStartAt,
         DateTimeOffset? hiddenStartAt,

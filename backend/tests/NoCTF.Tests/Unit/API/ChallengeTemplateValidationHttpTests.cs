@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
+using System.Text.Json.Nodes;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using FastEndpoints;
@@ -32,6 +34,163 @@ public sealed class ChallengeTemplateValidationHttpTests
         "a6500287-4946-476e-933d-19a31ea5f2b9");
 
     [Test]
+    [Arguments(GameModeProtocol.Ctf)]
+    [Arguments(GameModeProtocol.Awd)]
+    [Arguments(GameModeProtocol.Awdp)]
+    [Arguments(GameModeProtocol.Koh)]
+    public async Task Create_template_accepts_browser_ordered_definition(GameModeProtocol mode)
+    {
+        await using var app = await CreateApplicationAsync();
+        using var client = app.GetTestClient();
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue(BearerScheme, "test-token");
+        var definition = new JsonObject();
+        definition[mode.ToString().ToLowerInvariant()] = mode switch
+        {
+            GameModeProtocol.Ctf => new JsonObject { ["interactionKind"] = "FlagSubmission" },
+            GameModeProtocol.Awd => new JsonObject { ["flagInjection"] = null },
+            _ => new JsonObject()
+        };
+        definition["patchCommand"] = new JsonArray();
+        definition["mode"] = mode.ToString();
+        var payload = new JsonObject
+        {
+            ["mode"] = mode.ToString(),
+            ["visibility"] = "Private",
+            ["title"] = $"{mode} template",
+            ["direction"] = "Web",
+            ["definition"] = definition
+        };
+        using var body = new StringContent(payload.ToJsonString(), Encoding.UTF8, "application/json");
+
+        using var response = await client.PostAsync("/api/v1/admin/challenges", body);
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Created);
+    }
+
+    [Test]
+    public async Task Create_template_without_definition_mode_returns_400()
+    {
+        await using var app = await CreateApplicationAsync();
+        using var client = app.GetTestClient();
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue(BearerScheme, "test-token");
+
+        using var response = await client.PostAsJsonAsync("/api/v1/admin/challenges", new
+        {
+            mode = "Ctf",
+            visibility = "Private",
+            title = "Template",
+            direction = "Web",
+            definition = new { interactionKind = "FlagSubmission" }
+        });
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+    }
+
+    [Test]
+    public async Task Missing_definition_mode_is_a_client_error()
+    {
+        await using var app = await CreateApplicationAsync();
+        using var client = app.GetTestClient();
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue(BearerScheme, "test-token");
+
+        using var response = await client.PatchAsJsonAsync(
+            $"/api/v1/admin/challenges/{Guid.NewGuid()}",
+            new
+            {
+                content = new
+                {
+                    mode = "Ctf",
+                    visibility = "Private",
+                    title = "Template",
+                    direction = "Web",
+                    definition = new { runtime = (object?)null }
+                }
+            });
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+    }
+
+    [Test]
+    public async Task Missing_nested_runtime_kind_is_a_client_error()
+    {
+        await using var app = await CreateApplicationAsync();
+        using var client = app.GetTestClient();
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue(BearerScheme, "test-token");
+
+        using var response = await client.PatchAsJsonAsync(
+            $"/api/v1/admin/challenges/{Guid.NewGuid()}",
+            new
+            {
+                content = new
+                {
+                    mode = "Ctf",
+                    visibility = "Private",
+                    title = "Template",
+                    direction = "Web",
+                    definition = new
+                    {
+                        mode = "Ctf",
+                        interactionKind = "FlagSubmission",
+                        runtime = new { allocation = "PerTeam" }
+                    }
+                }
+            });
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+    }
+
+    [Test]
+    public async Task Unknown_definition_mode_remains_a_client_error()
+    {
+        await using var app = await CreateApplicationAsync();
+        using var client = app.GetTestClient();
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue(BearerScheme, "test-token");
+
+        using var response = await client.PostAsJsonAsync("/api/v1/admin/challenges", new
+        {
+            mode = "Ctf",
+            visibility = "Private",
+            title = "Template",
+            direction = "Web",
+            definition = new { mode = "Unknown", interactionKind = "FlagSubmission" }
+        });
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+    }
+
+    [Test]
+    [Arguments("""{"mode":"Ctf"}""")]
+    [Arguments("""{"mode":"Ctf","awd":{"flagInjection":null}}""")]
+    [Arguments("""{"mode":"Ctf","ctf":{"interactionKind":"FlagSubmission"},"awd":{"flagInjection":null}}""")]
+    [Arguments("""{"mode":"Ctf","ctf":{"interactionKind":"FlagSubmission"},"runtime":{"kind":"Container","ova":{"sourceUrl":"https://example.test/a.ova","sha256":"abc"}}}""")]
+    [Arguments("""{"mode":"Ctf","ctf":{"interactionKind":"FlagSubmission"},"runtime":{"kind":"Container","container":{"image":"alpine","command":[],"environment":{},"labels":{},"portMappings":[],"security":null,"flagEnvironmentVariableName":null,"internalPorts":[]}}}""")]
+    public async Task Invalid_definition_or_runtime_branch_returns_400(string definitionJson)
+    {
+        await using var app = await CreateApplicationAsync();
+        using var client = app.GetTestClient();
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue(BearerScheme, "test-token");
+        var payload = new JsonObject
+        {
+            ["mode"] = "Ctf",
+            ["visibility"] = "Private",
+            ["title"] = "Template",
+            ["direction"] = "Web",
+            ["definition"] = JsonNode.Parse(definitionJson)
+        };
+
+        using var response = await client.PostAsync("/api/v1/admin/challenges",
+            new StringContent(payload.ToJsonString(), Encoding.UTF8, "application/json"));
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+    }
+
+    [Test]
     public async Task Automatic_and_application_validation_share_problem_details_contract()
     {
         await using var app = await CreateApplicationAsync();
@@ -49,7 +208,7 @@ public sealed class ChallengeTemplateValidationHttpTests
                 title = "",
                 description = (string?)null,
                 direction = "",
-                definitionJson = "{}"
+                definition = Definition(GameModeProtocol.Ctf)
             }
         });
         await AssertValidationProblemAsync(
@@ -66,24 +225,24 @@ public sealed class ChallengeTemplateValidationHttpTests
                 title = "Template",
                 description = (string?)null,
                 direction = "Web",
-                definitionJson = "not-json"
+                definition = (object?)null
             }
         });
         await AssertValidationProblemAsync(
             applicationResponse,
-            "Content.DefinitionJson");
+            "Content.Definition");
     }
 
     [Test]
-    [Arguments(GameModeProtocol.Ctf, "{\"schemaVersion\":2}")]
-    [Arguments(GameModeProtocol.Awd, "{\"schemaVersion\":4}")]
-    [Arguments(GameModeProtocol.Awdp, "{\"schemaVersion\":4,\"maximumPatchUploadBytes\":268435456}")]
-    [Arguments(GameModeProtocol.Koh, "{\"schemaVersion\":1}")]
+    [Arguments(GameModeProtocol.Ctf)]
+    [Arguments(GameModeProtocol.Awd)]
+    [Arguments(GameModeProtocol.Awdp)]
+    [Arguments(GameModeProtocol.Koh)]
     public async Task Minimal_definition_updates_succeed_for_every_game_mode(
-        GameModeProtocol mode,
-        string definitionJson)
+        GameModeProtocol mode)
     {
-        await using var app = await CreateApplicationAsync();
+        await using var app = await CreateApplicationAsync(
+            mode: (NoCTF.Domain.Competitions.GameMode)mode);
         using var client = app.GetTestClient();
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue(BearerScheme, "test-token");
@@ -99,11 +258,46 @@ public sealed class ChallengeTemplateValidationHttpTests
                     title = $"{mode} template",
                     description = (string?)null,
                     direction = "Pwn",
-                    definitionJson
+                    definition = Definition(mode)
                 }
             });
 
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        if (response.StatusCode != HttpStatusCode.OK)
+            throw new InvalidOperationException(await response.Content.ReadAsStringAsync());
+    }
+
+    private static ChallengeDefinitionContract Definition(GameModeProtocol mode)
+    {
+        ChallengeDefinitionContract definition = mode switch
+        {
+            GameModeProtocol.Ctf => new ChallengeDefinitionContract
+            {
+                Mode = mode,
+                Ctf = new CtfChallengeDefinitionContract
+                {
+                    InteractionKind = NoCTF.API.Endpoints.Challenges.CtfInteractionKindProtocol.FlagSubmission
+                }
+            },
+            GameModeProtocol.Awd => new ChallengeDefinitionContract
+            {
+                Mode = mode,
+                Awd = new AwdChallengeDefinitionContract { FlagInjection = null }
+            },
+            GameModeProtocol.Awdp => new ChallengeDefinitionContract
+            {
+                Mode = mode,
+                Awdp = new AwdpChallengeDefinitionContract(),
+                MaximumPatchUploadBytes = 268_435_456
+            },
+            GameModeProtocol.Koh => new ChallengeDefinitionContract
+            {
+                Mode = mode,
+                Koh = new KohChallengeDefinitionContract()
+            },
+            _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, null)
+        };
+        definition.PatchCommand = [];
+        return definition;
     }
 
     [Test]
@@ -134,11 +328,13 @@ public sealed class ChallengeTemplateValidationHttpTests
     private static async Task<WebApplication> CreateApplicationAsync(
         bool isAdministrator = true,
         Guid? ownerId = null,
-        Guid[]? managerIds = null)
+        Guid[]? managerIds = null,
+        NoCTF.Domain.Competitions.GameMode mode = NoCTF.Domain.Competitions.GameMode.Ctf)
     {
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
         builder.Services.AddProblemDetails();
+        builder.Services.AddExceptionHandler<RequestSafetyExceptionHandler>();
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddFastEndpoints(options =>
         {
@@ -146,7 +342,9 @@ public sealed class ChallengeTemplateValidationHttpTests
             options.Assemblies = [typeof(PatchChallengeTemplateEndpoint).Assembly];
             options.Filter = type =>
                 type == typeof(PatchChallengeTemplateEndpoint)
-                || type == typeof(PatchChallengeTemplateValidator);
+                || type == typeof(PatchChallengeTemplateValidator)
+                || type == typeof(CreateChallengeTemplateEndpoint)
+                || type == typeof(CreateChallengeTemplateValidator);
         });
         builder.Services.SwaggerDocument();
         builder.Services
@@ -165,6 +363,29 @@ public sealed class ChallengeTemplateValidationHttpTests
         user.IsAdministrator.Returns(isAdministrator);
         builder.Services.AddSingleton<IUserContext>(user);
         var store = Substitute.For<IChallengeBankStore>();
+        store.CreateAsync(
+                Arg.Any<CreateChallengeTemplateCommand>(),
+                Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                var command = call.Arg<CreateChallengeTemplateCommand>()!;
+                return Task.FromResult(new ChallengeTemplateWriteResult(
+                    ChallengeTemplateWriteState.Succeeded,
+                    new ChallengeTemplateView(
+                        command.ChallengeId ?? Guid.CreateVersion7(),
+                        command.OwnerId,
+                        [],
+                        command.Mode,
+                        command.Visibility,
+                        command.Title,
+                        command.Description,
+                        command.Direction,
+                        command.Definition,
+                        null,
+                        0,
+                        command.CreatedAt,
+                        command.CreatedAt)));
+            });
         store.FindAsync(
                 Arg.Any<Guid>(),
                 Arg.Any<Guid>(),
@@ -178,12 +399,15 @@ public sealed class ChallengeTemplateValidationHttpTests
                     challengeId,
                     ownerId ?? ActorId,
                     managerIds ?? [],
-                    NoCTF.Domain.Competitions.GameMode.Ctf,
+                    mode,
                     NoCTF.Domain.Challenges.ChallengeVisibility.Private,
                     "Template",
                     null,
                     "Web",
-                    "{}",
+                    ChallengeDefinitionContractMapper.ToDomain(
+                        challengeId,
+                        mode,
+                        Definition((GameModeProtocol)mode)),
                     null,
                     0,
                     DateTimeOffset.UtcNow,
@@ -206,7 +430,7 @@ public sealed class ChallengeTemplateValidationHttpTests
                         command.Title,
                         command.Description,
                         command.Direction,
-                        command.DefinitionJson,
+                        command.Definition,
                         null,
                         0,
                         command.UpdatedAt,
@@ -216,12 +440,14 @@ public sealed class ChallengeTemplateValidationHttpTests
         builder.Services.AddSingleton<IChallengeConfigurationCatalog>(
             new GameModeChallengeConfigurationCatalog());
         builder.Services.AddScoped<GetChallengeTemplate>();
+        builder.Services.AddScoped<CreateChallengeTemplate>();
         builder.Services.AddScoped<UpdateChallengeTemplate>();
         builder.Services.AddScoped<UpdateChallengeTemplatePermissions>();
         builder.Services.AddScoped<TransferChallengeTemplateOwner>();
         builder.Services.AddSingleton<IAtomicAggregatePatch, TestAtomicAggregatePatch>();
 
         var app = builder.Build();
+        app.UseExceptionHandler();
         app.UseAuthentication();
         app.UseAuthorization();
         app.UseNoCtfEndpoints();
@@ -263,7 +489,10 @@ public sealed class ChallengeTemplateValidationHttpTests
         protected override Task<AuthenticateResult> HandleAuthenticateAsync()
         {
             var identity = new ClaimsIdentity(
-                [new Claim(ClaimTypes.NameIdentifier, ActorId.ToString())],
+                [
+                    new Claim(ClaimTypes.NameIdentifier, ActorId.ToString()),
+                    new Claim(ClaimTypes.Role, "Organizer")
+                ],
                 Scheme.Name);
             var ticket = new AuthenticationTicket(
                 new ClaimsPrincipal(identity),

@@ -1,5 +1,6 @@
 using NoCTF.Application.Runtime.Capacity;
 using Microsoft.Extensions.Options;
+using NoCTF.Domain.Runtime;
 
 namespace NoCTF.Infrastructure.Runtime.Capacity;
 
@@ -16,7 +17,7 @@ public sealed class DevelopmentRunnerCapacityGate(
 {
     private readonly string runnerId = options.Value.Id;
     private readonly string runnerPool = options.Value.Pool;
-    private readonly Dictionary<Guid, string> claims = [];
+    private readonly Dictionary<string, string> claims = [];
     private readonly Lock sync = new();
 
     public Task<RunnerHeartbeatStatus> GetHeartbeatAsync(
@@ -53,7 +54,17 @@ public sealed class DevelopmentRunnerCapacityGate(
         Guid runtimeInstanceId,
         string runnerId,
         CancellationToken cancellationToken) =>
-        ReleaseCore(runtimeInstanceId, runnerId, cancellationToken);
+        ReleaseCore(runtimeInstanceId.ToString("N"), runnerId, cancellationToken);
+
+    public Task<RunnerCapacityReleaseOutcome> ReleaseWorkloadAsync(RuntimeWorkloadIdentity identity, string runnerId,
+        CancellationToken cancellationToken) => ReleaseCore(identity.Key, runnerId, cancellationToken);
+
+    public Task<bool> CanCreateWorkloadAsync(RuntimeWorkloadIdentity identity, Guid factId, string runnerId,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (sync) return Task.FromResult(claims.TryGetValue(identity.Key, out var owner) && owner == runnerId);
+    }
 
     private Task<RunnerCapacityClaim> TryClaimCore(
         RunnerCapacityRequest request,
@@ -68,14 +79,14 @@ public sealed class DevelopmentRunnerCapacityGate(
 
         lock (sync)
         {
-            if (claims.TryGetValue(request.RuntimeInstanceId, out var owner))
+            if (claims.TryGetValue(request.ClaimSuffix, out var owner))
             {
                 return Task.FromResult(new RunnerCapacityClaim(
                     RunnerCapacityAvailability.Claimed,
                     owner,
                     RunnerCapacityClaimState.AlreadyOwned));
             }
-            claims.Add(request.RuntimeInstanceId, runnerId);
+            claims.Add(request.ClaimSuffix, runnerId);
         }
         return Task.FromResult(new RunnerCapacityClaim(
             RunnerCapacityAvailability.Claimed,
@@ -84,18 +95,18 @@ public sealed class DevelopmentRunnerCapacityGate(
     }
 
     private Task<RunnerCapacityReleaseOutcome> ReleaseCore(
-        Guid runtimeInstanceId,
+        string claimKey,
         string candidateRunnerId,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         lock (sync)
         {
-            if (!claims.TryGetValue(runtimeInstanceId, out var owner))
+            if (!claims.TryGetValue(claimKey, out var owner))
                 return Task.FromResult(RunnerCapacityReleaseOutcome.AlreadyReleased);
             if (!string.Equals(owner, candidateRunnerId, StringComparison.Ordinal))
                 return Task.FromResult(RunnerCapacityReleaseOutcome.OwnerMismatch);
-            claims.Remove(runtimeInstanceId);
+            claims.Remove(claimKey);
             return Task.FromResult(RunnerCapacityReleaseOutcome.Released);
         }
     }

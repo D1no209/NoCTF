@@ -30,4 +30,15 @@ public sealed class LibvirtRuntimeResourceReconciler(
         runtime.DestroyByIdentityAsync(
             new(identity.RuntimeInstanceId),
             cancellationToken);
+
+    public Task DestroyByIdentityAsync(
+        RuntimeResourceIdentity identity,
+        RuntimeTerminationMode mode,
+        RuntimeTerminationPolicy policy,
+        CancellationToken cancellationToken) =>
+        runtime.DestroyByIdentityAsync(
+            new(identity.RuntimeInstanceId),
+            mode,
+            policy,
+            cancellationToken);
 }

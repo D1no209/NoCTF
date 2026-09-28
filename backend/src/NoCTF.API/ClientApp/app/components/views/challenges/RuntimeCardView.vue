@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { RuntimeCardViewState } from '~/features/challenges/useRuntimeCard'
 
 const viewProps = defineProps<{ state: RuntimeCardViewState }>()
-const { publicGatewayFailure, publicGatewayState, runtime, loading, loadError, extendMinutes, polling, timedOut, retryLoad, start, stop, reset, extend, ttl, isRunning, busy, stateVariant, RuntimeAccessUrl, controls, dockTarget } = toRefs(viewProps.state)
+const { runnerFailureLabel, canStop, stopDisabled, runtime, loading, loadError, extendMinutes, extendMinutesInvalid, canExtend, polling, timedOut, retryLoad, start, stop, reset, extend, ttl, isRunning, busy, stateVariant, RuntimeAccessUrl, controls, dockTarget } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -31,17 +31,12 @@ const { publicGatewayFailure, publicGatewayState, runtime, loading, loadError, e
         </Alert>
 
         <template v-if="!loadError && runtime">
-          <div v-if="isRunning && (runtime.access?.route === 'Gateway' || runtime.access?.failure)" class="text-sm text-muted-foreground" role="status" aria-live="polite">
-              <span v-if="runtime.access?.route === 'Gateway'">{{ publicGatewayState(runtime.access.state) }}</span>
-              <span v-if="runtime.access?.failure"> {{ publicGatewayFailure(runtime.access.failure) }}</span>
-              <p v-if="runtime.access?.route === 'Gateway'" class="mt-1">{{ $t('ui.publicConnectionStatusDoesNotChangeTheRuntimeState') }}</p>
-          </div>
-          <div v-if="isRunning && runtime.urls?.length" class="flex flex-col gap-1">
+          <div v-if="isRunning && runtime.accesses?.length" class="flex flex-col gap-1">
             <span class="text-sm text-muted-foreground">{{ $t('ui.accessAddress') }}</span>
             <component :is="RuntimeAccessUrl"
-              v-for="url in runtime.urls"
-              :key="url"
-              :url="url"
+              v-for="access in runtime.accesses"
+              :key="`${access.directAddress}:${access.webSocketAddress}`"
+              :access="access"
             />
           </div>
 
@@ -49,25 +44,32 @@ const { publicGatewayFailure, publicGatewayState, runtime, loading, loadError, e
           </div>
         </template>
 
+        <FieldDescription v-if="runtime?.waitingReason">{{ runnerFailureLabel(runtime.waitingReason) }}</FieldDescription>
+
         <div v-if="!loadError" class="flex flex-wrap items-center gap-2">
           <template v-if="controls === 'full'">
             <Button v-if="!runtime || runtime.state === 'Stopped' || runtime.state === 'Failed'" :disabled="busy" @click="start">
               <Spinner v-if="busy && polling" data-icon="inline-start" /> {{ $t('ui.startEnvironment') }} </Button>
-            <Button v-if="isRunning" variant="outline" :disabled="busy" @click="stop"> {{ $t('ui.stop') }} </Button>
+            <Button v-if="canStop" variant="outline" :disabled="stopDisabled" @click="stop"> {{ $t('ui.stop') }} </Button>
           </template>
           <Button v-if="runtime && controls !== 'readonly'" variant="outline" :disabled="busy" @click="reset">
             <Spinner v-if="polling" data-icon="inline-start" /> {{ $t('ui.resetEnvironment') }} </Button>
           <template v-if="controls === 'full' && isRunning">
-            <div class="flex items-center gap-2">
-              <NumberInput
-                v-model.number="extendMinutes"
-
-                min="1"
-                max="720"
-                class="w-20"
-                :aria-label="$t('ui.renewalMinutes2')"
-              />
-              <Button variant="outline" :disabled="busy" @click="extend">{{ $t('ui.renewalMinutes') }}</Button>
+            <div class="flex items-start gap-2">
+              <Field class="w-36 shrink-0" :data-invalid="extendMinutesInvalid">
+                <FieldLabel :for="`runtime-extend-${runtime?.id}`" class="sr-only">{{ $t('ui.renewalMinutes2') }}</FieldLabel>
+                <NumberInput
+                  :id="`runtime-extend-${runtime?.id}`"
+                  v-model="extendMinutes"
+                  min="1"
+                  max="720"
+                  required
+                  class="w-full"
+                  :aria-invalid="extendMinutesInvalid"
+                />
+                <FieldDescription v-if="extendMinutesInvalid">{{ $t('ui.renewalMinutesRange', { max: 720 }) }}</FieldDescription>
+              </Field>
+              <Button variant="outline" :disabled="!canExtend" @click="extend">{{ $t('ui.renewalMinutes') }}</Button>
             </div>
           </template>
         </div>

@@ -1,6 +1,7 @@
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Gameplay;
+using NoCTF.Domain.Competitions.Events;
 
 namespace NoCTF.Application.GameplayFacts.AdjudicationPreview;
 
@@ -12,8 +13,6 @@ public enum AdjudicationDifferenceCertainty : short
 
 public enum AdjudicationDifferenceKind : short
 {
-    CurrentCorrectShouldBeDuplicate,
-    CurrentDuplicateShouldBeCorrect,
     DuplicateWithoutCurrentPredecessor,
     HistoricalResultChanged,
     MissingAdjudicationRecord,
@@ -26,7 +25,22 @@ public enum AdjudicationDifferenceKind : short
 
 public sealed record AdjudicationDifference(
     AdjudicationDifferenceKind Kind,
-    AdjudicationDifferenceCertainty Certainty);
+    AdjudicationDifferenceCertainty Certainty,
+    AdjudicationFindingSeverity Severity = AdjudicationFindingSeverity.Warning,
+    AdjudicationFindingClassification Classification = AdjudicationFindingClassification.InsufficientEvidence);
+
+public enum AdjudicationFindingSeverity : short { Information, Warning, Error }
+public enum AdjudicationFindingClassification : short
+{
+    CurrentResultMismatch, IntegrityGap, SuspectedDuplicate, LegalHistoryChange,
+    EligibilityAdjustment, InsufficientEvidence, RetainedResult
+}
+public enum AdjudicationEvidenceCompleteness : short { Complete, Truncated, MissingFields, Ambiguous }
+
+public sealed record AdjudicationEventEvidence(Guid EventId, DateTimeOffset OccurredAt,
+    CompetitionEventKind Kind, GameplayFactState? State, GameplayFactResult? Result,
+    Guid? ActorUserId = null, Guid? ParentEventId = null, bool Readable = true,
+    Guid? GameplayFactId = null);
 
 public sealed record HistoricalAdjudicationDifferenceItem(
     Guid GameplayFactId,
@@ -40,13 +54,26 @@ public sealed record HistoricalAdjudicationDifferenceItem(
     LeaderboardBloodRank? DeterministicExpectedBloodRank,
     IReadOnlyList<LeaderboardBloodRank> RecordedBloodRanks,
     DateTimeOffset OccurredAt,
-    IReadOnlyList<AdjudicationDifference> Differences);
+    IReadOnlyList<AdjudicationDifference> Differences)
+{
+    public GameplayFactState CurrentState { get; init; }
+    public LeaderboardBloodRank? CurrentProjectedBloodRank { get; init; }
+    public AdjudicationEvidenceCompleteness EvidenceCompleteness { get; init; }
+    public AdjudicationEventEvidence? LatestProcessingEvent { get; init; }
+    public AdjudicationEventEvidence? LatestEffectiveAdjudication { get; init; }
+    public int ResultChangeCount { get; init; }
+    public int EvidenceCount { get; init; }
+    public IReadOnlyList<AdjudicationEventEvidence> EligibilityEvents { get; init; } = [];
+}
 
 public sealed record HistoricalAdjudicationPreviewPage(
     HistoricalAdjudicationPreviewReadState State,
     IReadOnlyList<HistoricalAdjudicationDifferenceItem> Items,
     DateTimeOffset? NextBeforeOccurredAt,
-    Guid? NextBeforeId);
+    Guid? NextBeforeId)
+{
+    public int ScannedFacts { get; init; }
+}
 
 public enum HistoricalAdjudicationPreviewReadState : short
 {
@@ -68,8 +95,14 @@ public sealed record HistoricalAdjudicationEvidence(
     bool HasEarlierCorrect,
     int EarlierCorrectTeamCount,
     bool BloodEligibilityHistoryRequiresReview,
-    IReadOnlyList<GameplayFactResult> HistoricalResults,
-    IReadOnlyList<LeaderboardBloodRank> RecordedBloodRanks);
+    IReadOnlyList<AdjudicationEventEvidence> Events,
+    IReadOnlyList<LeaderboardBloodRank> RecordedBloodRanks,
+    GameplayFactState CurrentState = GameplayFactState.Completed,
+    AdjudicationEvidenceCompleteness Completeness = AdjudicationEvidenceCompleteness.Complete,
+    bool HasEligibilityChanges = false,
+    bool CurrentBloodEligible = true,
+    bool MatchesCurrentInteraction = true,
+    IReadOnlyList<AdjudicationEventEvidence>? EligibilityEvents = null);
 
 public sealed record HistoricalAdjudicationEvidencePage(
     HistoricalAdjudicationPreviewReadState State,
@@ -77,6 +110,8 @@ public sealed record HistoricalAdjudicationEvidencePage(
 
 public interface IHistoricalAdjudicationEvidenceStore
 {
+    Task<HistoricalAdjudicationEvidencePage> ReadRestrictedAsync(Guid competitionId, Guid? challengeId,
+        DateTimeOffset? beforeOccurredAt, Guid? beforeId, int scanLimit, CancellationToken ct);
     Task<HistoricalAdjudicationEvidencePage> ReadAsync(
         Guid competitionId,
         Guid? competitionChallengeId,
@@ -89,22 +124,33 @@ public interface IHistoricalAdjudicationEvidenceStore
 public sealed class PreviewHistoricalAdjudicationDifferences(
     IHistoricalAdjudicationEvidenceStore store)
 {
-    public async Task<HistoricalAdjudicationPreviewPage> ExecuteAsync(
+    public Task<HistoricalAdjudicationPreviewPage> ExecuteAsync(
         Guid competitionId,
         Guid? competitionChallengeId,
         DateTimeOffset? beforeOccurredAt,
         Guid? beforeId,
         int limit,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        ExecuteAsync(competitionId, competitionChallengeId, beforeOccurredAt, beforeId, limit, false, cancellationToken);
+
+    public async Task<HistoricalAdjudicationPreviewPage> ExecuteAsync(
+        Guid competitionId, Guid? competitionChallengeId, DateTimeOffset? beforeOccurredAt,
+        Guid? beforeId, int limit, bool includeInformational, CancellationToken cancellationToken = default) =>
+        await ExecuteAsync(competitionId, competitionChallengeId, beforeOccurredAt, beforeId, limit,
+            includeInformational, false, cancellationToken);
+
+    public async Task<HistoricalAdjudicationPreviewPage> ExecuteAsync(
+        Guid competitionId, Guid? competitionChallengeId, DateTimeOffset? beforeOccurredAt,
+        Guid? beforeId, int limit, bool includeInformational, bool includeInternalTeams, CancellationToken cancellationToken = default)
     {
         var scanLimit = Math.Min(checked(limit * 10), 500);
-        var evidencePage = await store.ReadAsync(
+        var evidencePage = includeInternalTeams ? await store.ReadAsync(
             competitionId,
             competitionChallengeId,
             beforeOccurredAt,
             beforeId,
             scanLimit,
-            cancellationToken);
+            cancellationToken) : await store.ReadRestrictedAsync(competitionId, competitionChallengeId, beforeOccurredAt, beforeId, scanLimit, cancellationToken);
         if (evidencePage.State != HistoricalAdjudicationPreviewReadState.Available)
             return new(evidencePage.State, [], null, null);
         if (evidencePage.Items.Count == 0)
@@ -115,23 +161,12 @@ public sealed class PreviewHistoricalAdjudicationDifferences(
         foreach (var evidence in evidencePage.Items)
         {
             processed++;
-            var issues = Analyze(evidence);
-            if (issues.Count == 0)
+            var item = HistoricalAdjudicationAnalyzer.Analyze(evidence);
+            if (item.Differences.Count == 0 || !includeInformational
+                && item.Differences.All(issue => issue.Severity == AdjudicationFindingSeverity.Information))
                 continue;
 
-            differences.Add(new(
-                evidence.GameplayFactId,
-                evidence.CompetitionChallengeId,
-                evidence.ChallengeTitle,
-                evidence.TeamId,
-                evidence.TeamName,
-                evidence.GameplayFactKind,
-                evidence.CurrentResult,
-                ExpectedResult(evidence),
-                ExpectedBloodRank(evidence),
-                evidence.RecordedBloodRanks,
-                evidence.OccurredAt,
-                issues));
+            differences.Add(item);
             if (differences.Count == limit)
                 break;
         }
@@ -143,103 +178,7 @@ public sealed class PreviewHistoricalAdjudicationDifferences(
             HistoricalAdjudicationPreviewReadState.Available,
             differences,
             hasMore ? last.OccurredAt : null,
-            hasMore ? last.GameplayFactId : null);
+            hasMore ? last.GameplayFactId : null) { ScannedFacts = processed };
     }
 
-    private static IReadOnlyList<AdjudicationDifference> Analyze(
-        HistoricalAdjudicationEvidence evidence)
-    {
-        var issues = new List<AdjudicationDifference>();
-        if (ShouldBeCorrect(evidence))
-        {
-            issues.Add(new(
-                AdjudicationDifferenceKind.CurrentDuplicateShouldBeCorrect,
-                AdjudicationDifferenceCertainty.Deterministic));
-        }
-        else if (evidence.GameMode == GameMode.Ctf
-            && evidence.CurrentResult == GameplayFactResult.Duplicate
-            && !evidence.HasEarlierCorrect)
-        {
-            issues.Add(new(
-                AdjudicationDifferenceKind.DuplicateWithoutCurrentPredecessor,
-                AdjudicationDifferenceCertainty.NeedsReview));
-        }
-
-        if (evidence.HistoricalResults.Distinct().Count() > 1
-            || evidence.HistoricalResults.Any(result => result != evidence.CurrentResult))
-        {
-            issues.Add(new(
-                AdjudicationDifferenceKind.HistoricalResultChanged,
-                AdjudicationDifferenceCertainty.NeedsReview));
-        }
-        if (evidence.CurrentResult is not null && evidence.HistoricalResults.Count == 0)
-        {
-            issues.Add(new(
-                AdjudicationDifferenceKind.MissingAdjudicationRecord,
-                AdjudicationDifferenceCertainty.NeedsReview));
-        }
-
-        if (evidence.BloodEligibilityHistoryRequiresReview)
-        {
-            issues.Add(new(
-                AdjudicationDifferenceKind.TeamEligibilityHistoryRequiresReview,
-                AdjudicationDifferenceCertainty.NeedsReview));
-        }
-        var expectedBloodRank = ExpectedBloodRank(evidence);
-        if (evidence.RecordedBloodRanks.GroupBy(rank => rank).Any(group => group.Count() > 1))
-        {
-            issues.Add(new(
-                AdjudicationDifferenceKind.DuplicateBloodAward,
-                AdjudicationDifferenceCertainty.Deterministic));
-        }
-        if (expectedBloodRank is { } expected)
-        {
-            if (!evidence.RecordedBloodRanks.Contains(expected))
-            {
-                issues.Add(new(
-                    AdjudicationDifferenceKind.MissingBloodAward,
-                    AdjudicationDifferenceCertainty.Deterministic));
-            }
-            if (evidence.RecordedBloodRanks.Any(rank => rank != expected))
-            {
-                issues.Add(new(
-                    AdjudicationDifferenceKind.WrongBloodRank,
-                    AdjudicationDifferenceCertainty.Deterministic));
-            }
-        }
-        else if (!evidence.BloodEligibilityHistoryRequiresReview
-            && evidence.RecordedBloodRanks.Count > 0)
-        {
-            issues.Add(new(
-                AdjudicationDifferenceKind.UnexpectedBloodAward,
-                evidence.CurrentResult == GameplayFactResult.Correct
-                    ? AdjudicationDifferenceCertainty.Deterministic
-                    : AdjudicationDifferenceCertainty.NeedsReview));
-        }
-        return issues;
-    }
-
-    private static bool ShouldBeCorrect(HistoricalAdjudicationEvidence evidence) =>
-        evidence.GameMode == GameMode.Awdp
-        && evidence.GameplayFactKind == GameplayFactKind.BreakAttempt
-        && evidence.CurrentResult == GameplayFactResult.Duplicate
-        && evidence.CurrentFailureCode == GameplayFactFailureCode.DuplicateAchievement;
-
-    private static GameplayFactResult? ExpectedResult(HistoricalAdjudicationEvidence evidence)
-    {
-        return ShouldBeCorrect(evidence) ? GameplayFactResult.Correct : null;
-    }
-
-    private static LeaderboardBloodRank? ExpectedBloodRank(
-        HistoricalAdjudicationEvidence evidence)
-    {
-        if (evidence.GameMode != GameMode.Ctf
-            || evidence.GameplayFactKind != GameplayFactKind.FlagAttempt
-            || evidence.CurrentResult != GameplayFactResult.Correct
-            || evidence.HasEarlierCorrect
-            || evidence.BloodEligibilityHistoryRequiresReview)
-            return null;
-        var rank = evidence.EarlierCorrectTeamCount + 1;
-        return rank is >= 1 and <= 3 ? (LeaderboardBloodRank)rank : null;
-    }
 }

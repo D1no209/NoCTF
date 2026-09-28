@@ -4,7 +4,6 @@ using NoCTF.API.Endpoints.Runtime;
 using NoCTF.API.Security;
 using NoCTF.Application.GameplayFacts.Awdp;
 using NoCTF.Domain.Runtime;
-using NoCTF.Application.Runtime.PublicAccess;
 
 namespace NoCTF.API.Endpoints.GameplayFacts;
 
@@ -40,10 +39,14 @@ public sealed record AwdpParticipantStateResponse(
 
 internal static class AwdpParticipantStateMapping
 {
-    internal static AwdpParticipantStateResponse ToResponse(AwdpParticipantStateView view, RuntimeAccessProjection? access = null) =>
+    internal static AwdpParticipantStateResponse ToResponse(
+        AwdpParticipantStateView view,
+        HttpRequest request) =>
         new(
             view.CurrentRound,
-            view.AttackRuntime is null ? null : RuntimeEndpointMapping.ToResponse(view.AttackRuntime, access),
+            view.AttackRuntime is null
+                ? null
+                : RuntimeEndpointMapping.ToResponse(view.AttackRuntime, request),
             view.LatestBreakAttempt is null
                 ? null
                 : GameplayFactMapper.ToStatusResponse(view.LatestBreakAttempt),
@@ -84,9 +87,8 @@ internal static class AwdpParticipantStateMapping
 public sealed class GetAwdpParticipantStateEndpoint(
     GetAwdpParticipantState get,
     IUserContext user,
-    TimeProvider timeProvider,
-    ReadRuntimePublicAccess access)
-    : EndpointWithoutRequest<Results<Ok<AwdpParticipantStateResponse>, NotFound, ProblemHttpResult>>
+    TimeProvider timeProvider)
+    : EndpointWithoutRequest<Results<Ok<AwdpParticipantStateResponse>, NotFound>>
 {
     public override void Configure()
     {
@@ -100,7 +102,7 @@ public sealed class GetAwdpParticipantStateEndpoint(
         });
     }
 
-    public override async Task<Results<Ok<AwdpParticipantStateResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(
+    public override async Task<Results<Ok<AwdpParticipantStateResponse>, NotFound>> ExecuteAsync(
         CancellationToken cancellationToken)
     {
         var view = await get.ExecuteAsync(
@@ -110,9 +112,8 @@ public sealed class GetAwdpParticipantStateEndpoint(
             timeProvider.GetUtcNow(),
             cancellationToken);
         if (view is null) return TypedResults.NotFound();
-        var projection = view.AttackRuntime is null ? null : await access.ExecuteAsync(view.AttackRuntime,
-            $"{HttpContext.Request.Scheme}://{HttpContext.Request.Host}", cancellationToken);
-        if (view.AttackRuntime is not null && projection is null) return RuntimeEndpointMapping.UnknownOrigin();
-        return TypedResults.Ok(AwdpParticipantStateMapping.ToResponse(view, projection));
+        return TypedResults.Ok(AwdpParticipantStateMapping.ToResponse(
+            view,
+            HttpContext.Request));
     }
 }

@@ -17,9 +17,9 @@ using NoCTF.Infrastructure.Authentication;
 using NoCTF.Infrastructure.Runtime.Capacity;
 using NoCTF.Runtime.Kubernetes.Networking;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Http.Resilience;
 using Polly;
-using StackExchange.Redis;
 using NoCTF.Domain.Runtime;
 using NoCTF.Infrastructure.Caching;
 using NoCTF.Application.Competitions.Events;
@@ -27,6 +27,7 @@ using NoCTF.Infrastructure.Competitions.Events;
 using NoCTF.Hosting.Health;
 using NoCTF.Application.GameplayFacts.Processing;
 using NoCTF.Infrastructure.GameplayFacts.Processing;
+using NoCTF.Infrastructure.Messaging;
 
 namespace NoCTF.Runner.Composition;
 
@@ -57,8 +58,8 @@ public static class ServiceRegistration
                 "RunnerScoring:CallbackBaseUrl must be configured as an absolute HTTP(S) URI.")
             .ValidateOnStart();
         services.AddScoped<ICompetitionEventRecorder, CompetitionEventStore>();
-        services.AddScoped<IAwdpFixExecutionFence, PostgresAwdpFixExecutionFence>();
-        services.AddNoCtfLocalComputationCaching(configuration);
+        services.AddScoped<IAwdpFixExecutionFence, AwdpFixExecutionFence>();
+        services.AddNoCtfCaching(configuration, development);
         services.AddHttpClient();
         services.AddHttpClient(
                 AwdpFixArchiveDownloader.ClientName,
@@ -84,20 +85,18 @@ public static class ServiceRegistration
             .ValidateOnStart();
         if (!development)
         {
-            var redis = configuration.GetConnectionString("Redis");
-            if (string.IsNullOrWhiteSpace(redis))
-                throw new InvalidOperationException(
-                    "ConnectionStrings:Redis is required for the Runner host.");
-            services.AddSingleton<IConnectionMultiplexer>(_ =>
-            {
-                var redisOptions = ConfigurationOptions.Parse(redis);
-                redisOptions.AbortOnConnectFail = false;
-                return ConnectionMultiplexer.Connect(redisOptions);
-            });
-            services.AddScoped<IRunnerCapacityGate, RedisRunnerCapacityGate>();
-            services.AddSingleton<RedisRunnerAvailabilityRegistry>();
+            services.TryAddSingleton<IClusterLeaseManager, NatsClusterLeaseManager>();
+            services.TryAddSingleton<RunnerCapacityLedgerCoordinator>();
+            services.AddScoped<IRunnerCapacityGate, PersistedRunnerCapacityGate>();
+            services.TryAddSingleton<NatsRunnerAvailabilityRegistry>();
+            services.AddSingleton<RunnerResourceObserver>();
+            services.AddSingleton<IReadinessDependency, RunnerAdmissionReadinessDependency>();
+            services.AddHostedService<RunnerLivenessPublisher>();
             services.AddHostedService<RunnerAvailabilityPublisher>();
         }
+        services.AddSingleton<RunnerResourceMutationCoordinator>();
+        if (!development)
+            services.AddScoped<AuxiliaryRuntimeCapacity>();
         var isKubernetesPool = string.Equals(
             configuredProvider,
             nameof(NoCTF.Domain.Runtime.RuntimeProvider.Kubernetes),
@@ -129,22 +128,21 @@ public static class ServiceRegistration
         services.AddSingleton<IAwdFlagInjectionWorkReader, AwdFlagInjectionWorkReader>();
         services.AddSingleton<IChallengeTestFlagInjectionStore, ChallengeTestFlagInjectionStore>();
         services.AddSingleton<IAwdCheckerWorkReader, AwdCheckerWorkReader>();
-        services.AddSingleton<RuntimeProviderHandler>();
-        services.AddSingleton<ContainerRuntimeMessageHandler>();
-        services.AddSingleton<ComposeRuntimeMessageHandler>();
-        services.AddSingleton<OvaRuntimeMessageHandler>();
-        services.AddSingleton<RuntimeTerminationMessageHandler>();
+        services.AddScoped<RuntimeProviderHandler>();
+        services.AddScoped<ContainerRuntimeMessageHandler>();
+        services.AddScoped<ComposeRuntimeMessageHandler>();
+        services.AddScoped<OvaRuntimeMessageHandler>();
+        services.AddScoped<RuntimeTerminationMessageHandler>();
         services.AddScoped<RuntimeProvisionWriteBackMessageHandler>();
         services.AddScoped<RuntimeStopWriteBackMessageHandler>();
-        services.AddSingleton<IAwdCheckerExecutor, AwdCheckerExecutor>();
-        services.AddSingleton<IAwdpFixWorkReader, AwdpFixWorkReader>();
-        services.AddSingleton<IAwdpCheckerExecutor, AwdpCheckerExecutor>();
+        services.AddScoped<IAwdCheckerExecutor, AwdCheckerExecutor>();
+        services.AddScoped<IAwdpFixWorkReader, AwdpFixWorkReader>();
+        services.AddScoped<IAwdpCheckerExecutor, AwdpCheckerExecutor>();
         services.AddSingleton<IAwdpAttackProvisioningPlanReader,
             AwdpAttackProvisioningPlanReader>();
         services.AddSingleton<AwdpFixArchiveDownloader>();
         services.AddSingleton<FixArchivePreparer>();
         services.AddSingleton<IRuntimeNodeWorkReader, RuntimeNodeWorkReader>();
-        NoCTF.Runner.PublicAccess.PublicGatewayRegistration.AddPublicGatewayCoordinator(services, configuration);
         return services;
     }
 

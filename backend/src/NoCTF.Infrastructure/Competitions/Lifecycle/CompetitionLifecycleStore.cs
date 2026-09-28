@@ -13,7 +13,7 @@ namespace NoCTF.Infrastructure.Competitions.Lifecycle;
 public sealed class CompetitionLifecycleStore(
     NoCtfDbContext db,
     CompetitionStartGate startGate,
-    ITransactionalMessageOutbox outbox,
+    IPostCommitMessagePublisher outbox,
     ICompetitionEventRecorder? eventRecorder = null,
     NoCTF.Infrastructure.Competitions.Management.CompetitionReadModelCache? readModels = null,
     TimeProvider? clock = null)
@@ -52,7 +52,7 @@ public sealed class CompetitionLifecycleStore(
     {
         if (!db.Database.IsRelational())
         {
-            var competition = await db.Competitions.SingleOrDefaultAsync(
+            var competition = await db.Competitions.AsSplitQuery().SingleOrDefaultAsync(
                 item => item.Id == competitionId && item.Status == from,
                 cancellationToken);
             if (competition is null)
@@ -99,7 +99,7 @@ public sealed class CompetitionLifecycleStore(
         if (from == CompetitionStatus.Published && to == CompetitionStatus.Running
             && (await startGate.ValidateAsync(competitionId, cancellationToken)) is not { Count: 0 })
             return false;
-        var competition = await db.Competitions
+        var competition = await db.Competitions.AsSplitQuery()
             .SingleAsync(item => item.Id == competitionId, cancellationToken);
         var now = timeProvider.GetUtcNow();
         if (competition.Mode == GameMode.Awd)
@@ -112,9 +112,11 @@ public sealed class CompetitionLifecycleStore(
                     .OrderByDescending(@event => @event.OccurredAt)
                     .ThenByDescending(@event => @event.Id)
                     .FirstOrDefaultAsync(cancellationToken);
-                var pauseStartedAt = pauseEvent is not null
-                    && JsonSerializer.Deserialize<LifecyclePayload>(pauseEvent.PayloadJson, JsonOptions)
-                        is { From: CompetitionStatus.Running, To: CompetitionStatus.Paused }
+                var pauseStartedAt = pauseEvent is
+                    {
+                        PreviousCompetitionStatus: CompetitionStatus.Running,
+                        CompetitionStatus: CompetitionStatus.Paused
+                    }
                     ? pauseEvent.OccurredAt
                     : (DateTimeOffset?)null;
                 if (pauseStartedAt is DateTimeOffset pausedAt)
@@ -156,18 +158,9 @@ public sealed class CompetitionLifecycleStore(
                     ActorUserId: actorId,
                     CompetitionStatus: to,
                     LeaderboardVisibility: CompetitionLeaderboardVisibility.Normal,
-                    PayloadJson: JsonSerializer.Serialize(new
-                    {
-                        schemaVersion = 1,
-                        from = effectiveVisibility,
-                        to = CompetitionLeaderboardVisibility.Normal,
-                        frozenStartAt = (DateTimeOffset?)null,
-                        hiddenStartAt = (DateTimeOffset?)null,
-                        actorUserId = actorId,
-                        operatedAt = now,
-                        automatic = true,
-                        reason = "competition_finished"
-                    })),
+                    PreviousLeaderboardVisibility: effectiveVisibility,
+                    Automatic: true,
+                    Reason: "competition_finished"),
                     cancellationToken);
             }
             competition.FrozenStartAt = null;
@@ -183,15 +176,9 @@ public sealed class CompetitionLifecycleStore(
             now,
             ActorUserId: actorId,
             CompetitionStatus: to,
-            PayloadJson: JsonSerializer.Serialize(new
-            {
-                schemaVersion = 1,
-                competitionStatus = to,
-                from,
-                to,
-                automatic,
-                reason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim()
-            })), cancellationToken);
+            PreviousCompetitionStatus: from,
+            Automatic: automatic,
+            Reason: string.IsNullOrWhiteSpace(reason) ? null : reason.Trim()), cancellationToken);
         if (effects.HasFlag(CompetitionLifecycleEffects.ProvisionRuntimes))
             await outbox.PublishAsync(new ProvisionCompetitionRuntimes(competitionId));
         if (effects.HasFlag(CompetitionLifecycleEffects.CleanupRuntimes))
@@ -202,17 +189,11 @@ public sealed class CompetitionLifecycleStore(
         if (transaction is not null)
         {
             await transaction.CommitAsync(cancellationToken);
-            await outbox.FlushOutgoingMessagesAsync();
+            await outbox.FlushCommittedMessagesAsync();
         }
         if (readModels is not null)
             await readModels.InvalidateAsync(competitionId, cancellationToken);
         return true;
     }
 
-    private sealed record LifecyclePayload(
-        int SchemaVersion,
-        CompetitionStatus From,
-        CompetitionStatus To,
-        bool Automatic,
-        string? Reason);
 }

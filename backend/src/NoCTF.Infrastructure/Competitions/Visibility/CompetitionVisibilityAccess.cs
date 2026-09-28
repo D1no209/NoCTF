@@ -25,9 +25,8 @@ public sealed class CompetitionVisibilityAccess(NoCtfDbContext db)
                 candidate.AccessMode,
                 candidate.TracksEnabled,
                 candidate.OwnerId,
-                candidate.ManagerIds,
-                candidate.JudgeIds,
-                candidate.ObserverIds,
+                IsCollaborator = candidate.Collaborators.Any(collaborator =>
+                    collaborator.UserId == userId),
                 candidate.FrozenStartAt,
                 candidate.HiddenStartAt
             })
@@ -39,14 +38,12 @@ public sealed class CompetitionVisibilityAccess(NoCtfDbContext db)
             ? null
             : await db.Users.AsNoTracking()
                 .Where(user => user.Id == userId)
-                .Select(user => new { user.Kind, user.Role })
+                .Select(user => new { user.Role })
                 .SingleOrDefaultAsync(ct);
         var isCollaborator = identity is not null
             && (identity.Role == UserRole.Administrator
                 || competition.OwnerId == userId
-                || competition.ManagerIds.Contains(userId)
-                || competition.JudgeIds.Contains(userId)
-                || competition.ObserverIds.Contains(userId));
+                || competition.IsCollaborator);
         if ((competition.Status == CompetitionStatus.Draft
                 || competition.AccessMode == CompetitionAccessMode.StaffOnly)
             && !isCollaborator)
@@ -56,7 +53,7 @@ public sealed class CompetitionVisibilityAccess(NoCtfDbContext db)
             competition.FrozenStartAt,
             competition.HiddenStartAt,
             now);
-        var scope = DataScope(identity?.Kind, isCollaborator, visibility);
+        var scope = DataScope(isCollaborator, visibility);
         return new(
             competition.Mode,
             competition.Status,
@@ -66,16 +63,11 @@ public sealed class CompetitionVisibilityAccess(NoCtfDbContext db)
     }
 
     private static LeaderboardDataScope DataScope(
-        UserKind? userKind,
         bool isCollaborator,
         CompetitionLeaderboardVisibility visibility)
     {
-        if (isCollaborator && userKind != UserKind.Bot)
+        if (isCollaborator)
             return LeaderboardDataScope.Live;
-        if (isCollaborator && userKind == UserKind.Bot)
-            return visibility == CompetitionLeaderboardVisibility.Blackout
-                ? LeaderboardDataScope.Hidden
-                : LeaderboardDataScope.Live;
 
         return visibility switch
         {

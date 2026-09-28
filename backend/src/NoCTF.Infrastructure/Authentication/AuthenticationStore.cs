@@ -14,13 +14,16 @@ using NoCTF.Application.Messaging;
 using NoCTF.Application.Observability;
 using NoCTF.Infrastructure.Messaging;
 using NoCTF.Infrastructure.Storage;
+using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Gameplay;
+using NoCTF.Domain.Teams;
 
 namespace NoCTF.Infrastructure.Authentication;
 
 public sealed class AuthenticationStore(
     NoCtfDbContext db,
     IPasswordHasher<User> passwordHasher,
-    ITransactionalMessageOutbox? messageOutbox = null,
+    IPostCommitMessagePublisher? messageOutbox = null,
     FileReferenceLock? fileReferenceLock = null,
     TimeProvider? clock = null,
     IEmailVerificationConfigurationStore? emailVerificationConfiguration = null,
@@ -31,8 +34,8 @@ public sealed class AuthenticationStore(
         ICurrentUserProfilePatchStore
 {
     private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
-    private readonly ITransactionalMessageOutbox outbox =
-        messageOutbox ?? new NoOpTransactionalMessageOutbox();
+    private readonly IPostCommitMessagePublisher outbox =
+        messageOutbox ?? new NoOpPostCommitMessagePublisher();
     private readonly FileReferenceLock fileLock = fileReferenceLock ?? new FileReferenceLock();
     public async Task<AuthenticatedUser?> FindByLoginAsync(
         string login,
@@ -60,13 +63,23 @@ public sealed class AuthenticationStore(
             ct);
         if (user is null || user.Kind != UserKind.Human)
             return false;
-        var result = passwordHasher.VerifyHashedPassword(user, user.PasswordHash, password);
-        if (result == PasswordVerificationResult.SuccessRehashNeeded)
+        if (!IsCurrentPasswordHash(user.PasswordHash))
+            return false;
+        return passwordHasher.VerifyHashedPassword(user, user.PasswordHash, password)
+            == PasswordVerificationResult.Success;
+    }
+
+    private static bool IsCurrentPasswordHash(string hash)
+    {
+        try
         {
-            return await UserCredentialWrite.ReplaceAsync(db, user, passwordHasher.HashPassword(user, password),
-                invalidateTokens: false, timeProvider.GetUtcNow(), ct);
+            var decoded = Convert.FromBase64String(hash);
+            return decoded.Length > 0 && decoded[0] == 0x01;
         }
-        return result != PasswordVerificationResult.Failed;
+        catch (FormatException)
+        {
+            return false;
+        }
     }
 
     public async Task<AuthenticatedUser?> FindByIdAsync(Guid userId, CancellationToken ct) =>
@@ -90,8 +103,163 @@ public sealed class AuthenticationStore(
                 user.WallpaperFileId,
                 user.WallpaperEnabled,
                 user.SchoolFullName,
-                user.SchoolStudentNumber))
+                user.SchoolStudentNumber,
+                user.ProfileCoverFileId))
             .SingleOrDefaultAsync(ct);
+
+    public async Task<PublicUserProfile?> GetPublicProfileAsync(
+        Guid userId,
+        CancellationToken ct)
+    {
+        var profile = await db.Users.AsNoTracking()
+            .Where(user => user.Id == userId
+                && user.AccountStatus == UserAccountStatus.Active)
+            .Select(user => new PublicUserProfile(
+                user.Id,
+                user.UserName,
+                user.Description,
+                user.AvatarFileId,
+                user.ProfileCoverFileId))
+            .SingleOrDefaultAsync(ct);
+        if (profile is null)
+            return null;
+
+        var publicCompetitions = db.Competitions.AsNoTracking()
+            .Where(competition => competition.AccessMode == CompetitionAccessMode.Public
+                && competition.Status != CompetitionStatus.Draft
+                && competition.DeletedAt == null);
+        var eligibleTeams = db.Teams.AsNoTracking()
+            .Where(team => team.Members.Any(member => member.UserId == userId)
+                && team.RegistrationStatus == TeamRegistrationStatus.Approved
+                && !team.IsBanned
+                && team.DeletedAt == null);
+
+        var participations = await eligibleTeams
+            .Join(
+                publicCompetitions,
+                team => team.CompetitionId,
+                competition => competition.Id,
+                (team, competition) => new
+                {
+                    CompetitionId = competition.Id,
+                    competition.Title,
+                    TeamName = team.Name,
+                    competition.Mode,
+                    competition.Status,
+                    competition.StartAt,
+                    competition.EndAt
+                })
+            .OrderByDescending(item => item.EndAt)
+            .ThenByDescending(item => item.StartAt)
+            .Select(item => new PublicUserCompetitionSummary(
+                item.CompetitionId,
+                item.Title,
+                item.TeamName,
+                item.Mode,
+                item.Status,
+                item.StartAt,
+                item.EndAt))
+            .ToListAsync(ct);
+
+        var directionRows = await db.GameplayFacts.AsNoTracking()
+            .Where(fact => fact.ActorUserId == userId
+                && fact.State == GameplayFactState.Completed
+                && fact.TeamId != null
+                && ((fact.Kind == GameplayFactKind.FlagAttempt
+                        || fact.Kind == GameplayFactKind.BreakAttempt)
+                    && fact.Result == GameplayFactResult.Correct
+                    || fact.Kind == GameplayFactKind.FixAttempt
+                    && fact.Result == GameplayFactResult.Applied
+                    || fact.Kind == GameplayFactKind.KohControlObservation
+                    && fact.Result == GameplayFactResult.Controlled))
+            .Join(
+                eligibleTeams,
+                fact => fact.TeamId,
+                team => (Guid?)team.Id,
+                (fact, team) => fact)
+            .Join(
+                publicCompetitions,
+                fact => fact.CompetitionId,
+                competition => competition.Id,
+                (fact, competition) => fact)
+            .Join(
+                db.CompetitionChallenges.AsNoTracking()
+                    .Where(item => item.IsPublished && item.DeletedAt == null),
+                fact => fact.CompetitionChallengeId,
+                competitionChallenge => competitionChallenge.Id,
+                (fact, competitionChallenge) => new
+                {
+                    fact.CompetitionChallengeId,
+                    competitionChallenge.ChallengeId
+                })
+            .Join(
+                db.Challenges.AsNoTracking().Where(challenge => challenge.DeletedAt == null),
+                item => item.ChallengeId,
+                challenge => challenge.Id,
+                (item, challenge) => new
+                {
+                    item.CompetitionChallengeId,
+                    challenge.Direction
+                })
+            .GroupBy(item => item.Direction)
+            .Select(group => new
+            {
+                Direction = group.Key,
+                SuccessfulChallengeCount = group
+                    .Select(item => item.CompetitionChallengeId)
+                    .Distinct()
+                    .Count()
+            })
+            .OrderByDescending(item => item.SuccessfulChallengeCount)
+            .ThenBy(item => item.Direction)
+            .ToListAsync(ct);
+        var historicalDirections = await db.CompetitionChallenges.AsNoTracking()
+            .Where(item => item.IsPublished && item.DeletedAt == null)
+            .Join(publicCompetitions.Where(competition =>
+                    competition.Status == CompetitionStatus.Running
+                    || competition.Status == CompetitionStatus.Paused
+                    || competition.Status == CompetitionStatus.Finished),
+                item => item.CompetitionId,
+                competition => competition.Id,
+                (item, _) => item.ChallengeId)
+            .Join(db.Challenges.AsNoTracking()
+                    .Where(challenge => challenge.DeletedAt == null),
+                challengeId => challengeId,
+                challenge => challenge.Id,
+                (_, challenge) => challenge.Direction)
+            .Distinct()
+            .ToArrayAsync(ct);
+        var completedByDirection = directionRows.ToDictionary(
+            item => item.Direction,
+            item => item.SuccessfulChallengeCount,
+            StringComparer.OrdinalIgnoreCase);
+        var directionStats = historicalDirections
+            .Select(direction => new PublicUserDirectionSummary(
+                direction,
+                completedByDirection.GetValueOrDefault(direction)))
+            .OrderByDescending(item => item.SuccessfulChallengeCount)
+            .ThenBy(item => item.Direction, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var modeStats = participations
+            .GroupBy(item => item.Mode)
+            .Select(group => new PublicUserModeSummary(group.Key, group.Count()))
+            .OrderByDescending(item => item.CompetitionCount)
+            .ThenBy(item => item.Mode)
+            .ToList();
+
+        return profile with
+        {
+            Modes = modeStats,
+            Directions = directionStats,
+            RecentCompetitions = participations.Take(5).ToList(),
+            CompetitionCount = participations.Count,
+            FinishedCompetitionCount = participations.Count(item =>
+                item.Status == CompetitionStatus.Finished),
+            SuccessfulChallengeCount = directionStats.Sum(item =>
+                item.SuccessfulChallengeCount)
+        };
+    }
 
     public async Task<UserProfile?> UpdateProfileAsync(
         Guid userId,
@@ -152,6 +320,42 @@ public sealed class AuthenticationStore(
                 && user.AccountStatus == UserAccountStatus.Active
                 && user.AvatarFileId != null)
             .Join(db.Files.AsNoTracking(), user => user.AvatarFileId, file => file.Id,
+                (_, file) => new BusinessFileReference(
+                    file.Id, file.ObjectKey, file.FileName, file.ContentType))
+            .SingleOrDefaultAsync(ct);
+
+    public async Task<UserProfileCoverReplacement?> ReplaceProfileCoverAsync(
+        Guid userId,
+        Guid fileId,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var user = await db.Users.SingleOrDefaultAsync(item =>
+            item.Id == userId && item.AccountStatus == UserAccountStatus.Active,
+            ct);
+        if (user is null)
+            return null;
+        if (!await fileLock.AcquireAsync(db, fileId, ct))
+            return null;
+
+        var previousFileId = user.ProfileCoverFileId;
+        user.ProfileCoverFileId = fileId;
+        user.UpdatedAt = now;
+        if (previousFileId is { } previous && previous != fileId)
+            await outbox.PublishAsync(new CleanupFile(previous));
+        await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+        await outbox.FlushCommittedMessagesAsync();
+        return new UserProfileCoverReplacement(ToProfile(user), previousFileId);
+    }
+
+    public Task<BusinessFileReference?> GetProfileCoverFileAsync(Guid userId, CancellationToken ct) =>
+        db.Users.AsNoTracking()
+            .Where(user => user.Id == userId
+                && user.AccountStatus == UserAccountStatus.Active
+                && user.ProfileCoverFileId != null)
+            .Join(db.Files.AsNoTracking(), user => user.ProfileCoverFileId, file => file.Id,
                 (_, file) => new BusinessFileReference(
                     file.Id, file.ObjectKey, file.FileName, file.ContentType))
             .SingleOrDefaultAsync(ct);
@@ -356,6 +560,7 @@ public sealed class AuthenticationStore(
             ct);
         if (user is null
             || user.Kind != UserKind.Human
+            || !IsCurrentPasswordHash(user.PasswordHash)
             || passwordHasher.VerifyHashedPassword(
                 user, user.PasswordHash, currentPassword) == PasswordVerificationResult.Failed)
             return ChangePasswordState.CurrentPasswordInvalid;
@@ -408,7 +613,8 @@ public sealed class AuthenticationStore(
             user.WallpaperFileId,
             user.WallpaperEnabled,
             user.SchoolFullName,
-            user.SchoolStudentNumber);
+            user.SchoolStudentNumber,
+            user.ProfileCoverFileId);
 
     private User CreateUser(
         Guid userId,

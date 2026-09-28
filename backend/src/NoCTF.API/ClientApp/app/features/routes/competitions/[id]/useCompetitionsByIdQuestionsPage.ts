@@ -3,7 +3,7 @@ import { markRaw } from 'vue'
 
 import { toast } from 'vue-sonner'
 import { addCompetitionQuestionMessage, changeCompetitionQuestionStatus, createCompetitionQuestion, getCompetitionQuestion, listChallengesEndpoint, listCompetitionQuestions } from '../../../../api'
-import type { NoCtfapiEndpointsChallengesChallengeResponse, NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode, NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionSubjectCode, NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse } from '../../../../api'
+import type { NoCtfapiEndpointsChallengesChallengeSummaryResponse, NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode, NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionSubjectCode, NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse } from '../../../../api'
 import { createLatestRequestGuard } from '../../../../lib/latest-request'
 import { competitionQuestionErrorMessage, competitionQuestionRoleLabel, isCompetitionQuestionHandlerRole, mergeCompetitionQuestions } from '../../../../lib/competition-question'
 import { createTrailingRefresh } from '../../../../lib/latest-page-refresh'
@@ -88,7 +88,7 @@ export function useCompetitionsByIdQuestionsPage() {
 
   const createError = ref<string | null>(null)
 
-  const challenges = ref<NoCtfapiEndpointsChallengesChallengeResponse[]>([])
+  const challenges = ref<NoCtfapiEndpointsChallengesChallengeSummaryResponse[]>([])
 
   const challengesLoading = ref(false)
 

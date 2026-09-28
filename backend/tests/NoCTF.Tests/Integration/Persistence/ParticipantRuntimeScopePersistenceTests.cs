@@ -1,5 +1,7 @@
 using System.Text.Json;
+using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using NoCTF.Application.Challenges.Flags;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
@@ -47,9 +49,7 @@ public sealed class ParticipantRuntimeScopePersistenceTests
                 new FixedRuntimePlacementPolicy(),
                 new UnexpectedRuntimeFlagStore(),
                 new NoopOutbox());
-            var targets = new RuntimeTargetReader(
-                db,
-                new ChallengeRuntimeTemplateCatalog());
+            var targets = new RuntimeTargetReader(db);
             var observations = new List<InvalidScopeObservation>();
             foreach (var scope in fixture.InvalidScopes)
             {
@@ -92,6 +92,11 @@ public sealed class ParticipantRuntimeScopePersistenceTests
                     .Where(observation => observation.TargetsWereVisible)
                     .Select(observation => observation.Name))
                 .IsEmpty();
+            var pendingScope = fixture.InvalidScopes.Single(scope => scope.Name == "pending-team");
+            var retainedPendingRuntime = await db.RuntimeInstances.AsNoTracking().SingleAsync(
+                instance => instance.TeamId == pendingScope.TeamId,
+                cancellationToken);
+            await Assert.That(retainedPendingRuntime.State).IsEqualTo(RuntimeState.Running);
 
             var validRuntime = await instances.FindPlayerRuntimeAsync(
                 fixture.ValidScope.CompetitionId,
@@ -110,9 +115,78 @@ public sealed class ParticipantRuntimeScopePersistenceTests
             await Assert.That(validRuntime).IsNotNull();
             await Assert.That(visibleTargets).HasSingleItem();
             await Assert.That(visibleTargets[0].TeamId).IsEqualTo(fixture.ValidScope.TeamId);
-            await Assert.That(visibleTargets[0].Urls)
+            await Assert.That(visibleTargets[0].AccessEndpoints?.Select(endpoint => endpoint.DirectAddress).OfType<string>())
                 .IsEquivalentTo(["https://active-team.example.test"]);
+
+            var existingTemplateId = await db.CompetitionChallenges.AsNoTracking()
+                .Where(challenge => challenge.Id == fixture.ValidScope.CompetitionChallengeId)
+                .Select(challenge => challenge.ChallengeId)
+                .SingleAsync(cancellationToken);
+            var ownerId = await db.Challenges.AsNoTracking()
+                .Where(template => template.Id == existingTemplateId)
+                .Select(template => template.OwnerId)
+                .SingleAsync(cancellationToken);
+            var templateId = Guid.CreateVersion7();
+            var unstartedChallengeId = Guid.CreateVersion7();
+            var nextOrder = await db.CompetitionChallenges.AsNoTracking()
+                .Where(challenge => challenge.CompetitionId == fixture.ValidScope.CompetitionId)
+                .MaxAsync(challenge => challenge.Order, cancellationToken) + 1;
+            db.Challenges.Add(new AwdChallenge
+            {
+                Id = templateId,
+                OwnerId = ownerId,
+                Title = "Unstarted Runtime template",
+                Direction = "Web",
+                Definition = TestConfigurations.Definition(GameMode.Awd),
+                CreatedAt = fixture.Now,
+                UpdatedAt = fixture.Now
+            });
+            db.CompetitionChallenges.Add(new AwdCompetitionChallenge
+            {
+                Id = unstartedChallengeId,
+                CompetitionId = fixture.ValidScope.CompetitionId,
+                ChallengeId = templateId,
+                Order = nextOrder,
+                IsPublished = true,
+                Rules = TestConfigurations.Rules(GameMode.Awd),
+                UpdatedAt = fixture.Now
+            });
+            await db.SaveChangesAsync(cancellationToken);
+            var counter = new QueryCounter();
+            var measuredOptions = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .AddInterceptors(counter)
+                .Options;
+            await using var measuredDb = new NoCtfDbContext(measuredOptions);
+            var measuredInstances = new RuntimeInstanceStore(
+                measuredDb,
+                new ChallengeRuntimeTemplateCatalog(),
+                new FixedRuntimePlacementPolicy(),
+                new UnexpectedRuntimeFlagStore(),
+                new NoopOutbox());
+            await Assert.That(await measuredInstances.FindPlayerRuntimeAsync(
+                fixture.ValidScope.CompetitionId,
+                unstartedChallengeId,
+                fixture.ValidScope.UserId,
+                cancellationToken)).IsNull();
+            await Assert.That(counter.ReaderCount).IsLessThanOrEqualTo(2);
         });
+    }
+
+    private sealed class QueryCounter : DbCommandInterceptor
+    {
+        public int ReaderCount { get; private set; }
+
+        public override ValueTask<DbDataReader> ReaderExecutedAsync(
+            DbCommand command,
+            CommandExecutedEventData eventData,
+            DbDataReader result,
+            CancellationToken cancellationToken = default)
+        {
+            ReaderCount++;
+            return ValueTask.FromResult(result);
+        }
     }
 
     private static async Task<Fixture> SeedAsync(
@@ -124,12 +198,12 @@ public sealed class ParticipantRuntimeScopePersistenceTests
         var now = DateTimeOffset.Parse("2026-07-31T12:00:00Z");
         var challengeDefinition = JsonSerializer.Serialize(
             new AwdChallengeConfiguration(
-                AwdChallengeConfiguration.CurrentSchemaVersion,
                 Runtime: new ChallengeRuntimeTemplate(
                     RuntimeAllocation.PerTeam,
                     new ContainerRuntimeDefinition(
                         "scope-test:latest",
-                        PortMappings: new Dictionary<int, int> { [31337] = 0 }),
+                        PortMappings: new Dictionary<int, int> { [31337] = 0 },
+                        Security: new(false, false, false, ["ALL"], [])),
                     new RuntimeResourceLimits(67_108_864, 100_000_000, 64),
                     UrlBindings:
                     [
@@ -143,7 +217,7 @@ public sealed class ParticipantRuntimeScopePersistenceTests
                     "printf '%s' '${FLAG}' > /dev/shm/flag")),
             new JsonSerializerOptions(JsonSerializerDefaults.Web));
         var challengeRules = JsonSerializer.Serialize(
-            new AwdChallengeConfiguration(AwdChallengeConfiguration.CurrentSchemaVersion),
+            new AwdChallengeConfiguration(),
             new JsonSerializerOptions(JsonSerializerDefaults.Web));
         var competitionConfiguration = JsonSerializer.Serialize(
             AwdConfiguration.Default,
@@ -182,6 +256,30 @@ public sealed class ParticipantRuntimeScopePersistenceTests
                 competitionConfiguration,
                 now,
                 teamDeletedAt: now),
+            AddScope(
+                db,
+                "pending-team",
+                challengeDefinition,
+                challengeRules,
+                competitionConfiguration,
+                now,
+                registrationStatus: TeamRegistrationStatus.Pending),
+            AddScope(
+                db,
+                "unregistered-team",
+                challengeDefinition,
+                challengeRules,
+                competitionConfiguration,
+                now,
+                registrationStatus: TeamRegistrationStatus.Unregistered),
+            AddScope(
+                db,
+                "banned-team",
+                challengeDefinition,
+                challengeRules,
+                competitionConfiguration,
+                now,
+                teamBanned: true),
             AddScope(
                 db,
                 "deleted-competition",
@@ -226,6 +324,8 @@ public sealed class ParticipantRuntimeScopePersistenceTests
         DateTimeOffset? competitionChallengeDeletedAt = null,
         DateTimeOffset? challengeDeletedAt = null,
         DateTimeOffset? teamDeletedAt = null,
+        TeamRegistrationStatus registrationStatus = TeamRegistrationStatus.Approved,
+        bool teamBanned = false,
         string? runtimeUrl = null)
     {
         var userId = Guid.CreateVersion7(now);
@@ -233,14 +333,15 @@ public sealed class ParticipantRuntimeScopePersistenceTests
         var challengeId = Guid.CreateVersion7(now);
         var competitionChallengeId = Guid.CreateVersion7(now);
         db.Users.Add(NewUser(userId, name, now));
-        db.Competitions.Add(new Competition
+        db.Competitions.Add(new AwdCompetition
         {
             Id = competitionId,
             Title = name,
             OwnerId = userId,
-            Mode = GameMode.Awd,
             Status = CompetitionStatus.Running,
-            ConfigurationJson = competitionConfiguration,
+            ModeConfiguration = TestConfigurations.Competition(
+                GameMode.Awd,
+                competitionConfiguration),
             StartAt = now.AddHours(-1),
             EndAt = now.AddHours(1),
             FlagDerivationSecret = Enumerable.Range(1, 32).Select(value => (byte)value).ToArray(),
@@ -248,24 +349,23 @@ public sealed class ParticipantRuntimeScopePersistenceTests
             UpdatedAt = now,
             DeletedAt = competitionDeletedAt
         });
-        db.Challenges.Add(new Challenge
+        db.Challenges.Add(new AwdChallenge
         {
             Id = challengeId,
             OwnerId = userId,
-            Mode = GameMode.Awd,
             Title = name,
-            DefinitionJson = challengeDefinition,
+            Definition = TestConfigurations.Definition(GameMode.Awd, challengeDefinition),
             CreatedAt = now,
             UpdatedAt = now,
             DeletedAt = challengeDeletedAt
         });
-        db.CompetitionChallenges.Add(new CompetitionChallenge
+        db.CompetitionChallenges.Add(new AwdCompetitionChallenge
         {
             Id = competitionChallengeId,
             CompetitionId = competitionId,
             ChallengeId = challengeId,
             IsPublished = published,
-            RulesJson = challengeRules,
+            Rules = TestConfigurations.Rules(GameMode.Awd, challengeRules),
             UpdatedAt = now,
             DeletedAt = competitionChallengeDeletedAt
         });
@@ -274,11 +374,13 @@ public sealed class ParticipantRuntimeScopePersistenceTests
             competitionId,
             name,
             now,
-            deletedAt: teamDeletedAt,
             runtime: new(
                 competitionId,
                 competitionChallengeId,
-                runtimeUrl ?? $"https://{name}.example.test"));
+                runtimeUrl ?? $"https://{name}.example.test"),
+            deletedAt: teamDeletedAt,
+            registrationStatus: registrationStatus,
+            banned: teamBanned);
         return new(name, competitionId, competitionChallengeId, team.UserId, team.TeamId);
     }
 
@@ -287,8 +389,10 @@ public sealed class ParticipantRuntimeScopePersistenceTests
         Guid competitionId,
         string name,
         DateTimeOffset now,
-        DateTimeOffset? deletedAt,
-        RuntimeFixture runtime)
+        RuntimeFixture runtime,
+        DateTimeOffset? deletedAt = null,
+        TeamRegistrationStatus registrationStatus = TeamRegistrationStatus.Approved,
+        bool banned = false)
     {
         var userId = Guid.CreateVersion7(now);
         var teamId = Guid.CreateVersion7(now);
@@ -301,21 +405,25 @@ public sealed class ParticipantRuntimeScopePersistenceTests
             CaptainId = userId,
             MemberIds = [userId],
             InvitationToken = Guid.NewGuid().ToString("N"),
-            RegistrationStatus = TeamRegistrationStatus.Approved,
+            RegistrationStatus = registrationStatus,
             RegisteredAt = now,
+            IsBanned = banned,
             DeletedAt = deletedAt
         });
-        db.RuntimeInstances.Add(new RuntimeInstance
+        db.RuntimeInstances.Add(new PlayerRuntimeInstance
         {
             Id = Guid.CreateVersion7(now),
             CompetitionId = runtime.CompetitionId,
             CompetitionChallengeId = runtime.CompetitionChallengeId,
             TeamId = teamId,
-            Purpose = RuntimePurpose.Player,
             RuntimeKind = RuntimeKind.Container,
             RuntimeProvider = RuntimeProvider.Docker,
             State = RuntimeState.Running,
-            Urls = [runtime.Url],
+            AccessEndpoints = [new RuntimeAccessEndpoint
+            {
+                BindingIndex = 0,
+                DirectAddress = runtime.Url
+            }],
             CreatedAt = now.AddMinutes(-1),
             RunningAt = now.AddSeconds(-30)
         });
@@ -383,7 +491,7 @@ public sealed class ParticipantRuntimeScopePersistenceTests
             throw new InvalidOperationException("AWD runtime reset must not invalidate an AWDP flag.");
     }
 
-    private sealed class NoopOutbox : ITransactionalMessageOutbox
+    private sealed class NoopOutbox : IPostCommitMessagePublisher
     {
         public ValueTask PublishAsync<T>(T message) => ValueTask.CompletedTask;
         public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) =>

@@ -1,13 +1,15 @@
 import { markRaw } from 'vue'
 
-import { ClipboardCheck, FileText, LayoutDashboard, MessageCircleQuestion, Puzzle, Trophy, UserRound } from '@lucide/vue'
-import { getCompetitionEndpoint, getLeaderboardEndpoint, getMyTeamEndpoint } from '../../../api'
+import { ClipboardCheck, FileText, GitBranch, LayoutDashboard, MessageCircleQuestion, Puzzle, Trophy, UserRound } from '@lucide/vue'
+import { getCompetitionEndpoint, getLeaderboardEndpoint, getMyTeamEndpoint, getPlayerCompetitionProgression } from '../../../api'
 import type { NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsCompetitionsScoreboardTeamResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../api'
 import { competitionWorkspaceNavigationKey } from '../../app/workspace-nav'
 import type { WorkspaceNavGroup } from '../../app/workspace-nav'
 import { createTrailingRefresh } from '../../../lib/latest-page-refresh'
 import CompetitionCountdownComponent from '../../competitions/CompetitionCountdown.vue'
 import LifecycleBadgeComponent from '../../competitions/LifecycleBadge.vue'
+import { useCompetitionAnnouncementCatchUp } from '../../competition/useCompetitionAnnouncementCatchUp'
+import { competitionPath } from '../../../utils/app-routes'
 
 /** Owns state, effects and commands for CompetitionsByIdPage. */
 export function useCompetitionsByIdPage() {
@@ -16,14 +18,19 @@ export function useCompetitionsByIdPage() {
 
   const competitionId = computed(() => route.params.id as string)
 
+  const isOverview = computed(() => route.path === competitionPath(competitionId.value))
+
   const isControlScreen = computed(() => [
     `/competitions/${competitionId.value}/live`,
-    `/competitions/${competitionId.value}/live-`,
     `/competitions/${competitionId.value}/awdp-live`,
   ].includes(route.path))
 
   const isWriteUpReview = computed(() =>
     route.path === `/competitions/${competitionId.value}/writeups`,
+  )
+
+  const isProgression = computed(() =>
+    route.path === `/competitions/${competitionId.value}/progression`,
   )
 
   const competition = ref<NoCtfapiEndpointsCompetitionsCompetitionResponse | null>(null)
@@ -44,11 +51,35 @@ export function useCompetitionsByIdPage() {
 
   const { user } = useAuth()
 
+  const { refreshMissedAnnouncements } = useCompetitionAnnouncementCatchUp(competitionId)
+
   const hasCompetitionStaffAccess = computed(() => competition.value?.administrationRole != null)
 
   const hasParticipantChallengeAccess = computed(() =>
     myTeam.value?.registrationStatus === 'Approved' && !myTeam.value.isBanned,
   )
+
+  const progressionEnabled = ref(false)
+
+  let progressionRequestId = 0
+
+  async function refreshProgressionEnabled() {
+    const requestId = ++progressionRequestId
+    if (competition.value?.mode !== 'Ctf'
+      || (!hasCompetitionStaffAccess.value && !hasParticipantChallengeAccess.value)) {
+      progressionEnabled.value = false
+      return
+    }
+    const { data } = await getPlayerCompetitionProgression({
+      path: { competitionId: competitionId.value },
+    })
+    if (requestId === progressionRequestId)
+      progressionEnabled.value = data?.enabled === true
+  }
+
+  watch([competition, myTeam, () => user.value?.userId], () => {
+    void refreshProgressionEnabled()
+  }, { immediate: true })
 
   async function refreshMyTeam() {
     if (!user.value) {
@@ -111,6 +142,7 @@ export function useCompetitionsByIdPage() {
     loading.value = false
     if (err || !data) {
       error.value = parseApiError(err, translate("ui.loadingCompetitionFailed")).message
+      progressionEnabled.value = false
       return response?.status === 404 ? 'not-found' : 'failed'
     }
     error.value = null
@@ -132,6 +164,7 @@ export function useCompetitionsByIdPage() {
     () => user.value?.userId,
     () => {
       if (!isWriteUpReview.value) void refreshMyTeam()
+      void refreshMissedAnnouncements()
     },
   )
 
@@ -146,17 +179,26 @@ export function useCompetitionsByIdPage() {
       competitionEventChanged: event => {
         if (event.kind === 'CompetitionAudienceChanged')
           void handleAudienceChanged()
+        if (event.kind === 'CompetitionUpdated')
+          void refreshProgressionEnabled()
+        if (event.kind === 'AnnouncementPublished')
+          void refreshMissedAnnouncements()
       },
       scoreboardUpdated: () => {
         if (!isWriteUpReview.value) void refreshStandingLatest()
       },
       onReconnected: () => {
         if (!isWriteUpReview.value) void refreshStandingLatest()
+        void refreshProgressionEnabled()
+        void refreshMissedAnnouncements()
       },
     })
   })
 
-  onUnmounted(() => unwatch?.())
+  onUnmounted(() => {
+    progressionRequestId++
+    unwatch?.()
+  })
 
   provide(competitionContextKey, {
     competition,
@@ -175,8 +217,11 @@ export function useCompetitionsByIdPage() {
       {
         label: translate("ui.competitions"),
         items: [
-          { to: `/competitions?competition=${competitionId.value}`, label: translate("ui.overview"), icon: LayoutDashboard, exact: true },
+          { to: competitionPath(competitionId.value), label: translate("ui.overview"), icon: LayoutDashboard, exact: true },
           ...(challengesVisible && canReadChallenges ? [{ to: `${base}/challenges`, label: translate("ui.challenge"), icon: Puzzle }] : []),
+          ...(competition.value?.mode === 'Ctf' && canReadChallenges && progressionEnabled.value
+            ? [{ to: `${base}/progression`, label: translate('progression.title'), icon: GitBranch }]
+            : []),
           { to: `${base}/leaderboard`, label: translate("ui.leaderboard"), icon: Trophy },
           { to: `${base}/questions`, label: translate("ui.questions"), icon: MessageCircleQuestion },
         ],
@@ -211,12 +256,15 @@ export function useCompetitionsByIdPage() {
   async function initialize() {
     await refresh()
     if (!isWriteUpReview.value) await refreshMyTeam()
+    await refreshMissedAnnouncements()
   }
 
   return {
       initialize,
+      isOverview,
       isControlScreen,
       isWriteUpReview,
+      isProgression,
       competition,
       myStanding,
       standingLoading,

@@ -5,22 +5,18 @@ import { themeColor } from '../../utils/theme-color'
 import type { TrendSeries } from './types'
 import { scoreTrendTimeRange } from './score-trend-range'
 
+export interface ScoreTrendChartProps {
+  title: string
+  series: TrendSeries[]
+  revision: string | number | null
+  /** 时间轴范围(ISO);没有数据的队伍画一条 0 分平线。 */
+  rangeStart: string | null
+  rangeEnd: string | null
+  height: string
+}
+
 /** Owns state, effects and commands for ScoreTrendChart. */
-export function useScoreTrendChart(props: Readonly<Omit<{
-    title?: string
-    series: TrendSeries[]
-    /** 时间轴范围(ISO);没有数据的队伍画一条 0 分平线。 */
-    rangeStart?: string | null
-    rangeEnd?: string | null
-    height?: string
-  }, "title" | "rangeStart" | "rangeEnd" | "height"> & Required<Pick<{
-    title?: string
-    series: TrendSeries[]
-    /** 时间轴范围(ISO);没有数据的队伍画一条 0 分平线。 */
-    rangeStart?: string | null
-    rangeEnd?: string | null
-    height?: string
-  }, "title" | "rangeStart" | "rangeEnd" | "height">>>) {
+export function useScoreTrendChart(props: Readonly<ScoreTrendChartProps>) {
   const el = ref<HTMLElement | null>(null)
 
   const { locale } = useLocale()
@@ -38,6 +34,10 @@ export function useScoreTrendChart(props: Readonly<Omit<{
   let focusedTeamName: string | null = null
 
   let applyingOption = false
+
+  let renderFrame = 0
+
+  let lastSeriesSignature = ''
 
   function zoomValue(value: unknown, percent: unknown, edge: 'start' | 'end'): number {
     const numeric = typeof value === 'number' ? value : Number.NaN
@@ -99,7 +99,11 @@ export function useScoreTrendChart(props: Readonly<Omit<{
     const name = (args[0] as { name?: unknown } | undefined)?.name
     if (typeof name !== 'string' || !name) return
     focusedTeamName = focusedTeamName === name ? null : name
-    render()
+    scheduleRender()
+  }
+
+  function releaseWheelToScrollSurface(event: WheelEvent) {
+    if (!event.ctrlKey) event.stopImmediatePropagation()
   }
 
   function buildOption(): echarts.EChartsCoreOption {
@@ -239,6 +243,7 @@ export function useScoreTrendChart(props: Readonly<Omit<{
         }
         const lineColor = palette[index % Math.max(1, palette.length)]
         return {
+          id: team.teamId || team.teamName || `team-${index}`,
           type: 'line' as const,
           colorBy: 'series' as const,
           name: team.teamName ?? translate("ui.team"),
@@ -267,15 +272,32 @@ export function useScoreTrendChart(props: Readonly<Omit<{
     }
   }
 
-  function render() {
+  function applyRender() {
     if (!chart) return
+    const seriesSignature = props.series
+      .map((team, index) => team.teamId || team.teamName || `team-${index}`)
+      .join('\u0000')
+    const replaceSeries = lastSeriesSignature !== '' && lastSeriesSignature !== seriesSignature
+    lastSeriesSignature = seriesSignature
     applyingOption = true
     try {
-      chart.setOption(buildOption(), { notMerge: true })
+      chart.setOption(buildOption(), {
+        notMerge: false,
+        lazyUpdate: true,
+        ...(replaceSeries ? { replaceMerge: ['series'] } : {}),
+      })
     }
     finally {
       applyingOption = false
     }
+  }
+
+  function scheduleRender() {
+    if (!chart || renderFrame) return
+    renderFrame = requestAnimationFrame(() => {
+      renderFrame = 0
+      applyRender()
+    })
   }
 
   onMounted(() => {
@@ -283,24 +305,46 @@ export function useScoreTrendChart(props: Readonly<Omit<{
     chart.on('datazoom', rememberZoom)
     chart.on('restore', restoreChartView)
     chart.on('legendselectchanged', toggleTeamFocus)
-    render()
+    scheduleRender()
   })
 
-  watch(() => [props.series, props.rangeStart, props.rangeEnd, props.title, locale.value], render, { deep: true })
+  watch(
+    () => [props.revision, props.rangeStart, props.rangeEnd, props.title, locale.value],
+    scheduleRender,
+  )
 
-  watch(isDark, () => void nextTick(render))
-
-  const onResize = () => chart?.resize()
+  watch(isDark, () => void nextTick(scheduleRender))
 
   let observer: ResizeObserver | null = null
 
+  let resizeFrame = 0
+
+  let observedWidth = -1
+
+  let observedHeight = -1
+
   onMounted(() => {
-    observer = new ResizeObserver(onResize)
+    observer = new ResizeObserver((entries) => {
+      const size = entries[0]?.contentRect
+      if (!size) return
+      const width = Math.ceil(size.width)
+      const height = Math.ceil(size.height)
+      if (width === observedWidth && height === observedHeight) return
+      observedWidth = width
+      observedHeight = height
+      if (resizeFrame) cancelAnimationFrame(resizeFrame)
+      resizeFrame = requestAnimationFrame(() => {
+        resizeFrame = 0
+        chart?.resize()
+      })
+    })
     if (el.value) observer.observe(el.value)
   })
 
   onUnmounted(() => {
     observer?.disconnect()
+    if (renderFrame) cancelAnimationFrame(renderFrame)
+    if (resizeFrame) cancelAnimationFrame(resizeFrame)
     chart?.off('datazoom', rememberZoom)
     chart?.off('restore', restoreChartView)
     chart?.off('legendselectchanged', toggleTeamFocus)
@@ -313,7 +357,8 @@ export function useScoreTrendChart(props: Readonly<Omit<{
   return {
       ...toRefs(props),
       el,
-      setElRef
+      setElRef,
+      releaseWheelToScrollSurface,
     }
 }
 

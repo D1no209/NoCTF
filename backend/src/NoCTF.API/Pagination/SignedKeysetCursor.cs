@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
 
@@ -15,15 +16,13 @@ public sealed class PaginationOptions
 
 public sealed class SignedKeysetCursor(IOptions<PaginationOptions> options)
 {
-    private static readonly JsonSerializerOptions JsonOptions =
-        new(JsonSerializerDefaults.Web);
     private readonly byte[] key = Encoding.UTF8.GetBytes(options.Value.SigningKey);
 
     public string Encode(string endpoint, string filter, KeysetPosition position)
     {
         var payload = JsonSerializer.SerializeToUtf8Bytes(
             new CursorPayload(endpoint, filter, position.CreatedAt, position.Id),
-            JsonOptions);
+            CursorJsonContext.Default.CursorPayload);
         var signature = HMACSHA256.HashData(key, payload);
         return $"{WebEncoders.Base64UrlEncode(payload)}.{WebEncoders.Base64UrlEncode(signature)}";
     }
@@ -47,7 +46,8 @@ public sealed class SignedKeysetCursor(IOptions<PaginationOptions> options)
             var expected = HMACSHA256.HashData(key, payload);
             if (!CryptographicOperations.FixedTimeEquals(supplied, expected))
                 return false;
-            var value = JsonSerializer.Deserialize<CursorPayload>(payload, JsonOptions);
+            var value = JsonSerializer.Deserialize(
+                payload, CursorJsonContext.Default.CursorPayload);
             if (value is null
                 || !string.Equals(value.Endpoint, endpoint, StringComparison.Ordinal)
                 || !string.Equals(value.Filter, filter, StringComparison.Ordinal))
@@ -66,7 +66,7 @@ public sealed class SignedKeysetCursor(IOptions<PaginationOptions> options)
     {
         var payload = JsonSerializer.SerializeToUtf8Bytes(
             new OpaqueCursorPayload(endpoint, filter, position),
-            JsonOptions);
+            CursorJsonContext.Default.OpaqueCursorPayload);
         var signature = HMACSHA256.HashData(key, payload);
         return $"{WebEncoders.Base64UrlEncode(payload)}.{WebEncoders.Base64UrlEncode(signature)}";
     }
@@ -90,7 +90,8 @@ public sealed class SignedKeysetCursor(IOptions<PaginationOptions> options)
             var expected = HMACSHA256.HashData(key, payload);
             if (!CryptographicOperations.FixedTimeEquals(supplied, expected))
                 return false;
-            var value = JsonSerializer.Deserialize<OpaqueCursorPayload>(payload, JsonOptions);
+            var value = JsonSerializer.Deserialize(
+                payload, CursorJsonContext.Default.OpaqueCursorPayload);
             if (value is null
                 || string.IsNullOrWhiteSpace(value.Position)
                 || !string.Equals(value.Endpoint, endpoint, StringComparison.Ordinal)
@@ -106,14 +107,20 @@ public sealed class SignedKeysetCursor(IOptions<PaginationOptions> options)
         }
     }
 
-    private sealed record CursorPayload(
-        string Endpoint,
-        string Filter,
-        DateTimeOffset CreatedAt,
-        Guid Id);
-
-    private sealed record OpaqueCursorPayload(
-        string Endpoint,
-        string Filter,
-        string Position);
 }
+
+internal sealed record CursorPayload(
+    string Endpoint,
+    string Filter,
+    DateTimeOffset CreatedAt,
+    Guid Id);
+
+internal sealed record OpaqueCursorPayload(
+    string Endpoint,
+    string Filter,
+    string Position);
+
+[JsonSourceGenerationOptions(JsonSerializerDefaults.Web)]
+[JsonSerializable(typeof(CursorPayload))]
+[JsonSerializable(typeof(OpaqueCursorPayload))]
+internal partial class CursorJsonContext : JsonSerializerContext;

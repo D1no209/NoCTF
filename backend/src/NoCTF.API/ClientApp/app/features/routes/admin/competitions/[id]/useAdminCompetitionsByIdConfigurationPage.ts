@@ -3,6 +3,8 @@ import { markRaw } from 'vue'
 import { toast } from 'vue-sonner'
 import { adminGetCompetition, adminPatchCompetition } from '../../../../../api'
 import type { NoCtfapiEndpointsAdministrationCompetitionsCompetitionConfigurationResponse } from '../../../../../api'
+import type { NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract } from '../../../../../api'
+import type { NoCtfapiEndpointsCompetitionsRuntimeAccessModeProtocol } from '../../../../../api'
 
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
 import CompetitionModeConfigEditorComponent from '../../../../admin/CompetitionModeConfigEditor.vue'
@@ -28,6 +30,19 @@ export function useAdminCompetitionsByIdConfigurationPage() {
   const maxTeamMembers = ref(1)
 
   const maxConcurrentRuntimeInstancesPerTeam = ref(1)
+
+  const runtimeAccessMode = ref<NoCtfapiEndpointsCompetitionsRuntimeAccessModeProtocol>('Direct')
+
+  const trafficCaptureEnabled = ref(false)
+
+  const trafficCaptureLimitMiB = ref<number | null>(null)
+
+  const trafficCaptureHasDirectBypass = computed(() =>
+    trafficCaptureEnabled.value && runtimeAccessMode.value === 'DirectAndWsrx')
+
+  watch(runtimeAccessMode, (mode) => {
+    if (mode === 'Direct') trafficCaptureEnabled.value = false
+  })
 
   const maxActiveQuestionsPerTeam = ref(5)
 
@@ -57,6 +72,11 @@ export function useAdminCompetitionsByIdConfigurationPage() {
     allowTeamRegistrationWhileRunning.value = c.allowTeamRegistrationWhileRunning ?? false
     maxTeamMembers.value = c.maxTeamMembers ?? 1
     maxConcurrentRuntimeInstancesPerTeam.value = c.maxConcurrentRuntimeInstancesPerTeam ?? 1
+    runtimeAccessMode.value = c.runtimeAccessMode ?? 'Direct'
+    trafficCaptureEnabled.value = c.trafficCaptureEnabled ?? false
+    trafficCaptureLimitMiB.value = c.trafficCaptureLimitBytes == null
+      ? null
+      : c.trafficCaptureLimitBytes / 1_048_576
     maxActiveQuestionsPerTeam.value = c.maxActiveQuestionsPerTeam ?? 5
     maxParticipantMessagesBeforeHandlerReply.value = c.maxParticipantMessagesBeforeHandlerReply ?? 3
     allowChallengeOwnersToHandleQuestions.value = c.allowChallengeOwnersToHandleQuestions ?? true
@@ -82,6 +102,17 @@ export function useAdminCompetitionsByIdConfigurationPage() {
       })
       return
     }
+    if (trafficCaptureEnabled.value && runtimeAccessMode.value === 'Direct') {
+      metaError.value = translate('runtime.captureRequiresWsrx')
+      return
+    }
+    if (trafficCaptureLimitMiB.value !== null
+      && (!Number.isInteger(trafficCaptureLimitMiB.value)
+        || trafficCaptureLimitMiB.value < 1
+        || trafficCaptureLimitMiB.value > 4096)) {
+      metaError.value = translate('runtime.captureLimitInvalid')
+      return
+    }
     savingMeta.value = true
     try {
       const { error } = await adminPatchCompetition({
@@ -96,6 +127,11 @@ export function useAdminCompetitionsByIdConfigurationPage() {
             allowTeamRegistrationWhileRunning: allowTeamRegistrationWhileRunning.value,
             maxTeamMembers: maxTeamMembers.value,
             maxConcurrentRuntimeInstancesPerTeam: maxConcurrentRuntimeInstancesPerTeam.value,
+            runtimeAccessMode: runtimeAccessMode.value,
+            trafficCaptureEnabled: trafficCaptureEnabled.value,
+            trafficCaptureLimitBytes: trafficCaptureLimitMiB.value === null
+              ? null
+              : trafficCaptureLimitMiB.value * 1_048_576,
             maxActiveQuestionsPerTeam: maxActiveQuestionsPerTeam.value,
             maxParticipantMessagesBeforeHandlerReply: maxParticipantMessagesBeforeHandlerReply.value,
             allowChallengeOwnersToHandleQuestions: allowChallengeOwnersToHandleQuestions.value,
@@ -131,13 +167,13 @@ export function useAdminCompetitionsByIdConfigurationPage() {
     configLoading.value = false
   }
 
-  async function saveConfig(json: string) {
+  async function saveConfig(configuration: NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract) {
     if (!config.value) return
     savingConfig.value = true
     try {
       const { data, error } = await adminPatchCompetition({
         path: { competitionId },
-        body: { modeConfiguration: { json } },
+        body: { modeConfiguration: { configuration } },
       })
       if (error) throw error
       config.value = data?.modeConfiguration ?? config.value
@@ -166,6 +202,10 @@ export function useAdminCompetitionsByIdConfigurationPage() {
       allowTeamRegistrationWhileRunning,
       maxTeamMembers,
       maxConcurrentRuntimeInstancesPerTeam,
+      runtimeAccessMode,
+      trafficCaptureEnabled,
+      trafficCaptureLimitMiB,
+      trafficCaptureHasDirectBypass,
       maxActiveQuestionsPerTeam,
       maxParticipantMessagesBeforeHandlerReply,
       allowChallengeOwnersToHandleQuestions,

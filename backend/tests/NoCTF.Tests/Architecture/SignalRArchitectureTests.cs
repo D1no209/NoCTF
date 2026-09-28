@@ -3,7 +3,7 @@ namespace NoCTF.Tests.Architecture;
 public sealed class SignalRArchitectureTests
 {
     [Test]
-    public async Task SignalR_publishers_use_typed_clients_without_changing_scale_out_topology()
+    public async Task SignalR_publishers_use_typed_clients_and_NATS_local_fanout()
     {
         var root = FindRepositoryRoot();
         var signalRRoot = Path.Combine(
@@ -28,10 +28,13 @@ public sealed class SignalRArchitectureTests
         await Assert.That(sources.Any(source => source.Contains(".SendAsync("))).IsFalse();
         await Assert.That(sources.Any(source =>
             source.Contains("IHubContext<CompetitionHub>")
-            || source.Contains("IHubContext<PlatformLogHub>"))).IsFalse();
-        await Assert.That(registration).Contains("signalR.AddStackExchangeRedis(redis)");
-        await Assert.That(registration).Contains("RedisLeaderboardRefreshRelay");
-        await Assert.That(registration).Contains("RedisGameplayFactStateRelay");
+            || source.Contains("IHubContext<PlatformLogHub>")
+            || source.Contains("IHubContext<NotificationHub>"))).IsFalse();
+        await Assert.That(registration).DoesNotContain("AddStackExchangeRedis");
+        await Assert.That(registration).Contains("NatsLeaderboardRefreshRelay");
+        await Assert.That(registration).Contains("NatsGameplayFactStateRelay");
+        await Assert.That(registration).Contains("NatsCompetitionEventRefreshRelay");
+        await Assert.That(registration).Contains("NatsNotificationChangeRelay");
         await Assert.That(hostRoles).Contains("return defaults ?? All()");
         await Assert.That(hostRoles).Contains("HostRole.Api, HostRole.Worker, HostRole.Runner");
     }

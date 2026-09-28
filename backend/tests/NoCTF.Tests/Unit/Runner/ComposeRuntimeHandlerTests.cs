@@ -21,12 +21,12 @@ public sealed class ComposeRuntimeHandlerTests
             new FixedWorkReader(RuntimeProvisionWorkStatus.Current));
         var message = CreateProvisionMessage();
 
-        var result = await handler.Handle(message, CancellationToken.None);
+        var result = await handler.ProvisionComposeAsync(message, CancellationToken.None);
 
         await Assert.That(result).IsTypeOf<RuntimeProvisioned>();
-        var provisioned = (RuntimeProvisioned)result;
+        var provisioned = (RuntimeProvisioned)result!;
         await Assert.That(provisioned.Provider).IsEqualTo(RuntimeProvider.Docker);
-        await Assert.That(provisioned.Urls)
+        await Assert.That(provisioned.AccessEndpoints.Select(endpoint => endpoint.DirectAddress).OfType<string>())
             .IsEquivalentTo(["http://runner.example:32000/play"]);
         await Assert.That(runtime.UpCount).IsEqualTo(1);
         await Assert.That(runtime.DownCount).IsEqualTo(0);
@@ -59,10 +59,10 @@ public sealed class ComposeRuntimeHandlerTests
             }
         };
 
-        var result = await handler.Handle(message, CancellationToken.None);
+        var result = await handler.ProvisionComposeAsync(message, CancellationToken.None);
 
         await Assert.That(result).IsTypeOf<RuntimeProvisionTerminated>();
-        await Assert.That(((RuntimeProvisionTerminated)result).FailureCode)
+        await Assert.That(((RuntimeProvisionTerminated)result!).FailureCode)
             .IsEqualTo(RuntimeFailureCode.UrlExpansionFailed);
         await Assert.That(reconciler.Destroyed)
             .IsEquivalentTo([new RuntimeResourceIdentity(message.RuntimeInstanceId)]);
@@ -99,7 +99,7 @@ public sealed class ComposeRuntimeHandlerTests
             }
         };
 
-        Func<Task> action = () => handler.Handle(message, CancellationToken.None);
+        Func<Task> action = () => handler.ProvisionComposeAsync(message, CancellationToken.None);
 
         var exception = await Assert.That(action).Throws<InvalidOperationException>();
         await Assert.That(exception!.Message).IsEqualTo("cleanup failed");
@@ -125,10 +125,10 @@ public sealed class ComposeRuntimeHandlerTests
             reconciler);
         var message = CreateProvisionMessage();
 
-        var result = await handler.Handle(message, CancellationToken.None);
+        var result = await handler.ProvisionComposeAsync(message, CancellationToken.None);
 
         await Assert.That(result).IsTypeOf<RuntimeProvisionCanceled>();
-        var canceled = (RuntimeProvisionCanceled)result;
+        var canceled = (RuntimeProvisionCanceled)result!;
         await Assert.That(canceled.RuntimeInstanceId).IsEqualTo(message.RuntimeInstanceId);
         await Assert.That(canceled.RunnerId).IsEqualTo(message.RunnerId);
         await Assert.That(runtime.UpCount).IsEqualTo(0);
@@ -155,7 +155,7 @@ public sealed class ComposeRuntimeHandlerTests
             new FixedWorkReader(RuntimeProvisionWorkStatus.StopRequested),
             reconciler);
 
-        Func<Task> action = () => handler.Handle(
+        Func<Task> action = () => handler.ProvisionComposeAsync(
             CreateProvisionMessage(),
             CancellationToken.None);
 
@@ -178,7 +178,7 @@ public sealed class ComposeRuntimeHandlerTests
             reconciler);
         var message = CreateProvisionMessage();
 
-        Func<Task> action = () => handler.Handle(message, CancellationToken.None);
+        Func<Task> action = () => handler.ProvisionComposeAsync(message, CancellationToken.None);
 
         await Assert.That(action).Throws<InvalidOperationException>();
         await Assert.That(runtime.UpCount).IsEqualTo(0);
@@ -199,9 +199,9 @@ public sealed class ComposeRuntimeHandlerTests
             new FixedWorkReader(RuntimeProvisionWorkStatus.AssignmentRetained));
         var message = CreateProvisionMessage();
 
-        var result = await handler.Handle(message, CancellationToken.None);
+        var result = await handler.ProvisionComposeAsync(message, CancellationToken.None);
 
-        await Assert.That(result).IsTypeOf<RuntimeProvisionFailed>();
+        await Assert.That(result).IsNull();
         await Assert.That(runtime.UpCount).IsEqualTo(0);
         await Assert.That(capacity.ReleasedRuntimeIds).IsEmpty();
     }
@@ -219,13 +219,13 @@ public sealed class ComposeRuntimeHandlerTests
                 RuntimeProvisionWorkStatus.Current,
                 new(
                     RuntimeProvider.Docker,
-                    System.Text.Json.JsonSerializer.Serialize(receipt),
+                    ComposeRuntimeReceiptData.From(receipt),
                     RuntimeKind.Compose)));
         var message = new StopComposeRuntime(
             receipt.OperationId,
             "runner-a");
 
-        var result = await handler.Handle(message, CancellationToken.None);
+        var result = await handler.StopComposeAsync(message, CancellationToken.None);
 
         await Assert.That(result).IsTypeOf<RuntimeStopped>();
         await Assert.That(runtime.DownCount).IsEqualTo(1);
@@ -247,13 +247,13 @@ public sealed class ComposeRuntimeHandlerTests
                 RuntimeProvisionWorkStatus.Current,
                 new(
                     RuntimeProvider.Docker,
-                    System.Text.Json.JsonSerializer.Serialize(receipt),
+                    ComposeRuntimeReceiptData.From(receipt),
                     RuntimeKind.Compose)));
         var message = new StopComposeRuntime(
             receipt.OperationId,
             "runner-a");
 
-        var result = await handler.Handle(message, CancellationToken.None);
+        var result = await handler.StopComposeAsync(message, CancellationToken.None);
 
         await Assert.That(result).IsTypeOf<RuntimeStopFailed>();
         await Assert.That(result).IsNotTypeOf<RuntimeStopped>();

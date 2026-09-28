@@ -19,6 +19,9 @@ public sealed class TerminateRuntimeEndpoint(
     {
         Delete("/admin/runtimes/{runtimeInstanceId}");
         AuthSchemes("Bearer");
+        Options(builder => builder.WithMetadata(
+            new NoCTF.Hosting.Observability.RuntimeOperationMetricsMetadata(
+                NoCTF.Application.Observability.RuntimeOperationMetricKind.Terminate)));
         Description(builder => builder.WithName("AdminTerminateRuntime"));
         Summary(summary => summary.Summary = "Terminates an authorized Runtime instance.");
     }

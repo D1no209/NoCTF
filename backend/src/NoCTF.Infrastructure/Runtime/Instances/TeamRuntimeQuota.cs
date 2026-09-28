@@ -19,23 +19,8 @@ public sealed class TeamRuntimeQuota(
                     TimeSpan.FromSeconds(2), cancellationToken)
                 ?? throw new FeatureCriticalSectionTimeoutException("team-runtime-quota");
 
-        using var budget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        await NoCTF.Infrastructure.Competitions.Participation.CompetitionParticipationLock.AcquireAsync(db, competitionId, cancellationToken);
-        budget.CancelAfter(TimeSpan.FromSeconds(2));
-        try
-        {
-            var exists = await db.Teams
-                .FromSqlInterpolated($"SELECT * FROM teams WHERE id = {teamId} AND competition_id = {competitionId} FOR UPDATE")
-                .AsNoTracking()
-                .AnyAsync(budget.Token);
-            if (!exists)
-                throw new DbUpdateConcurrencyException("The runtime quota team no longer exists.");
-            return NoopCriticalSectionLease.Instance;
-        }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            throw new FeatureCriticalSectionTimeoutException("team-runtime-quota");
-        }
+        cancellationToken.ThrowIfCancellationRequested();
+        return NoopCriticalSectionLease.Instance;
     }
 
     public async Task<bool> CanCreateSlotAsync(
@@ -55,7 +40,8 @@ public sealed class TeamRuntimeQuota(
                 runtime.TeamId == teamId &&
                 (runtime.Purpose == RuntimePurpose.Player
                     || runtime.Purpose == RuntimePurpose.Practice
-                    || runtime.Purpose == RuntimePurpose.AwdpAttack) &&
+                    || runtime.Purpose == RuntimePurpose.AwdpAttack
+                    || runtime.Purpose == RuntimePurpose.PatchVerificationTarget) &&
                 (runtime.State == RuntimeState.Queued ||
                  runtime.State == RuntimeState.Provisioning ||
                  runtime.State == RuntimeState.Running ||

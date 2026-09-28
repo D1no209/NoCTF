@@ -3,23 +3,13 @@ import { toRefs } from 'vue'
 import type { DefinitionRuntimeViewState } from '~/features/admin/useDefinitionRuntime'
 
 const viewProps = defineProps<{ state: DefinitionRuntimeViewState }>()
-const { bytesToMib, coresToNanoCpus, mibToBytes, nanoCpusToCores, RuntimeAllocation, UrlExposure, isCompose, kindOptions, switchKind, flagSourceOptions, exposureOptions, controlBindingList, DefinitionCompose, DefinitionContainer, UrlBindingList, runtime, mode, disabled, onUpdateModelValueRuntimeLimitsMemoryBytes, onUpdateModelValueRuntimeLimitsNanoCpus, onUpdateModelValueRuntimeLimitsPidsLimit, onUpdateModelValueRuntimeTtlSeconds, onUpdateModelValueRuntimeOperationTimeoutSeconds, onUpdateModelValueRuntimeFlagSource, onUpdateModelValueRuntimeUrlBindings } = toRefs(viewProps.state)
+const { bytesToMib, nanoCpusToCores, RuntimeAllocation, UrlExposure, isCompose, showDynamicFlagInjection, dynamicFlagInjection, kindOptions, switchKind, flagSourceOptions, exposureOptions, controlBindingList, hasCustomRuntimePolicy, DefinitionCompose, DefinitionContainer, UrlBindingList, runtime, mode, disabled, onUpdateModelValueRuntimeLimitsMemoryBytes, onUpdateModelValueRuntimeLimitsNanoCpus, onUpdateModelValueRuntimeLimitsPidsLimit, onUpdateModelValueRuntimeTtlSeconds, onUpdateModelValueRuntimeOperationTimeoutSeconds, onUpdateModelValueRuntimeFlagSource, setDynamicFlagInjection, onUpdateModelValueRuntimeUrlBindings } = toRefs(viewProps.state)
 </script>
 
 <template>
   <FieldGroup>
-    <div class="grid gap-4 sm:grid-cols-2">
-      <Field>
-        <FieldLabel>{{ $t('ui.distributionMethod') }}</FieldLabel>
-        <div class="flex h-9 items-center gap-2">
-          <Badge variant="secondary">
-            {{ runtime.allocation === RuntimeAllocation.Shared ? $t('ui.share') : $t('ui.eachTeamIsIndependent') }}
-          </Badge>
-        </div>
-        <FieldDescription v-if="mode === 'Koh'">{{ $t('ui.kohRequiresAllTeamsToShareTheSameEnvironment') }}</FieldDescription>
-        <FieldDescription v-else>{{ $t('ui.requiresASeparateRuntimeEnvironmentForEachTeam', { mode }) }}</FieldDescription>
-      </Field>
-      <Field>
+    <div class="flex flex-wrap items-end gap-4">
+      <Field class="min-w-60 flex-1">
         <FieldLabel>{{ $t('ui.operatingEnvironmentType') }}</FieldLabel>
         <Select
           :model-value="runtime.definition.kind"
@@ -37,9 +27,30 @@ const { bytesToMib, coresToNanoCpus, mibToBytes, nanoCpusToCores, RuntimeAllocat
             </SelectGroup>
           </SelectContent>
         </Select>
-        <FieldDescription v-if="mode === 'Awdp'">{{ $t('ui.awdpOnlySupportsSingleContainerRunningEnvironments') }}</FieldDescription>
       </Field>
+      <Badge variant="secondary" class="mb-1 h-8 px-3">
+        {{ runtime.allocation === RuntimeAllocation.Shared ? $t('ui.share') : $t('ui.eachTeamIsIndependent') }}
+      </Badge>
     </div>
+
+    <Field v-if="showDynamicFlagInjection" orientation="horizontal">
+      <Switch
+        id="ctf-dynamic-flag-injection"
+        :model-value="dynamicFlagInjection"
+        :disabled="disabled"
+        @update:model-value="setDynamicFlagInjection($event === true)"
+      />
+      <div class="space-y-1">
+        <FieldLabel for="ctf-dynamic-flag-injection" class="font-normal">
+          {{ $t('ui.dynamicFlagInjection') }}
+        </FieldLabel>
+        <FieldDescription>
+          {{ dynamicFlagInjection
+            ? $t('ui.dynamicFlagInjectionEnabledDescription')
+            : $t('ui.dynamicFlagInjectionDisabledDescription') }}
+        </FieldDescription>
+      </div>
+    </Field>
 
     <component :is="DefinitionContainer"
       v-if="runtime.definition.kind === 'container'"
@@ -49,12 +60,61 @@ const { bytesToMib, coresToNanoCpus, mibToBytes, nanoCpusToCores, RuntimeAllocat
       :disabled="disabled"
     />
     <component :is="DefinitionCompose"
-      v-else
+      v-else-if="runtime.definition.kind === 'compose'"
       :definition="runtime.definition"
+      :flag-source="runtime.flagSource"
       :disabled="disabled"
     />
+    <DefinitionSection v-else :title="$t('ui.operatingEnvironmentType')" :collapsible="false">
+      <Field>
+        <FieldLabel>{{ $t('ui.ovaSourceUrl') }}</FieldLabel>
+        <Input v-model="runtime.definition.sourceUrl" :disabled="disabled" />
+      </Field>
+      <Field>
+        <FieldLabel>{{ $t('ui.sha256') }}</FieldLabel>
+        <Input v-model="runtime.definition.sha256" :disabled="disabled" />
+      </Field>
+    </DefinitionSection>
 
-    <DefinitionSection :title="$t('ui.resourcesLifecycle')"  :collapsible="false">
+    <DefinitionSection :title="$t('ui.accessEntrance')" :collapsible="false" accent-title>
+      <Field v-if="mode !== 'Ctf' && mode !== 'Awdp'">
+        <FieldLabel>{{ $t('ui.flagSource') }}</FieldLabel>
+        <Select
+          :model-value="String(runtime.flagSource)"
+          :disabled="disabled"
+          @update:model-value="onUpdateModelValueRuntimeFlagSource"
+        >
+          <SelectTrigger class="w-full sm:max-w-xs"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem v-for="option in flagSourceOptions" :key="option.value" :value="String(option.value)">{{ option.label }}</SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      </Field>
+      <Field>
+        <component :is="UrlBindingList"
+          :model-value="runtime.urlBindings"
+          :exposure-options="exposureOptions"
+          :show-service-name="isCompose"
+          :disabled="disabled"
+          @update:model-value="onUpdateModelValueRuntimeUrlBindings"
+        />
+      </Field>
+      <Field v-if="mode === 'Koh'">
+        <FieldLabel>{{ $t('ui.controlCheckEntry') }}</FieldLabel>
+        <component :is="UrlBindingList"
+          v-model="controlBindingList"
+          :exposure-options="[{ value: UrlExposure.Participants, label: $t('ui.platformCheckUsage') }]"
+          :show-service-name="isCompose"
+          :add-label="$t('ui.setUpControlCheckEntry')"
+          :allow-custom-display="false"
+          :disabled="disabled"
+        />
+      </Field>
+    </DefinitionSection>
+
+    <DefinitionSection :title="$t('ui.resourcesLifecycle')" :default-open="hasCustomRuntimePolicy" accent-title>
       <div class="grid gap-4 sm:grid-cols-3">
         <Field>
           <FieldLabel>{{ $t('ui.memoryMib') }}</FieldLabel>
@@ -110,63 +170,6 @@ const { bytesToMib, coresToNanoCpus, mibToBytes, nanoCpusToCores, RuntimeAllocat
           />
         </Field>
       </div>
-      <FieldDescription>{{ $t('ui.blankValuesUseThePlatformDefaultResourceLimitsAndLifecycle') }}</FieldDescription>
-    </DefinitionSection>
-
-    <DefinitionSection :title="$t('ui.flagAccess')"  :collapsible="false">
-      <Field v-if="mode !== 'Ctf' && mode !== 'Awdp'">
-        <FieldLabel>{{ $t('ui.flagSource') }}</FieldLabel>
-        <Select
-          :model-value="String(runtime.flagSource)"
-          :disabled="disabled"
-          @update:model-value="onUpdateModelValueRuntimeFlagSource"
-        >
-          <SelectTrigger class="w-full sm:max-w-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectItem v-for="option in flagSourceOptions" :key="option.value" :value="String(option.value)">
-                {{ option.label }}
-              </SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-      </Field>
-      <Field v-else>
-        <FieldLabel>{{ $t('ui.flagSource') }}</FieldLabel>
-        <div class="flex h-9 items-center gap-2">
-          <Badge variant="secondary">{{ $t('ui.perTeamFlagEnvironmentInjection') }}</Badge>
-        </div>
-        <FieldDescription>{{ $t('ui.forRuntimeChallengesThePlatformGeneratesATeamSpecificFlag') }}</FieldDescription>
-      </Field>
-
-      <Field>
-        <FieldLabel>{{ $t('ui.accessEntrance') }}</FieldLabel>
-        <component :is="UrlBindingList"
-          :model-value="runtime.urlBindings"
-          :exposure-options="exposureOptions"
-          :show-service-name="isCompose"
-          :disabled="disabled"
-          @update:model-value="onUpdateModelValueRuntimeUrlBindings"
-        />
-        <FieldDescription v-if="mode === 'Koh'"> {{ $t('ui.kohRequiresAtLeastOneEntranceVisibleToAllParticipants') }} </FieldDescription>
-        <FieldDescription v-else-if="mode === 'Awd'"> {{ $t('ui.inAwdPlayersAccessEachOtherSServicesUsuallyRequiring') }} </FieldDescription>
-        <FieldDescription v-else-if="mode === 'Awdp'"> {{ $t('ui.awdpAttackRuntimeAccessIsVisibleOnlyToItsOwning') }} </FieldDescription>
-      </Field>
-
-      <Field v-if="mode === 'Koh'">
-        <FieldLabel>{{ $t('ui.controlCheckEntry') }}</FieldLabel>
-        <component :is="UrlBindingList"
-          v-model="controlBindingList"
-          :exposure-options="[{ value: UrlExposure.Participants, label: $t('ui.platformCheckUsage') }]"
-          :show-service-name="isCompose"
-          :add-label="$t('ui.setUpControlCheckEntry')"
-          :allow-custom-display="false"
-          :disabled="disabled"
-        />
-        <FieldDescription>{{ $t('ui.thePlatformPeriodicallyChecksTheControlAddressItIsRequired') }}</FieldDescription>
-      </Field>
     </DefinitionSection>
   </FieldGroup>
 </template>

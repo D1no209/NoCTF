@@ -1,31 +1,71 @@
 using System.Globalization;
 using NoCTF.Application.Runtime.Provisioning;
+using NoCTF.Domain.Runtime;
 
 namespace NoCTF.Runner.Messages;
 
-public sealed record ExpandedRuntimeUrls(IReadOnlyList<string> Urls);
+public sealed record ExpandedRuntimeAccess(
+    IReadOnlyList<RuntimeAccessEndpointMapping> AccessEndpoints)
+{
+    public IReadOnlyList<string> DirectAddresses => AccessEndpoints
+        .Select(endpoint => endpoint.DirectAddress)
+        .OfType<string>()
+        .ToArray();
+}
 
 public static class RuntimeUrlExpander
 {
-    public static ExpandedRuntimeUrls ExpandContainer(
+    public static ExpandedRuntimeAccess ExpandContainer(
         ContainerReceipt receipt,
         IReadOnlyList<RuntimeUrlBinding>? bindings)
     {
-        var urls = new List<string>();
+        var endpoints = new List<RuntimeAccessEndpointMapping>();
+        var index = 0;
         foreach (var binding in bindings ?? [])
         {
-            var url = ExpandPublicContainerBinding(receipt, binding);
-            urls.Add(url);
+            var directAddress = PublishesDirect(requestedMode: null)
+                ? ExpandPublicContainerBinding(receipt, binding)
+                : null;
+            endpoints.Add(new(
+                index++,
+                directAddress,
+                null,
+                null));
         }
-        return new(urls);
+        return ToResult(endpoints);
     }
 
-    public static ExpandedRuntimeUrls ExpandCompose(
+    public static ExpandedRuntimeAccess ExpandContainer(
+        ContainerReceipt receipt,
+        IReadOnlyList<RuntimeUrlBinding>? bindings,
+        RuntimeAccessMode accessMode)
+    {
+        var endpoints = new List<RuntimeAccessEndpointMapping>();
+        var index = 0;
+        foreach (var binding in bindings ?? [])
+        {
+            var containerPort = binding.ContainerPort
+                ?? throw new InvalidOperationException("Container URL binding requires ContainerPort.");
+            endpoints.Add(new(
+                index++,
+                PublishesDirect(accessMode)
+                    ? ExpandPublicContainerBinding(receipt, binding)
+                    : null,
+                SupportsWsrx(accessMode)
+                    ? RequiredInternalHost(receipt.InternalHost)
+                    : null,
+                SupportsWsrx(accessMode) ? containerPort : null));
+        }
+        return ToResult(endpoints);
+    }
+
+    public static ExpandedRuntimeAccess ExpandCompose(
         ComposeReceipt receipt,
         ComposeStatus status,
         IReadOnlyList<RuntimeUrlBinding>? bindings)
     {
-        var urls = new List<string>();
+        var endpoints = new List<RuntimeAccessEndpointMapping>();
+        var index = 0;
         foreach (var binding in bindings ?? [])
         {
             var service = FindComposeService(status, binding);
@@ -37,23 +77,60 @@ public static class RuntimeUrlExpander
                 throw new InvalidOperationException(
                     "Compose URL binding has no dynamic public port.");
             var url = ExpandAccessUrl(binding.UrlTemplate, receipt.PublicHost, publicPort);
-            urls.Add(url);
+            endpoints.Add(new(index++, url, null, null));
         }
-        return new(urls);
+        return ToResult(endpoints);
     }
 
-    public static ExpandedRuntimeUrls ExpandOva(
+    public static ExpandedRuntimeAccess ExpandCompose(
+        ComposeReceipt receipt,
+        ComposeStatus status,
+        IReadOnlyList<RuntimeUrlBinding>? bindings,
+        RuntimeAccessMode accessMode)
+    {
+        var endpoints = new List<RuntimeAccessEndpointMapping>();
+        var index = 0;
+        foreach (var binding in bindings ?? [])
+        {
+            var service = FindComposeService(status, binding);
+            var containerPort = binding.ContainerPort
+                ?? throw new InvalidOperationException("Compose URL binding requires ContainerPort.");
+            string? directAddress = null;
+            if (PublishesDirect(accessMode))
+            {
+                if (!service.PublishedPorts.TryGetValue(containerPort, out var publicPort)
+                    || publicPort is < 1 or > 65535)
+                    throw new InvalidOperationException(
+                        "Compose URL binding has no dynamic public port.");
+                directAddress = ExpandAccessUrl(
+                    binding.UrlTemplate,
+                    receipt.PublicHost,
+                    publicPort);
+            }
+            endpoints.Add(new(
+                index++,
+                directAddress,
+                SupportsWsrx(accessMode)
+                    ? RequiredInternalHost(service.InternalHost)
+                    : null,
+                SupportsWsrx(accessMode) ? containerPort : null));
+        }
+        return ToResult(endpoints);
+    }
+
+    public static ExpandedRuntimeAccess ExpandOva(
         OvaRuntimeReceipt receipt,
         IReadOnlyList<RuntimeUrlBinding>? bindings)
     {
-        var urls = new List<string>();
+        var addresses = new List<string>();
         foreach (var binding in bindings ?? [])
         {
             var machine = FindOvaVirtualMachine(receipt, binding);
-            var url = ExpandOvaBinding(machine, binding);
-            urls.Add(url);
+            var address = ExpandOvaBinding(machine, binding);
+            addresses.Add(address);
         }
-        return new(urls);
+        return new(addresses.Select((address, index) =>
+            new RuntimeAccessEndpointMapping(index, address, null, null)).ToArray());
     }
 
     private static ComposeServiceStatus FindComposeService(
@@ -139,5 +216,21 @@ public static class RuntimeUrlExpander
 
     private static string ExpandAccessUrl(string template, string? host, int port) =>
         Expand(template, host, port);
+
+    private static ExpandedRuntimeAccess ToResult(
+        IReadOnlyList<RuntimeAccessEndpointMapping> endpoints) =>
+        new(endpoints);
+
+    private static string RequiredInternalHost(string? host) =>
+        !string.IsNullOrWhiteSpace(host)
+            ? host
+            : throw new InvalidOperationException(
+                "Runtime receipt does not contain an internal proxy host.");
+
+    private static bool PublishesDirect(RuntimeAccessMode? requestedMode) =>
+        requestedMode is null or RuntimeAccessMode.Direct or RuntimeAccessMode.DirectAndWsrx;
+
+    private static bool SupportsWsrx(RuntimeAccessMode mode) =>
+        mode is RuntimeAccessMode.DirectAndWsrx or RuntimeAccessMode.WsrxOnly;
 
 }

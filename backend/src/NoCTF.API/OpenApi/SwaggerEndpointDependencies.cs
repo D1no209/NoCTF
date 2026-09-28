@@ -11,6 +11,7 @@ using NoCTF.Application.GameplayFacts.PatchUploads;
 using NoCTF.Application.GameplayFacts.Awdp;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Challenges;
 using NoCTF.Application.Storage;
 
 namespace NoCTF.API.OpenApi;
@@ -91,8 +92,9 @@ internal sealed class SwaggerGameplayFactAdmissionModePolicy : IGameplayFactAdmi
 {
     public GameplayFactAdmissionRules GetRules(
         GameMode mode,
-        string competitionConfigurationJson,
-        string challengeConfigurationJson) => new(true, true, null, null);
+        CompetitionModeConfiguration competitionConfiguration,
+        CompetitionChallengeRules challengeRules,
+        ChallengeDefinition? challengeDefinition = null) => new(true, true, null, null);
 }
 
 internal sealed class SwaggerStatusReader : IGameplayFactStatusReader
@@ -164,8 +166,7 @@ internal sealed class SwaggerAccessTokenVersionReader : IAccessTokenVersionReade
     public Task<bool> IsCurrentAsync(
         Guid userId,
         int tokenVersion,
-        CancellationToken cancellationToken,
-        AdministratorIssuedAccessToken? administratorIssuedToken = null) =>
+        CancellationToken cancellationToken) =>
         Task.FromResult(false);
 }
 
@@ -224,8 +225,7 @@ internal sealed class SwaggerTokenIssuer : IAccessTokenIssuer
     public IssuedAccessToken Issue(
         AuthenticatedUser user,
         DateTimeOffset now,
-        TimeSpan? lifetime = null,
-        Guid? impersonatorUserId = null) =>
+        TimeSpan? lifetime = null) =>
         new("swagger-export-token", now.Add(lifetime ?? TimeSpan.FromMinutes(15)));
 
     public IssuedRefreshToken IssueRefresh(AuthenticatedUser user) =>
@@ -263,8 +263,6 @@ internal sealed class SwaggerBackendMessagePublisher : IBackendMessagePublisher
 
 internal sealed class SwaggerLeaderboardCache : ILeaderboardCache
 {
-    public Task<LeaderboardResponse?> GetAsync(Guid competitionId, CancellationToken cancellationToken) => Task.FromResult<LeaderboardResponse?>(null);
-    public Task<LeaderboardResponse?> GetFrozenAsync(Guid competitionId, CancellationToken cancellationToken) => Task.FromResult<LeaderboardResponse?>(null);
     public Task RefreshAsync(Guid competitionId, CancellationToken cancellationToken) => Task.CompletedTask;
     public Task InvalidateAsync(Guid competitionId, CancellationToken cancellationToken) => Task.CompletedTask;
 }

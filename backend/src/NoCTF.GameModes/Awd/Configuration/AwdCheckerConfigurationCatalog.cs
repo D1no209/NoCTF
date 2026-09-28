@@ -1,25 +1,39 @@
 using NoCTF.Application.Runtime.Configuration;
+using NoCTF.Domain.Challenges;
+using NoCTF.Domain.Competitions;
 
 namespace NoCTF.GameModes.Awd.Configuration;
 
 public sealed record AwdCheckerSettings(
     int CheckerIntervalSeconds,
     RunnerJobConfiguration? Checker,
-    bool CheckerAllowRoot = false);
+    bool CheckerAllowRoot = false,
+    string? TargetServiceName = null);
 
 public sealed class AwdCheckerConfigurationCatalog
 {
     public AwdCheckerSettings Get(
-        string competitionConfigurationJson,
-        string challengeRulesJson,
-        string challengeDefinitionJson)
+        AwdCompetitionModeConfiguration competition,
+        AwdCompetitionChallengeRules rules,
+        AwdChallengeDefinition definition)
     {
-        var competition = AwdConfigurationUpgrader.ParseCompetition(competitionConfigurationJson);
-        var rules = AwdConfigurationUpgrader.ParseChallenge(challengeRulesJson);
-        var definition = AwdConfigurationUpgrader.ParseChallenge(challengeDefinitionJson);
+        var checker = definition.Checker is null
+            ? null
+            : new RunnerJobConfiguration(
+                definition.Checker.Image,
+                definition.StringItems
+                    .Where(item => item.Kind == ChallengeDefinitionStringKind.CheckerCommand)
+                    .OrderBy(item => item.Position)
+                    .Select(item => item.Value)
+                    .ToArray(),
+                definition.StringItems
+                    .Where(item => item.Kind == ChallengeDefinitionStringKind.CheckerEnvironment)
+                    .ToDictionary(item => item.Key!, item => item.Value, StringComparer.Ordinal),
+                definition.Checker.TimeoutSeconds);
         return new(
             rules.CheckerIntervalSeconds ?? competition.CheckerIntervalSeconds,
-            definition.Checker?.Job,
-            definition.CheckerAllowRoot);
+            checker,
+            definition.CheckerAllowRoot,
+            definition.Checker?.TargetServiceName);
     }
 }

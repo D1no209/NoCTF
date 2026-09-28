@@ -1,8 +1,10 @@
 using System.Net;
+using System.Diagnostics;
 using k8s;
 using k8s.Autorest;
 using k8s.Models;
 using NoCTF.Application.Runtime.Provisioning;
+using NoCTF.Application.Observability;
 using NoCTF.Domain.Runtime;
 using NoCTF.Runtime.Kubernetes.Configuration;
 
@@ -14,6 +16,19 @@ public sealed class KubernetesRuntimeResourceReconciler(
     IRuntimeProviderAvailabilityProbe
 {
     public RuntimeProvider Provider => RuntimeProvider.Kubernetes;
+
+    public async Task<bool?> WorkloadExistsAsync(RuntimeWorkloadIdentity identity, CancellationToken cancellationToken)
+    {
+        identity.Validate();
+        var name = $"noctf-{identity.OperationId:N}";
+        var selector = $"noctf.io/managed=true,noctf.io/runtime-instance-id={identity.RuntimeInstanceId:D}";
+        var pods = await client.CoreV1.ListNamespacedPodAsync(options.Namespace, labelSelector: selector, cancellationToken: cancellationToken);
+        var services = await client.CoreV1.ListNamespacedServiceAsync(options.Namespace, labelSelector: selector, cancellationToken: cancellationToken);
+        var policies = await client.NetworkingV1.ListNamespacedNetworkPolicyAsync(options.Namespace, labelSelector: selector, cancellationToken: cancellationToken);
+        return pods.Items.Any(item => item.Metadata.Name == name)
+            || services.Items.Any(item => item.Metadata.Name == name || item.Metadata.Name == name + "-public")
+            || policies.Items.Any(item => item.Metadata.Name == name + "-callback");
+    }
 
     public async Task CheckAvailabilityAsync(CancellationToken cancellationToken)
     {
@@ -53,10 +68,152 @@ public sealed class KubernetesRuntimeResourceReconciler(
         RuntimeResourceIdentity identity,
         CancellationToken cancellationToken)
     {
+        await DestroyByIdentityAsync(
+            identity,
+            RuntimeTerminationMode.GracefulThenForce,
+            RuntimeTerminationPolicy.Default,
+            cancellationToken);
+    }
+
+    public async Task DestroyByIdentityAsync(
+        RuntimeResourceIdentity identity,
+        RuntimeTerminationMode mode,
+        RuntimeTerminationPolicy policy,
+        CancellationToken cancellationToken)
+    {
         if (identity.RuntimeInstanceId == Guid.Empty)
             throw new ArgumentOutOfRangeException(nameof(identity));
-        var selector = IdentitySelector(identity);
         var failures = new List<Exception>();
+        var networkStarted = Stopwatch.GetTimestamp();
+        using (var network = CreateStageToken(
+                   cancellationToken,
+                   policy.NetworkCleanupTimeout))
+        {
+            try
+            {
+                await DeleteNetworkResourcesAsync(identity, network.Token, failures);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                failures.Add(exception);
+            }
+        }
+        NoCtfTelemetry.RecordRuntimeStopDuration(
+            "kubernetes", "managed", "network_cleanup",
+            failures.Count == 0 ? "success" : "warning",
+            Stopwatch.GetElapsedTime(networkStarted).TotalSeconds);
+
+        var resourcesAbsent = false;
+        if (mode == RuntimeTerminationMode.GracefulThenForce)
+        {
+            var gracefulStarted = Stopwatch.GetTimestamp();
+            using var graceful = CreateStageToken(
+                cancellationToken,
+                policy.GracefulStopTimeout);
+            try
+            {
+                await DeleteComputeResourcesAsync(
+                    identity,
+                    checked((long)Math.Max(
+                        1,
+                        Math.Ceiling(policy.GracefulStopTimeout.TotalSeconds))),
+                    graceful.Token,
+                    failures);
+                await WaitUntilDeletedAsync(identity, graceful.Token);
+                resourcesAbsent = true;
+                NoCtfTelemetry.RecordRuntimeStopDuration(
+                    "kubernetes", "managed", "graceful", "success",
+                    Stopwatch.GetElapsedTime(gracefulStarted).TotalSeconds);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                NoCtfTelemetry.RecordRuntimeStopDuration(
+                    "kubernetes", "managed", "graceful", "timeout",
+                    Stopwatch.GetElapsedTime(gracefulStarted).TotalSeconds);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                failures.Add(exception);
+                NoCtfTelemetry.RecordRuntimeStopDuration(
+                    "kubernetes", "managed", "graceful", "warning",
+                    Stopwatch.GetElapsedTime(gracefulStarted).TotalSeconds);
+            }
+        }
+
+        if (!resourcesAbsent)
+        {
+            NoCtfTelemetry.RecordRuntimeStopForce(
+                "kubernetes",
+                mode == RuntimeTerminationMode.Force ? "requested" : "graceful_failed");
+            var forceStarted = Stopwatch.GetTimestamp();
+            using var force = CreateStageToken(
+                cancellationToken,
+                policy.ForceDeleteTimeout);
+            try
+            {
+                await DeleteComputeResourcesAsync(identity, 0, force.Token, failures);
+                NoCtfTelemetry.RecordRuntimeStopDuration(
+                    "kubernetes", "managed", "force_delete",
+                    failures.Count == 0 ? "success" : "warning",
+                    Stopwatch.GetElapsedTime(forceStarted).TotalSeconds);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                NoCtfTelemetry.RecordRuntimeStopDuration(
+                    "kubernetes", "managed", "force_delete", "timeout",
+                    Stopwatch.GetElapsedTime(forceStarted).TotalSeconds);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                failures.Add(exception);
+                NoCtfTelemetry.RecordRuntimeStopDuration(
+                    "kubernetes", "managed", "force_delete", "warning",
+                    Stopwatch.GetElapsedTime(forceStarted).TotalSeconds);
+            }
+        }
+
+        var verificationStarted = Stopwatch.GetTimestamp();
+        using var verification = CreateStageToken(
+            cancellationToken,
+            policy.VerificationTimeout);
+        try
+        {
+            await WaitUntilDeletedAsync(identity, verification.Token);
+            NoCtfTelemetry.RecordRuntimeStopDuration(
+                "kubernetes", "managed", "verification", "success",
+                Stopwatch.GetElapsedTime(verificationStarted).TotalSeconds);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            NoCtfTelemetry.RecordRuntimeStopResourcesRemaining("kubernetes", "managed");
+            NoCtfTelemetry.RecordRuntimeStopDuration(
+                "kubernetes", "managed", "verification", "timeout",
+                Stopwatch.GetElapsedTime(verificationStarted).TotalSeconds);
+            throw new InvalidOperationException(
+                "Kubernetes Runtime resources remain after identity-based cleanup.",
+                failures.Count == 0 ? null : new AggregateException(failures));
+        }
+    }
+
+    private async Task DeleteComputeResourcesAsync(
+        RuntimeResourceIdentity identity,
+        long gracePeriodSeconds,
+        CancellationToken cancellationToken,
+        ICollection<Exception> failures)
+    {
+        var selector = IdentitySelector(identity);
         var deployments = await client.AppsV1.ListNamespacedDeploymentAsync(
             options.Namespace,
             labelSelector: selector,
@@ -68,7 +225,11 @@ public sealed class KubernetesRuntimeResourceReconciler(
                 () => client.AppsV1.DeleteNamespacedDeploymentAsync(
                     deployment.Metadata.Name,
                     options.Namespace,
-                    body: new V1DeleteOptions { PropagationPolicy = "Foreground" },
+                    body: new V1DeleteOptions
+                    {
+                        GracePeriodSeconds = gracePeriodSeconds,
+                        PropagationPolicy = "Foreground"
+                    },
                     cancellationToken: cancellationToken),
                 failures,
                 cancellationToken);
@@ -85,12 +246,24 @@ public sealed class KubernetesRuntimeResourceReconciler(
                 () => client.CoreV1.DeleteNamespacedPodAsync(
                     pod.Metadata.Name,
                     options.Namespace,
-                    body: new V1DeleteOptions { GracePeriodSeconds = 0 },
+                    body: new V1DeleteOptions
+                    {
+                        GracePeriodSeconds = gracePeriodSeconds,
+                        PropagationPolicy = "Foreground"
+                    },
                     cancellationToken: cancellationToken),
                 failures,
                 cancellationToken);
         }
 
+    }
+
+    private async Task DeleteNetworkResourcesAsync(
+        RuntimeResourceIdentity identity,
+        CancellationToken cancellationToken,
+        ICollection<Exception> failures)
+    {
+        var selector = IdentitySelector(identity);
         var services = await client.CoreV1.ListNamespacedServiceAsync(
             options.Namespace,
             labelSelector: selector,
@@ -125,9 +298,6 @@ public sealed class KubernetesRuntimeResourceReconciler(
                 cancellationToken);
         }
 
-        if (failures.Count > 0)
-            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failures[0]).Throw();
-        await WaitUntilDeletedAsync(identity, cancellationToken);
     }
 
     private async Task WaitUntilDeletedAsync(
@@ -135,6 +305,8 @@ public sealed class KubernetesRuntimeResourceReconciler(
         CancellationToken cancellationToken)
     {
         var selector = IdentitySelector(identity);
+        var delays = new[] { 200, 400, 800, 1_000 };
+        var attempt = 0;
         while (true)
         {
             var deployments = await client.AppsV1.ListNamespacedDeploymentAsync(
@@ -158,8 +330,19 @@ public sealed class KubernetesRuntimeResourceReconciler(
                 && services.Items.Count == 0
                 && policies.Items.Count == 0)
                 return;
-            await Task.Delay(250, cancellationToken);
+            await Task.Delay(
+                TimeSpan.FromMilliseconds(delays[Math.Min(attempt++, delays.Length - 1)]),
+                cancellationToken);
         }
+    }
+
+    private static CancellationTokenSource CreateStageToken(
+        CancellationToken cancellationToken,
+        TimeSpan timeout)
+    {
+        var source = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        source.CancelAfter(timeout);
+        return source;
     }
 
     private static void AddIdentities<TResource>(

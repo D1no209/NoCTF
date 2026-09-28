@@ -19,6 +19,8 @@ const trackMessages = {
   TeamNotFound: "ui.teamNotFound",
   TrackNotFound: "ui.theSelectedTrackDoesNotExist",
   TrackNotPublicSelectable: "ui.participantsCannotSelectThisTrack",
+  TrackSsoIdentityRequired: "sso.trackIdentityRequired",
+  SsoProviderNotFound: "sso.trackProviderNotFound",
 } satisfies Record<NoCtfapiEndpointsAdministrationCompetitionsCompetitionTrackFailureCodeProtocol, string>
 
 const registrationMessages = {
@@ -38,6 +40,7 @@ const registrationMessages = {
   TrackNotPublicSelectable: "ui.participantsCannotSelectThisTrack",
   TrackInvitationRequired: "ui.message7",
   TrackInvitationInvalid: "ui.message8",
+  TrackSsoIdentityRequired: "sso.trackIdentityRequired",
 } satisfies Record<NoCtfapiEndpointsTeamsTeamRegistrationFailureCodeProtocol, string>
 
 const membershipMessages = {
@@ -54,7 +57,30 @@ const membershipMessages = {
   MembershipNotFound: "ui.theTeamMembershipWasNotFound",
   CaptainMustTransfer: "ui.theCaptainMustTransferCaptaincyFirst",
   CaptainOnly: "ui.onlyTheCaptainCanPerformThisOperation",
+  TrackSsoIdentityRequired: "sso.trackIdentityRequired",
 } satisfies Record<NoCtfapiEndpointsTeamsTeamMembershipFailureCodeProtocol, string>
+
+export function nextCompetitionTrackOrdinal(trackKeys: readonly string[]): number {
+  const normalizedKeys = new Set(trackKeys.map(key => key.trim().toLowerCase()))
+  const greatestGeneratedOrdinal = trackKeys.reduce((greatest, key) => {
+    const match = /^track-(\d+)$/i.exec(key.trim())
+    if (!match?.[1]) return greatest
+    return Math.max(greatest, Number.parseInt(match[1], 10))
+  }, 0)
+  let ordinal = Math.max(trackKeys.length + 1, greatestGeneratedOrdinal + 1)
+  while (normalizedKeys.has(`track-${ordinal}`)) ordinal += 1
+  return ordinal
+}
+
+export function duplicateCompetitionTrackKey(trackKeys: readonly string[]): string | null {
+  const keys = new Set<string>()
+  for (const key of trackKeys) {
+    const normalized = key.trim().toLowerCase()
+    if (keys.has(normalized)) return normalized
+    keys.add(normalized)
+  }
+  return null
+}
 
 export function competitionTrackErrorMessage(error: unknown, fallback: string): string {
   const payload = error as Partial<NoCtfapiEndpointsAdministrationCompetitionsCompetitionTrackFailureResponse> | null

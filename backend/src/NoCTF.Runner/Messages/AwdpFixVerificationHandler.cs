@@ -12,6 +12,8 @@ using NoCTF.Application.GameplayFacts.Awdp;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Gameplay;
 using NoCTF.GameModes.Awdp.Configuration;
+using NoCTF.GameModes.PatchVerification.Configuration;
+using NoCTF.Domain.Competitions;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Authentication;
 using NoCTF.Runner.Composition;
@@ -32,7 +34,8 @@ public sealed record AwdpCheckerWork(
     string CallbackToken,
     TimeSpan Timeout,
     bool FixInputEnabled = false,
-    bool AllowRoot = false)
+    bool AllowRoot = false,
+    Guid? GameplayFactId = null)
 {
     public override string ToString() =>
         $"AwdpCheckerWork {{ RuntimeInstanceId = {RuntimeInstanceId}, Provider = {Provider}, "
@@ -61,7 +64,7 @@ public sealed record AwdpFixRecoveryWork(
     Guid GameplayFactId,
     Guid RuntimeInstanceId,
     RuntimeProvider Provider,
-    string? ProviderReceiptJson,
+    RuntimeReceiptData? ProviderReceipt,
     string RunnerId);
 
 public sealed record AwdpFixWorkClaim(
@@ -73,11 +76,7 @@ public interface IAwdpCheckerExecutor
 {
     Task<AwdpCheckerExecutionOutcome> ExecuteAsync(
         AwdpCheckerWork work,
-        CancellationToken cancellationToken);
-
-    Task<AwdpCheckerExecutionOutcome> ExecuteAsync(
-        AwdpCheckerWork work,
-        OneShotInputArchive input,
+        OneShotInputArchive? input,
         CancellationToken cancellationToken);
 }
 
@@ -170,7 +169,8 @@ public static class AwdpPatchCommand
 }
 
 public sealed class AwdpFixWorkReader(
-    IServiceScopeFactory scopes,
+    IDbContextFactory<NoCtfDbContext> contexts,
+    IAwdpFixExecutionFence fence,
     IRunnerScoringTokenIssuer tokens,
     IOptions<RunnerScoringOptions> scoringOptions,
     TimeProvider timeProvider) : IAwdpFixWorkReader
@@ -179,8 +179,6 @@ public sealed class AwdpFixWorkReader(
         RunAwdpFixVerification message,
         CancellationToken cancellationToken)
     {
-        await using var scope = scopes.CreateAsyncScope();
-        var fence = scope.ServiceProvider.GetRequiredService<IAwdpFixExecutionFence>();
         var fenceResult = await fence.AcquireAsync(new(
             message.GameplayFactId,
             message.CompetitionChallengeId,
@@ -198,11 +196,11 @@ public sealed class AwdpFixWorkReader(
                     message.GameplayFactId,
                     fenceResult.RuntimeInstanceId,
                     fenceResult.Provider,
-                    fenceResult.ProviderReceiptJson,
+                    fenceResult.ProviderReceipt,
                     fenceResult.RunnerId));
         }
 
-        var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
+        await using var db = await contexts.CreateDbContextAsync(cancellationToken);
         var target = await db.GameplayFacts.AsNoTracking()
             .Where(submission => submission.Id == message.GameplayFactId
                 && submission.CompetitionChallengeId == message.CompetitionChallengeId
@@ -223,7 +221,8 @@ public sealed class AwdpFixWorkReader(
             .Join(
                 db.RuntimeInstances.AsNoTracking()
                     .Where(runtime => runtime.Id == message.RuntimeInstanceId
-                        && runtime.Purpose == RuntimePurpose.AwdpTarget
+                        && (runtime.Purpose == RuntimePurpose.AwdpTarget
+                            || runtime.Purpose == RuntimePurpose.PatchVerificationTarget)
                         && runtime.GameplayFactId == message.GameplayFactId
                         && runtime.State == RuntimeState.Running
                         && runtime.RunnerId == message.RunnerId),
@@ -246,7 +245,7 @@ public sealed class AwdpFixWorkReader(
                     item.Upload,
                     item.File,
                     item.Runtime,
-                    ChallengeRulesJson = challenge.RulesJson,
+                    ChallengeRules = challenge.Rules!,
                     challenge.ChallengeId
                 })
             .Join(
@@ -258,8 +257,8 @@ public sealed class AwdpFixWorkReader(
                     item.Upload,
                     item.File,
                     item.Runtime,
-                    item.ChallengeRulesJson,
-                    ChallengeDefinitionJson = challenge.DefinitionJson,
+                    item.ChallengeRules,
+                    ChallengeDefinition = challenge.Definition!,
                     item.GameplayFact
                 })
             .Join(
@@ -271,24 +270,28 @@ public sealed class AwdpFixWorkReader(
                     item.Upload,
                     item.File,
                     item.Runtime,
-                    item.ChallengeRulesJson,
-                    item.ChallengeDefinitionJson,
-                    CompetitionConfigurationJson = competition.ConfigurationJson
+                    item.ChallengeRules,
+                    item.ChallengeDefinition,
+                    CompetitionConfiguration = competition.ModeConfiguration!,
+                    competition.Mode
                 })
+            .AsSplitQuery()
             .SingleOrDefaultAsync(cancellationToken);
         if (target is null
             || timeProvider.GetUtcNow() >= message.Deadline
-            || string.IsNullOrWhiteSpace(target.Runtime.ProviderReceiptJson))
+            || target.Runtime.ProviderReceipt is null)
             return new(AwdpFixExecutionFenceDisposition.Superseded);
 
-        var settings = AwdpConfigurationResolver.Resolve(
-            target.CompetitionConfigurationJson,
-            target.ChallengeRulesJson,
-            target.ChallengeDefinitionJson);
-        if (settings.Checker is not { } checker)
+        var settings = PatchVerificationConfigurationResolver.Resolve(
+            target.Mode,
+            target.CompetitionConfiguration,
+            target.ChallengeRules,
+            target.ChallengeDefinition);
+        if (settings is null)
             return new(AwdpFixExecutionFenceDisposition.Superseded);
-        var receipt = JsonSerializer.Deserialize<ContainerReceipt>(
-            target.Runtime.ProviderReceiptJson);
+        var checker = settings.Checker;
+        var receipt = (target.Runtime.ProviderReceipt?.ToData()
+            as ContainerRuntimeReceiptData)?.ToReceipt();
         if (receipt?.NetworkId is not { Length: > 0 } networkId
             || receipt.InternalHost is not { Length: > 0 } targetHost)
             return new(AwdpFixExecutionFenceDisposition.Superseded);
@@ -302,12 +305,15 @@ public sealed class AwdpFixWorkReader(
             return new(AwdpFixExecutionFenceDisposition.Superseded);
         var checkerTimeout = TimeSpan.FromSeconds(checker.TimeoutSeconds);
         var timeout = checkerTimeout < remaining ? checkerTimeout : remaining;
-        var callbackToken = tokens.IssueAwdpFixResult(new(
+        var callbackTokenRequest = new AwdpFixResultTokenRequest(
             message.RunnerId,
             message.GameplayFactId,
             message.RuntimeInstanceId,
             message.Deadline,
-            now));
+            now);
+        var callbackToken = target.Mode == GameMode.Ctf
+            ? tokens.IssuePatchVerificationResult(callbackTokenRequest)
+            : tokens.IssueAwdpFixResult(callbackTokenRequest);
         var archiveToken = tokens.IssueFixArchiveRead(
             message.RunnerId,
             message.PatchUploadId,
@@ -340,25 +346,23 @@ public sealed class AwdpFixWorkReader(
                     networkId,
                     targetHost,
                     settings.ReadyTimeoutSeconds,
-                    new Uri(baseUri, "/api/internal/v1/awdp/fix-results"),
+                    new Uri(baseUri, target.Mode == GameMode.Ctf
+                        ? "/api/internal/v1/patch-verification/results"
+                        : "/api/internal/v1/awdp/fix-results"),
                     callbackToken,
                     timeout,
                     settings.CheckerFixInput,
-                    settings.CheckerAllowRoot)));
+                    settings.CheckerAllowRoot,
+                    message.GameplayFactId)));
     }
 }
 
-public sealed class AwdpCheckerExecutor(IOneShotRuntimeProviderCatalog providers)
+public sealed class AwdpCheckerExecutor(IOneShotRuntimeProviderCatalog providers, AuxiliaryRuntimeCapacity? capacity = null)
     : IAwdpCheckerExecutor
 {
     public Task<AwdpCheckerExecutionOutcome> ExecuteAsync(
         AwdpCheckerWork work,
-        CancellationToken cancellationToken) =>
-        ExecuteCoreAsync(work, input: null, cancellationToken);
-
-    public Task<AwdpCheckerExecutionOutcome> ExecuteAsync(
-        AwdpCheckerWork work,
-        OneShotInputArchive input,
+        OneShotInputArchive? input,
         CancellationToken cancellationToken) =>
         ExecuteCoreAsync(work, input, cancellationToken);
 
@@ -384,7 +388,7 @@ public sealed class AwdpCheckerExecutor(IOneShotRuntimeProviderCatalog providers
             new Dictionary<string, string>(),
             new Dictionary<int, int>(),
             new RuntimeResourceLimits(256 * 1024 * 1024, 250_000_000, 128),
-            new ContainerSecurityPolicy(true, input is null, !work.AllowRoot, ["ALL"], []),
+            new ContainerSecurityPolicy(true, input is null, !work.AllowRoot, [], []),
             work.Timeout,
             NetworkName: work.NetworkId,
             OperationTimeout: work.Timeout,
@@ -396,9 +400,12 @@ public sealed class AwdpCheckerExecutor(IOneShotRuntimeProviderCatalog providers
         try
         {
             var runner = providers.OneShot(work.Provider);
-            var result = input is null
-                ? await runner.RunAsync(request, timeout.Token)
-                : await runner.RunAsync(request, input, timeout.Token);
+            var result = capacity is null
+                ? await runner.RunAsync(request, input, timeout.Token)
+                : await capacity.RunAsync(request,
+                    new(RuntimeWorkloadKind.PatchChecker, work.RuntimeInstanceId, request.OperationId),
+                    work.GameplayFactId ?? throw new InvalidOperationException("Checker capacity requires a gameplay fact."),
+                    (reserved, token) => runner.RunAsync(reserved, input, token), timeout.Token);
             return result.ExitCode == 0
                 ? AwdpCheckerExecutionOutcome.Completed
                 : AwdpCheckerExecutionOutcome.AbnormalExit;
@@ -466,12 +473,24 @@ public sealed class AwdpFixVerificationHandler(
     IAwdpCheckerExecutor checker,
     IEnumerable<IRuntimeManagedResourceReconciler> resourceReconcilers,
     IRunnerCapacityGate capacity,
-    ITransactionalMessageOutbox outbox,
+    IPostCommitMessagePublisher outbox,
     IOptions<RunnerOptions> runnerOptions,
     IHostApplicationLifetime applicationLifetime,
     TimeProvider timeProvider,
-    ILogger<AwdpFixVerificationHandler> logger)
+    ILogger<AwdpFixVerificationHandler> logger,
+    NoCTF.Infrastructure.Runtime.Capacity.RunnerResourceMutationCoordinator? mutations = null)
 {
+    public Task Handle(
+        RunPatchVerification message,
+        CancellationToken cancellationToken) =>
+        Handle(new RunAwdpFixVerification(
+            message.GameplayFactId,
+            message.CompetitionChallengeId,
+            message.PatchUploadId,
+            message.RuntimeInstanceId,
+            message.Deadline,
+            message.RunnerId), cancellationToken);
+
     public async Task Handle(
         RunAwdpFixVerification message,
         CancellationToken cancellationToken)
@@ -718,6 +737,7 @@ public sealed class AwdpFixVerificationHandler(
                     {
                         execution = await checker.ExecuteAsync(
                             work.Checker,
+                            null,
                             cancellationToken);
                     }
                     if (execution != AwdpCheckerExecutionOutcome.Completed)
@@ -759,21 +779,22 @@ public sealed class AwdpFixVerificationHandler(
             message.RuntimeInstanceId,
             outcome,
             timeProvider.GetUtcNow())).AsTask().WaitAsync(compensation.Token);
-        await outbox.FlushOutgoingMessagesAsync().WaitAsync(compensation.Token);
+        await outbox.SaveChangesAndFlushAsync(compensation.Token).WaitAsync(compensation.Token);
     }
 
     private async Task RecoverAsync(
         AwdpFixRecoveryWork recovery,
         CancellationToken cancellationToken)
     {
+        using var mutation = mutations is null ? null : await mutations.EnterAsync(cancellationToken);
         var identity = new RuntimeResourceIdentity(recovery.RuntimeInstanceId);
-        if (!string.IsNullOrWhiteSpace(recovery.ProviderReceiptJson))
+        if (recovery.ProviderReceipt is not null)
         {
             await RuntimeReceiptCleanup.CleanupContainerAsync(
                 providers,
                 identity,
                 recovery.Provider,
-                recovery.ProviderReceiptJson,
+                recovery.ProviderReceipt,
                 cancellationToken);
         }
         else
@@ -794,7 +815,7 @@ public sealed class AwdpFixVerificationHandler(
             recovery.RuntimeInstanceId,
             recovery.RunnerId,
             cancellationToken);
-        if (release == RunnerCapacityReleaseOutcome.OwnerMismatch)
+        if (release is RunnerCapacityReleaseOutcome.OwnerMismatch or RunnerCapacityReleaseOutcome.RecoveryRequired)
             throw new InvalidOperationException(
                 "AWDP target capacity belongs to a different Runner assignment.");
 

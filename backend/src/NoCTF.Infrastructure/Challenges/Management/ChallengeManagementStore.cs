@@ -8,14 +8,18 @@ using NoCTF.Application.Messaging;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Competitions.Events;
+using NoCTF.GameModes.Ctf.Configuration;
+using NoCTF.GameModes.Registration;
+using NoCTF.Application.Challenges.Bank;
 
 namespace NoCTF.Infrastructure.Challenges.Management;
 
 public sealed class ChallengeManagementStore(
     NoCtfDbContext db,
-    ITransactionalMessageOutbox outbox,
+    IPostCommitMessagePublisher outbox,
     IChallengeRuntimeTemplateCatalog runtimeTemplates,
-    ICompetitionEventRecorder? eventRecorder = null) : IChallengeManagementStore
+    ICompetitionEventRecorder? eventRecorder = null,
+    IExperimentalFeatureReader? experimentalFeatures = null) : IChallengeManagementStore
 {
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
@@ -28,10 +32,33 @@ public sealed class ChallengeManagementStore(
 
     public async Task<ChallengeMutationResult> CreateAsync(
         CreateCompetitionChallengeCommand command,
-        string configurationJson,
+        CompetitionChallengeRules rules,
         CancellationToken ct)
     {
-        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                return await CreateOnceAsync(command, rules, ct);
+            }
+            catch (Exception exception) when (attempt < 2
+                && RelationalRetry.IsTransientConcurrency(exception))
+            {
+                db.ChangeTracker.Clear();
+                await Task.Delay(TimeSpan.FromMilliseconds(Random.Shared.Next(5, 31)), ct);
+            }
+        }
+    }
+
+    private async Task<ChallengeMutationResult> CreateOnceAsync(
+        CreateCompetitionChallengeCommand command,
+        CompetitionChallengeRules rules,
+        CancellationToken ct)
+    {
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(
+            db,
+            System.Data.IsolationLevel.Serializable,
+            ct);
         if (await CompetitionStateReader.ReadAsync(db, command.CompetitionId, ct) is null)
             return new(null, ChallengeMutationFailure.CompetitionNotFound);
         var competitionMode = await db.Competitions.AsNoTracking()
@@ -51,16 +78,24 @@ public sealed class ChallengeManagementStore(
             return new(null, ChallengeMutationFailure.TemplateNotFound);
         if (template.Mode != competitionMode)
             return new(null, ChallengeMutationFailure.TemplateModeMismatch);
-        var entity = new CompetitionChallenge
+        if (GetInteractionKind(template.Definition)
+                == CtfInteractionKind.PatchVerification
+            && !(await IsPatchVerificationEnabledAsync(ct)))
         {
-            Id = command.CompetitionChallengeId ?? Guid.CreateVersion7(command.CreatedAt),
-            CompetitionId = command.CompetitionId,
-            ChallengeId = command.ChallengeId,
-            CustomTitle = command.CustomTitle,
-            Order = command.Order,
-            RulesJson = configurationJson,
-            UpdatedAt = command.CreatedAt
-        };
+            return new(null, ChallengeMutationFailure.ExperimentalFeatureDisabled);
+        }
+        var entityId = command.CompetitionChallengeId ?? Guid.CreateVersion7(command.CreatedAt);
+        if (rules.Mode != template.Mode)
+            return new(null, ChallengeMutationFailure.TemplateModeMismatch);
+        rules.CompetitionChallengeId = entityId;
+        var entity = CompetitionChallengeGeneratedCatalog.Create(template.Mode);
+        entity.Id = entityId;
+        entity.CompetitionId = command.CompetitionId;
+        entity.ChallengeId = command.ChallengeId;
+        entity.CustomTitle = command.CustomTitle;
+        entity.Order = command.Order;
+        entity.Rules = rules;
+        entity.UpdatedAt = command.CreatedAt;
         db.CompetitionChallenges.Add(entity);
         await events.RecordAsync(new(
             entity.CompetitionId,
@@ -73,7 +108,7 @@ public sealed class ChallengeManagementStore(
         {
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
-            await outbox.FlushOutgoingMessagesAsync();
+            await transaction.FlushMessagesAsync(outbox);
             return new(Map(entity, template));
         }
         catch (DbUpdateException)
@@ -109,15 +144,42 @@ public sealed class ChallengeManagementStore(
         return projection is null ? null : Map(projection);
     }
 
-    public async Task<IReadOnlyList<ChallengeView>> ListAsync(
+    public async Task<IReadOnlyList<CompetitionChallengeSummaryView>> ListAsync(
         Guid competitionId,
         bool includeUnpublished,
         bool includeDeleted,
-        CancellationToken ct) =>
-        (await Query(includeUnpublished, includeDeleted, competitionId)
-            .ToListAsync(ct))
-            .Select(Map)
-            .ToArray();
+        CancellationToken ct)
+    {
+        var instances = includeDeleted
+            ? db.CompetitionChallenges.IgnoreQueryFilters().AsNoTracking().IgnoreAutoIncludes()
+            : db.CompetitionChallenges.AsNoTracking().IgnoreAutoIncludes();
+        var templates = includeDeleted
+            ? db.Challenges.IgnoreQueryFilters().AsNoTracking().IgnoreAutoIncludes()
+            : db.Challenges.AsNoTracking().IgnoreAutoIncludes();
+        return await instances.Where(instance => instance.CompetitionId == competitionId)
+            .Join(templates,
+                instance => instance.ChallengeId,
+                template => template.Id,
+                (instance, template) => new { Instance = instance, Template = template })
+            .Where(item => includeUnpublished || item.Instance.IsPublished)
+            .OrderBy(item => item.Instance.Order)
+            .ThenBy(item => item.Instance.Id)
+            .Select(item => new CompetitionChallengeSummaryView(
+                item.Instance.Id,
+                item.Instance.CompetitionId,
+                item.Instance.ChallengeId,
+                item.Instance.CustomTitle ?? item.Template.Title,
+                item.Instance.CustomTitle,
+                item.Template.Direction,
+                item.Instance.Order,
+                item.Instance.IsPublished,
+                item.Instance.DeletedAt,
+                db.Set<CtfChallengeDefinition>().AsNoTracking()
+                    .Where(definition => definition.ChallengeId == item.Template.Id)
+                    .Select(definition => definition.InteractionKind)
+                    .FirstOrDefault()))
+            .ToArrayAsync(ct);
+    }
 
     public async Task<ChallengeMutationResult> UpdateAsync(
         UpdateCompetitionChallengeCommand command,
@@ -128,6 +190,7 @@ public sealed class ChallengeManagementStore(
             return new(null, ChallengeMutationFailure.CompetitionNotFound);
 
         var entity = await db.CompetitionChallenges
+            .AsSplitQuery()
             .SingleOrDefaultAsync(item =>
                 item.Id == command.CompetitionChallengeId &&
                 item.CompetitionId == command.CompetitionId, ct);
@@ -135,6 +198,20 @@ public sealed class ChallengeManagementStore(
             return new(null, ChallengeMutationFailure.ChallengeNotFound);
         var wasPublished = entity.IsPublished;
         var becamePublished = !wasPublished && command.IsPublished;
+        if (becamePublished)
+        {
+            var definition = await db.Challenges.AsNoTracking()
+                .Where(challenge => challenge.Id == entity.ChallengeId)
+                .Select(challenge => new { challenge.Mode, challenge.Definition })
+                .AsSplitQuery()
+                .SingleAsync(ct);
+            if (GetInteractionKind(definition.Definition)
+                    == CtfInteractionKind.PatchVerification
+                && !(await IsPatchVerificationEnabledAsync(ct)))
+            {
+                return new(null, ChallengeMutationFailure.ExperimentalFeatureDisabled);
+            }
+        }
         entity.CustomTitle = command.CustomTitle;
         entity.Order = command.Order;
         entity.IsPublished = command.IsPublished;
@@ -160,6 +237,7 @@ public sealed class ChallengeManagementStore(
             if (becamePublished)
             {
                 var publishedTemplate = await db.Challenges.AsNoTracking()
+                    .AsSplitQuery()
                     .SingleAsync(challenge => challenge.Id == entity.ChallengeId, ct);
                 await outbox.PublishAsync(new ChallengePublished(
                     command.CompetitionId,
@@ -169,8 +247,9 @@ public sealed class ChallengeManagementStore(
                     command.UpdatedAt));
             }
             await transaction.CommitAsync(ct);
-            await outbox.FlushOutgoingMessagesAsync();
+            await transaction.FlushMessagesAsync(outbox);
             var template = await db.Challenges.AsNoTracking()
+                .AsSplitQuery()
                 .SingleAsync(challenge => challenge.Id == entity.ChallengeId, ct);
             return new(Map(entity, template));
         }
@@ -267,7 +346,7 @@ public sealed class ChallengeManagementStore(
         {
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
-            await outbox.FlushOutgoingMessagesAsync();
+            await transaction.FlushMessagesAsync(outbox);
             return null;
         }
         catch (DbUpdateException)
@@ -324,14 +403,15 @@ public sealed class ChallengeManagementStore(
                 item.Instance.IsPublished,
                 item.Instance.DeletedAt,
                 item.Template.Mode,
-                item.Template.DefinitionJson,
+                item.Template.Definition,
                 item.Template.CreatedAt,
-                item.Instance.UpdatedAt));
+                item.Instance.UpdatedAt))
+            .AsSplitQuery();
     }
 
     private ChallengeView Map(CompetitionChallenge instance, Challenge template)
     {
-        var runtime = runtimeTemplates.Get(template.Mode, template.DefinitionJson);
+        var runtime = runtimeTemplates.Get(template.Definition);
         return new(
             instance.Id,
             instance.CompetitionId,
@@ -347,13 +427,14 @@ public sealed class ChallengeManagementStore(
             template.CreatedAt,
             instance.UpdatedAt)
         {
-            UsesDynamicFlag = runtime is { FlagSource: not RuntimeFlagSource.Static }
+            UsesDynamicFlag = runtime is { FlagSource: not RuntimeFlagSource.Static },
+            InteractionKind = GetInteractionKind(template.Definition)
         };
     }
 
     private ChallengeView Map(ChallengeProjection projection)
     {
-        var runtime = runtimeTemplates.Get(projection.Mode, projection.DefinitionJson);
+        var runtime = runtimeTemplates.Get(projection.Definition);
         return new(
             projection.Id,
             projection.CompetitionId,
@@ -369,9 +450,19 @@ public sealed class ChallengeManagementStore(
             projection.CreatedAt,
             projection.UpdatedAt)
         {
-            UsesDynamicFlag = runtime is { FlagSource: not RuntimeFlagSource.Static }
+            UsesDynamicFlag = runtime is { FlagSource: not RuntimeFlagSource.Static },
+            InteractionKind = GetInteractionKind(projection.Definition)
         };
     }
+
+    private static CtfInteractionKind GetInteractionKind(ChallengeDefinition? definition) =>
+        definition is CtfChallengeDefinition ctf
+            ? ctf.InteractionKind
+            : CtfInteractionKind.FlagSubmission;
+
+    private Task<bool> IsPatchVerificationEnabledAsync(CancellationToken ct) =>
+        experimentalFeatures?.IsCtfPatchVerificationEnabledAsync(ct)
+        ?? Task.FromResult(false);
 
     private sealed record ChallengeProjection(
         Guid Id,
@@ -385,7 +476,7 @@ public sealed class ChallengeManagementStore(
         bool IsPublished,
         DateTimeOffset? DeletedAt,
         GameMode Mode,
-        string DefinitionJson,
+        ChallengeDefinition? Definition,
         DateTimeOffset CreatedAt,
         DateTimeOffset UpdatedAt);
 

@@ -20,15 +20,18 @@ public sealed record ProvisionOvaRuntime(
 
 public sealed record StopContainerRuntime(
     Guid RuntimeInstanceId,
-    string RunnerId) : IRuntimeStopMessage;
+    string RunnerId,
+    DateTimeOffset RequestedAt = default) : IRuntimeStopMessage;
 
 public sealed record StopComposeRuntime(
     Guid RuntimeInstanceId,
-    string RunnerId) : IRuntimeStopMessage;
+    string RunnerId,
+    DateTimeOffset RequestedAt = default) : IRuntimeStopMessage;
 
 public sealed record StopOvaRuntime(
     Guid RuntimeInstanceId,
-    string RunnerId) : IRuntimeStopMessage;
+    string RunnerId,
+    DateTimeOffset RequestedAt = default) : IRuntimeStopMessage;
 
 public sealed record ReconcileRuntimeResources(
     string RunnerId,
@@ -50,11 +53,12 @@ public interface IRuntimeProvisionMessage : IRunnerNodeMessage
 public interface IRuntimeStopMessage : IRunnerNodeMessage
 {
     Guid RuntimeInstanceId { get; }
+    DateTimeOffset RequestedAt { get; }
 }
 
 public sealed record RuntimeStopWork(
     RuntimeProvider Provider,
-    string? ProviderReceiptJson,
+    RuntimeReceiptData? ProviderReceipt,
     RuntimeKind RuntimeKind = RuntimeKind.Container);
 
 public enum RuntimeProvisionWorkStatus
@@ -80,8 +84,8 @@ public sealed record RuntimeProvisioned(
     Guid RuntimeInstanceId,
     string RunnerId,
     RuntimeProvider Provider,
-    string ProviderReceiptJson,
-    IReadOnlyList<string> Urls,
+    RuntimeReceiptData ProviderReceipt,
+    IReadOnlyList<RuntimeAccessEndpointMapping> AccessEndpoints,
     DateTimeOffset? ExpiresAt,
     IReadOnlyList<RuntimePublishedPortMapping>? PublishedPorts = null);
 

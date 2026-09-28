@@ -5,7 +5,6 @@ using NoCTF.Hosting;
 using NoCTF.Hosting.Health;
 using NoCTF.Worker;
 using Wolverine;
-using Wolverine.Configuration;
 
 namespace NoCTF.Tests.Unit.Worker;
 
@@ -41,6 +40,7 @@ public sealed class WorkerRoleTests
         await Assert.That(WorkerQueues.GetConcurrency(configuration, WorkerQueue.Gameplay)).IsEqualTo(8);
         await Assert.That(WorkerQueues.GetConcurrency(configuration, WorkerQueue.Projection)).IsEqualTo(2);
         await Assert.That(WorkerQueues.GetConcurrency(configuration, WorkerQueue.Background)).IsEqualTo(2);
+        await Assert.That(WorkerQueues.GetConcurrency(configuration, WorkerQueue.Webhook)).IsEqualTo(32);
     }
 
     [Test]
@@ -135,8 +135,9 @@ public sealed class WorkerRoleTests
     }
 
     [Test]
-    [Arguments(CompetitionEventFanoutQueueNames.Realtime, "nats://subject/noctf.events.realtime")]
-    [Arguments(CompetitionEventFanoutQueueNames.Leaderboard, "nats://subject/noctf.events.leaderboard")]
+    [Arguments(CompetitionEventFanoutQueueNames.Realtime, "nats://subject/noctf.v2.events.realtime")]
+    [Arguments(CompetitionEventFanoutQueueNames.Leaderboard, "nats://subject/noctf.v2.events.leaderboard")]
+    [Arguments(CompetitionEventFanoutQueueNames.Webhook, "nats://subject/noctf.v2.events.webhook")]
     public async Task Sticky_fanout_uses_the_canonical_NATS_subject_address(
         string queueName,
         string expected)
@@ -148,20 +149,11 @@ public sealed class WorkerRoleTests
     }
 
     [Test]
-    public async Task Leaderboard_fanout_rejects_listener_not_pinned_to_leader()
-    {
-        var action = () => WorkerMessageTopologyStartupValidator.ValidateLeaderboardListenerScope(
-            ListenerScope.Exclusive);
-
-        await Assert.That(action).Throws<InvalidOperationException>();
-    }
-
-    [Test]
     public async Task Account_notifications_use_the_canonical_background_NATS_route()
     {
         var endpoint = WorkerMessageTopologyStartupValidator.BackgroundEndpointAddress();
 
-        await Assert.That(endpoint).IsEqualTo("nats://subject/noctf.background");
+        await Assert.That(endpoint).IsEqualTo("nats://subject/noctf.v2.background");
         WorkerMessageTopologyStartupValidator.ValidateBackgroundRouting(endpoint);
     }
 

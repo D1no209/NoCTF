@@ -14,6 +14,9 @@ using Microsoft.Extensions.Options;
 using NSubstitute;
 using NoCTF.API.Composition;
 using NoCTF.API.Endpoints.Administration.Platform;
+using NoCTF.API.Endpoints.Administration.Runtime;
+using NoCTF.API.Security;
+using NoCTF.Application.Teams.Moderation;
 using NoCTF.API.Pagination;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Domain.Runtime;
@@ -23,6 +26,28 @@ namespace NoCTF.Tests.Unit.API;
 public sealed class PlatformRuntimeEndpointTests
 {
     private const string Route = "/api/v1/admin/platform/runtimes";
+
+    [Test, Arguments(true), Arguments(false)]
+    public async Task Allocation_amounts_are_disclosed_only_to_platform_administrators(bool administrator)
+    {
+        var id = Guid.NewGuid();
+        var store = CreateStore();
+        var view = new RuntimeInstanceView(id, Guid.NewGuid(), Guid.NewGuid(), null, null, RuntimePurpose.Player,
+            RuntimeKind.Container, RuntimeProvider.Docker, RuntimeState.Running, null, DateTimeOffset.UtcNow, null, null, null)
+        {
+            Capacity = RuntimeCapacityAllocations.Empty.Add(new(new(RuntimeWorkloadKind.Runtime, id, id), null,
+                "domain", "runner", new(1024, 250, 128), new(1024, 500, 128)))
+        };
+        store.FindPlatformAsync(id, Arg.Any<CancellationToken>()).Returns(view);
+        await using var app = await CreateApp(store, administrator);
+        using var client = app.GetTestClient();
+        client.DefaultRequestHeaders.Add("X-Test-Role", administrator ? "Administrator" : "Organizer");
+        var result = await client.GetFromJsonAsync<AdminRuntimeResponse>($"/api/v1/admin/runtimes/{id}");
+        await Assert.That(result).IsNotNull();
+        await Assert.That(result!.Capacity is not null).IsEqualTo(administrator);
+        if (administrator)
+            await Assert.That(result.Capacity!.Single().Budget.NanoCpus).IsEqualTo(250);
+    }
 
     [Test]
     [Arguments("Administrator", HttpStatusCode.OK)]
@@ -40,31 +65,19 @@ public sealed class PlatformRuntimeEndpointTests
     }
 
     [Test]
-    public async Task Filters_reach_store_and_cursor_is_bound_to_every_filter()
+    public async Task Filters_and_offset_page_reach_the_store()
     {
         var store = CreateStore();
         await using var app = await CreateApp(store);
         using var client = app.GetTestClient();
         client.DefaultRequestHeaders.Add("X-Test-Role", "Administrator");
-        const string filters = "search=soul&scope=Competition&state=Running&runtimeKind=Container&limit=1";
-        var first = await client.GetFromJsonAsync<PlatformRuntimeListResponse>($"{Route}?{filters}");
-        await Assert.That(first!.NextCursor).IsNotNull();
-        await store.Received(1).ListActiveContainersAsync(
+        const string filters = "search=soul&scope=Competition&state=Running&runtimeKind=Container&offset=5&limit=1&desc=true";
+        var page = await client.GetFromJsonAsync<PlatformRuntimeListResponse>($"{Route}?{filters}");
+        await Assert.That(page!.Total).IsEqualTo(1);
+        await store.Received(1).ListActiveContainersPageAsync(
             new("soul", PlatformRuntimeScope.Competition, RuntimeState.Running, RuntimeKind.Container),
-            null, null, 1, Arg.Any<CancellationToken>());
-        var cursor = Uri.EscapeDataString(first.NextCursor!);
-        using var next = await client.GetAsync($"{Route}?{filters}&cursor={cursor}");
-        await Assert.That(next.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        foreach (var changed in new[]
-        {
-            filters.Replace("soul", "different"), filters.Replace("Competition", "ChallengeTest"),
-            filters.Replace("Running", "Stopping"), filters.Replace("Container", "Compose")
-        })
-        {
-            using var response = await client.GetAsync($"{Route}?{changed}&cursor={cursor}");
-            await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
-        }
-        await Assert.That(store.ReceivedCalls().Count()).IsEqualTo(2);
+            5, 1, true, Arg.Any<CancellationToken>());
+        await Assert.That(store.ReceivedCalls()).Count().IsEqualTo(1);
     }
 
     [Test]
@@ -90,13 +103,24 @@ public sealed class PlatformRuntimeEndpointTests
             Arg.Any<Guid?>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(
             Task.FromResult<IReadOnlyList<PlatformRuntimeInstanceView>>([
                 new(new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, null, RuntimePurpose.Player,
-                    RuntimeKind.Container, RuntimeProvider.Docker, RuntimeState.Running, null, [],
+                    RuntimeKind.Container, RuntimeProvider.Docker, RuntimeState.Running, null,
                     DateTimeOffset.UtcNow, null, null, null), PlatformRuntimeScope.Competition, "Contest", "soul")
             ]));
+        store.ListActiveContainersPageAsync(
+                Arg.Any<PlatformRuntimeFilter>(),
+                Arg.Any<int>(),
+                Arg.Any<int>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new PlatformRuntimeListPage(
+                [new(new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, null, RuntimePurpose.Player,
+                    RuntimeKind.Container, RuntimeProvider.Docker, RuntimeState.Running, null,
+                    DateTimeOffset.UtcNow, null, null, null), PlatformRuntimeScope.Competition, "Contest", "soul")],
+                1)));
         return store;
     }
 
-    private static async Task<WebApplication> CreateApp(IAdminRuntimeStore store)
+    private static async Task<WebApplication> CreateApp(IAdminRuntimeStore store, bool administrator = true)
     {
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
@@ -106,17 +130,21 @@ public sealed class PlatformRuntimeEndpointTests
             options.DisableAutoDiscovery = true;
             options.Assemblies = [typeof(ListPlatformRuntimesEndpoint).Assembly];
             options.Filter = type => type == typeof(ListPlatformRuntimesEndpoint)
-                || type == typeof(ListPlatformRuntimesValidator);
+                || type == typeof(ListPlatformRuntimesValidator) || type == typeof(GetAdminRuntimeEndpoint);
         });
         builder.Services.SwaggerDocument();
         builder.Services.AddAuthentication("Bearer")
             .AddScheme<AuthenticationSchemeOptions, TestBearer>("Bearer", _ => { });
         builder.Services.AddAuthorization();
+        var user = Substitute.For<IUserContext>();
+        user.IsAdministrator.Returns(administrator);
+        builder.Services.AddSingleton(user);
+        var authorizer = Substitute.For<ICompetitionModerationAuthorizer>();
+        authorizer.CanObserveAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
+        builder.Services.AddSingleton(authorizer);
         builder.Services.AddSingleton(store);
         builder.Services.AddScoped<ManageAdminRuntimes>();
         builder.Services.AddSingleton(TimeProvider.System);
-        builder.Services.Configure<PaginationOptions>(options => options.SigningKey = "test-only-cursor-signing-key");
-        builder.Services.AddSingleton<SignedKeysetCursor>();
         var app = builder.Build();
         app.UseAuthentication();
         app.UseAuthorization();

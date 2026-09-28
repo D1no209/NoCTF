@@ -6,13 +6,15 @@ using NoCTF.Application.Competitions.Visibility;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Application.Scoring.Leaderboard;
 
 namespace NoCTF.Infrastructure.Competitions.Visibility;
 
 public sealed class CompetitionVisibilityStore(
     NoCtfDbContext db,
     ICompetitionEventRecorder? eventRecorder = null,
-    NoCTF.Infrastructure.Competitions.Management.CompetitionReadModelCache? readModels = null)
+    NoCTF.Infrastructure.Competitions.Management.CompetitionReadModelCache? readModels = null,
+    ILeaderboardCache? leaderboard = null)
     : ICompetitionVisibilityStore
 {
     private readonly ICompetitionEventRecorder events =
@@ -54,6 +56,7 @@ public sealed class CompetitionVisibilityStore(
             competition.FrozenStartAt,
             competition.HiddenStartAt,
             command.Now);
+        var previousFrozenAt = competition.FrozenStartAt;
         competition.FrozenStartAt = TruncateToMicroseconds(command.FrozenStartAt);
         competition.HiddenStartAt = TruncateToMicroseconds(command.HiddenStartAt);
         competition.UpdatedAt = command.Now;
@@ -69,21 +72,25 @@ public sealed class CompetitionVisibilityStore(
             CompetitionEventVisibility.Public,
             command.Now,
             ActorUserId: command.ActorId,
-            PayloadJson: JsonSerializer.Serialize(new
-            {
-                schemaVersion = 1,
-                from = before,
-                to = after,
-                frozenStartAt = competition.FrozenStartAt,
-                hiddenStartAt = competition.HiddenStartAt,
-                actorUserId = command.ActorId,
-                operatedAt = command.Now,
-                reason = NormalizeReason(command.Reason)
-            }, JsonOptions),
             CompetitionStatus: competition.Status,
-            LeaderboardVisibility: after), ct);
+            LeaderboardVisibility: after,
+            PreviousLeaderboardVisibility: before,
+            FrozenStartAt: competition.FrozenStartAt,
+            HiddenStartAt: competition.HiddenStartAt,
+            Reason: NormalizeReason(command.Reason)), ct);
 
         await db.SaveChangesAsync(ct);
+        if (leaderboard is not null
+            && after == CompetitionLeaderboardVisibility.Frozen
+            && (before != CompetitionLeaderboardVisibility.Frozen
+                || previousFrozenAt != competition.FrozenStartAt)
+            && competition.FrozenStartAt is { } frozenAt)
+        {
+            _ = await leaderboard.GetFrozenWebhookScoreboardAsync(
+                competition.Id, frozenAt, ct)
+                ?? throw new InvalidOperationException(
+                    "Frozen public projection could not be captured.");
+        }
         await transaction.CommitAsync(ct);
         if (readModels is not null)
             await readModels.InvalidateAsync(competition.Id, ct);

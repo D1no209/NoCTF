@@ -35,7 +35,13 @@ public enum PlatformAdministrationActionProtocol
     AuditArchiveExported,
     UserAccessTokenIssued,
     UserAccessTokenRevoked,
-    UserTokensInvalidated
+    UserTokensInvalidated,
+    SsoGlobalConfigurationUpdated,
+    SsoProviderCreated,
+    SsoProviderUpdated,
+    SsoProviderSecretReplaced,
+    SsoExternalIdentityBound,
+    SsoExternalIdentityUnbound
 }
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<UserAccountLifecycleActionProtocol>))]

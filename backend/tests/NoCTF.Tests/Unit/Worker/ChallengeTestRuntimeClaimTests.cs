@@ -13,11 +13,10 @@ public sealed class ChallengeTestRuntimeClaimTests
     {
         var runtimeId = Guid.CreateVersion7();
         var challengeId = Guid.CreateVersion7();
-        var instance = new RuntimeInstance
+        var instance = new TemplateTestRuntimeInstance
         {
             Id = runtimeId,
             ChallengeId = challengeId,
-            Purpose = RuntimePurpose.TemplateTest,
             TestFlagDelivery = RuntimeTestFlagDelivery.Environment,
             TestFlagState = RuntimeTestFlagState.Pending,
             RuntimeKind = RuntimeKind.Container,
@@ -29,6 +28,7 @@ public sealed class ChallengeTestRuntimeClaimTests
             RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition(
                 "challenge:test",
+                Security: new(false, false, false, ["ALL"], []),
                 FlagEnvironmentVariableName: "CHALLENGE_FLAG"),
             new RuntimeResourceLimits(67_108_864, 100_000_000, 64),
             FlagSource: RuntimeFlagSource.PerTeam);
@@ -38,7 +38,7 @@ public sealed class ChallengeTestRuntimeClaimTests
             "runner-test",
             GameMode.Ctf,
             template,
-            "{}",
+            null,
             "flag{template-test}");
         var provision = message as ProvisionContainerRuntime
             ?? throw new InvalidOperationException("Expected a Container provision message.");

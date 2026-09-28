@@ -11,6 +11,8 @@ using NoCTF.Infrastructure.GameplayFacts.Administration;
 using NoCTF.Infrastructure.GameplayFacts.Intake;
 using NoCTF.Infrastructure.GameplayFacts.Management;
 using NoCTF.Infrastructure.GameplayFacts.PatchUploads;
+using NoCTF.Application.GameplayFacts.PatchVerification;
+using NoCTF.Infrastructure.GameplayFacts.PatchVerification;
 using NoCTF.Infrastructure.GameplayFacts.Processing;
 using NoCTF.Infrastructure.GameplayFacts.Status;
 using NoCTF.Infrastructure.GameplayFacts.CheatIncidents;
@@ -27,6 +29,7 @@ internal static class GameplayFactInfrastructure
     {
         services.AddScoped<GameplayFactAttemptCriticalSection>();
         services.AddScoped<IGameplayFactIntakeStore, GameplayFactIntakeStore>();
+        services.AddScoped<IFlagAttemptStateReader, FlagAttemptStateReader>();
         services.AddScoped<GetFlagAttemptState>();
         services.AddScoped<IAwdpParticipantStateReader, AwdpParticipantStateReader>();
         services.AddScoped<GetAwdpParticipantState>();
@@ -37,6 +40,9 @@ internal static class GameplayFactInfrastructure
         services.AddScoped<CreateManualAdjustment>();
         services.AddScoped<IPatchUploadStore, PatchUploadStore>();
         services.AddScoped<CreatePatchUpload>();
+        services.AddScoped<IPatchVerificationTargetStore, PatchVerificationTargetStore>();
+        services.AddScoped<RequestPatchVerificationTarget>();
+        services.AddScoped<GetPatchVerificationState>();
         services.AddScoped<IFixArchiveReader, FixArchiveReader>();
         services.AddScoped<IAdminPatchDownloadStore, AdminPatchDownloadStore>();
         services.AddScoped<AccessAdminPatch>();
@@ -51,11 +57,13 @@ internal static class GameplayFactInfrastructure
         services.AddScoped<AccessCheatIncident>();
         services.AddScoped<ResolveCheatIncident>();
         services.AddScoped<IHistoricalAdjudicationEvidenceStore, HistoricalAdjudicationPreviewStore>();
+        services.AddScoped<IHistoricalAdjudicationEventStore, HistoricalAdjudicationPreviewStore>();
+        services.AddScoped<ReadHistoricalAdjudicationEvents>();
         services.AddScoped<PreviewHistoricalAdjudicationDifferences>();
         services.AddScoped<IGameplayFactProcessor, GameplayFactProcessor>();
         services.AddScoped<BloodRankCriticalSection>();
         services.AddScoped<IInternalResultStore, InternalResultStore>();
-        services.AddScoped<IAwdpFixExecutionFence, PostgresAwdpFixExecutionFence>();
+        services.AddScoped<IAwdpFixExecutionFence, AwdpFixExecutionFence>();
         services.AddScoped<RecordInternalResult>();
         services.AddSingleton<IGameplayFactEvaluatorCatalog, GameModeGameplayFactEvaluatorCatalog>();
         services.AddSingleton<IGameplayFactAdmissionModePolicy, GameModeGameplayFactAdmissionPolicy>();

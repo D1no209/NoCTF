@@ -13,6 +13,9 @@ public sealed class AwdpFixVerificationExecutionTimeoutPolicyTests
                 typeof(RunAwdpFixVerification)))
             .IsEqualTo(AwdpFixExecutionBudget.HandlerExecutionTimeoutSeconds);
         await Assert.That(AwdpFixVerificationExecutionTimeoutPolicy.TimeoutFor(
+                typeof(RunPatchVerification)))
+            .IsEqualTo(AwdpFixExecutionBudget.HandlerExecutionTimeoutSeconds);
+        await Assert.That(AwdpFixVerificationExecutionTimeoutPolicy.TimeoutFor(
                 typeof(StartAwdpFixVerification)))
             .IsNull();
     }

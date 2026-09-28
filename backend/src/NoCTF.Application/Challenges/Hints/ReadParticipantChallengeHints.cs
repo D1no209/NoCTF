@@ -1,3 +1,5 @@
+using NoCTF.Domain.Competitions;
+
 namespace NoCTF.Application.Challenges.Hints;
 
 public sealed record ParticipantChallengeHintView(
@@ -18,7 +20,8 @@ public interface IParticipantChallengeHintStore
     Task<ParticipantChallengeHintAccess?> ReadAsync(
         Guid competitionId,
         Guid competitionChallengeId,
-        Guid userId,
+        CompetitionStatus competitionStatus,
+        Guid? teamId,
         CancellationToken cancellationToken);
 }
 
@@ -27,11 +30,13 @@ public sealed class ReadParticipantChallengeHints(IParticipantChallengeHintStore
     public async Task<IReadOnlyList<ParticipantChallengeHintView>> ExecuteAsync(
         Guid competitionId,
         Guid competitionChallengeId,
-        Guid userId,
+        CompetitionStatus competitionStatus,
+        Guid? teamId,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        var access = await store.ReadAsync(competitionId, competitionChallengeId, userId, cancellationToken);
+        var access = await store.ReadAsync(
+            competitionId, competitionChallengeId, competitionStatus, teamId, cancellationToken);
         if (access is null)
             return [];
         return access.Hints

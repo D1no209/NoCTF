@@ -12,6 +12,8 @@ using NoCTF.Application.Competitions.Tracks;
 using NoCTF.Application.Competitions.Visibility;
 using NoCTF.Application.Common;
 using NoCTF.Application.Teams.Moderation;
+using NoCTF.Application.Authentication.Sso;
+using NoCTF.API.Endpoints.Authentication;
 using NoCTF.Domain.Competitions;
 using Riok.Mapperly.Abstractions;
 using System.Text.Json.Serialization;
@@ -30,6 +32,7 @@ public sealed class UpdateCompetitionTrackRequest
     public required bool AffectsDynamicChallengeScore { get; set; }
     public required bool VisibleOnLeaderboard { get; set; }
     public required bool AffectsCompetitiveResults { get; set; }
+    public required Guid? RequiredSsoProviderId { get; set; }
     public required string? InvitationCode { get; set; }
     public required bool ClearInvitationCode { get; set; }
 }
@@ -51,11 +54,14 @@ public sealed class CompetitionMetadataPatchRequest
     public required bool WriteUpSubmissionRequired { get; set; }
     public required int WriteUpSubmissionDeadlineHours { get; set; }
     public required CompetitionAccessModeProtocol AccessMode { get; set; }
+    public RuntimeAccessModeProtocol RuntimeAccessMode { get; set; } = RuntimeAccessModeProtocol.Direct;
+    public bool TrafficCaptureEnabled { get; set; }
+    public long? TrafficCaptureLimitBytes { get; set; }
 }
 
 public sealed class CompetitionConfigurationPatchRequest
 {
-    public required string Json { get; set; }
+    public required CompetitionModeConfigurationContract Configuration { get; set; }
 }
 
 public sealed class CompetitionTracksPatchRequest
@@ -63,7 +69,6 @@ public sealed class CompetitionTracksPatchRequest
     public required bool Enabled { get; set; }
     public required IReadOnlyList<UpdateCompetitionTrackRequest> Tracks { get; set; }
     public IReadOnlyList<RemovedTrackReassignmentRequest> RemovedTrackReassignments { get; set; } = [];
-    [JsonIgnore] public string? TrackConfigurationJson { get; set; }
 }
 
 public sealed class RemovedTrackReassignmentRequest
@@ -84,7 +89,9 @@ public enum CompetitionTrackFailureCodeProtocol
     InvalidTrackReassignment,
     TeamNotFound,
     TrackNotFound,
-    TrackNotPublicSelectable
+    TrackNotPublicSelectable,
+    TrackSsoIdentityRequired,
+    SsoProviderNotFound
 }
 
 public sealed record CompetitionTrackFailureResponse(
@@ -161,8 +168,25 @@ public sealed class PatchCompetitionValidator : Validator<PatchCompetitionReques
             .When(request => request.Metadata is not null);
         RuleFor(request => request.Metadata!.AccessMode).IsInEnum()
             .When(request => request.Metadata is not null);
-        RuleFor(request => request.ModeConfiguration!.Json).NotEmpty()
+        RuleFor(request => request.Metadata!.RuntimeAccessMode).IsInEnum()
+            .When(request => request.Metadata is not null);
+        RuleFor(request => request.Metadata!.TrafficCaptureLimitBytes)
+            .InclusiveBetween(
+                RuntimeAccessPolicy.MinimumCaptureLimitBytes,
+                RuntimeAccessPolicy.MaximumCaptureLimitBytes)
+            .When(request => request.Metadata?.TrafficCaptureLimitBytes is not null);
+        RuleFor(request => request.Metadata)
+            .Must(metadata => metadata is null
+                || !metadata.TrafficCaptureEnabled
+                || metadata.RuntimeAccessMode is RuntimeAccessModeProtocol.DirectAndWsrx
+                    or RuntimeAccessModeProtocol.WsrxOnly)
+            .WithMessage("Traffic capture requires a WSRX-enabled Runtime access mode.");
+        RuleFor(request => request.ModeConfiguration!.Configuration).NotNull()
             .When(request => request.ModeConfiguration is not null);
+        RuleFor(request => request.ModeConfiguration!.Configuration)
+            .Must(CompetitionModeConfigurationContractMapper.HasValidShape)
+            .When(request => request.ModeConfiguration is not null)
+            .WithMessage("Configuration must contain exactly the branch matching its mode.");
         RuleFor(request => request.Tracks!.Tracks).NotNull()
             .Must(tracks => tracks.Count is >= 1 and <= 32)
             .When(request => request.Tracks is not null);
@@ -203,17 +227,23 @@ public static partial class CompetitionPatchMapper
     [MapProperty(nameof(CompetitionMetadataPatchRequest.StartTime), nameof(Competition.StartAt))]
     [MapProperty(nameof(CompetitionMetadataPatchRequest.EndTime), nameof(Competition.EndAt))]
     [MapperIgnoreSource(nameof(CompetitionMetadataPatchRequest.AccessMode))]
+    [MapperIgnoreSource(nameof(CompetitionMetadataPatchRequest.RuntimeAccessMode))]
     [MapperIgnoreTarget(nameof(Competition.AccessMode))]
+    [MapperIgnoreTarget(nameof(Competition.RuntimeAccessMode))]
     [MapperIgnoreTarget(nameof(Competition.OwnerId))]
     [MapperIgnoreTarget(nameof(Competition.ManagerIds))]
     [MapperIgnoreTarget(nameof(Competition.JudgeIds))]
     [MapperIgnoreTarget(nameof(Competition.ObserverIds))]
-    [MapperIgnoreTarget(nameof(Competition.ConfigurationJson))]
+    [MapperIgnoreTarget(nameof(Competition.ModeConfiguration))]
+    [MapperIgnoreTarget(nameof(Competition.WebhookConfiguration))]
+    [MapperIgnoreTarget(nameof(Competition.WebhookTargets))]
     [MapperIgnoreTarget(nameof(Competition.TracksEnabled))]
-    [MapperIgnoreTarget(nameof(Competition.TrackConfigurationJson))]
+    [MapperIgnoreTarget(nameof(Competition.Tracks))]
     [MapperIgnoreTarget(nameof(Competition.FrozenStartAt))]
     [MapperIgnoreTarget(nameof(Competition.HiddenStartAt))]
     [MapperIgnoreTarget(nameof(Competition.Id))]
+    [MapperIgnoreTarget(nameof(Competition.Collaborators))]
+    [MapperIgnoreTarget(nameof(Competition.ConcurrencyStamp))]
     [MapperIgnoreTarget(nameof(Competition.Mode))]
     [MapperIgnoreTarget(nameof(Competition.Status))]
     [MapperIgnoreTarget(nameof(Competition.PosterFileId))]
@@ -222,20 +252,27 @@ public static partial class CompetitionPatchMapper
     [MapperIgnoreTarget(nameof(Competition.CreatedAt))]
     [MapperIgnoreTarget(nameof(Competition.UpdatedAt))]
     [MapperIgnoreTarget(nameof(Competition.DeletedAt))]
+    [MapperIgnoreTarget(nameof(Competition.NormalizedTitle))]
     public static partial void ApplyMetadataAsModerator(
         CompetitionMetadataPatchRequest request,
         [MappingTarget] Competition target);
 
-    [MapProperty(nameof(CompetitionConfigurationPatchRequest.Json), nameof(Competition.ConfigurationJson))]
+    [MapperIgnoreSource(nameof(CompetitionConfigurationPatchRequest.Configuration))]
+    [MapperIgnoreTarget(nameof(Competition.ModeConfiguration))]
+    [MapperIgnoreTarget(nameof(Competition.WebhookConfiguration))]
+    [MapperIgnoreTarget(nameof(Competition.WebhookTargets))]
     [MapperIgnoreTarget(nameof(Competition.Title))]
     [MapperIgnoreTarget(nameof(Competition.Description))]
     [MapperIgnoreTarget(nameof(Competition.AccessMode))]
+    [MapperIgnoreTarget(nameof(Competition.RuntimeAccessMode))]
+    [MapperIgnoreTarget(nameof(Competition.TrafficCaptureEnabled))]
+    [MapperIgnoreTarget(nameof(Competition.TrafficCaptureLimitBytes))]
     [MapperIgnoreTarget(nameof(Competition.OwnerId))]
     [MapperIgnoreTarget(nameof(Competition.ManagerIds))]
     [MapperIgnoreTarget(nameof(Competition.JudgeIds))]
     [MapperIgnoreTarget(nameof(Competition.ObserverIds))]
     [MapperIgnoreTarget(nameof(Competition.TracksEnabled))]
-    [MapperIgnoreTarget(nameof(Competition.TrackConfigurationJson))]
+    [MapperIgnoreTarget(nameof(Competition.Tracks))]
     [MapperIgnoreTarget(nameof(Competition.FrozenStartAt))]
     [MapperIgnoreTarget(nameof(Competition.HiddenStartAt))]
     [MapperIgnoreTarget(nameof(Competition.StartAt))]
@@ -251,6 +288,8 @@ public static partial class CompetitionPatchMapper
     [MapperIgnoreTarget(nameof(Competition.MaxParticipantMessagesBeforeHandlerReply))]
     [MapperIgnoreTarget(nameof(Competition.AllowChallengeOwnersToHandleQuestions))]
     [MapperIgnoreTarget(nameof(Competition.Id))]
+    [MapperIgnoreTarget(nameof(Competition.Collaborators))]
+    [MapperIgnoreTarget(nameof(Competition.ConcurrencyStamp))]
     [MapperIgnoreTarget(nameof(Competition.Mode))]
     [MapperIgnoreTarget(nameof(Competition.Status))]
     [MapperIgnoreTarget(nameof(Competition.PosterFileId))]
@@ -259,6 +298,7 @@ public static partial class CompetitionPatchMapper
     [MapperIgnoreTarget(nameof(Competition.CreatedAt))]
     [MapperIgnoreTarget(nameof(Competition.UpdatedAt))]
     [MapperIgnoreTarget(nameof(Competition.DeletedAt))]
+    [MapperIgnoreTarget(nameof(Competition.NormalizedTitle))]
     public static partial void ApplyConfigurationAsModerator(
         CompetitionConfigurationPatchRequest request,
         [MappingTarget] Competition target);
@@ -266,15 +306,20 @@ public static partial class CompetitionPatchMapper
     [MapperIgnoreSource(nameof(CompetitionTracksPatchRequest.Tracks))]
     [MapperIgnoreSource(nameof(CompetitionTracksPatchRequest.RemovedTrackReassignments))]
     [MapProperty(nameof(CompetitionTracksPatchRequest.Enabled), nameof(Competition.TracksEnabled))]
-    [MapProperty(nameof(CompetitionTracksPatchRequest.TrackConfigurationJson), nameof(Competition.TrackConfigurationJson))]
+    [MapperIgnoreTarget(nameof(Competition.Tracks))]
     [MapperIgnoreTarget(nameof(Competition.Title))]
     [MapperIgnoreTarget(nameof(Competition.Description))]
     [MapperIgnoreTarget(nameof(Competition.AccessMode))]
+    [MapperIgnoreTarget(nameof(Competition.RuntimeAccessMode))]
+    [MapperIgnoreTarget(nameof(Competition.TrafficCaptureEnabled))]
+    [MapperIgnoreTarget(nameof(Competition.TrafficCaptureLimitBytes))]
     [MapperIgnoreTarget(nameof(Competition.OwnerId))]
     [MapperIgnoreTarget(nameof(Competition.ManagerIds))]
     [MapperIgnoreTarget(nameof(Competition.JudgeIds))]
     [MapperIgnoreTarget(nameof(Competition.ObserverIds))]
-    [MapperIgnoreTarget(nameof(Competition.ConfigurationJson))]
+    [MapperIgnoreTarget(nameof(Competition.ModeConfiguration))]
+    [MapperIgnoreTarget(nameof(Competition.WebhookConfiguration))]
+    [MapperIgnoreTarget(nameof(Competition.WebhookTargets))]
     [MapperIgnoreTarget(nameof(Competition.FrozenStartAt))]
     [MapperIgnoreTarget(nameof(Competition.HiddenStartAt))]
     [MapperIgnoreTarget(nameof(Competition.StartAt))]
@@ -290,6 +335,8 @@ public static partial class CompetitionPatchMapper
     [MapperIgnoreTarget(nameof(Competition.MaxParticipantMessagesBeforeHandlerReply))]
     [MapperIgnoreTarget(nameof(Competition.AllowChallengeOwnersToHandleQuestions))]
     [MapperIgnoreTarget(nameof(Competition.Id))]
+    [MapperIgnoreTarget(nameof(Competition.Collaborators))]
+    [MapperIgnoreTarget(nameof(Competition.ConcurrencyStamp))]
     [MapperIgnoreTarget(nameof(Competition.Mode))]
     [MapperIgnoreTarget(nameof(Competition.Status))]
     [MapperIgnoreTarget(nameof(Competition.PosterFileId))]
@@ -298,6 +345,7 @@ public static partial class CompetitionPatchMapper
     [MapperIgnoreTarget(nameof(Competition.CreatedAt))]
     [MapperIgnoreTarget(nameof(Competition.UpdatedAt))]
     [MapperIgnoreTarget(nameof(Competition.DeletedAt))]
+    [MapperIgnoreTarget(nameof(Competition.NormalizedTitle))]
     public static partial void ApplyTracksAsModerator(
         CompetitionTracksPatchRequest request,
         [MappingTarget] Competition target);
@@ -305,9 +353,14 @@ public static partial class CompetitionPatchMapper
     [MapperIgnoreTarget(nameof(Competition.Title))]
     [MapperIgnoreTarget(nameof(Competition.Description))]
     [MapperIgnoreTarget(nameof(Competition.AccessMode))]
-    [MapperIgnoreTarget(nameof(Competition.ConfigurationJson))]
+    [MapperIgnoreTarget(nameof(Competition.RuntimeAccessMode))]
+    [MapperIgnoreTarget(nameof(Competition.TrafficCaptureEnabled))]
+    [MapperIgnoreTarget(nameof(Competition.TrafficCaptureLimitBytes))]
+    [MapperIgnoreTarget(nameof(Competition.ModeConfiguration))]
+    [MapperIgnoreTarget(nameof(Competition.WebhookConfiguration))]
+    [MapperIgnoreTarget(nameof(Competition.WebhookTargets))]
     [MapperIgnoreTarget(nameof(Competition.TracksEnabled))]
-    [MapperIgnoreTarget(nameof(Competition.TrackConfigurationJson))]
+    [MapperIgnoreTarget(nameof(Competition.Tracks))]
     [MapperIgnoreTarget(nameof(Competition.FrozenStartAt))]
     [MapperIgnoreTarget(nameof(Competition.HiddenStartAt))]
     [MapperIgnoreTarget(nameof(Competition.StartAt))]
@@ -323,6 +376,8 @@ public static partial class CompetitionPatchMapper
     [MapperIgnoreTarget(nameof(Competition.MaxParticipantMessagesBeforeHandlerReply))]
     [MapperIgnoreTarget(nameof(Competition.AllowChallengeOwnersToHandleQuestions))]
     [MapperIgnoreTarget(nameof(Competition.Id))]
+    [MapperIgnoreTarget(nameof(Competition.Collaborators))]
+    [MapperIgnoreTarget(nameof(Competition.ConcurrencyStamp))]
     [MapperIgnoreTarget(nameof(Competition.Mode))]
     [MapperIgnoreTarget(nameof(Competition.Status))]
     [MapperIgnoreTarget(nameof(Competition.PosterFileId))]
@@ -331,6 +386,7 @@ public static partial class CompetitionPatchMapper
     [MapperIgnoreTarget(nameof(Competition.CreatedAt))]
     [MapperIgnoreTarget(nameof(Competition.UpdatedAt))]
     [MapperIgnoreTarget(nameof(Competition.DeletedAt))]
+    [MapperIgnoreTarget(nameof(Competition.NormalizedTitle))]
     public static partial void ApplyPermissionsAsOwner(
         CompetitionPermissionsPatchRequest request,
         [MappingTarget] Competition target);
@@ -339,13 +395,18 @@ public static partial class CompetitionPatchMapper
     [MapperIgnoreTarget(nameof(Competition.Title))]
     [MapperIgnoreTarget(nameof(Competition.Description))]
     [MapperIgnoreTarget(nameof(Competition.AccessMode))]
+    [MapperIgnoreTarget(nameof(Competition.RuntimeAccessMode))]
+    [MapperIgnoreTarget(nameof(Competition.TrafficCaptureEnabled))]
+    [MapperIgnoreTarget(nameof(Competition.TrafficCaptureLimitBytes))]
     [MapperIgnoreTarget(nameof(Competition.OwnerId))]
     [MapperIgnoreTarget(nameof(Competition.ManagerIds))]
     [MapperIgnoreTarget(nameof(Competition.JudgeIds))]
     [MapperIgnoreTarget(nameof(Competition.ObserverIds))]
-    [MapperIgnoreTarget(nameof(Competition.ConfigurationJson))]
+    [MapperIgnoreTarget(nameof(Competition.ModeConfiguration))]
+    [MapperIgnoreTarget(nameof(Competition.WebhookConfiguration))]
+    [MapperIgnoreTarget(nameof(Competition.WebhookTargets))]
     [MapperIgnoreTarget(nameof(Competition.TracksEnabled))]
-    [MapperIgnoreTarget(nameof(Competition.TrackConfigurationJson))]
+    [MapperIgnoreTarget(nameof(Competition.Tracks))]
     [MapperIgnoreTarget(nameof(Competition.StartAt))]
     [MapperIgnoreTarget(nameof(Competition.EndAt))]
     [MapperIgnoreTarget(nameof(Competition.TeamRegistrationAutoApprove))]
@@ -359,6 +420,8 @@ public static partial class CompetitionPatchMapper
     [MapperIgnoreTarget(nameof(Competition.MaxParticipantMessagesBeforeHandlerReply))]
     [MapperIgnoreTarget(nameof(Competition.AllowChallengeOwnersToHandleQuestions))]
     [MapperIgnoreTarget(nameof(Competition.Id))]
+    [MapperIgnoreTarget(nameof(Competition.Collaborators))]
+    [MapperIgnoreTarget(nameof(Competition.ConcurrencyStamp))]
     [MapperIgnoreTarget(nameof(Competition.Mode))]
     [MapperIgnoreTarget(nameof(Competition.Status))]
     [MapperIgnoreTarget(nameof(Competition.PosterFileId))]
@@ -367,6 +430,7 @@ public static partial class CompetitionPatchMapper
     [MapperIgnoreTarget(nameof(Competition.CreatedAt))]
     [MapperIgnoreTarget(nameof(Competition.UpdatedAt))]
     [MapperIgnoreTarget(nameof(Competition.DeletedAt))]
+    [MapperIgnoreTarget(nameof(Competition.NormalizedTitle))]
     public static partial void ApplyLeaderboardAsModerator(
         CompetitionLeaderboardPatchRequest request,
         [MappingTarget] Competition target);
@@ -386,6 +450,7 @@ public sealed class PatchCompetitionEndpoint(
     UpdateCompetitionVisibility updateVisibility,
     IAtomicAggregatePatch atomicPatch,
     ICompetitionModerationAuthorizer authorizer,
+    ManageSsoProviders ssoProviders,
     IUserContext user,
     TimeProvider timeProvider)
     : Endpoint<PatchCompetitionRequest,
@@ -420,55 +485,65 @@ public sealed class PatchCompetitionEndpoint(
             competitionId, user.UserId, user.IsAdministrator, ct);
         if (current is null || configuration is null)
             return TypedResults.NotFound();
+        if ((sections & CompetitionPatchSection.ModeConfiguration) != 0
+            && request.ModeConfiguration!.Configuration.Mode != (GameModeProtocol)current.Mode)
+            return Failure("Configuration mode must match the competition mode.");
         if ((sections & CompetitionPatchSection.Permissions) != 0
             && permissions.State != CompetitionPermissionSnapshotState.Found)
             return TypedResults.Forbid();
 
-        if ((sections & CompetitionPatchSection.Tracks) != 0)
-        {
-            request.Tracks!.TrackConfigurationJson = CompetitionTrackConfiguration.Serialize(new(
-                CompetitionTrackConfiguration.CurrentSchemaVersion,
-                request.Tracks.Tracks.Select(ToDefinition).ToArray()));
-        }
-        var target = new Competition
-        {
-            Id = current.Id,
-            Title = current.Title,
-            Description = current.Description,
-            OwnerId = current.OwnerId,
-            AccessMode = current.AccessMode,
-            ManagerIds = permissions.Snapshot?.ManagerIds.ToArray() ?? [],
-            JudgeIds = permissions.Snapshot?.JudgeIds.ToArray() ?? [],
-            ObserverIds = permissions.Snapshot?.ObserverIds.ToArray() ?? [],
-            Mode = current.Mode,
-            ConfigurationJson = configuration.Json,
-            TracksEnabled = current.TracksEnabled,
-            FrozenStartAt = current.FrozenStartAt,
-            HiddenStartAt = current.HiddenStartAt,
-            StartAt = current.StartTime,
-            EndAt = current.EndTime,
-            Status = current.Status,
-            TeamRegistrationAutoApprove = current.TeamRegistrationAutoApprove,
-            AllowTeamRegistrationWhileRunning = current.AllowTeamRegistrationWhileRunning,
-            PracticeModeEnabled = current.PracticeModeEnabled,
-            WriteUpSubmissionRequired = current.WriteUpSubmissionRequired,
-            WriteUpSubmissionDeadlineHours = current.WriteUpSubmissionDeadlineHours,
-            MaxTeamMembers = current.MaxTeamMembers,
-            MaxConcurrentRuntimeInstancesPerTeam = current.MaxConcurrentRuntimeInstancesPerTeam,
-            MaxActiveQuestionsPerTeam = current.MaxActiveQuestionsPerTeam,
-            MaxParticipantMessagesBeforeHandlerReply = current.MaxParticipantMessagesBeforeHandlerReply,
-            AllowChallengeOwnersToHandleQuestions = current.AllowChallengeOwnersToHandleQuestions,
-            DeletedAt = current.DeletedAt
-        };
+        var target = CompetitionGeneratedCatalog.Create(current.Mode);
+        target.Id = current.Id;
+        target.Title = current.Title;
+        target.Description = current.Description;
+        target.OwnerId = current.OwnerId;
+        target.AccessMode = current.AccessMode;
+        target.ManagerIds = permissions.Snapshot?.ManagerIds.ToArray() ?? [];
+        target.JudgeIds = permissions.Snapshot?.JudgeIds.ToArray() ?? [];
+        target.ObserverIds = permissions.Snapshot?.ObserverIds.ToArray() ?? [];
+        target.ModeConfiguration = configuration.Configuration;
+        target.TracksEnabled = current.TracksEnabled;
+        target.FrozenStartAt = current.FrozenStartAt;
+        target.HiddenStartAt = current.HiddenStartAt;
+        target.StartAt = current.StartTime;
+        target.EndAt = current.EndTime;
+        target.Status = current.Status;
+        target.TeamRegistrationAutoApprove = current.TeamRegistrationAutoApprove;
+        target.AllowTeamRegistrationWhileRunning = current.AllowTeamRegistrationWhileRunning;
+        target.PracticeModeEnabled = current.PracticeModeEnabled;
+        target.WriteUpSubmissionRequired = current.WriteUpSubmissionRequired;
+        target.WriteUpSubmissionDeadlineHours = current.WriteUpSubmissionDeadlineHours;
+        target.MaxTeamMembers = current.MaxTeamMembers;
+        target.MaxConcurrentRuntimeInstancesPerTeam = current.MaxConcurrentRuntimeInstancesPerTeam;
+        target.MaxActiveQuestionsPerTeam = current.MaxActiveQuestionsPerTeam;
+        target.MaxParticipantMessagesBeforeHandlerReply = current.MaxParticipantMessagesBeforeHandlerReply;
+        target.AllowChallengeOwnersToHandleQuestions = current.AllowChallengeOwnersToHandleQuestions;
+        target.RuntimeAccessMode = current.RuntimeAccessMode;
+        target.TrafficCaptureEnabled = current.TrafficCaptureEnabled;
+        target.TrafficCaptureLimitBytes = current.TrafficCaptureLimitBytes;
+        target.DeletedAt = current.DeletedAt;
         if ((sections & CompetitionPatchSection.Metadata) != 0)
         {
             CompetitionPatchMapper.ApplyMetadataAsModerator(request.Metadata!, target);
             target.AccessMode = CompetitionProtocolMapper.ToDomain(request.Metadata!.AccessMode);
+            target.RuntimeAccessMode = CompetitionProtocolMapper.ToDomain(
+                request.Metadata.RuntimeAccessMode);
         }
         if ((sections & CompetitionPatchSection.ModeConfiguration) != 0)
-            CompetitionPatchMapper.ApplyConfigurationAsModerator(request.ModeConfiguration!, target);
+            target.ModeConfiguration = CompetitionModeConfigurationContractMapper.ToDomain(
+                competitionId,
+                target.Mode,
+                request.ModeConfiguration!.Configuration);
         if ((sections & CompetitionPatchSection.Tracks) != 0)
+        {
             CompetitionPatchMapper.ApplyTracksAsModerator(request.Tracks!, target);
+            target.Tracks = request.Tracks!.Tracks.Select((track, position) =>
+                ToDefinition(track) with
+                {
+                    CompetitionId = competitionId,
+                    Position = position
+                }).ToList();
+        }
         if ((sections & CompetitionPatchSection.Permissions) != 0)
             CompetitionPatchMapper.ApplyPermissionsAsOwner(request.Permissions!, target);
         if ((sections & CompetitionPatchSection.LeaderboardVisibility) != 0)
@@ -507,7 +582,10 @@ public sealed class PatchCompetitionEndpoint(
                     target.PracticeModeEnabled,
                     target.AccessMode,
                     target.WriteUpSubmissionRequired,
-                    target.WriteUpSubmissionDeadlineHours), transactionCt);
+                    target.WriteUpSubmissionDeadlineHours,
+                    target.RuntimeAccessMode,
+                    target.TrafficCaptureEnabled,
+                    target.TrafficCaptureLimitBytes), transactionCt);
                 if (!result.Succeeded)
                     return Reject(Failure(
                         result.ErrorMessage ?? "Competition metadata is invalid."));
@@ -516,7 +594,7 @@ public sealed class PatchCompetitionEndpoint(
             {
                 var result = await updateConfiguration.ExecuteAsync(
                     competitionId,
-                    target.ConfigurationJson,
+                    target.ModeConfiguration!,
                     timeProvider.GetUtcNow(),
                     transactionCt);
                 if (!result.Succeeded)
@@ -644,6 +722,7 @@ public sealed class PatchCompetitionEndpoint(
             competitionId, user.UserId, user.IsAdministrator, ct);
         var visibility = await getVisibility.ExecuteAsync(
             competitionId, timeProvider.GetUtcNow(), ct);
+        var sso = await ssoProviders.GetAsync(ct);
         if (configuration is null || tracks is null || visibility is null)
             return null;
         var role = await CompetitionAdministrationRoleResolver.ResolveAsync(
@@ -659,6 +738,15 @@ public sealed class PatchCompetitionEndpoint(
                 ? CompetitionPermissionsMapper.ToResponse(permissions.Snapshot!)
                 : null,
             CompetitionLeaderboardVisibilityMapper.ToResponse(visibility),
+            sso.Providers.Select(provider => new CompetitionSsoProviderResponse(
+                provider.Id,
+                provider.Name,
+                provider.IconUrl,
+                provider.Protocol == NoCTF.Domain.Identity.SsoProtocol.Oidc
+                    ? PublicSsoProtocol.Oidc
+                    : PublicSsoProtocol.Cas,
+                provider.Enabled,
+                provider.AllowBinding)).ToArray(),
             new(true, canModerate,
                 permissions.State == CompetitionPermissionSnapshotState.Found));
     }
@@ -675,7 +763,8 @@ public sealed class PatchCompetitionEndpoint(
             track.AffectsDynamicChallengeScore,
             track.VisibleOnLeaderboard,
             track.AffectsCompetitiveResults,
-            track.InvitationCode);
+            track.InvitationCode,
+            track.RequiredSsoProviderId);
 
     private static CompetitionPatchSection ResolveSections(PatchCompetitionRequest request) =>
         (request.Metadata is null ? CompetitionPatchSection.None

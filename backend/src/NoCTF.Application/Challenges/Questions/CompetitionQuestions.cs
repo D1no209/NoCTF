@@ -36,7 +36,6 @@ public enum CompetitionQuestionChallengeReferenceState : short
 }
 
 public sealed record CompetitionQuestionCreationContext(
-    bool IsHuman,
     CompetitionStatus CompetitionStatus,
     bool HasApprovedTeam,
     CompetitionQuestionSubject Subject,
@@ -183,8 +182,6 @@ public static class CompetitionQuestionRules
     public static CompetitionQuestionFailure? ValidateCreation(
         CompetitionQuestionCreationContext context)
     {
-        if (!context.IsHuman)
-            return CompetitionQuestionFailure.Forbidden;
         if (context.CompetitionStatus is not (CompetitionStatus.Running or CompetitionStatus.Paused))
             return CompetitionQuestionFailure.CompetitionNotAcceptingQuestions;
         if (!context.HasApprovedTeam)

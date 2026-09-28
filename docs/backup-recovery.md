@@ -28,8 +28,8 @@ PostgreSQL WAL/PITR 与对象版本的一致性协议，不能把本工具描述
 - manifest 只记录非秘密的 `secretSetId`。恢复者必须提供完全相同的外部 Secret 集标识。
 - JWT signing key、Runner scoring key、S3/数据库凭据、age identity、Minisign signing key 和
   `EmailVerification__EncryptionKey` 不在
-  备份中，必须在独立 Secret 管理系统中备份。尤其是邮箱 SMTP 密码在数据库中为密文；缺少原
-  `EmailVerification__EncryptionKey` 时无法解密。
+  备份中，必须在独立 Secret 管理系统中备份。邮箱 SMTP 密码、SSO Client Secret 与共享
+  Data Protection 密钥环在数据库中为密文；缺少原 `EmailVerification__EncryptionKey` 时无法解密。
 - 加密备份必须复制到与运行集群不同的故障域。至少保留一份不可由 NoCTF 运行身份删除的副本。
 - 恢复工具只接受空数据库和空 bucket，不支持覆盖、合并或原地恢复。
 
@@ -43,7 +43,7 @@ docker build -t noctf-recovery:local deploy/recovery
 
 工具需要网络访问源或目标 PostgreSQL/S3。下面示例中的 `/run/noctf-recovery` 是只读 Secret
 挂载，`/backup` 是加密产物目录；不要把真实凭据放进命令行、镜像或仓库。
-源数据库身份至少需要 `CONNECT`、所有应用/Wolverine schema 的 `USAGE`、表 `SELECT`、sequence
+源数据库身份至少需要 `CONNECT`、应用 schema 的 `USAGE`、表 `SELECT`、sequence
 读取及查看其他连接的权限；源 S3 身份只需要目标 bucket 的 List/Get/Head。恢复身份必须能在空
 database 创建 schema/table 并向空 bucket Put/Head/Get/List。生产环境应为两条路径配置不同的
 最小权限身份。
@@ -114,12 +114,13 @@ docker run --rm \
 任何非空目标。写入完成后会再次比较所有受保护 schema 的逐表行数，并下载每个对象核验 key、
 内容 SHA-256、`Content-Type` 与 SHA-256 元数据。
 
-4. 人工核验比赛、用户、`competition_events`、待处理 GameplayFact、Wolverine scheduled/dead-letter
-   数量和关键附件。记录备份时间、开始/完成时间、操作者和验证结果。
+4. 人工核验比赛、用户、`competition_events`、待处理 GameplayFact、JetStream scheduled/dead-letter
+   数量、consumer 状态和关键附件。记录备份时间、开始/完成时间、操作者和验证结果。
 5. 先用备份时相同的应用版本验收，再按正常 migration 流程升级。验收通过前不得让新旧环境同时
    消费同一队列或操作同一 Runtime provider。
-6. 先启动包含 Worker 的宿主并确认 Singular Agent 与 Sticky PostgreSQL endpoint ready，再启动各 Runner 节点和 API；全合一部署只需启动 Host。Wolverine 会按持久化状态恢复租约和投递；
-   所有外部副作用仍必须依赖业务幂等键、durable inbox 和唯一约束，不使用持久化 ProcessingVersion 栅栏。
+6. 先恢复 NATS stream/consumer/KV 并启动包含 Worker 的宿主，确认调度租约与 JetStream endpoint ready，
+   再启动各 Runner 节点和 API；全合一部署只需启动 Host。所有外部副作用仍必须依赖业务幂等键、
+   状态转换和唯一约束，不使用持久化 ProcessingVersion 栅栏。
 
 ## 自动恢复演练
 
@@ -129,6 +130,6 @@ docker run --rm \
 bash deploy/recovery/rehearse.sh
 ```
 
-演练覆盖两个隔离 PostgreSQL、两个隔离 MinIO、全部三个 Wolverine schema、比赛永久事件、多个对象
+演练覆盖两个隔离 PostgreSQL、两个隔离 MinIO、JetStream/KV 恢复点、比赛永久事件、多个对象
 及其元数据、快照后源数据变化、恢复后逐表/逐对象验证、加密文件篡改拒绝和非空目标拒绝。它不
 连接开发或生产 NoCTF 服务。

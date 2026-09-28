@@ -1,4 +1,4 @@
-import { accounts, createFixtures } from './data/fixtures'
+import { accounts, createFixtures, mockModeConfiguration, mockRules } from './data/fixtures'
 import { date, id, matchOperation, model, now, resolve, responseSchema, sample, type Data } from './schema'
 import { leaderboardRead } from './leaderboard'
 import { questionActorRole, questionView } from './questions'
@@ -13,102 +13,6 @@ function shape(schema: Data | undefined, value: any): any {
   if (type.type === 'array') return Array.isArray(value) ? value.map(item => shape(type.items, item)) : []
   if (type.properties) return Object.fromEntries(Object.entries(type.properties).map(([key, field]) => [key, shape(field as Data, value[key] ?? sample(field as Data))]))
   return value
-}
-
-function mockMonitoringSnapshot(): Data {
-  const metric = (
-    kind: number,
-    unit: number,
-    value: number,
-    status = 0,
-    sampleCount: number | null = null,
-    windowSeconds: number | null = sampleCount === null ? null : 300,
-    minimumSamples: number | null = sampleCount === null ? null : 50,
-  ) => ({
-    kind,
-    unit,
-    value,
-    status,
-    sampleCount,
-    minimumSamples,
-    windowSeconds,
-  })
-  const latency = (kind: number, endpoint: string, p95: number, p99: number, mean: number, rate: number, errors: number, samples: number, status = 0) => ({
-    kind,
-    endpoint,
-    p95Milliseconds: p95,
-    p99Milliseconds: p99,
-    meanMilliseconds: mean,
-    requestsPerSecond: rate,
-    errorPercent: errors,
-    sampleCount: samples,
-    minimumSamples: 50,
-    windowSeconds: 300,
-    status,
-  })
-  const pool = (name: string, resource: number, available: number, total: number, onlineRunners: number) => ({
-    pool: name,
-    resource,
-    available,
-    total,
-    onlineRunners,
-  })
-
-  return {
-    status: 1,
-    prometheusAvailable: true,
-    natsAvailable: true,
-    capturedAt: now(),
-    dashboardUrl: null,
-    latencySustainedWindowMinutes: 3,
-    metrics: [
-      metric(0, 1, 148.6, 0, 44_580),
-      metric(1, 2, 186, 0, 44_580),
-      metric(2, 4, 0.36, 0, 44_580),
-      metric(3, 0, 324),
-      metric(4, 0, 1),
-      metric(5, 4, 72.4, 1),
-      metric(6, 0, 12),
-      metric(7, 0, 5),
-      metric(8, 0, 1, 1),
-      metric(9, 0, 24),
-      metric(10, 0, 8),
-      metric(11, 0, 4, 1),
-      metric(12, 3, 18, 1),
-      metric(13, 1, 0, 0, 300),
-      metric(14, 1, 0.02, 1, 300),
-      metric(15, 2, 240, 0, 300),
-      metric(16, 1, 0, 0, 300),
-      metric(17, 1, 0, 0, 300),
-      metric(18, 0, 6),
-      metric(19, 4, 23, 1),
-      metric(20, 4, 68, 1),
-      metric(21, 2, 44, 0, 1_820),
-      metric(22, 4, 31, 1),
-      metric(23, 1, 38.4, 0, null, 300),
-      metric(24, 0, 11_520, 0, null, 300),
-      metric(25, 1, 0.18, 0, null, 300),
-      metric(26, 0, 54, 0, null, 300),
-      metric(27, 4, 73.8, 0, 10_944, 300, 20),
-      metric(28, 2, 342, 0, 11_520, 300, 20),
-      metric(29, 4, 0.4, 0, 11_520, 300, 20),
-    ],
-    latencyDetails: [
-      latency(0, '/api/v1/competitions', 186, 342, 104, 88.4, 0.18, 26_520),
-      latency(1, '/hubs/v1/competitions', 41_200, 58_900, 17_800, 1.08, 0.04, 324),
-      latency(2, '/api/v1/auth/me/wallpaper', 580, 1_250, 312, 0.42, 1.2, 126, 1),
-      latency(3, '/api/v1/files/{fileId}', 210, 460, 128, 3.9, 0.08, 1_170),
-      latency(4, 'leaderboard:publish', 44, 86, 22, 6.07, 0.02, 1_820),
-    ],
-    poolResources: [
-      pool('default', 0, 18_790_481_920, 68_719_476_736, 4),
-      pool('default', 1, 3_200_000_000, 12_000_000_000, 4),
-      pool('default', 2, 1_536, 4_096, 4),
-      pool('burst', 0, 4_294_967_296, 17_179_869_184, 2),
-      pool('burst', 1, 1_150_000_000, 4_000_000_000, 2),
-      pool('burst', 2, 420, 2_048, 2),
-    ],
-  }
 }
 
 function mockWriteUpPdf(teamName: string): Blob {
@@ -142,8 +46,8 @@ export function createMockApi() {
   ]))
   const sessions = new Map<string, string>()
   const tokens = new Map<string, string>()
-  const administratorIssuedTokens = new Map<string, Data>()
   const wallpapers = new Map<string, Blob>()
+  const profileCovers = new Map<string, Blob>()
   const competitionPosters = new Map<string, Blob | null>()
   const teamWriteUps = new Map<string, { metadata: Data; content: Blob }>()
   const writeUpPreviewTickets = new Map<string, string>()
@@ -167,6 +71,7 @@ export function createMockApi() {
     })
   }
   const changes = new Set<(competitionId: string) => void>()
+  const notificationChanges = new Set<() => void>()
   const json = (value: any, status = 200, headers: HeadersInit = {}) => Response.json(value, { status, headers: { 'X-NoCTF-Mock': 'true', 'Cache-Control': 'no-store', ...headers } })
   const problem = (status: number, detail: string) => json({ status, title: 'Mock API', detail }, status)
   const defaultHumanVerification = () => ({
@@ -205,24 +110,62 @@ export function createMockApi() {
     tokens.set(accessToken, user.userId)
     return json({ accessToken }, 200, { 'Set-Cookie': `noctf_mock_session=${session}; Path=/; HttpOnly; SameSite=Strict` })
   }
+  function challengeSummary(item: Data) {
+    return {
+      id: item.id,
+      competitionId: item.competitionId,
+      challengeId: item.challengeId,
+      title: item.title,
+      customTitle: item.customTitle ?? null,
+      direction: item.direction,
+      order: item.order,
+      isPublished: item.isPublished,
+      deletedAt: item.deletedAt ?? null,
+      interactionKind: item.interactionKind ?? 'FlagSubmission',
+    }
+  }
+
+  function templateSummary(item: Data) {
+    return {
+      id: item.id,
+      mode: item.mode,
+      visibility: item.visibility,
+      title: item.title,
+      direction: item.direction,
+      deletedAt: item.deletedAt ?? null,
+      activeCompetitionReferenceCount: item.activeCompetitionReferenceCount,
+      updatedAt: item.updatedAt,
+      interactionKind: item.interactionKind ?? 'FlagSubmission',
+    }
+  }
+
   function list(items: Data[], url: URL) {
     const search = (url.searchParams.get('search') ?? url.searchParams.get('query') ?? '').toLowerCase()
     const mode = url.searchParams.get('mode')
     const status = url.searchParams.get('status')
-    let filtered = items.filter(item => !item.deletedAt && (!search || JSON.stringify(item).toLowerCase().includes(search))
+    const direction = url.searchParams.get('direction')?.trim().toLowerCase()
+    const includeDeleted = url.searchParams.get('includeDeleted') === 'true'
+    let filtered = items.filter(item => (includeDeleted || !item.deletedAt) && (!search || JSON.stringify(item).toLowerCase().includes(search))
+      && (!direction || String(item.direction ?? '').trim().toLowerCase() === direction)
       && (!mode || item.mode === mode) && (!status || item.status === status))
     for (const key of ['competitionChallengeId', 'teamId', 'actorUserId', 'kind', 'state', 'result', 'trackKey', 'role']) {
       const selected = url.searchParams.get(key)
       if (selected) filtered = filtered.filter(item => String(item[key]) === selected)
     }
     const schema = resolve(responseSchema(matchOperation(url.pathname, 'GET')?.operation ?? {}))
-    const paginated = 'nextCursor' in (schema.properties ?? {})
-    const limit = paginated ? Math.max(1, Math.min(100, Number(url.searchParams.get('limit') ?? url.searchParams.get('pageSize') ?? 30) || 30)) : Math.max(1, filtered.length)
+    const schemaProperties = schema.properties ?? Object.assign({}, ...(schema.allOf ?? []).map((part: Data) => resolve(part).properties ?? {}))
+    const cursorPaginated = 'nextCursor' in schemaProperties
+    const offsetPaginated = 'total' in schemaProperties
+    const paginated = cursorPaginated || offsetPaginated
+    const limit = paginated ? Math.max(1, Math.min(200, Number(url.searchParams.get('limit') ?? url.searchParams.get('pageSize') ?? 30) || 30)) : Math.max(1, filtered.length)
     const cursor = url.searchParams.get('cursor')
-    const offset = paginated && cursor?.startsWith('mock:') ? Number(cursor.slice(5)) || 0 : 0
-    const nextCursor = offset + limit < filtered.length ? `mock:${offset + limit}` : null
+    const offset = cursor?.startsWith('mock:')
+      ? Number(cursor.slice(5)) || 0
+      : Math.max(0, Number(url.searchParams.get('offset') ?? 0) || 0)
+    const nextCursor = cursorPaginated && offset + limit < filtered.length ? `mock:${offset + limit}` : null
+    const total = filtered.length
     filtered = filtered.slice(offset, offset + limit)
-    return { items: filtered, nextCursor }
+    return offsetPaginated ? { items: filtered, total } : { items: filtered, nextCursor }
   }
 
   async function handle(request: Request): Promise<Response> {
@@ -259,11 +202,6 @@ export function createMockApi() {
     if ((route.startsWith('/admin') || route.startsWith('/auth/me') || request.method !== 'GET') && !user) return problem(401, '请先登录演示账号 / Sign in to the Mock site')
     if (route.startsWith('/admin/platform') && user?.role !== 'Administrator') return problem(403, '需要 Mock 管理员账号 / Administrator required')
     if (route.startsWith('/admin/') && !['Administrator', 'Organizer'].includes(user?.role)) return problem(403, '需要 Mock 管理账号 / Staff account required')
-    const bearerToken = request.headers.get('Authorization')?.replace(/^Bearer /, '') ?? ''
-    const impersonatedRequest = [...administratorIssuedTokens.values()]
-      .some(item => item.accessToken === bearerToken)
-    if (impersonatedRequest && route.startsWith('/admin/platform/users/')
-      && route.includes('/tokens')) return problem(403, '模拟身份不能管理 JWT / Impersonated sessions cannot manage JWTs')
 
     const competition = state.competitions.find(c => c.id === p.competitionId)
     if (p.competitionId && !competition) return problem(404, '演示比赛不存在 / Competition not found')
@@ -360,6 +298,13 @@ export function createMockApi() {
           headers: { 'Content-Type': wallpaper.type || 'image/png', 'Cache-Control': 'no-store', 'X-NoCTF-Mock': 'true' },
         })
       }
+      else if (route === '/users/{userId}/profile-cover') {
+        const cover = profileCovers.get(p.userId!)
+        if (!cover) return problem(404, '尚未上传个人标签装饰图 / No profile cover uploaded')
+        return new Response(cover, {
+          headers: { 'Content-Type': cover.type || 'image/png', 'Cache-Control': 'no-store', 'X-NoCTF-Mock': 'true' },
+        })
+      }
       if (route === '/competitions/{competitionId}/poster') {
         const storedPoster = competitionPosters.get(p.competitionId!)
         if (storedPoster === null) return problem(404, '演示海报不存在 / No poster')
@@ -400,34 +345,68 @@ export function createMockApi() {
           smtpHost: '', smtpPort: 587, smtpSecurityMode: 'StartTls', smtpUserName: '',
           smtpPasswordConfigured: false, smtpFromAddress: '', smtpFromName: '', smtpTimeoutSeconds: 15,
         },
-        publicGateway: state.settings.get('platform/gateway') ?? {
-          policy: { enabled: false, connectorId: 'gateway', publicOrigin: '', directOrigins: [], publicRuntimeHost: '', directRuntimeHostOverride: null, maxPublishedPorts: 8 },
-          capability: { connectorId: 'gateway', runnerId: 'mock-runner', approvedOrigins: ['https://public.example.test'], firstPort: 32768, lastPort: 60999, reservedPorts: [], maximumPorts: 8, namespaceIsolationAvailable: true },
-        },
-        publicGatewayStatusUrl: '/api/v1/admin/platform/public-gateway/status',
+        experimentalFeatures: state.platform.experimentalFeatures,
       }
       else if (route === '/auth/me') value = user
       else if (route === '/auth/me/profile') {
         const identity = state.settings.get(`${user!.userId}/school-identity`) ?? { fullName: '演示用户', studentNumber: 'MOCK-2026' }
         value = { description: user!.description ?? null, schoolIdentity: identity, appearance: { wallpaperEnabled: Boolean(user!.wallpaperEnabled) }, privacy: { ipRetentionDays: 7 } }
       }
-      else if (route === '/users/{userId}') value = state.users.find(u => u.userId === p.userId)
-      else if (route === '/admin/platform/users/{userId}') value = { user: state.users.find(u => u.userId === p.userId), schoolIdentity: state.settings.get(`${p.userId}/school-identity`) ?? { fullName: null, studentNumber: null } }
-      else if (route === '/admin/platform/users') value = list(state.users.map(u => ({ ...u, id: u.userId, accountStatus: 'Active', createdAt: date(-720) })), url)
-      else if (route === '/admin/platform/users/{userId}/tokens') {
+      else if (route === '/users/{userId}') {
+        const target = state.users.find(candidate => candidate.userId === p.userId)
+        if (!target) return problem(404, '演示账号不存在 / Mock user not found')
+        const participations = state.teams
+          .filter(team => team.memberIds?.includes(target.userId) && team.registrationStatus === 'Approved' && !team.isBanned)
+          .map(team => ({ team, competition: state.competitions.find(item => item.id === team.competitionId) }))
+          .filter(item => item.competition?.accessMode === 'Public')
+        const modeCounts = new Map<string, number>()
+        for (const item of participations)
+          modeCounts.set(item.competition!.mode, (modeCounts.get(item.competition!.mode) ?? 0) + 1)
+        const directionSeeds = [...new Set(state.challenges
+          .filter(challenge => challenge.isPublished && !challenge.deletedAt
+            && state.competitions.some(competition => competition.id === challenge.competitionId
+              && competition.accessMode === 'Public'
+              && ['Running', 'Paused', 'Finished'].includes(competition.status)))
+          .map(challenge => challenge.direction as string))]
+        const solvedCounts = new Map(['Web', 'Crypto', 'Pwn', 'Reverse', 'Forensics', 'OSINT']
+          .map((direction, index) => [direction, 7 - index]))
         value = {
-          items: [...administratorIssuedTokens.values()].filter(item =>
-            item.issuedByUserId === user!.userId
-            && item.targetUserId === p.userId
-            && !item.revoked
-            && Date.parse(item.expiresAt) > Date.now()),
+          ...target,
+          profileCoverUrl: target.profileCoverUrl ?? null,
+          competitionCount: participations.length,
+          finishedCompetitionCount: participations.filter(item => item.competition?.status === 'Finished').length,
+          successfulChallengeCount: 27,
+          modes: [...modeCounts].map(([mode, competitionCount]) => ({ mode, competitionCount })),
+          directions: directionSeeds.map(direction => ({
+            direction, successfulChallengeCount: solvedCounts.get(direction) ?? 0,
+          })),
+          badges: target.userId === accounts[0]!.userId ? [{
+            id: id(34, 1), competitionId: state.competitions[0]!.id,
+            competitionTitle: state.competitions[0]!.title,
+            name: 'Take Control', description: 'Local Mock achievement / 本地演示勋章',
+            imageUrl: state.competitions[0]!.posterUrl,
+          }] : [],
+          recentCompetitions: participations
+            .slice()
+            .sort((left, right) => String(right.competition?.endTime).localeCompare(String(left.competition?.endTime)))
+            .slice(0, 5)
+            .map(item => ({
+              competitionId: item.competition!.id,
+              title: item.competition!.title,
+              teamName: item.team.name,
+              mode: item.competition!.mode,
+              status: item.competition!.status,
+              startAt: item.competition!.startTime,
+              endAt: item.competition!.endTime,
+            })),
         }
       }
+      else if (route === '/admin/platform/users/{userId}') value = { user: state.users.find(u => u.userId === p.userId), schoolIdentity: state.settings.get(`${p.userId}/school-identity`) ?? { fullName: null, studentNumber: null } }
+      else if (route === '/admin/platform/users') value = list(state.users.map(u => ({ ...u, id: u.userId, accountStatus: 'Active', createdAt: date(-720) })), url)
       else if (route === '/admin/platform/information') value = { version: 'MOCK / local-memory', contributors: [] }
-      else if (route === '/admin/platform/monitoring') value = mockMonitoringSnapshot()
       else if (route === '/admin/competitions/{competitionId}') value = {
         competition: { ...competition, administrationRole: user?.role === 'Administrator' ? 'Owner' : user?.role === 'Organizer' ? 'Manager' : null },
-        modeConfiguration: { competitionId: competition!.id, mode: competition!.mode, competitionStatus: competition!.status, json: '{}', updatedAt: now() },
+        modeConfiguration: { competitionId: competition!.id, mode: competition!.mode, competitionStatus: competition!.status, configuration: mockModeConfiguration(String(competition!.mode)), updatedAt: now() },
         tracks: state.settings.get(`/competitions/{competitionId}/tracks${p.competitionId}`) ?? { mode: competition!.mode, enabled: competition!.tracksEnabled ?? false, canUpdate: competition!.status !== 'Finished', items: [] },
         permissions: { competitionId: competition!.id, ownerId: competition!.ownerId, managerIds: [], judgeIds: [], observerIds: [] },
         leaderboardVisibility: { competitionId: competition!.id, effectiveVisibility: 'Normal', frozenStartAt: null, hiddenStartAt: null },
@@ -437,7 +416,7 @@ export function createMockApi() {
         challenge,
         mode: competition!.mode,
         competitionStatus: competition!.status,
-        rulesJson: '{}',
+        rules: mockRules(String(competition!.mode)),
       }
       else if (cleanRoute === '/competitions') {
         const visibleCompetitions = route.startsWith('/admin') || competitionStaff
@@ -446,7 +425,30 @@ export function createMockApi() {
         value = list(visibleCompetitions.map(c => ({ ...c, administrationRole: user?.role === 'Administrator' ? 'Owner' : user?.role === 'Organizer' ? 'Manager' : null })), url)
       }
       else if (cleanRoute === '/competitions/{competitionId}') value = { ...competition, administrationRole: user?.role === 'Administrator' ? 'Owner' : user?.role === 'Organizer' ? 'Manager' : null }
-      else if (cleanRoute === '/competitions/{competitionId}/challenges') value = { ...list(state.challenges.filter(c => c.competitionId === p.competitionId), url), leaderboardVisibility: 'Normal', dataScope: 'Live' }
+      else if (cleanRoute === '/competitions/{competitionId}/challenges') {
+        const page = list(state.challenges.filter(c => c.competitionId === p.competitionId), url)
+        value = { ...page, items: page.items.map(challengeSummary), leaderboardVisibility: 'Normal', dataScope: 'Live' }
+      }
+      else if (cleanRoute === '/competitions/{competitionId}/progression') {
+        const challenges = state.challenges.filter(item => item.competitionId === p.competitionId).slice(0, 8)
+        const links = [[0, 2], [1, 2], [2, 3], [3, 4], [2, 5], [5, 6], [4, 7], [6, 7]]
+        value = {
+          enabled: competition?.mode === 'Ctf', showPlayerMap: competition?.mode === 'Ctf',
+          revision: 1, badges: [],
+          nodes: competition?.mode === 'Ctf' ? challenges.map((item, index) => ({
+            id: item.id, kind: 0, resourceId: item.id,
+            title: item.customTitle || item.title, description: null, direction: item.direction,
+            active: index < 2, complete: index === 0, visited: index === 0,
+            requiresPrerequisites: true,
+            firstOpenedAt: index === 0 ? now() : null, imageUrl: null,
+          })) : [],
+          edges: competition?.mode === 'Ctf' ? links.filter(([from, to]) => challenges[from] && challenges[to])
+            .map(([from, to], index) => ({
+              id: id(31, index + 1), sourceNodeId: challenges[from]!.id,
+              targetNodeId: challenges[to]!.id, condition: 0,
+            })) : [],
+        }
+      }
       else if (cleanRoute === '/competitions/{competitionId}/challenges/{competitionChallengeId}') value = {
         ...challenge,
         solvedByMyTeam: competition?.mode === 'Ctf' && Boolean(myTeam && state.facts.some(fact =>
@@ -459,7 +461,16 @@ export function createMockApi() {
         if (!user) return problem(401, '请先登录演示账号 / Sign in to list attachments')
         value = { deliveryPolicy: 'All', items: state.attachments.filter(item => item.challengeId === challenge!.challengeId && !item.deletedAt) }
       }
-      else if (route === '/admin/challenges') value = list(state.templates, url)
+      else if (route === '/admin/challenges') {
+        const page = list(state.templates, url)
+        const includeDeleted = url.searchParams.get('includeDeleted') === 'true'
+        const directions = [...new Set(state.templates
+          .filter(template => includeDeleted || !template.deletedAt)
+          .map(template => String(template.direction ?? '').trim())
+          .filter(Boolean))]
+          .sort((left, right) => left.localeCompare(right))
+        value = { ...page, items: page.items.map(templateSummary), directions }
+      }
       else if (route === '/admin/challenges/{challengeId}') value = template
       else if (route === '/admin/challenges/{challengeId}/attachments') value = { deliveryPolicy: 'All', items: state.attachments.filter(item => item.challengeId === template!.id && (!item.deletedAt || url.searchParams.get('includeDeleted') === 'true')) }
       else if (cleanRoute.endsWith('/invitation-token')) {
@@ -488,6 +499,19 @@ export function createMockApi() {
       else if (cleanRoute.endsWith('/gameplay-facts')) value = list(state.facts.filter(f => f.competitionId === p.competitionId), url)
       else if (cleanRoute.endsWith('/gameplay-facts/{gameplayFactId}')) value = state.facts.find(f => f.id === p.gameplayFactId)
       else if (cleanRoute.endsWith('/gameplay-facts/{gameplayFactId}/value')) value = { gameplayFactId: p.gameplayFactId, value: state.facts.find(f => f.id === p.gameplayFactId)?.value ?? '' }
+      else if (route === '/competitions/{competitionId}/teams/me/runtimes') {
+        if (!myTeam || myTeam.registrationStatus !== 'Approved' || myTeam.isBanned)
+          return problem(404, '演示队伍不可访问 / Mock team unavailable')
+        value = list(state.runtimes
+          .filter(runtime => runtime.competitionId === p.competitionId
+            && runtime.teamId === myTeam.id
+            && ['Queued', 'Provisioning', 'Running', 'Stopping'].includes(runtime.state))
+          .sort((left, right) => String(right.createdAt).localeCompare(String(left.createdAt)))
+          .map(runtime => ({
+            runtime,
+            challengeTitle: state.challenges.find(challenge => challenge.id === runtime.competitionChallengeId)?.title ?? '',
+          })), url)
+      }
       else if (cleanRoute.endsWith('/runtimes/current') || route.endsWith('/test-runtimes/current')) {
         value = [...state.runtimes].reverse().find(r => r.competitionChallengeId === challenge?.id && r.challengeId === template?.id)
         if (!value) return problem(404, '演示实例未启动 / No active Mock runtime')
@@ -496,7 +520,7 @@ export function createMockApi() {
       else if (route.endsWith('/runtimes')) value = list(state.runtimes.filter(r => !p.competitionId || r.competitionId === p.competitionId).map(r => route.startsWith('/admin/platform') ? { runtime: r, scope: 'Competition', competitionTitle: competition?.title ?? state.competitions[0]!.title, challengeTitle: 'Mock runtime' } : r), url)
       else if (route.endsWith('/permissions') && competition) value = { competitionId: competition.id, ownerId: competition.ownerId, managerIds: [id(1, 2)], judgeIds: [], observerIds: [] }
       else if (route.endsWith('/permission-candidates')) value = { items: state.users }
-      else if (route.endsWith('/configuration') && competition) value = { competitionId: competition.id, mode: competition.mode, competitionStatus: competition.status, json: JSON.stringify({ schemaVersion: { Ctf: 2, Awd: 2, Awdp: 4, Koh: 1 }[competition.mode as string] }), updatedAt: now() }
+      else if (route.endsWith('/configuration') && competition) value = { competitionId: competition.id, mode: competition.mode, competitionStatus: competition.status, configuration: mockModeConfiguration(String(competition.mode)), updatedAt: now() }
       else if (/\/(avatar|poster|logo|attachment)$/.test(route)) return new Response(null, { status: 404 })
       const saved = state.settings.get(path)
       if (saved) value = saved
@@ -522,6 +546,16 @@ export function createMockApi() {
           return json({ code: 'UnsupportedFormat' }, 400)
         wallpapers.set(user!.userId, file)
         Object.assign(user!, { wallpaperRevision: crypto.randomUUID(), wallpaperEnabled: true })
+        value = user
+      }
+      else if (route === '/auth/me/profile-cover' && request.method === 'PUT') {
+        const form = await request.formData()
+        const file = form.get('file')
+        if (!(file instanceof Blob) || !file.type.startsWith('image/'))
+          return json({ code: 'UnsupportedFormat' }, 400)
+        profileCovers.set(user!.userId, file)
+        const revision = crypto.randomUUID().replaceAll('-', '')
+        user!.profileCoverUrl = `/api/v1/users/${user!.userId}/profile-cover?revision=${revision}`
         value = user
       }
       else if (route === '/admin/competitions/{competitionId}/poster' && request.method === 'PUT') {
@@ -593,16 +627,17 @@ export function createMockApi() {
           state.settings.set('platform/human-verification', updated)
         }
         if (body.emailVerification) state.settings.set('platform/email', body.emailVerification)
-        if (body.publicGateway) state.settings.set('platform/gateway', {
-          policy: body.publicGateway,
-          capability: { connectorId: body.publicGateway.connectorId, runnerId: 'mock-runner', approvedOrigins: [body.publicGateway.publicOrigin], firstPort: 32768, lastPort: 60999, reservedPorts: [], maximumPorts: 8, namespaceIsolationAvailable: true },
-        })
+        if (body.experimentalFeatures) {
+          state.platform.experimentalFeatures = {
+            ctfPatchVerificationEnabled:
+              body.experimentalFeatures.ctfPatchVerificationEnabled === true,
+          }
+        }
         value = {
           branding: state.platform,
           humanVerification: currentHumanVerification(),
           emailVerification: state.settings.get('platform/email'),
-          publicGateway: state.settings.get('platform/gateway'),
-          publicGatewayStatusUrl: '/api/v1/admin/platform/public-gateway/status',
+          experimentalFeatures: state.platform.experimentalFeatures,
         }
       }
       else if (route === '/admin/platform/human-verification/secret' && request.method === 'PUT') {
@@ -621,50 +656,25 @@ export function createMockApi() {
         if (target.accountStatus && target.accountStatus !== 'Active')
           return json({ code: 'AccountInactive', message: 'Only active accounts can receive tokens.' }, 409)
         const expiresInSeconds = Number(body.expiresInSeconds)
-        const reason = typeof body.reason === 'string' ? body.reason.trim() : ''
         if (!Number.isInteger(expiresInSeconds)
           || expiresInSeconds < 60
-          || expiresInSeconds > 31_536_000
-          || reason.length < 3
-          || reason.length > 500) return problem(400, 'JWT lifetime or reason is invalid.')
+          || expiresInSeconds > 31_536_000) return problem(400, 'JWT lifetime is invalid.')
         const jwtId = crypto.randomUUID()
         const expiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString()
         const accessToken = `mock.${Buffer.from(JSON.stringify({
           sub: target.userId,
           exp: Math.floor(Date.parse(expiresAt) / 1000),
           jti: jwtId.replaceAll('-', ''),
-          impersonation: true,
-          impersonator_id: user!.userId,
+          role: target.role,
+          user_kind: target.kind,
+          token_type: 'access',
         })).toString('base64url')}.${crypto.randomUUID()}`
         tokens.set(accessToken, target.userId)
-        administratorIssuedTokens.set(jwtId, {
-          jwtId,
-          targetUserId: target.userId,
-          targetUserName: target.userName,
-          issuedByUserId: user!.userId,
-          issuedAt: now(),
-          expiresAt,
-          reason,
-          accessToken,
-          revoked: false,
-        })
-        value = { accessToken, expiresAt, jwtId, targetUserId: target.userId, targetUserName: target.userName }
-      }
-      else if (route === '/admin/platform/users/{userId}/tokens/{jwtId}' && request.method === 'DELETE') {
-        const issued = administratorIssuedTokens.get(p.jwtId!)
-        if (!issued || issued.issuedByUserId !== user!.userId || issued.targetUserId !== p.userId)
-          return problem(404, '签发记录不存在 / Issued token not found')
-        issued.revoked = true
-        tokens.delete(issued.accessToken)
-        return new Response(null, { status: 204, headers: { 'X-NoCTF-Mock': 'true' } })
+        value = { accessToken, expiresAt, targetUserId: target.userId, targetUserName: target.userName }
       }
       else if (route === '/admin/platform/users/{userId}/tokens' && request.method === 'DELETE') {
-        for (const [jwtId, issued] of administratorIssuedTokens) {
-          if (issued.targetUserId !== p.userId) continue
-          issued.revoked = true
-          tokens.delete(issued.accessToken)
-          administratorIssuedTokens.set(jwtId, issued)
-        }
+        for (const [token, tokenUserId] of tokens)
+          if (tokenUserId === p.userId) tokens.delete(token)
         const target = state.users.find(candidate => candidate.userId === p.userId)
         if (!target) return problem(404, '演示账号不存在 / Mock user not found')
         target.tokenVersion = Number(target.tokenVersion ?? 0) + 1
@@ -680,7 +690,7 @@ export function createMockApi() {
           competition!.tracksEnabled = body.tracks.enabled
           state.settings.set(`/competitions/{competitionId}/tracks${p.competitionId}`, { mode: competition!.mode, enabled: body.tracks.enabled, canUpdate: competition!.status !== 'Finished', items: body.tracks.tracks })
         }
-        value = { competition, modeConfiguration: body.modeConfiguration ?? { json: '{}' }, tracks: state.settings.get(`/competitions/{competitionId}/tracks${p.competitionId}`) ?? { enabled: competition!.tracksEnabled ?? false, canUpdate: competition!.status !== 'Finished', items: [] }, permissions: body.permissions ?? null, leaderboardVisibility: body.leaderboardVisibility ?? { effectiveVisibility: 'Normal' }, capabilities: { canObserve: true, canModerate: true, canManagePermissions: true } }
+        value = { competition, modeConfiguration: body.modeConfiguration ?? { competitionId: competition!.id, mode: competition!.mode, competitionStatus: competition!.status, configuration: mockModeConfiguration(String(competition!.mode)), updatedAt: now() }, tracks: state.settings.get(`/competitions/{competitionId}/tracks${p.competitionId}`) ?? { enabled: competition!.tracksEnabled ?? false, canUpdate: competition!.status !== 'Finished', items: [] }, permissions: body.permissions ?? null, leaderboardVisibility: body.leaderboardVisibility ?? { effectiveVisibility: 'Normal' }, capabilities: { canObserve: true, canModerate: true, canManagePermissions: true } }
       }
       else if (route === '/admin/competitions/{competitionId}/status' && request.method === 'PUT') { competition!.status = body.status; value = {} }
       else if (route === '/admin/competitions/{competitionId}/gameplay-facts/manual-adjustments') {
@@ -703,16 +713,16 @@ export function createMockApi() {
         if (!source) return problem(400, '选择同赛制的演示模板 / Select a template in the same mode')
         value = { ...state.challenges[0], ...body, id: body.id ?? crypto.randomUUID(), competitionId: competition!.id, title: body.customTitle ?? source.title, description: source.description, direction: source.direction, challengeId: source.id }; state.challenges.push(value)
       }
-      else if (route === '/admin/competitions/{competitionId}/challenges/{competitionChallengeId}' && request.method === 'PATCH') { if (body.presentation) Object.assign(challenge!, body.presentation, { title: body.presentation.customTitle ?? challenge!.title }); value = { challenge, mode: competition!.mode, competitionStatus: competition!.status, rulesJson: body.rules?.json ?? '{}' } }
+      else if (route === '/admin/competitions/{competitionId}/challenges/{competitionChallengeId}' && request.method === 'PATCH') { if (body.presentation) Object.assign(challenge!, body.presentation, { title: body.presentation.customTitle ?? challenge!.title }); value = { challenge, mode: competition!.mode, competitionStatus: competition!.status, rules: body.rules?.configuration ?? mockRules(String(competition!.mode)) } }
       else if (cleanRoute === '/competitions/{competitionId}/teams' && request.method === 'POST') {
         if (myTeam) return problem(409, '已加入队伍，请先退出 / Already in a team')
-        value = { ...state.teams[0], ...body, id: body.id ?? crypto.randomUUID(), competitionId: p.competitionId, captainId: user!.userId, memberIds: [user!.userId], registeredAt: now() }; state.teams.push(value); invitationTokens.set(value.id, crypto.randomUUID().replaceAll('-', ''))
+        value = { ...state.teams[0], ...body, id: body.id ?? crypto.randomUUID(), competitionId: p.competitionId, captainId: user!.userId, memberIds: [user!.userId], registrationStatus: 'Unregistered', registeredAt: now() }; state.teams.push(value); invitationTokens.set(value.id, crypto.randomUUID().replaceAll('-', ''))
       }
       else if (cleanRoute === '/competitions/{competitionId}/teams/{teamId}' && request.method === 'PATCH') {
         if (!team || (team.captainId !== user!.userId && user!.role !== 'Administrator')) return problem(403, '仅队长可以编辑 / Captain required')
-        if (body.profile) Object.assign(team, body.profile)
-        if (body.membership) Object.assign(team, body.membership)
-        if (body.registration) team.registrationStatus = body.registration.status
+        if (body.profile) { Object.assign(team, body.profile); team.registrationStatus = 'Unregistered' }
+        if (body.membership) { Object.assign(team, body.membership); team.registrationStatus = 'Unregistered' }
+        if (body.registration) team.registrationStatus = competition?.teamRegistrationAutoApprove ? 'Approved' : 'Pending'
         if (body.administration) {
           team.trackKey = body.administration.trackKey
           team.registrationStatus = body.administration.registrationStatus
@@ -731,7 +741,11 @@ export function createMockApi() {
         const invitedTeam = state.teams.find(candidate => candidate.competitionId === p.competitionId && invitationTokens.get(candidate.id) === body.invitationToken)
         if (!invitedTeam) return problem(400, '无效的演示邀请码 / Invalid demo invitation')
         if (myTeam) return problem(409, '已加入队伍 / Already in a team')
-        value = invitedTeam; value.memberIds.push(user!.userId)
+        value = invitedTeam; value.memberIds.push(user!.userId); value.registrationStatus = 'Unregistered'
+      }
+      else if (route === '/competitions/{competitionId}/challenges/{competitionChallengeId}/start') {
+        if (!challenge || !challenge.isPublished) return problem(404, '演示题目不可访问 / Mock challenge unavailable')
+        return new Response(null, { status: 204, headers: { 'X-NoCTF-Mock': 'true' } })
       }
       else if (route.endsWith('/flag-submissions')) {
         if (!myTeam) return problem(409, '先加入演示队伍 / Join a team first')
@@ -761,7 +775,14 @@ export function createMockApi() {
         }
         if (!runtime) return problem(404, '演示实例未启动 / No runtime')
         if (action === 'stop') Object.assign(runtime, { state: 'Stopped', stoppedAt: now() })
-        if (action === 'extend') runtime.expiresAt = date(2)
+        if (action === 'extend') {
+          const requestedExpiry = Date.parse(body.expiresAt)
+          const currentExpiry = Date.parse(runtime.expiresAt)
+          if (runtime.state !== 'Running' || !Number.isFinite(requestedExpiry)
+            || !Number.isFinite(currentExpiry) || requestedExpiry <= currentExpiry)
+            return problem(409, '演示实例当前无法续期 / Mock runtime cannot be extended')
+          runtime.expiresAt = new Date(requestedExpiry).toISOString()
+        }
         value = { ...runtime, runtimeInstanceId: runtime.id, statusUrl: path.replace(/\/{runtimeInstanceId}$/, '/current') }
       }
       else if (route === '/competitions/{competitionId}/teams/{teamId}/writeup/consultations') {
@@ -826,6 +847,7 @@ export function createMockApi() {
       }
       else if (route === '/admin/competitions/{competitionId}/announcements') {
         value = model('NotificationsNotificationResponse', { id: crypto.randomUUID(), sourceType: 2, sourceId: p.competitionId, targetType: 2, targetId: p.competitionId, kind: 'CompetitionAnnouncement', content: body, sentAt: now(), sourceDisplayName: user!.userName }); state.notifications.unshift(value)
+        for (const notify of notificationChanges) notify()
       }
       else return problem(501, `尚未模拟此操作，未调用真实服务 / Mock operation not implemented: ${request.method} ${route}`)
       changed = true
@@ -834,5 +856,5 @@ export function createMockApi() {
     if (status === 204) return new Response(null, { status, headers: { 'X-NoCTF-Mock': 'true' } })
     return json(shape(responseSchema(operation, String(status)), value), status)
   }
-  return { state, handle, changes, userFor }
+  return { state, handle, changes, notificationChanges, userFor }
 }

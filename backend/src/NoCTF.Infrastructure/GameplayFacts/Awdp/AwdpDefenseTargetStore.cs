@@ -5,6 +5,7 @@ using NoCTF.Application.GameplayFacts.Awdp;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Runtime;
@@ -15,6 +16,7 @@ using NoCTF.GameModes.Registration;
 using NoCTF.Infrastructure.GameplayFacts.Intake;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Application.Commands.Idempotency;
+using NoCTF.Domain.Commands;
 
 namespace NoCTF.Infrastructure.GameplayFacts.Awdp;
 
@@ -22,7 +24,7 @@ public sealed class AwdpDefenseTargetStore(
     NoCtfDbContext db,
     GameplayFactAttemptCriticalSection criticalSection,
     IRuntimePlacementPolicy placementPolicy,
-    ITransactionalMessageOutbox outbox,
+    IPostCommitMessagePublisher outbox,
     ICompetitionEventRecorder? eventRecorder = null,
     IRequestReplay? replay = null) : IAwdpDefenseTargetStore
 {
@@ -41,7 +43,7 @@ public sealed class AwdpDefenseTargetStore(
                 && team.DeletedAt == null
                 && !team.IsBanned
                 && team.RegistrationStatus == TeamRegistrationStatus.Approved
-                && team.MemberIds.Contains(userId))
+                && team.Members.Any(member => member.UserId == userId))
             .Select(team => new { TeamId = team.Id })
             .SingleOrDefaultAsync(cancellationToken);
         if (scope is null)
@@ -62,12 +64,13 @@ public sealed class AwdpDefenseTargetStore(
             && team.DeletedAt == null
             && !team.IsBanned
             && team.RegistrationStatus == TeamRegistrationStatus.Approved
-            && team.MemberIds.Contains(userId),
+            && team.Members.Any(member => member.UserId == userId),
             cancellationToken);
         if (!teamIsStillEligible)
             return new(AwdpDefenseTargetRequestState.ScopeNotFound);
         var prior = replay is null ? null : await replay.FindAsync<AwdpDefenseTargetRequestResult>(
-            new(userId, ReplayOperation.AwdpDefenseTarget, competitionId, competitionChallengeId), new { }, cancellationToken);
+            new(userId, ReplayOperation.AwdpDefenseTarget, competitionId, competitionChallengeId),
+            new EmptyReplayFingerprint(), cancellationToken);
         if (prior is not null) return prior;
 
         var context = await db.CompetitionChallenges
@@ -118,7 +121,7 @@ public sealed class AwdpDefenseTargetStore(
                 || instance.State == RuntimeState.Running
                 || instance.State == RuntimeState.Stopping
                 || instance.State == RuntimeState.Failed
-                    && instance.ProviderReceiptJson != null),
+                    && instance.ProviderReceipt != null),
             cancellationToken);
         if (activeTargetExists)
             return new(AwdpDefenseTargetRequestState.ActiveTargetExists);
@@ -127,10 +130,14 @@ public sealed class AwdpDefenseTargetStore(
         RuntimePlacement placement;
         try
         {
+            if (context.Competition.ModeConfiguration is not AwdpCompetitionModeConfiguration competitionConfiguration
+                || context.Challenge.Rules is not AwdpCompetitionChallengeRules challengeRules
+                || context.Template.Definition is not AwdpChallengeDefinition definition)
+                return new(AwdpDefenseTargetRequestState.InvalidConfiguration);
             var configuration = AwdpConfigurationResolver.Resolve(
-                context.Competition.ConfigurationJson,
-                context.Challenge.RulesJson,
-                context.Template.DefinitionJson);
+                competitionConfiguration,
+                challengeRules,
+                definition);
             template = configuration.Runtime;
             if (template is null || configuration.Checker is null)
                 return new(AwdpDefenseTargetRequestState.InvalidConfiguration);
@@ -201,6 +208,21 @@ public sealed class AwdpDefenseTargetStore(
         }
         catch (DbUpdateException exception) when (!TransactionFailureClassifier.IsRetryable(exception))
         {
+            await transaction.RollbackAsync(cancellationToken);
+            outbox.DiscardPendingMessages();
+            db.ChangeTracker.Clear();
+            if (await db.RuntimeInstances.AsNoTracking().AnyAsync(instance =>
+                    instance.CompetitionId == competitionId
+                    && instance.CompetitionChallengeId == competitionChallengeId
+                    && instance.TeamId == scope.TeamId
+                    && instance.Purpose == RuntimePurpose.AwdpTarget
+                    && (instance.State == RuntimeState.Queued
+                        || instance.State == RuntimeState.Provisioning
+                        || instance.State == RuntimeState.Running
+                        || instance.State == RuntimeState.Stopping
+                        || instance.State == RuntimeState.Failed
+                            && instance.ProviderReceipt != null), cancellationToken))
+                return new(AwdpDefenseTargetRequestState.ActiveTargetExists);
             return new(AwdpDefenseTargetRequestState.ConcurrencyConflict);
         }
     }

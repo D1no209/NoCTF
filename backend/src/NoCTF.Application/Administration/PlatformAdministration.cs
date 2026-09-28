@@ -13,13 +13,29 @@ public sealed record PlatformUserView(
     int TokenVersion,
     bool EmailVerified,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    Guid? SsoProviderId = null,
+    SsoProtocol? SsoProtocol = null,
+    string? SsoSubject = null,
+    DateTimeOffset? SsoBoundAt = null);
+
+public sealed record PlatformUserListQuery(
+    string? Keyword,
+    UserKind? Kind,
+    UserRole? Role,
+    int Offset,
+    int Limit,
+    bool Desc,
+    Guid? SsoProviderId = null);
+
+public sealed record PlatformUserListPage(
+    IReadOnlyList<PlatformUserView> Items,
+    int Total);
 
 public enum UpdatePlatformRoleState
 {
     Updated,
     UserNotFound,
-    InvalidBotRole,
     ActiveOwnerOrManagerAssignments,
     LastAdministratorProtected
 }
@@ -60,7 +76,6 @@ public enum PatchPlatformUserState
 {
     Updated,
     UserNotFound,
-    InvalidBotRole,
     ActiveOwnerOrManagerAssignments,
     LastAdministratorProtected,
     AnonymizedAccountImmutable
@@ -88,8 +103,7 @@ public enum IssuePlatformUserTokenFailure
     None,
     UserNotFound,
     AccountInactive,
-    InvalidLifetime,
-    ReasonInvalid
+    InvalidLifetime
 }
 
 public sealed record IssuePlatformUserTokenResult(
@@ -114,20 +128,6 @@ public sealed record PlatformUserTokenAuditFact(
     string? Reason,
     int TokenVersion);
 
-public sealed record AdminIssuedAccessTokenView(
-    Guid JwtId,
-    Guid TargetUserId,
-    string TargetUserName,
-    DateTimeOffset IssuedAt,
-    DateTimeOffset ExpiresAt,
-    string Reason);
-
-public enum RevokeAdminIssuedAccessTokenState
-{
-    Revoked,
-    NotFound
-}
-
 public static class BotIdentity
 {
     public static string DummyEmail(Guid userId) => $"bot-{userId:N}@bot.invalid";
@@ -136,6 +136,9 @@ public static class BotIdentity
 public interface IPlatformAdministrationStore
 {
     Task<IReadOnlyList<PlatformUserView>> ListUsersAsync(CancellationToken cancellationToken);
+    Task<PlatformUserListPage> ListUsersPageAsync(
+        PlatformUserListQuery query,
+        CancellationToken cancellationToken);
     Task<PlatformUserView?> FindUserAsync(Guid userId, CancellationToken cancellationToken);
     Task<CreateBotResult> CreateBotAsync(
         string userName,
@@ -166,22 +169,6 @@ public interface IPlatformAdministrationStore
         bool? emailVerified,
         DateTimeOffset now,
         CancellationToken cancellationToken);
-    Task RecordTokenIssuedAsync(
-        Guid actorUserId,
-        PlatformUserTokenAuditFact fact,
-        DateTimeOffset now,
-        CancellationToken cancellationToken);
-    Task<IReadOnlyList<AdminIssuedAccessTokenView>> ListIssuedTokensAsync(
-        Guid actorUserId,
-        Guid targetUserId,
-        DateTimeOffset now,
-        CancellationToken cancellationToken);
-    Task<RevokeAdminIssuedAccessTokenState> RevokeIssuedTokenAsync(
-        Guid actorUserId,
-        Guid targetUserId,
-        Guid jwtId,
-        DateTimeOffset now,
-        CancellationToken cancellationToken);
     Task<PlatformUserView?> InvalidateTokensAsync(
         Guid userId,
         Guid actorUserId,
@@ -195,11 +182,13 @@ public sealed class ManagePlatform(
 {
     public const long MinimumIssuedTokenLifetimeSeconds = 60;
     public const long MaximumIssuedTokenLifetimeSeconds = 31_536_000;
-    public const int MinimumTokenIssuanceReasonLength = 3;
-    public const int MaximumTokenIssuanceReasonLength = 500;
 
     public Task<IReadOnlyList<PlatformUserView>> ListUsersAsync(CancellationToken ct = default) =>
         store.ListUsersAsync(ct);
+    public Task<PlatformUserListPage> ListUsersPageAsync(
+        PlatformUserListQuery query,
+        CancellationToken ct = default) =>
+        store.ListUsersPageAsync(query, ct);
     public Task<PlatformUserView?> GetUserAsync(Guid userId, CancellationToken ct = default) =>
         store.FindUserAsync(userId, ct);
     public Task<CreateBotResult> CreateBotAsync(
@@ -213,25 +202,19 @@ public sealed class ManagePlatform(
             || !normalized.All(character =>
                 char.IsAsciiLetterOrDigit(character) || character is '_' or '-'))
             return Task.FromResult(new CreateBotResult(CreateBotState.InvalidUserName));
-        if (role is not (UserRole.User or UserRole.Organizer))
+        if (!Enum.IsDefined(role))
             return Task.FromResult(new CreateBotResult(CreateBotState.InvalidRole));
         return store.CreateBotAsync(normalized, role, now, ct);
     }
     public async Task<IssuePlatformUserTokenResult> IssueUserTokenAsync(
         Guid userId,
-        Guid actorUserId,
         long expiresInSeconds,
-        string reason,
         DateTimeOffset now,
         CancellationToken ct = default)
     {
         if (expiresInSeconds is < MinimumIssuedTokenLifetimeSeconds
             or > MaximumIssuedTokenLifetimeSeconds)
             return new(null, null, IssuePlatformUserTokenFailure.InvalidLifetime);
-        var normalizedReason = reason.Trim();
-        if (normalizedReason.Length is < MinimumTokenIssuanceReasonLength
-            or > MaximumTokenIssuanceReasonLength)
-            return new(null, null, IssuePlatformUserTokenFailure.ReasonInvalid);
         var user = await store.FindUserAsync(userId, ct);
         if (user is null)
             return new(null, null, IssuePlatformUserTokenFailure.UserNotFound);
@@ -249,21 +232,7 @@ public sealed class ManagePlatform(
                     user.TokenVersion,
                     user.EmailVerified),
                 now,
-                lifetime,
-                actorUserId);
-            await store.RecordTokenIssuedAsync(
-                actorUserId,
-                new(
-                    1,
-                    user.Id,
-                    user.UserName,
-                    PlatformUserTokenAdministrationAction.AccessTokenIssued,
-                    token.JwtId,
-                    token.ExpiresAt,
-                    normalizedReason,
-                    user.TokenVersion),
-                now,
-                ct);
+                lifetime);
             return new(token, user, IssuePlatformUserTokenFailure.None);
         }
         catch (ArgumentOutOfRangeException)
@@ -311,19 +280,6 @@ public sealed class ManagePlatform(
         DateTimeOffset now,
         CancellationToken ct = default) =>
         store.PatchUserAsync(userId, actorUserId, apply, emailVerified, now, ct);
-    public Task<IReadOnlyList<AdminIssuedAccessTokenView>> ListIssuedTokensAsync(
-        Guid actorUserId,
-        Guid targetUserId,
-        DateTimeOffset now,
-        CancellationToken ct = default) =>
-        store.ListIssuedTokensAsync(actorUserId, targetUserId, now, ct);
-    public Task<RevokeAdminIssuedAccessTokenState> RevokeIssuedTokenAsync(
-        Guid actorUserId,
-        Guid targetUserId,
-        Guid jwtId,
-        DateTimeOffset now,
-        CancellationToken ct = default) =>
-        store.RevokeIssuedTokenAsync(actorUserId, targetUserId, jwtId, now, ct);
     public Task<PlatformUserView?> InvalidateTokensAsync(
         Guid userId,
         Guid actorUserId,

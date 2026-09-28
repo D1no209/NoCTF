@@ -274,6 +274,65 @@ public sealed class LeaderboardEndpointTests
     }
 
     [Test]
+    public async Task Staff_uses_published_challenge_view_on_participant_leaderboard_routes()
+    {
+        var competitionId = Guid.CreateVersion7();
+        var publishedId = Guid.CreateVersion7();
+        var unpublishedId = Guid.CreateVersion7();
+        var teamId = Guid.CreateVersion7();
+        var full = CreateProjection(
+            competitionId,
+            [
+                new(publishedId, "Published", "PWN", "PWN", 1, true),
+                new(unpublishedId, "Unpublished", "WEB", "WEB", 2, false)
+            ],
+            [new(4, publishedId, null), new(9, unpublishedId, null)],
+            [new(teamId, "Alpha", "default", 1, ScoreboardRankingState.Eligible,
+                30, 0, [],
+                [
+                    new(4, ScoreboardScoreState.Provisional, 10, 0, 10, 1, [], []),
+                    new(9, ScoreboardScoreState.Provisional, 20, 0, 20, 1, [], [])
+                ])]);
+        var published = CreateProjection(
+            competitionId,
+            [new(publishedId, "Published", "PWN", "PWN", 1, true)],
+            [new(0, publishedId, null)],
+            [new(teamId, "Alpha", "default", 1, ScoreboardRankingState.Eligible,
+                10, 0, [],
+                [new(0, ScoreboardScoreState.Provisional, 10, 0, 10, 1, [], [])])]);
+        full = full with { ParticipantView = ScoreboardAudienceView.From(published) };
+        await using var app = await CreateApplicationAsync(
+            competitionId,
+            new CachedLeaderboard(projection: full),
+            new RecordingMessagePublisher(),
+            authorizer: new StaffAccess(canJudge: true),
+            userContext: new AuthenticatedUserContext(Guid.CreateVersion7()));
+        using var client = app.GetTestClient();
+
+        using var catalogResponse = await client.GetAsync(
+            $"/api/v1/competitions/{competitionId}/leaderboard/challenges");
+        using var schemaResponse = await client.GetAsync(
+            $"/api/v1/competitions/{competitionId}/leaderboard/schema");
+        using var snapshotResponse = await client.GetAsync(
+            $"/api/v1/competitions/{competitionId}/leaderboard");
+        var catalog = await catalogResponse.Content
+            .ReadFromJsonAsync<ScoreboardChallengeCatalogResponse>();
+        var schema = await schemaResponse.Content
+            .ReadFromJsonAsync<ScoreboardSchemaResponse>();
+        var snapshot = await snapshotResponse.Content
+            .ReadFromJsonAsync<ScoreboardSnapshotResponse>();
+
+        await Assert.That(catalogResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(schemaResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(snapshotResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(catalog!.Items.Select(item => item.Id)).IsEquivalentTo([publishedId]);
+        await Assert.That(schema!.Columns.Select(column => column.CompetitionChallengeId))
+            .IsEquivalentTo([publishedId]);
+        await Assert.That(snapshot!.Teams.Single().TotalScore).IsEqualTo(10);
+        await Assert.That(snapshot.Teams.Single().Slots).HasSingleItem();
+    }
+
+    [Test]
     public async Task Public_slot_detail_remaps_allocations_after_hiding_unpublished_challenges()
     {
         var competitionId = Guid.CreateVersion7();
@@ -1240,29 +1299,6 @@ public sealed class LeaderboardEndpointTests
     {
         public List<Guid> InvalidatedCompetitionIds { get; } = [];
 
-        public Task<LeaderboardResponse?> GetAsync(
-            Guid competitionId,
-            CancellationToken cancellationToken) =>
-            Task.FromResult<LeaderboardResponse?>(
-                missing
-                    ? null
-                    : new(competitionId, DateTimeOffset.UtcNow, []));
-
-        public Task<LeaderboardResponse?> GetFrozenAsync(
-            Guid competitionId,
-            CancellationToken cancellationToken) =>
-            Task.FromResult<LeaderboardResponse?>(frozen
-                ? new LeaderboardResponse(
-                    competitionId,
-                    DateTimeOffset.UtcNow.AddMinutes(-5),
-                    [])
-                {
-                    Visibility = CompetitionLeaderboardVisibility.Frozen,
-                    DataScope = LeaderboardDataScope.Frozen,
-                    DataAsOf = DateTimeOffset.UtcNow.AddMinutes(-5)
-                }
-                : null);
-
         public Task<ScoreboardProjection?> GetScoreboardAsync(
             Guid competitionId,
             CancellationToken cancellationToken) =>
@@ -1366,17 +1402,9 @@ public sealed class LeaderboardEndpointTests
                 ? first
                 : second));
 
-        public Task<LeaderboardResponse?> GetFrozenAsync(
-            Guid competitionId,
-            CancellationToken cancellationToken) => Task.FromResult<LeaderboardResponse?>(null);
-
         public Task<ScoreboardProjection?> GetScoreboardAsync(
             Guid competitionId,
             CancellationToken cancellationToken) => Task.FromResult<ScoreboardProjection?>(null);
-
-        public Task<LeaderboardResponse?> GetAsync(
-            Guid competitionId,
-            CancellationToken cancellationToken) => Task.FromResult<LeaderboardResponse?>(null);
 
         public Task RefreshAsync(Guid competitionId, CancellationToken cancellationToken) => Task.CompletedTask;
 

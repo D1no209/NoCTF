@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.AspNetCore.Authorization;
 using NoCTF.API.Security;
+using Microsoft.AspNetCore.Authentication;
 
 namespace NoCTF.API.Composition;
 
@@ -10,6 +11,7 @@ public static class AuthenticationRegistration
 {
     public const string AccessScheme = JwtBearerDefaults.AuthenticationScheme;
     public const string InternalScheme = "Internal";
+    public const string SsoFlowScheme = "SsoFlow";
 
     public static IServiceCollection AddNoCtfAuthentication(this IServiceCollection services, IConfiguration configuration)
     {
@@ -27,6 +29,8 @@ public static class AuthenticationRegistration
                     OnMessageReceived = context =>
                     {
                         if ((context.HttpContext.Request.Path.StartsWithSegments("/hubs/v1/competitions")
+                                || context.HttpContext.Request.Path.StartsWithSegments(
+                                    "/hubs/v1/notifications")
                                 || context.HttpContext.Request.Path.StartsWithSegments(
                                     "/hubs/v1/admin/platform-logs"))
                             && context.Request.Query.TryGetValue("access_token", out var token))
@@ -71,8 +75,12 @@ public static class AuthenticationRegistration
                     ClockSkew = TimeSpan.Zero,
                     NameClaimType = "runner_id"
                 };
-            });
+            })
+            .AddScheme<AuthenticationSchemeOptions, SsoFlowAuthenticationHandler>(
+                SsoFlowScheme,
+                _ => { });
         services.AddScoped<CurrentAccessTokenValidator>();
+        services.AddSingleton<SsoBrowserCorrelation>();
         services.AddAuthorization(options =>
         {
             options.DefaultPolicy = new AuthorizationPolicyBuilder(AccessScheme)
@@ -92,6 +100,15 @@ public static class AuthenticationRegistration
                 .RequireAuthenticatedUser()
                 .RequireClaim("token_type", "internal")
                 .RequireClaim("permission", "awdp:fix-result:write")
+                .RequireClaim("resource")
+                .RequireClaim("gameplay_fact_id")
+                .RequireClaim("runtime_instance_id")
+                .RequireClaim("deadline"));
+            options.AddPolicy("PatchVerificationResult", policy => policy
+                .AddAuthenticationSchemes(InternalScheme)
+                .RequireAuthenticatedUser()
+                .RequireClaim("token_type", "internal")
+                .RequireClaim("permission", "patch-verification:result:write")
                 .RequireClaim("resource")
                 .RequireClaim("gameplay_fact_id")
                 .RequireClaim("runtime_instance_id")

@@ -1,0 +1,153 @@
+groups:
+  - name: noctf-availability
+    rules:
+      - alert: NoCtfMetricsTargetUnavailable
+        expr: up{job="noctf"} == 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: NoCTF metrics target is unavailable
+      - alert: NoCtfPublicProbeUnavailable
+        expr: probe_success{job="blackbox"} == 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: NoCTF or configured external HTTP target is unavailable
+      - alert: NoCtfNatsUnavailable
+        expr: (max(up{job="nats"}) or vector(0)) == 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: NATS exporter or monitoring endpoint is unavailable
+
+  - name: noctf-messaging
+    rules:
+      - alert: NoCtfCriticalQueuePending
+        expr: noctf:jetstream_pending:sum > 100
+        for: 3m
+        labels: { severity: critical }
+        annotations:
+          summary: Critical JetStream consumers have more than 100 pending messages
+      - alert: NoCtfCriticalQueueAckPending
+        expr: noctf:jetstream_ack_pending:sum > 50
+        for: 3m
+        labels: { severity: critical }
+        annotations:
+          summary: Critical JetStream consumers have more than 50 unacknowledged messages
+      - alert: NoCtfCriticalQueueRedelivered
+        expr: noctf:jetstream_redelivered:sum > 10
+        for: 3m
+        labels: { severity: critical }
+        annotations:
+          summary: Critical JetStream consumers have more than 10 redeliveries
+
+  - name: noctf-performance
+    rules:
+      - alert: NoCtfApiP95High
+        expr: noctf:api_request_duration:p95_5m > 0.8 and sum(increase(noctf_api_request_duration_seconds_count{request_kind="rest"}[5m])) >= 100
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: API P95 latency exceeds 800ms
+      - alert: NoCtfApiServerErrorRateHigh
+        expr: noctf:api_server_error:ratio5m > 0.02 and sum(increase(noctf_api_requests_total{request_kind="rest"}[5m])) >= 100
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: API server error ratio exceeds 2 percent
+      - alert: NoCtfHumanVerificationUnavailable
+        expr: noctf:human_verification_unavailable:rate5m > 0
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: Human verification provider requests are failing
+      - alert: NoCtfRuntimeWaitingTooLong
+        expr: noctf:runtime_waiting_oldest_age:seconds > 30
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: Oldest queued Runtime has waited more than 30 seconds
+      - alert: NoCtfLeaderboardFailing
+        expr: noctf:leaderboard_failures:rate5m > 0
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: Leaderboard projection or publication is failing
+      - alert: NoCtfLeaderboardProjectionSlow
+        expr: noctf:leaderboard_projection_duration:p95_5m > 2 and noctf:leaderboard_projection_samples:count5m >= 3
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: Leaderboard projection P95 exceeds two seconds
+      - alert: NoCtfWebhookFirstAttemptP95Slow
+        expr: noctf:webhook_queue_age:p95_5m > 2 and sum(increase(noctf_webhook_queue_age_seconds_count[5m])) >= 20
+        for: 2m
+        labels: { severity: warning }
+        annotations:
+          summary: Webhook event-to-first-HTTP P95 exceeds two seconds
+      - alert: NoCtfWebhookQueueAgeHigh
+        expr: noctf:webhook_queue_age:p99_5m > 5 and sum(increase(noctf_webhook_queue_age_seconds_count[5m])) >= 20
+        for: 1m
+        labels: { severity: warning }
+        annotations:
+          summary: Webhook event-to-first-HTTP P99 exceeds five seconds
+      - alert: NoCtfWebhookOldestPendingHigh
+        expr: noctf:webhook_oldest_pending_age:seconds > 10
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: Oldest pending webhook event is more than ten seconds old
+      - alert: NoCtfPostgresConnectionsHigh
+        expr: noctf:postgres_connections:ratio > 0.8
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: PostgreSQL connection usage exceeds 80 percent
+      - alert: NoCtfNatsP99High
+        expr: noctf:nats_operation_duration:p99_5m > 0.05 and sum(increase(noctf_nats_operation_duration_seconds_count[5m])) >= 20
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: NATS coordination operation P99 exceeds 50ms
+      - alert: NoCtfRunnerCapacityLow
+        expr: min(noctf:runner_capacity_available:ratio) < 0.15
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: A Runner resource pool has less than 15 percent capacity
+      - alert: NoCtfRunnerUnavailable
+        expr: noctf:runner_online:sum < 1
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: No Runner is online
+      - alert: NoCtfRunnerCapacityTransactionExhausted
+        expr: sum(increase(noctf_runner_capacity_transaction_exhaustions_total[5m])) > 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: Runner capacity transaction retries were exhausted
+      - alert: NoCtfDiskSpaceWarning
+        expr: noctf:disk_available:ratio < 0.25 and noctf:disk_available:ratio >= 0.15
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: Host disk availability is below 25 percent
+      - alert: NoCtfDiskSpaceLow
+        expr: noctf:disk_available:ratio < 0.15
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: Host disk availability is below 15 percent
+      - alert: NoCtfLokiUnavailable
+        expr: up{job="loki"} == 0
+        for: 2m
+        labels: { severity: warning }
+        annotations:
+          summary: Private Loki metrics endpoint is unavailable
+      - alert: NoCtfLokiDiscardingLogs
+        expr: sum(increase(loki_discarded_samples_total[5m])) > 0
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: Loki rejected log samples in the last five minutes

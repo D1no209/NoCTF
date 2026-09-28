@@ -61,7 +61,7 @@ public class AccountSourceAddressTests
         var json = JsonSerializer.Serialize(new User { SchoolFullName = "private-name", SchoolStudentNumber = "001Ab" });
         await Assert.That(json).DoesNotContain("private-name");
         await Assert.That(json).DoesNotContain("001Ab");
-        await Assert.That(JsonSerializer.Serialize(new GameplayFact { SourceIpAddress = "192.0.2.9" })).DoesNotContain("192.0.2.9");
+        await Assert.That(JsonSerializer.Serialize(new FlagAttemptGameplayFact { SourceIpAddress = "192.0.2.9" })).DoesNotContain("192.0.2.9");
         await Assert.That(new AccountActivity(Guid.NewGuid(), AccountActivityKind.LoggedIn, DateTimeOffset.UtcNow, "192.0.2.9").ToString()).DoesNotContain("192.0.2.9");
     }
 

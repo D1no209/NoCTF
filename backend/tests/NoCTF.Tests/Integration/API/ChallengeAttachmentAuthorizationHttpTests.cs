@@ -288,14 +288,13 @@ public sealed class ChallengeAttachmentAuthorizationHttpTests
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.Competitions.Add(new Competition
+        db.Competitions.Add(new CtfCompetition
         {
             Id = competitionId,
             OwnerId = userId,
             Title = "Attachment authorization",
-            Mode = GameMode.Ctf,
             Status = CompetitionStatus.Running,
-            ConfigurationJson = "{}",
+            ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
             FlagDerivationSecret = new byte[32],
             StartAt = now.AddHours(-1),
             EndAt = now.AddHours(1),
@@ -389,13 +388,12 @@ public sealed class ChallengeAttachmentAuthorizationHttpTests
             .UseSnakeCaseNamingConvention()
             .Options);
 
-    private static Challenge Challenge(Guid id, Guid ownerId, string title) => new()
+    private static Challenge Challenge(Guid id, Guid ownerId, string title) => new CtfChallenge
     {
         Id = id,
         OwnerId = ownerId,
         Title = title,
-        Mode = GameMode.Ctf,
-        DefinitionJson = "{}",
+        Definition = TestConfigurations.Definition(GameMode.Ctf),
         CreatedAt = DateTimeOffset.UtcNow,
         UpdatedAt = DateTimeOffset.UtcNow
     };
@@ -406,19 +404,18 @@ public sealed class ChallengeAttachmentAuthorizationHttpTests
         Guid challengeId,
         bool isPublished,
         int order,
-        string policy,
-        DateTimeOffset now) => new()
+        string _,
+        DateTimeOffset now) => new CtfCompetitionChallenge
         {
             Id = id,
             CompetitionId = competitionId,
             ChallengeId = challengeId,
             Order = order,
             IsPublished = isPublished,
-            RulesJson = JsonSerializer.Serialize(new
+            Rules = new CtfCompetitionChallengeRules
             {
-                schemaVersion = 1,
-                attachmentPolicy = policy
-            }),
+                CompetitionChallengeId = id
+            },
             UpdatedAt = now
         };
 
@@ -427,7 +424,7 @@ public sealed class ChallengeAttachmentAuthorizationHttpTests
         string objectKey,
         string fileName,
         byte[] content,
-        DateTimeOffset now) => new()
+        DateTimeOffset now) => new StoredFile
         {
             Id = id,
             ObjectKey = objectKey,
@@ -456,7 +453,7 @@ public sealed class ChallengeAttachmentAuthorizationHttpTests
         Guid challengeId,
         Guid attachmentId,
         string flag,
-        DateTimeOffset now) => new()
+        DateTimeOffset now) => new TemplateChallengeFlag
         {
             Id = Guid.CreateVersion7(),
             ChallengeId = challengeId,

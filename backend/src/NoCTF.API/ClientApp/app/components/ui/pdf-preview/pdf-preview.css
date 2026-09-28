@@ -1,0 +1,19 @@
+[data-slot='pdf-preview-toolbar'] {
+  display: flex; flex: none; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;
+  min-height: 48px; padding: 6px 10px;
+  background: color-mix(in oklch, var(--control) 88%, transparent);
+  box-shadow: 0 1px color-mix(in oklch, var(--foreground) 8%, transparent);
+}
+[data-slot='pdf-preview-toolbar'] > [role='group'] { display: flex; min-width: 0; align-items: center; gap: 2px; }
+[data-slot='pdf-page-stage'] {
+  display: flex; width: max-content; min-width: 100%; min-height: 100%; align-items: flex-start; justify-content: center;
+  padding: 16px; background: color-mix(in oklch, var(--background) 42%, transparent);
+}
+[data-slot='pdf-page'] {
+  flex: none; overflow: hidden; border-radius: var(--control-radius);
+  background: var(--pdf-paper); box-shadow: var(--panel-shadow);
+}
+[data-slot='pdf-page'] canvas { display: block; background: var(--pdf-paper); }
+@media (max-width: 639px) {
+  [data-slot='pdf-preview-toolbar'] { justify-content: center; }
+}

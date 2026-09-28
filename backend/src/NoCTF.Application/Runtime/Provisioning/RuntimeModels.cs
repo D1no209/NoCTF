@@ -9,7 +9,23 @@ public sealed record ContainerSecurityPolicy(
     bool ReadonlyRootfs,
     bool RunAsNonRoot,
     IReadOnlyList<string> CapDrop,
-    IReadOnlyList<string> CapAdd);
+    IReadOnlyList<string> CapAdd)
+{
+    public static ContainerSecurityPolicy Default { get; } =
+        new(false, false, false, [], []);
+
+    public ContainerSecurityPolicy NormalizeCapabilities() => this with
+    {
+        CapDrop = Normalize(CapDrop),
+        CapAdd = Normalize(CapAdd)
+    };
+
+    private static IReadOnlyList<string> Normalize(IReadOnlyList<string>? capabilities) =>
+        capabilities?
+            .Where(capability => !string.IsNullOrWhiteSpace(capability))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray() ?? [];
+}
 
 public sealed class RuntimeConfigurationException(string message) : Exception(message);
 
@@ -73,11 +89,11 @@ public abstract record ChallengeRuntimeDefinition
 
 public sealed record ContainerRuntimeDefinition(
     string Image,
+    ContainerSecurityPolicy Security,
     IReadOnlyList<string>? Command = null,
     IReadOnlyDictionary<string, string>? Environment = null,
     IReadOnlyDictionary<string, string>? Labels = null,
     IReadOnlyDictionary<int, int>? PortMappings = null,
-    ContainerSecurityPolicy? Security = null,
     string? FlagEnvironmentVariableName = null,
     RuntimeEgressPolicy EgressPolicy = RuntimeEgressPolicy.Isolated,
     IReadOnlyList<int>? InternalPorts = null) : ChallengeRuntimeDefinition
@@ -121,7 +137,7 @@ public sealed record ChallengeRuntimeTemplate(
 
 public interface IChallengeRuntimeTemplateCatalog
 {
-    ChallengeRuntimeTemplate? Get(NoCTF.Domain.Competitions.GameMode mode, string challengeConfigurationJson);
+    ChallengeRuntimeTemplate? Get(NoCTF.Domain.Challenges.ChallengeDefinition? definition);
 }
 
 public sealed record RuntimePlacement(RuntimeProvider Provider, string RunnerPool);
@@ -130,6 +146,12 @@ public sealed record RuntimePublishedPortMapping(
     string? ServiceName,
     int ContainerPort,
     int HostPort);
+
+public sealed record RuntimeAccessEndpointMapping(
+    int BindingIndex,
+    string? DirectAddress,
+    string? TargetHost,
+    int? TargetPort);
 
 /// <summary>Resolves platform-owned Runtime placement independently of challenge definitions.</summary>
 public interface IRuntimePlacementPolicy
@@ -159,7 +181,9 @@ public sealed record ContainerRequest(
     RuntimeUrlBinding? ControlCheckUrlBinding = null,
     RuntimeInternalEndpointBinding? AwdCheckerTargetBinding = null,
     RuntimeEgressPolicy EgressPolicy = RuntimeEgressPolicy.Isolated,
-    ContainerNetworkPurpose NetworkPurpose = ContainerNetworkPurpose.PersistentRuntime)
+    ContainerNetworkPurpose NetworkPurpose = ContainerNetworkPurpose.PersistentRuntime,
+    RuntimeResourceLimits? Budget = null,
+    RuntimeAccessMode AccessMode = RuntimeAccessMode.Direct)
 {
     public IReadOnlyList<int> ContainerPorts =>
         [.. PortMappings.Keys.Concat(InternalPorts ?? []).Distinct().Order()];
@@ -224,6 +248,25 @@ public sealed class OneShotInputPreparationException(string message, Exception? 
 public sealed class OneShotCleanupException(string message, Exception? innerException = null)
     : Exception(message, innerException);
 
+public enum RuntimeTerminationMode
+{
+    GracefulThenForce,
+    Force
+}
+
+public sealed record RuntimeTerminationPolicy(
+    TimeSpan GracefulStopTimeout,
+    TimeSpan ForceDeleteTimeout,
+    TimeSpan NetworkCleanupTimeout,
+    TimeSpan VerificationTimeout)
+{
+    public static RuntimeTerminationPolicy Default { get; } = new(
+        TimeSpan.FromSeconds(2),
+        TimeSpan.FromSeconds(8),
+        TimeSpan.FromSeconds(5),
+        TimeSpan.FromSeconds(3));
+}
+
 public interface IContainerLifecycle
 {
     Task<ContainerReceipt> CreateAsync(ContainerRequest request, CancellationToken cancellationToken);
@@ -231,20 +274,21 @@ public interface IContainerLifecycle
         ContainerRequest request,
         CancellationToken cancellationToken);
     Task DestroyAsync(ContainerReceipt receipt, CancellationToken cancellationToken);
+    Task DestroyAsync(
+        ContainerReceipt receipt,
+        RuntimeTerminationMode mode,
+        RuntimeTerminationPolicy policy,
+        CancellationToken cancellationToken) =>
+        DestroyAsync(receipt, cancellationToken);
     Task<ContainerReceipt?> GetAsync(RuntimeProvider provider, string resourceId, CancellationToken cancellationToken);
 }
 
 public interface IOneShotJobRunner
 {
-    Task<OneShotResult> RunAsync(ContainerRequest request, CancellationToken cancellationToken);
-
     Task<OneShotResult> RunAsync(
         ContainerRequest request,
         OneShotInputArchive? input,
-        CancellationToken cancellationToken) => input is null
-        ? RunAsync(request, cancellationToken)
-        : Task.FromException<OneShotResult>(new NotSupportedException(
-            "The selected one-shot Runtime provider does not support input archives."));
+        CancellationToken cancellationToken);
 }
 
 public sealed record ContainerExecResult(int ExitCode, bool TimedOut);
@@ -274,7 +318,8 @@ public sealed record ContainerNetworkPolicyRequest(
     ContainerNetworkPurpose Purpose,
     RuntimeEgressPolicy EgressPolicy,
     IReadOnlyList<int> PublicIngressPorts,
-    int? TargetPort = null);
+    int? TargetPort = null,
+    IReadOnlyList<int>? ProxyIngressPorts = null);
 
 public abstract record AttachedRuntimeTarget(
     RuntimeResourceIdentity Identity);
@@ -302,11 +347,30 @@ public interface IRuntimeManagedResourceReconciler
 {
     RuntimeProvider Provider { get; }
 
+    Task<bool?> WorkloadExistsAsync(RuntimeWorkloadIdentity identity, CancellationToken cancellationToken) =>
+        Task.FromResult<bool?>(null);
+
     Task<IReadOnlyList<RuntimeResourceIdentity>> ListManagedAsync(
         CancellationToken cancellationToken);
 
     Task DestroyByIdentityAsync(
         RuntimeResourceIdentity identity,
+        CancellationToken cancellationToken);
+
+    Task DestroyByIdentityAsync(
+        RuntimeResourceIdentity identity,
+        RuntimeTerminationMode mode,
+        RuntimeTerminationPolicy policy,
+        CancellationToken cancellationToken) =>
+        DestroyByIdentityAsync(identity, cancellationToken);
+}
+
+public interface IRuntimeProxyNetworkReconciler
+{
+    Task EnsureProxyNetworkAsync(
+        Guid runtimeInstanceId,
+        RuntimeKind runtimeKind,
+        RuntimeReceiptData providerReceipt,
         CancellationToken cancellationToken);
 }
 

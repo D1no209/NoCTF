@@ -2,15 +2,41 @@ import { toRefs } from 'vue'
 
 import { ShieldCheck, Swords, Users } from '@lucide/vue'
 import { getMyTeamEndpoint, listChallengesEndpoint } from '../../api'
-import type { NoCtfapiEndpointsChallengesChallengeResponse, NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol } from '../../api'
+import type { NoCtfapiEndpointsChallengesChallengeSummaryResponse, NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol } from '../../api'
 import { bloodRankLabel } from '../leaderboard/types'
 import { directionGlyph } from '../../utils/directions'
 import { challengeProgressIcon } from './challenge-progress-icon'
 import { scoreboardBreakdown, scoreboardColumnsForChallenge, scoreboardCurrentChallengeScore, scoreboardSlot } from '../../utils/scoreboard'
+import { createTrailingRefresh } from '../../lib/latest-page-refresh'
 
-type Challenge = NoCtfapiEndpointsChallengesChallengeResponse
+type Challenge = NoCtfapiEndpointsChallengesChallengeSummaryResponse
 type BloodRank = 'First' | 'Second' | 'Third'
 const bloodOrder: Record<BloodRank, number> = { First: 0, Second: 1, Third: 2 }
+
+export function isChallengeVisible(
+  challenge: Pick<Challenge, 'title' | 'locked'>,
+  filters: { hideSolved: boolean; hideLocked: boolean; solvedByMyTeam: boolean; search: string },
+): boolean {
+  return (!filters.hideSolved || !filters.solvedByMyTeam)
+    && (!filters.hideLocked || !challenge.locked)
+    && (!filters.search || (challenge.title ?? '').toLocaleLowerCase().includes(filters.search))
+}
+
+export function affectsCompetitionChallengeList(kind: string): boolean {
+  return kind === 'ChallengeCreated'
+    || kind === 'ChallengeUpdated'
+    || kind === 'ChallengePublished'
+    || kind === 'ChallengeUnpublished'
+    || kind === 'ChallengeDeleted'
+    || kind === 'ChallengeDescriptionUpdated'
+    || kind === 'TeamRegistrationChanged'
+    || kind === 'TeamTrackChanged'
+    || kind === 'TeamBanned'
+    || kind === 'TeamUnbanned'
+    || kind === 'TeamBanCorrectionPublished'
+    || kind === 'CompetitionUpdated'
+    || kind === 'GameplayFactAdjudicated'
+}
 
 interface ChallengeBloodMark {
   rank: BloodRank
@@ -40,6 +66,8 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
 
   const { isLoggedIn } = useAuth()
 
+  const isCtf = computed(() => ctx.competition.value?.mode === 'Ctf')
+
   const isAwdp = computed(() => ctx.competition.value?.mode === 'Awdp')
 
   const items = ref<Challenge[]>([])
@@ -54,9 +82,14 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
 
   const hideSolved = ref(false)
 
+  const hideLocked = ref(false)
+
+  const hidesLockedChallenges = computed(() => isCtf.value && hideLocked.value)
+
   const search = ref('')
 
-
+  let initialized = false
+  let unwatch: (() => void) | undefined
 
   const board = useScoreboardMatrix(props.competitionId)
 
@@ -71,20 +104,38 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
     myTeamId.value = requestError ? null : data?.id ?? null
   }
 
-  onMounted(async () => {
-    const [{ data, error: requestError }] = await Promise.all([
-      listChallengesEndpoint({ path: { competitionId: props.competitionId } }),
-      loadMyTeam(),
-    ])
+  async function loadChallenges(): Promise<void> {
+    const { data, error: requestError, response } = await listChallengesEndpoint({
+      path: { competitionId: props.competitionId },
+    })
     loading.value = false
     if (requestError || !data) {
+      if (response?.status === 404) items.value = []
       error.value = parseApiError(requestError, translate("ui.failedToLoadQuestion")).message
-      emit('ready', null)
+      if (!initialized) emit('ready', null)
       return
     }
     items.value = (data.items ?? []).filter(challenge => challenge.isPublished)
     dataScope.value = data.dataScope ?? 'Live'
+    error.value = null
+    initialized = true
+  }
+
+  const refreshChallenges = createTrailingRefresh(loadChallenges)
+
+  onMounted(() => {
+    unwatch = watchCompetition(props.competitionId, {
+      competitionEventChanged: notification => {
+        if (affectsCompetitionChallengeList(notification.kind)) {
+          void Promise.all([refreshChallenges(), loadMyTeam()])
+        }
+      },
+      onReconnected: () => void refreshChallenges(),
+    })
+    void Promise.all([refreshChallenges(), loadMyTeam()])
   })
+
+  onUnmounted(() => unwatch?.())
 
   watch(isLoggedIn, () => void loadMyTeam())
 
@@ -217,15 +268,19 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
   const visibleGroups = computed(() => groups.value
     .map(group => ({
       ...group,
-      challenges: group.challenges.filter(challenge =>
-        (!hideSolved.value || !progressFor(challenge.id)?.solvedByMyTeam)
-        && (!normalizedSearch.value || (challenge.title ?? '').toLocaleLowerCase().includes(normalizedSearch.value))),
+      challenges: group.challenges.filter(challenge => isChallengeVisible(challenge, {
+        hideSolved: hideSolved.value,
+        hideLocked: hidesLockedChallenges.value,
+        solvedByMyTeam: hideSolved.value && !!progressFor(challenge.id)?.solvedByMyTeam,
+        search: normalizedSearch.value,
+      })),
     }))
     .filter(group => group.challenges.length > 0))
 
-  const emptyLabel = computed(() => normalizedSearch.value
+  const emptyLabel = computed(() => normalizedSearch.value || (hideSolved.value && hidesLockedChallenges.value)
     ? translate('challengeNavigator.noMatches')
-    : hideSolved.value ? translate('ui.noUnsolvedChallenges') : translate('ui.thereAreNoPublishedTopicsYet'))
+    : hidesLockedChallenges.value ? translate('challengeNavigator.noUnlockedChallenges')
+      : hideSolved.value ? translate('ui.noUnsolvedChallenges') : translate('ui.thereAreNoPublishedTopicsYet'))
 
   const groupOptions = computed(() => visibleGroups.value.map(group => ({
     value: group.direction,
@@ -234,13 +289,17 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
       .map(challenge => ({ value: challenge.id!, label: challenge.title ?? '', challenge })),
   })))
   const listOptions = computed(() => groupOptions.value.flatMap(group => group.items))
-  const visibleChallengeIds = computed(() => listOptions.value.map(item => item.value))
+  const visibleChallengeIds = computed(() => listOptions.value
+    .filter(item => !item.challenge.locked).map(item => item.value))
 
   watch([visibleChallengeIds, () => props.selectedChallengeId], ([ids, selectedId]) => {
     if (!loading.value && ids.length && !ids.includes(selectedId ?? '')) emit('ready', ids[0]!)
   }, { flush: 'post' })
 
-  function selectChallenge(challengeId: string) { emit('select', challengeId) }
+  function selectChallenge(challengeId: string) {
+    if (items.value.find(item => item.id === challengeId)?.locked) return
+    emit('select', challengeId)
+  }
 
   return {
       directionGlyph,
@@ -250,12 +309,14 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
       Users,
       bloodRankLabel,
       emit,
+      isCtf,
       isAwdp,
       items,
       loading,
       error,
       dataScope,
       hideSolved,
+      hideLocked,
       search,
       board,
       progressFor,

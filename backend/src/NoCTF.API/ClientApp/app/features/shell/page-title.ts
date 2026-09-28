@@ -11,11 +11,9 @@ const competitionTitles = {
   challenges: 'ui.challenge',
   leaderboard: 'ui.leaderboard',
   questions: 'ui.questions',
-  notifications: 'ui.notifications',
   events: 'ui.activity',
   teams: 'ui.teams',
   live: 'ui.3dLiveScreen',
-  'live-': 'ui.3dLiveScreen',
   'awdp-live': 'ui.controlScreen',
 } satisfies Record<string, MessageKey>
 
@@ -28,6 +26,7 @@ const competitionAdministrationTitles = {
   writeup: 'writeUp.myWriteUp',
   writeups: 'writeUp.review',
   runtimes: 'ui.runtime',
+  'traffic-captures': 'runtime.trafficCaptures',
   cheats: 'ui.cheating',
   leaderboard: 'ui.leaderboard',
   exports: 'ui.export',
@@ -38,9 +37,7 @@ const platformAdministrationTitles = {
   users: 'ui.user',
   bots: 'ui.bot',
   email: 'ui.emailAndHumanVerification',
-  monitoring: 'ui.monitoring',
   runtimes: 'ui.runtimeContainers',
-  'public-gateway': 'ui.intranetTunneling',
   logs: 'ui.log',
   audit: 'ui.audit',
 } satisfies Record<string, MessageKey>

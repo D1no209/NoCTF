@@ -1,0 +1,8 @@
+- targets:
+    - http://noctf:8080/health/live
+    - http://noctf:8080/health/ready
+  labels:
+    probe_scope: noctf
+
+# Add public NoCTF or Cap HTTP(S) URLs here when external probing is required.
+# Never place Cap secrets or siteverify request bodies in this file.

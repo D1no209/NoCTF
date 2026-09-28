@@ -3,6 +3,7 @@ using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Application.Runtime.Configuration;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Runtime;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.Worker.Runtime;
@@ -11,6 +12,9 @@ namespace NoCTF.Tests.Unit.Worker;
 
 public sealed class RuntimeClaimFactoryTests
 {
+    private static readonly ContainerSecurityPolicy CurrentSecurity =
+        ContainerSecurityPolicy.Default;
+
     [Test]
     public async Task Container_definition_creates_only_a_container_claim()
     {
@@ -19,11 +23,12 @@ public sealed class RuntimeClaimFactoryTests
                         RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition(
                 "challenge:v1",
+                Security: CurrentSecurity,
                 PortMappings: new Dictionary<int, int> { [8080] = 0 },
                 EgressPolicy: RuntimeEgressPolicy.Isolated),
             Limits: new(268_435_456, 500_000_000, 128));
 
-        var claim = RuntimeClaimFactory.Create(instance, "runner-a", GameMode.Ctf, template, "{}");
+        var claim = RuntimeClaimFactory.Create(instance, "runner-a", GameMode.Ctf, template, null);
 
         await Assert.That(claim).IsTypeOf<ProvisionContainerRuntime>();
         var container = (ProvisionContainerRuntime)claim;
@@ -45,7 +50,41 @@ public sealed class RuntimeClaimFactoryTests
     }
 
     [Test]
-    public async Task Container_security_treats_null_cap_add_as_empty()
+    public async Task Wsrx_only_claim_keeps_internal_port_without_public_mapping()
+    {
+        var instance = CreateInstance(RuntimeKind.Container, RuntimeProvider.Docker);
+        instance.AccessMode = RuntimeAccessMode.WsrxOnly;
+        var template = new ChallengeRuntimeTemplate(
+            RuntimeAllocation.PerTeam,
+            new ContainerRuntimeDefinition(
+                "challenge:v1",
+                PortMappings: new Dictionary<int, int> { [31337] = 0 },
+                Security: CurrentSecurity),
+            UrlBindings:
+            [
+                new RuntimeUrlBinding(
+                    "tcp://{HOST}:{PORT}",
+                    RuntimeExposure.OwnerOnly,
+                    31337)
+            ]);
+
+        var claim = (ProvisionContainerRuntime)RuntimeClaimFactory.Create(
+            instance,
+            "runner-a",
+            GameMode.Ctf,
+            template,
+            null);
+
+        await Assert.That(claim.Definition.AccessMode)
+            .IsEqualTo(RuntimeAccessMode.WsrxOnly);
+        await Assert.That(claim.Definition.PortMappings).IsEmpty();
+        await Assert.That(claim.Definition.InternalPorts).Contains(31337);
+        await Assert.That(claim.Definition.Labels["noctf.io/runtime-proxy-target"])
+            .IsEqualTo("true");
+    }
+
+    [Test]
+    public async Task Container_security_normalizes_null_capability_lists_to_empty()
     {
         var instance = CreateInstance(RuntimeKind.Container, RuntimeProvider.Docker);
         var template = new ChallengeRuntimeTemplate(
@@ -56,7 +95,7 @@ public sealed class RuntimeClaimFactoryTests
                     true,
                     true,
                     true,
-                    ["ALL"],
+                    [""],
                     null!)));
 
         var claim = (ProvisionContainerRuntime)RuntimeClaimFactory.Create(
@@ -64,8 +103,9 @@ public sealed class RuntimeClaimFactoryTests
             "runner-a",
             GameMode.Ctf,
             template,
-            "{}");
+            null);
 
+        await Assert.That(claim.Definition.Security.CapDrop).IsEmpty();
         await Assert.That(claim.Definition.Security.CapAdd).IsEmpty();
     }
 
@@ -78,6 +118,7 @@ public sealed class RuntimeClaimFactoryTests
             new ContainerRuntimeDefinition(
                 "challenge:v1",
                 Environment: new Dictionary<string, string> { ["FLAG"] = "author-value" },
+                Security: CurrentSecurity,
                 FlagEnvironmentVariableName: "FLAG"),
             FlagSource: RuntimeFlagSource.PerTeam);
 
@@ -86,7 +127,7 @@ public sealed class RuntimeClaimFactoryTests
             "runner-a",
             GameMode.Ctf,
             template,
-            "{}",
+            null,
             "flag{fixed-team}");
 
         await Assert.That(claim.Definition.Environment["FLAG"])
@@ -97,7 +138,6 @@ public sealed class RuntimeClaimFactoryTests
     public async Task Awdp_per_team_container_uses_the_generation_flag_and_owner_only_url()
     {
         var instance = CreateInstance(RuntimeKind.Container, RuntimeProvider.Docker);
-        instance.Purpose = RuntimePurpose.Player;
         var ownerOnlyUrl = new RuntimeUrlBinding(
             "tcp://{HOST}:{PORT}",
             RuntimeExposure.OwnerOnly,
@@ -108,6 +148,7 @@ public sealed class RuntimeClaimFactoryTests
                 "awdp-target:latest",
                 Environment: new Dictionary<string, string> { ["FLAG"] = "author-value" },
                 PortMappings: new Dictionary<int, int> { [31337] = 0 },
+                Security: CurrentSecurity,
                 FlagEnvironmentVariableName: "FLAG",
                 InternalPorts: [31337]),
             UrlBindings: [ownerOnlyUrl],
@@ -118,7 +159,7 @@ public sealed class RuntimeClaimFactoryTests
             "runner-a",
             GameMode.Awdp,
             template,
-            "{}",
+            null,
             "flag{generation-one}");
 
         await Assert.That(claim.Definition.Environment["FLAG"])
@@ -131,11 +172,11 @@ public sealed class RuntimeClaimFactoryTests
     public async Task Awdp_per_team_container_rejects_a_missing_generation_flag()
     {
         var instance = CreateInstance(RuntimeKind.Container, RuntimeProvider.Docker);
-        instance.Purpose = RuntimePurpose.Player;
         var template = new ChallengeRuntimeTemplate(
             RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition(
                 "awdp-target:latest",
+                Security: CurrentSecurity,
                 FlagEnvironmentVariableName: "FLAG"),
             FlagSource: RuntimeFlagSource.PerTeam);
 
@@ -144,7 +185,7 @@ public sealed class RuntimeClaimFactoryTests
             "runner-a",
             GameMode.Awdp,
             template,
-            "{}");
+            null);
 
         await Assert.That(action).Throws<InvalidOperationException>();
     }
@@ -164,7 +205,7 @@ public sealed class RuntimeClaimFactoryTests
                 EgressPolicy: RuntimeEgressPolicy.Isolated),
             Limits: new(268_435_456, 500_000_000, 128));
 
-        var claim = RuntimeClaimFactory.Create(instance, "runner-a", GameMode.Ctf, template, "{}");
+        var claim = RuntimeClaimFactory.Create(instance, "runner-a", GameMode.Ctf, template, null);
 
         await Assert.That(claim).IsTypeOf<ProvisionComposeRuntime>();
         var compose = (ProvisionComposeRuntime)claim;
@@ -185,13 +226,15 @@ public sealed class RuntimeClaimFactoryTests
         var instance = CreateInstance(RuntimeKind.Container, RuntimeProvider.Docker);
         var template = new ChallengeRuntimeTemplate(
                         RuntimeAllocation.PerTeam,
-            new ContainerRuntimeDefinition("challenge:v1"));
-        var configuration = JsonSerializer.Serialize(
-            new AwdChallengeConfiguration(
-                AwdChallengeConfiguration.CurrentSchemaVersion,
-                Checker: new AwdCheckerConfiguration(
-                    new RunnerJobConfiguration("checker:v1"))),
-            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            new ContainerRuntimeDefinition("challenge:v1", Security: CurrentSecurity));
+        var configuration = new AwdChallengeDefinition
+        {
+            Checker = new ChallengeCheckerDefinition
+            {
+                Image = "checker:v1",
+                TimeoutSeconds = 60
+            }
+        };
 
         var claim = (ProvisionContainerRuntime)RuntimeClaimFactory.Create(
             instance,
@@ -218,13 +261,15 @@ public sealed class RuntimeClaimFactoryTests
                 {
                     ["web"] = new(268_435_456, 500_000_000, 128)
                 }));
-        var configuration = JsonSerializer.Serialize(
-            new AwdChallengeConfiguration(
-                AwdChallengeConfiguration.CurrentSchemaVersion,
-                Checker: new AwdCheckerConfiguration(
-                    new RunnerJobConfiguration("checker:v1"),
-                    TargetServiceName: "web")),
-            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var configuration = new AwdChallengeDefinition
+        {
+            Checker = new ChallengeCheckerDefinition
+            {
+                Image = "checker:v1",
+                TimeoutSeconds = 60,
+                TargetServiceName = "web"
+            }
+        };
 
         var claim = (ProvisionComposeRuntime)RuntimeClaimFactory.Create(
             instance,
@@ -248,7 +293,7 @@ public sealed class RuntimeClaimFactoryTests
             ContainerPort: 8080);
         var template = new ChallengeRuntimeTemplate(
             RuntimeAllocation.Shared,
-            new ContainerRuntimeDefinition("challenge:v1"),
+            new ContainerRuntimeDefinition("challenge:v1", Security: CurrentSecurity),
             ControlCheckUrlBinding: control);
 
         var claim = (ProvisionContainerRuntime)RuntimeClaimFactory.Create(
@@ -256,7 +301,7 @@ public sealed class RuntimeClaimFactoryTests
             "runner-a",
             GameMode.Koh,
             template,
-            "{}");
+            null);
 
         await Assert.That(claim.Definition.AllowInternalCallback).IsTrue();
         await Assert.That(claim.Definition.InternalPorts).IsEquivalentTo([8080]);
@@ -293,7 +338,7 @@ public sealed class RuntimeClaimFactoryTests
             "runner-a",
             GameMode.Ctf,
             template,
-            "{}",
+            null,
             "flag{fixed-team}");
 
         await Assert.That(claim.Definition.ServiceEnvironment).IsNotNull();
@@ -311,6 +356,7 @@ public sealed class RuntimeClaimFactoryTests
                         RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition(
                 "challenge:v1",
+                Security: CurrentSecurity,
                 FlagEnvironmentVariableName: "FLAG"),
             FlagSource: RuntimeFlagSource.PerTeam);
 
@@ -319,7 +365,7 @@ public sealed class RuntimeClaimFactoryTests
             "runner-a",
             GameMode.Ctf,
             template,
-            "{}");
+            null);
 
         await Assert.That(action).Throws<InvalidOperationException>();
     }
@@ -335,7 +381,7 @@ public sealed class RuntimeClaimFactoryTests
                 "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"),
             Limits: new(1_073_741_824, 1_000_000_000, 256));
 
-        var claim = RuntimeClaimFactory.Create(instance, "runner-a", GameMode.Ctf, template, "{}");
+        var claim = RuntimeClaimFactory.Create(instance, "runner-a", GameMode.Ctf, template, null);
 
         await Assert.That(claim).IsTypeOf<ProvisionOvaRuntime>();
         var ova = (ProvisionOvaRuntime)claim;
@@ -367,13 +413,13 @@ public sealed class RuntimeClaimFactoryTests
             "runner-a",
             GameMode.Ctf,
             template,
-            "{}");
+            null);
 
         await Assert.That(action).Throws<InvalidOperationException>();
     }
 
     private static RuntimeInstance CreateInstance(RuntimeKind kind, RuntimeProvider provider) =>
-        new()
+        new PlayerRuntimeInstance
         {
             Id = Guid.Parse("11111111-1111-1111-1111-111111111111"),
             CompetitionId = Guid.Parse("22222222-2222-2222-2222-222222222222"),

@@ -4,7 +4,8 @@ import { markRaw } from 'vue'
 import { Plus } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { adminCreateManualAdjustment, adminCreateCompetitionChallengeHint, adminDeleteCompetitionChallengeHint, adminGetCompetition, adminGetCompetitionChallenge, adminListGameplayFacts, adminListCompetitionChallengeHints, adminListTeams, adminPatchCompetitionChallenge, adminRestoreCompetitionChallengeHint, adminUpdateCompetitionChallengeHint, getLeaderboardEndpoint, getScoreboardSchemaEndpoint } from '../../../../../../api'
-import type { NoCtfapiEndpointsAdministrationChallengesChallengeHintResponse, NoCtfapiEndpointsChallengesChallengeResponse, NoCtfapiEndpointsCompetitionsGameModeProtocol, NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse, NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse, NoCtfapiEndpointsGameplayFactsGameplayFactListResponse, NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../../../../api'
+import type { NoCtfapiEndpointsAdministrationChallengesChallengeHintResponse, NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract, NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract, NoCtfapiEndpointsChallengesChallengeResponse, NoCtfapiEndpointsCompetitionsGameModeProtocol, NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse, NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse, NoCtfapiEndpointsGameplayFactsGameplayFactListResponse, NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../../../../api'
+import { useOffsetPagination } from '../../../../../../composables/useOffsetPagination'
 import { useCompetitionAdmin } from '../../../../../../lib/admin-competition'
 
 import ChallengeRulesEditorComponent from '../../../../../admin/ChallengeRulesEditor.vue'
@@ -19,7 +20,7 @@ interface ChallengeTeamScoringRow {
 
 interface ChallengeConfiguration {
   mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol
-  json?: string
+  rules?: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract
 }
 
 /** Owns state, effects and commands for AdminCompetitionsByIdChallengesByCcIdPage. */
@@ -32,11 +33,26 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
 
   const challenge = ref<NoCtfapiEndpointsChallengesChallengeResponse | null>(null)
 
+  const hiddenRuleKeys = computed(() => {
+    if (challenge.value?.interactionKind === 'PatchVerification')
+      return ['maxFlagAttempts', 'flagTemplate']
+    const hidden = ['maxPatchAttempts']
+    if (challenge.value?.usesDynamicFlag !== true) hidden.push('flagTemplate')
+    return hidden
+  })
+
   const loading = ref(true)
 
   const loadError = ref<string | null>(null)
 
   const activeSection = ref('general')
+
+  const sectionOptions = computed(() => [
+    { value: 'general', label: translate('ui.basicSettings') },
+    { value: 'config', label: translate('ui.questionConfiguration') },
+    { value: 'hints', label: translate('ui.hint') },
+    { value: 'scoring', label: translate('ui.teamScoring') },
+  ])
 
   async function loadChallenge() {
     loading.value = true
@@ -94,7 +110,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
 
   const savingConfig = ref(false)
 
-  const inheritedConfigJson = ref<string | null>(null)
+  const inheritedConfiguration = ref<NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract | null>(null)
 
   async function loadConfig() {
     configLoading.value = true
@@ -108,26 +124,26 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
     if (!challengeResult.error && challengeResult.data) {
       config.value = {
         mode: challengeResult.data.mode,
-        json: challengeResult.data.rulesJson,
+        rules: challengeResult.data.rules,
       }
     }
     if (!competitionResult.error && competitionResult.data) {
-      inheritedConfigJson.value = competitionResult.data.modeConfiguration?.json ?? null
+      inheritedConfiguration.value = competitionResult.data.modeConfiguration?.configuration ?? null
     }
     configLoading.value = false
   }
 
-  async function saveConfig(json: string) {
+  async function saveConfig(rules: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract) {
     if (!config.value) return
     savingConfig.value = true
     try {
       const { data, error } = await adminPatchCompetitionChallenge({
         path: { competitionId, competitionChallengeId: ccId },
-        body: { rules: { json } },
+        body: { rules: { configuration: rules } },
       })
       if (error) throw error
       config.value = data
-        ? { mode: data.mode, json: data.rulesJson }
+        ? { mode: data.mode, rules: data.rules }
         : config.value
       toast.success(translate("ui.questionConfigurationHasBeenSaved"))
     }
@@ -256,7 +272,18 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
     }
   }
 
-  const scoringTeams = ref<NoCtfapiEndpointsTeamsTeamResponse[]>([])
+  const scoringSearch = ref('')
+
+  const scoringPagination = useOffsetPagination<NoCtfapiEndpointsTeamsTeamResponse>(async ({ offset, limit, desc }) => {
+    const { data, error } = await adminListTeams({
+      path: { competitionId },
+      query: { keyword: scoringSearch.value.trim() || null, offset, limit, desc },
+    })
+    if (error || !data) throw error ?? new Error(translate("ui.failedToLoadTeams"))
+    return { items: data.items ?? [], total: data.total ?? 0 }
+  })
+
+  const scoringTeams = scoringPagination.items
 
   const scoringFacts = ref<NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse[]>([])
 
@@ -264,48 +291,52 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
 
   const scoringSchema = ref<NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse | null>(null)
 
-  const scoringLoading = ref(true)
+  const scoringContextLoading = ref(true)
 
-  const scoringError = ref<string | null>(null)
+  const scoringContextError = ref<string | null>(null)
+
+  const scoringLoading = computed(() => scoringContextLoading.value
+    || (scoringPagination.loading.value && !scoringPagination.initialized.value))
+
+  const scoringError = computed(() => scoringContextError.value
+    ?? scoringPagination.error.value?.message
+    ?? null)
 
   let scoringLoadGeneration = 0
 
   async function loadAllChallengeFacts(): Promise<NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse[]> {
     const facts: NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse[] = []
-    const seenCursors = new Set<string>()
-    let cursor: string | null = null
+    let offset = 0
+    let total = 0
     do {
       const response: {
         data?: NoCtfapiEndpointsGameplayFactsGameplayFactListResponse
         error?: unknown
       } = await adminListGameplayFacts({
         path: { competitionId },
-        query: { competitionChallengeId: ccId, cursor, limit: 200 },
+        query: { competitionChallengeId: ccId, offset, limit: 200, desc: true },
       })
       if (response.error || !response.data)
         throw response.error ?? new Error(translate("ui.failedToLoadThisChallengeSAdjudicationRecords"))
       facts.push(...(response.data.items ?? []))
-      cursor = response.data.nextCursor ?? null
-      if (cursor && seenCursors.has(cursor)) throw new Error(translate("ui.theAdjudicationRecordCursorRepeatedUnexpectedly"))
-      if (cursor) seenCursors.add(cursor)
-    } while (cursor)
+      total = response.data.total ?? facts.length
+      offset += response.data.items?.length ?? 0
+    } while (offset < total && offset > 0)
     return facts
   }
 
   async function loadChallengeTeamScoring(): Promise<void> {
     const generation = ++scoringLoadGeneration
-    scoringLoading.value = true
-    scoringError.value = null
+    scoringContextLoading.value = true
+    scoringContextError.value = null
     try {
-      const [teamsResult, facts, leaderboardResult, schemaResult] = await Promise.all([
-        adminListTeams({ path: { competitionId } }),
+      const [, facts, leaderboardResult, schemaResult] = await Promise.all([
+        scoringPagination.loadPage(scoringPagination.page.value),
         loadAllChallengeFacts(),
         getLeaderboardEndpoint({ path: { competitionId } }),
         getScoreboardSchemaEndpoint({ path: { competitionId } }),
       ])
       if (generation !== scoringLoadGeneration) return
-      if (teamsResult.error || !teamsResult.data) throw teamsResult.error ?? new Error(translate("ui.failedToLoadTeams"))
-      scoringTeams.value = teamsResult.data.items ?? []
       scoringFacts.value = facts
       scoringSnapshot.value = leaderboardResult.data && 'teams' in leaderboardResult.data
         ? leaderboardResult.data
@@ -316,12 +347,21 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
     }
     catch (requestError) {
       if (generation === scoringLoadGeneration)
-        scoringError.value = parseApiError(requestError, translate("ui.failedToLoadTeamScoringForThisChallenge")).message
+        scoringContextError.value = parseApiError(requestError, translate("ui.failedToLoadTeamScoringForThisChallenge")).message
     }
     finally {
-      if (generation === scoringLoadGeneration) scoringLoading.value = false
+      if (generation === scoringLoadGeneration) scoringContextLoading.value = false
     }
   }
+
+  let scoringSearchTimer: ReturnType<typeof setTimeout> | null = null
+  function reloadScoringTeamsFromFirstPage(): void {
+    scoringPagination.reset()
+    if (scoringSearchTimer) clearTimeout(scoringSearchTimer)
+    scoringSearchTimer = setTimeout(() => { void scoringPagination.loadPage(1) }, 250)
+  }
+
+  watch(scoringSearch, reloadScoringTeamsFromFirstPage)
 
   function teamFacts(teamId?: string): NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse[] {
     return teamId ? scoringFacts.value.filter(fact => fact.teamId === teamId) : []
@@ -451,6 +491,11 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
     void loadChallengeTeamScoring()
   })
 
+  onBeforeUnmount(() => {
+    if (scoringSearchTimer) clearTimeout(scoringSearchTimer)
+    scoringPagination.reset()
+  })
+
   const ChallengeRulesEditor = markRaw(ChallengeRulesEditorComponent)
 
   const viewBindings = {
@@ -463,6 +508,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
       loading,
       loadError,
       activeSection,
+      sectionOptions,
       editCustomTitle,
       editOrder,
       editPublished,
@@ -471,7 +517,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
       config,
       configLoading,
       savingConfig,
-      inheritedConfigJson,
+      inheritedConfiguration,
       saveConfig,
       hints,
       hintsLoading,
@@ -489,7 +535,15 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
       restoreHint,
       scoringLoading,
       scoringError,
+      scoringSearch,
       loadChallengeTeamScoring,
+      scoringPage: scoringPagination.page,
+      scoringPageCount: scoringPagination.pageCount,
+      scoringTotal: scoringPagination.total,
+      scoringPageLimit: scoringPagination.limit,
+      scoringPageLoading: scoringPagination.loading,
+      loadScoringPage: scoringPagination.loadPage,
+      setScoringPageSize: scoringPagination.setPageSize,
       scoringDisplayNames,
       scoringRows,
       adjustmentTarget,
@@ -500,7 +554,8 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
       openAdjustment,
       closeAdjustment,
       submitAdjustment,
-      ChallengeRulesEditor
+      ChallengeRulesEditor,
+      hiddenRuleKeys
     }
   const viewState = proxyRefs(viewBindings)
 

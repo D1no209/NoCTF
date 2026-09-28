@@ -6,7 +6,7 @@ namespace NoCTF.Tests.Architecture;
 public sealed class PersistenceModelTests
 {
     [Test]
-    public async Task Business_entities_use_last_write_wins()
+    public async Task Mutable_aggregates_use_provider_neutral_concurrency_stamps()
     {
         await using var db = CreateDb();
 
@@ -19,7 +19,9 @@ public sealed class PersistenceModelTests
                 .Select(property => $"{entityType.ClrType.Name}.{property.Name}"))
             .ToArray();
 
-        await Assert.That(concurrencyProperties).IsEmpty();
+        await Assert.That(concurrencyProperties).Contains("Competition.ConcurrencyStamp");
+        await Assert.That(concurrencyProperties).Contains("Team.ConcurrencyStamp");
+        await Assert.That(concurrencyProperties).Contains("RuntimeInstance.ConcurrencyStamp");
     }
 
     private static NoCtfDbContext CreateDb() => new(

@@ -78,15 +78,13 @@ public sealed class GitOpsPersistenceContractTests
             await Assert.That(bot.TokenVersion).IsEqualTo(0);
 
             var competitionId = Guid.CreateVersion7(now.AddMilliseconds(2));
-            db.Competitions.Add(new Competition
+            db.Competitions.Add(new CtfCompetition
             {
                 Id = competitionId,
                 OwnerId = administratorId,
                 ManagerIds = [botId],
                 Title = "GitOps contract",
-                Mode = GameMode.Ctf,
-                ConfigurationJson =
-                    """{"schemaVersion":2,"defaultScoreCurve":{"initialPoints":500,"minimumPoints":100,"decayTeamCount":10,"decayMode":2},"bloodRewards":[]}""",
+                ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
                 FlagDerivationSecret = new byte[32],
                 StartAt = now.AddHours(1),
                 EndAt = now.AddHours(2),
@@ -107,23 +105,21 @@ public sealed class GitOpsPersistenceContractTests
                     "Stable challenge",
                     "Statement",
                     "Web",
-                    """{"schemaVersion":1}""",
+                    new CtfChallengeDefinition(),
                     now),
                 cancellationToken);
             await Assert.That(challenge.State)
                 .IsEqualTo(ChallengeTemplateWriteState.Succeeded);
             await Assert.That(challenge.Template!.Id).IsEqualTo(challengeId);
-            await Assert.That((await challengeBank.ListAsync(
-                botId,
-                false,
-                false,
-                cancellationToken)).Select(item => item.Id))
+            await Assert.That((await challengeBank.ListPageAsync(
+                new(botId, false, false, null, null, 0, 10, false),
+                cancellationToken)).Items.Select(item => item.Id))
                 .IsEquivalentTo([challengeId]);
 
             var competitionChallengeId = Guid.CreateVersion7(now.AddMilliseconds(4));
             var competitionChallenges = new ChallengeManagementStore(
                 db,
-                Substitute.For<ITransactionalMessageOutbox>(),
+                Substitute.For<IPostCommitMessagePublisher>(),
                 new ChallengeRuntimeTemplateCatalog());
             var linked = await competitionChallenges.CreateAsync(
                 new(
@@ -133,7 +129,7 @@ public sealed class GitOpsPersistenceContractTests
                     1,
                     now,
                     "Finals Web"),
-                """{"schemaVersion":2}""",
+                new CtfCompetitionChallengeRules(),
                 cancellationToken);
             await Assert.That(linked.Challenge!.Id).IsEqualTo(competitionChallengeId);
             await Assert.That(linked.Challenge.Title).IsEqualTo("Finals Web");
@@ -232,7 +228,7 @@ public sealed class GitOpsPersistenceContractTests
             var hintId = Guid.CreateVersion7(now.AddMilliseconds(7));
             var hintStore = new ChallengeHintStore(
                 db,
-                Substitute.For<ITransactionalMessageOutbox>());
+                Substitute.For<IPostCommitMessagePublisher>());
             var hint = await hintStore.SaveAsync(
                 new(
                     CompetitionId: competitionId,
@@ -319,16 +315,12 @@ public sealed class GitOpsPersistenceContractTests
                 false,
                 now,
                 cancellationToken)).IsNull();
-            await Assert.That(await challengeBank.ListAsync(
-                botId,
-                false,
-                false,
-                cancellationToken)).IsEmpty();
-            await Assert.That((await challengeBank.ListAsync(
-                botId,
-                false,
-                true,
-                cancellationToken)).Single().DeletedAt).IsNotNull();
+            await Assert.That((await challengeBank.ListPageAsync(
+                new(botId, false, false, null, null, 0, 10, false),
+                cancellationToken)).Items).IsEmpty();
+            await Assert.That((await challengeBank.ListPageAsync(
+                new(botId, false, true, null, null, 0, 10, false),
+                cancellationToken)).Items.Single().DeletedAt).IsNotNull();
             await Assert.That(await challengeBank.FindAsync(
                 challengeId,
                 botId,

@@ -27,6 +27,8 @@ using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Awdp.Runtime;
 using NoCTF.GameModes.Registration;
+using NoCTF.GameModes.PatchVerification.Configuration;
+using NoCTF.Application.GameplayFacts.PatchVerification;
 using NoCTF.Worker.Runtime;
 using CompetitionLifecycleAdvancer = NoCTF.Application.Competitions.Lifecycle.AdvanceCompetitionLifecycleUseCase;
 using NoCTF.Application.Competitions.Events;
@@ -40,24 +42,34 @@ internal static partial class BackendMessageOperations
 {
     private static readonly TimeSpan AwdpFixReadinessRetryDelay = TimeSpan.FromSeconds(1);
 
+    public static Task StartPatchVerificationAsync(
+        StartPatchVerification message,
+        NoCtfDbContext db,
+        IPostCommitMessagePublisher outbox,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken,
+        ICompetitionEventRecorder? events = null) =>
+        StartAwdpFixVerificationAsync(
+            new StartAwdpFixVerification(message.GameplayFactId, message.RuntimeInstanceId),
+            db,
+            outbox,
+            timeProvider,
+            cancellationToken,
+            events);
+
     public static async Task StartAwdpFixVerificationAsync(
         StartAwdpFixVerification message,
         NoCtfDbContext db,
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         TimeProvider timeProvider,
         CancellationToken cancellationToken,
         ICompetitionEventRecorder? events = null)
     {
         events ??= NullCompetitionEventRecorder.Instance;
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var runtime = await db.RuntimeInstances
-            .FromSqlInterpolated($"""
-                SELECT *
-                FROM runtime_instances
-                WHERE id = {message.RuntimeInstanceId}
-                FOR UPDATE
-                """)
-            .SingleOrDefaultAsync(cancellationToken);
+        var runtime = await db.RuntimeInstances.SingleOrDefaultAsync(
+            item => item.Id == message.RuntimeInstanceId,
+            cancellationToken);
         var fact = await db.GameplayFacts.SingleOrDefaultAsync(
             candidate => candidate.Id == message.GameplayFactId,
             cancellationToken);
@@ -70,9 +82,10 @@ internal static partial class BackendMessageOperations
             }
             || runtime is not
             {
-                Purpose: RuntimePurpose.AwdpTarget,
                 GameplayFactId: not null
             }
+            || runtime.Purpose is not (RuntimePurpose.AwdpTarget
+                or RuntimePurpose.PatchVerificationTarget)
             || runtime.GameplayFactId != fact.Id
             || runtime.Id != message.RuntimeInstanceId
             || runtime.CompetitionChallengeId != fact.CompetitionChallengeId
@@ -87,7 +100,7 @@ internal static partial class BackendMessageOperations
             await outbox.ScheduleAsync(
                 message,
                 timeProvider.GetUtcNow().Add(AwdpFixReadinessRetryDelay));
-            await outbox.FlushOutgoingMessagesAsync();
+            await outbox.FlushCommittedMessagesAsync();
             return;
         }
 
@@ -105,7 +118,7 @@ internal static partial class BackendMessageOperations
                 cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
-            await outbox.FlushOutgoingMessagesAsync();
+            await outbox.FlushCommittedMessagesAsync();
             return;
         }
 
@@ -127,7 +140,7 @@ internal static partial class BackendMessageOperations
                 cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
-            await outbox.FlushOutgoingMessagesAsync();
+            await outbox.FlushCommittedMessagesAsync();
             return;
         }
 
@@ -139,8 +152,8 @@ internal static partial class BackendMessageOperations
                 template => template.Id,
                 (challenge, template) => new
                 {
-                    challenge.RulesJson,
-                    template.DefinitionJson,
+                    Rules = challenge.Rules!,
+                    Definition = template.Definition!,
                     challenge.CompetitionId
                 })
             .Join(
@@ -149,16 +162,19 @@ internal static partial class BackendMessageOperations
                 competition => competition.Id,
                 (item, competition) => new
                 {
-                    competition.ConfigurationJson,
-                    item.RulesJson,
-                    item.DefinitionJson
+                    Configuration = competition.ModeConfiguration!,
+                    competition.Mode,
+                    item.Rules,
+                    item.Definition
                 })
+            .AsSplitQuery()
             .SingleAsync(cancellationToken);
-        var configuration = AwdpConfigurationResolver.Resolve(
-            configurationContext.ConfigurationJson,
-            configurationContext.RulesJson,
-            configurationContext.DefinitionJson);
-        if (configuration.Checker is null
+        var configuration = PatchVerificationConfigurationResolver.Resolve(
+            configurationContext.Mode,
+            configurationContext.Configuration,
+            configurationContext.Rules,
+            configurationContext.Definition);
+        if (configuration is null
             || configuration.PatchTimeoutSeconds is < 1
                 or > AwdpFixExecutionBudget.MaximumPatchTimeoutSeconds
             || configuration.Checker.TimeoutSeconds is < 1
@@ -178,7 +194,7 @@ internal static partial class BackendMessageOperations
                 cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
-            await outbox.FlushOutgoingMessagesAsync();
+            await outbox.FlushCommittedMessagesAsync();
             return;
         }
         var deadline = AwdpFixExecutionBudget.CalculateDeadline(
@@ -198,19 +214,32 @@ internal static partial class BackendMessageOperations
                 cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
-            await outbox.FlushOutgoingMessagesAsync();
+            await outbox.FlushCommittedMessagesAsync();
             return;
         }
         fact.State = GameplayFactState.Processing;
         fact.UpdatedAt = now;
         await outbox.PublishAsync(new GameplayFactStateChanged(fact.Id, fact.State));
-        await outbox.PublishToRunnerNodeAsync(new RunAwdpFixVerification(
-            fact.Id,
-            fact.CompetitionChallengeId,
-            fact.ReferenceId.Value,
-            runtime.Id,
-            deadline,
-            runtime.RunnerId));
+        if (runtime.Purpose == RuntimePurpose.AwdpTarget)
+        {
+            await outbox.PublishToRunnerNodeAsync(new RunAwdpFixVerification(
+                fact.Id,
+                fact.CompetitionChallengeId,
+                fact.ReferenceId.Value,
+                runtime.Id,
+                deadline,
+                runtime.RunnerId));
+        }
+        else
+        {
+            await outbox.PublishToRunnerNodeAsync(new RunPatchVerification(
+                fact.Id,
+                fact.CompetitionChallengeId,
+                fact.ReferenceId.Value,
+                runtime.Id,
+                deadline,
+                runtime.RunnerId));
+        }
         await outbox.ScheduleAsync(new ExpireAwdpFixVerification(
             fact.Id,
             runtime.Id,
@@ -218,7 +247,7 @@ internal static partial class BackendMessageOperations
             runtime.RunnerId), deadline);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        await outbox.FlushOutgoingMessagesAsync();
+        await outbox.FlushCommittedMessagesAsync();
     }
 
     public static Task RecordAwdpFixResultAsync(
@@ -230,26 +259,22 @@ internal static partial class BackendMessageOperations
     public static async Task CompleteAwdpFixRecoveryAsync(
         CompleteAwdpFixRecovery message,
         NoCtfDbContext db,
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         CancellationToken cancellationToken,
         ICompetitionEventRecorder? events = null)
     {
         events ??= NullCompetitionEventRecorder.Instance;
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var previous = await db.RuntimeInstances
-            .FromSqlInterpolated($"""
-                SELECT *
-                FROM runtime_instances
-                WHERE id = {message.RuntimeInstanceId}
-                FOR UPDATE
-                """)
-            .SingleOrDefaultAsync(cancellationToken);
+        var previous = await db.RuntimeInstances.SingleOrDefaultAsync(
+            item => item.Id == message.RuntimeInstanceId,
+            cancellationToken);
         var fact = await db.GameplayFacts.SingleOrDefaultAsync(
             candidate => candidate.Id == message.GameplayFactId,
             cancellationToken);
         if (previous is null
             || fact is null
-            || previous.Purpose != RuntimePurpose.AwdpTarget
+            || previous.Purpose is not (RuntimePurpose.AwdpTarget
+                or RuntimePurpose.PatchVerificationTarget)
             || previous.GameplayFactId != fact.Id
             || previous.State != RuntimeState.Stopping
             || !string.Equals(previous.RunnerId, message.RunnerId, StringComparison.Ordinal))
@@ -275,13 +300,13 @@ internal static partial class BackendMessageOperations
 
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        await outbox.FlushOutgoingMessagesAsync();
+        await outbox.FlushCommittedMessagesAsync();
     }
 
     public static async Task ExpireAwdpFixVerificationAsync(
         ExpireAwdpFixVerification message,
         NoCtfDbContext db,
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         TimeProvider timeProvider,
         CancellationToken cancellationToken,
         ICompetitionEventRecorder? events = null)
@@ -303,7 +328,8 @@ internal static partial class BackendMessageOperations
             cancellationToken);
         if (runtime is null
             || submission is null
-            || runtime.Purpose != RuntimePurpose.AwdpTarget
+            || runtime.Purpose is not (RuntimePurpose.AwdpTarget
+                or RuntimePurpose.PatchVerificationTarget)
             || runtime.GameplayFactId != submission.Id
             || (runtime.RunnerId is not null
                 && !string.Equals(runtime.RunnerId, message.RunnerId, StringComparison.Ordinal)))
@@ -318,7 +344,7 @@ internal static partial class BackendMessageOperations
             cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        await outbox.FlushOutgoingMessagesAsync();
+        await outbox.FlushCommittedMessagesAsync();
     }
 
 }

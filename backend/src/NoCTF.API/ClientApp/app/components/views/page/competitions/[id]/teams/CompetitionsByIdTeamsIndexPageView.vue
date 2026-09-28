@@ -28,6 +28,7 @@ const { competitionId, teams, loading, error, teamDisplayNames } = toRefs(viewPr
         v-for="team in teams"
         :key="team.id"
         :to="`/competitions/${competitionId}/teams/${team.id}`"
+        prefetch-on="interaction"
       >
         <Card class="h-full transition-colors hover:border-primary/50">
           <CardHeader>

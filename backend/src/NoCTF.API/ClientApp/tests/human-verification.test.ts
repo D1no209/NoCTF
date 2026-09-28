@@ -29,7 +29,7 @@ describe('human verification coordination', () => {
       sourceFile(new URL('../app/features/challenges/useFixSubmit.ts', import.meta.url)).text(),
     ])
 
-    expect(sources[0]).toContain("requestHumanVerification('login')")
+    expect(sources[0]).toContain("requestHumanVerification('login', 'login-inline')")
     expect(sources[1]).toContain("requestHumanVerification('registration')")
     expect(sources[2]).toContain("requestHumanVerification('runtime')")
     expect(sources[3]).toContain("requestHumanVerification('evaluation')")
@@ -53,5 +53,18 @@ describe('human verification coordination', () => {
     expect(feature).toContain("action === 'evaluation' && provider.evaluationRequired === false")
     expect(feature).toContain('watch(() => route.fullPath')
     expect(platform).not.toContain('secret')
+  })
+
+  test('renders login CAP work inline while preserving dialog verification elsewhere', async () => {
+    const feature = await Bun.file(new URL('../app/features/security/useHumanVerification.ts', import.meta.url)).text()
+    const login = await sourceFile(new URL('../app/features/routes/auth/AuthLoginPage.vue', import.meta.url)).text()
+    const gate = await Bun.file(new URL('../app/components/views/security/HumanVerificationGateView.vue', import.meta.url)).text()
+
+    expect(login).toContain("requestHumanVerification('login', 'login-inline')")
+    expect(login).toContain('<CapVerificationStatus')
+    expect(login).toContain(':state="capVerification.state"')
+    expect(feature).toContain("provider.provider === 'Cap' && action === 'login'")
+    expect(feature).toContain("challenge.value.surface === 'dialog'")
+    expect(gate).toContain("provider === 'Turnstile'")
   })
 })

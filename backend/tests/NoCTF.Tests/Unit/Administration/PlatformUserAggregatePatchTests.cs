@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.Sqlite;
 using NoCTF.Application.Administration;
 using NoCTF.Domain.Identity;
 using NoCTF.Infrastructure.Administration;
@@ -13,10 +14,13 @@ public sealed class PlatformUserAggregatePatchTests
     public async Task Multiple_managed_fields_invalidate_tokens_exactly_once(
         CancellationToken cancellationToken)
     {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync(cancellationToken);
         var options = new DbContextOptionsBuilder<NoCtfDbContext>()
-            .UseInMemoryDatabase($"platform-user-patch-{Guid.NewGuid():N}")
+            .UseSqlite(connection)
             .Options;
         await using var db = new NoCtfDbContext(options);
+        await db.Database.EnsureCreatedAsync(cancellationToken);
         var user = new User
         {
             Id = Guid.NewGuid(),

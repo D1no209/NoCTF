@@ -1,0 +1,67 @@
+.flag-celebration-layer {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 10;
+  display: grid;
+  height: clamp(10rem, 28vh, 15rem);
+  place-items: center;
+  overflow: visible;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 72%, color-mix(in oklch, var(--primary) 18%, transparent), transparent 58%);
+}
+
+.flag-celebration-burst {
+  position: relative;
+  display: grid;
+  width: 13rem;
+  height: 13rem;
+  place-items: center;
+}
+
+.flag-celebration-core {
+  display: grid;
+  width: 5rem;
+  height: 5rem;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  color: var(--primary);
+  background: var(--background);
+  box-shadow: 0 0 28px color-mix(in oklch, var(--primary) 32%, transparent);
+  animation: flag-celebration-core 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.flag-celebration-particle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0.34rem;
+  height: 1rem;
+  border-radius: 9999px;
+  background: currentColor;
+  opacity: 0;
+  transform-origin: 50% 0;
+  animation: flag-celebration-particle 760ms cubic-bezier(0.16, 1, 0.3, 1) var(--particle-delay) both;
+}
+
+.flag-celebration-leave-active { transition: opacity 160ms cubic-bezier(0.25, 1, 0.5, 1); }
+.flag-celebration-leave-to { opacity: 0; }
+
+@keyframes flag-celebration-core {
+  0% { opacity: 0; transform: scale(0.55) rotate(-12deg); }
+  45% { opacity: 1; transform: scale(1.08) rotate(4deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+
+@keyframes flag-celebration-particle {
+  0% { opacity: 0; transform: rotate(var(--particle-angle)) translateY(-0.8rem) scaleY(0.45); }
+  18% { opacity: 1; }
+  100% { opacity: 0; transform: rotate(var(--particle-angle)) translateY(var(--particle-distance)) scaleY(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flag-celebration-core,
+  .flag-celebration-particle { animation: none; }
+  .flag-celebration-leave-active { transition: none; }
+}

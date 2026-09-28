@@ -1,6 +1,7 @@
 import { markRaw } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import { Image as ImageIcon, LockKeyhole, LogOut, ShieldCheck, UserRound } from '@lucide/vue'
+import { useMediaQuery } from '@vueuse/core'
 import { toast } from 'vue-sonner'
 import {
   authenticationGetMyProfile,
@@ -9,8 +10,13 @@ import {
   authenticationUploadMyWallpaper,
   changePasswordEndpoint,
   resendEmailVerificationEndpoint,
+  authenticationSsoBeginBinding,
+  authenticationSsoGetMyBinding,
+  authenticationSsoUnbindIdentity,
 } from '../../api'
+import type { NoCtfapiEndpointsAuthenticationMySsoBindingConfigurationResponse } from '../../api'
 import AvatarCropDialogComponent from './AvatarCropDialog.vue'
+import AdminDateTimeComponent from '../admin/AdminDateTime.vue'
 import { exceedsUploadLimit } from './upload-limits'
 import { runDownRevealTransition } from '../../motion/reveal-transition'
 
@@ -18,7 +24,8 @@ export type AccountPanelSection = 'profile' | 'identity' | 'wallpaper' | 'securi
 
 /** Owns the compact account popover, drafts and account commands across route changes. */
 export function useAccountPanel() {
-  const { user, fetchMe, logout, logoutAll, impersonation } = useAuth()
+  const route = useRoute()
+  const { user, fetchMe, logout, logoutAll, invalidate, impersonation } = useAuth()
   const isImpersonating = computed(() => impersonation.value !== null)
   const { configuration: platformConfiguration } = usePlatform()
   const maximumAvatarBytes = computed(() =>
@@ -34,6 +41,7 @@ export function useAccountPanel() {
 
   const open = ref(false)
   const activeSection = ref<AccountPanelSection | null>(null)
+  const wideAccountPanel = useMediaQuery('(min-width: 1024px)')
 
   function uploadTooLarge(maximumBytes: number | null): string {
     return maximumBytes
@@ -66,6 +74,8 @@ export function useAccountPanel() {
     if ((section === 'profile' || section === 'identity' || section === 'wallpaper')
       && !identityLoaded.value && !identityLoading.value)
       void loadIdentity()
+    if (section === 'security' && !ssoLoaded.value && !ssoLoading.value)
+      void loadSsoBinding()
   }
 
   const description = ref('')
@@ -293,6 +303,79 @@ export function useAccountPanel() {
     }
   }
 
+  const ssoConfiguration = ref<NoCtfapiEndpointsAuthenticationMySsoBindingConfigurationResponse | null>(null)
+  const ssoLoading = ref(false)
+  const ssoLoaded = ref(false)
+  const ssoPending = ref(false)
+  const ssoError = ref<string | null>(null)
+  const ssoProviderId = ref('')
+
+  async function loadSsoBinding() {
+    ssoLoading.value = true
+    ssoError.value = null
+    const { data, error } = await authenticationSsoGetMyBinding()
+    ssoLoading.value = false
+    if (error || !data) {
+      ssoError.value = parseApiError(error, translate('sso.bindingUnavailable')).message
+      return
+    }
+    ssoConfiguration.value = data
+    ssoProviderId.value ||= data.providers?.[0]?.id ?? ''
+    ssoLoaded.value = true
+  }
+
+  async function beginSsoBinding() {
+    if (!ssoProviderId.value || ssoPending.value) return
+    ssoPending.value = true
+    ssoError.value = null
+    try {
+      const { data, error } = await authenticationSsoBeginBinding({
+        body: { providerId: ssoProviderId.value },
+      })
+      if (error || !data?.authorizationUrl) throw error
+      window.location.assign(data.authorizationUrl)
+    }
+    catch (error) {
+      ssoError.value = parseApiError(error, translate('sso.bindingStartFailed')).message
+      ssoPending.value = false
+    }
+  }
+
+  async function unbindSsoIdentity() {
+    if (ssoPending.value) return
+    ssoPending.value = true
+    ssoError.value = null
+    const { error } = await authenticationSsoUnbindIdentity()
+    ssoPending.value = false
+    if (error) {
+      ssoError.value = parseApiError(error, translate('sso.unbindingFailed')).message
+      return
+    }
+    invalidate()
+    toast.success(translate('sso.unbindingSuccessful'))
+    open.value = false
+    await navigateTo('/auth/login')
+  }
+
+  watch(
+    () => [route.query.account, route.query.ssoProvider] as const,
+    async ([account, requestedProvider]) => {
+      if (account !== 'security' || !user.value || isImpersonating.value) return
+      open.value = true
+      activeSection.value = 'security'
+      if (!ssoLoaded.value && !ssoLoading.value) await loadSsoBinding()
+      if (typeof requestedProvider === 'string'
+        && ssoConfiguration.value?.providers?.some(provider => provider.id === requestedProvider)) {
+        ssoProviderId.value = requestedProvider
+      }
+      const query = { ...route.query }
+      delete query.account
+      delete query.ssoProvider
+      await navigateTo({ path: route.path, query, hash: route.hash }, { replace: true })
+    },
+    { immediate: true },
+  )
+
   const currentPassword = ref('')
   const newPassword = ref('')
   const confirmNewPassword = ref('')
@@ -330,7 +413,8 @@ export function useAccountPanel() {
     await logout()
   }
 
-  const hasUnsaved = computed(() => profileDirty.value || identityDirty.value || Boolean(currentPassword.value || newPassword.value || confirmNewPassword.value))
+  const hasUnsaved = computed(() => profileDirty.value || identityDirty.value
+    || Boolean(currentPassword.value || newPassword.value || confirmNewPassword.value))
 
   function beforeUnload(event: BeforeUnloadEvent) {
     if (!hasUnsaved.value) return
@@ -342,6 +426,7 @@ export function useAccountPanel() {
   onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 
   const AvatarCropDialog = markRaw(AvatarCropDialogComponent)
+  const AdminDateTime = markRaw(AdminDateTimeComponent)
 
   function setAvatarInputRef(element: Element | ComponentPublicInstance | null) {
     avatarInput.value = (element instanceof Element ? element : element?.$el ?? null) as typeof avatarInput.value
@@ -358,6 +443,7 @@ export function useAccountPanel() {
     ImageIcon,
     LogOut,
     user,
+    wideAccountPanel,
     isImpersonating,
     fetchMe,
     open,
@@ -403,6 +489,15 @@ export function useAccountPanel() {
     emailMessage,
     emailError,
     resendEmail,
+    ssoConfiguration,
+    ssoLoading,
+    ssoLoaded,
+    ssoPending,
+    ssoError,
+    ssoProviderId,
+    loadSsoBinding,
+    beginSsoBinding,
+    unbindSsoIdentity,
     currentPassword,
     newPassword,
     confirmNewPassword,
@@ -411,6 +506,7 @@ export function useAccountPanel() {
     changePassword,
     logoutAll,
     AvatarCropDialog,
+    AdminDateTime,
   }
 }
 

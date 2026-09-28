@@ -13,7 +13,7 @@ const props = withDefaults(defineProps<{
   /** Compose 运行时需要选择服务名。 */
   showServiceName?: boolean
   addLabel?: string
-  /** 访问入口允许输出命令等自定义显示文本；控制检查入口仍要求 URL。 */
+  /** 访问入口使用连接格式预设；控制检查入口仍要求 URL。 */
   allowCustomDisplay?: boolean
   disabled?: boolean
 }>(), {

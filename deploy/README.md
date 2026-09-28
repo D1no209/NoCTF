@@ -16,6 +16,10 @@ environment、命名卷、tmpfs、group_add、cap、security_opt 或 read_only�
 数据库、Redis 和 NATS 只加入默认网络，不接入 1panel-network，也不发布宿主机端口。
 镜像自身的 EXPOSE 元数据不等于发布宿主机端口；Compose 不设置 ports/expose。
 TLS、域名、WebSocket/SignalR 转发及镜像上传请求大小/超时，由运维配置。
+启用比赛的 WSRX 访问后，反向代理还必须允许 `/api/v1/runtime-proxies/` 的 WebSocket Upgrade，
+并将该路径的读取、发送与空闲超时设置为大于 `RuntimeProxy__MaximumConnectionMinutes`；默认值为 30 分钟。
+流量捕获会先在 API 容器临时目录生成单连接 PCAPNG section，再写入已配置的对象存储；临时目录容量应至少
+覆盖允许的单 Runtime 抓包上限，并按并发比赛规模额外预留空间。
 
 ## 目录布局
 
@@ -77,6 +81,7 @@ Cap 使用独立部署的官方 Cap Standalone。在后台填写 Server URL、si
 IP 头，因此不能绕过代理直接暴露源站。启用 Standalone 的 asset server，并固定
 `WIDGET_VERSION=0.1.57` 与 `WASM_VERSION=0.0.7`；NoCTF 会从同一实例加载求解 WASM，避免运行时
 依赖公共 CDN。NoCTF 不把 Cap 或其 Valkey 生命周期并入本 Compose 栈。
+仓库中的 `deploy/cap/` 提供固定版本的独立 Compose、目录初始化、反向代理片段、备份与回滚说明。
 
 Turnstile 在后台填写 site key、secret 和不含 scheme/路径的允许 hostname；用于首次启动回退时可填写
 `TURNSTILE_SITE_KEY`、`TURNSTILE_SECRET` 和 `TURNSTILE_ALLOWED_HOSTNAME`。测试、预发布与生产使用不同 widget；生产 hostname 不得使用 localhost。
@@ -115,15 +120,14 @@ NoCTF SDK 拉取单容器/Checker 与 Compose CLI 共用挂载的 `config/docker
 - 旧的拆分角色与监控/exporter 容器由运维核实后退役，保留旧卷和备份直到验收，不做全局 prune。
 - 启动新拓扑后检查登录、用户/题目数量、文件下载、消息队列及题目容器。其他项目服务不在操作范围内。
 
-CI 只部署测试服务器。它读取现有应用容器记录的 Compose、环境文件与项目名，校验环境变量和数据挂载后，
-仅通过额外的镜像覆盖文件更新 NoCTF 应用，保留现有运行用户。旧版拆分角色和新版统一 Host 都不会在发布时
-被自动换成另一种拓扑。发布覆盖会把可安全等价转换的 wildcard `ASPNETCORE_URLS` 改写为
-`ASPNETCORE_HTTP_PORTS`/`ASPNETCORE_HTTPS_PORTS`，完整保留 8080、9464 等实际监听端口并消除重复配置告警；
-特定 IP 或非 URL 绑定不会自动改写。
-安装用的 `docker-compose.yml` 不覆盖已有环境，目录化迁移必须另行安排。
-发布前备份数据库与配置；发布后检查 readiness、业务记录数量及网络 ID。数据库、Redis、NATS、
-Registry、监控与反代不重建，不清理数据卷或宿主机缓存。失败时仅在数据库结构未变化时回退应用镜像，
-不会自动恢复数据库覆盖新数据。迁移仍由应用按现有 `Database:AutoMigrate` 配置在启动时执行，不创建迁移容器。
+CI 只构建并发布统一的 `NoCTF.Host` 镜像，不登录服务器、不执行原地升级，也不识别拆分进程布局。
+所有环境必须使用 `noctf` 服务和 `NoCTF.Host.dll`，角色通过 `Hosting__Roles__*` 明确配置；默认启用
+Api、Worker、Runner 三个角色。本次发布前停止旧写入者，备份 PostgreSQL、上传目录、配置和旧平台日志，
+再用 `NoCTF.Host.dll --migrate-only` 对现有数据库应用仓库内 EF CLI 生成的加法迁移；不得重置迁移历史、
+清空业务库或手动修改 PostgreSQL。Redis 只保留 FusionCache 后端数据，新 key 前缀避免读取旧缓存；
+旧 NATS namespace 在回滚窗口内冻结，不导入旧消息或 Runner Claim，新 Runner 从 EF Allocation 与资源
+清单重建容量。停机切换前等待短期 SSO/Webhook 状态完成或到期，不混跑旧 Host/Runner。切换后核对
+readiness、业务记录数量、文件、NATS KV 注册/租约及消息端点；回退使用旧镜像和切换前完整备份。
 
 `/health/ready` 保持 fail-closed，但相同故障只在状态变化时写一次结构化日志。排查 503 时读取响应中的
 `data`：每个依赖都有 `<dependency>.status`；账户邮件还提供
@@ -131,9 +135,10 @@ Registry、监控与反代不重建，不清理数据卷或宿主机缓存。失
 `EMAIL_VERIFICATION_ENCRYPTION_KEY` 无法解密既有密码；应修正配置或恢复原加密密钥，不能通过关闭
 readiness 掩盖。
 
-生产服务器禁止通过 CI 部署。人工部署使用 CI 发布的同一 digest，通过 SSH 显式调用
-`update_image.py --manual-production`；该参数只接受已确认的生产主机，CI 包装脚本不传此参数且独立拒绝生产主机。
-两个路径都只保留并校验既有网络（包括 `1panel-network`），不会创建、删除或重建网络。
+生产服务器禁止通过 CI 部署。人工部署必须使用 CI 发布的精确 digest、仓库当前 Compose 和独立变更单；
+不得恢复已删除的原地升级脚本或拆分进程入口。既有外部网络（包括 `1panel-network`）由运维显式核对。
 
-默认关闭 OpenTelemetry 与 Prometheus exporter，监控页面的外部指标显示不可用，不影响普通业务与日志。
+默认关闭 OpenTelemetry 与 Prometheus exporter，不影响普通业务。启用监控时按
+`observability/README.md` 配置私有 `9464` 指标监听器及 Loki OTLP 日志接收端，并独立部署 Prometheus/Grafana/Loki；
+平台本身不查询 Prometheus，也不提供内嵌监控页面。
 本文件只约束平台部署栈；题目运行时的 Docker 随机端口发布与沙箱规则不因此更改。

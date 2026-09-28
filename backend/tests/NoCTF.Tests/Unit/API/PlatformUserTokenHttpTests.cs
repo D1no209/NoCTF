@@ -35,8 +35,7 @@ public sealed class PlatformUserTokenHttpTests
         issuer.Issue(
                 Arg.Any<AuthenticatedUser>(),
                 Arg.Any<DateTimeOffset>(),
-                TimeSpan.FromHours(1),
-                ActorId)
+                TimeSpan.FromHours(1))
             .Returns(call => new IssuedAccessToken(
                 "administrator-issued-token",
                 call.ArgAt<DateTimeOffset>(1).AddHours(1),
@@ -48,7 +47,7 @@ public sealed class PlatformUserTokenHttpTests
 
         using var response = await client.PostAsJsonAsync(
             $"/api/v1/admin/platform/users/{targetId}/tokens",
-            new { expiresInSeconds = 3600, reason = "support case" });
+            new { expiresInSeconds = 3600 });
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(response.Headers.Contains("Set-Cookie")).IsFalse();
@@ -57,11 +56,13 @@ public sealed class PlatformUserTokenHttpTests
     }
 
     [Test]
-    public async Task Non_administrator_and_impersonated_administrator_cannot_issue()
+    public async Task Role_controls_issuance()
     {
         var targetId = Guid.NewGuid();
         var store = ActiveTargetStore(targetId);
         var issuer = Substitute.For<IAccessTokenIssuer>();
+        issuer.Issue(Arg.Any<AuthenticatedUser>(), Arg.Any<DateTimeOffset>(), Arg.Any<TimeSpan>())
+            .Returns(call => new IssuedAccessToken("ordinary-token", call.ArgAt<DateTimeOffset>(1).AddHours(1)));
         await using var app = await CreateApplicationAsync(store, issuer);
         using var client = app.GetTestClient();
 
@@ -69,17 +70,16 @@ public sealed class PlatformUserTokenHttpTests
             new AuthenticationHeaderValue("Bearer", "User");
         using var forbiddenRole = await client.PostAsJsonAsync(
             $"/api/v1/admin/platform/users/{targetId}/tokens",
-            new { expiresInSeconds = 3600, reason = "support case" });
+            new { expiresInSeconds = 3600 });
         client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", "ImpersonatedAdministrator");
-        using var forbiddenImpersonation = await client.PostAsJsonAsync(
+            new AuthenticationHeaderValue("Bearer", "Administrator");
+        using var administrator = await client.PostAsJsonAsync(
             $"/api/v1/admin/platform/users/{targetId}/tokens",
-            new { expiresInSeconds = 3600, reason = "support case" });
+            new { expiresInSeconds = 3600 });
 
         await Assert.That(forbiddenRole.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
-        await Assert.That(forbiddenImpersonation.StatusCode)
-            .IsEqualTo(HttpStatusCode.Forbidden);
-        issuer.DidNotReceiveWithAnyArgs().Issue(default!, default, default);
+        await Assert.That(administrator.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        issuer.Received(1).Issue(Arg.Any<AuthenticatedUser>(), Arg.Any<DateTimeOffset>(), Arg.Any<TimeSpan>());
     }
 
     [Test]
@@ -108,7 +108,7 @@ public sealed class PlatformUserTokenHttpTests
 
         using var response = await client.PostAsJsonAsync(
             $"/api/v1/admin/platform/users/{targetId}/tokens",
-            new { expiresInSeconds = 3600, reason = "support case" });
+            new { expiresInSeconds = 3600 });
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Conflict);
         var body = await response.Content
@@ -118,7 +118,7 @@ public sealed class PlatformUserTokenHttpTests
     }
 
     [Test]
-    public async Task Reason_bounds_are_applied_after_trimming_and_missing_users_are_not_found()
+    public async Task Lifetime_bounds_and_missing_users_are_enforced()
     {
         var targetId = Guid.NewGuid();
         var store = ActiveTargetStore(targetId);
@@ -126,8 +126,7 @@ public sealed class PlatformUserTokenHttpTests
         issuer.Issue(
                 Arg.Any<AuthenticatedUser>(),
                 Arg.Any<DateTimeOffset>(),
-                Arg.Any<TimeSpan>(),
-                ActorId)
+                Arg.Any<TimeSpan>())
             .Returns(call => new IssuedAccessToken(
                 "administrator-issued-token",
                 call.ArgAt<DateTimeOffset>(1).AddHours(1),
@@ -139,41 +138,17 @@ public sealed class PlatformUserTokenHttpTests
 
         using var accepted = await client.PostAsJsonAsync(
             $"/api/v1/admin/platform/users/{targetId}/tokens",
-            new { expiresInSeconds = 3600, reason = $"  {new string('x', 500)}  " });
+            new { expiresInSeconds = 3600 });
         using var invalid = await client.PostAsJsonAsync(
             $"/api/v1/admin/platform/users/{targetId}/tokens",
-            new { expiresInSeconds = 59, reason = "  no  " });
+            new { expiresInSeconds = 59 });
         using var missing = await client.PostAsJsonAsync(
             $"/api/v1/admin/platform/users/{Guid.NewGuid()}/tokens",
-            new { expiresInSeconds = 3600, reason = "support case" });
+            new { expiresInSeconds = 3600 });
 
         await Assert.That(accepted.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(invalid.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
         await Assert.That(missing.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
-    }
-
-    [Test]
-    public async Task Impersonated_administrator_cannot_list_or_revoke_tokens()
-    {
-        var targetId = Guid.NewGuid();
-        var store = ActiveTargetStore(targetId);
-        await using var app = await CreateApplicationAsync(
-            store,
-            Substitute.For<IAccessTokenIssuer>());
-        using var client = app.GetTestClient();
-        client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", "ImpersonatedAdministrator");
-
-        using var list = await client.GetAsync(
-            $"/api/v1/admin/platform/users/{targetId}/tokens");
-        using var revokeOne = await client.DeleteAsync(
-            $"/api/v1/admin/platform/users/{targetId}/tokens/{Guid.NewGuid()}");
-        using var revokeAll = await client.DeleteAsync(
-            $"/api/v1/admin/platform/users/{targetId}/tokens");
-
-        await Assert.That(list.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
-        await Assert.That(revokeOne.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
-        await Assert.That(revokeAll.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
     }
 
     private static IPlatformAdministrationStore ActiveTargetStore(Guid targetId)
@@ -213,10 +188,7 @@ public sealed class PlatformUserTokenHttpTests
             options.DisableAutoDiscovery = true;
             options.Assemblies = [typeof(IssuePlatformUserTokenEndpoint).Assembly];
             options.Filter = type => type == typeof(IssuePlatformUserTokenEndpoint)
-                || type == typeof(IssuePlatformUserTokenValidator)
-                || type == typeof(ListPlatformUserTokensEndpoint)
-                || type == typeof(RevokePlatformUserTokenEndpoint)
-                || type == typeof(DeletePlatformUserTokensEndpoint);
+                || type == typeof(IssuePlatformUserTokenValidator);
         });
         builder.Services.AddSingleton(store);
         builder.Services.AddSingleton(issuer);
@@ -250,11 +222,6 @@ public sealed class PlatformUserTokenHttpTests
                 new(ClaimTypes.Role, role),
                 new("user_kind", "Human")
             };
-            if (token.StartsWith("Impersonated", StringComparison.Ordinal))
-            {
-                claims.Add(new(AccessTokenClaims.Impersonation, "true"));
-                claims.Add(new(AccessTokenClaims.ImpersonatorId, Guid.NewGuid().ToString()));
-            }
             var identity = new ClaimsIdentity(claims, Scheme.Name);
             return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(
                 new ClaimsPrincipal(identity),

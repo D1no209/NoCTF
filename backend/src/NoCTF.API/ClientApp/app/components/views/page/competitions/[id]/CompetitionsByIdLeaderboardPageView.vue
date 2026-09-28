@@ -3,14 +3,15 @@ import { toRefs } from 'vue'
 import type { CompetitionsByIdLeaderboardPageViewState } from '~/features/routes/competitions/[id]/useCompetitionsByIdLeaderboardPage'
 
 const viewProps = defineProps<{ state: CompetitionsByIdLeaderboardPageViewState }>()
-const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, medalBloodRankClass, medalRankClass, scoreboardBloodAward, scoreboardEntryKindLabel, scoreboardEntryOutcomeLabel, scoreboardRankingStateLabel, scoreboardSlot, competitionId, board, allTracksKey, selectedTrackKey, tracksEnabled, availableTracks, selectedAllTracks, trackName, teams, displayRank, visibleTeams, showMoreTeams, displayTeamName, columnGroups, isCtf, trends, trendsLoading, trendsError, visibleTrendSeries, trendRangeStart, trendRangeEnd, loadTrends, roundWindowLabel, roundLabel, slotTitle, ctfScore, exportCsv, detailOpen, teamDetailOpen, teamDetailTeam, teamDetailTrendSeries, detailLoading, detailLoadingMore, detailError, detail, detailEntries, detailTeam, detailColumn, loadDetailPage, openDetail, openTeamDetail, showOlderRoundWindow, showNewerRoundWindow, showLatestRoundWindow, entryActor, adjustmentOpen, adjustmentLoading, adjustmentLoadingMore, adjustmentError, adjustmentDetail, adjustmentEntries, adjustmentTeam, loadAdjustmentPage, openAdjustments, adjustmentActor, adjustmentKind, ScoreboardSlotStatus, LazyScoreTrendChart, LazyScoreboardTeamDetailDialog } = toRefs(viewProps.state)
+const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, medalBloodRankClass, medalRankClass, scoreboardBloodAward, scoreboardEntryKindLabel, scoreboardEntryOutcomeLabel, scoreboardRankingStateLabel, scoreboardSlot, competitionId, competitionReturnPath, dampenLeaderboardWheel, board, allTracksKey, selectedTrackKey, tracksEnabled, canViewInternalTracks, showLeaderboardHiddenTeams, availableTracks, selectedAllTracks, trackName, teams, displayRank, visibleTeams, showMoreTeams, displayTeamName, columnGroups, isCtf, trends, trendsLoading, trendsError, visibleTrendSeries, trendRangeStart, trendRangeEnd, trendRevision, loadTrends, roundWindowLabel, roundLabel, slotTitle, ctfScore, exportCsv, detailOpen, teamDetailOpen, teamDetailTeam, teamDetailTrendSeries, detailLoading, detailLoadingMore, detailError, detail, detailEntries, detailTeam, detailColumn, loadDetailPage, openDetail, openTeamDetail, showOlderRoundWindow, showNewerRoundWindow, showLatestRoundWindow, entryActor, adjustmentOpen, adjustmentLoading, adjustmentLoadingMore, adjustmentError, adjustmentDetail, adjustmentEntries, adjustmentTeam, loadAdjustmentPage, openAdjustments, adjustmentActor, adjustmentKind, ScoreboardSlotStatus, LazyScoreTrendChart, LazyScoreboardTeamDetailDialog } = toRefs(viewProps.state)
 </script>
 
 <template>
-  <div data-scoreboard-page-scroll class="flex flex-col gap-6 pb-4">
+  <ScrollSurface as="div" axis="y" data-scoreboard-page-scroll class="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-3" @wheel.capture="dampenLeaderboardWheel">
+    <div class="flex flex-col gap-6 pb-4">
     <div>
       <Button variant="ghost" size="sm" as-child>
-        <NuxtLink :to="`/competitions/${competitionId}`">
+        <NuxtLink :to="competitionReturnPath">
           <ArrowLeft data-icon="inline-start" />{{ $t('ui.backToCompetition') }}
         </NuxtLink>
       </Button>
@@ -38,6 +39,10 @@ const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, 
               <History data-icon="inline-start" />{{ $t('ui.backToLatestRounds') }}
             </Button>
           </div>
+          <div v-if="canViewInternalTracks && tracksEnabled" class="flex items-center gap-2">
+            <Label :for="`leaderboard-hidden-teams-${competitionId}`" class="cursor-pointer text-sm font-medium">{{ $t('ui.showLeaderboardHiddenTeams') }}</Label>
+            <Switch :id="`leaderboard-hidden-teams-${competitionId}`" v-model="showLeaderboardHiddenTeams" />
+          </div>
           <Select v-if="tracksEnabled && availableTracks.length > 1" v-model="selectedTrackKey">
             <SelectTrigger class="min-w-40" :aria-label="$t('ui.selectLeaderboardTrack')"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -58,7 +63,7 @@ const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, 
             <CardContent class="py-4">
               <Skeleton v-if="trendsLoading && !trends" class="h-[320px] w-full" />
               <Empty v-else-if="!visibleTrendSeries.length" class="h-[320px]"><EmptyHeader><EmptyTitle>{{ $t('ui.noScoreTrendDataYet') }}</EmptyTitle></EmptyHeader></Empty>
-              <component :is="LazyScoreTrendChart" v-else :series="visibleTrendSeries" :range-start="trendRangeStart" :range-end="trendRangeEnd" height="clamp(220px, 32vh, 320px)" />
+              <component :is="LazyScoreTrendChart" v-else :series="visibleTrendSeries" :revision="trendRevision" :range-start="trendRangeStart" :range-end="trendRangeEnd" height="clamp(220px, 32vh, 320px)" />
             </CardContent>
           </Card>
         </div>
@@ -66,12 +71,12 @@ const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, 
         <CardContent class="pt-6">
           <Empty v-if="!teams.length" class="border py-8"><EmptyHeader><EmptyTitle>{{ $t('ui.noTeamHasScoredYet') }}</EmptyTitle></EmptyHeader></Empty>
           <div v-else class="min-w-0">
-            <Table class="min-w-max table-auto">
+            <Table pin-horizontal-scrollbar class="min-w-max table-auto">
               <TableHeader>
                 <TableRow>
-                  <TableHead :rowspan="isCtf ? 1 : 2" class="sticky left-0 z-30 w-20 min-w-20 max-w-20 bg-card text-center">{{ $t('ui.ranking') }}</TableHead>
+                  <TableHead :rowspan="isCtf ? 1 : 2" data-scoreboard-frozen-corner="top-start" class="sticky left-0 z-30 w-20 min-w-20 max-w-20 bg-card text-center">{{ $t('ui.ranking') }}</TableHead>
                   <TableHead :rowspan="isCtf ? 1 : 2" class="sticky left-20 z-30 w-56 min-w-56 max-w-56 bg-card">{{ $t('ui.teams') }}</TableHead>
-                  <TableHead :rowspan="isCtf ? 1 : 2" class="sticky left-76 z-30 w-28 min-w-28 max-w-28 border-r bg-card text-right">{{ $t('ui.totalScore') }}</TableHead>
+                  <TableHead :rowspan="isCtf ? 1 : 2" data-scoreboard-frozen-corner="top-end" class="sticky left-76 z-30 w-28 min-w-28 max-w-28 border-r bg-card text-right">{{ $t('ui.totalScore') }}</TableHead>
                   <TableHead v-for="group in columnGroups" :key="group.competitionChallengeId" :colspan="group.columns.length" class="border-l px-4 text-center">
                     <span class="inline-flex items-center gap-1.5 whitespace-nowrap"><component :is="directionIcon(group.challenge?.direction)" class="size-4" :class="directionTextClass(group.challenge?.direction)" />{{ group.challenge?.title ?? $t('ui.unknownQuestion') }}</span>
                   </TableHead>
@@ -79,10 +84,10 @@ const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, 
                 <TableRow v-if="!isCtf"><template v-for="group in columnGroups" :key="`${group.competitionChallengeId}-rounds`"><TableHead v-for="column in group.columns" :key="column.index" class="min-w-28 border-l px-3 text-center">{{ roundLabel(column) }}</TableHead></template></TableRow>
               </TableHeader>
               <TableBody>
-                <TableRow v-for="team in visibleTeams" :key="team.teamId" :class="(displayRank(team) ?? 99) <= 3 ? 'bg-primary/5' : ''">
-                  <TableCell class="sticky left-0 z-20 w-20 min-w-20 max-w-20 bg-card text-center"><Medal v-if="(displayRank(team) ?? 99) <= 3" class="size-5" :class="medalRankClass[displayRank(team) ?? 0]" /><span v-else class="font-mono tabular-nums">{{ displayRank(team) ?? $t('ui.symbol') }}</span></TableCell>
+                <TableRow v-for="(team, teamIndex) in visibleTeams" :key="team.teamId" :class="(displayRank(team) ?? 99) <= 3 ? 'bg-primary/5' : ''">
+                  <TableCell :data-scoreboard-frozen-corner="teamIndex === visibleTeams.length - 1 ? 'bottom-start' : undefined" class="sticky left-0 z-20 w-20 min-w-20 max-w-20 bg-card text-center"><Medal v-if="(displayRank(team) ?? 99) <= 3" class="size-5" :class="medalRankClass[displayRank(team) ?? 0]" /><span v-else class="font-mono tabular-nums">{{ displayRank(team) ?? $t('ui.symbol') }}</span></TableCell>
                   <TableCell class="sticky left-20 z-20 w-56 min-w-56 max-w-56 bg-card"><div class="flex min-w-0 flex-col items-start gap-1"><Hint :content="displayTeamName(team)" ><ActionButton type="button" class="w-full whitespace-normal break-words rounded-sm text-left font-medium underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"  :aria-label="$t('ui.viewDetailsForTeam', { team: displayTeamName(team) })" @click="openTeamDetail(team)">{{ displayTeamName(team) }}</ActionButton></Hint><div v-if="(tracksEnabled && selectedAllTracks && availableTracks.length > 1) || team.rankingState !== 'Eligible'" class="flex flex-wrap items-center gap-1"><Hint v-if="tracksEnabled && selectedAllTracks && availableTracks.length > 1" :content="trackName(team.trackKey)"><Badge variant="outline" class="whitespace-normal break-words text-left">{{ trackName(team.trackKey) }}</Badge></Hint><Badge v-if="team.rankingState !== 'Eligible'" variant="destructive">{{ scoreboardRankingStateLabel(team.rankingState) }}</Badge></div></div></TableCell>
-                  <TableCell class="sticky left-76 z-20 w-28 min-w-28 max-w-28 border-r bg-card text-right">
+                  <TableCell :data-scoreboard-frozen-corner="teamIndex === visibleTeams.length - 1 ? 'bottom-end' : undefined" class="sticky left-76 z-20 w-28 min-w-28 max-w-28 border-r bg-card text-right">
                     <ActionButton v-if="(team.globalAdjustmentCount ?? 0) > 0" type="button" class="w-full rounded-md px-2 py-1 text-right transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" @click="openAdjustments(team)">
                       <span class="block font-mono font-semibold tabular-nums">{{ team.totalScore ?? 0 }} {{ $t('ui.pts2') }}</span>
                       <span class="mt-1 block text-[0.7rem] text-muted-foreground">{{ $t('ui.globalAdjustments2', { count: team.globalAdjustmentCount ?? 0 }) }}</span>
@@ -137,11 +142,12 @@ const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, 
       :trend-error="trendsError"
       :trend-range-start="trendRangeStart"
       :trend-range-end="trendRangeEnd"
+      :trend-revision="trendRevision"
       @retry-trends="loadTrends"
     />
 
     <Dialog v-model:open="detailOpen">
-      <DialogScrollContent class="max-h-[85vh] sm:max-w-2xl">
+      <DialogScrollContent data-score-detail-dialog class="max-h-[85vh] sm:max-w-2xl">
         <DialogHeader><DialogTitle>{{ detailTeam ? displayTeamName(detailTeam) : '' }} · {{ board.challengesById.value.get(detailColumn?.competitionChallengeId ?? '')?.title ?? $t('ui.unknownQuestion') }} · {{ detailColumn ? roundLabel(detailColumn) : '' }}</DialogTitle><DialogDescription>{{ isCtf ? $t('ui.scoresComeFromTheAuthoritativeServerSideScoringResult') : $t('ui.scoresAndStatesComeFromAuthoritativeServerSettlement') }}</DialogDescription></DialogHeader>
         <Alert v-if="detailError" variant="destructive"><AlertDescription>{{ $message(detailError) }}</AlertDescription></Alert>
         <div v-if="detailLoading" class="flex items-center justify-center py-10"><Spinner /></div>
@@ -169,5 +175,6 @@ const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, 
         </template>
       </DialogScrollContent>
     </Dialog>
-  </div>
+    </div>
+  </ScrollSurface>
 </template>

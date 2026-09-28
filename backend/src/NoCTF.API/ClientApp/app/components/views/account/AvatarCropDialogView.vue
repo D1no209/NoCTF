@@ -3,25 +3,30 @@ import { toRefs } from 'vue'
 import type { AvatarCropDialogViewState } from '~/features/account/useAvatarCropDialog'
 
 const viewProps = defineProps<{ state: AvatarCropDialogViewState }>()
-const { RotateCcw, RotateCw, Scan, AVATAR_CROP_SIZE, emit, sourceImage, loadError, dragging, encoding, zoomPercent, resetCrop, rotate, handleWheel, startDrag, continueDrag, finishDrag, createCroppedFile, setPreviewFrameRef, setPreviewRef, open, saving } = toRefs(viewProps.state)
+const { RotateCcw, RotateCw, Scan, profileCover, cropWidth, cropHeight, emit, sourceImage, loadError, dragging, encoding, zoomPercent, resetCrop, rotate, handleWheel, startDrag, continueDrag, finishDrag, createCroppedFile, setPreviewFrameRef, setPreviewRef, open, saving } = toRefs(viewProps.state)
 </script>
 
 <template>
   <Dialog :open="open" @update:open="emit('update:open', $event)">
-    <DialogContent class="sm:max-w-[760px]">
+    <DialogContent :class="profileCover ? 'sm:max-w-[900px]' : 'sm:max-w-[760px]'" :data-profile-cover-crop="profileCover || undefined">
       <DialogHeader>
-        <DialogTitle>{{ $t('ui.cropAvatar') }}</DialogTitle>
-        <DialogDescription> {{ $t('ui.dragOnThePictureToAdjustThePositionAndScroll') }} </DialogDescription>
+        <DialogTitle>{{ profileCover ? $t('profile.cropCover') : $t('ui.cropAvatar') }}</DialogTitle>
+        <DialogDescription>
+          {{ profileCover ? $t('profile.coverCropDescription') : $t('ui.dragOnThePictureToAdjustThePositionAndScroll') }}
+        </DialogDescription>
       </DialogHeader>
 
-      <div class="grid gap-5 md:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
+      <div class="grid gap-5" :class="profileCover ? '' : 'md:grid-cols-[minmax(0,360px)_minmax(0,1fr)]'">
         <div
           :ref="setPreviewFrameRef"
-          class="relative mx-auto aspect-square w-full max-w-[360px] touch-none select-none overflow-hidden rounded-lg border bg-muted outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
-          :class="dragging ? 'cursor-grabbing' : 'cursor-grab'"
+          class="relative mx-auto w-full touch-none select-none overflow-hidden rounded-lg border bg-muted outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/40"
+          :class="[
+            profileCover ? 'aspect-[4/1] max-w-[720px]' : 'aspect-square max-w-[360px]',
+            dragging ? 'cursor-grabbing' : 'cursor-grab',
+          ]"
           role="group"
           tabindex="0"
-          :aria-label="$t('ui.avatarCropPreview')"
+          :aria-label="profileCover ? $t('profile.coverCropPreview') : $t('ui.avatarCropPreview')"
           @dragstart.prevent
           @wheel.prevent="handleWheel"
           @pointerdown="startDrag"
@@ -32,12 +37,13 @@ const { RotateCcw, RotateCw, Scan, AVATAR_CROP_SIZE, emit, sourceImage, loadErro
         >
           <canvas
             :ref="setPreviewRef"
-            :width="AVATAR_CROP_SIZE"
-            :height="AVATAR_CROP_SIZE"
+            :width="cropWidth"
+            :height="cropHeight"
             class="size-full"
-            :aria-label="$t('ui.avatarCropCanvas')"
+            :aria-label="profileCover ? $t('profile.coverCropCanvas') : $t('ui.avatarCropCanvas')"
           />
           <div
+            v-if="!profileCover"
             class="pointer-events-none absolute inset-0 rounded-full border-2 border-dashed border-background/90 shadow-[0_0_0_999px_oklch(0_0_0/0.3)]"
           />
           <div

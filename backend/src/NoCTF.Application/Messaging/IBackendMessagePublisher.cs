@@ -1,3 +1,5 @@
+using NoCTF.Application.Competitions.Webhooks;
+
 namespace NoCTF.Application.Messaging;
 
 /// <summary>
@@ -17,5 +19,8 @@ public interface IBackendMessagePublisher
         CancellationToken cancellationToken) => ValueTask.CompletedTask;
     ValueTask ProvisionCompetitionRuntimesAsync(
         Guid competitionId,
+        CancellationToken cancellationToken) => ValueTask.CompletedTask;
+    ValueTask TestCompetitionWebhookAsync(
+        TestCompetitionWebhook message,
         CancellationToken cancellationToken) => ValueTask.CompletedTask;
 }

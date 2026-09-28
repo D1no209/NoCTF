@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.Competitions.Lifecycle;
 using NoCTF.Application.Messaging;
@@ -40,6 +41,8 @@ public sealed class CompetitionLifecyclePersistenceTests
             var options = new DbContextOptionsBuilder<NoCtfDbContext>()
                 .UseNpgsql(postgres.GetConnectionString())
                 .UseSnakeCaseNamingConvention()
+                .ConfigureWarnings(warnings => warnings.Throw(
+                    RelationalEventId.MultipleCollectionIncludeWarning))
                 .Options;
             var now = DateTimeOffset.UtcNow;
             var ownerId = Guid.CreateVersion7(now);
@@ -62,37 +65,35 @@ public sealed class CompetitionLifecyclePersistenceTests
                     CreatedAt = now,
                     UpdatedAt = now
                 });
-                seed.Competitions.Add(new Competition
+                seed.Competitions.Add(new CtfCompetition
                 {
                     Id = competitionId,
                     Title = "Score start gate",
                     OwnerId = ownerId,
-                    Mode = GameMode.Ctf,
                     Status = CompetitionStatus.Published,
-                    ConfigurationJson = GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Ctf),
+                    ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
                     StartAt = now.AddMinutes(-1),
                     EndAt = now.AddHours(1),
                     FlagDerivationSecret = Enumerable.Range(1, 32).Select(value => (byte)value).ToArray(),
                     CreatedAt = now,
                     UpdatedAt = now,
                 });
-                seed.Challenges.Add(new Challenge
+                seed.Challenges.Add(new CtfChallenge
                 {
                     Id = challengeId,
                     OwnerId = ownerId,
-                    Mode = GameMode.Ctf,
                     Title = "Persisted score limit",
-                    DefinitionJson = configurations.GetDefaultDefinitionJson(GameMode.Ctf),
+                    Definition = configurations.CreateDefaultDefinitionForTest(GameMode.Ctf),
                     CreatedAt = now,
                     UpdatedAt = now
                 });
-                seed.CompetitionChallenges.Add(new CompetitionChallenge
+                seed.CompetitionChallenges.Add(new CtfCompetitionChallenge
                 {
                     Id = competitionChallengeId,
                     CompetitionId = competitionId,
                     ChallengeId = challengeId,
                     IsPublished = true,
-                    RulesJson = configurations.GetDefaultJson(GameMode.Ctf),
+                    Rules = configurations.CreateDefaultRulesForTest(GameMode.Ctf),
                     Hints =
                     [
                         new CompetitionChallengeHint
@@ -149,6 +150,8 @@ public sealed class CompetitionLifecyclePersistenceTests
             var options = new DbContextOptionsBuilder<NoCtfDbContext>()
                 .UseNpgsql(postgres.GetConnectionString())
                 .UseSnakeCaseNamingConvention()
+                .ConfigureWarnings(warnings => warnings.Throw(
+                    RelationalEventId.MultipleCollectionIncludeWarning))
                 .Options;
             var fixture = await SeedIncompleteAwdAsync(options, cancellationToken);
             var outbox = new RecordingOutbox();
@@ -168,7 +171,7 @@ public sealed class CompetitionLifecyclePersistenceTests
                 error.Code == StartGateFailureCode.RuntimeDefinitionInvalid &&
                 error.CompetitionChallengeId == fixture.CompetitionChallengeId);
             await Assert.That(runtimeError.Message)
-                .IsEqualTo("Runtime is required before an AWD competition can start.");
+                .IsEqualTo("Runtime is required when Checker is configured.");
 
             var store = new CompetitionLifecycleStore(
                 db,
@@ -220,6 +223,8 @@ public sealed class CompetitionLifecyclePersistenceTests
             var options = new DbContextOptionsBuilder<NoCtfDbContext>()
                 .UseNpgsql(postgres.GetConnectionString())
                 .UseSnakeCaseNamingConvention()
+                .ConfigureWarnings(warnings => warnings.Throw(
+                    RelationalEventId.MultipleCollectionIncludeWarning))
                 .Options;
             var fixture = await SeedAsync(options, cancellationToken);
             var outbox = new RecordingOutbox();
@@ -265,11 +270,11 @@ public sealed class CompetitionLifecyclePersistenceTests
             }
 
             await using var verify = new NoCtfDbContext(options);
-            var competition = await verify.Competitions.AsNoTracking().SingleAsync(
+            var competition = await verify.Competitions.AsNoTracking().AsSplitQuery().SingleAsync(
                 item => item.Id == fixture.CompetitionId,
                 cancellationToken);
             await Assert.That(competition.Status).IsEqualTo(CompetitionStatus.Running);
-            var runtime = await verify.RuntimeInstances.AsNoTracking().SingleAsync(
+            var runtime = await verify.RuntimeInstances.AsNoTracking().AsSplitQuery().SingleAsync(
                 item => item.Id == fixture.RuntimeId,
                 cancellationToken);
             await Assert.That(runtime.State).IsEqualTo(RuntimeState.Running);
@@ -312,39 +317,52 @@ public sealed class CompetitionLifecyclePersistenceTests
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.Competitions.Add(new Competition
+        db.Competitions.Add(new AwdCompetition
         {
             Id = competitionId,
             Title = "Incomplete AWD",
             OwnerId = ownerId,
-            Mode = GameMode.Awd,
             Status = CompetitionStatus.Published,
-            ConfigurationJson = JsonSerializer.Serialize(
-                AwdConfiguration.Default,
-                new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+            ModeConfiguration = TestConfigurations.Competition(
+                GameMode.Awd,
+                JsonSerializer.Serialize(
+                    AwdConfiguration.Default,
+                    new JsonSerializerOptions(JsonSerializerDefaults.Web))),
             StartAt = now.AddMinutes(-1),
             EndAt = now.AddHours(1),
             FlagDerivationSecret = Enumerable.Range(1, 32).Select(value => (byte)value).ToArray(),
             CreatedAt = now,
             UpdatedAt = now,
         });
-        db.Challenges.Add(new Challenge
+        var definition = configurations.CreateDefaultDefinitionForTest(GameMode.Awd);
+        definition.Runtime = null;
+        definition.Checker = new ChallengeCheckerDefinition
+        {
+            Image = "checker:test",
+            TimeoutSeconds = 30
+        };
+        definition.StringItems.Add(new ChallengeDefinitionStringItem
+        {
+            Kind = ChallengeDefinitionStringKind.CheckerCommand,
+            Position = 0,
+            Value = "check"
+        });
+        db.Challenges.Add(new AwdChallenge
         {
             Id = challengeId,
             OwnerId = ownerId,
-            Mode = GameMode.Awd,
             Title = "Missing runtime",
-            DefinitionJson = configurations.GetDefaultDefinitionJson(GameMode.Awd),
+            Definition = definition,
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.CompetitionChallenges.Add(new CompetitionChallenge
+        db.CompetitionChallenges.Add(new AwdCompetitionChallenge
         {
             Id = competitionChallengeId,
             CompetitionId = competitionId,
             ChallengeId = challengeId,
             IsPublished = true,
-            RulesJson = configurations.GetDefaultJson(GameMode.Awd),
+            Rules = configurations.CreateDefaultRulesForTest(GameMode.Awd),
             UpdatedAt = now
         });
         db.Teams.Add(new Team
@@ -386,40 +404,38 @@ public sealed class CompetitionLifecyclePersistenceTests
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.Competitions.Add(new Competition
+        db.Competitions.Add(new AwdCompetition
         {
             Id = competitionId,
             Title = "AWD lifecycle",
             OwnerId = ownerId,
-            Mode = GameMode.Awd,
             Status = CompetitionStatus.Running,
-            ConfigurationJson = "{}",
+            ModeConfiguration = TestConfigurations.Competition(GameMode.Awd),
             StartAt = now.AddHours(-1),
             EndAt = now.AddHours(1),
             FlagDerivationSecret = new byte[32],
             CreatedAt = now,
             UpdatedAt = now,
         });
-        db.Challenges.Add(new Challenge
+        db.Challenges.Add(new AwdChallenge
         {
             Id = challengeId,
             OwnerId = ownerId,
-            Mode = GameMode.Awd,
             Title = "Service",
-            DefinitionJson = "{}",
+            Definition = TestConfigurations.Definition(GameMode.Awd),
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.CompetitionChallenges.Add(new CompetitionChallenge
+        db.CompetitionChallenges.Add(new AwdCompetitionChallenge
         {
             Id = competitionChallengeId,
             CompetitionId = competitionId,
             ChallengeId = challengeId,
             IsPublished = true,
-            RulesJson = "{}",
+            Rules = TestConfigurations.Rules(GameMode.Awd),
             UpdatedAt = now
         });
-        db.RuntimeInstances.Add(new RuntimeInstance
+        db.RuntimeInstances.Add(new PlayerRuntimeInstance
         {
             Id = runtimeId,
             CompetitionId = competitionId,
@@ -427,14 +443,27 @@ public sealed class CompetitionLifecyclePersistenceTests
             RuntimeKind = RuntimeKind.Container,
             RuntimeProvider = RuntimeProvider.Docker,
             State = RuntimeState.Running,
-            ProviderReceiptJson = "{\"id\":\"runtime\"}",
+            ProviderReceipt = RuntimeReceiptTestData.ContainerEntity(),
             CreatedAt = now,
             RunningAt = now
         });
-        db.ChallengeFlags.Add(new ChallengeFlag
+        var teamId = Guid.CreateVersion7();
+        db.Teams.Add(new Team
+        {
+            Id = teamId,
+            CompetitionId = competitionId,
+            Name = "Lifecycle team",
+            CaptainId = ownerId,
+            MemberIds = [ownerId],
+            InvitationToken = Guid.NewGuid().ToString("N"),
+            RegistrationStatus = TeamRegistrationStatus.Approved,
+            RegisteredAt = now
+        });
+        db.ChallengeFlags.Add(new AwdRoundChallengeFlag
         {
             Id = flagId,
             CompetitionChallengeId = competitionChallengeId,
+            TeamId = teamId,
             Flag = "flag{pause}",
             FlagSha256 = new byte[32],
             SpecificationKind = SpecificationKind.AwdRound,
@@ -481,7 +510,7 @@ public sealed class CompetitionLifecyclePersistenceTests
                 cancellationToken);
     }
 
-    private sealed class RecordingOutbox : ITransactionalMessageOutbox
+    private sealed class RecordingOutbox : IPostCommitMessagePublisher
     {
         public List<object> Published { get; } = [];
         public List<(object Message, DateTimeOffset At)> Scheduled { get; } = [];

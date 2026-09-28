@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using NoCTF.Application.Notifications;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
@@ -32,6 +33,8 @@ public sealed class NotificationReaderPersistenceTests
             var options = new DbContextOptionsBuilder<NoCtfDbContext>()
                 .UseNpgsql(postgres.GetConnectionString())
                 .UseSnakeCaseNamingConvention()
+                .ConfigureWarnings(warnings => warnings.Throw(
+                    RelationalEventId.MultipleCollectionIncludeWarning))
                 .Options;
             var now = DateTimeOffset.Parse("2026-08-08T12:00:00Z");
             var ids = new TestIds(now);
@@ -74,6 +77,14 @@ public sealed class NotificationReaderPersistenceTests
                     cancellationToken);
                 await Assert.That(competitionNotifications.Select(item => item.Id))
                     .IsEquivalentTo([ids.RootId, ids.FormerReplyId, ids.OwnerReplyId]);
+                var ownerInbox = await reader.ListAsync(
+                    ids.OwnerId, null, null, 10, NotificationReadScope.Inbox, cancellationToken);
+                await Assert.That(ownerInbox.Select(item => item.Id))
+                    .DoesNotContain(ids.OwnerReplyId);
+                var formerManagerInbox = await reader.ListAsync(
+                    ids.FormerManagerId, null, null, 10, NotificationReadScope.Inbox, cancellationToken);
+                await Assert.That(formerManagerInbox.Select(item => item.Id))
+                    .DoesNotContain(ids.FormerReplyId);
                 await Assert.That(competitionNotifications.Single(
                     item => item.Id == ids.RootId).SourceDisplayName)
                     .IsEqualTo("notification-asker");
@@ -128,7 +139,7 @@ public sealed class NotificationReaderPersistenceTests
 
             await using (var mutate = new NoCtfDbContext(options))
             {
-                var competition = await mutate.Competitions.SingleAsync(
+                var competition = await mutate.Competitions.AsSplitQuery().SingleAsync(
                     candidate => candidate.Id == ids.CompetitionId,
                     cancellationToken);
                 competition.ManagerIds = [ids.CurrentManagerId];
@@ -203,15 +214,14 @@ public sealed class NotificationReaderPersistenceTests
 
             await using (var append = new NoCtfDbContext(options))
             {
-                append.Notifications.Add(new Notification
+                append.Notifications.Add(new MessageNotification
                 {
                     Id = ids.CurrentReplyId,
                     SourceType = NotificationSourceType.User,
                     SourceId = ids.CurrentManagerId,
                     TargetType = NotificationTargetType.CompetitionCollaborators,
                     TargetId = ids.CompetitionId,
-                    Kind = NotificationKind.Message,
-                    ContentJson = """{"schemaVersion":1,"body":"current handler reply"}""",
+                    Body = "current handler reply",
                     RelatedType = EntityReferenceKind.Competition,
                     RelatedId = ids.CompetitionId,
                     ThreadRootId = ids.RootId,
@@ -278,14 +288,13 @@ public sealed class NotificationReaderPersistenceTests
             User(ids.FormerParticipantId, "notification-former-participant", UserRole.User, now),
             User(ids.NewParticipantId, "notification-new-participant", UserRole.User, now),
             User(ids.UnrelatedId, "notification-unrelated", UserRole.User, now));
-        db.Competitions.Add(new Competition
+        db.Competitions.Add(new CtfCompetition
         {
             Id = ids.CompetitionId,
             OwnerId = ids.OwnerId,
             ManagerIds = [ids.FormerManagerId],
             Title = "Notification reader",
-            Mode = GameMode.Ctf,
-            ConfigurationJson = """{"schemaVersion":1}""",
+            ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
             FlagDerivationSecret = new byte[32],
             StartAt = now.AddHours(-1),
             EndAt = now.AddHours(1),
@@ -305,70 +314,65 @@ public sealed class NotificationReaderPersistenceTests
             RegisteredAt = now
         });
         db.Notifications.AddRange(
-            new Notification
+            new QuestionOpenedNotification
             {
                 Id = ids.RootId,
                 SourceType = NotificationSourceType.User,
                 SourceId = ids.AskerId,
                 TargetType = NotificationTargetType.CompetitionCollaborators,
                 TargetId = ids.CompetitionId,
-                Kind = NotificationKind.QuestionOpened,
-                ContentJson = """{"schemaVersion":1,"title":"private question"}""",
+                Title = "private question",
                 RelatedType = EntityReferenceKind.Competition,
                 RelatedId = ids.CompetitionId,
                 SentAt = now.AddSeconds(1)
             },
-            new Notification
+            new MessageNotification
             {
                 Id = ids.FormerReplyId,
                 SourceType = NotificationSourceType.User,
                 SourceId = ids.FormerManagerId,
                 TargetType = NotificationTargetType.CompetitionCollaborators,
                 TargetId = ids.CompetitionId,
-                Kind = NotificationKind.Message,
-                ContentJson = """{"schemaVersion":1,"body":"former handler reply"}""",
+                Body = "former handler reply",
                 RelatedType = EntityReferenceKind.Competition,
                 RelatedId = ids.CompetitionId,
                 ThreadRootId = ids.RootId,
                 ReplyToId = ids.RootId,
                 SentAt = now.AddSeconds(2)
             },
-            new Notification
+            new MessageNotification
             {
                 Id = ids.OwnerReplyId,
                 SourceType = NotificationSourceType.User,
                 SourceId = ids.OwnerId,
                 TargetType = NotificationTargetType.CompetitionCollaborators,
                 TargetId = ids.CompetitionId,
-                Kind = NotificationKind.Message,
-                ContentJson = """{"schemaVersion":1,"body":"owner reply"}""",
+                Body = "owner reply",
                 RelatedType = EntityReferenceKind.Competition,
                 RelatedId = ids.CompetitionId,
                 ThreadRootId = ids.RootId,
                 ReplyToId = ids.RootId,
                 SentAt = now.AddSeconds(3)
             },
-            new Notification
+            new CompetitionAnnouncementNotification
             {
                 Id = ids.ParticipantAnnouncementId,
                 SourceType = NotificationSourceType.System,
                 TargetType = NotificationTargetType.CompetitionParticipants,
                 TargetId = ids.CompetitionId,
-                Kind = NotificationKind.CompetitionAnnouncement,
-                ContentJson = """{"schemaVersion":1,"body":"participant notice"}""",
+                Body = "participant notice",
                 RelatedType = EntityReferenceKind.Competition,
                 RelatedId = ids.CompetitionId,
                 SentAt = now.AddMilliseconds(500)
             },
-            new Notification
+            new CompetitionAnnouncementNotification
             {
                 Id = ids.ManualAnnouncementId,
                 SourceType = NotificationSourceType.User,
                 SourceId = ids.OwnerId,
                 TargetType = NotificationTargetType.CompetitionParticipants,
                 TargetId = ids.CompetitionId,
-                Kind = NotificationKind.CompetitionAnnouncement,
-                ContentJson = """{"schemaVersion":1,"body":"manual official notice"}""",
+                Body = "manual official notice",
                 RelatedType = EntityReferenceKind.Competition,
                 RelatedId = ids.CompetitionId,
                 SentAt = now.AddMilliseconds(600)

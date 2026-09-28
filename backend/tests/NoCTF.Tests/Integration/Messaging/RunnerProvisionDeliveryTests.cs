@@ -14,6 +14,7 @@ using NoCTF.Domain.Runtime;
 using NoCTF.Hosting;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Persistence.PostgreSql;
 using NoCTF.Runner;
 using NoCTF.Tests.Integration.Persistence;
 using NoCTF.Runner.Composition;
@@ -21,8 +22,6 @@ using NoCTF.Runner.Messages;
 using Testcontainers.PostgreSql;
 using Wolverine;
 using Wolverine.Nats;
-using Wolverine.Postgresql;
-using Wolverine.EntityFrameworkCore;
 
 namespace NoCTF.Tests.Integration.Messaging;
 
@@ -49,6 +48,7 @@ public sealed class RunnerProvisionDeliveryTests
             work.ReadProvisionStatusAsync(Arg.Any<IRuntimeProvisionMessage>(), Arg.Any<CancellationToken>())
                 .Returns(_ => { called.TrySetResult(); return Task.FromResult(RuntimeProvisionWorkStatus.AssignmentAbsent); });
             var capacity = Substitute.For<IRunnerCapacityGate>();
+            capacity.CanCreateAsync(Arg.Any<Guid>(), runnerId, Arg.Any<CancellationToken>()).Returns(true);
             var provider = new RuntimeProviderHandler(Substitute.For<IRuntimeProviderCatalog>(), [],
                 Options.Create(new RunnerOptions { Id = runnerId, Pool = "default", Provider = RuntimeProvider.Docker }), capacity, work);
             var probe = new ResultProbe();
@@ -57,16 +57,17 @@ public sealed class RunnerProvisionDeliveryTests
             var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Runner:Id"] = runnerId, ["Runner:Pool"] = "default", ["Runner:Provider"] = "Docker",
-                ["Runner:Capacity:MemoryBytes"] = "67108864", ["Runner:Capacity:NanoCpus"] = "100000000", ["Runner:Capacity:PidsLimit"] = "64",
                 ["Runner:Heartbeat:IntervalSeconds"] = "5", ["Runner:Heartbeat:TtlSeconds"] = "15",
                 ["RunnerScoring:CallbackBaseUrl"] = "http://127.0.0.1:8080", ["RunnerScoring:SigningKey"] = new string('x', 64),
-                ["ConnectionStrings:PostgreSql"] = postgres.GetConnectionString()
+                ["ConnectionStrings:PostgreSql"] = postgres.GetConnectionString(),
+                ["ConnectionStrings:Nats"] = $"nats://{nats.Hostname}:{nats.GetMappedPublicPort(4222)}"
             }).Build();
             using var host = Host.CreateDefaultBuilder()
                 .ConfigureServices(services =>
                 {
                     if (fullRegistration)
                     {
+                        services.AddNoCtfDatabaseProvider(configuration);
                         services.AddNoCtfStandaloneRunnerPersistence(configuration);
                         services.AddNoCtfRunner(configuration, development: true);
                         services.Replace(ServiceDescriptor.Singleton(work));
@@ -87,26 +88,23 @@ public sealed class RunnerProvisionDeliveryTests
                     }
                     options.Discovery.IncludeType(typeof(ProvisionResultHandler));
                     options.Discovery.IncludeType(typeof(RuntimeEventHandler));
-                    options.PersistMessagesWithPostgresql(postgres.GetConnectionString(), "runner_delivery_test");
-                    if (fullRegistration) options.UseEntityFrameworkCoreTransactions();
-                    options.AutoBuildMessageStorageOnStartup = AutoCreate.All;
                     options.UseNats($"nats://{nats.Hostname}:{nats.GetMappedPublicPort(4222)}").AutoProvision()
                         .UseJetStream(_ => { }).DefineWorkQueueStream(NatsSubjects.RunnerStream,
-                            stream => stream.WithSubject("noctf.runner.>"), "noctf.runner.>")
+                            stream => stream.WithSubject("noctf.v2.runner.>"), "noctf.v2.runner.>")
                         .DefineWorkQueueStream(NatsSubjects.EventsStream,
                             stream => stream.WithSubject(NatsSubjects.RealtimeEvents), NatsSubjects.RealtimeEvents);
                     options.PublishMessage<CompetitionEventCommitted>()
-                        .ToNatsSubject(NatsSubjects.RealtimeEvents).UseJetStream(NatsSubjects.EventsStream).UseDurableOutbox();
+                        .ToNatsSubject(NatsSubjects.RealtimeEvents).UseJetStream(NatsSubjects.EventsStream);
                     options.ListenToNatsSubject(NatsSubjects.RealtimeEvents)
-                        .UseJetStream(NatsSubjects.EventsStream, "delivery-event-test").UseDurableInbox();
-                    options.ListenToNatsSubject(subject).UseJetStream(NatsSubjects.RunnerStream, "delivery-test").UseDurableInbox();
+                        .UseJetStream(NatsSubjects.EventsStream, "delivery-event-test");
+                    options.ListenToNatsSubject(subject).UseJetStream(NatsSubjects.RunnerStream, "delivery-test");
                     options.Policies.Add(new NoCTF.Hosting.Messaging.DurableRunnerCommandPolicy());
                 }).Build();
             if (fullRegistration)
             {
-                await using var scope = host.Services.CreateAsyncScope();
-                await scope.ServiceProvider.GetRequiredService<NoCtfDbContext>().Database.EnsureCreatedAsync(ct);
-                var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
+                var factory = host.Services.GetRequiredService<IDbContextFactory<NoCtfDbContext>>();
+                await using var db = await factory.CreateDbContextAsync(ct);
+                await db.Database.EnsureCreatedAsync(ct);
                 await fixture.SeedAsync(db, ct);
                 var runtime = await db.RuntimeInstances.SingleAsync(x => x.Id == fixture.RuntimeIds[0], ct);
                 runtime.State = RuntimeState.Stopping;

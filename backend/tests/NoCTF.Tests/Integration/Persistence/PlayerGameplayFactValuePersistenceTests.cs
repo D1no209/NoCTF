@@ -40,7 +40,7 @@ public sealed class PlayerGameplayFactValuePersistenceTests
             await using var db = new NoCtfDbContext(options);
             var store = new GameplayFactManagementStore(
                 db,
-                Substitute.For<ITransactionalMessageOutbox>());
+                Substitute.For<IPostCommitMessagePublisher>());
 
             var ownFlag = await store.ReadPlayerValueAsync(
                 fixture.CompetitionId,
@@ -103,13 +103,12 @@ public sealed class PlayerGameplayFactValuePersistenceTests
             User(ownerId, "value-owner", UserRole.Organizer, now),
             User(teamMemberId, "value-member", UserRole.User, now),
             User(otherTeamMemberId, "value-other", UserRole.User, now));
-        db.Competitions.Add(new Competition
+        db.Competitions.Add(new CtfCompetition
         {
             Id = competitionId,
             OwnerId = ownerId,
             Title = "Player gameplay fact value",
-            Mode = GameMode.Ctf,
-            ConfigurationJson = """{"schemaVersion":2,"defaultScoreCurve":{"initialPoints":500,"minimumPoints":100,"decayTeamCount":10,"decayMode":2},"bloodRewards":[]}""",
+            ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
             FlagDerivationSecret = new byte[32],
             StartAt = now.AddMinutes(-5),
             EndAt = now.AddHours(1),
@@ -120,25 +119,24 @@ public sealed class PlayerGameplayFactValuePersistenceTests
         db.Teams.AddRange(
             Team(teamId, competitionId, teamMemberId, "Player Team", '1', now),
             Team(otherTeamId, competitionId, otherTeamMemberId, "Other Team", '2', now));
-        db.Challenges.Add(new Challenge
+        db.Challenges.Add(new CtfChallenge
         {
             Id = challengeId,
             OwnerId = ownerId,
-            Mode = GameMode.Ctf,
             Visibility = ChallengeVisibility.Private,
             Title = "Value challenge",
             Direction = "Web",
-            DefinitionJson = """{"schemaVersion":2}""",
+            Definition = TestConfigurations.Definition(GameMode.Ctf),
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.CompetitionChallenges.Add(new CompetitionChallenge
+        db.CompetitionChallenges.Add(new CtfCompetitionChallenge
         {
             Id = competitionChallengeId,
             CompetitionId = competitionId,
             ChallengeId = challengeId,
             IsPublished = true,
-            RulesJson = """{"schemaVersion":2}""",
+            Rules = TestConfigurations.Rules(GameMode.Ctf),
             UpdatedAt = now
         });
         db.GameplayFacts.AddRange(
@@ -204,22 +202,22 @@ public sealed class PlayerGameplayFactValuePersistenceTests
         Guid actorUserId,
         GameplayFactKind kind,
         string? value,
-        DateTimeOffset occurredAt) =>
-        new()
-        {
-            Id = id,
-            CompetitionId = competitionId,
-            CompetitionChallengeId = competitionChallengeId,
-            TeamId = teamId,
-            ActorUserId = actorUserId,
-            Kind = kind,
-            Value = value,
-            ValueSha256 = value is null ? null : SHA256.HashData(Encoding.UTF8.GetBytes(value)),
-            OccurredAt = occurredAt,
-            State = GameplayFactState.Completed,
-            Result = GameplayFactResult.Correct,
-            UpdatedAt = occurredAt
-        };
+        DateTimeOffset occurredAt)
+    {
+        var fact = GameplayFactGeneratedCatalog.Create(kind);
+        fact.Id = id;
+        fact.CompetitionId = competitionId;
+        fact.CompetitionChallengeId = competitionChallengeId;
+        fact.TeamId = teamId;
+        fact.ActorUserId = actorUserId;
+        fact.Value = value;
+        fact.ValueSha256 = value is null ? null : SHA256.HashData(Encoding.UTF8.GetBytes(value));
+        fact.OccurredAt = occurredAt;
+        fact.State = GameplayFactState.Completed;
+        fact.Result = GameplayFactResult.Correct;
+        fact.UpdatedAt = occurredAt;
+        return fact;
+    }
 
     private sealed record Fixture(
         Guid CompetitionId,

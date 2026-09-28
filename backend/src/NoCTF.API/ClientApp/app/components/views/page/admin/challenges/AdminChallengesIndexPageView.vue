@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminChallengesIndexPageViewState } from '~/features/routes/admin/challenges/useAdminChallengesIndexPage'
 
 const viewProps = defineProps<{ state: AdminChallengesIndexPageViewState }>()
-const { Plus, canOrganize, templates, loading, loadError, includeDeleted, createOpen, setCreateOpen, templateCreated, visibilityLabel, AdminDateTime, AdminGameModeBadge, ChallengeTemplateCreateDialog } = toRefs(viewProps.state)
+const { Plus, canOrganize, templates, filteredTemplates, search, directionFilter, directionOptions, loading, loadError, includeDeleted, createOpen, setCreateOpen, templateCreated, visibilityLabel, AdminDateTime, AdminGameModeBadge, ChallengeTemplateCreateDialog, page, pageCount, total, pageLimit, pageLoading, loadPage, setPageSize } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -20,9 +20,29 @@ const { Plus, canOrganize, templates, loading, loadError, includeDeleted, create
     </Alert>
 
     <template v-else>
-      <div class="flex items-center gap-2">
-        <Switch id="include-deleted" v-model="includeDeleted" />
-        <Label for="include-deleted">{{ $t('ui.showDeletedTemplates') }}</Label>
+      <div class="flex flex-wrap items-end gap-4">
+        <Field class="w-full sm:w-72">
+          <FieldLabel>{{ $t('ui.searchQuestionBankTemplates') }}</FieldLabel>
+          <Input v-model="search" :placeholder="$t('ui.searchQuestionBankTemplates')" />
+        </Field>
+        <Field class="w-full sm:w-56">
+          <FieldLabel>{{ $t('ui.category') }}</FieldLabel>
+          <Select v-model="directionFilter">
+            <SelectTrigger class="w-full"><SelectValue /></SelectTrigger>
+            <SelectContent position="popper">
+              <SelectGroup>
+                <SelectItem value="all">{{ $t('ui.allDirections') }}</SelectItem>
+                <SelectItem v-for="option in directionOptions" :key="option.value" :value="option.value!">
+                  {{ option.label }}
+                </SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </Field>
+        <div class="flex h-10 items-center gap-2">
+          <Switch id="include-deleted" v-model="includeDeleted" />
+          <Label for="include-deleted">{{ $t('ui.showDeletedTemplates') }}</Label>
+        </div>
       </div>
 
       <Alert v-if="loadError" variant="destructive">
@@ -35,7 +55,7 @@ const { Plus, canOrganize, templates, loading, loadError, includeDeleted, create
         </CardContent>
       </Card>
 
-      <Empty v-else-if="templates.length === 0 && !loadError">
+      <Empty v-else-if="filteredTemplates.length === 0 && !loadError">
         <EmptyHeader>
           <EmptyTitle>{{ $t('ui.noQuestionTemplateYet') }}</EmptyTitle>
           <EmptyDescription>{{ $t('ui.clickNewTemplateInTheUpperRightCornerToCreate') }}</EmptyDescription>
@@ -56,14 +76,17 @@ const { Plus, canOrganize, templates, loading, loadError, includeDeleted, create
             </TableRow>
           </TableHeader>
           <TableBody>
-            <TableRow v-for="template in templates" :key="template.id">
+            <TableRow v-for="template in filteredTemplates" :key="template.id">
               <TableCell>
-                <NuxtLink :to="`/admin/challenges/${template.id}`" class="font-medium hover:underline">
+                <NuxtLink :to="`/admin/challenges/${template.id}`" prefetch-on="interaction" class="font-medium hover:underline">
                   {{ template.title }}
                 </NuxtLink>
               </TableCell>
               <TableCell>
                 <component :is="AdminGameModeBadge" :mode="template.mode" />
+                <Badge v-if="template.interactionKind === 'PatchVerification'" variant="secondary" class="ml-2">
+                  {{ $t('ui.patchVerification') }}
+                </Badge>
               </TableCell>
               <TableCell>{{ directionLabel(template.direction) }}</TableCell>
               <TableCell>
@@ -81,6 +104,17 @@ const { Plus, canOrganize, templates, loading, loadError, includeDeleted, create
           </TableBody>
         </Table>
       </Card>
+
+      <OffsetPagination
+        v-if="filteredTemplates.length > 0 || total > 0"
+        :page="page"
+        :page-count="pageCount"
+        :total="total"
+        :limit="pageLimit"
+        :loading="pageLoading"
+        @update:page="loadPage"
+        @update:limit="setPageSize"
+      />
     </template>
 
     <component

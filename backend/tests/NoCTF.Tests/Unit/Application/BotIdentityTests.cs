@@ -19,7 +19,10 @@ public sealed class BotIdentityTests
     }
 
     [Test]
-    public async Task CreateBot_AcceptsLeastPrivilegeNotificationRelayRole()
+    [Arguments(UserRole.User)]
+    [Arguments(UserRole.Organizer)]
+    [Arguments(UserRole.Administrator)]
+    public async Task CreateBot_AcceptsEveryDefinedRole(UserRole role)
     {
         var store = Substitute.For<IPlatformAdministrationStore>();
         store.CreateBotAsync(
@@ -34,33 +37,15 @@ public sealed class BotIdentityTests
 
         var result = await platform.CreateBotAsync(
             "repository-bot",
-            UserRole.User,
+            role,
             DateTimeOffset.UtcNow);
 
         await Assert.That(result.State).IsNotEqualTo(CreateBotState.InvalidRole);
         await store.Received(1).CreateBotAsync(
             "repository-bot",
-            UserRole.User,
+            role,
             Arg.Any<DateTimeOffset>(),
             Arg.Any<CancellationToken>());
-    }
-
-    [Test]
-    public async Task CreateBot_RejectsAdministratorRole()
-    {
-        var store = Substitute.For<IPlatformAdministrationStore>();
-        var platform = new ManagePlatform(
-            store,
-            Substitute.For<IAccessTokenIssuer>());
-
-        var result = await platform.CreateBotAsync(
-            "administrator-bot",
-            UserRole.Administrator,
-            DateTimeOffset.UtcNow);
-
-        await Assert.That(result.State).IsEqualTo(CreateBotState.InvalidRole);
-        await store.DidNotReceiveWithAnyArgs()
-            .CreateBotAsync(default!, default, default, default);
     }
 
     [Test]
@@ -76,9 +61,7 @@ public sealed class BotIdentityTests
 
         var result = await platform.IssueUserTokenAsync(
             Guid.NewGuid(),
-            Guid.NewGuid(),
             expiresInSeconds,
-            "support investigation",
             DateTimeOffset.UtcNow);
 
         await Assert.That(result.Failure)
@@ -108,9 +91,7 @@ public sealed class BotIdentityTests
 
         var result = await platform.IssueUserTokenAsync(
             userId,
-            Guid.NewGuid(),
             3600,
-            "support investigation",
             now);
 
         await Assert.That(result.Failure)
@@ -122,12 +103,11 @@ public sealed class BotIdentityTests
     [Arguments(UserKind.Human, UserRole.User)]
     [Arguments(UserKind.Bot, UserRole.Organizer)]
     [Arguments(UserKind.Human, UserRole.Administrator)]
-    public async Task IssueUserToken_AcceptsEveryActiveTargetAndPersistsTrimmedAuditBeforeReturning(
+    public async Task IssueUserToken_AcceptsEveryActiveTargetAsAnOrdinaryAccessToken(
         UserKind kind,
         UserRole role)
     {
         var userId = Guid.NewGuid();
-        var actorId = Guid.NewGuid();
         var jwtId = Guid.NewGuid();
         var now = DateTimeOffset.Parse("2026-09-12T01:00:00Z");
         var user = new PlatformUserView(
@@ -147,16 +127,13 @@ public sealed class BotIdentityTests
         issuer.Issue(
                 Arg.Any<AuthenticatedUser>(),
                 now,
-                TimeSpan.FromHours(1),
-                actorId)
+                TimeSpan.FromHours(1))
             .Returns(new IssuedAccessToken("token", now.AddHours(1), jwtId));
         var platform = new ManagePlatform(store, issuer);
 
         var result = await platform.IssueUserTokenAsync(
             userId,
-            actorId,
             3600,
-            "  support case  ",
             now);
 
         await Assert.That(result.Failure).IsEqualTo(IssuePlatformUserTokenFailure.None);
@@ -170,78 +147,6 @@ public sealed class BotIdentityTests
                 && target.TokenVersion == 6
                 && !target.EmailVerified),
             now,
-            TimeSpan.FromHours(1),
-            actorId);
-        await store.Received(1).RecordTokenIssuedAsync(
-            actorId,
-            Arg.Is<PlatformUserTokenAuditFact>(fact =>
-                fact != null
-                && fact.TargetUserId == userId
-                && fact.Action == PlatformUserTokenAdministrationAction.AccessTokenIssued
-                && fact.JwtId == jwtId
-                && fact.Reason == "support case"
-                && fact.TokenVersion == 6),
-            now,
-            Arg.Any<CancellationToken>());
-    }
-
-    [Test]
-    public async Task IssueUserToken_RejectsBlankReasonBeforeReadingAccount()
-    {
-        var store = Substitute.For<IPlatformAdministrationStore>();
-        var platform = new ManagePlatform(store, Substitute.For<IAccessTokenIssuer>());
-
-        var result = await platform.IssueUserTokenAsync(
-            Guid.NewGuid(),
-            Guid.NewGuid(),
-            3600,
-            " ",
-            DateTimeOffset.UtcNow);
-
-        await Assert.That(result.Failure)
-            .IsEqualTo(IssuePlatformUserTokenFailure.ReasonInvalid);
-        await store.DidNotReceiveWithAnyArgs().FindUserAsync(default, default);
-    }
-
-    [Test]
-    public async Task IssueUserToken_DoesNotReturnWhenPermanentAuditFails()
-    {
-        var userId = Guid.NewGuid();
-        var actorId = Guid.NewGuid();
-        var now = DateTimeOffset.UtcNow;
-        var store = Substitute.For<IPlatformAdministrationStore>();
-        store.FindUserAsync(userId, Arg.Any<CancellationToken>()).Returns(new PlatformUserView(
-            userId,
-            "target",
-            "target@example.test",
-            UserKind.Human,
-            UserRole.User,
-            UserAccountStatus.Active,
-            0,
-            true,
-            now,
-            now));
-        store.RecordTokenIssuedAsync(
-                actorId,
-                Arg.Any<PlatformUserTokenAuditFact>(),
-                now,
-                Arg.Any<CancellationToken>())
-            .Returns<Task>(_ => throw new InvalidOperationException("audit unavailable"));
-        var issuer = Substitute.For<IAccessTokenIssuer>();
-        issuer.Issue(
-                Arg.Any<AuthenticatedUser>(),
-                now,
-                TimeSpan.FromHours(1),
-                actorId)
-            .Returns(new IssuedAccessToken("not-returned", now.AddHours(1), Guid.NewGuid()));
-        var platform = new ManagePlatform(store, issuer);
-
-        await Assert.That(async () => await platform.IssueUserTokenAsync(
-                userId,
-                actorId,
-                3600,
-                "support case",
-                now))
-            .Throws<InvalidOperationException>();
+            TimeSpan.FromHours(1));
     }
 }

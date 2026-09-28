@@ -12,7 +12,10 @@ public sealed class AwdpTargetDefinitionFactoryTests
         var operationId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var template = new ChallengeRuntimeTemplate(
             RuntimeAllocation.PerTeam,
-            new ContainerRuntimeDefinition("target:latest", InternalPorts: [8080]));
+            new ContainerRuntimeDefinition(
+                "target:latest",
+                Security: ContainerSecurityPolicy.Default,
+                InternalPorts: [8080]));
 
         var definition = AwdpTargetDefinitionFactory.Create(
             operationId,
@@ -53,7 +56,14 @@ public sealed class AwdpTargetDefinitionFactoryTests
             RuntimeProvider.Docker,
             DateTimeOffset.UtcNow);
 
-        await Assert.That(definition.Security).IsEqualTo(expected);
+        await Assert.That(definition.Security.NoNewPrivileges)
+            .IsEqualTo(expected.NoNewPrivileges);
+        await Assert.That(definition.Security.ReadonlyRootfs)
+            .IsEqualTo(expected.ReadonlyRootfs);
+        await Assert.That(definition.Security.RunAsNonRoot)
+            .IsEqualTo(expected.RunAsNonRoot);
+        await Assert.That(definition.Security.CapDrop).IsEquivalentTo(expected.CapDrop);
+        await Assert.That(definition.Security.CapAdd).IsEquivalentTo(expected.CapAdd);
     }
 
     [Test]
@@ -63,7 +73,9 @@ public sealed class AwdpTargetDefinitionFactoryTests
     {
         ChallengeRuntimeDefinition definition = kind switch
         {
-            RuntimeKind.Container => new ContainerRuntimeDefinition("target:latest"),
+            RuntimeKind.Container => new ContainerRuntimeDefinition(
+                "target:latest",
+                ContainerSecurityPolicy.Default),
             RuntimeKind.Compose => new ComposeRuntimeDefinition(
                 "services:\n  target:\n    image: target:latest",
                 new Dictionary<string, RuntimeResourceLimits>

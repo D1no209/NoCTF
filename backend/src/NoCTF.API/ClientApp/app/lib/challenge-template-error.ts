@@ -6,7 +6,6 @@ const definitionDiagnostics: Record<string, string> = {
   'Runtime image cannot exceed 512 characters.': "ui.containerImageCannotExceed512Characters",
   'Runtime internal ports must be between 1 and 65535.': "ui.internalPortsMustBeIntegersBetween1And65535",
   'Runtime internal ports cannot contain duplicates.': "ui.internalPortsCannotContainDuplicates",
-  'Runtime security must drop all capabilities.': "ui.capDropAll",
   'Runtime TtlSeconds must be between 1 and 604800 when configured.': "ui.runtimeLifetimeMustBeBetween1And604800Seconds",
   'Runtime OperationTimeoutSeconds must be between 1 and 300 when configured.': "ui.runtimeOperationTimeoutMustBeBetween1And300Seconds",
   'Runtime resource limits are required.': "ui.message4",
@@ -20,7 +19,10 @@ const definitionDiagnostics: Record<string, string> = {
   'PerTeam Container runtimes require FlagEnvironmentVariableName.': "ui.perTeamFlagsRequireAFlagEnvironmentVariableName",
   'Flag environment variables cannot use the NOCTF_ prefix.': "ui.theFlagEnvironmentVariableNameCannotUseTheNoctfPrefix",
   'CTF runtimes must use PerTeam allocation.': "ui.ctfRuntimesMustUsePerTeamAllocation",
-  'CTF runtimes must use PerTeam flags injected into the runtime environment.': "ui.ctfContainerChallengesMustUsePerTeamFlags",
+  'CTF runtimes support only Static or PerTeam flags.': "ui.ctfContainerChallengesMustUsePerTeamFlags",
+  'CTF PatchVerification runtimes cannot inject flags.': "ui.ctfPatchVerificationRuntimesCannotInjectFlags",
+  'CTF PatchVerification requires a Docker or Kubernetes Container runtime.': "ui.ctfPatchVerificationOnlySupportsSingleContainerRuntimes",
+  'CTF PatchVerification Runtime must declare exactly one InternalPort.': "ui.ctfPatchVerificationRequiresExactlyOneInternalPort",
   'CTF runtime URL bindings must use OwnerOnly exposure.': "ui.ctfAccessUrlsMustBeVisibleOnlyToTheirOwning",
   'AWD runtimes must use PerTeam allocation.': "ui.awdRuntimesMustUsePerTeamAllocation",
   'AWD runtimes must use AwdRotation flags.': "ui.awdRuntimesMustUseRotatingFlags",
@@ -50,6 +52,7 @@ const definitionDiagnostics: Record<string, string> = {
   'ReadyTimeoutSeconds must be positive when configured.': "ui.readyTimeoutMustBePositive",
   'ReadyTimeoutSeconds must be positive.': "ui.readyTimeoutMustBePositive",
   'ReadyTimeoutSeconds cannot exceed Checker.TimeoutSeconds.': "ui.theReadinessTimeoutCannotExceedTheCheckerTimeout",
+  'PatchVerification execution budget must remain below the handler timeout.': "ui.theTotalFixExecutionBudgetMustRemainBelowTheDedicated",
   'PatchCommand cannot contain more than 64 arguments.': "ui.thePatchCommandCanContainAtMost64Arguments",
   'PatchCommand cannot contain blank arguments.': "ui.thePatchCommandCannotContainBlankArguments",
   'PatchCommand arguments cannot exceed 4096 characters.': "ui.eachPatchCommandArgumentCanContainAtMost4096Characters",
@@ -68,7 +71,7 @@ function splitDiagnostics(message: string): string[] {
 function localizeDiagnostic(message: string): string {
   const direct = definitionDiagnostics[message]
   if (direct) return translate(direct)
-  if (/definition|schemaVersion|JSON/i.test(message))
+  if (/definition/i.test(message))
     return translate("ui.theChallengeDefinitionVersionOrJsonFormatIsInvalid")
   if (currentLocale() === 'en') return message
   return translate("ui.theServerReturnedAnUnrecognizedValidationReason", { reason: message })

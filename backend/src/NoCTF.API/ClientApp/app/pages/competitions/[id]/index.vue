@@ -1,9 +1,7 @@
 <script setup lang="ts">
-definePageMeta({
-  redirect: route => ({ path: '/competitions', query: { ...route.query, competition: route.params.id } }),
-})
+import Feature from '~/features/routes/competitions/CompetitionsIndexPage.vue'
 </script>
 
 <template>
-  <NuxtPage />
+  <Feature><slot /></Feature>
 </template>

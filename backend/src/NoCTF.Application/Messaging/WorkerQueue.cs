@@ -5,7 +5,8 @@ public enum WorkerQueue
     Control,
     Gameplay,
     Projection,
-    Background
+    Background,
+    Webhook
 }
 
 public static class WorkerQueueNames
@@ -14,13 +15,15 @@ public static class WorkerQueueNames
     public const string Gameplay = "noctf-gameplay";
     public const string Projection = "noctf-projection";
     public const string Background = "noctf-background";
+    public const string Webhook = "noctf-webhook";
 
     public static readonly IReadOnlyList<WorkerQueue> All =
     [
         WorkerQueue.Control,
         WorkerQueue.Gameplay,
         WorkerQueue.Projection,
-        WorkerQueue.Background
+        WorkerQueue.Background,
+        WorkerQueue.Webhook
     ];
 
     public static string GetName(WorkerQueue queue) => queue switch
@@ -29,6 +32,7 @@ public static class WorkerQueueNames
         WorkerQueue.Gameplay => Gameplay,
         WorkerQueue.Projection => Projection,
         WorkerQueue.Background => Background,
+        WorkerQueue.Webhook => Webhook,
         _ => throw new ArgumentOutOfRangeException(nameof(queue), queue, null)
     };
 }
@@ -37,6 +41,7 @@ public static class CompetitionEventFanoutQueueNames
 {
     public const string Realtime = "noctf-competition-events-realtime";
     public const string Leaderboard = "noctf-competition-events-leaderboard";
+    public const string Webhook = "noctf-competition-events-webhook";
 
-    public static readonly IReadOnlyList<string> All = [Realtime, Leaderboard];
+    public static readonly IReadOnlyList<string> All = [Realtime, Leaderboard, Webhook];
 }

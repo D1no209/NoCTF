@@ -19,6 +19,7 @@ export function useScoreboardTeamDetailDialog(props: Readonly<{
   trendError?: string | null
   trendRangeStart?: string | null
   trendRangeEnd?: string | null
+  trendRevision?: string | number | null
 }>,
 emit: { (event: "retryTrends", ...args: []): void },
 open: Ref<boolean>) {
@@ -41,28 +42,25 @@ open: Ref<boolean>) {
       : 0
   }
 
+  const memberContributionRows = computed(() => memberContributionSlices.value.map((slice, index) => ({
+    ...slice,
+    percent: memberContributionPercent(slice.value),
+    color: `var(--chart-${index % 10 + 1})`,
+  })))
+
   const memberContributionPieOption = computed<echarts.EChartsCoreOption>(() => ({
     tooltip: {
       trigger: 'item',
       formatter: '{b}<br/>{c} pts · {d}%',
     },
-    legend: {
-      type: 'scroll',
-      bottom: 0,
-      left: 'center',
-    },
+    legend: { show: false },
     series: [{
       type: 'pie',
       radius: ['38%', '68%'],
-      center: ['50%', '43%'],
-      avoidLabelOverlap: true,
+      center: ['50%', '50%'],
       minAngle: 4,
-      label: {
-        formatter: '{b}\n{c} pts · {d}%',
-        fontSize: 11,
-        lineHeight: 16,
-      },
-      labelLine: { length: 12, length2: 8 },
+      label: { show: false },
+      labelLine: { show: false },
       data: memberContributionSlices.value,
     }],
   }))
@@ -180,6 +178,7 @@ open: Ref<boolean>) {
       scoreLabel,
       memberContributionSlices,
       memberContributionPercent,
+      memberContributionRows,
       memberContributionPieOption,
       rows,
       directionGroups,

@@ -9,6 +9,7 @@ using NoCTF.Domain.Runtime;
 using NoCTF.GameModes.Registration;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Application.Commands.Idempotency;
+using NoCTF.Domain.Commands;
 
 namespace NoCTF.Infrastructure.Challenges.Testing;
 
@@ -16,7 +17,7 @@ public sealed class ChallengeTestRuntimeStore(
     NoCtfDbContext db,
     IChallengeRuntimeTemplateCatalog templates,
     IRuntimePlacementPolicy placementPolicy,
-    ITransactionalMessageOutbox outbox,
+    IPostCommitMessagePublisher outbox,
     IRequestReplay? replay = null) : IChallengeTestRuntimeStore
 {
     public async Task<ChallengeTestRuntimeView?> FindAsync(
@@ -58,7 +59,7 @@ public sealed class ChallengeTestRuntimeStore(
 
         var prior = replay is null ? null : await replay.FindAsync<RuntimeCommandReceipt>(
             new(command.ActorUserId, ReplayOperation.TemplateTestRuntimeMutation, Guid.Empty, command.ChallengeId),
-            new { command.Action, command.Extension }, cancellationToken);
+            new RuntimeReplayFingerprint(command.Action, command.Extension), cancellationToken);
         if (prior is not null)
         {
             var original = await db.RuntimeInstances.AsNoTracking().SingleOrDefaultAsync(item => item.Id == prior.RuntimeInstanceId, cancellationToken);
@@ -79,7 +80,7 @@ public sealed class ChallengeTestRuntimeStore(
         {
             try
             {
-                template = templates.Get(challenge.Mode, challenge.DefinitionJson);
+                template = templates.Get(challenge.Definition);
                 if (template is null
                     || template.RuntimeKind is not RuntimeKind.Container and not RuntimeKind.Compose)
                 {
@@ -88,10 +89,12 @@ public sealed class ChallengeTestRuntimeStore(
                 newRuntimeInstanceId = Guid.CreateVersion7(command.Now);
                 newFlagPlan = ChallengeTestFlagFactory.Create(
                     challenge.Mode,
-                    challenge.DefinitionJson,
                     template,
                     challenge.Id,
-                    newRuntimeInstanceId.Value);
+                    newRuntimeInstanceId.Value,
+                    challenge.Definition?.HasFlagTemplate == true
+                        ? challenge.Definition.FlagTemplate
+                        : null);
             }
             catch (Exception exception) when (exception is InvalidOperationException
                 or GameModeConfigurationException
@@ -143,10 +146,11 @@ public sealed class ChallengeTestRuntimeStore(
                 {
                     return new(null, RuntimeMutationFailure.InvalidState);
                 }
-                var remaining = current.ExpiresAt.Value - command.Now;
-                if (remaining <= TimeSpan.Zero || remaining >= TimeSpan.FromMinutes(10))
+                var extendedExpiry = RuntimeExtensionPolicy.CalculateExpiry(
+                    current.ExpiresAt, command.Now, command.Extension);
+                if (extendedExpiry is null)
                     return new(null, RuntimeMutationFailure.InvalidState);
-                current.ExpiresAt = command.Now.Add(command.Extension.Value);
+                current.ExpiresAt = extendedExpiry;
                 entity = current;
                 break;
             default:
@@ -178,7 +182,7 @@ public sealed class ChallengeTestRuntimeStore(
     {
         if (flagPlan.Flag is { } flag)
         {
-            db.ChallengeFlags.Add(new ChallengeFlag
+            db.ChallengeFlags.Add(new RuntimeInstanceChallengeFlag
             {
                 Id = Guid.CreateVersion7(now),
                 ChallengeId = challenge.Id,
@@ -192,11 +196,11 @@ public sealed class ChallengeTestRuntimeStore(
         }
 
         var placement = placementPolicy.Resolve(template.RuntimeKind);
-        var entity = new RuntimeInstance
+        var entity = new TemplateTestRuntimeInstance
         {
             Id = runtimeInstanceId,
             ChallengeId = challenge.Id,
-            Purpose = RuntimePurpose.TemplateTest,
+            AccessMode = RuntimeAccessMode.DirectAndWsrx,
             TestFlagDelivery = flagPlan.Delivery,
             TestFlagState = flagPlan.InitialState,
             RuntimeKind = template.RuntimeKind,
@@ -217,7 +221,7 @@ public sealed class ChallengeTestRuntimeStore(
         await EndPendingFlagAsync(runtime, RuntimeTestFlagState.Canceled, now, cancellationToken);
         if (runtime.State == RuntimeState.Queued
             && runtime.RunnerId is null
-            && string.IsNullOrWhiteSpace(runtime.ProviderReceiptJson))
+            && runtime.ProviderReceipt is null)
         {
             runtime.State = RuntimeState.Stopped;
             runtime.StoppedAt = now;
@@ -289,7 +293,7 @@ public sealed class ChallengeTestRuntimeStore(
             challenge.Id == challengeId
             && (isAdministrator
                 || challenge.OwnerId == actorUserId
-                || challenge.ManagerIds.Contains(actorUserId)),
+                || challenge.Managers.Any(manager => manager.UserId == actorUserId)),
             cancellationToken);
 
     private static bool CanManage(
@@ -298,7 +302,7 @@ public sealed class ChallengeTestRuntimeStore(
         bool isAdministrator) =>
         isAdministrator
         || challenge.OwnerId == actorUserId
-        || challenge.ManagerIds.Contains(actorUserId);
+        || challenge.Managers.Any(manager => manager.UserId == actorUserId);
 
     private async Task<ChallengeTestRuntimeView> MapAsync(
         RuntimeInstance runtime,
@@ -324,11 +328,17 @@ public sealed class ChallengeTestRuntimeStore(
             runtime.TestFlagDelivery ?? RuntimeTestFlagDelivery.NotRequired,
             runtime.TestFlagState ?? RuntimeTestFlagState.NotRequired,
             testFlag,
-            runtime.State == RuntimeState.Running ? runtime.Urls : [],
             runtime.CreatedAt,
             runtime.RunningAt,
             runtime.ExpiresAt,
-            runtime.StoppedAt);
+            runtime.StoppedAt,
+            runtime.AccessMode,
+            runtime.AccessEndpoints.OrderBy(endpoint => endpoint.BindingIndex)
+                .Select(endpoint => new RuntimeAccessEndpointView(
+                    endpoint.BindingIndex,
+                    endpoint.DirectAddress,
+                    endpoint.TargetHost,
+                    endpoint.TargetPort)).ToArray());
     }
 
     private static bool IsRunningOrStarting(RuntimeState state) =>

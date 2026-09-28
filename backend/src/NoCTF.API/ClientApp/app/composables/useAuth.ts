@@ -3,14 +3,15 @@ import {
   loginEndpoint,
   logoutAllEndpoint,
   logoutEndpoint,
+  authenticationSsoCompleteLogin,
 } from '../api'
 import type { NoCtfapiEndpointsAuthenticationCurrentUserResponse } from '../api'
 import {
   beginImpersonationAccessToken,
   clearImpersonationAccessToken,
   getAccessToken,
-  refreshAdministratorSession,
   refreshSession,
+  restoreImpersonationAccessToken,
   setAccessToken,
 } from '../lib/session'
 
@@ -106,6 +107,17 @@ export function useAuth() {
     await navigateTo('/auth/login')
   }
 
+  async function completeSsoLogin(flowId: string): Promise<string> {
+    const { data, error } = await authenticationSsoCompleteLogin({
+      path: { flowId },
+    })
+    if (error || !data?.accessToken)
+      throw parseApiError(error)
+    setAccessToken(data.accessToken)
+    await fetchMe()
+    return data.returnPath ?? '/'
+  }
+
   async function startImpersonation(input: {
     accessToken: string
     expiresAt: string
@@ -116,6 +128,10 @@ export function useAuth() {
     const administrator = user.value
     if (!administrator?.userId || administrator.role !== 'Administrator')
       throw new Error(translate("ui.administratorSessionRequired"))
+    if (impersonation.value)
+      throw new Error(translate("ui.identitySwitchAlreadyActive"))
+    if (!beginImpersonationAccessToken(input.accessToken, input.expiresAt))
+      throw new Error(translate("ui.administratorSessionRequired"))
     impersonation.value = {
       administratorUserId: administrator.userId,
       administratorUserName: administrator.userName ?? administrator.userId,
@@ -124,7 +140,6 @@ export function useAuth() {
       expiresAt: input.expiresAt,
       returnPath: input.returnPath,
     }
-    beginImpersonationAccessToken(input.accessToken, input.expiresAt)
     await fetchMe()
     if (user.value?.userId !== input.targetUserId) {
       await endImpersonation()
@@ -138,11 +153,10 @@ export function useAuth() {
       const active = impersonation.value
       if (!active) return
       impersonationEnding.value = true
-      clearImpersonationAccessToken()
-      const restored = await refreshAdministratorSession()
-      if (restored) await fetchMe()
-      const administratorRestored = restored
-        && user.value?.userId === active.administratorUserId
+      const restoredToken = restoreImpersonationAccessToken()
+      if (restoredToken) await fetchMe()
+      else if (await refreshSession()) await fetchMe()
+      const administratorRestored = user.value?.userId === active.administratorUserId
         && user.value.role === 'Administrator'
       impersonation.value = null
       if (!administratorRestored) {
@@ -169,6 +183,7 @@ export function useAuth() {
     invalidate,
     restore,
     login,
+    completeSsoLogin,
     logout,
     logoutAll,
     fetchMe,

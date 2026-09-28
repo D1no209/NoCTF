@@ -100,7 +100,13 @@ public enum PlatformAdministrationAction : short
     AuditArchiveExported,
     UserAccessTokenIssued,
     UserAccessTokenRevoked,
-    UserTokensInvalidated
+    UserTokensInvalidated,
+    SsoGlobalConfigurationUpdated,
+    SsoProviderCreated,
+    SsoProviderUpdated,
+    SsoProviderSecretReplaced,
+    SsoExternalIdentityBound,
+    SsoExternalIdentityUnbound
 }
 
 public sealed record PlatformAuditView(

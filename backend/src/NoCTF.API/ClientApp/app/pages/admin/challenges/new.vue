@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import Feature from '~/features/routes/admin/challenges/AdminChallengesIndexPage.vue'
-definePageMeta({ middleware: 'auth' })
+definePageMeta({ middleware: 'organizer' })
 </script>
 
 <template>

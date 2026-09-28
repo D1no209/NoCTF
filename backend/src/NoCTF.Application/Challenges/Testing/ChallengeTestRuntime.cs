@@ -13,11 +13,12 @@ public sealed record ChallengeTestRuntimeView(
     RuntimeTestFlagDelivery FlagDelivery,
     RuntimeTestFlagState FlagState,
     string? TestFlag,
-    IReadOnlyList<string> Urls,
     DateTimeOffset CreatedAt,
     DateTimeOffset? RunningAt,
     DateTimeOffset? ExpiresAt,
-    DateTimeOffset? StoppedAt);
+    DateTimeOffset? StoppedAt,
+    RuntimeAccessMode AccessMode = RuntimeAccessMode.Direct,
+    IReadOnlyList<RuntimeAccessEndpointView>? AccessEndpoints = null);
 
 public sealed record ChallengeTestRuntimeCommand(
     Guid ChallengeId,

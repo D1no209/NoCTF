@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AuthLoginPageViewState } from '~/features/routes/auth/useAuthLoginPage'
 
 const viewProps = defineProps<{ state: AuthLoginPageViewState }>()
-const { loginCharacter, registerCharacter, configuration, loginName, password, error, pending, submit } = toRefs(viewProps.state)
+const { authArtwork, configuration, loginName, password, error, pending, capVerification, capCanRetry, submitDisabled, submit, ssoProviders, ssoLoading, ssoPendingId, beginSso } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -17,8 +17,7 @@ const { loginCharacter, registerCharacter, configuration, loginName, password, e
       <p v-if="configuration?.description" class="text-sm text-muted-foreground">{{ configuration.description }}</p>
     </div>
     <Card class="auth-card">
-      <img data-slot="auth-character-cutout" data-theme-character="dark" data-corner="left-bottom" :src="loginCharacter" alt="" aria-hidden="true">
-      <img data-slot="auth-character-cutout" data-theme-character="light" data-corner="right-top" :src="registerCharacter" alt="" aria-hidden="true">
+      <img v-if="authArtwork" data-slot="auth-character-cutout" :data-corner="authArtwork.corner" :src="authArtwork.src" :width="authArtwork.width" :height="authArtwork.height" decoding="async" alt="" aria-hidden="true">
       <CardHeader class="relative z-10 pt-3">
         <CardTitle class="text-xl font-semibold">{{ $t('ui.signIn') }}</CardTitle>
       </CardHeader>
@@ -40,13 +39,53 @@ const { loginCharacter, registerCharacter, configuration, loginName, password, e
               </FieldDescription>
             </Field>
             <Field>
-              <Button type="submit" :disabled="pending" class="w-full sm:mx-auto sm:w-2/3">
-                <Spinner v-if="pending" data-icon="inline-start" />
-                {{ $t('ui.signIn') }}
+              <CapVerificationStatus
+                v-if="capVerification"
+                :key="capVerification.id"
+                :state="capVerification.state"
+                :progress="capVerification.progress"
+                :label="capVerification.label"
+              />
+              <Button type="submit" :disabled="submitDisabled" class="w-full sm:mx-auto sm:w-2/3">
+                <Spinner v-if="pending && !capCanRetry" data-icon="inline-start" />
+                {{ capCanRetry ? $t('ui.retry') : $t('ui.signIn') }}
               </Button>
             </Field>
           </FieldGroup>
         </UiForm>
+        <template v-if="ssoLoading || ssoProviders.length">
+          <div class="my-5 flex items-center gap-3" aria-hidden="true">
+            <Separator class="flex-1" />
+            <span class="text-xs text-muted-foreground">{{ $t('sso.orUseSingleSignOn') }}</span>
+            <Separator class="flex-1" />
+          </div>
+          <div class="flex flex-col gap-2">
+            <Skeleton v-if="ssoLoading" class="h-10 w-full" />
+            <template v-else>
+              <Button
+                v-for="provider in ssoProviders"
+                :key="provider.id"
+                type="button"
+                variant="outline"
+                class="w-full"
+                :disabled="Boolean(ssoPendingId)"
+                @click="provider.id && beginSso(provider.id)"
+              >
+                <Spinner v-if="ssoPendingId === provider.id" data-icon="inline-start" />
+                <img
+                  v-else-if="provider.iconUrl"
+                  :src="provider.iconUrl"
+                  class="size-5 shrink-0 object-contain"
+                  alt=""
+                  aria-hidden="true"
+                  decoding="async"
+                  referrerpolicy="no-referrer"
+                >
+                {{ $t('sso.continueWith', { provider: provider.name ?? '' }) }}
+              </Button>
+            </template>
+          </div>
+        </template>
       </CardContent>
       <CardFooter class="relative z-10 justify-center text-sm text-muted-foreground">
         {{ $t('ui.donTHaveAnAccountYet') }}
@@ -55,3 +94,5 @@ const { loginCharacter, registerCharacter, configuration, loginName, password, e
     </Card>
   </div>
 </template>
+
+<style src="./auth-artwork.css"></style>

@@ -40,7 +40,7 @@ internal static partial class BackendMessageOperations
         AdvanceCompetitionLifecycle message,
         CompetitionLifecycleAdvancer advancer,
         NoCtfDbContext db,
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         CancellationToken cancellationToken)
     {
         _ = await ExecuteCompetitionLifecycleAsync(
@@ -55,7 +55,7 @@ internal static partial class BackendMessageOperations
         AdvanceCompetitionLifecycle message,
         CompetitionLifecycleAdvancer advancer,
         NoCtfDbContext db,
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         CancellationToken cancellationToken)
     {
         var transitions = await advancer.ExecuteAsync(message.At, cancellationToken);

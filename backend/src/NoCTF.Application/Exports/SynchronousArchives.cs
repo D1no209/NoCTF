@@ -7,7 +7,6 @@ public enum SynchronousArchiveFailure : short
     SubjectNotFound,
     Forbidden,
     ProtectedFlagsRequireAdministrator,
-    ProtectedFlagsRequireHuman,
     ReasonRequired,
     InvalidQuery,
     RecordLimitExceeded,
@@ -30,14 +29,12 @@ public sealed record ExportCompetitionArchiveCommand(
     Guid CompetitionId,
     Guid RequestedByUserId,
     bool RequesterIsAdministrator,
-    bool RequesterIsHuman,
     bool IncludeProtectedFlags,
     string? Reason);
 
 public sealed record ExportPlatformAuditArchiveCommand(
     Guid RequestedByUserId,
     bool RequesterIsAdministrator,
-    bool RequesterIsHuman,
     PlatformAuditKind? Kind,
     Guid? CompetitionId,
     Guid? ActorId,
@@ -76,11 +73,6 @@ public sealed class ExportCompetitionArchive(ISynchronousArchiveGenerator genera
             return Task.FromResult(new SynchronousArchiveResult(
                 Failure: SynchronousArchiveFailure.ProtectedFlagsRequireAdministrator));
         }
-        if (normalized.IncludeProtectedFlags && !normalized.RequesterIsHuman)
-        {
-            return Task.FromResult(new SynchronousArchiveResult(
-                Failure: SynchronousArchiveFailure.ProtectedFlagsRequireHuman));
-        }
         if (normalized.IncludeProtectedFlags
             && normalized.Reason is null or { Length: < 8 or > 512 })
         {
@@ -98,7 +90,7 @@ public sealed class ExportPlatformAuditArchive(ISynchronousArchiveGenerator gene
         ExportPlatformAuditArchiveCommand command,
         CancellationToken cancellationToken = default)
     {
-        if (!command.RequesterIsAdministrator || !command.RequesterIsHuman)
+        if (!command.RequesterIsAdministrator)
         {
             return Task.FromResult(new SynchronousArchiveResult(
                 Failure: SynchronousArchiveFailure.Forbidden));

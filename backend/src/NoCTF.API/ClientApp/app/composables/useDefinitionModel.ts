@@ -1,47 +1,50 @@
+import { ref, toRaw, watch } from 'vue'
 import type { DefinitionModel, GameModeValue } from '../utils/game-config'
-import { parseDefinition, serializeDefinition } from '../utils/game-config'
+import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract } from '../api'
+import { definitionContractToModel, definitionModelToContract } from '../utils/game-config'
 
 /**
- * definitionJson 字符串 v-model 与结构化 DefinitionModel 的桥接。
- * model 是共享的响应式单一事实源,各定义切片组件直接修改它;
- * deep watch 统一序列化回 emit,自身序列化回灌时跳过重解析。
+ * OpenAPI 强类型 definition 与编辑器 DefinitionModel 的映射。
  */
 export function useDefinitionModel(
-  modelValue: () => string,
+  modelValue: () => NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract,
   mode: () => GameModeValue,
-  emit: (json: string) => void,
+  emit: (definition: NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract) => void,
 ) {
   const model = ref<DefinitionModel | null>(null)
   const parseFailed = ref(false)
-  let lastSerialized = ''
+  let syncing = false
+  let lastEmitted: NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract | null = null
+  let lastEmittedMode: GameModeValue | null = null
 
   watch(
-    modelValue,
-    (json) => {
-      // 自身序列化回灌跳过重解析。
-      if (json === lastSerialized) return
-      const parsed = parseDefinition(json, mode())
-      if (parsed === null) {
-        parseFailed.value = true
-        model.value = null
-        return
+    [modelValue, mode],
+    ([definition, currentMode]) => {
+      if (toRaw(definition) === lastEmitted && currentMode === lastEmittedMode) return
+      syncing = true
+      try {
+        model.value = definitionContractToModel(definition, currentMode)
+        parseFailed.value = false
       }
-      parseFailed.value = false
-      model.value = parsed
-      lastSerialized = json ?? ''
+      catch {
+        model.value = null
+        parseFailed.value = true
+      }
+      finally {
+        syncing = false
+      }
     },
-    { immediate: true },
+    { immediate: true, flush: 'sync' },
   )
 
-  function emitSerialized(): void {
-    if (!model.value) return
-    const json = serializeDefinition(mode(), model.value)
-    lastSerialized = json
-    emit(json)
+  function emitDefinition(): void {
+    if (!model.value || syncing) return
+    lastEmittedMode = mode()
+    lastEmitted = definitionModelToContract(lastEmittedMode, model.value)
+    emit(lastEmitted)
   }
 
-  watch(model, emitSerialized, { deep: true })
-  watch(mode, emitSerialized)
+  watch(model, emitDefinition, { deep: true, flush: 'sync' })
 
   return { model, parseFailed }
 }

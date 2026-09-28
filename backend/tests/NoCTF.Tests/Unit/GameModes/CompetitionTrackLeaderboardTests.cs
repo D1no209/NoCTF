@@ -7,14 +7,14 @@ namespace NoCTF.Tests.Unit.GameModes;
 
 public sealed class CompetitionTrackLeaderboardTests
 {
-    private static LeaderboardProjectionResult ProjectLegacy(
+    private static ScoreboardProjection ProjectCurrent(
         LeaderboardProjectionInput input) =>
         new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog())
-            .ProjectOutputs(input).Legacy;
+            .Project(input);
 
-    private static LeaderboardProjectionResult ProjectLegacy(
+    private static ScoreboardProjection ProjectCurrent(
         LeaderboardProjectionEngine engine,
-        LeaderboardProjectionInput input) => engine.ProjectOutputs(input).Legacy;
+        LeaderboardProjectionInput input) => engine.Project(input);
 
     private static readonly DateTimeOffset Start =
         DateTimeOffset.Parse("2026-08-12T00:00:00Z");
@@ -42,17 +42,19 @@ public sealed class CompetitionTrackLeaderboardTests
             facts,
             [new(challengeId, "web", "track-test", false)]);
 
-        var result = ProjectLegacy(input);
-        var formalEntries = result.Entries.Where(entry => entry.TrackKey == "formal").ToArray();
-        var studentEntry = result.Entries.Single(entry => entry.TeamId == student.Id);
+        var result = ProjectCurrent(input);
+        var formalEntries = result.Snapshot.Teams.Where(entry => entry.TrackKey == "formal").ToArray();
+        var studentEntry = result.Snapshot.Teams.Single(entry => entry.TeamId == student.Id);
 
-        await Assert.That(formalEntries.Select(entry => entry.Rank)).IsEquivalentTo([1, 2]);
+        await Assert.That(formalEntries.Select(entry => entry.Rank))
+            .IsEquivalentTo([(int?)1, (int?)2]);
         await Assert.That(studentEntry.Rank).IsEqualTo(1);
-        await Assert.That(result.Entries.Any(entry => entry.TeamId == internalTeam.Id)).IsFalse();
-        await Assert.That(result.Challenges.Single().CurrentScore).IsNotNull();
-        await Assert.That(result.Entries.Single(entry => entry.TeamId == formalA.Id)
-            .Cells.Single().BloodRank).IsEqualTo(LeaderboardBloodRank.First);
-        await Assert.That(studentEntry.Cells.Single().BloodRank).IsNull();
+        await Assert.That(result.Snapshot.Teams.Single(entry => entry.TeamId == internalTeam.Id).Rank).IsNull();
+        await Assert.That(result.Snapshot.CurrentChallengeScores.Single().Score).IsNotNull();
+        await Assert.That(result.Snapshot.Teams.Single(entry => entry.TeamId == formalA.Id).Achievements!
+            .Any(achievement => achievement.Kind == ScoreboardEntryKind.Solve)).IsTrue();
+        await Assert.That(studentEntry.Slots.SelectMany(slot => slot.Entries)
+            .All(entry => entry.Award is null)).IsTrue();
     }
 
     [Test]
@@ -88,20 +90,20 @@ public sealed class CompetitionTrackLeaderboardTests
             },
             _ => throw new ArgumentOutOfRangeException(nameof(mode))
         };
-        var result = ProjectLegacy(new(
+        var result = ProjectCurrent(new(
             Guid.NewGuid(),
             mode,
             [publicA, publicB, internalTeam],
             facts,
             [new(challengeId, "pwn", "track-test", false)]));
 
-        await Assert.That(result.Entries.Single(entry => entry.TeamId == publicA.Id).Rank).IsEqualTo(1);
-        await Assert.That(result.Entries.Single(entry => entry.TeamId == publicB.Id).Rank).IsEqualTo(1);
-        await Assert.That(result.Entries.Any(entry => entry.TeamId == internalTeam.Id)).IsFalse();
+        await Assert.That(result.Snapshot.Teams.Single(entry => entry.TeamId == publicA.Id).Rank).IsEqualTo(1);
+        await Assert.That(result.Snapshot.Teams.Single(entry => entry.TeamId == publicB.Id).Rank).IsEqualTo(1);
+        await Assert.That(result.Snapshot.Teams.Single(entry => entry.TeamId == internalTeam.Id).Rank).IsNull();
     }
 
     [Test]
-    public async Task Manual_adjustment_does_not_restore_score_for_a_non_scoring_track()
+    public async Task Manual_adjustment_remains_auditable_for_a_non_ranking_track()
     {
         var challengeId = Guid.NewGuid();
         var publicTeam = Team("public", "formal", earnsBlood: true, affectsDynamic: true);
@@ -115,14 +117,16 @@ public sealed class CompetitionTrackLeaderboardTests
                 Value: "500"),
             Solve(publicTeam.Id, challengeId, Start.AddSeconds(1))
         };
-        var result = ProjectLegacy(new(
+        var result = ProjectCurrent(new(
             Guid.NewGuid(),
             GameMode.Ctf,
             [publicTeam, internalTeam],
             facts,
             [new(challengeId, "web", "track-test", false)]));
 
-        await Assert.That(result.Entries.Any(entry => entry.TeamId == internalTeam.Id)).IsFalse();
+        var internalEntry = result.Snapshot.Teams.Single(entry => entry.TeamId == internalTeam.Id);
+        await Assert.That(internalEntry.Rank).IsNull();
+        await Assert.That(internalEntry.TotalScore).IsEqualTo(500);
     }
 
     [Test]
@@ -132,7 +136,7 @@ public sealed class CompetitionTrackLeaderboardTests
         var formal = Team("formal", "formal", earnsBlood: true, affectsDynamic: true);
         var calibration = Team("calibration", "calibration", earnsScore: false, earnsBlood: false,
             affectsDynamic: true, visible: false, competitive: false);
-        var result = ProjectLegacy(new(
+        var result = ProjectCurrent(new(
             Guid.NewGuid(),
             GameMode.Ctf,
             [formal, calibration],
@@ -142,10 +146,10 @@ public sealed class CompetitionTrackLeaderboardTests
             ],
             [new(challengeId, "web", "track-test", false)]));
 
-        await Assert.That(result.Entries.Any(entry => entry.TeamId == calibration.Id)).IsFalse();
-        await Assert.That(result.Challenges.Single().CurrentScore!.Value).IsLessThan(500);
-        await Assert.That(result.Entries.Single().Cells.Single().BloodRank)
-            .IsEqualTo(LeaderboardBloodRank.First);
+        await Assert.That(result.Snapshot.Teams.Single(entry => entry.TeamId == calibration.Id).Rank).IsNull();
+        await Assert.That(result.Snapshot.CurrentChallengeScores.Single().Score!.Value).IsLessThan(500);
+        await Assert.That(result.Snapshot.Teams.Single(entry => entry.TeamId == formal.Id).Achievements!
+            .Any(achievement => achievement.Kind == ScoreboardEntryKind.Solve)).IsTrue();
     }
 
     [Test]
@@ -161,35 +165,38 @@ public sealed class CompetitionTrackLeaderboardTests
             Solve(firstTeam.Id, challengeId, Start) with { GameplayFactId = earlierId },
             Solve(secondTeam.Id, challengeId, Start) with { GameplayFactId = laterId }
         };
-        var result = ProjectLegacy(new(
+        var result = ProjectCurrent(new(
             Guid.NewGuid(), GameMode.Ctf, [firstTeam, secondTeam], facts,
             [new(challengeId, "web", "track-test", false)]));
 
-        await Assert.That(result.Entries.Single(entry => entry.TeamId == firstTeam.Id)
-            .Cells.Single().BloodRank).IsEqualTo(LeaderboardBloodRank.First);
-        await Assert.That(result.Entries.Single(entry => entry.TeamId == secondTeam.Id)
-            .Cells.Single().BloodRank).IsEqualTo(LeaderboardBloodRank.Second);
+        await Assert.That(result.Snapshot.Teams.Single(entry => entry.TeamId == firstTeam.Id).Slots
+            .SelectMany(slot => slot.Entries)
+            .Any(entry => entry.Award == ScoreboardAward.FirstBlood)).IsTrue();
+        await Assert.That(result.Snapshot.Teams.Single(entry => entry.TeamId == secondTeam.Id).Slots
+            .SelectMany(slot => slot.Entries)
+            .Any(entry => entry.Award == ScoreboardAward.SecondBlood)).IsTrue();
     }
 
     [Test]
-    public async Task Legacy_default_team_projection_is_unchanged()
+    public async Task Omitted_track_key_matches_the_explicit_default_track()
     {
         var challengeId = Guid.NewGuid();
         var teamId = Guid.NewGuid();
         var fact = Solve(teamId, challengeId, Start);
-        var legacy = new LeaderboardTeamFact(teamId, "legacy", false, false, Start.AddMinutes(-1));
-        var explicitDefault = Team("legacy", CompetitionTrackConfiguration.DefaultTrackKey,
+        var implicitDefault = new LeaderboardTeamFact(teamId, "default", false, false, Start.AddMinutes(-1));
+        var explicitDefault = Team("default", CompetitionTrackConfiguration.DefaultTrackKey,
             earnsBlood: true, affectsDynamic: true) with { Id = teamId };
         var engine = new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog());
-        var legacyResult = ProjectLegacy(engine, new(
-            Guid.NewGuid(), GameMode.Ctf, [legacy], [fact],
-            [new(challengeId, "web", "track-test", false)]));
-        var explicitResult = ProjectLegacy(engine, new(
-            Guid.NewGuid(), GameMode.Ctf, [explicitDefault], [fact],
-            [new(challengeId, "web", "track-test", false)]));
+        var competitionId = Guid.NewGuid();
+        var projectedAt = Start.AddMinutes(1);
+        var defaultResult = ProjectCurrent(engine, new(
+            competitionId, GameMode.Ctf, [implicitDefault], [fact],
+            [new(challengeId, "web", "track-test", false)], ProjectedAt: projectedAt));
+        var explicitResult = ProjectCurrent(engine, new(
+            competitionId, GameMode.Ctf, [explicitDefault], [fact],
+            [new(challengeId, "web", "track-test", false)], ProjectedAt: projectedAt));
 
-        await Assert.That(explicitResult.Entries).IsEquivalentTo(legacyResult.Entries);
-        await Assert.That(explicitResult.Challenges).IsEquivalentTo(legacyResult.Challenges);
+        await Assert.That(explicitResult).IsEquivalentTo(defaultResult);
     }
 
     [Test]
@@ -208,14 +215,14 @@ public sealed class CompetitionTrackLeaderboardTests
                 GameplayFactKind.KohControlObservation, Start.AddSeconds(10), GameplayFactState.Completed,
                 GameplayFactResult.Controlled, null)
         };
-        var result = ProjectLegacy(new(
+        var result = ProjectCurrent(new(
             Guid.NewGuid(), GameMode.Koh, [publicTeam, internalTeam], observations,
             [new(challengeId, "pwn", "track-test", false)]));
 
-        var publicEntry = result.Entries.Single();
+        var publicEntry = result.Snapshot.Teams.Single(entry => entry.TeamId == publicTeam.Id);
         await Assert.That(publicEntry.TeamId).IsEqualTo(publicTeam.Id);
-        await Assert.That(publicEntry.SolveCount).IsEqualTo(2);
-        await Assert.That(publicEntry.Score).IsGreaterThan(0);
+        await Assert.That(publicEntry.Slots.Sum(slot => slot.EntryCount)).IsEqualTo(1);
+        await Assert.That(publicEntry.TotalScore).IsGreaterThan(0);
     }
 
     [Test]
@@ -242,13 +249,12 @@ public sealed class CompetitionTrackLeaderboardTests
                 GameplayFactResult.Controlled, null),
             _ => throw new ArgumentOutOfRangeException(nameof(mode))
         };
-        var result = ProjectLegacy(new(
+        var result = ProjectCurrent(new(
             Guid.NewGuid(), mode, [publicTeam, internalTeam], [fact],
             [new(challengeId, "pwn", "track-test", false)]));
 
-        await Assert.That(result.Entries.Single().TeamId).IsEqualTo(publicTeam.Id);
-        await Assert.That(result.Entries.Single().Score).IsEqualTo(0);
-        await Assert.That(result.Entries.Single().Cells).IsEmpty();
+        await Assert.That(result.Snapshot.Teams.Single(entry => entry.TeamId == publicTeam.Id).TotalScore)
+            .IsEqualTo(0);
     }
 
     private static LeaderboardTeamFact Team(

@@ -1,4 +1,3 @@
-using System.Text.Json;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Runtime;
@@ -16,64 +15,37 @@ public sealed class ChallengeTestFlagFactoryTests
     {
         var challengeId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var runtimeId = Guid.Parse("22222222-2222-2222-2222-222222222222");
-        var definitionJson = JsonSerializer.Serialize(
-            new CtfChallengeConfiguration(
-                CtfChallengeConfiguration.CurrentSchemaVersion,
-                null,
-                null,
-                Runtime: null,
-                FlagTemplate: new PerTeamFlagTemplate(
-                    "test",
-                    "[CHALLENGEID:N]-[TEAMHASH:8]",
-                    false)),
-            new JsonSerializerOptions(JsonSerializerDefaults.Web));
         var runtime = Runtime(RuntimeFlagSource.PerTeam);
 
         var plan = ChallengeTestFlagFactory.Create(
             GameMode.Ctf,
-            definitionJson,
             runtime,
             challengeId,
             runtimeId);
 
         await Assert.That(plan.Delivery).IsEqualTo(RuntimeTestFlagDelivery.Environment);
         await Assert.That(plan.InitialState).IsEqualTo(RuntimeTestFlagState.Pending);
-        await Assert.That(plan.Flag).StartsWith($"test{{{challengeId:N}-");
+        await Assert.That(plan.Flag).StartsWith("flag{");
     }
 
     [Test]
     public async Task Create_AwdRotation_UsesCommandDelivery()
     {
-        var definitionJson = JsonSerializer.Serialize(
-            new AwdChallengeConfiguration(
-                AwdChallengeConfiguration.CurrentSchemaVersion,
-                FlagTemplate: new PerTeamFlagTemplate("awdtest", "[GUID:N]", false)),
-            new JsonSerializerOptions(JsonSerializerDefaults.Web));
-
         var plan = ChallengeTestFlagFactory.Create(
             GameMode.Awd,
-            definitionJson,
             Runtime(RuntimeFlagSource.AwdRotation),
             Guid.CreateVersion7(),
             Guid.CreateVersion7());
 
         await Assert.That(plan.Delivery).IsEqualTo(RuntimeTestFlagDelivery.Command);
-        await Assert.That(plan.Flag).StartsWith("awdtest{");
+        await Assert.That(plan.Flag).StartsWith("flag{");
     }
 
     [Test]
     public async Task Create_StaticRuntime_DoesNotInventAnInjectedFlag()
     {
-        var definitionJson = JsonSerializer.Serialize(
-            new CtfChallengeConfiguration(
-                CtfChallengeConfiguration.CurrentSchemaVersion,
-                null,
-                null),
-            new JsonSerializerOptions(JsonSerializerDefaults.Web));
-
         var plan = ChallengeTestFlagFactory.Create(
             GameMode.Ctf,
-            definitionJson,
             Runtime(RuntimeFlagSource.Static),
             Guid.CreateVersion7(),
             Guid.CreateVersion7());
@@ -88,6 +60,7 @@ public sealed class ChallengeTestFlagFactoryTests
             RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition(
                 "challenge:test",
+                Security: ContainerSecurityPolicy.Default,
                 FlagEnvironmentVariableName: flagSource == RuntimeFlagSource.PerTeam
                     ? "CHALLENGE_FLAG"
                     : null),

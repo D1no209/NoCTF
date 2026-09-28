@@ -39,8 +39,9 @@ Payload 由 NotificationKind 对应强类型 DTO 序列化，只含安全展示�
 - 比赛「动态」是按访问级别过滤后的不可变 `competition_events` 完整事实流，用于追溯比赛状态和操作，不等同于个人消息。
 - 题目页「赛事播报」是公开事实流的紧凑投影，只展示一二三血、作弊封禁、申诉纠正、提示发布、题目描述更新和题目开放；不复制事件数据。
 - 全局「消息中心」使用 `GET /notifications?scope=Inbox`，只展示手工官方通知以及与当前账号、队伍或管理职责直接相关的消息。系统自动写入 `CompetitionParticipants` 的公开播报不进入个人收件箱，避免不同账号收到相同内容后被错误描述为“你的队伍”。
-- `GET /notifications/feed` 和默认 `scope=All` 保持完整动态受众语义，BOT 与已有消费者不受个人收件箱投影影响。
+- `GET /notifications/feed` 和默认 `scope=All` 保持完整动态受众语义。公开比赛公告正文另由
+  `GET /competitions/{competitionId}/announcements` 提供给所有普通 Bearer 客户端，不改变通知受众。
 
-旧的 QQBot 公钥 Agent、群组同步和专用投递协议不在目标架构中。QQBOT 作为普通
-User Bot 使用 Bearer JWT 消费自身的 `/notifications/feed`，并复用现有排行榜接口；
-平台不维护 QQ 群、投递状态或 QQBOT 专用通知表。详见 [QQBOT JWT 接入](qqbot-jwt.md)。
+外部系统通过赛事级 Webhook 接收公开播报事件。Worker 使用独立 JetStream 队列异步发送
+CloudEvents 1.0 JSON，并按 Standard Webhooks 约定附加 HMAC-SHA256 签名。平台不维护聊天
+Provider、群组、消息模板或专用 Bot 投递状态；浏览器 SignalR 链路不受影响。

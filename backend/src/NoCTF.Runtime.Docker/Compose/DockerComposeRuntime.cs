@@ -1,7 +1,9 @@
 using System.Text.Json;
+using System.Diagnostics;
 using CliWrap;
 using CliWrap.Buffered;
 using NoCTF.Application.Runtime.Configuration;
+using NoCTF.Application.Observability;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Runtime;
 using NoCTF.Runtime.Docker.Containers;
@@ -61,6 +63,13 @@ public sealed class DockerComposeRuntime(
                 "--wait-timeout",
                 Math.Max(1, (int)Math.Ceiling(request.OperationTimeout.TotalSeconds)).ToString(
                     System.Globalization.CultureInfo.InvariantCulture));
+            if (request.AccessMode is RuntimeAccessMode.DirectAndWsrx
+                or RuntimeAccessMode.WsrxOnly)
+            {
+                await ConnectRuntimeProxyGatewaysAsync(
+                    request.ProjectName,
+                    cancellationToken);
+            }
         }
         catch (Exception exception)
         {
@@ -81,15 +90,280 @@ public sealed class DockerComposeRuntime(
 
     public async Task DownAsync(ComposeReceipt receipt, CancellationToken cancellationToken)
     {
+        await DownAsync(
+            receipt,
+            RuntimeTerminationMode.GracefulThenForce,
+            RuntimeTerminationPolicy.Default,
+            cancellationToken);
+    }
+
+    public Task EnsureRuntimeProxyGatewaysAsync(
+        ComposeReceipt receipt,
+        CancellationToken cancellationToken) =>
+        ConnectRuntimeProxyGatewaysAsync(receipt.ProjectName, cancellationToken);
+
+    public async Task DownAsync(
+        ComposeReceipt receipt,
+        RuntimeTerminationMode mode,
+        RuntimeTerminationPolicy policy,
+        CancellationToken cancellationToken)
+    {
         var directory = ResolveOwnedDirectory(receipt.Namespace);
-        await RunDockerAsync(
-            directory,
-            receipt.ProjectName,
-            "down",
+        var warnings = new List<Exception>();
+        try
+        {
+            await DisconnectRuntimeProxyGatewaysAsync(
+                receipt.ProjectName,
+                cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            warnings.Add(exception);
+        }
+        var gracefulSucceeded = false;
+        if (mode == RuntimeTerminationMode.GracefulThenForce
+            && Directory.Exists(directory))
+        {
+            var started = Stopwatch.GetTimestamp();
+            using var graceful = CreateStageToken(cancellationToken, policy.GracefulStopTimeout);
+            try
+            {
+                await RunDockerAsync(
+                    directory,
+                    receipt.ProjectName,
+                    "down",
+                    graceful.Token,
+                    "--timeout",
+                    Math.Max(1, (int)Math.Ceiling(policy.GracefulStopTimeout.TotalSeconds))
+                        .ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    "--remove-orphans");
+                gracefulSucceeded = !await ProjectResourcesRemainAsync(
+                    receipt.ProjectName,
+                    graceful.Token);
+                NoCtfTelemetry.RecordRuntimeStopDuration(
+                    "docker", "compose", "graceful",
+                    gracefulSucceeded ? "success" : "warning",
+                    Stopwatch.GetElapsedTime(started).TotalSeconds);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                NoCtfTelemetry.RecordRuntimeStopDuration(
+                    "docker", "compose", "graceful", "timeout",
+                    Stopwatch.GetElapsedTime(started).TotalSeconds);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                warnings.Add(exception);
+                NoCtfTelemetry.RecordRuntimeStopDuration(
+                    "docker", "compose", "graceful", "warning",
+                    Stopwatch.GetElapsedTime(started).TotalSeconds);
+            }
+        }
+
+        if (mode == RuntimeTerminationMode.Force || !gracefulSucceeded)
+        {
+            NoCtfTelemetry.RecordRuntimeStopForce(
+                "docker",
+                mode == RuntimeTerminationMode.Force ? "requested" : "graceful_failed");
+            var started = Stopwatch.GetTimestamp();
+            using var force = CreateStageToken(cancellationToken, policy.ForceDeleteTimeout);
+            if (Directory.Exists(directory))
+            {
+                try
+                {
+                    await RunDockerAsync(
+                        directory,
+                        receipt.ProjectName,
+                        "down",
+                        force.Token,
+                        "--timeout",
+                        "0",
+                        "--remove-orphans");
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    warnings.Add(exception);
+                }
+            }
+            try
+            {
+                await ForceRemoveProjectContainersAsync(receipt.ProjectName, force.Token);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                warnings.Add(exception);
+            }
+            NoCtfTelemetry.RecordRuntimeStopDuration(
+                "docker", "compose", "force_delete",
+                warnings.Count == 0 ? "success" : "warning",
+                Stopwatch.GetElapsedTime(started).TotalSeconds);
+        }
+
+        var networkStarted = Stopwatch.GetTimestamp();
+        using (var network = CreateStageToken(
+                   cancellationToken,
+                   policy.NetworkCleanupTimeout))
+        {
+            try
+            {
+                await RemoveProjectNetworksAsync(receipt.ProjectName, network.Token);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                warnings.Add(exception);
+            }
+        }
+        NoCtfTelemetry.RecordRuntimeStopDuration(
+            "docker", "compose", "network_cleanup",
+            warnings.Count == 0 ? "success" : "warning",
+            Stopwatch.GetElapsedTime(networkStarted).TotalSeconds);
+
+        var verificationStarted = Stopwatch.GetTimestamp();
+        using var verification = CreateStageToken(cancellationToken, policy.VerificationTimeout);
+        try
+        {
+            await WaitUntilDestroyedAsync(receipt, verification.Token);
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+            NoCtfTelemetry.RecordRuntimeStopDuration(
+                "docker", "compose", "verification", "success",
+                Stopwatch.GetElapsedTime(verificationStarted).TotalSeconds);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            NoCtfTelemetry.RecordRuntimeStopResourcesRemaining("docker", "compose");
+            NoCtfTelemetry.RecordRuntimeStopDuration(
+                "docker", "compose", "verification", "timeout",
+                Stopwatch.GetElapsedTime(verificationStarted).TotalSeconds);
+            throw new InvalidOperationException(
+                "Docker Compose resources remain after the termination budget.",
+                warnings.Count == 0 ? null : new AggregateException(warnings));
+        }
+    }
+
+    private async Task WaitUntilDestroyedAsync(
+        ComposeReceipt receipt,
+        CancellationToken cancellationToken)
+    {
+        var delays = new[] { 200, 400, 800, 1_000 };
+        var attempt = 0;
+        while (true)
+        {
+            if (!await ProjectResourcesRemainAsync(
+                    receipt.ProjectName,
+                    cancellationToken))
+                return;
+            await Task.Delay(
+                TimeSpan.FromMilliseconds(delays[Math.Min(attempt++, delays.Length - 1)]),
+                timeProvider,
+                cancellationToken);
+        }
+    }
+
+    private async Task<bool> ProjectResourcesRemainAsync(
+        string projectName,
+        CancellationToken cancellationToken)
+    {
+        var containers = await ListProjectResourceIdsAsync(
+            ["ps", "--all", "--quiet"],
+            projectName,
+            cancellationToken);
+        var networks = await ListProjectResourceIdsAsync(
+            ["network", "ls", "--quiet"],
+            projectName,
+            cancellationToken);
+        return containers.Length > 0 || networks.Length > 0;
+    }
+
+    private async Task ForceRemoveProjectContainersAsync(
+        string projectName,
+        CancellationToken cancellationToken)
+    {
+        var containers = await ListProjectResourceIdsAsync(
+            ["ps", "--all", "--quiet"],
+            projectName,
+            cancellationToken);
+        foreach (var containerId in containers)
+        {
+            _ = await RunRawDockerAsync(
+                cancellationToken,
+                "rm",
+                "--force",
+                containerId);
+        }
+    }
+
+    private async Task RemoveProjectNetworksAsync(
+        string projectName,
+        CancellationToken cancellationToken)
+    {
+        var networks = await ListProjectResourceIdsAsync(
+            ["network", "ls", "--quiet"],
+            projectName,
+            cancellationToken);
+        foreach (var networkId in networks)
+        {
+            _ = await RunRawDockerAsync(
+                cancellationToken,
+                "network",
+                "rm",
+                networkId);
+        }
+    }
+
+    private async Task<string[]> ListProjectResourceIdsAsync(
+        IReadOnlyList<string> command,
+        string projectName,
+        CancellationToken cancellationToken)
+    {
+        var output = await RunRawDockerAsync(
             cancellationToken,
-            "--remove-orphans");
-        if (Directory.Exists(directory))
-            Directory.Delete(directory, recursive: true);
+            [.. command, "--filter", $"label=com.docker.compose.project={projectName}"]);
+        return output.Split(
+            ['\r', '\n'],
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    }
+
+    private async Task<string> RunRawDockerAsync(
+        CancellationToken cancellationToken,
+        params string[] arguments)
+    {
+        var result = await Cli.Wrap(dockerExecutable)
+            .WithArguments(arguments)
+            .WithValidation(CommandResultValidation.None)
+            .ExecuteBufferedAsync(cancellationToken);
+        if (result.ExitCode != 0)
+            throw new ComposeCommandFailedException(result.ExitCode, result.StandardError);
+        return result.StandardOutput;
+    }
+
+    private static CancellationTokenSource CreateStageToken(
+        CancellationToken cancellationToken,
+        TimeSpan timeout)
+    {
+        var source = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        source.CancelAfter(timeout);
+        return source;
     }
 
     public async Task<ComposeStatus?> GetStatusAsync(ComposeReceipt receipt, CancellationToken cancellationToken)
@@ -105,8 +379,10 @@ public sealed class DockerComposeRuntime(
             "--format",
             "json");
         var entries = ParseProcesses(result);
-        var services = entries
-            .Select(entry => new ComposeServiceStatus(
+        var services = new List<ComposeServiceStatus>(entries.Count);
+        foreach (var entry in entries)
+        {
+            services.Add(new ComposeServiceStatus(
                 entry.Service,
                 entry.Id,
                 ToRuntimeStatus(entry.State),
@@ -119,12 +395,14 @@ public sealed class DockerComposeRuntime(
                     .ToDictionary(
                         group => group.Key,
                         group => group.First().PublishedPort),
-                entry.Service))
-            .ToArray();
+                await ReadContainerInternalAddressAsync(
+                    entry.Id,
+                    cancellationToken)));
+        }
         var resourceStatuses = entries
             .Select(entry => ToRuntimeStatus(entry.State))
             .ToArray();
-        var status = services.Length == 0
+        var status = services.Count == 0
             ? RuntimeStatus.Stopped
             : resourceStatuses.All(resourceStatus =>
                     resourceStatus == RuntimeStatus.Running)
@@ -214,6 +492,7 @@ public sealed class DockerComposeRuntime(
         try
         {
             using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            await DisconnectRuntimeProxyGatewaysAsync(project, cleanup.Token);
             await RunDockerAsync(
                 directory,
                 project,
@@ -251,6 +530,152 @@ public sealed class DockerComposeRuntime(
         RuntimeResourceIdentity identity,
         CancellationToken cancellationToken)
     {
+        await DestroyByIdentityAsync(
+            identity,
+            RuntimeTerminationMode.GracefulThenForce,
+            RuntimeTerminationPolicy.Default,
+            cancellationToken);
+    }
+
+    private async Task ConnectRuntimeProxyGatewaysAsync(
+        string projectName,
+        CancellationToken cancellationToken)
+    {
+        var networks = await ListProjectResourceIdsAsync(
+            ["network", "ls", "--quiet"],
+            projectName,
+            cancellationToken);
+        if (networks.Length == 0)
+            throw new InvalidOperationException(
+                "Docker Compose WSRX Runtime has no owned network.");
+        var gateways = await ResolveRuntimeProxyGatewaysAsync(cancellationToken);
+        foreach (var network in networks)
+        {
+            var attached = await ReadNetworkContainersAsync(network, cancellationToken);
+            foreach (var gateway in gateways)
+            {
+                if (attached.Contains(gateway))
+                    continue;
+                _ = await RunRawDockerAsync(
+                    cancellationToken,
+                    "network",
+                    "connect",
+                    network,
+                    gateway);
+            }
+        }
+    }
+
+    private async Task DisconnectRuntimeProxyGatewaysAsync(
+        string projectName,
+        CancellationToken cancellationToken)
+    {
+        var networks = await ListProjectResourceIdsAsync(
+            ["network", "ls", "--quiet"],
+            projectName,
+            cancellationToken);
+        if (networks.Length == 0)
+            return;
+        var gateways = await ResolveRuntimeProxyGatewaysAsync(
+            cancellationToken,
+            requireAny: false);
+        foreach (var network in networks)
+        {
+            var attached = await ReadNetworkContainersAsync(network, cancellationToken);
+            foreach (var gateway in gateways)
+            {
+                if (!attached.Contains(gateway))
+                    continue;
+                _ = await RunRawDockerAsync(
+                    cancellationToken,
+                    "network",
+                    "disconnect",
+                    "--force",
+                    network,
+                    gateway);
+            }
+        }
+    }
+
+    private async Task<IReadOnlyList<string>> ResolveRuntimeProxyGatewaysAsync(
+        CancellationToken cancellationToken,
+        bool requireAny = true)
+    {
+        string output;
+        if (!string.IsNullOrWhiteSpace(options.ProxyContainerName))
+        {
+            output = await RunRawDockerAsync(
+                cancellationToken,
+                "inspect",
+                "--format",
+                "{{.Id}}",
+                options.ProxyContainerName);
+        }
+        else
+        {
+            output = await RunRawDockerAsync(
+                cancellationToken,
+                "ps",
+                "--quiet",
+                "--filter",
+                $"label={options.ProxyContainerLabelKey}={options.ProxyContainerLabelValue}");
+        }
+        var gateways = output.Split(
+            ['\r', '\n'],
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (requireAny && gateways.Length == 0)
+            throw new InvalidOperationException(
+                "No running Runtime proxy gateway carries the required role label.");
+        return gateways;
+    }
+
+    private async Task<HashSet<string>> ReadNetworkContainersAsync(
+        string networkId,
+        CancellationToken cancellationToken)
+    {
+        var json = await RunRawDockerAsync(
+            cancellationToken,
+            "network",
+            "inspect",
+            "--format",
+            "{{json .Containers}}",
+            networkId);
+        using var document = JsonDocument.Parse(json);
+        return document.RootElement.ValueKind == JsonValueKind.Object
+            ? document.RootElement.EnumerateObject()
+                .Select(property => property.Name)
+                .ToHashSet(StringComparer.Ordinal)
+            : [];
+    }
+
+    private async Task<string> ReadContainerInternalAddressAsync(
+        string containerId,
+        CancellationToken cancellationToken)
+    {
+        var json = await RunRawDockerAsync(
+            cancellationToken,
+            "inspect",
+            "--format",
+            "{{json .NetworkSettings.Networks}}",
+            containerId);
+        using var document = JsonDocument.Parse(json);
+        foreach (var network in document.RootElement.EnumerateObject()
+                     .OrderBy(property => property.Name, StringComparer.Ordinal))
+        {
+            if (network.Value.TryGetProperty("IPAddress", out var address)
+                && !string.IsNullOrWhiteSpace(address.GetString()))
+                return address.GetString()!;
+        }
+        throw new InvalidOperationException(
+            "Docker Compose service has no internal proxy address.");
+    }
+
+    public async Task DestroyByIdentityAsync(
+        RuntimeResourceIdentity identity,
+        RuntimeTerminationMode mode,
+        RuntimeTerminationPolicy policy,
+        CancellationToken cancellationToken)
+    {
         if (identity.RuntimeInstanceId == Guid.Empty)
             throw new ArgumentOutOfRangeException(nameof(identity));
         if (!Directory.Exists(workDirectory))
@@ -265,14 +690,19 @@ public sealed class DockerComposeRuntime(
             var composePath = Path.Combine(directory, "compose.yaml");
             if (File.Exists(composePath))
             {
-                await RunDockerAsync(
-                    directory,
-                    metadata.ProjectName,
-                    "down",
-                    cancellationToken,
-                    "--remove-orphans");
+                await DownAsync(
+                    new ComposeReceipt(
+                        metadata.OperationId,
+                        RuntimeProvider.Docker,
+                        metadata.ProjectName,
+                        directory,
+                        options.PublicHost,
+                        default),
+                    mode,
+                    policy,
+                    cancellationToken);
             }
-            if (Directory.Exists(directory))
+            else if (Directory.Exists(directory))
                 Directory.Delete(directory, recursive: true);
         }
     }

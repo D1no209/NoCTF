@@ -3,27 +3,28 @@ import { toRefs } from 'vue'
 import type { CompetitionsByIdPageViewState } from '~/features/routes/competitions/useCompetitionsByIdPage'
 
 const viewProps = defineProps<{ state: CompetitionsByIdPageViewState }>()
-const { isControlScreen, isWriteUpReview, competition, myStanding, standingLoading, teamLoadError, standingError, error, refreshMyTeam, refreshMyStanding, CompetitionCountdown, LifecycleBadge } = toRefs(viewProps.state)
+const { isOverview, isControlScreen, isWriteUpReview, isProgression, competition, myStanding, standingLoading, teamLoadError, standingError, error, refreshMyTeam, refreshMyStanding, CompetitionCountdown, LifecycleBadge } = toRefs(viewProps.state)
 </script>
 
 <template>
-  <NuxtPage v-if="isControlScreen" />
+  <NuxtPage v-if="isOverview || isControlScreen" />
 
   <div
     v-else-if="competition"
     data-contained-workspace-page
+    :data-progression-route="isProgression"
     class="mx-auto flex w-full max-w-[120rem] flex-col"
     :class="isWriteUpReview ? 'p-0' : 'gap-4 px-3 py-4 md:px-5'"
   >
     <div v-if="!isWriteUpReview" class="flex flex-col justify-between gap-3 border-b pb-4 sm:flex-row sm:items-start">
       <div class="relative isolate flex min-w-0 flex-1 flex-col gap-1">
-        <TypeWatermark :text="gameModeLabel(competition.mode)" class="text-primary" />
+        <TypeWatermark v-if="!isProgression" :text="gameModeLabel(competition.mode)" class="text-primary" />
         <span class="sr-only">{{ gameModeLabel(competition.mode) }}</span>
         <div class="relative z-10 flex flex-wrap items-center gap-x-3 gap-y-2">
           <h1 class="text-display text-2xl md:text-3xl">{{ competition.title }}</h1>
           <component :is="LifecycleBadge" :status="competition.status" />
         </div>
-        <div class="relative z-10 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs tabular-nums md:text-sm">
+        <div v-if="!isProgression" class="relative z-10 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs tabular-nums md:text-sm">
           <span class="text-muted-foreground">
             {{ formatDateTime(competition.startTime) }} ~ {{ formatDateTime(competition.endTime) }}
           </span>

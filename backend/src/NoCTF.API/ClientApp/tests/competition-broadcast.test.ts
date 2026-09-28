@@ -89,7 +89,7 @@ describe('competition broadcast projection', () => {
   test('links challenge broadcasts to the matching challenge', () => {
     expect(competitionBroadcastTargetPath(event('HintPublished', {
       competitionChallengeId: 'challenge-1',
-    }))).toBe('/competitions/competition-1/challenges?challenge=challenge-1')
+    }))).toBe('/competitions/competition-1/challenges/challenge-1')
   })
 
   test('links published notices to their notification detail', () => {
@@ -135,7 +135,18 @@ describe('competition broadcast projection', () => {
 
     expect(competitionBroadcastQueryWindow(startAt, clientNow, serverEventAt)).toEqual({
       from: '2026-09-01T00:00:00.000Z',
-      to: '2026-09-14T10:00:08.000Z',
+      to: '2026-09-14T10:05:00.000Z',
+    })
+  })
+
+  test('uses a newer notification timestamp beyond the reconnect clock margin', () => {
+    const startAt = Date.parse('2026-09-01T00:00:00Z')
+    const clientNow = Date.parse('2026-09-14T10:00:00Z')
+    const serverEventAt = Date.parse('2026-09-14T10:08:00Z')
+
+    expect(competitionBroadcastQueryWindow(startAt, clientNow, serverEventAt)).toEqual({
+      from: '2026-09-01T00:00:00.000Z',
+      to: '2026-09-14T10:08:00.000Z',
     })
   })
 
@@ -144,14 +155,14 @@ describe('competition broadcast projection', () => {
     const clientNow = Date.parse('2026-09-14T10:00:00Z')
 
     expect(competitionBroadcastQueryWindow(startAt, clientNow)).toEqual({
-      from: '2026-08-15T10:00:00.000Z',
-      to: '2026-09-14T10:00:00.000Z',
+      from: '2026-08-15T10:05:00.000Z',
+      to: '2026-09-14T10:05:00.000Z',
     })
   })
 
   test('mounts the compact panel beside challenges and removes the overlapping tab', async () => {
     const challengePage = await sourceFile(
-      new URL('../app/pages/competitions/[id]/challenges/index.vue', import.meta.url),
+      new URL('../app/pages/competitions/[id]/challenges/[[ccId]].vue', import.meta.url),
     ).text()
     const participantWorkspace = await sourceFile(
       new URL('../app/features/competition/CompetitionParticipantWorkspace.vue', import.meta.url),
@@ -173,12 +184,12 @@ describe('competition broadcast projection', () => {
     expect(participantWorkspace).toContain('challenge-workspace')
     expect(participantWorkspace).toContain("<component :is=\"CompetitionWorkspaceNavigation\"")
     expect(participantWorkspace).not.toContain('<ScrollSurface axis="y" class="col-span-full h-full"')
-    expect(participantWorkspace).toContain('min-[1440px]:grid-cols-1')
-    expect(participantWorkspace).toContain('min-[1440px]:grid-rows-[fit-content(50%)_minmax(0,1fr)]')
+    expect(participantWorkspace).toContain('min-[900px]:grid-cols-1')
+    expect(participantWorkspace).toContain('min-[900px]:grid-rows-[fit-content(50%)_minmax(0,1fr)]')
     expect(participantWorkspace).toContain('xl:grid-rows-[fit-content(50%)_minmax(0,1fr)]')
     expect(participantWorkspace).not.toContain('18rem]')
     expect(participantWorkspace).not.toContain('content-start')
-    expect(participantWorkspace).toContain("showChallengeNavigator ? 'min-[1440px]:h-auto' : 'xl:h-auto'")
+    expect(participantWorkspace).toContain("showChallengeNavigator ? 'min-[900px]:h-auto' : 'xl:h-auto'")
     expect(workspaceNavigation).toContain('<Card as="nav"')
     expect(workspaceNavigation).toContain('<ScrollSurface axis="y"')
     expect(panel).toContain('<Card')
@@ -199,9 +210,11 @@ describe('competition broadcast projection', () => {
     expect(panel).toContain('onReconnected: () => void refreshLatest()')
     expect(panel).toContain('const refreshLatest = createTrailingRefresh(load)')
     expect(panel).toContain('mergeCompetitionBroadcasts(items.value, data.items ?? [])')
-    expect(panel).toContain('name="broadcast"')
+    expect(panel).not.toContain('<TransitionGroup')
+    expect(panel).toContain('v-bind="broadcastMotionAttributes(event)"')
+    expect(panel).toContain("motionAttributes('list-enter')")
     expect(panel).toContain(':key="competitionBroadcastIdentity(event)"')
-    expect(panel).toContain('@media (prefers-reduced-motion: reduce)')
+    expect(panel).not.toContain('.broadcast-move')
     expect(panel).toContain('const initialLoad = !initialized.value')
     expect(panel).toContain("now < startAt || status === 'Draft' || status === 'Visible' || status === 'Published'")
     expect(panel).not.toContain("status === 'Finished' && initialized.value")
@@ -231,14 +244,10 @@ describe('competition administration entry', () => {
     expect(page).not.toContain('probeRole')
   })
 
-  test('creates competitions in a dialog and keeps the old page URL as a redirect', async () => {
+  test('creates competitions in the canonical dialog flow', async () => {
     const dialog = await sourceFile(
       new URL('../app/features/competitions/CreateCompetitionDialog.vue', import.meta.url),
     ).text()
-    const legacyRoute = await Bun.file(
-      new URL('../app/pages/admin/competitions/new.vue', import.meta.url),
-    ).text()
-
     expect(dialog).toContain('<Dialog :open="open" @update:open="setOpen">')
     expect(dialog).toContain('sm:max-w-3xl')
     expect(dialog).toContain('<FileUpload')
@@ -248,6 +257,5 @@ describe('competition administration entry', () => {
     expect(dialog).toContain('completeCreation()')
     expect(dialog).toContain('<ScrollSurface axis="y"')
     expect(dialog).not.toContain('navigateTo(`/admin/competitions/')
-    expect(legacyRoute).toContain("redirect: '/competitions?create=1'")
   })
 })

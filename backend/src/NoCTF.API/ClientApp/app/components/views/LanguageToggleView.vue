@@ -9,12 +9,11 @@ const { Languages, isEnglish, switchLocale, t } = toRefs(viewProps.state)
 <template>
   <Button
     variant="ghost"
-    size="sm"
-    class="gap-1.5 px-2 font-medium"
+    size="icon"
+    class="rounded-full"
     :aria-label="isEnglish ? t('ui.switchToChinese') : t('ui.switchToEnglish')"
     @click="switchLocale"
   >
     <Languages class="size-4" />
-    <span aria-hidden="true">{{ isEnglish ? $t('locale.switchToChineseShort') : $t('locale.switchToEnglishShort') }}</span>
   </Button>
 </template>

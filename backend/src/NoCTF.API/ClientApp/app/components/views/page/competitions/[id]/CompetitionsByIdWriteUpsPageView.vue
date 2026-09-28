@@ -8,7 +8,7 @@ const { ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, Ref
 
 <template>
   <div data-writeup-review-workspace class="flex min-h-0 flex-1 flex-col">
-    <div data-scroll-surface data-scroll-axis="y" class="grid h-full min-h-0 gap-4 overflow-y-auto p-1 xl:grid-cols-[minmax(13rem,15rem)_minmax(0,1fr)_minmax(18rem,22rem)] xl:grid-rows-[minmax(0,1fr)] xl:overflow-hidden">
+    <div v-scroll-surface data-scroll-surface data-scroll-axis="y" class="grid h-full min-h-0 gap-4 overflow-y-auto p-1 xl:grid-cols-[minmax(13rem,15rem)_minmax(0,1fr)_minmax(18rem,22rem)] xl:grid-rows-[minmax(0,1fr)] xl:overflow-hidden">
       <ChoiceSidebar
         :items="teamOptions"
         :model-value="selectedTeamId || null"
@@ -23,7 +23,7 @@ const { ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, Ref
           <header class="flex flex-col gap-2 pr-10">
             <div class="flex items-center gap-2">
               <Button variant="ghost" size="icon-sm" as-child>
-                <NuxtLink :to="`/competitions?competition=${competitionId}`" :aria-label="$t('ui.backToCompetition')">
+                <NuxtLink :to="competitionPath(competitionId)" :aria-label="$t('ui.backToCompetition')">
                   <ArrowLeft />
                 </NuxtLink>
               </Button>

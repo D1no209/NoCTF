@@ -6,17 +6,21 @@ import { resolveCompetitionBrowser, type CompetitionGroup } from '../../competit
 import CompetitionOverviewComponent from '../../competitions/CompetitionOverview.vue'
 import CompetitionSidebarComponent from '../../competitions/CompetitionSidebar.vue'
 import CreateCompetitionDialogComponent from '../../competitions/CreateCompetitionDialog.vue'
+import { competitionPath, competitionsPath } from '../../../utils/app-routes'
 
 /** Owns list loading and URL-backed selection; the overview owns its own requests and forms. */
 export function useCompetitionsIndexPage() {
   const route = useRoute()
+  if ('competition' in route.query) throw createError({ statusCode: 404, statusMessage: 'Page not found' })
   const router = useRouter()
   const { isAdministrator } = useAuth()
   const items = ref<NoCtfapiEndpointsCompetitionsCompetitionResponse[]>([])
   const loading = ref(true)
   const error = ref<string | null>(null)
   const queryValue = (value: unknown) => typeof value === 'string' ? value : null
-  const browser = computed(() => resolveCompetitionBrowser(items.value, queryValue(route.query.competition), queryValue(route.query.group), isAdministrator.value))
+  const routeCompetitionId = computed(() => queryValue(route.params.id))
+  const requestedCompetitionId = routeCompetitionId
+  const browser = computed(() => resolveCompetitionBrowser(items.value, requestedCompetitionId.value, queryValue(route.query.group), isAdministrator.value))
   const running = computed(() => browser.value.groups.running)
   const upcoming = computed(() => browser.value.groups.upcoming)
   const finished = computed(() => browser.value.groups.finished)
@@ -25,8 +29,7 @@ export function useCompetitionsIndexPage() {
   const group = computed({
     get: () => browser.value.group,
     set: (value: CompetitionGroup) => {
-      const { competition: _selected, ...query } = route.query
-      void router.push({ query: { ...query, group: value } })
+      void router.push({ path: competitionsPath, query: { ...route.query, group: value } })
     },
   })
   const selected = computed(() => browser.value.selected)
@@ -37,7 +40,9 @@ export function useCompetitionsIndexPage() {
     value: competition.id!, label: competition.title ?? '', competition,
   })))
   function selectCompetition(value: string) {
-    if (value !== selectedId.value) void router.push({ query: { ...route.query, competition: value } })
+    if (value === selectedId.value) return
+    const { group: _group, ...query } = route.query
+    void router.push({ path: competitionPath(value), query })
   }
   function openCreateDialog() {
     createOpen.value = true
@@ -55,8 +60,8 @@ export function useCompetitionsIndexPage() {
       return
     }
     items.value = [competition, ...items.value.filter(item => item.id !== competition.id)]
-    const { create: _create, ...query } = route.query
-    void router.push({ query: { ...query, competition: competition.id } })
+    const { create: _create, group: _group, ...query } = route.query
+    void router.push({ path: competitionPath(competition.id), query })
   }
   let loadGeneration = 0
   async function load() {

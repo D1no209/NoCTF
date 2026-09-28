@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using NoCTF.Application.Challenges.Bank;
 using NoCTF.Application.Challenges.Flags;
 using NoCTF.Application.Runtime.Provisioning;
@@ -33,6 +34,8 @@ public sealed class ChallengeFlagRegularExpressionPersistenceTests
             var options = new DbContextOptionsBuilder<NoCtfDbContext>()
                 .UseNpgsql(postgres.GetConnectionString())
                 .UseSnakeCaseNamingConvention()
+                .ConfigureWarnings(warnings => warnings.Throw(
+                    RelationalEventId.MultipleCollectionIncludeWarning))
                 .Options;
             var now = DateTimeOffset.UtcNow;
             var ownerId = Guid.CreateVersion7(now);
@@ -47,29 +50,27 @@ public sealed class ChallengeFlagRegularExpressionPersistenceTests
                 User(ownerId, "regex-owner", now),
                 User(managerId, "regex-manager", now),
                 User(outsiderId, "regex-outsider", now));
-            db.Challenges.Add(new Challenge
+            db.Challenges.Add(new CtfChallenge
             {
                 Id = challengeId,
                 OwnerId = ownerId,
                 ManagerIds = [managerId],
-                Mode = GameMode.Ctf,
                 Visibility = ChallengeVisibility.Private,
                 Title = "Static regex challenge",
                 Direction = "Web",
-                DefinitionJson = """{"schemaVersion":1}""",
+                Definition = TestConfigurations.Definition(GameMode.Ctf),
                 CreatedAt = now,
                 UpdatedAt = now
             });
-            db.Challenges.Add(new Challenge
+            db.Challenges.Add(new AwdpChallenge
             {
                 Id = awdpChallengeId,
                 OwnerId = ownerId,
                 ManagerIds = [],
-                Mode = GameMode.Awdp,
                 Visibility = ChallengeVisibility.Private,
                 Title = "AWDP break challenge",
                 Direction = "Pwn",
-                DefinitionJson = """{"schemaVersion":1}""",
+                Definition = TestConfigurations.Definition(GameMode.Awdp),
                 CreatedAt = now,
                 UpdatedAt = now
             });
@@ -113,18 +114,19 @@ public sealed class ChallengeFlagRegularExpressionPersistenceTests
                 .IsEqualTo(ChallengeFlagFailureCode.RegularExpressionNotSupported);
             await Assert.That(await db.ChallengeFlags.CountAsync(ct)).IsEqualTo(3);
 
-            var dynamicDefinition = JsonSerializer.Serialize(
-                new CtfChallengeConfiguration(
-                    CtfChallengeConfiguration.CurrentSchemaVersion,
-                    null,
-                    null,
-                    Runtime: new ChallengeRuntimeTemplate(
-                        RuntimeAllocation.PerTeam,
-                        new ContainerRuntimeDefinition(
-                            "registry.example/challenge:v1",
-                            FlagEnvironmentVariableName: "FLAG"),
-                        FlagSource: RuntimeFlagSource.PerTeam)),
-                new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            var dynamicDefinition = new CtfChallengeDefinition
+            {
+                ChallengeId = challengeId,
+                Runtime = new ContainerChallengeRuntimeTemplate
+                {
+                    ChallengeId = challengeId,
+                    Allocation = PersistedRuntimeAllocation.PerTeam,
+                    FlagSource = PersistedRuntimeFlagSource.PerTeam,
+                    Image = "registry.example/challenge:v1",
+                    FlagEnvironmentVariableName = "FLAG",
+                    Capabilities = [new() { ChallengeId = challengeId, Name = "ALL" }]
+                }
+            };
             var bank = new ChallengeBankStore(db);
             var blocked = await bank.UpdateAsync(new(
                 challengeId,

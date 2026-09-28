@@ -1,5 +1,6 @@
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Gameplay;
 using NoCTF.GameModes.Awd.Scheduling;
 using NoCTF.GameModes.Awdp.Configuration;
@@ -14,7 +15,7 @@ internal static class AwdpDynamicLeaderboardProjection
 
     public static GameModeLeaderboardProjection Project(LeaderboardProjectionInput input)
     {
-        var competition = ParseCompetition(input.CompetitionConfigurationJson);
+        var competition = ParseCompetition(input.CompetitionConfiguration);
         var activeTeams = input.Teams
             .Where(team => !team.IsBanned && !team.IsDeleted)
             .ToDictionary(team => team.Id);
@@ -30,7 +31,7 @@ internal static class AwdpDynamicLeaderboardProjection
             .ToDictionary(challenge => challenge.Id);
         var settingsByChallenge = challenges.ToDictionary(
             pair => pair.Key,
-            pair => Effective(competition, pair.Value.ConfigurationJson));
+            pair => Effective(competition, pair.Value.Rules));
         var defaultSettings = Effective(competition, null);
         AwdpEffectiveConfiguration SettingsFor(Guid challengeId) =>
             settingsByChallenge.GetValueOrDefault(challengeId) ?? defaultSettings;
@@ -362,45 +363,26 @@ internal static class AwdpDynamicLeaderboardProjection
         return checked(completedRounds + 1);
     }
 
-    private static AwdpConfiguration ParseCompetition(string? json)
-    {
-        if (!string.IsNullOrWhiteSpace(json))
-        {
-            try
-            {
-                return AwdpConfigurationParser.ParseCompetition(json);
-            }
-            catch (GameModeConfigurationException)
-            {
-            }
-        }
-        return new(
-            AwdpConfiguration.CurrentSchemaVersion,
-            300,
-            ScoreCurveConfiguration.Default,
-            ScoreCurveConfiguration.Default,
-            RequireBreakBeforeFix: false);
-    }
+    private static AwdpConfiguration ParseCompetition(
+        CompetitionModeConfiguration? configuration) =>
+        configuration is AwdpCompetitionModeConfiguration awdp
+            ? TypedGameModeConfiguration.Awdp(awdp)
+            : TypedGameModeConfiguration.Awdp(
+                (AwdpCompetitionModeConfiguration)CompetitionModeConfigurationDefaults.Create(
+                    GameMode.Awdp, Guid.Empty));
 
-    private static AwdpChallengeConfiguration ParseChallenge(string? json)
-    {
-        if (!string.IsNullOrWhiteSpace(json))
-        {
-            try
-            {
-                return AwdpConfigurationParser.ParseChallenge(json);
-            }
-            catch (GameModeConfigurationException)
-            {
-            }
-        }
-        return new(AwdpChallengeConfiguration.CurrentSchemaVersion, null, null, null, null, null);
-    }
+    private static AwdpChallengeConfiguration ParseChallenge(
+        CompetitionChallengeRules? rules) => rules is AwdpCompetitionChallengeRules awdp
+        ? TypedGameModeConfiguration.Awdp(awdp)
+        : new(null, null, null, null, null);
 
     private static AwdpEffectiveConfiguration Effective(
         AwdpConfiguration competition,
-        string? challengeJson) =>
-        AwdpConfigurationResolver.Resolve(competition, ParseChallenge(challengeJson));
+        CompetitionChallengeRules? rules) =>
+        AwdpConfigurationResolver.Resolve(
+            competition,
+            ParseChallenge(rules),
+            AwdpChallengeConfiguration.Empty);
 
     private static long PenaltyFor(
         LeaderboardGameplayFact fact,

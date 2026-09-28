@@ -1,32 +1,29 @@
 import { markRaw, toRefs } from 'vue'
+import type { NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract, NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract } from '../../api'
 
 import type { ConfigFieldDef, ConfigValues, GameModeValue } from '../../utils/game-config'
-import { challengeRuleFields, parseConfigValues, serializeConfigValues } from '../../utils/game-config'
+import { buildConfigValues, challengeRuleFields, readConfigValues } from '../../utils/game-config'
 import ConfigFieldInputComponent from './ConfigFieldInput.vue'
 
 /** Owns state, effects and commands for ChallengeRulesEditor. */
 export function useChallengeRulesEditor(props: Readonly<Omit<{
   mode: GameModeValue
-  /** 服务器端当前规则 JSON。 */
-  json?: string | null
-  /** 当前竞赛配置 JSON，用于展示继承后的具体值。 */
-  inheritedJson?: string | null
+  rules?: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract | null
+  inheritedConfiguration?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract | null
   readonly?: boolean
   loading?: boolean
   saving?: boolean
   hiddenKeys?: string[]
-}, "json" | "inheritedJson" | "readonly" | "loading" | "saving" | "hiddenKeys"> & Required<Pick<{
+}, "rules" | "inheritedConfiguration" | "readonly" | "loading" | "saving" | "hiddenKeys"> & Required<Pick<{
   mode: GameModeValue
-  /** 服务器端当前规则 JSON。 */
-  json?: string | null
-  /** 当前竞赛配置 JSON，用于展示继承后的具体值。 */
-  inheritedJson?: string | null
+  rules?: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract | null
+  inheritedConfiguration?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract | null
   readonly?: boolean
   loading?: boolean
   saving?: boolean
   hiddenKeys?: string[]
-}, "json" | "inheritedJson" | "readonly" | "loading" | "saving" | "hiddenKeys">>>,
-emit: { (event: "save", ...args: [json: string]): void }) {
+}, "rules" | "inheritedConfiguration" | "readonly" | "loading" | "saving" | "hiddenKeys">>>,
+emit: { (event: "save", ...args: [rules: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract]): void }) {
   const fields = computed(() => challengeRuleFields(props.mode)
     .filter(field => !props.hiddenKeys.includes(field.key)))
 
@@ -37,13 +34,21 @@ emit: { (event: "save", ...args: [json: string]): void }) {
   const parseFailed = ref(false)
 
   const inheritedValues = computed(() =>
-    parseConfigValues(props.inheritedJson, fields.value)?.values ?? {},
+    readConfigValues(
+      props.inheritedConfiguration as Record<string, unknown> | null,
+      fields.value,
+      { rules: false },
+    )?.values ?? {},
   )
 
   watch(
-    [() => props.json, () => props.mode],
+    [() => props.rules, () => props.mode],
     () => {
-      const parsed = parseConfigValues(props.json, fields.value)
+      const parsed = readConfigValues(
+        props.rules as Record<string, unknown> | null,
+        fields.value,
+        { rules: true },
+      )
       if (parsed) {
         values.value = parsed.values
         overridden.value = parsed.overridden
@@ -83,6 +88,7 @@ emit: { (event: "save", ...args: [json: string]): void }) {
     if (value !== null && typeof value === 'object') {
       return Object.fromEntries(
         Object.entries(value as Record<string, unknown>)
+          .filter(([, entry]) => entry !== null && entry !== undefined)
           .sort(([a], [b]) => a.localeCompare(b))
           .map(([k, v]) => [k, canonicalize(v)]),
       )
@@ -90,23 +96,20 @@ emit: { (event: "save", ...args: [json: string]): void }) {
     return value
   }
 
-  function normalize(json: string): string | null {
-    try {
-      return JSON.stringify(canonicalize(JSON.parse(json)))
-    }
-    catch {
-      return null
-    }
+  function normalize(value: unknown): string {
+    return JSON.stringify(canonicalize(value))
   }
 
   const serialized = computed(() =>
-    serializeConfigValues(props.mode, fields.value, values.value, { rules: true, overridden: overridden.value }),
+    buildConfigValues(props.mode, fields.value, values.value, {
+      rules: true,
+      overridden: overridden.value,
+    }) as NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract,
   )
 
   const dirty = computed(() => {
     if (parseFailed.value) return false
-    const original = normalize(props.json ?? '')
-    if (original === null) return true
+    const original = normalize(props.rules)
     return normalize(serialized.value) !== original
   })
 

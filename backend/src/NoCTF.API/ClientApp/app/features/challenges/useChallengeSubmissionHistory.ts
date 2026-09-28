@@ -1,8 +1,9 @@
-import { toRefs } from 'vue'
+import { inject, toRefs } from 'vue'
 
-import { getGameplayFactStatusEndpoint, getGameplayFactValueEndpoint, listGameplayFactsEndpoint } from '../../api'
+import { getGameplayFactValueEndpoint, listGameplayFactsEndpoint } from '../../api'
 import type { NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse, NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse } from '../../api'
 import { createLatestPageRefresh } from '../../lib/latest-page-refresh'
+import { challengeGameplayFactStatusKey, createChallengeGameplayFactStatusReader } from './challenge-gameplay-fact-status'
 
 type Submission = NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse
 
@@ -16,6 +17,7 @@ export function useChallengeSubmissionHistory(props: Readonly<Omit<{
   competitionChallengeId: string
   refreshKey?: number
 }, "refreshKey">>>) {
+  const readStatus = inject(challengeGameplayFactStatusKey) ?? createChallengeGameplayFactStatusReader()
   const valueDialogOpen = ref(false)
 
   const valueSubmission = ref<Submission | null>(null)
@@ -34,13 +36,17 @@ export function useChallengeSubmissionHistory(props: Readonly<Omit<{
         path: { competitionId: props.competitionId },
         query: {
           competitionChallengeId: props.competitionChallengeId,
-          cursor,
+          offset: cursor ? Number(cursor) || 0 : 0,
           limit: 20,
+          desc: true,
         },
       })
       if (response?.status === 404) return { items: [], nextCursor: null }
       if (requestError || !data) throw requestError ?? new Error(translate("ui.failedToLoadSubmissionHistory"))
-      return { items: data.items, nextCursor: data.nextCursor }
+      const pageItems = data.items ?? []
+      const offset = cursor ? Number(cursor) || 0 : 0
+      const nextOffset = offset + pageItems.length
+      return { items: pageItems, nextCursor: nextOffset < (data.total ?? 0) ? String(nextOffset) : null }
     })
 
   const { loadNextPage, refreshLatest } = createLatestPageRefresh({
@@ -69,15 +75,8 @@ export function useChallengeSubmissionHistory(props: Readonly<Omit<{
   async function refreshPending(): Promise<void> {
     const pending = items.value.filter(item => item.id && isGameplayFactPending(item.state))
     await Promise.all(pending.map(async (submission) => {
-      const { data, error: requestError } = await getGameplayFactStatusEndpoint({
-        path: {
-          competitionId: props.competitionId,
-          gameplayFactId: submission.id!,
-        },
-      })
-      if (requestError || !data)
-        throw parseApiError(requestError, translate("ui.failedToRefreshSubmissionStatus"))
-      if (data) applyStatus(data)
+      const data = await readStatus(props.competitionId, submission.id!)
+      applyStatus(data)
     }))
   }
 

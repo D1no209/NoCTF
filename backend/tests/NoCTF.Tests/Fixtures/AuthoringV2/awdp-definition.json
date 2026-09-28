@@ -12,7 +12,7 @@
         "noNewPrivileges": true,
         "readonlyRootfs": false,
         "runAsNonRoot": true,
-        "capDrop": ["ALL"],
+        "capDrop": [],
         "capAdd": []
       }
     },

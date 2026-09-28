@@ -3,18 +3,59 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdChallengesIndexPageViewState } from '~/features/routes/admin/competitions/[id]/challenges/useAdminCompetitionsByIdChallengesIndexPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdChallengesIndexPageViewState }>()
-const { Plus, competitionId, competition, canWrite, items, loading, error, includeDeleted, pendingId, addOpen, templatesLoading, selectedTemplateId, newCustomTitle, newOrder, adding, addError, modeTemplates, openAdd, addChallenge, deleteTarget, deletePending, deleteError, closeDeleteDialog, beginDeleteChallenge, removeChallenge, restoreChallenge, onClickAddOpen } = toRefs(viewProps.state)
+const { Plus, competitionId, competition, canWrite, items, loading, error, includeDeleted, search, directionFilter, directionOptions, statusFilter, filteredItems, pageItems, page, pageLimit, pageCount, total, loadPage, setPageSize, pendingId, addOpen, templatesLoading, selectedTemplateId, templateSearch, hideAddedTemplates, newCustomTitle, newOrder, adding, addError, modeTemplates, visibleModeTemplates, openAdd, addChallenge, deleteTarget, deletePending, deleteError, closeDeleteDialog, beginDeleteChallenge, removeChallenge, restoreChallenge, setChallengePublished, onClickAddOpen } = toRefs(viewProps.state)
 </script>
 
 <template>
   <div class="flex flex-col gap-4">
-    <div class="flex items-center justify-between">
-      <div class="flex items-center gap-2">
-        <Checkbox id="show-deleted" v-model="includeDeleted" />
-        <Label for="show-deleted" class="text-sm text-muted-foreground">{{ $t('ui.showDeleted') }}</Label>
+    <div class="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+      <div class="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(16rem,1fr)_12rem_12rem]">
+        <Field>
+          <FieldLabel for="competition-challenge-search">{{ $t('ui.search') }}</FieldLabel>
+          <Input
+            id="competition-challenge-search"
+            v-model="search"
+            :placeholder="$t('ui.searchCompetitionChallenges')"
+          />
+        </Field>
+        <Field>
+          <FieldLabel for="competition-challenge-direction">{{ $t('ui.category') }}</FieldLabel>
+          <Select id="competition-challenge-direction" v-model="directionFilter">
+            <SelectTrigger class="w-full"><SelectValue /></SelectTrigger>
+            <SelectContent position="popper">
+              <SelectGroup>
+                <SelectItem value="all">{{ $t('ui.allDirections') }}</SelectItem>
+                <SelectItem v-for="option in directionOptions" :key="option.value" :value="option.value">
+                  {{ option.label }}
+                </SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field>
+          <FieldLabel for="competition-challenge-status">{{ $t('ui.status') }}</FieldLabel>
+          <Select id="competition-challenge-status" v-model="statusFilter">
+            <SelectTrigger class="w-full"><SelectValue /></SelectTrigger>
+            <SelectContent position="popper">
+              <SelectGroup>
+                <SelectItem value="all">{{ $t('ui.statusAll') }}</SelectItem>
+                <SelectItem value="published">{{ $t('ui.published') }}</SelectItem>
+                <SelectItem value="unpublished">{{ $t('ui.unpublished') }}</SelectItem>
+                <SelectItem value="deleted" :disabled="!includeDeleted">{{ $t('ui.deleted') }}</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </Field>
       </div>
-      <Button v-if="canWrite" size="sm" @click="openAdd">
-        <Plus data-icon="inline-start" /> {{ $t('ui.addFromQuestionBank') }} </Button>
+      <div class="flex flex-wrap items-center justify-between gap-3 xl:justify-end">
+        <div class="flex h-10 items-center gap-2">
+          <Checkbox id="show-deleted" v-model="includeDeleted" />
+          <Label for="show-deleted" class="text-sm text-muted-foreground">{{ $t('ui.showDeleted') }}</Label>
+        </div>
+        <Button v-if="canWrite" size="sm" @click="openAdd">
+          <Plus data-icon="inline-start" /> {{ $t('ui.addFromQuestionBank') }}
+        </Button>
+      </div>
     </div>
 
     <Alert v-if="error" variant="destructive">
@@ -30,6 +71,13 @@ const { Plus, competitionId, competition, canWrite, items, loading, error, inclu
       </EmptyHeader>
     </Empty>
 
+    <Empty v-else-if="filteredItems.length === 0" class="py-12">
+      <EmptyHeader>
+        <EmptyTitle>{{ $t('ui.noMatchingCompetitionChallenges') }}</EmptyTitle>
+        <EmptyDescription>{{ $t('ui.adjustYourSearchOrFilters') }}</EmptyDescription>
+      </EmptyHeader>
+    </Empty>
+
     <Table v-else>
       <TableHeader>
         <TableRow>
@@ -41,13 +89,14 @@ const { Plus, competitionId, competition, canWrite, items, loading, error, inclu
         </TableRow>
       </TableHeader>
       <TableBody>
-        <TableRow v-for="c in items" :key="c.id" :class="{ 'opacity-60': c.deletedAt }">
+        <TableRow v-for="c in pageItems" :key="c.id" :class="{ 'opacity-60': c.deletedAt }">
           <TableCell class="font-mono tabular-nums">{{ c.order }}</TableCell>
           <TableCell>
             <NuxtLink
               v-if="!c.deletedAt"
               class="font-medium underline-offset-4 hover:underline"
               :to="`/admin/competitions/${competitionId}/challenges/${c.id}`"
+              prefetch-on="interaction"
             >
               {{ c.title }}
             </NuxtLink>
@@ -60,6 +109,20 @@ const { Plus, competitionId, competition, canWrite, items, loading, error, inclu
           </TableCell>
           <TableCell>
             <Badge v-if="c.deletedAt" variant="destructive">{{ $t('ui.deleted') }}</Badge>
+            <div v-else-if="canWrite" class="flex items-center gap-2">
+              <Spinner v-if="pendingId === c.id" class="size-4" />
+              <Switch
+                v-else
+                :id="`challenge-published-${c.id}`"
+                :model-value="c.isPublished"
+                :disabled="pendingId !== null"
+                :aria-label="c.isPublished ? $t('ui.unpublishCompetitionChallenge') : $t('ui.publishCompetitionChallenge')"
+                @update:model-value="setChallengePublished(c, $event)"
+              />
+              <FieldLabel :for="`challenge-published-${c.id}`" class="whitespace-nowrap text-xs">
+                {{ c.isPublished ? $t('ui.published') : $t('ui.unpublished') }}
+              </FieldLabel>
+            </div>
             <Badge v-else :variant="c.isPublished ? 'default' : 'outline'">
               {{ c.isPublished ? $t('ui.published') : $t('ui.unpublished') }}
             </Badge>
@@ -70,7 +133,7 @@ const { Plus, competitionId, competition, canWrite, items, loading, error, inclu
                 v-if="c.deletedAt"
                 variant="outline"
                 size="sm"
-                :disabled="pendingId === c.id"
+                :disabled="pendingId !== null"
                 @click="restoreChallenge(c)"
               >
                 <Spinner v-if="pendingId === c.id" data-icon="inline-start" /> {{ $t('ui.restore2') }} </Button>
@@ -78,7 +141,7 @@ const { Plus, competitionId, competition, canWrite, items, loading, error, inclu
                 v-else
                 variant="ghost"
                 size="sm"
-                :disabled="pendingId === c.id"
+                :disabled="pendingId !== null"
                 @click="beginDeleteChallenge(c)"
               > {{ $t('ui.delete') }} </Button>
             </div>
@@ -86,6 +149,17 @@ const { Plus, competitionId, competition, canWrite, items, loading, error, inclu
         </TableRow>
       </TableBody>
     </Table>
+
+    <OffsetPagination
+      v-if="filteredItems.length > 0"
+      :page="page"
+      :page-count="pageCount"
+      :total="total"
+      :limit="pageLimit"
+      :loading="loading"
+      @update:page="loadPage"
+      @update:limit="setPageSize"
+    />
 
     <Dialog v-model:open="addOpen">
       <DialogContent>
@@ -100,20 +174,40 @@ const { Plus, competitionId, competition, canWrite, items, loading, error, inclu
           <Field>
             <FieldLabel for="tpl">{{ $t('ui.questionBankTemplate') }}</FieldLabel>
             <Skeleton v-if="templatesLoading" class="h-9 w-full" />
-            <Select v-else id="tpl" v-model="selectedTemplateId">
-              <SelectTrigger class="w-full">
-                <SelectValue :placeholder="$t('ui.selectTemplate')" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem v-for="t in modeTemplates" :key="t.id" :value="t.id!">
-                    {{ t.title }}({{ directionLabel(t.direction) }})
-                  </SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+            <template v-else>
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <Input
+                  id="template-search"
+                  v-model="templateSearch"
+                  class="flex-1"
+                  :placeholder="$t('ui.searchQuestionBankTemplates')"
+                  :aria-label="$t('ui.searchQuestionBankTemplates')"
+                />
+                <div class="flex shrink-0 items-center gap-2">
+                  <Switch id="hide-added-templates" v-model="hideAddedTemplates" />
+                  <FieldLabel for="hide-added-templates" class="cursor-pointer whitespace-nowrap text-xs">
+                    {{ $t('ui.hideAddedQuestions') }}
+                  </FieldLabel>
+                </div>
+              </div>
+              <Select id="tpl" v-model="selectedTemplateId">
+                <SelectTrigger class="w-full">
+                  <SelectValue :placeholder="$t('ui.selectTemplate')" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem v-for="t in visibleModeTemplates" :key="t.id" :value="t.id!">
+                      {{ t.title }}({{ directionLabel(t.direction) }})
+                    </SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </template>
             <FieldDescription v-if="!templatesLoading && modeTemplates.length === 0">
               {{ $t('ui.noAvailableTemplatesInTheChallengeLibrary', { mode: enumLabel(GameModeLabel, competition?.mode) }) }}
+            </FieldDescription>
+            <FieldDescription v-else-if="!templatesLoading && visibleModeTemplates.length === 0">
+              {{ $t('ui.noMatchingQuestionBankTemplates') }}
             </FieldDescription>
           </Field>
           <Field>

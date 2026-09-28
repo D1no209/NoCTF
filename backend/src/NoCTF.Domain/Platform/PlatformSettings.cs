@@ -1,11 +1,13 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace NoCTF.Domain.Platform;
 
-public sealed class PlatformSettings
+public sealed class PlatformSettings : NoCTF.Domain.Shared.IConcurrencyTracked
 {
     [Key]
     public short Id { get; set; }
+    public Guid ConcurrencyStamp { get; set; } = Guid.NewGuid();
 
     [MaxLength(100)]
     public string Name { get; set; } = string.Empty;
@@ -21,6 +23,8 @@ public sealed class PlatformSettings
     public bool HumanVerificationRuntimeEnabled { get; set; } = true;
 
     public bool HumanVerificationEvaluationEnabled { get; set; } = true;
+
+    public bool CtfPatchVerificationEnabled { get; set; }
 
     public HumanVerificationProvider? HumanVerificationProvider { get; set; }
 
@@ -39,7 +43,21 @@ public sealed class PlatformSettings
     [MaxLength(4096)]
     public byte[]? HumanVerificationTurnstileSecretCiphertext { get; set; }
 
-    public string[] HumanVerificationTurnstileAllowedHostnames { get; set; } = [];
+    public List<HumanVerificationTurnstileHostname> HumanVerificationTurnstileHostnames { get; set; } = [];
+    [NotMapped]
+    public string[] HumanVerificationTurnstileAllowedHostnames
+    {
+        get => HumanVerificationTurnstileHostnames.OrderBy(hostname => hostname.Position)
+            .Select(hostname => hostname.Hostname).ToArray();
+        set => HumanVerificationTurnstileHostnames = (value ?? [])
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select((hostname, position) => new HumanVerificationTurnstileHostname
+            {
+                PlatformSettingsId = Id,
+                Position = position,
+                Hostname = hostname
+            }).ToList();
+    }
 
     public bool EmailVerificationEnabled { get; set; }
 
@@ -72,17 +90,37 @@ public sealed class PlatformSettings
 
     public int EmailSmtpTimeoutSeconds { get; set; }
 
-    public bool PublicGatewayEnabled { get; set; }
-    [MaxLength(128)]
-    public string PublicGatewayConnectorId { get; set; } = string.Empty;
+    public bool SsoEnabled { get; set; }
+
     [MaxLength(2048)]
-    public string PublicGatewayOrigin { get; set; } = string.Empty;
-    public string[] PublicGatewayDirectOrigins { get; set; } = [];
-    [MaxLength(253)]
-    public string PublicGatewayRuntimeHost { get; set; } = string.Empty;
-    [MaxLength(253)]
-    public string? PublicGatewayDirectHostOverride { get; set; }
-    public int PublicGatewayMaxPorts { get; set; }
+    public string SsoPublicBaseUrl { get; set; } = string.Empty;
+
+    public List<SsoProviderConfiguration> SsoProviders { get; set; } = [];
+
+    [NotMapped]
+    public SsoConfiguration SsoConfiguration
+    {
+        get => new()
+        {
+            Enabled = SsoEnabled,
+            PublicBaseUrl = SsoPublicBaseUrl,
+            Providers = SsoProviders
+        };
+        set
+        {
+            SsoEnabled = value?.Enabled ?? false;
+            SsoPublicBaseUrl = value?.PublicBaseUrl ?? string.Empty;
+            SsoProviders = value?.Providers ?? [];
+        }
+    }
 
     public DateTimeOffset UpdatedAt { get; set; }
+}
+
+public sealed class HumanVerificationTurnstileHostname
+{
+    public short PlatformSettingsId { get; set; }
+    public int Position { get; set; }
+    [MaxLength(253)]
+    public string Hostname { get; set; } = string.Empty;
 }

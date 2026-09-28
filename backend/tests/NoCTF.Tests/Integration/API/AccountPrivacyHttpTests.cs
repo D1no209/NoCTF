@@ -12,8 +12,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -27,6 +25,7 @@ using NoCTF.Application.Authentication.Privacy;
 using NoCTF.Application.Teams.Moderation;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Notifications;
+using NoCTF.Domain.Platform;
 using NoCTF.Infrastructure.Authentication;
 using NoCTF.Infrastructure.Authentication.Privacy;
 using NoCTF.Infrastructure.Notifications;
@@ -41,19 +40,54 @@ namespace NoCTF.Tests.Integration.API;
 public sealed class AccountPrivacyHttpTests
 {
     [Test, Timeout(300_000)]
-    public async Task Incremental_migration_private_endpoints_scope_retention_and_authentication_events(CancellationToken ct)
+    public async Task Current_baseline_private_endpoints_scope_retention_and_authentication_events(CancellationToken ct)
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
             await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193").Build();
             await postgres.StartAsync(ct);
-            var options = new DbContextOptionsBuilder<NoCtfDbContext>().UseNpgsql(postgres.GetConnectionString()).UseSnakeCaseNamingConvention().Options;
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString(), npgsql => npgsql.MigrationsAssembly(
+                    typeof(NoCTF.Persistence.PostgreSql.PostgreSqlPersistence).Assembly.FullName))
+                .UseSnakeCaseNamingConvention().Options;
             await using var db = new NoCtfDbContext(options);
-            await db.GetService<IMigrator>().MigrateAsync("20260904120421_ChallengeTemplateTestRuntimes", ct);
-            var existing = Guid.NewGuid();
-            await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO users (id,user_name,normalized_user_name,email,password_hash,kind,role,account_status,token_version,created_at,updated_at) VALUES ({existing},'existing','EXISTING','existing@example.test','unused',0,0,0,0,now(),now())", ct);
             await db.Database.MigrateAsync(ct);
-            await Assert.That((await db.Users.SingleAsync(x => x.Id == existing, ct)).SchoolFullName).IsNull();
+            var existing = Guid.NewGuid();
+            db.Users.Add(new User
+            {
+                Id = existing,
+                UserName = "existing",
+                NormalizedUserName = "EXISTING",
+                Email = "existing@example.test",
+                PasswordHash = "unused",
+                Kind = UserKind.Human,
+                Role = UserRole.User,
+                AccountStatus = UserAccountStatus.Active,
+                CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow
+            });
+            await db.SaveChangesAsync(ct);
+            var existingUser = await db.Users.SingleAsync(x => x.Id == existing, ct);
+            await Assert.That(existingUser.SchoolFullName).IsNull();
+            var providerId = Guid.NewGuid();
+            existingUser.ExternalIdentityProviderId = providerId;
+            existingUser.ExternalIdentityProtocol = SsoProtocol.Cas;
+            existingUser.ExternalIdentityNamespace = "school";
+            existingUser.ExternalIdentitySubject = "student-001";
+            existingUser.ExternalIdentityBoundAt = DateTimeOffset.UtcNow;
+            var platformSettings = await db.PlatformSettings.SingleAsync(ct);
+            platformSettings.SsoConfiguration.Providers.Add(new CasSsoProviderConfiguration
+            {
+                Id = providerId,
+                Name = "School SSO",
+                IconUrl = "https://sso.example.test/icon.png",
+                Enabled = true,
+                AllowBinding = true,
+                AllowedHosts = ["sso.example.test"],
+                IdentityNamespace = "school",
+                LoginUrl = "https://sso.example.test/login",
+                ServiceValidateUrl = "https://sso.example.test/serviceValidate"
+            });
             var fixture = new CompetitionForceDeleteFixture();
             await fixture.SeedAsync(db, ct);
             var owner = Guid.NewGuid(); var manager = Guid.NewGuid(); var judge = Guid.NewGuid(); var observer = Guid.NewGuid(); var outsider = Guid.NewGuid();
@@ -74,7 +108,8 @@ public sealed class AccountPrivacyHttpTests
             await store.RecordLoginAsync(null, fixture.Now, ct);
             var failure = await db.Notifications.SingleAsync(x => x.Kind == NotificationKind.AuthenticationSecurityActivity && x.SourceId == null, ct);
             await Assert.That(failure.SourceType).IsEqualTo(NotificationSourceType.System);
-            await Assert.That(JsonSerializer.Deserialize<AccountActivity>(failure.ContentJson)!.Kind).IsEqualTo(AccountActivityKind.LoginFailed);
+            await Assert.That((AccountActivityKind)failure.ActionValue!.Value)
+                .IsEqualTo(AccountActivityKind.LoginFailed);
             var registrationId = Guid.NewGuid();
             var auth = new AuthenticationStore(db, new PasswordHasher<User>(), source: source);
             await auth.RegisterAsync(registrationId, "new-user", "new@example.test", "long-password", fixture.Now, ct);
@@ -106,6 +141,8 @@ public sealed class AccountPrivacyHttpTests
                 if (!allowed) continue;
                 var detail = (await response.Content.ReadFromJsonAsync<PrivateAccountResponse>(ct))!;
                 await Assert.That(detail.Identity.StudentNumber).IsEqualTo("001Ab");
+                await Assert.That(detail.SsoBinding!.ProviderName).IsEqualTo("School SSO");
+                await Assert.That(detail.SsoBinding.Subject).IsEqualTo("student-001");
                 await Assert.That(detail.Activities.All(x => x.CompetitionId == fixture.Id && x.Kind == "PatchUploaded")).IsTrue();
                 await Assert.That(detail.Activities.Single(x => x.Id == fact.Id).IpAddress).IsEqualTo("192.0.2.9");
             }
@@ -115,7 +152,7 @@ public sealed class AccountPrivacyHttpTests
                 await Assert.That(pending.StatusCode).IsEqualTo(HttpStatusCode.OK);
             await db.Teams.Where(x => x.Id == team.Id).ExecuteUpdateAsync(s => s.SetProperty(x => x.RegistrationStatus, NoCTF.Domain.Teams.TeamRegistrationStatus.Rejected), ct);
             using (var rejected = await client.GetAsync(path, ct))
-                await Assert.That(rejected.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+                await Assert.That(rejected.StatusCode).IsEqualTo(HttpStatusCode.OK);
             await db.Teams.Where(x => x.Id == team.Id).ExecuteUpdateAsync(s => s.SetProperty(x => x.RegistrationStatus, NoCTF.Domain.Teams.TeamRegistrationStatus.Approved), ct);
             using (var cross = await client.GetAsync(path.Replace(fixture.Id.ToString(), fixture.OtherId.ToString()), ct))
                 await Assert.That(cross.StatusCode).IsEqualTo(HttpStatusCode.NotFound);

@@ -3,13 +3,14 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdTeamsPageViewState } from '~/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdTeamsPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdTeamsPageViewState }>()
-const { competitionId, canJudge, canWrite, teams, loading, error, pendingId, tracks, tracksEnabled, selectedTeam, teamMembers, teamDetailLoading, teamDisplayNames, displayTeamName, scoreAdjustmentTeam, scoreAdjustmentChallenges, scoreAdjustmentChallengeId, scoreAdjustmentDelta, scoreAdjustmentLoading, scoreAdjustmentPending, scoreAdjustmentError, scoreAdjustmentValid, openScoreAdjustment, closeScoreAdjustment, submitScoreAdjustment, openTeamDetail, assignTrackValue, simpleAction, banDialog, banReason, banAnnouncePublicly, banPending, banReasonValid, openBan, submitBan, appeals, appealsLoading, appealsError, appealDialog, appealReason, appealPending, openAppeal, submitAppeal, PrivateAccountPanel, onUpdateOpenOpen, onClickScoreAdjustmentTeam, onUpdateOpenBanDialog, onClickBanDialog, onUpdateOpenAppealDialog, onClickAppealDialog } = toRefs(viewProps.state)
+const { competitionId, canJudge, canWrite, teams, search, loading, pageLoading, error, page, pageCount, total, pageLimit, loadPage, setPageSize, pendingId, tracks, tracksEnabled, registrationStatusOptions, selectedTeam, teamMembers, teamDetailLoading, teamInvitationToken, teamInvitationLoading, teamInvitationError, reloadTeamInvitation, copyTeamInvitation, expandedMemberId, setExpandedMember, teamDisplayNames, displayTeamName, scoreAdjustmentTeam, scoreAdjustmentChallenges, scoreAdjustmentChallengeId, scoreAdjustmentDelta, scoreAdjustmentLoading, scoreAdjustmentPending, scoreAdjustmentError, scoreAdjustmentValid, openScoreAdjustment, closeScoreAdjustment, submitScoreAdjustment, openTeamDetail, assignTrackValue, setRegistrationStatusValue, banDialog, banReason, banAnnouncePublicly, banPending, banReasonValid, openBan, submitBan, appeals, appealsLoading, appealsError, appealDialog, appealReason, appealPending, openAppeal, submitAppeal, PrivateAccountPanel, onUpdateOpenOpen, onClickScoreAdjustmentTeam, onUpdateOpenBanDialog, onClickBanDialog, onUpdateOpenAppealDialog, onClickAppealDialog } = toRefs(viewProps.state)
 </script>
 
 <template>
   <div class="flex flex-col gap-8">
     <div id="ban-appeals" class="flex scroll-mt-24 flex-col gap-4">
       <h2 class="text-lg font-semibold">{{ $t('ui.teamManagement2') }}</h2>
+      <Input v-model="search" :placeholder="$t('ui.searchTeam')" :aria-label="$t('ui.searchTeam')" />
       <Alert v-if="error" variant="destructive">
         <AlertDescription>{{ $message(error) }}</AlertDescription>
       </Alert>
@@ -60,7 +61,26 @@ const { competitionId, canJudge, canWrite, teams, loading, error, pendingId, tra
             </TableCell>
             <TableCell class="font-mono tabular-nums">{{ t.memberIds?.length ?? 0 }}</TableCell>
             <TableCell>
-              <Badge :variant="t.registrationStatus === 'Approved' ? 'default' : t.registrationStatus === 'Rejected' ? 'destructive' : 'secondary'">
+              <DropdownMenu v-if="canWrite">
+                <DropdownMenuTrigger as-child>
+                  <ActionButton type="button" :disabled="pendingId === t.id" :aria-label="$t('ui.changeTeamRegistrationStatus', { team: displayTeamName(t) })">
+                    <Badge :variant="t.registrationStatus === 'Approved' ? 'default' : t.registrationStatus === 'Rejected' ? 'destructive' : 'secondary'">
+                      {{ enumLabel(TeamRegistrationStatusLabel, t.registrationStatus) }}
+                    </Badge>
+                  </ActionButton>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem
+                    v-for="option in registrationStatusOptions"
+                    :key="option.value"
+                    :disabled="pendingId === t.id || option.value === t.registrationStatus"
+                    @select="setRegistrationStatusValue(t, option.value)"
+                  >
+                    {{ $t(option.label) }}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Badge v-else :variant="t.registrationStatus === 'Approved' ? 'default' : t.registrationStatus === 'Rejected' ? 'destructive' : 'secondary'">
                 {{ enumLabel(TeamRegistrationStatusLabel, t.registrationStatus) }}
               </Badge>
             </TableCell>
@@ -71,10 +91,6 @@ const { competitionId, canJudge, canWrite, teams, loading, error, pendingId, tra
             <TableCell class="font-mono tabular-nums">{{ adminFormatDateTime(t.registeredAt) }}</TableCell>
             <TableCell v-if="canWrite || canJudge" class="text-right">
               <div class="flex flex-wrap justify-end gap-1">
-                <template v-if="canWrite && t.registrationStatus === 'Pending'">
-                  <Button size="sm" :disabled="pendingId === t.id" @click="simpleAction(t, 'approve')">{{ $t('ui.pass') }}</Button>
-                  <Button variant="outline" size="sm" :disabled="pendingId === t.id" @click="simpleAction(t, 'reject')">{{ $t('ui.reject') }}</Button>
-                </template>
                 <Button v-if="canJudge" variant="outline" size="sm" :disabled="pendingId === t.id" @click="openScoreAdjustment(t)">
                   {{ $t('ui.adjustScore') }}
                 </Button>
@@ -89,6 +105,16 @@ const { competitionId, canJudge, canWrite, teams, loading, error, pendingId, tra
           </TableRow>
         </TableBody>
       </Table>
+      <OffsetPagination
+        v-if="teams.length > 0 || total > 0"
+        :page="page"
+        :page-count="pageCount"
+        :total="total"
+        :limit="pageLimit"
+        :loading="pageLoading"
+        @update:page="loadPage"
+        @update:limit="setPageSize"
+      />
     </div>
 
     <Sheet :open="selectedTeam !== null" @update:open="onUpdateOpenOpen">
@@ -107,6 +133,23 @@ const { competitionId, canJudge, canWrite, teams, loading, error, pendingId, tra
             <dd>{{ selectedTeam.isBanned ? $t('ui.banned2') : $t('ui.normal') }}</dd>
             <dt class="text-muted-foreground">{{ $t('ui.registrationTime') }}</dt>
             <dd class="font-mono tabular-nums">{{ adminFormatDateTime(selectedTeam.registeredAt) }}</dd>
+            <dt v-if="canWrite" class="text-muted-foreground">{{ $t('ui.invitationCode') }}</dt>
+            <dd v-if="canWrite" class="min-w-0">
+              <Skeleton v-if="teamInvitationLoading" class="h-10 w-full" />
+              <div v-else-if="teamInvitationError" class="flex flex-wrap items-center gap-2">
+                <span role="alert" class="text-sm text-destructive">{{ $message(teamInvitationError) }}</span>
+                <Button type="button" size="sm" variant="outline" @click="reloadTeamInvitation">
+                  {{ $t('ui.retry') }}
+                </Button>
+              </div>
+              <div v-else-if="teamInvitationToken" class="flex min-w-0 items-center gap-2">
+                <Input :model-value="teamInvitationToken" readonly class="min-w-0 font-mono" />
+                <Button type="button" size="sm" variant="outline" @click="copyTeamInvitation">
+                  {{ $t('ui.copy') }}
+                </Button>
+              </div>
+              <span v-else class="text-muted-foreground">-</span>
+            </dd>
           </dl>
           <Separator />
           <section class="flex flex-col gap-3">
@@ -114,25 +157,41 @@ const { competitionId, canJudge, canWrite, teams, loading, error, pendingId, tra
             <div v-if="teamDetailLoading" class="flex items-center gap-2 text-sm text-muted-foreground">
               <Spinner class="size-4" />{{ $t('ui.loading2') }}
             </div>
-            <div v-else class="flex flex-col divide-y rounded-md border">
-              <div v-for="member in teamMembers" :key="member.userId" class="flex flex-wrap items-center gap-3 p-3">
-                <Avatar class="size-9">
-                  <AvatarImage v-if="member.avatarUrl" :src="member.avatarUrl" :alt="member.userName ?? ''" />
-                  <AvatarFallback>{{ member.userName?.slice(0, 2) }}</AvatarFallback>
-                </Avatar>
-                <div class="min-w-0 flex-1">
-                  <NuxtLink :to="`/users/${member.userId}`" class="font-medium hover:underline">
-                    {{ member.userName }}
-                  </NuxtLink>
+            <Accordion
+              v-else
+              type="single"
+              collapsible
+              :model-value="expandedMemberId ?? undefined"
+              class="rounded-md bg-muted/20"
+              @update:model-value="setExpandedMember"
+            >
+              <AccordionItem v-for="member in teamMembers" :key="member.userId" :value="member.userId!" class="px-3">
+                <div class="flex flex-wrap items-center gap-3 py-3">
+                  <Avatar class="size-9">
+                    <AvatarImage v-if="member.avatarUrl" :src="member.avatarUrl" :alt="member.userName ?? ''" />
+                    <AvatarFallback>{{ member.userName?.slice(0, 2) }}</AvatarFallback>
+                  </Avatar>
+                  <div class="min-w-0 flex-1">
+                    <NuxtLink :to="`/users/${member.userId}`" class="font-medium hover:underline">
+                      {{ member.userName }}
+                    </NuxtLink>
+                  </div>
+                  <Badge v-if="member.userId === selectedTeam.captainId" variant="secondary">{{ $t('ui.captain') }}</Badge>
                 </div>
-                <Badge v-if="member.userId === selectedTeam.captainId" variant="secondary">{{ $t('ui.captain') }}</Badge>
-                <Collapsible v-if="canJudge && member.userId && selectedTeam.id" class="w-full">
-                  <CollapsibleTrigger as-child><Button variant="outline" size="sm">{{ $t('ui.privateMemberDetails') }}</Button></CollapsibleTrigger>
-                  <CollapsibleContent class="pt-4"><component :is="PrivateAccountPanel" :user-id="member.userId" :competition-id="competitionId" :team-id="selectedTeam.id" /></CollapsibleContent>
-                </Collapsible>
-              </div>
+                <AccordionTrigger v-if="canJudge">{{ $t('ui.privateMemberDetails') }}</AccordionTrigger>
+                <AccordionContent v-if="canJudge" class="pb-3">
+                  <component
+                    :is="PrivateAccountPanel"
+                    v-if="expandedMemberId === member.userId && member.userId && selectedTeam.id"
+                    :user-id="member.userId"
+                    :competition-id="competitionId"
+                    :team-id="selectedTeam.id"
+                    :show-activities="false"
+                  />
+                </AccordionContent>
+              </AccordionItem>
               <p v-if="!teamMembers.length" class="p-3 text-sm text-muted-foreground">{{ $t('ui.noMembers') }}</p>
-            </div>
+            </Accordion>
           </section>
         </div>
       </SheetContent>

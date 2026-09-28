@@ -20,6 +20,9 @@ public sealed class StopSharedRuntimeEndpoint(
         Delete("/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes/{runtimeInstanceId}");
         AuthSchemes("Bearer");
         Options(builder => builder.WithMetadata(new NoCTF.API.Security.ProtectedEntryMetadata(NoCTF.API.Security.ProtectedEntry.RuntimeCommand)));
+        Options(builder => builder.WithMetadata(
+            new NoCTF.Hosting.Observability.RuntimeOperationMetricsMetadata(
+                NoCTF.Application.Observability.RuntimeOperationMetricKind.SharedStop)));
         Description(builder => builder.WithName("AdminStopSharedRuntime")
             .ProducesProblemFE(StatusCodes.Status409Conflict));
         Summary(summary =>

@@ -4,16 +4,18 @@ import { toRefs } from 'vue'
 
 import { Plus, X } from '@lucide/vue'
 import type { ComposeDefinitionModel } from '../../utils/game-config'
-import { bytesToMib, coresToNanoCpus, mibToBytes, nanoCpusToCores } from '../../utils/game-config'
+import { bytesToMib, coresToNanoCpus, FlagSource, mibToBytes, nanoCpusToCores } from '../../utils/game-config'
 
 /** Owns state, effects and commands for DefinitionCompose. */
 export function useDefinitionCompose(props: Readonly<Omit<{
   definition: ComposeDefinitionModel
+  flagSource?: number
   disabled?: boolean
-}, "disabled"> & Required<Pick<{
+}, "flagSource" | "disabled"> & Required<Pick<{
   definition: ComposeDefinitionModel
+  flagSource?: number
   disabled?: boolean
-}, "disabled">>>) {
+}, "flagSource" | "disabled">>>) {
   function addService(definition: ComposeDefinitionModel): void {
     definition.serviceResources.push({ service: '', memoryBytes: null, nanoCpus: null, pidsLimit: null })
   }
@@ -23,6 +25,7 @@ export function useDefinitionCompose(props: Readonly<Omit<{
     || Object.keys(props.definition.labels).length > 0
     || Object.keys(props.definition.flagEnvironmentVariables).length > 0,
   )
+  const showFlagEnvironmentVariables = computed(() => props.flagSource !== FlagSource.Static)
 
   const viewBindings = {
       ...toRefs(props),
@@ -33,7 +36,8 @@ export function useDefinitionCompose(props: Readonly<Omit<{
       mibToBytes,
       nanoCpusToCores,
       addService,
-      hasMetadata
+      hasMetadata,
+      showFlagEnvironmentVariables
     }
   const viewState = proxyRefs(viewBindings)
 

@@ -65,14 +65,13 @@ public sealed class TeamWriteUpPersistenceTests
                     User(ownerId, "writeup-owner", now),
                     User(memberId, "writeup-member", now),
                     User(outsiderId, "writeup-outsider", now));
-                db.Competitions.Add(new Competition
+                db.Competitions.Add(new CtfCompetition
                 {
                     Id = competitionId,
                     OwnerId = ownerId,
                     Title = "WriteUp competition",
-                    Mode = GameMode.Ctf,
                     Status = CompetitionStatus.Running,
-                    ConfigurationJson = "{}",
+                    ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
                     FlagDerivationSecret = new byte[32],
                     StartAt = now.AddHours(-2),
                     EndAt = now.AddHours(1),
@@ -296,7 +295,7 @@ public sealed class TeamWriteUpPersistenceTests
     private static byte[] PdfBytes(string body) =>
         System.Text.Encoding.ASCII.GetBytes($"%PDF-1.7\n{body}\n%%EOF\n");
 
-    private sealed class RecordingOutbox : ITransactionalMessageOutbox
+    private sealed class RecordingOutbox : IPostCommitMessagePublisher
     {
         public List<object> Published { get; } = [];
 

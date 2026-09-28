@@ -8,12 +8,12 @@ import { reactiveOmit } from '@vueuse/core'
 import {
   DialogClose,
   DialogContent as RekaDialogContent,
-  DialogOverlay,
   DialogPortal,
   useForwardPropsEmits,
 } from 'reka-ui'
 import { cn } from '~/lib/utils'
 import { Card } from '~/components/ui/card'
+import DialogOverlay from '~/components/ui/dialog/DialogOverlay.vue'
 
 defineOptions({
   inheritAttrs: false,
@@ -37,7 +37,7 @@ function preventScrollbarDismiss(event: PointerDownOutsideEvent) {
 
 <template>
   <DialogPortal>
-    <DialogOverlay data-scroll-surface data-scroll-axis="y"
+    <DialogOverlay v-scroll-surface data-scroll-surface data-scroll-axis="y"
       class="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-black/80  data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
     >
       <Card

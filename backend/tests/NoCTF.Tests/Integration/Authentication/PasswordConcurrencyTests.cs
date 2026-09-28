@@ -31,7 +31,7 @@ public sealed class PasswordConcurrencyTests
             await using var changeDb = new NoCtfDbContext(options); await using var resetDb = new NoCtfDbContext(options);
             var change = new AuthenticationStore(changeDb, hasher).ChangePasswordAsync(user.Id, "old-password", "changed-password", DateTimeOffset.UtcNow, ct);
             var reset = new PasswordResetStore(resetDb, hasher, Substitute.For<IEmailVerificationConfigurationStore>(),
-                Substitute.For<IEmailVerificationDeliveryConfigurationReader>(), new NoOpTransactionalMessageOutbox())
+                Substitute.For<IEmailVerificationDeliveryConfigurationReader>(), new NoOpPostCommitMessagePublisher())
                 .CompleteAsync(token, "reset-password", DateTimeOffset.UtcNow, ct);
             await Task.WhenAll(change, reset);
             await Assert.That((await change == ChangePasswordState.Changed ? 1 : 0) + (await reset == PasswordResetCompletionState.Reset ? 1 : 0)).IsEqualTo(1);
@@ -41,24 +41,26 @@ public sealed class PasswordConcurrencyTests
     }
 
     [Test, Timeout(300_000)]
-    public async Task Deferred_automatic_rehash_cannot_restore_the_old_password(CancellationToken ct)
+    public async Task Identity_v2_password_hash_is_rejected(CancellationToken ct)
     {
-        await WithUser(async (options, user, hasher) => {
-            var legacyHasher = new PasswordHasher<User>(Options.Create(new PasswordHasherOptions { CompatibilityMode = PasswordHasherCompatibilityMode.IdentityV2 }));
-            await using (var setup = new NoCtfDbContext(options)) {
-                var entity = await setup.Users.SingleAsync(ct); entity.PasswordHash = legacyHasher.HashPassword(entity, "old-password"); await setup.SaveChangesAsync(ct);
+        await WithUser(async (options, user, hasher) =>
+        {
+            var identityV2 = new PasswordHasher<User>(Options.Create(
+                new PasswordHasherOptions
+                {
+                    CompatibilityMode = PasswordHasherCompatibilityMode.IdentityV2
+                }));
+            await using (var setup = new NoCtfDbContext(options))
+            {
+                var entity = await setup.Users.SingleAsync(ct);
+                entity.PasswordHash = identityV2.HashPassword(entity, "old-password");
+                await setup.SaveChangesAsync(ct);
             }
-            using var gate = new GateHasher(hasher);
-            await using var loginDb = new NoCtfDbContext(options); await using var changeDb = new NoCtfDbContext(options);
-            var login = new AuthenticationStore(loginDb, gate).VerifyPasswordAsync(user.Id, "old-password", ct);
-            await gate.RehashEntered.Task.WaitAsync(TimeSpan.FromSeconds(10), ct);
-            try {
-                await Assert.That(await new AuthenticationStore(changeDb, hasher).ChangePasswordAsync(user.Id, "old-password", "new-password", DateTimeOffset.UtcNow, ct)).IsEqualTo(ChangePasswordState.Changed);
-            } finally { gate.Release.Set(); }
-            await Assert.That(await login).IsFalse();
-            await using var verify = new NoCtfDbContext(options); var final = await verify.Users.SingleAsync(ct);
-            await Assert.That(hasher.VerifyHashedPassword(final, final.PasswordHash, "new-password")).IsNotEqualTo(PasswordVerificationResult.Failed);
-            await Assert.That(final.TokenVersion).IsEqualTo(1);
+
+            await using var verify = new NoCtfDbContext(options);
+            await Assert.That(await new AuthenticationStore(verify, hasher)
+                    .VerifyPasswordAsync(user.Id, "old-password", ct))
+                .IsFalse();
         }, ct);
     }
 
@@ -86,14 +88,6 @@ public sealed class PasswordConcurrencyTests
             await using (var setup = new NoCtfDbContext(options)) { await setup.Database.EnsureCreatedAsync(ct); setup.Users.Add(user); await setup.SaveChangesAsync(ct); }
             await test(options, user, hasher);
         });
-    }
-    private sealed class GateHasher(PasswordHasher<User> inner) : IPasswordHasher<User>, IDisposable
-    {
-        public TaskCompletionSource RehashEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        public ManualResetEventSlim Release { get; } = new(false);
-        public string HashPassword(User user, string password) { RehashEntered.TrySetResult(); if (!Release.Wait(TimeSpan.FromSeconds(15))) throw new TimeoutException("Rehash test barrier timed out."); return inner.HashPassword(user, password); }
-        public PasswordVerificationResult VerifyHashedPassword(User user, string hash, string password) => inner.VerifyHashedPassword(user, hash, password);
-        public void Dispose() => Release.Dispose();
     }
     [Test, Timeout(300_000)]
     public async Task Two_writers_with_the_same_old_password_only_one_can_commit(CancellationToken ct)

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Http.Resilience;
 using Polly;
 using NoCTF.Application.Competitions.Awd;
@@ -26,6 +27,10 @@ using NoCTF.Application.Competitions.Tracks;
 using NoCTF.Infrastructure.Competitions.Tracks;
 using NoCTF.Application.Competitions.Access;
 using NoCTF.Infrastructure.Competitions.Access;
+using NoCTF.Application.Competitions.Webhooks;
+using NoCTF.Infrastructure.Competitions.Webhooks;
+using NoCTF.Application.Competitions.Progression;
+using NoCTF.Infrastructure.Competitions.Progression;
 
 namespace NoCTF.Infrastructure.Competitions;
 
@@ -33,13 +38,24 @@ internal static class CompetitionInfrastructure
 {
     internal static IServiceCollection AddNoCtfCompetitions(
         this IServiceCollection services,
+        IConfiguration configuration,
         bool development)
     {
         services.AddScoped<ICompetitionLifecycleStore, CompetitionLifecycleStore>();
-        services.AddScoped<IAwdRoundCoordinator, PostgresAwdRoundCoordinator>();
-        services.AddScoped<IAwdRuntimeProvisioner, PostgresAwdRuntimeProvisioner>();
-        services.AddScoped<IKohRuntimeProvisioner, PostgresKohRuntimeProvisioner>();
-        services.AddScoped<IKohChallengeAccessReader, PostgresKohChallengeAccessReader>();
+        services.AddScoped<ICompetitionProgressionStore, CompetitionProgressionStore>();
+        services.AddSingleton<ProgressionGraphReadCache>();
+        services.AddScoped<GetCompetitionProgression>();
+        services.AddScoped<SaveCompetitionProgression>();
+        services.AddScoped<ProgressionReconciler>();
+        services.AddScoped<IProgressionChallengeAccess, ProgressionChallengeAccess>();
+        services.AddScoped<IProgressionChallengeStarter, ProgressionChallengeStarter>();
+        services.AddScoped<ICompetitionBadgeStore, CompetitionBadgeStore>();
+        services.AddScoped<ManageCompetitionBadges>();
+        services.AddScoped<IProgressionPlayerReader, ProgressionPlayerReader>();
+        services.AddScoped<IAwdRoundCoordinator, AwdRoundCoordinator>();
+        services.AddScoped<IAwdRuntimeProvisioner, AwdRuntimeProvisioner>();
+        services.AddScoped<IKohRuntimeProvisioner, KohRuntimeProvisioner>();
+        services.AddScoped<IKohChallengeAccessReader, KohChallengeAccessReader>();
         services.AddSingleton<AwdRoundConfigurationCatalog>();
         services.AddSingleton<IAwdRoundConfigurationCatalog,
             FusionAwdRoundConfigurationCatalog>();
@@ -107,8 +123,51 @@ internal static class CompetitionInfrastructure
         services.AddScoped<ListCompetitionEvents>();
         services.AddScoped<ExportCompetitionEvents>();
         services.AddScoped<AccessGameplayFactValue>();
-        if (!development)
-            services.AddSingleton<RedisCompetitionEventRefreshPublisher>();
+        services.AddScoped<ICompetitionWebhookStore, CompetitionWebhookStore>();
+        services.AddScoped<ListCompetitionWebhookTargets>();
+        services.AddScoped<CreateCompetitionWebhookTarget>();
+        services.AddScoped<UpdateCompetitionWebhookTarget>();
+        services.AddScoped<RotateCompetitionWebhookSecret>();
+        services.AddScoped<DeleteCompetitionWebhookTarget>();
+        var publicBaseUrlValue = configuration["Webhooks:PublicBaseUrl"]
+            ?? (development ? "http://localhost:5000" : "https://localhost");
+        if (!Uri.TryCreate(publicBaseUrlValue, UriKind.Absolute, out var webhookPublicBaseUrl)
+            || webhookPublicBaseUrl.Scheme is not ("https" or "http")
+            || webhookPublicBaseUrl.UserInfo.Length > 0
+            || webhookPublicBaseUrl.AbsolutePath != "/"
+            || webhookPublicBaseUrl.Query.Length > 0
+            || webhookPublicBaseUrl.Fragment.Length > 0
+            || !development && webhookPublicBaseUrl.Scheme != Uri.UriSchemeHttps)
+        {
+            throw new InvalidOperationException(
+                "Webhooks:PublicBaseUrl must be an absolute HTTPS origin in production.");
+        }
+        var webhookTimeoutSeconds = configuration.GetValue("Webhooks:TimeoutSeconds", 10);
+        if (webhookTimeoutSeconds is < 1 or > 120)
+            throw new InvalidOperationException("Webhooks:TimeoutSeconds must be between 1 and 120.");
+        services.AddSingleton(new CompetitionWebhookOptions(
+            new Uri(webhookPublicBaseUrl.AbsoluteUri.TrimEnd('/') + "/"),
+            webhookTimeoutSeconds,
+            ReadAllowList(configuration.GetSection(
+                "Webhooks:PrivateNetworkAllowList").Get<string[]>()),
+            ReadAllowList(configuration.GetSection(
+                "Webhooks:InsecureHttpHostAllowList").Get<string[]>())));
+        services.AddScoped<ICompetitionWebhookDeliveryStore, CompetitionWebhookDeliveryStore>();
+        services.AddSingleton<ICompetitionWebhookSender, CompetitionWebhookSender>();
+        services.AddSingleton<ICompetitionWebhookTestStatusStore,
+            FusionCompetitionWebhookTestStatusStore>();
+        if (development)
+            services.AddSingleton<ICompetitionEventRefreshPublisher,
+                NoOpCompetitionEventRefreshPublisher>();
+        else
+            services.AddSingleton<ICompetitionEventRefreshPublisher,
+                NatsCompetitionEventRefreshPublisher>();
         return services;
     }
+
+    private static IReadOnlySet<string> ReadAllowList(string[]? values) =>
+        new HashSet<string>(
+            (values ?? []).Select(value => value.Trim().TrimEnd('.'))
+                .Where(value => value.Length > 0),
+            StringComparer.OrdinalIgnoreCase);
 }

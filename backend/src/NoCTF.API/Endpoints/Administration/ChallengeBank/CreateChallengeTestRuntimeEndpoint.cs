@@ -31,6 +31,9 @@ public sealed class CreateChallengeTestRuntimeEndpoint(
         AuthSchemes("Bearer");
         Roles("Organizer", "Administrator");
         Options(builder => builder.WithMetadata(new ProtectedEntryMetadata(ProtectedEntry.RuntimeCommand)));
+        Options(builder => builder.WithMetadata(
+            new NoCTF.Hosting.Observability.RuntimeOperationMetricsMetadata(
+                NoCTF.Application.Observability.RuntimeOperationMetricKind.TestCreate)));
         Description(builder => builder.WithName("AdminChallengeBankCreateTestRuntime")
             .ProducesProblemFE(StatusCodes.Status409Conflict)
             .ProducesProblemFE(StatusCodes.Status503ServiceUnavailable));
@@ -92,6 +95,11 @@ internal static class ChallengeTestRuntimeMutationEndpoint
             if (result.Failure is RuntimeMutationFailure.InvalidState or RuntimeMutationFailure.Conflict)
                 return TypedResults.Conflict(new RuntimeConflictResponse(
                     "The test Runtime changed while the operation was processed."));
+            if (result.Failure == RuntimeMutationFailure.CapacityExceeded)
+            {
+                NoCTF.Application.Observability.NoCtfTelemetry
+                    .RecordRuntimeMutationFailure(MetricOperation(action), result.Failure.Value);
+            }
             return TypedResults.Problem(
                 statusCode: result.Failure == RuntimeMutationFailure.CapacityExceeded
                     ? StatusCodes.Status503ServiceUnavailable
@@ -104,4 +112,12 @@ internal static class ChallengeTestRuntimeMutationEndpoint
             statusUrl,
             new ChallengeTestRuntimeAcceptedResponse(result.Runtime.Id, statusUrl));
     }
+
+    private static NoCTF.Application.Observability.RuntimeOperationMetricKind MetricOperation(
+        RuntimeAction action) => action switch
+        {
+            RuntimeAction.Extend => NoCTF.Application.Observability.RuntimeOperationMetricKind.TestExtend,
+            RuntimeAction.Stop => NoCTF.Application.Observability.RuntimeOperationMetricKind.TestStop,
+            _ => NoCTF.Application.Observability.RuntimeOperationMetricKind.TestCreate
+        };
 }

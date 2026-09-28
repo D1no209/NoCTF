@@ -17,7 +17,11 @@ public sealed record CompetitionTrackView(
     bool AffectsCompetitiveResults,
     bool IsViewerTrack = false,
     bool RequiresInvitationCode = false,
-    string? InvitationCode = null);
+    string? InvitationCode = null,
+    Guid? RequiredSsoProviderId = null,
+    string? RequiredSsoProviderName = null,
+    string? RequiredSsoProviderIconUrl = null,
+    bool MeetsSsoRequirement = true);
 
 public sealed record CompetitionTracksView(
     Guid CompetitionId,
@@ -38,7 +42,9 @@ public enum CompetitionTrackFailureCode
     InvalidTrackReassignment,
     TeamNotFound,
     TrackNotFound,
-    TrackNotPublicSelectable
+    TrackNotPublicSelectable,
+    TrackSsoIdentityRequired,
+    SsoProviderNotFound
 }
 
 public sealed record CompetitionTrackInvitationCodeUpdate(
@@ -149,6 +155,8 @@ public static partial class CompetitionTrackPolicy
                 errors.Add($"Track '{key ?? track.Key}' can earn blood only in CTF while earning score.");
             if (mode != GameMode.Ctf && track.AffectsDynamicChallengeScore)
                 errors.Add($"Track '{key ?? track.Key}' can affect dynamic challenge scores only in CTF.");
+            if (track.RequiredSsoProviderId == Guid.Empty)
+                errors.Add($"Track '{key ?? track.Key}' has an invalid SSO provider identifier.");
         }
         return errors.Distinct().ToArray();
     }
@@ -158,15 +166,12 @@ public static partial class CompetitionTrackPolicy
         CompetitionTrackConfiguration configuration)
     {
         var errors = new List<string>();
-        if (configuration.SchemaVersion != CompetitionTrackConfiguration.CurrentSchemaVersion)
-            errors.Add($"Track configuration schema version must be {CompetitionTrackConfiguration.CurrentSchemaVersion}.");
         errors.AddRange(Validate(mode, configuration.Tracks));
         return errors.Distinct().ToArray();
     }
 
     public static CompetitionTrackConfiguration Normalize(
         IReadOnlyList<CompetitionTrackDefinition> tracks) => new(
-        CompetitionTrackConfiguration.CurrentSchemaVersion,
         tracks.Select(track => track with
         {
             Key = CompetitionTrackConfiguration.NormalizeKey(track.Key) ?? string.Empty,
@@ -203,7 +208,7 @@ public sealed class UpdateCompetitionTracks(ICompetitionTrackStore store)
         var errors = CompetitionTrackPolicy.Validate(mode, command.Tracks);
         foreach (var update in command.InvitationCodeUpdates ?? [])
         {
-            if (update.InvitationCode is not null
+            if (!string.IsNullOrWhiteSpace(update.InvitationCode)
                 && update.InvitationCode.Trim().Length is < 8 or > 128)
             {
                 errors = errors.Append(

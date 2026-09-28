@@ -1,4 +1,5 @@
 using NoCTF.Application.Messaging;
+using NoCTF.Application.Competitions.Webhooks;
 using Wolverine;
 
 namespace NoCTF.Infrastructure.Messaging;
@@ -32,4 +33,9 @@ public sealed class WolverineBackendMessagePublisher(IMessageBus bus) : IBackend
         Guid competitionId,
         CancellationToken cancellationToken) =>
         await bus.SendAsync(new ProvisionCompetitionRuntimes(competitionId));
+
+    public async ValueTask TestCompetitionWebhookAsync(
+        TestCompetitionWebhook message,
+        CancellationToken cancellationToken) =>
+        await bus.SendAsync(message);
 }

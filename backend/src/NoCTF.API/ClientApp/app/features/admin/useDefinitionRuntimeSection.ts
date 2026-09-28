@@ -1,7 +1,7 @@
 import { markRaw, toRefs } from 'vue'
 
 import type { DefinitionModel, GameModeValue } from '../../utils/game-config'
-import { emptyRuntimeTemplate } from '../../utils/game-config'
+import { applyCtfInteraction, CtfInteraction, emptyRuntimeTemplate } from '../../utils/game-config'
 import DefinitionRuntimeComponent from './DefinitionRuntime.vue'
 
 /** Owns state, effects and commands for DefinitionRuntimeSection. */
@@ -15,7 +15,15 @@ export function useDefinitionRuntimeSection(props: Readonly<Omit<{
   disabled?: boolean
 }, "disabled">>>) {
   function toggleRuntime(enabled: boolean): void {
-    props.model.runtime = enabled ? emptyRuntimeTemplate(props.mode) : null
+    if (!enabled) {
+      props.model.runtime = null
+      return
+    }
+    props.model.runtime = emptyRuntimeTemplate(props.mode)
+    if (props.mode === 'Ctf'
+      && props.model.interactionKind === CtfInteraction.PatchVerification) {
+      applyCtfInteraction(props.model, CtfInteraction.PatchVerification)
+    }
   }
 
   const DefinitionRuntime = markRaw(DefinitionRuntimeComponent)

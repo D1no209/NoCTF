@@ -1,7 +1,7 @@
 import { proxyRefs } from 'vue'
 import { markRaw } from 'vue'
 
-import { Activity, Container, Download, FileCheck, GitBranch, KeyRound, LayoutDashboard, Megaphone, Orbit, Puzzle, Settings, ShieldAlert, Trophy, Users } from '@lucide/vue'
+import { Activity, Container, Download, FileCheck, GitBranch, KeyRound, LayoutDashboard, Megaphone, Network, Orbit, Puzzle, Settings, ShieldAlert, Trophy, Users, Webhook } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { adminCreateCompetitionAnnouncement, adminGetCompetition } from '../../../../api'
 import type { NoCtfapiEndpointsAdministrationCompetitionsAnnouncementAudience, NoCtfapiEndpointsCompetitionsCompetitionResponse } from '../../../../api'
@@ -19,6 +19,16 @@ export function useAdminCompetitionsByIdPage() {
   const activePath = computed(() => route.path)
 
   const competitionId = route.params.id as string
+
+  const base = `/admin/competitions/${competitionId}`
+
+  const isProgressionPage = computed(() => activePath.value ===
+    `${base}/progression`)
+
+  const usesPageScroll = computed(() => activePath.value === `${base}/teams`
+    || activePath.value === `${base}/challenges`
+    || activePath.value.startsWith(`${base}/challenges/`)
+    || isProgressionPage.value)
 
   const { user, isAdministrator } = useAuth()
 
@@ -125,8 +135,6 @@ export function useAdminCompetitionsByIdPage() {
     refresh,
   })
 
-  const base = `/admin/competitions/${competitionId}`
-
   const navGroups = computed<WorkspaceNavGroup[]>(() => [
     {
       label: translate("ui.operations"),
@@ -147,6 +155,7 @@ export function useAdminCompetitionsByIdPage() {
         { to: `/competitions/${competitionId}/events`, label: translate("ui.activity"), icon: Activity },
         { to: `${base}/submissions`, label: translate("ui.submissions"), icon: FileCheck },
         { to: `${base}/runtimes`, label: translate("ui.runtime"), icon: Container },
+        { to: `${base}/traffic-captures`, label: translate("runtime.trafficCaptures"), icon: Network },
         { to: `${base}/cheats`, label: translate("ui.cheating"), icon: ShieldAlert },
         { to: `${base}/leaderboard`, label: translate("ui.leaderboard"), icon: Trophy },
       ],
@@ -155,6 +164,10 @@ export function useAdminCompetitionsByIdPage() {
       label: translate("ui.management"),
       items: [
         { to: `${base}/exports`, label: translate("ui.export"), icon: Download },
+        { to: `${base}/webhooks`, label: translate("webhook.title"), icon: Webhook },
+        ...(competition.value?.mode === 'Ctf'
+          ? [{ to: `${base}/progression`, label: translate('progression.title'), icon: GitBranch }]
+          : []),
         ...(canManagePermissions.value
           ? [{ to: `${base}/permissions`, label: translate("ui.permissions"), icon: KeyRound }]
           : []),
@@ -193,6 +206,8 @@ export function useAdminCompetitionsByIdPage() {
       setAnnouncementOpen,
       navGroups,
       activePath,
+      isProgressionPage,
+      usesPageScroll,
       CompetitionStatusBadge,
       GameModeBadge,
       AppWorkspaceNav

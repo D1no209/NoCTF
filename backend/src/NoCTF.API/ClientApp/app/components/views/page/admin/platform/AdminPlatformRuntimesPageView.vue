@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminPlatformRuntimesPageViewState } from '~/features/routes/admin/platform/useAdminPlatformRuntimesPage'
 
 const viewProps = defineProps<{ state: AdminPlatformRuntimesPageViewState }>()
-const { ExternalLink, RefreshCw, filters, detailTarget, items, loading, error, hasMore, initialized, loadMore, refresh, detail, applyFilters, clearFilters, terminateTarget, terminatePending, terminationError, forceTerminateTarget, forceTerminateReason, forceTerminateConfirmed, forceTerminatePending, forceTerminationError, teamLabel, stateBadgeVariant, canTerminate, openTermination, openForceTermination, submitTermination, submitForceTermination, onClickDetailTarget, onUpdateOpenDetailTarget, onUpdateOpenTerminateTarget, onUpdateOpenForceTerminateTarget } = toRefs(viewProps.state)
+const { formatCapacityAmount, runnerFailureLabel, ExternalLink, RuntimeAccessUrl, RefreshCw, filters, detailTarget, items, loading, error, initialized, refresh, page, pageCount, total, pageLimit, loadPage, setPageSize, detail, applyFilters, clearFilters, terminateTarget, terminatePending, terminationError, forceTerminateTarget, forceTerminateReason, forceTerminateConfirmed, forceTerminatePending, forceTerminationError, teamLabel, stateBadgeVariant, canTerminate, openTermination, openForceTermination, submitTermination, submitForceTermination, onClickDetailTarget, onUpdateOpenDetailTarget, onUpdateOpenTerminateTarget, onUpdateOpenForceTerminateTarget } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -148,11 +148,15 @@ const { ExternalLink, RefreshCw, filters, detailTarget, items, loading, error, h
           </TableRow>
         </TableBody>
       </Table>
-      <div v-if="hasMore" class="flex justify-center border-t p-4">
-        <Button variant="outline" :disabled="loading" @click="loadMore">
-          <Spinner v-if="loading" data-icon="inline-start" /> {{ $t('ui.loadMore') }}
-        </Button>
-      </div>
+      <OffsetPagination
+        :page="page"
+        :page-count="pageCount"
+        :total="total"
+        :limit="pageLimit"
+        :loading="loading"
+        @update:page="loadPage"
+        @update:limit="setPageSize"
+      />
     </template>
 
     <Sheet :open="detailTarget !== null" @update:open="onUpdateOpenDetailTarget">
@@ -172,10 +176,20 @@ const { ExternalLink, RefreshCw, filters, detailTarget, items, loading, error, h
             <dt class="text-muted-foreground">{{ $t('ui.creationTime') }}</dt><dd class="font-mono text-xs tabular-nums">{{ adminFormatDateTime(detail.runtime?.createdAt) }}</dd>
             <dt class="text-muted-foreground">{{ $t('ui.expirationTime') }}</dt><dd class="font-mono text-xs tabular-nums">{{ adminFormatDateTime(detail.runtime?.expiresAt) }}</dd>
           </dl>
-          <template v-if="detail.runtime?.urls?.length">
+          <FieldDescription v-if="detail.runtime?.waitingReason">{{ runnerFailureLabel(detail.runtime.waitingReason) }}</FieldDescription>
+          <template v-if="detail.runtime?.capacity?.length">
+            <Separator />
+            <FieldDescription>{{ $t('capacity.units') }}</FieldDescription>
+            <dl v-for="allocation in detail.runtime.capacity" :key="allocation.operationId" class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2">
+              <dt>{{ $t('capacity.workload') }}</dt><dd class="break-all font-mono text-xs">{{ allocation.operationId }}</dd>
+              <dt>{{ $t('capacity.limit') }}</dt><dd class="font-mono tabular-nums">{{ formatCapacityAmount(allocation.limit) }}</dd>
+              <dt>{{ $t('capacity.budget') }}</dt><dd class="font-mono tabular-nums">{{ formatCapacityAmount(allocation.budget) }}</dd>
+            </dl>
+          </template>
+          <template v-if="detail.runtime?.accesses?.length">
             <Separator />
             <p class="font-medium">{{ $t('ui.accessEntrance') }}</p>
-            <code v-for="url in detail.runtime.urls" :key="url" class="whitespace-pre-wrap break-all text-xs">{{ url }}</code>
+            <component :is="RuntimeAccessUrl" v-for="access in detail.runtime.accesses" :key="`${access.directAddress}:${access.webSocketAddress}`" :access="access" />
           </template>
           <Separator />
           <Button v-if="detail.runtime?.competitionId" variant="outline" as-child>

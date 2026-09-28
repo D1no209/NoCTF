@@ -16,8 +16,12 @@ backend/src/NoCTF.API/ClientApp/dist
 backend/src/NoCTF.API/ClientApp/.data/
 backend/src/NoCTF.API/ClientApp/playwright-report/
 backend/src/NoCTF.API/ClientApp/test-results/
+backend/tools/
 
-backend/artifacts/
+backend/artifacts/*
+!backend/artifacts/webhooks/
+backend/artifacts/webhooks/*
+!backend/artifacts/webhooks/competition-events-v1.schema.json
 backend/src/NoCTF.API/backend.log
 *.log
 

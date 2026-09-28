@@ -1,25 +1,54 @@
 namespace NoCTF.Application.Authentication.Privacy;
 
+using NoCTF.Domain.Identity;
+
 public interface IRequestSourceAddress
 {
     string? Address { get; }
 }
 
-public enum AccountActivityKind { Registered, LoggedIn, LoginFailed, FlagSubmitted, PatchUploaded }
+public enum AccountActivityKind
+{
+    Registered,
+    LoggedIn,
+    LoginFailed,
+    FlagSubmitted,
+    PatchUploaded,
+    SsoLoggedIn,
+    SsoLoginFailed
+}
 
 public sealed record AccountActivity(Guid Id, AccountActivityKind Kind, DateTimeOffset OccurredAt,
-    string? IpAddress, Guid? CompetitionId = null, Guid? GameplayFactId = null)
+    string? IpAddress, Guid? CompetitionId = null, Guid? GameplayFactId = null,
+    Guid? SsoProviderId = null)
 {
     [System.Text.Json.Serialization.JsonPropertyName("schemaVersion")]
     public int SchemaVersion => 1;
     public override string ToString() => $"AccountActivity {{ Id = {Id}, Kind = {Kind}, IpAddress = [REDACTED] }}";
 }
 public sealed record SchoolIdentity(string? FullName, string? StudentNumber);
-public sealed record PrivateAccountDetails(SchoolIdentity Identity, IReadOnlyList<AccountActivity> Activities, int RetentionDays);
+public sealed record PrivateSsoBinding(
+    Guid ProviderId,
+    string? ProviderName,
+    string? ProviderIconUrl,
+    SsoProtocol Protocol,
+    string Subject,
+    DateTimeOffset BoundAt);
+public sealed record PrivateAccountDetails(
+    SchoolIdentity Identity,
+    IReadOnlyList<AccountActivity> Activities,
+    int RetentionDays,
+    PrivateSsoBinding? SsoBinding = null);
 
 public interface IAccountActivityRecorder
 {
     Task RecordLoginAsync(Guid? authenticatedUserId, DateTimeOffset now, CancellationToken ct);
+    Task RecordSsoAsync(
+        Guid? authenticatedUserId,
+        Guid providerId,
+        bool succeeded,
+        DateTimeOffset now,
+        CancellationToken ct);
 }
 
 public interface IAccountPrivacyStore

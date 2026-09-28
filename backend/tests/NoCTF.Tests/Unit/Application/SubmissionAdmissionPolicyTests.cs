@@ -38,6 +38,17 @@ public class GameplayFactAdmissionPolicyTests
     }
 
     [Test]
+    public async Task Pending_team_is_rejected_even_when_competition_is_running()
+    {
+        var snapshot = Snapshot(CompetitionStatus.Running) with { TeamApproved = false };
+
+        var result = Check(snapshot, DateTimeOffset.UtcNow);
+
+        await Assert.That(result.FailureCode)
+            .IsEqualTo(GameplayFactAdmissionFailureCode.TeamForbidden);
+    }
+
+    [Test]
     public async Task NonRunning_competitions_are_rejected()
     {
         foreach (var status in new[] { CompetitionStatus.Draft, CompetitionStatus.Published, CompetitionStatus.Paused, CompetitionStatus.Finished })
@@ -73,7 +84,10 @@ public class GameplayFactAdmissionPolicyTests
     }
 
     private static GameplayFactAdmissionSnapshot Snapshot(CompetitionStatus status) => new(
-        Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), GameMode.Ctf, "{}", "{}", 0, 0, status,
+        Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), GameMode.Ctf,
+        CompetitionModeConfigurationDefaults.Create(GameMode.Ctf, Guid.NewGuid()),
+        new NoCTF.GameModes.Registration.GameModeChallengeConfigurationCatalog()
+            .CreateDefaultRules(GameMode.Ctf, Guid.NewGuid()), 0, 0, status,
         DateTimeOffset.UtcNow.AddMinutes(-1),
         DateTimeOffset.UtcNow.AddMinutes(1),
         false, false, true, false, false, true, true);

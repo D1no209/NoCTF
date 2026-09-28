@@ -24,7 +24,8 @@ public enum TeamMembershipFailureCodeProtocol
     MemberNotFound,
     MembershipNotFound,
     CaptainMustTransfer,
-    CaptainOnly
+    CaptainOnly,
+    TrackSsoIdentityRequired
 }
 
 public sealed record TeamMembershipFailureResponse(

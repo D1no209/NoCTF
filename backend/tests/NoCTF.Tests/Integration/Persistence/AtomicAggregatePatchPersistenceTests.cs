@@ -92,7 +92,7 @@ public sealed class AtomicAggregatePatchPersistenceTests
             {
                 IAtomicAggregatePatch patch = new AggregatePatchTransaction(
                     db,
-                    new NoOpTransactionalMessageOutbox());
+                    new NoOpPostCommitMessagePublisher());
                 var outcome = await patch.ExecuteAsync(async ct =>
                 {
                     await using var sectionTransaction =
@@ -117,7 +117,7 @@ public sealed class AtomicAggregatePatchPersistenceTests
         });
     }
 
-    private sealed class RecordingOutbox(List<string> order) : ITransactionalMessageOutbox
+    private sealed class RecordingOutbox(List<string> order) : IPostCommitMessagePublisher
     {
         public ValueTask PublishAsync<T>(T message) => ValueTask.CompletedTask;
 

@@ -85,10 +85,13 @@ public enum GameplayFactFailureCodeProtocol
     AwdpPatchTimeout,
     AwdpServiceAbnormal,
     AwdpPlatformFailed,
-    AwdpViolation,
     ForeignTeamFlagDetected,
     InsufficientScore,
-    HintUnavailable
+    HintUnavailable,
+    PatchStillExploitable,
+    PatchExecutionFailed,
+    PatchServiceAbnormal,
+    PatchVerificationPlatformFailed
 }
 
 public sealed record AcceptedGameplayFactResponse(

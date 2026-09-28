@@ -20,4 +20,6 @@ public interface IRunnerScoringTokenIssuer
     string IssueFixArchiveRead(string runnerId, Guid uploadId, Guid gameplayFactId, DateTimeOffset now);
     string IssueAwdChecker(AwdCheckerTokenRequest request);
     string IssueAwdpFixResult(AwdpFixResultTokenRequest request);
+    string IssuePatchVerificationResult(AwdpFixResultTokenRequest request) =>
+        IssueAwdpFixResult(request);
 }

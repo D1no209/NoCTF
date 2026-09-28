@@ -6,7 +6,7 @@ using Microsoft.Extensions.Options;
 using NoCTF.Hosting;
 using NoCTF.Hosting.Health;
 using NSubstitute;
-using StackExchange.Redis;
+using NoCTF.Infrastructure.Caching;
 using Wolverine.Configuration;
 using Wolverine.Runtime;
 using Wolverine.Transports;
@@ -72,22 +72,22 @@ public sealed class RoleReadinessHealthCheckTests
     }
 
     [Test]
-    public async Task Role_registration_distinguishes_optional_api_and_required_worker_runner_redis()
+    public async Task Redis_cache_is_optional_for_every_host_role()
     {
         var apiDependencies = ResolveDependencies(HostRoles.Only(HostRole.Api));
         var runnerDependencies = ResolveDependencies(HostRoles.Only(HostRole.Runner));
         var workerDependencies = ResolveDependencies(HostRoles.Only(HostRole.Worker));
 
-        await Assert.That(apiDependencies.OfType<RedisReadinessDependency>().Single()
+        await Assert.That(apiDependencies.OfType<DistributedCacheReadinessDependency>().Single()
                 .FailureIsCritical)
             .IsFalse();
-        await Assert.That(runnerDependencies.OfType<RedisReadinessDependency>().Single()
+        await Assert.That(runnerDependencies.OfType<DistributedCacheReadinessDependency>().Single()
                 .FailureIsCritical)
-            .IsTrue();
-        await Assert.That(workerDependencies.OfType<RedisReadinessDependency>().Single()
+            .IsFalse();
+        await Assert.That(workerDependencies.OfType<DistributedCacheReadinessDependency>().Single()
                 .FailureIsCritical)
-            .IsTrue();
-        await Assert.That(workerDependencies.OfType<PostgreSqlReadinessDependency>())
+            .IsFalse();
+        await Assert.That(workerDependencies.OfType<DatabaseReadinessDependency>())
             .HasSingleItem();
         await Assert.That(workerDependencies.OfType<WolverineReadinessDependency>())
             .HasSingleItem();
@@ -229,7 +229,7 @@ public sealed class RoleReadinessHealthCheckTests
     {
         var services = new ServiceCollection();
         services.AddSingleton(Substitute.For<IWolverineRuntime>());
-        services.AddSingleton(Substitute.For<IConnectionMultiplexer>());
+        services.AddFusionCache(NoCtfCacheNames.ReadModels);
         services.AddNoCtfRoleHealthChecks(
             new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
             {

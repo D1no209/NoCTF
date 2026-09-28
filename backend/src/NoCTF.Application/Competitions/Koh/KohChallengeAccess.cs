@@ -1,8 +1,13 @@
+using NoCTF.Application.Runtime.Instances;
+using NoCTF.Domain.Runtime;
+
 namespace NoCTF.Application.Competitions.Koh;
 
 public sealed record KohChallengeAccessView(
     string ControlFlag,
-    IReadOnlyList<string> Urls);
+    Guid RuntimeInstanceId,
+    RuntimeAccessMode AccessMode,
+    IReadOnlyList<RuntimeAccessEndpointView> AccessEndpoints);
 
 public interface IKohChallengeAccessReader
 {

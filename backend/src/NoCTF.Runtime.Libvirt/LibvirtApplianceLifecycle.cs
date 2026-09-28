@@ -1,7 +1,9 @@
 using System.Globalization;
+using System.Diagnostics;
 using System.Net;
 using System.Text.RegularExpressions;
 using NoCTF.Application.Runtime.Provisioning;
+using NoCTF.Application.Observability;
 using NoCTF.Domain.Runtime;
 
 namespace NoCTF.Runtime.Libvirt;
@@ -119,6 +121,19 @@ public sealed partial class LibvirtApplianceLifecycle(
         OvaRuntimeReceipt receipt,
         CancellationToken cancellationToken)
     {
+        await DestroyAsync(
+            receipt,
+            RuntimeTerminationMode.GracefulThenForce,
+            RuntimeTerminationPolicy.Default,
+            cancellationToken);
+    }
+
+    public async Task DestroyAsync(
+        OvaRuntimeReceipt receipt,
+        RuntimeTerminationMode mode,
+        RuntimeTerminationPolicy policy,
+        CancellationToken cancellationToken)
+    {
         if (receipt.Provider != RuntimeProvider.Libvirt)
             throw new InvalidOperationException("OVA receipt is not owned by Libvirt.");
         var expectedNetwork = NetworkName(receipt.OperationId);
@@ -131,9 +146,11 @@ public sealed partial class LibvirtApplianceLifecycle(
                 .Any(matches => !matches))
             throw new InvalidOperationException(
                 "OVA receipt does not match its stable Runtime resource identity.");
-        await DestroyDomainsAsync(receipt.VirtualMachines, cancellationToken);
-        await networks.DestroyAsync(receipt.NetworkId, cancellationToken);
-        DeleteDirectoryIfPresent(RuntimeDirectory(receipt.OperationId));
+        await DestroyByIdentityAsync(
+            new OvaManagedRuntimeResource(receipt.OperationId),
+            mode,
+            policy,
+            cancellationToken);
     }
 
     public async Task<IReadOnlyList<OvaManagedRuntimeResource>> ListManagedAsync(
@@ -169,19 +186,125 @@ public sealed partial class LibvirtApplianceLifecycle(
         OvaManagedRuntimeResource identity,
         CancellationToken cancellationToken)
     {
+        await DestroyByIdentityAsync(
+            identity,
+            RuntimeTerminationMode.GracefulThenForce,
+            RuntimeTerminationPolicy.Default,
+            cancellationToken);
+    }
+
+    public async Task DestroyByIdentityAsync(
+        OvaManagedRuntimeResource identity,
+        RuntimeTerminationMode mode,
+        RuntimeTerminationPolicy policy,
+        CancellationToken cancellationToken)
+    {
         if (identity.OperationId == Guid.Empty)
             throw new InvalidOperationException("OVA managed resource identity is invalid.");
-        var domains = (await ListDomainNamesAsync(cancellationToken))
-            .Where(name => TryParseResourceName(name, expectDomain: true, out var parsed)
-                && parsed == identity)
-            .Order(StringComparer.Ordinal)
-            .Select(name => new OvaVirtualMachineReceipt(string.Empty, name, string.Empty))
-            .ToArray();
-        await DestroyDomainsAsync(domains, cancellationToken);
-        await networks.DestroyAsync(
-            NetworkName(identity.OperationId),
-            cancellationToken);
-        DeleteDirectoryIfPresent(RuntimeDirectory(identity.OperationId));
+        var warnings = new List<Exception>();
+        NoCtfTelemetry.RecordRuntimeStopForce(
+            "libvirt",
+            mode == RuntimeTerminationMode.Force ? "requested" : "provider_only_force");
+        var forceStarted = Stopwatch.GetTimestamp();
+        using (var force = CreateStageToken(cancellationToken, policy.ForceDeleteTimeout))
+        {
+            try
+            {
+                var domains = (await ListDomainNamesAsync(force.Token))
+                    .Where(name => TryParseResourceName(name, expectDomain: true, out var parsed)
+                        && parsed == identity)
+                    .Order(StringComparer.Ordinal)
+                    .Select(name => new OvaVirtualMachineReceipt(string.Empty, name, string.Empty))
+                    .ToArray();
+                await DestroyDomainsAsync(domains, force.Token);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                warnings.Add(exception);
+            }
+        }
+        NoCtfTelemetry.RecordRuntimeStopDuration(
+            "libvirt", "ova", "force_delete",
+            warnings.Count == 0 ? "success" : "warning",
+            Stopwatch.GetElapsedTime(forceStarted).TotalSeconds);
+
+        var networkStarted = Stopwatch.GetTimestamp();
+        using (var network = CreateStageToken(cancellationToken, policy.NetworkCleanupTimeout))
+        {
+            try
+            {
+                await networks.DestroyAsync(NetworkName(identity.OperationId), network.Token);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                warnings.Add(exception);
+            }
+        }
+        NoCtfTelemetry.RecordRuntimeStopDuration(
+            "libvirt", "ova", "network_cleanup",
+            warnings.Count == 0 ? "success" : "warning",
+            Stopwatch.GetElapsedTime(networkStarted).TotalSeconds);
+
+        var verificationStarted = Stopwatch.GetTimestamp();
+        using var verification = CreateStageToken(cancellationToken, policy.VerificationTimeout);
+        try
+        {
+            await WaitUntilResourcesAbsentAsync(identity, verification.Token);
+            DeleteDirectoryIfPresent(RuntimeDirectory(identity.OperationId));
+            NoCtfTelemetry.RecordRuntimeStopDuration(
+                "libvirt", "ova", "verification", "success",
+                Stopwatch.GetElapsedTime(verificationStarted).TotalSeconds);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            NoCtfTelemetry.RecordRuntimeStopResourcesRemaining("libvirt", "ova");
+            NoCtfTelemetry.RecordRuntimeStopDuration(
+                "libvirt", "ova", "verification", "timeout",
+                Stopwatch.GetElapsedTime(verificationStarted).TotalSeconds);
+            throw new InvalidOperationException(
+                "Libvirt Runtime resources remain after the termination budget.",
+                warnings.Count == 0 ? null : new AggregateException(warnings));
+        }
+    }
+
+    private async Task WaitUntilResourcesAbsentAsync(
+        OvaManagedRuntimeResource identity,
+        CancellationToken cancellationToken)
+    {
+        var delays = new[] { 200, 400, 800, 1_000 };
+        var attempt = 0;
+        while (true)
+        {
+            var domainsRemain = (await ListDomainNamesAsync(cancellationToken))
+                .Any(name => TryParseResourceName(name, expectDomain: true, out var parsed)
+                    && parsed == identity);
+            var networkRemains = (await networks.ListManagedNetworkNamesAsync(cancellationToken))
+                .Any(name => TryParseResourceName(name, expectDomain: false, out var parsed)
+                    && parsed == identity);
+            if (!domainsRemain && !networkRemains)
+                return;
+            await Task.Delay(
+                TimeSpan.FromMilliseconds(delays[Math.Min(attempt++, delays.Length - 1)]),
+                timeProvider,
+                cancellationToken);
+        }
+    }
+
+    private static CancellationTokenSource CreateStageToken(
+        CancellationToken cancellationToken,
+        TimeSpan timeout)
+    {
+        var source = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        source.CancelAfter(timeout);
+        return source;
     }
 
     private async Task EnsureDomainAsync(

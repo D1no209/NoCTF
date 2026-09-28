@@ -3,6 +3,7 @@ import type {
   NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse,
 } from '../api'
 import { translate } from './i18n'
+import { competitionChallengePath, competitionTeamsPath } from './app-routes'
 
 export const competitionBroadcastKinds = [
   'FirstBloodAwarded',
@@ -19,6 +20,7 @@ export const competitionBroadcastKinds = [
 ] satisfies NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol[]
 
 const competitionBroadcastLookbackMs = 30 * 24 * 60 * 60 * 1000
+const competitionBroadcastClockSkewMs = 5 * 60 * 1000
 
 export interface CompetitionBroadcastQueryWindow {
   from: string
@@ -32,7 +34,13 @@ export function competitionBroadcastQueryWindow(
   latestNotifiedAt = 0,
 ): CompetitionBroadcastQueryWindow | null {
   if (!Number.isFinite(startAt) || !Number.isFinite(clientNow)) return null
-  const queryEnd = Math.max(clientNow, Number.isFinite(latestNotifiedAt) ? latestNotifiedAt : 0)
+  // A reconnect can miss the invalidation that carries the authoritative server
+  // timestamp. Keep a small future margin so that a slow client clock does not
+  // hide an already committed event until the user refreshes manually.
+  const queryEnd = Math.max(
+    clientNow + competitionBroadcastClockSkewMs,
+    Number.isFinite(latestNotifiedAt) ? latestNotifiedAt : 0,
+  )
   return {
     from: new Date(Math.max(startAt, queryEnd - competitionBroadcastLookbackMs)).toISOString(),
     to: new Date(queryEnd).toISOString(),
@@ -115,10 +123,10 @@ export function competitionBroadcastTargetPath(
   event: NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse,
 ): string | null {
   if (event.competitionChallengeId) {
-    return `/competitions/${event.competitionId}/challenges?challenge=${event.competitionChallengeId}`
+    return competitionChallengePath(event.competitionId!, event.competitionChallengeId)
   }
   if (event.kind === 'TeamBanned' || event.kind === 'TeamBanCorrectionPublished')
-    return `/competitions/${event.competitionId}/teams`
+    return competitionTeamsPath(event.competitionId!)
   if (event.kind === 'AnnouncementPublished' && event.questionId)
     return `/notifications?notification=${event.questionId}`
   return null

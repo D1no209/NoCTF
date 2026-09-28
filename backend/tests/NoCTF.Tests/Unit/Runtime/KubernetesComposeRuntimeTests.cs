@@ -102,7 +102,17 @@ public sealed class KubernetesComposeRuntimeTests
                 Arg.Any<CancellationToken>())
             .Returns(_ => Task.FromResult(new HttpOperationResponse<V1ServiceList>
             {
-                Body = new V1ServiceList { Items = services }
+                Body = new V1ServiceList { Items = [.. services] }
+            }));
+        core.ListNamespacedPodWithHttpMessagesAsync(
+                Arg.Any<string>(), Arg.Any<bool?>(), Arg.Any<string?>(), Arg.Any<string?>(),
+                Arg.Any<string?>(), Arg.Any<int?>(), Arg.Any<string?>(), Arg.Any<string?>(),
+                Arg.Any<bool?>(), Arg.Any<int?>(), Arg.Any<bool?>(), Arg.Any<bool?>(),
+                Arg.Any<IReadOnlyDictionary<string, IReadOnlyList<string>>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new HttpOperationResponse<V1PodList>
+            {
+                Body = new V1PodList { Items = [] }
             }));
         networking.ListNamespacedNetworkPolicyWithHttpMessagesAsync(
                 Arg.Any<string>(), Arg.Any<bool?>(), Arg.Any<string?>(), Arg.Any<string?>(),
@@ -126,17 +136,22 @@ public sealed class KubernetesComposeRuntimeTests
             .Returns(Task.FromResult(new HttpOperationResponse<V1Status>
             {
                 Body = new V1Status()
-            }));
+            }))
+            .AndDoes(_ => deployment = null);
         core.DeleteNamespacedServiceWithHttpMessagesAsync(
                 Arg.Any<string>(), Arg.Any<string>(), Arg.Any<V1DeleteOptions>(),
                 Arg.Any<string?>(), Arg.Any<int?>(), Arg.Any<bool?>(), Arg.Any<bool?>(),
                 Arg.Any<string?>(), Arg.Any<bool?>(),
                 Arg.Any<IReadOnlyDictionary<string, IReadOnlyList<string>>?>(),
                 Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(new HttpOperationResponse<V1Service>
+            .Returns(call =>
             {
-                Body = new V1Service()
-            }));
+                services.RemoveAll(service => service.Metadata.Name == call.ArgAt<string>(0));
+                return Task.FromResult(new HttpOperationResponse<V1Service>
+                {
+                    Body = new V1Service()
+                });
+            });
         networking.DeleteNamespacedNetworkPolicyWithHttpMessagesAsync(
                 Arg.Any<string>(), Arg.Any<string>(), Arg.Any<V1DeleteOptions>(),
                 Arg.Any<string?>(), Arg.Any<int?>(), Arg.Any<bool?>(), Arg.Any<bool?>(),
@@ -146,7 +161,8 @@ public sealed class KubernetesComposeRuntimeTests
             .Returns(Task.FromResult(new HttpOperationResponse<V1Status>
             {
                 Body = new V1Status()
-            }));
+            }))
+            .AndDoes(_ => policy = null);
 
         var runtime = new KubernetesComposeRuntime(
             client,
@@ -162,12 +178,14 @@ public sealed class KubernetesComposeRuntimeTests
         var receipt = await runtime.UpAsync(request, CancellationToken.None);
         var publicService = services.Single(service => service.Spec.Type == "NodePort");
         publicService.Spec.Ports.Single().NodePort = 31234;
+        var createdPolicy = policy;
+        var createdDeployment = deployment;
         var status = await runtime.GetStatusAsync(receipt, CancellationToken.None);
         await runtime.DownAsync(receipt, CancellationToken.None);
 
         await Assert.That(receipt.Namespace).IsEqualTo("runtime");
-        await Assert.That(policy).IsNotNull();
-        await Assert.That(deployment).IsNotNull();
+        await Assert.That(createdPolicy).IsNotNull();
+        await Assert.That(createdDeployment).IsNotNull();
         await Assert.That(status!.Status).IsEqualTo(RuntimeStatus.Running);
         var web = status.Services.Single();
         await Assert.That(web.PublishedPorts[8080]).IsEqualTo(31234);

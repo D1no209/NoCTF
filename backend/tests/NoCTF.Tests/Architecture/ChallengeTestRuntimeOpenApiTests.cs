@@ -37,7 +37,7 @@ public sealed class ChallengeTestRuntimeOpenApiTests
             .GetProperty("properties");
         await Assert.That(schema.TryGetProperty("testFlag", out _)).IsTrue();
         await Assert.That(schema.TryGetProperty("flagState", out _)).IsTrue();
-        await Assert.That(schema.TryGetProperty("urls", out _)).IsTrue();
+        await Assert.That(schema.TryGetProperty("accesses", out _)).IsTrue();
     }
 
     [Test]

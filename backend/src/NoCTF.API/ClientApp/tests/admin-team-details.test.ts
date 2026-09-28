@@ -6,11 +6,25 @@ const page = () => sourceFile(new URL('../app/pages/admin/competitions/[id]/team
 describe('admin competition team details', () => {
   test('opens a detail sheet from the team name and resolves member profiles through the generated SDK', async () => {
     const source = await page()
+    const privatePanel = await sourceFile(new URL('../app/features/account/PrivateAccountPanel.vue', import.meta.url)).text()
 
     expect(source).toContain('userProfileGet')
     expect(source).toContain('@click="openTeamDetail(t)"')
     expect(source).toContain("$t('ui.teamDetails')")
     expect(source).toContain('member.userId === selectedTeam.captainId')
+    expect(source).toContain(':show-activities="false"')
+    expect(source).toContain('<Accordion')
+    expect(source).toContain('type="single"')
+    expect(source).toContain('collapsible')
+    expect(source).toContain('v-if="expandedMemberId === member.userId')
+    expect(source).toContain('@update:model-value="setExpandedMember"')
+    expect(source).toContain('adminGetTeamInvitation')
+    expect(source).toContain('v-if="canWrite" class="text-muted-foreground">{{ $t(\'ui.invitationCode\') }}')
+    expect(source).toContain(':model-value="teamInvitationToken" readonly')
+    expect(source).toContain('@click="copyTeamInvitation"')
+    expect(source).toContain('if (!canWrite.value || !team?.id) return')
+    expect(privatePanel).toContain('data.ssoBinding')
+    expect(privatePanel).toContain('data.ssoBinding.subject')
   })
 
   test('records one manual score adjustment through the generated SDK and preserves the form on failure', async () => {

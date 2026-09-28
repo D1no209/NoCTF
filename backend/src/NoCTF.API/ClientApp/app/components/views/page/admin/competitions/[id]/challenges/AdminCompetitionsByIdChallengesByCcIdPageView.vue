@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdChallengesByCcIdPageViewState } from '~/features/routes/admin/competitions/[id]/challenges/useAdminCompetitionsByIdChallengesByCcIdPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdChallengesByCcIdPageViewState }>()
-const { Plus, competitionId, competition, canWrite, canJudge, challenge, loading, loadError, activeSection, editCustomTitle, editOrder, editPublished, savingEdit, saveEdit, config, configLoading, savingConfig, inheritedConfigJson, saveConfig, hints, hintsLoading, hintsLoadError, includeDeletedHints, hintDialogOpen, editingHint, hintForm, hintError, savingHint, pendingHintId, openHintDialog, saveHint, deleteHint, restoreHint, scoringLoading, scoringError, loadChallengeTeamScoring, scoringDisplayNames, scoringRows, adjustmentTarget, adjustmentDelta, adjustmentPending, adjustmentError, adjustmentValid, openAdjustment, closeAdjustment, submitAdjustment, ChallengeRulesEditor, onClickAdjustmentTarget, onClickHintDialogOpen } = toRefs(viewProps.state)
+const { Plus, competitionId, competition, canWrite, canJudge, challenge, loading, loadError, activeSection, sectionOptions, editCustomTitle, editOrder, editPublished, savingEdit, saveEdit, config, configLoading, savingConfig, inheritedConfiguration, saveConfig, hints, hintsLoading, hintsLoadError, includeDeletedHints, hintDialogOpen, editingHint, hintForm, hintError, savingHint, pendingHintId, openHintDialog, saveHint, deleteHint, restoreHint, scoringLoading, scoringError, scoringSearch, loadChallengeTeamScoring, scoringPage, scoringPageCount, scoringTotal, scoringPageLimit, scoringPageLoading, loadScoringPage, setScoringPageSize, scoringDisplayNames, scoringRows, adjustmentTarget, adjustmentDelta, adjustmentPending, adjustmentError, adjustmentValid, openAdjustment, closeAdjustment, submitAdjustment, ChallengeRulesEditor, hiddenRuleKeys, onClickAdjustmentTarget, onClickHintDialogOpen } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -26,15 +26,19 @@ const { Plus, competitionId, competition, canWrite, canJudge, challenge, loading
         <Badge variant="secondary">{{ directionLabel(challenge.direction) }}</Badge>
       </div>
 
-      <Tabs v-model="activeSection" default-value="general" class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_14rem] lg:items-start">
-        <TabsList data-scroll-surface class="h-auto w-full justify-start overflow-x-auto p-1.5 lg:sticky lg:top-24 lg:col-start-2 lg:row-start-1 lg:flex-col lg:overflow-visible">
-          <TabsTrigger value="general" class="h-10 flex-1 px-4 text-sm lg:w-full lg:flex-none lg:justify-start">{{ $t('ui.basicSettings') }}</TabsTrigger>
-          <TabsTrigger value="config" class="h-10 flex-1 px-4 text-sm lg:w-full lg:flex-none lg:justify-start">{{ $t('ui.questionConfiguration') }}</TabsTrigger>
-          <TabsTrigger value="hints" class="h-10 flex-1 px-4 text-sm lg:w-full lg:flex-none lg:justify-start">{{ $t('ui.hint') }}</TabsTrigger>
-          <TabsTrigger value="scoring" class="h-10 flex-1 px-4 text-sm lg:w-full lg:flex-none lg:justify-start">{{ $t('ui.teamScoring') }}</TabsTrigger>
-        </TabsList>
+      <div data-challenge-editor-workspace>
+        <ChoiceSidebar
+          v-model="activeSection"
+          data-side="right"
+          :items="sectionOptions"
+          :label="$t('ui.questionConfiguration')"
+          :loading-label="$t('ui.questionConfiguration')"
+          :empty-label="$t('ui.questionConfiguration')"
+          controls="competition-challenge-editor-content"
+        />
 
-        <TabsContent value="general" class="mt-0 lg:col-start-1 lg:row-start-1">
+        <div id="competition-challenge-editor-content" data-challenge-editor-content class="min-w-0">
+        <section v-if="activeSection === 'general'">
           <Card>
             <CardHeader>
               <CardTitle>{{ $t('ui.basicSettings') }}</CardTitle>
@@ -69,9 +73,9 @@ const { Plus, competitionId, competition, canWrite, canJudge, challenge, loading
               </UiForm>
             </CardContent>
           </Card>
-        </TabsContent>
+        </section>
 
-        <TabsContent value="config" class="mt-0 lg:col-start-1 lg:row-start-1">
+        <section v-else-if="activeSection === 'config'">
           <Card>
             <CardHeader>
               <CardTitle>{{ $t('ui.questionRules') }}</CardTitle>
@@ -80,19 +84,19 @@ const { Plus, competitionId, competition, canWrite, canJudge, challenge, loading
             <CardContent>
               <component :is="ChallengeRulesEditor"
                 :mode="(config?.mode ?? competition?.mode ?? 'Ctf') as GameModeValue"
-                :json="config?.json"
-                :inherited-json="inheritedConfigJson"
+                :rules="config?.rules"
+                :inherited-configuration="inheritedConfiguration"
                 :readonly="!canWrite"
                 :loading="configLoading"
                 :saving="savingConfig"
-                :hidden-keys="challenge.usesDynamicFlag ? [] : ['flagTemplate']"
+                :hidden-keys="hiddenRuleKeys"
                 @save="saveConfig"
               />
             </CardContent>
           </Card>
-        </TabsContent>
+        </section>
 
-        <TabsContent value="hints" class="mt-0 lg:col-start-1 lg:row-start-1">
+        <section v-else-if="activeSection === 'hints'">
           <div class="flex flex-col gap-3">
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-2">
@@ -145,9 +149,9 @@ const { Plus, competitionId, competition, canWrite, canJudge, challenge, loading
               </TableBody>
             </Table>
           </div>
-        </TabsContent>
+        </section>
 
-        <TabsContent value="scoring" class="mt-0 lg:col-start-1 lg:row-start-1">
+        <section v-else-if="activeSection === 'scoring'">
           <div class="flex flex-col gap-4">
             <div class="flex flex-wrap items-center justify-between gap-3">
               <h3 class="text-lg font-semibold">{{ $t('ui.challengeTeamScoring') }}</h3>
@@ -156,12 +160,19 @@ const { Plus, competitionId, competition, canWrite, canJudge, challenge, loading
               </Button>
             </div>
 
+            <Input
+              v-model="scoringSearch"
+              class="sm:max-w-sm"
+              :placeholder="$t('ui.searchTeam')"
+              :aria-label="$t('ui.searchTeam')"
+            />
+
             <Alert v-if="scoringError" variant="destructive">
               <AlertDescription>{{ $message(scoringError) }}</AlertDescription>
             </Alert>
             <Skeleton v-if="scoringLoading" class="h-48 w-full" />
             <Empty v-else-if="!scoringError && scoringRows.length === 0" class="border border-dashed py-12">
-              <EmptyHeader><EmptyTitle>{{ $t('ui.thereIsNoRegisteredTeamYet') }}</EmptyTitle></EmptyHeader>
+              <EmptyHeader><EmptyTitle>{{ scoringSearch.trim() ? $t('ui.noMatchingTeams') : $t('ui.thereIsNoRegisteredTeamYet') }}</EmptyTitle></EmptyHeader>
             </Empty>
             <Table v-else-if="scoringRows.length > 0">
               <TableHeader>
@@ -198,9 +209,20 @@ const { Plus, competitionId, competition, canWrite, canJudge, challenge, loading
                 </TableRow>
               </TableBody>
             </Table>
+            <OffsetPagination
+              v-if="scoringRows.length > 0 || scoringTotal > 0"
+              :page="scoringPage"
+              :page-count="scoringPageCount"
+              :total="scoringTotal"
+              :limit="scoringPageLimit"
+              :loading="scoringPageLoading"
+              @update:page="loadScoringPage"
+              @update:limit="setScoringPageSize"
+            />
           </div>
-        </TabsContent>
-      </Tabs>
+        </section>
+        </div>
+      </div>
 
       <Dialog :open="adjustmentTarget !== null" @update:open="closeAdjustment">
         <DialogContent>

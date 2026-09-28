@@ -24,13 +24,14 @@ public static class AwdpFixFailureConvergence
     public static async Task<AwdpFixFailureConvergenceResult> ConvergeAwdpFixFailureAsync(
         RuntimeInstance runtime,
         NoCtfDbContext db,
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         ICompetitionEventRecorder events,
         DateTimeOffset failedAt,
         AwdpFixRuntimeCleanupMode cleanupMode,
         CancellationToken cancellationToken)
     {
-        if (runtime.Purpose != RuntimePurpose.AwdpTarget
+        if (runtime.Purpose is not (RuntimePurpose.AwdpTarget
+                or RuntimePurpose.PatchVerificationTarget)
             || runtime.GameplayFactId is not Guid gameplayFactId)
             return new(false, false, false);
 
@@ -51,7 +52,9 @@ public static class AwdpFixFailureConvergence
         {
             fact.State = GameplayFactState.PlatformFailed;
             fact.Result = null;
-            fact.FailureCode = GameplayFactFailureCode.AwdpPlatformFailed;
+            fact.FailureCode = runtime.Purpose == RuntimePurpose.AwdpTarget
+                ? GameplayFactFailureCode.AwdpPlatformFailed
+                : GameplayFactFailureCode.PatchVerificationPlatformFailed;
             fact.UpdatedAt = failedAt;
             await outbox.PublishAsync(new GameplayFactStateChanged(fact.Id, fact.State));
             await RecordFactEventsAsync(
@@ -114,18 +117,12 @@ public static class AwdpFixFailureConvergence
             GameplayFactState: fact.State,
             RuntimeState: runtime.State), cancellationToken);
 
+        if (runtime.Purpose != RuntimePurpose.AwdpTarget)
+            return;
+
         if (fact.ReferenceId is not Guid patchUploadId
             || fact.TeamId is not Guid teamId)
             return;
-        var payload = AwdpFixResolvedEventPayload.Create(
-            fact.Id,
-            patchUploadId,
-            runtime.Id,
-            teamId,
-            fact.CompetitionChallengeId,
-            AwdpFixOutcome.PlatformFailed,
-            fact.FailureCode,
-            failedAt);
         await events.RecordAsync(new(
             fact.CompetitionId,
             CompetitionEventKind.AwdpFixResolved,
@@ -138,13 +135,16 @@ public static class AwdpFixFailureConvergence
             GameplayFactId: fact.Id,
             GameplayFactKind: fact.Kind,
             GameplayFactState: fact.State,
-            PayloadJson: payload.Serialize()), cancellationToken);
+            PatchUploadId: patchUploadId,
+            AwdpFixOutcome: AwdpFixOutcome.PlatformFailed,
+            GameplayFactFailureCode: fact.FailureCode,
+            ResolvedAt: failedAt), cancellationToken);
     }
 
     private static async Task QueueNextFixAsync(
         GameplayFact failed,
         NoCtfDbContext db,
-        ITransactionalMessageOutbox outbox,
+        IPostCommitMessagePublisher outbox,
         CancellationToken cancellationToken)
     {
         var nextGameplayFactId = await db.GameplayFacts.AsNoTracking()
@@ -159,6 +159,6 @@ public static class AwdpFixFailureConvergence
             .Select(candidate => (Guid?)candidate.Id)
             .FirstOrDefaultAsync(cancellationToken);
         if (nextGameplayFactId is Guid id)
-            await outbox.PublishAsync(new EvaluateGameplayFact(id));
+            await outbox.PublishAsync(new EvaluateGameplayFact(id, Guid.CreateVersion7()));
     }
 }

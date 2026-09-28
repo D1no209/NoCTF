@@ -10,6 +10,33 @@ namespace NoCTF.Infrastructure.Notifications;
 
 public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
 {
+    public async Task<NotificationListPage> ListPageAsync(
+        Guid userId,
+        Guid? competitionId,
+        int offset,
+        int limit,
+        bool desc,
+        NotificationReadScope scope,
+        CancellationToken cancellationToken)
+    {
+        var query = ApplyScope(await VisibleToAsync(userId, cancellationToken), scope, userId);
+        if (competitionId is { } id)
+            query = query.Where(notification =>
+                notification.RelatedType == EntityReferenceKind.Competition
+                && notification.RelatedId == id);
+
+        var total = await query.CountAsync(cancellationToken);
+        var ordered = desc
+            ? query.OrderByDescending(notification => notification.SentAt)
+                .ThenByDescending(notification => notification.Id)
+            : query.OrderBy(notification => notification.SentAt)
+                .ThenBy(notification => notification.Id);
+        var items = await ProjectAsync(
+            ordered.Skip(offset).Take(limit),
+            cancellationToken);
+        return new NotificationListPage(items, total);
+    }
+
     public Task<IReadOnlyList<NotificationView>> ListAsync(
         Guid userId,
         DateTimeOffset? beforeCreatedAt,
@@ -27,7 +54,7 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
         CancellationToken ct)
     {
         var query = await VisibleToAsync(userId, ct);
-        query = ApplyScope(query, scope);
+        query = ApplyScope(query, scope, userId);
         return await ListPageAsync(query, beforeCreatedAt, beforeId, limit, ct);
     }
 
@@ -56,7 +83,7 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
         NotificationReadScope scope,
         CancellationToken ct)
     {
-        var query = ApplyScope(await VisibleToAsync(userId, ct), scope).Where(notification =>
+        var query = ApplyScope(await VisibleToAsync(userId, ct), scope, userId).Where(notification =>
             notification.RelatedType == EntityReferenceKind.Competition
             && notification.RelatedId == competitionId);
         return await ListPageAsync(query, beforeCreatedAt, beforeId, limit, ct);
@@ -64,12 +91,15 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
 
     private static IQueryable<Notification> ApplyScope(
         IQueryable<Notification> query,
-        NotificationReadScope scope) =>
+        NotificationReadScope scope,
+        Guid userId) =>
         scope == NotificationReadScope.Inbox
             ? query.Where(notification =>
-                notification.TargetType != NotificationTargetType.CompetitionParticipants
-                || notification.Kind == NotificationKind.CompetitionAnnouncement
-                    && notification.SourceType == NotificationSourceType.User)
+                (notification.TargetType != NotificationTargetType.CompetitionParticipants
+                    || notification.Kind == NotificationKind.CompetitionAnnouncement
+                        && notification.SourceType == NotificationSourceType.User)
+                && !(notification.SourceType == NotificationSourceType.User
+                    && notification.SourceId == userId))
             : query;
 
     private async Task<IReadOnlyList<NotificationView>> ListPageAsync(
@@ -83,11 +113,10 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
             query = query.Where(notification =>
                 notification.SentAt < createdAt
                 || notification.SentAt == createdAt && notification.Id.CompareTo(id) < 0);
-        return await Project(query
+        return await ProjectAsync(query
             .OrderByDescending(notification => notification.SentAt)
             .ThenByDescending(notification => notification.Id)
-            .Take(limit))
-            .ToListAsync(ct);
+            .Take(limit), ct);
     }
 
     public async Task<KeysetNotificationPosition> GetFeedCheckpointAsync(
@@ -110,15 +139,14 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
         KeysetNotificationPosition position,
         int limit,
         CancellationToken ct) =>
-        await Project((await VisibleToAsync(userId, ct))
+        await ProjectAsync((await VisibleToAsync(userId, ct))
             .Where(notification =>
                 notification.SentAt > position.CreatedAt
                     || notification.SentAt == position.CreatedAt
                     && notification.Id.CompareTo(position.Id) > 0)
             .OrderBy(notification => notification.SentAt)
             .ThenBy(notification => notification.Id)
-            .Take(limit))
-            .ToListAsync(ct);
+            .Take(limit), ct);
 
     public async Task<IReadOnlyList<NotificationView>?> ReadThreadAsync(
         Guid userId,
@@ -134,37 +162,49 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
         var rootId = selected.ThreadRootId ?? selected.Id;
         var thread = db.Notifications.AsNoTracking()
             .Where(notification => notification.Id == rootId
-                || notification.ThreadRootId == rootId)
+                || notification.ThreadRootId == rootId
+                    && notification.TargetType != NotificationTargetType.User)
             .OrderBy(notification => notification.SentAt)
             .ThenBy(notification => notification.Id);
-        return await Project(thread).ToListAsync(ct);
+        return await ProjectAsync(thread, ct);
     }
 
-    private IQueryable<NotificationView> Project(IQueryable<Notification> query) =>
-        query.Where(notification => notification.Kind != NotificationKind.AuthenticationSecurityActivity
-                && notification.Kind != NotificationKind.HttpCommandReceipt
+    private async Task<IReadOnlyList<NotificationView>> ProjectAsync(
+        IQueryable<Notification> query,
+        CancellationToken ct)
+    {
+        var notifications = await query.Where(notification =>
+                notification.Kind != NotificationKind.AuthenticationSecurityActivity
                 && notification.Kind != NotificationKind.PlatformUserAccessTokenIssued
                 && notification.Kind != NotificationKind.PlatformUserAccessTokenRevoked
-                && notification.Kind != NotificationKind.PlatformUserTokensInvalidated)
-            .Select(notification => new NotificationView(
+                && notification.Kind != NotificationKind.PlatformUserTokensInvalidated
+                && notification.Kind != NotificationKind.SsoProviderConfigurationChanged
+                && notification.Kind != NotificationKind.SsoExternalIdentityBindingChanged)
+            .ToArrayAsync(ct);
+        var sourceIds = notifications.Where(notification => notification.SourceId != null)
+            .Select(notification => notification.SourceId!.Value)
+            .Distinct()
+            .ToArray();
+        var sourceNames = await db.Users.IgnoreQueryFilters().AsNoTracking()
+            .Where(user => sourceIds.Contains(user.Id))
+            .ToDictionaryAsync(user => user.Id, user => user.UserName, ct);
+        return notifications.Select(notification => new NotificationView(
                 notification.Id,
                 notification.SourceType,
                 notification.SourceId,
                 notification.TargetType,
                 notification.TargetId,
                 notification.Kind,
-                notification.ContentJson,
+                NotificationContentProjection.Create(notification),
                 notification.RelatedType,
                 notification.RelatedId,
                 notification.ThreadRootId,
                 notification.ReplyToId,
                 notification.SentAt,
-                notification.SourceId == null
-                    ? null
-                    : db.Users.IgnoreQueryFilters()
-                        .Where(user => user.Id == notification.SourceId)
-                        .Select(user => user.UserName)
-                        .FirstOrDefault()));
+                notification.SourceId is { } sourceId
+                    ? sourceNames.GetValueOrDefault(sourceId)
+                    : null)).ToArray();
+    }
 
     private async Task<IQueryable<Notification>> VisibleToAsync(
         Guid userId,
@@ -172,98 +212,80 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
     {
         if (!db.Database.IsRelational())
             return await VisibleToInMemoryAsync(userId, ct);
-        return db.Notifications.FromSqlInterpolated($$"""
-            WITH notification_scope AS (
-                SELECT n.id,
-                       COALESCE(
-                           CASE
-                               WHEN n.related_type = {{(short)EntityReferenceKind.Competition}}
-                                   THEN n.related_id
-                               WHEN n.target_type IN (
-                                   {{(short)NotificationTargetType.CompetitionCollaborators}},
-                                   {{(short)NotificationTargetType.CompetitionParticipants}})
-                                   THEN n.target_id
-                               WHEN n.target_type = {{(short)NotificationTargetType.TeamMembers}}
-                                   THEN (
-                                       SELECT t.competition_id
-                                       FROM teams AS t
-                                       WHERE t.id = n.target_id)
-                           END,
-                           CASE
-                               WHEN n.thread_root_id IS NOT NULL THEN (
-                                   SELECT root.related_id
-                                   FROM notifications AS root
-                                   WHERE root.id = n.thread_root_id
-                                     AND root.related_type = {{(short)EntityReferenceKind.Competition}})
-                           END) AS competition_id
-                FROM notifications AS n
-            ), audience_visible AS (
-                SELECT n.*
-                FROM notifications AS n
-                JOIN notification_scope AS scope ON scope.id = n.id
-                WHERE scope.competition_id IS NULL
-                   OR NOT EXISTS (
-                       SELECT 1
-                       FROM competitions AS c
-                       WHERE c.id = scope.competition_id
-                         AND c.access_mode = {{(short)NoCTF.Domain.Competitions.CompetitionAccessMode.StaffOnly}}
-                         AND NOT EXISTS (
-                             SELECT 1
-                             FROM users AS u
-                             WHERE u.id = {{userId}}
-                               AND u.account_status = {{(short)UserAccountStatus.Active}}
-                               AND (u.role = {{(short)UserRole.Administrator}}
-                                 OR c.owner_id = {{userId}}
-                                 OR {{userId}} = ANY(c.manager_ids)
-                                 OR {{userId}} = ANY(c.judge_ids)
-                                 OR {{userId}} = ANY(c.observer_ids))))
-            ), directly_visible AS (
-                SELECT n.id,
-                       COALESCE(n.thread_root_id, n.id) AS root_id
-                FROM audience_visible AS n
-                WHERE (n.target_type = 0 AND n.target_id = {{userId}})
-                   OR (n.target_type = 1 AND EXISTS (
-                       SELECT 1 FROM competitions AS c
-                       WHERE c.id = n.target_id AND c.deleted_at IS NULL
-                         AND (c.owner_id = {{userId}}
-                           OR {{userId}} = ANY(c.manager_ids)
-                           OR {{userId}} = ANY(c.judge_ids)
-                           OR {{userId}} = ANY(c.observer_ids))))
-                   OR (n.target_type = 2 AND EXISTS (
-                       SELECT 1 FROM teams AS t
-                       WHERE t.competition_id = n.target_id AND t.deleted_at IS NULL
-                         AND t.registration_status = 1 AND NOT t.is_banned
-                         AND {{userId}} = ANY(t.member_ids)))
-                   OR (n.target_type = 3 AND EXISTS (
-                       SELECT 1 FROM teams AS t
-                       WHERE t.id = n.target_id AND t.deleted_at IS NULL
-                         AND {{userId}} = ANY(t.member_ids)))
-                   OR (n.target_type = 4 AND EXISTS (
-                       SELECT 1 FROM users AS u
-                       WHERE u.id = {{userId}}
-                         AND u.kind = {{(short)UserKind.Human}}
-                         AND u.role = {{(short)UserRole.Administrator}}
-                         AND u.account_status = {{(short)UserAccountStatus.Active}}))
-            ), participated_roots AS (
-                SELECT DISTINCT COALESCE(n.thread_root_id, n.id) AS root_id
-                FROM audience_visible AS n
-                WHERE n.source_type = {{(short)NotificationSourceType.User}}
-                  AND n.source_id = {{userId}}
-            ), visible_roots AS (
-                SELECT root_id FROM directly_visible
-                UNION
-                SELECT root_id FROM participated_roots
-            )
-            SELECT n.*
-            FROM audience_visible AS n
-            JOIN visible_roots AS visible
-              ON n.id = visible.root_id OR n.thread_root_id = visible.root_id
-            """).AsNoTracking().Where(item =>
+        var activeAdministrator = db.Users.IgnoreQueryFilters().Any(user =>
+            user.Id == userId
+            && user.Role == UserRole.Administrator
+            && user.AccountStatus == UserAccountStatus.Active);
+        var inaccessibleStaffCompetitionIds = db.Competitions.IgnoreQueryFilters()
+            .Where(competition =>
+                competition.AccessMode == NoCTF.Domain.Competitions.CompetitionAccessMode.StaffOnly
+                && !(activeAdministrator
+                    || competition.OwnerId == userId
+                    || competition.Collaborators.Any(collaborator => collaborator.UserId == userId)))
+            .Select(competition => competition.Id);
+
+        var audienceVisible = db.Notifications.AsNoTracking().Where(notification =>
+            !(notification.TargetType == NotificationTargetType.User
+                && notification.TargetId != userId)
+            && !(notification.RelatedType == EntityReferenceKind.Competition
+                && notification.RelatedId != null
+                && inaccessibleStaffCompetitionIds.Contains(notification.RelatedId.Value))
+            && !((notification.TargetType == NotificationTargetType.CompetitionCollaborators
+                    || notification.TargetType == NotificationTargetType.CompetitionParticipants)
+                && inaccessibleStaffCompetitionIds.Contains(notification.TargetId))
+            && !(notification.TargetType == NotificationTargetType.TeamMembers
+                && db.Teams.IgnoreQueryFilters().Any(team =>
+                    team.Id == notification.TargetId
+                    && inaccessibleStaffCompetitionIds.Contains(team.CompetitionId)))
+            && !(notification.ThreadRootId != null
+                && db.Notifications.Any(root =>
+                    root.Id == notification.ThreadRootId
+                    && root.RelatedType == EntityReferenceKind.Competition
+                    && root.RelatedId != null
+                    && inaccessibleStaffCompetitionIds.Contains(root.RelatedId.Value))));
+
+        var directlyVisibleRootIds = audienceVisible
+            .Where(notification =>
+                notification.TargetType == NotificationTargetType.User
+                    && notification.TargetId == userId
+                || notification.TargetType == NotificationTargetType.CompetitionCollaborators
+                    && db.Competitions.Any(competition =>
+                        competition.Id == notification.TargetId
+                        && competition.DeletedAt == null
+                        && (competition.OwnerId == userId
+                            || competition.Collaborators.Any(collaborator =>
+                                collaborator.UserId == userId)))
+                || notification.TargetType == NotificationTargetType.CompetitionParticipants
+                    && db.Teams.Any(team =>
+                        team.CompetitionId == notification.TargetId
+                        && team.DeletedAt == null
+                        && team.RegistrationStatus == TeamRegistrationStatus.Approved
+                        && !team.IsBanned
+                        && team.Members.Any(member => member.UserId == userId))
+                || notification.TargetType == NotificationTargetType.TeamMembers
+                    && db.Teams.Any(team =>
+                        team.Id == notification.TargetId
+                        && team.DeletedAt == null
+                        && team.Members.Any(member => member.UserId == userId))
+                || notification.TargetType == NotificationTargetType.PlatformAdministrators
+                    && activeAdministrator)
+            .Select(notification => notification.ThreadRootId ?? notification.Id);
+        var participatedRootIds = audienceVisible
+            .Where(notification => notification.SourceType == NotificationSourceType.User
+                && notification.SourceId == userId)
+            .Select(notification => notification.ThreadRootId ?? notification.Id);
+        var visibleRootIds = directlyVisibleRootIds.Union(participatedRootIds);
+
+        return audienceVisible
+            .Where(notification => visibleRootIds.Contains(
+                notification.ThreadRootId ?? notification.Id))
+            .Where(item =>
                 item.Kind != NotificationKind.AuthenticationSecurityActivity
-                && item.Kind != NotificationKind.HttpCommandReceipt
                 && item.Kind != NotificationKind.PlatformUserAccessTokenIssued
                 && item.Kind != NotificationKind.PlatformUserAccessTokenRevoked
-                && item.Kind != NotificationKind.PlatformUserTokensInvalidated);
+                && item.Kind != NotificationKind.PlatformUserTokensInvalidated
+                && item.Kind != NotificationKind.SsoProviderConfigurationChanged
+                && item.Kind != NotificationKind.SsoExternalIdentityBindingChanged);
     }
 
     private async Task<IQueryable<Notification>> VisibleToInMemoryAsync(
@@ -300,6 +322,9 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
 
         bool IsAudienceVisible(Notification notification)
         {
+            if (notification.TargetType == NotificationTargetType.User
+                && notification.TargetId != userId)
+                return false;
             var competitionId = AudienceCompetitionId(notification);
             if (competitionId is null
                 || !competitions.TryGetValue(competitionId.Value, out var competition)
@@ -309,9 +334,9 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
             return user is { AccountStatus: UserAccountStatus.Active }
                 && (user.Role == UserRole.Administrator
                     || competition.OwnerId == userId
-                    || competition.ManagerIds.Contains(userId)
-                    || competition.JudgeIds.Contains(userId)
-                    || competition.ObserverIds.Contains(userId));
+                    || competition.Collaborators.Any(collaborator => collaborator.Role == NoCTF.Domain.Competitions.CompetitionCollaboratorRole.Manager && collaborator.UserId == userId)
+                    || competition.Collaborators.Any(collaborator => collaborator.Role == NoCTF.Domain.Competitions.CompetitionCollaboratorRole.Judge && collaborator.UserId == userId)
+                    || competition.Collaborators.Any(collaborator => collaborator.Role == NoCTF.Domain.Competitions.CompetitionCollaboratorRole.Observer && collaborator.UserId == userId));
         }
 
         var audienceVisible = notifications.Where(IsAudienceVisible).ToArray();
@@ -326,22 +351,21 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
                 competitions.TryGetValue(notification.TargetId, out var competition)
                 && competition.DeletedAt is null
                 && (competition.OwnerId == userId
-                    || competition.ManagerIds.Contains(userId)
-                    || competition.JudgeIds.Contains(userId)
-                    || competition.ObserverIds.Contains(userId)),
+                    || competition.Collaborators.Any(collaborator => collaborator.Role == NoCTF.Domain.Competitions.CompetitionCollaboratorRole.Manager && collaborator.UserId == userId)
+                    || competition.Collaborators.Any(collaborator => collaborator.Role == NoCTF.Domain.Competitions.CompetitionCollaboratorRole.Judge && collaborator.UserId == userId)
+                    || competition.Collaborators.Any(collaborator => collaborator.Role == NoCTF.Domain.Competitions.CompetitionCollaboratorRole.Observer && collaborator.UserId == userId)),
             NotificationTargetType.CompetitionParticipants => teams.Any(team =>
                 team.CompetitionId == notification.TargetId
                 && team.DeletedAt is null
                 && team.RegistrationStatus == TeamRegistrationStatus.Approved
                 && !team.IsBanned
-                && team.MemberIds.Contains(userId)),
+                && team.Members.Any(member => member.UserId == userId)),
             NotificationTargetType.TeamMembers => teams.Any(team =>
                 team.Id == notification.TargetId
                 && team.DeletedAt is null
-                && team.MemberIds.Contains(userId)),
+                && team.Members.Any(member => member.UserId == userId)),
             NotificationTargetType.PlatformAdministrators => user is
             {
-                Kind: UserKind.Human,
                 Role: UserRole.Administrator,
                 AccountStatus: UserAccountStatus.Active
             },
@@ -360,10 +384,11 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
         return db.Notifications.AsNoTracking()
             .Where(notification =>
                 notification.Kind != NotificationKind.AuthenticationSecurityActivity
-                && notification.Kind != NotificationKind.HttpCommandReceipt
                 && notification.Kind != NotificationKind.PlatformUserAccessTokenIssued
                 && notification.Kind != NotificationKind.PlatformUserAccessTokenRevoked
-                && notification.Kind != NotificationKind.PlatformUserTokensInvalidated)
+                && notification.Kind != NotificationKind.PlatformUserTokensInvalidated
+                && notification.Kind != NotificationKind.SsoProviderConfigurationChanged
+                && notification.Kind != NotificationKind.SsoExternalIdentityBindingChanged)
             .Where(notification => visibleRootIds.Contains(
                 notification.ThreadRootId ?? notification.Id))
             .Where(notification => audienceVisibleIds.Contains(notification.Id));

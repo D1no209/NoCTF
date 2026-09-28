@@ -1,5 +1,6 @@
 using NoCTF.Application.Challenges.Configuration;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Challenges;
 
 namespace NoCTF.Tests.Unit.Application;
 
@@ -20,7 +21,7 @@ public class ChallengeConfigurationTests
         var result = await useCase.ExecuteAsync(
             store.Current!.CompetitionId,
             store.Current.CompetitionChallengeId,
-            ValidJson,
+            Rules(1),
             DateTimeOffset.UtcNow);
 
         await Assert.That(result.Succeeded).IsTrue();
@@ -38,7 +39,7 @@ public class ChallengeConfigurationTests
         var result = await useCase.ExecuteAsync(
             store.Current!.CompetitionId,
             store.Current.CompetitionChallengeId,
-            "{}",
+            Rules(2),
             DateTimeOffset.UtcNow);
 
         await Assert.That(result.FailureCode).IsEqualTo(ChallengeConfigurationFailureCode.InvalidConfiguration);
@@ -56,17 +57,17 @@ public class ChallengeConfigurationTests
         var first = await useCase.ExecuteAsync(
             store.Current!.CompetitionId,
             store.Current.CompetitionChallengeId,
-            ValidJson,
+            Rules(1),
             DateTimeOffset.UtcNow);
         var second = await useCase.ExecuteAsync(
             store.Current!.CompetitionId,
             store.Current.CompetitionChallengeId,
-            "{\"schemaVersion\":1,\"flagPrefix\":\"latest\"}",
+            Rules(3),
             DateTimeOffset.UtcNow.AddSeconds(1));
 
         await Assert.That(first.Succeeded).IsTrue();
         await Assert.That(second.Succeeded).IsTrue();
-        await Assert.That(store.Current!.Json).Contains("latest");
+        await Assert.That(store.Current!.Rules.MaxFlagAttempts).IsEqualTo(3);
     }
 
     [Test]
@@ -79,24 +80,23 @@ public class ChallengeConfigurationTests
         var result = await useCase.ExecuteAsync(
             current.CompetitionId,
             current.CompetitionChallengeId,
-            ValidJson,
+            Rules(1),
             DateTimeOffset.UtcNow);
 
         await Assert.That(result.Succeeded).IsTrue();
         await Assert.That(store.UpdateCalls).IsEqualTo(1);
     }
 
-    private const string ValidJson = """{"schemaVersion":1}""";
-
     private static ChallengeConfigurationView View(CompetitionStatus status) => new(
         Guid.NewGuid(),
         Guid.NewGuid(),
         GameMode.Ctf,
-        ValidJson,
-        ValidJson,
+        Rules(1),
+        new CtfCompetitionModeConfiguration(),
         status,
         2,
-        DateTimeOffset.UtcNow);
+        DateTimeOffset.UtcNow,
+        new CtfChallengeDefinition());
 
     private sealed class Store(ChallengeConfigurationView? current) : IChallengeConfigurationStore
     {
@@ -111,14 +111,14 @@ public class ChallengeConfigurationTests
         public Task<ChallengeConfigurationUpdateResult> TryUpdateAsync(
             Guid competitionId,
             Guid challengeId,
-            string json,
+            CompetitionChallengeRules rules,
             DateTimeOffset updatedAt,
             CancellationToken cancellationToken)
         {
             UpdateCalls++;
             Current = Current is null
                 ? null
-                : Current with { Json = json, UpdatedAt = updatedAt };
+                : Current with { Rules = rules, UpdatedAt = updatedAt };
             return Task.FromResult(Current is null
                 ? new ChallengeConfigurationUpdateResult(null, ChallengeConfigurationUpdateFailure.ChallengeNotFound)
                 : new ChallengeConfigurationUpdateResult(Current));
@@ -127,12 +127,22 @@ public class ChallengeConfigurationTests
 
     private sealed class Catalog(IReadOnlyList<string>? errors = null) : IChallengeConfigurationCatalog
     {
-        public string GetDefaultJson(GameMode mode) => ValidJson;
+        public CompetitionChallengeRules CreateDefaultRules(GameMode mode, Guid id) => Rules(1);
+        public ChallengeDefinition CreateDefaultDefinition(GameMode mode, Guid id) =>
+            new CtfChallengeDefinition { ChallengeId = id };
         public IReadOnlyList<string> Validate(
             GameMode mode,
-            string json,
-            string competitionConfigurationJson,
+            CompetitionChallengeRules rules,
+            CompetitionModeConfiguration competitionConfiguration,
             int eligibleTeamCount) => errors ?? [];
+        public IReadOnlyList<string> ValidateDefinition(
+            GameMode mode,
+            ChallengeDefinition definition) => errors ?? [];
     }
+
+    private static CtfCompetitionChallengeRules Rules(int attempts) => new()
+    {
+        MaxFlagAttempts = attempts
+    };
 
 }

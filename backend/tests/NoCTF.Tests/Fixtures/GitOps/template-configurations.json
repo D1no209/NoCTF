@@ -3,7 +3,7 @@
     "scenario": "Ctf/None",
     "mode": "Ctf",
     "definition": {
-      "schemaVersion": 2
+      "schemaVersion": 3
     },
     "rules": {
       "schemaVersion": 2,
@@ -19,12 +19,19 @@
     "scenario": "Ctf/Container",
     "mode": "Ctf",
     "definition": {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "runtime": {
         "allocation": 1,
         "definition": {
           "kind": "container",
           "image": "example.invalid/test@sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "security": {
+            "noNewPrivileges": false,
+            "readonlyRootfs": false,
+            "runAsNonRoot": false,
+            "capDrop": [],
+            "capAdd": []
+          },
           "flagEnvironmentVariableName": "FLAG",
           "environment": {},
           "labels": {},
@@ -63,7 +70,7 @@
     "scenario": "Ctf/Compose",
     "mode": "Ctf",
     "definition": {
-      "schemaVersion": 2,
+      "schemaVersion": 3,
       "runtime": {
         "allocation": 1,
         "flagSource": 1,
@@ -119,6 +126,13 @@
         "definition": {
           "kind": "container",
           "image": "example.invalid/test@sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "security": {
+            "noNewPrivileges": false,
+            "readonlyRootfs": false,
+            "runAsNonRoot": false,
+            "capDrop": [],
+            "capAdd": []
+          },
           "environment": {},
           "labels": {},
           "egressPolicy": 0,
@@ -222,6 +236,13 @@
         "definition": {
           "kind": "container",
           "image": "example.invalid/test@sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "security": {
+            "noNewPrivileges": false,
+            "readonlyRootfs": false,
+            "runAsNonRoot": false,
+            "capDrop": [],
+            "capAdd": []
+          },
           "internalPorts": [
             8080
           ],
@@ -282,6 +303,13 @@
         "definition": {
           "kind": "container",
           "image": "example.invalid/test@sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "security": {
+            "noNewPrivileges": false,
+            "readonlyRootfs": false,
+            "runAsNonRoot": false,
+            "capDrop": [],
+            "capAdd": []
+          },
           "environment": {},
           "labels": {},
           "egressPolicy": 0,
@@ -325,6 +353,13 @@
         "definition": {
           "kind": "container",
           "image": "example.invalid/test@sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "security": {
+            "noNewPrivileges": false,
+            "readonlyRootfs": false,
+            "runAsNonRoot": false,
+            "capDrop": [],
+            "capAdd": []
+          },
           "internalPorts": [
             8080
           ],

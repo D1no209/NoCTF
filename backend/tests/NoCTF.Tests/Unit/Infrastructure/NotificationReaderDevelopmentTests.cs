@@ -1,4 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.Sqlite;
+using NoCTF.Application.Messaging;
+using NoCTF.Application.Notifications;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Notifications;
@@ -11,10 +14,12 @@ namespace NoCTF.Tests.Unit.Infrastructure;
 public sealed class NotificationReaderDevelopmentTests
 {
     [Test]
-    public async Task InMemory_development_provider_preserves_competition_visibility_and_threads()
+    public async Task Sqlite_development_provider_preserves_competition_visibility_and_threads()
     {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
         var options = new DbContextOptionsBuilder<NoCtfDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .UseSqlite(connection)
             .Options;
         var now = DateTimeOffset.Parse("2026-08-10T01:00:00Z");
         var ownerId = Guid.CreateVersion7(now);
@@ -24,16 +29,16 @@ public sealed class NotificationReaderDevelopmentTests
         var replyId = Guid.CreateVersion7(now.AddMilliseconds(4));
 
         await using var db = new NoCtfDbContext(options);
+        await db.Database.EnsureCreatedAsync();
         db.Users.AddRange(
             User(ownerId, "development-owner", UserRole.Organizer, now),
             User(askerId, "development-asker", UserRole.User, now));
-        db.Competitions.Add(new Competition
+        db.Competitions.Add(new CtfCompetition
         {
             Id = competitionId,
             OwnerId = ownerId,
             Title = "Development notification reader",
-            Mode = GameMode.Ctf,
-            ConfigurationJson = """{"schemaVersion":1}""",
+            ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
             FlagDerivationSecret = new byte[32],
             StartAt = now.AddHours(-1),
             EndAt = now.AddHours(1),
@@ -42,27 +47,25 @@ public sealed class NotificationReaderDevelopmentTests
             UpdatedAt = now
         });
         db.Notifications.AddRange(
-            new Notification
+            new CompetitionAnnouncementNotification
             {
                 Id = rootId,
                 SourceType = NotificationSourceType.User,
                 SourceId = askerId,
                 TargetType = NotificationTargetType.CompetitionCollaborators,
                 TargetId = competitionId,
-                Kind = NotificationKind.CompetitionAnnouncement,
-                ContentJson = """{"schemaVersion":1,"title":"announcement"}""",
+                Title = "announcement",
                 RelatedType = EntityReferenceKind.Competition,
                 RelatedId = competitionId,
                 SentAt = now
             },
-            new Notification
+            new MessageNotification
             {
                 Id = replyId,
                 SourceType = NotificationSourceType.System,
                 TargetType = NotificationTargetType.TeamMembers,
                 TargetId = Guid.CreateVersion7(now.AddMilliseconds(4)),
-                Kind = NotificationKind.Message,
-                ContentJson = """{"schemaVersion":1,"body":"follow-up"}""",
+                Body = "follow-up",
                 RelatedType = EntityReferenceKind.Competition,
                 RelatedId = competitionId,
                 ThreadRootId = rootId,
@@ -94,6 +97,68 @@ public sealed class NotificationReaderDevelopmentTests
         await Assert.That(threadFromReply!.Select(item => item.Id))
             .IsEquivalentTo([rootId, replyId]);
         await Assert.That(askerThread).IsNotNull();
+
+        await new CompetitionNotificationDelivery(db).DeliverToUsersAsync(
+            competitionId,
+            rootId,
+            NotificationKind.QuestionOpened,
+            $"competition-question:{rootId:N}:root:opened",
+            new CompetitionQuestionActivityPayload(
+                competitionId,
+                rootId,
+                null,
+                CompetitionQuestionNotificationEvent.Opened,
+                "private question",
+                now.AddSeconds(2)),
+            [ownerId, askerId],
+            CancellationToken.None);
+        var ownerNoticeId = await db.Notifications.AsNoTracking()
+            .Where(notification => notification.TargetType == NotificationTargetType.User
+                && notification.TargetId == ownerId)
+            .Select(notification => notification.Id)
+            .SingleAsync();
+        var askerNoticeId = await db.Notifications.AsNoTracking()
+            .Where(notification => notification.TargetType == NotificationTargetType.User
+                && notification.TargetId == askerId)
+            .Select(notification => notification.Id)
+            .SingleAsync();
+        await Assert.That(await db.Notifications.AsNoTracking()
+            .Where(notification => notification.Id == ownerNoticeId
+                || notification.Id == askerNoticeId)
+            .AllAsync(notification => notification.ThreadRootId == rootId)).IsTrue();
+
+        var ownerInbox = await reader.ListAsync(ownerId, null, null, 10, CancellationToken.None);
+        var askerInbox = await reader.ListAsync(askerId, null, null, 10, CancellationToken.None);
+        await Assert.That(ownerInbox.Select(item => item.Id)).Contains(ownerNoticeId);
+        await Assert.That(ownerInbox.Select(item => item.Id)).DoesNotContain(askerNoticeId);
+        await Assert.That(askerInbox.Select(item => item.Id)).Contains(askerNoticeId);
+        await Assert.That(askerInbox.Select(item => item.Id)).DoesNotContain(ownerNoticeId);
+        var noticeThread = await reader.ReadThreadAsync(ownerId, ownerNoticeId, CancellationToken.None);
+        await Assert.That(noticeThread).IsNotNull();
+        await Assert.That(noticeThread!.Select(item => item.Id))
+            .IsEquivalentTo([rootId, replyId]);
+
+        var authoredReplyId = Guid.CreateVersion7(now.AddSeconds(3));
+        db.Notifications.Add(new MessageNotification
+        {
+            Id = authoredReplyId,
+            SourceType = NotificationSourceType.User,
+            SourceId = ownerId,
+            TargetType = NotificationTargetType.CompetitionCollaborators,
+            TargetId = competitionId,
+            Body = "own reply",
+            RelatedType = EntityReferenceKind.Competition,
+            RelatedId = competitionId,
+            ThreadRootId = rootId,
+            SentAt = now.AddSeconds(3)
+        });
+        await db.SaveChangesAsync();
+        var ownerLatestInbox = await reader.ListAsync(
+            ownerId, null, null, 10, NotificationReadScope.Inbox, CancellationToken.None);
+        var askerLatestInbox = await reader.ListAsync(
+            askerId, null, null, 10, NotificationReadScope.Inbox, CancellationToken.None);
+        await Assert.That(ownerLatestInbox.Select(item => item.Id)).DoesNotContain(authoredReplyId);
+        await Assert.That(askerLatestInbox.Select(item => item.Id)).Contains(authoredReplyId);
 
         var competition = await db.Competitions.SingleAsync(
             candidate => candidate.Id == competitionId);

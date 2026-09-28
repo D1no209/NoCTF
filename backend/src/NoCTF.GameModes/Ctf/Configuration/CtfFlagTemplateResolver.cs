@@ -1,19 +1,18 @@
 using NoCTF.GameModes.Flags;
+using NoCTF.Domain.Challenges;
+using NoCTF.Domain.Competitions;
+using NoCTF.GameModes.Registration;
 
 namespace NoCTF.GameModes.Ctf.Configuration;
 
 public static class CtfFlagTemplateResolver
 {
     public static PerTeamFlagTemplate Resolve(
-        string competitionConfigurationJson,
-        string challengeRulesJson)
+        CtfCompetitionModeConfiguration competition,
+        CtfCompetitionChallengeRules challenge)
     {
-        var competition = CtfConfigurationUpgrader.ParseCompetition(
-            competitionConfigurationJson);
-        var challenge = CtfConfigurationUpgrader.ParseChallenge(
-            challengeRulesJson);
-        return challenge.FlagTemplate
-            ?? competition.FlagTemplate
+        return (challenge.HasFlagTemplate ? TypedGameModeConfiguration.Ctf(challenge).FlagTemplate : null)
+            ?? TypedGameModeConfiguration.Ctf(competition).FlagTemplate
             ?? PerTeamFlagTemplate.Default;
     }
 }

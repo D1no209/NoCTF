@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Competitions.Lifecycle;
 using NoCTF.Domain.Competitions;
@@ -9,8 +8,6 @@ namespace NoCTF.Infrastructure.Competitions.Lifecycle;
 
 internal static class CompetitionEffectiveRuntimeReader
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
     public static async Task<CompetitionEffectiveRuntime> ReadAsync(
         NoCtfDbContext db,
         Guid competitionId,
@@ -24,24 +21,25 @@ internal static class CompetitionEffectiveRuntimeReader
                 && item.Kind == CompetitionEventKind.CompetitionLifecycleChanged)
             .OrderBy(item => item.OccurredAt)
             .ThenBy(item => item.Id)
-            .Select(item => new { item.Id, item.OccurredAt, item.PayloadJson })
+            .Select(item => new
+            {
+                item.Id,
+                item.OccurredAt,
+                From = item.PreviousCompetitionStatus,
+                To = item.CompetitionStatus
+            })
             .ToArrayAsync(cancellationToken);
-        var transitions = stored.Select(item =>
-        {
-            var payload = JsonSerializer.Deserialize<LifecyclePayload>(item.PayloadJson, JsonOptions)
-                ?? throw new InvalidOperationException(
-                    $"Competition lifecycle event {item.Id} has an invalid payload.");
-            return new CompetitionLifecycleMoment(item.Id, item.OccurredAt, payload.From, payload.To);
-        });
+        var transitions = stored.Select(item => new CompetitionLifecycleMoment(
+            item.Id,
+            item.OccurredAt,
+            item.From ?? throw new InvalidOperationException(
+                $"Competition lifecycle event {item.Id} has no previous status."),
+            item.To ?? throw new InvalidOperationException(
+                $"Competition lifecycle event {item.Id} has no current status.")));
         return CompetitionEffectiveRuntimePolicy.Calculate(
             competitionStartAt,
             competitionEndAt,
             now,
             transitions);
     }
-
-    private sealed record LifecyclePayload(
-        int SchemaVersion,
-        CompetitionStatus From,
-        CompetitionStatus To);
 }

@@ -11,8 +11,6 @@ using MailKit.Net.Imap;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using Microsoft.Extensions.Logging.Abstractions;
-using NSubstitute;
-using NoCTF.Application.Authentication.Account;
 using NoCTF.Application.Authentication.EmailVerification;
 using NoCTF.Application.Authentication.PasswordReset;
 using NoCTF.Domain.Identity;
@@ -269,27 +267,10 @@ public sealed class SmtpEmailVerificationDeliveryTests
     private static SmtpEmailVerificationDelivery CreateDelivery(
         EmailVerificationDeliveryConfiguration configuration)
     {
-        var configurationStore = Substitute.For<IEmailVerificationConfigurationStore>();
-        configurationStore.GetAsync(Arg.Any<CancellationToken>())
-            .Returns(ConfigurationView(configuration));
-        var configurationReader = Substitute.For<IEmailVerificationDeliveryConfigurationReader>();
-        configurationReader.GetDeliveryConfigurationAsync(
-                Arg.Any<bool>(),
-                Arg.Any<CancellationToken>())
-            .Returns(configuration);
-        var users = Substitute.For<IUserAuthenticationStore>();
-        users.GetProfileAsync(UserId, Arg.Any<CancellationToken>())
-            .Returns(new UserProfile(
-                UserId,
-                "你好-admin",
-                "admin@noctf.test",
-                UserRole.Administrator,
-                UserKind.Human,
-                EmailVerified: true));
+        var data = SmtpDeliveryTestData.Create(configuration, UserId);
         return new(
-            configurationStore,
-            configurationReader,
-            users,
+            data.Factory,
+            data.Secrets,
             new TrustedTestSmtpClientFactory(),
             NullLogger<SmtpEmailVerificationDelivery>.Instance);
     }
@@ -310,26 +291,6 @@ public sealed class SmtpEmailVerificationDeliveryTests
             SmtpFromAddress: "no-reply@noctf.test",
             SmtpFromName: "NoCTF 测试",
             SmtpTimeoutSeconds: 10);
-
-    private static EmailVerificationConfigurationView ConfigurationView(
-        EmailVerificationDeliveryConfiguration configuration) =>
-        new(
-            Enabled: configuration.Enabled,
-            PublicBaseUrl: configuration.PublicBaseUrl,
-            TokenLifetimeMinutes: 1440,
-            ResendCooldownSeconds: 60,
-            PasswordResetTokenLifetimeMinutes: 30,
-            PasswordResetCooldownSeconds: 60,
-            PasswordResetMaxRequestsPerHour: 3,
-            SmtpHost: configuration.SmtpHost,
-            SmtpPort: configuration.SmtpPort,
-            SmtpSecurityMode: configuration.SmtpSecurityMode,
-            SmtpUserName: configuration.SmtpUserName,
-            SmtpPasswordConfigured: configuration.SmtpPassword is not null,
-            SmtpFromAddress: configuration.SmtpFromAddress,
-            SmtpFromName: configuration.SmtpFromName,
-            SmtpTimeoutSeconds: configuration.SmtpTimeoutSeconds,
-            UpdatedAt: DateTimeOffset.UnixEpoch);
 
     private static async Task<IReadOnlyList<MimeKit.MimeMessage>> ReadMessagesAsync(
         IContainer greenMail,

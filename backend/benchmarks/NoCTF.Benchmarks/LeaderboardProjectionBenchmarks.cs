@@ -2,11 +2,13 @@ using BenchmarkDotNet.Attributes;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Gameplay;
+using NoCTF.Domain.Challenges;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Ctf.Configuration;
 using NoCTF.GameModes.Leaderboard;
 using NoCTF.GameModes.Scoring;
+using NoCTF.GameModes.Registration;
 
 namespace NoCTF.Benchmarks;
 
@@ -26,39 +28,29 @@ public class LeaderboardProjectionBenchmarks
     public void Setup()
     {
         input = Corpus.Create(Mode, TeamCount);
-        var separateLegacy = engine.ProjectOutputs(input).Legacy;
-        var separateScoreboard = engine.ProjectOutputs(input).Scoreboard;
-        var combined = engine.ProjectOutputs(input);
-        if (!EqualsByValue(separateLegacy, combined.Legacy)
-            || !EqualsByValue(separateScoreboard, combined.Scoreboard))
-            throw new InvalidOperationException("Combined projection changed output semantics.");
-        if (combined.Legacy.Entries.Count == 0
-            || combined.Scoreboard.Snapshot.Teams.Count == 0
-            || Mode != GameMode.Koh && combined.Scoreboard.EntryAllocations.Count == 0)
+        var projection = engine.Project(input);
+        if (projection.Snapshot.Teams.Count == 0
+            || Mode != GameMode.Koh && projection.EntryAllocations.Count == 0)
             throw new InvalidOperationException("The benchmark corpus did not exercise the leaderboard hot path.");
     }
 
-    [Benchmark(Baseline = true)]
-    public (LeaderboardProjectionResult Legacy, ScoreboardProjection Scoreboard) Separate() =>
-        (engine.ProjectOutputs(input).Legacy, engine.ProjectOutputs(input).Scoreboard);
-
     [Benchmark]
-    public LeaderboardProjectionOutputs Combined() => engine.ProjectOutputs(input);
+    public ScoreboardProjection Project() => engine.Project(input);
 
-    private static bool EqualsByValue<T>(T left, T right) =>
-        System.Text.Json.JsonSerializer.Serialize(left)
-        == System.Text.Json.JsonSerializer.Serialize(right);
+    internal static LeaderboardProjectionInput CreateMixedCtfInput(int teamCount) =>
+        Corpus.Create(GameMode.Ctf, teamCount, mixedCtf: true);
 
     private static class Corpus
     {
         private const int ChallengeCount = 12;
         private const int RoundCount = 20;
-        private static readonly System.Text.Json.JsonSerializerOptions JsonOptions =
-            new(System.Text.Json.JsonSerializerDefaults.Web);
         private static readonly DateTimeOffset Start =
             DateTimeOffset.Parse("2026-08-28T00:00:00Z");
 
-        public static LeaderboardProjectionInput Create(GameMode mode, int teamCount)
+        public static LeaderboardProjectionInput Create(
+            GameMode mode,
+            int teamCount,
+            bool mixedCtf = false)
         {
             var competitionId = StableGuid(1);
             var challenges = Enumerable.Range(1, ChallengeCount)
@@ -68,7 +60,10 @@ public class LeaderboardProjectionBenchmarks
                     $"Challenge {index}",
                     false,
                     ChallengeConfiguration(mode, index),
-                    Order: index))
+                    Order: index,
+                    InteractionKind: mode == GameMode.Ctf && mixedCtf && index % 2 == 0
+                        ? CtfInteractionKind.PatchVerification
+                        : CtfInteractionKind.FlagSubmission))
                 .ToArray();
             var teams = Enumerable.Range(1, teamCount)
                 .Select(index => new LeaderboardTeamFact(
@@ -96,7 +91,7 @@ public class LeaderboardProjectionBenchmarks
                 competitionId,
                 mode,
                 teams,
-                corpus.LegacyFacts,
+                corpus.AggregateFacts,
                 challenges,
                 CompetitionConfiguration(mode),
                 CompetitionStartTime: Start,
@@ -122,9 +117,12 @@ public class LeaderboardProjectionBenchmarks
                 {
                     var actorId = StableGuid(500_000 + teamIndex * 10 + challengeIndex % 4);
                     var occurredAt = Start.AddMinutes(5 + teamIndex).AddSeconds(challengeIndex);
-                    facts.Add(Fact(sequence++, team.Id, challenge.Id, GameplayFactKind.FlagAttempt,
+                    var interactionKind = challenge.InteractionKind == CtfInteractionKind.PatchVerification
+                        ? GameplayFactKind.FixAttempt
+                        : GameplayFactKind.FlagAttempt;
+                    facts.Add(Fact(sequence++, team.Id, challenge.Id, interactionKind,
                         occurredAt, GameplayFactResult.Correct, actorId: actorId));
-                    facts.Add(Fact(sequence++, team.Id, challenge.Id, GameplayFactKind.FlagAttempt,
+                    facts.Add(Fact(sequence++, team.Id, challenge.Id, interactionKind,
                         occurredAt.AddSeconds(-1), GameplayFactResult.Wrong, actorId: actorId, multiplicity: 3));
                     if (challengeIndex % 3 == 0)
                         facts.Add(Fact(sequence++, team.Id, challenge.Id, GameplayFactKind.HintUnlock,
@@ -140,7 +138,7 @@ public class LeaderboardProjectionBenchmarks
             IReadOnlyList<LeaderboardTeamFact> teams,
             IReadOnlyList<LeaderboardChallengeFact> challenges)
         {
-            var legacy = new List<LeaderboardGameplayFact>();
+            var aggregate = new List<LeaderboardGameplayFact>();
             var scoreboard = new List<LeaderboardGameplayFact>();
             var rounds = new List<LeaderboardAwdRoundFact>();
             var aggregates = new List<LeaderboardAwdAggregateFact>();
@@ -188,10 +186,10 @@ public class LeaderboardProjectionBenchmarks
                 var adjustment = Fact(sequence++, team.Id, challenges[0].Id,
                     GameplayFactKind.ManualAdjustment, Start.AddHours(5),
                     GameplayFactResult.Applied, actorId: StableGuid(900_000), value: "-5");
-                legacy.Add(adjustment);
+                aggregate.Add(adjustment);
                 scoreboard.Add(adjustment);
             }
-            return new(legacy, scoreboard, rounds, aggregates);
+            return new(aggregate, scoreboard, rounds, aggregates);
         }
 
         private static CorpusData CreateAwdp(
@@ -275,47 +273,69 @@ public class LeaderboardProjectionBenchmarks
                 multiplicity,
                 lastOccurredAt);
 
-        private static string? CompetitionConfiguration(GameMode mode) => mode switch
+        private static CompetitionModeConfiguration CompetitionConfiguration(GameMode mode)
         {
-            GameMode.Ctf => System.Text.Json.JsonSerializer.Serialize(new CtfConfiguration(
-                CtfConfiguration.CurrentSchemaVersion,
-                new ScoreCurveConfiguration(500, 100, 50),
-                [new(BloodRewardPolicy.CurrentPointsPercentage, 10)],
-                WrongSubmissionPenalty: 2), JsonOptions),
-            GameMode.Awd => System.Text.Json.JsonSerializer.Serialize(AwdConfiguration.Default, JsonOptions),
-            GameMode.Awdp => System.Text.Json.JsonSerializer.Serialize(new AwdpConfiguration(
-                AwdpConfiguration.CurrentSchemaVersion,
-                300,
-                new ScoreCurveConfiguration(500, 100, 50),
-                new ScoreCurveConfiguration(400, 100, 50),
-                FlagWrongPenalty: 2,
-                ExploitSucceededPenalty: 3,
-                ServiceAbnormalPenalty: 5,
-                RequireBreakBeforeFix: true), JsonOptions),
-            GameMode.Koh => "{\"schemaVersion\":1,\"pollIntervalSeconds\":30,\"controlPointsPerInterval\":5}",
-            _ => null
-        };
+            var configuration = CompetitionModeConfigurationDefaults.Create(mode, Guid.Empty);
+            switch (configuration)
+            {
+                case CtfCompetitionModeConfiguration ctf:
+                    ctf.DefaultScoreCurve = Curve(500, 100, 50);
+                    ctf.WrongSubmissionPenalty = 2;
+                    ctf.BloodRewards =
+                    [
+                        new CompetitionBloodReward
+                        {
+                            Policy = CompetitionBloodRewardPolicy.CurrentPointsPercentage,
+                            Value = 10
+                        }
+                    ];
+                    break;
+                case AwdpCompetitionModeConfiguration awdp:
+                    awdp.BreakScoreCurve = Curve(500, 100, 50);
+                    awdp.FixScoreCurve = Curve(400, 100, 50);
+                    awdp.FlagWrongPenalty = 2;
+                    awdp.ExploitSucceededPenalty = 3;
+                    awdp.ServiceAbnormalPenalty = 5;
+                    break;
+                case KohCompetitionModeConfiguration koh:
+                    koh.PollIntervalSeconds = 30;
+                    koh.ControlPointsPerInterval = 5;
+                    break;
+            }
+            return configuration;
+        }
 
-        private static string? ChallengeConfiguration(GameMode mode, int index) => mode switch
+        private static CompetitionChallengeRules ChallengeConfiguration(GameMode mode, int index)
         {
-            GameMode.Ctf => System.Text.Json.JsonSerializer.Serialize(new CtfChallengeConfiguration(
-                CtfChallengeConfiguration.CurrentSchemaVersion,
-                index % 3 == 0 ? new ScoreCurveConfiguration(600, 120, 60) : null,
-                null,
-                WrongSubmissionPenalty: index % 4 == 0 ? 3 : null), JsonOptions),
-            GameMode.Awd => System.Text.Json.JsonSerializer.Serialize(new AwdChallengeConfiguration(
-                AwdChallengeConfiguration.CurrentSchemaVersion,
-                ServiceHealthyPoints: index % 3 == 0 ? 110 : null), JsonOptions),
-            GameMode.Awdp => System.Text.Json.JsonSerializer.Serialize(new AwdpChallengeConfiguration(
-                AwdpChallengeConfiguration.CurrentSchemaVersion,
-                null,
-                null,
-                RequireBreakBeforeFix: index % 4 != 0,
-                null,
-                null,
-                FlagWrongPenalty: index % 3 == 0 ? 4 : null), JsonOptions),
-            GameMode.Koh => $"{{\"schemaVersion\":1,\"controlPointsPerInterval\":{5 + index % 3}}}",
-            _ => null
+            var rules = new GameModeChallengeConfigurationCatalog()
+                .CreateDefaultRules(mode, Guid.Empty);
+            switch (rules)
+            {
+                case CtfCompetitionChallengeRules ctf:
+                    ctf.HasScoreCurve = index % 3 == 0;
+                    ctf.ScoreCurve = Curve(600, 120, 60);
+                    ctf.WrongSubmissionPenalty = index % 4 == 0 ? 3 : null;
+                    break;
+                case AwdCompetitionChallengeRules awd:
+                    awd.ServiceHealthyPoints = index % 3 == 0 ? 110 : null;
+                    break;
+                case AwdpCompetitionChallengeRules awdp:
+                    awdp.RequireBreakBeforeFix = index % 4 != 0;
+                    awdp.FlagWrongPenalty = index % 3 == 0 ? 4 : null;
+                    break;
+                case KohCompetitionChallengeRules koh:
+                    koh.ControlPointsPerInterval = 5 + index % 3;
+                    break;
+            }
+            return rules;
+        }
+
+        private static ScoreCurveValue Curve(long initial, long minimum, int teams) => new()
+        {
+            InitialPoints = initial,
+            MinimumPoints = minimum,
+            DecayTeamCount = teams,
+            DecayMode = PersistedScoreDecayMode.Quadratic
         };
 
         private static IReadOnlyList<CompetitionLifecycleTransition> Lifecycle(Guid competitionId) =>
@@ -342,9 +362,31 @@ public class LeaderboardProjectionBenchmarks
             new(value, 0, 0, new byte[8]);
 
         private sealed record CorpusData(
-            IReadOnlyList<LeaderboardGameplayFact> LegacyFacts,
+            IReadOnlyList<LeaderboardGameplayFact> AggregateFacts,
             IReadOnlyList<LeaderboardGameplayFact> ScoreboardFacts,
             IReadOnlyList<LeaderboardAwdRoundFact>? AwdRounds,
             IReadOnlyList<LeaderboardAwdAggregateFact>? AwdAggregates);
     }
+}
+
+[MemoryDiagnoser]
+public class CtfMixedLeaderboardProjectionBenchmarks
+{
+    private readonly LeaderboardProjectionEngine engine = new(new LeaderboardProjectorCatalog());
+    private LeaderboardProjectionInput input = null!;
+
+    [Params(16, 64)]
+    public int TeamCount { get; set; }
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        input = LeaderboardProjectionBenchmarks.CreateMixedCtfInput(TeamCount);
+        var output = engine.Project(input);
+        if (output.Snapshot.Teams.Count == 0 || output.EntryAllocations.Count == 0)
+            throw new InvalidOperationException("The mixed CTF corpus did not exercise the leaderboard hot path.");
+    }
+
+    [Benchmark]
+    public ScoreboardProjection Project() => engine.Project(input);
 }

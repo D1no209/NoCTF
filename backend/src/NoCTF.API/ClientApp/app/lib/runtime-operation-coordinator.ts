@@ -16,6 +16,8 @@ interface RuntimeOperationEntry {
 export interface RuntimeOperationCoordinatorOptions {
   maxAttempts?: number
   intervalMs?: number
+  maxIntervalMs?: number
+  delaysMs?: readonly number[]
   timeoutMs?: number
   wait?: (delayMs: number, signal: AbortSignal) => Promise<void>
 }
@@ -41,6 +43,8 @@ export function createRuntimeOperationCoordinator(options: RuntimeOperationCoord
   const {
     maxAttempts = 12,
     intervalMs = 2_000,
+    maxIntervalMs = 8_000,
+    delaysMs = [],
     timeoutMs = 30_000,
     wait = waitForDelay,
   } = options
@@ -80,6 +84,7 @@ export function createRuntimeOperationCoordinator(options: RuntimeOperationCoord
       timedOut = true
       entry.controller.abort()
     }, timeoutMs)
+    let previousDelay = intervalMs
 
     try {
       for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
@@ -95,8 +100,12 @@ export function createRuntimeOperationCoordinator(options: RuntimeOperationCoord
           // Transient refresh failures do not change the accepted operation state.
         }
 
-        if (attempt + 1 < maxAttempts)
-          await wait(intervalMs, entry.controller.signal)
+        if (attempt + 1 < maxAttempts) {
+          const scheduledDelay = delaysMs[attempt]
+          const delay = scheduledDelay ?? Math.min(previousDelay * 1.5, maxIntervalMs)
+          previousDelay = delay
+          await wait(delay, entry.controller.signal)
+        }
       }
 
       return 'exhausted'

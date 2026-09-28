@@ -1,10 +1,10 @@
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Hosting;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Observability;
 using Wolverine;
-using Wolverine.Runtime.Agents;
 
 namespace NoCTF.Infrastructure.Messaging;
 
@@ -14,9 +14,9 @@ public sealed class MaintenanceTickAgent(
     ClusterSchedulingState state,
     ClusterSchedulerNodeIdentity nodeIdentity,
     IClusterSchedulerStatusStore statusStore,
-    LeaderboardProjectionMergeQueue leaderboardMergeQueue,
+    NatsClusterLeaseManager leases,
     ILogger<MaintenanceTickAgent> logger)
-    : SingularAgent(AgentName)
+    : BackgroundService
 {
     public const string AgentName = "noctf-maintenance-ticks";
     private static readonly TimeSpan RebuildInterval = TimeSpan.FromSeconds(5);
@@ -24,6 +24,7 @@ public sealed class MaintenanceTickAgent(
     private static readonly HashSet<ClusterScheduleKind> RebuiltKinds =
     [
         ClusterScheduleKind.AwdRound,
+        ClusterScheduleKind.AwdChecker,
         ClusterScheduleKind.KohPoll
     ];
 
@@ -36,12 +37,26 @@ public sealed class MaintenanceTickAgent(
     private Task? loop;
     private DateTimeOffset nextRebuildAt;
     private DateTimeOffset nextStatusRenewalAt;
+    private DateTimeOffset nextLeaseRenewalAt;
+    private int leaseRenewalFailures;
     private ClusterSchedulerStatus? activeStatus;
+    private NatsClusterLease? activeLease;
 
-    protected override async Task startAsync(CancellationToken cancellationToken)
+    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         stopping = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         state.Activating(nodeIdentity.Value);
+        while (!stopping.IsCancellationRequested && activeLease is null)
+        {
+            activeLease = await leases.TryAcquireAsync(
+                AgentName,
+                nodeIdentity.Value,
+                stopping.Token);
+            if (activeLease is null)
+                await Task.Delay(TimeSpan.FromSeconds(5), stopping.Token);
+        }
+        if (activeLease is null)
+            return;
         var startedAt = timeProvider.GetUtcNow();
         try
         {
@@ -57,29 +72,18 @@ public sealed class MaintenanceTickAgent(
                 entries.Count);
             nextRebuildAt = timeProvider.GetUtcNow().Add(RebuildInterval);
             nextStatusRenewalAt = timeProvider.GetUtcNow().Add(RebuildInterval);
+            nextLeaseRenewalAt = timeProvider.GetUtcNow().Add(
+                NatsClusterLeaseManager.RenewalInterval);
             loop = RunAsync(stopping.Token);
+            await loop;
+        }
+        catch (OperationCanceledException) when (stopping.IsCancellationRequested)
+        {
         }
         catch (Exception exception)
         {
             state.Failed(exception.GetType().Name, TimeSpan.Zero);
             throw;
-        }
-    }
-
-    protected override async Task stopAsync(CancellationToken cancellationToken)
-    {
-        if (stopping is null || loop is null)
-        {
-            state.Stopped();
-            return;
-        }
-        await stopping.CancelAsync();
-        try
-        {
-            await loop.WaitAsync(cancellationToken);
-        }
-        catch (OperationCanceledException)
-        {
         }
         finally
         {
@@ -87,7 +91,7 @@ public sealed class MaintenanceTickAgent(
             {
                 try
                 {
-                    await statusStore.ReleaseAsync(activeStatus, cancellationToken);
+                    await statusStore.ReleaseAsync(activeStatus, CancellationToken.None);
                 }
                 catch (Exception exception)
                 {
@@ -96,6 +100,8 @@ public sealed class MaintenanceTickAgent(
                         "Failed to release the cluster scheduler diagnostic lease.");
                 }
             }
+            if (activeLease is not null)
+                await activeLease.DisposeAsync();
             state.Stopped();
             stopping.Dispose();
         }
@@ -107,6 +113,30 @@ public sealed class MaintenanceTickAgent(
         while (!cancellationToken.IsCancellationRequested)
         {
             var now = timeProvider.GetUtcNow();
+            if (activeLease is not null && now >= nextLeaseRenewalAt)
+            {
+                try
+                {
+                    await activeLease.RenewAsync(cancellationToken);
+                    leaseRenewalFailures = 0;
+                }
+                catch (Exception exception)
+                {
+                    leaseRenewalFailures++;
+                    logger.LogError(
+                        exception,
+                        "Cluster scheduler NATS lease renewal failed ({FailureCount}/2).",
+                        leaseRenewalFailures);
+                    if (leaseRenewalFailures >= 2)
+                    {
+                        state.Failed(exception.GetType().Name, TimeSpan.Zero);
+                        await stopping!.CancelAsync();
+                        break;
+                    }
+                }
+                nextLeaseRenewalAt = timeProvider.GetUtcNow().Add(
+                    NatsClusterLeaseManager.RenewalInterval);
+            }
             if (activeStatus is not null && now >= nextStatusRenewalAt)
             {
                 try
@@ -140,35 +170,8 @@ public sealed class MaintenanceTickAgent(
                 nextRebuildAt = timeProvider.GetUtcNow().Add(RebuildInterval);
             }
 
-            await DrainLeaderboardMergesAsync(now, cancellationToken);
             await DrainDueAsync(now, cancellationToken);
             await timer.WaitForNextTickAsync(cancellationToken);
-        }
-    }
-
-    private async Task DrainLeaderboardMergesAsync(
-        DateTimeOffset now,
-        CancellationToken cancellationToken)
-    {
-        foreach (var competitionId in leaderboardMergeQueue.TakeDue(now))
-        {
-            try
-            {
-                await PublishAsync(new ProjectLeaderboard(competitionId), cancellationToken);
-                NoCtfTelemetry.RecordLeaderboardMergeDispatch("success");
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception exception)
-            {
-                leaderboardMergeQueue.Retry(competitionId, now.AddSeconds(1));
-                NoCtfTelemetry.RecordLeaderboardMergeDispatch("failure");
-                logger.LogError(
-                    exception,
-                    "Cluster scheduler failed to publish merged leaderboard projection.");
-            }
         }
     }
 
@@ -296,8 +299,9 @@ public sealed class MaintenanceTickAgent(
             DispatchAwdCheckers value => bus.PublishAsync(value),
             PollKohChallenge value => bus.PublishAsync(value),
             AdvanceCompetitionLifecycle value => bus.PublishAsync(value),
-            ProjectLeaderboard value => bus.PublishAsync(value),
             ExpireAccountSourceAddresses value => bus.PublishAsync(value),
+            DispatchQueuedRuntimes value => bus.PublishAsync(value),
+            DispatchPendingGameplayFacts value => bus.PublishAsync(value),
             _ => throw new ArgumentOutOfRangeException(
                 nameof(message),
                 message.GetType().FullName,
@@ -307,14 +311,12 @@ public sealed class MaintenanceTickAgent(
 
     private void AddFixedSchedules(DateTimeOffset now)
     {
+        AddFixed(new("runtime-dispatch", ClusterScheduleKind.RuntimeDispatch,
+            now, TimeSpan.FromSeconds(5), new DispatchQueuedRuntimes(now)));
+        AddFixed(new("gameplay-fact-recovery", ClusterScheduleKind.GameplayFactRecovery,
+            now, TimeSpan.FromSeconds(5), new DispatchPendingGameplayFacts(now)));
         AddFixed(new("account-source-retention", ClusterScheduleKind.AccountPrivacyRetention,
             now, TimeSpan.FromHours(1), new ExpireAccountSourceAddresses(now)));
-        AddFixed(new(
-            "awd-checkers",
-            ClusterScheduleKind.AwdChecker,
-            now,
-            TimeSpan.FromSeconds(1),
-            new DispatchAwdCheckers(now)));
         AddFixed(new(
             "competition-lifecycle",
             ClusterScheduleKind.CompetitionLifecycle,
@@ -343,6 +345,8 @@ public sealed class MaintenanceTickAgent(
         ClusterScheduleKind.KohPoll => "koh_poll",
         ClusterScheduleKind.CompetitionLifecycle => "competition_lifecycle",
         ClusterScheduleKind.AccountPrivacyRetention => "account_privacy_retention",
+        ClusterScheduleKind.RuntimeDispatch => "runtime_dispatch",
+        ClusterScheduleKind.GameplayFactRecovery => "gameplay_fact_recovery",
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
     };
 }

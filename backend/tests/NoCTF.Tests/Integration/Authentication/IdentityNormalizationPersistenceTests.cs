@@ -52,22 +52,30 @@ public sealed class IdentityNormalizationPersistenceTests
                 var second = await new RegisterUser(store).ExecuteAsync(
                     new("Player_Two", "player-two@example.test", "eight888", now.AddTicks(1)),
                     cancellationToken);
+                var chinese = await new RegisterUser(store).ExecuteAsync(
+                    new("  中文选手  ", "chinese-player@example.test", "eight888", now.AddTicks(2)),
+                    cancellationToken);
 
                 await Assert.That(first.Succeeded).IsTrue();
                 await Assert.That(first.Value!.Profile.UserName).IsEqualTo("Player_One");
                 await Assert.That(first.Value.Profile.Email).IsEqualTo("player-one@example.test");
                 await Assert.That(second.Succeeded).IsTrue();
+                await Assert.That(chinese.Succeeded).IsTrue();
+                await Assert.That(chinese.Value!.Profile.UserName).IsEqualTo("中文选手");
+                await Assert.That((await store.FindByLoginAsync("  中文选手  ", cancellationToken))!.Id)
+                    .IsEqualTo(chinese.Value.Profile.Id);
                 firstUserId = first.Value.Profile.Id;
                 secondUserId = second.Value!.Profile.Id;
 
-                db.Competitions.Add(new Competition
+                db.Competitions.Add(new CtfCompetition
                 {
                     Id = Guid.CreateVersion7(),
                     OwnerId = firstUserId,
                     Title = "Normalization",
-                    Mode = GameMode.Ctf,
                     Status = CompetitionStatus.Draft,
-                    ConfigurationJson = "{}",
+                    Tracks = CompetitionTrackConfiguration.ToPersisted(
+                        CompetitionTrackConfiguration.DefaultFor(GameMode.Ctf)),
+                    ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
                     MaxTeamMembers = 5,
                     FlagDerivationSecret = new byte[32],
                     StartAt = now.AddHours(1),
@@ -124,7 +132,7 @@ public sealed class IdentityNormalizationPersistenceTests
         });
     }
 
-    private sealed class NoopOutbox : ITransactionalMessageOutbox
+    private sealed class NoopOutbox : IPostCommitMessagePublisher
     {
         public ValueTask PublishAsync<T>(T message) => ValueTask.CompletedTask;
         public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) =>

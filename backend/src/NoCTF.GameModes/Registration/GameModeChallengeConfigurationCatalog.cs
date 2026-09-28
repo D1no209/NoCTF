@@ -1,5 +1,6 @@
-using System.Text.Json;
 using NoCTF.Application.Challenges.Configuration;
+using NoCTF.Application.GameplayFacts.PatchUploads;
+using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Awdp.Configuration;
@@ -10,193 +11,159 @@ namespace NoCTF.GameModes.Registration;
 
 public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurationCatalog
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
-    public string GetDefaultJson(GameMode mode) =>
-        JsonSerializer.Serialize(
-            new { schemaVersion = CurrentSchemaVersion(mode) },
-            JsonOptions);
-
-    public string GetDefaultDefinitionJson(GameMode mode) => GetDefaultJson(mode);
-
-    public IReadOnlyList<string> ValidateRules(
+    public CompetitionChallengeRules CreateDefaultRules(
         GameMode mode,
-        string json,
-        string competitionConfigurationJson,
-        int eligibleTeamCount) =>
-        [
-            .. ValidateOwnedProperties(mode, json, DefinitionProperties(mode), "RulesJson"),
-            .. Validate(mode, json, competitionConfigurationJson, eligibleTeamCount)
-        ];
-
-    public IReadOnlyList<string> ValidateDefinition(GameMode mode, string json) =>
-        [
-            .. ValidateOwnedProperties(mode, json, RuleProperties(mode), "DefinitionJson"),
-            .. Validate(
-                mode,
-                json,
-                GameModeDefaultConfiguration.GetCompetitionJson(mode),
-                1)
-        ];
-
-    public IReadOnlyList<string> ValidateDefinitionForStart(GameMode mode, string json)
+        Guid competitionChallengeId)
     {
-        var errors = ValidateDefinition(mode, json).ToList();
-        if (errors.Count > 0 || mode != GameMode.Awd)
-            return errors;
-
-        if (AwdConfigurationUpgrader.ParseChallenge(json).Runtime is null)
-            errors.Add("Runtime is required before an AWD competition can start.");
-        return errors;
+        CompetitionChallengeRules rules = mode switch
+        {
+            GameMode.Ctf => new CtfCompetitionChallengeRules(),
+            GameMode.Awd => new AwdCompetitionChallengeRules(),
+            GameMode.Awdp => new AwdpCompetitionChallengeRules(),
+            GameMode.Koh => new KohCompetitionChallengeRules(),
+            _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, null)
+        };
+        rules.CompetitionChallengeId = competitionChallengeId;
+        return rules;
     }
 
-    private static int CurrentSchemaVersion(GameMode mode) => mode switch
+    public ChallengeDefinition CreateDefaultDefinition(GameMode mode, Guid challengeId)
     {
-        GameMode.Ctf => CtfChallengeConfiguration.CurrentSchemaVersion,
-        GameMode.Awd => AwdChallengeConfiguration.CurrentSchemaVersion,
-        GameMode.Awdp => AwdpChallengeConfiguration.CurrentSchemaVersion,
-        GameMode.Koh => KohChallengeConfiguration.CurrentSchemaVersion,
-        _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unsupported game mode.")
-    };
-
-    public IReadOnlyList<string> Validate(GameMode mode, string json) =>
-        Validate(mode, json, GameModeDefaultConfiguration.GetCompetitionJson(mode), 1);
+        ChallengeDefinition definition = mode switch
+        {
+            GameMode.Ctf => new CtfChallengeDefinition
+            {
+                InteractionKind = CtfInteractionKind.FlagSubmission
+            },
+            GameMode.Awd => new AwdChallengeDefinition(),
+            GameMode.Awdp => new AwdpChallengeDefinition
+            {
+                MaximumPatchUploadBytes = PatchUploadRules.DefaultMaximumArchiveBytes
+            },
+            GameMode.Koh => new KohChallengeDefinition(),
+            _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, null)
+        };
+        definition.ChallengeId = challengeId;
+        return definition;
+    }
 
     public IReadOnlyList<string> Validate(
         GameMode mode,
-        string json,
-        string competitionConfigurationJson,
-        int eligibleTeamCount)
-    {
-        try
+        CompetitionChallengeRules rules,
+        CompetitionModeConfiguration competitionConfiguration,
+        int eligibleTeamCount) => (rules, competitionConfiguration) switch
         {
-            return mode switch
-            {
-                GameMode.Ctf => CtfConfigurationValidator.Validate(
-                    CtfConfigurationUpgrader.ParseChallenge(json),
-                    CtfConfigurationUpgrader.ParseCompetition(competitionConfigurationJson),
+            (CtfCompetitionChallengeRules ctfRules,
+                CtfCompetitionModeConfiguration ctfCompetition) =>
+                CtfConfigurationValidator.Validate(
+                    TypedGameModeConfiguration.Ctf(ctfRules),
+                    TypedGameModeConfiguration.Ctf(ctfCompetition),
                     eligibleTeamCount),
-                GameMode.Awd => AwdConfigurationValidator.Validate(AwdConfigurationUpgrader.ParseChallenge(json)),
-                GameMode.Awdp => ValidateAwdp(
-                    json,
-                    competitionConfigurationJson,
-                    eligibleTeamCount),
-                GameMode.Koh => KohConfigurationValidator.Validate(KohConfigurationUpgrader.ParseChallenge(json)),
-                _ => ["Unsupported game mode."]
-            };
-        }
-        catch (Exception exception) when (exception is GameModeConfigurationException or JsonException)
-        {
-            return [exception.Message];
-        }
-    }
+            (AwdCompetitionChallengeRules awdRules,
+                AwdCompetitionModeConfiguration) =>
+                AwdConfigurationValidator.Validate(TypedGameModeConfiguration.Awd(awdRules)),
+            (AwdpCompetitionChallengeRules awdpRules,
+                AwdpCompetitionModeConfiguration awdpCompetition) =>
+                ValidateAwdpRules(awdpRules, awdpCompetition, eligibleTeamCount),
+            (KohCompetitionChallengeRules kohRules,
+                KohCompetitionModeConfiguration) =>
+                KohConfigurationValidator.Validate(TypedGameModeConfiguration.Koh(kohRules)),
+            _ => ["Challenge rules type does not match the competition mode."]
+        };
 
-    private static IReadOnlyList<string> ValidateAwdp(
-        string json,
-        string competitionConfigurationJson,
-        int eligibleTeamCount)
-    {
-        var competition = AwdpConfigurationParser.ParseCompetition(
-            competitionConfigurationJson);
-        var challenge = AwdpConfigurationParser.ParseChallenge(json);
-        var competitionErrors = AwdpConfigurationValidator.Validate(
-            competition,
-            eligibleTeamCount);
-        if (competitionErrors.Count > 0)
-            return competitionErrors;
-        return
-        [
-            .. AwdpConfigurationValidator.Validate(challenge, eligibleTeamCount),
-            .. AwdpConfigurationValidator.Validate(
-                AwdpConfigurationResolver.Resolve(competition, challenge),
-                eligibleTeamCount)
-        ];
-    }
-
-    private static IReadOnlyList<string> ValidateOwnedProperties(
+    public IReadOnlyList<string> ValidateDefinition(
         GameMode mode,
-        string json,
-        IReadOnlySet<string> forbidden,
-        string section)
+        ChallengeDefinition definition)
     {
-        try
+        if (definition.Mode != mode)
+            return ["Challenge definition type does not match the game mode."];
+        var runtime = TypedGameModeConfiguration.Runtime(definition.Runtime);
+        var errors = ChallengeRuntimeTemplateValidator.Validate(
+            runtime,
+            allowControlCheckUrlBinding: mode == GameMode.Koh).ToList();
+        errors.AddRange(definition switch
         {
-            using var document = JsonDocument.Parse(json);
-            if (document.RootElement.ValueKind != JsonValueKind.Object)
-                return [$"{section} must be a JSON object."];
-            return document.RootElement.EnumerateObject()
-                .Where(property => forbidden.Contains(property.Name))
-                .Select(property =>
-                    $"{section} cannot contain '{property.Name}' because it belongs to the other challenge section.")
-                .ToArray();
-        }
-        catch (JsonException exception)
-        {
-            return [exception.Message];
-        }
+            CtfChallengeDefinition ctf => CtfConfigurationValidator.Validate(
+                TypedGameModeConfiguration.Ctf(ctf)),
+            AwdChallengeDefinition awd => AwdConfigurationValidator.Validate(
+                TypedGameModeConfiguration.Awd(awd)),
+            AwdpChallengeDefinition awdp => AwdpConfigurationValidator.Validate(
+                TypedGameModeConfiguration.Awdp(awdp)),
+            KohChallengeDefinition koh => KohConfigurationValidator.Validate(
+                TypedGameModeConfiguration.Koh(koh)),
+            _ => ["Unsupported challenge definition type."]
+        });
+        return errors;
     }
 
-    private static IReadOnlySet<string> DefinitionProperties(GameMode mode) =>
-        new HashSet<string>(
-            mode switch
-            {
-                GameMode.Ctf => ["runtime"],
-                GameMode.Awd => ["runtime", "checker", "checkerAllowRoot", "flagInjection"],
-                GameMode.Awdp =>
-                [
-                    "runtime",
-                    "patchEntrypoint",
-                    "patchCommand",
-                    "patchTimeoutSeconds",
-                    "checker",
-                    "checkerFixInput",
-                    "checkerAllowRoot",
-                    "readyTimeoutSeconds",
-                    "flagInjection"
-                ],
-                GameMode.Koh => ["runtime"],
-                _ => []
-            },
-            StringComparer.OrdinalIgnoreCase);
+    public IReadOnlyList<string> ValidateDefinitionForStart(
+        GameMode mode,
+        ChallengeDefinition definition)
+    {
+        var errors = ValidateDefinition(mode, definition).ToList();
+        if (errors.Count > 0) return errors;
+        if (definition is KohChallengeDefinition koh)
+            errors.AddRange(KohConfigurationValidator.ValidateForStart(
+                TypedGameModeConfiguration.Koh(koh)));
+        return errors;
+    }
 
-    private static IReadOnlySet<string> RuleProperties(GameMode mode) =>
-        new HashSet<string>(
-            mode switch
+    public IReadOnlyList<string> ValidateRulesForDefinition(
+        GameMode mode,
+        CompetitionChallengeRules rules,
+        ChallengeDefinition definition,
+        CompetitionModeConfiguration competitionConfiguration,
+        int eligibleTeamCount)
+    {
+        var errors = Validate(
+            mode, rules, competitionConfiguration, eligibleTeamCount).ToList();
+        errors.AddRange(ValidateDefinition(mode, definition));
+        if (errors.Count > 0) return errors;
+        if (mode == GameMode.Awdp
+            && rules is AwdpCompetitionChallengeRules awdpRules
+            && definition is AwdpChallengeDefinition awdpDefinition
+            && competitionConfiguration is AwdpCompetitionModeConfiguration awdpCompetition)
+        {
+            errors.AddRange(AwdpConfigurationValidator.Validate(
+                AwdpConfigurationResolver.Resolve(
+                    awdpCompetition,
+                    awdpRules,
+                    awdpDefinition),
+                eligibleTeamCount));
+        }
+        if (mode == GameMode.Ctf
+            && rules is CtfCompetitionChallengeRules ctfRules
+            && definition is CtfChallengeDefinition ctfDefinition)
+        {
+            if (ctfDefinition.InteractionKind == CtfInteractionKind.PatchVerification)
             {
-                GameMode.Ctf =>
-                [
-                    "scoreCurve",
-                    "bloodRewards",
-                    "maxFlagAttempts",
-                    "wrongSubmissionPenalty",
-                    "flagTemplate"
-                ],
-                GameMode.Awd =>
-                [
-                    "attackRewardMode",
-                    "attackPoints",
-                    "victimDefensePoolPoints",
-                    "checkerIntervalSeconds",
-                    "serviceHealthyPoints",
-                    "serviceUnhealthyPenalty",
-                    "flagTemplate"
-                ],
-                GameMode.Awdp =>
-                [
-                    "break",
-                    "fix",
-                    "requireBreakBeforeFix",
-                    "maxBreakSubmissions",
-                    "maxFixSubmissions",
-                    "breakWrongPenalty",
-                    "flagWrongPenalty",
-                    "exploitSucceededPenalty",
-                    "serviceAbnormalPenalty",
-                    "evaluationDispatchMode",
-                    "flagTemplate"
-                ],
-                GameMode.Koh => ["pollIntervalSeconds", "controlPointsPerInterval"],
-                _ => []
-            },
-            StringComparer.OrdinalIgnoreCase);
+                if (ctfRules.MaxFlagAttempts is not null)
+                    errors.Add("PatchVerification rules cannot configure MaxFlagAttempts.");
+                if (ctfRules.HasFlagTemplate)
+                    errors.Add("PatchVerification rules cannot configure FlagTemplate.");
+            }
+            else if (ctfRules.MaxPatchAttempts is not null)
+            {
+                errors.Add("FlagSubmission rules cannot configure MaxPatchAttempts.");
+            }
+        }
+        return errors;
+    }
+
+    private static IReadOnlyList<string> ValidateAwdpRules(
+        AwdpCompetitionChallengeRules rules,
+        AwdpCompetitionModeConfiguration competition,
+        int eligibleTeamCount)
+    {
+        var mappedRules = TypedGameModeConfiguration.Awdp(rules);
+        var errors = AwdpConfigurationValidator.Validate(
+            mappedRules, eligibleTeamCount).ToList();
+        errors.AddRange(AwdpConfigurationValidator.Validate(
+            AwdpConfigurationResolver.Resolve(
+                TypedGameModeConfiguration.Awdp(competition),
+                mappedRules,
+                AwdpChallengeConfiguration.Empty),
+            eligibleTeamCount));
+        return errors;
+    }
 }

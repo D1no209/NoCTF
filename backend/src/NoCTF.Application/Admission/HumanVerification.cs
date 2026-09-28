@@ -46,12 +46,17 @@ public sealed class HumanVerificationOptions
         _ => false
     };
 
-    public Uri CapApiEndpoint()
+    public Uri CapApiEndpoint() => BuildCapApiEndpoint(Cap.ServerUrl);
+
+    public Uri CapBackendApiEndpoint() =>
+        BuildCapApiEndpoint(CapBackendServerRoot().AbsoluteUri);
+
+    public Uri CapBackendServerRoot()
     {
-        var serverUrl = Cap.ServerUrl.TrimEnd('/') + "/";
-        return new Uri(
-            new Uri(serverUrl, UriKind.Absolute),
-            $"{Uri.EscapeDataString(Cap.SiteKey)}/");
+        var serverUrl = string.IsNullOrWhiteSpace(Cap.BackendServerUrl)
+            ? Cap.ServerUrl
+            : Cap.BackendServerUrl;
+        return new Uri(serverUrl.TrimEnd('/') + "/", UriKind.Absolute);
     }
 
     private bool IsValidCap(bool development)
@@ -61,14 +66,32 @@ public sealed class HumanVerificationOptions
             || string.IsNullOrWhiteSpace(Cap.Secret)
             || Cap.SiteKey != Cap.SiteKey.Trim()
             || Cap.ServerUrl != Cap.ServerUrl.Trim()
-            || !Uri.TryCreate(Cap.ServerUrl, UriKind.Absolute, out var serverUri)
-            || serverUri.Scheme is not ("http" or "https")
-            || !string.IsNullOrEmpty(serverUri.UserInfo)
-            || !string.IsNullOrEmpty(serverUri.Query)
-            || !string.IsNullOrEmpty(serverUri.Fragment))
+            || !TryServiceEndpoint(Cap.ServerUrl, out var serverUri)
+            || (!string.IsNullOrWhiteSpace(Cap.BackendServerUrl)
+                && (Cap.BackendServerUrl != Cap.BackendServerUrl.Trim()
+                    || !TryServiceEndpoint(Cap.BackendServerUrl, out _))))
             return false;
 
         return development || serverUri.Scheme == Uri.UriSchemeHttps;
+    }
+
+    private Uri BuildCapApiEndpoint(string serverUrl) => new(
+        new Uri(serverUrl.TrimEnd('/') + "/", UriKind.Absolute),
+        $"{Uri.EscapeDataString(Cap.SiteKey)}/");
+
+    private static bool TryServiceEndpoint(string value, out Uri uri)
+    {
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var parsed)
+            || parsed.Scheme is not ("http" or "https")
+            || !string.IsNullOrEmpty(parsed.UserInfo)
+            || !string.IsNullOrEmpty(parsed.Query)
+            || !string.IsNullOrEmpty(parsed.Fragment))
+        {
+            uri = null!;
+            return false;
+        }
+        uri = parsed;
+        return true;
     }
 
     private bool IsValidTurnstile(bool development)
@@ -96,8 +119,10 @@ public sealed class HumanVerificationOptions
 public sealed class CapHumanVerificationOptions
 {
     public string ServerUrl { get; set; } = string.Empty;
+    public string BackendServerUrl { get; set; } = string.Empty;
     public string SiteKey { get; set; } = string.Empty;
     public string Secret { get; set; } = string.Empty;
+    public string ManagementApiKey { get; set; } = string.Empty;
 }
 
 public sealed class TurnstileHumanVerificationOptions

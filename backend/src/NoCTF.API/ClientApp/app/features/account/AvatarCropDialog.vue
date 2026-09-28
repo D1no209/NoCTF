@@ -4,11 +4,14 @@ import { bindViewState } from '~/features/shared/view-state'
 import { useAvatarCropDialog } from './useAvatarCropDialog'
 import View from '~/components/views/account/AvatarCropDialogView.vue'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   open: boolean
   file: File | null
   saving: boolean
-}>()
+  variant?: 'avatar' | 'profile-cover'
+}>(), {
+  variant: 'avatar',
+})
 const emit = defineEmits<{
   'update:open': [value: boolean]
   'save': [file: File]

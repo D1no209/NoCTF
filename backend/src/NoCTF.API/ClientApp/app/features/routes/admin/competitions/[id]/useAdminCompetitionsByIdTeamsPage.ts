@@ -2,11 +2,12 @@ import { proxyRefs } from 'vue'
 import { markRaw } from 'vue'
 
 import { toast } from 'vue-sonner'
-import { adminCreateManualAdjustment, adminCorrectTeamBan, adminGetCompetition, adminListCompetitionChallenges, adminListTeamBanAppeals, adminListTeams, adminResolveTeamBanAppeal, patchCompetitionTeam, userProfileGet } from '../../../../../api'
-import type { NoCtfapiEndpointsAdministrationTeamsAdminTeamBanCaseResponse, NoCtfapiEndpointsAuthenticationPublicUserProfileResponse, NoCtfapiEndpointsChallengesChallengeResponse, NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../../../api'
+import { adminCreateManualAdjustment, adminCorrectTeamBan, adminGetCompetition, adminGetTeamInvitation, adminListCompetitionChallenges, adminListTeamBanAppeals, adminListTeams, adminResolveTeamBanAppeal, patchCompetitionTeam, userProfileGet } from '../../../../../api'
+import type { NoCtfapiEndpointsAdministrationTeamsAdminTeamBanCaseResponse, NoCtfapiEndpointsAuthenticationPublicUserProfileResponse, NoCtfapiEndpointsChallengesChallengeSummaryResponse, NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../../../api'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
 import { competitionTrackErrorMessage } from '../../../../../lib/competition-track'
 import PrivateAccountPanelComponent from '../../../../account/PrivateAccountPanel.vue'
+import { useOffsetPagination } from '../../../../../composables/useOffsetPagination'
 
 /** Owns state, effects and commands for AdminCompetitionsByIdTeamsPage. */
 export function useAdminCompetitionsByIdTeamsPage() {
@@ -15,6 +16,8 @@ export function useAdminCompetitionsByIdTeamsPage() {
   const route = useRoute()
 
   const teams = ref<NoCtfapiEndpointsTeamsTeamResponse[]>([])
+
+  const search = ref('')
 
   const loading = ref(true)
 
@@ -26,11 +29,89 @@ export function useAdminCompetitionsByIdTeamsPage() {
 
   const tracksEnabled = ref(false)
 
+  const registrationStatusOptions = [
+    { value: 'Unregistered', label: "ui.notRegistered" },
+    { value: 'Pending', label: "ui.pendingApproval" },
+    { value: 'Approved', label: "ui.passed" },
+    { value: 'Rejected', label: "ui.rejected" },
+  ] as const
+
   const selectedTeam = ref<NoCtfapiEndpointsTeamsTeamResponse | null>(null)
 
   const teamMembers = ref<NoCtfapiEndpointsAuthenticationPublicUserProfileResponse[]>([])
 
   const teamDetailLoading = ref(false)
+
+  const teamInvitationToken = ref<string | null>(null)
+
+  const teamInvitationLoading = ref(false)
+
+  const teamInvitationError = ref<string | null>(null)
+
+  const expandedMemberId = ref<string | null>(null)
+
+  function setExpandedMember(value: unknown): void {
+    expandedMemberId.value = typeof value === 'string' ? value : null
+  }
+
+  async function loadTeamInvitation(
+    team: NoCtfapiEndpointsTeamsTeamResponse | null = selectedTeam.value,
+  ): Promise<void> {
+    teamInvitationToken.value = null
+    teamInvitationError.value = null
+    if (!canWrite.value || !team?.id) return
+    teamInvitationLoading.value = true
+    try {
+      const { data, error: requestError } = await adminGetTeamInvitation({
+        path: { competitionId, teamId: team.id },
+      })
+      if (selectedTeam.value?.id !== team.id) return
+      if (requestError || !data?.invitationToken) {
+        teamInvitationError.value = parseApiError(
+          requestError,
+          translate('ui.failedToLoadInvitationCode'),
+        ).message
+        return
+      }
+      teamInvitationToken.value = data.invitationToken
+    }
+    catch (requestError) {
+      if (selectedTeam.value?.id === team.id) {
+        teamInvitationError.value = parseApiError(
+          requestError,
+          translate('ui.failedToLoadInvitationCode'),
+        ).message
+      }
+    }
+    finally {
+      if (selectedTeam.value?.id === team.id) teamInvitationLoading.value = false
+    }
+  }
+
+  async function copyTeamInvitation(): Promise<void> {
+    if (!teamInvitationToken.value) return
+    try {
+      await navigator.clipboard.writeText(teamInvitationToken.value)
+      toast.success(translate('ui.invitationCodeHasBeenCopied'))
+    }
+    catch {
+      toast.error(translate('ui.copyFailedPleaseManuallySelectCopy'))
+    }
+  }
+
+  function reloadTeamInvitation(): void {
+    void loadTeamInvitation()
+  }
+
+  const pagination = useOffsetPagination<NoCtfapiEndpointsTeamsTeamResponse>(async ({ offset, limit, desc }) => {
+    const { data, error: requestError } = await adminListTeams({
+      path: { competitionId },
+      query: { keyword: search.value.trim() || null, offset, limit, desc },
+    })
+    if (requestError || !data) throw requestError ?? new Error('Failed to load teams.')
+    teams.value = data.items ?? []
+    return { items: teams.value, total: data.total ?? 0 }
+  })
 
   const teamDisplayNames = computed(() => buildTeamDisplayNames(teams.value))
 
@@ -39,7 +120,7 @@ export function useAdminCompetitionsByIdTeamsPage() {
 
   const scoreAdjustmentTeam = ref<NoCtfapiEndpointsTeamsTeamResponse | null>(null)
 
-  const scoreAdjustmentChallenges = ref<NoCtfapiEndpointsChallengesChallengeResponse[]>([])
+  const scoreAdjustmentChallenges = ref<NoCtfapiEndpointsChallengesChallengeSummaryResponse[]>([])
 
   const scoreAdjustmentChallengeId = ref('')
 
@@ -118,8 +199,10 @@ export function useAdminCompetitionsByIdTeamsPage() {
 
   async function openTeamDetail(team: NoCtfapiEndpointsTeamsTeamResponse): Promise<void> {
     selectedTeam.value = team
+    expandedMemberId.value = null
     teamMembers.value = []
     teamDetailLoading.value = true
+    void loadTeamInvitation(team)
     const memberIds = team.memberIds ?? []
     const responses = await Promise.all(memberIds.map(userId => userProfileGet({ path: { userId } })))
     if (selectedTeam.value?.id === team.id) {
@@ -131,18 +214,20 @@ export function useAdminCompetitionsByIdTeamsPage() {
   async function load() {
     loading.value = true
     error.value = null
-    const [teamResult, trackResult] = await Promise.all([
-      adminListTeams({ path: { competitionId } }),
-      adminGetCompetition({ path: { competitionId } }),
-    ])
-    if (teamResult.error || !teamResult.data) error.value = parseApiError(teamResult.error).message
-    else teams.value = teamResult.data.items ?? []
+    const trackResult = await adminGetCompetition({ path: { competitionId } })
+    await pagination.loadPage(pagination.page.value)
+    if (pagination.error.value) error.value = pagination.error.value.message
     if (!trackResult.error && trackResult.data) {
       tracks.value = trackResult.data.tracks?.items ?? []
       tracksEnabled.value = trackResult.data.tracks?.enabled ?? false
     }
     loading.value = false
   }
+
+  watch(search, () => {
+    pagination.reset()
+    void load()
+  })
 
   async function assignTrack(team: NoCtfapiEndpointsTeamsTeamResponse, trackKey: string) {
     if (!team.id || !team.registrationStatus || !canWrite.value || !tracksEnabled.value || team.trackKey === trackKey) return
@@ -168,8 +253,11 @@ export function useAdminCompetitionsByIdTeamsPage() {
     if (typeof value === 'string') void assignTrack(team, value)
   }
 
-  async function simpleAction(team: NoCtfapiEndpointsTeamsTeamResponse, action: 'approve' | 'reject') {
-    if (!team.id || !team.trackKey) return
+  async function setRegistrationStatus(
+    team: NoCtfapiEndpointsTeamsTeamResponse,
+    registrationStatus: NonNullable<NoCtfapiEndpointsTeamsTeamResponse['registrationStatus']>,
+  ) {
+    if (!team.id || !team.trackKey || team.registrationStatus === registrationStatus) return
     pendingId.value = team.id
     try {
       const path = { competitionId, teamId: team.id }
@@ -178,7 +266,7 @@ export function useAdminCompetitionsByIdTeamsPage() {
         body: {
           administration: {
             trackKey: team.trackKey,
-            registrationStatus: action === 'approve' ? 'Approved' : 'Rejected',
+            registrationStatus,
           },
         },
       })
@@ -192,6 +280,14 @@ export function useAdminCompetitionsByIdTeamsPage() {
     finally {
       pendingId.value = null
     }
+  }
+
+  function setRegistrationStatusValue(
+    team: NoCtfapiEndpointsTeamsTeamResponse,
+    value: unknown,
+  ): void {
+    if (registrationStatusOptions.some(option => option.value === value))
+      void setRegistrationStatus(team, value as NonNullable<NoCtfapiEndpointsTeamsTeamResponse['registrationStatus']>)
   }
 
   const banDialog = ref<{ team: NoCtfapiEndpointsTeamsTeamResponse; mode: 'ban' | 'correct' } | null>(null)
@@ -317,14 +413,31 @@ export function useAdminCompetitionsByIdTeamsPage() {
       canJudge,
       canWrite,
       teams,
+      search,
+      page: pagination.page,
+      pageCount: pagination.pageCount,
+      total: pagination.total,
+      pageLimit: pagination.limit,
+      pageLoading: pagination.loading,
+      loadPage: pagination.loadPage,
+      setPageSize: pagination.setPageSize,
       loading,
       error,
       pendingId,
       tracks,
       tracksEnabled,
+      registrationStatusOptions,
       selectedTeam,
       teamMembers,
       teamDetailLoading,
+      teamInvitationToken,
+      teamInvitationLoading,
+      teamInvitationError,
+      loadTeamInvitation,
+      reloadTeamInvitation,
+      copyTeamInvitation,
+      expandedMemberId,
+      setExpandedMember,
       teamDisplayNames,
       displayTeamName,
       scoreAdjustmentTeam,
@@ -341,7 +454,7 @@ export function useAdminCompetitionsByIdTeamsPage() {
       openTeamDetail,
       assignTrack,
       assignTrackValue,
-      simpleAction,
+      setRegistrationStatusValue,
       banDialog,
       banReason,
       banAnnouncePublicly,
@@ -362,7 +475,13 @@ export function useAdminCompetitionsByIdTeamsPage() {
   const viewState = proxyRefs(viewBindings)
 
   function onUpdateOpenOpen(open: boolean) {
-     if (!open) viewState.selectedTeam = null
+     if (!open) {
+       viewState.selectedTeam = null
+       viewState.teamInvitationToken = null
+       viewState.teamInvitationError = null
+       viewState.teamInvitationLoading = false
+       viewState.expandedMemberId = null
+     }
   }
 
   function onClickScoreAdjustmentTeam(value: typeof viewState.scoreAdjustmentTeam) {

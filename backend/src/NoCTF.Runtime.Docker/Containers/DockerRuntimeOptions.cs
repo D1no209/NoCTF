@@ -11,4 +11,8 @@ public sealed record DockerRuntimeOptions(
     string CallbackContainerLabelValue = "scoring-callback-gateway",
     long RuntimeLogMaxSizeBytes = 10_485_760,
     int RuntimeLogMaxFiles = 3,
-    int OneShotOutputLimitBytesPerStream = 1_048_576);
+    int OneShotOutputLimitBytesPerStream = 1_048_576,
+    string ProxyContainerName = "",
+    string ProxyContainerLabelKey = "noctf.io/runtime-proxy-gateway",
+    string ProxyContainerLabelValue = "true",
+    string? RegistryConfigDirectory = null);

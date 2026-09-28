@@ -30,7 +30,7 @@ export const CompetitionStatusLabel = {
 } satisfies Record<NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol, string>
 
 export const TeamRegistrationStatusLabel = {
-  Pending: "ui.pendingApproval", Approved: "ui.passed", Rejected: "ui.rejected",
+  Pending: "ui.pendingApproval", Approved: "ui.passed", Rejected: "ui.rejected", Unregistered: "ui.notRegistered",
 } satisfies Record<NoCtfapiEndpointsTeamsTeamRegistrationStatusProtocol, string>
 
 export const TeamBanSourceLabel = {

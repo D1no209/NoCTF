@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AuthRegisterPageViewState } from '~/features/routes/auth/useAuthRegisterPage'
 
 const viewProps = defineProps<{ state: AuthRegisterPageViewState }>()
-const { registerCharacter, loginCharacter, configuration, userName, email, password, confirmPassword, error, pending, registered, resendPending, resendDone, resendError, submit, resendVerification } = toRefs(viewProps.state)
+const { authArtwork, configuration, userName, email, password, confirmPassword, error, pending, registered, resendPending, resendDone, resendError, loginTarget, submit, resendVerification } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -17,8 +17,7 @@ const { registerCharacter, loginCharacter, configuration, userName, email, passw
       <p v-if="configuration?.description" class="text-sm text-muted-foreground">{{ configuration.description }}</p>
     </div>
     <Card v-if="registered" class="auth-card">
-      <img data-slot="auth-character-cutout" data-theme-character="dark" data-corner="left-bottom" :src="loginCharacter" alt="" aria-hidden="true">
-      <img data-slot="auth-character-cutout" data-theme-character="light" data-corner="right-top" :src="registerCharacter" alt="" aria-hidden="true">
+      <img v-if="authArtwork" data-slot="auth-character-cutout" :data-corner="authArtwork.corner" :src="authArtwork.src" :width="authArtwork.width" :height="authArtwork.height" decoding="async" alt="" aria-hidden="true">
       <CardHeader class="relative z-10">
         <CardTitle>{{ $t('ui.registrationSuccessful') }}</CardTitle>
         <CardDescription>
@@ -43,13 +42,12 @@ const { registerCharacter, loginCharacter, configuration, userName, email, passw
       </CardContent>
       <CardFooter class="relative z-10">
         <Button as-child class="w-full">
-          <NuxtLink to="/auth/login">{{ $t('ui.goToLogin') }}</NuxtLink>
+          <NuxtLink :to="loginTarget">{{ $t('ui.goToLogin') }}</NuxtLink>
         </Button>
       </CardFooter>
     </Card>
     <Card v-else class="auth-card">
-      <img data-slot="auth-character-cutout" data-theme-character="dark" data-corner="left-bottom" :src="loginCharacter" alt="" aria-hidden="true">
-      <img data-slot="auth-character-cutout" data-theme-character="light" data-corner="right-top" :src="registerCharacter" alt="" aria-hidden="true">
+      <img v-if="authArtwork" data-slot="auth-character-cutout" :data-corner="authArtwork.corner" :src="authArtwork.src" :width="authArtwork.width" :height="authArtwork.height" decoding="async" alt="" aria-hidden="true">
       <CardHeader class="relative z-10 pt-3">
         <CardTitle class="text-xl font-semibold">{{ $t('ui.createAccount') }}</CardTitle>
       </CardHeader>
@@ -86,8 +84,10 @@ const { registerCharacter, loginCharacter, configuration, userName, email, passw
       </CardContent>
       <CardFooter class="relative z-10 justify-center text-sm text-muted-foreground">
         {{ $t('ui.alreadyHaveAnAccount') }}
-        <NuxtLink to="/auth/login" class="ml-1 underline">{{ $t('ui.logInDirectly') }}</NuxtLink>
+        <NuxtLink :to="loginTarget" class="ml-1 underline">{{ $t('ui.logInDirectly') }}</NuxtLink>
       </CardFooter>
     </Card>
   </div>
 </template>
+
+<style src="./auth-artwork.css"></style>

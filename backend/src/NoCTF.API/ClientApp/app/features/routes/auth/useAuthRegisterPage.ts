@@ -1,12 +1,13 @@
 import { authenticationRequestEmailVerification, registerEndpoint } from '../../../api'
-import registerCharacter from '~/assets/images/auth/register-character.png'
-import loginCharacter from '~/assets/images/auth/login-character.png'
 import { useHumanVerification } from '~/features/security/useHumanVerification'
+import { useAuthThemeArtwork } from './useAuthThemeArtwork'
 
 /** Owns the standalone registration page workflow. */
 export function useAuthRegisterPage() {
+  const route = useRoute()
   const { configuration } = usePlatform()
   const { request: requestHumanVerification } = useHumanVerification()
+  const { authArtwork } = useAuthThemeArtwork()
   const userName = ref('')
   const email = ref('')
   const password = ref('')
@@ -20,6 +21,17 @@ export function useAuthRegisterPage() {
   const resendPending = ref(false)
   const resendDone = ref(false)
   const resendError = ref<string | null>(null)
+  const loginTarget = computed(() => {
+    const candidate = route.query.redirect
+    const redirect = typeof candidate === 'string'
+      && candidate.startsWith('/')
+      && !candidate.startsWith('//')
+      ? candidate
+      : null
+    return redirect
+      ? { path: '/auth/login', query: { redirect } }
+      : { path: '/auth/login' }
+  })
 
   async function submit() {
     error.value = null
@@ -67,8 +79,7 @@ export function useAuthRegisterPage() {
   }
 
   return {
-    registerCharacter,
-    loginCharacter,
+    authArtwork,
     configuration,
     userName,
     email,
@@ -80,6 +91,7 @@ export function useAuthRegisterPage() {
     resendPending,
     resendDone,
     resendError,
+    loginTarget,
     submit,
     resendVerification,
   }

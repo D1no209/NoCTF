@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using NoCTF.API.Security;
+using NoCTF.API.Pagination;
 using NoCTF.API.Serialization;
 using NoCTF.Application.Teams.Registration;
 using NoCTF.Domain.Teams;
@@ -16,7 +17,8 @@ public enum TeamRegistrationStatusProtocol
 {
     Pending,
     Approved,
-    Rejected
+    Rejected,
+    Unregistered
 }
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<TeamBanAppealStatusProtocol>))]
@@ -52,7 +54,8 @@ public enum TeamRegistrationFailureCodeProtocol
     TrackNotFound,
     TrackNotPublicSelectable,
     TrackInvitationRequired,
-    TrackInvitationInvalid
+    TrackInvitationInvalid,
+    TrackSsoIdentityRequired
 }
 
 public sealed record TeamRegistrationFailureResponse(
@@ -87,19 +90,15 @@ public sealed record TeamResponse(
     bool IsBanned,
     DateTimeOffset RegisteredAt);
 
-public sealed record TeamListResponse(IReadOnlyList<TeamResponse> Items);
-
-public sealed class UpdateTeamRequest
+public sealed class TeamListResponse : ArrayResult<TeamResponse>
 {
-    private string name = string.Empty;
+    public TeamListResponse() { }
 
-    public Guid CompetitionId { get; set; }
-    public Guid TeamId { get; set; }
-    public string Name
-    {
-        get => name;
-        set => name = value?.Trim() ?? string.Empty;
-    }
+    public TeamListResponse(TeamResponse[] items)
+        : base(items, items.Length) { }
+
+    public TeamListResponse(TeamResponse[] items, int total)
+        : base(items, total) { }
 }
 
 [Mapper]
@@ -109,8 +108,6 @@ internal static partial class TeamMapper
         CreateTeamRequest request,
         Guid userId,
         DateTimeOffset registeredAt);
-    public static partial UpdateTeamCommand ToCommand(UpdateTeamRequest request);
-
     public static TeamResponse ToResponse(
         TeamView view,
         LinkGenerator links,

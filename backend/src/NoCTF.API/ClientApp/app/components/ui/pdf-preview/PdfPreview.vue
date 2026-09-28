@@ -300,3 +300,5 @@ onBeforeUnmount(() => {
     </Empty>
   </div>
 </template>
+
+<style src="./pdf-preview.css"></style>

@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Globalization;
 using System.Net;
+using System.Diagnostics;
 using System.Text;
 using Docker.DotNet;
 using Docker.DotNet.Models;
@@ -117,6 +118,15 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                     CapAdd = request.Security.CapAdd?.ToList() ?? []
                 }
             }, cancellationToken);
+            if (SupportsWsrx(request.AccessMode))
+            {
+                if (string.IsNullOrWhiteSpace(request.NetworkName))
+                    throw new InvalidOperationException(
+                        "A Docker WSRX Runtime requires an owned Runtime network.");
+                await ConnectRuntimeProxyGatewaysAsync(
+                    request.NetworkName,
+                    cancellationToken);
+            }
             if (request.AllowInternalCallback)
                 await ConnectInternalCallbackAsync(request, response.ID, cancellationToken);
             if (startContainer)
@@ -151,9 +161,11 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             return new(request.OperationId, RuntimeProvider.Docker, response.ID, status,
                 ReadPublishedPorts(created, request.PortMappings.Keys),
                 options.PublicHost,
-                request.NetworkPurpose == ContainerNetworkPurpose.PersistentRuntime
-                    ? "target"
-                    : containerName,
+                SupportsWsrx(request.AccessMode)
+                    ? ResolveInternalAddress(created, request.NetworkName)
+                    : request.NetworkPurpose == ContainerNetworkPurpose.PersistentRuntime
+                        ? "target"
+                        : containerName,
                 RuntimeInstanceId: request.RuntimeInstanceId);
         }
         catch
@@ -181,6 +193,20 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                 catch
                 {
                     // The failed create has no durable receipt; surface the cleanup failure.
+                }
+            }
+            if (SupportsWsrx(request.AccessMode)
+                && !string.IsNullOrWhiteSpace(request.NetworkName))
+            {
+                try
+                {
+                    await DisconnectRuntimeProxyGatewaysAsync(
+                        request.NetworkName,
+                        cleanupSource.Token);
+                }
+                catch
+                {
+                    // The failed provision has no durable receipt; the outer cleanup owns the network.
                 }
             }
             throw;
@@ -241,8 +267,25 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                 status,
                 request.PortMappings,
                 options.PublicHost,
-                resourceName), cancellationToken);
+                resourceName,
+                NetworkId: SupportsWsrx(request.AccessMode)
+                    ? request.NetworkName
+                    : null), cancellationToken);
             return await CreateAsync(request, cancellationToken);
+        }
+
+        var internalHost = request.NetworkPurpose == ContainerNetworkPurpose.PersistentRuntime
+            ? "target"
+            : resourceName;
+        if (SupportsWsrx(request.AccessMode))
+        {
+            if (string.IsNullOrWhiteSpace(request.NetworkName))
+                throw new InvalidOperationException(
+                    "A Docker WSRX Runtime requires an owned Runtime network.");
+            await ConnectRuntimeProxyGatewaysAsync(
+                request.NetworkName,
+                cancellationToken);
+            internalHost = ResolveInternalAddress(existing, request.NetworkName);
         }
 
         return new ContainerReceipt(
@@ -252,7 +295,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             RuntimeStatus.Running,
             ReadPublishedPorts(existing, request.PortMappings.Keys),
             options.PublicHost,
-            resourceName,
+            internalHost,
             RuntimeInstanceId: request.RuntimeInstanceId);
     }
 
@@ -272,7 +315,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         var progress = new ImagePullProgress();
         await client.Images.CreateImageAsync(
             new ImagesCreateParameters { FromImage = image },
-            DockerRegistryAuthentication.Read(image),
+            DockerRegistryAuthentication.Read(image, options.RegistryConfigDirectory),
             progress,
             cancellationToken);
         if (progress.Error is not null)
@@ -285,48 +328,189 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
 
     public async Task DestroyAsync(ContainerReceipt receipt, CancellationToken cancellationToken)
     {
-        Exception? failure = null;
-        try
+        await DestroyAsync(
+            receipt,
+            RuntimeTerminationMode.GracefulThenForce,
+            RuntimeTerminationPolicy.Default,
+            cancellationToken);
+    }
+
+    public async Task DestroyAsync(
+        ContainerReceipt receipt,
+        RuntimeTerminationMode mode,
+        RuntimeTerminationPolicy policy,
+        CancellationToken cancellationToken)
+    {
+        var warnings = new List<Exception>();
+        var gracefulSucceeded = false;
+        if (mode == RuntimeTerminationMode.GracefulThenForce)
         {
-            await client.Containers.StopContainerAsync(receipt.ResourceId, new ContainerStopParameters(), cancellationToken);
+            var started = Stopwatch.GetTimestamp();
+            using var graceful = CreateStageToken(cancellationToken, policy.GracefulStopTimeout);
+            try
+            {
+                await client.Containers.StopContainerAsync(
+                    receipt.ResourceId,
+                    new ContainerStopParameters
+                    {
+                        WaitBeforeKillSeconds = checked((uint)Math.Max(
+                            1,
+                            Math.Ceiling(policy.GracefulStopTimeout.TotalSeconds)))
+                    },
+                    graceful.Token);
+                gracefulSucceeded = true;
+                NoCtfTelemetry.RecordRuntimeStopDuration(
+                    "docker", "container", "graceful", "success",
+                    Stopwatch.GetElapsedTime(started).TotalSeconds);
+            }
+            catch (DockerContainerNotFoundException)
+            {
+                gracefulSucceeded = true;
+                NoCtfTelemetry.RecordRuntimeStopDuration(
+                    "docker", "container", "graceful", "absent",
+                    Stopwatch.GetElapsedTime(started).TotalSeconds);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                NoCtfTelemetry.RecordRuntimeStopDuration(
+                    "docker", "container", "graceful", "timeout",
+                    Stopwatch.GetElapsedTime(started).TotalSeconds);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                warnings.Add(exception);
+                NoCtfTelemetry.RecordRuntimeStopDuration(
+                    "docker", "container", "graceful", "warning",
+                    Stopwatch.GetElapsedTime(started).TotalSeconds);
+            }
         }
-        catch (DockerContainerNotFoundException)
-        {
-            // Destroy is idempotent: an externally removed runtime is already stopped.
-        }
-        catch (Exception exception)
-        {
-            failure = exception;
-        }
+
+        var forceStarted = Stopwatch.GetTimestamp();
+        if (mode == RuntimeTerminationMode.Force || !gracefulSucceeded)
+            NoCtfTelemetry.RecordRuntimeStopForce(
+                "docker",
+                mode == RuntimeTerminationMode.Force ? "requested" : "graceful_failed");
+        using var force = CreateStageToken(cancellationToken, policy.ForceDeleteTimeout);
         try
         {
             await client.Containers.RemoveContainerAsync(
                 receipt.ResourceId,
                 new ContainerRemoveParameters { Force = true },
-                cancellationToken);
+                force.Token);
+            NoCtfTelemetry.RecordRuntimeStopDuration(
+                "docker", "container", "force_delete", "success",
+                Stopwatch.GetElapsedTime(forceStarted).TotalSeconds);
         }
         catch (DockerContainerNotFoundException)
         {
-            // A failed or skipped stop may still race with external cleanup.
+            NoCtfTelemetry.RecordRuntimeStopDuration(
+                "docker", "container", "force_delete", "absent",
+                Stopwatch.GetElapsedTime(forceStarted).TotalSeconds);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception exception)
         {
-            failure ??= exception;
+            warnings.Add(exception);
+            NoCtfTelemetry.RecordRuntimeStopDuration(
+                "docker", "container", "force_delete", "warning",
+                Stopwatch.GetElapsedTime(forceStarted).TotalSeconds);
         }
+
+        var networkStarted = Stopwatch.GetTimestamp();
+        using var network = CreateStageToken(cancellationToken, policy.NetworkCleanupTimeout);
         try
         {
+            if (!string.IsNullOrWhiteSpace(receipt.NetworkId))
+            {
+                await DisconnectRuntimeProxyGatewaysAsync(
+                    receipt.NetworkId,
+                    network.Token);
+            }
             await DeleteCallbackNetworkAsync(
                 receipt.OperationId,
                 new RuntimeResourceIdentity(
                     receipt.RuntimeInstanceId ?? receipt.OperationId),
-                cancellationToken);
+                network.Token);
+            NoCtfTelemetry.RecordRuntimeStopDuration(
+                "docker", "container", "network_cleanup", "success",
+                Stopwatch.GetElapsedTime(networkStarted).TotalSeconds);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception exception)
         {
-            failure ??= exception;
+            warnings.Add(exception);
+            NoCtfTelemetry.RecordRuntimeStopDuration(
+                "docker", "container", "network_cleanup", "warning",
+                Stopwatch.GetElapsedTime(networkStarted).TotalSeconds);
         }
-        if (failure is not null)
-            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+
+        var verificationStarted = Stopwatch.GetTimestamp();
+        using var verification = CreateStageToken(cancellationToken, policy.VerificationTimeout);
+        try
+        {
+            await WaitUntilDestroyedAsync(receipt, verification.Token);
+            NoCtfTelemetry.RecordRuntimeStopDuration(
+                "docker", "container", "verification", "success",
+                Stopwatch.GetElapsedTime(verificationStarted).TotalSeconds);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            NoCtfTelemetry.RecordRuntimeStopResourcesRemaining("docker", "container");
+            NoCtfTelemetry.RecordRuntimeStopDuration(
+                "docker", "container", "verification", "timeout",
+                Stopwatch.GetElapsedTime(verificationStarted).TotalSeconds);
+            throw new InvalidOperationException(
+                "Docker Runtime resources remain after the termination budget.",
+                warnings.Count == 0 ? null : new AggregateException(warnings));
+        }
+    }
+
+    private async Task WaitUntilDestroyedAsync(
+        ContainerReceipt receipt,
+        CancellationToken cancellationToken)
+    {
+        var delays = new[] { 200, 400, 800, 1_000 };
+        var attempt = 0;
+        while (true)
+        {
+            var container = await GetAsync(
+                RuntimeProvider.Docker,
+                receipt.ResourceId,
+                cancellationToken);
+            var callbackNetwork = await FindNetworkAsync(
+                CallbackNetworkName(receipt.OperationId),
+                cancellationToken);
+            var callbackNetworkRemains = callbackNetwork is not null
+                && HasResourceIdentity(
+                    callbackNetwork.Labels,
+                    new RuntimeResourceIdentity(
+                        receipt.RuntimeInstanceId ?? receipt.OperationId));
+            if (container is null && !callbackNetworkRemains)
+                return;
+            await Task.Delay(
+                TimeSpan.FromMilliseconds(delays[Math.Min(attempt++, delays.Length - 1)]),
+                timeProvider,
+                cancellationToken);
+        }
+    }
+
+    private static CancellationTokenSource CreateStageToken(
+        CancellationToken cancellationToken,
+        TimeSpan timeout)
+    {
+        var source = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        source.CancelAfter(timeout);
+        return source;
     }
 
     public async Task<ContainerReceipt?> GetAsync(RuntimeProvider provider, string resourceId, CancellationToken cancellationToken)
@@ -344,11 +528,6 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             return null;
         }
     }
-
-    public Task<OneShotResult> RunAsync(
-        ContainerRequest request,
-        CancellationToken cancellationToken) =>
-        RunAsync(request, input: null, cancellationToken);
 
     public async Task<OneShotResult> RunAsync(
         ContainerRequest request,
@@ -952,6 +1131,11 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
 
     private static void ValidatePortMappings(ContainerRequest request)
     {
+        if (request.AccessMode == RuntimeAccessMode.WsrxOnly
+            && request.PortMappings.Count > 0)
+            throw new ArgumentOutOfRangeException(
+                nameof(request),
+                "WSRX-only Docker runtimes cannot publish host ports.");
         if (request.NetworkPurpose == ContainerNetworkPurpose.PersistentRuntime
             && request.PortMappings.Any(mapping => mapping.Value != 0))
             throw new ArgumentOutOfRangeException(
@@ -969,8 +1153,9 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
     {
         var identity = new RuntimeResourceIdentity(
             request.RuntimeInstanceId ?? request.OperationId);
+        var expectedJobKind = BuildLabels(request).GetValueOrDefault("noctf.io/job-kind") ?? JobKind(request.NetworkPurpose);
         if (!HasResourceIdentity(container.Config?.Labels, identity)
-            || !HasJobKind(container.Config?.Labels, JobKind(request.NetworkPurpose))
+            || !HasJobKind(container.Config?.Labels, expectedJobKind)
             || !HasPublishedPortBindings(container.NetworkSettings?.Ports, request.PortMappings))
             throw new InvalidOperationException(
                 $"Docker Container '{resourceName}' has a different ownership identity, purpose, or published port contract.");
@@ -1009,7 +1194,12 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         IReadOnlyDictionary<int, int> expected)
     {
         if (expected.Count == 0)
-            return actual is null || actual.Count == 0;
+        {
+            return actual is null
+                || actual.Count == 0
+                || actual.Values.All(bindings => bindings is null
+                    || bindings.Count == 0);
+        }
         if (actual is null || actual.Count != expected.Count)
             return false;
 
@@ -1083,6 +1273,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                 RuntimeInstanceId = target.Identity.RuntimeInstanceId,
                 NetworkPurpose = ContainerNetworkPurpose.AwdChecker
             },
+            null,
             cancellationToken);
     }
 
@@ -1169,6 +1360,143 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         };
         return labels;
     }
+
+    private async Task ConnectRuntimeProxyGatewaysAsync(
+        string networkId,
+        CancellationToken cancellationToken)
+    {
+        var network = await client.Networks.InspectNetworkAsync(
+            networkId,
+            cancellationToken);
+        var gateways = await ResolveRuntimeProxyContainersAsync(
+            cancellationToken,
+            requireAny: false);
+        foreach (var gateway in gateways)
+        {
+            if (network.Containers?.ContainsKey(gateway) == true)
+                continue;
+            await client.Networks.ConnectNetworkAsync(
+                network.ID,
+                new NetworkConnectParameters { Container = gateway },
+                cancellationToken);
+        }
+    }
+
+    private async Task DisconnectRuntimeProxyGatewaysAsync(
+        string networkId,
+        CancellationToken cancellationToken)
+    {
+        NetworkResponse network;
+        try
+        {
+            network = await client.Networks.InspectNetworkAsync(
+                networkId,
+                cancellationToken);
+        }
+        catch (DockerApiException exception)
+            when (exception.StatusCode == HttpStatusCode.NotFound)
+        {
+            return;
+        }
+        var gateways = await ResolveRuntimeProxyContainersAsync(cancellationToken);
+        foreach (var gateway in gateways)
+        {
+            if (network.Containers?.ContainsKey(gateway) != true)
+                continue;
+            await client.Networks.DisconnectNetworkAsync(
+                network.ID,
+                new NetworkDisconnectParameters
+                {
+                    Container = gateway,
+                    Force = true
+                },
+                cancellationToken);
+        }
+    }
+
+    private async Task<IReadOnlyList<string>> ResolveRuntimeProxyContainersAsync(
+        CancellationToken cancellationToken,
+        bool requireAny = true)
+    {
+        if (!string.IsNullOrWhiteSpace(options.ProxyContainerName))
+        {
+            ContainerInspectResponse configured;
+            try
+            {
+                configured = await client.Containers.InspectContainerAsync(
+                    options.ProxyContainerName,
+                    cancellationToken);
+            }
+            catch (DockerContainerNotFoundException) when (!requireAny)
+            {
+                return [];
+            }
+            EnsureRuntimeProxyRole(configured.ID, configured.Config?.Labels);
+            return [configured.ID];
+        }
+
+        var candidates = await client.Containers.ListContainersAsync(
+            new ContainersListParameters
+            {
+                All = !requireAny,
+                Filters = new Dictionary<string, IDictionary<string, bool>>
+                {
+                    ["label"] = new Dictionary<string, bool>
+                    {
+                        [$"{options.ProxyContainerLabelKey}={options.ProxyContainerLabelValue}"] = true
+                    }
+                }
+            },
+            cancellationToken);
+        if (requireAny && candidates.Count == 0)
+            throw new InvalidOperationException(
+                "No running Runtime proxy gateway carries the required role label.");
+        foreach (var candidate in candidates)
+            EnsureRuntimeProxyRole(candidate.ID, candidate.Labels);
+        return candidates.Select(candidate => candidate.ID)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private void EnsureRuntimeProxyRole(
+        string containerId,
+        IDictionary<string, string>? labels)
+    {
+        if (string.IsNullOrWhiteSpace(containerId)
+            || labels is null
+            || !labels.TryGetValue(options.ProxyContainerLabelKey, out var role)
+            || !string.Equals(
+                role,
+                options.ProxyContainerLabelValue,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "The configured Runtime proxy gateway does not carry the required role label.");
+        }
+    }
+
+    private static string ResolveInternalAddress(
+        ContainerInspectResponse container,
+        string? requestedNetwork)
+    {
+        var networks = container.NetworkSettings?.Networks
+            ?? throw new InvalidOperationException(
+                "Docker Runtime has no network attachment metadata.");
+        var endpoint = networks.FirstOrDefault(pair =>
+                string.Equals(pair.Key, requestedNetwork, StringComparison.Ordinal)
+                || string.Equals(
+                    pair.Value.NetworkID,
+                    requestedNetwork,
+                    StringComparison.Ordinal))
+            .Value;
+        if (string.IsNullOrWhiteSpace(endpoint?.IPAddress))
+            throw new InvalidOperationException(
+                "Docker Runtime has no internal proxy address on its owned network.");
+        return endpoint.IPAddress;
+    }
+
+    private static bool SupportsWsrx(RuntimeAccessMode mode) =>
+        mode is RuntimeAccessMode.DirectAndWsrx or RuntimeAccessMode.WsrxOnly;
 
     private sealed class CallerOwnedReadStream(Stream inner) : Stream
     {

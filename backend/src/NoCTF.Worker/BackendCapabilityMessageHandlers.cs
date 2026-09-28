@@ -9,6 +9,7 @@ using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.Infrastructure.Persistence;
+using Microsoft.Extensions.Logging;
 using CompetitionLifecycleAdvancer = NoCTF.Application.Competitions.Lifecycle.AdvanceCompetitionLifecycleUseCase;
 
 namespace NoCTF.Worker;
@@ -22,19 +23,28 @@ public sealed class FileCleanupMessageHandler(NoCtfDbContext db, IStore objects)
 public sealed class AwdMessageHandler(
     NoCtfDbContext db,
     AwdCheckerConfigurationCatalog configurations,
-    ITransactionalMessageOutbox outbox,
+    IPostCommitMessagePublisher outbox,
     IAwdRoundCoordinator rounds,
-    IInternalResultStore results)
+    IInternalResultStore results,
+    ILogger<AwdMessageHandler> logger)
 {
     public Task Handle(DispatchAwdCheckers message, CancellationToken cancellationToken) =>
         BackendMessageOperations.DispatchAwdCheckersAsync(
             message, db, configurations, outbox, cancellationToken);
 
-    public Task Handle(AdvanceAwdRound message, CancellationToken cancellationToken) =>
-        BackendMessageOperations.AdvanceAwdRoundAsync(message, rounds, cancellationToken);
+    public async Task Handle(AdvanceAwdRound message, CancellationToken cancellationToken)
+    {
+        var outcome = await rounds.AdvanceAsync(message, cancellationToken);
+        logger.LogDebug("AWD round advance for {CompetitionChallengeId} ended with {Outcome}.",
+            message.CompetitionChallengeId, outcome);
+    }
 
-    public Task Handle(GenerateAwdFlags message, CancellationToken cancellationToken) =>
-        BackendMessageOperations.GenerateAwdFlagsAsync(message, rounds, cancellationToken);
+    public async Task Handle(GenerateAwdFlags message, CancellationToken cancellationToken)
+    {
+        var outcome = await rounds.GenerateFlagsAsync(message, cancellationToken);
+        logger.LogDebug("AWD Flag generation for {CompetitionChallengeId}, round {Round} ended with {Outcome}.",
+            message.CompetitionChallengeId, message.Round, outcome);
+    }
 
     public Task Handle(AwdFlagInjectionFailed message, CancellationToken cancellationToken) =>
         BackendMessageOperations.AwdFlagInjectionFailedAsync(message, db, cancellationToken);
@@ -47,7 +57,7 @@ public sealed class AwdMessageHandler(
 public sealed class CompetitionLifecycleMessageHandler(
     CompetitionLifecycleAdvancer advancer,
     NoCtfDbContext db,
-    ITransactionalMessageOutbox outbox)
+    IPostCommitMessagePublisher outbox)
 {
     public Task Handle(
         AdvanceCompetitionLifecycle message,
@@ -64,7 +74,7 @@ public sealed class CompetitionLifecycleMessageHandler(
 public sealed class AwdpMessageHandler(
     IInternalResultStore results,
     NoCtfDbContext db,
-    ITransactionalMessageOutbox outbox,
+    IPostCommitMessagePublisher outbox,
     ICompetitionEventRecorder events,
     TimeProvider timeProvider)
 {
@@ -72,6 +82,17 @@ public sealed class AwdpMessageHandler(
         StartAwdpFixVerification message,
         CancellationToken cancellationToken) =>
         BackendMessageOperations.StartAwdpFixVerificationAsync(
+            message,
+            db,
+            outbox,
+            timeProvider,
+            cancellationToken,
+            events);
+
+    public Task Handle(
+        StartPatchVerification message,
+        CancellationToken cancellationToken) =>
+        BackendMessageOperations.StartPatchVerificationAsync(
             message,
             db,
             outbox,
@@ -100,15 +121,21 @@ public sealed class RuntimeDispatchMessageHandler(
     IChallengeRuntimeTemplateCatalog templates,
     IRuntimePlacementPolicy placement,
     IRunnerCapacityGate capacity,
-    ITransactionalMessageOutbox outbox,
+    IPostCommitMessagePublisher outbox,
     ICompetitionEventRecorder events,
     IAwdRuntimeProvisioner awdRuntimes,
     IKohRuntimeProvisioner kohRuntimes,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    Microsoft.Extensions.Logging.ILogger<RuntimeDispatchMessageHandler> logger,
+    NoCTF.Application.Runtime.Capacity.RuntimeResourceBudgetPolicy? budgets = null)
 {
-    public Task Handle(DispatchRuntime message, CancellationToken cancellationToken) =>
-        BackendMessageOperations.DispatchRuntimeAsync(
-            message, db, templates, placement, capacity, outbox, timeProvider, cancellationToken, events);
+    public async Task Handle(DispatchRuntime message, CancellationToken cancellationToken)
+    {
+        logger.LogDebug("Dispatching Runtime {RuntimeId} with attempt {AttemptId}.",
+            message.RuntimeInstanceId, message.DispatchAttemptId);
+        await BackendMessageOperations.DispatchRuntimeAsync(
+            message, db, templates, placement, capacity, outbox, timeProvider, cancellationToken, events, budgets);
+    }
 
     public Task Handle(StopRuntime message, CancellationToken cancellationToken) =>
         BackendMessageOperations.StopRuntimeAsync(
@@ -135,7 +162,7 @@ public sealed class RuntimeDispatchMessageHandler(
 
 public sealed class GameplayFactDrainMessageHandler(
     NoCtfDbContext db,
-    ITransactionalMessageOutbox outbox,
+    IPostCommitMessagePublisher outbox,
     TimeProvider timeProvider)
 {
     public Task Handle(

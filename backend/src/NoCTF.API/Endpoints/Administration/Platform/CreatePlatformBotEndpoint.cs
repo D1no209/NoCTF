@@ -28,8 +28,7 @@ public sealed class CreatePlatformBotValidator : Validator<CreatePlatformBotRequ
             .NotEmpty()
             .Length(3, 64)
             .Matches("^[A-Za-z0-9_-]+$");
-        RuleFor(request => request.Role)
-            .Must(role => role is UserRoleProtocol.User or UserRoleProtocol.Organizer);
+        RuleFor(request => request.Role).IsInEnum();
     }
 }
 
@@ -47,7 +46,7 @@ public sealed class CreatePlatformBotEndpoint(ManagePlatform platform, TimeProvi
         {
             summary.Summary = "Creates a non-interactive integration Bot.";
             summary.Description =
-                "Creates a User Notification Relay Bot or Organizer GitOps Bot that cannot use password login or refresh tokens.";
+                "Creates a role-bearing Bot that uses ordinary Access JWT authorization without password login or refresh tokens.";
         });
     }
 
@@ -71,7 +70,7 @@ public sealed class CreatePlatformBotEndpoint(ManagePlatform platform, TimeProvi
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "Bot was not created.",
                 detail: result.State == CreateBotState.InvalidRole
-                    ? "Notification Relay Bots must use User and GitOps Bots must use Organizer."
+                    ? "Bot role must be a defined platform role."
                     : "Bot UserName must contain 3..64 ASCII letters, digits, '_' or '-'.");
 
         var response = PlatformUserMapping.ToResponse(result.User!);

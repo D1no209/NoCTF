@@ -4,7 +4,7 @@
 
 ## 采集窗口
 
-执行前启动 `deploy/docker-compose.observability.yml`，预热 2 分钟，然后记录：
+按 `deploy/observability/README.md` 启用私有指标并启动独立监控栈，预热 2 分钟，然后记录：
 
 - k6：请求吞吐、失败率、P50/P95/P99。
 - Prometheus：API、Wolverine 队列、PostgreSQL、Redis、Runner 和排行榜指标。

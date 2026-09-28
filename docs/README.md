@@ -1,57 +1,53 @@
 # NoCTF 权威设计规范
 
-本目录是 NoCTF 后续开发的唯一产品与技术规范。实现、测试、OpenAPI、数据库模型和部署配置必须与这里一致；代码现状与本文冲突时，以本文为目标架构，不能为了兼容旧实现而保留错误概念。
+本目录的当前主题文档是 NoCTF 产品与技术规范。实现、测试、OpenAPI、EF 模型和部署配置必须
+与它们一致；不得为了兼容旧实现恢复已删除概念。
 
 ## 阅读顺序
 
-1. [数据模型与 Wolverine 调度简化权威规范](data-model-wolverine-simplification.md)
-   - [阶段 0 基线](data-model-wolverine-stage0-baseline.md)
-   - [生产切换与回滚 Runbook](data-model-wolverine-cutover.md)
-   - [阶段 1：删除 Revision 协议闭环](data-model-wolverine-stage1-revision-removal.md)
-   - [阶段 2：核心实体与隐私模型](data-model-wolverine-stage2-core-privacy.md)
-   - [阶段 3：Notifications/Questions 线程化](data-model-wolverine-stage3-notification-threads.md)
-   - [阶段 4：同步流式导出](data-model-wolverine-stage4-streaming-exports.md)
-   - [阶段 5：Runtime 最小模型与节点直投](data-model-wolverine-stage5-runtime-routing.md)
-   - [阶段 6：GameplayFact 与 AWDP 强类型结果](data-model-wolverine-stage6-gameplay-facts.md)
-   - [阶段 7：Wolverine competing consumers 与显式 fan-out](data-model-wolverine-stage7-messaging-topology.md)
-   - [阶段 8：Singular Agent 周期调度](data-model-wolverine-stage8-singular-agent.md)
-   - [阶段 9：事件驱动排行榜投影](data-model-wolverine-stage9-leaderboard.md)
-   - [阶段 10：单一 EF 初始基线](data-model-wolverine-stage10-ef-baseline.md)
-   - [阶段 11：契约与全量验证](data-model-wolverine-stage11-validation.md)
-2. [产品与领域模型](product-domain.md)
-3. [系统架构](architecture.md)
-4. [进程、消息与并发](processes-messaging.md)
-5. [数据库](database.md)
-6. [认证与授权](authentication-authorization.md)
-7. [API 通用规范](api-conventions.md) 与 [API 清单](api.md)
-8. [GameplayFact 与判定/重判](gameplay-facts-adjudication.md)
-9. [计分与排行榜投影](scoring-projection.md)
-10. [Flag](flags.md)
-11. [Runtime](runtime.md)
-12. [附件与对象存储](storage-attachments.md)
-13. 模式规范：[CTF](game-modes/ctf.md)、[AWD](game-modes/awd.md)、[AWDP](game-modes/awdp.md)、[KoH](game-modes/koh.md)
-14. [实时与站内通知](realtime-notifications.md)
-15. [QQBOT JWT 接入](qqbot-jwt.md)
-16. [开发规范](development.md)、[测试规范](testing.md)、[部署边界](deployment.md)
-17. [PostgreSQL、对象存储与 Wolverine 备份恢复](backup-recovery.md)
-18. [比赛题目仓库与 GitOps 管理设计](challenge-repository-gitops.md)
-19. [AWD、AWDP 出题规范](challenge-authoring-awd-awdp.md) 与 [可复制出题模板](challenge-authoring-templates/README.md)
+1. [产品与领域模型](product-domain.md)
+2. [系统架构](architecture.md)
+3. [进程、消息与并发](processes-messaging.md)
+4. [关系数据模型与 provider 边界](database.md)
+5. [认证与授权](authentication-authorization.md)、[通用 SSO](sso-authentication.md) 与 [CDUT Auth 接入](sso-cdut-auth-integration.md)
+6. [API 通用规范](api-conventions.md) 与 [API 清单](api.md)
+7. [GameplayFact 与判定/重判](gameplay-facts-adjudication.md)
+8. [计分与排行榜投影](scoring-projection.md)
+9. [Flag](flags.md)
+10. [Runtime](runtime.md)
+11. [附件与对象存储](storage-attachments.md)
+12. 模式规范：[CTF](game-modes/ctf.md)、[CTF PatchVerification](ctf-patch-verification-experiment.md)、[AWD](game-modes/awd.md)、[AWDP](game-modes/awdp.md)、[KoH](game-modes/koh.md)
+13. [实时与站内通知](realtime-notifications.md)
+14. [赛事 Webhook](competition-webhooks.md) 与 [Webhook/BOT 对接手册](webhook-bot-integration.md)
+15. [开发规范](development.md)、[测试规范](testing.md)、[部署边界](deployment.md)
+16. [PostgreSQL、NATS JetStream 与对象存储备份恢复](backup-recovery.md)；本次生产切换另见[一次性关系模型迁移清单](one-time-relational-cutover.md)
+17. [比赛题目仓库与 GitOps 管理设计](challenge-repository-gitops.md)
+18. [AWD、AWDP 出题规范](challenge-authoring-awd-awdp.md) 与 [可复制出题模板](challenge-authoring-templates/README.md)
 
-当前本地重构分支已完成阶段 0 至阶段 11 的代码、契约与自动化验证；生产部署和数据切换仍受
-[生产切换与回滚 Runbook](data-model-wolverine-cutover.md) 约束。在尚未切换的分支、部署或历史文档中出现冲突时，
-第一项文档仍定义目标语义，不能据此恢复已经废弃的兼容模型。
+`data-model-wolverine-*`、`*-audit*`、`*-worklog*` 与 HANDOFF 文件只保存历史决策和验收记录，
+不定义当前 persistence、messaging 或 deployment 契约。它们与上述当前文档冲突时，不得据此
+恢复 JSON/数组持久化、PostgreSQL Wolverine、数据库锁或其他已删除架构。
 
 ## 强制边界
 
-- 只支持 `Ctf`、`Awd`、`Awdp`、`Koh`。不存在 `Penetration` GameMode、多阶段题或静态容器群题型。
-- `Api`、`Worker`、`Runner` 是三个可组合角色；既可使用三个兼容独立入口，也可通过
-  `NoCTF.Host` 以任意非空组合运行，缺省为单进程全合一。
-- PostgreSQL 是业务事实源；Redis 是可丢失的缓存、限流、SignalR backplane 与 Runner 心跳存储。
-- NATS JetStream 承载 Wolverine durable 消息、ack、重投与 DLQ；PostgreSQL 只保存业务事实。周期调度由集群 Singular Agent 从事实重建，业务任务不得使用进程内 Channel。
-- GameplayFact 不保存分值、分差或累计分，只保存当前结果。排行榜由事件驱动立即失效、500ms 合并并用当前配置全量投影；不存在 Dirty 列或快照列。
-- 所有配置可在任何生命周期状态修改；保存后发布影响投影的比赛事件并失效排行榜缓存，但不会自动重判 GameplayFact。
+- 只支持 `Ctf`、`Awd`、`Awdp`、`Koh`。不存在 Penetration GameMode、多阶段题或静态容器群题型。
+- `NoCTF.Host.dll` 是唯一进程入口；`Api`、`Worker`、`Runner` 是任意非空组合的角色。
+- EF Core 关系模型是唯一持久化定义。公共模型 provider-neutral；Host 仅使用 PostgreSQL
+  provider 与 migration assembly，隔离 SQLite 项目仅供模型测试。
+- 多态聚合、事件、通知和 receipt 使用稳定 discriminator TPH；无身份值对象使用普通列 Complex
+  Types；集合使用关系表。业务 JSON/数组列和旧 schema upgrader 禁止出现。
+- Mutable aggregate 使用 `Guid ConcurrencyStamp`；集合不变量使用唯一约束与 Serializable bounded retry。
+  不使用数据库方言锁、filtered index、check constraint 或业务 Raw SQL。
+- Wolverine 只使用 NATS JetStream；PostgreSQL 不保存 Message Store、Inbox、Outbox 或 schedule。
+  数据库提交后发布，关键 Pending 状态必须可重新派发，消费者必须按至少一次投递幂等。
+- 周期调度和 Runner resource-domain 使用 NATS KV CAS 租约与 revision fencing。
+- GameplayFact 不保存分值、分差或累计分。排行榜由事件驱动立即失效、500 ms 合并并从关系事实
+  全量投影；不存在 Dirty 或 legacy cache 格式。
 - Migration 与 Snapshot 只允许 `dotnet ef migrations ...` 生成，禁止手改。
 
 ## 已废弃内容
 
-旧 Penetration、QQBot 专用 Agent/群组同步协议、插件式 GameMode、进程内队列、`runtime_operations`、`runtime_artifacts`、TeamMember 顺序队长模型和 CompetitionCollaborator 子表不属于目标架构。QQBOT 只能作为普通 JWT 通知消费者接入。仓库历史、旧提交或外部说明中出现这些旧设计时，不得据此恢复它们。
+旧 Penetration、聊天 Bot 专用 Agent/群组同步协议、插件式 GameMode、进程内业务队列、
+`runtime_operations`、`runtime_artifacts`、成员 UUID 数组、协作者 UUID 数组、JSON payload/config、
+独立 API/Worker/Runner 可执行程序和旧前端路由均不属于当前架构。当前 TeamMember/TeamCaptain 与
+CompetitionCollaborator 是关系模型的一部分。仓库历史或外部说明中出现旧设计时，不得恢复它们。

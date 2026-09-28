@@ -1,10 +1,10 @@
+using JasperFx.CodeGeneration.Model;
 using Microsoft.Extensions.Configuration;
+using NoCTF.Application.Competitions.Lifecycle;
 using NoCTF.Application.Messaging;
 using NoCTF.Hosting.Messaging;
 using Wolverine;
-using Wolverine.EntityFrameworkCore;
 using Wolverine.Nats;
-using Wolverine.Postgresql;
 
 namespace NoCTF.Hosting;
 
@@ -15,16 +15,13 @@ public static class WolverineHosting
         IConfiguration configuration,
         HostRoles roles)
     {
-        var postgres = configuration.GetConnectionString("PostgreSql")
-            ?? throw new InvalidOperationException(
-                "ConnectionStrings:PostgreSql is required.");
+        options.ServiceLocationPolicy = ServiceLocationPolicy.NotAllowed;
+
         var nats = configuration.GetConnectionString("Nats")
             ?? configuration["Wolverine:Nats:ConnectionString"]
             ?? throw new InvalidOperationException(
                 "ConnectionStrings:Nats or Wolverine:Nats:ConnectionString is required.");
 
-        options.PersistMessagesWithPostgresql(postgres, roles.PersistenceSchema);
-        options.UseEntityFrameworkCoreTransactions();
         options.Policies.Add(new AwdpFixVerificationExecutionTimeoutPolicy());
         options.Policies.Add(new AwdFlagInjectionExecutionTimeoutPolicy());
 
@@ -42,11 +39,15 @@ public static class WolverineHosting
             })
             .DefineWorkQueueStream(
                 NatsSubjects.ControlStream,
-                stream => stream.WithSubjects(NatsSubjects.Subject(WorkerQueue.Control)),
+                stream => stream.WithSubjects(
+                    NatsSubjects.Subject(WorkerQueue.Control),
+                    NatsSubjects.ScheduledSubject(WorkerQueue.Control)).EnableScheduledDelivery(),
                 NatsSubjects.Subject(WorkerQueue.Control))
             .DefineWorkQueueStream(
                 NatsSubjects.GameplayStream,
-                stream => stream.WithSubjects(NatsSubjects.Subject(WorkerQueue.Gameplay)),
+                stream => stream.WithSubjects(
+                    NatsSubjects.Subject(WorkerQueue.Gameplay),
+                    NatsSubjects.ScheduledSubject(WorkerQueue.Gameplay)).EnableScheduledDelivery(),
                 NatsSubjects.Subject(WorkerQueue.Gameplay))
             .DefineWorkQueueStream(
                 NatsSubjects.ProjectionStream,
@@ -54,18 +55,26 @@ public static class WolverineHosting
                 NatsSubjects.Subject(WorkerQueue.Projection))
             .DefineWorkQueueStream(
                 NatsSubjects.BackgroundStream,
-                stream => stream.WithSubjects(NatsSubjects.Subject(WorkerQueue.Background)),
+                stream => stream.WithSubjects(
+                    NatsSubjects.Subject(WorkerQueue.Background),
+                    NatsSubjects.ScheduledSubject(WorkerQueue.Background)).EnableScheduledDelivery(),
                 NatsSubjects.Subject(WorkerQueue.Background))
+            .DefineWorkQueueStream(
+                NatsSubjects.WebhookStream,
+                stream => stream.WithSubjects(NatsSubjects.Subject(WorkerQueue.Webhook)),
+                NatsSubjects.Subject(WorkerQueue.Webhook))
             .DefineWorkQueueStream(
                 NatsSubjects.EventsStream,
                 stream => stream.WithSubjects(
                     NatsSubjects.RealtimeEvents,
-                    NatsSubjects.LeaderboardEvents),
+                    NatsSubjects.LeaderboardEvents,
+                    NatsSubjects.WebhookEvents),
                 NatsSubjects.RealtimeEvents,
-                NatsSubjects.LeaderboardEvents)
+                NatsSubjects.LeaderboardEvents,
+                NatsSubjects.WebhookEvents)
             .DefineWorkQueueStream(
                 NatsSubjects.RunnerStream,
-                stream => stream.WithSubject("noctf.runner.>"),
-                "noctf.runner.>");
+                stream => stream.WithSubject("noctf.v2.runner.>").EnableScheduledDelivery(),
+                "noctf.v2.runner.>");
     }
 }

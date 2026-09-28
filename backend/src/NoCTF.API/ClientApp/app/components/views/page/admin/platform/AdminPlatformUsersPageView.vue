@@ -3,13 +3,13 @@ import { toRefs } from 'vue'
 import type { AdminPlatformUsersPageViewState } from '~/features/routes/admin/platform/useAdminPlatformUsersPage'
 
 const viewProps = defineProps<{ state: AdminPlatformUsersPageViewState }>()
-const { Copy, KeyRound, LogIn, Plus, ShieldOff, Trash2, currentUser, loading, loadError, search, roleFilter, ROLE_LABELS, STATUS_LABELS, MANAGED_ACCOUNT_STATUS_OPTIONS, REFERENCE_LABELS, filteredUsers, createBotOpen, creatingBot, botName, botRole, openCreateBot, setCreateBotOpen, createBot, detailOpen, detailLoading, detail, pendingRole, pendingAccountStatus, pendingEmailVerification, roleSaving, accountStatusSaving, emailVerificationSaving, invalidating, activeTokens, activeTokensLoading, revokingTokenId, tokenOpen, tokenIntent, tokenIssuing, tokenExpiresInSeconds, tokenReason, issuedToken, openToken, setTokenOpen, issueToken, copyIssuedToken, revokeIssuedToken, openDetail, saveRole, saveAccountStatus, saveEmailVerification, invalidateTokens, deleteOpen, previewLoading, preview, deletionMode, deletionReason, deleting, startDelete, confirmDelete, PrivateAccountPanel, AdminDateTime } = toRefs(viewProps.state)
+const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageLoading, loadError, search, roleFilter, ssoProviders, ssoProviderFilter, ROLE_LABELS, STATUS_LABELS, MANAGED_ACCOUNT_STATUS_OPTIONS, REFERENCE_LABELS, filteredUsers, page, pageCount, total, pageLimit, loadPage, setPageSize, createBotOpen, creatingBot, botName, botRole, openCreateBot, setCreateBotOpen, createBot, detailOpen, detailLoading, detail, pendingRole, pendingAccountStatus, pendingEmailVerification, roleSaving, accountStatusSaving, emailVerificationSaving, invalidating, ssoUnbinding, tokenOpen, tokenIntent, identitySwitchActive, tokenIssuing, tokenExpiresInSeconds, issuedToken, openToken, setTokenOpen, issueToken, copyIssuedToken, openDetail, saveRole, saveAccountStatus, saveEmailVerification, invalidateTokens, unbindManagedSsoIdentity, deleteOpen, previewLoading, preview, deletionMode, deletionReason, deleting, startDelete, confirmDelete, PrivateAccountPanel, AdminDateTime } = toRefs(viewProps.state)
 </script>
 
 <template>
   <div class="flex min-w-0 flex-col gap-6">
     <div class="flex flex-wrap items-center gap-3">
-      <Input v-model="search" class="w-full sm:max-w-sm" :placeholder="$t('ui.searchUsernameOrEmail')" :aria-label="$t('ui.searchUsernameOrEmail')" />
+      <Input v-model="search" class="w-full sm:max-w-sm" :placeholder="$t('sso.adminUserSearchPlaceholder')" :aria-label="$t('sso.adminUserSearchPlaceholder')" />
       <Select v-model="roleFilter">
         <SelectTrigger class="w-full sm:w-44" :aria-label="$t('ui.role')">
           <SelectValue />
@@ -21,6 +21,19 @@ const { Copy, KeyRound, LogIn, Plus, ShieldOff, Trash2, currentUser, loading, lo
             <SelectItem value="Organizer">{{ $t('ui.organizer') }}</SelectItem>
             <SelectItem value="Administrator">{{ $t('ui.administrator') }}</SelectItem>
             <SelectItem value="Bot">{{ $t('ui.bot') }}</SelectItem>
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+      <Select v-model="ssoProviderFilter">
+        <SelectTrigger class="w-full sm:w-52" :aria-label="$t('sso.identityProvider')">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            <SelectItem value="all">{{ $t('sso.allIdentityProviders') }}</SelectItem>
+            <SelectItem v-for="provider in ssoProviders" :key="provider.id" :value="provider.id!">
+              {{ provider.name }}
+            </SelectItem>
           </SelectGroup>
         </SelectContent>
       </Select>
@@ -45,7 +58,7 @@ const { Copy, KeyRound, LogIn, Plus, ShieldOff, Trash2, currentUser, loading, lo
       </EmptyHeader>
     </Empty>
 
-    <Table v-else class="min-w-[860px] [&_th]:px-4 [&_th]:py-3 [&_td]:px-4 [&_td]:py-4">
+    <Table v-else class="min-w-[1040px] [&_th]:px-4 [&_th]:py-3 [&_td]:px-4 [&_td]:py-4">
       <TableHeader class="bg-muted/30">
         <TableRow>
           <TableHead class="w-[26%]">{{ $t('ui.username') }}</TableHead>
@@ -53,6 +66,7 @@ const { Copy, KeyRound, LogIn, Plus, ShieldOff, Trash2, currentUser, loading, lo
           <TableHead>{{ $t('ui.type') }}</TableHead>
           <TableHead>{{ $t('ui.role') }}</TableHead>
           <TableHead>{{ $t('ui.status') }}</TableHead>
+          <TableHead>{{ $t('sso.externalIdentity') }}</TableHead>
           <TableHead>{{ $t('ui.registrationTime') }}</TableHead>
         </TableRow>
       </TableHeader>
@@ -88,12 +102,30 @@ const { Copy, KeyRound, LogIn, Plus, ShieldOff, Trash2, currentUser, loading, lo
               {{ STATUS_LABELS[String(user.accountStatus)] ? $t(STATUS_LABELS[String(user.accountStatus)]!) : user.accountStatus }}
             </Badge>
           </TableCell>
+          <TableCell class="max-w-64 whitespace-normal">
+            <div v-if="user.ssoBinding" class="flex flex-col gap-1">
+              <span class="font-medium">{{ user.ssoBinding.providerName || user.ssoBinding.providerId }}</span>
+              <span class="break-all text-xs text-muted-foreground">{{ user.ssoBinding.subject }}</span>
+            </div>
+            <span v-else class="text-muted-foreground">{{ $t('sso.notBound') }}</span>
+          </TableCell>
           <TableCell>
             <component :is="AdminDateTime" :value="user.createdAt" />
           </TableCell>
         </TableRow>
       </TableBody>
     </Table>
+
+    <OffsetPagination
+      v-if="filteredUsers.length > 0 || total > 0"
+      :page="page"
+      :page-count="pageCount"
+      :total="total"
+      :limit="pageLimit"
+      :loading="pageLoading"
+      @update:page="loadPage"
+      @update:limit="setPageSize"
+    />
 
     <Dialog :open="createBotOpen" @update:open="setCreateBotOpen">
       <DialogContent>
@@ -169,6 +201,44 @@ const { Copy, KeyRound, LogIn, Plus, ShieldOff, Trash2, currentUser, loading, lo
               <dt class="text-muted-foreground">{{ $t('ui.updateTime') }}</dt>
               <dd><component :is="AdminDateTime" :value="detail.updatedAt" /></dd>
             </dl>
+          </section>
+
+          <Separator />
+
+          <section class="flex flex-col gap-4" aria-labelledby="user-sso-binding">
+            <h3 id="user-sso-binding" class="font-semibold">{{ $t('sso.externalIdentity') }}</h3>
+            <div v-if="detail.ssoBinding" class="flex flex-col gap-3 rounded-xl border p-4">
+              <dl class="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm">
+                <dt class="text-muted-foreground">{{ $t('sso.identityProvider') }}</dt>
+                <dd>{{ detail.ssoBinding.providerName || detail.ssoBinding.providerId }}</dd>
+                <dt class="text-muted-foreground">{{ $t('sso.protocol') }}</dt>
+                <dd>{{ detail.ssoBinding.protocol }}</dd>
+                <dt class="text-muted-foreground">{{ $t('sso.subject') }}</dt>
+                <dd class="select-all break-all font-mono text-xs">{{ detail.ssoBinding.subject }}</dd>
+                <dt class="text-muted-foreground">{{ $t('sso.boundAt') }}</dt>
+                <dd><component :is="AdminDateTime" :value="detail.ssoBinding.boundAt" /></dd>
+              </dl>
+              <AlertDialog>
+                <AlertDialogTrigger as-child>
+                  <Button type="button" variant="destructive" size="sm" class="self-start" :disabled="ssoUnbinding">
+                    <Spinner v-if="ssoUnbinding" data-icon="inline-start" />
+                    <Unlink v-else data-icon="inline-start" />
+                    {{ $t('sso.adminUnbind') }}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>{{ $t('sso.adminUnbind') }}</AlertDialogTitle>
+                    <AlertDialogDescription>{{ $t('sso.adminUnbindDescription') }}</AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>{{ $t('ui.cancel') }}</AlertDialogCancel>
+                    <AlertDialogAction @click="unbindManagedSsoIdentity">{{ $t('sso.adminUnbind') }}</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+            <p v-else class="text-sm text-muted-foreground">{{ $t('sso.notBound') }}</p>
           </section>
 
           <component :is="PrivateAccountPanel" v-if="detail.id" :key="detail.id" :user-id="detail.id" :show-activities="false" />
@@ -299,7 +369,7 @@ const { Copy, KeyRound, LogIn, Plus, ShieldOff, Trash2, currentUser, loading, lo
                 <Button
                   type="button"
                   size="sm"
-                  :disabled="detail.accountStatus !== 'Active'"
+                  :disabled="detail.accountStatus !== 'Active' || identitySwitchActive"
                   @click="openToken(detail, 'impersonate')"
                 >
                   <LogIn data-icon="inline-start" />{{ $t('ui.signInAsThisUser') }}
@@ -309,41 +379,7 @@ const { Copy, KeyRound, LogIn, Plus, ShieldOff, Trash2, currentUser, loading, lo
             <p v-if="detail.accountStatus !== 'Active'" class="text-sm text-muted-foreground">
               {{ $t('ui.onlyActiveAccountsCanReceiveAdministratorIssuedTokens') }}
             </p>
-            <div v-if="activeTokensLoading" class="flex flex-col gap-2">
-              <Skeleton v-for="i in 2" :key="i" class="h-16 w-full" />
-            </div>
-            <p v-else-if="activeTokens.length === 0" class="text-sm text-muted-foreground">
-              {{ $t('ui.noActiveTokensIssuedByYou') }}
-            </p>
-            <div v-else class="flex flex-col gap-2">
-              <div
-                v-for="token in activeTokens"
-                :key="token.jwtId"
-                class="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-muted/40 px-4 py-3"
-              >
-                <div class="min-w-0 flex-1 basis-64 text-sm">
-                  <p class="break-words font-medium">{{ token.reason }}</p>
-                  <p class="mt-1 text-xs text-muted-foreground">
-                    {{ $t('ui.creationTime') }}: <component :is="AdminDateTime" :value="token.issuedAt" />
-                  </p>
-                  <p class="mt-1 text-xs text-muted-foreground">
-                    {{ $t('ui.expiresAt') }} <component :is="AdminDateTime" :value="token.expiresAt" />
-                  </p>
-                  <p class="mt-1 select-all break-all font-mono text-xs text-muted-foreground">{{ token.jwtId }}</p>
-                </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  :disabled="revokingTokenId !== null"
-                  @click="revokeIssuedToken(token)"
-                >
-                  <Spinner v-if="revokingTokenId === token.jwtId" data-icon="inline-start" />
-                  <ShieldOff v-else data-icon="inline-start" />
-                  {{ $t('ui.revokeThisToken') }}
-                </Button>
-              </div>
-            </div>
+            <FieldDescription>{{ $t('ui.issuedTokensAreStatelessAndCanOnlyBeRevokedTogether') }}</FieldDescription>
           </section>
 
           <Separator />
@@ -398,15 +434,10 @@ const { Copy, KeyRound, LogIn, Plus, ShieldOff, Trash2, currentUser, loading, lo
                 <NumberInput id="user-token-ttl" v-model.number="tokenExpiresInSeconds" min="60" max="31536000" step="60" required />
                 <FieldDescription>{{ $t('ui.tokenLifetimeRange') }}</FieldDescription>
               </Field>
-              <Field>
-                <FieldLabel for="user-token-reason">{{ $t('ui.issuanceReason') }}</FieldLabel>
-                <Textarea id="user-token-reason" v-model="tokenReason" minlength="3" maxlength="500" rows="3" required />
-                <FieldDescription>{{ $t('ui.issuanceReasonAuditNotice') }}</FieldDescription>
-              </Field>
             </FieldGroup>
             <DialogFooter>
               <Button type="button" variant="outline" @click="setTokenOpen(false)">{{ $t('ui.cancel') }}</Button>
-              <Button type="submit" :disabled="tokenIssuing || tokenReason.trim().length < 3 || tokenExpiresInSeconds < 60 || tokenExpiresInSeconds > 31536000">
+              <Button type="submit" :disabled="tokenIssuing || tokenExpiresInSeconds < 60 || tokenExpiresInSeconds > 31536000">
                 <Spinner v-if="tokenIssuing" data-icon="inline-start" />
                 {{ tokenIntent === 'impersonate' ? $t('ui.issueAndSignIn') : $t('ui.issue') }}
               </Button>

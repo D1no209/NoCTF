@@ -1,5 +1,6 @@
 using k8s;
 using k8s.Models;
+using System.Diagnostics;
 using System.Text.Json;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Application.Runtime.Callbacks;
@@ -129,15 +130,7 @@ public sealed class KubernetesContainerLifecycle(
                                 Add = request.Security.CapAdd?.ToList() ?? []
                             }
                         },
-                        Resources = new V1ResourceRequirements
-                        {
-                            Limits = new Dictionary<string, ResourceQuantity>
-                            {
-                                ["memory"] = new(request.Limits.MemoryBytes.ToString(
-                                    System.Globalization.CultureInfo.InvariantCulture)),
-                                ["cpu"] = new($"{request.Limits.NanoCpus / 1_000_000L}m")
-                            }
-                        }
+                        Resources = KubernetesWorkloadResources.Create(request.Limits, request.Budget)
                     }
                 ],
                 RestartPolicy = "Never"
@@ -288,52 +281,194 @@ public sealed class KubernetesContainerLifecycle(
 
     public async Task DestroyAsync(ContainerReceipt receipt, CancellationToken cancellationToken)
     {
-        var failures = new List<Exception>();
-        await TryDeleteAsync(() => client.CoreV1.DeleteNamespacedServiceAsync(
-            $"{receipt.ResourceId}{PublicServiceSuffix}",
-            options.Namespace,
-            body: new V1DeleteOptions(),
-            cancellationToken: cancellationToken));
-        await TryDeleteAsync(() => client.CoreV1.DeleteNamespacedServiceAsync(
-            receipt.ResourceId,
-            options.Namespace,
-            body: new V1DeleteOptions(),
-            cancellationToken: cancellationToken));
-        await TryDeleteAsync(() => client.NetworkingV1.DeleteNamespacedNetworkPolicyAsync(
+        await DestroyAsync(
+            receipt,
+            RuntimeTerminationMode.GracefulThenForce,
+            RuntimeTerminationPolicy.Default,
+            cancellationToken);
+    }
+
+    public async Task DestroyAsync(
+        ContainerReceipt receipt,
+        RuntimeTerminationMode mode,
+        RuntimeTerminationPolicy policy,
+        CancellationToken cancellationToken)
+    {
+        var warnings = new List<Exception>();
+        var networkStarted = Stopwatch.GetTimestamp();
+        using (var network = CreateStageToken(cancellationToken, policy.NetworkCleanupTimeout))
+        {
+            await TryDeleteTerminationResourceAsync(() => client.CoreV1.DeleteNamespacedServiceAsync(
+                $"{receipt.ResourceId}{PublicServiceSuffix}",
+                options.Namespace,
+                body: new V1DeleteOptions(),
+                cancellationToken: network.Token), warnings, cancellationToken);
+            await TryDeleteTerminationResourceAsync(() => client.CoreV1.DeleteNamespacedServiceAsync(
+                receipt.ResourceId,
+                options.Namespace,
+                body: new V1DeleteOptions(),
+                cancellationToken: network.Token), warnings, cancellationToken);
+            await TryDeleteTerminationResourceAsync(() => client.NetworkingV1.DeleteNamespacedNetworkPolicyAsync(
                 $"{receipt.ResourceId}-callback",
                 options.Namespace,
                 body: new V1DeleteOptions(),
-                cancellationToken: cancellationToken));
-        await TryDeleteAsync(() => client.CoreV1.DeleteNamespacedPodAsync(
+                cancellationToken: network.Token), warnings, cancellationToken);
+        }
+        NoCtfTelemetry.RecordRuntimeStopDuration(
+            "kubernetes", "container", "network_cleanup",
+            warnings.Count == 0 ? "success" : "warning",
+            Stopwatch.GetElapsedTime(networkStarted).TotalSeconds);
+
+        var podAbsent = false;
+        if (mode == RuntimeTerminationMode.GracefulThenForce)
+        {
+            var gracefulStarted = Stopwatch.GetTimestamp();
+            using var graceful = CreateStageToken(cancellationToken, policy.GracefulStopTimeout);
+            try
+            {
+                await TryDeleteTerminationResourceAsync(() => client.CoreV1.DeleteNamespacedPodAsync(
+                    receipt.ResourceId,
+                    options.Namespace,
+                    body: new V1DeleteOptions
+                    {
+                        GracePeriodSeconds = checked((long)Math.Max(
+                            1,
+                            Math.Ceiling(policy.GracefulStopTimeout.TotalSeconds))),
+                        PropagationPolicy = "Foreground"
+                    },
+                    cancellationToken: graceful.Token), warnings, cancellationToken);
+                podAbsent = await WaitForPodAbsentAsync(receipt.ResourceId, graceful.Token);
+                NoCtfTelemetry.RecordRuntimeStopDuration(
+                    "kubernetes", "container", "graceful",
+                    podAbsent ? "success" : "warning",
+                    Stopwatch.GetElapsedTime(gracefulStarted).TotalSeconds);
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                NoCtfTelemetry.RecordRuntimeStopDuration(
+                    "kubernetes", "container", "graceful", "timeout",
+                    Stopwatch.GetElapsedTime(gracefulStarted).TotalSeconds);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                warnings.Add(exception);
+                NoCtfTelemetry.RecordRuntimeStopDuration(
+                    "kubernetes", "container", "graceful", "warning",
+                    Stopwatch.GetElapsedTime(gracefulStarted).TotalSeconds);
+            }
+        }
+
+        if (!podAbsent)
+        {
+            NoCtfTelemetry.RecordRuntimeStopForce(
+                "kubernetes",
+                mode == RuntimeTerminationMode.Force ? "requested" : "graceful_timeout");
+            var forceStarted = Stopwatch.GetTimestamp();
+            using var force = CreateStageToken(cancellationToken, policy.ForceDeleteTimeout);
+            await TryDeleteTerminationResourceAsync(() => client.CoreV1.DeleteNamespacedPodAsync(
                 receipt.ResourceId,
                 options.Namespace,
-                body: new V1DeleteOptions { PropagationPolicy = "Foreground" },
-                cancellationToken: cancellationToken));
-        if (failures.Count > 0)
-            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failures[0]).Throw();
+                body: new V1DeleteOptions
+                {
+                    GracePeriodSeconds = 0,
+                    PropagationPolicy = "Foreground"
+                },
+                cancellationToken: force.Token), warnings, cancellationToken);
+            NoCtfTelemetry.RecordRuntimeStopDuration(
+                "kubernetes", "container", "force_delete",
+                warnings.Count == 0 ? "success" : "warning",
+                Stopwatch.GetElapsedTime(forceStarted).TotalSeconds);
+        }
 
-        async Task TryDeleteAsync(Func<Task> delete)
+        var verificationStarted = Stopwatch.GetTimestamp();
+        using var verification = CreateStageToken(cancellationToken, policy.VerificationTimeout);
+        try
+        {
+            await WaitUntilDeletedAsync(
+                receipt.ResourceId,
+                policy.VerificationTimeout,
+                waitForCallbackPolicy: true,
+                verification.Token);
+            NoCtfTelemetry.RecordRuntimeStopDuration(
+                "kubernetes", "container", "verification", "success",
+                Stopwatch.GetElapsedTime(verificationStarted).TotalSeconds);
+        }
+        catch (Exception exception) when (exception is TimeoutException
+            || exception is OperationCanceledException && !cancellationToken.IsCancellationRequested)
+        {
+            NoCtfTelemetry.RecordRuntimeStopResourcesRemaining("kubernetes", "container");
+            NoCtfTelemetry.RecordRuntimeStopDuration(
+                "kubernetes", "container", "verification", "timeout",
+                Stopwatch.GetElapsedTime(verificationStarted).TotalSeconds);
+            throw new InvalidOperationException(
+                "Kubernetes Runtime resources remain after the termination budget.",
+                warnings.Count == 0 ? exception : new AggregateException(warnings.Append(exception)));
+        }
+    }
+
+    private async Task<bool> WaitForPodAbsentAsync(
+        string name,
+        CancellationToken cancellationToken)
+    {
+        var delays = new[] { 200, 400, 800, 1_000 };
+        var attempt = 0;
+        while (true)
         {
             try
             {
-                await delete();
+                _ = await client.CoreV1.ReadNamespacedPodAsync(
+                    name,
+                    options.Namespace,
+                    cancellationToken: cancellationToken);
             }
             catch (k8s.Autorest.HttpOperationException exception)
                 when (exception.Response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
-                // The deterministic resource is already absent.
+                return true;
             }
-            catch (Exception exception)
-            {
-                failures.Add(exception);
-            }
+            await Task.Delay(
+                TimeSpan.FromMilliseconds(delays[Math.Min(attempt++, delays.Length - 1)]),
+                timeProvider,
+                cancellationToken);
         }
     }
 
-    public Task<OneShotResult> RunAsync(
-        ContainerRequest request,
-        CancellationToken cancellationToken) =>
-        RunAsync(request, input: null, cancellationToken);
+    private static async Task TryDeleteTerminationResourceAsync(
+        Func<Task> delete,
+        ICollection<Exception> warnings,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await delete();
+        }
+        catch (k8s.Autorest.HttpOperationException exception)
+            when (exception.Response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            // The deterministic resource is already absent.
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            warnings.Add(exception);
+        }
+    }
+
+    private static CancellationTokenSource CreateStageToken(
+        CancellationToken cancellationToken,
+        TimeSpan timeout)
+    {
+        var source = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        source.CancelAfter(timeout);
+        return source;
+    }
 
     public async Task<OneShotResult> RunAsync(
         ContainerRequest request,
@@ -426,7 +561,7 @@ public sealed class KubernetesContainerLifecycle(
                     AllowPrivilegeEscalation = false,
                     ReadOnlyRootFilesystem = true,
                     RunAsNonRoot = request.Security.RunAsNonRoot,
-                    Capabilities = new V1Capabilities { Drop = ["ALL"], Add = [] }
+                    Capabilities = new V1Capabilities { Drop = [], Add = [] }
                 },
                 Resources = checker.Resources,
                 VolumeMounts =
@@ -569,6 +704,7 @@ public sealed class KubernetesContainerLifecycle(
                 RuntimeInstanceId = target.Identity.RuntimeInstanceId,
                 NetworkPurpose = ContainerNetworkPurpose.AwdChecker
             },
+            null,
             cancellationToken);
     }
 
@@ -633,7 +769,8 @@ public sealed class KubernetesContainerLifecycle(
             throw new ArgumentOutOfRangeException(nameof(request));
         if (!Enum.IsDefined(request.Purpose)
             || !Enum.IsDefined(request.EgressPolicy)
-            || request.PublicIngressPorts.Any(port => port is < 1 or > 65535))
+            || request.PublicIngressPorts.Any(port => port is < 1 or > 65535)
+            || request.ProxyIngressPorts?.Any(port => port is < 1 or > 65535) == true)
             throw new ArgumentOutOfRangeException(nameof(request));
         if (request.Purpose == ContainerNetworkPurpose.AwdpVerification
             && request.TargetPort is not (>= 1 and <= 65535))
@@ -691,6 +828,42 @@ public sealed class KubernetesContainerLifecycle(
             ingress.Add(new V1NetworkPolicyIngressRule
             {
                 Ports = request.PublicIngressPorts
+                    .Distinct()
+                    .Order()
+                    .Select(port => new V1NetworkPolicyPort
+                    {
+                        Protocol = "TCP",
+                        Port = port
+                    })
+                    .ToList()
+            });
+        }
+        if (request.Purpose == ContainerNetworkPurpose.PersistentRuntime
+            && request.ProxyIngressPorts is { Count: > 0 })
+        {
+            ingress.Add(new V1NetworkPolicyIngressRule
+            {
+                FromProperty =
+                [
+                    new V1NetworkPolicyPeer
+                    {
+                        NamespaceSelector = new V1LabelSelector
+                        {
+                            MatchLabels = new Dictionary<string, string>
+                            {
+                                ["kubernetes.io/metadata.name"] = "noctf"
+                            }
+                        },
+                        PodSelector = new V1LabelSelector
+                        {
+                            MatchLabels = new Dictionary<string, string>
+                            {
+                                ["noctf.io/runtime-proxy-gateway"] = "true"
+                            }
+                        }
+                    }
+                ],
+                Ports = request.ProxyIngressPorts
                     .Distinct()
                     .Order()
                     .Select(port => new V1NetworkPolicyPort
@@ -1220,6 +1393,10 @@ public sealed class KubernetesContainerLifecycle(
         if (identity.RuntimeInstanceId == Guid.Empty)
             throw new InvalidOperationException(
                 "A Kubernetes Container requires a valid Runtime identity.");
+        if (request.AccessMode == RuntimeAccessMode.WsrxOnly
+            && request.PortMappings.Count > 0)
+            throw new InvalidOperationException(
+                "WSRX-only Kubernetes runtimes cannot publish NodePorts.");
         if (request.ContainerPorts.Any(port => port is < 1 or > 65535)
             || request.PortMappings.Any(mapping => mapping.Value != 0))
             throw new InvalidOperationException(
@@ -1658,6 +1835,8 @@ public sealed class KubernetesContainerLifecycle(
         CancellationToken cancellationToken)
     {
         var deadline = timeProvider.GetUtcNow().Add(timeout);
+        var delays = new[] { 200, 400, 800, 1_000 };
+        var attempt = 0;
         while (timeProvider.GetUtcNow() < deadline)
         {
             var podExists = true;
@@ -1720,7 +1899,10 @@ public sealed class KubernetesContainerLifecycle(
                 && !publicServiceExists
                 && !callbackPolicyExists)
                 return;
-            await Task.Delay(TimeSpan.FromMilliseconds(250), timeProvider, cancellationToken);
+            await Task.Delay(
+                TimeSpan.FromMilliseconds(delays[Math.Min(attempt++, delays.Length - 1)]),
+                timeProvider,
+                cancellationToken);
         }
         throw new TimeoutException("Kubernetes terminal resources were not deleted before recreation.");
     }

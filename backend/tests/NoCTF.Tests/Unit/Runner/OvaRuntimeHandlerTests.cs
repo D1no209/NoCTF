@@ -21,12 +21,12 @@ public sealed class OvaRuntimeHandlerTests
             new FixedWorkReader(RuntimeProvisionWorkStatus.Current));
         var message = CreateProvisionMessage();
 
-        var result = await handler.Handle(message, CancellationToken.None);
+        var result = await handler.ProvisionOvaAsync(message, CancellationToken.None);
 
         await Assert.That(result).IsTypeOf<RuntimeProvisioned>();
-        var provisioned = (RuntimeProvisioned)result;
+        var provisioned = (RuntimeProvisioned)result!;
         await Assert.That(provisioned.Provider).IsEqualTo(RuntimeProvider.Libvirt);
-        await Assert.That(provisioned.Urls)
+        await Assert.That(provisioned.AccessEndpoints.Select(endpoint => endpoint.DirectAddress).OfType<string>())
             .IsEquivalentTo(["http://10.90.0.2:8080/play"]);
         await Assert.That(runtime.ImportCount).IsEqualTo(1);
         await Assert.That(runtime.DestroyCount).IsEqualTo(0);
@@ -60,10 +60,10 @@ public sealed class OvaRuntimeHandlerTests
             }
         };
 
-        var result = await handler.Handle(message, CancellationToken.None);
+        var result = await handler.ProvisionOvaAsync(message, CancellationToken.None);
 
         await Assert.That(result).IsTypeOf<RuntimeProvisionTerminated>();
-        await Assert.That(((RuntimeProvisionTerminated)result).FailureCode)
+        await Assert.That(((RuntimeProvisionTerminated)result!).FailureCode)
             .IsEqualTo(RuntimeFailureCode.UrlExpansionFailed);
         await Assert.That(reconciler.Destroyed)
             .IsEquivalentTo([new RuntimeResourceIdentity(message.RuntimeInstanceId)]);
@@ -84,12 +84,12 @@ public sealed class OvaRuntimeHandlerTests
                 RuntimeProvisionWorkStatus.Current,
                 new(
                     RuntimeProvider.Libvirt,
-                    System.Text.Json.JsonSerializer.Serialize(receipt))));
+                    OvaRuntimeReceiptData.From(receipt))));
         var message = new StopOvaRuntime(
             receipt.OperationId,
             "runner-a");
 
-        var result = await handler.Handle(message, CancellationToken.None);
+        var result = await handler.StopOvaAsync(message, CancellationToken.None);
 
         await Assert.That(result).IsTypeOf<RuntimeStopped>();
         await Assert.That(runtime.DestroyCount).IsEqualTo(1);
@@ -111,12 +111,12 @@ public sealed class OvaRuntimeHandlerTests
                 RuntimeProvisionWorkStatus.Current,
                 new(
                     RuntimeProvider.Libvirt,
-                    System.Text.Json.JsonSerializer.Serialize(receipt))));
+                    OvaRuntimeReceiptData.From(receipt))));
         var message = new StopOvaRuntime(
             receipt.OperationId,
             "runner-a");
 
-        var result = await handler.Handle(message, CancellationToken.None);
+        var result = await handler.StopOvaAsync(message, CancellationToken.None);
 
         await Assert.That(result).IsTypeOf<RuntimeStopFailed>();
         await Assert.That(result).IsNotTypeOf<RuntimeStopped>();

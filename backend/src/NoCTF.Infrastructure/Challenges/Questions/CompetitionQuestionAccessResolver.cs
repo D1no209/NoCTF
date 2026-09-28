@@ -18,7 +18,6 @@ public sealed class CompetitionQuestionAccessResolver(NoCtfDbContext db)
     {
         var user = await db.Users.AsNoTracking()
             .Where(candidate => candidate.Id == actorUserId
-                && candidate.Kind == UserKind.Human
                 && candidate.AccountStatus == UserAccountStatus.Active)
             .Select(candidate => new { candidate.Role })
             .SingleOrDefaultAsync(ct);
@@ -27,9 +26,15 @@ public sealed class CompetitionQuestionAccessResolver(NoCtfDbContext db)
             .Select(candidate => new
             {
                 candidate.OwnerId,
-                candidate.ManagerIds,
-                candidate.JudgeIds,
-                candidate.ObserverIds,
+                IsManager = candidate.Collaborators.Any(collaborator =>
+                    collaborator.Role == CompetitionCollaboratorRole.Manager
+                    && collaborator.UserId == actorUserId),
+                IsJudge = candidate.Collaborators.Any(collaborator =>
+                    collaborator.Role == CompetitionCollaboratorRole.Judge
+                    && collaborator.UserId == actorUserId),
+                IsObserver = candidate.Collaborators.Any(collaborator =>
+                    collaborator.Role == CompetitionCollaboratorRole.Observer
+                    && collaborator.UserId == actorUserId),
                 candidate.MaxActiveQuestionsPerTeam,
                 candidate.MaxParticipantMessagesBeforeHandlerReply,
                 candidate.AllowChallengeOwnersToHandleQuestions
@@ -39,7 +44,7 @@ public sealed class CompetitionQuestionAccessResolver(NoCtfDbContext db)
             return null;
         var teamId = await db.Teams.AsNoTracking()
             .Where(team => team.CompetitionId == competitionId
-                && team.MemberIds.Contains(actorUserId)
+                && team.Members.Any(member => member.UserId == actorUserId)
                 && team.DeletedAt == null
                 && team.RegistrationStatus == TeamRegistrationStatus.Approved
                 && !team.IsBanned)
@@ -47,10 +52,9 @@ public sealed class CompetitionQuestionAccessResolver(NoCtfDbContext db)
             .SingleOrDefaultAsync(ct);
         return new(
             user.Role == UserRole.Administrator,
-            competition.OwnerId == actorUserId
-                || competition.ManagerIds.Contains(actorUserId),
-            competition.JudgeIds.Contains(actorUserId),
-            competition.ObserverIds.Contains(actorUserId),
+            competition.OwnerId == actorUserId || competition.IsManager,
+            competition.IsJudge,
+            competition.IsObserver,
             teamId,
             competition.MaxActiveQuestionsPerTeam,
             competition.MaxParticipantMessagesBeforeHandlerReply,
@@ -75,14 +79,9 @@ public sealed class CompetitionQuestionAccessResolver(NoCtfDbContext db)
                 db.Challenges.AsNoTracking(),
                 binding => binding.ChallengeId,
                 challenge => challenge.Id,
-                (binding, challenge) => new
-                {
-                    binding.Id,
-                    challenge.OwnerId,
-                    challenge.ManagerIds
-                })
-            .Where(item => item.OwnerId == actorUserId
-                || item.ManagerIds.Contains(actorUserId))
+                (binding, challenge) => new { binding.Id, Challenge = challenge })
+            .Where(item => item.Challenge.OwnerId == actorUserId
+                || item.Challenge.Managers.Any(manager => manager.UserId == actorUserId))
             .OrderBy(item => item.Id)
             .Select(item => item.Id)
             .ToArrayAsync(ct);
@@ -131,7 +130,7 @@ public sealed class CompetitionQuestionAccessResolver(NoCtfDbContext db)
                 && binding.CompetitionId == question.RootNotification.TargetId
                 && db.Challenges.Any(challenge => challenge.Id == binding.ChallengeId
                     && (challenge.OwnerId == actorUserId
-                        || challenge.ManagerIds.Contains(actorUserId))), ct)
+                        || challenge.Managers.Any(manager => manager.UserId == actorUserId))), ct)
             ? new(CompetitionQuestionAccess.Handler,
                 CompetitionQuestionParticipantRole.ChallengeOwner)
             : null;

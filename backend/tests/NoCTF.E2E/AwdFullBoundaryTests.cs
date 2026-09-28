@@ -45,23 +45,27 @@ public sealed class AwdFullBoundaryTests
             cancellationToken);
         var competitionId = competition.GetProperty("id").GetGuid();
 
-        var competitionConfigurationJson = JsonSerializer.Serialize(new
+        var competitionConfiguration = new
         {
-            schemaVersion = 2,
-            hardeningDurationSeconds = 20,
-            roundDurationSeconds = 30,
-            attackRewardMode = "FixedPerAttack",
-            attackPoints = 13,
-            victimDefensePoolPoints = 17,
-            checkerIntervalSeconds = 2,
-            serviceHealthyPoints = 11,
-            serviceUnhealthyPenalty = 7
-        }, JsonOptions);
+            mode = "Awd",
+            flagTemplate = new { header = "flag", bodyTemplate = "[GUID]", leetLiteralText = false },
+            awd = new
+            {
+                hardeningDurationSeconds = 20,
+                roundDurationSeconds = 30,
+                attackRewardMode = "FixedPerAttack",
+                attackPoints = 13L,
+                victimDefensePoolPoints = 17L,
+                checkerIntervalSeconds = 2,
+                serviceHealthyPoints = 11L,
+                serviceUnhealthyPenalty = 7L
+            }
+        };
         await SendJsonAsync(
             admin,
             HttpMethod.Patch,
             $"/api/v1/admin/competitions/{competitionId}",
-            new { modeConfiguration = new { json = competitionConfigurationJson } },
+            new { modeConfiguration = new { configuration = competitionConfiguration } },
             HttpStatusCode.OK,
             cancellationToken);
 
@@ -76,7 +80,7 @@ public sealed class AwdFullBoundaryTests
                 title = "Rotating AWD Service",
                 description = "Exposes rotating Flags and a controllable health endpoint.",
                 direction = "Pwn",
-                definitionJson = BuildDefinition(runtimeImage, checkerImage)
+                definition = BuildDefinition(runtimeImage, checkerImage)
             },
             HttpStatusCode.Created,
             cancellationToken);
@@ -91,10 +95,6 @@ public sealed class AwdFullBoundaryTests
             cancellationToken);
         var competitionChallengeId = challenge.GetProperty("id").GetGuid();
 
-        var challengeConfigurationJson = JsonSerializer.Serialize(new
-        {
-            schemaVersion = 4
-        }, JsonOptions);
         await SendJsonAsync(
             admin,
             HttpMethod.Patch,
@@ -107,7 +107,7 @@ public sealed class AwdFullBoundaryTests
                     order = 0,
                     isPublished = true
                 },
-                rules = new { json = challengeConfigurationJson }
+                rules = new { configuration = new { mode = "Awd", awd = new { } } }
             },
             HttpStatusCode.OK,
             cancellationToken);
@@ -311,6 +311,10 @@ public sealed class AwdFullBoundaryTests
 
         await GetFixtureTextAsync(redRuntimeUrl, "cgi-bin/up", cancellationToken);
         await GetFixtureTextAsync(blueRuntimeUrl, "cgi-bin/up", cancellationToken);
+        await Assert.That(await GetFixtureTextAsync(redRuntimeUrl, "cgi-bin/health", cancellationToken))
+            .IsEqualTo("up");
+        await Assert.That(await GetFixtureTextAsync(blueRuntimeUrl, "cgi-bin/health", cancellationToken))
+            .IsEqualTo("up");
         var expiredId = await SubmitSingleFlagAsync(
             red.Client,
             competitionId,
@@ -383,35 +387,47 @@ public sealed class AwdFullBoundaryTests
             cancellationToken);
     }
 
-    private static string BuildDefinition(string runtimeImage, string checkerImage) =>
-        JsonSerializer.Serialize(new
+    private static object BuildDefinition(string runtimeImage, string checkerImage) =>
+        new
         {
-            schemaVersion = 4,
+            mode = "Awd",
+            awd = new
+            {
+                flagInjection = new
+                {
+                    command = "printf '%s' '${FLAG}' > /dev/shm/flag",
+                    timeoutSeconds = 5,
+                    serviceName = (string?)null
+                }
+            },
             runtime = new
             {
-                allocation = 1,
-                definition = new
+                kind = "Container",
+                allocation = "PerTeam",
+                container = new
                 {
-                    kind = "container",
                     image = runtimeImage,
+                    command = Array.Empty<string>(),
                     environment = new Dictionary<string, string>(),
                     labels = new Dictionary<string, string>(),
-                    portMappings = new Dictionary<string, int> { ["8080"] = 0 },
+                    portMappings = new[] { new { containerPort = 8080, hostPort = 0 } },
                     security = new
                     {
                         noNewPrivileges = true,
                         readonlyRootfs = true,
                         runAsNonRoot = true,
-                        capDrop = new[] { "ALL" },
+                        capDrop = Array.Empty<string>(),
                         capAdd = Array.Empty<string>()
                     },
-                    egressPolicy = 0
+                    flagEnvironmentVariableName = (string?)null,
+                    internalPorts = Array.Empty<int>()
                 },
+                egressPolicy = "Isolated",
                 limits = new
                 {
-                    memoryBytes = 67_108_864,
-                    nanoCpus = 100_000_000,
-                    pidsLimit = 64
+                    memoryBytes = 67_108_864L,
+                    nanoCpus = 100_000_000L,
+                    pidsLimit = 64L
                 },
                 operationTimeoutSeconds = 60,
                 urlBindings = new[]
@@ -419,28 +435,25 @@ public sealed class AwdFullBoundaryTests
                     new
                     {
                         urlTemplate = "http://{HOST}:{PORT}/",
-                        exposure = 1,
-                        containerPort = 8080
+                        exposure = "Participants",
+                        containerPort = 8080,
+                        serviceName = (string?)null,
+                        vmId = (string?)null,
+                        guestPort = (int?)null,
+                        isControlCheck = false
                     }
                 },
-                flagSource = 2
+                flagSource = "AwdRotation"
             },
             checker = new
             {
-                job = new
-                {
-                    image = checkerImage,
-                    command = Array.Empty<string>(),
-                    environment = new Dictionary<string, string>(),
-                    timeoutSeconds = 15
-                }
-            },
-            flagInjection = new
-            {
-                command = "printf '%s' '${FLAG}' > /dev/shm/flag",
-                timeoutSeconds = 5
+                image = checkerImage,
+                command = Array.Empty<string>(),
+                environment = new Dictionary<string, string>(),
+                timeoutSeconds = 15,
+                targetServiceName = (string?)null
             }
-        }, JsonOptions);
+        };
 
     private static async Task<TeamSession> RegisterTeamAsync(
         HttpClient anonymous,
@@ -471,7 +484,10 @@ public sealed class AwdFullBoundaryTests
             new { name = teamName, trackKey = "default" },
             HttpStatusCode.Created,
             cancellationToken);
-        return new(client, team.GetProperty("id").GetGuid());
+        var teamId = team.GetProperty("id").GetGuid();
+        await E2ELifecycle.SubmitTeamRegistrationAsync(
+            client, competitionId, teamId, cancellationToken);
+        return new(client, teamId);
     }
 
     private static async Task<Guid> SubmitSingleFlagAsync(
@@ -521,12 +537,11 @@ public sealed class AwdFullBoundaryTests
         var items = response.GetProperty("items");
         await Assert.That(items.GetArrayLength()).IsEqualTo(1);
         await Assert.That(items[0].GetProperty("teamId").GetGuid()).IsEqualTo(teamId);
-        await Assert.That(items[0].GetProperty("urls").GetArrayLength()).IsEqualTo(1);
+        await Assert.That(items[0].GetProperty("accesses").GetArrayLength()).IsEqualTo(1);
     }
 
     private static string RequiredFirstUrl(JsonElement runtime) =>
-        runtime.GetProperty("urls")[0].GetString()
-        ?? throw new InvalidOperationException("The running AWD Runtime did not expose a URL.");
+        E2ELifecycle.FirstDirectAddress(runtime);
 
     private static async Task<string> GetFixtureTextAsync(
         string runtimeUrl,
@@ -682,6 +697,7 @@ public sealed class AwdFullBoundaryTests
         {
             Content = JsonContent.Create(body, options: JsonOptions)
         };
+        E2ELifecycle.AddIdempotencyKey(request);
         using var response = await client.SendAsync(request, cancellationToken);
         return await ReadExpectedJsonAsync(response, expected, cancellationToken);
     }
@@ -694,6 +710,7 @@ public sealed class AwdFullBoundaryTests
         CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(method, path);
+        E2ELifecycle.AddIdempotencyKey(request);
         using var response = await client.SendAsync(request, cancellationToken);
         if (response.StatusCode != expected)
             throw await UnexpectedResponseAsync(response, expected, cancellationToken);

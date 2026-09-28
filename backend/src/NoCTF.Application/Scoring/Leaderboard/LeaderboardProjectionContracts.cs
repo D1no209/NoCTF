@@ -1,5 +1,6 @@
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Gameplay;
+using NoCTF.Domain.Challenges;
 
 namespace NoCTF.Application.Scoring.Leaderboard;
 
@@ -9,7 +10,7 @@ public sealed record LeaderboardProjectionInput(
     IReadOnlyList<LeaderboardTeamFact> Teams,
     IReadOnlyList<LeaderboardGameplayFact> GameplayFacts,
     IReadOnlyList<LeaderboardChallengeFact>? Challenges = null,
-    string? CompetitionConfigurationJson = null,
+    CompetitionModeConfiguration? CompetitionConfiguration = null,
     DateTimeOffset? CompetitionStartTime = null,
     IReadOnlyList<CompetitionLifecycleTransition>? LifecycleAudits = null,
     IReadOnlyList<LeaderboardAwdRoundFact>? AwdRounds = null,
@@ -37,9 +38,11 @@ public sealed record LeaderboardChallengeFact(
     string Direction,
     string Title,
     bool IsDeleted,
-    string? ConfigurationJson = null,
+    CompetitionChallengeRules? Rules = null,
     int Order = 0,
-    bool IsPublished = true);
+    bool IsPublished = true,
+    ChallengeDefinition? Definition = null,
+    CtfInteractionKind InteractionKind = CtfInteractionKind.FlagSubmission);
 
 public sealed record LeaderboardGameplayFact(
     Guid GameplayFactId,
@@ -98,7 +101,7 @@ public interface ILeaderboardProjectorCatalog
     IGameModeLeaderboardProjector Get(GameMode mode);
 }
 
-public sealed record LeaderboardProjectionResult(
+public sealed record LeaderboardAggregateProjection(
     IReadOnlyList<LeaderboardEntry> Entries,
     IReadOnlyList<LeaderboardChallengeInfo> Challenges,
     int? CurrentRound = null,
@@ -106,11 +109,7 @@ public sealed record LeaderboardProjectionResult(
     int? RoundDurationSeconds = null,
     int? CurrentRoundRemainingSeconds = null);
 
-public sealed record LeaderboardProjectionOutputs(
-    LeaderboardProjectionResult Legacy,
-    ScoreboardProjection Scoreboard);
-
 public interface ILeaderboardProjectionEngine
 {
-    LeaderboardProjectionOutputs ProjectOutputs(LeaderboardProjectionInput input);
+    ScoreboardProjection Project(LeaderboardProjectionInput input);
 }

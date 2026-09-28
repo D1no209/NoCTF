@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { DefinitionComposeViewState } from '~/features/admin/useDefinitionCompose'
 
 const viewProps = defineProps<{ state: DefinitionComposeViewState }>()
-const { Plus, X, bytesToMib, nanoCpusToCores, addService, hasMetadata, definition, disabled, onUpdateModelValueResourceMemoryBytes, onUpdateModelValueResourceNanoCpus, onUpdateModelValueResourcePidsLimit, onUpdateModelValueDefinitionEnvironment, onUpdateModelValueDefinitionLabels, onUpdateModelValueDefinitionFlagEnvironmentVariables } = toRefs(viewProps.state)
+const { Plus, X, bytesToMib, nanoCpusToCores, addService, hasMetadata, showFlagEnvironmentVariables, definition, disabled, onUpdateModelValueResourceMemoryBytes, onUpdateModelValueResourceNanoCpus, onUpdateModelValueResourcePidsLimit, onUpdateModelValueDefinitionEnvironment, onUpdateModelValueDefinitionLabels, onUpdateModelValueDefinitionFlagEnvironmentVariables } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -86,7 +86,7 @@ const { Plus, X, bytesToMib, nanoCpusToCores, addService, hasMetadata, definitio
     </Field>
 
     <DefinitionSection :title="$t('ui.environmentMetadata')"
-
+      accent-title
       :hint="$t('ui.environmentVariablesLabelsAndFlagInjectionTargetsMostChallengesDo')"
       :default-open="hasMetadata"
     >
@@ -112,7 +112,7 @@ const { Plus, X, bytesToMib, nanoCpusToCores, addService, hasMetadata, definitio
           @update:model-value="onUpdateModelValueDefinitionLabels"
         />
       </Field>
-      <Field>
+      <Field v-if="showFlagEnvironmentVariables">
         <FieldLabel>{{ $t('ui.flagEnvironmentVariable') }}</FieldLabel>
         <KeyValueEditor
           :model-value="definition.flagEnvironmentVariables"

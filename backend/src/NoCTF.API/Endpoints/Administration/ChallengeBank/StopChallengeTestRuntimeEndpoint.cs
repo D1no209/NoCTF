@@ -21,6 +21,9 @@ public sealed class StopChallengeTestRuntimeEndpoint(
         Delete("/admin/challenges/{challengeId}/test-runtimes/{runtimeInstanceId}");
         AuthSchemes("Bearer");
         Options(builder => builder.WithMetadata(new NoCTF.API.Security.ProtectedEntryMetadata(NoCTF.API.Security.ProtectedEntry.RuntimeCommand)));
+        Options(builder => builder.WithMetadata(
+            new NoCTF.Hosting.Observability.RuntimeOperationMetricsMetadata(
+                NoCTF.Application.Observability.RuntimeOperationMetricKind.TestStop)));
         Roles("Organizer", "Administrator");
         Description(builder => builder.WithName("AdminChallengeBankStopTestRuntime")
             .ProducesProblemFE(StatusCodes.Status409Conflict)

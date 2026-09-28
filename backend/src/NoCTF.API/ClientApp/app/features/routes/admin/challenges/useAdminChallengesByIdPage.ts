@@ -4,10 +4,11 @@ import type { ComponentPublicInstance } from 'vue'
 import { Paperclip, RotateCcw, Trash2, Upload } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { adminChallengeBankCreateFlag, adminChallengeBankDeleteAttachment, adminChallengeBankDeleteFlag, adminChallengeBankDeleteTemplate, adminChallengeBankGetTemplate, adminChallengeBankListAttachments, adminChallengeBankListFlags, adminChallengeBankPatchTemplate, adminChallengeBankRestoreAttachment, adminChallengeBankRestoreFlag, adminChallengeBankRestoreTemplate, adminChallengeBankUploadAttachments } from '../../../../api'
-import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol, NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol, NoCtfapiEndpointsCompetitionsGameModeProtocol, NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol, NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse, NoCtfapiEndpointsAdministrationChallengeBankAttachmentBatchFailureResponse } from '../../../../api'
+import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract, NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol, NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateContentPatchRequest, NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol, NoCtfapiEndpointsCompetitionsGameModeProtocol, NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol, NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse, NoCtfapiEndpointsAdministrationChallengeBankAttachmentBatchFailureResponse } from '../../../../api'
 import { challengeTemplateWriteErrorMessages } from '../../../../lib/challenge-template-error'
 import { validateChallengeTemplateDraft } from '../../../../lib/challenge-template-validation'
-import { defaultDefinitionJson, FlagSource, normalizeDefinitionJson, serializeDefinition } from '../../../../utils/game-config'
+import type { DefinitionModel } from '../../../../utils/game-config'
+import { applyCtfInteraction, CtfInteraction, defaultDefinition, definitionContractToModel, definitionModelToContract, FlagSource } from '../../../../utils/game-config'
 import AdminDateTimeComponent from '../../../admin/AdminDateTime.vue'
 import AdminGameModeBadgeComponent from '../../../admin/AdminGameModeBadge.vue'
 import ChallengeTestRuntimePanelComponent from '../../../admin/ChallengeTestRuntimePanel.vue'
@@ -16,6 +17,7 @@ import DefinitionFlagInjectionSectionComponent from '../../../admin/DefinitionFl
 import DefinitionFlagTemplateSectionComponent from '../../../admin/DefinitionFlagTemplateSection.vue'
 import DefinitionPatchSectionComponent from '../../../admin/DefinitionPatchSection.vue'
 import DefinitionRuntimeSectionComponent from '../../../admin/DefinitionRuntimeSection.vue'
+import { challengeRuntimeDefinitionsEqual, mergeChallengeModeDefinition, mergeChallengeRuntimeDefinition } from '../../../admin/challenge-definition-sections'
 
 type Template = NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse
 
@@ -30,6 +32,7 @@ export function useAdminChallengesByIdPage() {
   const challengeId = route.params.id as string
 
   const { canOrganize } = useAuth()
+  const { configuration: platformConfiguration } = usePlatform()
 
   const template = ref<Template | null>(null)
 
@@ -43,14 +46,22 @@ export function useAdminChallengesByIdPage() {
     visibility: 'Private' as NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol,
     direction: '',
     description: '',
-    definitionJson: '{}',
+    definition: defaultDefinition('Ctf') as NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract,
   })
 
-  const saving = ref(false)
+  type SaveSection = 'basic' | 'runtime' | 'definition'
 
-  const saveErrors = ref<string[]>([])
+  const savingSection = ref<SaveSection | null>(null)
 
-  const saveAttempted = ref(false)
+  const saving = computed(() => savingSection.value !== null)
+
+  const basicSaveErrors = ref<string[]>([])
+
+  const runtimeSaveErrors = ref<string[]>([])
+
+  const definitionSaveErrors = ref<string[]>([])
+
+  const basicSaveAttempted = ref(false)
 
   const deleting = ref(false)
 
@@ -58,62 +69,177 @@ export function useAdminChallengesByIdPage() {
 
   const isDeleted = computed(() => !!template.value?.deletedAt)
 
-  const titleInvalid = computed(() => saveAttempted.value
+  const titleInvalid = computed(() => basicSaveAttempted.value
     && (!form.title.trim() || form.title.trim().length > 160))
 
-  const directionInvalid = computed(() => saveAttempted.value
+  const directionInvalid = computed(() => basicSaveAttempted.value
     && (!form.direction.trim() || form.direction.trim().length > 96))
 
   const { model: definitionModel, parseFailed: definitionParseFailed } = useDefinitionModel(
-    () => form.definitionJson,
+    () => form.definition,
     () => form.mode,
-    (json) => { form.definitionJson = json },
+    (definition) => { form.definition = definition },
   )
+
+  const runtimeDefinitionModel = ref<DefinitionModel | null>(null)
+
+  const runtimeDefinitionParseFailed = ref(false)
 
   const hasModeDefinition = computed(() => {
     if (form.mode === 'Awd' || form.mode === 'Awdp') return true
-    if (form.mode === 'Ctf') return definitionModel.value?.runtime?.flagSource === FlagSource.PerTeam
+    if (form.mode === 'Ctf') return definitionModel.value?.interactionKind === CtfInteraction.PatchVerification
+      || definitionModel.value?.runtime?.flagSource === FlagSource.PerTeam
     return false
   })
 
-  const usesRuntimeFlagInjection = computed(() =>
-    (form.mode === 'Ctf' || form.mode === 'Awdp')
-    && definitionModel.value?.runtime?.flagSource === FlagSource.PerTeam,
-  )
+  const persistedDefinitionModel = computed(() => {
+    const value = template.value
+    return value?.mode
+      && value.definition
+      ? definitionContractToModel(value.definition, value.mode)
+      : null
+  })
 
-  const runtimeDisabled = computed(() => definitionModel.value !== null && definitionModel.value.runtime === null)
+  const usesRuntimeFlagInjection = computed(() => {
+    const value = template.value
+    return (value?.mode === 'Ctf' || value?.mode === 'Awdp')
+      && persistedDefinitionModel.value?.runtime?.flagSource === FlagSource.PerTeam
+  })
+
+  const runtimeDisabled = computed(() =>
+    persistedDefinitionModel.value !== null
+    && persistedDefinitionModel.value.runtime === null,
+  )
 
   const runtimeDefinitionDirty = computed(() => {
     if (!template.value) return true
-    const current = definitionModel.value
-      ? normalizeDefinitionJson(form.mode, serializeDefinition(form.mode, definitionModel.value))
-      : null
-    const persisted = normalizeDefinitionJson(template.value.mode ?? form.mode, template.value.definitionJson ?? '{}')
-    return current === null || persisted === null || current !== persisted
+    const mode = template.value.mode ?? 'Ctf'
+    const current = runtimeDefinitionModel.value
+    const persisted = persistedDefinitionModel.value
+    if (!current || !persisted) return true
+    return !challengeRuntimeDefinitionsEqual(mode, current, persisted)
   })
+
+  const patchVerificationEnabled = computed(() =>
+    platformConfiguration.value?.experimentalFeatures?.ctfPatchVerificationEnabled === true,
+  )
+
+  const showInteractionKind = computed(() => form.mode === 'Ctf'
+    && (patchVerificationEnabled.value
+      || definitionModel.value?.interactionKind === CtfInteraction.PatchVerification),
+  )
+
+  function setInteractionKind(value: unknown): void {
+    if (!definitionModel.value || isDeleted.value || typeof value !== 'string') return
+    const interactionKind = value === 'PatchVerification'
+      ? CtfInteraction.PatchVerification
+      : CtfInteraction.FlagSubmission
+    if (interactionKind === CtfInteraction.PatchVerification
+      && !patchVerificationEnabled.value) return
+    applyCtfInteraction(definitionModel.value, interactionKind)
+  }
 
   function changeMode(value: unknown): void {
     if (value !== 'Ctf' && value !== 'Awd' && value !== 'Awdp' && value !== 'Koh') return
-    form.definitionJson = defaultDefinitionJson(value)
+    form.definition = defaultDefinition(value)
     form.mode = value
   }
 
-  function resetDefinitionToCurrentMode(): void {
-    form.definitionJson = defaultDefinitionJson(form.mode)
+  function resetRuntimeDefinition(): void {
+    const mode = template.value?.mode
+    if (!mode) return
+    runtimeDefinitionModel.value = definitionContractToModel(defaultDefinition(mode), mode)
+    runtimeDefinitionParseFailed.value = false
     toast.info(translate("ui.loadedTheCurrentModeSDefaultChallengeDefinitionSaveYour"))
   }
 
-  function syncForm(value: Template): void {
+  function resetModeDefinition(): void {
+    form.definition = defaultDefinition(form.mode)
+    toast.info(translate("ui.loadedTheCurrentModeSDefaultChallengeDefinitionSaveYour"))
+  }
+
+  function syncBasicForm(value: Template): void {
     form.title = value.title ?? ''
     form.visibility = value.visibility ?? 'Private'
     form.direction = directionLabel(value.direction)
     form.description = value.description ?? ''
-    // Keep definitionJson ahead of mode while loading existing templates.
-    // useDefinitionModel watches mode and serializes the current parsed model;
-    // setting mode first can briefly serialize the empty initial CTF model as the
-    // loaded mode and hide persisted runtime/checker settings in the editor.
-    form.definitionJson = value.definitionJson ?? '{}'
+  }
+
+  function syncModeDefinition(value: Template): void {
     form.mode = value.mode ?? 'Ctf'
+    form.definition = value.definition ?? defaultDefinition(form.mode)
+  }
+
+  function syncRuntimeDefinition(value: Template): void {
+    const mode = value.mode ?? 'Ctf'
+    runtimeDefinitionModel.value = value.definition
+      ? definitionContractToModel(value.definition, mode)
+      : null
+    runtimeDefinitionParseFailed.value = runtimeDefinitionModel.value === null
+  }
+
+  function syncForm(value: Template): void {
+    syncBasicForm(value)
+    syncModeDefinition(value)
+    syncRuntimeDefinition(value)
+  }
+
+  function contentFromTemplate(
+    value: Template,
+    overrides: Partial<NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateContentPatchRequest> = {},
+  ): NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateContentPatchRequest {
+    return {
+      mode: value.mode ?? 'Ctf',
+      visibility: value.visibility ?? 'Private',
+      title: value.title ?? '',
+      description: value.description ?? null,
+      direction: directionLabel(value.direction),
+      definition: value.definition ?? defaultDefinition(value.mode ?? 'Ctf'),
+      ...overrides,
+    }
+  }
+
+  async function updateContent(
+    section: SaveSection,
+    content: NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateContentPatchRequest,
+    errors: { value: string[] },
+  ): Promise<Template | null> {
+    if (savingSection.value !== null) return null
+    savingSection.value = section
+    const { data, error } = await adminChallengeBankPatchTemplate({
+      path: { challengeId },
+      body: { content },
+    })
+    savingSection.value = null
+    if (error || !data) {
+      errors.value = challengeTemplateWriteErrorMessages(error)
+      toast.error(errors.value[0] ?? translate("ui.unableToSaveTheChallengeTemplate"))
+      return null
+    }
+    template.value = data
+    errors.value = []
+    toast.success(translate("ui.saved"))
+    return data
+  }
+
+  function validateDefinitionForSave(
+    mode: NoCtfapiEndpointsCompetitionsGameModeProtocol,
+    definition: DefinitionModel,
+    errors: { value: string[] },
+  ): NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract | null {
+    const value = template.value
+    const validationErrors = validateChallengeTemplateDraft({
+      mode,
+      title: value?.title ?? '',
+      direction: value?.direction ?? '',
+      definition,
+    })
+    if (validationErrors.length > 0) {
+      errors.value = validationErrors
+      toast.error(validationErrors[0] ?? translate("ui.unableToSaveTheChallengeTemplate"))
+      return null
+    }
+    return definitionModelToContract(mode, definition)
   }
 
   async function loadTemplate(): Promise<void> {
@@ -133,63 +259,98 @@ export function useAdminChallengesByIdPage() {
     syncPermissions(data)
   }
 
-  async function save(): Promise<void> {
-    saveAttempted.value = true
-    saveErrors.value = []
-    if (!template.value) {
-      saveErrors.value = [translate("ui.theTemplateHasNotFinishedLoadingAndCannotBeSaved")]
-      toast.error(saveErrors.value[0] ?? translate("ui.unableToSaveTheChallengeTemplate"))
+  async function saveBasic(): Promise<void> {
+    basicSaveAttempted.value = true
+    basicSaveErrors.value = []
+    const value = template.value
+    if (!value) {
+      basicSaveErrors.value = [translate("ui.theTemplateHasNotFinishedLoadingAndCannotBeSaved")]
+      toast.error(basicSaveErrors.value[0] ?? translate("ui.unableToSaveTheChallengeTemplate"))
       return
     }
-    // Read directly from the structured editor model. Its JSON bridge is watched,
-    // so relying only on form.definitionJson can miss the latest edit when Save is
-    // clicked in the same interaction cycle.
-    const currentDefinition = definitionModel.value
-      ? serializeDefinition(form.mode, definitionModel.value)
-      : form.definitionJson
-    const normalizedDefinition = normalizeDefinitionJson(form.mode, currentDefinition)
-    if (!normalizedDefinition) {
-      saveErrors.value = [translate("ui.theChallengeDefinitionCannotBeParsedResetOrCorrectIt")]
-      toast.error(saveErrors.value[0] ?? translate("ui.unableToSaveTheChallengeTemplate"))
-      return
-    }
-    const validationErrors = validateChallengeTemplateDraft({
-      mode: form.mode,
-      title: form.title,
-      direction: form.direction,
-      definitionJson: normalizedDefinition,
-    })
+    const validationErrors: string[] = []
+    if (!form.title.trim()) validationErrors.push(translate("ui.titleIsRequired"))
+    else if (form.title.trim().length > 160)
+      validationErrors.push(translate("ui.titleCannotExceed160Characters"))
+    if (!form.direction.trim()) validationErrors.push(translate("ui.directionIsRequired"))
+    else if (form.direction.trim().length > 96)
+      validationErrors.push(translate("ui.directionCannotExceed96Characters"))
     if (validationErrors.length > 0) {
-      saveErrors.value = validationErrors
+      basicSaveErrors.value = validationErrors
       toast.error(validationErrors[0] ?? translate("ui.unableToSaveTheChallengeTemplate"))
       return
     }
-    saving.value = true
-    const { data, error } = await adminChallengeBankPatchTemplate({
-      path: { challengeId },
-      body: {
-        content: {
-          title: form.title.trim(),
-          mode: form.mode,
-          visibility: form.visibility,
-          direction: directionLabel(form.direction),
-          description: form.description.trim() || null,
-          definitionJson: normalizedDefinition,
-        },
-      },
-    })
-    saving.value = false
-    if (error) {
-      saveErrors.value = challengeTemplateWriteErrorMessages(error)
-      toast.error(saveErrors.value[0] ?? translate("ui.unableToSaveTheChallengeTemplate"))
+    const updated = await updateContent('basic', contentFromTemplate(value, {
+      title: form.title.trim(),
+      visibility: form.visibility,
+      direction: directionLabel(form.direction),
+      description: form.description.trim() || null,
+    }), basicSaveErrors)
+    if (updated) syncBasicForm(updated)
+  }
+
+  async function saveRuntimeDefinition(): Promise<void> {
+    runtimeSaveErrors.value = []
+    const value = template.value
+    if (!value) {
+      runtimeSaveErrors.value = [translate("ui.theTemplateHasNotFinishedLoadingAndCannotBeSaved")]
+      toast.error(runtimeSaveErrors.value[0] ?? translate("ui.unableToSaveTheChallengeTemplate"))
       return
     }
-    if (data) {
-      template.value = data
-      syncForm(data)
+    const mode = value.mode ?? 'Ctf'
+    const persisted = persistedDefinitionModel.value
+    const merged = runtimeDefinitionModel.value && persisted
+      ? mergeChallengeRuntimeDefinition(
+          persisted,
+          runtimeDefinitionModel.value,
+        )
+      : null
+    const normalized = merged
+      ? validateDefinitionForSave(mode, merged, runtimeSaveErrors)
+      : null
+    if (!normalized) return
+    const updated = await updateContent('runtime', contentFromTemplate(value, {
+      definition: normalized,
+    }), runtimeSaveErrors)
+    if (updated) syncRuntimeDefinition(updated)
+  }
+
+  async function saveModeDefinition(): Promise<void> {
+    definitionSaveErrors.value = []
+    const value = template.value
+    if (!value) {
+      definitionSaveErrors.value = [translate("ui.theTemplateHasNotFinishedLoadingAndCannotBeSaved")]
+      toast.error(definitionSaveErrors.value[0] ?? translate("ui.unableToSaveTheChallengeTemplate"))
+      return
     }
-    saveErrors.value = []
-    toast.success(translate("ui.saved"))
+    const previousMode = value.mode ?? 'Ctf'
+    const runtimeWasDirty = runtimeDefinitionDirty.value
+    const persisted = persistedDefinitionModel.value
+    const merged = definitionModel.value && persisted
+      ? mergeChallengeModeDefinition(
+          previousMode,
+          persisted,
+          form.mode,
+          definitionModel.value,
+        )
+      : null
+    const normalized = merged
+      ? validateDefinitionForSave(form.mode, merged, definitionSaveErrors)
+      : null
+    if (!normalized) return
+    const updated = await updateContent('definition', contentFromTemplate(value, {
+      mode: form.mode,
+      definition: normalized,
+    }), definitionSaveErrors)
+    if (!updated) return
+    syncModeDefinition(updated)
+    if (previousMode !== updated.mode || !runtimeWasDirty) {
+      syncRuntimeDefinition(updated)
+    }
+    else if (updated.mode === 'Ctf' && runtimeDefinitionModel.value) {
+      applyCtfInteraction(runtimeDefinitionModel.value, definitionModel.value?.interactionKind
+        ?? CtfInteraction.FlagSubmission)
+    }
   }
 
   async function removeTemplate(): Promise<void> {
@@ -390,13 +551,16 @@ export function useAdminChallengesByIdPage() {
 
   const flags = ref<Flag[]>([])
 
-  const supportsRegularExpression = ref(false)
+  const regularExpressionCapability = ref(false)
+
+  const supportsRegularExpression = computed(() => regularExpressionCapability.value
+    || template.value?.mode === 'Ctf'
+      && persistedDefinitionModel.value?.interactionKind === CtfInteraction.FlagSubmission
+      && !usesRuntimeFlagInjection.value)
 
   const flagsLoading = ref(false)
 
   const flagsIncludeDeleted = ref(false)
-
-  const flagCreateOpen = ref(false)
 
   const flagCreating = ref(false)
 
@@ -425,7 +589,7 @@ export function useAdminChallengesByIdPage() {
       return
     }
     flags.value = data?.items ?? []
-    supportsRegularExpression.value = data?.supportsRegularExpression ?? false
+    regularExpressionCapability.value = data?.supportsRegularExpression ?? false
     if (!supportsRegularExpression.value && flagForm.matchKind === 'RegularExpression')
       flagForm.matchKind = 'Exact'
   }
@@ -433,12 +597,6 @@ export function useAdminChallengesByIdPage() {
   watch(flagsIncludeDeleted, () => {
     void loadFlags()
   })
-
-  function openFlagCreate(): void {
-    flagForm.flag = ''
-    flagForm.matchKind = 'Exact'
-    flagCreateOpen.value = true
-  }
 
   async function createFlag(): Promise<void> {
     if (!flagForm.flag.trim()) {
@@ -458,7 +616,8 @@ export function useAdminChallengesByIdPage() {
       toast.error(challengeFlagErrorMessage(error))
       return
     }
-    flagCreateOpen.value = false
+    flagForm.flag = ''
+    flagForm.matchKind = 'Exact'
     toast.success(translate("ui.flagAdded"))
     await loadFlags()
   }
@@ -618,7 +777,9 @@ export function useAdminChallengesByIdPage() {
       loadError,
       form,
       saving,
-      saveErrors,
+      basicSaveErrors,
+      runtimeSaveErrors,
+      definitionSaveErrors,
       deleting,
       restoring,
       isDeleted,
@@ -626,13 +787,22 @@ export function useAdminChallengesByIdPage() {
       directionInvalid,
       definitionModel,
       definitionParseFailed,
+      runtimeDefinitionModel,
+      runtimeDefinitionParseFailed,
       hasModeDefinition,
       usesRuntimeFlagInjection,
       runtimeDisabled,
       runtimeDefinitionDirty,
+      CtfInteraction,
+      patchVerificationEnabled,
+      showInteractionKind,
+      setInteractionKind,
       changeMode,
-      resetDefinitionToCurrentMode,
-      save,
+      resetRuntimeDefinition,
+      resetModeDefinition,
+      saveBasic,
+      saveRuntimeDefinition,
+      saveModeDefinition,
       removeTemplate,
       restoreTemplate,
       attachments,
@@ -659,14 +829,12 @@ export function useAdminChallengesByIdPage() {
       supportsRegularExpression,
       flagsLoading,
       flagsIncludeDeleted,
-      flagCreateOpen,
       flagCreating,
       flagForm,
       deletingFlag,
       flagActionPending,
       staticFlags,
       systemFlags,
-      openFlagCreate,
       createFlag,
       confirmDeleteFlag,
       restoreFlag,
@@ -718,15 +886,11 @@ export function useAdminChallengesByIdPage() {
     viewState.randomBatchOpen = value
   }
 
-  function onClickFlagCreateOpen(value: typeof viewState.flagCreateOpen) {
-    viewState.flagCreateOpen = value
-  }
-
   function onUpdateOpenDeletingFlag(open: boolean) {
      if (!open) viewState.deletingFlag = null
   }
 
-  return { ...viewBindings, onBlurFormDirection, onClickRandomBatchOpen, onClickDeletingAttachment, onClickDeletingFlag, onClickTransferOpen, onUpdateOpenDeletingAttachment, onClickRandomBatchOpen2, onClickFlagCreateOpen, onUpdateOpenDeletingFlag }
+  return { ...viewBindings, onBlurFormDirection, onClickRandomBatchOpen, onClickDeletingAttachment, onClickDeletingFlag, onClickTransferOpen, onUpdateOpenDeletingAttachment, onClickRandomBatchOpen2, onUpdateOpenDeletingFlag }
 }
 
 export type AdminChallengesByIdPageViewState = import('vue').ShallowUnwrapRef<Awaited<ReturnType<typeof useAdminChallengesByIdPage>>>

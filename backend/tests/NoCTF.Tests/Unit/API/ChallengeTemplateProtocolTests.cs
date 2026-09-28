@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using NoCTF.Application.Challenges.Bank;
 using NoCTF.API.Endpoints.Administration.ChallengeBank;
+using NoCTF.API.Endpoints.Administration.Challenges;
+using NoCTF.API.Endpoints.Administration.Competitions;
 using NoCTF.API.Endpoints.Competitions;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
@@ -16,7 +18,7 @@ public sealed class ChallengeTemplateProtocolTests
         new(JsonSerializerDefaults.Web);
 
     [Test]
-    [Arguments("""{"mode":"Ctf","visibility":"Private"}""")]
+    [Arguments("""{"mode":"Ctf","visibility":"Private","definition":{"mode":"Ctf","ctf":{"interactionKind":"FlagSubmission"},"patchCommand":[]}}""")]
     public async Task Create_request_accepts_pascal_case_string_enums(string json)
     {
         var request = JsonSerializer.Deserialize<CreateChallengeTemplateRequest>(
@@ -29,7 +31,7 @@ public sealed class ChallengeTemplateProtocolTests
     }
 
     [Test]
-    [Arguments("""{"content":{"mode":"Ctf","visibility":"Private","title":"Template","description":null,"direction":"Web","definitionJson":"{}"}}""")]
+    [Arguments("""{"content":{"mode":"Ctf","visibility":"Private","title":"Template","description":null,"direction":"Web","definition":{"mode":"Ctf","ctf":{"interactionKind":"FlagSubmission"},"patchCommand":[]}}}""")]
     public async Task Update_request_accepts_pascal_case_string_enums(string json)
     {
         var request = JsonSerializer.Deserialize<PatchChallengeTemplateRequest>(
@@ -39,6 +41,40 @@ public sealed class ChallengeTemplateProtocolTests
         await Assert.That(request).IsNotNull();
         await Assert.That(request!.Content!.Mode).IsEqualTo(GameModeProtocol.Ctf);
         await Assert.That(request.Content.Visibility).IsEqualTo(ChallengeVisibilityProtocol.Private);
+    }
+
+    [Test]
+    [Arguments("""{"ctf":{"defaultScoreCurve":{},"bloodRewards":[]},"flagTemplate":{"header":"flag","bodyTemplate":"[GUID]","leetLiteralText":false},"mode":"Ctf"}""", true)]
+    [Arguments("""{"awd":{},"flagTemplate":{"header":"flag","bodyTemplate":"[GUID]","leetLiteralText":false},"mode":"Ctf"}""", false)]
+    [Arguments("""{"ctf":{"defaultScoreCurve":{},"bloodRewards":[]},"awd":{},"flagTemplate":{"header":"flag","bodyTemplate":"[GUID]","leetLiteralText":false},"mode":"Ctf"}""", false)]
+    [Arguments("""{"ctf":{"defaultScoreCurve":null,"bloodRewards":[]},"flagTemplate":{"header":"flag","bodyTemplate":"[GUID]","leetLiteralText":false},"mode":"Ctf"}""", false)]
+    public async Task Configuration_branch_is_validated_independently_of_json_order(string json, bool valid)
+    {
+        var contract = JsonSerializer.Deserialize<CompetitionModeConfigurationContract>(json, JsonOptions);
+
+        await Assert.That(CompetitionModeConfigurationContractMapper.HasValidShape(contract)).IsEqualTo(valid);
+    }
+
+    [Test]
+    [Arguments("""{"ctf":{},"mode":"Ctf"}""", true)]
+    [Arguments("""{"awd":{},"mode":"Ctf"}""", false)]
+    [Arguments("""{"ctf":{},"awd":{},"mode":"Ctf"}""", false)]
+    public async Task Rules_branch_is_validated_independently_of_json_order(string json, bool valid)
+    {
+        var contract = JsonSerializer.Deserialize<CompetitionChallengeRulesContract>(json, JsonOptions);
+
+        await Assert.That(CompetitionChallengeRulesContractMapper.HasValidShape(contract)).IsEqualTo(valid);
+    }
+
+    [Test]
+    [Arguments("""{"ova":{"sourceUrl":"https://example.test/a.ova","sha256":"abc"},"kind":"Ova"}""")]
+    [Arguments("""{"compose":{"composeYaml":"services: {}","environment":{},"labels":{},"flagEnvironmentVariables":{},"serviceResources":[]},"kind":"Compose"}""")]
+    [Arguments("""{"container":{"image":"alpine","command":[],"environment":{},"labels":{},"portMappings":[],"security":{"noNewPrivileges":false,"readonlyRootfs":false,"runAsNonRoot":false,"capDrop":[],"capAdd":[]},"flagEnvironmentVariableName":null,"internalPorts":[]},"kind":"Container"}""")]
+    public async Task Runtime_branch_is_validated_with_kind_after_payload(string json)
+    {
+        var contract = JsonSerializer.Deserialize<ChallengeRuntimeContract>(json, JsonOptions);
+
+        await Assert.That(ChallengeDefinitionContractMapper.HasValidRuntimeShape(contract)).IsTrue();
     }
 
     [Test]
@@ -54,7 +90,7 @@ public sealed class ChallengeTemplateProtocolTests
                 Title = string.Empty,
                 Description = null,
                 Direction = string.Empty,
-                DefinitionJson = string.Empty
+                Definition = CtfDefinition()
             }
         });
         var missingProperties = missing.Errors
@@ -78,7 +114,7 @@ public sealed class ChallengeTemplateProtocolTests
                 Title = "Template",
                 Description = null,
                 Direction = "Web",
-                DefinitionJson = """{"schemaVersion":1}"""
+                Definition = CtfDefinition()
             }
         }).IsValid).IsTrue();
     }
@@ -98,11 +134,11 @@ public sealed class ChallengeTemplateProtocolTests
     [Test]
     public async Task Permission_specific_mappers_only_update_their_allowed_fields()
     {
-        var challenge = new Challenge
+        var challenge = new CtfChallenge
         {
             Id = Guid.NewGuid(), OwnerId = Guid.NewGuid(), ManagerIds = [],
-            Mode = GameMode.Ctf, Visibility = ChallengeVisibility.Private,
-            Title = "Old", Direction = "Web", DefinitionJson = "{}"
+            Visibility = ChallengeVisibility.Private,
+            Title = "Old", Direction = "Web", Definition = TestConfigurations.Definition(GameMode.Ctf)
         };
         ChallengeTemplatePatchMapper.ApplyContentAsTemplateManager(new()
         {
@@ -111,7 +147,7 @@ public sealed class ChallengeTemplateProtocolTests
             Title = "New",
             Description = null,
             Direction = "Pwn",
-            DefinitionJson = "{}"
+            Definition = AwdDefinition()
         }, challenge);
         var ownerAfterContent = challenge.OwnerId;
         var newOwner = Guid.NewGuid();
@@ -125,4 +161,21 @@ public sealed class ChallengeTemplateProtocolTests
         await Assert.That(challenge.OwnerId).IsEqualTo(newOwner);
         await Assert.That(ownerAfterContent).IsNotEqualTo(newOwner);
     }
+
+    private static ChallengeDefinitionContract CtfDefinition() => new()
+    {
+        Mode = GameModeProtocol.Ctf,
+        Ctf = new CtfChallengeDefinitionContract
+        {
+            InteractionKind = NoCTF.API.Endpoints.Challenges.CtfInteractionKindProtocol.FlagSubmission
+        },
+        PatchCommand = []
+    };
+
+    private static ChallengeDefinitionContract AwdDefinition() => new()
+    {
+        Mode = GameModeProtocol.Awd,
+        Awd = new AwdChallengeDefinitionContract { FlagInjection = null },
+        PatchCommand = []
+    };
 }

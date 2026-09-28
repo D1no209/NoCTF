@@ -2,6 +2,7 @@ using NoCTF.Application.Competitions.Tracks;
 using NoCTF.Application.Competitions.Lifecycle;
 using NoCTF.Domain.Competitions;
 using NoCTF.GameModes.Registration;
+using NSubstitute;
 
 namespace NoCTF.Tests.Unit.Application;
 
@@ -69,29 +70,49 @@ public sealed class CompetitionTrackPolicyTests
     }
 
     [Test]
-    public async Task Invalid_persisted_configuration_falls_back_without_throwing()
+    public async Task Invalid_persisted_configuration_is_rejected()
     {
-        var invalid = CompetitionTrackConfiguration.Serialize(new(
-            CompetitionTrackConfiguration.CurrentSchemaVersion,
+        var invalid = CompetitionTrackConfiguration.ToPersisted(new(
             [Track("one"), Track("two")]));
 
-        var parsed = CompetitionTrackConfiguration.ParseOrDefault(GameMode.Awd, invalid);
-
-        await Assert.That(parsed.DefaultTrack.Key)
-            .IsEqualTo(CompetitionTrackConfiguration.DefaultTrackKey);
-        await Assert.That(parsed.DefaultTrack.EarnsBlood).IsFalse();
+        await Assert.That(() => CompetitionTrackConfiguration.FromPersisted(GameMode.Awd, invalid))
+            .Throws<InvalidOperationException>();
     }
 
     [Test]
-    public async Task Null_track_collection_is_rejected_without_throwing()
+    public async Task Null_track_collection_is_rejected()
     {
-        const string invalid = """{"schemaVersion":1,"tracks":null}""";
+        await Assert.That(() => CompetitionTrackConfiguration.FromPersisted(GameMode.Ctf, null))
+            .Throws<InvalidOperationException>();
+    }
 
-        var parsed = CompetitionTrackConfiguration.ParseOrDefault(GameMode.Ctf, invalid);
+    [Test]
+    public async Task Sso_gate_round_trips_and_is_ignored_when_tracks_are_disabled()
+    {
+        var providerId = Guid.CreateVersion7();
+        var configuration = new CompetitionTrackConfiguration(
+        [
+            Track("default", isDefault: true) with
+            {
+                RequiredSsoProviderId = providerId
+            }
+        ]);
 
-        await Assert.That(parsed.DefaultTrack.Key)
-            .IsEqualTo(CompetitionTrackConfiguration.DefaultTrackKey);
-        await Assert.That(CompetitionTrackConfiguration.TryParse(invalid, out _)).IsFalse();
+        var restored = CompetitionTrackConfiguration.FromPersisted(
+            GameMode.Ctf,
+            CompetitionTrackConfiguration.ToPersisted(configuration));
+        var disabled = CompetitionTrackConfiguration.EffectiveFor(
+            GameMode.Ctf,
+            tracksEnabled: false,
+            CompetitionTrackConfiguration.ToPersisted(configuration));
+
+        await Assert.That(restored.DefaultTrack.RequiredSsoProviderId).IsEqualTo(providerId);
+        await Assert.That(disabled.DefaultTrack.RequiredSsoProviderId).IsNull();
+        await Assert.That(CompetitionTrackPolicy.Validate(GameMode.Ctf,
+            [Track("default", isDefault: true) with
+            {
+                RequiredSsoProviderId = Guid.Empty
+            }])).IsNotEmpty();
     }
 
     [Test]
@@ -101,7 +122,7 @@ public sealed class CompetitionTrackPolicyTests
     [Arguments(GameMode.Koh)]
     public async Task Disabled_tracks_use_one_public_comprehensive_default_for_every_mode(GameMode mode)
     {
-        var saved = new CompetitionTrackConfiguration(1,
+        var saved = new CompetitionTrackConfiguration(
         [
             Track("formal", isDefault: true) with
             {
@@ -120,7 +141,7 @@ public sealed class CompetitionTrackPolicyTests
         var effective = CompetitionTrackConfiguration.EffectiveFor(
             mode,
             tracksEnabled: false,
-            CompetitionTrackConfiguration.Serialize(saved));
+            CompetitionTrackConfiguration.ToPersisted(saved));
 
         await Assert.That(effective.Tracks).HasSingleItem();
         await Assert.That(effective.DefaultTrack.Key).IsEqualTo("formal");
@@ -148,6 +169,58 @@ public sealed class CompetitionTrackPolicyTests
         await Assert.That(CompetitionTrackPolicy.CanUpdate(status)).IsEqualTo(expected);
 
     [Test]
+    public async Task Blank_invitation_code_preserves_the_existing_code()
+    {
+        var competitionId = Guid.CreateVersion7();
+        var track = Track("default", isDefault: true);
+        var store = Substitute.For<ICompetitionTrackStore>();
+        UpdateCompetitionTracksCommand? receivedCommand = null;
+        store.UpdateAsync(
+                Arg.Any<UpdateCompetitionTracksCommand>(),
+                Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                receivedCommand = call.ArgAt<UpdateCompetitionTracksCommand>(0);
+                return UpdateCompetitionTracksResult.Success(new(
+                    competitionId,
+                    GameMode.Ctf,
+                    CompetitionStatus.Running,
+                    true,
+                    true,
+                    [new(
+                        track.Key,
+                        track.Name,
+                        track.IsDefault,
+                        track.IsPublicSelectable,
+                        track.IsInternal,
+                        track.EarnsScore,
+                        track.EarnsBlood,
+                        track.AffectsDynamicChallengeScore,
+                        track.VisibleOnLeaderboard,
+                        track.AffectsCompetitiveResults,
+                        RequiresInvitationCode: true)]));
+            });
+        var update = new UpdateCompetitionTracks(store);
+
+        var result = await update.ExecuteAsync(new(
+            competitionId,
+            true,
+            [track],
+            [],
+            Guid.CreateVersion7(),
+            DateTimeOffset.UtcNow,
+            [new(track.Key, "  ", ClearInvitationCode: false)]), GameMode.Ctf);
+
+        await Assert.That(result.Succeeded).IsTrue();
+        await store.Received(1).UpdateAsync(
+            Arg.Any<UpdateCompetitionTracksCommand>(),
+            Arg.Any<CancellationToken>());
+        await Assert.That(receivedCommand).IsNotNull();
+        await Assert.That(receivedCommand!.InvitationCodeUpdates).IsNotNull();
+        await Assert.That(receivedCommand.InvitationCodeUpdates![0].InvitationCode).IsNull();
+    }
+
+    [Test]
     public async Task Start_gate_rejects_invalid_configuration_and_missing_team_track()
     {
         var competitionId = Guid.CreateVersion7();
@@ -157,13 +230,12 @@ public sealed class CompetitionTrackPolicyTests
                 competitionId,
                 GameMode.Ctf,
                 CompetitionStatus.Published,
-                GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Ctf),
+                CompetitionModeConfigurationDefaults.Create(GameMode.Ctf, competitionId),
                 [],
                 ApprovedTeamCount: 1,
                 MaxConcurrentRuntimeInstancesPerTeam: 0,
-                TrackConfigurationJson: CompetitionTrackConfiguration.Serialize(new(
-                    SchemaVersion: 99,
-                    [Track("formal", isDefault: true)])),
+                Tracks: CompetitionTrackConfiguration.ToPersisted(new(
+                    [Track("formal", isDefault: true), Track("other", isDefault: true)])),
                 ApprovedTeamTrackKeys: ["missing"],
                 TracksEnabled: true)),
             new GameModeCompetitionConfigurationValidator(),
@@ -174,8 +246,6 @@ public sealed class CompetitionTrackPolicyTests
         var validationErrors = errors!;
         await Assert.That(validationErrors.Any(error =>
             error.Code == StartGateFailureCode.TrackConfigurationInvalid)).IsTrue();
-        await Assert.That(validationErrors.Any(error =>
-            error.Code == StartGateFailureCode.TeamTrackInvalid)).IsTrue();
     }
 
     private static CompetitionTrackDefinition Track(string key, bool isDefault = false) => new(

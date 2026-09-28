@@ -8,11 +8,13 @@ import { createHumanVerificationCoordinator } from '~/lib/human-verification-coo
 import type { HumanVerificationHeaders } from '~/lib/human-verification-coordinator'
 
 export type HumanVerificationAction = 'login' | 'registration' | 'runtime' | 'evaluation'
+export type HumanVerificationSurface = 'dialog' | 'login-inline'
 
 interface ChallengeState {
   id: number
   provider: 'Cap' | 'Turnstile'
   action: HumanVerificationAction
+  surface: HumanVerificationSurface
   siteKey: string
   apiEndpoint: string
   progress: number
@@ -114,7 +116,10 @@ export function useHumanVerification() {
   const challenge = sharedChallenge()
   const { configuration, ensureLoaded } = usePlatform()
 
-  async function request(action: HumanVerificationAction): Promise<HumanVerificationHeaders | null> {
+  async function request(
+    action: HumanVerificationAction,
+    requestedSurface: HumanVerificationSurface = 'dialog',
+  ): Promise<HumanVerificationHeaders | null> {
     await ensureLoaded()
     const provider = providerConfiguration(configuration.value)
     if (!provider?.provider) {
@@ -146,6 +151,9 @@ export function useHumanVerification() {
       id,
       provider: provider.provider,
       action,
+      surface: provider.provider === 'Cap' && action === 'login' && requestedSurface === 'login-inline'
+        ? 'login-inline'
+        : 'dialog',
       siteKey,
       apiEndpoint,
       progress: 0,
@@ -164,7 +172,31 @@ export function useHumanVerification() {
     return result
   }
 
-  return { request }
+  const inlineCap = computed(() => {
+    const current = challenge.value
+    if (current?.provider !== 'Cap' || current.surface !== 'login-inline') return null
+    return {
+      id: current.id,
+      progress: Math.round(current.progress),
+      errorMessage: current.errorKey ? translate(current.errorKey) : null,
+    }
+  })
+
+  function retryInlineCap(): void {
+    const current = challenge.value
+    if (current?.provider !== 'Cap' || current.surface !== 'login-inline') return
+    const id = ++nextChallengeId
+    challenge.value = { ...current, id, progress: 0, errorKey: null }
+    beginChallengeTimeout(challenge, id)
+    void solveCapChallenge(
+      challenge,
+      id,
+      token => settleChallenge(challenge, { 'X-NoCTF-Human-Verification': token }),
+      errorKey => failChallenge(challenge, errorKey, id),
+    )
+  }
+
+  return { request, inlineCap, retryInlineCap }
 }
 
 /** Owns the single application-level challenge surface rendered by ApplicationRoot. */
@@ -226,7 +258,7 @@ export function useHumanVerificationGate() {
   return {
     ShieldCheck: markRaw(ShieldCheck),
     TurnstileWidget: markRaw(TurnstileWidgetComponent),
-    open: computed(() => challenge.value !== null),
+    open: computed(() => challenge.value !== null && challenge.value.surface === 'dialog'),
     provider: computed(() => challenge.value?.provider ?? null),
     challengeId: computed(() => challenge.value?.id ?? 0),
     siteKey: computed(() => challenge.value?.siteKey ?? ''),

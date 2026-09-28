@@ -65,13 +65,13 @@ public interface ICompetitionPermissionStore
 public enum CompetitionPermissionUpdateState
 {
     Updated,
+    Conflict,
     NotFound,
     Forbidden,
     RolesOverlap,
     OwnerIncluded,
     UserNotFound,
-    RoleNotEligible,
-    EmailNotVerified
+    RoleNotEligible
 }
 
 public sealed record CompetitionPermissionUpdateResult(

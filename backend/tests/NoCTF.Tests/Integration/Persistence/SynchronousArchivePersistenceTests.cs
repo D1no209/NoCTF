@@ -49,7 +49,6 @@ public sealed class SynchronousArchivePersistenceTests
                     ids.CompetitionId,
                     ids.OwnerId,
                     RequesterIsAdministrator: false,
-                    RequesterIsHuman: true,
                     IncludeProtectedFlags: false,
                     Reason: null), cancellationToken);
 
@@ -78,7 +77,6 @@ public sealed class SynchronousArchivePersistenceTests
                     ids.CompetitionId,
                     ids.AdministratorId,
                     RequesterIsAdministrator: true,
-                    RequesterIsHuman: true,
                     IncludeProtectedFlags: true,
                     Reason: "Investigate the reported scoring incident."), cancellationToken);
                 await Assert.That(protectedArchive.Failure).IsNull();
@@ -102,8 +100,8 @@ public sealed class SynchronousArchivePersistenceTests
                     .OrderBy(item => item.OccurredAt)
                     .ToArrayAsync(cancellationToken);
                 await Assert.That(auditEvents).Count().IsEqualTo(2);
-                await Assert.That(auditEvents[0].PayloadJson).DoesNotContain(ids.ProtectedFlag);
-                await Assert.That(auditEvents[1].PayloadJson)
+                await Assert.That(auditEvents[0].Reason ?? string.Empty).DoesNotContain(ids.ProtectedFlag);
+                await Assert.That(auditEvents[1].Reason ?? string.Empty)
                     .Contains("Investigate the reported scoring incident.");
                 await Assert.That(Directory.GetFiles(temporaryDirectory)).IsEmpty();
             }
@@ -144,21 +142,18 @@ public sealed class SynchronousArchivePersistenceTests
                     ids.CompetitionId,
                     ids.StrangerId,
                     RequesterIsAdministrator: false,
-                    RequesterIsHuman: true,
                     IncludeProtectedFlags: false,
                     Reason: null), cancellationToken);
                 var notFound = await generator.GenerateCompetitionAsync(new(
                     Guid.NewGuid(),
                     ids.OwnerId,
                     RequesterIsAdministrator: false,
-                    RequesterIsHuman: true,
                     IncludeProtectedFlags: false,
                     Reason: null), cancellationToken);
                 var limited = await generator.GenerateCompetitionAsync(new(
                     ids.CompetitionId,
                     ids.OwnerId,
                     RequesterIsAdministrator: false,
-                    RequesterIsHuman: true,
                     IncludeProtectedFlags: false,
                     Reason: null), cancellationToken);
 
@@ -175,7 +170,6 @@ public sealed class SynchronousArchivePersistenceTests
                     ids.CompetitionId,
                     ids.OwnerId,
                     RequesterIsAdministrator: false,
-                    RequesterIsHuman: true,
                     IncludeProtectedFlags: false,
                     Reason: null), cancellationToken);
 
@@ -192,7 +186,6 @@ public sealed class SynchronousArchivePersistenceTests
                     ids.CompetitionId,
                     ids.OwnerId,
                     RequesterIsAdministrator: false,
-                    RequesterIsHuman: true,
                     IncludeProtectedFlags: false,
                     Reason: null), cancellationToken);
 
@@ -209,7 +202,6 @@ public sealed class SynchronousArchivePersistenceTests
                 var deadlineTask = deadlineGenerator.GeneratePlatformAuditAsync(new(
                     ids.AdministratorId,
                     RequesterIsAdministrator: true,
-                    RequesterIsHuman: true,
                     Kind: null,
                     CompetitionId: null,
                     ActorId: null,
@@ -226,7 +218,6 @@ public sealed class SynchronousArchivePersistenceTests
                         ids.CompetitionId,
                         ids.OwnerId,
                         RequesterIsAdministrator: false,
-                        RequesterIsHuman: true,
                         IncludeProtectedFlags: false,
                         Reason: null), cancelled.Token);
                 };
@@ -283,7 +274,6 @@ public sealed class SynchronousArchivePersistenceTests
                 var result = await useCase.ExecuteAsync(new(
                     ids.AdministratorId,
                     RequesterIsAdministrator: true,
-                    RequesterIsHuman: true,
                     Kind: PlatformAuditKind.CompetitionEvent,
                     CompetitionId: ids.CompetitionId,
                     ActorId: ids.OwnerId,
@@ -310,8 +300,8 @@ public sealed class SynchronousArchivePersistenceTests
                     item.Kind == NotificationKind.PlatformAuditExported,
                     cancellationToken);
                 await Assert.That(auditFact.SourceId).IsEqualTo(ids.AdministratorId);
-                await Assert.That(auditFact.ContentJson).Contains("recordCount");
-                await Assert.That(auditFact.ContentJson).DoesNotContain(ids.ProtectedFlag);
+                await Assert.That(auditFact.Value!.Value).IsGreaterThan(0);
+                await Assert.That(auditFact.Body).IsNull();
                 await Assert.That(Directory.GetFiles(temporaryDirectory)).IsEmpty();
             }
             finally
@@ -322,7 +312,7 @@ public sealed class SynchronousArchivePersistenceTests
         });
     }
 
-    private static PostgresSynchronousArchiveGenerator Generator(
+    private static SynchronousArchiveGenerator Generator(
         NoCtfDbContext db,
         string temporaryDirectory,
         TimeProvider timeProvider,
@@ -352,7 +342,7 @@ public sealed class SynchronousArchivePersistenceTests
             new PlatformAuditLogStore(db),
             Options.Create(archiveOptions),
             timeProvider,
-            NullLogger<PostgresSynchronousArchiveGenerator>.Instance);
+            NullLogger<SynchronousArchiveGenerator>.Instance);
     }
 
     private static async Task<TestIds> SeedAsync(
@@ -377,14 +367,13 @@ public sealed class SynchronousArchivePersistenceTests
             User(ids.AdministratorId, "archive-admin", UserRole.Administrator, now),
             User(ids.OwnerId, "archive-owner", UserRole.User, now),
             User(ids.StrangerId, "archive-stranger", UserRole.User, now));
-        db.Competitions.Add(new Competition
+        db.Competitions.Add(new CtfCompetition
         {
             Id = ids.CompetitionId,
             Title = "Archive competition",
             Description = "Archive integration fixture",
             OwnerId = ids.OwnerId,
-            Mode = GameMode.Ctf,
-            ConfigurationJson = "{}",
+            ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
             FlagDerivationSecret = Enumerable.Repeat((byte)0x2A, 32).ToArray(),
             StartAt = now.AddHours(1),
             EndAt = now.AddHours(2),
@@ -393,29 +382,28 @@ public sealed class SynchronousArchivePersistenceTests
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.Challenges.Add(new Challenge
+        db.Challenges.Add(new CtfChallenge
         {
             Id = ids.ChallengeId,
             OwnerId = ids.OwnerId,
-            Mode = GameMode.Ctf,
             Visibility = ChallengeVisibility.Private,
             Title = "Archive challenge",
             Direction = "Web",
-            DefinitionJson = "{\"schemaVersion\":2}",
+            Definition = TestConfigurations.Definition(GameMode.Ctf),
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.CompetitionChallenges.Add(new CompetitionChallenge
+        db.CompetitionChallenges.Add(new CtfCompetitionChallenge
         {
             Id = ids.CompetitionChallengeId,
             CompetitionId = ids.CompetitionId,
             ChallengeId = ids.ChallengeId,
             Order = 1,
             IsPublished = true,
-            RulesJson = "{}",
+            Rules = TestConfigurations.Rules(GameMode.Ctf),
             UpdatedAt = now
         });
-        db.ChallengeFlags.Add(new ChallengeFlag
+        db.ChallengeFlags.Add(new CompetitionChallengeFlag
         {
             Id = ids.ChallengeFlagId,
             CompetitionChallengeId = ids.CompetitionChallengeId,
@@ -424,11 +412,10 @@ public sealed class SynchronousArchivePersistenceTests
             MatchKind = ChallengeFlagMatchKind.Exact,
             CreatedAt = now
         });
-        db.CompetitionEvents.Add(new CompetitionEvent
+        db.CompetitionEvents.Add(new CompetitionCreatedEvent
         {
             Id = Guid.CreateVersion7(now.AddTicks(7)),
             CompetitionId = ids.CompetitionId,
-            Kind = CompetitionEventKind.CompetitionCreated,
             Level = CompetitionEventLevel.Information,
             Visibility = CompetitionEventVisibility.Staff,
             ActorUserId = ids.OwnerId,

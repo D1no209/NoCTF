@@ -97,7 +97,7 @@ public static class KubernetesComposeManifestPolicy
             ["noctf.io/managed"] = "true",
             ["noctf.io/runtime-instance-id"] = request.OperationId.ToString("D")
         };
-        var publicPorts = (request.UrlBindings ?? [])
+        var accessPorts = (request.UrlBindings ?? [])
             .GroupBy(binding => binding.ServiceName!, StringComparer.Ordinal)
             .ToDictionary(
                 group => group.Key,
@@ -107,6 +107,9 @@ public static class KubernetesComposeManifestPolicy
                     .Order()
                     .ToArray(),
                 StringComparer.Ordinal);
+        var publicPorts = request.AccessMode == NoCTF.Domain.Runtime.RuntimeAccessMode.WsrxOnly
+            ? new Dictionary<string, int[]>(StringComparer.Ordinal)
+            : accessPorts;
         var controlPorts = request.ControlCheckUrlBinding is { } control
             ? new Dictionary<string, int[]>(StringComparer.Ordinal)
             {
@@ -130,12 +133,14 @@ public static class KubernetesComposeManifestPolicy
             var limits = request.ServiceResources[serviceName];
             container.Name = serviceName;
             container.ImagePullPolicy = options.ImagePullPolicy;
-            container.Resources = ResourceRequirements(limits);
+            container.Resources = KubernetesWorkloadResources.Create(limits,
+                request.ServiceBudgets is null ? null : request.ServiceBudgets.TryGetValue(serviceName, out var budget)
+                    ? budget : throw new InvalidOperationException("Every Compose service requires its committed budget."));
             container.SecurityContext = new V1SecurityContext
             {
                 AllowPrivilegeEscalation = false,
                 Privileged = false,
-                Capabilities = new V1Capabilities { Drop = ["ALL"], Add = [] },
+                Capabilities = new V1Capabilities { Drop = [], Add = [] },
                 SeccompProfile = new V1SeccompProfile { Type = "RuntimeDefault" }
             };
             pod.AutomountServiceAccountToken = false;
@@ -262,6 +267,45 @@ public static class KubernetesComposeManifestPolicy
                     Port = port
                 }).ToList()
             });
+        }
+        if (request.AccessMode is NoCTF.Domain.Runtime.RuntimeAccessMode.DirectAndWsrx
+                or NoCTF.Domain.Runtime.RuntimeAccessMode.WsrxOnly)
+        {
+            var proxyPorts = accessPorts.Values.SelectMany(ports => ports)
+                .Distinct()
+                .Order()
+                .ToArray();
+            if (proxyPorts.Length > 0)
+            {
+                ingress.Add(new V1NetworkPolicyIngressRule
+                {
+                    FromProperty =
+                    [
+                        new V1NetworkPolicyPeer
+                        {
+                            NamespaceSelector = new V1LabelSelector
+                            {
+                                MatchLabels = new Dictionary<string, string>
+                                {
+                                    ["kubernetes.io/metadata.name"] = "noctf"
+                                }
+                            },
+                            PodSelector = new V1LabelSelector
+                            {
+                                MatchLabels = new Dictionary<string, string>
+                                {
+                                    ["noctf.io/runtime-proxy-gateway"] = "true"
+                                }
+                            }
+                        }
+                    ],
+                    Ports = proxyPorts.Select(port => new V1NetworkPolicyPort
+                    {
+                        Protocol = "TCP",
+                        Port = port
+                    }).ToList()
+                });
+            }
         }
         var networkPolicy = new V1NetworkPolicy
         {
@@ -404,22 +448,6 @@ public static class KubernetesComposeManifestPolicy
         {
             ["noctf.io/compose-project"] = request.ProjectName
         };
-
-    private static V1ResourceRequirements ResourceRequirements(
-        RuntimeResourceLimits limits)
-    {
-        var cpuMillis = checked((limits.NanoCpus + 999_999) / 1_000_000);
-        var resources = new Dictionary<string, ResourceQuantity>
-        {
-            ["memory"] = new(limits.MemoryBytes.ToString(CultureInfo.InvariantCulture)),
-            ["cpu"] = new($"{cpuMillis}m")
-        };
-        return new V1ResourceRequirements
-        {
-            Limits = resources,
-            Requests = new Dictionary<string, ResourceQuantity>(resources)
-        };
-    }
 
     private static string ResourceName(
         string runtimeName,

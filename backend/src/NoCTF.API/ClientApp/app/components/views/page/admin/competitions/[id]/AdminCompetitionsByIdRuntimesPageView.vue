@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdRuntimesPageViewState } from '~/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdRuntimesPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdRuntimesPageViewState }>()
-const { canWrite, isAdministrator, challengeOptions, teamOptions, runtimeTeamLabel, isPlayerManagedRuntime, challengeTitle, filterChallenge, filterTeam, filterState, filterKind, items, loading, listError, hasMore, initialized, loadMore, applyFilters, detail, detailOpen, detailLoading, openDetail, opMessage, isRuntimePending, isRuntimeOperationPending, runRuntimeOp, terminateDialog, terminatePending, canTerminate, submitTermination, forceTerminateDialog, forceTerminateReason, forceTerminateConfirmed, forceTerminatePending, openForceTermination, submitForceTermination, extendDialog, extendSeconds, extendPending, submitExtend, RuntimeAccessUrl, onClickFilterChallenge, onClickTerminateDialog, onClickExtendDialog, onUpdateOpenExtendDialog, onClickExtendDialog2, onUpdateOpenTerminateDialog, onUpdateOpenForceTerminateDialog } = toRefs(viewProps.state)
+const { canWrite, isAdministrator, challengeOptions, teamOptions, runtimeTeamLabel, isPlayerManagedRuntime, challengeTitle, filterChallenge, filterTeam, filterState, filterKind, items, loading, listError, initialized, page, pageCount, total, pageLimit, loadPage, setPageSize, applyFilters, detail, detailOpen, detailLoading, openDetail, opMessage, isRuntimePending, isRuntimeOperationPending, runRuntimeOp, terminateDialog, terminatePending, canTerminate, submitTermination, forceTerminateDialog, forceTerminateReason, forceTerminateConfirmed, forceTerminatePending, openForceTermination, submitForceTermination, extendDialog, extendSeconds, extendPending, submitExtend, RuntimeAccessUrl, onClickFilterChallenge, onClickTerminateDialog, onClickExtendDialog, onUpdateOpenExtendDialog, onClickExtendDialog2, onUpdateOpenTerminateDialog, onUpdateOpenForceTerminateDialog } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -137,11 +137,8 @@ const { canWrite, isAdministrator, challengeOptions, teamOptions, runtimeTeamLab
           </TableRow>
         </TableBody>
       </Table>
-      <div v-if="hasMore" class="flex justify-center">
-        <Button variant="outline" :disabled="loading" @click="loadMore">
-          <Spinner v-if="loading" data-icon="inline-start" /> {{ $t('ui.loadMore') }} </Button>
-      </div>
     </template>
+    <OffsetPagination v-if="initialized" :page="page" :page-count="pageCount" :total="total" :limit="pageLimit" :loading="loading" @update:page="loadPage" @update:limit="setPageSize" />
 
     <Sheet v-model:open="detailOpen">
       <SheetContent data-scroll-surface class="overflow-y-auto">
@@ -162,10 +159,10 @@ const { canWrite, isAdministrator, challengeOptions, teamOptions, runtimeTeamLab
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.runningTime') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.runningAt) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.expirationTime') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.expiresAt) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.stopTime') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.stoppedAt) }}</span></div>
-          <template v-if="detail.urls?.length">
+          <template v-if="detail.accesses?.length">
             <Separator />
             <p class="text-muted-foreground">{{ $t('ui.accessAddress') }}</p>
-            <component :is="RuntimeAccessUrl" v-for="url in detail.urls" :key="url" :url="url" />
+            <component :is="RuntimeAccessUrl" v-for="access in detail.accesses" :key="`${access.directAddress}:${access.webSocketAddress}`" :access="access" />
           </template>
           <template v-if="detail.publishedPorts?.length">
             <Separator />

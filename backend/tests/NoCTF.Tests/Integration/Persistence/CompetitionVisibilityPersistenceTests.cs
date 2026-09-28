@@ -1,19 +1,28 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Time.Testing;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.Competitions.Lifecycle;
 using NoCTF.Application.Competitions.Visibility;
 using NoCTF.Application.Messaging;
+using NoCTF.Application.Notifications;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Identity;
+using NoCTF.GameModes.Leaderboard;
+using NoCTF.GameModes.Registration;
+using NoCTF.Infrastructure.Caching;
 using NoCTF.Infrastructure.Competitions.Events;
 using NoCTF.Infrastructure.Competitions.Lifecycle;
 using NoCTF.Infrastructure.Competitions.Visibility;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Infrastructure.Scoring.Leaderboard;
+using NSubstitute;
 using Testcontainers.PostgreSql;
+using ZiggyCreatures.Caching.Fusion;
 
 namespace NoCTF.Tests.Integration.Persistence;
 
@@ -21,6 +30,43 @@ namespace NoCTF.Tests.Integration.Persistence;
 [Category("CompetitionVisibility")]
 public sealed class CompetitionVisibilityPersistenceTests
 {
+    [Test]
+    [Timeout(300_000)]
+    public async Task Past_freeze_configuration_captures_one_persistent_public_snapshot(
+        CancellationToken ct)
+    {
+        await RunAsync("noctf_visibility_frozen_capture", async fixture =>
+        {
+            await using var db = new NoCtfDbContext(fixture.Options);
+            using var cacheServices = new ServiceCollection()
+                .AddFusionCache(NoCtfCacheNames.Leaderboards).Services.BuildServiceProvider();
+            var cache = new FusionLeaderboardCache(
+                db,
+                new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()),
+                Substitute.For<ILeaderboardRefreshPublisher>(),
+                cacheServices.GetRequiredService<IFusionCacheProvider>(),
+                clock: new FakeTimeProvider(fixture.Now));
+            var outbox = new RecordingOutbox();
+            var store = new CompetitionVisibilityStore(
+                db, new CompetitionEventStore(db, outbox), leaderboard: cache);
+            var frozenAt = fixture.Now.AddMinutes(-1);
+
+            var result = await store.UpdateAsync(new(
+                fixture.CompetitionId, frozenAt, null,
+                fixture.HumanObserverId, "freeze now", fixture.Now), ct);
+
+            await Assert.That(result.State)
+                .IsEqualTo(CompetitionVisibilityMutationState.Updated);
+            await Assert.That(result.Configuration?.EffectiveVisibility)
+                .IsEqualTo(CompetitionLeaderboardVisibility.Frozen);
+            await Assert.That(await db.CompetitionWebhookFrozenProjections.AsNoTracking()
+                .CountAsync(item => item.CompetitionId == fixture.CompetitionId, ct))
+                .IsEqualTo(1);
+            await Assert.That(await cache.GetFrozenWebhookScoreboardAsync(
+                fixture.CompetitionId, frozenAt, ct)).IsNotNull();
+        });
+    }
+
     [Test]
     [Timeout(300_000)]
     public async Task Visibility_schedule_is_stored_as_two_timestamps_and_audited(
@@ -59,17 +105,14 @@ public sealed class CompetitionVisibilityPersistenceTests
             var audit = await verify.CompetitionEvents.AsNoTracking()
                 .SingleAsync(@event => @event.CompetitionId == fixture.CompetitionId
                     && @event.Kind == CompetitionEventKind.LeaderboardVisibilityChanged, ct);
-            using var payload = JsonDocument.Parse(audit.PayloadJson);
-            await Assert.That(payload.RootElement.GetProperty("frozenStartAt").GetDateTimeOffset())
-                .IsEqualTo(frozenAt);
-            await Assert.That(payload.RootElement.GetProperty("hiddenStartAt").GetDateTimeOffset())
-                .IsEqualTo(hiddenAt);
+            await Assert.That(audit.FrozenStartAt).IsEqualTo(frozenAt);
+            await Assert.That(audit.HiddenStartAt).IsEqualTo(hiddenAt);
         });
     }
 
     [Test]
     [Timeout(300_000)]
-    public async Task Blackout_hides_public_and_bot_data_but_trusted_humans_remain_live(
+    public async Task Blackout_hides_public_data_but_all_trusted_collaborators_remain_live(
         CancellationToken ct)
     {
         await RunAsync("noctf_visibility_access", async fixture =>
@@ -94,7 +137,7 @@ public sealed class CompetitionVisibilityPersistenceTests
                 ct);
 
             await Assert.That(participant?.DataScope).IsEqualTo(LeaderboardDataScope.Hidden);
-            await Assert.That(observerBot?.DataScope).IsEqualTo(LeaderboardDataScope.Hidden);
+            await Assert.That(observerBot?.DataScope).IsEqualTo(LeaderboardDataScope.Live);
             await Assert.That(humanObserver?.DataScope).IsEqualTo(LeaderboardDataScope.Live);
             await Assert.That(humanObserver?.Visibility)
                 .IsEqualTo(CompetitionLeaderboardVisibility.Blackout);
@@ -181,13 +224,12 @@ public sealed class CompetitionVisibilityPersistenceTests
             User(humanObserverId, "visibility-observer", UserKind.Human),
             User(observerBotId, "visibility-bot", UserKind.Bot),
             User(participantId, "visibility-participant", UserKind.Human));
-        db.Competitions.Add(new Competition
+        db.Competitions.Add(new CtfCompetition
         {
             Id = competitionId,
             Title = "Visibility",
             OwnerId = ownerId,
             ObserverIds = [humanObserverId, observerBotId],
-            Mode = GameMode.Ctf,
             Status = CompetitionStatus.Running,
             FrozenStartAt = visibility == CompetitionLeaderboardVisibility.Frozen
                 ? now.AddMinutes(-1)
@@ -195,7 +237,7 @@ public sealed class CompetitionVisibilityPersistenceTests
             HiddenStartAt = visibility == CompetitionLeaderboardVisibility.Blackout
                 ? now.AddMinutes(-1)
                 : null,
-            ConfigurationJson = "{}",
+            ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
             FlagDerivationSecret = new byte[32],
             StartAt = now.AddHours(-1),
             EndAt = now.AddHours(1),
@@ -232,7 +274,7 @@ public sealed class CompetitionVisibilityPersistenceTests
         Guid ObserverBotId,
         Guid ParticipantId);
 
-    private sealed class RecordingOutbox : ITransactionalMessageOutbox
+    private sealed class RecordingOutbox : IPostCommitMessagePublisher
     {
         public List<object> Published { get; } = [];
         public List<(object Message, DateTimeOffset At)> Scheduled { get; } = [];

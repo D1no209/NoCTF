@@ -49,9 +49,9 @@ internal static class ResourceManagerRoleGuard
                 continue;
             }
 
-            _ = await db.Users
-                .FromSqlInterpolated($"SELECT * FROM users WHERE id = {userId} FOR UPDATE")
-                .SingleOrDefaultAsync(cancellationToken);
+            _ = await db.Users.SingleOrDefaultAsync(
+                candidate => candidate.Id == userId,
+                cancellationToken);
         }
     }
 }

@@ -3,11 +3,23 @@ import { describe, expect, test } from 'bun:test'
 import {
   avatarDrawMetrics,
   clampAvatarCropState,
+  imageCropDrawMetrics,
   moveAvatarCrop,
   zoomAvatarCropAtPoint,
 } from "../app/features/account/avatar-crop"
 
 describe('avatar crop geometry', () => {
+  test('fills a four-to-one profile cover viewport without exposing empty pixels', () => {
+    expect(
+      imageCropDrawMetrics(800, 400, { width: 720, height: 180 }, {
+        zoom: 1,
+        offsetX: 0,
+        offsetY: 400,
+        rotation: 0,
+      }),
+    ).toEqual({ scale: 0.9, offsetX: 0, offsetY: 90, maximumX: 0, maximumY: 90 })
+  })
+
   test('uses rotated dimensions for a quarter turn', () => {
     expect(
       avatarDrawMetrics(720, 360, 360, {
@@ -63,5 +75,20 @@ describe('account avatar integration', () => {
     expect(accountPanel).toContain("<component :is=\"AvatarCropDialog\"")
     expect(accountPanel).toContain('@save="uploadAvatar"')
     expect(accountPanel).not.toContain('<Input ref="avatarInput"')
+  })
+
+  test('reuses the crop dialog for wide profile artwork', async () => {
+    const profile = await sourceFile(
+      new URL('../app/pages/users/[id].vue', import.meta.url),
+    ).text()
+    const cropDialog = await sourceFile(
+      new URL('../app/features/account/AvatarCropDialog.vue', import.meta.url),
+    ).text()
+
+    expect(cropDialog).toContain("variant?: 'avatar' | 'profile-cover'")
+    expect(cropDialog).toContain('PROFILE_COVER_CROP_WIDTH = 720')
+    expect(cropDialog).toContain('PROFILE_COVER_OUTPUT_WIDTH = 1600')
+    expect(profile).toContain('variant="profile-cover"')
+    expect(cropDialog).toContain('profile.coverCropDescription')
   })
 })

@@ -6,14 +6,6 @@
 
 ## Platform
 
-### 可选公网访问（仅平台管理员）
-
-```text
-GET /api/v1/admin/platform/public-gateway/status
-```
-
-配置只允许选择部署批准的连接器、HTTPS 入口、主机显示与端口配额，不返回配对密钥或允许任意网络探测。保存返回 202 和状态地址；状态读取使用有界缓存，不同步请求 Docker/FRP。Runtime 响应的 `access` 与 Runtime 自身状态独立，公网不可用时不回落为内网地址。默认未安装时仍使用原有直连行为。
-
 ### 私密账户资料（不属于公开用户协议）
 
 ```text
@@ -54,6 +46,16 @@ GET  /api/v1/auth/me/wallpaper
 PUT  /api/v1/auth/me/wallpaper
 PUT  /api/v1/auth/password
 POST /api/v1/auth/logout-all
+GET  /api/v1/auth/sso/providers
+POST /api/v1/auth/sso/login/flows
+GET  /api/v1/auth/sso/callback/oidc/{providerId}
+GET  /api/v1/auth/sso/callback/cas/{providerId}
+GET  /api/v1/auth/sso/flows/{flowId}
+POST /api/v1/auth/sso/flows/{flowId}/complete-login
+GET  /api/v1/auth/me/sso-binding
+POST /api/v1/auth/me/sso-binding/flows
+POST /api/v1/auth/me/sso-binding/flows/{flowId}/complete
+DELETE /api/v1/auth/me/sso-binding
 GET  /api/v1/users/{userId}
 GET  /api/v1/users/{userId}/avatar
 ```
@@ -61,6 +63,12 @@ GET  /api/v1/users/{userId}/avatar
 Login/Refresh 返回 AccessToken 与 ExpiresAt；Refresh Cookie 不出现在 body。
 公开用户资料默认隐藏邮箱；本人和 Administrator 始终可见，其他访问者仅在用户主动公开后可见。
 密码重置请求对所有合法邮箱格式统一返回 202；完成接口成功返回 204，无效、过期或已消费 Token 返回 typed 400 `InvalidOrExpired`。完成后不会签发新 Token，并清除当前 Refresh Cookie。
+
+`GET /auth/sso/flows/{flowId}` 的安全状态摘要包含 `providerId`，供完成页在消费前记住后续绑定引导；
+不返回 Subject、授权码、票据或外部令牌。`complete-login` 会先原子消费认证结果，未找到绑定时返回
+`IdentityNotLinked`，此后读取或重放同一 Flow 均失败。用户需注册或本地登录，再从账户安全输入密码并
+发起新的绑定 Flow。两个 `.../{flowId}/complete*` 接口均为无正文 POST，不要求 JSON
+`Content-Type`。
 
 ## Competition 与 Team
 
@@ -142,12 +150,20 @@ AWDP 队伍行额外返回完整已结算历史的 `attackScore`、`defenseScore
 
 ```text
 GET  /api/v1/competitions/{competitionId}/challenges
+GET  /api/v1/competitions/{competitionId}/progression
+GET  /api/v1/competitions/{competitionId}/badges/{badgeId}/image
 GET  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}
+POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/start
 GET  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/attachments
 GET  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/attachments/{attachmentId}
 GET  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/attachment
 POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/hints/{hintId}/unlock
 ```
+
+CTF 闯关图只传节点、边、条件与本队状态，不传画布坐标；布局由客户端生成。
+`start` 在读取题目详情前调用，可选提交地图修订 `expectedRevision`，成功为 `204`，
+图修订变化为带 `GraphChanged` 原因的 `409`。它只幂等记录本队首次打开已解锁节点，
+不改变解锁资格；题目详情 GET 始终只读，仍独立执行权限检查。
 
 `attachments` 列表与带 Id 下载只用于 `All`；`attachment` 单数路由只用于 `RandomOnePerTeam`，抽取发生在该 GET 内且请求没有 AttachmentId。策略不匹配返回 404。KoH 详情在 Running 时对本队返回 Control Flag 与 shared Hill 的公开 urls，不返回 ControlCheckUrl；CTF PerTeamRuntime Flag 不单独返回，注入 Runtime 环境。
 
@@ -166,6 +182,7 @@ GET  /api/v1/competitions/{competitionId}/questions/{threadRootId}
 POST /api/v1/competitions/{competitionId}/questions/{threadRootId}/messages
 PUT  /api/v1/competitions/{competitionId}/questions/{threadRootId}/status
 POST /api/v1/admin/competitions/{competitionId}/announcements
+GET  /api/v1/competitions/{competitionId}/announcements
 GET  /api/v1/notifications/{notificationId}/thread
 GET  /api/v1/competitions/{competitionId}/events
 ```
@@ -182,6 +199,16 @@ Question 根就是 `notifications.id`；回复和状态事件使用 `ThreadRootI
 删除 Question publication；面向全体参赛者的通用说明创建 CompetitionAnnouncement。管理员公告 Source 是发送者 UserId，
 Target 是 CompetitionId，默认 TargetType=CompetitionCollaborators；面向选手必须显式选择 CompetitionParticipants。所有写操作采用 last-write-wins，发起与回复共享每用户/IP
 每分钟 8 次的限流策略。
+
+公开公告列表使用 Bearer 认证与签名 keyset cursor，只返回 Public、非 Draft 比赛中
+`CompetitionParticipants` 且对应 `AnnouncementPublished` 事件为 Public 的公告 ID、标题、正文和
+发布时间。它是通用只读比赛契约，不区分 Human/Bot，不返回协作者公告，也不承担外部投递。
+
+已认证用户的 SignalR Hub `/hubs/v1/notifications` 在通知提交后向当前受众推送
+`notificationChanged`（无正文、用户标识或目标 ID）。跨 API 实例经 NATS 失效信号转发；
+顶栏与已打开的消息中心收到信号、连接重建或低频兜底触发后，仍通过受权限约束的
+`GET /api/v1/notifications` 与通知线程接口读取事实。比赛公告的
+`competitionEventChanged` 继续用于比赛内事件刷新，不替代个人通知读取。
 
 ## GameplayFact 动作
 
@@ -221,6 +248,7 @@ AWDP Break 首次正确后，普通 Flag 提交不再创建新 GameplayFact、�
 
 ```text
 GET  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes/current
+GET  /api/v1/competitions/{competitionId}/teams/me/runtimes
 POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes
 PATCH /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes/{runtimeInstanceId}
 DELETE /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes/{runtimeInstanceId}
@@ -228,7 +256,12 @@ GET  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/ta
 GET  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-state
 ```
 
-变更返回 202、RuntimeInstanceId 与 status URL。只有 Running 返回展开后的 `urls: string[]`。
+本队实例列表只向已审核、未封禁的当前队员返回活动槽位中的题目 Runtime，按
+`offset/limit/total` 分页。列表不返回其他队伍、历史已停机实例或一次性防御 Target；
+只有 Running 项包含可访问地址。列表中的重置、停止和续期仍调用对应题目 Runtime 命令，
+保留原有权限、人机验证和状态重验。
+
+变更返回 202、RuntimeInstanceId 与 status URL。只有 Running 返回展开后的 `accesses`。
 
 CTF 开放四个动作；AWD 玩家 GET/Reset，Start/Stop 由平台生命周期控制且 Extend 不支持；KoH 不开放普通玩家 Runtime 动作。AWDP schema v4 的玩家 `Player/AwdpAttack` Runtime 是长期攻击靶机，可通过统一 Runtime 路由启停、重置和续期；一次性 `AwdpTarget` 防御验证环境只通过申请与 Fix 上传路由管理，不通过普通玩家 Runtime 动作暴露。路由保留统一形状，但每个 Endpoint 的 Application policy 必须按 GameMode/RuntimePurpose 拒绝不支持动作。
 
@@ -269,6 +302,13 @@ PUT  /api/v1/admin/competitions/{competitionId}/cheat-incidents/{gameplayFactId}
 失败码与 `affectedTeamCount` 的强类型 409。Running/Paused 允许更新，Finished 返回
 `CompetitionFinished`。关闭赛道时服务端在同一事务将所有队伍归并到新配置的默认赛道。
 
+每条赛道的 `requiredSsoProviderId` 可为空，或引用一个已配置的 SSO Provider UUID。管理比赛响应的
+`ssoProviders` 只包含无密钥目录；公开赛道响应返回门禁 Provider 的 ID、名称、图标，以及当前查看者的
+`meetsSsoRequirement`，不返回任何 Subject。赛道开启时，建队校验创建者，邀请加入校验新成员，
+管理员改道校验队伍全体成员；邀请码与 SSO 门禁同时配置时必须同时满足。资格不足返回
+`TrackSsoIdentityRequired`，保存不存在的 Provider 返回 `SsoProviderNotFound`。已有队伍不因新增
+门禁或成员后续解绑被追溯处理；赛道关闭时忽略门禁。
+
 Lifecycle 状态资源复用同一 Application state machine，并通过强类型 `PUT .../status` 表达目标状态。
 
 普通删除是可恢复的软删除，恢复不会清理任何历史。物理删除是独立操作，不要求先软删除；调用方应先读取
@@ -282,7 +322,7 @@ CompetitionEvent；不在 Competition 保存 revision、scheduled next-run 或�
 
 比赛事件使用永久、不可变的单表事实流。活动比赛的公共参与者只能读取公开事件，已审批且
 未封禁队伍还能读取本队事件；其查询必须提供最长 31 天的时间窗。Administrator 与该比赛的
-Owner/Manager/Judge/Observer 可以省略时间窗，通过签名 keyset cursor 分页读取完整历史，比赛
+Owner/Manager/Judge/Observer 可以省略时间窗，通过 `offset/limit/total` 页码分页读取完整历史，比赛
 软删除归档后仍保留这一只读能力；参赛者不能借归档状态继续读取或扩大可见范围。JSONL 导出仍
 要求有界时间窗、最多 50,000 条，且仅 Administrator、Owner、Manager 可用。实时通知只携带事件
 Id、类型、级别与发生时间，客户端收到后通过本 GET 重新读取，不通过 SignalR 传输敏感正文。
@@ -368,7 +408,7 @@ POST /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallenge
 DELETE /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes/{runtimeInstanceId}
 ```
 
-列表按 CreatedAt desc/Id desc keyset，可筛选 CompetitionChallengeId、TeamId、RuntimeKind、Provider、RunnerId、State、ExpiresBefore。Manager 可执行常规动作；Judge/Observer 只读；ProviderReceipt/内部错误只在管理详情返回。精确终止仅使用 RuntimeInstanceId 定位实例，并通过持久化 `Stopping -> Stopped` Provider 清理状态机；同一终态操作依赖状态和幂等资源身份收敛。仅平台 Administrator 可对已停留至少五分钟的 `Provisioning`/`Stopping` 实例执行强制终结，必须提交原因；Runner 先按实例 UUID 标签清理并确认 Provider 资源已不存在，再释放容量、写回 `Stopped` 并派发等待实例，结果记录为工作人员可见的比赛事件。该流程幂等，禁止仅修改数据库状态。带 Team 的动作服务 CTF/AWD，复用玩家 Runtime 状态机，不提供绕过额度或状态的“强制成功”。不带 Team 的三个动作只服务 KoH shared Runtime，不伪造 TeamId；KoH 没有 Extend。
+列表使用 `offset/limit/total` 页码分页，可筛选 CompetitionChallengeId、TeamId、RuntimeKind、Provider、RunnerId、State、ExpiresBefore。Manager 可执行常规动作；Judge/Observer 只读；ProviderReceipt/内部错误只在管理详情返回。精确终止仅使用 RuntimeInstanceId 定位实例，并通过持久化 `Stopping -> Stopped` Provider 清理状态机；同一终态操作依赖状态和幂等资源身份收敛。仅平台 Administrator 可对已停留至少五分钟的 `Provisioning`/`Stopping` 实例执行强制终结，必须提交原因；Runner 先按实例 UUID 标签清理并确认 Provider 资源已不存在，再释放容量、写回 `Stopped` 并派发等待实例，结果记录为工作人员可见的比赛事件。该流程幂等，禁止仅修改数据库状态。带 Team 的动作服务 CTF/AWD，复用玩家 Runtime 状态机，不提供绕过额度或状态的“强制成功”。不带 Team 的三个动作只服务 KoH shared Runtime，不伪造 TeamId；KoH 没有 Extend。
 
 ## CompetitionChallenge Management
 
@@ -405,6 +445,7 @@ CompetitionChallenge 管理写共享 Competition transaction lock，并通过 Ou
 GET  /api/v1/admin/competitions/{competitionId}/gameplay-facts
 GET  /api/v1/admin/competitions/{competitionId}/gameplay-facts/adjudication-differences
 GET  /api/v1/admin/competitions/{competitionId}/gameplay-facts/{gameplayFactId}
+GET  /api/v1/admin/competitions/{competitionId}/gameplay-facts/{gameplayFactId}/adjudication-events
 GET  /api/v1/admin/competitions/{competitionId}/gameplay-facts/{gameplayFactId}/patch
 POST /api/v1/admin/competitions/{competitionId}/gameplay-facts/{gameplayFactId}/flag-access
 POST /api/v1/admin/competitions/{competitionId}/gameplay-facts/queue-evaluation
@@ -449,55 +490,93 @@ PATCH /api/v1/admin/platform/users/{userId}
 GET  /api/v1/admin/platform/users/{userId}/activity
 GET  /api/v1/admin/platform/users/{userId}/deletion-preview
 DELETE /api/v1/admin/platform/users/{userId}
+DELETE /api/v1/admin/platform/users/{userId}/sso-binding
 GET  /api/v1/admin/platform/configuration
 PATCH /api/v1/admin/platform/configuration
 PUT  /api/v1/admin/platform/configuration/logo
 GET  /api/v1/admin/platform/information
-GET  /api/v1/admin/platform/monitoring
 GET  /api/v1/admin/platform/runtimes
 GET  /api/v1/admin/platform/logs
 GET  /api/v1/admin/platform/logs/export
 GET  /api/v1/admin/platform/audit-logs
 POST /api/v1/admin/platform/audit-logs/data-export
 POST /api/v1/admin/platform/bots
-GET  /api/v1/admin/platform/users/{userId}/tokens
 POST /api/v1/admin/platform/users/{userId}/tokens
-DELETE /api/v1/admin/platform/users/{userId}/tokens/{jwtId}
 DELETE /api/v1/admin/platform/users/{userId}/tokens
 PUT  /api/v1/admin/platform/email-verification/password
 PUT  /api/v1/admin/platform/human-verification/secret
+GET  /api/v1/admin/platform/human-verification/cap-workload
+PUT  /api/v1/admin/platform/human-verification/cap-workload
 POST /api/v1/admin/platform/email-verification/test
+GET  /api/v1/admin/platform/sso
+PATCH /api/v1/admin/platform/sso
+POST /api/v1/admin/platform/sso/providers
+PUT  /api/v1/admin/platform/sso/providers/{providerId}
+PUT  /api/v1/admin/platform/sso/providers/{providerId}/secret
+POST /api/v1/admin/platform/sso/providers/{providerId}/connection-tests
+POST /api/v1/admin/platform/sso/providers/{providerId}/authentication-tests
 ```
 
+用户列表和详情的可空 `ssoBinding` 包含 Provider UUID/名称、协议、Subject 和绑定时间。列表的
+`search` 同时匹配用户名、邮箱和 SSO Subject，`ssoProviderId` 可按 Provider 筛选。管理员解除绑定
+支持正常、封禁和停用的人类账户，清空全部绑定字段并递增目标用户 `TokenVersion`；审计不记录
+Subject。管理员解除自己的绑定后，管理前端会清除当前会话并返回登录页。
+
 平台 Runtime 清单只投影当前处于 Queued、Provisioning、Running 或 Stopping 状态的 Container 与
-Compose 实例，包含比赛 Runtime 与题库模板测试 Runtime，并按 CreatedAt/Id 使用签名 keyset cursor
+Compose 实例，包含比赛 Runtime 与题库模板测试 Runtime，并使用 `offset/limit/total` 页码
 分页。响应带作用域、赛事或模板题目、来源队伍、Provider、Runner、端口及生命周期时间；平台级停止
 与强制终结按 RuntimeInstanceId 操作两种作用域，复用同一 durable cleanup 链路。比赛 Runtime 继续写入
 比赛审计事件，题库测试 Runtime 不伪造 CompetitionEvent。
 
-Bot 创建请求只包含 UserName 和 Role，仅允许 `UserRole.User` 或 `UserRole.Organizer`，不能创建
-Administrator Bot，也不接受 Email 或 Password。服务端生成不可用的非空 dummy Email 和 PasswordHash。
+Bot 创建请求只包含 UserName 和 Role，允许 User、Organizer 或 Administrator，也不接受 Email 或 Password。
+服务端生成不可用的非空 dummy Email 和 PasswordHash；业务权限与 Human 一样只由角色和资源关系决定。
 管理员可为任意 Active Human、Bot 或 Administrator 签发 60 秒至 1 年的普通 Access JWT，
-请求必须包含审计原因；响应只显示一次完整 Token，不签发 Refresh Token。签发事实登记在
-append-only notifications，JWT 额外携带 impersonation 与 impersonator_id；认证同时检查签发事实和
-单枚吊销事实。GET 只列出当前管理员本人签发、仍有效且未吊销的 JWT 元数据。DELETE 单枚只允许
-原签发管理员操作；DELETE collection 原子递增 User.TokenVersion，使目标账号全部 Access/Refresh JWT
-失效。模拟身份不得嵌套签发或撤销 Token。
+请求只包含有效期；响应只显示一次完整 Token，不签发 Refresh Token、不保存签发事实，JWT 也不携带
+impersonation 或签发者信息。平台不提供 JWT 列表和单枚吊销；DELETE collection 原子递增
+User.TokenVersion，使目标账号全部 Access/Refresh JWT 失效。Web 身份切换仅保存于当前 SPA 内存。
 NATS JetStream 的 consumer、重投与 dead-letter 运维由受控基础设施工具负责，不通过平台 HTTP API
 暴露消息正文、异常详情或任意重投能力。比赛管理者不能操作
 DLQ，只能从 Competition/GameplayFact/Runtime 领域 API 重新触发。
 
-平台运行日志使用每日 Redis Stream 分片聚合 API、Worker、Runner、Host 的结构化诊断日志，并通过
-管理员专用 SignalR Hub `/hubs/v1/admin/platform-logs` 实时推送。每个 UTC 日分片精确保留最多
-50,000 条，保留 14 天后由 Redis TTL 删除，不自动归档。历史查询默认从 Warning 开始，使用
+## Competition Webhooks
+
+```text
+GET    /api/v1/admin/competitions/{competitionId}/webhooks
+GET    /api/v1/admin/competitions/{competitionId}/webhook-deliveries
+GET    /api/v1/admin/competitions/{competitionId}/progression
+PUT    /api/v1/admin/competitions/{competitionId}/progression
+GET    /api/v1/admin/competitions/{competitionId}/badges
+POST   /api/v1/admin/competitions/{competitionId}/badges
+PUT    /api/v1/admin/competitions/{competitionId}/badges/{badgeId}
+DELETE /api/v1/admin/competitions/{competitionId}/badges/{badgeId}
+POST   /api/v1/admin/competitions/{competitionId}/webhooks
+PUT    /api/v1/admin/competitions/{competitionId}/webhooks/{targetId}
+DELETE /api/v1/admin/competitions/{competitionId}/webhooks/{targetId}
+POST   /api/v1/admin/competitions/{competitionId}/webhooks/{targetId}/rotate-secret
+POST   /api/v1/admin/competitions/{competitionId}/webhooks/{targetId}/test-deliveries
+GET    /api/v1/admin/competitions/{competitionId}/webhooks/{targetId}/test-deliveries/{deliveryId}
+```
+
+目标列表使用 `offset/limit/total` 页码分页，不设置产品数量上限。Administrator、Owner、Manager 可写；Judge 与
+Observer 只能读取名称、主机和状态；投递诊断不包含密钥或正文。创建及轮换只显示一次 HMAC 密钥。
+正式事件与 Webhook Outbox 同事务提交，Worker 扫描未投递记录并向独立 NATS 队列发送首轮尝试；
+目标重试与 DeadLetter 状态保存在 PostgreSQL。详细事件、签名、重试和网络限制见
+[赛事 Webhook](competition-webhooks.md)。
+
+平台运行日志经脱敏的 OpenTelemetry 批量写入私有 Loki，并通过 NATS Core 和管理员专用
+SignalR Hub `/hubs/v1/admin/platform-logs` 实时推送。Loki 保留 14 天，不自动归档；旧 Redis
+日志只在切换前导出为离线只读档案，不进入新查询。历史查询默认从 Warning 开始，使用
 与筛选条件绑定的签名游标，支持按服务、最低级别、UTC 时间、Category、Competition、
 RuntimeInstance、Team、User、CompetitionChallenge、GameplayFact 以及有界全文摘要筛选；全文
 搜索不区分大小写，覆盖 Category、Event、Message 和 Exception。JSONL 导出沿用相同筛选，
 范围最多 14 天且最多 50,000 条。
 
 日志入口与读取投影都会保留结构化作用域；密码、Token、Authorization/Cookie、SMTP 凭据和
-通用 Secret 必须在写入 Redis 前脱敏。无论调用者角色，Flag 原文都不得进入普通日志层，
-业务代码也不得为调试目的主动打印 Flag。管理审计使用签名 keyset 分页，从用户账号生命周期
+通用 Secret 与 Flag 属性必须在 OTLP 导出前脱敏。无论调用者角色，Flag 原文都不得进入普通日志层，
+业务代码也不得为调试目的主动打印 Flag。Loki 文档中的 UserId 使用由现有
+`RunnerScoring:SigningKey` 派生的独立用途密钥加密；管理员日志读取时解密，故 User 筛选及响应保持不变，
+Grafana 原始日志不含明文 UserId。数据库异常的原始文本与 SQL 命令不导出至 Loki。
+管理审计使用签名 keyset 分页，从用户账号生命周期
 审计和工作人员可见的 PostgreSQL `competition_events` 投影，不复制事实、不设置 TTL 或新增
 审计业务表。`competition_events` 默认永久、append-only，普通物理删除在存在历史事件时必须拒绝；
 比赛结束、队伍解散和用户匿名化注销不会清理事件关系。唯一显式例外是平台 Administrator 的强制
@@ -519,6 +598,10 @@ ID 与头像，不把 GitHub 可用性变成管理后台的运行时依赖。
 POST /api/internal/v1/awd/check-results
 POST /api/internal/v1/awdp/fix-results
 GET  /api/internal/v1/awdp/fix-archives/{gameplayFactId}
+POST /api/internal/v1/patch-verification/results
+GET  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/patch-verification
+POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/patch-verification-targets
+POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/patch-verification-targets/{runtimeInstanceId}/patch
 ```
 
 全部使用独立 JWT Scheme、精确 audience/permission 与资源 Claims。Request body 不能包含可覆盖 Claims 的 Competition/Team/GameplayFact Id。JWT 由调度该 durable Job 的可信进程签发，不提供公开“任意换 Token”接口。
@@ -539,3 +622,24 @@ Runner 自身通过 Wolverine 读写，不需要 HTTP callback Endpoint。
 - 所有写入必须在返回前完成接入事务与 Outbox commit；commit 失败不得返回资源 Id。
 - 可变资源写采用 last-write-wins；状态机动作在事务内校验当前状态，并用业务唯一键与 Inbox/Outbox 保证幂等。
 - 每个具体 Endpoint 的 `Results<T...>` 只能声明其真实分支；不能为了省事统一声明 200/400/401/403/404/409/500 全家桶。
+
+## Runtime WSRX 与流量捕获
+
+```text
+GET /api/v1/runtime-proxies/{runtimeInstanceId}/{bindingIndex}
+GET /api/v1/admin/competitions/{competitionId}/traffic-captures
+GET /api/v1/admin/competitions/{competitionId}/traffic-captures/{runtimeInstanceId}/file
+POST /api/v1/admin/competitions/{competitionId}/traffic-captures/export
+DELETE /api/v1/admin/competitions/{competitionId}/traffic-captures/{runtimeInstanceId}
+```
+
+探测路由返回 204/404；同一路由的 WebSocket Upgrade 由 TCP 代理中间件接管。抓包管理接口按 Runtime 聚合
+PCAPNG section，观察权限可查看和下载，管理权限可删除终态 Runtime 的抓包。
+
+## 其他扩展路由
+
+```text
+GET /api/v1/admin/competitions/{competitionId}/teams/{teamId}/invitation-token
+GET /api/v1/users/{userId}/profile-cover
+PUT /api/v1/auth/me/profile-cover
+```

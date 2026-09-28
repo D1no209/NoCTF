@@ -27,10 +27,7 @@ public static class ServiceRegistration
     {
         await using var scope = services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
-        if (db.Database.IsRelational())
-            await db.Database.MigrateAsync(cancellationToken);
-        else
-            await db.Database.EnsureCreatedAsync(cancellationToken);
+        await db.Database.MigrateAsync(cancellationToken);
         await scope.ServiceProvider.GetRequiredService<AdministratorBootstrapper>()
             .SeedAsync(cancellationToken);
     }
@@ -44,22 +41,18 @@ public static class ServiceRegistration
 
         services.AddNoCtfCaching(configuration, development);
         services.AddNoCtfPersistence(configuration, exporting, development);
-        services.AddNoCtfMessaging(exporting, development);
+        services.AddNoCtfMessaging(configuration, exporting, development);
         services.AddNoCtfRuntime(configuration, development);
-        NoCTF.Infrastructure.Runtime.PublicAccess.PublicGatewayInfrastructure.AddNoCtfPublicGateway(services, configuration);
         services.AddNoCtfSubmissions();
         services.AddNoCtfScoring(development);
         services.AddNoCtfNotifications(development);
         services.AddNoCtfTeams();
         services.AddNoCtfChallenges();
         services.AddNoCtfStorage(configuration);
-        services.AddNoCtfCompetitions(development);
+        services.AddNoCtfCompetitions(configuration, development || exporting);
         services.AddNoCtfAuthentication(configuration, development);
         services.AddNoCtfAdministration(configuration, exporting, development);
         services.AddNoCtfSynchronousArchives(configuration);
-        if (!exporting && configuration.GetValue("Observability:Enabled", true))
-            services.AddHostedService<OperationalMetricsCollector>();
-
         return services;
     }
 }

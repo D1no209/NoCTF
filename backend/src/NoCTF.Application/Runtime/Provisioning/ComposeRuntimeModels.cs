@@ -18,7 +18,9 @@ public sealed record ComposeRequest(
     RuntimeInternalEndpointBinding? AwdCheckerTargetBinding = null,
     IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>? ServiceEnvironment = null,
     RuntimeEgressPolicy EgressPolicy = RuntimeEgressPolicy.Isolated,
-    IReadOnlyList<RuntimePublishedPortMapping>? PublishedPorts = null);
+    IReadOnlyList<RuntimePublishedPortMapping>? PublishedPorts = null,
+    IReadOnlyDictionary<string, RuntimeResourceLimits>? ServiceBudgets = null,
+    RuntimeAccessMode AccessMode = RuntimeAccessMode.Direct);
 
 public sealed record ComposeServiceStatus(
     string Name,
@@ -40,6 +42,12 @@ public interface IComposeRuntime
 {
     Task<ComposeReceipt> UpAsync(ComposeRequest request, CancellationToken cancellationToken);
     Task DownAsync(ComposeReceipt receipt, CancellationToken cancellationToken);
+    Task DownAsync(
+        ComposeReceipt receipt,
+        RuntimeTerminationMode mode,
+        RuntimeTerminationPolicy policy,
+        CancellationToken cancellationToken) =>
+        DownAsync(receipt, cancellationToken);
     Task<ComposeStatus?> GetStatusAsync(ComposeReceipt receipt, CancellationToken cancellationToken);
     Task<ContainerExecResult> ExecAsync(
         ComposeReceipt receipt,

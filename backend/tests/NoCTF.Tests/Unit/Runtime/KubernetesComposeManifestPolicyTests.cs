@@ -188,7 +188,7 @@ public sealed class KubernetesComposeManifestPolicyTests
             .IsEqualTo("512");
         var container = deployment.Spec.Template.Spec.Containers.Single();
         await Assert.That(container.SecurityContext!.AllowPrivilegeEscalation).IsFalse();
-        await Assert.That(container.SecurityContext.Capabilities!.Drop).IsEquivalentTo(["ALL"]);
+        await Assert.That(container.SecurityContext.Capabilities!.Drop).IsEmpty();
         await Assert.That(container.Resources!.Limits!["cpu"].ToString()).IsEqualTo("500m");
         await Assert.That(container.Resources.Limits["memory"].ToString())
             .IsEqualTo("268435456");
@@ -208,6 +208,38 @@ public sealed class KubernetesComposeManifestPolicyTests
             rule.Ports?.Any(port => port.Port.Value == "53") == true);
         await Assert.That(dns.To.Single(peer => peer.IpBlock is not null).IpBlock!.Cidr)
             .IsEqualTo("10.96.0.10/32");
+    }
+
+    [Test]
+    public async Task Wsrx_only_policy_omits_node_ports_and_allows_only_the_proxy_gateway()
+    {
+        var manifests = KubernetesComposeManifestPolicy.ParseAndValidate(
+            SafeManifests,
+            new HashSet<string>(["web"], StringComparer.Ordinal));
+
+        var plan = KubernetesComposeManifestPolicy.ApplyPlatformPolicy(
+            manifests,
+            Request() with { AccessMode = RuntimeAccessMode.WsrxOnly },
+            new KubernetesRuntimeOptions(
+                Namespace: "runtime",
+                PodPidsLimit: 512,
+                ClusterDomain: "cluster.local",
+                ClusterDnsServiceAddress: "10.96.0.10",
+                NetworkPolicyRequired: true));
+
+        await Assert.That(plan.Services.Any(service => service.Spec.Type == "NodePort"))
+            .IsFalse();
+        var proxyIngress = plan.NetworkPolicy.Spec.Ingress.Single(rule =>
+            rule.FromProperty?.Any(peer =>
+                peer.PodSelector?.MatchLabels?.TryGetValue(
+                    "noctf.io/runtime-proxy-gateway",
+                    out var value) == true
+                && value == "true") == true);
+        await Assert.That(proxyIngress.Ports!.Single().Port.Value)
+            .IsEqualTo("8080");
+        await Assert.That(proxyIngress.FromProperty!.Single()
+                .NamespaceSelector!.MatchLabels["kubernetes.io/metadata.name"])
+            .IsEqualTo("noctf");
     }
 
     [Test]

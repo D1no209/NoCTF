@@ -35,6 +35,17 @@ public sealed class PlatformBotProtocolTests
     }
 
     [Test]
+    public async Task CreateBot_accepts_administrator_role()
+    {
+        var request = JsonSerializer.Deserialize<CreatePlatformBotRequest>(
+            """{"userName":"platform-bot","role":"Administrator"}""",
+            WebJson);
+
+        await Assert.That(request).IsNotNull();
+        await Assert.That(request!.Role).IsEqualTo(UserRoleProtocol.Administrator);
+    }
+
+    [Test]
     public async Task Platform_user_patch_serializes_bounded_fields_as_named_enums()
     {
         var json = JsonSerializer.Serialize(new PatchPlatformUserRequest

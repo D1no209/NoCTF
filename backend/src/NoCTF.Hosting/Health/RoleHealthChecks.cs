@@ -7,8 +7,10 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
-using Npgsql;
-using StackExchange.Redis;
+using Microsoft.EntityFrameworkCore;
+using NoCTF.Infrastructure.Persistence;
+using ZiggyCreatures.Caching.Fusion;
+using NoCTF.Infrastructure.Caching;
 using Wolverine.Configuration;
 using Wolverine.Runtime;
 using Wolverine.Transports;
@@ -162,19 +164,18 @@ public sealed partial class RoleReadinessHealthCheck(
         IReadOnlyDictionary<string, object> Data);
 }
 
-public sealed class PostgreSqlReadinessDependency(string connectionString)
+public sealed class DatabaseReadinessDependency(IServiceScopeFactory scopeFactory)
     : IReadinessDependency
 {
-    public string Name => "postgresql";
+    public string Name => "database";
     public bool FailureIsCritical => true;
 
     public async Task CheckAsync(CancellationToken cancellationToken)
     {
-        await using var connection = new NpgsqlConnection(connectionString);
-        await connection.OpenAsync(cancellationToken);
-        await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT 1";
-        _ = await command.ExecuteScalarAsync(cancellationToken);
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
+        if (!await db.Database.CanConnectAsync(cancellationToken))
+            throw new InvalidOperationException("The configured database is unavailable.");
     }
 }
 
@@ -206,18 +207,31 @@ public sealed class WolverineReadinessDependency(IWolverineRuntime runtime)
                 or ReceiveLoopStatus.Faulted);
 }
 
-public sealed class RedisReadinessDependency(
-    IConnectionMultiplexer redis,
+public sealed class DistributedCacheReadinessDependency(
+    IFusionCacheProvider caches,
     bool failureIsCritical) : IReadinessDependency
 {
+    private readonly IFusionCache cache = caches.GetCache(NoCtfCacheNames.ReadModels);
+    private static readonly FusionCacheEntryOptions Options = new()
+    {
+        Duration = TimeSpan.FromSeconds(5),
+        SkipMemoryCacheRead = true,
+        SkipMemoryCacheWrite = true,
+        IsFailSafeEnabled = false,
+        AllowBackgroundDistributedCacheOperations = false,
+        ReThrowDistributedCacheExceptions = true
+    };
     public string Name => "redis";
     public bool FailureIsCritical { get; } = failureIsCritical;
 
     public async Task CheckAsync(CancellationToken cancellationToken)
     {
-        if (!redis.IsConnected)
-            throw new InvalidOperationException("Redis is disconnected.");
-        _ = await redis.GetDatabase().PingAsync().WaitAsync(cancellationToken);
+        var key = "readiness:" + Guid.NewGuid().ToString("N");
+        await cache.SetAsync(key, "ready", Options, token: cancellationToken);
+        var value = await cache.GetOrDefaultAsync<string?>(
+            key, null, Options, token: cancellationToken);
+        if (value != "ready")
+            throw new InvalidOperationException("The distributed FusionCache backend is unavailable.");
     }
 }
 
@@ -237,21 +251,16 @@ public static class RoleHealthCheckRegistration
         services.AddSingleton<RoleReadinessLogState>();
         if (!development)
         {
-            var postgres = configuration.GetConnectionString("PostgreSql")
-                ?? throw new InvalidOperationException(
-                    "ConnectionStrings:PostgreSql is required for readiness checks.");
-            services.AddSingleton<IReadinessDependency>(
-                new PostgreSqlReadinessDependency(postgres));
+            services.AddSingleton<IReadinessDependency, DatabaseReadinessDependency>();
             services.AddSingleton<IReadinessDependency, WolverineReadinessDependency>();
             if (roles.Has(HostRole.Api)
                 || roles.Has(HostRole.Worker)
                 || roles.Has(HostRole.Runner))
             {
                 services.AddSingleton<IReadinessDependency>(provider =>
-                    new RedisReadinessDependency(
-                        provider.GetRequiredService<IConnectionMultiplexer>(),
-                        failureIsCritical: roles.Has(HostRole.Worker)
-                            || roles.Has(HostRole.Runner)));
+                    new DistributedCacheReadinessDependency(
+                        provider.GetRequiredService<IFusionCacheProvider>(),
+                        failureIsCritical: false));
             }
         }
 

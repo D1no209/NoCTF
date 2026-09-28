@@ -8,6 +8,7 @@ import View from '~/components/views/admin/DefinitionRuntimeView.vue'
 const props = withDefaults(defineProps<{
   runtime: RuntimeTemplateModel
   mode: GameModeValue
+  interactionKind: number
   disabled?: boolean
 }>(), {
   disabled: false,

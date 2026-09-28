@@ -42,7 +42,8 @@ public enum CompetitionEventKindProtocol
     TrackConfigurationUpdated, TeamTrackChanged, TrackRegistrationPolicyUpdated,
     AwdpBreakAttempted, AwdpFixAttempted,
     AwdpBreakResolved, AwdpFixResolved, GameplayFactPatchDownloaded,
-    CompetitionAudienceChanged, TeamWriteUpSubmitted
+    CompetitionAudienceChanged, TeamWriteUpSubmitted,
+    RuntimeTrafficCaptureStored, RuntimeTrafficCaptureDeleted
 }
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<CompetitionEventLevelProtocol>))]
@@ -85,7 +86,7 @@ internal static partial class CompetitionEventProtocolMapper
     [MapEnum(EnumMappingStrategy.ByName)] public static partial CompetitionEventLevel ToDomain(CompetitionEventLevelProtocol value);
 }
 
-public sealed class ListCompetitionEventsRequest
+public sealed class ListCompetitionEventsRequest : PaginationRequest
 {
     [QueryParam] public CompetitionEventKindProtocol? Kind { get; set; }
     [QueryParam] public CompetitionEventKindProtocol[]? Kinds { get; set; }
@@ -97,7 +98,6 @@ public sealed class ListCompetitionEventsRequest
     [QueryParam] public DateTimeOffset? From { get; set; }
     [QueryParam] public DateTimeOffset? To { get; set; }
     [QueryParam] public string? Cursor { get; set; }
-    [QueryParam] public int Limit { get; set; } = 50;
 }
 
 public sealed class ListCompetitionEventsValidator
@@ -105,7 +105,7 @@ public sealed class ListCompetitionEventsValidator
 {
     public ListCompetitionEventsValidator()
     {
-        RuleFor(request => request.Limit).InclusiveBetween(1, 200);
+        PaginationRules.Add(this);
         RuleFor(request => request).Must(request =>
                 request.From is null && request.To is null
                 || request.From is DateTimeOffset from
@@ -162,7 +162,8 @@ public sealed record CompetitionEventListResponse(
     bool CanExport,
     bool CanAccessGameplayFactValues,
     IReadOnlyList<CompetitionEventResponse> Items,
-    string? NextCursor);
+    string? NextCursor,
+    int Total = 0);
 
 public sealed class ListCompetitionEventsEndpoint(
     ListCompetitionEvents list,
@@ -205,6 +206,7 @@ public sealed class ListCompetitionEventsEndpoint(
                 title: "Invalid cursor.");
         }
 
+        var offsetMode = string.IsNullOrWhiteSpace(request.Cursor);
         var result = await list.ExecuteAsync(new CompetitionEventQuery(
             competitionId,
             user.UserId,
@@ -219,7 +221,10 @@ public sealed class ListCompetitionEventsEndpoint(
             position?.CreatedAt,
             position?.Id,
             request.Limit,
-            request.Kinds?.Select(CompetitionEventProtocolMapper.ToDomain).ToArray()), cancellationToken);
+            request.Kinds?.Select(CompetitionEventProtocolMapper.ToDomain).ToArray(),
+            request.Offset,
+            request.Desc,
+            offsetMode), cancellationToken);
         if (result.State == CompetitionEventReadState.Forbidden)
             return TypedResults.Forbid();
         if (result.State == CompetitionEventReadState.CompetitionNotFound)
@@ -247,7 +252,8 @@ public sealed class ListCompetitionEventsEndpoint(
             result.CanExport,
             result.CanAccessGameplayFactValues,
             result.Items.Select(Map).ToArray(),
-            nextCursor));
+            nextCursor,
+            result.Total));
     }
 
     internal static string FilterKey(

@@ -50,37 +50,43 @@ public sealed class AwdpFullBoundaryTests
             cancellationToken);
         var competitionId = competition.GetProperty("id").GetGuid();
 
-        var competitionConfigurationJson = JsonSerializer.Serialize(new
+        var competitionConfiguration = new
         {
-            schemaVersion = 4,
-            roundDurationSeconds = 30,
-            @break = new
+            mode = "Awdp",
+            flagTemplate = new { header = "flag", bodyTemplate = "[GUID]", leetLiteralText = false },
+            awdp = new
             {
-                initialPoints = 40,
-                minimumPoints = 20,
-                decayTeamCount = 10,
-                decayMode = 1
-            },
-            fix = new
-            {
-                initialPoints = 60,
-                minimumPoints = 30,
-                decayTeamCount = 10,
-                decayMode = 1
-            },
-            serviceAbnormalPenalty = 13,
-            requireBreakBeforeFix = false,
-            flagWrongPenalty = 7,
-            exploitSucceededPenalty = 11,
-            maxBreakSubmissions = 5,
-            maxFixSubmissions = 20,
-            evaluationDispatchMode = 0
-        }, JsonOptions);
+                roundDurationSeconds = 30,
+                breakScoreCurve = new
+                {
+                    initialPoints = 40L,
+                    minimumPoints = 20L,
+                    decayTeamCount = 10,
+                    decayMode = "Linear",
+                    customExpression = (string?)null
+                },
+                fixScoreCurve = new
+                {
+                    initialPoints = 60L,
+                    minimumPoints = 30L,
+                    decayTeamCount = 10,
+                    decayMode = "Linear",
+                    customExpression = (string?)null
+                },
+                serviceAbnormalPenalty = 13L,
+                requireBreakBeforeFix = false,
+                flagWrongPenalty = 7L,
+                exploitSucceededPenalty = 11L,
+                maxBreakSubmissions = 5,
+                maxFixSubmissions = 20,
+                evaluationDispatchMode = "Automatic"
+            }
+        };
         await SendJsonAsync(
             admin,
             HttpMethod.Patch,
             $"/api/v1/admin/competitions/{competitionId}",
-            new { modeConfiguration = new { json = competitionConfigurationJson } },
+            new { modeConfiguration = new { configuration = competitionConfiguration } },
             HttpStatusCode.OK,
             cancellationToken);
 
@@ -95,7 +101,7 @@ public sealed class AwdpFullBoundaryTests
                 description = "Exposes an injected generation Flag and validates isolated Fix archives.",
                 direction = "Pwn",
                 mode = "Awdp",
-                definitionJson = BuildDefinition(targetImage, checkerImage)
+                definition = BuildDefinition(targetImage, checkerImage)
             },
             HttpStatusCode.Created,
             cancellationToken);
@@ -109,20 +115,22 @@ public sealed class AwdpFullBoundaryTests
             cancellationToken);
         var competitionChallengeId = challenge.GetProperty("id").GetGuid();
 
-        var challengeConfigurationJson = JsonSerializer.Serialize(new
+        var challengeConfiguration = new
         {
-            schemaVersion = 4,
-            requireBreakBeforeFix = false,
-            maxBreakSubmissions = 5,
-            maxFixSubmissions = 20,
-            maximumPatchUploadBytes = 1_048_576,
-            flagTemplate = new
+            mode = "Awdp",
+            awdp = new
             {
-                header = "flag",
-                bodyTemplate = "[GUID]",
-                leetLiteralText = false
+                requireBreakBeforeFix = false,
+                maxBreakSubmissions = 5,
+                maxFixSubmissions = 20,
+                flagTemplate = new
+                {
+                    header = "flag",
+                    bodyTemplate = "[GUID]",
+                    leetLiteralText = false
+                }
             }
-        }, JsonOptions);
+        };
         await SendJsonAsync(
             admin,
             HttpMethod.Patch,
@@ -135,7 +143,7 @@ public sealed class AwdpFullBoundaryTests
                     order = 0,
                     isPublished = true
                 },
-                rules = new { json = challengeConfigurationJson }
+                rules = new { configuration = challengeConfiguration }
             },
             HttpStatusCode.OK,
             cancellationToken);
@@ -251,7 +259,7 @@ public sealed class AwdpFullBoundaryTests
             blueDefenseTargetId,
             CreateOversizedArchive(1_048_577),
             "oversized.tar.gz",
-            HttpStatusCode.UnprocessableEntity,
+            HttpStatusCode.RequestEntityTooLarge,
             cancellationToken);
 
         var redRuntime = await StartAndPollRuntimeAsync(
@@ -268,10 +276,8 @@ public sealed class AwdpFullBoundaryTests
             .IsNotEqualTo(blueRuntime.GetProperty("id").GetGuid());
         await Assert.That(blueRuntime.GetProperty("id").GetGuid())
             .IsNotEqualTo(blueDefenseTargetId);
-        var redUrl = redRuntime.GetProperty("urls")[0].GetString()
-            ?? throw new InvalidOperationException("Red attack Runtime did not expose a URL.");
-        var blueUrl = blueRuntime.GetProperty("urls")[0].GetString()
-            ?? throw new InvalidOperationException("Blue attack Runtime did not expose a URL.");
+        var redUrl = E2ELifecycle.FirstDirectAddress(redRuntime);
+        var blueUrl = E2ELifecycle.FirstDirectAddress(blueRuntime);
         var redFlag = await PollTextAsync(new Uri(new Uri(redUrl), "flag").ToString(),
             TimeSpan.FromSeconds(30), cancellationToken);
         var blueFlag = await PollTextAsync(new Uri(new Uri(blueUrl), "flag").ToString(),
@@ -323,8 +329,7 @@ public sealed class AwdpFullBoundaryTests
             cancellationToken);
         await Assert.That(redGenerationTwo.GetProperty("id").GetGuid())
             .IsNotEqualTo(redRuntime.GetProperty("id").GetGuid());
-        var redGenerationTwoUrl = redGenerationTwo.GetProperty("urls")[0].GetString()
-            ?? throw new InvalidOperationException("Reset attack Runtime did not expose a URL.");
+        var redGenerationTwoUrl = E2ELifecycle.FirstDirectAddress(redGenerationTwo);
         var redGenerationTwoFlag = await PollTextAsync(
             new Uri(new Uri(redGenerationTwoUrl), "flag").ToString(),
             TimeSpan.FromSeconds(30),
@@ -689,37 +694,39 @@ public sealed class AwdpFullBoundaryTests
             cancellationToken);
     }
 
-    private static string BuildDefinition(string targetImage, string checkerImage) =>
-        JsonSerializer.Serialize(new
+    private static object BuildDefinition(string targetImage, string checkerImage) =>
+        new
         {
-            schemaVersion = 4,
+            mode = "Awdp",
+            awdp = new { },
             runtime = new
             {
-                allocation = 1,
-                definition = new
+                kind = "Container",
+                allocation = "PerTeam",
+                container = new
                 {
-                    kind = "container",
                     image = targetImage,
+                    command = Array.Empty<string>(),
                     environment = new Dictionary<string, string>(),
                     labels = new Dictionary<string, string>(),
-                    portMappings = new Dictionary<string, int> { ["8080"] = 0 },
+                    portMappings = new[] { new { containerPort = 8080, hostPort = 0 } },
                     flagEnvironmentVariableName = "FLAG",
                     security = new
                     {
                         noNewPrivileges = true,
                         readonlyRootfs = false,
                         runAsNonRoot = true,
-                        capDrop = new[] { "ALL" },
+                        capDrop = Array.Empty<string>(),
                         capAdd = Array.Empty<string>()
                     },
-                    egressPolicy = 0,
                     internalPorts = new[] { 8080 }
                 },
+                egressPolicy = "Isolated",
                 limits = new
                 {
-                    memoryBytes = 67_108_864,
-                    nanoCpus = 100_000_000,
-                    pidsLimit = 64
+                    memoryBytes = 67_108_864L,
+                    nanoCpus = 100_000_000L,
+                    pidsLimit = 64L
                 },
                 ttlSeconds = 600,
                 operationTimeoutSeconds = 60,
@@ -728,11 +735,15 @@ public sealed class AwdpFullBoundaryTests
                     new
                     {
                         urlTemplate = "http://{HOST}:{PORT}/",
-                        exposure = 0,
-                        containerPort = 8080
+                        exposure = "OwnerOnly",
+                        containerPort = 8080,
+                        serviceName = (string?)null,
+                        vmId = (string?)null,
+                        guestPort = (int?)null,
+                        isControlCheck = false
                     }
                 },
-                flagSource = 1
+                flagSource = "PerTeam"
             },
             patchEntrypoint = "fix.sh",
             patchCommand = new[] { "/bin/sh", "{entrypoint}" },
@@ -742,10 +753,12 @@ public sealed class AwdpFullBoundaryTests
                 image = checkerImage,
                 command = Array.Empty<string>(),
                 environment = new Dictionary<string, string>(),
-                timeoutSeconds = 20
+                timeoutSeconds = 20,
+                targetServiceName = (string?)null
             },
-            readyTimeoutSeconds = 10
-        }, JsonOptions);
+            readyTimeoutSeconds = 10,
+            maximumPatchUploadBytes = 1_048_576L
+        };
 
     private static async Task<TeamSession> RegisterTeamAsync(
         HttpClient anonymous,
@@ -778,7 +791,10 @@ public sealed class AwdpFullBoundaryTests
             new { name = $"{suffix} Team", trackKey = "default" },
             HttpStatusCode.Created,
             cancellationToken);
-        return new(client, team.GetProperty("id").GetGuid());
+        var teamId = team.GetProperty("id").GetGuid();
+        await E2ELifecycle.SubmitTeamRegistrationAsync(
+            client, competitionId, teamId, cancellationToken);
+        return new(client, teamId);
     }
 
     private static async Task<Guid> SubmitBreakAsync(
@@ -901,10 +917,14 @@ public sealed class AwdpFullBoundaryTests
         using var content = new ByteArrayContent(archive);
         content.Headers.ContentType = new MediaTypeHeaderValue("application/gzip");
         form.Add(content, "File", fileName);
-        using var response = await client.PostAsync(
-            $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets/{runtimeInstanceId}/fix",
-            form,
-            cancellationToken);
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets/{runtimeInstanceId}/fix")
+        {
+            Content = form
+        };
+        E2ELifecycle.AddIdempotencyKey(request);
+        using var response = await client.SendAsync(request, cancellationToken);
         var body = await ReadExpectedJsonAsync(response, HttpStatusCode.Accepted, cancellationToken);
         return body.GetProperty("gameplayFactId").GetGuid();
     }
@@ -923,11 +943,18 @@ public sealed class AwdpFullBoundaryTests
         using var content = new ByteArrayContent(archive);
         content.Headers.ContentType = new MediaTypeHeaderValue("application/gzip");
         form.Add(content, "File", fileName);
-        using var response = await client.PostAsync(
-            $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets/{runtimeInstanceId}/fix",
-            form,
-            cancellationToken);
-        await Assert.That(response.StatusCode).IsEqualTo(expected);
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets/{runtimeInstanceId}/fix")
+        {
+            Content = form
+        };
+        E2ELifecycle.AddIdempotencyKey(request);
+        using var response = await client.SendAsync(request, cancellationToken);
+        if (response.StatusCode != expected)
+            throw new InvalidOperationException(
+                $"Expected {(int)expected} for Patch upload, received {(int)response.StatusCode}: "
+                + await response.Content.ReadAsStringAsync(cancellationToken));
     }
 
     private static async Task<JsonElement> StartAndPollRuntimeAsync(
@@ -1004,11 +1031,18 @@ public sealed class AwdpFullBoundaryTests
         HttpStatusCode expected,
         CancellationToken cancellationToken)
     {
-        using var response = await client.PostAsJsonAsync(
-            $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes",
-            new { replacesRuntimeId = (Guid?)null },
-            cancellationToken);
-        await Assert.That(response.StatusCode).IsEqualTo(expected);
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes")
+        {
+            Content = JsonContent.Create(new { replacesRuntimeId = (Guid?)null })
+        };
+        E2ELifecycle.AddIdempotencyKey(request);
+        using var response = await client.SendAsync(request, cancellationToken);
+        if (response.StatusCode != expected)
+            throw new InvalidOperationException(
+                $"Expected {(int)expected} for Runtime start, received {(int)response.StatusCode}: "
+                + await response.Content.ReadAsStringAsync(cancellationToken));
     }
 
     private static byte[] CreatePatchArchive(string script)
@@ -1547,6 +1581,7 @@ public sealed class AwdpFullBoundaryTests
         {
             Content = JsonContent.Create(body, options: JsonOptions)
         };
+        E2ELifecycle.AddIdempotencyKey(request);
         using var response = await client.SendAsync(request, cancellationToken);
         return await ReadExpectedJsonAsync(response, expected, cancellationToken);
     }
@@ -1559,6 +1594,7 @@ public sealed class AwdpFullBoundaryTests
         CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(method, path);
+        E2ELifecycle.AddIdempotencyKey(request);
         using var response = await client.SendAsync(request, cancellationToken);
         if (response.StatusCode != expected)
             throw await UnexpectedResponseAsync(response, expected, cancellationToken);
@@ -1576,6 +1612,7 @@ public sealed class AwdpFullBoundaryTests
         {
             Content = JsonContent.Create(body, options: JsonOptions)
         };
+        E2ELifecycle.AddIdempotencyKey(request);
         using var response = await client.SendAsync(request, cancellationToken);
         if (response.StatusCode != expected)
             throw await UnexpectedResponseAsync(response, expected, cancellationToken);
@@ -1589,6 +1626,7 @@ public sealed class AwdpFullBoundaryTests
         CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(method, path);
+        E2ELifecycle.AddIdempotencyKey(request);
         using var response = await client.SendAsync(request, cancellationToken);
         return await ReadExpectedJsonAsync(response, expected, cancellationToken);
     }

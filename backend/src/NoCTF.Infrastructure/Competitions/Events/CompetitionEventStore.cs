@@ -11,6 +11,7 @@ using NoCTF.Domain.Identity;
 using NoCTF.Domain.Teams;
 using NoCTF.Domain.Shared;
 using NoCTF.Infrastructure.Observability;
+using NoCTF.Infrastructure.Competitions.Webhooks;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.GameModes.Awdp.Scoring;
 
@@ -18,7 +19,8 @@ namespace NoCTF.Infrastructure.Competitions.Events;
 
 public sealed class CompetitionEventStore(
     NoCtfDbContext db,
-    ITransactionalMessageOutbox outbox)
+    IPostCommitMessagePublisher outbox,
+    TimeProvider? clock = null)
     : ICompetitionEventStore, ICompetitionEventRecorder
 {
     private static readonly JsonSerializerOptions ExportJsonOptions = new(JsonSerializerDefaults.Web)
@@ -34,22 +36,98 @@ public sealed class CompetitionEventStore(
         var id = Guid.CreateVersion7(draft.OccurredAt);
         var subject = ResolveSubject(draft, id);
         var related = ResolveRelated(draft, subject);
-        db.CompetitionEvents.Add(new CompetitionEvent
+        var entity = CompetitionEventGeneratedCatalog.Create(draft.Kind);
+        entity.Id = id;
+        entity.CompetitionId = draft.CompetitionId;
+        entity.Level = draft.Level;
+        entity.Visibility = draft.Visibility;
+        entity.ActorUserId = draft.ActorUserId;
+        entity.SubjectType = subject.Type;
+        entity.SubjectId = subject.Id;
+        entity.RelatedType = related?.Type;
+        entity.RelatedId = related?.Id;
+        entity.ParentEventId = draft.ParentEventId;
+        entity.OccurredAt = draft.OccurredAt;
+        entity.RelatedUserId = draft.RelatedUserId;
+        entity.TeamId = draft.TeamId;
+        entity.CompetitionChallengeId = draft.CompetitionChallengeId;
+        entity.HintId = draft.HintId;
+        entity.RuntimeInstanceId = draft.RuntimeInstanceId;
+        entity.GameplayFactId = draft.GameplayFactId;
+        entity.QuestionId = draft.QuestionId;
+        entity.CompetitionStatus = draft.CompetitionStatus;
+        entity.PreviousCompetitionStatus = draft.PreviousCompetitionStatus;
+        entity.LeaderboardVisibility = draft.LeaderboardVisibility;
+        entity.PreviousLeaderboardVisibility = draft.PreviousLeaderboardVisibility;
+        entity.CompetitionAccessMode = draft.CompetitionAccessMode;
+        entity.PreviousCompetitionAccessMode = draft.PreviousCompetitionAccessMode;
+        entity.CompetitionAudienceChangeKind = draft.CompetitionAudienceChangeKind;
+        entity.TeamRegistrationStatus = draft.TeamRegistrationStatus;
+        entity.GameplayFactKind = draft.GameplayFactKind;
+        entity.GameplayFactState = draft.GameplayFactState;
+        entity.GameplayFactResult = draft.GameplayFactResult;
+        entity.RuntimeState = draft.RuntimeState;
+        entity.RuntimeCleanupResult = draft.RuntimeCleanupResult;
+        entity.QuestionStatus = draft.QuestionStatus;
+        entity.HostPort = draft.HostPort;
+        entity.Reason = SanitizeReason(draft.Reason);
+        entity.TrackKey = draft.TrackKey;
+        entity.PreviousTrackKey = draft.PreviousTrackKey;
+        entity.Automatic = draft.Automatic;
+        entity.PatchUploadId = draft.PatchUploadId;
+        entity.AwdpFixOutcome = draft.AwdpFixOutcome;
+        entity.GameplayFactFailureCode = draft.GameplayFactFailureCode;
+        entity.ResolvedAt = draft.ResolvedAt;
+        entity.TrackConfigurationEnabled = draft.TrackConfigurationEnabled;
+        entity.DefaultTrackKey = draft.DefaultTrackKey;
+        entity.ReassignedTeamCount = draft.ReassignedTeamCount;
+        entity.TrackKeys = (draft.TrackKeys ?? []).Select((value, position) =>
+            new CompetitionEventTrackKey
+            {
+                Id = Guid.CreateVersion7(),
+                Position = position,
+                Value = value
+            }).ToList();
+        entity.IncludesProtectedFlags = draft.IncludesProtectedFlags;
+        entity.FrozenStartAt = draft.FrozenStartAt;
+        entity.HiddenStartAt = draft.HiddenStartAt;
+        if (draft.TrafficCapture is { } traffic)
         {
-            Id = id,
-            CompetitionId = draft.CompetitionId,
-            Kind = draft.Kind,
-            Level = draft.Level,
-            Visibility = draft.Visibility,
-            ActorUserId = draft.ActorUserId,
-            SubjectType = subject.Type,
-            SubjectId = subject.Id,
-            RelatedType = related?.Type,
-            RelatedId = related?.Id,
-            ParentEventId = draft.ParentEventId,
-            PayloadJson = SerializePayload(draft),
-            OccurredAt = draft.OccurredAt
-        });
+            entity.TrafficSegmentId = traffic.SegmentId;
+            entity.TrafficBindingIndex = traffic.BindingIndex;
+            entity.TrafficConnectionId = traffic.ConnectionId;
+            entity.TrafficStartedAt = traffic.StartedAt;
+            entity.TrafficEndedAt = traffic.EndedAt;
+            entity.TrafficClientAddress = traffic.ClientAddress;
+            entity.TrafficClientPort = traffic.ClientPort;
+            entity.TrafficDestinationAddress = traffic.DestinationAddress;
+            entity.TrafficDestinationPort = traffic.DestinationPort;
+            entity.TrafficClientToRuntimeBytes = traffic.ClientToRuntimeBytes;
+            entity.TrafficRuntimeToClientBytes = traffic.RuntimeToClientBytes;
+            entity.TrafficCapturedBytes = traffic.CapturedBytes;
+            entity.TrafficTruncated = traffic.Truncated;
+        }
+        db.CompetitionEvents.Add(entity);
+        if (draft.Visibility == CompetitionEventVisibility.Public
+            && CompetitionWebhookEventTypes.From(draft.Kind) is not null)
+        {
+            var revision = db.Competitions.Local
+                .FirstOrDefault(item => item.Id == draft.CompetitionId)?.ConcurrencyStamp
+                ?? await db.Competitions.AsNoTracking()
+                    .Where(item => item.Id == draft.CompetitionId)
+                    .Select(item => item.ConcurrencyStamp)
+                    .SingleOrDefaultAsync(cancellationToken);
+            var persistedAt = (clock ?? TimeProvider.System).GetUtcNow();
+            db.CompetitionWebhookOutboxEvents.Add(new CompetitionWebhookOutboxEvent
+            {
+                EventId = id,
+                CompetitionId = draft.CompetitionId,
+                CompetitionRevision = revision,
+                DomainEventCreatedAt = draft.OccurredAt,
+                OutboxPersistedAt = persistedAt,
+                NextDispatchAt = persistedAt
+            });
+        }
         await outbox.PublishAsync(new CompetitionEventCommitted(
             draft.CompetitionId,
             id,
@@ -76,14 +154,15 @@ public sealed class CompetitionEventStore(
             && access.AccessLevel != CompetitionEventAccessLevel.Staff)
             return new(CompetitionEventReadState.Forbidden);
 
-        var items = await LoadAsync(query, access, cancellationToken);
+        var (items, total) = await LoadAsync(query, access, cancellationToken);
         return new(
             CompetitionEventReadState.Available,
             access.AccessLevel,
             access.TeamId,
             access.CanExport,
             access.CanAccessGameplayFactValues,
-            await EnrichAsync(items, cancellationToken));
+            await EnrichAsync(items, cancellationToken),
+            total);
     }
 
     public async Task<CompetitionEventExportResult> ExportAsync(
@@ -103,7 +182,7 @@ public sealed class CompetitionEventStore(
             return new(CompetitionEventReadState.InvalidQuery);
 
         var items = await EnrichAsync(
-            await LoadAsync(query, access, cancellationToken),
+            (await LoadAsync(query, access, cancellationToken)).Items,
             cancellationToken);
         var stream = new MemoryStream();
         foreach (var item in items)
@@ -172,7 +251,7 @@ public sealed class CompetitionEventStore(
         }
         await transaction.CommitAsync(cancellationToken);
         if (access.ShouldAuditGameplayFactValueAccess)
-            await outbox.FlushOutgoingMessagesAsync();
+            await outbox.FlushCommittedMessagesAsync();
         return new(
             CompetitionEventReadState.Available,
             new GameplayFactValueAccessView(
@@ -191,7 +270,6 @@ public sealed class CompetitionEventStore(
         var user = await db.Users.AsNoTracking()
             .Where(item =>
                 item.Id == userId
-                && item.Kind == UserKind.Human
                 && item.AccountStatus == UserAccountStatus.Active)
             .Select(item => new { item.Role })
             .SingleOrDefaultAsync(cancellationToken);
@@ -205,9 +283,15 @@ public sealed class CompetitionEventStore(
                 item.Status,
                 item.DeletedAt,
                 item.OwnerId,
-                item.ManagerIds,
-                item.JudgeIds,
-                item.ObserverIds
+                IsManager = item.Collaborators.Any(collaborator =>
+                    collaborator.Role == CompetitionCollaboratorRole.Manager
+                    && collaborator.UserId == userId),
+                IsJudge = item.Collaborators.Any(collaborator =>
+                    collaborator.Role == CompetitionCollaboratorRole.Judge
+                    && collaborator.UserId == userId),
+                IsObserver = item.Collaborators.Any(collaborator =>
+                    collaborator.Role == CompetitionCollaboratorRole.Observer
+                    && collaborator.UserId == userId)
             })
             .SingleOrDefaultAsync(cancellationToken);
         if (competition is null)
@@ -215,9 +299,9 @@ public sealed class CompetitionEventStore(
 
         var administrator = user.Role == UserRole.Administrator;
         var owner = competition.OwnerId == userId;
-        var manager = competition.ManagerIds.Contains(userId);
-        var judge = competition.JudgeIds.Contains(userId);
-        var observer = competition.ObserverIds.Contains(userId);
+        var manager = competition.IsManager;
+        var judge = competition.IsJudge;
+        var observer = competition.IsObserver;
         var staff = administrator || owner || manager || judge || observer;
         if (competition.DeletedAt is not null && (!allowArchivedStaff || !staff))
             return new(CompetitionEventReadState.CompetitionNotFound);
@@ -240,7 +324,7 @@ public sealed class CompetitionEventStore(
                 && team.DeletedAt == null
                 && !team.IsBanned
                 && team.RegistrationStatus == TeamRegistrationStatus.Approved
-                && team.MemberIds.Contains(userId))
+                && team.Members.Any(member => member.UserId == userId))
             .Select(team => (Guid?)team.Id)
             .SingleOrDefaultAsync(cancellationToken);
         return teamId is Guid approvedTeamId
@@ -258,7 +342,7 @@ public sealed class CompetitionEventStore(
                 false);
     }
 
-    private async Task<IReadOnlyList<CompetitionEvent>> LoadAsync(
+    private async Task<(IReadOnlyList<CompetitionEvent> Items, int Total)> LoadAsync(
         CompetitionEventQuery filter,
         AccessResolution access,
         CancellationToken cancellationToken)
@@ -275,11 +359,12 @@ public sealed class CompetitionEventStore(
         {
             var competition = await db.Competitions.AsNoTracking()
                 .Where(item => item.Id == filter.CompetitionId)
-                .Select(item => new { item.Mode, item.TrackConfigurationJson })
+                .Select(item => new { item.Mode, item.TracksEnabled, item.Tracks })
                 .SingleAsync(cancellationToken);
-            var internalTrackKeys = CompetitionTrackConfiguration.ParseOrDefault(
+            var internalTrackKeys = CompetitionTrackConfiguration.EffectiveFor(
                     competition.Mode,
-                    competition.TrackConfigurationJson)
+                    competition.TracksEnabled,
+                    competition.Tracks)
                 .Tracks.Where(track => track.IsInternal)
                 .Select(track => track.Key)
                 .ToArray();
@@ -325,6 +410,14 @@ public sealed class CompetitionEventStore(
                     && item.SubjectId == runtimeInstanceId
                 || item.RelatedType == EntityReferenceKind.RuntimeInstance
                     && item.RelatedId == runtimeInstanceId);
+        if (filter.OffsetMode)
+        {
+            var total = await query.CountAsync(cancellationToken);
+            var ordered = filter.Desc
+                ? query.OrderByDescending(item => item.OccurredAt).ThenByDescending(item => item.Id)
+                : query.OrderBy(item => item.OccurredAt).ThenBy(item => item.Id);
+            return (await ordered.Skip(filter.Offset).Take(filter.Limit).ToListAsync(cancellationToken), total);
+        }
         if (filter.BeforeOccurredAt is DateTimeOffset beforeOccurredAt
             && filter.BeforeId is Guid beforeId)
         {
@@ -333,11 +426,11 @@ public sealed class CompetitionEventStore(
                 || item.OccurredAt == beforeOccurredAt
                 && item.Id.CompareTo(beforeId) < 0);
         }
-        return await query
+        return (await query
             .OrderByDescending(item => item.OccurredAt)
             .ThenByDescending(item => item.Id)
             .Take(filter.Limit)
-            .ToListAsync(cancellationToken);
+            .ToListAsync(cancellationToken), 0);
     }
 
     private async Task<IReadOnlyList<CompetitionEventView>> EnrichAsync(
@@ -350,43 +443,48 @@ public sealed class CompetitionEventStore(
             .Select(item => item!.Value)
             .Distinct()
             .ToArray();
-        var users = await db.Users.AsNoTracking()
-            .Where(user => userIds.Contains(user.Id))
-            .ToDictionaryAsync(user => user.Id, user => user.UserName, cancellationToken);
+        var users = userIds.Length == 0
+            ? new Dictionary<Guid, string>()
+            : await db.Users.AsNoTracking()
+                .Where(user => userIds.Contains(user.Id))
+                .ToDictionaryAsync(user => user.Id, user => user.UserName, cancellationToken);
         var teamIds = events
             .Select(item => item.TeamId)
             .Where(item => item is not null)
             .Select(item => item!.Value)
             .Distinct()
             .ToArray();
-        var teams = await db.Teams.AsNoTracking()
-            .Where(team => teamIds.Contains(team.Id))
-            .ToDictionaryAsync(team => team.Id, team => team.Name, cancellationToken);
+        var teams = teamIds.Length == 0
+            ? new Dictionary<Guid, string>()
+            : await db.Teams.AsNoTracking()
+                .Where(team => teamIds.Contains(team.Id))
+                .ToDictionaryAsync(team => team.Id, team => team.Name, cancellationToken);
         var challengeIds = events
             .Select(item => item.CompetitionChallengeId)
             .Where(item => item is not null)
             .Select(item => item!.Value)
             .Distinct()
             .ToArray();
-        var challenges = await db.CompetitionChallenges.AsNoTracking()
-            .Where(challenge => challengeIds.Contains(challenge.Id))
-            .Join(
-                db.Challenges.AsNoTracking(),
-                competitionChallenge => competitionChallenge.ChallengeId,
-                challenge => challenge.Id,
-                (competitionChallenge, challenge) => new
-                {
-                    competitionChallenge.Id,
-                    Title = competitionChallenge.CustomTitle ?? challenge.Title
-                })
-            .ToDictionaryAsync(
-                item => item.Id,
-                item => item.Title,
-                cancellationToken);
+        var challenges = challengeIds.Length == 0
+            ? new Dictionary<Guid, string>()
+            : await db.CompetitionChallenges.AsNoTracking()
+                .Where(challenge => challengeIds.Contains(challenge.Id))
+                .Join(
+                    db.Challenges.AsNoTracking(),
+                    competitionChallenge => competitionChallenge.ChallengeId,
+                    challenge => challenge.Id,
+                    (competitionChallenge, challenge) => new
+                    {
+                        competitionChallenge.Id,
+                        Title = competitionChallenge.CustomTitle ?? challenge.Title
+                    })
+                .ToDictionaryAsync(
+                    item => item.Id,
+                    item => item.Title,
+                    cancellationToken);
 
         return events.Select(item =>
         {
-            var payload = ParsePayload(item);
             var relatedUserId = item.RelatedUserId;
             var teamId = item.TeamId;
             var challengeId = item.CompetitionChallengeId;
@@ -409,22 +507,22 @@ public sealed class CompetitionEventStore(
             item.GameplayFactId,
             item.QuestionId,
             item.ParentEventId,
-            payload.CompetitionStatus,
-            payload.LeaderboardVisibility,
-            payload.CompetitionAccessMode,
-            payload.PreviousCompetitionAccessMode,
-            payload.CompetitionAudienceChangeKind,
-            payload.TeamRegistrationStatus,
-            payload.GameplayFactKind,
-            payload.GameplayFactState,
-            payload.GameplayFactResult,
-            payload.RuntimeState,
-            payload.RuntimeCleanupResult,
-            payload.QuestionStatus,
-            payload.HostPort,
-            payload.Reason,
-            payload.TrackKey,
-            payload.PreviousTrackKey,
+            item.CompetitionStatus,
+            item.LeaderboardVisibility,
+            item.CompetitionAccessMode,
+            item.PreviousCompetitionAccessMode,
+            item.CompetitionAudienceChangeKind,
+            item.TeamRegistrationStatus,
+            item.GameplayFactKind,
+            item.GameplayFactState,
+            item.GameplayFactResult,
+            item.RuntimeState,
+            item.RuntimeCleanupResult,
+            item.QuestionStatus,
+            item.HostPort,
+            item.Reason,
+            item.TrackKey,
+            item.PreviousTrackKey,
             item.OccurredAt);
         }).ToArray();
     }
@@ -442,60 +540,6 @@ public sealed class CompetitionEventStore(
             return null;
         var sanitized = PlatformLogRedactor.Redact(reason.Trim(), []);
         return sanitized.Length <= 512 ? sanitized : sanitized[..512];
-    }
-
-    internal static string SerializePayload(CompetitionEventDraft draft)
-    {
-        var standard = JsonSerializer.SerializeToNode(new
-        {
-            schemaVersion = 1,
-            competitionStatus = draft.CompetitionStatus,
-            leaderboardVisibility = draft.LeaderboardVisibility,
-            competitionAccessMode = draft.CompetitionAccessMode,
-            previousCompetitionAccessMode = draft.PreviousCompetitionAccessMode,
-            competitionAudienceChangeKind = draft.CompetitionAudienceChangeKind,
-            teamRegistrationStatus = draft.TeamRegistrationStatus,
-            gameplayFactKind = draft.GameplayFactKind,
-            gameplayFactState = draft.GameplayFactState,
-            gameplayFactResult = draft.GameplayFactResult,
-            runtimeState = draft.RuntimeState,
-            runtimeCleanupResult = draft.RuntimeCleanupResult,
-            questionStatus = draft.QuestionStatus,
-            hostPort = draft.HostPort,
-            relatedUserId = draft.RelatedUserId,
-            teamId = draft.TeamId,
-            competitionChallengeId = draft.CompetitionChallengeId,
-            hintId = draft.HintId,
-            runtimeInstanceId = draft.RuntimeInstanceId,
-            gameplayFactId = draft.GameplayFactId,
-            questionId = draft.QuestionId,
-            reason = SanitizeReason(draft.Reason),
-            trackKey = draft.TrackKey,
-            previousTrackKey = draft.PreviousTrackKey
-        }, ExportJsonOptions)!.AsObject();
-        if (draft.PayloadJson is null)
-            return standard.ToJsonString(ExportJsonOptions);
-
-        JsonObject custom;
-        try
-        {
-            custom = JsonNode.Parse(draft.PayloadJson)?.AsObject()
-                ?? throw new InvalidOperationException(
-                    "Competition event payload must be a JSON object.");
-        }
-        catch (JsonException exception)
-        {
-            throw new InvalidOperationException(
-                "Competition event payload must be valid JSON.",
-                exception);
-        }
-
-        foreach (var (name, value) in standard)
-        {
-            if (value is not null && !custom.ContainsKey(name))
-                custom[name] = value.DeepClone();
-        }
-        return custom.ToJsonString(ExportJsonOptions);
     }
 
     private static (EntityReferenceKind Type, Guid Id) ResolveSubject(
@@ -548,71 +592,6 @@ public sealed class CompetitionEventStore(
         id is Guid value && (subject.Type != type || subject.Id != value)
             ? (type, value)
             : null;
-
-    internal static CompetitionEventPayload ParsePayload(CompetitionEvent item)
-    {
-        var payload = ParseLegacyPayload(item.PayloadJson);
-        if (item.Kind != CompetitionEventKind.AwdpFixResolved
-            || payload.GameplayFactState is not null)
-            return payload;
-
-        try
-        {
-            var resolved = AwdpFixResolvedEventPayload.Deserialize(item.PayloadJson);
-            if (resolved is null || !Enum.IsDefined(resolved.Outcome))
-                return payload;
-            if (resolved.Outcome == AwdpFixOutcome.PlatformFailed)
-            {
-                return payload with
-                {
-                    GameplayFactKind = GameplayFactKind.FixAttempt,
-                    GameplayFactState = GameplayFactState.PlatformFailed,
-                    GameplayFactResult = null
-                };
-            }
-
-            return payload with
-            {
-                GameplayFactKind = GameplayFactKind.FixAttempt,
-                GameplayFactState = GameplayFactState.Completed,
-                GameplayFactResult = AwdpFixOutcomeMapper.Map(resolved.Outcome).Result
-            };
-        }
-        catch (JsonException)
-        {
-            return payload;
-        }
-    }
-
-    private static CompetitionEventPayload ParseLegacyPayload(string json)
-    {
-        try
-        {
-            return JsonSerializer.Deserialize<CompetitionEventPayload>(json, ExportJsonOptions) ?? new();
-        }
-        catch (JsonException)
-        {
-            return new();
-        }
-    }
-
-    internal sealed record CompetitionEventPayload(
-        CompetitionStatus? CompetitionStatus = null,
-        CompetitionLeaderboardVisibility? LeaderboardVisibility = null,
-        CompetitionAccessMode? CompetitionAccessMode = null,
-        CompetitionAccessMode? PreviousCompetitionAccessMode = null,
-        CompetitionAudienceChangeKind? CompetitionAudienceChangeKind = null,
-        TeamRegistrationStatus? TeamRegistrationStatus = null,
-        NoCTF.Domain.Gameplay.GameplayFactKind? GameplayFactKind = null,
-        NoCTF.Domain.Gameplay.GameplayFactState? GameplayFactState = null,
-        NoCTF.Domain.Gameplay.GameplayFactResult? GameplayFactResult = null,
-        NoCTF.Domain.Runtime.RuntimeState? RuntimeState = null,
-        NoCTF.Domain.Runtime.RuntimeCleanupResult? RuntimeCleanupResult = null,
-        NoCTF.Domain.Challenges.Questions.CompetitionQuestionStatus? QuestionStatus = null,
-        int? HostPort = null,
-        string? Reason = null,
-        string? TrackKey = null,
-        string? PreviousTrackKey = null);
 
     private sealed record AccessResolution(
         CompetitionEventReadState State,

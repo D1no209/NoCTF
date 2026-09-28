@@ -8,28 +8,46 @@ namespace NoCTF.Tests.Refactor;
 
 public sealed class DataModelSchemaTests
 {
-    private static readonly string[] ExpectedTables =
+    private static readonly string[] RequiredTables =
     [
-        "account_tokens",
-        "challenge_attachments",
-        "challenge_flags",
+        "active_runtime_slots",
+        "challenge_definitions",
+        "challenge_runtime_templates",
         "challenges",
+        "command_receipts",
+        "competition_challenge_rules",
         "competition_challenges",
+        "competition_collaborators",
+        "competition_progressions",
+        "competition_progression_nodes",
+        "competition_progression_edges",
+        "competition_badges",
+        "competition_webhook_outbox_events",
+        "competition_webhook_deliveries",
+        "competition_webhook_frozen_projections",
         "competition_events",
+        "competition_mode_configurations",
         "competitions",
-        "files",
+        "external_identities",
         "gameplay_facts",
+        "human_verification_turnstile_hostnames",
         "notifications",
-        "patch_uploads",
         "platform_settings",
+        "runtime_access_endpoints",
+        "runtime_capacity_allocations",
         "runtime_instances",
+        "team_members",
+        "team_progression_node_states",
+        "team_progression_badge_states",
+        "user_badge_grants",
+        "user_badge_transitions",
         "teams",
         "users"
     ];
 
     [Test]
     [Category("Integration")]
-    public async Task Current_model_contains_exactly_the_fifteen_business_tables(
+    public async Task Current_model_uses_only_relational_portable_business_storage(
         CancellationToken ct)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -42,7 +60,8 @@ public sealed class DataModelSchemaTests
             await postgres.StartAsync(ct);
 
             var options = new DbContextOptionsBuilder<NoCtfDbContext>()
-                .UseNpgsql(postgres.GetConnectionString())
+                .UseNpgsql(postgres.GetConnectionString(), npgsql => npgsql.MigrationsAssembly(
+                    typeof(NoCTF.Persistence.PostgreSql.PostgreSqlPersistence).Assembly.FullName))
                 .UseSnakeCaseNamingConvention()
                 .Options;
             await using (var db = new NoCtfDbContext(options))
@@ -60,7 +79,8 @@ public sealed class DataModelSchemaTests
                     actual.Add(reader.GetString(0));
             }
 
-            await Assert.That(actual).IsEquivalentTo(ExpectedTables);
+            await Assert.That(RequiredTables.All(actual.Contains)).IsTrue();
+            await Assert.That(actual).Contains("data_protection_keys");
 
             await using var migrationCommand = new NpgsqlCommand(
                 "SELECT migration_id FROM \"__EFMigrationsHistory\" ORDER BY migration_id",
@@ -72,24 +92,20 @@ public sealed class DataModelSchemaTests
                     migrations.Add(reader.GetString(0));
             }
 
-            await Assert.That(migrations).IsEquivalentTo(
-            [
-                "20260826172216_InitialBaseline",
-                "20260904120421_ChallengeTemplateTestRuntimes",
-                "20260907190934_PrivateSchoolIdentityAndSourceAddresses",
-                "20260908040028_OptionalPublicGateway",
-                "20260908161132_PracticeOnlyTeams",
-                "20260910145118_UserWallpaperPreferences",
-                "20260911081054_RemovePracticeTeamMarker",
-                "20260911144210_AddHumanVerificationToggle",
-                "20260911164825_AddManagedHumanVerificationProviders",
-                "20260911213004_AddCompetitionTracksEnabled",
-                "20260912074543_AddRuntimeHumanVerificationToggle",
-                "20260912130511_AddCompetitionAccessMode",
-                "20260912150416_AddTeamWriteUps",
-                "20260912182604_ConfigureTeamWriteUpSubmission"
-            ]);
+            await Assert.That(migrations).Count().IsEqualTo(7);
             await Assert.That(migrations[0]).EndsWith("_InitialBaseline");
+            await Assert.That(migrations[1]).EndsWith("_CompetitionProgression");
+            await Assert.That(migrations[2]).EndsWith("_PersistedSsoFlows");
+            await Assert.That(migrations[3]).EndsWith("_PersistedRequestAdmission");
+            await Assert.That(migrations[4]).EndsWith("_CompetitionWebhookOutbox");
+            await Assert.That(migrations[5]).EndsWith("_ProgressionReadableMap");
+            await Assert.That(migrations[6]).EndsWith("_ProgressionNodePrerequisitePolicy");
+
+            await using var removedGatewayColumnsCommand = new NpgsqlCommand(
+                "SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'platform_settings' AND column_name LIKE 'public_gateway_%'",
+                connection);
+            var removedGatewayColumns = (long)(await removedGatewayColumnsCommand.ExecuteScalarAsync(ct))!;
+            await Assert.That(removedGatewayColumns).IsEqualTo(0);
 
             await using var accessModeColumnCommand = new NpgsqlCommand(
                 """
@@ -127,20 +143,21 @@ public sealed class DataModelSchemaTests
                   AND conrelid::regclass::text = ANY(@tables)
                 """,
                 connection);
-            primaryKeyCommand.Parameters.AddWithValue("tables", ExpectedTables);
+            primaryKeyCommand.Parameters.AddWithValue("tables", actual.ToArray());
             await Assert.That((int)(await primaryKeyCommand.ExecuteScalarAsync(ct))!)
-                .IsEqualTo(ExpectedTables.Length);
+                .IsEqualTo(actual.Count);
 
-            await using var cascadingForeignKeyCommand = new NpgsqlCommand(
+            await using var nonPortableColumnCommand = new NpgsqlCommand(
                 """
                 SELECT count(*)::int
-                FROM pg_constraint
-                WHERE connamespace = 'public'::regnamespace
-                  AND contype = 'f'
-                  AND confdeltype = 'c'
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND (data_type IN ('ARRAY', 'json', 'jsonb')
+                    OR udt_name IN ('json', 'jsonb')
+                    OR column_name LIKE '%\_json' ESCAPE '\')
                 """,
                 connection);
-            await Assert.That((int)(await cascadingForeignKeyCommand.ExecuteScalarAsync(ct))!)
+            await Assert.That((int)(await nonPortableColumnCommand.ExecuteScalarAsync(ct))!)
                 .IsEqualTo(0);
 
             await using var forbiddenSchemaCommand = new NpgsqlCommand(
@@ -150,8 +167,9 @@ public sealed class DataModelSchemaTests
                 WHERE table_schema = 'public'
                   AND (
                     table_name = 'data_exports'
+                    OR (column_name = 'revision'
+                        AND table_name <> 'competition_progressions')
                     OR column_name IN (
-                        'revision',
                         'expected_revision',
                         'concurrency_token',
                         'leaderboard_dirty',

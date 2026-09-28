@@ -1,5 +1,6 @@
 using NoCTF.Application.Common;
 using NoCTF.Domain.Identity;
+using NoCTF.Domain.Competitions;
 using NoCTF.Application.Storage;
 
 namespace NoCTF.Application.Authentication.Account;
@@ -17,12 +18,6 @@ public sealed record IssuedAccessToken(
     Guid JwtId = default);
 public sealed record IssuedRefreshToken(string Token, DateTimeOffset ExpiresAt);
 public sealed record RefreshTokenPrincipal(Guid UserId, int TokenVersion);
-
-public static class AccessTokenClaims
-{
-    public const string Impersonation = "impersonation";
-    public const string ImpersonatorId = "impersonator_id";
-}
 public sealed record UserProfile(
     Guid Id,
     string UserName,
@@ -35,13 +30,32 @@ public sealed record UserProfile(
     Guid? WallpaperFileId = null,
     bool WallpaperEnabled = false,
     string? SchoolFullName = null,
-    string? SchoolStudentNumber = null);
+    string? SchoolStudentNumber = null,
+    Guid? ProfileCoverFileId = null);
 public sealed record PublicUserProfile(
     Guid Id,
     string UserName,
     string? Description,
-    Guid? AvatarFileId);
+    Guid? AvatarFileId,
+    Guid? ProfileCoverFileId = null,
+    IReadOnlyList<PublicUserModeSummary>? Modes = null,
+    IReadOnlyList<PublicUserDirectionSummary>? Directions = null,
+    IReadOnlyList<PublicUserCompetitionSummary>? RecentCompetitions = null,
+    int CompetitionCount = 0,
+    int FinishedCompetitionCount = 0,
+    int SuccessfulChallengeCount = 0);
+public sealed record PublicUserModeSummary(GameMode Mode, int CompetitionCount);
+public sealed record PublicUserDirectionSummary(string Direction, int SuccessfulChallengeCount);
+public sealed record PublicUserCompetitionSummary(
+    Guid CompetitionId,
+    string Title,
+    string TeamName,
+    GameMode Mode,
+    CompetitionStatus Status,
+    DateTimeOffset StartAt,
+    DateTimeOffset EndAt);
 public sealed record UserAvatarReplacement(UserProfile Profile, Guid? PreviousFileId);
+public sealed record UserProfileCoverReplacement(UserProfile Profile, Guid? PreviousFileId);
 public sealed record UserWallpaperReplacement(UserProfile Profile, Guid? PreviousFileId);
 public enum UserWallpaperPreferenceState { Updated, UserNotFound, WallpaperNotUploaded }
 public sealed record UserWallpaperPreferenceResult(
@@ -71,6 +85,10 @@ public interface IUserAuthenticationStore
     Task<bool> VerifyPasswordAsync(Guid userId, string password, CancellationToken cancellationToken);
     Task<AuthenticatedUser?> FindByIdAsync(Guid userId, CancellationToken cancellationToken);
     Task<UserProfile?> GetProfileAsync(Guid userId, CancellationToken cancellationToken);
+    Task<PublicUserProfile?> GetPublicProfileAsync(
+        Guid userId,
+        CancellationToken cancellationToken) =>
+        Task.FromResult<PublicUserProfile?>(null);
     Task<UserProfile?> UpdateProfileAsync(
         Guid userId,
         string? description,
@@ -81,6 +99,16 @@ public interface IUserAuthenticationStore
         Guid fileId,
         DateTimeOffset now,
         CancellationToken cancellationToken);
+    Task<UserProfileCoverReplacement?> ReplaceProfileCoverAsync(
+        Guid userId,
+        Guid fileId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken) =>
+        Task.FromResult<UserProfileCoverReplacement?>(null);
+    Task<BusinessFileReference?> GetProfileCoverFileAsync(
+        Guid userId,
+        CancellationToken cancellationToken) =>
+        Task.FromResult<BusinessFileReference?>(null);
     Task<BusinessFileReference?> GetAvatarFileAsync(
         Guid userId,
         CancellationToken cancellationToken) =>
@@ -127,8 +155,7 @@ public interface IAccessTokenIssuer
     IssuedAccessToken Issue(
         AuthenticatedUser user,
         DateTimeOffset now,
-        TimeSpan? lifetime = null,
-        Guid? impersonatorUserId = null);
+        TimeSpan? lifetime = null);
     IssuedRefreshToken IssueRefresh(AuthenticatedUser user);
     RefreshTokenPrincipal? ValidateRefresh(string token);
 }

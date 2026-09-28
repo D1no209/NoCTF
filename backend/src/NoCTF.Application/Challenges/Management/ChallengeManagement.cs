@@ -1,5 +1,7 @@
 using NoCTF.Application.Challenges.Configuration;
+using NoCTF.Application.Competitions.Visibility;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Challenges;
 
 namespace NoCTF.Application.Challenges.Management;
 
@@ -35,7 +37,20 @@ public sealed record ChallengeView(
     DateTimeOffset UpdatedAt)
 {
     public bool UsesDynamicFlag { get; init; }
+    public CtfInteractionKind InteractionKind { get; init; }
 }
+
+public sealed record CompetitionChallengeSummaryView(
+    Guid Id,
+    Guid CompetitionId,
+    Guid ChallengeId,
+    string Title,
+    string? CustomTitle,
+    string Direction,
+    int Order,
+    bool IsPublished,
+    DateTimeOffset? DeletedAt,
+    CtfInteractionKind InteractionKind);
 
 public enum ChallengeMutationFailure
 {
@@ -49,7 +64,8 @@ public enum ChallengeMutationFailure
     ResourceIdConflict,
     ChallengeOrderConflict,
     ChallengeTemplateConflict,
-    LifecycleStateConflict
+    LifecycleStateConflict,
+    ExperimentalFeatureDisabled
 }
 
 public sealed record ChallengeMutationResult(
@@ -66,11 +82,16 @@ public static class ParticipantChallengeVisibilityPolicy
             or CompetitionStatus.Finished;
 }
 
-public interface ICompetitionChallengeAudienceAccess
+public sealed record CompetitionChallengeReadDecision(
+    CompetitionVisibilityAccessDecision Visibility,
+    Guid? TeamId);
+
+public interface ICompetitionChallengeReadAccess
 {
-    Task<bool> CanReadAsync(
+    Task<CompetitionChallengeReadDecision?> ResolveAsync(
         Guid userId,
         Guid competitionId,
+        DateTimeOffset now,
         CancellationToken cancellationToken);
 }
 
@@ -79,7 +100,7 @@ public interface IChallengeManagementStore
     Task<ChallengeCompetitionContext?> GetCompetitionAsync(Guid competitionId, CancellationToken cancellationToken);
     Task<ChallengeMutationResult> CreateAsync(
         CreateCompetitionChallengeCommand command,
-        string configurationJson,
+        CompetitionChallengeRules rules,
         CancellationToken cancellationToken);
     Task<ChallengeView?> FindAsync(
         Guid competitionId,
@@ -87,7 +108,7 @@ public interface IChallengeManagementStore
         bool includeUnpublished,
         bool includeDeleted,
         CancellationToken cancellationToken);
-    Task<IReadOnlyList<ChallengeView>> ListAsync(
+    Task<IReadOnlyList<CompetitionChallengeSummaryView>> ListAsync(
         Guid competitionId,
         bool includeUnpublished,
         bool includeDeleted,
@@ -129,7 +150,9 @@ public sealed class CreateChallenge(
 
         return await store.CreateAsync(
             command with { CustomTitle = customTitle },
-            configurationCatalog.GetDefaultJson(competition.Mode),
+            configurationCatalog.CreateDefaultRules(
+                competition.Mode,
+                command.CompetitionChallengeId ?? Guid.Empty),
             ct);
     }
 }
@@ -152,7 +175,7 @@ public sealed class GetChallenge(IChallengeManagementStore store)
 
 public sealed class ListChallenges(IChallengeManagementStore store)
 {
-    public Task<IReadOnlyList<ChallengeView>> ExecuteAsync(
+    public Task<IReadOnlyList<CompetitionChallengeSummaryView>> ExecuteAsync(
         Guid competitionId,
         bool includeUnpublished,
         bool includeDeleted = false,

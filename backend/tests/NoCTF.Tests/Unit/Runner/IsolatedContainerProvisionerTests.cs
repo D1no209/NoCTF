@@ -57,7 +57,7 @@ public sealed class IsolatedContainerProvisionerTests
     }
 
     [Test]
-    public async Task Destroy_attempts_network_cleanup_when_container_cleanup_fails()
+    public async Task Destroy_succeeds_when_cleanup_warning_is_followed_by_confirmed_absence()
     {
         var lifecycle = new RecordingLifecycle
         {
@@ -68,10 +68,8 @@ public sealed class IsolatedContainerProvisionerTests
             Guid.NewGuid(), RuntimeProvider.Docker, "target", RuntimeStatus.Running,
             new Dictionary<int, int>(), null, "target.internal", "network-1");
 
-        var action = async () => await IsolatedContainerProvisioner.DestroyAsync(
+        await IsolatedContainerProvisioner.DestroyAsync(
             lifecycle, sandbox, receipt, CancellationToken.None);
-
-        await Assert.That(action).Throws<InvalidOperationException>();
         await Assert.That(sandbox.DeletedNetworks).IsEquivalentTo(["network-1"]);
     }
 

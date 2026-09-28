@@ -13,7 +13,7 @@ using NoCTF.Domain.Runtime;
 
 namespace NoCTF.API.Endpoints.Administration.Runtime;
 
-public sealed class ListAdminRuntimesRequest
+public sealed class ListAdminRuntimesRequest : PaginationRequest
 {
     [QueryParam] public Guid? CompetitionChallengeId { get; set; }
     [QueryParam] public Guid? TeamId { get; set; }
@@ -24,7 +24,6 @@ public sealed class ListAdminRuntimesRequest
     [QueryParam] public DateTimeOffset? ExpiresBefore { get; set; }
     [QueryParam] public int? HostPort { get; set; }
     [QueryParam] public string? Cursor { get; set; }
-    [QueryParam] public int Limit { get; set; } = 50;
 }
 
 public sealed class ListAdminRuntimesValidator : Validator<ListAdminRuntimesRequest>
@@ -52,24 +51,41 @@ public sealed record AdminRuntimeResponse(
     string? RunnerId,
     RuntimeStateProtocol State,
     RuntimeFailureCodeProtocol? FailureCode,
-    IReadOnlyList<string> Urls,
+    IReadOnlyList<RuntimeAccessResponse> Accesses,
     IReadOnlyList<RuntimePublishedPortView> PublishedPorts,
     DateTimeOffset CreatedAt,
     DateTimeOffset? RunningAt,
     DateTimeOffset? ExpiresAt,
     DateTimeOffset? StoppedAt,
     DateTimeOffset? ForceTerminationAvailableAt,
-    bool CanForceTerminate);
+    bool CanForceTerminate)
+{
+    public RunnerAdmissionFailureProtocol? WaitingReason { get; init; }
+    public IReadOnlyList<AdminRuntimeAllocationResponse>? Capacity { get; init; }
+}
+
+public sealed record AdminRuntimeAllocationResponse(Guid OperationId,
+    NoCTF.Domain.Runtime.RuntimeWorkloadKind Kind,
+    AdminRuntimeResourceAmountResponse Limit,
+    AdminRuntimeResourceAmountResponse Budget);
+
+public sealed record AdminRuntimeResourceAmountResponse(
+    long MemoryBytes,
+    long NanoCpus,
+    long PidsLimit);
 
 public sealed record AdminRuntimeListResponse(
     IReadOnlyList<AdminRuntimeResponse> Items,
-    string? NextCursor);
+    string? NextCursor,
+    int Total = 0);
 
 internal static class AdminRuntimeMapping
 {
     public static AdminRuntimeResponse ToResponse(
         RuntimeInstanceView view,
-        DateTimeOffset now)
+        HttpRequest request,
+        DateTimeOffset now,
+        bool includeCapacity = false)
     {
         var availableAt = RuntimeForceTerminationPolicy.AvailableAt(view);
         return new(
@@ -81,10 +97,20 @@ internal static class AdminRuntimeMapping
             view.RunnerId,
             RuntimeProtocolMapper.ToProtocol(view.State),
             view.FailureCode is null ? null : RuntimeProtocolMapper.ToProtocol(view.FailureCode.Value),
-            view.Urls, view.PublishedPorts ?? [], view.CreatedAt,
+            view.State == RuntimeState.Running
+                ? RuntimeAccessMapping.ToResponse(view, request)
+                : [],
+            view.PublishedPorts ?? [], view.CreatedAt,
             view.RunningAt, view.ExpiresAt, view.StoppedAt,
             availableAt,
-            availableAt is { } value && value <= now);
+            availableAt is { } value && value <= now)
+        {
+            WaitingReason = view.WaitingReason is { } reason ? RuntimeProtocolMapper.ToProtocol(reason) : null,
+            Capacity = includeCapacity ? view.Capacity?.Items.Select(item => new AdminRuntimeAllocationResponse(
+                item.Identity.OperationId, item.Identity.Kind,
+                new(item.Limit.MemoryBytes, item.Limit.NanoCpus, item.Limit.PidsLimit),
+                new(item.Budget.MemoryBytes, item.Budget.NanoCpus, item.Budget.PidsLimit))).ToArray() : null
+        };
     }
 }
 
@@ -125,21 +151,33 @@ public sealed class ListAdminRuntimesEndpoint(
             request.HostPort);
         if (!cursors.TryDecode(request.Cursor, CursorEndpoint, filterKey, out var position))
             return TypedResults.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Invalid cursor.");
-        var items = await runtimes.ListAsync(new(
+        var filter = new AdminRuntimeFilter(
                 competitionId, request.CompetitionChallengeId, request.TeamId,
                 request.RuntimeKind is null ? null : RuntimeProtocolMapper.ToDomain(request.RuntimeKind.Value),
                 request.Provider is null ? null : RuntimeProtocolMapper.ToDomain(request.Provider.Value),
                 request.RunnerId,
                 request.State is null ? null : RuntimeProtocolMapper.ToDomain(request.State.Value),
                 request.ExpiresBefore,
-                request.HostPort),
-            position?.CreatedAt, position?.Id, request.Limit, ct);
+                request.HostPort);
+        if (string.IsNullOrWhiteSpace(request.Cursor))
+        {
+            var page = await runtimes.ListPageAsync(filter, request.Offset, request.Limit, request.Desc, ct);
+            return TypedResults.Ok(new AdminRuntimeListResponse(
+                page.Items.Select(item => AdminRuntimeMapping.ToResponse(
+                    item,
+                    HttpContext.Request,
+                    timeProvider.GetUtcNow())).ToArray(),
+                null,
+                page.Total));
+        }
+        var items = await runtimes.ListAsync(filter, position?.CreatedAt, position?.Id, request.Limit, ct);
         var next = items.Count == request.Limit
             ? cursors.Encode(CursorEndpoint, filterKey, new(items[^1].CreatedAt, items[^1].Id))
             : null;
         return TypedResults.Ok(new AdminRuntimeListResponse(
             items.Select(item => AdminRuntimeMapping.ToResponse(
                 item,
+                HttpContext.Request,
                 timeProvider.GetUtcNow())).ToArray(), next));
     }
 }

@@ -7,12 +7,12 @@ public sealed class RawSqlPersistenceRulesTests
     [
         "ExecuteSqlRaw",
         "FromSqlRaw",
-        ".SqlQuery<",
         "PostgresException",
         "PostgresErrorCodes"
     ];
     private static readonly string[] ProviderSpecificTokens =
     [
+        ".SqlQuery<",
         "ExecuteSqlInterpolated",
         "FromSqlInterpolated",
         "pg_advisory_",
@@ -22,164 +22,6 @@ public sealed class RawSqlPersistenceRulesTests
         "ON CONFLICT",
         "WITH RECURSIVE"
     ];
-    private static readonly IReadOnlyDictionary<string, HashSet<string>> ApprovedProviderSql =
-        new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
-        {
-            // Parameterized settings/runtime SHARE locks fence only the bounded local gateway lease write.
-            ["backend/src/NoCTF.Infrastructure/Runtime/PublicAccess/PublicGatewayLeaseGuard.cs"] = ["ExecuteSqlInterpolated"],
-            // Competition-scoped shared admission lock, with a bound UUID parameter.
-            ["backend/src/NoCTF.Infrastructure/Competitions/Participation/CompetitionParticipationLock.cs"] = ["ExecuteSqlInterpolated"],
-            ["backend/src/NoCTF.Infrastructure/Commands/Idempotency/TransactionalRequestReplay.cs"] = ["ExecuteSqlInterpolated", "pg_advisory_"],
-            ["backend/src/NoCTF.Infrastructure/Challenges/Questions/CompetitionQuestionStore.cs"] =
-            [
-                "ExecuteSqlInterpolated",
-                "FromSqlInterpolated",
-                "pg_advisory_",
-                "WITH RECURSIVE"
-            ],
-            ["backend/src/NoCTF.Infrastructure/Challenges/Attachments/ChallengeAttachmentStore.cs"] =
-            [
-                "FromSqlInterpolated",
-                "FOR UPDATE"
-            ],
-            ["backend/src/NoCTF.Infrastructure/Challenges/ChallengeTemplateCriticalSection.cs"] =
-            [
-                "FromSqlInterpolated",
-                "FOR UPDATE"
-            ],
-            ["backend/src/NoCTF.Infrastructure/Challenges/TeamChallengeCriticalSection.cs"] =
-            [
-                "FromSqlInterpolated",
-                "FOR UPDATE"
-            ],
-            ["backend/src/NoCTF.Infrastructure/Administration/ActiveHumanAdministratorMutationGuard.cs"] =
-            [
-                "ExecuteSqlInterpolated",
-                "LOCK TABLE"
-            ],
-            ["backend/src/NoCTF.Infrastructure/Administration/ResourceManagerRoleGuard.cs"] =
-            [
-                "FromSqlInterpolated",
-                "FOR UPDATE"
-            ],
-            // Serialize revocation facts for one administrator-issued JWT.
-            ["backend/src/NoCTF.Infrastructure/Administration/PlatformUserTokenCriticalSection.cs"] =
-            [
-                "FromSqlInterpolated",
-                "FOR UPDATE"
-            ],
-            ["backend/src/NoCTF.Infrastructure/Authentication/PasswordResetStore.cs"] =
-            [
-                "FromSqlInterpolated",
-                "FOR UPDATE"
-            ],
-            ["backend/src/NoCTF.Infrastructure/Authentication/EmailVerificationStore.cs"] =
-            [
-                "FromSqlInterpolated",
-                "FOR UPDATE"
-            ],
-            ["backend/src/NoCTF.Infrastructure/Competitions/Administration/AdminCompetitionStore.cs"] =
-            [
-                "ExecuteSqlInterpolated",
-                "FromSqlInterpolated",
-                "FOR UPDATE",
-                "WITH RECURSIVE"
-            ],
-            // Lock the proven notification roots/members to serialize new FK references with deletion.
-            ["backend/src/NoCTF.Infrastructure/Competitions/Administration/CompetitionNotificationDeletionScope.cs"] =
-            [
-                "ExecuteSqlInterpolated",
-                "FOR UPDATE"
-            ],
-            ["backend/src/NoCTF.Infrastructure/Competitions/Management/CompetitionManagementStore.cs"] =
-            [
-                "ExecuteSqlInterpolated",
-                "FOR UPDATE"
-            ],
-            ["backend/src/NoCTF.Infrastructure/Notifications/NotificationReader.cs"] =
-            [
-                "FromSqlInterpolated",
-                "WITH RECURSIVE"
-            ],
-            ["backend/src/NoCTF.Infrastructure/Storage/ManagedFileUploadRegistry.cs"] =
-            [
-                "ExecuteSqlInterpolated",
-                "FOR UPDATE"
-            ],
-            ["backend/src/NoCTF.Infrastructure/Teams/CompetitionTeamMutationCriticalSection.cs"] =
-            [
-                "FromSqlInterpolated",
-                "FOR UPDATE"
-            ],
-            ["backend/src/NoCTF.Infrastructure/GameplayFacts/Intake/SubmissionIntakeStore.cs"] =
-            [
-                "FromSqlInterpolated",
-                "FOR UPDATE"
-            ],
-            ["backend/src/NoCTF.Infrastructure/GameplayFacts/Intake/SubmissionAttemptLock.cs"] =
-            [
-                "FromSqlInterpolated",
-                "FOR UPDATE"
-            ],
-            ["backend/src/NoCTF.Infrastructure/GameplayFacts/Processing/SubmissionProcessor.cs"] =
-            [
-                "ExecuteSqlInterpolated",
-                "pg_advisory_"
-            ],
-            ["backend/src/NoCTF.Infrastructure/GameplayFacts/Processing/AwdpFixExecutionFence.cs"] =
-            [
-                "FromSqlInterpolated",
-                "FOR UPDATE"
-            ],
-            ["backend/src/NoCTF.Infrastructure/GameplayFacts/Processing/InternalResultStore.cs"] =
-            [
-                "FromSqlInterpolated",
-                "FOR UPDATE"
-            ],
-            ["backend/src/NoCTF.Infrastructure/GameplayFacts/Processing/BloodRankCriticalSection.cs"] =
-            [
-                "FromSqlInterpolated",
-                "FOR UPDATE"
-            ],
-            ["backend/src/NoCTF.Infrastructure/Runtime/Instances/RuntimeInstanceStore.cs"] =
-            [
-                "ExecuteSqlInterpolated",
-                "FOR UPDATE"
-            ],
-            ["backend/src/NoCTF.Infrastructure/Runtime/Instances/SharedRuntimeScopeLock.cs"] =
-            [
-                "FromSqlInterpolated",
-                "FOR UPDATE"
-            ],
-            ["backend/src/NoCTF.Infrastructure/Runtime/Instances/TeamRuntimeQuota.cs"] =
-            [
-                "FromSqlInterpolated",
-                "FOR UPDATE"
-            ],
-            ["backend/src/NoCTF.Infrastructure/Scoring/Leaderboard/FusionLeaderboardCache.cs"] =
-            [
-                "ExecuteSqlInterpolated",
-                "pg_advisory_"
-            ],
-            ["backend/src/NoCTF.Worker/BackendMessageHandlers.cs"] =
-            [
-                "ExecuteSqlInterpolated",
-                "FromSqlInterpolated",
-                "FOR UPDATE",
-                "SKIP LOCKED"
-            ],
-            ["backend/src/NoCTF.Worker/Storage/FileCleanupOperations.cs"] =
-            [
-                "ExecuteSqlInterpolated",
-                "FOR UPDATE"
-            ],
-            ["backend/src/NoCTF.Worker/GameplayFacts/AwdpRecoveryOperations.cs"] =
-            [
-                "FromSqlInterpolated",
-                "FOR UPDATE"
-            ]
-        };
-
     [Test]
     public async Task Provider_specific_sql_is_parameterized_and_explicitly_scoped()
     {
@@ -195,10 +37,8 @@ public sealed class RawSqlPersistenceRulesTests
                 .Where(token => source.Content.Contains(token, StringComparison.Ordinal))
                 .Select(token => $"{source.Path}: forbidden {token}"))
             .Concat(sources.SelectMany(source => ProviderSpecificTokens
-                .Where(token => source.Content.Contains(token, StringComparison.Ordinal)
-                    && (!ApprovedProviderSql.TryGetValue(source.Path, out var approved)
-                        || !approved.Contains(token)))
-                .Select(token => $"{source.Path}: unapproved {token}")))
+                .Where(token => source.Content.Contains(token, StringComparison.Ordinal))
+                .Select(token => $"{source.Path}: provider-specific {token}")))
             .Order()
             .ToArray();
 

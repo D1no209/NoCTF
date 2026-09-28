@@ -1,9 +1,11 @@
 using FastEndpoints;
 using FastEndpoints.Swagger;
+using System.IO.Compression;
 using System.Security.Claims;
 using System.Threading.RateLimiting;
 using NoCTF.Application.Observability;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using NoCTF.Application.Authentication.Login;
@@ -90,6 +92,7 @@ public static class ServiceRegistration
         services.AddSingleton(uploadLimits);
         services.AddProblemDetails();
         services.AddExceptionHandler<NoCTF.API.Security.RequestSafetyExceptionHandler>();
+        services.AddNoCtfStaticAssetDelivery();
         services.AddHttpContextAccessor();
         services.AddScoped<NoCTF.Application.Commands.Idempotency.IRequestCommandKey, NoCTF.API.Security.RequestCommandKey>();
         services.AddScoped<NoCTF.Application.Authentication.Privacy.IRequestSourceAddress, NoCTF.API.Security.RequestSourceAddress>();
@@ -128,7 +131,7 @@ public static class ServiceRegistration
         });
         if (includeInfrastructure)
         {
-            services.AddNoCtfHumanVerification();
+            services.AddNoCtfHumanVerification(configuration, development);
             services.AddNoCtfInfrastructure(configuration, development);
             services.AddScoped<SubmitFlag>();
             services.AddScoped<LoginUser>();
@@ -136,6 +139,8 @@ public static class ServiceRegistration
             services.AddScoped<RegisterUser>();
             services.AddScoped<GetCurrentUser>();
             services.AddScoped<GetPublicUserProfile>();
+            services.AddScoped<GetPublicUserProfileCover>();
+            services.AddScoped<ReplaceCurrentUserProfileCover>();
             services.AddScoped<ChangePassword>();
             services.AddScoped<LogoutAll>();
             services.AddScoped<RequestEmailVerification>();
@@ -170,6 +175,8 @@ public static class ServiceRegistration
             services.AddScoped<ReplaceCurrentUserWallpaper>();
             services.AddScoped<GetCurrentUserWallpaper>();
             services.AddScoped<UpdateCurrentUserWallpaperPreference>();
+            services.AddScoped<ReplaceCurrentUserProfileCover>();
+            services.AddScoped<GetPublicUserProfileCover>();
             services.AddScoped<ChangePassword>();
             services.AddScoped<LogoutAll>();
             services.AddScoped<ModerateTeam>();
@@ -194,8 +201,7 @@ public static class ServiceRegistration
         var requestAdmissionLimits = configuration
             .GetSection("RequestAdmission")
             .Get<RequestAdmissionOptions>() ?? new RequestAdmissionOptions();
-        var redis = configuration.GetConnectionString("Redis");
-        var signalR = services.AddSignalR();
+        services.AddSignalR();
         services.AddSingleton<CompetitionHubSubscriptionRegistry>();
         services.AddSingleton<ICompetitionHubAudienceAccess, CompetitionHubAudienceAccess>();
         services.AddSingleton<ICompetitionHubAudienceRouter, CompetitionHubAudienceRouter>();
@@ -207,20 +213,21 @@ public static class ServiceRegistration
                 LocalLeaderboardRefreshPublisher>();
             services.AddSingleton<IGameplayFactStateChangedNotification,
                 LocalGameplayFactStatePublisher>();
+            services.Replace(ServiceDescriptor.Singleton<INotificationChangePublisher,
+                LocalNotificationChangePublisher>());
         }
         services.AddSingleton<NoCTF.API.Pagination.SignedKeysetCursor>();
         services.AddSingleton<TeamWriteUpPreviewTicketCodec>();
         services.AddScoped<ICompetitionLifecycleNotificationPublisher, SignalRCompetitionLifecyclePublisher>();
         if (includeInfrastructure
             && !development
-            && !configuration.GetValue<bool>("OpenApi:Exporting")
-            && !string.IsNullOrWhiteSpace(redis))
+            && !configuration.GetValue<bool>("OpenApi:Exporting"))
         {
-            signalR.AddStackExchangeRedis(redis);
-            services.AddHostedService<NoCTF.API.SignalR.Publishing.RedisGameplayFactStateRelay>();
-            services.AddHostedService<NoCTF.API.SignalR.Publishing.RedisLeaderboardRefreshRelay>();
-            services.AddHostedService<NoCTF.API.SignalR.Publishing.RedisPlatformLogRelay>();
-            services.AddHostedService<NoCTF.API.SignalR.Publishing.RedisCompetitionEventRefreshRelay>();
+            services.AddHostedService<NoCTF.API.SignalR.Publishing.NatsGameplayFactStateRelay>();
+            services.AddHostedService<NoCTF.API.SignalR.Publishing.NatsLeaderboardRefreshRelay>();
+            services.AddHostedService<NoCTF.API.SignalR.Publishing.NatsPlatformLogRelay>();
+            services.AddHostedService<NoCTF.API.SignalR.Publishing.NatsCompetitionEventRefreshRelay>();
+            services.AddHostedService<NatsNotificationChangeRelay>();
         }
         services.AddRateLimiter(options =>
         {
@@ -288,6 +295,24 @@ public static class ServiceRegistration
                         QueueLimit = 0
                     }));
         });
+        return services;
+    }
+
+    public static IServiceCollection AddNoCtfStaticAssetDelivery(this IServiceCollection services)
+    {
+        services.AddResponseCompression(options =>
+        {
+            options.EnableForHttps = true;
+            options.Providers.Add<BrotliCompressionProvider>();
+            options.Providers.Add<GzipCompressionProvider>();
+            options.MimeTypes = ResponseCompressionDefaults.MimeTypes
+                .Concat(["image/svg+xml"])
+                .Distinct(StringComparer.OrdinalIgnoreCase);
+        });
+        services.Configure<BrotliCompressionProviderOptions>(options =>
+            options.Level = CompressionLevel.Fastest);
+        services.Configure<GzipCompressionProviderOptions>(options =>
+            options.Level = CompressionLevel.Fastest);
         return services;
     }
 }

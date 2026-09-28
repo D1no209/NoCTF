@@ -21,6 +21,8 @@ const { startGateErrorMessage, competitionId, competition, canWrite, canManagePe
           :alt="$t('ui.competitionPoster')"
           :fallback="$t('competitionBrowser.noPoster')"
           :aspect-ratio="16 / 9"
+          loading="eager"
+          fetchpriority="high"
           class="min-w-0 rounded-xl"
         />
         <div class="flex min-w-0 flex-col gap-4">
@@ -172,12 +174,22 @@ const { startGateErrorMessage, competitionId, competition, canWrite, canManagePe
         <div v-if="canManagePermissions && hardDeletePreviewLoading" class="flex items-center gap-2 text-sm text-muted-foreground">
           <Spinner data-icon="inline-start" /> {{ $t('ui.checkingPermanentDeletionImpact') }}
         </div>
-        <Alert v-else-if="canManagePermissions && hardDeletePreviewError" variant="destructive" class="w-full">
-          <AlertDescription>{{ $message(hardDeletePreviewError) }}</AlertDescription>
-        </Alert>
-        <Alert v-else-if="canManagePermissions && hardDeletePreview && !hardDeletePreview.canHardDelete" class="w-full">
-          <AlertTitle>{{ $t('ui.permanentDeletionIsProtected') }}</AlertTitle>
-          <AlertDescription class="flex flex-col gap-2">
+        <div
+          v-else-if="canManagePermissions && hardDeletePreviewError"
+          data-slot="hard-delete-impact"
+          role="status"
+          class="w-full text-sm text-destructive"
+        >
+          {{ $message(hardDeletePreviewError) }}
+        </div>
+        <div
+          v-else-if="canManagePermissions && hardDeletePreview && !hardDeletePreview.canHardDelete"
+          data-slot="hard-delete-impact"
+          role="status"
+          class="flex w-full flex-col gap-2 text-sm text-muted-foreground"
+        >
+          <p class="font-semibold text-foreground">{{ $t('ui.permanentDeletionIsProtected') }}</p>
+          <div class="flex flex-col gap-2">
             <span>{{ $t('ui.theFollowingPermanentHistoryOrBusinessReferencesStillExistSo') }}</span>
             <span v-if="hardDeletePreview.references?.some(reference => reference.code === 'HistoricalEvent')" class="font-medium">
               {{ $t('ui.competitionEventsAreRetainedPermanentlyAndCannotBeRemovedOr') }}
@@ -194,11 +206,16 @@ const { startGateErrorMessage, competitionId, competition, canWrite, canManagePe
                   ? $t('ui.forceDeletionBlockedNotificationThreadsContainCrossScopeOrUnproven')
                   : $t('ui.forceCascadeDeletionIsCurrentlyBlockedFinishTheCompetitionAnd') }}
             </span>
-          </AlertDescription>
-        </Alert>
-        <Alert v-else-if="canManagePermissions && hardDeletePreview?.canHardDelete" class="w-full">
-          <AlertDescription>{{ $t('ui.impactCheckPassedThisCompetitionHasNoPermanentHistoryOr') }}</AlertDescription>
-        </Alert>
+          </div>
+        </div>
+        <p
+          v-else-if="canManagePermissions && hardDeletePreview?.canHardDelete"
+          data-slot="hard-delete-impact"
+          role="status"
+          class="w-full text-sm text-muted-foreground"
+        >
+          {{ $t('ui.impactCheckPassedThisCompetitionHasNoPermanentHistoryOr') }}
+        </p>
       </CardContent>
       </section>
       </template>

@@ -14,14 +14,14 @@ namespace NoCTF.Infrastructure.Administration;
 
 public sealed class UserAccountAdministrationStore(
     NoCtfDbContext db,
-    ITransactionalMessageOutbox? messageOutbox = null)
+    IPostCommitMessagePublisher? messageOutbox = null)
     : IUserAccountAdministrationStore
 {
     private static readonly JsonSerializerOptions JsonOptions =
         new(JsonSerializerDefaults.Web);
 
-    private readonly ITransactionalMessageOutbox outbox =
-        messageOutbox ?? new NoOpTransactionalMessageOutbox();
+    private readonly IPostCommitMessagePublisher outbox =
+        messageOutbox ?? new NoOpPostCommitMessagePublisher();
     public async Task<UserDeletionPreview?> PreviewDeletionAsync(
         Guid userId,
         Guid actorUserId,
@@ -48,6 +48,7 @@ public sealed class UserAccountAdministrationStore(
         await ResourceManagerRoleGuard.AcquireAsync(db, [userId], ct);
         var user = await db.Users
             .Include(candidate => candidate.AvatarFile)
+            .Include(candidate => candidate.ProfileCoverFile)
             .Include(candidate => candidate.WallpaperFile)
             .SingleOrDefaultAsync(candidate => candidate.Id == userId, ct);
         if (user is null)
@@ -67,6 +68,7 @@ public sealed class UserAccountAdministrationStore(
             return new(UserDeletionState.HardDeleteBlocked, preview);
 
         var previousAvatarFileId = user.AvatarFileId;
+        var previousProfileCoverFileId = user.ProfileCoverFileId;
         var previousWallpaperFileId = user.WallpaperFileId;
         var originalUserName = user.UserName;
         await db.AccountTokens
@@ -105,14 +107,30 @@ public sealed class UserAccountAdministrationStore(
                 await outbox.PublishAsync(new CleanupFile(previous));
             if (previousWallpaperFileId is { } previousWallpaper)
                 await outbox.PublishAsync(new CleanupFile(previousWallpaper));
-            await db.SaveChangesAsync(ct);
-            await transaction.CommitAsync(ct);
-            await outbox.FlushOutgoingMessagesAsync();
+            if (previousProfileCoverFileId is { } previousProfileCover)
+                await outbox.PublishAsync(new CleanupFile(previousProfileCover));
+            try
+            {
+                await db.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
+            }
+            catch (Exception exception) when (TransactionFailureClassifier.IsRetryable(exception)
+                || exception is DbUpdateConcurrencyException)
+            {
+                await transaction.RollbackAsync(ct);
+                outbox.DiscardPendingMessages();
+                db.ChangeTracker.Clear();
+                if (await ActiveHumanAdministratorMutationGuard.CountAsync(db, ct) <= 1)
+                    return new(UserDeletionState.LastAdministratorProtected, preview);
+                throw;
+            }
+            await outbox.FlushCommittedMessagesAsync();
             return new(
                 UserDeletionState.PhysicallyDeleted,
                 preview,
                 previousAvatarFileId,
-                previousWallpaperFileId);
+                previousWallpaperFileId,
+                previousProfileCoverFileId);
         }
 
         await RemoveResourcePermissionsAsync(userId, ct);
@@ -120,6 +138,11 @@ public sealed class UserAccountAdministrationStore(
         user.NormalizedUserName = user.UserName.ToUpperInvariant();
         user.Email = string.Empty;
         user.PasswordHash = string.Empty;
+        user.ExternalIdentityProviderId = null;
+        user.ExternalIdentityProtocol = null;
+        user.ExternalIdentityNamespace = null;
+        user.ExternalIdentitySubject = null;
+        user.ExternalIdentityBoundAt = null;
         user.Role = UserRole.User;
         user.AccountStatus = UserAccountStatus.Anonymized;
         await NoCTF.Infrastructure.Authentication.UserCredentialWrite.InvalidateTokensAsync(db, user, ct);
@@ -129,6 +152,8 @@ public sealed class UserAccountAdministrationStore(
         user.SchoolStudentNumber = null;
         user.AvatarFileId = null;
         user.AvatarFile = null;
+        user.ProfileCoverFileId = null;
+        user.ProfileCoverFile = null;
         user.WallpaperFileId = null;
         user.WallpaperFile = null;
         user.WallpaperEnabled = false;
@@ -149,14 +174,30 @@ public sealed class UserAccountAdministrationStore(
             await outbox.PublishAsync(new CleanupFile(previousFileId));
         if (previousWallpaperFileId is { } wallpaperFileId)
             await outbox.PublishAsync(new CleanupFile(wallpaperFileId));
-        await db.SaveChangesAsync(ct);
-        await transaction.CommitAsync(ct);
-        await outbox.FlushOutgoingMessagesAsync();
+        if (previousProfileCoverFileId is { } profileCoverFileId)
+            await outbox.PublishAsync(new CleanupFile(profileCoverFileId));
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+        }
+        catch (Exception exception) when (TransactionFailureClassifier.IsRetryable(exception)
+            || exception is DbUpdateConcurrencyException)
+        {
+            await transaction.RollbackAsync(ct);
+            outbox.DiscardPendingMessages();
+            db.ChangeTracker.Clear();
+            if (await ActiveHumanAdministratorMutationGuard.CountAsync(db, ct) <= 1)
+                return new(UserDeletionState.LastAdministratorProtected, preview);
+            throw;
+        }
+        await outbox.FlushCommittedMessagesAsync();
         return new(
             UserDeletionState.Anonymized,
             preview,
             previousAvatarFileId,
-            previousWallpaperFileId);
+            previousWallpaperFileId,
+            previousProfileCoverFileId);
     }
 
     private void RecordLifecycleFact(
@@ -167,21 +208,18 @@ public sealed class UserAccountAdministrationStore(
         DateTimeOffset occurredAt,
         string? targetUserName = null)
     {
-        db.Notifications.Add(new Notification
+        db.Notifications.Add(new UserAccountLifecycleChangedNotification
         {
             Id = Guid.CreateVersion7(occurredAt),
             SourceType = NotificationSourceType.User,
             SourceId = actorUserId,
             TargetType = NotificationTargetType.PlatformAdministrators,
             TargetId = Notification.PlatformAdministratorsTargetId,
-            Kind = NotificationKind.UserAccountLifecycleChanged,
-            ContentJson = JsonSerializer.Serialize(new UserAccountLifecycleFact(
-                1,
-                user.Id,
-                targetUserName ?? user.UserName,
-                action,
-                reason,
-                false), JsonOptions),
+            UserId = user.Id,
+            UserName = targetUserName ?? user.UserName,
+            UserLifecycleAction = action,
+            Reason = reason,
+            Automatic = false,
             RelatedType = EntityReferenceKind.User,
             RelatedId = user.Id,
             SentAt = occurredAt
@@ -194,7 +232,7 @@ public sealed class UserAccountAdministrationStore(
         CancellationToken ct)
     {
         var teamIds = await db.Teams.IgnoreQueryFilters().AsNoTracking()
-            .Where(team => team.MemberIds.Contains(user.Id))
+            .Where(team => team.Members.Any(member => member.UserId == user.Id))
             .Select(team => team.Id)
             .ToArrayAsync(ct);
         var references = new List<UserDeletionReference>();
@@ -206,9 +244,9 @@ public sealed class UserAccountAdministrationStore(
         await AddReferenceAsync(
             UserDeletionReferenceKind.CompetitionCollaborator,
             db.Competitions.IgnoreQueryFilters().CountAsync(
-                competition => competition.ManagerIds.Contains(user.Id)
-                    || competition.JudgeIds.Contains(user.Id)
-                    || competition.ObserverIds.Contains(user.Id),
+                competition => competition.Collaborators.Any(collaborator => collaborator.Role == NoCTF.Domain.Competitions.CompetitionCollaboratorRole.Manager && collaborator.UserId == user.Id)
+                    || competition.Collaborators.Any(collaborator => collaborator.Role == NoCTF.Domain.Competitions.CompetitionCollaboratorRole.Judge && collaborator.UserId == user.Id)
+                    || competition.Collaborators.Any(collaborator => collaborator.Role == NoCTF.Domain.Competitions.CompetitionCollaboratorRole.Observer && collaborator.UserId == user.Id),
                 ct));
         await AddReferenceAsync(
             UserDeletionReferenceKind.ChallengeOwner,
@@ -218,7 +256,7 @@ public sealed class UserAccountAdministrationStore(
         await AddReferenceAsync(
             UserDeletionReferenceKind.ChallengeManager,
             db.Challenges.IgnoreQueryFilters().CountAsync(
-                challenge => challenge.ManagerIds.Contains(user.Id),
+                challenge => challenge.Managers.Any(manager => manager.UserId == user.Id),
                 ct));
         await AddReferenceAsync(
             UserDeletionReferenceKind.TeamCaptain,
@@ -288,9 +326,9 @@ public sealed class UserAccountAdministrationStore(
     private async Task RemoveResourcePermissionsAsync(Guid userId, CancellationToken ct)
     {
         var competitions = await db.Competitions.IgnoreQueryFilters()
-            .Where(competition => competition.ManagerIds.Contains(userId)
-                || competition.JudgeIds.Contains(userId)
-                || competition.ObserverIds.Contains(userId))
+            .Where(competition => competition.Collaborators.Any(collaborator => collaborator.Role == NoCTF.Domain.Competitions.CompetitionCollaboratorRole.Manager && collaborator.UserId == userId)
+                || competition.Collaborators.Any(collaborator => collaborator.Role == NoCTF.Domain.Competitions.CompetitionCollaboratorRole.Judge && collaborator.UserId == userId)
+                || competition.Collaborators.Any(collaborator => collaborator.Role == NoCTF.Domain.Competitions.CompetitionCollaboratorRole.Observer && collaborator.UserId == userId))
             .ToListAsync(ct);
         foreach (var competition in competitions)
         {
@@ -300,7 +338,7 @@ public sealed class UserAccountAdministrationStore(
         }
 
         var challenges = await db.Challenges.IgnoreQueryFilters()
-            .Where(challenge => challenge.ManagerIds.Contains(userId))
+            .Where(challenge => challenge.Managers.Any(manager => manager.UserId == userId))
             .ToListAsync(ct);
         foreach (var challenge in challenges)
             challenge.ManagerIds = challenge.ManagerIds.Where(id => id != userId).ToArray();
@@ -309,7 +347,7 @@ public sealed class UserAccountAdministrationStore(
     private async Task RemoveTeamMembershipsAsync(Guid userId, CancellationToken ct)
     {
         var teams = await db.Teams.IgnoreQueryFilters()
-            .Where(team => team.CaptainId != userId && team.MemberIds.Contains(userId))
+            .Where(team => team.CaptainId != userId && team.Members.Any(member => member.UserId == userId))
             .ToListAsync(ct);
         foreach (var team in teams)
             team.MemberIds = team.MemberIds.Where(id => id != userId).ToArray();

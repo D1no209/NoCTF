@@ -37,6 +37,7 @@ public sealed class GetAdminRuntimeEndpoint(
             ? TypedResults.NotFound()
             : TypedResults.Ok(AdminRuntimeMapping.ToResponse(
                 result,
-                timeProvider.GetUtcNow()));
+                HttpContext.Request,
+                timeProvider.GetUtcNow(), includeCapacity: user.IsAdministrator));
     }
 }

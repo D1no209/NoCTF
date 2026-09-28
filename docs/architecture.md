@@ -6,27 +6,32 @@
 Browser/Client
      |
      v
-NoCTF.API  ---- Redis (cache/rate limit/SignalR/heartbeat)
+NoCTF.Host [Api]  ---- Redis (FusionCache L2/backplane only)
      |
      +---- PostgreSQL (business facts)
-     +---- NATS JetStream (durable messages, consumers, retries, DLQ)
+     +---- NATS JetStream/KV (durable messages and short coordination leases)
+     +---- Loki (redacted OTLP platform logs)
                          |
               +----------+----------+
               v                     v
-        NoCTF.Worker (N)      NoCTF.Runner (N/pools)
+        NoCTF.Host [Worker]   NoCTF.Host [Runner] (N/pools)
                                       |
                          Docker / Kubernetes / Libvirt
 ```
 
-平台包含三个运行角色：
+唯一可执行文件 `NoCTF.Host.dll` 包含三个运行角色；下列名称表示功能类库，不是独立进程入口：
 
 - `NoCTF.API`：FastEndpoints、认证、授权、接入事务、REST、SignalR、内部 Checker callback。
 - `NoCTF.Worker`：Submission 普通判定、生命周期、轮次、Flag、排行榜投影、通知与清理。
 - `NoCTF.Runner`：Wolverine durable consumer；执行 Docker、Compose/Kompose、Kubernetes、Libvirt/OVA、Checker 和 Patch。
 
-角色可由兼容入口 `NoCTF.API`、`NoCTF.Worker`、`NoCTF.Runner` 分别承载，也可由
-`NoCTF.Host` 承载任意非空组合。统一宿主读取 `Hosting:Roles` 枚举数组，缺省启用
-`Api`、`Worker`、`Runner`；配置只在启动时解析，切换通过重启或滚动发布完成。
+外部通知统一使用赛事级 Webhook。平台不包含聊天协议、群组、消息模板或外部 Provider；Worker
+只向赛事负责人配置的目标发送带 HMAC 签名的公开 CloudEvents。浏览器继续通过 SignalR 接收
+失效提示并重读 REST。通用非交互自动化账户只负责 API 身份，不承担通知投递模型。
+
+`NoCTF.Host` 是唯一进程入口，可承载任意非空角色组合。统一宿主读取 `Hosting:Roles` 枚举数组，缺省启用
+`Api`、`Worker`、`Runner`；配置只在启动时解析。一次发布中的所有角色必须运行同一 Host 镜像，
+不支持新旧版本混跑或滚动兼容窗口。
 
 常见拓扑包括：
 
@@ -35,14 +40,16 @@ NoCTF.API  ---- Redis (cache/rate limit/SignalR/heartbeat)
 - 混合：API+Worker 与独立 Runner，或 API+Runner 与独立 Worker。
 
 Worker、Runner 与 API 均可多副本。每个进程中的每种角色至多一份，每个 Runner 进程
-只拥有一个稳定唯一 RunnerId。组合部署仍通过 PostgreSQL/Wolverine durable queue 传递业务
+只拥有一个稳定唯一 RunnerId。组合部署仍通过 NATS JetStream durable consumer 传递业务
 工作，不使用内存 Channel 或 fire-and-forget 代替持久投递。
 
 ## 数据依赖
 
 - PostgreSQL：唯一业务事实源；不承载 Wolverine message transport。
 - NATS JetStream：跨角色 durable transport、consumer group、重投和 DLQ。
-- Redis：FusionCache 排行榜 L2、TokenVersion 缓存、分布式限流、SignalR backplane 和 Runner heartbeat/capacity。Redis 丢失不丢业务事实，也不决定排行榜是否刷新。
+- Redis：仅作为 FusionCache 的可重建 L2 与跨实例失效 backplane；不保存业务配额、Runner 在线状态、租约或 SignalR 广播。
+- NATS KV：短期竞争状态、Runner 在线注册和资源域租约；容量分配与请求配额的权威状态仍在 EF Core。
+- Loki：接收 Host 脱敏后的 OTLP 日志并供管理员查询；不可用时日志接口报告不可用。
 - Object Storage：Challenge Attachment 与 AWDP Patch archive；支持 S3Compatible 和开发用 LocalFileSystem。
 - Runtime Provider：Docker、Kubernetes、Libvirt/QEMU/KVM。Provider 隐藏资源创建、查询、销毁与 receipt 细节。
 
@@ -59,6 +66,8 @@ HTML 响应使用 `no-cache`。API、Hub、健康检查、OpenAPI 与带扩展�
 ```text
 Domain <- Application <- API / Worker / Runner / Host
                        <- Infrastructure
+
+NoCTF.Worker -> signed competition Webhooks
 ```
 
 - Domain 不依赖 EF、HTTP、Redis、Wolverine 或 Provider SDK。
@@ -73,19 +82,17 @@ Domain <- Application <- API / Worker / Runner / Host
 
 分数投影不写回 GameplayFact。影响排行榜的业务提交发布 NATS 失效消息；Worker 按比赛合并 500ms 内的失效并从 PostgreSQL 全量投影到命名 FusionCache。缓存丢失时由 PostgreSQL 重建，不扫描 Dirty 业务列。
 
-Flag、AWDP Break 与 Fix 只有在 GameplayFact 事务提交成功后才增加低基数 Prometheus counter；幂等重放与拒绝请求不重复计数。Flag/Break 首次判定终态另记录 `correct | incorrect | platform_error` 低基数结果和从接收到最终判定的完整处理耗时，重判不重复计数。平台监控将 Flag 与 Break 合并展示，提供五分钟正确率、处理 P95、平台错误率、Flag/Fix 平均速率与提交量；正确率排除平台失败，平台错误率以全部终态处理为分母。
+Flag、AWDP Break 与 Fix 只有在 GameplayFact 事务提交成功后才增加低基数 Prometheus counter；幂等重放与拒绝请求不重复计数。Flag/Break 首次判定终态另记录 `correct | incorrect | platform_error` 低基数结果和从接收到最终判定的完整处理耗时，重判不重复计数。外部 Prometheus recording rules 将 Flag 与 Break 合并，计算五分钟正确率、处理 P95、平台错误率、Flag/Fix 平均速率与提交量；正确率排除平台失败，平台错误率以全部终态处理为分母。平台不查询或呈现这些监控数据。
 
 ## Runner Pool
 
-平台部署配置一个活动 RuntimeProvider（Docker 或 Kubernetes）与 RunnerPool；Challenge/Competition 不引用 Provider 或 RunnerPool。节点通过 Redis TTL heartbeat 发布容量，Worker 从 Registry 原子选择具体 RunnerId，并将 durable 命令直接投递到该节点的 `runner-node-{runnerId}` PostgreSQL queue。RuntimeInstance 只持久化本次调度实际使用的 RunnerId、RuntimeProvider、ProviderReceiptJson 与展开 URL，不保存 pool 路由状态。
+平台部署配置一个活动 RuntimeProvider（Docker 或 Kubernetes）与 RunnerPool；Challenge/Competition 不引用 Provider 或 RunnerPool。节点只使用 NATS KV Runner registration schema 3 发布有效期心跳；Worker 通过 EF Core Serializable 事务、capacity ledger/allocation 和当前观测选择具体 RunnerId，并将 durable 命令投递到该节点的 JetStream subject。RuntimeInstance 只持久化本次调度实际使用的 RunnerId、RuntimeProvider、结构化 AccessEndpoint 以及一对一 typed receipt，不保存 pool 路由状态或 JSON receipt。
 
-每次心跳同时维护 `runner-pool:{pool}:candidates` 有序集合。候选分数采用内存、CPU 与 PID
-三者中最高的已用比例，并加入不超过 `1e-6` 的随机扰动避免同分节点长期固定成为首选。
-调度热路径只读取压力最低的前 8 个候选，Lua 脚本原子校验成员资格、心跳、容量和
-`runner-claim:{runtimeInstanceId}` 幂等所有权，再扣减容量并更新分数。前 8 个候选均不可用时，
-只执行一次池索引重建与原子兜底选择，避免池中后续可用节点被误判为容量不足。释放 Claim
-会在同一脚本内恢复容量并更新候选分数；过期心跳在分配时从候选集合剔除。Runner/Runtime ID
-仅进入 Trace 与结构化日志，不作为 Prometheus 标签。
+Runner resource-domain 所有权使用 NATS KV CAS 租约：租约 30 秒、每 10 秒续租，KV revision
+作为 fencing token。连续两次续租失败时 Runner 进入 draining 并终止进程；接管者从关系数据库
+中的 ledger、allocation 与 Runtime 事实重建容量。分配以唯一约束和 concurrency stamp 保证幂等，
+不读取旧 Redis Claim、不使用 `__legacy__` pool。Runner/Runtime ID 仅进入 Trace 与结构化日志，
+不作为 Prometheus 标签。
 
 `file://` OVA URL 必须在部署所选 Runner 节点可访问。平台 API 不下载或管理 OVA；配置固定
 预期 SHA-256，Libvirt Provider 负责读取/下载、校验、内容寻址缓存以及多 VM Appliance

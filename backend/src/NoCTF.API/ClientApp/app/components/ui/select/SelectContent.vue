@@ -17,7 +17,7 @@ defineOptions({
 const props = withDefaults(
   defineProps<SelectContentProps & { class?: HTMLAttributes['class'] }>(),
   {
-    position: 'item-aligned',
+    position: 'popper',
     align: 'center',
   },
 )
@@ -42,7 +42,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
       )
       "
     >
-      <SelectViewport data-scroll-surface data-scroll-axis="y"
+      <SelectViewport v-scroll-surface data-scroll-surface data-scroll-axis="y"
         :data-position="position"
         :class="cn(
           'data-[position=popper]:h-(--reka-select-trigger-height) data-[position=popper]:w-full data-[position=popper]:min-w-(--reka-select-trigger-width)',

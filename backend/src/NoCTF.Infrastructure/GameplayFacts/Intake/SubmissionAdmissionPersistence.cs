@@ -6,8 +6,10 @@ using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Teams;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Runtime;
+using NoCTF.Domain.Challenges;
 using NoCTF.Infrastructure.Competitions.Lifecycle;
 using NoCTF.GameModes.Registration;
+using NoCTF.Infrastructure.Competitions.Progression;
 
 namespace NoCTF.Infrastructure.GameplayFacts.Intake;
 
@@ -51,33 +53,59 @@ internal static class GameplayFactAdmissionPersistence
                 challenge => challenge.Id,
                 (item, challenge) => new { item.Competition, item.CompetitionChallenge, Challenge = challenge })
             .Join(
-                db.Teams.AsNoTracking().Where(team => team.MemberIds.Contains(userId)),
+                db.Teams.AsNoTracking().Where(team => team.Members.Any(member => member.UserId == userId)),
                 item => item.Competition.Id,
                 team => team.CompetitionId,
-                (item, team) => new { item.Competition, item.CompetitionChallenge, item.Challenge, Team = team })
+                (item, team) => new
+                {
+                    item.Competition.Id,
+                    item.Competition.Mode,
+                    item.Competition.Status,
+                    item.Competition.StartAt,
+                    item.Competition.EndAt,
+                    item.Competition.PracticeModeEnabled,
+                    CompetitionDeleted = item.Competition.DeletedAt != null,
+                    CompetitionConfiguration = item.Competition.ModeConfiguration,
+                    CompetitionChallengeId = item.CompetitionChallenge.Id,
+                    ChallengeRules = item.CompetitionChallenge.Rules,
+                    ChallengePublished = item.CompetitionChallenge.IsPublished,
+                    ChallengeDeleted = item.Challenge.DeletedAt != null
+                        || item.CompetitionChallenge.DeletedAt != null,
+                    ChallengeDefinition = item.Challenge.Definition,
+                    TeamId = team.Id,
+                    TeamDeleted = team.DeletedAt != null,
+                    TeamBanned = team.IsBanned,
+                    TeamStatus = team.RegistrationStatus
+                })
+            .AsSplitQuery()
             .SingleOrDefaultAsync(cancellationToken);
         if (scope is null)
             return null;
+        if (scope.Mode == GameMode.Ctf
+            && !await new ProgressionChallengeAccess(db).IsActiveAsync(
+                competitionId, competitionChallengeId, scope.TeamId,
+                cancellationToken))
+            return null;
 
-        var officialWindow = scope.Competition.Mode == GameMode.Ctf
+        var officialWindow = scope.Mode == GameMode.Ctf
             ? await CompetitionOfficialWindowReader.ReadAsync(
                 db,
                 competitionId,
-                scope.Competition.StartAt,
-                scope.Competition.EndAt,
+                scope.StartAt,
+                scope.EndAt,
                 cancellationToken)
             : CompetitionOfficialWindow.Resolve(
-                scope.Competition.StartAt,
-                scope.Competition.EndAt);
-        var practicePhase = scope.Competition.Mode == GameMode.Ctf
-            && scope.Competition.Status == CompetitionStatus.Finished;
+                scope.StartAt,
+                scope.EndAt);
+        var practicePhase = scope.Mode == GameMode.Ctf
+            && scope.Status == CompetitionStatus.Finished;
         var attemptQuery = db.GameplayFacts.AsNoTracking()
             .Where(submission =>
                 submission.CompetitionId == competitionId
-                && submission.TeamId == scope.Team.Id
+                && submission.TeamId == scope.TeamId
                 && submission.CompetitionChallengeId == competitionChallengeId
                 && submission.State != GameplayFactState.PlatformFailed);
-        if (scope.Competition.Mode == GameMode.Ctf)
+        if (scope.Mode == GameMode.Ctf)
         {
             attemptQuery = practicePhase
                 ? attemptQuery.Where(submission => submission.OccurredAt >= officialWindow.EndAt)
@@ -97,9 +125,9 @@ internal static class GameplayFactAdmissionPersistence
         var breakAttempts = attempts.GetValueOrDefault(GameplayFactKind.BreakAttempt);
         var fixAttempts = attempts.GetValueOrDefault(GameplayFactKind.FixAttempt);
         var practiceRuntimeState = PracticeRuntimeAdmissionState.NotRequired;
-        if (practicePhase && scope.Competition.PracticeModeEnabled)
+        if (practicePhase && scope.PracticeModeEnabled)
         {
-            var template = runtimeTemplates.Get(scope.Competition.Mode, scope.Challenge.DefinitionJson);
+            var template = runtimeTemplates.Get(scope.ChallengeDefinition);
             if (template is not null)
             {
                 if (template.RuntimeKind is not (RuntimeKind.Container or RuntimeKind.Compose))
@@ -111,7 +139,7 @@ internal static class GameplayFactAdmissionPersistence
                     var running = await db.RuntimeInstances.AsNoTracking().AnyAsync(instance =>
                         instance.CompetitionId == competitionId
                         && instance.CompetitionChallengeId == competitionChallengeId
-                        && instance.TeamId == scope.Team.Id
+                        && instance.TeamId == scope.TeamId
                         && instance.Purpose == RuntimePurpose.Practice
                         && instance.State == RuntimeState.Running
                         && instance.ExpiresAt > observedAt,
@@ -125,29 +153,32 @@ internal static class GameplayFactAdmissionPersistence
 
         return new(
             competitionId,
-            scope.Team.Id,
+            scope.TeamId,
             competitionChallengeId,
-            scope.Competition.Mode,
-            scope.Competition.ConfigurationJson,
-            scope.CompetitionChallenge.RulesJson,
+            scope.Mode,
+            scope.CompetitionConfiguration
+                ?? throw new InvalidOperationException("Competition configuration is required."),
+            scope.ChallengeRules
+                ?? throw new InvalidOperationException("Challenge rules are required."),
             (flagAttempts?.Count ?? 0) + (breakAttempts?.Count ?? 0),
             fixAttempts?.Count ?? 0,
-            scope.Competition.Status,
-            scope.Competition.StartAt,
-            scope.Competition.EndAt,
-            scope.Competition.DeletedAt is not null,
-            scope.Challenge.DeletedAt is not null || scope.CompetitionChallenge.DeletedAt is not null,
-            scope.CompetitionChallenge.IsPublished,
-            scope.Team.DeletedAt is not null,
-            scope.Team.IsBanned,
-            scope.Team.RegistrationStatus == TeamRegistrationStatus.Approved,
+            scope.Status,
+            scope.StartAt,
+            scope.EndAt,
+            scope.CompetitionDeleted,
+            scope.ChallengeDeleted,
+            scope.ChallengePublished,
+            scope.TeamDeleted,
+            scope.TeamBanned,
+            scope.TeamStatus == TeamRegistrationStatus.Approved,
             true,
             breakAttempts?.HasCorrect == true,
             fixAttempts?.HasCorrect == true,
             flagAttempts?.HasCorrect == true,
             officialWindow.EndAt,
-            scope.Competition.PracticeModeEnabled,
-            practiceRuntimeState);
+            scope.PracticeModeEnabled,
+            practiceRuntimeState,
+            scope.ChallengeDefinition);
     }
 
     public static bool Matches(
@@ -157,10 +188,16 @@ internal static class GameplayFactAdmissionPersistence
         && current.CompetitionId == expected.CompetitionId
         && current.TeamId == expected.TeamId
         && current.CompetitionChallengeId == expected.CompetitionChallengeId
+        && current.Mode == expected.Mode
         && current.CompetitionStatus == expected.CompetitionStatus
+        && current.StartAt == expected.StartAt
+        && current.EndAt == expected.EndAt
         && current.OfficialEndAt == expected.OfficialEndAt
         && current.PracticeModeEnabled == expected.PracticeModeEnabled
         && current.PracticeRuntimeState == expected.PracticeRuntimeState
+        && ChallengeDefinitionStructuralComparer.Equals(
+            current.ChallengeDefinition,
+            expected.ChallengeDefinition)
         && current.CompetitionDeleted == expected.CompetitionDeleted
         && current.ChallengeDeleted == expected.ChallengeDeleted
         && current.ChallengePublished == expected.ChallengePublished

@@ -3,6 +3,10 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.Application.Challenges.Management;
 using NoCTF.API.Security;
 using NoCTF.Application.Competitions.Visibility;
+using NoCTF.Application.Challenges.Bank;
+using NoCTF.Domain.Challenges;
+using NoCTF.Domain.Competitions;
+using NoCTF.Application.Competitions.Progression;
 
 namespace NoCTF.API.Endpoints.Challenges;
 
@@ -13,10 +17,11 @@ public sealed class ListChallengesRequest
 
 public sealed class ListChallengesEndpoint(
     ListChallenges list,
-    ICompetitionChallengeAudienceAccess audienceAccess,
-    ICompetitionVisibilityAccess visibilityAccess,
+    ICompetitionChallengeReadAccess readAccess,
+    IProgressionChallengeAccess progressionAccess,
     IUserContext user,
-    TimeProvider timeProvider) : Endpoint<ListChallengesRequest, Results<Ok<ChallengeListResponse>, NotFound>>
+    TimeProvider timeProvider,
+    IExperimentalFeatureReader? experimentalFeatures = null) : Endpoint<ListChallengesRequest, Results<Ok<ChallengeListResponse>, NotFound>>
 {
     public override void Configure()
     {
@@ -30,25 +35,49 @@ public sealed class ListChallengesEndpoint(
         CancellationToken ct)
     {
         var competitionId = Route<Guid>("competitionId");
-        if (!await audienceAccess.CanReadAsync(user.UserId, competitionId, ct))
-            return TypedResults.NotFound();
-        var visibility = await visibilityAccess.ResolveAsync(
+        var decision = await readAccess.ResolveAsync(
             user.UserId,
             competitionId,
             timeProvider.GetUtcNow(),
             ct);
-        if (visibility is null
+        if (decision is null
             || !ParticipantChallengeVisibilityPolicy.CanView(
-                visibility.CompetitionStatus))
+                decision.Visibility.CompetitionStatus))
             return TypedResults.NotFound();
+        var visibility = decision.Visibility;
         var items = await list.ExecuteAsync(
             competitionId,
             includeUnpublished: false,
             includeDeleted: false,
             ct);
-        return TypedResults.Ok(ChallengeMapper.ToListResponse(
-            items,
-            visibility.Visibility,
-            visibility.DataScope));
+        if (visibility.CompetitionStatus is not (CompetitionStatus.Running or CompetitionStatus.Paused)
+            && !(await IsPatchVerificationEnabledAsync(ct)))
+        {
+            items = items.Where(item =>
+                item.InteractionKind != CtfInteractionKind.PatchVerification).ToArray();
+        }
+        var response = ChallengeMapper.ToListResponse(
+            items, visibility.Visibility, visibility.DataScope);
+        if (visibility.GameMode != GameMode.Ctf)
+            return TypedResults.Ok(response);
+        var statuses = await progressionAccess.ReadStatusesAsync(
+            competitionId, decision.TeamId, ct);
+        return TypedResults.Ok(response with
+        {
+            Items = response.Items.Select(item =>
+            {
+                if (!statuses.TryGetValue(item.Id, out var status)) return item;
+                return item with
+                {
+                    Locked = !status.Active,
+                    PrerequisitesSatisfied = status.PrerequisitesSatisfied,
+                    PrerequisitesTotal = status.PrerequisitesTotal
+                };
+            }).ToArray()
+        });
     }
+
+    private Task<bool> IsPatchVerificationEnabledAsync(CancellationToken ct) =>
+        experimentalFeatures?.IsCtfPatchVerificationEnabledAsync(ct)
+        ?? Task.FromResult(false);
 }

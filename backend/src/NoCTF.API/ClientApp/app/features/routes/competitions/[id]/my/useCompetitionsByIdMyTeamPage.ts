@@ -3,11 +3,14 @@ import { markRaw } from 'vue'
 
 import { toast } from 'vue-sonner'
 import { Copy, RefreshCw } from '@lucide/vue'
-import { deleteTeamEndpoint, getMyTeamBanCase, getMyTeamEndpoint, getTeamInvitationEndpoint, leaveTeamEndpoint, patchCompetitionTeam, rotateTeamInvitationEndpoint, submitTeamBanAppeal } from '../../../../../api'
-import type { NoCtfapiEndpointsTeamsMyTeamBanCaseResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../../../api'
+import { deleteTeamEndpoint, getMyTeamBanCase, getMyTeamEndpoint, getTeamInvitationEndpoint, leaveTeamEndpoint, listCompetitionTracks, patchCompetitionTeam, rotateTeamInvitationEndpoint, submitTeamBanAppeal, teamAvatarClear, teamAvatarReplace } from '../../../../../api'
+import type { NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse, NoCtfapiEndpointsTeamsMyTeamBanCaseResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../../../api'
 import { maximumAppealStatementLength, minimumAppealStatementLength, validateAppealStatement } from '../../../../../lib/participant-form-validation'
+import { teamRegistrationErrorMessage } from '../../../../../lib/competition-track'
+import { exceedsUploadLimit } from '../../../../account/upload-limits'
 import CompetitionParticipantWorkspaceComponent from '../../../../competition/CompetitionParticipantWorkspace.vue'
 import TeamMembersComponent from '../../../../teams/TeamMembers.vue'
+import TeamRuntimeManagerComponent from '../../../../teams/TeamRuntimeManager.vue'
 
 /** Owns state, effects and commands for CompetitionsByIdMyTeamPage. */
 export function useCompetitionsByIdMyTeamPage() {
@@ -16,6 +19,44 @@ export function useCompetitionsByIdMyTeamPage() {
   const competitionId = route.params.id as string
 
   const { user } = useAuth()
+
+  const competitionContext = inject(competitionContextKey)!
+
+  const competition = computed(() => competitionContext.competition.value)
+
+  const tracksEnabled = computed(() => competition.value?.tracksEnabled === true)
+
+  const canEditOrganization = computed(() => competition.value?.status === 'Visible'
+    || competition.value?.status === 'Published'
+    || competition.value?.status === 'Running'
+      && competition.value.allowTeamRegistrationWhileRunning === true)
+
+  const selectableTracks = ref<NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse[]>([])
+
+  const tracksLoading = ref(false)
+
+  const tracksError = ref<string | null>(null)
+
+  async function loadTracks(): Promise<void> {
+    selectableTracks.value = []
+    tracksError.value = null
+    if (!tracksEnabled.value) return
+    tracksLoading.value = true
+    try {
+      const { data, error } = await listCompetitionTracks({ path: { competitionId } })
+      if (error || !data) throw error
+      selectableTracks.value = (data.items ?? []).filter(track => track.isPublicSelectable)
+    }
+    catch (error) {
+      tracksError.value = parseApiError(
+        error,
+        translate('ui.failedToLoadCompetitionTracksPleaseTryAgain'),
+      ).message
+    }
+    finally {
+      tracksLoading.value = false
+    }
+  }
 
   const team = ref<NoCtfapiEndpointsTeamsTeamResponse | null>(null)
 
@@ -49,17 +90,45 @@ export function useCompetitionsByIdMyTeamPage() {
   }
 
   async function load() {
-    const { data, error } = await getMyTeamEndpoint({ path: { competitionId } })
+    loadError.value = null
+    const { data, error, response } = await getMyTeamEndpoint({ path: { competitionId } })
     loading.value = false
     if (error || !data) {
       team.value = null
+      if (error && response?.status !== 404) loadError.value = parseApiError(error).message
       return
     }
     team.value = data
     await loadInvitationToken()
   }
 
-  onMounted(load)
+  onMounted(() => {
+    void load()
+    void loadTracks()
+  })
+
+  watch(tracksEnabled, () => { void loadTracks() })
+
+  let unwatchCompetition: (() => void) | undefined
+  onMounted(() => {
+    unwatchCompetition = watchCompetition(competitionId, {
+      competitionEventChanged: (event) => {
+        if (event.kind === 'TeamRegistrationChanged'
+          || event.kind === 'TeamTrackChanged'
+          || event.kind === 'TeamBanned'
+          || event.kind === 'TeamUnbanned'
+          || event.kind === 'TeamBanCorrectionPublished') {
+          void load()
+        }
+        if (event.kind === 'TrackConfigurationUpdated'
+          || event.kind === 'TrackRegistrationPolicyUpdated') {
+          void loadTracks()
+        }
+      },
+      onReconnected: () => { void Promise.all([load(), loadTracks()]) },
+    })
+  })
+  onBeforeUnmount(() => unwatchCompetition?.())
 
   const isCaptain = computed(
     () => !!team.value && !!user.value && team.value.captainId === user.value.userId,
@@ -98,28 +167,116 @@ export function useCompetitionsByIdMyTeamPage() {
 
   const renameValue = ref('')
 
+  const renameTrackKey = ref('')
+
+  const selectedRenameTrack = computed(() => selectableTracks.value.find(
+    track => track.key === renameTrackKey.value,
+  ))
+
+  const renameTrackChanged = computed(() => Boolean(
+    tracksEnabled.value
+    && renameTrackKey.value
+    && renameTrackKey.value !== team.value?.trackKey,
+  ))
+
+  const renameValid = computed(() => Boolean(
+    team.value
+    && canEditOrganization.value
+    && renameValue.value.trim()
+    && (!tracksEnabled.value || renameTrackKey.value),
+  ))
+
   const renamePending = ref(false)
 
   function openRename() {
     renameValue.value = team.value?.name ?? ''
+    renameTrackKey.value = team.value?.trackKey ?? ''
     renameOpen.value = true
   }
 
+  function showOrganizationChangeSuccess(updatedTeam: NoCtfapiEndpointsTeamsTeamResponse): void {
+    toast.success(updatedTeam.registrationStatus === 'Unregistered'
+      ? translate('ui.teamDraftSavedSubmitRegistration')
+      : translate('ui.teamChangesSavedAndApproved'))
+  }
+
   async function submitRename() {
-    if (!team.value || !renameValue.value.trim()) return
+    if (!team.value || !renameValid.value) return
     renamePending.value = true
     const { data, error } = await patchCompetitionTeam({
       path: { competitionId, teamId: team.value.id! },
-      body: { profile: { name: renameValue.value.trim() } },
+      body: { profile: {
+        name: renameValue.value.trim(),
+        trackKey: tracksEnabled.value ? renameTrackKey.value : null,
+        trackInvitationCode: null,
+      } },
     })
     renamePending.value = false
     if (error || !data) {
-      toast.error(parseApiError(error, translate("ui.failedToModifyTeamName")).message)
+      toast.error(teamRegistrationErrorMessage(error, translate("ui.failedToModifyTeamName")))
       return
     }
     team.value = data
     renameOpen.value = false
-    toast.success(translate("ui.teamNameHasBeenUpdated"))
+    showOrganizationChangeSuccess(data)
+  }
+
+  const { configuration: platformConfiguration } = usePlatform()
+
+  const maximumAvatarBytes = computed(() =>
+    platformConfiguration.value?.imageUploadLimits?.maximumAvatarBytes ?? null)
+
+  const avatarInputKey = ref(0)
+
+  const avatarPending = ref(false)
+
+  async function replaceTeamAvatar(event: Event): Promise<void> {
+    const file = (event.target as HTMLInputElement).files?.[0] ?? null
+    avatarInputKey.value += 1
+    if (!team.value || !file || avatarPending.value || !canEditOrganization.value) return
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      toast.error(translate('ui.avatarMustBeAJpegPngOrWebpImage'))
+      return
+    }
+    if (exceedsUploadLimit(file.size, maximumAvatarBytes.value)) {
+      toast.error(translate('ui.theUploadedFileIsTooLarge'))
+      return
+    }
+    avatarPending.value = true
+    try {
+      const { error } = await teamAvatarReplace({
+        path: { competitionId, teamId: team.value.id! },
+        body: { file },
+      })
+      if (error) throw error
+      await load()
+      if (team.value) showOrganizationChangeSuccess(team.value)
+    }
+    catch (error) {
+      toast.error(teamRegistrationErrorMessage(error, translate('ui.failedToUpdateTeamAvatar')))
+    }
+    finally {
+      avatarPending.value = false
+    }
+  }
+
+  async function clearTeamAvatar(): Promise<void> {
+    if (!team.value?.avatarUrl || avatarPending.value || !canEditOrganization.value) return
+    avatarPending.value = true
+    try {
+      const { error } = await teamAvatarClear({
+        path: { competitionId, teamId: team.value.id! },
+      })
+      if (error) throw error
+      await load()
+      if (team.value) showOrganizationChangeSuccess(team.value)
+    }
+    catch (error) {
+      toast.error(teamRegistrationErrorMessage(error, translate('ui.failedToClearTeamAvatar')))
+    }
+    finally {
+      avatarPending.value = false
+    }
   }
 
   const transferOpen = ref(false)
@@ -135,7 +292,7 @@ export function useCompetitionsByIdMyTeamPage() {
   async function submitTransfer() {
     if (!team.value || !transferTarget.value) return
     transferPending.value = true
-    const { error } = await patchCompetitionTeam({
+    const { data, error } = await patchCompetitionTeam({
       path: { competitionId, teamId: team.value.id! },
       body: {
         membership: {
@@ -150,8 +307,11 @@ export function useCompetitionsByIdMyTeamPage() {
       return
     }
     transferOpen.value = false
-    toast.success(translate("ui.captainHasBeenTransferred"))
-    await load()
+    if (data) team.value = data
+    toast.success(data?.registrationStatus === 'Unregistered'
+      ? translate('ui.captainTransferredRegistrationRequired')
+      : translate("ui.captainHasBeenTransferred"))
+    if (!data) await load()
   }
 
   const acting = ref(false)
@@ -181,22 +341,6 @@ export function useCompetitionsByIdMyTeamPage() {
     }
     toast.success(translate("ui.hasLeftTheTeam"))
     team.value = null
-  }
-
-  async function resubmit() {
-    if (!team.value) return
-    acting.value = true
-    const { error } = await patchCompetitionTeam({
-      path: { competitionId, teamId: team.value.id! },
-      body: { registration: { status: 'Pending' } },
-    })
-    acting.value = false
-    if (error) {
-      toast.error(parseApiError(error, translate("ui.failedToResubmitRegistration")).message)
-      return
-    }
-    toast.success(translate("ui.registrationHasBeenResubmittedAndIsAwaitingReview"))
-    await load()
   }
 
   const banCase = ref<NoCtfapiEndpointsTeamsMyTeamBanCaseResponse | null>(null)
@@ -272,12 +416,21 @@ export function useCompetitionsByIdMyTeamPage() {
 
   const TeamMembers = markRaw(TeamMembersComponent)
 
+  const TeamRuntimeManager = markRaw(TeamRuntimeManagerComponent)
+
   const viewBindings = {
       Copy,
       RefreshCw,
       maximumAppealStatementLength,
       minimumAppealStatementLength,
       competitionId,
+      competition,
+      tracksEnabled,
+      canEditOrganization,
+      selectableTracks,
+      tracksLoading,
+      tracksError,
+      loadTracks,
       team,
       loading,
       loadError,
@@ -292,9 +445,18 @@ export function useCompetitionsByIdMyTeamPage() {
       copyToken,
       renameOpen,
       renameValue,
+      renameTrackKey,
+      selectedRenameTrack,
+      renameTrackChanged,
+      renameValid,
       renamePending,
       openRename,
       submitRename,
+      maximumAvatarBytes,
+      avatarInputKey,
+      avatarPending,
+      replaceTeamAvatar,
+      clearTeamAvatar,
       transferOpen,
       transferTarget,
       transferPending,
@@ -303,7 +465,6 @@ export function useCompetitionsByIdMyTeamPage() {
       acting,
       disband,
       leave,
-      resubmit,
       banCase,
       appealOpen,
       appealStatement,
@@ -315,7 +476,8 @@ export function useCompetitionsByIdMyTeamPage() {
       submitAppeal,
       setAppealOpen,
       CompetitionParticipantWorkspace,
-      TeamMembers
+      TeamMembers,
+      TeamRuntimeManager
     }
   const viewState = proxyRefs(viewBindings)
 

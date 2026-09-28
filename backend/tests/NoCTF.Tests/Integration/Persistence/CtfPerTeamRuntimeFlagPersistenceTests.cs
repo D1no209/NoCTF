@@ -1,5 +1,8 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using DotNet.Testcontainers.Builders;
+using NATS.Client.Core;
 using NoCTF.Application.Challenges.Flags;
 using NoCTF.Application.Competitions.Awd;
 using NoCTF.Application.Competitions.Koh;
@@ -15,19 +18,212 @@ using NoCTF.Domain.Teams;
 using NoCTF.GameModes.Ctf.Configuration;
 using NoCTF.GameModes.Registration;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Infrastructure.Caching;
 using NoCTF.Infrastructure.Challenges.Flags;
 using NoCTF.Infrastructure.Runtime.Capacity;
+using NoCTF.Infrastructure.Messaging;
 using NoCTF.Infrastructure.Runtime.Instances;
 using NoCTF.Worker;
-using StackExchange.Redis;
 using Testcontainers.PostgreSql;
-using Testcontainers.Redis;
+using ZiggyCreatures.Caching.Fusion;
 
 namespace NoCTF.Tests.Integration.Persistence;
 
 [Category("Integration")]
 public sealed class CtfPerTeamRuntimeFlagPersistenceTests
 {
+    [Test]
+    [Timeout(300_000)]
+    public async Task Team_runtime_list_returns_only_current_active_instances_for_the_member(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+                .WithDatabase("noctf_team_runtime_list")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var fixture = await SeedAsync(options, cancellationToken);
+            var otherUserId = Guid.CreateVersion7();
+            var otherTeamId = Guid.CreateVersion7();
+            var runningId = Guid.CreateVersion7();
+            var queuedId = Guid.CreateVersion7();
+            var otherRuntimeId = Guid.CreateVersion7();
+            await using var db = new NoCtfDbContext(options);
+            db.Users.Add(new User
+            {
+                Id = otherUserId,
+                UserName = "other-player",
+                NormalizedUserName = "OTHER-PLAYER",
+                Email = "other-player@example.test",
+                PasswordHash = "test",
+                CreatedAt = fixture.Now,
+                UpdatedAt = fixture.Now
+            });
+            db.Teams.Add(new Team
+            {
+                Id = otherTeamId,
+                CompetitionId = fixture.CompetitionId,
+                Name = "Other Team",
+                CaptainId = otherUserId,
+                MemberIds = [otherUserId],
+                InvitationToken = new string('b', 32),
+                RegistrationStatus = TeamRegistrationStatus.Approved,
+                RegisteredAt = fixture.Now
+            });
+            db.RuntimeInstances.AddRange(
+                new PlayerRuntimeInstance
+                {
+                    Id = runningId,
+                    CompetitionId = fixture.CompetitionId,
+                    CompetitionChallengeId = fixture.StartChallengeId,
+                    TeamId = fixture.TeamId,
+                    RuntimeKind = RuntimeKind.Container,
+                    RuntimeProvider = RuntimeProvider.Docker,
+                    State = RuntimeState.Running,
+                    CreatedAt = fixture.Now.AddMinutes(-2),
+                    ExpiresAt = fixture.Now.AddHours(1)
+                },
+                new PlayerRuntimeInstance
+                {
+                    Id = queuedId,
+                    CompetitionId = fixture.CompetitionId,
+                    CompetitionChallengeId = fixture.BatchChallengeId,
+                    TeamId = fixture.TeamId,
+                    RuntimeKind = RuntimeKind.Container,
+                    RuntimeProvider = RuntimeProvider.Docker,
+                    State = RuntimeState.Queued,
+                    CreatedAt = fixture.Now.AddMinutes(-1)
+                },
+                new PlayerRuntimeInstance
+                {
+                    Id = otherRuntimeId,
+                    CompetitionId = fixture.CompetitionId,
+                    CompetitionChallengeId = fixture.StartChallengeId,
+                    TeamId = otherTeamId,
+                    RuntimeKind = RuntimeKind.Container,
+                    RuntimeProvider = RuntimeProvider.Docker,
+                    State = RuntimeState.Running,
+                    CreatedAt = fixture.Now,
+                    ExpiresAt = fixture.Now.AddHours(1)
+                });
+            await db.SaveChangesAsync(cancellationToken);
+            var store = new RuntimeInstanceStore(
+                db,
+                new ChallengeRuntimeTemplateCatalog(),
+                new FixedRuntimePlacementPolicy(),
+                new PerTeamRuntimeFlagStore(db),
+                new RecordingOutbox());
+
+            var page = await store.ListTeamRuntimesAsync(
+                fixture.CompetitionId, fixture.UserId, 0, 1, true, cancellationToken);
+            await Assert.That(page).IsNotNull();
+            await Assert.That(page!.Total).IsEqualTo(2);
+            await Assert.That(page.Items.Single().Runtime.Id).IsEqualTo(queuedId);
+            await Assert.That(page.Items.Single().ChallengeTitle).IsEqualTo("Batch");
+            var nextPage = await store.ListTeamRuntimesAsync(
+                fixture.CompetitionId, fixture.UserId, 1, 1, true, cancellationToken);
+            await Assert.That(nextPage!.Items.Single().Runtime.Id).IsEqualTo(runningId);
+            var otherPage = await store.ListTeamRuntimesAsync(
+                fixture.CompetitionId, otherUserId, 0, 10, true, cancellationToken);
+            await Assert.That(otherPage!.Items.Single().Runtime.Id).IsEqualTo(otherRuntimeId);
+
+            var prior = await db.RuntimeInstances.SingleAsync(
+                instance => instance.Id == runningId, cancellationToken);
+            prior.State = RuntimeState.Stopping;
+            var replacementId = Guid.CreateVersion7();
+            db.RuntimeInstances.Add(new PlayerRuntimeInstance
+            {
+                Id = replacementId,
+                CompetitionId = fixture.CompetitionId,
+                CompetitionChallengeId = fixture.StartChallengeId,
+                TeamId = fixture.TeamId,
+                RuntimeKind = RuntimeKind.Container,
+                RuntimeProvider = RuntimeProvider.Docker,
+                State = RuntimeState.Queued,
+                CreatedAt = fixture.Now
+            });
+            await db.SaveChangesAsync(cancellationToken);
+            var afterReset = await store.ListTeamRuntimesAsync(
+                fixture.CompetitionId, fixture.UserId, 0, 10, true, cancellationToken);
+            await Assert.That(afterReset!.Items.Select(item => item.Runtime.Id))
+                .IsEquivalentTo([queuedId, replacementId]);
+            await Assert.That(await store.ListTeamRuntimesAsync(
+                fixture.CompetitionId, Guid.CreateVersion7(), 0, 10, true, cancellationToken)).IsNull();
+            var team = await db.Teams.SingleAsync(
+                item => item.Id == fixture.TeamId, cancellationToken);
+            team.IsBanned = true;
+            await db.SaveChangesAsync(cancellationToken);
+            await Assert.That(await store.ListTeamRuntimesAsync(
+                fixture.CompetitionId, fixture.UserId, 0, 10, true, cancellationToken)).IsNull();
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Running_runtime_can_extend_before_final_ten_minutes_without_losing_existing_time(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+                .WithDatabase("noctf_ctf_runtime_early_extension")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var fixture = await SeedAsync(options, cancellationToken);
+            var runtimeId = Guid.CreateVersion7(fixture.Now);
+            await using var db = new NoCtfDbContext(options);
+            db.RuntimeInstances.Add(new PlayerRuntimeInstance
+            {
+                Id = runtimeId,
+                CompetitionId = fixture.CompetitionId,
+                CompetitionChallengeId = fixture.StartChallengeId,
+                TeamId = fixture.TeamId,
+                RuntimeKind = RuntimeKind.Container,
+                RuntimeProvider = RuntimeProvider.Docker,
+                State = RuntimeState.Running,
+                CreatedAt = fixture.Now.AddMinutes(-1),
+                RunningAt = fixture.Now.AddMinutes(-1),
+                ExpiresAt = fixture.Now.AddMinutes(52)
+            });
+            await db.SaveChangesAsync(cancellationToken);
+            var store = new RuntimeInstanceStore(
+                db,
+                new ChallengeRuntimeTemplateCatalog(),
+                new FixedRuntimePlacementPolicy(),
+                new PerTeamRuntimeFlagStore(db),
+                new RecordingOutbox());
+
+            var result = await store.MutatePlayerRuntimeAsync(new(
+                fixture.CompetitionId,
+                fixture.StartChallengeId,
+                fixture.UserId,
+                RuntimeAction.Extend,
+                TimeSpan.FromMinutes(30),
+                fixture.Now), cancellationToken);
+
+            await Assert.That(result.Failure).IsNull();
+            await Assert.That(result.Runtime!.ExpiresAt).IsEqualTo(fixture.Now.AddMinutes(82));
+            await Assert.That(await db.RuntimeInstances.AsNoTracking()
+                .Where(runtime => runtime.Id == runtimeId)
+                .Select(runtime => runtime.ExpiresAt)
+                .SingleAsync(cancellationToken))
+                .IsEqualTo(fixture.Now.AddMinutes(82));
+        });
+    }
+
     [Test]
     [Timeout(300_000)]
     public async Task Start_dispatch_batch_generation_and_reset_reuse_one_fixed_team_flag(
@@ -50,7 +246,7 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
             var outbox = new RecordingOutbox();
 
             await using var db = new NoCtfDbContext(options);
-            var runtimeFlags = new PostgresPerTeamRuntimeFlagStore(db);
+            var runtimeFlags = new PerTeamRuntimeFlagStore(db);
             var runtimes = new RuntimeInstanceStore(
                 db,
                 templates,
@@ -92,7 +288,7 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
             await Assert.That(claim.Definition.Environment["CHALLENGE_FLAG"])
                 .IsEqualTo(initialFlag.Flag);
 
-            var generator = new PostgresMissingFlagGenerator(
+            var generator = new MissingFlagGenerator(
                 db,
                 templates,
                 runtimeFlags);
@@ -128,13 +324,14 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
             var competition = await db.Competitions.SingleAsync(
                 item => item.Id == fixture.CompetitionId,
                 cancellationToken);
-            competition.ConfigurationJson = JsonSerializer.Serialize(
+            competition.ModeConfiguration = TestConfigurations.Competition(
+                GameMode.Ctf,
+                JsonSerializer.Serialize(
                 new CtfConfiguration(
-                    CtfConfiguration.CurrentSchemaVersion,
                     new(500, 100, 10),
                     [],
                     FlagTemplate: new("changed", "[TEAMHASH]", false)),
-                new JsonSerializerOptions(JsonSerializerDefaults.Web));
+                new JsonSerializerOptions(JsonSerializerDefaults.Web)));
             var futureUserId = Guid.CreateVersion7();
             var futureTeamId = Guid.CreateVersion7();
             db.Users.Add(new User
@@ -212,12 +409,17 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
                 .WithUsername("postgres")
                 .WithPassword("postgres")
                 .Build();
-            await using var redisContainer = new RedisBuilder("redis:7.4.10-alpine3.21@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2")
+            await using var nats = new ContainerBuilder(
+                    "docker.m.daocloud.io/library/nats:2.12.2-alpine@sha256:2d5fce3229ae5741f4ef9225aff95dc4dc036455931eaf77a3eec33fddaa192d")
+                .WithPortBinding(4222, assignRandomHostPort: true).WithCommand("-js")
+                .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(4222))
                 .Build();
-            await postgres.StartAsync(cancellationToken);
-            await redisContainer.StartAsync(cancellationToken);
-            await using var redis = await ConnectionMultiplexer.ConnectAsync(
-                redisContainer.GetConnectionString());
+            await Task.WhenAll(postgres.StartAsync(cancellationToken),
+                nats.StartAsync(cancellationToken));
+            await using var connection = new NatsConnection(new NatsOpts
+            {
+                Url = $"nats://{nats.Hostname}:{nats.GetMappedPublicPort(4222)}"
+            });
             var options = new DbContextOptionsBuilder<NoCtfDbContext>()
                 .UseNpgsql(postgres.GetConnectionString())
                 .UseSnakeCaseNamingConvention()
@@ -255,7 +457,7 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
                 db,
                 templates,
                 new FixedRuntimePlacementPolicy(),
-                new PostgresPerTeamRuntimeFlagStore(db),
+                new PerTeamRuntimeFlagStore(db),
                 outbox);
             var first = await runtimes.MutatePlayerRuntimeAsync(
                 new(
@@ -278,28 +480,44 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
             await Assert.That(first.Failure).IsNull();
             await Assert.That(second.Failure).IsNull();
 
-            var registry = new RedisRunnerAvailabilityRegistry(redis);
+            var registry = new NatsRunnerAvailabilityRegistry(connection, TimeProvider.System);
+            await using var ownerA = await new NatsClusterLeaseManager(connection)
+                .TryAcquireAsync(NatsClusterLeaseManager.ResourceDomainKey("runner-a"),
+                    "runner-a", cancellationToken);
+            await using var ownerB = await new NatsClusterLeaseManager(connection)
+                .TryAcquireAsync(NatsClusterLeaseManager.ResourceDomainKey("runner-b"),
+                    "runner-b", cancellationToken);
+            await Assert.That(ownerA).IsNotNull();
+            await Assert.That(ownerB).IsNotNull();
             var runnerCapacity = new RuntimeResourceLimits(
                 512 * 1024 * 1024,
                 500_000_000,
                 256);
             foreach (var runnerId in new[] { "runner-a", "runner-b" })
             {
+                await registry.PublishHeartbeatAsync("tests", runnerId,
+                    RuntimeProvider.Docker, TimeSpan.FromMinutes(2), cancellationToken);
                 var registered = await registry.RegisterAsync(
-                    new RunnerAvailabilityRegistration(
+                    CurrentRunnerRegistration.Create(
                         "tests",
                         runnerId,
-                        RuntimeProvider.Docker,
-                        "stage-5-test",
-                        runnerCapacity,
-                        TimeSpan.FromMinutes(2),
-                        HasActiveAssignments: false),
+                        new(
+                            runnerCapacity.MemoryBytes,
+                            runnerCapacity.NanoCpus,
+                            runnerCapacity.PidsLimit),
+                        timeToLive: TimeSpan.FromMinutes(2),
+                        resourceDomainFencingToken: runnerId == "runner-a"
+                            ? ownerA!.FencingToken : ownerB!.FencingToken),
                     cancellationToken);
                 await Assert.That(registered)
                     .IsEqualTo(RunnerAvailabilityRegistrationOutcome.Online);
             }
 
-            var capacity = new RedisRunnerCapacityGate(redis);
+            using var cacheServices = new ServiceCollection()
+                .AddFusionCache(NoCtfCacheNames.ReadModels).Services.BuildServiceProvider();
+            var capacity = new PersistedRunnerCapacityGate(db, registry,
+                cacheServices.GetRequiredService<IFusionCacheProvider>(), outbox,
+                new RunnerCapacityLedgerCoordinator());
             var dispatches = outbox.Published.OfType<DispatchRuntime>().ToArray();
             await Assert.That(dispatches).Count().IsEqualTo(2);
             foreach (var dispatch in dispatches)
@@ -362,25 +580,25 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.Competitions.Add(new Competition
+        db.Competitions.Add(new CtfCompetition
         {
             Id = competitionId,
             Title = "CTF runtime flags",
             OwnerId = userId,
-            Mode = GameMode.Ctf,
             Status = CompetitionStatus.Running,
             StartAt = now.AddHours(-1),
             EndAt = now.AddHours(1),
             FlagDerivationSecret = Enumerable.Range(1, 32).Select(value => (byte)value).ToArray(),
             CreatedAt = now,
             UpdatedAt = now,
-            ConfigurationJson = JsonSerializer.Serialize(
+            ModeConfiguration = TestConfigurations.Competition(
+                GameMode.Ctf,
+                JsonSerializer.Serialize(
                 new CtfConfiguration(
-                    CtfConfiguration.CurrentSchemaVersion,
                     new(500, 100, 10),
                     [],
                     FlagTemplate: new("competition", "[TEAMHASH]", false)),
-                new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                new JsonSerializerOptions(JsonSerializerDefaults.Web)))
         });
         db.Teams.Add(new Team
         {
@@ -402,6 +620,7 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
                 {
                     ["CHALLENGE_FLAG"] = "author-value"
                 },
+                Security: new(false, false, false, ["ALL"], []),
                 FlagEnvironmentVariableName: "CHALLENGE_FLAG"),
             Limits: new(268_435_456, 500_000_000, 128),
             FlagSource: RuntimeFlagSource.PerTeam);
@@ -461,35 +680,35 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
         Guid competitionChallengeId,
         string title,
         int order,
-        string configurationJson,
+        string configurationFixture,
         NoCTF.GameModes.Flags.PerTeamFlagTemplate? flagTemplate,
         DateTimeOffset now)
     {
         var challengeId = Guid.CreateVersion7(now);
-        db.Challenges.Add(new Challenge
+        db.Challenges.Add(new CtfChallenge
         {
             Id = challengeId,
             OwnerId = ownerId,
-            Mode = GameMode.Ctf,
             Title = title,
-            DefinitionJson = configurationJson,
+            Definition = TestConfigurations.Definition(GameMode.Ctf, configurationFixture),
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.CompetitionChallenges.Add(new CompetitionChallenge
+        db.CompetitionChallenges.Add(new CtfCompetitionChallenge
         {
             Id = competitionChallengeId,
             CompetitionId = competitionId,
             ChallengeId = challengeId,
             Order = order,
             IsPublished = true,
-            RulesJson = JsonSerializer.Serialize(
+            Rules = TestConfigurations.Rules(
+                GameMode.Ctf,
+                JsonSerializer.Serialize(
                 new CtfChallengeConfiguration(
-                    CtfChallengeConfiguration.CurrentSchemaVersion,
                     null,
                     null,
                     FlagTemplate: flagTemplate),
-                new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+                new JsonSerializerOptions(JsonSerializerDefaults.Web))),
             UpdatedAt = now
         });
     }
@@ -497,7 +716,6 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
     private static string RuntimeConfiguration(ChallengeRuntimeTemplate runtime) =>
         JsonSerializer.Serialize(
             new CtfChallengeConfiguration(
-                CtfChallengeConfiguration.CurrentSchemaVersion,
                 null,
                 null,
                 Runtime: runtime),
@@ -528,7 +746,7 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
             CancellationToken cancellationToken) => Task.FromResult(outcome);
     }
 
-    private sealed class RecordingOutbox : ITransactionalMessageOutbox
+    private sealed class RecordingOutbox : IPostCommitMessagePublisher
     {
         public List<object> Published { get; } = [];
         public List<object> RunnerNodeMessages { get; } = [];

@@ -1,4 +1,5 @@
 using NoCTF.Domain.Runtime;
+using NoCTF.Application.Runtime.Provisioning;
 
 namespace NoCTF.Application.GameplayFacts.Processing;
 
@@ -21,7 +22,7 @@ public sealed record AwdpFixExecutionFenceResult(
     AwdpFixExecutionFenceDisposition Disposition,
     Guid RuntimeInstanceId,
     RuntimeProvider Provider,
-    string? ProviderReceiptJson,
+    RuntimeReceiptData? ProviderReceipt,
     string RunnerId)
 {
     public static AwdpFixExecutionFenceResult Superseded(

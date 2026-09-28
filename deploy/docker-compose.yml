@@ -27,7 +27,7 @@ services:
   nats:
     image: ${NATS_IMAGE:?Set NATS_IMAGE in .env}
     restart: unless-stopped
-    command: [-js, -sd, /data]
+    command: [-js, -sd, /data, -m, "8222"]
     volumes:
       - type: bind
         source: ./data/nats
@@ -62,8 +62,12 @@ services:
     restart: unless-stopped
     env_file:
       - ./env/noctf/.env
+    environment:
+      Observability__LokiBaseUrl: http://loki:3100/
+      Observability__RequireLoki: "true"
     labels:
       noctf.io/internal-role: scoring-callback-gateway
+      noctf.io/runtime-proxy-gateway: "true"
     depends_on: [postgres, redis, nats]
     volumes:
       - type: bind
@@ -79,6 +83,24 @@ services:
       - type: bind
         source: /var/run/docker.sock
         target: /var/run/docker.sock
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /proc
+        target: /host/proc
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /sys/fs/cgroup
+        target: /host/sys/fs/cgroup
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /etc/machine-id
+        target: /host/etc/machine-id
+        read_only: true
         bind:
           create_host_path: false
     networks:

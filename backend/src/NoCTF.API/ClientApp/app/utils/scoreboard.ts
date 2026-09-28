@@ -255,6 +255,15 @@ export function scoreboardDirectionGroups(
   return [...directions.values()]
 }
 
+/** Reorder only the presentation groups; each schema column keeps its authoritative index. */
+export function scoreboardChallengeColumnGroupsByDirection(
+  schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse | null | undefined,
+  catalog: NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogItemResponse[] | null | undefined,
+): ScoreboardChallengeColumnGroup[] {
+  return scoreboardDirectionGroups(scoreboardChallengeColumnGroups(schema, catalog))
+    .flatMap(direction => direction.groups)
+}
+
 export function scoreboardTeamDirectionScore(
   team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
   direction: ScoreboardDirectionGroup,

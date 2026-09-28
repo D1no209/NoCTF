@@ -9,18 +9,23 @@ describe('platform user account status management', () => {
     const platform = await sourceFile(
       new URL('../app/pages/admin/platform.vue', import.meta.url),
     ).text()
-    const oldBotRoute = await sourceFile(
-      new URL('../app/pages/admin/platform/bots.vue', import.meta.url),
-    ).text()
-
-    expect(source).toContain("roleFilter.value === 'Bot' && user.kind !== 'Bot'")
+    expect(source).toContain("kind: roleFilter.value === 'Bot' ? 'Bot'")
+    expect(source).toContain('keyword: search.value.trim() || null')
     expect(source).toContain('<SelectItem value="Bot">')
     expect(source).toContain('adminPlatformCreateBot({')
     expect(source).toContain('roleFilter.value = \'Bot\'')
     expect(source).toContain("$t('ui.createBot')")
     expect(source).toContain('validation="feature"')
     expect(platform).not.toContain("to: '/admin/platform/bots'")
-    expect(oldBotRoute).toContain("redirect: '/admin/platform/users?filter=Bot'")
+  })
+
+  test('leaves the initial skeleton after the first paged response', async () => {
+    const source = await sourceFile(pageUrl).text()
+
+    expect(source).toContain('const loading = computed(() => pagination.loading.value && !pagination.initialized.value)')
+    expect(source).not.toContain('const loading = ref(true)')
+    expect(source).toContain('<div v-if="loading"')
+    expect(source).toContain(':loading="pageLoading"')
   })
 
   test('uses the generated status endpoint and keeps the sheet open on failure', async () => {
@@ -69,5 +74,17 @@ describe('platform user account status management', () => {
       source.indexOf('async function invalidateTokens'),
     )
     expect(handler).not.toContain('detailOpen.value = false')
+  })
+
+  test('lists searches filters and removes administrator-visible SSO bindings', async () => {
+    const source = await sourceFile(pageUrl).text()
+
+    expect(source).toContain('ssoProviderId: ssoProviderFilter.value')
+    expect(source).toContain('adminPlatformSsoGetConfiguration')
+    expect(source).toContain('adminPlatformUnbindSsoIdentity')
+    expect(source).toContain('user.ssoBinding.subject')
+    expect(source).toContain('detail.ssoBinding.boundAt')
+    expect(source).toContain("translate('sso.adminUnbindSuccessful')")
+    expect(source).toContain("await navigateTo('/auth/login')")
   })
 })

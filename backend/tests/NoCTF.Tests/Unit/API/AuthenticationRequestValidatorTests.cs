@@ -7,6 +7,7 @@ public sealed class AuthenticationRequestValidatorTests
     [Test]
     [Arguments("player_01")]
     [Arguments("  player_01  ")]
+    [Arguments("中文选手")]
     public async Task Register_accepts_trimmed_username_and_eight_character_password(
         string userName)
     {

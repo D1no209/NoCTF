@@ -12,6 +12,8 @@ using NoCTF.Application.Challenges.Management;
 using NoCTF.Application.Challenges.Hints;
 using NoCTF.Application.Competitions.Koh;
 using NoCTF.Application.Competitions.Visibility;
+using NoCTF.Application.Competitions.Progression;
+using NoCTF.Domain.Challenges;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Application.GameplayFacts.Intake;
 using NoCTF.Domain.Competitions;
@@ -24,6 +26,7 @@ public sealed class ChallengeAudienceEndpointTests
     private static readonly Guid CompetitionId = Guid.CreateVersion7();
     private static readonly Guid ChallengeId = Guid.CreateVersion7();
     private static readonly Guid UserId = Guid.CreateVersion7();
+    private static readonly Guid TeamId = Guid.CreateVersion7();
 
     [Test]
     public async Task Ineligible_actor_cannot_list_or_get_published_challenges()
@@ -64,17 +67,38 @@ public sealed class ChallengeAudienceEndpointTests
         await Assert.That(store.FindCalls).IsEqualTo(1);
     }
 
+    [Test]
+    public async Task Detail_reuses_authorized_team_for_attempt_state()
+    {
+        var store = new RecordingStore();
+        var reader = Substitute.For<IFlagAttemptStateReader>();
+        reader.ReadAsync(CompetitionId, ChallengeId, TeamId, GameMode.Ctf,
+                CompetitionStatus.Running, Arg.Any<CancellationToken>())
+            .Returns(new FlagAttemptState(3, 1, 2, false));
+        await using var app = await CreateApplicationAsync(store, canRead: true,
+            teamId: TeamId, attemptReader: reader);
+        using var client = app.GetTestClient();
+
+        using var detail = await client.GetAsync(
+            $"/api/v1/competitions/{CompetitionId}/challenges/{ChallengeId}");
+        var response = await detail.Content.ReadFromJsonAsync<ChallengeResponse>();
+
+        await Assert.That(detail.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(response?.RemainingFlagAttempts).IsEqualTo(2);
+        await reader.Received(1).ReadAsync(CompetitionId, ChallengeId, TeamId,
+            GameMode.Ctf, CompetitionStatus.Running, Arg.Any<CancellationToken>());
+    }
+
     private static async Task<WebApplication> CreateApplicationAsync(
         RecordingStore store,
-        bool canRead)
+        bool canRead,
+        Guid? teamId = null,
+        IFlagAttemptStateReader? attemptReader = null)
     {
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
         builder.Services.AddProblemDetails();
         builder.Services.AddSingleton(TimeProvider.System);
-        builder.Services.AddSingleton(new NoCTF.Application.Runtime.PublicAccess.ReadRuntimePublicAccess(
-            Substitute.For<NoCTF.Application.Runtime.PublicAccess.IPublicGatewayPolicyStore>(),
-            Substitute.For<NoCTF.Application.Runtime.PublicAccess.IPublicGatewayStatusStore>(), TimeProvider.System));
         builder.Services.AddFastEndpoints(options =>
         {
             options.DisableAutoDiscovery = true;
@@ -83,19 +107,24 @@ public sealed class ChallengeAudienceEndpointTests
                 || type == typeof(GetChallengeEndpoint);
         });
         builder.Services.AddSingleton<IUserContext>(new ActorUserContext());
-        builder.Services.AddSingleton<ICompetitionChallengeAudienceAccess>(
-            new FixedAudienceAccess(canRead));
-        builder.Services.AddSingleton<ICompetitionVisibilityAccess>(new RunningVisibilityAccess());
-        builder.Services.AddSingleton<IKohChallengeAccessReader>(new EmptyKohAccess());
+        builder.Services.AddSingleton<ICompetitionChallengeReadAccess>(
+            new FixedReadAccess(canRead, teamId));
+        builder.Services.AddSingleton<IKohChallengeAccessReader>(new UnexpectedKohAccess());
         builder.Services.AddSingleton<IChallengeManagementStore>(store);
-        builder.Services.AddSingleton(Substitute.For<IGameplayFactIntakeStore>());
-        builder.Services.AddSingleton(Substitute.For<IGameplayFactAdmissionModePolicy>());
+        builder.Services.AddSingleton(attemptReader ?? Substitute.For<IFlagAttemptStateReader>());
+        var progression = Substitute.For<IProgressionChallengeAccess>();
+        progression.IsActiveAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<Guid?>(),
+            Arg.Any<CancellationToken>()).Returns(true);
+        progression.ReadStatusesAsync(Arg.Any<Guid>(), Arg.Any<Guid?>(),
+            Arg.Any<CancellationToken>()).Returns(
+                new Dictionary<Guid, ProgressionChallengeStatus>());
+        builder.Services.AddSingleton(progression);
         builder.Services.AddScoped<ListChallenges>();
         builder.Services.AddScoped<GetChallenge>();
         builder.Services.AddScoped<GetFlagAttemptState>();
         var hintStore = Substitute.For<IParticipantChallengeHintStore>();
         var now = DateTimeOffset.UtcNow.AddMinutes(-1);
-        hintStore.ReadAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+        hintStore.ReadAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CompetitionStatus>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>())
             .Returns(_ => canRead
                 ? new ParticipantChallengeHintAccess(
                     [
@@ -113,34 +142,24 @@ public sealed class ChallengeAudienceEndpointTests
         return app;
     }
 
-    private sealed class FixedAudienceAccess(bool canRead) : ICompetitionChallengeAudienceAccess
+    private sealed class FixedReadAccess(bool canRead, Guid? teamId) : ICompetitionChallengeReadAccess
     {
-        public Task<bool> CanReadAsync(Guid userId, Guid competitionId, CancellationToken cancellationToken) =>
-            Task.FromResult(canRead);
+        public Task<CompetitionChallengeReadDecision?> ResolveAsync(
+            Guid userId, Guid competitionId, DateTimeOffset now, CancellationToken cancellationToken) =>
+            Task.FromResult<CompetitionChallengeReadDecision?>(canRead
+                ? new(new(GameMode.Ctf, CompetitionStatus.Running,
+                    CompetitionLeaderboardVisibility.Normal, LeaderboardDataScope.Live), teamId)
+                : null);
     }
 
-    private sealed class RunningVisibilityAccess : ICompetitionVisibilityAccess
-    {
-        public Task<CompetitionVisibilityAccessDecision?> ResolveAsync(
-            Guid userId,
-            Guid competitionId,
-            DateTimeOffset now,
-            CancellationToken cancellationToken) =>
-            Task.FromResult<CompetitionVisibilityAccessDecision?>(new(
-                GameMode.Ctf,
-                CompetitionStatus.Running,
-                CompetitionLeaderboardVisibility.Normal,
-                LeaderboardDataScope.Live));
-    }
-
-    private sealed class EmptyKohAccess : IKohChallengeAccessReader
+    private sealed class UnexpectedKohAccess : IKohChallengeAccessReader
     {
         public Task<KohChallengeAccessView?> FindAsync(
             Guid competitionId,
             Guid competitionChallengeId,
             Guid userId,
             CancellationToken cancellationToken) =>
-            Task.FromResult<KohChallengeAccessView?>(null);
+            throw new InvalidOperationException("Non-KoH challenge must not load KoH access.");
     }
 
     private sealed class RecordingStore : IChallengeManagementStore
@@ -173,15 +192,20 @@ public sealed class ChallengeAudienceEndpointTests
             return Task.FromResult<ChallengeView?>(challenge);
         }
 
-        public Task<IReadOnlyList<ChallengeView>> ListAsync(Guid competitionId,
+        public Task<IReadOnlyList<CompetitionChallengeSummaryView>> ListAsync(Guid competitionId,
             bool includeUnpublished, bool includeDeleted, CancellationToken cancellationToken)
         {
             ListCalls++;
-            return Task.FromResult<IReadOnlyList<ChallengeView>>([challenge]);
+            return Task.FromResult<IReadOnlyList<CompetitionChallengeSummaryView>>([
+                new(challenge.Id, challenge.CompetitionId, challenge.ChallengeId,
+                    challenge.Title, challenge.CustomTitle, challenge.Direction,
+                    challenge.Order, challenge.IsPublished, challenge.DeletedAt,
+                    challenge.InteractionKind)
+            ]);
         }
 
         public Task<ChallengeCompetitionContext?> GetCompetitionAsync(Guid competitionId, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<ChallengeMutationResult> CreateAsync(CreateCompetitionChallengeCommand command, string configurationJson, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ChallengeMutationResult> CreateAsync(CreateCompetitionChallengeCommand command, CompetitionChallengeRules rules, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ChallengeMutationResult> UpdateAsync(UpdateCompetitionChallengeCommand command, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ChallengeMutationFailure?> SoftDeleteAsync(Guid competitionId, Guid competitionChallengeId, DateTimeOffset now, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ChallengeMutationFailure?> RestoreAsync(Guid competitionId, Guid competitionChallengeId, DateTimeOffset now, CancellationToken cancellationToken) => throw new NotSupportedException();

@@ -23,7 +23,6 @@ public sealed record RuntimeInstanceView(
     RuntimeProvider Provider,
     RuntimeState State,
     RuntimeFailureCode? FailureCode,
-    IReadOnlyList<string> Urls,
     DateTimeOffset CreatedAt,
     DateTimeOffset? RunningAt,
     DateTimeOffset? ExpiresAt,
@@ -33,13 +32,30 @@ public sealed record RuntimeInstanceView(
     DateTimeOffset? StateChangedAt = null,
     Guid? SourceTeamId = null,
     string? SourceTeamName = null,
-    GameMode? Mode = null,
-    IReadOnlyList<NoCTF.Application.Runtime.Provisioning.RuntimeUrlBinding>? AccessBindings = null);
+    RunnerAdmissionFailure? WaitingReason = null,
+    RuntimeAccessMode AccessMode = RuntimeAccessMode.Direct,
+    IReadOnlyList<RuntimeAccessEndpointView>? AccessEndpoints = null,
+    bool TrafficCaptureEnabled = false,
+    long? TrafficCaptureLimitBytes = null,
+    long TrafficCaptureReservedBytes = 0)
+{
+    public RuntimeCapacityAllocations? Capacity { get; init; }
+}
+
+public sealed record TeamRuntimeItemView(string ChallengeTitle, RuntimeInstanceView Runtime);
+
+public sealed record TeamRuntimeListPage(IReadOnlyList<TeamRuntimeItemView> Items, int Total);
 
 public sealed record RuntimePublishedPortView(
     string? ServiceName,
     int ContainerPort,
     int HostPort);
+
+public sealed record RuntimeAccessEndpointView(
+    int BindingIndex,
+    string? DirectAddress,
+    string? TargetHost,
+    int? TargetPort);
 
 public sealed record RuntimeMutationCommand(
     Guid CompetitionId,
@@ -78,6 +94,13 @@ public sealed record RuntimeMutationResult(
 
 public interface IRuntimeInstanceStore
 {
+    Task<TeamRuntimeListPage?> ListTeamRuntimesAsync(
+        Guid competitionId,
+        Guid userId,
+        int offset,
+        int limit,
+        bool desc,
+        CancellationToken cancellationToken);
     Task<RuntimeInstanceView?> FindPlayerRuntimeAsync(
         Guid competitionId,
         Guid competitionChallengeId,
@@ -88,7 +111,12 @@ public interface IRuntimeInstanceStore
         CancellationToken cancellationToken);
 }
 
-public sealed record RuntimeTargetView(Guid TeamId, string TeamName, IReadOnlyList<string> Urls);
+public sealed record RuntimeTargetView(
+    Guid TeamId,
+    string TeamName,
+    Guid? RuntimeInstanceId = null,
+    IReadOnlyList<RuntimeAccessEndpointView>? AccessEndpoints = null,
+    RuntimeAccessMode AccessMode = RuntimeAccessMode.Direct);
 
 public interface IRuntimeTargetReader
 {
@@ -111,14 +139,31 @@ public sealed class ListRuntimeTargets(IRuntimeTargetReader reader)
         reader.ListAsync(competitionId, competitionChallengeId, userId, now, ct);
 }
 
-public sealed class GetPlayerRuntime(IRuntimeInstanceStore store)
+public sealed class GetPlayerRuntime(IRuntimeInstanceStore store, NoCTF.Application.Runtime.Capacity.IRunnerCapacityGate? capacity = null)
 {
-    public Task<RuntimeInstanceView?> ExecuteAsync(
+    public async Task<RuntimeInstanceView?> ExecuteAsync(
         Guid competitionId,
         Guid competitionChallengeId,
         Guid userId,
+        CancellationToken ct = default)
+    {
+        var view = await store.FindPlayerRuntimeAsync(competitionId, competitionChallengeId, userId, ct);
+        if (view is null || capacity is null || view.State is not (RuntimeState.Queued or RuntimeState.Provisioning)) return view;
+        var waiting = await capacity.ReadWaitingAsync([view.Id], ct);
+        return view with { WaitingReason = waiting.TryGetValue(view.Id, out var reason) ? reason : null };
+    }
+}
+
+public sealed class ListTeamRuntimes(IRuntimeInstanceStore store)
+{
+    public Task<TeamRuntimeListPage?> ExecuteAsync(
+        Guid competitionId,
+        Guid userId,
+        int offset,
+        int limit,
+        bool desc,
         CancellationToken ct = default) =>
-        store.FindPlayerRuntimeAsync(competitionId, competitionChallengeId, userId, ct);
+        store.ListTeamRuntimesAsync(competitionId, userId, offset, limit, desc, ct);
 }
 
 public sealed class MutatePlayerRuntime(IRuntimeInstanceStore store)

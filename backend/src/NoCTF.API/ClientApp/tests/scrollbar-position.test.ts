@@ -1,9 +1,10 @@
 import { expect, test } from 'bun:test'
 
-test('scrollbar enhancement preserves fixed/absolute positioning and restores original inline styles', async () => {
+test('owned scrollbar enhancement preserves positioning and disposes its listeners', async () => {
   const source = await Bun.file(new URL('../app/components/ui/scroll-area/scrollbars.ts', import.meta.url)).text()
   const compiled = new Bun.Transpiler({ loader: 'ts' }).transformSync(source)
-    .replace(/^import[^\n]*\n/gm, '').replace('export function installScrollbars', 'function installScrollbars')
+    .replace(/^import[^\n]*\n/gm, '')
+    .replace(/^export /gm, '')
   class Style {
     values = new Map<string, string>()
     priorities = new Map<string, string>()
@@ -16,35 +17,37 @@ test('scrollbar enhancement preserves fixed/absolute positioning and restores or
     style = new Style()
     dataset = { scrollAxis: 'y' }
     enhanced = false
-    isConnected = true
-    constructor(public position: string, public children: Node[] = []) {}
-    querySelectorAll() { return this.children }
+    listeners = new Set<string>()
+    constructor(public position: string) {}
     querySelector() { return null }
     matches() { return false }
-    addEventListener() {}
-    removeEventListener() {}
+    addEventListener(name: string) { this.listeners.add(name) }
+    removeEventListener(name: string) { this.listeners.delete(name) }
   }
-  const dialog = new Node('fixed')
-  const popover = new Node('absolute')
-  popover.style.setProperty('position', 'absolute', 'important')
-  const normal = new Node('static')
-  const body = new Node('static', [dialog, popover, normal])
+  const options: unknown[] = []
   const deps = {
-    document: { body }, Element: Node, HTMLElement: Node,
     getComputedStyle: (node: Node) => ({ position: node.style.getPropertyValue('position') || (node.enhanced ? 'relative' : node.position) }),
-    MutationObserver: class { observe() {} disconnect() {} },
-    OverlayScrollbars: (value: Node | { target: Node }) => {
-      const target = value instanceof Node ? value : value.target
+    OverlayScrollbars: (value: { target: Node }) => {
+      const target = value.target
       target.enhanced = true
-      return { options() {}, destroy() { target.enhanced = false } }
+      return {
+        options(value: unknown) { options.push(value) },
+        destroy() { target.enhanced = false },
+      }
     },
   }
-  const dispose = new Function('deps', `const { ${Object.keys(deps).join(', ')} } = deps; ${compiled}; return installScrollbars();`)(deps)
+  const create = new Function('deps', `const { ${Object.keys(deps).join(', ')} } = deps; ${compiled}; return createScrollbars;`)(deps)
+
+  const dialog = new Node('fixed')
+  const binding = create(dialog, 'y')
   expect(deps.getComputedStyle(dialog).position).toBe('fixed')
-  expect(deps.getComputedStyle(popover).position).toBe('absolute')
-  expect(deps.getComputedStyle(normal).position).toBe('relative')
-  dispose()
+  expect(dialog.listeners).toEqual(new Set(['focusin', 'focusout']))
+  binding.update('x')
+  expect(options.at(-1)).toEqual({ overflow: { x: 'scroll', y: 'hidden' } })
+  binding.dispose()
+  expect(dialog.listeners.size).toBe(0)
   expect(dialog.style.getPropertyValue('position')).toBe('')
-  expect(popover.style.getPropertyValue('position')).toBe('absolute')
-  expect(popover.style.getPropertyPriority('position')).toBe('important')
+  expect(dialog.enhanced).toBe(false)
+  expect(source).not.toContain('MutationObserver')
+  expect(source).not.toContain('document.body')
 })

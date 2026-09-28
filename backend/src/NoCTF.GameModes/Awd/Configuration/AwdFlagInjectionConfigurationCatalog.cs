@@ -1,19 +1,21 @@
+using NoCTF.Domain.Challenges;
+
 namespace NoCTF.GameModes.Awd.Configuration;
 
 public sealed record AwdFlagInjectionSettings(string Command, int TimeoutSeconds, string? ServiceName);
 
 public interface IAwdFlagInjectionConfigurationCatalog
 {
-    AwdFlagInjectionSettings? Get(string challengeConfigurationJson);
+    AwdFlagInjectionSettings? Get(AwdChallengeDefinition definition);
 }
 
 public sealed class AwdFlagInjectionConfigurationCatalog : IAwdFlagInjectionConfigurationCatalog
 {
-    public AwdFlagInjectionSettings? Get(string challengeConfigurationJson)
-    {
-        var injection = AwdConfigurationUpgrader.ParseChallenge(challengeConfigurationJson).FlagInjection;
-        return injection is null
+    public AwdFlagInjectionSettings? Get(AwdChallengeDefinition definition) =>
+        definition.FlagInjectionCommand is null
             ? null
-            : new(injection.Command, injection.TimeoutSeconds, injection.ServiceName);
-    }
+            : new(
+                definition.FlagInjectionCommand,
+                definition.FlagInjectionTimeoutSeconds ?? 30,
+                definition.FlagInjectionServiceName);
 }

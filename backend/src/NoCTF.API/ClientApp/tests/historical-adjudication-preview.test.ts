@@ -15,10 +15,10 @@ describe('historical adjudication difference preview', () => {
     expect(source).toContain("previewCursor.value = data.nextCursor ?? null")
   })
 
-  test('distinguishes deterministic differences from manual review without an apply action', () => {
-    expect(source).toContain("difference.certainty === 'Deterministic'")
-    expect(source).toContain("$t('ui.deterministicDifference')")
-    expect(source).toContain("$t('ui.needsManualReview')")
+  test('presents severity and evidence separately without an apply action', () => {
+    expect(source).toContain('adjudicationSeverityLabel(adjudicationSeverity(item))')
+    expect(source).toContain('adjudicationClassificationLabel(difference.classification)')
+    expect(source).toContain('adjudicationCompletenessLabel(item.evidenceCompleteness)')
     const previewTemplate = source.slice(
       source.indexOf("$t('ui.historicalAdjudicationDifferencePreview')"),
       source.indexOf('<Card>', source.indexOf("$t('ui.historicalAdjudicationDifferencePreview')") + 1),
@@ -27,9 +27,9 @@ describe('historical adjudication difference preview', () => {
     expect(previewTemplate).not.toContain('纠正按钮')
   })
 
-  test('describes the narrow legacy AWDP break analysis accurately', () => {
+  test('describes current adjudication evidence accurately', () => {
     expect(source).toContain("ui.thisPreviewAnalyzesCtfFlagFactsAndAwdpBreakFacts")
-    expect(source).toContain('CurrentDuplicateShouldBeCorrect: "ui.theCurrentDuplicateResultComesFromALegacyDefectAnd"')
+    expect(source).not.toContain('CurrentDuplicateShouldBeCorrect')
     expect(source).toContain('MissingAdjudicationRecord: "ui.theCurrentResultHasNoImmutableAdjudicationEvent"')
     expect(source).toContain('TeamEligibilityHistoryRequiresReview: "ui.currentTeamEligibilityCannotProveBloodAwardEligibilityAtThe"')
   })

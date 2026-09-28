@@ -13,7 +13,7 @@ public sealed class AwdpTargetRuntimeFactoryTests
         var teamId = Guid.Parse("22222222-2222-2222-2222-222222222222");
         var template = new ChallengeRuntimeTemplate(
             RuntimeAllocation.PerTeam,
-            new ContainerRuntimeDefinition("target:latest"));
+            new ContainerRuntimeDefinition("target:latest", ContainerSecurityPolicy.Default));
 
         var target = AwdpTargetRuntimeFactory.Create(
             teamId,

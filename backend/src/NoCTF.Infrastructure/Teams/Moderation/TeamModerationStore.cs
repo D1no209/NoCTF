@@ -8,13 +8,15 @@ using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Shared;
 using NoCTF.Infrastructure.Observability;
 using NoCTF.Domain.Runtime;
+using NoCTF.Infrastructure.Competitions.Progression;
 
 namespace NoCTF.Infrastructure.Teams.Moderation;
 
 public sealed class TeamModerationStore(
     NoCtfDbContext db,
-    ITransactionalMessageOutbox outbox,
-    ICompetitionEventRecorder? eventRecorder = null) : ITeamModerationStore
+    IPostCommitMessagePublisher outbox,
+    ICompetitionEventRecorder? eventRecorder = null,
+    ProgressionReconciler? progressionReconciler = null) : ITeamModerationStore
 {
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
@@ -84,7 +86,7 @@ public sealed class TeamModerationStore(
                 .ToListAsync(cancellationToken);
             foreach (var runtime in practiceRuntimes)
             {
-                if (runtime.State == RuntimeState.Queued && runtime.RunnerId is null && runtime.ProviderReceiptJson is null)
+                if (runtime.State == RuntimeState.Queued && runtime.RunnerId is null && runtime.ProviderReceipt is null)
                 {
                     runtime.State = RuntimeState.Stopped;
                     runtime.StoppedAt = command.OccurredAt;
@@ -105,8 +107,11 @@ public sealed class TeamModerationStore(
                     : null));
         }
         await db.SaveChangesAsync(cancellationToken);
+        await (progressionReconciler ?? new ProgressionReconciler(db))
+            .ReconcilePersistedTeamAsync(command.CompetitionId, team.Id,
+                command.OccurredAt, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        await outbox.FlushCommittedMessagesAsync();
+        await transaction.FlushMessagesAsync(outbox);
         return new();
     }
 }

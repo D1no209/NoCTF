@@ -2,6 +2,8 @@ using System.Text.Json;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Ctf.Configuration;
 using NoCTF.GameModes.Flags;
+using NoCTF.Domain.Challenges;
+using NoCTF.Domain.Competitions;
 
 namespace NoCTF.Tests.Unit.GameModes;
 
@@ -89,27 +91,19 @@ public sealed class PerTeamFlagGeneratorTests
     [Test]
     public async Task Ctf_challenge_template_overrides_competition_dynamic_flag_default()
     {
-        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
-        var competition = new CtfConfiguration(
-            CtfConfiguration.CurrentSchemaVersion,
-            new(500, 100, 10),
-            [],
-            FlagTemplate: new("competition", "[TEAMHASH]", false));
-        var inherited = new CtfChallengeConfiguration(
-            CtfChallengeConfiguration.CurrentSchemaVersion,
-            null,
-            null);
-        var overridden = inherited with
+        var competition = new CtfCompetitionModeConfiguration
         {
-            FlagTemplate = new("challenge", "[TEAMHASH]", false)
+            FlagTemplate = new() { Header = "competition", BodyTemplate = "[TEAMHASH]" }
+        };
+        var inherited = new CtfCompetitionChallengeRules();
+        var overridden = new CtfCompetitionChallengeRules
+        {
+            HasFlagTemplate = true,
+            FlagTemplate = new() { Header = "challenge", BodyTemplate = "[TEAMHASH]" }
         };
 
-        var inheritedTemplate = CtfFlagTemplateResolver.Resolve(
-            JsonSerializer.Serialize(competition, options),
-            JsonSerializer.Serialize(inherited, options));
-        var overriddenTemplate = CtfFlagTemplateResolver.Resolve(
-            JsonSerializer.Serialize(competition, options),
-            JsonSerializer.Serialize(overridden, options));
+        var inheritedTemplate = CtfFlagTemplateResolver.Resolve(competition, inherited);
+        var overriddenTemplate = CtfFlagTemplateResolver.Resolve(competition, overridden);
 
         await Assert.That(inheritedTemplate.Header).IsEqualTo("competition");
         await Assert.That(overriddenTemplate.Header).IsEqualTo("challenge");
@@ -118,24 +112,19 @@ public sealed class PerTeamFlagGeneratorTests
     [Test]
     public async Task Awd_challenge_template_overrides_competition_dynamic_flag_default()
     {
-        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
-        var competition = AwdConfiguration.Default with
+        var competition = new AwdCompetitionModeConfiguration
         {
-            FlagTemplate = new("competition", "[TEAMHASH]", false)
+            FlagTemplate = new() { Header = "competition", BodyTemplate = "[TEAMHASH]" }
         };
-        var inherited = new AwdChallengeConfiguration(
-            AwdChallengeConfiguration.CurrentSchemaVersion);
-        var overridden = inherited with
+        var inherited = new AwdCompetitionChallengeRules();
+        var overridden = new AwdCompetitionChallengeRules
         {
-            FlagTemplate = new("challenge", "[TEAMHASH]", false)
+            HasFlagTemplate = true,
+            FlagTemplate = new() { Header = "challenge", BodyTemplate = "[TEAMHASH]" }
         };
 
-        var inheritedTemplate = AwdFlagTemplateResolver.Resolve(
-            JsonSerializer.Serialize(competition, options),
-            JsonSerializer.Serialize(inherited, options));
-        var overriddenTemplate = AwdFlagTemplateResolver.Resolve(
-            JsonSerializer.Serialize(competition, options),
-            JsonSerializer.Serialize(overridden, options));
+        var inheritedTemplate = AwdFlagTemplateResolver.Resolve(competition, inherited);
+        var overriddenTemplate = AwdFlagTemplateResolver.Resolve(competition, overridden);
 
         await Assert.That(inheritedTemplate.Header).IsEqualTo("competition");
         await Assert.That(overriddenTemplate.Header).IsEqualTo("challenge");
@@ -145,12 +134,10 @@ public sealed class PerTeamFlagGeneratorTests
     public async Task Ctf_rejects_invalid_competition_template_and_accepts_challenge_rule_override()
     {
         var invalidCompetition = new CtfConfiguration(
-            CtfConfiguration.CurrentSchemaVersion,
             new(500, 100, 10),
             [],
             FlagTemplate: new("flag", "[UNKNOWN]", false));
         var staticChallenge = new CtfChallengeConfiguration(
-            CtfChallengeConfiguration.CurrentSchemaVersion,
             null,
             null,
             FlagTemplate: new("flag", "[TEAMHASH]", false));

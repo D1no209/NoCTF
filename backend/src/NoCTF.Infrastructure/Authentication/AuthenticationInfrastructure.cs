@@ -7,6 +7,12 @@ using NoCTF.Application.Authentication.EmailVerification;
 using NoCTF.Application.Authentication.PasswordReset;
 using NoCTF.Application.Authentication.RefreshSession;
 using NoCTF.Domain.Identity;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
+using Microsoft.AspNetCore.DataProtection.Repositories;
+using NoCTF.Infrastructure.Persistence;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using NoCTF.Application.Authentication.Sso;
 
 namespace NoCTF.Infrastructure.Authentication;
 
@@ -17,6 +23,8 @@ internal static class AuthenticationInfrastructure
         IConfiguration configuration,
         bool development = false)
     {
+        var exporting = configuration.GetValue<bool>("OpenApi:Exporting");
+        var allowDevelopmentProtection = development || exporting;
         services.AddOptions<AuthenticationTokenOptions>()
             .Bind(configuration.GetSection(AuthenticationTokenOptions.SectionName))
             .Validate(options => System.Text.Encoding.UTF8.GetByteCount(options.SigningKey) >= 32,
@@ -40,23 +48,70 @@ internal static class AuthenticationInfrastructure
             .ValidateOnStart();
         services.AddOptions<EmailVerificationProtectionOptions>()
             .Bind(configuration.GetSection(EmailVerificationProtectionOptions.SectionName))
-            .Validate(options => string.IsNullOrWhiteSpace(options.EncryptionKey)
-                    || IsValidEncryptionKey(options.EncryptionKey),
+            .Validate(options => allowDevelopmentProtection
+                    && string.IsNullOrWhiteSpace(options.EncryptionKey)
+                    || !string.IsNullOrWhiteSpace(options.EncryptionKey)
+                    && IsValidEncryptionKey(options.EncryptionKey),
                 "EmailVerification:EncryptionKey must be a Base64-encoded 32-byte key.")
             .ValidateOnStart();
+        var allowDevelopmentHttp = development
+            || exporting;
+        services.AddSingleton(new SsoNetworkOptions(
+            AllowInsecurePublicBaseUrl: allowDevelopmentHttp
+                || configuration.GetValue<bool>("Sso:AllowInsecurePublicBaseUrl"),
+            AllowInsecureProviderUrls: allowDevelopmentHttp
+                || configuration.GetValue<bool>("Sso:AllowInsecureProviderUrls"),
+            PrivateNetworkAllowList: ReadAllowList(
+                configuration.GetSection("Sso:PrivateNetworkAllowList").Get<string[]>()),
+            InsecureHttpHostAllowList: ReadAllowList(
+                configuration.GetSection("Sso:InsecureHttpHostAllowList").Get<string[]>())));
+        services.AddSingleton<ISsoBackchannel, SsoBackchannel>();
+        services.AddScoped<ISsoConfigurationStore, SsoConfigurationStore>();
+        services.AddScoped<ISsoProviderConnectionTester, SsoProviderConnectionTester>();
+        services.AddScoped<ISsoProviderRuntimeReader, SsoProviderRuntimeReader>();
+        services.AddScoped<ISsoAccountStore, SsoAccountStore>();
+        services.AddSingleton<ISsoProtocolAdapter, OidcSsoProtocolAdapter>();
+        services.AddSingleton<ISsoProtocolAdapter, CasSsoProtocolAdapter>();
+        services.AddSingleton<ISsoFlowStore, PersistedSsoFlowStore>();
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddScoped<ManageSsoProviders>();
+        services.AddScoped<BeginSsoFlow>();
+        services.AddScoped<CompleteSsoCallback>();
+        services.AddScoped<GetSsoBinding>();
+        services.AddScoped<BeginSsoBinding>();
+        services.AddScoped<CompleteSsoLogin>();
+        services.AddScoped<CompleteSsoBinding>();
+        services.AddScoped<UnbindSsoIdentity>();
+        services.AddScoped<AdministrativelyUnbindSsoIdentity>();
+        services.AddDataProtection()
+            .SetApplicationName("NoCTF");
+        if (!string.IsNullOrWhiteSpace(
+                configuration[$"{EmailVerificationProtectionOptions.SectionName}:EncryptionKey"]))
+        {
+            services.AddSingleton<IXmlRepository, EncryptedDataProtectionKeyRepository>();
+            services.AddOptions<KeyManagementOptions>()
+                .Configure<IXmlRepository>((options, repository) =>
+                    options.XmlRepository = repository);
+        }
         services.AddSingleton<IRunnerScoringTokenIssuer, RunnerScoringTokenIssuer>();
         services.AddScoped<IUserAuthenticationStore, AuthenticationStore>();
         services.AddScoped<IUserRegistrationStore, AuthenticationStore>();
         services.AddScoped<ICurrentUserProfilePatchStore, AuthenticationStore>();
         services.AddScoped<NoCTF.Application.Commands.Idempotency.IRequestReplay, NoCTF.Infrastructure.Commands.Idempotency.TransactionalRequestReplay>();
-        services.AddSingleton<NoCTF.Application.Admission.IRequestAdmission, NoCTF.Infrastructure.Admission.RedisRequestAdmission>();
+        services.AddSingleton<NoCTF.Application.Admission.IRequestAdmission, NoCTF.Infrastructure.Admission.PersistedRequestAdmission>();
         if (development)
             services.AddSingleton<NoCTF.Application.Admission.IRequestAdmission, NoCTF.Infrastructure.Admission.DevelopmentRequestAdmission>();
+        else if (!exporting)
+            services.AddHostedService<NoCTF.Infrastructure.Admission.RequestAdmissionCleanupAgent>();
         services.AddSingleton<NoCTF.Application.Admission.ICredentialWorkAdmission, NoCTF.Infrastructure.Admission.CredentialWorkAdmission>();
         services.AddOptions<NoCTF.Application.Admission.RequestAdmissionOptions>()
             .Bind(configuration.GetSection("RequestAdmission"))
             .Validate(value => value.AuthenticationIpPerMinute > 0 && value.AuthenticationAccountPerMinute > 0
-                && value.PasswordConcurrency is >= 1 and <= 128 && value.SensitiveIpPerMinute > 0
+                && value.PasswordConcurrency is >= 1 and <= 128
+                && value.SsoIpPerMinute > 0
+                && value.SsoProtocolConcurrency is >= 1 and <= 128
+                && value.SsoPerProviderConcurrency is >= 1 and <= 32
+                && value.SensitiveIpPerMinute > 0
                 && value.RuntimeCommandPerUserPerMinute > 0 && value.PatchConcurrency is >= 1 and <= 32
                 && value.PatchPerUserConcurrency > 0 && value.SubmissionPerUserPerMinute > 0
                 && value.SubmissionConcurrency is >= 1 and <= 128 && value.SubmissionPerUserConcurrency > 0,
@@ -86,6 +141,8 @@ internal static class AuthenticationInfrastructure
         services.AddScoped<ReplaceCurrentUserWallpaper>();
         services.AddScoped<GetCurrentUserWallpaper>();
         services.AddScoped<UpdateCurrentUserWallpaperPreference>();
+        services.AddScoped<ReplaceCurrentUserProfileCover>();
+        services.AddScoped<GetPublicUserProfileCover>();
         services.AddScoped<ChangePassword>();
         services.AddScoped<LogoutAll>();
         services.AddScoped<IEmailVerificationStore, EmailVerificationStore>();
@@ -99,10 +156,10 @@ internal static class AuthenticationInfrastructure
         services.AddSingleton<
             IEmailVerificationSmtpClientFactory,
             EmailVerificationSmtpClientFactory>();
-        services.AddScoped<
+        services.AddSingleton<
             IEmailVerificationDelivery,
             SmtpEmailVerificationDelivery>();
-        services.AddScoped<
+        services.AddSingleton<
             IPasswordResetEmailDelivery,
             SmtpEmailVerificationDelivery>();
         services.AddScoped<IPasswordResetStore, PasswordResetStore>();
@@ -124,5 +181,11 @@ internal static class AuthenticationInfrastructure
         return Convert.TryFromBase64String(value, key, out var bytesWritten)
             && bytesWritten == key.Length;
     }
+
+    private static IReadOnlySet<string> ReadAllowList(string[]? values) =>
+        new HashSet<string>(
+            (values ?? []).Select(value => value.Trim().TrimEnd('.'))
+                .Where(value => value.Length > 0),
+            StringComparer.OrdinalIgnoreCase);
 
 }

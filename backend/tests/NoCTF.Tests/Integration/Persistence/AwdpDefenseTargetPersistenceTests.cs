@@ -56,7 +56,7 @@ public sealed class AwdpDefenseTargetPersistenceTests
             await using var db = new NoCtfDbContext(options);
             var outbox = new RecordingOutbox();
             var intake = new GameplayFactIntakeStore(db, outbox,
-                new GameplayFactAttemptCriticalSection(new AsyncKeyedLock.AsyncKeyedLocker<string>()),
+                new GameplayFactAttemptCriticalSection(),
                 new CompetitionEventStore(db, outbox), new PatchSourceAddress());
             var admission = await intake.LoadAdmissionAsync(fixture.CompetitionId, fixture.CompetitionChallengeId, fixture.UserId, ct);
             var id = Guid.NewGuid();
@@ -84,6 +84,7 @@ public sealed class AwdpDefenseTargetPersistenceTests
             var options = Options(postgres);
             var fixture = await SeedAsync(options, cancellationToken);
             var requested = await RequestTargetAsync(options, fixture, cancellationToken);
+            await Assert.That(requested.State).IsEqualTo(AwdpDefenseTargetRequestState.Created);
             var runtimeId = requested.RuntimeInstanceId!.Value;
             var fileId = Guid.CreateVersion7();
             await AddFilesAsync(options, fixture.Now, [fileId], cancellationToken);
@@ -126,7 +127,7 @@ public sealed class AwdpDefenseTargetPersistenceTests
                 cancellationToken);
             runtime.State = RuntimeState.Running;
             runtime.RunnerId = "runner-1";
-            runtime.ProviderReceiptJson = "{}";
+            runtime.ProviderReceipt = RuntimeReceiptTestData.ContainerEntity();
             runtime.RunningAt = fixture.Now;
             runtime.ExpiresAt = fixture.Now.AddMinutes(15);
             await db.SaveChangesAsync(cancellationToken);
@@ -156,7 +157,7 @@ public sealed class AwdpDefenseTargetPersistenceTests
             runtime.TeamId = null;
             await db.SaveChangesAsync(cancellationToken);
             var inventory = new AdminRuntimeStore(db, new ChallengeRuntimeTemplateCatalog(),
-                new FixedRuntimePlacementPolicy(), new PostgresPerTeamRuntimeFlagStore(db), outbox);
+                new FixedRuntimePlacementPolicy(), new PerTeamRuntimeFlagStore(db), outbox);
             var targets = await inventory.ListActiveContainersAsync(
                 new(Search: "  TEAM  ", Scope: PlatformRuntimeScope.Competition),
                 null, null, 50, cancellationToken);
@@ -212,7 +213,7 @@ public sealed class AwdpDefenseTargetPersistenceTests
                     cancellationToken);
                 runtime.State = RuntimeState.Running;
                 runtime.RunnerId = "runner-1";
-                runtime.ProviderReceiptJson = "{}";
+                runtime.ProviderReceipt = RuntimeReceiptTestData.ContainerEntity();
                 runtime.RunningAt = fixture.Now;
                 runtime.ExpiresAt = fixture.Now.AddMinutes(15);
                 await provisioned.SaveChangesAsync(cancellationToken);
@@ -295,7 +296,7 @@ public sealed class AwdpDefenseTargetPersistenceTests
                     cancellationToken);
                 runtime.State = RuntimeState.Running;
                 runtime.RunnerId = "runner-1";
-                runtime.ProviderReceiptJson = "{}";
+                runtime.ProviderReceipt = RuntimeReceiptTestData.ContainerEntity();
                 runtime.RunningAt = fixture.Now;
                 runtime.ExpiresAt = fixture.Now.AddMinutes(15);
                 await provisioned.SaveChangesAsync(cancellationToken);
@@ -306,8 +307,7 @@ public sealed class AwdpDefenseTargetPersistenceTests
             var intake = new GameplayFactIntakeStore(
                 attemptDb,
                 attemptOutbox,
-                new GameplayFactAttemptCriticalSection(
-                    new AsyncKeyedLock.AsyncKeyedLocker<string>()));
+                new GameplayFactAttemptCriticalSection());
             var staleAdmission = await intake.LoadAdmissionAsync(
                 fixture.CompetitionId,
                 fixture.CompetitionChallengeId,
@@ -320,8 +320,7 @@ public sealed class AwdpDefenseTargetPersistenceTests
             var patchStore = new PatchUploadStore(
                 patchDb,
                 patchOutbox,
-                new GameplayFactAttemptCriticalSection(
-                    new AsyncKeyedLock.AsyncKeyedLocker<string>()),
+                new GameplayFactAttemptCriticalSection(),
                 new FileReferenceLock(),
                 NullLogger<PatchUploadStore>.Instance,
                 new CompetitionEventStore(patchDb, patchOutbox));
@@ -393,7 +392,7 @@ public sealed class AwdpDefenseTargetPersistenceTests
         await using var db = new NoCtfDbContext(options);
         var store = new AwdpDefenseTargetStore(
             db,
-            new(new()),
+            new(),
             new FixedRuntimePlacementPolicy(),
             new RecordingOutbox());
         return await store.TryCreateAsync(
@@ -419,8 +418,7 @@ public sealed class AwdpDefenseTargetPersistenceTests
         var store = new PatchUploadStore(
             db,
             outbox,
-            new GameplayFactAttemptCriticalSection(
-                new AsyncKeyedLock.AsyncKeyedLocker<string>()),
+            new GameplayFactAttemptCriticalSection(),
             new FileReferenceLock(),
             NullLogger<PatchUploadStore>.Instance,
             new CompetitionEventStore(db, outbox),
@@ -475,14 +473,13 @@ public sealed class AwdpDefenseTargetPersistenceTests
         await using var db = new NoCtfDbContext(options);
         var breakValue = $"flag{{{Guid.NewGuid():N}}}";
         db.GameplayFacts.AddRange(
-            new GameplayFact
+            new BreakAttemptGameplayFact
             {
                 Id = Guid.CreateVersion7(),
                 CompetitionId = fixture.CompetitionId,
                 CompetitionChallengeId = fixture.CompetitionChallengeId,
                 TeamId = fixture.TeamId,
                 ActorUserId = fixture.UserId,
-                Kind = GameplayFactKind.BreakAttempt,
                 Value = breakValue,
                 ValueSha256 = SHA256.HashData(Encoding.UTF8.GetBytes(breakValue)),
                 OccurredAt = fixture.Now,
@@ -490,14 +487,13 @@ public sealed class AwdpDefenseTargetPersistenceTests
                 Result = GameplayFactResult.Correct,
                 UpdatedAt = fixture.Now
             },
-            new GameplayFact
+            new FixAttemptGameplayFact
             {
                 Id = Guid.CreateVersion7(),
                 CompetitionId = fixture.CompetitionId,
                 CompetitionChallengeId = fixture.CompetitionChallengeId,
                 TeamId = fixture.TeamId,
                 ActorUserId = fixture.UserId,
-                Kind = GameplayFactKind.FixAttempt,
                 ReferenceKind = GameplayFactReferenceKind.PatchUpload,
                 ReferenceId = Guid.CreateVersion7(),
                 OccurredAt = fixture.Now.AddSeconds(1),
@@ -519,10 +515,9 @@ public sealed class AwdpDefenseTargetPersistenceTests
         var competitionChallengeId = Guid.CreateVersion7();
         var teamId = Guid.CreateVersion7();
         var definition = new AwdpChallengeConfiguration(
-            AwdpChallengeConfiguration.CurrentSchemaVersion,
             Break: null,
             Fix: null,
-            RequireBreakBeforeFix: false,
+            RequireBreakBeforeFix: null,
             MaxBreakSubmissions: null,
             MaxFixSubmissions: null,
             Runtime: new(
@@ -530,6 +525,7 @@ public sealed class AwdpDefenseTargetPersistenceTests
                 new ContainerRuntimeDefinition(
                     "target:test",
                     PortMappings: new Dictionary<int, int> { [8080] = 0 },
+                    Security: new(false, false, false, ["ALL"], []),
                     FlagEnvironmentVariableName: "FLAG",
                     InternalPorts: [8080]),
                 new RuntimeResourceLimits(256 * 1024 * 1024, 250_000_000, 128),
@@ -560,13 +556,12 @@ public sealed class AwdpDefenseTargetPersistenceTests
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.Competitions.Add(new Competition
+        db.Competitions.Add(new AwdpCompetition
         {
             Id = competitionId,
             Title = "AWDP defense target",
             OwnerId = userId,
-            Mode = GameMode.Awdp,
-            ConfigurationJson = GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Awdp),
+            ModeConfiguration = TestConfigurations.Competition(GameMode.Awdp),
             FlagDerivationSecret = RandomNumberGenerator.GetBytes(32),
             StartAt = now.AddMinutes(-1),
             EndAt = now.AddHours(1),
@@ -574,25 +569,29 @@ public sealed class AwdpDefenseTargetPersistenceTests
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.Challenges.Add(new Challenge
+        db.Challenges.Add(new AwdpChallenge
         {
             Id = challengeId,
             OwnerId = userId,
-            Mode = GameMode.Awdp,
             Title = "Defense target",
             Visibility = ChallengeVisibility.Private,
-            DefinitionJson = JsonSerializer.Serialize(definition, JsonOptions),
+            Definition = TestConfigurations.Definition(
+                GameMode.Awdp,
+                JsonSerializer.Serialize(definition, JsonOptions)),
             CreatedAt = now,
             UpdatedAt = now
         });
-        db.CompetitionChallenges.Add(new CompetitionChallenge
+        var rules = new AwdpCompetitionChallengeRules
+        {
+            RequireBreakBeforeFix = false
+        };
+        db.CompetitionChallenges.Add(new AwdpCompetitionChallenge
         {
             Id = competitionChallengeId,
             CompetitionId = competitionId,
             ChallengeId = challengeId,
             IsPublished = true,
-            RulesJson = new GameModeChallengeConfigurationCatalog()
-                .GetDefaultJson(GameMode.Awdp),
+            Rules = rules,
             UpdatedAt = now
         });
         db.Teams.Add(new Team
@@ -606,18 +605,17 @@ public sealed class AwdpDefenseTargetPersistenceTests
             RegistrationStatus = TeamRegistrationStatus.Approved,
             RegisteredAt = now
         });
-        db.RuntimeInstances.Add(new RuntimeInstance
+        db.RuntimeInstances.Add(new PlayerRuntimeInstance
         {
             Id = Guid.CreateVersion7(),
             CompetitionId = competitionId,
             CompetitionChallengeId = competitionChallengeId,
             TeamId = teamId,
-            Purpose = RuntimePurpose.Player,
             RuntimeKind = RuntimeKind.Container,
             RuntimeProvider = RuntimeProvider.Docker,
             RunnerId = "attack-runner",
             State = RuntimeState.Running,
-            ProviderReceiptJson = "{}",
+            ProviderReceipt = RuntimeReceiptTestData.ContainerEntity(),
             CreatedAt = now,
             RunningAt = now,
             ExpiresAt = now.AddMinutes(15)
@@ -644,7 +642,7 @@ public sealed class AwdpDefenseTargetPersistenceTests
             .UseSnakeCaseNamingConvention()
             .Options;
 
-    private sealed class RecordingOutbox : ITransactionalMessageOutbox
+    private sealed class RecordingOutbox : IPostCommitMessagePublisher
     {
         public ConcurrentQueue<object> Messages { get; } = [];
         public ValueTask PublishAsync<T>(T message) => Add(message);
@@ -653,6 +651,10 @@ public sealed class AwdpDefenseTargetPersistenceTests
         public ValueTask ScheduleToRunnerNodeAsync<T>(T message, DateTimeOffset scheduledAt)
             where T : IRunnerNodeMessage => Add(message);
         public Task FlushOutgoingMessagesAsync() => Task.CompletedTask;
+        public void DiscardPendingMessages()
+        {
+            while (Messages.TryDequeue(out _)) { }
+        }
 
         private ValueTask Add<T>(T message)
         {

@@ -38,13 +38,13 @@ public sealed class ReadNotificationThreadEndpoint(
             item.TargetType,
             item.TargetId,
             NotificationProtocolMapper.ToProtocol(item.Kind),
-            JsonSerializer.Deserialize<JsonElement>(item.ContentJson),
+            item.Content,
             item.RelatedType,
             item.RelatedId,
             item.ThreadRootId,
             item.ReplyToId,
             item.SentAt,
             item.SourceDisplayName)).ToArray();
-        return TypedResults.Ok(new NotificationListResponse(response, null));
+        return TypedResults.Ok(new NotificationListResponse(response, response.Length));
     }
 }

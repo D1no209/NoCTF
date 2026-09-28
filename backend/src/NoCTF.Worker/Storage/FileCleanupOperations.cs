@@ -43,9 +43,6 @@ internal static partial class BackendMessageOperations
         CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT 1 FROM files WHERE id = {message.FileId} FOR UPDATE",
-            cancellationToken);
         var file = await db.Files.SingleOrDefaultAsync(item => item.Id == message.FileId, cancellationToken);
         if (file is null)
             return;
@@ -56,9 +53,19 @@ internal static partial class BackendMessageOperations
                 item.AvatarFileId == file.Id || item.WriteUpFileId == file.Id,
                 cancellationToken)
             || await db.Competitions.IgnoreQueryFilters().AnyAsync(item => item.PosterFileId == file.Id, cancellationToken)
+            || await db.CompetitionBadges.AnyAsync(item => item.ImageFileId == file.Id
+                && item.DeletedAt == null, cancellationToken)
             || await db.PlatformSettings.AnyAsync(item => item.LogoFileId == file.Id, cancellationToken)
             || await db.Set<ChallengeAttachment>().AnyAsync(item => item.FileId == file.Id, cancellationToken)
-            || await db.PatchUploads.AnyAsync(item => item.FileId == file.Id, cancellationToken);
+            || await db.PatchUploads.AnyAsync(item => item.FileId == file.Id, cancellationToken)
+            || await db.CompetitionEvents.AnyAsync(capture =>
+                capture.Kind == CompetitionEventKind.RuntimeTrafficCaptureStored
+                && capture.RelatedType == EntityReferenceKind.File
+                && capture.RelatedId == file.Id
+                && !db.CompetitionEvents.Any(deleted =>
+                    deleted.Kind == CompetitionEventKind.RuntimeTrafficCaptureDeleted
+                    && deleted.ParentEventId == capture.Id),
+                cancellationToken);
         if (referenced)
             return;
         await objects.DeleteObject(file.ObjectKey, cancellationToken);

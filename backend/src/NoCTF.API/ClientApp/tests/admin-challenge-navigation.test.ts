@@ -4,27 +4,39 @@ import { describe, expect, test } from 'bun:test'
 const page = () => sourceFile(new URL('../app/pages/admin/competitions/[id]/challenges/[ccId].vue', import.meta.url)).text()
 
 describe('admin competition challenge navigation', () => {
-  test('places the challenge sections in a sticky right rail on desktop', async () => {
+  test('places the challenge sections in the shared right sidebar', async () => {
     const source = await page()
+    const css = await sourceFile(new URL('../app/components/views/app/settings-workspace.css', import.meta.url)).text()
 
-    expect(source).toContain('lg:grid-cols-[minmax(0,1fr)_14rem]')
-    expect(source).toContain('lg:sticky lg:top-24 lg:col-start-2 lg:row-start-1 lg:flex-col')
-    expect(source).toContain('value="general" class="mt-0 lg:col-start-1 lg:row-start-1"')
-    expect(source).toContain('value="config" class="mt-0 lg:col-start-1 lg:row-start-1"')
-    expect(source).toContain('value="hints" class="mt-0 lg:col-start-1 lg:row-start-1"')
-    expect(source).toContain('value="scoring" class="mt-0 lg:col-start-1 lg:row-start-1"')
+    expect(source).toContain('<ChoiceSidebar')
+    expect(source).toContain('v-model="activeSection"')
+    expect(source).toContain('data-side="right"')
+    expect(source).toContain(':items="sectionOptions"')
+    expect(source).toContain('controls="competition-challenge-editor-content"')
+    expect(source).not.toContain('<TabsList')
+    expect(source).not.toContain('<TabsTrigger')
+    expect(css).toContain('[data-challenge-editor-workspace] > [data-side=\'right\'] { grid-column: 2; grid-row: 1; }')
+    expect(css).toContain('transform-origin: right center;')
   })
 
-  test('lists every team and all paged challenge facts before allowing a judge to correct scoring', async () => {
+  test('paginates and searches challenge team scoring before allowing a judge to correct scoring', async () => {
     const source = await page()
 
     expect(source).toContain('adminListTeams')
+    expect(source).toContain('useOffsetPagination<NoCtfapiEndpointsTeamsTeamResponse>')
+    expect(source).toContain('keyword: scoringSearch.value.trim() || null, offset, limit, desc')
+    expect(source).toContain('watch(scoringSearch, reloadScoringTeamsFromFirstPage)')
+    expect(source).toContain('setTimeout(() => { void scoringPagination.loadPage(1) }, 250)')
+    expect(source).toContain('v-model="scoringSearch"')
+    expect(source).toContain('<OffsetPagination')
+    expect(source).toContain('@update:page="loadScoringPage"')
+    expect(source).not.toContain('query: { keyword: null, offset: 0, limit: 200, desc: false }')
     expect(source).toContain('adminListGameplayFacts')
     expect(source).toContain('getLeaderboardEndpoint')
     expect(source).toContain('getScoreboardSchemaEndpoint')
     expect(source).toContain('do {')
-    expect(source).toContain('} while (cursor)')
-    expect(source).toContain('seenCursors.has(cursor)')
+    expect(source).toContain('} while (offset < total && offset > 0)')
+    expect(source).toContain('query: { competitionChallengeId: ccId, offset, limit: 200, desc: true }')
     expect(source).toContain('v-for="row in scoringRows"')
     expect(source).toContain('v-if="canJudge"')
     expect(source).toContain('adminCreateManualAdjustment')
@@ -40,16 +52,31 @@ describe('admin competition challenge navigation', () => {
 })
 
 describe('challenge template list navigation', () => {
-  test('restores the previous list before refreshing it in the background', async () => {
+  test('enforces organizer access at the route boundary', async () => {
+    const [indexRoute, newRoute, detailRoute, middleware, trafficCaptures] = await Promise.all([
+      Bun.file(new URL('../app/pages/admin/challenges/index.vue', import.meta.url)).text(),
+      Bun.file(new URL('../app/pages/admin/challenges/new.vue', import.meta.url)).text(),
+      Bun.file(new URL('../app/pages/admin/challenges/[id].vue', import.meta.url)).text(),
+      Bun.file(new URL('../app/middleware/organizer.ts', import.meta.url)).text(),
+      Bun.file(new URL('../app/pages/admin/competitions/[id]/traffic-captures.vue', import.meta.url)).text(),
+    ])
+
+    for (const route of [indexRoute, newRoute, detailRoute])
+      expect(route).toContain("middleware: 'organizer'")
+    expect(middleware).toContain('canOrganize')
+    expect(middleware).toContain("path: '/auth/login'")
+    expect(trafficCaptures).toContain("middleware: 'platform-admin'")
+  })
+
+  test('uses server-side offset pagination and debounced filters', async () => {
     const source = await sourceFile(
       new URL('../app/pages/admin/challenges/index.vue', import.meta.url),
     ).text()
 
-    expect(source).toContain('const templateListCache = new Map<boolean, ChallengeTemplate[]>()')
-    expect(source).toContain('const templates = ref<ChallengeTemplate[]>([...(templateListCache.get(includeDeleted.value) ?? [])])')
-    expect(source).toContain('templateListCache.set(requestedIncludeDeleted, [...nextTemplates])')
-    expect(source).toContain('templates.value = [...(templateListCache.get(value) ?? [])]')
-    expect(source).toContain('if (generation !== loadGeneration) return')
+    expect(source).toContain('useOffsetPagination<ChallengeTemplate>')
+    expect(source).toContain('offset,')
+    expect(source).toContain('keyword: search.value.trim() || null')
+    expect(source).toContain('setTimeout(() => { void load() }, 250)')
     expect(source).toContain('v-if="loading && templates.length === 0"')
   })
 
@@ -75,5 +102,30 @@ describe('challenge template list navigation', () => {
     expect(dialog).not.toMatch(/<Input[\s\S]{0,160}v-model="direction"/)
     expect(dialog).toContain('class="px-1"')
     expect(dialog).toContain('overscroll-contain')
+  })
+
+  test('filters the challenge library by direction', async () => {
+    const index = await sourceFile(
+      new URL('../app/pages/admin/challenges/index.vue', import.meta.url),
+    ).text()
+
+    expect(index).toContain("const directionFilter = ref(typeof route.query.direction === 'string'")
+    expect(index).toContain('const filteredTemplates = computed(')
+    expect(index).toContain('v-model="directionFilter"')
+    expect(index).toContain("$t('ui.allDirections')")
+    expect(index).toContain('v-for="template in filteredTemplates"')
+    expect(index).toContain('interface ChallengeLibrarySnapshot')
+    expect(index).toContain("const directionFilter = ref(typeof route.query.direction === 'string'")
+    expect(index).toContain("const search = ref(typeof route.query.q === 'string'")
+    expect(index).toContain('templates: [...templates.value]')
+    expect(index).toContain('directions: [...directions.value]')
+    expect(index).toContain('directionCatalogs.set(includeDeleted.value, catalog)')
+    expect(index).toContain('if (!pagination.error.value) rememberSnapshot()')
+    expect(index).toContain('function syncFiltersToRoute(): void')
+    expect(index).toContain("query.direction = directionFilter.value")
+    expect(index).toContain("query.deleted = '1'")
+    expect(index).toContain('void router.replace({ query })')
+    expect(index).toContain('onBeforeUnmount(() => {')
+    expect(index).toContain('rememberSnapshot()')
   })
 })

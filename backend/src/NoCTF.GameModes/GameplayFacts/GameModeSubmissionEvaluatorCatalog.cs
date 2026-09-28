@@ -99,11 +99,21 @@ public sealed class CtfGameplayFactEvaluator(IGameplayFactEvaluator inner) : IGa
 {
     public GameplayFactDecision Evaluate(GameplayFactProcessingContext context)
     {
+        var interactionKind = context.ChallengeDefinition is CtfChallengeDefinition ctf
+            ? ctf.InteractionKind
+            : CtfInteractionKind.FlagSubmission;
+        if (interactionKind == NoCTF.Domain.Challenges.CtfInteractionKind.PatchVerification)
+        {
+            return ModeGameplayFactEvaluatorRules.Reject(
+                context.GameplayFact,
+                GameplayFactFailureCode.FlagNotSupported);
+        }
         if (context.GameplayFact.Kind != GameplayFactKind.FlagAttempt)
             return ModeGameplayFactEvaluatorRules.Reject(
                 context.GameplayFact,
                 GameplayFactFailureCode.FixNotSupported);
-        var usesRuntimeInjection = UsesRuntimeInjection(context.ChallengeDefinitionJson);
+        var usesRuntimeInjection = context.ChallengeDefinition is CtfChallengeDefinition
+            { Runtime: { FlagSource: PersistedRuntimeFlagSource.PerTeam } };
         var effectiveContext = usesRuntimeInjection
             ? context with
             {
@@ -120,20 +130,6 @@ public sealed class CtfGameplayFactEvaluator(IGameplayFactEvaluator inner) : IGa
             inner.Evaluate(effectiveContext));
     }
 
-    private static bool UsesRuntimeInjection(string? definitionJson)
-    {
-        if (string.IsNullOrWhiteSpace(definitionJson))
-            return false;
-        try
-        {
-            return CtfConfigurationUpgrader.ParseChallenge(definitionJson).Runtime?.FlagSource
-                == RuntimeFlagSource.PerTeam;
-        }
-        catch (GameModeConfigurationException)
-        {
-            return false;
-        }
-    }
 }
 
 public sealed class AwdGameplayFactEvaluator : IGameplayFactEvaluator
@@ -144,7 +140,9 @@ public sealed class AwdGameplayFactEvaluator : IGameplayFactEvaluator
         if (submission.Kind != GameplayFactKind.FlagAttempt)
             return ModeGameplayFactEvaluatorRules.Reject(submission, GameplayFactFailureCode.FixNotSupported);
 
-        var configuration = AwdConfigurationUpgrader.ParseCompetition(context.CompetitionConfigurationJson);
+        var configuration = context.CompetitionConfiguration is AwdCompetitionModeConfiguration awd
+            ? awd
+            : throw new InvalidOperationException("AWD competition configuration is required.");
         if (context.EffectiveRunningTime is TimeSpan effectiveRunningTime
             && effectiveRunningTime < TimeSpan.FromSeconds(configuration.HardeningDurationSeconds))
             return ModeGameplayFactEvaluatorRules.Reject(submission, GameplayFactFailureCode.HardeningActive);

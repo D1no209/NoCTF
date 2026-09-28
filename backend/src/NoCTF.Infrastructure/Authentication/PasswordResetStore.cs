@@ -18,7 +18,7 @@ public sealed class PasswordResetStore(
     IPasswordHasher<User> passwordHasher,
     IEmailVerificationConfigurationStore configuration,
     IEmailVerificationDeliveryConfigurationReader deliveryConfiguration,
-    ITransactionalMessageOutbox outbox,
+    IPostCommitMessagePublisher outbox,
     ILogger<PasswordResetStore>? logger = null) : IPasswordResetStore
 {
     public async Task<PasswordResetRequestState> IssueAsync(
@@ -46,7 +46,7 @@ public sealed class PasswordResetStore(
             return Observe(PasswordResetRequestState.Ignored, null);
 
         await using var transaction = await db.Database.BeginTransactionAsync(
-            IsolationLevel.ReadCommitted,
+            IsolationLevel.Serializable,
             ct);
         await AcquireUserLockAsync(userId.Value, ct);
 
@@ -98,18 +98,19 @@ public sealed class PasswordResetStore(
             ExpiresAt = now.AddMinutes(settings.PasswordResetTokenLifetimeMinutes),
             CreatedAt = now
         });
-        await outbox.PublishAsync(new SendPasswordReset(userId.Value, rawToken));
         try
         {
             await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
         }
-        catch (DbUpdateConcurrencyException)
+        catch (Exception exception) when (exception is DbUpdateConcurrencyException
+            || TransactionFailureClassifier.IsRetryable(exception))
         {
-            await transaction.RollbackAsync(ct);
+            await TryRollbackAsync(transaction, ct);
             db.ChangeTracker.Clear();
             return Observe(PasswordResetRequestState.RateLimited, userId);
         }
-        await transaction.CommitAsync(ct);
+        await outbox.PublishAsync(new SendPasswordReset(userId.Value, rawToken));
         await outbox.FlushCommittedMessagesAsync();
         return Observe(PasswordResetRequestState.Queued, userId);
     }
@@ -130,7 +131,7 @@ public sealed class PasswordResetStore(
             return PasswordResetCompletionState.InvalidOrExpired;
 
         await using var transaction = await db.Database.BeginTransactionAsync(
-            IsolationLevel.ReadCommitted,
+            IsolationLevel.Serializable,
             ct);
         await AcquireUserLockAsync(descriptor.UserId, ct);
         var resetToken = await db.AccountTokens
@@ -154,39 +155,60 @@ public sealed class PasswordResetStore(
             return PasswordResetCompletionState.InvalidOrExpired;
 
         var passwordHash = passwordHasher.HashPassword(user, newPassword);
-        if (!await UserCredentialWrite.ReplaceAsync(db, user, passwordHash, invalidateTokens: true, now, ct))
+        try
+        {
+            if (!await UserCredentialWrite.ReplaceAsync(
+                    db,
+                    user,
+                    passwordHash,
+                    invalidateTokens: true,
+                    now,
+                    ct))
+                return PasswordResetCompletionState.InvalidOrExpired;
+        }
+        catch (Exception exception) when (TransactionFailureClassifier.IsRetryable(exception))
+        {
             return PasswordResetCompletionState.InvalidOrExpired;
+        }
 
         resetToken.ConsumedAt = now;
         await UserCredentialWrite.InvalidateResetTokensAsync(db, user.Id, resetToken.Id, now, ct);
-        await outbox.PublishAsync(new SendPasswordChangedNotification(user.Id));
         try
         {
             await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
         }
-        catch (DbUpdateConcurrencyException)
+        catch (Exception exception) when (exception is DbUpdateConcurrencyException
+            || TransactionFailureClassifier.IsRetryable(exception))
         {
-            await transaction.RollbackAsync(ct);
+            await TryRollbackAsync(transaction, ct);
             db.ChangeTracker.Clear();
             return PasswordResetCompletionState.InvalidOrExpired;
         }
-        await transaction.CommitAsync(ct);
+        await outbox.PublishAsync(new SendPasswordChangedNotification(user.Id));
         await outbox.FlushCommittedMessagesAsync();
         return PasswordResetCompletionState.Reset;
     }
 
     private async Task AcquireUserLockAsync(Guid userId, CancellationToken ct)
     {
-        if (!db.Database.IsRelational())
-        {
-            _ = await db.Users.SingleOrDefaultAsync(candidate => candidate.Id == userId, ct);
-            return;
-        }
+        _ = await db.Users.AsNoTracking()
+            .SingleOrDefaultAsync(candidate => candidate.Id == userId, ct);
+    }
 
-        _ = await db.Users
-            .FromSqlInterpolated($"SELECT * FROM users WHERE id = {userId} FOR NO KEY UPDATE")
-            .AsNoTracking()
-            .SingleOrDefaultAsync(ct);
+    private static async Task TryRollbackAsync(
+        Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction transaction,
+        CancellationToken ct)
+    {
+        try
+        {
+            await transaction.RollbackAsync(ct);
+        }
+        catch (InvalidOperationException)
+        {
+            // A provider may mark a serialization-failed transaction completed before surfacing
+            // the standardized 40001 error. There is nothing left to roll back in that case.
+        }
     }
 
     private static byte[] HashToken(string token) =>

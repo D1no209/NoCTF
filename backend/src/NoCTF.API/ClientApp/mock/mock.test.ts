@@ -39,13 +39,61 @@ function validate(schema: Data | undefined, value: any, path = '$') {
 }
 
 describe('isolated Mock API', () => {
+  test('lists only the signed-in team active runtimes with pagination', async () => {
+    const { send } = await setup('player')
+    const path = `${competition}/teams/me/runtimes?offset=0&limit=5&desc=true`
+    const response = await send(path)
+    expect(response.status).toBe(200)
+    const page = await response.json()
+    expect(page.total).toBe(14)
+    expect(page.items).toHaveLength(5)
+    expect(page.items.every((item: Data) => item.runtime.teamId === id(5))).toBeTrue()
+    expect(page.items.every((item: Data) => Boolean(item.challengeTitle))).toBeTrue()
+    const runtime = page.items[0].runtime
+    const extendedExpiry = new Date(Date.parse(runtime.expiresAt) + 30 * 60_000).toISOString()
+    expect((await send(`${competition}/challenges/${runtime.competitionChallengeId}/runtimes/${runtime.id}`,
+      'PATCH', { expiresAt: extendedExpiry })).status).toBe(202)
+    const afterExtend = await (await send(path)).json()
+    expect(afterExtend.items.find((item: Data) => item.runtime.id === runtime.id).runtime.expiresAt).toBe(extendedExpiry)
+    expect((await send(`${competition}/challenges/${runtime.competitionChallengeId}/runtimes/${runtime.id}`, 'DELETE')).status).toBe(202)
+    const afterStop = await (await send(path)).json()
+    expect(afterStop.total).toBe(13)
+  })
+
+  test('starting a visible CTF challenge is an idempotent no-content operation', async () => {
+    const { send } = await setup()
+    const path = `${competition}/challenges/${id(4)}/start`
+    expect((await send(path, 'POST', {})).status).toBe(204)
+    expect((await send(path, 'POST', {})).status).toBe(204)
+  })
+
+  test('the local CTF progression map exposes a readable route fixture', async () => {
+    const { send } = await setup()
+    const response = await send(`${competition}/progression`)
+    expect(response.status).toBe(200)
+    const graph = await response.json()
+    expect(graph.showPlayerMap).toBe(true)
+    expect(graph.nodes).toHaveLength(8)
+    expect(graph.edges).toHaveLength(8)
+    expect(graph.nodes[0].positionX).toBeUndefined()
+  })
+
+  test('the public profile includes a visible earned badge and zero-score historical directions', async () => {
+    const { send } = await setup()
+    const response = await send(`/api/v1/users/${id(1)}`)
+    expect(response.status).toBe(200)
+    const profile = await response.json()
+    expect(profile.badges).toHaveLength(1)
+    expect(profile.badges[0].name).toBe('Take Control')
+    expect(profile.directions.some((direction: Data) => direction.successfulChallengeCount === 0)).toBe(true)
+  })
   test('seeds one downloadable challenge for every supported direction', async () => {
     const { send } = await setup()
     const catalog = await (await send(`${competition}/challenges`)).json()
     const directions = ['Misc', 'Web', 'Crypto', 'Pwn', 'Reverse', 'Penetration', 'Forensics', 'OSINT', 'AI', 'Mobile', 'IoT', 'Hardware', 'Cloud', 'Blockchain']
     expect(catalog.items).toHaveLength(directions.length)
     expect(new Set(catalog.items.map((item: Data) => item.direction))).toEqual(new Set(directions))
-    expect(catalog.items.every((item: Data) => item.hasRuntime)).toBe(true)
+    expect(catalog.items.every((item: Data) => !('hasRuntime' in item))).toBe(true)
     const sockets = new Set<string>()
     for (const challenge of catalog.items) {
       const path = `${competition}/challenges/${challenge.id}/attachments`
@@ -65,9 +113,9 @@ describe('isolated Mock API', () => {
       expect(await download.text()).toContain(`Direction: ${challenge.direction}`)
       const runtime = await (await send(`${competition}/challenges/${challenge.id}/runtimes/current`)).json()
       expect(runtime.state).toBe('Running')
-      expect(runtime.urls).toHaveLength(1)
-      expect(runtime.urls[0]).toMatch(/^tcp:\/\/challenge\.mock\.invalid:31\d{3}$/)
-      sockets.add(runtime.urls[0])
+      expect(runtime.accesses).toHaveLength(1)
+      expect(runtime.accesses[0].directAddress).toMatch(/^tcp:\/\/challenge\.mock\.invalid:31\d{3}$/)
+      sockets.add(runtime.accesses[0].directAddress)
     }
     expect(sockets.size).toBe(directions.length)
   })
@@ -333,30 +381,6 @@ describe('isolated Mock API', () => {
     expect((await (await fresh.send('/api/v1/platform/configuration')).json()).name).toBe('NoCTF · MOCK')
   })
 
-  test('monitoring demo exposes a complete and varied live snapshot', async () => {
-    const { send } = await setup()
-    const response = await send('/api/v1/admin/platform/monitoring')
-    expect(response.status).toBe(200)
-    const snapshot = await response.json()
-    expect(snapshot.status).toBe(1)
-    expect(snapshot.prometheusAvailable).toBe(true)
-    expect(snapshot.natsAvailable).toBe(true)
-    expect(snapshot.metrics).toHaveLength(30)
-    expect(snapshot.metrics.find((metric: { kind: number }) => metric.kind === 27)?.value).toBe(73.8)
-    expect(snapshot.metrics.find((metric: { kind: number }) => metric.kind === 28)?.value).toBe(342)
-    expect(snapshot.metrics.find((metric: { kind: number }) => metric.kind === 29)?.value).toBe(0.4)
-    expect(snapshot.metrics).toEqual(expect.arrayContaining([
-      expect.objectContaining({ kind: 23, unit: 1, value: 38.4, windowSeconds: 300 }),
-      expect.objectContaining({ kind: 24, unit: 0, value: 11_520, windowSeconds: 300 }),
-      expect.objectContaining({ kind: 25, unit: 1, value: 0.18, windowSeconds: 300 }),
-      expect.objectContaining({ kind: 26, unit: 0, value: 54, windowSeconds: 300 }),
-    ]))
-    expect(new Set(snapshot.metrics.map((item: Data) => item.kind)).size).toBe(30)
-    expect(snapshot.metrics.some((item: Data) => item.status === 1)).toBe(true)
-    expect(snapshot.latencyDetails).toHaveLength(5)
-    expect(snapshot.poolResources).toHaveLength(6)
-  })
-
   test('wallpaper upload, protected read and preference changes share account state', async () => {
     const { api, accessToken, send } = await setup()
     const before = await (await send('/api/v1/auth/me')).json()
@@ -382,6 +406,41 @@ describe('isolated Mock API', () => {
     const disabled = await (await send('/api/v1/auth/me/profile', 'PATCH', { appearance: { wallpaperEnabled: false } })).json()
     expect(disabled.appearance.wallpaperEnabled).toBe(false)
     expect((await (await send('/api/v1/auth/me')).json()).wallpaperRevision).toBe(current.wallpaperRevision)
+  })
+
+  test('filters the challenge bank by direction and keeps the direction catalog', async () => {
+    const { send } = await setup()
+    const response = await send('/api/v1/admin/challenges?direction=Web&offset=0&limit=200')
+
+    expect(response.status).toBe(200)
+    const result = await response.json()
+    expect(result.items.length).toBeGreaterThan(0)
+    expect(result.items.every((item: Data) => item.direction === 'Web')).toBe(true)
+    expect(result.items.every((item: Data) => !('definition' in item))).toBe(true)
+    expect(result.directions).toEqual(expect.arrayContaining(['Web', 'Crypto', 'Pwn']))
+  })
+
+  test('profile cover upload remains independent from the site wallpaper', async () => {
+    const { api, accessToken, send } = await setup()
+    const form = new FormData()
+    form.set('file', new File(['mock profile cover'], 'profile-cover.webp', { type: 'image/webp' }))
+    const uploaded = await api.handle(new Request(base + '/api/v1/auth/me/profile-cover', {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${accessToken}` },
+      body: form,
+    }))
+
+    expect(uploaded.status).toBe(200)
+    const current = await uploaded.json()
+    expect(current.profileCoverUrl).toContain(`/api/v1/users/${id(1)}/profile-cover?revision=`)
+    expect(current.wallpaperRevision).toBeNull()
+    expect(current.wallpaperEnabled).toBe(false)
+
+    const profile = await (await send(`/api/v1/users/${id(1)}`)).json()
+    expect(profile.profileCoverUrl).toBe(current.profileCoverUrl)
+    const image = await send('/api/v1/users/{userId}/profile-cover'.replace('{userId}', id(1)))
+    expect(image.status).toBe(200)
+    expect(image.headers.get('content-type')).toContain('image/webp')
   })
 
   test('competition poster upload is available to the create-competition flow', async () => {
@@ -419,34 +478,32 @@ describe('isolated Mock API', () => {
     expect(current.login).toBeUndefined()
   })
 
-  test('administrator-issued user tokens can impersonate and be individually revoked', async () => {
+  test('administrator-issued JWTs are ordinary stateless identity tokens', async () => {
     const { api, send } = await setup()
     const targetUserId = id(1, 3)
     expect((await send(
       `/api/v1/admin/platform/users/${targetUserId}/tokens`,
       'POST',
-      { expiresInSeconds: 59, reason: 'support case' },
+      { expiresInSeconds: 59 },
     )).status).toBe(400)
     const issuedResponse = await send(
       `/api/v1/admin/platform/users/${targetUserId}/tokens`,
       'POST',
-      { expiresInSeconds: 3600, reason: '  support case  ' },
+      { expiresInSeconds: 3600 },
     )
     expect(issuedResponse.status).toBe(200)
     const issued = await issuedResponse.json()
-    const list = await (await send(`/api/v1/admin/platform/users/${targetUserId}/tokens`)).json()
-    expect(list.items.map((item: Data) => item.jwtId)).toContain(issued.jwtId)
-    expect(list.items.find((item: Data) => item.jwtId === issued.jwtId)?.reason).toBe('support case')
+    expect(issued.jwtId).toBeUndefined()
+    const payload = JSON.parse(Buffer.from(issued.accessToken.split('.')[1]!, 'base64url').toString())
+    expect(payload.impersonation).toBeUndefined()
+    expect(payload.impersonator_id).toBeUndefined()
     const impersonated = await api.handle(new Request(base + '/api/v1/auth/me', {
       headers: { Authorization: `Bearer ${issued.accessToken}` },
     }))
     expect(impersonated.status).toBe(200)
     expect((await impersonated.json()).userId).toBe(targetUserId)
 
-    expect((await send(
-      `/api/v1/admin/platform/users/${targetUserId}/tokens/${issued.jwtId}`,
-      'DELETE',
-    )).status).toBe(204)
+    expect((await send(`/api/v1/admin/platform/users/${targetUserId}/tokens`, 'DELETE')).status).toBe(200)
     const revoked = await api.handle(new Request(base + '/api/v1/auth/me', {
       headers: { Authorization: `Bearer ${issued.accessToken}` },
     }))
@@ -455,13 +512,17 @@ describe('isolated Mock API', () => {
     const administratorToken = await (await send(
       `/api/v1/admin/platform/users/${id(1)}/tokens`,
       'POST',
-      { expiresInSeconds: 3600, reason: 'nested check' },
+      { expiresInSeconds: 3600 },
     )).json()
     const nested = await api.handle(new Request(
       base + `/api/v1/admin/platform/users/${targetUserId}/tokens`,
-      { headers: { Authorization: `Bearer ${administratorToken.accessToken}` } },
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${administratorToken.accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expiresInSeconds: 3600 }),
+      },
     ))
-    expect(nested.status).toBe(403)
+    expect(nested.status).toBe(200)
   })
 
   test('logout blocks cookie restore and rejects the old access token', async () => {
@@ -476,17 +537,17 @@ describe('isolated Mock API', () => {
   test('pagination is stable and runtime reset replaces the simulated runtime ID', async () => {
     const { send } = await setup()
     const first = await (await send(`${competition}/gameplay-facts?limit=1`)).json()
-    const next = await (await send(`${competition}/gameplay-facts?limit=1&cursor=${first.nextCursor}`)).json()
+    const next = await (await send(`${competition}/gameplay-facts?limit=1&offset=1`)).json()
     expect(first.items).toHaveLength(1)
     expect(next.items[0].id).not.toBe(first.items[0].id)
     const path = `${competition}/challenges/${id(4, 2)}/runtimes`
     const started = await (await send(path, 'POST', { replacesRuntimeId: null })).json()
     const afterStart = await (await send(path + '/current')).json()
     expect(afterStart.state).toBe('Running')
-    expect(afterStart.urls).toEqual(['tcp://challenge.mock.invalid:31002'])
+    expect(afterStart.accesses).toEqual([{ directAddress: 'tcp://challenge.mock.invalid:31002', webSocketAddress: null }])
     const reset = await (await send(path, 'POST', { replacesRuntimeId: started.runtimeInstanceId })).json()
     expect(reset.runtimeInstanceId).not.toBe(started.runtimeInstanceId)
-    expect((await (await send(path + '/current')).json()).urls).toEqual(['tcp://challenge.mock.invalid:31002'])
+    expect((await (await send(path + '/current')).json()).accesses).toEqual([{ directAddress: 'tcp://challenge.mock.invalid:31002', webSocketAddress: null }])
     await send(path + `/${reset.runtimeInstanceId}`, 'DELETE', {})
     expect((await (await send(path + '/current')).json()).state).toBe('Stopped')
   })
@@ -505,5 +566,20 @@ describe('isolated Mock API', () => {
     await send(`${competition}/challenges/${id(4)}/flag-submissions`, 'POST', { flag: 'flag{mock_success}' })
     expect(await (await hub(request(path))).text()).toContain('scoreboardUpdated')
     expect((await hub(request(path, 'DELETE'))).status).toBe(202)
+  })
+
+  test('authenticated notification SignalR receives a content-free invalidation', async () => {
+    const { api, request, send } = await setup('admin')
+    const hub = createMockRealtime(api)
+    const negotiation = await (await hub(request('/hubs/v1/notifications/negotiate', 'POST', {}))).json()
+    const path = '/hubs/v1/notifications?id=' + negotiation.connectionToken
+    expect(await (await hub(request(path))).text()).toBe('')
+    const post = (value: any) => hub(new Request(base + path, { method: 'POST', body: JSON.stringify(value) + '\x1e' }))
+    await post({ protocol: 'json', version: 1 })
+    expect(await (await hub(request(path))).text()).toBe('{}\x1e')
+    await send(`/api/v1/admin/competitions/${id(2)}/announcements`, 'POST', { title: 'Update', body: 'Body', audience: 'Participants' })
+    const signal = (await hub(request(path))).text()
+    expect(await signal).toContain('notificationChanged')
+    expect(await signal).not.toContain('Body')
   })
 })

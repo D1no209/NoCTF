@@ -6,6 +6,7 @@ using NoCTF.Application.Storage;
 using NoCTF.Domain.Runtime;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.Infrastructure.Caching;
+using NoCTF.Infrastructure.Messaging;
 using NoCTF.Runner.Composition;
 using NoCTF.Runtime.Docker.Containers;
 using ZiggyCreatures.Caching.Fusion;
@@ -15,6 +16,27 @@ namespace NoCTF.Tests.Unit.Runner;
 public sealed class RunnerOptionsTests
 {
     [Test]
+    public async Task Runner_registration_provides_the_KV_lease_for_a_combined_host()
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:Redis"] = "localhost:6379",
+                ["RunnerScoring:CallbackBaseUrl"] = "https://api.internal",
+                ["Runner:Provider"] = nameof(RuntimeProvider.Docker),
+                ["Runner:Id"] = "runner-1",
+                ["Runner:Pool"] = "docker"
+            }).Build();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddNoCtfRunner(configuration);
+
+        await Assert.That(services.Any(descriptor =>
+            descriptor.ServiceType == typeof(IClusterLeaseManager)
+            && descriptor.ImplementationType == typeof(NatsClusterLeaseManager))).IsTrue();
+    }
+
+    [Test]
     public async Task Docker_runtime_log_limits_are_configurable()
     {
         using var services = BuildServices(new Dictionary<string, string?>
@@ -22,9 +44,6 @@ public sealed class RunnerOptionsTests
             ["Runner:Provider"] = nameof(RuntimeProvider.Docker),
             ["Runner:Pool"] = "docker",
             ["Runner:Id"] = "docker-1",
-            ["Runner:Capacity:MemoryBytes"] = "4294967296",
-            ["Runner:Capacity:NanoCpus"] = "2000000000",
-            ["Runner:Capacity:PidsLimit"] = "2048",
             ["Runner:Heartbeat:IntervalSeconds"] = "5",
             ["Runner:Heartbeat:TtlSeconds"] = "15",
             ["Runtime:Docker:RuntimeLogMaxSizeBytes"] = "8388608",
@@ -47,9 +66,6 @@ public sealed class RunnerOptionsTests
             ["Runner:Provider"] = nameof(RuntimeProvider.Docker),
             ["Runner:Pool"] = "docker",
             ["Runner:Id"] = "docker-1",
-            ["Runner:Capacity:MemoryBytes"] = "4294967296",
-            ["Runner:Capacity:NanoCpus"] = "2000000000",
-            ["Runner:Capacity:PidsLimit"] = "2048",
             ["Runner:Heartbeat:IntervalSeconds"] = "5",
             ["Runner:Heartbeat:TtlSeconds"] = "15"
         });
@@ -59,13 +75,35 @@ public sealed class RunnerOptionsTests
         await Assert.That(options.Id).IsEqualTo("docker-1");
         await Assert.That(options.Pool).IsEqualTo("docker");
         await Assert.That(options.Provider).IsEqualTo(RuntimeProvider.Docker);
-        await Assert.That(options.Capacity.MemoryBytes).IsEqualTo(4_294_967_296);
         await Assert.That(options.Heartbeat.Interval).IsEqualTo(TimeSpan.FromSeconds(5));
         await Assert.That(options.Heartbeat.Ttl).IsEqualTo(TimeSpan.FromSeconds(15));
+        var cleanup = options.Cleanup.ToPolicy();
+        await Assert.That(cleanup.GracefulStopTimeout).IsEqualTo(TimeSpan.FromSeconds(2));
+        await Assert.That(cleanup.ForceDeleteTimeout).IsEqualTo(TimeSpan.FromSeconds(8));
+        await Assert.That(cleanup.NetworkCleanupTimeout).IsEqualTo(TimeSpan.FromSeconds(5));
+        await Assert.That(cleanup.VerificationTimeout).IsEqualTo(TimeSpan.FromSeconds(3));
     }
 
     [Test]
-    public async Task Runner_availability_configuration_rejects_missing_capacity()
+    public async Task Runner_cleanup_configuration_requires_positive_stage_budgets()
+    {
+        using var services = BuildServices(new Dictionary<string, string?>
+        {
+            ["Runner:Provider"] = nameof(RuntimeProvider.Docker),
+            ["Runner:Pool"] = "docker",
+            ["Runner:Id"] = "docker-1",
+            ["Runner:Heartbeat:IntervalSeconds"] = "5",
+            ["Runner:Heartbeat:TtlSeconds"] = "15",
+            ["Runner:Cleanup:VerificationTimeoutSeconds"] = "0"
+        });
+        Func<RunnerOptions> read = () =>
+            services.GetRequiredService<IOptions<RunnerOptions>>().Value;
+
+        await Assert.That(read).Throws<OptionsValidationException>();
+    }
+
+    [Test]
+    public async Task Runner_availability_configuration_uses_observation_without_manual_capacity()
     {
         using var services = BuildServices(new Dictionary<string, string?>
         {
@@ -75,10 +113,10 @@ public sealed class RunnerOptionsTests
             ["Runner:Heartbeat:IntervalSeconds"] = "5",
             ["Runner:Heartbeat:TtlSeconds"] = "15"
         });
-        Func<RunnerOptions> read = () =>
-            services.GetRequiredService<IOptions<RunnerOptions>>().Value;
+        var options = services.GetRequiredService<IOptions<RunnerOptions>>().Value;
 
-        await Assert.That(read).Throws<OptionsValidationException>();
+        await Assert.That(options.Id).IsEqualTo("docker-1");
+        await Assert.That(options.Admission.IsValid()).IsTrue();
     }
 
     [Test]
@@ -89,9 +127,6 @@ public sealed class RunnerOptionsTests
             ["Runner:Provider"] = nameof(RuntimeProvider.Docker),
             ["Runner:Pool"] = "docker",
             ["Runner:Id"] = "docker-1",
-            ["Runner:Capacity:MemoryBytes"] = "1024",
-            ["Runner:Capacity:NanoCpus"] = "100",
-            ["Runner:Capacity:PidsLimit"] = "10",
             ["Runner:Heartbeat:IntervalSeconds"] = "15",
             ["Runner:Heartbeat:TtlSeconds"] = "15"
         });
@@ -109,9 +144,6 @@ public sealed class RunnerOptionsTests
             ["Runner:Provider"] = "mystery",
             ["Runner:Pool"] = "pool-a",
             ["Runner:Id"] = "runner-a",
-            ["Runner:Capacity:MemoryBytes"] = "1024",
-            ["Runner:Capacity:NanoCpus"] = "100",
-            ["Runner:Capacity:PidsLimit"] = "10",
             ["Runner:Heartbeat:IntervalSeconds"] = "5",
             ["Runner:Heartbeat:TtlSeconds"] = "15"
         });
@@ -150,9 +182,6 @@ public sealed class RunnerOptionsTests
             ["Runner:Provider"] = nameof(RuntimeProvider.Docker),
             ["Runner:Pool"] = "docker",
             ["Runner:Id"] = "docker-1",
-            ["Runner:Capacity:MemoryBytes"] = "1024",
-            ["Runner:Capacity:NanoCpus"] = "100",
-            ["Runner:Capacity:PidsLimit"] = "10",
             ["Runner:Heartbeat:IntervalSeconds"] = "5",
             ["Runner:Heartbeat:TtlSeconds"] = "15",
             ["Storage:Provider"] = "S3",
@@ -174,9 +203,6 @@ public sealed class RunnerOptionsTests
             ["Runner:Provider"] = nameof(RuntimeProvider.Docker),
             ["Runner:Pool"] = "docker",
             ["Runner:Id"] = "docker-1",
-            ["Runner:Capacity:MemoryBytes"] = "1024",
-            ["Runner:Capacity:NanoCpus"] = "100",
-            ["Runner:Capacity:PidsLimit"] = "10",
             ["Runner:Heartbeat:IntervalSeconds"] = "5",
             ["Runner:Heartbeat:TtlSeconds"] = "15"
         });

@@ -6,14 +6,24 @@ import { getLeaderboardTrendsEndpoint, getScoreboardAdjustmentDetailEndpoint, ge
 import type { NoCtfapiEndpointsCompetitionsScoreboardAdjustmentDetailResponse, NoCtfapiEndpointsCompetitionsScoreboardAdjustmentResponse, NoCtfapiEndpointsCompetitionsScoreboardColumnResponse, NoCtfapiEndpointsCompetitionsScoreboardEntryResponse, NoCtfapiEndpointsCompetitionsScoreboardSlotDetailResponse, NoCtfapiEndpointsCompetitionsScoreboardSlotResponse, NoCtfapiEndpointsCompetitionsScoreboardTeamResponse, NoCtfapiEndpointsCompetitionsScoreboardTrendsResponse } from '../../../../api'
 import { medalBloodRankClass, medalRankClass } from '../../../leaderboard/types'
 import type { TrendSeries } from '../../../leaderboard/types'
-import { scoreboardChallengeColumnGroups, scoreboardBloodAward, scoreboardBreakdown, scoreboardEntryKindLabel, scoreboardEntryOutcomeLabel, scoreboardRankingStateLabel, scoreboardSlot } from '../../../../utils/scoreboard'
+import { scoreboardChallengeColumnGroupsByDirection, scoreboardBloodAward, scoreboardBreakdown, scoreboardEntryKindLabel, scoreboardEntryOutcomeLabel, scoreboardRankingStateLabel, scoreboardSlot } from '../../../../utils/scoreboard'
+import { competitionChallengesPath } from '../../../../utils/app-routes'
 import ScoreboardSlotStatusComponent from '../../../leaderboard/ScoreboardSlotStatus.vue'
+
+export const leaderboardWheelDamping = 0.55
+
+export function dampenedLeaderboardWheelDelta(event: Pick<WheelEvent, 'deltaMode' | 'deltaY'>, viewportHeight: number, lineHeight = 16): number {
+  const unit = event.deltaMode === 1 ? lineHeight : event.deltaMode === 2 ? viewportHeight : 1
+  return event.deltaY * unit * leaderboardWheelDamping
+}
 
 /** Owns state, effects and commands for CompetitionsByIdLeaderboardPage. */
 export function useCompetitionsByIdLeaderboardPage() {
   const route = useRoute()
 
   const competitionId = route.params.id as string
+
+  const competitionReturnPath = competitionChallengesPath(competitionId)
 
   const ctx = inject(competitionContextKey)!
 
@@ -29,14 +39,25 @@ export function useCompetitionsByIdLeaderboardPage() {
 
   const visibleTeamCount = ref(50)
 
+  const showLeaderboardHiddenTeams = ref(false)
+
   const canViewInternalTracks = computed(() => {
     const role = ctx.competition.value?.administrationRole
     return isAdministrator.value || role === 'Owner' || role === 'Manager' || role === 'Judge'
   })
 
+  const publiclyVisibleTrackKeys = computed(() => new Set(
+    (board.snapshot.value?.tracks ?? [])
+      .filter(track => !track.isInternal && track.visibleOnLeaderboard)
+      .map(track => track.key),
+  ))
+
   const availableTracks = computed(() => tracksEnabled.value
-    ? (board.snapshot.value?.tracks ?? []).filter(track => canViewInternalTracks.value
-        || !track.isInternal && (track.isViewerTrack || track.visibleOnLeaderboard))
+    ? (board.snapshot.value?.tracks ?? []).filter(track => (
+        canViewInternalTracks.value && showLeaderboardHiddenTeams.value
+      ) || (
+        !track.isInternal && (track.isViewerTrack || track.visibleOnLeaderboard)
+      ))
     : [])
 
   const selectedAllTracks = computed(() => selectedTrackKey.value === allTracksKey)
@@ -56,7 +77,9 @@ export function useCompetitionsByIdLeaderboardPage() {
   }, { immediate: true })
 
   const teams = computed(() => {
-    const all = board.snapshot.value?.teams ?? []
+    let all = board.snapshot.value?.teams ?? []
+    if (tracksEnabled.value && canViewInternalTracks.value && !showLeaderboardHiddenTeams.value)
+      all = all.filter(team => publiclyVisibleTrackKeys.value.has(team.trackKey))
     if (tracksEnabled.value && !selectedAllTracks.value)
       return all.filter(team => team.trackKey === selectedTrackKey.value)
     return [...all].sort((left, right) => {
@@ -89,6 +112,18 @@ export function useCompetitionsByIdLeaderboardPage() {
     visibleTeamCount.value += 50
   }
 
+  function dampenLeaderboardWheel(event: WheelEvent): void {
+    if (event.ctrlKey || event.shiftKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return
+    const surface = event.currentTarget as HTMLElement | null
+    if (!surface || surface.scrollHeight <= surface.clientHeight) return
+    const lineHeight = Number.parseFloat(getComputedStyle(surface).lineHeight) || 16
+    const delta = dampenedLeaderboardWheelDelta(event, surface.clientHeight, lineHeight)
+    const next = Math.min(surface.scrollHeight - surface.clientHeight, Math.max(0, surface.scrollTop + delta))
+    if (next === surface.scrollTop) return
+    event.preventDefault()
+    surface.scrollTop = next
+  }
+
   const teamDisplayNames = computed(() => buildTeamDisplayNames(teams.value))
 
   const displayTeamName = (team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse) =>
@@ -96,7 +131,7 @@ export function useCompetitionsByIdLeaderboardPage() {
 
   watch(teams, () => { visibleTeamCount.value = 50 })
 
-  const columnGroups = computed(() => scoreboardChallengeColumnGroups(
+  const columnGroups = computed(() => scoreboardChallengeColumnGroupsByDirection(
     board.schema.value,
     board.catalog.value?.items,
   ))
@@ -132,6 +167,12 @@ export function useCompetitionsByIdLeaderboardPage() {
   const trendRangeStart = computed(() => ctx.competition.value?.startTime ?? null)
 
   const trendRangeEnd = computed(() => trends.value?.dataAsOf ?? trends.value?.generatedAt ?? null)
+
+  const trendRevision = computed(() => [
+    trends.value?.version ?? 'none',
+    trends.value?.dataAsOf ?? trends.value?.generatedAt ?? 'none',
+    selectedTrackKey.value,
+  ].join(':'))
 
   async function loadTrends(): Promise<void> {
     if (trendsRetryTimer) clearTimeout(trendsRetryTimer)
@@ -495,11 +536,15 @@ export function useCompetitionsByIdLeaderboardPage() {
       scoreboardRankingStateLabel,
       scoreboardSlot,
       competitionId,
+      competitionReturnPath,
+      dampenLeaderboardWheel,
       board,
       allTracksKey,
       selectedTrackKey,
       tracksEnabled,
       visibleTeamCount,
+      canViewInternalTracks,
+      showLeaderboardHiddenTeams,
       availableTracks,
       selectedAllTracks,
       trackName,
@@ -516,6 +561,7 @@ export function useCompetitionsByIdLeaderboardPage() {
       visibleTrendSeries,
       trendRangeStart,
       trendRangeEnd,
+      trendRevision,
       loadTrends,
       roundWindowLabel,
       roundLabel,
