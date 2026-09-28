@@ -30,6 +30,8 @@ public static class AuthenticationRegistration
                     {
                         if ((context.HttpContext.Request.Path.StartsWithSegments("/hubs/v1/competitions")
                                 || context.HttpContext.Request.Path.StartsWithSegments(
+                                    "/hubs/v1/notifications")
+                                || context.HttpContext.Request.Path.StartsWithSegments(
                                     "/hubs/v1/admin/platform-logs"))
                             && context.Request.Query.TryGetValue("access_token", out var token))
                             context.Token = token;

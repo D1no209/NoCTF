@@ -7,4 +7,5 @@ namespace NoCTF.Application.Messaging;
 [JsonSerializable(typeof(CompetitionEventCommitted))]
 [JsonSerializable(typeof(GameplayFactStateChangedNotification))]
 [JsonSerializable(typeof(ScoreboardUpdated))]
+[JsonSerializable(typeof(NotificationChanged))]
 public partial class NoCtfMessageJsonContext : JsonSerializerContext;

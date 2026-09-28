@@ -71,6 +71,7 @@ export function createMockApi() {
     })
   }
   const changes = new Set<(competitionId: string) => void>()
+  const notificationChanges = new Set<() => void>()
   const json = (value: any, status = 200, headers: HeadersInit = {}) => Response.json(value, { status, headers: { 'X-NoCTF-Mock': 'true', 'Cache-Control': 'no-store', ...headers } })
   const problem = (status: number, detail: string) => json({ status, title: 'Mock API', detail }, status)
   const defaultHumanVerification = () => ({
@@ -846,6 +847,7 @@ export function createMockApi() {
       }
       else if (route === '/admin/competitions/{competitionId}/announcements') {
         value = model('NotificationsNotificationResponse', { id: crypto.randomUUID(), sourceType: 2, sourceId: p.competitionId, targetType: 2, targetId: p.competitionId, kind: 'CompetitionAnnouncement', content: body, sentAt: now(), sourceDisplayName: user!.userName }); state.notifications.unshift(value)
+        for (const notify of notificationChanges) notify()
       }
       else return problem(501, `尚未模拟此操作，未调用真实服务 / Mock operation not implemented: ${request.method} ${route}`)
       changed = true
@@ -854,5 +856,5 @@ export function createMockApi() {
     if (status === 204) return new Response(null, { status, headers: { 'X-NoCTF-Mock': 'true' } })
     return json(shape(responseSchema(operation, String(status)), value), status)
   }
-  return { state, handle, changes, userFor }
+  return { state, handle, changes, notificationChanges, userFor }
 }

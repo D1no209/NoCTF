@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Notifications;
@@ -18,16 +19,31 @@ using NoCTF.Domain.Commands;
 using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using NoCTF.Infrastructure.Authentication;
 using NoCTF.Infrastructure.Admission;
+using NoCTF.Application.Notifications;
+using NoCTF.Infrastructure.Notifications;
 
 namespace NoCTF.Infrastructure.Persistence;
 
 /// <summary>Relational persistence for all NoCTF business facts and current state.</summary>
 public sealed class NoCtfDbContext(
     DbContextOptions<NoCtfDbContext> options,
-    TimeProvider? clock = null)
+    TimeProvider? clock = null,
+    INotificationChangePublisher? notificationPublisher = null,
+    ILogger<NoCtfDbContext>? logger = null)
     : DbContext(options), IDataProtectionKeyContext
 {
     private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
+    private NotificationChangeTracker? notificationChangeTracker;
+
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        if (notificationPublisher is null) return;
+        notificationChangeTracker ??= new(this, notificationPublisher, logger);
+        notificationChangeTracker.Attach();
+        optionsBuilder.AddInterceptors(
+            notificationChangeTracker.Saves,
+            notificationChangeTracker.Transactions);
+    }
     public DbSet<User> Users => Set<User>();
     public DbSet<Competition> Competitions => Set<Competition>();
     public DbSet<CompetitionProgression> CompetitionProgressions => Set<CompetitionProgression>();

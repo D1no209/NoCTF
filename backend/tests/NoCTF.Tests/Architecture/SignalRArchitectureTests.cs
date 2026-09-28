@@ -28,11 +28,13 @@ public sealed class SignalRArchitectureTests
         await Assert.That(sources.Any(source => source.Contains(".SendAsync("))).IsFalse();
         await Assert.That(sources.Any(source =>
             source.Contains("IHubContext<CompetitionHub>")
-            || source.Contains("IHubContext<PlatformLogHub>"))).IsFalse();
+            || source.Contains("IHubContext<PlatformLogHub>")
+            || source.Contains("IHubContext<NotificationHub>"))).IsFalse();
         await Assert.That(registration).DoesNotContain("AddStackExchangeRedis");
         await Assert.That(registration).Contains("NatsLeaderboardRefreshRelay");
         await Assert.That(registration).Contains("NatsGameplayFactStateRelay");
         await Assert.That(registration).Contains("NatsCompetitionEventRefreshRelay");
+        await Assert.That(registration).Contains("NatsNotificationChangeRelay");
         await Assert.That(hostRoles).Contains("return defaults ?? All()");
         await Assert.That(hostRoles).Contains("HostRole.Api, HostRole.Worker, HostRole.Runner");
     }

@@ -1,6 +1,6 @@
 import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
-import { isNotificationUnread } from '../app/composables/useNotificationUnread'
+import { isNotificationUnread, newNotificationNotices } from '../app/composables/useNotificationUnread'
 
 describe('notification unread state', () => {
   test('shows unread only when the latest immutable notification differs from the read marker', () => {
@@ -27,6 +27,13 @@ describe('notification unread state', () => {
     expect(center).toContain('markAllRead(items.value[0]?.id)')
     expect(center).toContain("scope: 'Inbox'")
     expect(center).not.toContain("ui.officialAnnouncementsAndMessagesDirectlyRelatedToYourAccountTeam")
+  })
+
+  test('shows newly arrived notifications in order without replaying the previous marker', () => {
+    const newestFirst = [{ id: '4' }, { id: '3' }, { id: '2' }, { id: '1' }]
+    expect(newNotificationNotices(newestFirst, '2')).toEqual([{ id: '3' }, { id: '4' }])
+    expect(newNotificationNotices(newestFirst, 'missing', 2)).toEqual([{ id: '3' }, { id: '4' }])
+    expect(newNotificationNotices(newestFirst, '4')).toEqual([])
   })
 
   test('reuses the shared choice sidebar, card and scroll surface for the message center', async () => {

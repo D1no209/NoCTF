@@ -45,7 +45,7 @@ describe('competition announcement catch-up', () => {
 
     expect(catchUp).toContain('competitionId: requestedCompetitionId')
     expect(catchUp).toContain("scope: 'Inbox'")
-    expect(catchUp).toContain("idPrefix: isEntryCatchUp ? 'competition-announcement' : 'notification'")
+    expect(catchUp).toContain('showNotificationNotice(notification)')
     expect(catchUp).toContain('safeLocalStorage.setItem(')
     expect(competitionPage).toContain('await refreshMissedAnnouncements()')
     expect(competitionPage).toContain("if (event.kind === 'AnnouncementPublished')")

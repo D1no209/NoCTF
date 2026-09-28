@@ -204,6 +204,12 @@ Target 是 CompetitionId，默认 TargetType=CompetitionCollaborators；面向�
 `CompetitionParticipants` 且对应 `AnnouncementPublished` 事件为 Public 的公告 ID、标题、正文和
 发布时间。它是通用只读比赛契约，不区分 Human/Bot，不返回协作者公告，也不承担外部投递。
 
+已认证用户的 SignalR Hub `/hubs/v1/notifications` 在通知提交后向当前受众推送
+`notificationChanged`（无正文、用户标识或目标 ID）。跨 API 实例经 NATS 失效信号转发；
+顶栏与已打开的消息中心收到信号、连接重建或低频兜底触发后，仍通过受权限约束的
+`GET /api/v1/notifications` 与通知线程接口读取事实。比赛公告的
+`competitionEventChanged` 继续用于比赛内事件刷新，不替代个人通知读取。
+
 ## GameplayFact 动作
 
 ```text

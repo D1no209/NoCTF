@@ -4,6 +4,8 @@ import { ArrowRight, Bell, Mail } from '@lucide/vue'
 import { listNotificationsEndpoint, readNotificationThreadEndpoint } from '../../api'
 import type { NoCtfapiEndpointsNotificationsNotificationResponse } from '../../api'
 import { createLatestRequestGuard } from '../../lib/latest-request'
+import { createLatestPageRefresh } from '../../lib/latest-page-refresh'
+import { watchNotifications } from '../../composables/useNotificationHub'
 
 type Notification = NoCtfapiEndpointsNotificationsNotificationResponse
 
@@ -27,7 +29,7 @@ export function useNotificationCenter() {
 
   const threadRequests = createLatestRequestGuard()
 
-  const { items, loading, error, hasMore, initialized, loadMore } =
+  const { items, loading, error, hasMore, initialized, loadMore, reset } =
     useCursorPagination<Notification>(async (cursor) => {
       const { data, error: requestError } = await listNotificationsEndpoint({
         query: {
@@ -43,6 +45,11 @@ export function useNotificationCenter() {
       const nextOffset = offset + pageItems.length
       return { items: pageItems, nextCursor: nextOffset < (data.total ?? 0) ? String(nextOffset) : null }
     })
+
+  const { refreshLatest } = createLatestPageRefresh({
+    loadMore,
+    reset: () => reset({ preserveItems: true }),
+  })
 
   const notificationOptions = computed(() => items.value.flatMap(notification => notification.id
     ? [{ value: notification.id, label: notificationTitle(notification), notification }]
@@ -188,6 +195,48 @@ export function useNotificationCenter() {
     markAllRead(items.value[0]?.id)
     await openFromRoute()
   })
+
+  let unwatchNotifications: (() => void) | undefined
+  onMounted(() => {
+    unwatchNotifications = watchNotifications({
+      notificationChanged: () => void refreshInbox(),
+      onReconnected: () => void refreshInbox(),
+    })
+  })
+  onUnmounted(() => unwatchNotifications?.())
+
+  async function refreshInbox(): Promise<void> {
+    await refreshLatest()
+    if (!error.value) markAllRead(items.value[0]?.id)
+    if (selected.value?.id && notificationThreadRootId(selected.value))
+      await refreshSelectedThread()
+  }
+
+  async function refreshSelectedThread(): Promise<void> {
+    const current = selected.value
+    const rootId = current && notificationThreadRootId(current)
+    if (!rootId) return
+    const request = threadRequests.begin()
+    try {
+      const { data, error: requestError } = await readNotificationThreadEndpoint({
+        path: { notificationId: rootId },
+      })
+      if (!threadRequests.isCurrent(request) || selected.value?.id !== current.id) return
+      if (requestError || !data) throw requestError
+      thread.value = data.items ?? []
+      threadError.value = null
+    }
+    catch (failure) {
+      if (!threadRequests.isCurrent(request) || selected.value?.id !== current.id) return
+      const parsed = parseApiError(failure, translate('ui.failedToLoadNotificationDetails'))
+      if (parsed.status === 403 || parsed.status === 404) {
+        selected.value = null
+        thread.value = []
+        routeError.value = parsed.message
+      }
+      else threadError.value = parsed.message
+    }
+  }
 
   watch(() => route.query.notification, () => void openFromRoute())
 

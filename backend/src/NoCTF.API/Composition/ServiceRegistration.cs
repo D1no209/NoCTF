@@ -213,6 +213,8 @@ public static class ServiceRegistration
                 LocalLeaderboardRefreshPublisher>();
             services.AddSingleton<IGameplayFactStateChangedNotification,
                 LocalGameplayFactStatePublisher>();
+            services.Replace(ServiceDescriptor.Singleton<INotificationChangePublisher,
+                LocalNotificationChangePublisher>());
         }
         services.AddSingleton<NoCTF.API.Pagination.SignedKeysetCursor>();
         services.AddSingleton<TeamWriteUpPreviewTicketCodec>();
@@ -225,6 +227,7 @@ public static class ServiceRegistration
             services.AddHostedService<NoCTF.API.SignalR.Publishing.NatsLeaderboardRefreshRelay>();
             services.AddHostedService<NoCTF.API.SignalR.Publishing.NatsPlatformLogRelay>();
             services.AddHostedService<NoCTF.API.SignalR.Publishing.NatsCompetitionEventRefreshRelay>();
+            services.AddHostedService<NatsNotificationChangeRelay>();
         }
         services.AddRateLimiter(options =>
         {

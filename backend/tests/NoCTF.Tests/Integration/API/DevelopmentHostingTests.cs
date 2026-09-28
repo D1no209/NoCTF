@@ -101,6 +101,10 @@ public sealed class DevelopmentHostingTests
 
         using var health = await client.GetAsync("/health", cancellationToken);
         await Assert.That(health.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using var anonymousHub = await client.PostAsync(
+            "/hubs/v1/notifications/negotiate?negotiateVersion=1",
+            null, cancellationToken);
+        await Assert.That(anonymousHub.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
 
         using var login = await client.PostAsJsonAsync(
             "/api/v1/auth/login",
@@ -110,6 +114,12 @@ public sealed class DevelopmentHostingTests
         using var loginJson = JsonDocument.Parse(
             await login.Content.ReadAsStreamAsync(cancellationToken));
         var accessToken = loginJson.RootElement.GetProperty("accessToken").GetString();
+        using var realtimeClient = factory.CreateClient();
+        using var notificationHub = await realtimeClient.PostAsync(
+            "/hubs/v1/notifications/negotiate?negotiateVersion=1&access_token="
+                + Uri.EscapeDataString(accessToken!),
+            null, cancellationToken);
+        await Assert.That(notificationHub.StatusCode).IsEqualTo(HttpStatusCode.OK);
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", accessToken);
 
