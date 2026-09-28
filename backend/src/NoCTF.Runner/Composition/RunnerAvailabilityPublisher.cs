@@ -149,7 +149,7 @@ public sealed class RunnerAvailabilityPublisher(
                     && (runtime.RunnerId == options.Id
                         || runtime.CapacityAllocationEntries.Any(allocation =>
                             allocation.RunnerId == options.Id)))
-                .AsNoTracking().ToArrayAsync(cancellationToken);
+                .AsNoTracking().AsSplitQuery().ToArrayAsync(cancellationToken);
             if (runtimes.Any(runtime => runtime.CapacityAllocations.Items.Count == 0
                     && (runtime.State is RuntimeState.Provisioning or RuntimeState.Running or RuntimeState.Stopping
                         || runtime.State == RuntimeState.Failed && runtime.ProviderReceipt != null)))
