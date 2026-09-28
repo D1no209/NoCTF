@@ -506,7 +506,8 @@ public sealed class DeploymentTopologyTests
         await Assert.That(compose).DoesNotContain("depends_on:");
         await Assert.That(compose).DoesNotContain("Observability__PrometheusBaseUrl");
         await Assert.That(compose).Contains("GF_PLUGINS_PREINSTALL_AUTO_UPDATE: \"false\"");
-        await Assert.That(compose).Contains("--config.file=");
+        await Assert.That(compose).Contains(
+            "--config.file=/etc/postgres-exporter/postgres_exporter.yml");
         await Assert.That(compose).Contains("--path.udev.data=/host/run/udev/data");
         await Assert.That(compose).DoesNotContain("--extend.query-path");
         await Assert.That(File.Exists(Path.Combine(
@@ -515,6 +516,10 @@ public sealed class DeploymentTopologyTests
         await Assert.That(File.Exists(Path.Combine(
             RepositoryRoot, "deploy", "observability", "grafana", "provisioning",
             "plugins", ".gitkeep"))).IsTrue();
+        var postgresExporterConfig = await File.ReadAllTextAsync(Path.Combine(
+            RepositoryRoot, "deploy", "observability", "postgres-exporter",
+            "postgres_exporter.yml"));
+        await Assert.That(postgresExporterConfig.Trim()).IsEqualTo("{}");
     }
 
     [Test]

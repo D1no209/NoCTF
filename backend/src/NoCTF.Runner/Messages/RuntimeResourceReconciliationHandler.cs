@@ -74,6 +74,7 @@ public sealed class RuntimeResourceReconciliationHandler(
                 && instance.RuntimeProvider == configuredProvider
                 && instance.RunnerId == message.RunnerId)
             .OrderBy(instance => instance.Id)
+            .AsSplitQuery()
             .ToListAsync(cancellationToken);
         var failedIdentities = failedAssignments
             .Select(instance => new RuntimeResourceIdentity(instance.Id))
@@ -191,6 +192,7 @@ public sealed class RuntimeResourceReconciliationHandler(
                         || allocation.WorkloadKind == RuntimeWorkloadKind.PatchChecker)))
             .OrderBy(runtime => runtime.Id)
             .Take(500)
+            .AsSplitQuery()
             .ToArrayAsync(ct);
         foreach (var runtime in rows.Where(row => row.RuntimeProvider == reconciler.Provider))
         foreach (var allocation in runtime.CapacityAllocations.Items.Where(item => item.Identity.IsAuxiliary && item.RunnerId == runnerId))

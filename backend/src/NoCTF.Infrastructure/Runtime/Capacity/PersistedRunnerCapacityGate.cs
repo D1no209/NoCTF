@@ -65,6 +65,7 @@ public sealed class PersistedRunnerCapacityGate(
     {
         var runtime = await db.RuntimeInstances.AsNoTracking()
             .Include(item => item.CapacityAllocationEntries)
+            .AsSplitQuery()
             .SingleOrDefaultAsync(item => item.Id == runtimeInstanceId
                 && item.State == RuntimeState.Provisioning && item.RunnerId == runnerId, ct);
         var allocation = runtime?.CapacityAllocations.Items.SingleOrDefault(
@@ -78,6 +79,7 @@ public sealed class PersistedRunnerCapacityGate(
     {
         var runtime = await db.RuntimeInstances.AsNoTracking()
             .Include(item => item.CapacityAllocationEntries)
+            .AsSplitQuery()
             .SingleOrDefaultAsync(item => item.Id == identity.RuntimeInstanceId
                 && item.RunnerId == runnerId && item.State == RuntimeState.Running, ct);
         var allocation = runtime?.CapacityAllocations.Items.SingleOrDefault(item =>
@@ -171,6 +173,7 @@ public sealed class PersistedRunnerCapacityGate(
                 .SingleOrDefaultAsync(ct);
             var runtime = await db.RuntimeInstances
                 .Include(item => item.CapacityAllocationEntries)
+                .AsSplitQuery()
                 .SingleOrDefaultAsync(item => item.Id == request.RuntimeInstanceId, ct);
             if (runtime is null || current is null
                 || current.State is RuntimeState.Stopped or RuntimeState.Stopping
@@ -364,6 +367,7 @@ public sealed class PersistedRunnerCapacityGate(
     {
         var runtime = await db.RuntimeInstances.AsNoTracking()
             .Include(item => item.CapacityAllocationEntries)
+            .AsSplitQuery()
             .SingleOrDefaultAsync(item => item.Id == runtimeId, ct);
         if (runtime is null) return RunnerCapacityReleaseOutcome.RecoveryRequired;
         var primary = runtime.CapacityAllocations.Items.SingleOrDefault(
@@ -411,6 +415,7 @@ public sealed class PersistedRunnerCapacityGate(
         var ledger = await db.RuntimeCapacityLedgers.SingleAsync(item => item.Id == 1, ct);
         var runtime = await db.RuntimeInstances
             .Include(item => item.CapacityAllocationEntries)
+            .AsSplitQuery()
             .SingleOrDefaultAsync(item => item.Id == identity.RuntimeInstanceId, ct);
         var allocation = runtime?.CapacityAllocations.Items.SingleOrDefault(
             item => item.Identity == identity);

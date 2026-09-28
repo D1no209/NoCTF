@@ -447,6 +447,7 @@ public sealed class CompetitionWebhookDeliveryStore(
         CancellationToken cancellationToken)
     {
         var competition = await db.Competitions.IgnoreQueryFilters().AsNoTracking()
+            .AsSplitQuery()
             .SingleOrDefaultAsync(item => item.Id == command.CompetitionId, cancellationToken);
         if (competition is null || competition.DeletedAt is not null)
         {
@@ -594,6 +595,7 @@ public sealed class CompetitionWebhookDeliveryStore(
         CancellationToken cancellationToken)
     {
         var competition = await db.Competitions.AsNoTracking()
+            .AsSplitQuery()
             .SingleOrDefaultAsync(item => item.Id == command.CompetitionId, cancellationToken);
         var target = competition?.WebhookConfiguration.Targets
             .SingleOrDefault(item => item.Id == command.TargetId);
@@ -656,7 +658,7 @@ public sealed class CompetitionWebhookDeliveryStore(
         CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var competition = await db.Competitions.SingleOrDefaultAsync(
+        var competition = await db.Competitions.AsSplitQuery().SingleOrDefaultAsync(
             item => item.Id == competitionId,
             cancellationToken);
         var target = competition?.WebhookConfiguration.Targets

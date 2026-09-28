@@ -45,7 +45,7 @@ internal static partial class BackendMessageOperations
         ICompetitionEventRecorder? events = null)
     {
         events ??= NullCompetitionEventRecorder.Instance;
-        var instance = await db.RuntimeInstances.SingleOrDefaultAsync(
+        var instance = await db.RuntimeInstances.AsSplitQuery().SingleOrDefaultAsync(
             candidate => candidate.Id == message.RuntimeInstanceId,
             cancellationToken);
         if (instance is null || instance.State != RuntimeState.Stopping)
@@ -109,6 +109,7 @@ internal static partial class BackendMessageOperations
                             || instance.Purpose == RuntimePurpose.PatchVerificationTarget)
                         && instance.GameplayFactId != null)))
             .OrderBy(instance => instance.CreatedAt)
+            .AsSplitQuery()
             .ToListAsync(cancellationToken);
         var now = timeProvider.GetUtcNow();
         foreach (var instance in runtimes)
@@ -259,6 +260,7 @@ internal static partial class BackendMessageOperations
                         && fact.Result == GameplayFactResult.Correct)))
             .OrderBy(instance => instance.Id)
             .Take(500)
+            .AsSplitQuery()
             .ToListAsync(cancellationToken);
         foreach (var instance in solvedRuntimes)
         {
@@ -285,6 +287,7 @@ internal static partial class BackendMessageOperations
             .OrderBy(instance => instance.ExpiresAt)
             .ThenBy(instance => instance.Id)
             .Take(500)
+            .AsSplitQuery()
             .ToListAsync(cancellationToken);
         foreach (var instance in expiredRuntimes)
         {
@@ -311,6 +314,7 @@ internal static partial class BackendMessageOperations
                     || instance.Id.CompareTo(message.AfterRuntimeInstanceId.Value) > 0))
             .OrderBy(instance => instance.Id)
             .Take(500)
+            .AsSplitQuery()
             .ToListAsync(cancellationToken);
 
         var heartbeatStatuses = new List<RunnerHeartbeatStatus>(assignments.Count);
