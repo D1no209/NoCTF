@@ -13,6 +13,7 @@ public sealed class CompetitionStartGateStore(NoCtfDbContext db)
         CancellationToken ct)
     {
         var competition = await db.Competitions.AsNoTracking()
+            .AsSplitQuery()
             .SingleOrDefaultAsync(item => item.Id == competitionId && item.DeletedAt == null, ct);
         if (competition?.ModeConfiguration is null)
             return null;
@@ -24,6 +25,7 @@ public sealed class CompetitionStartGateStore(NoCtfDbContext db)
                 item => item.ChallengeId,
                 template => template.Id,
                 (item, template) => new { Instance = item, Template = template })
+            .AsSplitQuery()
             .ToArrayAsync(ct);
         var challenges = challengeRows.Select(row => new StartGateChallenge(
             row.Instance.Id,

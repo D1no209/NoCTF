@@ -52,7 +52,7 @@ public sealed class CompetitionLifecycleStore(
     {
         if (!db.Database.IsRelational())
         {
-            var competition = await db.Competitions.SingleOrDefaultAsync(
+            var competition = await db.Competitions.AsSplitQuery().SingleOrDefaultAsync(
                 item => item.Id == competitionId && item.Status == from,
                 cancellationToken);
             if (competition is null)
@@ -99,7 +99,7 @@ public sealed class CompetitionLifecycleStore(
         if (from == CompetitionStatus.Published && to == CompetitionStatus.Running
             && (await startGate.ValidateAsync(competitionId, cancellationToken)) is not { Count: 0 })
             return false;
-        var competition = await db.Competitions
+        var competition = await db.Competitions.AsSplitQuery()
             .SingleAsync(item => item.Id == competitionId, cancellationToken);
         var now = timeProvider.GetUtcNow();
         if (competition.Mode == GameMode.Awd)
