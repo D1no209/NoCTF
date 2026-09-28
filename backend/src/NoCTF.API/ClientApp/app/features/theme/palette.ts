@@ -1,18 +1,19 @@
 import { normalizeHex } from '../../components/ui/color-picker/color'
-export const defaultWallpaperOpacity = 35
+export const defaultWallpaperBlur = 0
+export const maximumWallpaperBlur = 24
 
 export type ThemePalette = {
   light: string | null
   dark: string | null
-  lightWallpaperOpacity: number
-  darkWallpaperOpacity: number
+  lightWallpaperBlur: number
+  darkWallpaperBlur: number
 }
 export const paletteStorageKey = 'noctf-theme-palette'
 
-function normalizeOpacity(value: unknown): number {
+function normalizeBlur(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value)
-    ? Math.round(Math.min(100, Math.max(0, value)))
-    : defaultWallpaperOpacity
+    ? Math.round(Math.min(maximumWallpaperBlur, Math.max(0, value)))
+    : defaultWallpaperBlur
 }
 
 export function parseThemePalette(raw: string | null): ThemePalette {
@@ -21,16 +22,16 @@ export function parseThemePalette(raw: string | null): ThemePalette {
     return {
       light: normalizeHex(value?.light),
       dark: normalizeHex(value?.dark),
-      lightWallpaperOpacity: normalizeOpacity(value?.lightWallpaperOpacity),
-      darkWallpaperOpacity: normalizeOpacity(value?.darkWallpaperOpacity),
+      lightWallpaperBlur: normalizeBlur(value?.lightWallpaperBlur),
+      darkWallpaperBlur: normalizeBlur(value?.darkWallpaperBlur),
     }
   }
   catch {
     return {
       light: null,
       dark: null,
-      lightWallpaperOpacity: defaultWallpaperOpacity,
-      darkWallpaperOpacity: defaultWallpaperOpacity,
+      lightWallpaperBlur: defaultWallpaperBlur,
+      darkWallpaperBlur: defaultWallpaperBlur,
     }
   }
 }
