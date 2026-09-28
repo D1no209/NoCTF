@@ -71,7 +71,7 @@ Nuxt 4 SPA(`ssr: false`),Bun 管理依赖,TypeScript strict,Vue 用 `<script set
 - 竞赛管理与平台管理的路由级多分区导航使用 AppWorkspaceNav 组合 ChoiceSidebar / WaveSelectionList，不使用旧 SidebarProvider / SidebarInset；桌面端为网格内 sticky 侧栏，移动端位于内容上方。Tabs 仅用于单页内内容切换。
 - 竞赛管理与平台管理默认共用固定视口的 `data-workspace-scroll-content` 内容区：页面本身不滚动，标题保持固定，子页面由纵向 ScrollSurface 独立滚动，并用 MotionSwap 执行路由内容切换。赛事题目列表及详情、队伍管理、闯关编排页例外，取消工作区固定高度与内部纵向滚动，使用 DefaultLayout 页面主滚动；桌面端左侧导航整列 sticky，不随右侧页面滚动，窄屏仍按正常页面流排列。Vue Flow 画布仍保留自身拖拽与缩放。赛事题目列表先完成搜索/方向/状态筛选，再用 OffsetPagination 对结果分页；队伍管理继续使用服务端分页。竞赛概览、配置、排行榜、导出与权限页把同一任务域的分区合并到一张连续 Card，以 Separator 划分。
 - DefaultLayout 主滚动面与竞赛管理、平台管理的持久 ScrollSurface 必须以当前路由路径作为 `resetKey`，确保切换页面后复位到顶部；查询筛选、弹窗和普通局部滚动不使用该键。
-- 公开个人资料页固定在导航栏下方视口内，不产生页面级滚动；上下两层等宽，上层高度为 0.618fr 的较短身份标签且头像位于左上角，下层高度为 1fr 的较高技术画像。下层左侧上下排列赛制分布与擅长方向图表，右侧为近期赛事内部滚动列表，三个分区标题不显示图标。方向雷达必须以 `challengeDirectionOptions` 的完整题目创建方向目录为轴，暂无成绩的方向补 0。个人标签装饰图使用独立 ProfileCover 上传与公开读取接口，上传前复用共享裁切器按 4:1 宽幅比例自定义位置、缩放与旋转，不得复用或改变个人壁纸状态。
+- 公开个人资料页固定在导航栏下方视口内，不产生页面级滚动；上下两层等宽，上层高度为 0.618fr 的较短身份标签且头像位于左上角，下层高度为 1fr 的较高技术画像。下层在宽屏用三列分别展示赛制分布、擅长方向及近期赛事／当前有效的公开比赛勋章，窄屏在卡片内部滚动；三个原有分区标题不显示图标。方向雷达只以公开且已开赛（运行中、暂停或结束）赛事的已发布题目中实际出现过的方向为轴，按题目创建方向目录排序，暂无成绩的方向补 0；少于三个方向时展示数值列表。勋章默认只显示图片和名称，点击后显示详情。个人标签装饰图使用独立 ProfileCover 上传与公开读取接口，上传前复用共享裁切器按 4:1 宽幅比例自定义位置、缩放与旋转，不得复用或改变个人壁纸状态。
 - 普通列表使用 offset/limit/total 页码分页（useOffsetPagination + OffsetPagination）；改筛选必须回到第一页。通知增量 feed 与 Redis 平台日志保留签名/opaque cursor +「加载更多」(useCursorPagination)。
 - 异步操作(提交/runtime/重判等)返回 202 时用 usePolling 轮询 statusUrl;SignalR 推送只做失效重取,REST 为事实源。开发环境下两个 Hub 强制走 SSE/长轮询(`import.meta.dev` 分支):Vite ws 代理转发 SignalR WebSocket 会被重置并引发 Nuxt 崩溃重启循环,生产直连后端不受影响。
 - 管理端写操作不携带持久化修订并发字段；可变记录采用 last-write-wins。409 只按生成 SDK 的强类型业务失败码展示，不得统一翻译为修订冲突。

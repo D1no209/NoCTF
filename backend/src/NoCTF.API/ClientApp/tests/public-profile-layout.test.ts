@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test'
+import { buildProfileDirectionRows } from '../app/lib/profile-directions'
 import { sourceFile } from './support/feature-source'
 
 test('public profile uses equal-width layers with a fixed golden-ratio height split', async () => {
@@ -28,11 +29,21 @@ test('public profile uses equal-width layers with a fixed golden-ratio height sp
   expect(profile.match(/<MiniChart/g)).toHaveLength(2)
   expect(profile).toContain('modeChartOption')
   expect(profile).toContain('directionChartOption')
-  expect(profile).toContain('challengeDirectionOptions.map')
-  expect(profile).toContain('counts.get(directionKey(direction)) ?? 0')
+  expect(profile).toContain('buildProfileDirectionRows(directions.value)')
   expect(profile).not.toContain('directionRows.value.slice')
   expect(profile).toContain('shape: \'polygon\'')
+  expect(profile).toContain('min: -visualInset')
+  expect(profile).toContain('highest > 0 ? Math.max(1, Math.ceil(highest * 0.18)) : 0')
+  expect(profile).toContain('v-if="directionRows.length >= 3"')
+  expect(profile).toContain('v-else-if="directionRows.length"')
   expect(profile).toContain('<MiniChart :option="directionChartOption"')
+  expect(profile).toContain('color-token="--primary"')
+  expect(profile).toContain('modeRows')
+  expect(profile).toContain('data-profile-earned-badges')
+  expect(profile).toContain('<Popover v-for="badge in profile.badges"')
+  expect(profile).toContain('{{ badge.competitionTitle }}')
+  expect(profile).toContain('v-if="badge.description"')
+  expect(profile).not.toContain('<ScrollSurface v-if="profile.badges?.length"')
   expect(profile).toContain('variant="profile-cover"')
   expect(profile).toContain('@save="uploadCover"')
   expect(profile).toContain('coverEditorOpen.value = true')
@@ -40,6 +51,19 @@ test('public profile uses equal-width layers with a fixed golden-ratio height sp
   expect(cropDialog).toContain('data-profile-cover-crop')
   expect(main).toContain('[data-public-profile-avatar]')
   expect(main).toContain('box-shadow: var(--card-shadow)')
+})
+
+test('profile radar axes contain only historical competition directions, including zero scores', () => {
+  expect(buildProfileDirectionRows([
+    { direction: 'Pwn', successfulChallengeCount: 5 },
+    { direction: 'Web', successfulChallengeCount: 0 },
+    { direction: 'pwn', successfulChallengeCount: 1 },
+    { direction: 'Custom', successfulChallengeCount: 0 },
+  ])).toEqual([
+    { direction: 'web', label: 'Web', successfulChallengeCount: 0 },
+    { direction: 'pwn', label: 'Pwn', successfulChallengeCount: 6 },
+    { direction: 'custom', label: 'Custom', successfulChallengeCount: 0 },
+  ])
 })
 
 test('account popover is a compact square launcher with a profile entry', async () => {
