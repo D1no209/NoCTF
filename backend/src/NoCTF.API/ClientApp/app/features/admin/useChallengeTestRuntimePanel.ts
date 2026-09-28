@@ -6,6 +6,7 @@ import { adminChallengeBankCreateTestRuntime, adminChallengeBankExtendTestRuntim
 import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeTestRuntimeAcceptedResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeTestRuntimeResponse, NoCtfapiEndpointsAdministrationChallengeBankRuntimeTestFlagStateProtocol } from '../../api'
 import type { ChallengeTestRuntimeLoadOutcome, ChallengeTestRuntimeMutationKind, PendingChallengeTestRuntimeMutation } from '../../utils/challenge-test-runtime-polling'
 import RuntimeAccessUrlComponent from '../challenges/RuntimeAccessUrl.vue'
+import { createRuntimeExtensionRequest, parseRuntimeExtensionMinutes } from '../../lib/runtime-extension'
 
 type TestRuntime = NoCtfapiEndpointsAdministrationChallengeBankChallengeTestRuntimeResponse
 
@@ -28,7 +29,7 @@ export function useChallengeTestRuntimePanel(props: Readonly<{
 
   const now = ref(Date.now())
 
-  const extendMinutes = ref(30)
+  const extendMinutes = ref<number | string>(30)
 
   let copiedTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -160,19 +161,20 @@ export function useChallengeTestRuntimePanel(props: Readonly<{
     translate("ui.failedToResetTheChallengeTestContainer"),
   )
 
-  const extend = () => act(
-    'extend',
-    () => adminChallengeBankExtendTestRuntime({
-      path: { ...path.value, runtimeInstanceId: runtime.value!.id! },
-      body: {
-        expiresAt: new Date(
-          new Date(runtime.value!.expiresAt!).getTime()
-          + Math.max(60, Math.round(extendMinutes.value * 60)) * 1000,
-        ).toISOString(),
-      },
-    }),
-    translate("ui.failedToExtendTheChallengeTestContainer"),
-  )
+  const extend = () => {
+    const current = runtime.value
+    const extension = createRuntimeExtensionRequest(
+      current?.expiresAt, Date.now(), extendMinutes.value, 1440)
+    if (current?.state !== 'Running' || !current.id || extension === null) return
+    return act(
+      'extend',
+      () => adminChallengeBankExtendTestRuntime({
+        path: { ...path.value, runtimeInstanceId: current.id! },
+        body: { expiresAt: extension.expiresAt },
+      }),
+      translate("ui.failedToExtendTheChallengeTestContainer"),
+    )
+  }
 
   async function copyTestFlag(): Promise<void> {
     if (!runtime.value?.testFlag) return
@@ -216,8 +218,13 @@ export function useChallengeTestRuntimePanel(props: Readonly<{
   const canExtend = computed(() => {
     if (runtime.value?.state !== 'Running' || !runtime.value.expiresAt) return false
     const remaining = new Date(runtime.value.expiresAt).getTime() - now.value
-    return remaining > 0 && remaining < 10 * 60_000
+    return remaining > 0
   })
+  const extendMinutesInvalid = computed(() =>
+    parseRuntimeExtensionMinutes(extendMinutes.value, 1440) === null)
+  const validExtension = computed(() => canExtend.value && !busy.value
+    && createRuntimeExtensionRequest(
+      runtime.value?.expiresAt, now.value, extendMinutes.value, 1440) !== null)
 
   const stateVariant = computed(() => {
     if (runtime.value?.state === 'Running') return 'default' as const
@@ -255,6 +262,8 @@ export function useChallengeTestRuntimePanel(props: Readonly<{
       loadError,
       copied,
       extendMinutes,
+      extendMinutesInvalid,
+      validExtension,
       timedOut,
       retryLoad,
       start,

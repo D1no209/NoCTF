@@ -86,6 +86,7 @@ export const messages = {
   "ui.renewalMinutes": "续期(分钟)",
   "ui.renewalOperationHasBeenAccepted": "续期操作已受理",
   "ui.renewalMinutes2": "续期分钟数",
+  "ui.renewalMinutesRange": "请输入 1–{max} 分钟的整数。",
   "ui.renewalFailed": "续期失败",
   "ui.extendSeconds": "延长秒数",
   "ui.extendedRunTime": "延长运行时间",
