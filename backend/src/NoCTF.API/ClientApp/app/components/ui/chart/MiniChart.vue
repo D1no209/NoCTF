@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { chartPalette, chartTooltipTheme, echarts } from '~/utils/echarts'
+import { themeColor } from '~/utils/theme-color'
 
 const props = withDefaults(
   defineProps<{
     option: echarts.EChartsCoreOption
     height?: string
+    colorToken?: string
   }>(),
   { height: '260px' },
 )
@@ -25,7 +27,9 @@ function render() {
   chart.setOption(
     {
       backgroundColor: 'transparent',
-      color: chartPalette(el.value),
+      color: props.colorToken
+        ? [themeColor(props.colorToken, el.value)]
+        : chartPalette(el.value),
       textStyle: { color: foreground },
       ...props.option,
       tooltip: Array.isArray(props.option.tooltip)

@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { UsersByIdPageViewState } from '~/features/routes/users/useUsersByIdPage'
 
 const viewProps = defineProps<{ state: UsersByIdPageViewState }>()
-const { ImagePlus, UserRound, profile, loading, error, isOwnProfile, coverUrl, modes, directionRows, recentCompetitions, modeChartOption, directionChartOption, coverInput, coverPending, coverEditorOpen, coverSourceFile, setCoverInputRef, selectCover, setCoverEditorOpen, uploadCover, reportCoverError, ProfileCoverCropDialog } = toRefs(viewProps.state)
+const { ImagePlus, UserRound, profile, loading, error, isOwnProfile, coverUrl, modes, modeRows, directionRows, recentCompetitions, modeChartOption, directionChartOption, coverInput, coverPending, coverEditorOpen, coverSourceFile, setCoverInputRef, selectCover, setCoverEditorOpen, uploadCover, reportCoverError, ProfileCoverCropDialog } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -60,16 +60,6 @@ const { ImagePlus, UserRound, profile, loading, error, isOwnProfile, coverUrl, m
             <p v-else class="mt-2 text-sm text-muted-foreground">{{ $t('ui.thisUserHasNotFilledOutAProfileYet') }}</p>
           </div>
 
-          <ScrollSurface v-if="profile.badges?.length" axis="x" class="max-w-3xl" :aria-label="$t('progression.publicBadges')">
-            <div class="flex items-center gap-2 py-1">
-            <div v-for="badge in profile.badges" :key="`${badge.competitionId}:${badge.id}`"
-              class="flex shrink-0 items-center gap-2 rounded-lg border bg-background/75 px-2 py-1.5">
-              <img :src="badge.imageUrl" :alt="badge.name" class="size-8 rounded object-cover" />
-              <span class="max-w-36 truncate text-xs font-medium">{{ badge.name }}</span>
-            </div>
-            </div>
-          </ScrollSurface>
-
           <div class="grid max-w-3xl grid-cols-3 gap-2 rounded-2xl bg-background/65 p-1.5 sm:gap-3 sm:p-2">
             <div class="px-2 py-1.5 sm:px-3">
               <p class="text-xs text-muted-foreground">{{ $t('profile.competitionsJoined') }}</p>
@@ -91,11 +81,21 @@ const { ImagePlus, UserRound, profile, loading, error, isOwnProfile, coverUrl, m
         <CardHeader class="shrink-0 px-5 pb-1">
           <CardTitle class="text-display text-xl">{{ $t('profile.competitionProfile') }}</CardTitle>
         </CardHeader>
-        <CardContent class="grid min-h-0 flex-1 gap-6 overflow-hidden px-5 md:grid-cols-[minmax(18rem,0.72fr)_minmax(0,1.28fr)]">
-          <section class="contents md:grid md:h-full md:min-h-0 md:min-w-0 md:grid-rows-2 md:gap-3" aria-labelledby="profile-participation-title">
-            <div class="order-1 min-h-0 min-w-0 md:order-none">
+        <CardContent data-scroll-surface data-scroll-axis="y"
+          class="grid min-h-0 flex-1 gap-5 overflow-y-auto px-5 lg:grid-cols-[minmax(10rem,0.55fr)_minmax(20rem,1fr)_minmax(18rem,1.12fr)] lg:overflow-hidden">
+          <section class="contents" aria-labelledby="profile-participation-title">
+            <div class="flex min-h-0 min-w-0 flex-col">
               <h2 id="profile-participation-title" class="font-semibold">{{ $t('profile.competitionModes') }}</h2>
-              <MiniChart v-if="modes.length" :option="modeChartOption" height="clamp(9rem, 20dvh, 11.5rem)" />
+              <div v-if="modes.length" class="h-36 min-h-0 lg:h-auto lg:flex-1">
+                <MiniChart :option="modeChartOption" height="100%" />
+              </div>
+              <ul v-if="modeRows.length" class="grid shrink-0 grid-cols-2 gap-x-3 gap-y-1.5 pb-2 text-xs">
+                <li v-for="mode in modeRows" :key="mode.mode" class="flex min-w-0 items-center gap-1.5">
+                  <span :class="mode.colorClass" class="size-2 shrink-0 rounded-full" aria-hidden="true" />
+                  <span class="min-w-0 truncate">{{ mode.label }}</span>
+                  <span class="ml-auto font-mono tabular-nums">{{ mode.competitionCount }}</span>
+                </li>
+              </ul>
               <Empty v-else class="mt-3 min-h-36">
                 <EmptyDescription>{{ $t('profile.noPublicCompetitionData') }}</EmptyDescription>
               </Empty>
@@ -104,9 +104,21 @@ const { ImagePlus, UserRound, profile, loading, error, isOwnProfile, coverUrl, m
               </ul>
             </div>
 
-            <div class="order-3 min-h-0 min-w-0 md:order-none">
+            <div class="flex min-h-0 min-w-0 flex-col">
               <h2 id="profile-directions-title" class="font-semibold">{{ $t('profile.strongDirections') }}</h2>
-              <MiniChart :option="directionChartOption" height="clamp(11rem, 23dvh, 14rem)" />
+              <div v-if="directionRows.length >= 3" class="h-72 min-h-0 lg:h-auto lg:flex-1">
+                <MiniChart :option="directionChartOption" color-token="--primary" height="100%" />
+              </div>
+              <ul v-else-if="directionRows.length" class="mt-4 flex flex-col gap-2">
+                <li v-for="direction in directionRows" :key="direction.direction"
+                  class="flex items-center justify-between gap-4 text-sm">
+                  <span>{{ direction.label }}</span>
+                  <Badge variant="secondary" class="font-mono tabular-nums">{{ direction.successfulChallengeCount }}</Badge>
+                </li>
+              </ul>
+              <Empty v-else class="mt-3 min-h-36">
+                <EmptyDescription>{{ $t('profile.noPublicCompetitionData') }}</EmptyDescription>
+              </Empty>
               <ul class="sr-only">
                 <li v-for="direction in directionRows" :key="direction.direction">
                   {{ direction.label }}: {{ direction.successfulChallengeCount ?? 0 }}
@@ -115,7 +127,7 @@ const { ImagePlus, UserRound, profile, loading, error, isOwnProfile, coverUrl, m
             </div>
           </section>
 
-          <section class="order-2 flex h-full min-h-0 min-w-0 flex-col md:order-none" aria-labelledby="profile-recent-competitions-title">
+          <section class="flex h-full min-h-0 min-w-0 flex-col" aria-labelledby="profile-recent-competitions-title">
             <h2 id="profile-recent-competitions-title" class="font-semibold">{{ $t('profile.recentCompetitions') }}</h2>
             <ScrollSurface v-if="recentCompetitions.length" axis="y" class="mt-3 min-h-0 flex-1 pr-2" :aria-label="$t('profile.recentCompetitions')">
               <div class="flex flex-col">
@@ -140,6 +152,34 @@ const { ImagePlus, UserRound, profile, loading, error, isOwnProfile, coverUrl, m
             <Empty v-else class="mt-4 min-h-44">
               <EmptyDescription>{{ $t('profile.noRecentCompetitions') }}</EmptyDescription>
             </Empty>
+
+            <section v-if="profile.badges?.length" data-profile-earned-badges class="mt-4 shrink-0" aria-labelledby="profile-badges-title">
+              <Separator class="mb-3" />
+              <div class="flex items-center justify-between gap-3">
+                <h2 id="profile-badges-title" class="font-semibold">{{ $t('profile.earnedBadges') }}</h2>
+                <Badge variant="secondary" class="font-mono tabular-nums">{{ profile.badges.length }}</Badge>
+              </div>
+              <ScrollSurface axis="x" class="mt-2 w-full" :aria-label="$t('profile.earnedBadges')">
+                <div class="flex items-start gap-2 pb-2">
+                  <Popover v-for="badge in profile.badges" :key="`${badge.competitionId}:${badge.id}`">
+                    <PopoverTrigger as-child>
+                      <Button type="button" variant="secondary" class="h-auto w-36 shrink-0 flex-col gap-2 p-3 whitespace-normal">
+                        <img :src="badge.imageUrl" alt="" class="size-14 rounded-lg object-contain" />
+                        <span class="line-clamp-2 w-full break-words text-center text-xs font-medium">{{ badge.name }}</span>
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent class="w-72 max-w-[calc(100vw-2rem)]" align="start">
+                      <img :src="badge.imageUrl" alt="" class="mx-auto mb-3 size-20 rounded-xl object-contain" />
+                      <PopoverHeader>
+                        <PopoverTitle>{{ badge.name }}</PopoverTitle>
+                        <PopoverDescription>{{ badge.competitionTitle }}</PopoverDescription>
+                      </PopoverHeader>
+                      <p v-if="badge.description" class="mt-3 break-words text-sm">{{ badge.description }}</p>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </ScrollSurface>
+            </section>
           </section>
         </CardContent>
       </Card>

@@ -361,7 +361,14 @@ export function createMockApi() {
         const modeCounts = new Map<string, number>()
         for (const item of participations)
           modeCounts.set(item.competition!.mode, (modeCounts.get(item.competition!.mode) ?? 0) + 1)
-        const directionSeeds = ['Web', 'Crypto', 'Pwn', 'Reverse', 'Forensics', 'OSINT']
+        const directionSeeds = [...new Set(state.challenges
+          .filter(challenge => challenge.isPublished && !challenge.deletedAt
+            && state.competitions.some(competition => competition.id === challenge.competitionId
+              && competition.accessMode === 'Public'
+              && ['Running', 'Paused', 'Finished'].includes(competition.status)))
+          .map(challenge => challenge.direction as string))]
+        const solvedCounts = new Map(['Web', 'Crypto', 'Pwn', 'Reverse', 'Forensics', 'OSINT']
+          .map((direction, index) => [direction, 7 - index]))
         value = {
           ...target,
           profileCoverUrl: target.profileCoverUrl ?? null,
@@ -369,7 +376,15 @@ export function createMockApi() {
           finishedCompetitionCount: participations.filter(item => item.competition?.status === 'Finished').length,
           successfulChallengeCount: 27,
           modes: [...modeCounts].map(([mode, competitionCount]) => ({ mode, competitionCount })),
-          directions: directionSeeds.map((direction, index) => ({ direction, successfulChallengeCount: 7 - index })),
+          directions: directionSeeds.map(direction => ({
+            direction, successfulChallengeCount: solvedCounts.get(direction) ?? 0,
+          })),
+          badges: target.userId === accounts[0]!.userId ? [{
+            id: id(34, 1), competitionId: state.competitions[0]!.id,
+            competitionTitle: state.competitions[0]!.title,
+            name: 'Take Control', description: 'Local Mock achievement / 本地演示勋章',
+            imageUrl: state.competitions[0]!.posterUrl,
+          }] : [],
           recentCompetitions: participations
             .slice()
             .sort((left, right) => String(right.competition?.endTime).localeCompare(String(left.competition?.endTime)))

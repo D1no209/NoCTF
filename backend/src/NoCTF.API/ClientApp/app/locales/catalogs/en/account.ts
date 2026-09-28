@@ -20,6 +20,7 @@ export const messages = {
   "profile.competitionModes": "Mode mix",
   "profile.recentCompetitions": "Recent competitions",
   "profile.strongDirections": "Strong directions",
+  "profile.earnedBadges": "Earned badges",
   "profile.noPublicCompetitionData": "No public competition data yet",
   "profile.noRecentCompetitions": "No recent public competitions",
   "profile.noDirectionData": "A direction profile will appear after public challenge successes",

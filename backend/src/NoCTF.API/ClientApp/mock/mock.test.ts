@@ -56,6 +56,16 @@ describe('isolated Mock API', () => {
     expect(graph.edges).toHaveLength(8)
     expect(graph.nodes[0].positionX).toBeUndefined()
   })
+
+  test('the public profile includes a visible earned badge and zero-score historical directions', async () => {
+    const { send } = await setup()
+    const response = await send(`/api/v1/users/${id(1)}`)
+    expect(response.status).toBe(200)
+    const profile = await response.json()
+    expect(profile.badges).toHaveLength(1)
+    expect(profile.badges[0].name).toBe('Take Control')
+    expect(profile.directions.some((direction: Data) => direction.successfulChallengeCount === 0)).toBe(true)
+  })
   test('seeds one downloadable challenge for every supported direction', async () => {
     const { send } = await setup()
     const catalog = await (await send(`${competition}/challenges`)).json()

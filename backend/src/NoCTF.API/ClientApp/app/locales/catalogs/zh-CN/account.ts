@@ -20,6 +20,7 @@ export const messages = {
   "profile.competitionModes": "赛制分布",
   "profile.recentCompetitions": "近期赛事",
   "profile.strongDirections": "擅长方向",
+  "profile.earnedBadges": "获得的勋章",
   "profile.noPublicCompetitionData": "暂无可公开的参赛数据",
   "profile.noRecentCompetitions": "暂无近期公开赛事",
   "profile.noDirectionData": "完成公开题目后，这里会形成方向画像",

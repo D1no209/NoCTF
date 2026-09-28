@@ -5,7 +5,7 @@ import { toast } from 'vue-sonner'
 import { authenticationUploadMyProfileCover, userProfileGet } from '../../../api'
 import type { NoCtfapiEndpointsAuthenticationPublicUserProfileResponse } from '../../../api'
 import type { echarts } from '../../../utils/echarts'
-import { challengeDirectionOptions, directionKey, directionLabel } from '../../../utils/directions'
+import { buildProfileDirectionRows } from '../../../lib/profile-directions'
 import { competitionStatusLabel, gameModeLabel } from '../../../utils/labels'
 import { exceedsUploadLimit } from '../../account/upload-limits'
 import AvatarCropDialogComponent from '../../account/AvatarCropDialog.vue'
@@ -47,20 +47,14 @@ export function useUsersByIdPage() {
   watch(userId, () => void loadProfile(), { immediate: true })
 
   const modes = computed(() => profile.value?.modes ?? [])
+  const modeRows = computed(() => modes.value.map((item, index) => ({
+    mode: item.mode,
+    label: gameModeLabel(item.mode),
+    competitionCount: item.competitionCount ?? 0,
+    colorClass: ['bg-chart-1', 'bg-chart-2', 'bg-chart-3', 'bg-chart-4'][index % 4],
+  })))
   const directions = computed(() => profile.value?.directions ?? [])
-  const directionRows = computed(() => {
-    const counts = new Map<string, number>()
-    for (const item of directions.value) {
-      const key = directionKey(item.direction)
-      if (!key) continue
-      counts.set(key, (counts.get(key) ?? 0) + (item.successfulChallengeCount ?? 0))
-    }
-    return challengeDirectionOptions.map(direction => ({
-      direction,
-      label: directionLabel(direction),
-      successfulChallengeCount: counts.get(directionKey(direction)) ?? 0,
-    }))
-  })
+  const directionRows = computed(() => buildProfileDirectionRows(directions.value))
   const recentCompetitions = computed(() => (profile.value?.recentCompetitions ?? []).map(item => ({
     ...item,
     modeLabel: gameModeLabel(item.mode),
@@ -81,12 +75,12 @@ export function useUsersByIdPage() {
 
   const modeChartOption = computed<echarts.EChartsCoreOption>(() => ({
     tooltip: { trigger: 'item', formatter: '{b}<br/>{c} · {d}%' },
-    legend: { type: 'scroll', bottom: 0, left: 'center' },
+    legend: { show: false },
     series: [{
       name: translate('profile.competitionModes'),
       type: 'pie',
-      radius: ['50%', '74%'],
-      center: ['50%', '42%'],
+      radius: ['48%', '69%'],
+      center: ['50%', '50%'],
       minAngle: 8,
       avoidLabelOverlap: true,
       label: { show: false },
@@ -100,21 +94,24 @@ export function useUsersByIdPage() {
 
   const directionChartOption = computed<echarts.EChartsCoreOption>(() => {
     const values = directionRows.value
-    const maximum = Math.max(1, ...values.map(item => item.successfulChallengeCount ?? 0))
+    const highest = Math.max(0, ...values.map(item => item.successfulChallengeCount))
+    const maximum = Math.max(1, highest)
+    const visualInset = highest > 0 ? Math.max(1, Math.ceil(highest * 0.18)) : 0
     return {
       tooltip: { trigger: 'item' },
       radar: {
         indicator: values.map(item => ({
           name: item.label,
+          min: -visualInset,
           max: Math.max(1, Math.ceil(maximum * 1.15)),
         })),
-        center: ['50%', '51%'],
-        radius: '56%',
-        splitNumber: 4,
+        center: ['50%', '52%'],
+        radius: '73%',
+        splitNumber: 3,
         shape: 'polygon',
-        axisName: { fontSize: 10 },
-        axisLine: { lineStyle: { width: 1 } },
-        splitLine: { lineStyle: { width: 1 } },
+        axisName: { fontSize: 11 },
+        axisLine: { lineStyle: { width: 1, opacity: 0.42 } },
+        splitLine: { lineStyle: { width: 1, opacity: 0.36 } },
         splitArea: { areaStyle: { color: 'transparent' } },
       },
       series: [{
@@ -122,10 +119,10 @@ export function useUsersByIdPage() {
         data: [{
           name: translate('profile.successfulChallenges'),
           value: values.map(item => item.successfulChallengeCount ?? 0),
-          lineStyle: { width: 3 },
-          areaStyle: { opacity: 0.28 },
+          lineStyle: { width: 2.5 },
+          areaStyle: { opacity: 0.18 },
           symbol: 'circle',
-          symbolSize: 6,
+          symbolSize: 5,
         }],
       }],
     }
@@ -201,6 +198,7 @@ export function useUsersByIdPage() {
     isOwnProfile,
     coverUrl,
     modes,
+    modeRows,
     directions,
     directionRows,
     recentCompetitions,

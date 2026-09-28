@@ -45,12 +45,18 @@ public sealed class UserProfilePersistenceTests
             var userId = Guid.CreateVersion7(now);
             var publicCompetitionId = Guid.CreateVersion7(now.AddSeconds(1));
             var privateCompetitionId = Guid.CreateVersion7(now.AddSeconds(2));
+            var otherPublicCompetitionId = Guid.CreateVersion7(now.AddSeconds(9));
+            var futureCompetitionId = Guid.CreateVersion7(now.AddSeconds(12));
             var publicTeamId = Guid.CreateVersion7(now.AddSeconds(3));
             var privateTeamId = Guid.CreateVersion7(now.AddSeconds(4));
             var publicChallengeId = Guid.CreateVersion7(now.AddSeconds(5));
             var privateChallengeId = Guid.CreateVersion7(now.AddSeconds(6));
+            var unusedPublicChallengeId = Guid.CreateVersion7(now.AddSeconds(10));
+            var futureChallengeId = Guid.CreateVersion7(now.AddSeconds(13));
             var publicCompetitionChallengeId = Guid.CreateVersion7(now.AddSeconds(7));
             var privateCompetitionChallengeId = Guid.CreateVersion7(now.AddSeconds(8));
+            var unusedPublicCompetitionChallengeId = Guid.CreateVersion7(now.AddSeconds(11));
+            var futureCompetitionChallengeId = Guid.CreateVersion7(now.AddSeconds(14));
 
             await using var db = new NoCtfDbContext(options);
             await db.Database.EnsureCreatedAsync(cancellationToken);
@@ -66,16 +72,23 @@ public sealed class UserProfilePersistenceTests
 
             db.Competitions.AddRange(
                 Competition(publicCompetitionId, userId, CompetitionAccessMode.Public, "Public final", now),
-                Competition(privateCompetitionId, userId, CompetitionAccessMode.StaffOnly, "Private final", now));
+                Competition(privateCompetitionId, userId, CompetitionAccessMode.StaffOnly, "Private final", now),
+                Competition(otherPublicCompetitionId, userId, CompetitionAccessMode.Public, "Other public final", now),
+                Competition(futureCompetitionId, userId, CompetitionAccessMode.Public, "Future public", now,
+                    CompetitionStatus.Visible));
             db.Teams.AddRange(
                 Team(publicTeamId, publicCompetitionId, userId, "Public team", now),
                 Team(privateTeamId, privateCompetitionId, userId, "Private team", now));
             db.Challenges.AddRange(
                 Challenge(publicChallengeId, userId, "Web", now),
-                Challenge(privateChallengeId, userId, "Crypto", now));
+                Challenge(privateChallengeId, userId, "Crypto", now),
+                Challenge(unusedPublicChallengeId, userId, "Pwn", now),
+                Challenge(futureChallengeId, userId, "Misc", now));
             db.CompetitionChallenges.AddRange(
                 CompetitionChallenge(publicCompetitionChallengeId, publicCompetitionId, publicChallengeId, now),
-                CompetitionChallenge(privateCompetitionChallengeId, privateCompetitionId, privateChallengeId, now));
+                CompetitionChallenge(privateCompetitionChallengeId, privateCompetitionId, privateChallengeId, now),
+                CompetitionChallenge(unusedPublicCompetitionChallengeId, otherPublicCompetitionId, unusedPublicChallengeId, now),
+                CompetitionChallenge(futureCompetitionChallengeId, futureCompetitionId, futureChallengeId, now));
             db.GameplayFacts.AddRange(
                 SuccessfulFact(publicCompetitionId, publicCompetitionChallengeId, publicTeamId, userId, now.AddMinutes(1)),
                 SuccessfulFact(publicCompetitionId, publicCompetitionChallengeId, publicTeamId, userId, now.AddMinutes(2)),
@@ -90,8 +103,9 @@ public sealed class UserProfilePersistenceTests
             await Assert.That(profile.SuccessfulChallengeCount).IsEqualTo(1);
             await Assert.That(profile.Modes!).HasSingleItem();
             await Assert.That(profile.Modes![0]).IsEqualTo(new PublicUserModeSummary(GameMode.Ctf, 1));
-            await Assert.That(profile.Directions!).HasSingleItem();
+            await Assert.That(profile.Directions!).Count().IsEqualTo(2);
             await Assert.That(profile.Directions![0]).IsEqualTo(new PublicUserDirectionSummary("Web", 1));
+            await Assert.That(profile.Directions![1]).IsEqualTo(new PublicUserDirectionSummary("Pwn", 0));
             await Assert.That(profile.RecentCompetitions!).HasSingleItem();
             await Assert.That(profile.RecentCompetitions![0].CompetitionId).IsEqualTo(publicCompetitionId);
         });
@@ -304,7 +318,8 @@ public sealed class UserProfilePersistenceTests
         Guid ownerId,
         CompetitionAccessMode accessMode,
         string title,
-        DateTimeOffset now) => new CtfCompetition
+        DateTimeOffset now,
+        CompetitionStatus status = CompetitionStatus.Finished) => new CtfCompetition
     {
         Id = id,
         Title = title,
@@ -312,9 +327,11 @@ public sealed class UserProfilePersistenceTests
         AccessMode = accessMode,
         ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
         FlagDerivationSecret = new byte[32],
-        StartAt = now.AddDays(-2),
-        EndAt = now.AddDays(-1),
-        Status = CompetitionStatus.Finished,
+        StartAt = status == CompetitionStatus.Visible
+            ? now.AddDays(2) : now.AddDays(-2),
+        EndAt = status == CompetitionStatus.Visible
+            ? now.AddDays(3) : now.AddDays(-1),
+        Status = status,
         CreatedAt = now,
         UpdatedAt = now
     };

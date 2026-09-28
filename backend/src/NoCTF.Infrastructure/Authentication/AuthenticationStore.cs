@@ -213,10 +213,32 @@ public sealed class AuthenticationStore(
             .OrderByDescending(item => item.SuccessfulChallengeCount)
             .ThenBy(item => item.Direction)
             .ToListAsync(ct);
-        var directionStats = directionRows
-            .Select(item => new PublicUserDirectionSummary(
-                item.Direction,
-                item.SuccessfulChallengeCount))
+        var historicalDirections = await db.CompetitionChallenges.AsNoTracking()
+            .Where(item => item.IsPublished && item.DeletedAt == null)
+            .Join(publicCompetitions.Where(competition =>
+                    competition.Status == CompetitionStatus.Running
+                    || competition.Status == CompetitionStatus.Paused
+                    || competition.Status == CompetitionStatus.Finished),
+                item => item.CompetitionId,
+                competition => competition.Id,
+                (item, _) => item.ChallengeId)
+            .Join(db.Challenges.AsNoTracking()
+                    .Where(challenge => challenge.DeletedAt == null),
+                challengeId => challengeId,
+                challenge => challenge.Id,
+                (_, challenge) => challenge.Direction)
+            .Distinct()
+            .ToArrayAsync(ct);
+        var completedByDirection = directionRows.ToDictionary(
+            item => item.Direction,
+            item => item.SuccessfulChallengeCount,
+            StringComparer.OrdinalIgnoreCase);
+        var directionStats = historicalDirections
+            .Select(direction => new PublicUserDirectionSummary(
+                direction,
+                completedByDirection.GetValueOrDefault(direction)))
+            .OrderByDescending(item => item.SuccessfulChallengeCount)
+            .ThenBy(item => item.Direction, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
         var modeStats = participations
