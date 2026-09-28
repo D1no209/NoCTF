@@ -19,6 +19,7 @@ public sealed class ReleaseRunnerCapacityHandler(
         }
         var runtime = await db.RuntimeInstances.AsNoTracking()
             .Include(x => x.CapacityAllocationEntries)
+            .AsSplitQuery()
             .SingleOrDefaultAsync(x => x.Id == message.Identity.RuntimeInstanceId, ct);
         var document = runtime?.CapacityAllocations;
         if (document?.Items.Any(item => item.Identity == message.Identity) == true)

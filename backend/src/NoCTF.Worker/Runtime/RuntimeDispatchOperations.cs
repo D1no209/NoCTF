@@ -123,7 +123,7 @@ internal static partial class BackendMessageOperations
             }
         }
 
-        var instance = await db.RuntimeInstances.SingleOrDefaultAsync(
+        var instance = await db.RuntimeInstances.AsSplitQuery().SingleOrDefaultAsync(
             candidate => candidate.Id == message.RuntimeInstanceId,
             cancellationToken);
         if (instance is null || instance.State is not (RuntimeState.Queued or RuntimeState.Provisioning))
