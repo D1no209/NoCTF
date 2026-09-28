@@ -34,6 +34,65 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
 {
     [Test]
     [Timeout(300_000)]
+    public async Task Running_runtime_can_extend_before_final_ten_minutes_without_losing_existing_time(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+                .WithDatabase("noctf_ctf_runtime_early_extension")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var fixture = await SeedAsync(options, cancellationToken);
+            var runtimeId = Guid.CreateVersion7(fixture.Now);
+            await using var db = new NoCtfDbContext(options);
+            db.RuntimeInstances.Add(new PlayerRuntimeInstance
+            {
+                Id = runtimeId,
+                CompetitionId = fixture.CompetitionId,
+                CompetitionChallengeId = fixture.StartChallengeId,
+                TeamId = fixture.TeamId,
+                RuntimeKind = RuntimeKind.Container,
+                RuntimeProvider = RuntimeProvider.Docker,
+                State = RuntimeState.Running,
+                CreatedAt = fixture.Now.AddMinutes(-1),
+                RunningAt = fixture.Now.AddMinutes(-1),
+                ExpiresAt = fixture.Now.AddMinutes(52)
+            });
+            await db.SaveChangesAsync(cancellationToken);
+            var store = new RuntimeInstanceStore(
+                db,
+                new ChallengeRuntimeTemplateCatalog(),
+                new FixedRuntimePlacementPolicy(),
+                new PerTeamRuntimeFlagStore(db),
+                new RecordingOutbox());
+
+            var result = await store.MutatePlayerRuntimeAsync(new(
+                fixture.CompetitionId,
+                fixture.StartChallengeId,
+                fixture.UserId,
+                RuntimeAction.Extend,
+                TimeSpan.FromMinutes(30),
+                fixture.Now), cancellationToken);
+
+            await Assert.That(result.Failure).IsNull();
+            await Assert.That(result.Runtime!.ExpiresAt).IsEqualTo(fixture.Now.AddMinutes(82));
+            await Assert.That(await db.RuntimeInstances.AsNoTracking()
+                .Where(runtime => runtime.Id == runtimeId)
+                .Select(runtime => runtime.ExpiresAt)
+                .SingleAsync(cancellationToken))
+                .IsEqualTo(fixture.Now.AddMinutes(82));
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task Start_dispatch_batch_generation_and_reset_reuse_one_fixed_team_flag(
         CancellationToken cancellationToken)
     {

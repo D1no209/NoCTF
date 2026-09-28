@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { RuntimeCardViewState } from '~/features/challenges/useRuntimeCard'
 
 const viewProps = defineProps<{ state: RuntimeCardViewState }>()
-const { runnerFailureLabel, canStop, stopDisabled, runtime, loading, loadError, extendMinutes, polling, timedOut, retryLoad, start, stop, reset, extend, ttl, isRunning, busy, stateVariant, RuntimeAccessUrl, controls, dockTarget } = toRefs(viewProps.state)
+const { runnerFailureLabel, canStop, stopDisabled, runtime, loading, loadError, extendMinutes, extendMinutesInvalid, canExtend, polling, timedOut, retryLoad, start, stop, reset, extend, ttl, isRunning, busy, stateVariant, RuntimeAccessUrl, controls, dockTarget } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -55,16 +55,21 @@ const { runnerFailureLabel, canStop, stopDisabled, runtime, loading, loadError, 
           <Button v-if="runtime && controls !== 'readonly'" variant="outline" :disabled="busy" @click="reset">
             <Spinner v-if="polling" data-icon="inline-start" /> {{ $t('ui.resetEnvironment') }} </Button>
           <template v-if="controls === 'full' && isRunning">
-            <div class="flex items-center gap-2">
-              <NumberInput
-                v-model.number="extendMinutes"
-
-                min="1"
-                max="720"
-                class="w-20"
-                :aria-label="$t('ui.renewalMinutes2')"
-              />
-              <Button variant="outline" :disabled="busy" @click="extend">{{ $t('ui.renewalMinutes') }}</Button>
+            <div class="flex items-start gap-2">
+              <Field class="w-36 shrink-0" :data-invalid="extendMinutesInvalid">
+                <FieldLabel :for="`runtime-extend-${runtime?.id}`" class="sr-only">{{ $t('ui.renewalMinutes2') }}</FieldLabel>
+                <NumberInput
+                  :id="`runtime-extend-${runtime?.id}`"
+                  v-model="extendMinutes"
+                  min="1"
+                  max="720"
+                  required
+                  class="w-full"
+                  :aria-invalid="extendMinutesInvalid"
+                />
+                <FieldDescription v-if="extendMinutesInvalid">{{ $t('ui.renewalMinutesRange', { max: 720 }) }}</FieldDescription>
+              </Field>
+              <Button variant="outline" :disabled="!canExtend" @click="extend">{{ $t('ui.renewalMinutes') }}</Button>
             </div>
           </template>
         </div>

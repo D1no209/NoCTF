@@ -1111,10 +1111,11 @@ public sealed class AdminRuntimeStore(
             if (teamId is null || current is null || current.State != RuntimeState.Running ||
                 current.ExpiresAt is null || extension is null || extension <= TimeSpan.Zero)
                 return new(null, RuntimeMutationFailure.InvalidState);
-            var remaining = current.ExpiresAt.Value - now;
-            if (remaining <= TimeSpan.Zero || remaining >= TimeSpan.FromMinutes(10))
+            var extendedExpiry = RuntimeExtensionPolicy.CalculateExpiry(
+                current.ExpiresAt, now, extension);
+            if (extendedExpiry is null)
                 return new(null, RuntimeMutationFailure.InvalidState);
-            current.ExpiresAt = now.Add(extension.Value);
+            current.ExpiresAt = extendedExpiry;
             entity = current;
         }
         else

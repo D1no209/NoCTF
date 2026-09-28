@@ -278,10 +278,11 @@ public sealed class RuntimeInstanceStore(
             case RuntimeAction.Extend:
                 if (current is null || current.State != RuntimeState.Running || current.ExpiresAt is null)
                     return new(null, RuntimeMutationFailure.InvalidState);
-                var remaining = current.ExpiresAt.Value - command.Now;
-                if (remaining <= TimeSpan.Zero || remaining >= TimeSpan.FromMinutes(10))
+                var extendedExpiry = RuntimeExtensionPolicy.CalculateExpiry(
+                    current.ExpiresAt, command.Now, command.Extension);
+                if (extendedExpiry is null)
                     return new(null, RuntimeMutationFailure.InvalidState);
-                current.ExpiresAt = command.Now.Add(command.Extension!.Value);
+                current.ExpiresAt = extendedExpiry;
                 entity = current;
                 break;
             default:
