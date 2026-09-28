@@ -61,10 +61,10 @@ const { ShieldAlert, isHome, routePath, wallpaperActive, wallpaperStyle, isLogge
               </Button>
             </span>
           </ScrollSurface>
-          <component :is="LanguageToggle" />
         </div>
 
         <div data-slot="topbar-capsule" data-position="right" class="justify-self-end">
+          <component :is="LanguageToggle" />
           <component :is="ThemePalettePanel" />
           <component :is="ThemeToggle" />
           <component v-if="isLoggedIn" :is="AccountPanel" />
