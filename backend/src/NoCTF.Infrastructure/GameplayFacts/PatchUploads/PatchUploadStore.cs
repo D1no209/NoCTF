@@ -100,6 +100,7 @@ public sealed class PatchUploadStore(
                     || item.competition.Mode == GameMode.Ctf
                     && (item.competition.Status == CompetitionStatus.Running
                         || item.competition.Status == CompetitionStatus.Paused)))
+            .AsSplitQuery()
             .SingleOrDefaultAsync(ct);
         if (available is null)
             return null;
@@ -223,6 +224,7 @@ public sealed class PatchUploadStore(
                 challenge => challenge.ChallengeId,
                 template => template.Id,
                 (challenge, template) => new { Challenge = challenge, Template = template })
+            .AsSplitQuery()
             .SingleAsync(ct);
         var configuration = PatchVerificationConfigurationResolver.Resolve(
             admission.Mode,

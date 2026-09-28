@@ -91,7 +91,9 @@ public sealed class CompetitionWebhookBloodReadinessTests
                 leaderboard,
                 new CompetitionWebhookOptions(new Uri("https://noctf.example.test/"),
                     10, new HashSet<string>(), new HashSet<string>()),
-                clock);
+                clock,
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<
+                    CompetitionWebhookDeliveryStore>.Instance);
             foreach (var kind in new[]
             {
                 CompetitionEventKind.FirstBloodAwarded,

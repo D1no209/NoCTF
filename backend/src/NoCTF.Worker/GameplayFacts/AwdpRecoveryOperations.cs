@@ -167,6 +167,7 @@ internal static partial class BackendMessageOperations
                     item.Rules,
                     item.Definition
                 })
+            .AsSplitQuery()
             .SingleAsync(cancellationToken);
         var configuration = PatchVerificationConfigurationResolver.Resolve(
             configurationContext.Mode,

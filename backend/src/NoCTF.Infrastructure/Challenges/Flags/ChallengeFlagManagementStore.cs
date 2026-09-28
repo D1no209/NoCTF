@@ -242,6 +242,7 @@ public sealed class ChallengeFlagManagementStore(
             ? await db.Challenges.AsNoTracking()
                 .Where(item => item.Id == challengeId)
                 .Select(item => new ChallengeFlagSupport(item.Mode, item.Definition))
+                .AsSplitQuery()
                 .SingleAsync(ct)
             : await db.CompetitionChallenges.AsNoTracking()
                 .Where(item => item.Id == scope.CompetitionChallengeId
@@ -251,6 +252,7 @@ public sealed class ChallengeFlagManagementStore(
                     item => item.ChallengeId,
                     template => template.Id,
                     (_, template) => new ChallengeFlagSupport(template.Mode, template.Definition))
+                .AsSplitQuery()
                 .SingleAsync(ct);
     }
 

@@ -27,6 +27,10 @@ groups:
         expr: sum(max by (stream_name,consumer_name) (jetstream_consumer_num_redelivered{is_consumer_leader="true",stream_name=~"NOCTF_V2_.*"})) or vector(0)
       - record: noctf:leaderboard_projection_duration:p95_5m
         expr: histogram_quantile(0.95, sum by (le) (rate(noctf_leaderboard_projection_duration_seconds_bucket[5m])))
+      - record: noctf:leaderboard_projection_duration:mean_5m
+        expr: sum(rate(noctf_leaderboard_projection_duration_seconds_sum[5m])) / clamp_min(sum(rate(noctf_leaderboard_projection_duration_seconds_count[5m])), 0.001)
+      - record: noctf:leaderboard_projection_samples:count5m
+        expr: sum(increase(noctf_leaderboard_projection_duration_seconds_count[5m])) or vector(0)
       - record: noctf:webhook_queue_age:p50_5m
         expr: histogram_quantile(0.50, sum by (le) (rate(noctf_webhook_queue_age_seconds_bucket[5m])))
       - record: noctf:webhook_queue_age:p95_5m

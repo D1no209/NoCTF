@@ -27,7 +27,9 @@ public sealed class CreateRuntimeEndpoint(
         AuthSchemes("Bearer");
         Options(builder => builder
             .WithMetadata(new ProtectedEntryMetadata(ProtectedEntry.RuntimeCommand))
-            .WithMetadata(new HumanVerificationMetadata(HumanVerificationAction.Runtime)));
+            .WithMetadata(new HumanVerificationMetadata(HumanVerificationAction.Runtime))
+            .WithMetadata(new NoCTF.Hosting.Observability.RuntimeOperationMetricsMetadata(
+                NoCTF.Application.Observability.RuntimeOperationMetricKind.PlayerCreate)));
         Description(builder => builder
             .WithName("CreateRuntime")
             .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
@@ -103,6 +105,11 @@ internal static class PlayerRuntimeMutation
                 result.ErrorMessage ?? "Runtime state changed while the operation was processed."));
         if (!result.Succeeded)
         {
+            if (result.FailureCode is { } failure)
+            {
+                NoCTF.Application.Observability.NoCtfTelemetry
+                    .RecordRuntimeMutationFailure(MetricOperation(action), failure);
+            }
             return TypedResults.Problem(
                 statusCode: StatusCodes.Status503ServiceUnavailable,
                 title: "Runtime operation could not be queued.",
@@ -115,4 +122,12 @@ internal static class PlayerRuntimeMutation
         var accepted = RuntimeEndpointMapping.ToAccepted(result.Value!);
         return TypedResults.Accepted(accepted.StatusUrl, accepted);
     }
+
+    private static NoCTF.Application.Observability.RuntimeOperationMetricKind MetricOperation(
+        RuntimeAction action) => action switch
+        {
+            RuntimeAction.Extend => NoCTF.Application.Observability.RuntimeOperationMetricKind.PlayerExtend,
+            RuntimeAction.Stop => NoCTF.Application.Observability.RuntimeOperationMetricKind.PlayerStop,
+            _ => NoCTF.Application.Observability.RuntimeOperationMetricKind.PlayerCreate
+        };
 }

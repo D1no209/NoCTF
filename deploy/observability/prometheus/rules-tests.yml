@@ -1,0 +1,33 @@
+rule_files:
+  - rules/alerts.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: leaderboard single slow projection does not alert
+    interval: 1m
+    input_series:
+      - series: 'noctf:leaderboard_projection_duration:p95_5m'
+        values: '2.5 2.5 2.5 2.5 2.5 2.5'
+      - series: 'noctf:leaderboard_projection_samples:count5m'
+        values: '1 1 1 1 1 1'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: NoCtfLeaderboardProjectionSlow
+        exp_alerts: []
+
+  - name: leaderboard three sustained slow projections alert
+    interval: 1m
+    input_series:
+      - series: 'noctf:leaderboard_projection_duration:p95_5m'
+        values: '2.5 2.5 2.5 2.5 2.5 2.5'
+      - series: 'noctf:leaderboard_projection_samples:count5m'
+        values: '3 3 3 3 3 3'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: NoCtfLeaderboardProjectionSlow
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: Leaderboard projection P95 exceeds two seconds

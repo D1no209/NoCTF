@@ -1,12 +1,79 @@
 using System.Collections.Concurrent;
 using System.Diagnostics.Metrics;
 using NoCTF.Application.Observability;
+using NoCTF.Application.Runtime.Instances;
 using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.Tests.Unit.Application.Observability;
 
 public sealed class NoCtfTelemetryTests
 {
+    [Test]
+    public async Task Webhook_materialization_race_is_counted_without_dynamic_labels()
+    {
+        long count = 0;
+        int tagCount = -1;
+        using var listener = new MeterListener();
+        listener.InstrumentPublished = (instrument, meterListener) =>
+        {
+            if (instrument.Meter.Name == NoCtfTelemetry.MeterName
+                && instrument.Name == "noctf.webhook.materialization_races")
+                meterListener.EnableMeasurementEvents(instrument);
+        };
+        listener.SetMeasurementEventCallback<long>((_, value, tags, _) =>
+        {
+            count += value;
+            tagCount = tags.Length;
+        });
+        listener.Start();
+
+        NoCtfTelemetry.RecordWebhookMaterializationRace();
+
+        await Assert.That(count).IsEqualTo(1);
+        await Assert.That(tagCount).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task Runtime_and_capacity_diagnostics_use_bounded_enum_labels()
+    {
+        var values = new ConcurrentBag<(string Instrument, string Operation, string? Failure)>();
+        using var listener = new MeterListener();
+        listener.InstrumentPublished = (instrument, meterListener) =>
+        {
+            if (instrument.Meter.Name == NoCtfTelemetry.MeterName
+                && (instrument.Name.StartsWith(
+                        "noctf.runner.capacity.transaction_", StringComparison.Ordinal)
+                    || instrument.Name == "noctf.runtime.mutation.failures"))
+            {
+                meterListener.EnableMeasurementEvents(instrument);
+            }
+        };
+        listener.SetMeasurementEventCallback<long>((instrument, _, tags, _) =>
+        {
+            var array = tags.ToArray();
+            values.Add((
+                instrument.Name,
+                array.Single(tag => tag.Key == "operation").Value?.ToString() ?? string.Empty,
+                array.SingleOrDefault(tag => tag.Key == "failure").Value?.ToString()));
+        });
+        listener.Start();
+
+        NoCtfTelemetry.RecordRunnerCapacityTransactionRetry(
+            RunnerCapacityTransactionOperation.Claim);
+        NoCtfTelemetry.RecordRunnerCapacityTransactionExhaustion(
+            RunnerCapacityTransactionOperation.Release);
+        NoCtfTelemetry.RecordRuntimeMutationFailure(
+            RuntimeOperationMetricKind.PlayerCreate,
+            RuntimeMutationFailureCode.RuntimeCapacityExceeded);
+
+        await Assert.That(values).IsEquivalentTo(
+        [
+            ("noctf.runner.capacity.transaction_retries", "claim", null),
+            ("noctf.runner.capacity.transaction_exhaustions", "release", null),
+            ("noctf.runtime.mutation.failures", "player_create", "runtime_capacity_exceeded")
+        ]);
+    }
+
     [Test]
     public async Task Gameplay_submission_counter_uses_bounded_kinds_and_batch_counts()
     {

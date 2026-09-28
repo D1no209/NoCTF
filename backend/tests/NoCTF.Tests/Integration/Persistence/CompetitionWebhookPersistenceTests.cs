@@ -1,6 +1,8 @@
 using System.Text.Json;
 using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using NoCTF.Application.Challenges.Management;
@@ -135,7 +137,9 @@ public sealed class CompetitionWebhookPersistenceTests
                         10,
                         new HashSet<string>(),
                         new HashSet<string>()),
-                    TimeProvider.System);
+                    TimeProvider.System,
+                    Microsoft.Extensions.Logging.Abstractions.NullLogger<
+                        CompetitionWebhookDeliveryStore>.Instance);
                 var batch = await deliveryStore.PrepareBatchAsync(
                     new(competitionId, eventId),
                     100,
@@ -154,6 +158,79 @@ public sealed class CompetitionWebhookPersistenceTests
                     .GetProperty("competition")
                     .GetProperty("administrationRole").ValueKind)
                     .IsEqualTo(JsonValueKind.Null);
+            }
+
+            var raceEventId = Guid.CreateVersion7(now.AddTicks(3));
+            await using (var raceEventDb = new NoCtfDbContext(options))
+            {
+                raceEventDb.CompetitionEvents.Add(new CompetitionLifecycleChangedEvent
+                {
+                    Id = raceEventId,
+                    CompetitionId = competitionId,
+                    Level = CompetitionEventLevel.Information,
+                    Visibility = CompetitionEventVisibility.Public,
+                    SubjectType = EntityReferenceKind.Competition,
+                    SubjectId = competitionId,
+                    PreviousCompetitionStatus = CompetitionStatus.Running,
+                    CompetitionStatus = CompetitionStatus.Finished,
+                    OccurredAt = now.AddSeconds(2)
+                });
+                raceEventDb.CompetitionWebhookOutboxEvents.Add(
+                    new CompetitionWebhookOutboxEvent
+                    {
+                        EventId = raceEventId,
+                        CompetitionId = competitionId,
+                        CompetitionRevision = Guid.NewGuid(),
+                        DomainEventCreatedAt = now.AddSeconds(2),
+                        OutboxPersistedAt = now.AddSeconds(2),
+                        NextDispatchAt = now.AddSeconds(2)
+                    });
+                await raceEventDb.SaveChangesAsync(cancellationToken);
+            }
+
+            var materializationBarrier = new MaterializationBarrierInterceptor();
+            var raceOptions = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .AddInterceptors(materializationBarrier)
+                .Options;
+            await using (var firstRaceDb = new NoCtfDbContext(raceOptions))
+            await using (var secondRaceDb = new NoCtfDbContext(raceOptions))
+            {
+                var raceLogger = Substitute.For<ILogger<CompetitionWebhookDeliveryStore>>();
+                CompetitionWebhookDeliveryStore CreateDeliveryStore(NoCtfDbContext context) =>
+                    new(
+                        context,
+                        protector,
+                        new GetChallenge(Substitute.For<IChallengeManagementStore>()),
+                        new GetCompetitionTracks(Substitute.For<ICompetitionTrackStore>()),
+                        Substitute.For<ILeaderboardCache>(),
+                        new CompetitionWebhookOptions(
+                            new Uri("https://noctf.example.test/"),
+                            10,
+                            new HashSet<string>(),
+                            new HashSet<string>()),
+                        TimeProvider.System,
+                        raceLogger);
+
+                var command = new DispatchCompetitionWebhooks(competitionId, raceEventId);
+                var batches = await Task.WhenAll(
+                    CreateDeliveryStore(firstRaceDb).PrepareBatchAsync(
+                        command, 100, cancellationToken),
+                    CreateDeliveryStore(secondRaceDb).PrepareBatchAsync(
+                        command, 100, cancellationToken));
+                await Assert.That(batches.All(batch => batch.Deliveries.Count == 1))
+                    .IsTrue();
+                var raceLogs = raceLogger.ReceivedCalls().Count(call =>
+                    call.GetMethodInfo().Name == nameof(ILogger.Log));
+                await Assert.That(raceLogs).IsEqualTo(1);
+            }
+
+            await using (var raceVerifyDb = new NoCtfDbContext(options))
+            {
+                var count = await raceVerifyDb.CompetitionWebhookDeliveries
+                    .CountAsync(item => item.EventId == raceEventId, cancellationToken);
+                await Assert.That(count).IsEqualTo(1);
             }
 
             await using (var expandDb = new NoCtfDbContext(options))
@@ -193,7 +270,9 @@ public sealed class CompetitionWebhookPersistenceTests
                         10,
                         new HashSet<string>(),
                         new HashSet<string>()),
-                    TimeProvider.System);
+                    TimeProvider.System,
+                    Microsoft.Extensions.Logging.Abstractions.NullLogger<
+                        CompetitionWebhookDeliveryStore>.Instance);
                 Guid? cursor = null;
                 var dispatched = 0;
                 do
@@ -262,5 +341,29 @@ public sealed class CompetitionWebhookPersistenceTests
                     .Throws<CryptographicException>();
             }
         });
+    }
+
+    private sealed class MaterializationBarrierInterceptor : SaveChangesInterceptor
+    {
+        private readonly TaskCompletionSource ready = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        private int arrivals;
+
+        public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            if (eventData.Context?.ChangeTracker
+                    .Entries<CompetitionWebhookDeliveryRecord>()
+                    .Any(entry => entry.State == EntityState.Added) == true)
+            {
+                if (Interlocked.Increment(ref arrivals) == 2)
+                    ready.TrySetResult();
+                await ready.Task.WaitAsync(cancellationToken);
+            }
+            return await base.SavingChangesAsync(
+                eventData, result, cancellationToken);
+        }
     }
 }

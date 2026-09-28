@@ -2,6 +2,7 @@
 #pragma warning disable
 using FluentStorage.Storage;
 using Microsoft.EntityFrameworkCore;
+using System;
 
 namespace Internal.Generated.WolverineHandlers
 {
@@ -11,18 +12,20 @@ namespace Internal.Generated.WolverineHandlers
     {
         private readonly FluentStorage.Storage.IStore _store;
         private readonly Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> _dbContextOptionsOfNoCtfDbContext;
+        private readonly System.TimeProvider _timeProvider;
 
-        public CleanupFileHandler543377550(FluentStorage.Storage.IStore store, Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext)
+        public CleanupFileHandler543377550(FluentStorage.Storage.IStore store, Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, System.TimeProvider timeProvider)
         {
             _store = store;
             _dbContextOptionsOfNoCtfDbContext = dbContextOptionsOfNoCtfDbContext;
+            _timeProvider = timeProvider;
         }
 
 
 
         public override async System.Threading.Tasks.Task HandleAsync(Wolverine.Runtime.MessageContext context, System.Threading.CancellationToken cancellation)
         {
-            await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext);
+            await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider);
             // The actual message body
             var cleanupFile = (NoCTF.Application.Messaging.CleanupFile)context.Envelope.Message;
 

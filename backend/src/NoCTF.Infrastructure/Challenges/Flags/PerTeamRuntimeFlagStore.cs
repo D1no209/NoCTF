@@ -59,6 +59,7 @@ public sealed class PerTeamRuntimeFlagStore(
                     target.Competition.FlagDerivationSecret,
                     Configuration = target.Competition.ModeConfiguration!
                 })
+            .AsSplitQuery()
             .SingleOrDefaultAsync(cancellationToken)
             ?? throw new InvalidOperationException(
                 "The competition challenge does not belong to the competition.");
@@ -129,6 +130,7 @@ public sealed class PerTeamRuntimeFlagStore(
                     target.Competition.FlagDerivationSecret,
                     Configuration = target.Competition.ModeConfiguration!
                 })
+            .AsSplitQuery()
             .SingleOrDefaultAsync(cancellationToken)
             ?? throw new InvalidOperationException(
                 "The competition challenge does not belong to the competition.");

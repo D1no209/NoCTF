@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
+using NoCTF.Application.Observability;
 using NoCTF.Hosting.Observability;
 
 namespace NoCTF.Tests.Unit.Hosting;
@@ -43,28 +44,17 @@ public sealed class ObservabilityExtensionsTests
     }
 
     [Test]
-    [Arguments("POST", "/competitions/{competitionId}/challenges/{competitionChallengeId}/flag-submissions", "flag")]
-    [Arguments("POST", "/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-break-flag-judgement", "flag")]
-    [Arguments("POST", "/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets", "fix_request")]
-    [Arguments("POST", "/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets/{runtimeInstanceId}/fix", "fix_upload")]
-    [Arguments("POST", "/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime/start", "runtime_start")]
-    [Arguments("POST", "/admin/challenges/{challengeId}/test-runtime/start", "runtime_test_start")]
-    [Arguments("POST", "/admin/challenges/{challengeId}/test-runtime/stop", "runtime_test_stop")]
-    [Arguments("POST", "/admin/challenges/{challengeId}/test-runtime/reset", "runtime_test_reset")]
-    [Arguments("POST", "/admin/challenges/{challengeId}/test-runtime/extend", "runtime_test_extend")]
-    [Arguments("POST", "/admin/platform/runtimes/{runtimeInstanceId}/terminate", "runtime_terminate")]
-    [Arguments("POST", "/admin/competitions/{competitionId}/runtimes/{runtimeInstanceId}/force-terminate", "runtime_force_terminate")]
+    [Arguments("POST", "/competitions/{competitionId}/challenges/{competitionChallengeId}/flag-submissions", RuntimeOperationMetricKind.Flag)]
+    [Arguments("POST", "/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-break-flag-judgement", RuntimeOperationMetricKind.Flag)]
+    [Arguments("POST", "/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets", RuntimeOperationMetricKind.FixRequest)]
+    [Arguments("POST", "/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets/{runtimeInstanceId}/fix", RuntimeOperationMetricKind.FixUpload)]
     public async Task Mutating_gameplay_routes_are_classified(
         string method,
         string route,
-        string expected)
+        RuntimeOperationMetricKind expected)
     {
-        var classified = ObservabilityExtensions.TryClassifyRuntimeOperation(
-            method,
-            route,
-            out var operation);
+        var operation = ObservabilityExtensions.ClassifyGameplayOperation(method, route);
 
-        await Assert.That(classified).IsTrue();
         await Assert.That(operation).IsEqualTo(expected);
     }
 
@@ -77,12 +67,8 @@ public sealed class ObservabilityExtensionsTests
         string method,
         string route)
     {
-        var classified = ObservabilityExtensions.TryClassifyRuntimeOperation(
-            method,
-            route,
-            out var operation);
+        var operation = ObservabilityExtensions.ClassifyGameplayOperation(method, route);
 
-        await Assert.That(classified).IsFalse();
-        await Assert.That(operation).IsEmpty();
+        await Assert.That(operation).IsNull();
     }
 }

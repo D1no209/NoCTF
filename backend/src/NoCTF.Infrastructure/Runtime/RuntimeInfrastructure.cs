@@ -76,6 +76,7 @@ internal static class RuntimeInfrastructure
         else
         {
             services.TryAddSingleton<NatsRunnerAvailabilityRegistry>();
+            services.TryAddSingleton<RunnerCapacityLedgerCoordinator>();
             services.AddScoped<IRunnerCapacityGate, PersistedRunnerCapacityGate>();
         }
         services.AddSingleton<IRuntimePlacementPolicy, ConfiguredRuntimePlacementPolicy>();

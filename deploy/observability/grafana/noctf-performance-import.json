@@ -356,6 +356,54 @@
       "gridPos": { "x": 16, "y": 156, "w": 8, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": { "defaults": { "unit": "reqps" } },
       "targets": [{ "refId": "A", "expr": "topk(10, sum by (error_type) (rate(dotnet_exceptions_total{job=\"noctf\"}[$window])))", "format": "table", "instant": true, "range": false }]
+    },
+    {
+      "id": 55, "type": "timeseries", "title": "排行榜投影耗时", "description": "按 mode/outcome 显示 P95，并与五分钟总体均值对照；样本不足时不触发慢投影告警。",
+      "gridPos": { "x": 0, "y": 164, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        { "refId": "A", "expr": "histogram_quantile(0.95, sum by (le, mode, outcome) (rate(noctf_leaderboard_projection_duration_seconds_bucket[$window])))", "legendFormat": "{{mode}} / {{outcome}} P95" },
+        { "refId": "B", "expr": "sum by (mode, outcome) (rate(noctf_leaderboard_projection_duration_seconds_sum[$window])) / clamp_min(sum by (mode, outcome) (rate(noctf_leaderboard_projection_duration_seconds_count[$window])), 0.001)", "legendFormat": "{{mode}} / {{outcome}} mean" }
+      ]
+    },
+    {
+      "id": 56, "type": "timeseries", "title": "排行榜投影样本", "description": "按 mode/outcome 显示统计窗口内投影次数；至少 3 个五分钟样本才参与慢投影告警。",
+      "gridPos": { "x": 12, "y": 164, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 } },
+      "targets": [{ "refId": "A", "expr": "sum by (mode, outcome) (increase(noctf_leaderboard_projection_duration_seconds_count[$window]))", "legendFormat": "{{mode}} / {{outcome}}" }]
+    },
+    {
+      "id": 57, "type": "timeseries", "title": "Runtime 容量事务重试", "description": "按 claim/release 显示恢复的数据库事务重试与耗尽；耗尽必须保持为零。",
+      "gridPos": { "x": 0, "y": 172, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [
+        { "refId": "A", "expr": "sum by (operation) (rate(noctf_runner_capacity_transaction_retries_total[$window]))", "legendFormat": "{{operation}} retries" },
+        { "refId": "B", "expr": "sum by (operation) (rate(noctf_runner_capacity_transaction_exhaustions_total[$window]))", "legendFormat": "{{operation}} exhausted" }
+      ]
+    },
+    {
+      "id": 58, "type": "table", "title": "Runtime 受控失败分类", "description": "当前统计窗口按 operation/failure 汇总受控失败；用于解释 503，而不是替代总 5xx。",
+      "gridPos": { "x": 12, "y": 172, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 } },
+      "targets": [{ "refId": "A", "expr": "topk(20, sum by (operation, failure) (increase(noctf_runtime_mutation_failures_total[$window])))", "format": "table", "instant": true, "range": false }]
+    },
+    {
+      "id": 59, "type": "stat", "title": "24 小时数据库失败", "description": "Npgsql 报告的数据库命令失败近似数；须结合 Loki 分类判断可恢复竞争或真实故障。",
+      "gridPos": { "x": 0, "y": 180, "w": 8, "h": 5 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 1 }, { "color": "red", "value": 5 }] } } },
+      "targets": [{ "refId": "A", "expr": "sum(increase(db_client_operation_failed_total{job=\"noctf\"}[24h])) or vector(0)", "instant": true, "range": false }]
+    },
+    {
+      "id": 60, "type": "stat", "title": "24 小时 Webhook 幂等竞争", "description": "数据库唯一约束成功吸收的 delivery materialization race；少量非零可接受，持续增长需查重复派发。",
+      "gridPos": { "x": 8, "y": 180, "w": 8, "h": 5 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 } },
+      "targets": [{ "refId": "A", "expr": "sum(increase(noctf_webhook_materialization_races_total[24h])) or vector(0)", "instant": true, "range": false }]
+    },
+    {
+      "id": 61, "type": "stat", "title": "24 小时 Runtime 受控失败", "description": "返回稳定 failure code 的 Runtime mutation 失败；与总 5xx 和容量事务耗尽对照。",
+      "gridPos": { "x": 16, "y": 180, "w": 8, "h": 5 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 } },
+      "targets": [{ "refId": "A", "expr": "sum(increase(noctf_runtime_mutation_failures_total[24h])) or vector(0)", "instant": true, "range": false }]
     }
   ],
   "refresh": "30s",

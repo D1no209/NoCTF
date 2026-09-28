@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NoCTF.Infrastructure.Runtime.Capacity;
 using NoCTF.Runner.Composition;
+using System;
 using System.Collections.Generic;
 using ZiggyCreatures.Caching.Fusion;
 
@@ -18,20 +19,24 @@ namespace Internal.Generated.WolverineHandlers
         private readonly Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> _loggerOfWolverinePostCommitMessagePublisher;
         private readonly Microsoft.Extensions.Options.IOptions<NoCTF.Runner.Composition.RunnerOptions> _optionsOfRunnerOptions;
         private readonly NoCTF.Infrastructure.Runtime.Capacity.NatsRunnerAvailabilityRegistry _natsRunnerAvailabilityRegistry;
+        private readonly NoCTF.Infrastructure.Runtime.Capacity.RunnerCapacityLedgerCoordinator _runnerCapacityLedgerCoordinator;
         private readonly NoCTF.Infrastructure.Runtime.Capacity.RunnerResourceMutationCoordinator _runnerResourceMutationCoordinator;
         private readonly NoCTF.Runner.Composition.IRuntimeProviderCatalog _runtimeProviderCatalog;
         private readonly System.Collections.Generic.IEnumerable<NoCTF.Application.Runtime.Provisioning.IRuntimeManagedResourceReconciler> _runtimeManagedResourceReconcilerIEnumerable;
+        private readonly System.TimeProvider _timeProvider;
         private readonly ZiggyCreatures.Caching.Fusion.IFusionCacheProvider _fusionCacheProvider;
 
-        public ReconcileRuntimeResourcesHandler1940963141(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Options.IOptions<NoCTF.Runner.Composition.RunnerOptions> optionsOfRunnerOptions, NoCTF.Infrastructure.Runtime.Capacity.NatsRunnerAvailabilityRegistry natsRunnerAvailabilityRegistry, NoCTF.Infrastructure.Runtime.Capacity.RunnerResourceMutationCoordinator runnerResourceMutationCoordinator, NoCTF.Runner.Composition.IRuntimeProviderCatalog runtimeProviderCatalog, System.Collections.Generic.IEnumerable<NoCTF.Application.Runtime.Provisioning.IRuntimeManagedResourceReconciler> runtimeManagedResourceReconcilerIEnumerable, ZiggyCreatures.Caching.Fusion.IFusionCacheProvider fusionCacheProvider)
+        public ReconcileRuntimeResourcesHandler1940963141(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Options.IOptions<NoCTF.Runner.Composition.RunnerOptions> optionsOfRunnerOptions, NoCTF.Infrastructure.Runtime.Capacity.NatsRunnerAvailabilityRegistry natsRunnerAvailabilityRegistry, NoCTF.Infrastructure.Runtime.Capacity.RunnerCapacityLedgerCoordinator runnerCapacityLedgerCoordinator, NoCTF.Infrastructure.Runtime.Capacity.RunnerResourceMutationCoordinator runnerResourceMutationCoordinator, NoCTF.Runner.Composition.IRuntimeProviderCatalog runtimeProviderCatalog, System.Collections.Generic.IEnumerable<NoCTF.Application.Runtime.Provisioning.IRuntimeManagedResourceReconciler> runtimeManagedResourceReconcilerIEnumerable, System.TimeProvider timeProvider, ZiggyCreatures.Caching.Fusion.IFusionCacheProvider fusionCacheProvider)
         {
             _dbContextOptionsOfNoCtfDbContext = dbContextOptionsOfNoCtfDbContext;
             _loggerOfWolverinePostCommitMessagePublisher = loggerOfWolverinePostCommitMessagePublisher;
             _optionsOfRunnerOptions = optionsOfRunnerOptions;
             _natsRunnerAvailabilityRegistry = natsRunnerAvailabilityRegistry;
+            _runnerCapacityLedgerCoordinator = runnerCapacityLedgerCoordinator;
             _runnerResourceMutationCoordinator = runnerResourceMutationCoordinator;
             _runtimeProviderCatalog = runtimeProviderCatalog;
             _runtimeManagedResourceReconcilerIEnumerable = runtimeManagedResourceReconcilerIEnumerable;
+            _timeProvider = timeProvider;
             _fusionCacheProvider = fusionCacheProvider;
         }
 
@@ -40,9 +45,9 @@ namespace Internal.Generated.WolverineHandlers
         public override async System.Threading.Tasks.Task HandleAsync(Wolverine.Runtime.MessageContext context, System.Threading.CancellationToken cancellation)
         {
             var postCommitDispatchStatus = new NoCTF.Application.Messaging.PostCommitDispatchStatus();
-            await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext);
+            await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider);
             var wolverinePostCommitMessagePublisher = new NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher(context, noCtfDbContext, _loggerOfWolverinePostCommitMessagePublisher, postCommitDispatchStatus);
-            var persistedRunnerCapacityGate = new NoCTF.Infrastructure.Runtime.Capacity.PersistedRunnerCapacityGate(noCtfDbContext, _natsRunnerAvailabilityRegistry, _fusionCacheProvider, wolverinePostCommitMessagePublisher);
+            var persistedRunnerCapacityGate = new NoCTF.Infrastructure.Runtime.Capacity.PersistedRunnerCapacityGate(noCtfDbContext, _natsRunnerAvailabilityRegistry, _fusionCacheProvider, wolverinePostCommitMessagePublisher, _runnerCapacityLedgerCoordinator);
             // The actual message body
             var reconcileRuntimeResources = (NoCTF.Application.Runtime.Instances.ReconcileRuntimeResources)context.Envelope.Message;
 
