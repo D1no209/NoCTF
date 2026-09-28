@@ -16,6 +16,7 @@ public sealed class EmailVerificationConfigurationStore(
 
     public async Task<EmailVerificationConfigurationView> GetAsync(CancellationToken ct) =>
         ToView(await db.PlatformSettings.AsNoTracking()
+            .AsSplitQuery()
             .SingleAsync(settings => settings.Id == SettingsId, ct));
 
     public async Task<EmailVerificationConfigurationView> UpdateAsync(
@@ -72,6 +73,7 @@ public sealed class EmailVerificationConfigurationStore(
         CancellationToken ct)
     {
         var settings = await db.PlatformSettings.AsNoTracking()
+            .AsSplitQuery()
             .SingleAsync(candidate => candidate.Id == SettingsId, ct);
         return ToDeliveryConfiguration(settings, secrets, requireEnabled);
     }

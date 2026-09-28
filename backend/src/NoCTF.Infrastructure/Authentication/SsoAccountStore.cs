@@ -43,7 +43,8 @@ public sealed class SsoAccountStore(NoCtfDbContext db) : ISsoAccountStore
             || user.ExternalIdentitySubject is null
             || user.ExternalIdentityBoundAt is null)
             return null;
-        var settings = await db.PlatformSettings.AsNoTracking().SingleAsync(ct);
+        var settings = await db.PlatformSettings.AsNoTracking().AsSplitQuery()
+            .SingleAsync(ct);
         var provider = settings.SsoConfiguration.Providers
             .SingleOrDefault(item => item.Id == providerId);
         var providerName = provider?.Name ?? "Unavailable provider";
@@ -164,7 +165,8 @@ public sealed class SsoAccountStore(NoCtfDbContext db) : ISsoAccountStore
         if (user.ExternalIdentityProviderId is not Guid providerId
             || user.ExternalIdentityProtocol is not SsoProtocol protocol)
             return SsoUnbindState.NotLinked;
-        var settings = await db.PlatformSettings.AsNoTracking().SingleAsync(ct);
+        var settings = await db.PlatformSettings.AsNoTracking().AsSplitQuery()
+            .SingleAsync(ct);
         var providerName = settings.SsoConfiguration.Providers
             .SingleOrDefault(provider => provider.Id == providerId)?.Name
             ?? "Unavailable provider";
@@ -204,7 +206,8 @@ public sealed class SsoAccountStore(NoCtfDbContext db) : ISsoAccountStore
         if (user.ExternalIdentityProviderId is not Guid providerId
             || user.ExternalIdentityProtocol is not SsoProtocol protocol)
             return AdminSsoUnbindState.NotLinked;
-        var settings = await db.PlatformSettings.AsNoTracking().SingleAsync(ct);
+        var settings = await db.PlatformSettings.AsNoTracking().AsSplitQuery()
+            .SingleAsync(ct);
         var providerName = settings.SsoConfiguration.Providers
             .SingleOrDefault(provider => provider.Id == providerId)?.Name
             ?? "Unavailable provider";

@@ -29,7 +29,7 @@ public sealed class HumanVerificationConfigurationStore(
         UpdateHumanVerificationConfigurationCommand command,
         CancellationToken ct)
     {
-        var settings = await db.PlatformSettings.SingleAsync(
+        var settings = await db.PlatformSettings.AsSplitQuery().SingleAsync(
             candidate => candidate.Id == SettingsId,
             ct);
         SeedDeploymentSecrets(settings);
@@ -56,7 +56,7 @@ public sealed class HumanVerificationConfigurationStore(
         DateTimeOffset now,
         CancellationToken ct)
     {
-        var settings = await db.PlatformSettings.SingleAsync(
+        var settings = await db.PlatformSettings.AsSplitQuery().SingleAsync(
             candidate => candidate.Id == SettingsId,
             ct);
         var ciphertext = secrets.Protect(secret, Purpose(provider));
@@ -134,7 +134,7 @@ public sealed class HumanVerificationConfigurationStore(
     private async Task<HumanVerificationConfigurationSnapshot> LoadAsync(
         CancellationToken ct) =>
         HumanVerificationConfigurationSnapshot.From(
-            await db.PlatformSettings.AsNoTracking().SingleAsync(
+            await db.PlatformSettings.AsNoTracking().AsSplitQuery().SingleAsync(
                 candidate => candidate.Id == SettingsId,
                 ct));
 

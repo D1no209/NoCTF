@@ -47,7 +47,8 @@ public sealed class CompetitionTrackStore(
             new Dictionary<Guid, (string Name, string? IconUrl)>();
         if (hasActiveSsoGates)
         {
-            var settings = await db.PlatformSettings.AsNoTracking().SingleAsync(cancellationToken);
+            var settings = await db.PlatformSettings.AsNoTracking().AsSplitQuery()
+                .SingleAsync(cancellationToken);
             providers = settings.SsoConfiguration.Providers.ToDictionary(
                 provider => provider.Id,
                 provider => (provider.Name, provider.IconUrl));
@@ -153,7 +154,8 @@ public sealed class CompetitionTrackStore(
             return Failure(CompetitionTrackFailureCode.InvalidConfiguration,
                 string.Join(" ", validationErrors));
 
-        var settings = await db.PlatformSettings.AsNoTracking().SingleAsync(cancellationToken);
+        var settings = await db.PlatformSettings.AsNoTracking().AsSplitQuery()
+            .SingleAsync(cancellationToken);
         var providers = settings.SsoConfiguration.Providers.ToDictionary(
             provider => provider.Id,
             provider => (provider.Name, provider.IconUrl));

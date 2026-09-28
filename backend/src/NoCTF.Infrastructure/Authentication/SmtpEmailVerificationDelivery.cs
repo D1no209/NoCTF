@@ -174,6 +174,7 @@ public sealed class SmtpEmailVerificationDelivery(
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(ct);
         var settings = await db.PlatformSettings.AsNoTracking()
+            .AsSplitQuery()
             .SingleAsync(candidate => candidate.Id == 1, ct);
         return (
             settings.EmailVerificationEnabled,
