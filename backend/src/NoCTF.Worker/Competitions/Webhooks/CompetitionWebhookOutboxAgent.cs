@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
+using System.Diagnostics;
 using NoCTF.Application.Competitions.Webhooks;
 using NoCTF.Application.Observability;
 using NoCTF.Application.Scoring.Leaderboard;
@@ -24,6 +25,8 @@ public sealed class CompetitionWebhookOutboxAgent(
         var ticks = 0;
         do
         {
+            var started = Stopwatch.GetTimestamp();
+            var scanRecorded = false;
             try
             {
                 await using var scope = scopes.CreateAsyncScope();
@@ -31,6 +34,12 @@ public sealed class CompetitionWebhookOutboxAgent(
                     .GetRequiredService<ICompetitionWebhookDeliveryStore>();
                 var pending = await deliveries.ClaimPendingOutboxAsync(
                     clock.GetUtcNow(), 64, stoppingToken);
+                NoCtfTelemetry.RecordWebhookRecoveryScan(
+                    WebhookRecoveryScanKind.Outbox,
+                    pending.Count == 0 ? WebhookRecoveryScanOutcome.Empty
+                        : WebhookRecoveryScanOutcome.Work,
+                    Stopwatch.GetElapsedTime(started).TotalSeconds);
+                scanRecorded = true;
                 await Parallel.ForEachAsync(
                     pending.GroupBy(item => item.CompetitionId),
                     new ParallelOptions
@@ -60,6 +69,11 @@ public sealed class CompetitionWebhookOutboxAgent(
             }
             catch (Exception exception)
             {
+                if (!scanRecorded)
+                    NoCtfTelemetry.RecordWebhookRecoveryScan(
+                        WebhookRecoveryScanKind.Outbox,
+                        WebhookRecoveryScanOutcome.Failed,
+                        Stopwatch.GetElapsedTime(started).TotalSeconds);
                 logger.LogWarning(exception,
                     "Webhook outbox wakeup failed; pending events will be retried.");
             }

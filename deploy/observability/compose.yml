@@ -116,6 +116,13 @@ services:
       REDIS_ADDR: ${REDIS_EXPORTER_ADDR:-redis://redis:6379}
     networks: [noctf]
 
+  cap-valkey-exporter:
+    image: ${REDIS_EXPORTER_IMAGE:?Set REDIS_EXPORTER_IMAGE in .env}
+    restart: unless-stopped
+    environment:
+      REDIS_ADDR: redis://valkey:6379
+    networks: [observability, cap-internal]
+
   nats-exporter:
     image: ${NATS_EXPORTER_IMAGE:?Set NATS_EXPORTER_IMAGE in .env}
     restart: unless-stopped
@@ -149,7 +156,7 @@ services:
         source: ./blackbox/config.yml
         target: /etc/blackbox-exporter/config.yml
         read_only: true
-    networks: [observability, noctf]
+    networks: [observability, noctf, cap-internal]
 
 networks:
   observability:
@@ -159,3 +166,6 @@ networks:
   panel:
     external: true
     name: 1panel-network
+  cap-internal:
+    external: true
+    name: noctf-cap-internal

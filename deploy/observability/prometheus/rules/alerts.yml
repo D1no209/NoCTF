@@ -8,11 +8,29 @@ groups:
         annotations:
           summary: NoCTF metrics target is unavailable
       - alert: NoCtfPublicProbeUnavailable
-        expr: probe_success{job="blackbox"} == 0
+        expr: probe_success{job="blackbox",probe_scope="noctf"} == 0
         for: 1m
         labels: { severity: critical }
         annotations:
-          summary: NoCTF or configured external HTTP target is unavailable
+          summary: NoCTF public HTTP target is unavailable
+      - alert: NoCtfCapProbeUnavailable
+        expr: probe_success{job="blackbox",probe_scope="cap"} == 0 and on() max(noctf_cap_active{job="noctf"}) == 1
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: Cap internal HTTP target is unavailable
+      - alert: NoCtfCapValkeyExporterUnavailable
+        expr: up{job="cap-valkey"} == 0 and on() max(noctf_cap_active{job="noctf"}) == 1
+        for: 2m
+        labels: { severity: warning }
+        annotations:
+          summary: Cap Valkey diagnostic exporter is unavailable
+      - alert: NoCtfCapTelemetryUnavailable
+        expr: noctf_cap_active == 1 and noctf_cap_telemetry_available == 0
+        for: 3m
+        labels: { severity: warning }
+        annotations:
+          summary: Cap management telemetry is unavailable while verification is enabled
       - alert: NoCtfNatsUnavailable
         expr: (max(up{job="nats"}) or vector(0)) == 0
         for: 1m
@@ -61,6 +79,12 @@ groups:
         labels: { severity: critical }
         annotations:
           summary: Human verification provider requests are failing
+      - alert: NoCtfCapSiteverifySlow
+        expr: noctf:cap_siteverify_duration:p95_5m > 1 and noctf:cap_siteverify_samples:count5m >= 20
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: Cap siteverify P95 exceeds one second with sufficient samples
       - alert: NoCtfRuntimeWaitingTooLong
         expr: noctf:runtime_waiting_oldest_age:seconds > 30
         for: 1m

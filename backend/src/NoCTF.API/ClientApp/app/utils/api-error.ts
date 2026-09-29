@@ -95,6 +95,7 @@ function stableCodeMessage(code: string | undefined): string | null {
     case 'CapWorkloadConfigurationNotApplied': return translate('ui.capWorkloadConfigurationNotApplied')
     case 'EmailVerificationDisabled': return translate('ui.theTestEmailWillBeSentToTheEmailAddress')
     case 'WriteUpSubmissionDeadlinePassed': return translate('writeUp.deadlinePassedShort')
+    case 'RuntimeExtensionTooEarly': return translate('ui.renewalAvailableInFinalTenMinutes')
     default: return null
   }
 }

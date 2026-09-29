@@ -91,6 +91,7 @@ export const messages = {
   "ui.renewalOperationHasBeenAccepted": "Renewal operation has been accepted",
   "ui.renewalMinutes2": "Renewal minutes",
   "ui.renewalMinutesRange": "Enter a whole number from 1 to {max} minutes.",
+  "ui.renewalAvailableInFinalTenMinutes": "Renewal is available only in the final 10 minutes before expiry.",
   "ui.renewalFailed": "Renewal failed",
   "ui.extendSeconds": "Extend seconds",
   "ui.extendedRunTime": "Extended run time",

@@ -12,7 +12,7 @@ namespace NoCTF.API.SignalR.Publishing;
 
 public sealed class NatsNotificationChangeRelay(
     INatsConnection connection,
-    IServiceScopeFactory scopes,
+    NotificationChangeAudienceResolver audienceResolver,
     IHubContext<NotificationHub, INotificationHubClient> hub,
     ILogger<NatsNotificationChangeRelay> logger) : BackgroundService
 {
@@ -30,10 +30,7 @@ public sealed class NatsNotificationChangeRelay(
                     NoCtfMessageJsonContext.Default.NotificationChanged);
                 if (change?.Audiences is not { Length: > 0 }) continue;
 
-                await using var scope = scopes.CreateAsyncScope();
-                var users = await scope.ServiceProvider
-                    .GetRequiredService<NotificationChangeAudienceResolver>()
-                    .ResolveAsync(change.Audiences, stoppingToken);
+                var users = await audienceResolver.ResolveAsync(change.Audiences, stoppingToken);
                 if (users.Count == 0) continue;
                 await hub.Clients.Users(users.Select(id => id.ToString()).ToArray())
                     .NotificationChanged(stoppingToken);

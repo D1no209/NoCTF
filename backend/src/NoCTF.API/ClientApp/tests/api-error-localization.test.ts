@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from 'bun:test'
 import { parseApiError } from '../app/utils/api-error'
-import { setLocale } from '../app/utils/i18n'
+import { ensureLocaleDomains, setLocale } from '../app/utils/i18n'
 
 const apiPlugin = await Bun.file(new URL('../app/plugins/api.client.ts', import.meta.url)).text()
 
@@ -153,5 +153,16 @@ describe('api error localization', () => {
       status: 409,
       code: 'WriteUpSubmissionDeadlinePassed',
     }).message).toBe('题解提交期限已结束，无法提交或替换。')
+  })
+
+  test('explains the renewal window for player and administrator conflicts', async () => {
+    setLocale('zh-CN')
+    await ensureLocaleDomains(['runtime'])
+    expect(parseApiError({ status: 409, code: 'RuntimeExtensionTooEarly' }).message)
+      .toBe('仅在容器到期前最后 10 分钟可续期。')
+    expect(parseApiError({
+      status: 409,
+      message: 'Runtime renewal is available only during the final ten minutes before expiration.',
+    }).message).toBe('仅在容器到期前最后 10 分钟可续期。')
   })
 })

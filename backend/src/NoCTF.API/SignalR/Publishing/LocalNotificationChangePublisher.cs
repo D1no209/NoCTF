@@ -7,7 +7,7 @@ namespace NoCTF.API.SignalR.Publishing;
 
 /// <summary>Development single-process equivalent of the NATS fanout path.</summary>
 public sealed class LocalNotificationChangePublisher(
-    IServiceScopeFactory scopes,
+    NotificationChangeAudienceResolver audienceResolver,
     IHubContext<NotificationHub, INotificationHubClient> hub)
     : INotificationChangePublisher
 {
@@ -15,10 +15,7 @@ public sealed class LocalNotificationChangePublisher(
         NotificationChanged change,
         CancellationToken cancellationToken)
     {
-        await using var scope = scopes.CreateAsyncScope();
-        var users = await scope.ServiceProvider
-            .GetRequiredService<NotificationChangeAudienceResolver>()
-            .ResolveAsync(change.Audiences, cancellationToken);
+        var users = await audienceResolver.ResolveAsync(change.Audiences, cancellationToken);
         if (users.Count == 0) return;
         await hub.Clients.Users(users.Select(id => id.ToString()).ToArray())
             .NotificationChanged(cancellationToken);

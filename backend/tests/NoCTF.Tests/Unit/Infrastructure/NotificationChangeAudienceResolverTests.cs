@@ -33,7 +33,8 @@ public sealed class NotificationChangeAudienceResolverTests
             User(unrelatedId, "unrelated", UserRole.User, UserAccountStatus.Active));
         await db.SaveChangesAsync();
 
-        var recipients = await new NotificationChangeAudienceResolver(db).ResolveAsync(
+        var recipients = await new NotificationChangeAudienceResolver(
+            new TestDbContextFactory(options)).ResolveAsync(
             [new(NotificationTargetType.User, directId),
                 new(NotificationTargetType.PlatformAdministrators, Notification.PlatformAdministratorsTargetId)],
             CancellationToken.None);
@@ -117,7 +118,8 @@ public sealed class NotificationChangeAudienceResolverTests
         });
         await db.SaveChangesAsync();
 
-        var recipients = await new NotificationChangeAudienceResolver(db).ResolveAsync(
+        var recipients = await new NotificationChangeAudienceResolver(
+            new TestDbContextFactory(options)).ResolveAsync(
             [new(NotificationTargetType.CompetitionCollaborators, competitionId),
                 new(NotificationTargetType.CompetitionParticipants, competitionId)],
             CancellationToken.None);
@@ -125,7 +127,8 @@ public sealed class NotificationChangeAudienceResolverTests
         await Assert.That(recipients).IsEquivalentTo(
             [ownerId, managerId, captainId, memberId]);
 
-        var threadRecipients = await new NotificationChangeAudienceResolver(db).ResolveAsync(
+        var threadRecipients = await new NotificationChangeAudienceResolver(
+            new TestDbContextFactory(options)).ResolveAsync(
             [new(NotificationTargetType.TeamMembers, teamId, threadRootId)],
             CancellationToken.None);
         await Assert.That(threadRecipients).IsEquivalentTo(
@@ -145,4 +148,10 @@ public sealed class NotificationChangeAudienceResolverTests
         CreatedAt = DateTimeOffset.UtcNow,
         UpdatedAt = DateTimeOffset.UtcNow
     };
+
+    private sealed class TestDbContextFactory(DbContextOptions<NoCtfDbContext> options)
+        : IDbContextFactory<NoCtfDbContext>
+    {
+        public NoCtfDbContext CreateDbContext() => new(options);
+    }
 }

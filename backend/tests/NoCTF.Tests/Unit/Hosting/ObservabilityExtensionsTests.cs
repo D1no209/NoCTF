@@ -13,8 +13,10 @@ public sealed class ObservabilityExtensionsTests
     [Arguments("Microsoft.EntityFrameworkCore.Query", LogLevel.Warning, true)]
     [Arguments("Microsoft.EntityFrameworkCore.Update", LogLevel.Error, true)]
     [Arguments("Microsoft.EntityFrameworkCore.Query", LogLevel.Information, false)]
+    [Arguments("Microsoft.Extensions.Diagnostics.HealthChecks.DefaultHealthCheckService", LogLevel.Error, false)]
+    [Arguments("Microsoft.Extensions.Diagnostics.HealthChecks.DefaultHealthCheckService", LogLevel.Critical, true)]
     [Arguments(null, LogLevel.Warning, true)]
-    public async Task Platform_log_filter_keeps_application_information_and_all_warnings(
+    public async Task Platform_log_filter_keeps_application_information_and_actionable_warnings(
         string? category,
         LogLevel level,
         bool expected)

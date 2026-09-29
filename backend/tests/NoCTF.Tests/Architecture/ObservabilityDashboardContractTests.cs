@@ -62,7 +62,7 @@ public sealed class ObservabilityDashboardContractTests
             await Assert.That(target.GetProperty("range").GetBoolean()).IsFalse();
         }
 
-        foreach (var panelId in Enumerable.Range(47, 15))
+        foreach (var panelId in Enumerable.Range(47, 19))
             await Assert.That(panels.Any(panel =>
                 panel.GetProperty("id").GetInt32() == panelId)).IsTrue();
 
@@ -72,9 +72,45 @@ public sealed class ObservabilityDashboardContractTests
             .Contains("noctf_runtime_mutation_failures_total");
         await Assert.That(Query(Panel(panels, 60)))
             .Contains("noctf_webhook_materialization_races_total");
+        await Assert.That(Query(Panel(panels, 8))).Contains(">= 20");
+        await Assert.That(Query(Panel(panels, 63)))
+            .Contains("noctf_webhook_recovery_scans_total");
+        await Assert.That(Query(Panel(panels, 64)))
+            .Contains("noctf_api_requests_total");
+        await Assert.That(Query(Panel(panels, 65)))
+            .Contains("noctf_webhook_recovery_scan_duration_seconds_bucket");
 
         await Assert.That(root.GetProperty("links").EnumerateArray().Any(link =>
             link.GetProperty("url").GetString() == "/d/noctf-logs")).IsTrue();
+        await Assert.That(root.GetProperty("links").EnumerateArray().Any(link =>
+            link.GetProperty("url").GetString() == "/d/noctf-cap")).IsTrue();
+    }
+
+    [Test]
+    public async Task Cap_dashboard_separates_provider_latency_from_browser_solve_time()
+    {
+        using var document = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(
+            RepositoryRoot, "deploy", "observability", "grafana", "dashboards",
+            "noctf-cap.json")));
+        var panels = document.RootElement.GetProperty("panels").EnumerateArray().ToArray();
+
+        await Assert.That(Query(Panel(panels, 7)))
+            .Contains("noctf_cap_siteverify_duration_seconds_bucket");
+        await Assert.That(Query(Panel(panels, 9)))
+            .Contains("noctf_cap_verified_today");
+        await Assert.That(Query(Panel(panels, 10)))
+            .Contains("noctf_cap_average_solve_duration_seconds");
+        await Assert.That(Query(Panel(panels, 11)))
+            .Contains("probe_duration_seconds");
+        await Assert.That(Query(Panel(panels, 12)))
+            .Contains("redis_memory_used_bytes{job=\"cap-valkey\"}");
+        await Assert.That(Query(Panel(panels, 15)))
+            .Contains("noctf_cap_siteverify_failures_total");
+
+        var dashboard = await File.ReadAllTextAsync(Path.Combine(
+            RepositoryRoot, "deploy", "observability", "grafana", "dashboards",
+            "noctf-cap.json"));
+        await Assert.That(dashboard).DoesNotContain("siteKey").And.DoesNotContain("token");
     }
 
     [Test]

@@ -4,5 +4,9 @@
   labels:
     probe_scope: noctf
 
-# Add public NoCTF or Cap HTTP(S) URLs here when external probing is required.
+- targets:
+    - http://cap:3000/
+  labels:
+    probe_scope: cap
+
 # Never place Cap secrets or siteverify request bodies in this file.

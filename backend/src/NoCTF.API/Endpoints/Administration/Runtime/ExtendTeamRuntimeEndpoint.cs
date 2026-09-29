@@ -40,7 +40,7 @@ public sealed class ExtendTeamRuntimeEndpoint(
         Summary(summary =>
         {
             summary.Summary = "Extends a running team runtime.";
-            summary.Description = "Uses the normal runtime state machine and does not bypass TTL or mode policy.";
+            summary.Description = "Uses the normal runtime state machine and permits renewal only during the final ten minutes before expiry.";
         });
     }
 

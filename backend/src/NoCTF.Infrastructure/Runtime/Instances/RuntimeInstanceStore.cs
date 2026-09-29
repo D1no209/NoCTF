@@ -357,6 +357,9 @@ public sealed class RuntimeInstanceStore(
             case RuntimeAction.Extend:
                 if (current is null || current.State != RuntimeState.Running || current.ExpiresAt is null)
                     return new(null, RuntimeMutationFailure.InvalidState);
+                if (current.ExpiresAt > command.Now
+                    && !RuntimeExtensionPolicy.IsWithinRenewalWindow(current.ExpiresAt, command.Now))
+                    return new(null, RuntimeMutationFailure.ExtensionTooEarly);
                 var extendedExpiry = RuntimeExtensionPolicy.CalculateExpiry(
                     current.ExpiresAt, command.Now, command.Extension);
                 if (extendedExpiry is null)

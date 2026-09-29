@@ -146,6 +146,9 @@ public sealed class ChallengeTestRuntimeStore(
                 {
                     return new(null, RuntimeMutationFailure.InvalidState);
                 }
+                if (current.ExpiresAt > command.Now
+                    && !RuntimeExtensionPolicy.IsWithinRenewalWindow(current.ExpiresAt, command.Now))
+                    return new(null, RuntimeMutationFailure.ExtensionTooEarly);
                 var extendedExpiry = RuntimeExtensionPolicy.CalculateExpiry(
                     current.ExpiresAt, command.Now, command.Extension);
                 if (extendedExpiry is null)

@@ -6,7 +6,7 @@ import { adminChallengeBankCreateTestRuntime, adminChallengeBankExtendTestRuntim
 import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeTestRuntimeAcceptedResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeTestRuntimeResponse, NoCtfapiEndpointsAdministrationChallengeBankRuntimeTestFlagStateProtocol } from '../../api'
 import type { ChallengeTestRuntimeLoadOutcome, ChallengeTestRuntimeMutationKind, PendingChallengeTestRuntimeMutation } from '../../utils/challenge-test-runtime-polling'
 import RuntimeAccessUrlComponent from '../challenges/RuntimeAccessUrl.vue'
-import { createRuntimeExtensionRequest, parseRuntimeExtensionMinutes } from '../../lib/runtime-extension'
+import { createRuntimeExtensionRequest, isRuntimeExtensionTooEarly, parseRuntimeExtensionMinutes } from '../../lib/runtime-extension'
 
 type TestRuntime = NoCtfapiEndpointsAdministrationChallengeBankChallengeTestRuntimeResponse
 
@@ -220,6 +220,8 @@ export function useChallengeTestRuntimePanel(props: Readonly<{
     const remaining = new Date(runtime.value.expiresAt).getTime() - now.value
     return remaining > 0
   })
+  const renewalTooEarly = computed(() => runtime.value?.state === 'Running'
+    && isRuntimeExtensionTooEarly(runtime.value.expiresAt, now.value))
   const extendMinutesInvalid = computed(() =>
     parseRuntimeExtensionMinutes(extendMinutes.value, 1440) === null)
   const validExtension = computed(() => canExtend.value && !busy.value
@@ -263,6 +265,7 @@ export function useChallengeTestRuntimePanel(props: Readonly<{
       copied,
       extendMinutes,
       extendMinutesInvalid,
+      renewalTooEarly,
       validExtension,
       timedOut,
       retryLoad,

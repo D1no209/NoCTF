@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { RuntimeCardViewState } from '~/features/challenges/useRuntimeCard'
 
 const viewProps = defineProps<{ state: RuntimeCardViewState }>()
-const { runnerFailureLabel, canStop, stopDisabled, runtime, loading, loadError, extendMinutes, extendMinutesInvalid, canExtend, polling, timedOut, retryLoad, start, stop, reset, extend, ttl, isRunning, busy, stateVariant, RuntimeAccessUrl, controls, dockTarget } = toRefs(viewProps.state)
+const { runnerFailureLabel, canStop, stopDisabled, runtime, loading, loadError, extendMinutes, extendMinutesInvalid, renewalTooEarly, canExtend, polling, timedOut, retryLoad, start, stop, reset, extend, ttl, isRunning, busy, stateVariant, RuntimeAccessUrl, controls, dockTarget } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -55,7 +55,8 @@ const { runnerFailureLabel, canStop, stopDisabled, runtime, loading, loadError, 
           <Button v-if="runtime && controls !== 'readonly'" variant="outline" :disabled="busy" @click="reset">
             <Spinner v-if="polling" data-icon="inline-start" /> {{ $t('ui.resetEnvironment') }} </Button>
           <template v-if="controls === 'full' && isRunning">
-            <div class="flex items-start gap-2">
+            <div class="flex flex-col gap-1">
+              <div class="flex items-start gap-2">
               <Field class="w-36 shrink-0" :data-invalid="extendMinutesInvalid">
                 <FieldLabel :for="`runtime-extend-${runtime?.id}`" class="sr-only">{{ $t('ui.renewalMinutes2') }}</FieldLabel>
                 <NumberInput
@@ -70,6 +71,8 @@ const { runnerFailureLabel, canStop, stopDisabled, runtime, loading, loadError, 
                 <FieldDescription v-if="extendMinutesInvalid">{{ $t('ui.renewalMinutesRange', { max: 720 }) }}</FieldDescription>
               </Field>
               <Button variant="outline" :disabled="!canExtend" @click="extend">{{ $t('ui.renewalMinutes') }}</Button>
+              </div>
+              <FieldDescription v-if="renewalTooEarly">{{ $t('ui.renewalAvailableInFinalTenMinutes') }}</FieldDescription>
             </div>
           </template>
         </div>

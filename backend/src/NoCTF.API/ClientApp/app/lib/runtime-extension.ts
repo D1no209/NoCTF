@@ -3,6 +3,18 @@ export interface RuntimeExtensionRequest {
   expiresAt: string
 }
 
+export const RUNTIME_RENEWAL_WINDOW_MS = 10 * 60_000
+
+export function isRuntimeExtensionWindowOpen(currentExpiry: string | null | undefined, now: number): boolean {
+  const expiry = currentExpiry ? Date.parse(currentExpiry) : Number.NaN
+  return Number.isFinite(expiry) && expiry > now && expiry - now <= RUNTIME_RENEWAL_WINDOW_MS
+}
+
+export function isRuntimeExtensionTooEarly(currentExpiry: string | null | undefined, now: number): boolean {
+  const expiry = currentExpiry ? Date.parse(currentExpiry) : Number.NaN
+  return Number.isFinite(expiry) && expiry - now > RUNTIME_RENEWAL_WINDOW_MS
+}
+
 export function parseRuntimeExtensionMinutes(value: unknown, maximum: number): number | null {
   if (value === '' || value === null || value === undefined) return null
   const minutes = typeof value === 'number' || typeof value === 'string'
@@ -20,8 +32,8 @@ export function createRuntimeExtensionRequest(
   maximum: number,
 ): RuntimeExtensionRequest | null {
   const minutes = parseRuntimeExtensionMinutes(value, maximum)
-  const expiry = currentExpiry ? Date.parse(currentExpiry) : Number.NaN
-  if (minutes === null || !Number.isFinite(expiry) || expiry <= now) return null
+  if (minutes === null || !isRuntimeExtensionWindowOpen(currentExpiry, now)) return null
+  const expiry = Date.parse(currentExpiry ?? '')
   try {
     return { minutes, expiresAt: new Date(expiry + minutes * 60_000).toISOString() }
   }

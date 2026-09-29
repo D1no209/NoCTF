@@ -56,6 +56,15 @@ public static class HumanVerificationInfrastructure
             });
         services.AddSingleton<ICapWorkloadConfigurationClient,
             CapWorkloadConfigurationClient>();
+        services.AddHttpClient(CapTelemetryReader.ClientName, client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(5);
+            client.MaxResponseContentBufferSize = 128 * 1024;
+        }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+        {
+            AllowAutoRedirect = false
+        });
+        services.AddSingleton<ICapTelemetryReader, CapTelemetryReader>();
         services.AddScoped<ManageCapWorkloadConfiguration>();
         services.AddHttpClient(CapHumanVerificationConfigurationProbe.ClientName,
                 client =>

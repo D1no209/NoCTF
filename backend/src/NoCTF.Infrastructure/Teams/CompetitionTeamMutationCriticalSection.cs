@@ -12,6 +12,7 @@ internal static class CompetitionTeamMutationCriticalSection
         CancellationToken cancellationToken)
         => db.Competitions.IgnoreAutoIncludes()
             .Include(competition => competition.Tracks)
+            .Include(competition => competition.ModeConfiguration)
             .AsSplitQuery()
             .SingleOrDefaultAsync(
             competition => competition.Id == competitionId,

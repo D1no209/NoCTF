@@ -1,8 +1,10 @@
 using System.Net.Http.Json;
+using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using NoCTF.Application.Admission;
+using NoCTF.Application.Observability;
 using NoCTF.Domain.Platform;
 using Polly.CircuitBreaker;
 using Polly.Timeout;
@@ -28,13 +30,16 @@ public sealed class HttpHumanVerificationVerifier(
             || options.Provider == HumanVerificationProvider.None)
             return HumanVerificationResult.Verified;
 
+        var started = Stopwatch.GetTimestamp();
+        var outcome = HumanVerificationResult.Unavailable;
         try
         {
-            return options.Provider switch
+            outcome = options.Provider switch
             {
                 HumanVerificationProvider.Cap => await VerifyCapAsync(
                     options,
                     attempt.Token,
+                    attempt.Action,
                     cancellationToken),
                 HumanVerificationProvider.Turnstile => await VerifyTurnstileAsync(
                     options,
@@ -42,38 +47,80 @@ public sealed class HttpHumanVerificationVerifier(
                     cancellationToken),
                 _ => HumanVerificationResult.Unavailable
             };
+            return outcome;
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
+            if (options.Provider == HumanVerificationProvider.Cap)
+                NoCtfTelemetry.RecordCapSiteverifyFailure(
+                    attempt.Action, CapSiteverifyFailureReason.Timeout);
             LogUnavailable(options.Provider, attempt.Action, "timeout");
             return HumanVerificationResult.Unavailable;
         }
         catch (Exception exception) when (exception is HttpRequestException
                                           or JsonException
+                                          or NotSupportedException
                                           or TimeoutRejectedException
                                           or BrokenCircuitException)
         {
+            if (options.Provider == HumanVerificationProvider.Cap)
+                NoCtfTelemetry.RecordCapSiteverifyFailure(attempt.Action,
+                    exception switch
+                    {
+                        BrokenCircuitException => CapSiteverifyFailureReason.CircuitOpen,
+                        TimeoutRejectedException => CapSiteverifyFailureReason.Timeout,
+                        HttpRequestException => CapSiteverifyFailureReason.Transport,
+                        _ => CapSiteverifyFailureReason.InvalidResponse
+                    });
             LogUnavailable(options.Provider, attempt.Action, exception.GetType().Name);
             return HumanVerificationResult.Unavailable;
+        }
+        finally
+        {
+            if (options.Provider == HumanVerificationProvider.Cap
+                && !cancellationToken.IsCancellationRequested)
+                NoCtfTelemetry.RecordCapSiteverify(attempt.Action, outcome,
+                    Stopwatch.GetElapsedTime(started).TotalSeconds);
         }
     }
 
     private async Task<HumanVerificationResult> VerifyCapAsync(
         HumanVerificationOptions options,
         string token,
+        HumanVerificationAction action,
         CancellationToken cancellationToken)
     {
         using var response = await clients.CreateClient(ClientName).PostAsJsonAsync(
             new Uri(options.CapBackendApiEndpoint(), "siteverify"),
             new CapSiteverifyRequest(options.Cap.Secret, token),
             cancellationToken);
-        if ((int)response.StatusCode >= 500 || response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+        if ((int)response.StatusCode >= 500)
+        {
+            NoCtfTelemetry.RecordCapSiteverifyFailure(action,
+                CapSiteverifyFailureReason.UpstreamError);
             return HumanVerificationResult.Unavailable;
+        }
+        if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+        {
+            NoCtfTelemetry.RecordCapSiteverifyFailure(action,
+                CapSiteverifyFailureReason.RateLimited);
+            return HumanVerificationResult.Unavailable;
+        }
 
+        if (response.Content is null)
+        {
+            NoCtfTelemetry.RecordCapSiteverifyFailure(action,
+                CapSiteverifyFailureReason.InvalidResponse);
+            return HumanVerificationResult.Unavailable;
+        }
         var result = await response.Content.ReadFromJsonAsync<CapSiteverifyResponse>(
             cancellationToken: cancellationToken);
         if (result is null)
+        {
+            NoCtfTelemetry.RecordCapSiteverifyFailure(action,
+                CapSiteverifyFailureReason.InvalidResponse);
             return HumanVerificationResult.Unavailable;
+        }
         return result.Success
             ? HumanVerificationResult.Verified
             : HumanVerificationResult.Rejected;

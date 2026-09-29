@@ -31,6 +31,63 @@ public sealed class ChallengeTestRuntimePersistenceTests
 {
     [Test]
     [Timeout(300_000)]
+    public async Task Template_test_runtime_renews_only_during_final_ten_minutes(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+                .WithDatabase("noctf_test_runtime_renewal_window")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString(), npgsql => npgsql.MigrationsAssembly(
+                    typeof(NoCTF.Persistence.PostgreSql.PostgreSqlPersistence).Assembly.FullName))
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var fixture = await SeedAsync(options, cancellationToken);
+            await using var db = new NoCtfDbContext(options);
+            var runtime = RuntimeInstanceGeneratedCatalog.Create(RuntimePurpose.TemplateTest);
+            runtime.Id = Guid.CreateVersion7(fixture.Now.AddSeconds(1));
+            runtime.ChallengeId = fixture.ChallengeId;
+            runtime.RuntimeKind = RuntimeKind.Container;
+            runtime.RuntimeProvider = RuntimeProvider.Docker;
+            runtime.State = RuntimeState.Running;
+            runtime.CreatedAt = fixture.Now;
+            runtime.RunningAt = fixture.Now;
+            runtime.ExpiresAt = fixture.Now.AddMinutes(52);
+            db.RuntimeInstances.Add(runtime);
+            await db.SaveChangesAsync(cancellationToken);
+            var store = new ChallengeTestRuntimeStore(db,
+                new ChallengeRuntimeTemplateCatalog(),
+                new FixedRuntimePlacementPolicy(),
+                new RecordingOutbox());
+
+            var early = await store.MutateAsync(new(
+                fixture.ChallengeId, fixture.OwnerId, false,
+                RuntimeAction.Extend, TimeSpan.FromMinutes(30), fixture.Now),
+                cancellationToken);
+            await Assert.That(early.Failure)
+                .IsEqualTo(RuntimeMutationFailure.ExtensionTooEarly);
+            await db.Entry(runtime).ReloadAsync(cancellationToken);
+            await Assert.That(runtime.ExpiresAt).IsEqualTo(fixture.Now.AddMinutes(52));
+
+            runtime.ExpiresAt = fixture.Now.AddMinutes(9);
+            await db.SaveChangesAsync(cancellationToken);
+            var renewed = await store.MutateAsync(new(
+                fixture.ChallengeId, fixture.OwnerId, false,
+                RuntimeAction.Extend, TimeSpan.FromMinutes(30), fixture.Now),
+                cancellationToken);
+            await Assert.That(renewed.Failure).IsNull();
+            await Assert.That(renewed.Runtime?.ExpiresAt)
+                .IsEqualTo(fixture.Now.AddMinutes(39));
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task StartDispatchResetAndStop_KeepTemplateScopeAndDynamicFlagAtomic(
         CancellationToken cancellationToken)
     {
@@ -269,7 +326,9 @@ public sealed class ChallengeTestRuntimePersistenceTests
                 runtime => runtime.Id == queuedRuntimeId,
                 cancellationToken);
             await Assert.That(afterRace.State).IsEqualTo(RuntimeState.Stopped);
-            await Assert.That(raceCapacity.ClaimCount).IsEqualTo(0);
+            await Assert.That(afterRace.CapacityAllocations.Items).IsEmpty();
+            // Optimistic concurrency may inspect a queued snapshot and attempt a claim
+            // before the concurrent stop commits; only the persisted outcome is fenced.
         });
     }
 

@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { ChallengeTestRuntimePanelViewState } from '~/features/admin/useChallengeTestRuntimePanel'
 
 const viewProps = defineProps<{ state: ChallengeTestRuntimePanelViewState }>()
-const { Check, Clipboard, FlaskConical, RefreshCw, runtime, loading, loadError, copied, extendMinutes, extendMinutesInvalid, validExtension, timedOut, retryLoad, start, stop, reset, extend, copyTestFlag, active, canStart, busy, ttl, canExtend, stateVariant, flagVariant, flagStateLabel, RuntimeAccessUrl, definitionDirty } = toRefs(viewProps.state)
+const { Check, Clipboard, FlaskConical, RefreshCw, runtime, loading, loadError, copied, extendMinutes, extendMinutesInvalid, renewalTooEarly, validExtension, timedOut, retryLoad, start, stop, reset, extend, copyTestFlag, active, canStart, busy, ttl, canExtend, stateVariant, flagVariant, flagStateLabel, RuntimeAccessUrl, definitionDirty } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -110,7 +110,8 @@ const { Check, Clipboard, FlaskConical, RefreshCw, runtime, loading, loadError, 
         >
           <Spinner v-if="busy" data-icon="inline-start" />{{ $t('ui.resetTestContainer') }}
         </Button>
-        <div v-if="canExtend" class="flex items-start gap-2">
+        <div v-if="canExtend" class="flex flex-col gap-1">
+          <div class="flex items-start gap-2">
           <Field class="w-36 shrink-0" :data-invalid="extendMinutesInvalid">
             <FieldLabel :for="`test-runtime-extend-${runtime?.id}`" class="sr-only">{{ $t('ui.renewalMinutes2') }}</FieldLabel>
             <NumberInput :id="`test-runtime-extend-${runtime?.id}`" v-model="extendMinutes"
@@ -118,6 +119,8 @@ const { Check, Clipboard, FlaskConical, RefreshCw, runtime, loading, loadError, 
             <FieldDescription v-if="extendMinutesInvalid">{{ $t('ui.renewalMinutesRange', { max: 1440 }) }}</FieldDescription>
           </Field>
           <Button type="button" variant="outline" :disabled="!validExtension" @click="extend">{{ $t('ui.renewalMinutes') }}</Button>
+          </div>
+          <FieldDescription v-if="renewalTooEarly">{{ $t('ui.renewalAvailableInFinalTenMinutes') }}</FieldDescription>
         </div>
       </div>
     </template>

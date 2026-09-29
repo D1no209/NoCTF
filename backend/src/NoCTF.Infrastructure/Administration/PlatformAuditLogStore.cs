@@ -247,7 +247,8 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
                 {
                     SsoBindingAuditAction.Bound =>
                         PlatformAdministrationAction.SsoExternalIdentityBound,
-                    SsoBindingAuditAction.Unbound =>
+                    SsoBindingAuditAction.Unbound
+                        or SsoBindingAuditAction.AdministrativelyUnbound =>
                         PlatformAdministrationAction.SsoExternalIdentityUnbound,
                     _ => throw new InvalidOperationException(
                         $"Unsupported SSO binding audit action {bindingAction}.")

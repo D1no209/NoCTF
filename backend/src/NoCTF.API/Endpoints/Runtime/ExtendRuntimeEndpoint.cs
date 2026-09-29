@@ -40,7 +40,8 @@ public sealed class ExtendRuntimeEndpoint(
                 StatusCodes.Status409Conflict)
             .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
                 StatusCodes.Status503ServiceUnavailable));
-        Summary(summary => summary.Summary = "Extends a running CTF runtime.");
+        Summary(summary => summary.Summary =
+            "Extends a running CTF runtime during its final ten minutes.");
     }
 
     public override async Task<Results<Accepted<RuntimeAcceptedResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(
@@ -62,7 +63,9 @@ public sealed class ExtendRuntimeEndpoint(
             timeProvider.GetUtcNow()), ct);
         if (result.FailureCode is RuntimeMutationFailureCode.RuntimeNotFound or RuntimeMutationFailureCode.RuntimeActionUnsupported)
             return TypedResults.NotFound();
-        if (result.FailureCode is RuntimeMutationFailureCode.RuntimeStateConflict or RuntimeMutationFailureCode.RuntimeConflict)
+        if (result.FailureCode is RuntimeMutationFailureCode.RuntimeStateConflict
+            or RuntimeMutationFailureCode.RuntimeExtensionTooEarly
+            or RuntimeMutationFailureCode.RuntimeConflict)
             return TypedResults.Problem(
                 statusCode: StatusCodes.Status409Conflict,
                 title: "Runtime extension conflicts with its current state.",

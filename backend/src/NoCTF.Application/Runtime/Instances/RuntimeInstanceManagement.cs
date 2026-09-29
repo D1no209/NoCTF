@@ -70,6 +70,7 @@ public enum RuntimeMutationFailure
     NotFound,
     Unsupported,
     InvalidState,
+    ExtensionTooEarly,
     CapacityExceeded,
     Conflict,
     ConfigurationInvalid,
@@ -83,6 +84,7 @@ public enum RuntimeMutationFailureCode
     RuntimeNotFound,
     RuntimeActionUnsupported,
     RuntimeStateConflict,
+    RuntimeExtensionTooEarly,
     RuntimeCapacityExceeded,
     RuntimeConfigurationInvalid,
     RuntimeConflict
@@ -189,6 +191,7 @@ public sealed class MutatePlayerRuntime(IRuntimeInstanceStore store)
             RuntimeMutationFailure.NotFound => RuntimeMutationFailureCode.RuntimeNotFound,
             RuntimeMutationFailure.Unsupported => RuntimeMutationFailureCode.RuntimeActionUnsupported,
             RuntimeMutationFailure.InvalidState => RuntimeMutationFailureCode.RuntimeStateConflict,
+            RuntimeMutationFailure.ExtensionTooEarly => RuntimeMutationFailureCode.RuntimeExtensionTooEarly,
             RuntimeMutationFailure.CapacityExceeded => RuntimeMutationFailureCode.RuntimeCapacityExceeded,
             RuntimeMutationFailure.ConfigurationInvalid => RuntimeMutationFailureCode.RuntimeConfigurationInvalid,
             _ => RuntimeMutationFailureCode.RuntimeConflict
@@ -201,6 +204,8 @@ public sealed class MutatePlayerRuntime(IRuntimeInstanceStore store)
                 "This challenge does not support the requested runtime operation.",
             RuntimeMutationFailure.InvalidState =>
                 $"The runtime is not in a state that permits the requested {command.Action.ToString().ToLowerInvariant()} operation. Refresh the runtime status before retrying.",
+            RuntimeMutationFailure.ExtensionTooEarly =>
+                "Runtime renewal is available only during the final ten minutes before expiration.",
             RuntimeMutationFailure.CapacityExceeded =>
                 "No runner currently has enough capacity to start this runtime. Stop an unused runtime or try again later.",
             RuntimeMutationFailure.ConfigurationInvalid =>

@@ -1111,6 +1111,9 @@ public sealed class AdminRuntimeStore(
             if (teamId is null || current is null || current.State != RuntimeState.Running ||
                 current.ExpiresAt is null || extension is null || extension <= TimeSpan.Zero)
                 return new(null, RuntimeMutationFailure.InvalidState);
+            if (current.ExpiresAt > now
+                && !RuntimeExtensionPolicy.IsWithinRenewalWindow(current.ExpiresAt, now))
+                return new(null, RuntimeMutationFailure.ExtensionTooEarly);
             var extendedExpiry = RuntimeExtensionPolicy.CalculateExpiry(
                 current.ExpiresAt, now, extension);
             if (extendedExpiry is null)

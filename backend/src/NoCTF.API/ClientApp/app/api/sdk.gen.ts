@@ -463,7 +463,7 @@ export const stopRuntimeEndpoint = <ThrowOnError extends boolean = false>(option
 });
 
 /**
- * Extends a running CTF runtime.
+ * Extends a running CTF runtime during its final ten minutes.
  *
  * Executes PATCH /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes/{runtimeInstanceId}.
  */
@@ -2197,7 +2197,7 @@ export const adminStopTeamRuntime = <ThrowOnError extends boolean = false>(optio
 /**
  * Extends a running team runtime.
  *
- * Uses the normal runtime state machine and does not bypass TTL or mode policy.
+ * Uses the normal runtime state machine and permits renewal only during the final ten minutes before expiry.
  */
 export const adminExtendTeamRuntime = <ThrowOnError extends boolean = false>(options: Options<AdminExtendTeamRuntimeData, ThrowOnError>): RequestResult<AdminExtendTeamRuntimeResponses, AdminExtendTeamRuntimeErrors, ThrowOnError> => (options.client ?? client).patch<AdminExtendTeamRuntimeResponses, AdminExtendTeamRuntimeErrors, ThrowOnError>({
     security: [{
@@ -3911,7 +3911,7 @@ export const adminChallengeBankStopTestRuntime = <ThrowOnError extends boolean =
 });
 
 /**
- * Extends a nearly expired challenge-template test Runtime.
+ * Extends a challenge-template test Runtime during its final ten minutes.
  *
  * Executes PATCH /api/v1/admin/challenges/{challengeId}/test-runtimes/{runtimeInstanceId}.
  */

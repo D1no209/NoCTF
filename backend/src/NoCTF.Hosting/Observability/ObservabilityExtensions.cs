@@ -13,6 +13,7 @@ using OpenTelemetry.Trace;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Exporter;
 using NoCTF.Application.Administration.PlatformLogs;
+using NoCTF.Application.Admission;
 using NoCTF.Infrastructure.Observability;
 using NoCTF.Infrastructure.Caching;
 using ZiggyCreatures.Caching.Fusion;
@@ -36,6 +37,8 @@ public static class ObservabilityExtensions
         if (services.Any(descriptor => descriptor.ServiceType
                 == typeof(IDbContextFactory<NoCtfDbContext>)))
             services.AddHostedService<RuntimeWaitingMetricsAgent>();
+        if (services.Any(descriptor => descriptor.ServiceType == typeof(ICapTelemetryReader)))
+            services.AddHostedService<CapTelemetryAgent>();
         var openTelemetry = services.AddOpenTelemetry()
             .ConfigureResource(resource => resource
                 .AddService(serviceName, serviceVersion: ThisAssemblyVersion.Value)
@@ -116,10 +119,12 @@ public static class ObservabilityExtensions
     }
 
     internal static bool ShouldExportPlatformLog(string? category, LogLevel level) =>
-        level >= LogLevel.Warning
-        || category is not null
-            && category.StartsWith("NoCTF.", StringComparison.Ordinal)
-            && level >= LogLevel.Information;
+        category == "Microsoft.Extensions.Diagnostics.HealthChecks.DefaultHealthCheckService"
+            ? level >= LogLevel.Critical
+            : level >= LogLevel.Warning
+                || category is not null
+                    && category.StartsWith("NoCTF.", StringComparison.Ordinal)
+                    && level >= LogLevel.Information;
 
     internal static MeterProviderBuilder AddNoCtfDurationViews(this MeterProviderBuilder metrics)
     {
@@ -127,6 +132,7 @@ public static class ObservabilityExtensions
         foreach (var name in new[]
         {
             "noctf.api.request.duration",
+            "noctf.cap.siteverify.duration",
             "noctf.nats.operation.duration",
             "noctf.signalr.publish.duration", "noctf.runner.claim.duration",
             "noctf.leaderboard.projection.duration", "noctf.scheduler.rebuild.duration",
@@ -136,7 +142,8 @@ public static class ObservabilityExtensions
             "noctf.runtime.dispatch.stage.duration",
             "noctf.webhook.queue.age",
             "noctf.webhook.projection.wait",
-            "noctf.webhook.http.attempt.duration"
+            "noctf.webhook.http.attempt.duration",
+            "noctf.webhook.recovery.scan.duration"
         })
         {
             var view = new ExplicitBucketHistogramConfiguration

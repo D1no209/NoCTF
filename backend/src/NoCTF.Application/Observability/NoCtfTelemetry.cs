@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
+using NoCTF.Application.Admission;
 using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.Application.Observability;
@@ -31,6 +32,29 @@ public enum RunnerCapacityTransactionOperation
 {
     Claim,
     Release
+}
+
+public enum WebhookRecoveryScanKind
+{
+    Outbox,
+    Retry
+}
+
+public enum WebhookRecoveryScanOutcome
+{
+    Empty,
+    Work,
+    Failed
+}
+
+public enum CapSiteverifyFailureReason
+{
+    UpstreamError,
+    RateLimited,
+    Timeout,
+    Transport,
+    CircuitOpen,
+    InvalidResponse
 }
 
 public enum RuntimeOperationMetricKind
@@ -69,6 +93,12 @@ public static class NoCtfTelemetry
         "noctf.api.rate_limit.rejections", unit: "{request}");
     private static readonly Counter<long> HumanVerifications = Meter.CreateCounter<long>(
         "noctf.api.human_verification", unit: "{verification}");
+    private static readonly Histogram<double> CapSiteverifyDuration =
+        Meter.CreateHistogram<double>("noctf.cap.siteverify.duration", unit: "s");
+    private static readonly Counter<long> CapSiteverifyFailures =
+        Meter.CreateCounter<long>("noctf.cap.siteverify.failures", unit: "{failure}");
+    private static readonly Counter<long> CapTelemetryPolls =
+        Meter.CreateCounter<long>("noctf.cap.telemetry.polls", unit: "{poll}");
     private static readonly UpDownCounter<long> SignalRConnections = Meter.CreateUpDownCounter<long>(
         "noctf.signalr.connections", unit: "{connection}");
     private static readonly Histogram<double> SignalRPublishDuration = Meter.CreateHistogram<double>(
@@ -157,6 +187,10 @@ public static class NoCtfTelemetry
         "noctf.webhook.http.attempt.duration", unit: "s");
     private static readonly Counter<long> WebhookRetries = Meter.CreateCounter<long>(
         "noctf.webhook.retries", unit: "{retry}");
+    private static readonly Counter<long> WebhookRecoveryScans = Meter.CreateCounter<long>(
+        "noctf.webhook.recovery.scans", unit: "{scan}");
+    private static readonly Histogram<double> WebhookRecoveryScanDuration =
+        Meter.CreateHistogram<double>("noctf.webhook.recovery.scan.duration", unit: "s");
     private static readonly Counter<long> WebhookDeadLetters = Meter.CreateCounter<long>(
         "noctf.webhook.dead_letters", unit: "{delivery}");
     private static readonly Counter<long> WebhookMaterializationRaces =
@@ -169,6 +203,13 @@ public static class NoCtfTelemetry
     private static long webhookPendingCount;
     private static long webhookOldestPendingAgeSeconds;
     private static long webhookConsumerLag;
+    private static long capActive;
+    private static long capTelemetryAvailable;
+    private static long capVerifiedToday;
+    private static long capFailedToday;
+    private static long capRateLimitedToday;
+    private static long capObservedAtUnixSeconds;
+    private static double capAverageSolveDurationSeconds;
 
     static NoCtfTelemetry()
     {
@@ -192,6 +233,20 @@ public static class NoCtfTelemetry
             () => Volatile.Read(ref webhookOldestPendingAgeSeconds), unit: "s");
         Meter.CreateObservableGauge("noctf.webhook.consumer.lag",
             () => Volatile.Read(ref webhookConsumerLag), unit: "{event}");
+        Meter.CreateObservableGauge("noctf.cap.active",
+            () => Volatile.Read(ref capActive));
+        Meter.CreateObservableGauge("noctf.cap.telemetry.available",
+            () => Volatile.Read(ref capTelemetryAvailable));
+        Meter.CreateObservableGauge("noctf.cap.verified.today",
+            () => Volatile.Read(ref capVerifiedToday), unit: "{challenge}");
+        Meter.CreateObservableGauge("noctf.cap.failed.today",
+            () => Volatile.Read(ref capFailedToday), unit: "{challenge}");
+        Meter.CreateObservableGauge("noctf.cap.rate_limited.today",
+            () => Volatile.Read(ref capRateLimitedToday), unit: "{request}");
+        Meter.CreateObservableGauge("noctf.cap.average_solve.duration",
+            () => Volatile.Read(ref capAverageSolveDurationSeconds), unit: "s");
+        Meter.CreateObservableGauge("noctf.cap.telemetry.observed_at",
+            () => Volatile.Read(ref capObservedAtUnixSeconds), unit: "s");
     }
 
     public static void SetRuntimeWaitingSnapshot(long count, long oldestAgeSeconds)
@@ -221,6 +276,20 @@ public static class NoCtfTelemetry
     public static void RecordWebhookRetry(string stage) =>
         WebhookRetries.Add(1, new TagList { { "stage", stage } });
 
+    public static void RecordWebhookRecoveryScan(
+        WebhookRecoveryScanKind kind,
+        WebhookRecoveryScanOutcome outcome,
+        double elapsedSeconds)
+    {
+        var tags = new TagList
+        {
+            { "kind", kind.ToString().ToLowerInvariant() },
+            { "outcome", outcome.ToString().ToLowerInvariant() }
+        };
+        WebhookRecoveryScans.Add(1, tags);
+        WebhookRecoveryScanDuration.Record(elapsedSeconds, tags);
+    }
+
     public static void RecordWebhookDeadLetter(string reason) =>
         WebhookDeadLetters.Add(1, new TagList { { "reason", reason } });
 
@@ -244,6 +313,60 @@ public static class NoCtfTelemetry
             { "action", action.ToLowerInvariant() },
             { "outcome", outcome.ToLowerInvariant() }
         });
+
+    public static void RecordCapSiteverify(
+        HumanVerificationAction action,
+        HumanVerificationResult result,
+        double elapsedSeconds) =>
+        CapSiteverifyDuration.Record(elapsedSeconds, new TagList
+        {
+            { "action", action.ToString().ToLowerInvariant() },
+            { "outcome", result.ToString().ToLowerInvariant() }
+        });
+
+    public static void RecordCapSiteverifyFailure(
+        HumanVerificationAction action,
+        CapSiteverifyFailureReason reason) =>
+        CapSiteverifyFailures.Add(1, new TagList
+        {
+            { "action", action.ToString().ToLowerInvariant() },
+            { "reason", reason.ToString().ToLowerInvariant() }
+        });
+
+    public static void SetCapTelemetryActive(bool active) =>
+        Volatile.Write(ref capActive, active ? 1 : 0);
+
+    public static void RecordCapTelemetryPoll(CapTelemetryReadOutcome outcome) =>
+        CapTelemetryPolls.Add(1, new TagList
+        {
+            { "outcome", outcome.ToString().ToLowerInvariant() }
+        });
+
+    public static void SetCapTelemetryUnavailable() =>
+        Volatile.Write(ref capTelemetryAvailable, 0);
+
+    public static void ClearCapTelemetrySnapshot()
+    {
+        Volatile.Write(ref capTelemetryAvailable, 0);
+        Volatile.Write(ref capVerifiedToday, 0);
+        Volatile.Write(ref capFailedToday, 0);
+        Volatile.Write(ref capRateLimitedToday, 0);
+        Volatile.Write(ref capAverageSolveDurationSeconds, 0);
+        Volatile.Write(ref capObservedAtUnixSeconds, 0);
+    }
+
+    public static void SetCapTelemetrySnapshot(
+        CapDailyTelemetry snapshot,
+        DateTimeOffset observedAt)
+    {
+        Volatile.Write(ref capVerifiedToday, snapshot.Verified);
+        Volatile.Write(ref capFailedToday, snapshot.Failed);
+        Volatile.Write(ref capRateLimitedToday, snapshot.RateLimited);
+        Volatile.Write(ref capAverageSolveDurationSeconds,
+            snapshot.AverageSolveDurationSeconds);
+        Volatile.Write(ref capObservedAtUnixSeconds, observedAt.ToUnixTimeSeconds());
+        Volatile.Write(ref capTelemetryAvailable, 1);
+    }
 
     public static void SignalRConnected(string endpoint) =>
         SignalRConnections.Add(1, new TagList { { "endpoint", endpoint } });
