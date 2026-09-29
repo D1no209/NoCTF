@@ -92,6 +92,60 @@ public sealed class GitOpsApiOpenApiContractTests
             .IsEqualTo("guid");
     }
 
+    [Test]
+    public async Task GitOps_writes_use_typed_definition_and_rules_contracts()
+    {
+        using var swagger = await ReadSwaggerAsync();
+        var root = swagger.RootElement;
+
+        var createTemplate = RequestSchema(root, "/api/v1/admin/challenges", "post");
+        await Assert.That(PropertyNames(createTemplate)).Contains("definition");
+        await Assert.That(PropertyNames(createTemplate)).DoesNotContain("definitionJson");
+        var definition = ResolveSchema(root,
+            createTemplate.GetProperty("properties").GetProperty("definition"));
+        await Assert.That(RequiredPropertyNames(definition)).Contains("mode");
+        await Assert.That(PropertyNames(definition)).Contains("ctf");
+        await Assert.That(PropertyNames(definition)).Contains("awd");
+        await Assert.That(PropertyNames(definition)).Contains("awdp");
+        await Assert.That(PropertyNames(definition)).Contains("koh");
+
+        var patchTemplate = RequestSchema(
+            root, "/api/v1/admin/challenges/{challengeId}", "patch");
+        var content = ResolveSchema(root,
+            patchTemplate.GetProperty("properties").GetProperty("content"));
+        await Assert.That(PropertyNames(content)).Contains("definition");
+        await Assert.That(PropertyNames(content)).DoesNotContain("definitionJson");
+
+        var challengeDetail = ResponseSchema(root,
+            "/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}",
+            "get", "200");
+        await Assert.That(PropertyNames(challengeDetail)).Contains("rules");
+        await Assert.That(PropertyNames(challengeDetail)).DoesNotContain("rulesJson");
+
+        var patchChallenge = RequestSchema(root,
+            "/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}",
+            "patch");
+        var rulesPatch = ResolveSchema(root,
+            patchChallenge.GetProperty("properties").GetProperty("rules"));
+        await Assert.That(PropertyNames(rulesPatch)).IsEquivalentTo(["configuration"]);
+        await Assert.That(PropertyNames(rulesPatch)).DoesNotContain("json");
+        var rules = ResolveSchema(root,
+            rulesPatch.GetProperty("properties").GetProperty("configuration"));
+        await Assert.That(RequiredPropertyNames(rules)).Contains("mode");
+        await Assert.That(PropertyNames(rules)).Contains("ctf");
+        await Assert.That(PropertyNames(rules)).Contains("awd");
+        await Assert.That(PropertyNames(rules)).Contains("awdp");
+        await Assert.That(PropertyNames(rules)).Contains("koh");
+    }
+
+    private static JsonElement RequestSchema(JsonElement root, string path, string method)
+    {
+        var schema = root.GetProperty("paths").GetProperty(path).GetProperty(method)
+            .GetProperty("requestBody").GetProperty("content")
+            .GetProperty("application/json").GetProperty("schema");
+        return ResolveSchema(root, schema);
+    }
+
     private static JsonElement ResponseSchema(
         JsonElement root,
         string path,
@@ -107,10 +161,21 @@ public sealed class GitOpsApiOpenApiContractTests
 
     private static JsonElement ResolveSchema(JsonElement root, JsonElement schema)
     {
-        while (schema.TryGetProperty("$ref", out var reference))
+        while (true)
         {
-            schema = root.GetProperty("components").GetProperty("schemas")
-                .GetProperty(reference.GetString()!.Split('/')[^1]);
+            if (schema.TryGetProperty("$ref", out var reference))
+            {
+                schema = root.GetProperty("components").GetProperty("schemas")
+                    .GetProperty(reference.GetString()!.Split('/')[^1]);
+                continue;
+            }
+            if (schema.TryGetProperty("oneOf", out var oneOf)
+                && oneOf.GetArrayLength() == 1)
+            {
+                schema = oneOf[0];
+                continue;
+            }
+            break;
         }
         return schema;
     }

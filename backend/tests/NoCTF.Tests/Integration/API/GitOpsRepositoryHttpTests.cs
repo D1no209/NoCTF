@@ -5,10 +5,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using NoCTF.API.Composition;
 using NoCTF.API.Security;
@@ -18,6 +16,7 @@ using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
 using NoCTF.GameModes.Registration;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Persistence.PostgreSql;
 using NSubstitute;
 using Testcontainers.PostgreSql;
 
@@ -232,16 +231,14 @@ public sealed class GitOpsRepositoryHttpTests
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["OpenApi:Exporting"] = "true", ["Authentication:SigningKey"] = key,
-            ["RunnerScoring:SigningKey"] = key, ["Storage:LocalRoot"] = Path.Combine(temporary, "storage")
+            ["RunnerScoring:SigningKey"] = key, ["Storage:LocalRoot"] = Path.Combine(temporary, "storage"),
+            ["Database:Provider"] = "PostgreSql", ["ConnectionStrings:PostgreSql"] = connection
         });
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddScoped<IUserContext, HttpUserContext>();
+        builder.Services.AddNoCtfDatabaseProvider(builder.Configuration);
         builder.Services.AddNoCtfApi(builder.Configuration, includeInfrastructure: true, development: true,
             endpointAssemblies: [typeof(NoCTF.API.Endpoints.Administration.Competitions.GetAdminCompetitionEndpoint).Assembly]);
-        builder.Services.RemoveAll<NoCtfDbContext>();
-        builder.Services.RemoveAll<DbContextOptions<NoCtfDbContext>>();
-        builder.Services.RemoveAll<IDbContextOptionsConfiguration<NoCtfDbContext>>();
-        builder.Services.AddDbContext<NoCtfDbContext>(options => options.UseNpgsql(connection).UseSnakeCaseNamingConvention());
         builder.Services.AddSingleton(Substitute.For<IBackendMessagePublisher>());
         builder.Services.AddSingleton<TestFaults>();
         builder.Services.AddNoCtfAuthentication(builder.Configuration);
