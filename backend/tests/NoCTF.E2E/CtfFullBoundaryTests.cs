@@ -300,13 +300,13 @@ public sealed class CtfFullBoundaryTests
             {
                 id = challengeNodeId, kind = 0,
                 challenge = new { competitionChallengeId },
-                positionX = 0.0, positionY = 0.0
+                requiresPrerequisites = true
             },
             new
             {
                 id = badgeNodeId, kind = 1,
                 badge = new { competitionBadgeId = badgeId },
-                positionX = 240.0, positionY = 0.0
+                requiresPrerequisites = true
             }
         ];
         var graphEdges = new[]
