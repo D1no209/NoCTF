@@ -29,6 +29,48 @@ public sealed class RuntimeQuotaPersistenceTests
 {
     [Test]
     [Timeout(300_000)]
+    public async Task Admin_team_runtime_renews_only_during_final_ten_minutes(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+                .WithDatabase("noctf_admin_runtime_renewal_window")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var options = Options(postgres.GetConnectionString());
+            var fixture = await SeedAsync(options, [RuntimeState.Running], cancellationToken);
+            await using var db = new NoCtfDbContext(options);
+            var runtime = await db.RuntimeInstances.SingleAsync(cancellationToken);
+            runtime.ExpiresAt = fixture.Now.AddMinutes(52);
+            await db.SaveChangesAsync(cancellationToken);
+            var store = CreateAdminStore(db, new RecordingOutbox());
+            var teamId = fixture.Teams[0].TeamId;
+            var challengeId = fixture.ChallengeIds[0];
+
+            var early = await store.MutateAsync(
+                fixture.CompetitionId, challengeId, teamId, RuntimeAction.Extend,
+                TimeSpan.FromMinutes(30), fixture.Now, cancellationToken);
+            await Assert.That(early.Failure)
+                .IsEqualTo(RuntimeMutationFailure.ExtensionTooEarly);
+            await db.Entry(runtime).ReloadAsync(cancellationToken);
+            await Assert.That(runtime.ExpiresAt).IsEqualTo(fixture.Now.AddMinutes(52));
+
+            runtime.ExpiresAt = fixture.Now.AddMinutes(10);
+            await db.SaveChangesAsync(cancellationToken);
+            var renewed = await store.MutateAsync(
+                fixture.CompetitionId, challengeId, teamId, RuntimeAction.Extend,
+                TimeSpan.FromMinutes(30), fixture.Now, cancellationToken);
+            await Assert.That(renewed.Failure).IsNull();
+            await Assert.That(renewed.Runtime?.ExpiresAt)
+                .IsEqualTo(fixture.Now.AddMinutes(40));
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task Platform_runtime_inventory_lists_active_containers_across_competitions(
         CancellationToken cancellationToken)
     {

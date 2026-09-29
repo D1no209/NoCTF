@@ -1457,7 +1457,7 @@
         "tags": [
           "Competitions"
         ],
-        "summary": "Extends a running CTF runtime.",
+        "summary": "Extends a running CTF runtime during its final ten minutes.",
         "description": "Executes PATCH /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes/{runtimeInstanceId}.",
         "operationId": "ExtendRuntimeEndpoint",
         "parameters": [
@@ -7425,7 +7425,7 @@
           "Admin"
         ],
         "summary": "Extends a running team runtime.",
-        "description": "Uses the normal runtime state machine and does not bypass TTL or mode policy.",
+        "description": "Uses the normal runtime state machine and permits renewal only during the final ten minutes before expiry.",
         "operationId": "AdminExtendTeamRuntime",
         "parameters": [
           {
@@ -14655,7 +14655,7 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Extends a nearly expired challenge-template test Runtime.",
+        "summary": "Extends a challenge-template test Runtime during its final ten minutes.",
         "description": "Executes PATCH /api/v1/admin/challenges/{challengeId}/test-runtimes/{runtimeInstanceId}.",
         "operationId": "AdminChallengeBankExtendTestRuntime",
         "parameters": [

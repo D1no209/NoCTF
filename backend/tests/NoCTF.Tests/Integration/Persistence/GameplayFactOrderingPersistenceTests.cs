@@ -234,6 +234,8 @@ public sealed class GameplayFactOrderingPersistenceTests
 
             await using var verification = new NoCtfDbContext(options);
             var runtimes = await verification.RuntimeInstances.AsNoTracking()
+                .IgnoreAutoIncludes()
+                .Select(item => new { item.Id, item.State })
                 .ToDictionaryAsync(item => item.Id, cancellationToken);
             await Assert.That(runtimes[attackRuntimeId].State).IsEqualTo(RuntimeState.Stopping);
             if (mode == GameMode.Awdp)
@@ -416,7 +418,8 @@ public sealed class GameplayFactOrderingPersistenceTests
             var fixture = await SeedAsync(options, 1, cancellationToken);
             await using (var configure = new NoCtfDbContext(options))
             {
-                var competition = await configure.Competitions.SingleAsync(cancellationToken);
+                var competition = await configure.Competitions.AsSplitQuery()
+                    .SingleAsync(cancellationToken);
                 competition.HiddenStartAt = fixture.Now.AddSeconds(-1);
                 await configure.SaveChangesAsync(cancellationToken);
             }
@@ -455,7 +458,7 @@ public sealed class GameplayFactOrderingPersistenceTests
             var fixture = await SeedAsync(options, 2, cancellationToken);
             await using (var configure = new NoCtfDbContext(options))
             {
-                var competition = configure.Competitions.Single();
+                var competition = configure.Competitions.AsSplitQuery().Single();
                 competition.TracksEnabled = true;
                 competition.Tracks = CompetitionTrackConfiguration.ToPersisted(new(
                         [

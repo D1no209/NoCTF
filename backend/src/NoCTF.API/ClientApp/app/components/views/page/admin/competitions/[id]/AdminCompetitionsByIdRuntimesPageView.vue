@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdRuntimesPageViewState } from '~/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdRuntimesPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdRuntimesPageViewState }>()
-const { canWrite, isAdministrator, challengeOptions, teamOptions, runtimeTeamLabel, isPlayerManagedRuntime, challengeTitle, filterChallenge, filterTeam, filterState, filterKind, items, loading, listError, initialized, page, pageCount, total, pageLimit, loadPage, setPageSize, applyFilters, detail, detailOpen, detailLoading, openDetail, opMessage, isRuntimePending, isRuntimeOperationPending, runRuntimeOp, terminateDialog, terminatePending, canTerminate, submitTermination, forceTerminateDialog, forceTerminateReason, forceTerminateConfirmed, forceTerminatePending, openForceTermination, submitForceTermination, extendDialog, extendSeconds, extendPending, submitExtend, RuntimeAccessUrl, onClickFilterChallenge, onClickTerminateDialog, onClickExtendDialog, onUpdateOpenExtendDialog, onClickExtendDialog2, onUpdateOpenTerminateDialog, onUpdateOpenForceTerminateDialog } = toRefs(viewProps.state)
+const { canWrite, isAdministrator, challengeOptions, teamOptions, runtimeTeamLabel, isPlayerManagedRuntime, challengeTitle, filterChallenge, filterTeam, filterState, filterKind, items, loading, listError, initialized, page, pageCount, total, pageLimit, loadPage, setPageSize, applyFilters, detail, detailOpen, detailLoading, openDetail, opMessage, isRuntimePending, isRuntimeOperationPending, runRuntimeOp, terminateDialog, terminatePending, canTerminate, submitTermination, forceTerminateDialog, forceTerminateReason, forceTerminateConfirmed, forceTerminatePending, openForceTermination, submitForceTermination, extendDialog, extendSeconds, extendPending, canExtendRuntime, renewalHint, submitExtend, RuntimeAccessUrl, onClickFilterChallenge, onClickTerminateDialog, onClickExtendDialog, onUpdateOpenExtendDialog, onClickExtendDialog2, onUpdateOpenTerminateDialog, onUpdateOpenForceTerminateDialog } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -126,11 +126,13 @@ const { canWrite, isAdministrator, challengeOptions, teamOptions, runtimeTeamLab
                     @click="runRuntimeOp(rt, 'reset')"
                   >
                     <Spinner v-if="isRuntimeOperationPending(rt, 'reset')" data-icon="inline-start" /> {{ $t('ui.reset') }} </Button>
-                  <Button
-                    v-if="isPlayerManagedRuntime(rt) && rt.teamId && rt.state === 'Running'"
-                    variant="ghost" size="sm" :disabled="isRuntimePending(rt)"
-                    @click="onClickExtendDialog(rt)"
-                  >{{ $t('ui.renew') }}</Button>
+                  <Hint v-if="isPlayerManagedRuntime(rt) && rt.teamId && rt.state === 'Running'" :content="renewalHint(rt)">
+                    <span :tabindex="canExtendRuntime(rt) ? -1 : 0">
+                      <Button variant="ghost" size="sm"
+                        :disabled="isRuntimePending(rt) || !canExtendRuntime(rt)"
+                        @click="onClickExtendDialog(rt)">{{ $t('ui.renew') }}</Button>
+                    </span>
+                  </Hint>
                 </template>
               </div>
             </TableCell>
@@ -189,7 +191,7 @@ const { canWrite, isAdministrator, challengeOptions, teamOptions, runtimeTeamLab
         </FieldGroup>
         <DialogFooter>
           <Button variant="outline" @click="onClickExtendDialog2(null)">{{ $t('ui.cancel') }}</Button>
-          <Button :disabled="extendPending" @click="submitExtend">
+          <Button :disabled="extendPending || !extendDialog || !canExtendRuntime(extendDialog)" @click="submitExtend">
             <Spinner v-if="extendPending" data-icon="inline-start" /> {{ $t('ui.confirmRenewal') }} </Button>
         </DialogFooter>
       </DialogContent>

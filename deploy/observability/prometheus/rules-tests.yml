@@ -31,3 +31,61 @@ tests:
               severity: warning
             exp_annotations:
               summary: Leaderboard projection P95 exceeds two seconds
+
+  - name: Cap single slow siteverify does not alert
+    interval: 1m
+    input_series:
+      - series: 'noctf:cap_siteverify_duration:p95_5m'
+        values: '1.5 1.5 1.5 1.5 1.5 1.5'
+      - series: 'noctf:cap_siteverify_samples:count5m'
+        values: '1 1 1 1 1 1'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: NoCtfCapSiteverifySlow
+        exp_alerts: []
+
+  - name: Cap sustained slow siteverify alerts only with sufficient samples
+    interval: 1m
+    input_series:
+      - series: 'noctf:cap_siteverify_duration:p95_5m'
+        values: '1.5 1.5 1.5 1.5 1.5 1.5'
+      - series: 'noctf:cap_siteverify_samples:count5m'
+        values: '20 20 20 20 20 20'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: NoCtfCapSiteverifySlow
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: Cap siteverify P95 exceeds one second with sufficient samples
+
+  - name: Disabled Cap does not alert on an absent internal probe
+    interval: 1m
+    input_series:
+      - series: 'probe_success{job="blackbox",probe_scope="cap"}'
+        values: '0 0 0 0'
+      - series: 'noctf_cap_active{job="noctf"}'
+        values: '0 0 0 0'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: NoCtfCapProbeUnavailable
+        exp_alerts: []
+
+  - name: Enabled Cap alerts on a sustained internal probe failure
+    interval: 1m
+    input_series:
+      - series: 'probe_success{job="blackbox",probe_scope="cap"}'
+        values: '0 0 0 0'
+      - series: 'noctf_cap_active{job="noctf"}'
+        values: '1 1 1 1'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: NoCtfCapProbeUnavailable
+        exp_alerts:
+          - exp_labels:
+              job: blackbox
+              probe_scope: cap
+              severity: critical
+            exp_annotations:
+              summary: Cap internal HTTP target is unavailable

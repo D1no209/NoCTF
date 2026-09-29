@@ -19,6 +19,10 @@ groups:
         expr: sum(increase(noctf_gameplay_fact_processing_total{kind=~"flag|break",outcome="platform_error"}[5m])) / clamp_min(sum(increase(noctf_gameplay_fact_processing_total{kind=~"flag|break"}[5m])), 1)
       - record: noctf:human_verification_unavailable:rate5m
         expr: sum(rate(noctf_api_human_verification_total{outcome="unavailable"}[5m])) or vector(0)
+      - record: noctf:cap_siteverify_duration:p95_5m
+        expr: histogram_quantile(0.95, sum by (le) (rate(noctf_cap_siteverify_duration_seconds_bucket{outcome=~"verified|rejected"}[5m])))
+      - record: noctf:cap_siteverify_samples:count5m
+        expr: sum(increase(noctf_cap_siteverify_duration_seconds_count{outcome=~"verified|rejected"}[5m])) or vector(0)
       - record: noctf:jetstream_pending:sum
         expr: sum(max by (stream_name,consumer_name) (jetstream_consumer_num_pending{is_consumer_leader="true",stream_name=~"NOCTF_V2_.*"})) or vector(0)
       - record: noctf:jetstream_ack_pending:sum

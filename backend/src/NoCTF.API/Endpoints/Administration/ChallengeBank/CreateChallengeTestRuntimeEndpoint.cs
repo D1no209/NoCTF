@@ -90,6 +90,9 @@ internal static class ChallengeTestRuntimeMutationEndpoint
             timeProvider.GetUtcNow()), ct);
         if (result.Failure == RuntimeMutationFailure.NotFound)
             return TypedResults.NotFound();
+        if (result.Failure == RuntimeMutationFailure.ExtensionTooEarly)
+            return TypedResults.Conflict(new RuntimeConflictResponse(
+                "Runtime renewal is available only during the final ten minutes before expiration."));
         if (result.Runtime is null)
         {
             if (result.Failure is RuntimeMutationFailure.InvalidState or RuntimeMutationFailure.Conflict)

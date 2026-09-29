@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Diagnostics;
+using System.Data.Common;
 using System.Text.Json;
 using OpenTelemetry;
 using OpenTelemetry.Logs;
@@ -46,10 +47,21 @@ public sealed class RedactedPlatformLogProcessor(
             Microsoft.Extensions.Logging.LogLevel.Critical => PlatformLogLevel.Critical,
             _ => PlatformLogLevel.Information
         };
-        var message = Limit(SanitizeMessage(category,
-            record.FormattedMessage ?? record.Body, properties), 16_384);
-        if (record.EventId.Id == 20504 && ReadDiagnosticSource() is { } source)
-            message = Limit($"{message} Query source: {source}.", 16_384);
+        var message = (category, record.EventId.Id) switch
+        {
+            ("Microsoft.EntityFrameworkCore.Update", 10000) =>
+                "Database save failure details were suppressed before log export.",
+            ("Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddleware", 1) =>
+                "Unhandled request failure details were suppressed before log export.",
+            _ => Limit(SanitizeMessage(category,
+                record.FormattedMessage ?? record.Body, properties), 16_384)
+        };
+        if (ShouldIncludeDatabaseState(category, record.EventId.Id)
+            && ReadSqlState(record.Exception) is { } sqlState)
+            message = $"{message} SQLSTATE: {sqlState}.";
+        if (ShouldIncludeDiagnosticSource(category, record.EventId.Id)
+            && ReadDiagnosticSource() is { } source)
+            message = Limit($"{message} Operation source: {source}.", 16_384);
         // Exception.ToString() can embed EF command text, parameters, or provider
         // details. Preserve the type for diagnostics without exporting that payload.
         string? exceptionMessage = null;
@@ -112,6 +124,32 @@ public sealed class RedactedPlatformLogProcessor(
         if (string.IsNullOrWhiteSpace(source))
             return null;
         return Limit(source, 512);
+    }
+
+    private static bool ShouldIncludeDiagnosticSource(string category, int eventId) =>
+        category switch
+        {
+            "Microsoft.EntityFrameworkCore.Query" => eventId == 20504,
+            "Microsoft.EntityFrameworkCore.Database.Command" => eventId == 20102,
+            "Microsoft.EntityFrameworkCore.Update" => eventId == 10000,
+            "Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddleware" => eventId == 1,
+            _ => false
+        };
+
+    private static bool ShouldIncludeDatabaseState(string category, int eventId) =>
+        category == "Microsoft.EntityFrameworkCore.Database.Command" && eventId == 20102
+        || category == "Microsoft.EntityFrameworkCore.Update" && eventId == 10000;
+
+    private static string? ReadSqlState(Exception? exception)
+    {
+        for (var current = exception; current is not null; current = current.InnerException)
+        {
+            if (current is not DbException { SqlState: { Length: 5 } state }
+                || !state.All(char.IsAsciiLetterOrDigit))
+                continue;
+            return state;
+        }
+        return null;
     }
 
     private static string Limit(string value, int maximum) =>

@@ -88,6 +88,9 @@ internal static class AdminRuntimeMutation
             ct);
         if (result.Failure is RuntimeMutationFailure.NotFound or RuntimeMutationFailure.Unsupported)
             return TypedResults.NotFound();
+        if (result.Failure == RuntimeMutationFailure.ExtensionTooEarly)
+            return TypedResults.Conflict(new RuntimeConflictResponse(
+                "Runtime renewal is available only during the final ten minutes before expiration."));
         if (result.Runtime is null)
             return TypedResults.Conflict(new RuntimeConflictResponse(
                 "The Runtime state or competition policy does not allow this operation."));

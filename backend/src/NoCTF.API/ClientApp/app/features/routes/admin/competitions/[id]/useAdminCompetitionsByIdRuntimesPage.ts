@@ -10,6 +10,7 @@ import { createTrailingRefresh } from '../../../../../lib/latest-page-refresh'
 import { adminRuntimeTeamLabel } from '../../../../../utils/admin-runtime'
 import { createRuntimeOperationCoordinator, type RuntimeOperationKind, type RuntimeOperationToken } from '../../../../../lib/runtime-operation-coordinator'
 import { RUNTIME_STOP_POLL_DELAYS_MS, RUNTIME_STOP_POLL_MAX_INTERVAL_MS, RUNTIME_STOP_POLL_TIMEOUT_MS } from '../../../../../lib/runtime-stop-polling'
+import { isRuntimeExtensionTooEarly, isRuntimeExtensionWindowOpen } from '../../../../../lib/runtime-extension'
 import RuntimeAccessUrlComponent from '../../../../challenges/RuntimeAccessUrl.vue'
 
 /** Owns state, effects and commands for AdminCompetitionsByIdRuntimesPage. */
@@ -287,11 +288,35 @@ export function useAdminCompetitionsByIdRuntimesPage() {
 
   const extendSeconds = ref(1800)
 
+  const now = ref(Date.now())
+
+  let clockTimer: ReturnType<typeof setInterval> | undefined
+
+  function canExtendRuntime(rt: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse): boolean {
+    return rt.state === 'Running' && !!rt.teamId && isPlayerManagedRuntime(rt)
+      && isRuntimeExtensionWindowOpen(rt.expiresAt, now.value)
+  }
+
+  function renewalHint(rt: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse): string | null {
+    if (isRuntimeExtensionTooEarly(rt.expiresAt, now.value))
+      return translate('ui.renewalAvailableInFinalTenMinutes')
+    return !isRuntimeExtensionWindowOpen(rt.expiresAt, now.value)
+      ? translate('ui.expired') : null
+  }
+
   const extendPending = computed(() => isRuntimeOperationPending(extendDialog.value, 'extend'))
 
   async function submitExtend() {
     const rt = extendDialog.value
     if (!rt?.id || !rt.teamId || !rt.competitionChallengeId) return
+    if (!canExtendRuntime(rt)) {
+      toast.error(renewalHint(rt) ?? translate('ui.renewalFailed'))
+      return
+    }
+    if (!Number.isInteger(extendSeconds.value) || extendSeconds.value < 60) {
+      toast.error(translate('ui.renewalFailed'))
+      return
+    }
     const token = beginRuntimeOperation(rt, 'extend')
     if (!token) return
     try {
@@ -325,9 +350,13 @@ export function useAdminCompetitionsByIdRuntimesPage() {
   onMounted(() => {
     void loadRefs()
     void pagination.loadPage(1)
+    clockTimer = setInterval(() => { now.value = Date.now() }, 1000)
   })
 
-  onBeforeUnmount(() => runtimeOperations.cancelAll())
+  onBeforeUnmount(() => {
+    if (clockTimer) clearInterval(clockTimer)
+    runtimeOperations.cancelAll()
+  })
 
   const RuntimeAccessUrl = markRaw(RuntimeAccessUrlComponent)
 
@@ -375,6 +404,8 @@ export function useAdminCompetitionsByIdRuntimesPage() {
       extendDialog,
       extendSeconds,
       extendPending,
+      canExtendRuntime,
+      renewalHint,
       submitExtend,
       RuntimeAccessUrl
     }
@@ -389,6 +420,7 @@ export function useAdminCompetitionsByIdRuntimesPage() {
   }
 
   function onClickExtendDialog(rt: typeof viewState.extendDialog) {
+    if (rt && !canExtendRuntime(rt)) return
     viewState.extendDialog = rt; viewState.extendSeconds = 1800
   }
 

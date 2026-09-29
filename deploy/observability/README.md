@@ -45,7 +45,10 @@ The base NoCTF Compose enables the NATS monitoring listener on internal port
    This changes only the Linux memory-allocation policy. It does not modify
    Redis data and does not require a PostgreSQL restart.
 4. Confirm that NOCTF_NETWORK_NAME matches the network created by the NoCTF
-   core deployment.
+   core deployment. Start the separate Cap stack first: the observability stack
+   also joins its existing `noctf-cap-internal` network for the read-only Cap
+   Valkey exporter. It does not mount Cap data or connect to Valkey from the
+   NoCTF application.
 5. Validate and start the independent stack:
 
        docker compose --env-file deploy/observability/.env \
@@ -96,6 +99,30 @@ coordination latency, EF Core query-cache hit rate and ThreadPool queue length. 
 completion, compare intake stages, Wolverine execution/effective time and
 JetStream pending. Correlation suggests where to investigate; aggregate
 histograms alone do not identify an individual SQL statement or prove a cause.
+The dashboard suppresses the slow-route P95 ranking below 20 requests per
+selected window and compares REST, EF-query and Npgsql-command rates to reveal
+idle background scans. The Webhook recovery-scan panel separates empty scans
+from useful work; this is diagnostic only and does not change retry timing.
+
+`NoCTF · Cap 验证` is provisioned at `/d/noctf-cap`. A Blackbox probe checks
+Cap's private HTTP login page without issuing a challenge or submitting a
+token; it does not measure the public TLS proxy path.
+The pinned Cap Standalone image does not expose `/metrics`; the dashboard does
+not pretend that a successful login-page probe proves challenge verification.
+The separate standard Valkey exporter reads only server diagnostics on Cap's
+private network. NoCTF samples Cap's native `today` statistics through its
+existing dedicated management API key once per minute; site key, credentials,
+tokens, IPs and response payloads never become metric labels or logs. Cap's
+native `avgLatency` is the mean time from challenge issuance to successful
+redeem (including browser work); the NoCTF `siteverify` histogram measures
+server-to-server HTTP time. Neither is a browser P95 solve-time metric.
+Daily Cap counters reset at Cap's UTC day boundary and are exposed as gauges,
+not Prometheus counters. Check the telemetry-available flag and sample age
+before reading them. A management-API outage affects observability only, not
+verification or NoCTF readiness.
+Per-container Cap CPU/memory is not scraped: this design does not mount the
+Docker socket into an exporter. Use a bounded host-side diagnostic only when
+those resources become a demonstrated bottleneck.
 FusionCache panels show memory and distributed hit/miss rates by one of four fixed
 cache profiles; cache keys are never metric labels. A memory miss followed by a
 distributed hit is one read path, not two failed requests.
@@ -133,9 +160,9 @@ Run Docker Compose config validation, then use the pinned Prometheus image from
 
     promtool check config /etc/prometheus/prometheus.yml
 
-After startup, confirm that the noctf, postgres, redis, nats, node,
+After startup, confirm that the noctf, postgres, redis, cap-valkey, nats, node,
 blackbox-exporter, blackbox and loki targets are up. Grafana should provision the
-NoCTF Operations dashboard without requiring application API access.
+NoCTF performance and Cap dashboards without requiring application API access.
 
 When an operator needs an interactive PostgreSQL shell, expand environment
 variables inside the PostgreSQL container rather than passing Compose-style

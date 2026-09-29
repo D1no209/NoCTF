@@ -167,13 +167,13 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
 
     [Test]
     [Timeout(300_000)]
-    public async Task Running_runtime_can_extend_before_final_ten_minutes_without_losing_existing_time(
+    public async Task Running_runtime_extends_only_in_final_ten_minutes_without_losing_existing_time(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
             await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
-                .WithDatabase("noctf_ctf_runtime_early_extension")
+                .WithDatabase("noctf_ctf_runtime_renewal_window")
                 .WithUsername("postgres")
                 .WithPassword("postgres")
                 .Build();
@@ -214,13 +214,37 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
                 TimeSpan.FromMinutes(30),
                 fixture.Now), cancellationToken);
 
-            await Assert.That(result.Failure).IsNull();
-            await Assert.That(result.Runtime!.ExpiresAt).IsEqualTo(fixture.Now.AddMinutes(82));
+            await Assert.That(result.Failure).IsEqualTo(RuntimeMutationFailure.ExtensionTooEarly);
             await Assert.That(await db.RuntimeInstances.AsNoTracking()
                 .Where(runtime => runtime.Id == runtimeId)
                 .Select(runtime => runtime.ExpiresAt)
                 .SingleAsync(cancellationToken))
-                .IsEqualTo(fixture.Now.AddMinutes(82));
+                .IsEqualTo(fixture.Now.AddMinutes(52));
+
+            var tracked = await db.RuntimeInstances.SingleAsync(
+                runtime => runtime.Id == runtimeId, cancellationToken);
+            tracked.ExpiresAt = fixture.Now.AddMinutes(9);
+            await db.SaveChangesAsync(cancellationToken);
+
+            var nearExpiry = await store.MutatePlayerRuntimeAsync(new(
+                fixture.CompetitionId,
+                fixture.StartChallengeId,
+                fixture.UserId,
+                RuntimeAction.Extend,
+                TimeSpan.FromMinutes(30),
+                fixture.Now), cancellationToken);
+
+            await Assert.That(nearExpiry.Failure).IsNull();
+            await Assert.That(nearExpiry.Runtime!.ExpiresAt).IsEqualTo(fixture.Now.AddMinutes(39));
+            var repeated = await store.MutatePlayerRuntimeAsync(new(
+                fixture.CompetitionId,
+                fixture.StartChallengeId,
+                fixture.UserId,
+                RuntimeAction.Extend,
+                TimeSpan.FromMinutes(30),
+                fixture.Now), cancellationToken);
+            await Assert.That(repeated.Failure)
+                .IsEqualTo(RuntimeMutationFailure.ExtensionTooEarly);
         });
     }
 

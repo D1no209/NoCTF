@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Diagnostics;
+using System.Data.Common;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using NoCTF.Application.Administration.PlatformLogs;
@@ -34,7 +35,7 @@ public sealed class RedactedPlatformLogProcessorTests
         var stored = JsonSerializer.Deserialize(exporter.Body!,
             StoredPlatformLogJsonContext.Default.StoredPlatformLog);
         await Assert.That(stored!.View.Message)
-            .Contains("Query source: /api/v1/competitions/{competitionId}.");
+            .Contains("Operation source: /api/v1/competitions/{competitionId}.");
     }
 
     [Test]
@@ -64,6 +65,66 @@ public sealed class RedactedPlatformLogProcessorTests
             .IsEqualTo("Microsoft.EntityFrameworkCore.Database.Command");
         await Assert.That(stored.View.Message)
             .IsEqualTo("Database command details were suppressed before log export.");
+    }
+
+    [Test]
+    [Arguments("Microsoft.EntityFrameworkCore.Database.Command", 20102)]
+    [Arguments("Microsoft.EntityFrameworkCore.Update", 10000)]
+    [Arguments("Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddleware", 1)]
+    public async Task Failure_logs_include_only_the_bounded_diagnostic_source(
+        string category, int eventId)
+    {
+        var queue = new PlatformLogBroadcastQueue();
+        var exporter = new CaptureExporter();
+        using var factory = LoggerFactory.Create(builder => builder.AddOpenTelemetry(options =>
+        {
+            options.IncludeFormattedMessage = true;
+            options.AddProcessor(new RedactedPlatformLogProcessor(
+                queue, PlatformLogService.Api, NewProtector()));
+            options.AddProcessor(new SimpleLogRecordExportProcessor(exporter));
+        }));
+        using var activity = new Activity("request").Start();
+        activity.SetTag("noctf.endpoint", "/api/v1/competitions/{competitionId}/challenges");
+
+        factory.CreateLogger(category).LogError(
+            new EventId(eventId), "Failed executing SELECT secret_column FROM users.");
+
+        var stored = JsonSerializer.Deserialize(exporter.Body!,
+            StoredPlatformLogJsonContext.Default.StoredPlatformLog);
+        await Assert.That(stored!.View.Message)
+            .Contains("Operation source: /api/v1/competitions/{competitionId}/challenges.");
+        await Assert.That(exporter.Body!).DoesNotContain("SELECT secret_column");
+    }
+
+    [Test]
+    public async Task Database_update_log_exports_only_safe_sql_state_and_source()
+    {
+        var queue = new PlatformLogBroadcastQueue();
+        var exporter = new CaptureExporter();
+        using var factory = LoggerFactory.Create(builder => builder.AddOpenTelemetry(options =>
+        {
+            options.IncludeFormattedMessage = true;
+            options.AddProcessor(new RedactedPlatformLogProcessor(
+                queue, PlatformLogService.Worker, NewProtector()));
+            options.AddProcessor(new SimpleLogRecordExportProcessor(exporter));
+        }));
+        using var activity = new Activity("message").Start();
+        activity.SetTag("messaging.message.type", "NoCTF.Worker.DispatchRuntime");
+        var exception = new InvalidOperationException("SELECT secret FROM accounts",
+            new TestDatabaseException("40001", "password=super-secret"));
+
+        factory.CreateLogger("Microsoft.EntityFrameworkCore.Update").LogError(
+            new EventId(10000), exception, "Failed: SELECT secret FROM accounts");
+
+        var stored = JsonSerializer.Deserialize(exporter.Body!,
+            StoredPlatformLogJsonContext.Default.StoredPlatformLog);
+        await Assert.That(stored!.View.Message).Contains("SQLSTATE: 40001.");
+        await Assert.That(stored.View.Message)
+            .Contains("Operation source: NoCTF.Worker.DispatchRuntime.");
+        await Assert.That(exporter.Body!).DoesNotContain("SELECT secret");
+        await Assert.That(exporter.Body!).DoesNotContain("super-secret");
+        await Assert.That(stored.View.ExceptionType)
+            .IsEqualTo(typeof(InvalidOperationException).FullName);
     }
 
     [Test]
@@ -144,5 +205,11 @@ public sealed class RedactedPlatformLogProcessorTests
                 Body = record.Body;
             return ExportResult.Success;
         }
+    }
+
+    private sealed class TestDatabaseException(string state, string message)
+        : DbException(message)
+    {
+        public override string? SqlState => state;
     }
 }

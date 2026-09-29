@@ -23,6 +23,13 @@ The platform administrator page reads and updates the active Site Key through Ca
 
 NoCTF validates CORS, the local WASM asset, and `siteverify` once before enabling Cap or replacing the secret of an enabled Cap configuration. Runtime availability is observed through real verification metrics and the independent Prometheus/Blackbox stack; Cap remains excluded from NoCTF readiness so an outage cannot restart the API, Worker, or Runner.
 
+The observability stack probes Cap's private HTTP login page, scrapes the
+dedicated Valkey through a standard read-only exporter, and samples Cap's
+native daily statistics through the existing dedicated management API key.
+NoCTF records `siteverify` latency separately. No Cap database or Valkey keys
+are read by application telemetry, and no site key, secret, token or IP is a
+Prometheus label. See `/d/noctf-cap` in Grafana.
+
 ## Backup and upgrade
 
 Back up `/opt/noctf-cap/data/cap`, `/opt/noctf-cap/data/valkey`, the mode-`0600` environment file, and the Nginx configuration. Before an upgrade, stop writes, copy both data directories, build the exact reviewed upstream commit, and retain the previous image digest. Do not use `docker compose down -v`; this stack uses bind mounts, and their contents must be preserved.

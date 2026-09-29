@@ -3,7 +3,10 @@
   "editable": true,
   "graphTooltip": 1,
   "id": null,
-  "links": [{ "asDropdown": false, "icon": "external link", "includeVars": false, "keepTime": true, "tags": [], "targetBlank": false, "title": "日志诊断", "tooltip": "打开同一时间范围的日志", "type": "link", "url": "/d/noctf-logs" }],
+  "links": [
+    { "asDropdown": false, "icon": "external link", "includeVars": false, "keepTime": true, "tags": [], "targetBlank": false, "title": "日志诊断", "tooltip": "打开同一时间范围的日志", "type": "link", "url": "/d/noctf-logs" },
+    { "asDropdown": false, "icon": "external link", "includeVars": false, "keepTime": true, "tags": [], "targetBlank": false, "title": "Cap 验证", "tooltip": "查看人机验证与 Cap 依赖性能", "type": "link", "url": "/d/noctf-cap" }
+  ],
   "panels": [
     {
       "id": 1, "type": "stat", "title": "NoCTF 在线", "description": "1 表示 Prometheus 最近一次抓取 NoCTF 成功；0 表示目标不可达。",
@@ -52,10 +55,10 @@
       ]
     },
     {
-      "id": 8, "type": "table", "title": "最慢路由 Top 10（P95）", "description": "当前统计窗口内至少 3 次请求的路由快照；即时表格避免时序 TopK 产生系列漂移。",
+      "id": 8, "type": "table", "title": "最慢路由 Top 10（P95）", "description": "当前统计窗口内至少 20 次请求的路由快照；低样本 P95 不参与排名。",
       "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": { "defaults": { "unit": "s" } },
-      "targets": [{ "refId": "A", "expr": "topk(10, (histogram_quantile(0.95, sum by (le, endpoint) (rate(noctf_api_request_duration_seconds_bucket{request_kind=\"rest\",endpoint=~\"${route:regex}\"}[$window]))) > 0) and on (endpoint) (sum by (endpoint) (increase(noctf_api_request_duration_seconds_count{request_kind=\"rest\",endpoint=~\"${route:regex}\"}[$window])) >= 3))", "format": "table", "instant": true, "range": false }]
+      "targets": [{ "refId": "A", "expr": "topk(10, (histogram_quantile(0.95, sum by (le, endpoint) (rate(noctf_api_request_duration_seconds_bucket{request_kind=\"rest\",endpoint=~\"${route:regex}\"}[$window]))) > 0) and on (endpoint) (sum by (endpoint) (increase(noctf_api_request_duration_seconds_count{request_kind=\"rest\",endpoint=~\"${route:regex}\"}[$window])) >= 20))", "format": "table", "instant": true, "range": false }]
     },
     {
       "id": 9, "type": "table", "title": "每路由请求速率 Top 10", "description": "当前统计窗口最繁忙的 10 条规范路由；即时表格避免排名变化累积成过多系列。",
@@ -388,9 +391,9 @@
       "targets": [{ "refId": "A", "expr": "topk(20, sum by (operation, failure) (increase(noctf_runtime_mutation_failures_total[$window])))", "format": "table", "instant": true, "range": false }]
     },
     {
-      "id": 59, "type": "stat", "title": "24 小时数据库失败", "description": "Npgsql 报告的数据库命令失败近似数；须结合 Loki 分类判断可恢复竞争或真实故障。",
+      "id": 59, "type": "stat", "title": "24 小时数据库命令失败尝试", "description": "Npgsql 记录的失败命令尝试（包括随后成功重试的 40001 序列化冲突），不等于业务请求失败；需结合 Loki、重试耗尽与 HTTP 5xx 判断。",
       "gridPos": { "x": 0, "y": 180, "w": 8, "h": 5 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 1 }, { "color": "red", "value": 5 }] } } },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 } },
       "targets": [{ "refId": "A", "expr": "sum(increase(db_client_operation_failed_total{job=\"noctf\"}[24h])) or vector(0)", "instant": true, "range": false }]
     },
     {
@@ -404,6 +407,34 @@
       "gridPos": { "x": 16, "y": 180, "w": 8, "h": 5 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
       "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 } },
       "targets": [{ "refId": "A", "expr": "sum(increase(noctf_runtime_mutation_failures_total[24h])) or vector(0)", "instant": true, "range": false }]
+    },
+    {
+      "id": 62, "type": "timeseries", "title": "Cap siteverify P95", "description": "只在窗口至少 20 次 Cap 验证时显示 P95；日常低流量可到 Cap 专页查看样本和原生解题均值。",
+      "gridPos": { "x": 0, "y": 186, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [{ "refId": "A", "expr": "histogram_quantile(0.95, sum by (le) (rate(noctf_cap_siteverify_duration_seconds_bucket{outcome=~\"verified|rejected\"}[$window]))) and on() (sum(increase(noctf_cap_siteverify_duration_seconds_count{outcome=~\"verified|rejected\"}[$window])) >= 20)", "legendFormat": "P95" }]
+    },
+    {
+      "id": 63, "type": "timeseries", "title": "后台 Webhook 恢复扫描", "description": "区分 outbox/retry 的空扫、有效工作和失败；用于识别无待处理任务时的数据库查询开销。",
+      "gridPos": { "x": 12, "y": 186, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [{ "refId": "A", "expr": "sum by (kind, outcome) (rate(noctf_webhook_recovery_scans_total[$window]))", "legendFormat": "{{kind}} · {{outcome}}" }]
+    },
+    {
+      "id": 64, "type": "timeseries", "title": "API 请求与数据库操作速率", "description": "同窗口比较 REST 请求、EF 查询和 Npgsql 命令；后台扫描可使数据库操作远高于 HTTP 请求。三者不是同一种请求量。",
+      "gridPos": { "x": 0, "y": 194, "w": 24, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [
+        { "refId": "A", "expr": "sum(rate(noctf_api_requests_total{request_kind=\"rest\"}[$window])) or vector(0)", "legendFormat": "REST/s" },
+        { "refId": "B", "expr": "sum(rate(microsoft_entityframeworkcore_queries_total[$window])) or vector(0)", "legendFormat": "EF queries/s" },
+        { "refId": "C", "expr": "sum(rate(db_client_operation_duration_seconds_count{job=\"noctf\"}[$window])) or vector(0)", "legendFormat": "DB commands/s" }
+      ]
+    },
+    {
+      "id": 65, "type": "timeseries", "title": "Webhook 恢复扫描 P95", "description": "仅计领取待处理记录的扫描步骤，不包含实际 HTTP 投递；结合空扫速率和队列年龄判断数据库轮询成本。",
+      "gridPos": { "x": 0, "y": 202, "w": 24, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [{ "refId": "A", "expr": "histogram_quantile(0.95, sum by (le, kind) (rate(noctf_webhook_recovery_scan_duration_seconds_bucket[$window])))", "legendFormat": "{{kind}}" }]
     }
   ],
   "refresh": "30s",

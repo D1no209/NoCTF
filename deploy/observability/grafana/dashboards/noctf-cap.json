@@ -1,0 +1,129 @@
+{
+  "annotations": { "list": [] },
+  "editable": false,
+  "graphTooltip": 1,
+  "links": [
+    { "asDropdown": false, "icon": "external link", "includeVars": false, "keepTime": true, "tags": [], "targetBlank": false, "title": "平台性能", "type": "link", "url": "/d/noctf-performance" },
+    { "asDropdown": false, "icon": "external link", "includeVars": false, "keepTime": true, "tags": [], "targetBlank": false, "title": "日志诊断", "type": "link", "url": "/d/noctf-logs" }
+  ],
+  "panels": [
+    {
+      "id": 1, "type": "stat", "title": "Cap 内部入口", "description": "从独立 Blackbox 经 Cap 私有网络探测登录页；不调用需要令牌的挑战或 siteverify 接口。公网 TLS/代理另由 NoCTF 入口监测。",
+      "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] } } },
+      "targets": [{ "refId": "A", "expr": "min(probe_success{job=\"blackbox\",probe_scope=\"cap\"}) or vector(0)" }]
+    },
+    {
+      "id": 2, "type": "stat", "title": "平台验证启用", "description": "当前 NoCTF 配置中 Cap 是否启用；关闭时 Cap 可用性告警不代表登录受阻。",
+      "gridPos": { "x": 4, "y": 0, "w": 4, "h": 4 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "targets": [{ "refId": "A", "expr": "max(noctf_cap_active{job=\"noctf\"}) or vector(0)" }]
+    },
+    {
+      "id": 3, "type": "stat", "title": "Cap 原生统计可用", "description": "NoCTF 每分钟经受保护的管理 API 读取 Cap 汇总；失败时旧统计不应被当成实时值。",
+      "gridPos": { "x": 8, "y": 0, "w": 4, "h": 4 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] } } },
+      "targets": [{ "refId": "A", "expr": "max(noctf_cap_telemetry_available{job=\"noctf\"}) or vector(0)" }]
+    },
+    {
+      "id": 4, "type": "stat", "title": "Cap Valkey 指标", "description": "标准只读 exporter 的采集状态；与 Cap 的专用 Valkey 隔离。",
+      "gridPos": { "x": 12, "y": 0, "w": 4, "h": 4 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] } } },
+      "targets": [{ "refId": "A", "expr": "max(up{job=\"cap-valkey\"}) or vector(0)" }]
+    },
+    {
+      "id": 5, "type": "stat", "title": "siteverify 有效样本", "description": "只计 Cap 返回 verified/rejected 的 NoCTF 请求；unavailable 单独诊断。有效样本少于 20 时不展示 P95/P99。",
+      "gridPos": { "x": 16, "y": 0, "w": 4, "h": 4 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 } },
+      "targets": [{ "refId": "A", "expr": "sum(increase(noctf_cap_siteverify_duration_seconds_count{outcome=~\"verified|rejected\"}[$window])) or vector(0)" }]
+    },
+    {
+      "id": 6, "type": "stat", "title": "Cap 统计距上次成功", "description": "原生统计采集的新鲜度；可用性为 0 时持续增长。",
+      "gridPos": { "x": 20, "y": 0, "w": 4, "h": 4 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [{ "refId": "A", "expr": "time() - max(noctf_cap_telemetry_observed_at_seconds{job=\"noctf\"} > 0)" }]
+    },
+    {
+      "id": 7, "type": "timeseries", "title": "Cap siteverify 服务端耗时", "description": "NoCTF 到 Cap 的 HTTP 验证时长，仅统计 verified/rejected，排除快速断路错误；与浏览器 PoW 解题时间不同。P95/P99 至少需 20 个有效样本。",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        { "refId": "A", "expr": "histogram_quantile(0.50, sum by (le) (rate(noctf_cap_siteverify_duration_seconds_bucket{outcome=~\"verified|rejected\"}[$window])))", "legendFormat": "P50" },
+        { "refId": "B", "expr": "histogram_quantile(0.95, sum by (le) (rate(noctf_cap_siteverify_duration_seconds_bucket{outcome=~\"verified|rejected\"}[$window]))) and on() (sum(increase(noctf_cap_siteverify_duration_seconds_count{outcome=~\"verified|rejected\"}[$window])) >= 20)", "legendFormat": "P95" },
+        { "refId": "C", "expr": "histogram_quantile(0.99, sum by (le) (rate(noctf_cap_siteverify_duration_seconds_bucket{outcome=~\"verified|rejected\"}[$window]))) and on() (sum(increase(noctf_cap_siteverify_duration_seconds_count{outcome=~\"verified|rejected\"}[$window])) >= 20)", "legendFormat": "P99" }
+      ]
+    },
+    {
+      "id": 8, "type": "timeseries", "title": "NoCTF 验证结果", "description": "按 login/registration/runtime/evaluation 与 verified/rejected/unavailable 分组；缺令牌的本地拒绝也计入。",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [{ "refId": "A", "expr": "sum by (action, outcome) (rate(noctf_api_human_verification_total{provider=\"cap\"}[$window]))", "legendFormat": "{{action}} · {{outcome}}" }]
+    },
+    {
+      "id": 9, "type": "timeseries", "title": "Cap 今日挑战结果", "description": "Cap 原生统计：redeem 成功、失败及挑战生成限流。每日 UTC 边界重置；这些是 Gauge，不可直接套用 rate()。",
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 } },
+      "targets": [
+        { "refId": "A", "expr": "noctf_cap_verified_today{job=\"noctf\"}", "legendFormat": "verified" },
+        { "refId": "B", "expr": "noctf_cap_failed_today{job=\"noctf\"}", "legendFormat": "failed" },
+        { "refId": "C", "expr": "noctf_cap_rate_limited_today{job=\"noctf\"}", "legendFormat": "rate limited" }
+      ]
+    },
+    {
+      "id": 10, "type": "timeseries", "title": "Cap 平均浏览器解题耗时", "description": "Cap 原生 avgLatency：成功挑战从签发到 redeem 的当日平均值，含浏览器 PoW；不是 P95，也不是 siteverify HTTP 耗时。",
+      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [{ "refId": "A", "expr": "noctf_cap_average_solve_duration_seconds{job=\"noctf\"}", "legendFormat": "today mean" }]
+    },
+    {
+      "id": 11, "type": "timeseries", "title": "Cap 内部探测耗时", "description": "Cap 内部 HTTP 登录页 GET 的延迟；不含公网 TLS/代理，也不能单独证明站点密钥验证正常。",
+      "gridPos": { "x": 0, "y": 20, "w": 8, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [{ "refId": "A", "expr": "probe_duration_seconds{job=\"blackbox\",probe_scope=\"cap\"}", "legendFormat": "public Cap" }]
+    },
+    {
+      "id": 12, "type": "timeseries", "title": "Cap Valkey 内存", "description": "Cap 专用 Valkey 的服务端已用内存，不等于 Cap 容器进程内存。",
+      "gridPos": { "x": 8, "y": 20, "w": 8, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "bytes" } },
+      "targets": [{ "refId": "A", "expr": "redis_memory_used_bytes{job=\"cap-valkey\"}", "legendFormat": "used" }]
+    },
+    {
+      "id": 13, "type": "timeseries", "title": "Cap Valkey 命令与逐出", "description": "命令处理速率及逐出速率；逐出正常应为零，注意两个量纲分别阅读。",
+      "gridPos": { "x": 16, "y": 20, "w": 8, "h": 8 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ops" } },
+      "targets": [
+        { "refId": "A", "expr": "rate(redis_commands_processed_total{job=\"cap-valkey\"}[$window])", "legendFormat": "commands/s" },
+        { "refId": "B", "expr": "rate(redis_evicted_keys_total{job=\"cap-valkey\"}[$window])", "legendFormat": "evictions/s" }
+      ]
+    },
+    {
+      "id": 14, "type": "timeseries", "title": "Cap 原生统计采样", "description": "每分钟采样一次；失败与权限错误只降低诊断质量，不改变玩家验证行为。",
+      "gridPos": { "x": 0, "y": 28, "w": 24, "h": 7 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [{ "refId": "A", "expr": "sum by (outcome) (rate(noctf_cap_telemetry_polls_total[$window]))", "legendFormat": "{{outcome}}" }]
+    },
+    {
+      "id": 15, "type": "timeseries", "title": "Cap siteverify 不可用原因", "description": "仅统计 Cap 的服务端、限流、超时、传输、断路器或无效响应；普通错误令牌属于 rejected，不计入依赖故障。",
+      "gridPos": { "x": 0, "y": 35, "w": 24, "h": 7 }, "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [{ "refId": "A", "expr": "sum by (action, reason) (rate(noctf_cap_siteverify_failures_total[$window]))", "legendFormat": "{{action}} · {{reason}}" }]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 41,
+  "tags": ["NoCTF", "Cap", "performance", "production"],
+  "templating": { "list": [
+    { "name": "window", "label": "统计窗口", "type": "custom", "query": "5m,15m,1h", "multi": false,
+      "current": { "selected": true, "text": "15m", "value": "15m" },
+      "options": [
+        { "selected": false, "text": "5m", "value": "5m" },
+        { "selected": true, "text": "15m", "value": "15m" },
+        { "selected": false, "text": "1h", "value": "1h" }
+      ] }
+  ] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timezone": "browser",
+  "title": "NoCTF · Cap 验证",
+  "uid": "noctf-cap",
+  "version": 1
+}

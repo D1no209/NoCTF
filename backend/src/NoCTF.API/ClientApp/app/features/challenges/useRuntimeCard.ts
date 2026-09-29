@@ -6,7 +6,7 @@ import type { NoCtfapiEndpointsRuntimeRuntimeResponse } from '../../api'
 import { runnerFailureLabel } from '../shared/runner-capacity'
 import { classifyPlayerRuntimeLookup, normalizePlayerRuntime, shouldPollPlayerRuntime, type PlayerRuntimeLookupOutcome } from '../../utils/player-runtime'
 import { RUNTIME_STOP_POLL_DELAYS_MS, RUNTIME_STOP_POLL_MAX_INTERVAL_MS, RUNTIME_STOP_POLL_TIMEOUT_MS } from '../../lib/runtime-stop-polling'
-import { createRuntimeExtensionRequest, parseRuntimeExtensionMinutes } from '../../lib/runtime-extension'
+import { createRuntimeExtensionRequest, isRuntimeExtensionTooEarly, parseRuntimeExtensionMinutes } from '../../lib/runtime-extension'
 import RuntimeAccessUrlComponent from './RuntimeAccessUrl.vue'
 import { useHumanVerification } from '~/features/security/useHumanVerification'
 
@@ -218,6 +218,8 @@ export function useRuntimeCard(props: Readonly<Omit<{
   const busy = computed(() => acting.value || polling.value)
   const extendMinutesInvalid = computed(() =>
     parseRuntimeExtensionMinutes(extendMinutes.value, 720) === null)
+  const renewalTooEarly = computed(() => runtime.value?.state === 'Running'
+    && isRuntimeExtensionTooEarly(runtime.value.expiresAt, now.value))
   const canExtend = computed(() => runtime.value?.state === 'Running'
     && !!runtime.value.id
     && !busy.value
@@ -249,6 +251,7 @@ export function useRuntimeCard(props: Readonly<Omit<{
       loadError,
       extendMinutes,
       extendMinutesInvalid,
+      renewalTooEarly,
       canExtend,
       polling,
       timedOut,

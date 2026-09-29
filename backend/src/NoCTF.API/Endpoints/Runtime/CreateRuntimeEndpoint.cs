@@ -100,6 +100,7 @@ internal static class PlayerRuntimeMutation
             or RuntimeMutationFailureCode.RuntimeActionUnsupported)
             return TypedResults.NotFound();
         if (result.FailureCode is RuntimeMutationFailureCode.RuntimeStateConflict
+            or RuntimeMutationFailureCode.RuntimeExtensionTooEarly
             or RuntimeMutationFailureCode.RuntimeConflict)
             return TypedResults.Conflict(new RuntimeConflictResponse(
                 result.ErrorMessage ?? "Runtime state changed while the operation was processed."));

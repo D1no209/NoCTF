@@ -23,6 +23,10 @@ scrape_configs:
     static_configs:
       - targets: [redis-exporter:9121]
 
+  - job_name: cap-valkey
+    static_configs:
+      - targets: [cap-valkey-exporter:9121]
+
   - job_name: nats
     static_configs:
       - targets: [nats-exporter:7777]

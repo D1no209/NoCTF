@@ -1,7 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 using NoCTF.Application.Competitions.Webhooks;
+using NoCTF.Application.Observability;
 
 namespace NoCTF.Worker.Competitions.Webhooks;
 
@@ -16,6 +18,8 @@ public sealed class CompetitionWebhookRetryAgent(
         using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(250), clock);
         do
         {
+            var started = Stopwatch.GetTimestamp();
+            var scanRecorded = false;
             try
             {
                 await using var claimScope = scopes.CreateAsyncScope();
@@ -23,6 +27,12 @@ public sealed class CompetitionWebhookRetryAgent(
                     .GetRequiredService<ICompetitionWebhookDeliveryStore>();
                 var due = await store.ClaimDueDeliveriesAsync(
                     clock.GetUtcNow(), 64, stoppingToken);
+                NoCtfTelemetry.RecordWebhookRecoveryScan(
+                    WebhookRecoveryScanKind.Retry,
+                    due.Count == 0 ? WebhookRecoveryScanOutcome.Empty
+                        : WebhookRecoveryScanOutcome.Work,
+                    Stopwatch.GetElapsedTime(started).TotalSeconds);
+                scanRecorded = true;
                 await Parallel.ForEachAsync(due,
                     new ParallelOptions
                     {
@@ -56,6 +66,11 @@ public sealed class CompetitionWebhookRetryAgent(
             }
             catch (Exception exception)
             {
+                if (!scanRecorded)
+                    NoCtfTelemetry.RecordWebhookRecoveryScan(
+                        WebhookRecoveryScanKind.Retry,
+                        WebhookRecoveryScanOutcome.Failed,
+                        Stopwatch.GetElapsedTime(started).TotalSeconds);
                 logger.LogWarning(exception,
                     "Webhook retry scan failed; pending targets remain durable.");
             }

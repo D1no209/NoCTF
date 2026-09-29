@@ -19,7 +19,7 @@ internal static class NotificationInfrastructure
         services.AddScoped<ListPublicCompetitionAnnouncements>();
         services.AddScoped<ReadNotificationFeed>();
         services.AddScoped<CompetitionNotificationAudienceResolver>();
-        services.AddScoped<NotificationChangeAudienceResolver>();
+        services.AddSingleton<NotificationChangeAudienceResolver>();
         services.AddScoped<CompetitionNotificationDelivery>();
         services.AddScoped<ICompetitionAnnouncementPublisher>(provider =>
             provider.GetRequiredService<CompetitionNotificationDelivery>());

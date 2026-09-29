@@ -97,10 +97,11 @@ describe('runtime administration operation wiring', () => {
     ).text()
 
     expect(source).not.toContain('const opPending')
-    expect(source.match(/:disabled="isRuntimePending\(rt\)"/g)?.length).toBe(5)
+    expect(source.match(/:disabled="isRuntimePending\(rt\)"/g)?.length).toBe(4)
+    expect(source).toContain(':disabled="isRuntimePending(rt) || !canExtendRuntime(rt)"')
     expect(source).toContain('refreshRuntimeInBackground(token, data?.runtimeInstanceId ?? rt.id')
     expect(source).not.toContain('await refreshRuntimeInBackground')
-    expect(source).toContain('onBeforeUnmount(() => runtimeOperations.cancelAll())')
+    expect(source).toContain('runtimeOperations.cancelAll()')
   })
 
   test('surfaces request failures without changing a runtime snapshot', async () => {

@@ -8,6 +8,7 @@ using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Notifications;
 using NoCTF.Domain.Shared;
 using NoCTF.Infrastructure.Administration;
+using NoCTF.Infrastructure.Authentication;
 using NoCTF.Infrastructure.Persistence;
 using Testcontainers.PostgreSql;
 
@@ -73,6 +74,17 @@ public sealed class PlatformAuditLogStoreTests
                     RelatedId = targetId,
                     SentAt = now.AddMinutes(2)
                 });
+                seed.Notifications.Add(new SsoExternalIdentityBindingChangedNotification
+                {
+                    Id = Guid.CreateVersion7(now.AddMilliseconds(8)),
+                    SourceType = NotificationSourceType.User,
+                    SourceId = actorId,
+                    TargetType = NotificationTargetType.PlatformAdministrators,
+                    TargetId = Notification.PlatformAdministratorsTargetId,
+                    UserId = targetId,
+                    ActionValue = (int)SsoBindingAuditAction.AdministrativelyUnbound,
+                    SentAt = now.AddSeconds(30)
+                });
                 seed.CompetitionEvents.Add(new CompetitionLifecycleChangedEvent
                 {
                     Id = Guid.CreateVersion7(now.AddMilliseconds(5)),
@@ -118,7 +130,7 @@ public sealed class PlatformAuditLogStoreTests
             var all = await store.QueryAsync(
                 new(null, null, null, null, actorId, null, null, 10),
                 cancellationToken);
-            await Assert.That(all).Count().IsEqualTo(3);
+            await Assert.That(all).Count().IsEqualTo(4);
             await Assert.That(all[0].Kind).IsEqualTo(PlatformAuditKind.UserAccountLifecycle);
             await Assert.That(all[1].Kind).IsEqualTo(PlatformAuditKind.CompetitionEvent);
             await Assert.That(all[1].CompetitionEventKind)
@@ -129,6 +141,9 @@ public sealed class PlatformAuditLogStoreTests
             await Assert.That(all[2].CompetitionEventVisibility)
                 .IsEqualTo(CompetitionEventVisibility.Public);
             await Assert.That(all[2].Reason).IsEqualTo("started from immutable event");
+            await Assert.That(all[3].PlatformAdministrationAction)
+                .IsEqualTo(PlatformAdministrationAction.SsoExternalIdentityUnbound);
+            await Assert.That(all[3].ActorId).IsEqualTo(actorId);
 
             var competitionOnly = await store.QueryAsync(
                 new(null, null, null, competitionId, null, null, null, 10),

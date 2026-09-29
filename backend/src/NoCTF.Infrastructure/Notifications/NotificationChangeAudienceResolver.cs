@@ -8,12 +8,13 @@ using NoCTF.Infrastructure.Persistence;
 namespace NoCTF.Infrastructure.Notifications;
 
 /// <summary>Resolves current audience membership for a content-free realtime hint.</summary>
-public sealed class NotificationChangeAudienceResolver(NoCtfDbContext db)
+public sealed class NotificationChangeAudienceResolver(IDbContextFactory<NoCtfDbContext> dbFactory)
 {
     public async Task<IReadOnlyList<Guid>> ResolveAsync(
         IReadOnlyList<NotificationAudience> audiences,
         CancellationToken ct)
     {
+        await using var db = await dbFactory.CreateDbContextAsync(ct);
         var userIds = audiences
             .Where(item => item.TargetType == NotificationTargetType.User)
             .Select(item => item.TargetId)

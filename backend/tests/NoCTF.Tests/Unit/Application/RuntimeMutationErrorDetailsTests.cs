@@ -11,6 +11,10 @@ public sealed class RuntimeMutationErrorDetailsTests
         RuntimeMutationFailureCode.RuntimeStateConflict,
         "not in a state")]
     [Arguments(
+        RuntimeMutationFailure.ExtensionTooEarly,
+        RuntimeMutationFailureCode.RuntimeExtensionTooEarly,
+        "final ten minutes")]
+    [Arguments(
         RuntimeMutationFailure.Conflict,
         RuntimeMutationFailureCode.RuntimeConflict,
         "state changed")]
