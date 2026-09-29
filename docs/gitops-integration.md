@@ -1,7 +1,7 @@
 # GitOps 联调与上线检查
 
 本轮以 [NoCTF-Challenge-Template](https://github.com/D1no209/NoCTF-Challenge-Template)
-的 `25718936d1a32a1a8c5f73a74143e350d726c7aa` 为参考，适配当前 NoCTF 契约。
+的 `794651c0bf158fa98fdacf88cb0f3a52b9db4b2b` 为固定契约，适配 NoCTF 0.3.0。
 平台不拉取 Git、不构建镜像；仓库 Action 使用普通 Bot JWT 调用普通管理 API。
 
 ## 只使用现有接口
@@ -15,15 +15,16 @@ POST/PUT/DELETE。它不是服务端全量配置验证，也不保证后续写�
 
 ## 模板仓库必须同步更新
 
-旧仓库的 `revision` / `expectedRevision` 和独立 `baseScore` 不属于当前 API。
-不要为兼容旧脚本把这些字段重新加回平台：
+只支持 `gitops.noctf.dev/v2`；v1 不读取、不迁移。`revision` / `expectedRevision`、独立
+`baseScore`、`definitionJson`、`rulesJson` 和持久化 `schemaVersion` 不属于当前 API：
 
 | 内容 | 当前约定 |
 | --- | --- |
-| CTF Definition / Rules | Definition 为 schemaVersion 3，Rules 为 schemaVersion 2；分值在 rules.scoreCurve |
-| AWD Definition / Rules | schemaVersion 4；分值在 attackPoints、serviceHealthyPoints 等规则中 |
-| AWDP Definition / Rules | schemaVersion 4；Break 与 Fix 分别配置曲线 |
-| KoH Definition / Rules | schemaVersion 1；controlPointsPerInterval |
+| Definition / Rules | 都使用 `mode` 加唯一 `ctf`、`awd`、`awdp` 或 `koh` 分支 |
+| CTF | `definition.ctf.interactionKind` 必填，计分在 `rules.ctf.scoreCurve` |
+| AWD | Flag 注入在 `definition.awd.flagInjection`，计分在 `rules.awd` |
+| AWDP | `breakScoreCurve` 与 `fixScoreCurve` 位于 `rules.awdp` |
+| KoH | Control Check 是 `isControlCheck=true` 的 Runtime URL binding |
 | 比赛内题目更新 | 必须显式发送 customTitle（可为 null）、order、isPublished |
 | Flag 模板 | flagTemplate 属于比赛题目规则，不放在题库 Definition 中 |
 | AWDP Checker Fix 输入 | checkerFixInput 属于 Definition，不能放入 Rules |
@@ -47,11 +48,11 @@ POST/PUT/DELETE。它不是服务端全量配置验证，也不保证后续写�
 
 ## 重试与安全
 
-- GET 支持有界传输重试和完整 cursor 分页，重复 cursor 会终止，避免死循环。
+- GET 支持有界传输重试；GitOps 使用的集合接口一次返回完整 `items`。
 - 不盲目重试写入；创建响应丢失后按稳定 UUID 重读，只有内容/父资源匹配才视为成功。
 - 业务 409、权限错误不自动重试；中途失败可重新 Apply，同步从当前状态继续。
-- 题目交换顺序先使用空闲临时序号，再应用目标顺序；恢复时还需避让墓碑的旧序号，并在最终排序
-  前逐一恢复并腾空旧槽位，允许同槽位多个墓碑及中断重跑，不新增修订字段。
+- 题目交换和恢复先使用空闲临时序号，再应用目标顺序；普通唯一约束覆盖软删除记录，不假定墓碑
+  序号可被其他记录直接占用。中断后重跑仍从当前状态继续，不新增修订字段。
 - 已发布题目及 Shared 模板在更新过程中保持原状态；新建资源在依赖完成前不发布。提示内容与时间
   先做本地校验，后续写入失败也不将已有题目留在下线状态。
 - 镜像引用必须是唯一的 build/external 映射；Container、Checker、Compose serviceImages 同样检查。
@@ -60,7 +61,7 @@ POST/PUT/DELETE。它不是服务端全量配置验证，也不保证后续写�
   首次升级须全量重建仓库镜像；不删除旧 tag/digest，避免影响既有运行环境。
 - 不记录 JWT、Flag 或任意 API 错误响应正文；CI 错误保留方法、资源路径、HTTP 状态与稳定错误码。
 - 仅修改题面或附件不重建无关镜像；镜像内容、Dockerfile 或构建配置变化才触发对应构建。
-- PR 不读取 Bot Token；只有可信 main 的 Apply 阶段可以访问平台。
+- PR 不读取 Bot Token；main Deploy 使用不可取消的完整队列，只有其 Apply 阶段可以访问平台。
 
 ## 回归测试
 
@@ -71,8 +72,8 @@ Fixture 由模板仓库 `contract-fixtures --output <path>` 生成，只含明�
 设置 `NOCTF_GITOPS_TEMPLATE_ROOT` 为审核后的模板 checkout，设置
 `NOCTF_REQUIRE_DOCKER_INTEGRATION=true`，运行 `GitOpsRepositoryHttpTests`：
 它创建隔离 PostgreSQL、真实 JWT 与本地 HTTP API，调用模板脚本验证 dry-run 零写请求、首次导入、
-无操作重跑、已发布题目更新失败保持发布、顺序交换、附件/Flag/Hint 恢复、旧序号被占用时的题目
-恢复及恢复后中断重跑、附件不可变性与权限拒绝。
+无操作重跑、已发布题目更新失败保持发布、顺序交换、附件/Flag/Hint 恢复、恢复后中断重跑、
+附件不可变性与权限拒绝。
 测试消息 Outbox 为隔离替身；此测试验证 HTTP/认证/关系数据，不宣称证明 NATS/Wolverine 的持久投递。
 
 本轮不需要数据库 Migration，也不依赖新接口。此前试加的配置预检接口及 SDK 已撤回。
