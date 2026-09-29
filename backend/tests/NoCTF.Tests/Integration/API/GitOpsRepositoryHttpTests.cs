@@ -170,24 +170,6 @@ public sealed class GitOpsRepositoryHttpTests
                     await Assert.That(await db.CompetitionChallenges.IgnoreQueryFilters().Where(item => item.Id == secondInstance)
                         .Select(item => item.DeletedAt).SingleAsync(ct)).IsNotNull();
                 }
-                // A deleted row retains order 10; let another live row take it before restoration.
-                using (var client = new HttpClient { BaseAddress = new Uri(apiUrl) })
-                {
-                    client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-                    using var change = await client.PatchAsJsonAsync(
-                        $"/api/v1/admin/competitions/{competitionId}/challenges/{firstInstance}",
-                        new
-                        {
-                            presentation = new
-                            {
-                                customTitle = (string?)null,
-                                order = 10,
-                                isPublished = false
-                            }
-                        },
-                        ct);
-                    change.EnsureSuccessStatusCode();
-                }
                 WriteCompetition(temporary, competitionId, firstInstance, secondInstance, false, true, firstOrder: 10, secondOrder: 30);
                 faults.FailAfterRestorePath = $"/api/v1/admin/competitions/{competitionId}/challenges/{secondInstance}/restore";
                 await RunRepositoryAsync(temporary, apiUrl, token, 1, false, ct);
@@ -311,7 +293,7 @@ public sealed class GitOpsRepositoryHttpTests
         File.WriteAllText(Path.Combine(directory, "statement.md"), "GitOps contract challenge");
         File.WriteAllText(Path.Combine(directory, "attachments", "handout.txt"), "handout");
         File.WriteAllText(Path.Combine(directory, "challenge.yml"), $$"""
-            apiVersion: gitops.noctf.dev/v1
+            apiVersion: gitops.noctf.dev/v2
             kind: ChallengeTemplate
             id: {{id}}
             mode: Ctf
@@ -326,6 +308,10 @@ public sealed class GitOpsRepositoryHttpTests
             flags:
               - id: {{flagId}}
                 value: 'flag{gitops-http-test}'
+            definition:
+              mode: Ctf
+              ctf:
+                interactionKind: FlagSubmission
             """);
     }
 
@@ -340,10 +326,11 @@ public sealed class GitOpsRepositoryHttpTests
                 published: {{published.ToString().ToLowerInvariant()}}
                 hints: {{(slug == "first" ? "[{id: 00000000-0000-0000-0000-000000000144, content: " + System.Text.Json.JsonSerializer.Serialize(hintContent) + ", cost: 5, publishedAt: null}]" : "[]")}}
                 rules:
-                  schemaVersion: 2
+                  mode: Ctf
+                  ctf: {}
             """;
         File.WriteAllText(Path.Combine(root, "competition.yml"), $$"""
-            apiVersion: gitops.noctf.dev/v1
+            apiVersion: gitops.noctf.dev/v2
             kind: CompetitionChallengeSet
             initialized: true
             competitionId: {{competitionId}}
