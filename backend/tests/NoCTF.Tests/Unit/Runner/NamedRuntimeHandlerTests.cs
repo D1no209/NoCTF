@@ -8,12 +8,12 @@ using NoCTF.Runner.Messages;
 
 namespace NoCTF.Tests.Unit.Runner;
 
-public sealed class ComposeRuntimeHandlerTests
+public sealed class NamedRuntimeHandlerTests
 {
     [Test]
     public async Task Provision_persists_receipt_and_expands_compose_urls()
     {
-        var runtime = new RecordingComposeRuntime();
+        var runtime = new RecordingNamedRuntime();
         var capacity = new RecordingCapacity();
         var handler = CreateHandler(
             runtime,
@@ -21,7 +21,7 @@ public sealed class ComposeRuntimeHandlerTests
             new FixedWorkReader(RuntimeProvisionWorkStatus.Current));
         var message = CreateProvisionMessage();
 
-        var result = await handler.ProvisionComposeAsync(message, CancellationToken.None);
+        var result = await handler.ProvisionContainerAsync(message, CancellationToken.None);
 
         await Assert.That(result).IsTypeOf<RuntimeProvisioned>();
         var provisioned = (RuntimeProvisioned)result!;
@@ -36,7 +36,7 @@ public sealed class ComposeRuntimeHandlerTests
     [Test]
     public async Task Invalid_compose_url_cleans_up_and_releases_capacity()
     {
-        var runtime = new RecordingComposeRuntime();
+        var runtime = new RecordingNamedRuntime();
         var capacity = new RecordingCapacity();
         var reconciler = new RecordingResourceReconciler(RuntimeProvider.Docker);
         var handler = CreateHandler(
@@ -59,7 +59,7 @@ public sealed class ComposeRuntimeHandlerTests
             }
         };
 
-        var result = await handler.ProvisionComposeAsync(message, CancellationToken.None);
+        var result = await handler.ProvisionContainerAsync(message, CancellationToken.None);
 
         await Assert.That(result).IsTypeOf<RuntimeProvisionTerminated>();
         await Assert.That(((RuntimeProvisionTerminated)result!).FailureCode)
@@ -73,7 +73,7 @@ public sealed class ComposeRuntimeHandlerTests
     [Test]
     public async Task Provision_failure_cleanup_exception_is_not_reclassified_or_released()
     {
-        var runtime = new RecordingComposeRuntime();
+        var runtime = new RecordingNamedRuntime();
         var capacity = new RecordingCapacity();
         var reconciler = new RecordingResourceReconciler(
             RuntimeProvider.Docker,
@@ -99,7 +99,7 @@ public sealed class ComposeRuntimeHandlerTests
             }
         };
 
-        Func<Task> action = () => handler.ProvisionComposeAsync(message, CancellationToken.None);
+        Func<Task> action = () => handler.ProvisionContainerAsync(message, CancellationToken.None);
 
         var exception = await Assert.That(action).Throws<InvalidOperationException>();
         await Assert.That(exception!.Message).IsEqualTo("cleanup failed");
@@ -112,7 +112,7 @@ public sealed class ComposeRuntimeHandlerTests
     [Test]
     public async Task Stop_requested_before_provision_releases_capacity_without_starting_provider()
     {
-        var runtime = new RecordingComposeRuntime();
+        var runtime = new RecordingNamedRuntime();
         var operations = new List<string>();
         var capacity = new RecordingCapacity(operations);
         var reconciler = new RecordingResourceReconciler(
@@ -125,7 +125,7 @@ public sealed class ComposeRuntimeHandlerTests
             reconciler);
         var message = CreateProvisionMessage();
 
-        var result = await handler.ProvisionComposeAsync(message, CancellationToken.None);
+        var result = await handler.ProvisionContainerAsync(message, CancellationToken.None);
 
         await Assert.That(result).IsTypeOf<RuntimeProvisionCanceled>();
         var canceled = (RuntimeProvisionCanceled)result!;
@@ -144,7 +144,7 @@ public sealed class ComposeRuntimeHandlerTests
     [Test]
     public async Task Stop_requested_cleanup_failure_does_not_release_or_acknowledge()
     {
-        var runtime = new RecordingComposeRuntime();
+        var runtime = new RecordingNamedRuntime();
         var capacity = new RecordingCapacity();
         var reconciler = new RecordingResourceReconciler(
             RuntimeProvider.Docker,
@@ -155,7 +155,7 @@ public sealed class ComposeRuntimeHandlerTests
             new FixedWorkReader(RuntimeProvisionWorkStatus.StopRequested),
             reconciler);
 
-        Func<Task> action = () => handler.ProvisionComposeAsync(
+        Func<Task> action = () => handler.ProvisionContainerAsync(
             CreateProvisionMessage(),
             CancellationToken.None);
 
@@ -167,7 +167,7 @@ public sealed class ComposeRuntimeHandlerTests
     [Test]
     public async Task Stop_requested_capacity_owner_mismatch_fails_closed()
     {
-        var runtime = new RecordingComposeRuntime();
+        var runtime = new RecordingNamedRuntime();
         var capacity = new RecordingCapacity(
             releaseOutcome: RunnerCapacityReleaseOutcome.OwnerMismatch);
         var reconciler = new RecordingResourceReconciler(RuntimeProvider.Docker);
@@ -178,7 +178,7 @@ public sealed class ComposeRuntimeHandlerTests
             reconciler);
         var message = CreateProvisionMessage();
 
-        Func<Task> action = () => handler.ProvisionComposeAsync(message, CancellationToken.None);
+        Func<Task> action = () => handler.ProvisionContainerAsync(message, CancellationToken.None);
 
         await Assert.That(action).Throws<InvalidOperationException>();
         await Assert.That(runtime.UpCount).IsEqualTo(0);
@@ -191,7 +191,7 @@ public sealed class ComposeRuntimeHandlerTests
     [Test]
     public async Task Retained_assignment_does_not_release_running_runtime_capacity()
     {
-        var runtime = new RecordingComposeRuntime();
+        var runtime = new RecordingNamedRuntime();
         var capacity = new RecordingCapacity();
         var handler = CreateHandler(
             runtime,
@@ -199,7 +199,7 @@ public sealed class ComposeRuntimeHandlerTests
             new FixedWorkReader(RuntimeProvisionWorkStatus.AssignmentRetained));
         var message = CreateProvisionMessage();
 
-        var result = await handler.ProvisionComposeAsync(message, CancellationToken.None);
+        var result = await handler.ProvisionContainerAsync(message, CancellationToken.None);
 
         await Assert.That(result).IsNull();
         await Assert.That(runtime.UpCount).IsEqualTo(0);
@@ -209,7 +209,7 @@ public sealed class ComposeRuntimeHandlerTests
     [Test]
     public async Task Stop_uses_the_persisted_compose_receipt()
     {
-        var runtime = new RecordingComposeRuntime();
+        var runtime = new RecordingNamedRuntime();
         var capacity = new RecordingCapacity();
         var receipt = runtime.CreateReceipt();
         var handler = CreateHandler(
@@ -219,13 +219,13 @@ public sealed class ComposeRuntimeHandlerTests
                 RuntimeProvisionWorkStatus.Current,
                 new(
                     RuntimeProvider.Docker,
-                    ComposeRuntimeReceiptData.From(receipt),
-                    RuntimeKind.Compose)));
-        var message = new StopComposeRuntime(
+                    RuntimeReceiptTestData.From(receipt),
+                    RuntimeKind.Container)));
+        var message = new StopContainerRuntime(
             receipt.OperationId,
             "runner-a");
 
-        var result = await handler.StopComposeAsync(message, CancellationToken.None);
+        var result = await handler.StopContainerAsync(message, CancellationToken.None);
 
         await Assert.That(result).IsTypeOf<RuntimeStopped>();
         await Assert.That(runtime.DownCount).IsEqualTo(1);
@@ -236,7 +236,7 @@ public sealed class ComposeRuntimeHandlerTests
     [Test]
     public async Task Stop_capacity_owner_mismatch_fails_closed_after_provider_cleanup()
     {
-        var runtime = new RecordingComposeRuntime();
+        var runtime = new RecordingNamedRuntime();
         var capacity = new RecordingCapacity(
             releaseOutcome: RunnerCapacityReleaseOutcome.OwnerMismatch);
         var receipt = runtime.CreateReceipt();
@@ -247,13 +247,13 @@ public sealed class ComposeRuntimeHandlerTests
                 RuntimeProvisionWorkStatus.Current,
                 new(
                     RuntimeProvider.Docker,
-                    ComposeRuntimeReceiptData.From(receipt),
-                    RuntimeKind.Compose)));
-        var message = new StopComposeRuntime(
+                    RuntimeReceiptTestData.From(receipt),
+                    RuntimeKind.Container)));
+        var message = new StopContainerRuntime(
             receipt.OperationId,
             "runner-a");
 
-        var result = await handler.StopComposeAsync(message, CancellationToken.None);
+        var result = await handler.StopContainerAsync(message, CancellationToken.None);
 
         await Assert.That(result).IsTypeOf<RuntimeStopFailed>();
         await Assert.That(result).IsNotTypeOf<RuntimeStopped>();
@@ -263,7 +263,7 @@ public sealed class ComposeRuntimeHandlerTests
     }
 
     private static RuntimeProviderHandler CreateHandler(
-        IComposeRuntime runtime,
+        IContainerRuntime runtime,
         IRunnerCapacityGate capacity,
         IRuntimeNodeWorkReader reader,
         IRuntimeManagedResourceReconciler? reconciler = null)
@@ -283,42 +283,25 @@ public sealed class ComposeRuntimeHandlerTests
             reader);
     }
 
-    private static ProvisionComposeRuntime CreateProvisionMessage()
+    private static ProvisionContainerRuntime CreateProvisionMessage()
     {
         var runtimeInstanceId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         return new(
             runtimeInstanceId,
             "runner-a",
-            new ComposeRequest(
-                runtimeInstanceId,
-                RuntimeProvider.Docker,
-                "noctf-runtime",
-                "services:\n  web:\n    image: challenge:v1",
-                new Dictionary<string, string>(),
-                new Dictionary<string, string>(),
-                new Dictionary<string, RuntimeResourceLimits>
-                {
-                    ["web"] = new(268_435_456, 500_000_000, 128)
-                },
-                new(268_435_456, 500_000_000, 128),
-                TimeSpan.FromHours(1),
-                TimeSpan.FromMinutes(2),
-                [
-                    new(
-                        "http://{HOST}:{PORT}/play",
-                        RuntimeExposure.Participants,
-                        ContainerPort: 8080,
-                        ServiceName: "web")
-                ]));
+            new ContainerRuntimeRequest(runtimeInstanceId, RuntimeProvider.Docker,
+                [new("web", "challenge:v1", .5m, 256)], new Dictionary<string, string>(), new(268_435_456, 500, 256),
+                TimeSpan.FromHours(1), TimeSpan.FromMinutes(2),
+                [new("http://{HOST}:{PORT}/play", RuntimeExposure.Participants, 8080, "web")]));
     }
 
-    private sealed class RecordingComposeRuntime : IComposeRuntime
+    private sealed class RecordingNamedRuntime : IContainerRuntime
     {
         public int UpCount { get; private set; }
         public int DownCount { get; private set; }
 
-        public Task<ComposeReceipt> UpAsync(
-            ComposeRequest request,
+        public Task<ContainerDeploymentReceipt> UpAsync(
+            ContainerRuntimeRequest request,
             CancellationToken cancellationToken)
         {
             UpCount++;
@@ -326,21 +309,21 @@ public sealed class ComposeRuntimeHandlerTests
         }
 
         public Task DownAsync(
-            ComposeReceipt receipt,
+            ContainerDeploymentReceipt receipt,
             CancellationToken cancellationToken)
         {
             DownCount++;
             return Task.CompletedTask;
         }
 
-        public Task<ComposeStatus?> GetStatusAsync(
-            ComposeReceipt receipt,
+        public Task<ContainerRuntimeStatus?> GetStatusAsync(
+            ContainerDeploymentReceipt receipt,
             CancellationToken cancellationToken) => DownCount > 0
-                ? Task.FromResult<ComposeStatus?>(new(
+                ? Task.FromResult<ContainerRuntimeStatus?>(new(
                     receipt.ProjectName,
                     RuntimeStatus.Stopped,
                     []))
-                : Task.FromResult<ComposeStatus?>(new(
+                : Task.FromResult<ContainerRuntimeStatus?>(new(
                     receipt.ProjectName,
                     RuntimeStatus.Running,
                     [
@@ -353,14 +336,14 @@ public sealed class ComposeRuntimeHandlerTests
                     ]));
 
         public Task<ContainerExecResult> ExecAsync(
-            ComposeReceipt receipt,
+            ContainerDeploymentReceipt receipt,
             string serviceName,
             IReadOnlyList<string> command,
             TimeSpan timeout,
             CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 
-        public ComposeReceipt CreateReceipt(
+        public ContainerDeploymentReceipt CreateReceipt(
             Guid? operationId = null) =>
             new(
                 operationId ?? Guid.Parse("11111111-1111-1111-1111-111111111111"),
@@ -368,10 +351,10 @@ public sealed class ComposeRuntimeHandlerTests
                 "noctf-runtime",
                 "/tmp/noctf-runtime",
                 "runner.example",
-                DateTimeOffset.UtcNow);
+                DateTimeOffset.UtcNow, [new("web", "container-web", RuntimeStatus.Running, new Dictionary<int, int> { [8080] = 32000 }, "web")]);
     }
 
-    private sealed class RecordingProviderCatalog(IComposeRuntime runtime)
+    private sealed class RecordingProviderCatalog(IContainerRuntime runtime)
         : IRuntimeProviderCatalog
     {
         public IContainerLifecycle Containers(RuntimeProvider provider) =>
@@ -380,7 +363,7 @@ public sealed class ComposeRuntimeHandlerTests
         public IContainerSandboxLifecycle Sandbox(RuntimeProvider provider) =>
             throw new NotSupportedException();
 
-        public IComposeRuntime Compose(RuntimeProvider provider) => runtime;
+        public IContainerRuntime Runtime(RuntimeProvider provider) => runtime;
 
         public IOvaRuntime Appliance(RuntimeProvider provider) =>
             throw new NotSupportedException();

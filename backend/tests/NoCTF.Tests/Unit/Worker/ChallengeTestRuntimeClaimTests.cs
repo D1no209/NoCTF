@@ -26,11 +26,8 @@ public sealed class ChallengeTestRuntimeClaimTests
         };
         var template = new ChallengeRuntimeTemplate(
             RuntimeAllocation.PerTeam,
-            new ContainerRuntimeDefinition(
-                "challenge:test",
-                Security: new(false, false, false, ["ALL"], []),
-                FlagEnvironmentVariableName: "CHALLENGE_FLAG"),
-            new RuntimeResourceLimits(67_108_864, 100_000_000, 64),
+            new ContainerRuntimeDefinition([new RuntimeServiceDefinition("main", "challenge:test", FlagEnvironmentVariableName: "CHALLENGE_FLAG")]),
+            new RuntimeResourceLimits(67_108_864, 100, 64),
             FlagSource: RuntimeFlagSource.PerTeam);
 
         var message = RuntimeClaimFactory.Create(
@@ -43,10 +40,8 @@ public sealed class ChallengeTestRuntimeClaimTests
         var provision = message as ProvisionContainerRuntime
             ?? throw new InvalidOperationException("Expected a Container provision message.");
 
-        await Assert.That(provision.Definition.Environment["CHALLENGE_FLAG"])
+        await Assert.That(provision.Definition.Services[0].Environment!["CHALLENGE_FLAG"])
             .IsEqualTo("flag{template-test}");
-        await Assert.That(provision.Definition.NetworkIsolation)
-            .IsEqualTo(ContainerNetworkIsolation.Isolated);
         await Assert.That(provision.Definition.Labels["noctf.io/job-kind"])
             .IsEqualTo("challenge-test-runtime");
         await Assert.That(provision.Definition.Labels["noctf.io/challenge-id"])

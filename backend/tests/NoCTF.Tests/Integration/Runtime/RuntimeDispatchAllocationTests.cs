@@ -56,14 +56,13 @@ public sealed class RuntimeDispatchAllocationTests
             await fixture.SeedAsync(db, ct);
             var id = Guid.NewGuid();
             var challengeId = Guid.NewGuid();
-            var initial = new RuntimeResourceLimits(64 * 1024 * 1024, 500_000_000, 64);
+            var initial = new RuntimeResourceLimits(64 * 1024 * 1024, 500, 64);
             ChallengeDefinition Definition(RuntimeResourceLimits resources) =>
                 TestConfigurations.Definition(GameMode.Ctf, JsonSerializer.Serialize(new CtfChallengeConfiguration(
                     null, null, Runtime: new ChallengeRuntimeTemplate(RuntimeAllocation.PerTeam,
-                        compose ? new ComposeRuntimeDefinition("services:\n  web:\n    image: busybox:1.36.1\n", new Dictionary<string, RuntimeResourceLimits> { ["web"] = resources })
-                            : new ContainerRuntimeDefinition(
-                                "busybox:1.36.1",
-                                Security: new(false, false, false, ["ALL"], [])), resources)), new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+                        new ContainerRuntimeDefinition(compose
+                            ? [new("web", "busybox:1.36.1", resources.CpuMillicores / 1000m, resources.MemoryBytes / (1024 * 1024)), new("db", "busybox:1.36.1", .25m, 32)]
+                            : [new("main", "busybox:1.36.1", resources.CpuMillicores / 1000m, resources.MemoryBytes / (1024 * 1024))]))), new JsonSerializerOptions(JsonSerializerDefaults.Web)));
             db.Challenges.Add(new CtfChallenge
             {
                 Id = challengeId, OwnerId = fixture.OwnerId, Title = "Allocation limits",
@@ -72,7 +71,7 @@ public sealed class RuntimeDispatchAllocationTests
             db.RuntimeInstances.Add(new TemplateTestRuntimeInstance
             {
                 Id = id, ChallengeId = challengeId,
-                RuntimeKind = compose ? RuntimeKind.Compose : RuntimeKind.Container, RuntimeProvider = RuntimeProvider.Docker,
+                RuntimeKind = compose ? RuntimeKind.Container : RuntimeKind.Container, RuntimeProvider = RuntimeProvider.Docker,
                 State = RuntimeState.Queued, TestFlagDelivery = RuntimeTestFlagDelivery.NotRequired,
                 TestFlagState = RuntimeTestFlagState.NotRequired, CreatedAt = fixture.Now
             });
@@ -117,30 +116,12 @@ public sealed class RuntimeDispatchAllocationTests
                         RelationalEventId.MultipleCollectionIncludeWarning))
                     .Options));
             await Assert.That(await reader.ReadProvisionStatusAsync(request, ct)).IsEqualTo(RuntimeProvisionWorkStatus.Current);
-            var tampered = request switch
-            {
-                ProvisionContainerRuntime single => (IRuntimeProvisionMessage)(single with
-                { Definition = single.Definition with { Limits = initial with { NanoCpus = 1_000_000_000 } } }),
-                ProvisionComposeRuntime group => group with
-                { Definition = group.Definition with { ServiceResources = new Dictionary<string, RuntimeResourceLimits> { ["web"] = initial with { NanoCpus = 1_000_000_000 } } } },
-                _ => throw new InvalidOperationException()
-            };
+            var claimed = (ProvisionContainerRuntime)request;
+            var tampered = claimed with { Definition = claimed.Definition with
+                { Services = claimed.Definition.Services.Select(service => service with { CpuCores = 1m }).ToArray() } };
             await Assert.That(await reader.ReadProvisionStatusAsync(tampered, ct)).IsEqualTo(RuntimeProvisionWorkStatus.AssignmentRetained);
-            // Changing a hard limit must never match a previously committed allocation.
-            if (compose)
-            {
-                await db.Set<ComposeServiceResource>()
-                    .Where(row => row.ChallengeId == challengeId && row.ServiceName == "web")
-                    .ExecuteUpdateAsync(update => update
-                        .SetProperty(row => row.Limits.NanoCpus, 1_000_000_000), ct);
-            }
-            else
-            {
-                await db.Set<ChallengeRuntimeTemplateEntity>()
-                    .Where(row => row.ChallengeId == challengeId)
-                    .ExecuteUpdateAsync(update => update
-                        .SetProperty(row => row.Limits.NanoCpus, 1_000_000_000), ct);
-            }
+            await db.Set<ChallengeRuntimeService>().Where(row => row.ChallengeId == challengeId)
+                .ExecuteUpdateAsync(update => update.SetProperty(row => row.CpuCores, 1m), ct);
             db.ChangeTracker.Clear();
             await BackendMessageOperations.DispatchRuntimeAsync(new(id), db, templates, new FixedRuntimePlacementPolicy(),
                 capacity, outbox, TimeProvider.System, ct, budgets: new());
@@ -152,8 +133,8 @@ public sealed class RuntimeDispatchAllocationTests
             await Assert.That(rejected.RunnerId).IsEqualTo("runner");
             await Assert.That(rejected.CapacityAllocations.Items.Single()).IsEqualTo(allocation);
             await Assert.That(outbox.Messages.OfType<IRuntimeProvisionMessage>().Count()).IsEqualTo(1);
-            await Assert.That(rejected.CapacityAllocations.Items.Single().Limit.NanoCpus)
-                .IsEqualTo(500_000_000);
+            await Assert.That(rejected.CapacityAllocations.Items.Single().Limit.CpuMillicores)
+                .IsEqualTo(compose ? 750 : 500);
         });
     }
 

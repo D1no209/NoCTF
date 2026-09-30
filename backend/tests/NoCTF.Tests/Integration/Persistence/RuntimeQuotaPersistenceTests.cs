@@ -113,7 +113,7 @@ public sealed class RuntimeQuotaPersistenceTests
                     1,
                     fixture.Now);
                 seed.RuntimeInstances.AddRange(
-                    Runtime(RuntimeKind.Compose, RuntimeState.Running, 2),
+                    Runtime(RuntimeKind.Container, RuntimeState.Running, 2),
                     Runtime(RuntimeKind.Container, RuntimeState.Provisioning, 3),
                     Runtime(RuntimeKind.OvaVm, RuntimeState.Running, 4));
                 await seed.SaveChangesAsync(cancellationToken);
@@ -144,14 +144,14 @@ public sealed class RuntimeQuotaPersistenceTests
             await Assert.That(items.Select(item => item.ChallengeTitle))
                 .Contains("Second challenge");
             await Assert.That(items.All(item =>
-                    item.Runtime.RuntimeKind is RuntimeKind.Container or RuntimeKind.Compose))
+                    item.Runtime.RuntimeKind is RuntimeKind.Container or RuntimeKind.Container))
                 .IsTrue();
             var store = CreateAdminStore(db, new RecordingOutbox());
             var filtered = await store.ListActiveContainersAsync(
-                new(Search: "  SECOND  ", State: RuntimeState.Running, RuntimeKind: RuntimeKind.Compose),
+                new(Search: "  SECOND  ", State: RuntimeState.Running, RuntimeKind: RuntimeKind.Container),
                 null, null, 50, cancellationToken);
             await Assert.That(filtered).HasSingleItem();
-            await Assert.That(filtered[0].Runtime.RuntimeKind).IsEqualTo(RuntimeKind.Compose);
+            await Assert.That(filtered[0].Runtime.RuntimeKind).IsEqualTo(RuntimeKind.Container);
             var byTeam = await store.ListActiveContainersAsync(
                 new(Search: "Quota Team 0"), null, null, 50, cancellationToken);
             await Assert.That(byTeam).HasSingleItem();
@@ -527,10 +527,8 @@ public sealed class RuntimeQuotaPersistenceTests
         var templateId = Guid.CreateVersion7();
         var runtime = new ChallengeRuntimeTemplate(
             RuntimeAllocation.PerTeam,
-            new ContainerRuntimeDefinition(
-                "registry.example/quota:v1",
-                Security: new(false, false, false, ["ALL"], [])),
-            new RuntimeResourceLimits(67_108_864, 100_000_000, 64));
+            new ContainerRuntimeDefinition([new RuntimeServiceDefinition("main", "registry.example/quota:v1")]),
+            new RuntimeResourceLimits(67_108_864, 100, 64));
         db.Challenges.Add(new CtfChallenge
         {
             Id = templateId,

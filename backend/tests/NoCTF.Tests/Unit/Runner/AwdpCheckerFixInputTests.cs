@@ -20,13 +20,10 @@ public sealed class AwdpCheckerFixInputTests
         await Assert.That(outcome).IsEqualTo(AwdpCheckerExecutionOutcome.Completed);
         await Assert.That(runner.InputCalls).IsEqualTo(1);
         await Assert.That(runner.Input).IsNull();
-        await Assert.That(runner.Request!.Security.ReadonlyRootfs).IsTrue();
     }
 
     [Test]
-    [Arguments(false)]
-    [Arguments(true)]
-    public async Task ExecuteAsync_WithInput_PassesSameReadableStreamAndWritableCheckerRoot(bool allowRoot)
+    public async Task ExecuteAsync_WithInput_PassesSameReadableStreamAndWritableCheckerRoot()
     {
         var runner = new RecordingOneShotRunner();
         var executor = new AwdpCheckerExecutor(new RecordingCatalog(runner));
@@ -34,18 +31,13 @@ public sealed class AwdpCheckerFixInputTests
         stream.Position = "prefix-".Length;
         var input = new OneShotInputArchive(stream, OneShotInputArchive.RootDestinationPath);
 
-        var outcome = await executor.ExecuteAsync(Work() with { AllowRoot = allowRoot }, input, CancellationToken.None);
+        var outcome = await executor.ExecuteAsync(Work(), input, CancellationToken.None);
 
         await Assert.That(outcome).IsEqualTo(AwdpCheckerExecutionOutcome.Completed);
         await Assert.That(runner.InputCalls).IsEqualTo(1);
         await Assert.That(runner.Input).IsSameReferenceAs(input);
         await Assert.That(runner.Input!.Archive).IsSameReferenceAs(stream);
         await Assert.That(runner.Input.Archive.Position).IsEqualTo("prefix-".Length);
-        await Assert.That(runner.Request!.Security.ReadonlyRootfs).IsFalse();
-        await Assert.That(runner.Request.Security.RunAsNonRoot).IsEqualTo(!allowRoot);
-        await Assert.That(runner.Request.Security.NoNewPrivileges).IsTrue();
-        await Assert.That(runner.Request.Security.CapDrop).IsEmpty();
-        await Assert.That(runner.Request.Security.CapAdd).IsEmpty();
     }
 
     [Test]
@@ -129,25 +121,12 @@ public sealed class AwdpCheckerFixInputTests
         await Assert.That(forbidden).IsEmpty();
     }
 
-    private static AwdpCheckerWork Work() => new(
-        Guid.Parse("11111111-1111-1111-1111-111111111111"),
-        RuntimeProvider.Docker,
-        "checker:latest",
-        ["/checker"],
-        new Dictionary<string, string>(),
-        "network-1",
-        "target.internal",
-        30,
-        new Uri("https://api.example/api/internal/v1/awdp/fix-results"),
-        "callback-token",
-        TimeSpan.FromSeconds(20),
-        FixInputEnabled: true);
+    private static AwdpCheckerWork Work() => new(Guid.Parse("11111111-1111-1111-1111-111111111111"), RuntimeProvider.Docker, "checker:latest", ["/checker"], new Dictionary<string, string>(), new ContainerReceipt(Guid.Parse("11111111-1111-1111-1111-111111111111"), RuntimeProvider.Docker, "target-resource", RuntimeStatus.Running, new Dictionary<int, int>(), null, "target.internal", NetworkId: "network-1", RuntimeInstanceId: Guid.Parse("11111111-1111-1111-1111-111111111111")), "target.internal", 30, new Uri("https://api.example/api/internal/v1/awdp/fix-results"), "callback-token", TimeSpan.FromSeconds(20), FixInputEnabled: true);
 
     private sealed class RecordingCatalog(IOneShotJobRunner runner) : IOneShotRuntimeProviderCatalog
     {
         public IOneShotJobRunner OneShot(RuntimeProvider provider) => runner;
-        public IAttachedOneShotJobRunner Attached(RuntimeProvider provider) =>
-            throw new NotSupportedException();
+        public IAttachedOneShotJobRunner Attached(RuntimeProvider provider) => new TestAttachedJobRunner(runner);
     }
 
     private sealed class RecordingOneShotRunner : IOneShotJobRunner

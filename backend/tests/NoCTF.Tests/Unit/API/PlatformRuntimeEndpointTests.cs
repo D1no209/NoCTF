@@ -46,7 +46,7 @@ public sealed class PlatformRuntimeEndpointTests
         await Assert.That(result).IsNotNull();
         await Assert.That(result!.Capacity is not null).IsEqualTo(administrator);
         if (administrator)
-            await Assert.That(result.Capacity!.Single().Budget.NanoCpus).IsEqualTo(250);
+            await Assert.That(result.Capacity!.Single().Budget.CpuMillicores).IsEqualTo(250);
     }
 
     [Test]

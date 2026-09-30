@@ -120,33 +120,13 @@ public sealed class ChallengeReadPerformanceTests
     {
         Runtime = new ContainerChallengeRuntimeTemplate
         {
-            Image = "registry.example.test/challenge:current",
+            Services = [new ChallengeRuntimeService { Name = "main", Image = "registry.example.test/challenge:current" }],
             Allocation = PersistedRuntimeAllocation.PerTeam,
             FlagSource = PersistedRuntimeFlagSource.PerTeam,
             UrlBindings = [
                 new() { Position = 0, UrlTemplate = "http://{HOST}:{PORT}", ContainerPort = 80 },
                 new() { Position = 1, UrlTemplate = "tcp://{HOST}:{PORT}", ContainerPort = 443 }
             ],
-            KeyValues = [
-                new() { Kind = ChallengeRuntimeKeyValueKind.Environment, Key = "A", Value = "1" },
-                new() { Kind = ChallengeRuntimeKeyValueKind.Label, Key = "B", Value = "2" }
-            ],
-            CommandItems = [
-                new() { Position = 0, Value = "run" },
-                new() { Position = 1, Value = "challenge" }
-            ],
-            Capabilities = [
-                new() { Name = "ALL" },
-                new() { Add = true, Name = "CHOWN" }
-            ],
-            PortMappings = [
-                new() { ContainerPort = 80, HostPort = 0 },
-                new() { ContainerPort = 443, HostPort = 0 }
-            ],
-            InternalPorts = [
-                new() { Port = 8080 },
-                new() { Port = 9090 }
-            ]
         }
     };
 

@@ -47,27 +47,19 @@ public sealed class AwdStartGateTests
         {
             FlagInjectionCommand = "printf '%s' '${FLAG}' > /dev/shm/flag",
             FlagInjectionTimeoutSeconds = 30,
+            FlagInjectionServiceName = "main",
             Runtime = new ContainerChallengeRuntimeTemplate
             {
                 Allocation = PersistedRuntimeAllocation.PerTeam,
-                Limits = new()
-                {
-                    MemoryBytes = 67_108_864,
-                    NanoCpus = 100_000_000,
-                    PidsLimit = 64
-                },
-                HasExplicitLimits = true,
                 FlagSource = PersistedRuntimeFlagSource.AwdRotation,
-                Image = "registry.example/awd:v1",
-                Capabilities = [new() { Name = "ALL" }],
-                PortMappings = [new() { ContainerPort = 8080, HostPort = 0 }],
+                Services = [new ChallengeRuntimeService { Name = "main", Image = "registry.example/awd:v1" }],
                 UrlBindings =
                 [
                     new()
                     {
                         UrlTemplate = "nc {HOST} {PORT}",
                         Exposure = PersistedRuntimeExposure.Participants,
-                        ContainerPort = 8080
+                        ServiceName = "main", ContainerPort = 8080
                     }
                 ]
             }

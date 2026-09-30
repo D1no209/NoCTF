@@ -1,7 +1,7 @@
 using DotNet.Testcontainers.Builders;
 using NoCTF.Domain.Runtime;
 using NoCTF.Runtime.Docker;
-using NoCTF.Runtime.Docker.Compose;
+using NoCTF.Runtime.Docker.Services;
 using NoCTF.Runtime.Docker.Containers;
 using NoCTF.Application.Runtime.Provisioning;
 
@@ -26,9 +26,7 @@ public sealed class DockerWorkloadInventoryTests
                 ["noctf.io/managed"] = "true", ["noctf.io/runtime-instance-id"] = id.ToString("D"),
                 ["noctf.io/job-kind"] = templateTest ? "challenge-test-runtime" : "persistent-runtime"
             };
-            var request = new ContainerRequest(id, RuntimeProvider.Docker, "busybox:1.36.1", ["sleep", "120"],
-                new Dictionary<string, string>(), labels, new Dictionary<int, int>(), new(64 * 1024 * 1024, 200_000_000, 64),
-                new(true, false, false, ["ALL"], []), null, RuntimeInstanceId: id);
+            var request = new ContainerRequest(id, RuntimeProvider.Docker, "busybox:1.36.1", ["sleep", "120"], new Dictionary<string, string>(), labels, new Dictionary<int, int>(), new(64 * 1024 * 1024, 200, 64), null, RuntimeInstanceId: id);
             var receipt = await lifecycle.CreateAsync(request, ct);
             try
             {
@@ -63,7 +61,7 @@ public sealed class DockerWorkloadInventoryTests
             var endpoint = Environment.GetEnvironmentVariable("DOCKER_HOST")
                 ?? (OperatingSystem.IsWindows() ? "npipe://./pipe/docker_engine" : "unix:///var/run/docker.sock");
             var options = new DockerRuntimeOptions(Endpoint: endpoint);
-            using var inventory = new DockerRuntimeResourceReconciler(options, new DockerComposeRuntime(options));
+            using var inventory = new DockerRuntimeResourceReconciler(options);
             var identity = new RuntimeWorkloadIdentity(RuntimeWorkloadKind.AwdChecker, runtimeId, operationId);
             await Assert.That(await inventory.WorkloadExistsAsync(identity, ct)).IsTrue();
             await checker.DisposeAsync();

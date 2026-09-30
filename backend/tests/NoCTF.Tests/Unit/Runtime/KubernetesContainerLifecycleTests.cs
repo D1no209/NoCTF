@@ -384,29 +384,10 @@ public sealed class KubernetesContainerLifecycleTests
         var receipt = await lifecycle.CreateAsync(
             PersistentRequest(), CancellationToken.None);
 
-        await Assert.That(createdServices).Count().IsEqualTo(2);
-        var internalService = createdServices.Single(service => service.Spec.Type == "ClusterIP");
-        var publicService = createdServices.Single(service => service.Spec.Type == "NodePort");
-        var resourceName = $"noctf-{PersistentRequest().OperationId:N}";
-        await Assert.That(internalService.Metadata.Name).IsEqualTo(resourceName);
-        await Assert.That(publicService.Metadata.Name).IsEqualTo($"{resourceName}-public");
-        await Assert.That(internalService.Spec.Ports.Select(port => port.Port))
-            .IsEquivalentTo([8080, 9090]);
-        await Assert.That(publicService.Spec.Ports.Select(port => port.Port))
-            .IsEquivalentTo([8080]);
-        await Assert.That(internalService.Spec.Selector["noctf.io/runtime-id"])
-            .IsEqualTo(resourceName);
-        await Assert.That(publicService.Spec.Selector["noctf.io/runtime-id"])
-            .IsEqualTo(resourceName);
-        await Assert.That(publicService.Spec.Ports.Single().TargetPort.Value)
-            .IsEqualTo("8080");
-        await Assert.That(internalService.Metadata.Labels["noctf.io/resource-role"])
-            .IsEqualTo("dns");
-        await Assert.That(publicService.Metadata.Labels["noctf.io/resource-role"])
-            .IsEqualTo("public");
-        await Assert.That(requestedNodePort).IsNull();
+        await Assert.That(createdServices).HasSingleItem();
+        await Assert.That(createdServices[0].Spec.Type).IsEqualTo("NodePort");
         await Assert.That(receipt.PortMappings[8080]).IsEqualTo(31234);
-        await Assert.That(receipt.InternalHost).IsEqualTo("10.96.0.42");
+        await Assert.That(receipt.InternalHost).IsNull();
         await Assert.That(receipt.PublicHost).IsEqualTo("node.example");
     }
 
@@ -446,12 +427,9 @@ public sealed class KubernetesContainerLifecycleTests
 
         var receipt = await lifecycle.CreateAsync(request, CancellationToken.None);
 
-        await Assert.That(createdServices).HasSingleItem();
-        await Assert.That(createdServices[0].Spec.Type).IsEqualTo("ClusterIP");
-        await Assert.That(createdServices[0].Spec.Ports.Select(port => port.Port))
-            .IsEquivalentTo([8080, 9090]);
+        await Assert.That(createdServices).IsEmpty();
         await Assert.That(receipt.PortMappings).IsEmpty();
-        await Assert.That(receipt.InternalHost).IsEqualTo("10.96.0.42");
+        await Assert.That(receipt.InternalHost).IsNull();
     }
 
     [Test]
@@ -544,10 +522,10 @@ public sealed class KubernetesContainerLifecycleTests
             PersistentRequest(), CancellationToken.None);
 
         await Assert.That(receipt.PortMappings[8080]).IsEqualTo(31234);
-        await Assert.That(receipt.InternalHost).IsEqualTo("10.96.0.42");
+        await Assert.That(receipt.InternalHost).IsNull();
         await Assert.That(core.ReceivedCalls().Count(call =>
             call.GetMethodInfo().Name == "CreateNamespacedServiceWithHttpMessagesAsync"))
-            .IsEqualTo(2);
+            .IsEqualTo(1);
     }
 
     [Test]
@@ -714,7 +692,7 @@ public sealed class KubernetesContainerLifecycleTests
         await Assert.That(publicDelete!.Preconditions!.Uid)
             .IsEqualTo("service-public-uid");
         await Assert.That(receipt.PortMappings).IsEmpty();
-        await Assert.That(receipt.InternalHost).IsEqualTo("10.96.0.42");
+        await Assert.That(receipt.InternalHost).IsNull();
     }
 
     [Test]
@@ -799,12 +777,9 @@ public sealed class KubernetesContainerLifecycleTests
 
         var receipt = await lifecycle.CreateAsync(request, CancellationToken.None);
 
-        await Assert.That(createdServices).Count().IsEqualTo(1);
-        await Assert.That(createdServices.Single().Spec.Type).IsEqualTo("ClusterIP");
-        await Assert.That(createdServices.Single().Metadata.Labels["noctf.io/job-kind"])
-            .IsEqualTo("awdp-verification");
+        await Assert.That(createdServices).IsEmpty();
         await Assert.That(receipt.PortMappings).IsEmpty();
-        await Assert.That(receipt.InternalHost).IsEqualTo("10.96.0.43");
+        await Assert.That(receipt.InternalHost).IsNull();
     }
 
     [Test]
@@ -847,7 +822,7 @@ public sealed class KubernetesContainerLifecycleTests
         var receipt = await lifecycle.EnsureRunningAsync(request, CancellationToken.None);
 
         await Assert.That(receipt.PortMappings[8080]).IsEqualTo(31234);
-        await Assert.That(receipt.InternalHost).IsEqualTo("10.96.0.42");
+        await Assert.That(receipt.InternalHost).IsNull();
         await Assert.That(core.ReceivedCalls().Any(call =>
             call.GetMethodInfo().Name == "CreateNamespacedServiceWithHttpMessagesAsync"))
             .IsFalse();
@@ -1255,25 +1230,12 @@ public sealed class KubernetesContainerLifecycleTests
     private static ContainerRequest PersistentRequest(int hostPort = 0)
     {
         var runtimeId = Guid.Parse("019be6f7-882e-7cae-9389-898a98fbfe22");
-        return new ContainerRequest(
-            runtimeId,
-            RuntimeProvider.Kubernetes,
-            "challenge:latest",
-            ["/challenge"],
-            new Dictionary<string, string>(),
-            new Dictionary<string, string>
+        return new ContainerRequest(runtimeId, RuntimeProvider.Kubernetes, "challenge:latest", ["/challenge"], new Dictionary<string, string>(), new Dictionary<string, string>
             {
                 ["noctf.io/managed"] = "true",
                 ["noctf.io/job-kind"] = "persistent-runtime",
                 ["noctf.io/runtime-instance-id"] = runtimeId.ToString("D")
-            },
-            new Dictionary<int, int> { [8080] = hostPort },
-            new RuntimeResourceLimits(256 * 1024 * 1024, 250_000_000, 64),
-            new ContainerSecurityPolicy(true, true, true, ["ALL"], []),
-            TimeSpan.FromHours(1),
-            NetworkName: "noctf-rt-019be6f7882e7cae9389898a98fbfe22",
-            InternalPorts: [9090],
-            RuntimeInstanceId: runtimeId);
+            }, new Dictionary<int, int> { [8080] = hostPort }, new RuntimeResourceLimits(256 * 1024 * 1024, 250, 64), TimeSpan.FromHours(1), NetworkName: "noctf-rt-019be6f7882e7cae9389898a98fbfe22", InternalPorts: [9090], RuntimeInstanceId: runtimeId);
     }
 
     private static V1Service ExistingService(
@@ -1458,23 +1420,10 @@ public sealed class KubernetesContainerLifecycleTests
         CallbackNamespace
     }
 
-    private static ContainerRequest CheckerRequest() => new(
-        Guid.Parse("019be6f7-882e-7cae-9389-898a98fbfe22"),
-        RuntimeProvider.Kubernetes,
-        "checker:latest",
-        ["/checker"],
-        new Dictionary<string, string>
+    private static ContainerRequest CheckerRequest() => new(Guid.Parse("019be6f7-882e-7cae-9389-898a98fbfe22"), RuntimeProvider.Kubernetes, "checker:latest", ["/checker"], new Dictionary<string, string>
         {
             ["NOCTF_CALLBACK_URL"] = "https://callback.noctf.svc:8443/api/internal/v1/awdp/fix-results"
-        },
-        new Dictionary<string, string>(),
-        new Dictionary<int, int>(),
-        new RuntimeResourceLimits(128 * 1024 * 1024, 100_000_000, 64),
-        new ContainerSecurityPolicy(true, true, true, ["ALL"], []),
-        TimeSpan.FromMinutes(1),
-        NetworkName: "sandbox-a",
-        AllowInternalCallback: true,
-        NetworkPurpose: ContainerNetworkPurpose.AwdpVerification);
+        }, new Dictionary<string, string>(), new Dictionary<int, int>(), new RuntimeResourceLimits(128 * 1024 * 1024, 100, 64), TimeSpan.FromMinutes(1), NetworkName: "sandbox-a", AllowInternalCallback: true, NetworkPurpose: ContainerNetworkPurpose.AwdpVerification);
 
     private static HttpOperationException NotFound() => new("not found")
     {

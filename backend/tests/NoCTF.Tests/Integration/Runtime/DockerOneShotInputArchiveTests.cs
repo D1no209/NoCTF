@@ -16,7 +16,7 @@ public sealed class DockerOneShotInputArchiveTests
 {
     [Test]
     [Timeout(300_000)]
-    public async Task Root_image_is_refused_by_default_and_allowed_only_without_non_root_requirement(
+    public async Task Root_image_uses_the_platform_sandbox_without_author_security_overrides(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -24,10 +24,6 @@ public sealed class DockerOneShotInputArchiveTests
             await EnsureBusyBoxAsync(cancellationToken);
             using var lifecycle = CreateLifecycle();
             var request = Request(Guid.NewGuid(), "id -u; grep -E '^(CapEff|NoNewPrivs):' /proc/self/status");
-            var secure = request with { Security = request.Security with { RunAsNonRoot = true } };
-            Func<Task> runDenied = async () => _ = await lifecycle.RunAsync(secure, null, cancellationToken);
-            await Assert.That(runDenied).Throws<RuntimeConfigurationException>();
-
             var allowed = await lifecycle.RunAsync(request, null, cancellationToken);
             await Assert.That(allowed.ExitCode).IsEqualTo(0);
             await Assert.That(allowed.StandardOutput).StartsWith("0\n");
@@ -193,20 +189,7 @@ public sealed class DockerOneShotInputArchiveTests
         });
     }
 
-    private static ContainerRequest Request(Guid operationId, string script) => new(
-        operationId,
-        RuntimeProvider.Docker,
-        "busybox:1.36.1",
-        ["/bin/sh", "-c", script],
-        new Dictionary<string, string>(),
-        new Dictionary<string, string>(),
-        new Dictionary<int, int>(),
-        new RuntimeResourceLimits(128 * 1024 * 1024, 100_000_000, 64),
-        new ContainerSecurityPolicy(true, false, false, ["ALL"], []),
-        TimeSpan.FromMinutes(2),
-        NetworkName: "none",
-        RuntimeInstanceId: operationId,
-        NetworkPurpose: ContainerNetworkPurpose.AwdpVerification);
+    private static ContainerRequest Request(Guid operationId, string script) => new(operationId, RuntimeProvider.Docker, "busybox:1.36.1", ["/bin/sh", "-c", script], new Dictionary<string, string>(), new Dictionary<string, string>(), new Dictionary<int, int>(), new RuntimeResourceLimits(128 * 1024 * 1024, 100, 64), TimeSpan.FromMinutes(2), NetworkName: "none", RuntimeInstanceId: operationId, NetworkPurpose: ContainerNetworkPurpose.AwdpVerification, AccessMode: RuntimeAccessMode.Direct);
 
     private static MemoryStream PrefixedCanonicalTar(string payload)
     {

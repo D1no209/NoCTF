@@ -522,13 +522,8 @@ public sealed class AwdpDefenseTargetPersistenceTests
             MaxFixSubmissions: null,
             Runtime: new(
                 RuntimeAllocation.PerTeam,
-                new ContainerRuntimeDefinition(
-                    "target:test",
-                    PortMappings: new Dictionary<int, int> { [8080] = 0 },
-                    Security: new(false, false, false, ["ALL"], []),
-                    FlagEnvironmentVariableName: "FLAG",
-                    InternalPorts: [8080]),
-                new RuntimeResourceLimits(256 * 1024 * 1024, 250_000_000, 128),
+                new ContainerRuntimeDefinition([new RuntimeServiceDefinition("main", "target:test", InternalPorts: [8080], FlagEnvironmentVariableName: "FLAG")]),
+                new RuntimeResourceLimits(256 * 1024 * 1024, 250, 128),
                 TtlSeconds: 900,
                 OperationTimeoutSeconds: 120,
                 UrlBindings:

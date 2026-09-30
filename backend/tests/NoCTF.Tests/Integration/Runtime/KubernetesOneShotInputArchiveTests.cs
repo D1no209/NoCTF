@@ -135,24 +135,11 @@ public sealed class KubernetesOneShotInputArchiveTests
         }
     }
 
-    private static ContainerRequest Request(Guid operationId) => new(
-        operationId,
-        RuntimeProvider.Kubernetes,
-        "busybox:1.36.1",
-        [
+    private static ContainerRequest Request(Guid operationId) => new(operationId, RuntimeProvider.Kubernetes, "busybox:1.36.1", [
             "/bin/sh",
             "-c",
             "test -f /noctf/fix/fix.sh && test \"$(wc -c < /noctf/fix/blob.bin)\" -eq 2097152"
-        ],
-        new Dictionary<string, string>(),
-        new Dictionary<string, string>(),
-        new Dictionary<int, int>(),
-        new RuntimeResourceLimits(128 * 1024 * 1024, 100_000_000, 64),
-        new ContainerSecurityPolicy(true, false, false, ["ALL"], []),
-        TimeSpan.FromMinutes(2),
-        OperationTimeout: TimeSpan.FromMinutes(2),
-        RuntimeInstanceId: operationId,
-        NetworkPurpose: ContainerNetworkPurpose.AwdpVerification);
+        ], new Dictionary<string, string>(), new Dictionary<string, string>(), new Dictionary<int, int>(), new RuntimeResourceLimits(128 * 1024 * 1024, 100, 64), TimeSpan.FromMinutes(2), OperationTimeout: TimeSpan.FromMinutes(2), RuntimeInstanceId: operationId, NetworkPurpose: ContainerNetworkPurpose.AwdpVerification);
 
     private static async Task WaitUntilNamespaceDeletedAsync(
         IKubernetes client,

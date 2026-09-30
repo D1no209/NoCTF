@@ -258,31 +258,8 @@ public sealed class KohFullBoundaryTests
             {
                 kind = "Container",
                 allocation = "Shared",
-                container = new
-                {
-                    image = runtimeImage,
-                    command = Array.Empty<string>(),
-                    environment = new Dictionary<string, string>(),
-                    labels = new Dictionary<string, string>(),
-                    portMappings = new[] { new { containerPort = 8080, hostPort = 0 } },
-                    flagEnvironmentVariableName = (string?)null,
-                    internalPorts = Array.Empty<int>(),
-                    security = new
-                    {
-                        noNewPrivileges = true,
-                        readonlyRootfs = true,
-                        runAsNonRoot = true,
-                        capDrop = Array.Empty<string>(),
-                        capAdd = Array.Empty<string>()
-                    }
-                },
+                container = new { services = new[] { new { name = "main", cpuCores = 0.1m, memoryMiB = 64L, image = runtimeImage, command = Array.Empty<string>(), environment = new Dictionary<string, string>(), internalPorts = Array.Empty<int>(), flagEnvironmentVariableName = (string?)null } } },
                 egressPolicy = "Isolated",
-                limits = new
-                {
-                    memoryBytes = 67_108_864L,
-                    nanoCpus = 100_000_000L,
-                    pidsLimit = 64L
-                },
                 operationTimeoutSeconds = 60,
                 urlBindings = new[]
                 {
@@ -291,7 +268,7 @@ public sealed class KohFullBoundaryTests
                         urlTemplate = "http://{HOST}:{PORT}/play",
                         exposure = "Participants",
                         containerPort = 8080,
-                        serviceName = (string?)null,
+                        serviceName = "main",
                         vmId = (string?)null,
                         guestPort = (int?)null,
                         isControlCheck = false
@@ -301,7 +278,7 @@ public sealed class KohFullBoundaryTests
                         urlTemplate = "http://{HOST}:{PORT}/control",
                         exposure = "OwnerOnly",
                         containerPort = 8080,
-                        serviceName = (string?)null,
+                        serviceName = "main",
                         vmId = (string?)null,
                         guestPort = (int?)null,
                         isControlCheck = true

@@ -309,7 +309,7 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
                 TimeProvider.System,
                 cancellationToken);
             var claim = outbox.RunnerNodeMessages.OfType<ProvisionContainerRuntime>().Single();
-            await Assert.That(claim.Definition.Environment["CHALLENGE_FLAG"])
+            await Assert.That(claim.Definition.Services[0].Environment!["CHALLENGE_FLAG"])
                 .IsEqualTo(initialFlag.Flag);
 
             var generator = new MissingFlagGenerator(
@@ -515,7 +515,7 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
             await Assert.That(ownerB).IsNotNull();
             var runnerCapacity = new RuntimeResourceLimits(
                 512 * 1024 * 1024,
-                500_000_000,
+                500,
                 256);
             foreach (var runnerId in new[] { "runner-a", "runner-b" })
             {
@@ -527,7 +527,7 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
                         runnerId,
                         new(
                             runnerCapacity.MemoryBytes,
-                            runnerCapacity.NanoCpus,
+                            runnerCapacity.CpuMillicores,
                             runnerCapacity.PidsLimit),
                         timeToLive: TimeSpan.FromMinutes(2),
                         resourceDomainFencingToken: runnerId == "runner-a"
@@ -638,21 +638,17 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
 
         var perTeamRuntime = new ChallengeRuntimeTemplate(
                         RuntimeAllocation.PerTeam,
-            new ContainerRuntimeDefinition(
-                "registry.example/challenge:v1",
-                Environment: new Dictionary<string, string>
+            new ContainerRuntimeDefinition([new RuntimeServiceDefinition("main", "registry.example/challenge:v1", Environment: new Dictionary<string, string>
                 {
                     ["CHALLENGE_FLAG"] = "author-value"
-                },
-                Security: new(false, false, false, ["ALL"], []),
-                FlagEnvironmentVariableName: "CHALLENGE_FLAG"),
-            Limits: new(268_435_456, 500_000_000, 128),
+                }, FlagEnvironmentVariableName: "CHALLENGE_FLAG")]),
+            Limits: new(268_435_456, 500, 128),
             FlagSource: RuntimeFlagSource.PerTeam);
         var staticRuntime = perTeamRuntime with
         {
             Definition = ((ContainerRuntimeDefinition)perTeamRuntime.Definition) with
             {
-                FlagEnvironmentVariableName = null
+                Services = ((ContainerRuntimeDefinition)perTeamRuntime.Definition).Services.Select(service => service with { FlagEnvironmentVariableName = null }).ToArray()
             },
             FlagSource = RuntimeFlagSource.Static
         };

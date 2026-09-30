@@ -14,19 +14,9 @@ public sealed class RunnerAssignmentReconciliationTests
     {
         var runtimeId = Guid.CreateVersion7();
         const string runnerId = "runner-a";
-        var definition = new ContainerRequest(
-            runtimeId,
-            RuntimeProvider.Docker,
-            "challenge:latest",
-            [],
-            new Dictionary<string, string>(),
-            new Dictionary<string, string>(),
-            new Dictionary<int, int> { [8080] = 0 },
-            new RuntimeResourceLimits(256 * 1024 * 1024, 250_000_000, 128),
-            new ContainerSecurityPolicy(true, false, true, ["ALL"], []),
-            TimeSpan.FromMinutes(30));
+        var definition = new ContainerRequest(runtimeId, RuntimeProvider.Docker, "challenge:latest", [], new Dictionary<string, string>(), new Dictionary<string, string>(), new Dictionary<int, int> { [8080] = 0 }, new RuntimeResourceLimits(256 * 1024 * 1024, 250, 128), TimeSpan.FromMinutes(30));
 
-        IRunnerNodeMessage provision = new ProvisionContainerRuntime(runtimeId, runnerId, definition);
+        IRunnerNodeMessage provision = new ProvisionContainerRuntime(runtimeId, runnerId, RuntimeReceiptTestData.Request(definition));
         IRunnerNodeMessage stop = new StopContainerRuntime(runtimeId, runnerId);
 
         await Assert.That(provision.RunnerId).IsEqualTo(runnerId);

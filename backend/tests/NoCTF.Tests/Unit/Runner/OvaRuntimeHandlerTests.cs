@@ -222,7 +222,7 @@ public sealed class OvaRuntimeHandlerTests
         public IContainerSandboxLifecycle Sandbox(RuntimeProvider provider) =>
             throw new NotSupportedException();
 
-        public IComposeRuntime Compose(RuntimeProvider provider) =>
+        public IContainerRuntime Runtime(RuntimeProvider provider) =>
             throw new NotSupportedException();
 
         public IOvaRuntime Appliance(RuntimeProvider provider) => runtime;

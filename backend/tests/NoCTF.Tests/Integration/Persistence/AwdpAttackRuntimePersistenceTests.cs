@@ -136,8 +136,8 @@ public sealed class AwdpAttackRuntimePersistenceTests
 
             await Assert.That(plan.State).IsEqualTo(AwdpAttackProvisioningPlanState.Ready);
             await Assert.That(plan.Definition).IsNotNull();
-            await Assert.That(plan.Definition!.Environment["FLAG"]).IsEqualTo(flag);
-            await Assert.That(plan.Definition.Environment.ContainsKey("OLD_FLAG")).IsFalse();
+            await Assert.That(plan.Definition!.Services[0].Environment!["FLAG"]).IsEqualTo(flag);
+            await Assert.That(plan.Definition.Services[0].Environment!.ContainsKey("OLD_FLAG")).IsFalse();
         });
     }
 
@@ -609,12 +609,12 @@ public sealed class AwdpAttackRuntimePersistenceTests
             challengeDefinition.Definition,
             flag);
         var environment = includeInjectedFlag
-            ? claim.Definition.Environment
+            ? claim.Definition.Services[0].Environment!
             : new Dictionary<string, string>(StringComparer.Ordinal);
         return new(
             claim.RuntimeInstanceId,
             claim.RunnerId,
-            claim.Definition with { Environment = environment });
+            claim.Definition with { Services = [claim.Definition.Services[0] with { Environment = environment }] });
     }
 
     private static async Task AssertEnvironmentInjectionAsync(
@@ -647,8 +647,8 @@ public sealed class AwdpAttackRuntimePersistenceTests
 
         await Assert.That(entity.Purpose).IsEqualTo(RuntimePurpose.AwdpAttack);
         await Assert.That(entity.TeamId).IsEqualTo(runtime.TeamId);
-        await Assert.That(claim.Definition.Environment["FLAG"]).IsEqualTo(expectedFlag);
-        await Assert.That(claim.Definition.PortMappings[31337]).IsEqualTo(0);
+        await Assert.That(claim.Definition.Services[0].Environment!["FLAG"]).IsEqualTo(expectedFlag);
+        await Assert.That(claim.Definition.UrlBindings!.Single().ContainerPort).IsEqualTo(31337);
         await Assert.That(claim.Definition.UrlBindings!.Single().Exposure)
             .IsEqualTo(RuntimeExposure.OwnerOnly);
         entity.State = RuntimeState.Provisioning;
@@ -736,13 +736,8 @@ public sealed class AwdpAttackRuntimePersistenceTests
                 null,
                 Runtime: new(
                     RuntimeAllocation.PerTeam,
-                    new ContainerRuntimeDefinition(
-                        "awdp-target:latest",
-                        PortMappings: new Dictionary<int, int> { [31337] = 0 },
-                        Security: new(false, false, false, ["ALL"], []),
-                        FlagEnvironmentVariableName: "FLAG",
-                        InternalPorts: [31337]),
-                    new RuntimeResourceLimits(64 * 1024 * 1024, 100_000_000, 64),
+                    new ContainerRuntimeDefinition([new RuntimeServiceDefinition("main", "awdp-target:latest", InternalPorts: [31337], FlagEnvironmentVariableName: "FLAG")]),
+                    new RuntimeResourceLimits(64 * 1024 * 1024, 100, 64),
                     UrlBindings: [new("tcp://{HOST}:{PORT}", RuntimeExposure.OwnerOnly, 31337)],
                     FlagSource: RuntimeFlagSource.PerTeam)), json)),
             CreatedAt = now,

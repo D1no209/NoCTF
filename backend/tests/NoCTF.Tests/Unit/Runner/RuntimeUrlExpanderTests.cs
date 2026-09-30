@@ -7,156 +7,44 @@ namespace NoCTF.Tests.Unit.Runner;
 public sealed class RuntimeUrlExpanderTests
 {
     [Test]
-    public async Task Container_bindings_use_public_mapping()
+    public async Task Named_entries_resolve_each_services_own_random_port()
     {
-        var receipt = new ContainerReceipt(
-            Guid.CreateVersion7(),
-            RuntimeProvider.Docker,
-            "container-1",
-            RuntimeStatus.Running,
-            new Dictionary<int, int> { [8080] = 32000 },
-            "runner.example",
-            "container-1");
-        RuntimeUrlBinding[] bindings =
-        [
-            new("http://{HOST}:{PORT}/owner", RuntimeExposure.OwnerOnly, ContainerPort: 8080),
-            new("http://{HOST}:{PORT}/play", RuntimeExposure.Participants, ContainerPort: 8080)
-        ];
-        var expanded = RuntimeUrlExpander.ExpandContainer(
-            receipt,
-            bindings);
-
-        await Assert.That(expanded.DirectAddresses).IsEquivalentTo(
-            ["http://runner.example:32000/owner", "http://runner.example:32000/play"]);
+        var id = Guid.NewGuid();
+        ContainerServiceStatus[] services = [new("web", "web-resource", RuntimeStatus.Running, new Dictionary<int, int> { [8080] = 32000 }, "10.0.0.1"),
+            new("admin", "admin-resource", RuntimeStatus.Running, new Dictionary<int, int> { [8080] = 32001 }, "10.0.0.2")];
+        var receipt = new ContainerDeploymentReceipt(id, RuntimeProvider.Docker, $"noctf-rt-{id:N}", "", "runner.example", DateTimeOffset.UtcNow, services);
+        var expanded = RuntimeUrlExpander.ExpandContainer(receipt, new(receipt.ProjectName, RuntimeStatus.Running, services),
+            [new("http://{HOST}:{PORT}/play", RuntimeExposure.OwnerOnly, 8080, "web"), new("nc {HOST} {PORT}", RuntimeExposure.Participants, 8080, "admin")]);
+        await Assert.That(expanded.DirectAddresses).IsEquivalentTo(["http://runner.example:32000/play", "nc runner.example 32001"]);
     }
 
     [Test]
-    public async Task Missing_dynamic_port_mapping_is_rejected()
+    [Arguments(RuntimeAccessMode.Direct)]
+    [Arguments(RuntimeAccessMode.DirectAndWsrx)]
+    [Arguments(RuntimeAccessMode.WsrxOnly)]
+    public async Task Access_modes_publish_the_correct_direct_and_private_targets(RuntimeAccessMode mode)
     {
-        var receipt = new ContainerReceipt(
-            Guid.CreateVersion7(),
-            RuntimeProvider.Docker,
-            "container-1",
-            RuntimeStatus.Running,
-            new Dictionary<int, int>(),
-            "runner.example",
-            "container-1");
-
-        await Assert.That(() => RuntimeUrlExpander.ExpandContainer(
-                receipt,
-                [new("http://{HOST}:{PORT}", RuntimeExposure.Participants, ContainerPort: 8080)]))
-            .Throws<InvalidOperationException>();
+        var id = Guid.NewGuid();
+        ContainerServiceStatus[] services = [new("main", "resource", RuntimeStatus.Running, new Dictionary<int, int> { [80] = 32000 }, "10.0.0.1")];
+        var receipt = new ContainerDeploymentReceipt(id, RuntimeProvider.Docker, $"noctf-rt-{id:N}", "", "runner.example", DateTimeOffset.UtcNow, services);
+        var expanded = RuntimeUrlExpander.ExpandContainer(receipt, new(receipt.ProjectName, RuntimeStatus.Running, services),
+            [new("http://{HOST}:{PORT}", RuntimeExposure.OwnerOnly, 80, "main")], mode);
+        var entry = expanded.AccessEndpoints.Single();
+        await Assert.That(entry.DirectAddress is not null).IsEqualTo(mode != RuntimeAccessMode.WsrxOnly);
+        await Assert.That(entry.TargetHost is not null).IsEqualTo(mode != RuntimeAccessMode.Direct);
+        if (mode != RuntimeAccessMode.Direct) await Assert.That(entry.TargetHost).IsEqualTo("10.0.0.1");
     }
 
     [Test]
-    public async Task Public_bindings_render_custom_display_text()
+    public async Task Unknown_service_or_missing_public_port_is_rejected()
     {
-        var receipt = new ContainerReceipt(
-            Guid.CreateVersion7(),
-            RuntimeProvider.Docker,
-            "container-1",
-            RuntimeStatus.Running,
-            new Dictionary<int, int> { [8080] = 32000 },
-            "runner.example",
-            "container-1");
-
-        var expanded = RuntimeUrlExpander.ExpandContainer(
-            receipt,
-            [new("nc {HOST} {PORT}", RuntimeExposure.OwnerOnly, ContainerPort: 8080)]);
-
-        await Assert.That(expanded.DirectAddresses)
-            .IsEquivalentTo(["nc runner.example 32000"]);
-    }
-
-    [Test]
-    public async Task Compose_bindings_resolve_the_named_service()
-    {
-        var receipt = new ComposeReceipt(
-            Guid.CreateVersion7(),
-            RuntimeProvider.Docker,
-            "noctf-runtime",
-            "/tmp/noctf-runtime",
-            "runner.example",
-            DateTimeOffset.UtcNow);
-        var status = new ComposeStatus(
-            receipt.ProjectName,
-            RuntimeStatus.Running,
-            [
-                new(
-                    "web",
-                    "container-web",
-                    RuntimeStatus.Running,
-                    new Dictionary<int, int> { [8080] = 32000 },
-                    "web")
-            ]);
-        RuntimeUrlBinding[] bindings =
-        [
-            new(
-                "http://{HOST}:{PORT}/play",
-                RuntimeExposure.Participants,
-                ContainerPort: 8080,
-                ServiceName: "web")
-        ];
-        var expanded = RuntimeUrlExpander.ExpandCompose(
-            receipt,
-            status,
-            bindings);
-
-        await Assert.That(expanded.DirectAddresses)
-            .IsEquivalentTo(["http://runner.example:32000/play"]);
-    }
-
-    [Test]
-    public async Task Wsrx_only_container_uses_internal_target_without_public_mapping()
-    {
-        var receipt = new ContainerReceipt(
-            Guid.CreateVersion7(),
-            RuntimeProvider.Docker,
-            "container-1",
-            RuntimeStatus.Running,
-            new Dictionary<int, int>(),
-            "runner.example",
-            "10.42.0.5");
-
-        var expanded = RuntimeUrlExpander.ExpandContainer(
-            receipt,
-            [new("tcp://{HOST}:{PORT}", RuntimeExposure.OwnerOnly, ContainerPort: 31337)],
-            RuntimeAccessMode.WsrxOnly);
-
-        await Assert.That(expanded.DirectAddresses).IsEmpty();
-        await Assert.That(expanded.AccessEndpoints).Count().IsEqualTo(1);
-        await Assert.That(expanded.AccessEndpoints[0].DirectAddress).IsNull();
-        await Assert.That(expanded.AccessEndpoints[0].TargetHost).IsEqualTo("10.42.0.5");
-        await Assert.That(expanded.AccessEndpoints[0].TargetPort).IsEqualTo(31337);
-    }
-
-    [Test]
-    public async Task Dual_compose_access_contains_direct_and_internal_targets()
-    {
-        var receipt = new ComposeReceipt(
-            Guid.CreateVersion7(),
-            RuntimeProvider.Kubernetes,
-            "runtime",
-            "runtime",
-            "node.example",
-            DateTimeOffset.UtcNow);
-        var status = new ComposeStatus(
-            receipt.ProjectName,
-            RuntimeStatus.Running,
-            [new("web", "deployment", RuntimeStatus.Running,
-                new Dictionary<int, int> { [8080] = 31234 },
-                "web.runtime.svc.cluster.local")]);
-
-        var expanded = RuntimeUrlExpander.ExpandCompose(
-            receipt,
-            status,
-            [new("http://{HOST}:{PORT}", RuntimeExposure.Participants, 8080, "web")],
-            RuntimeAccessMode.DirectAndWsrx);
-
-        await Assert.That(expanded.AccessEndpoints[0].DirectAddress)
-            .IsEqualTo("http://node.example:31234");
-        await Assert.That(expanded.AccessEndpoints[0].TargetHost)
-            .IsEqualTo("web.runtime.svc.cluster.local");
-        await Assert.That(expanded.AccessEndpoints[0].TargetPort).IsEqualTo(8080);
+        var id = Guid.NewGuid();
+        ContainerServiceStatus[] services = [new("main", "resource", RuntimeStatus.Running, new Dictionary<int, int>(), "10.0.0.1")];
+        var receipt = new ContainerDeploymentReceipt(id, RuntimeProvider.Docker, $"noctf-rt-{id:N}", "", "runner.example", DateTimeOffset.UtcNow, services);
+        var status = new ContainerRuntimeStatus(receipt.ProjectName, RuntimeStatus.Running, services);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Task.FromResult(RuntimeUrlExpander.ExpandContainer(receipt, status,
+            [new("http://{HOST}:{PORT}", RuntimeExposure.OwnerOnly, 80, "missing")])));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => Task.FromResult(RuntimeUrlExpander.ExpandContainer(receipt, status,
+            [new("http://{HOST}:{PORT}", RuntimeExposure.OwnerOnly, 80, "main")])));
     }
 }

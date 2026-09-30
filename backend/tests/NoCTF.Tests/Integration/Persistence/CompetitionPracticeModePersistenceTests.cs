@@ -390,11 +390,8 @@ public sealed class CompetitionPracticeModePersistenceTests
                     null,
                     Runtime: new(
                         RuntimeAllocation.PerTeam,
-                        new ContainerRuntimeDefinition(
-                            "registry.example/practice:v1",
-                            Security: new(false, false, false, ["ALL"], []),
-                            FlagEnvironmentVariableName: "FLAG"),
-                        new RuntimeResourceLimits(67_108_864, 100_000_000, 64),
+                        new ContainerRuntimeDefinition([new RuntimeServiceDefinition("main", "registry.example/practice:v1", FlagEnvironmentVariableName: "FLAG")]),
+                        new RuntimeResourceLimits(67_108_864, 100, 64),
                         FlagSource: RuntimeFlagSource.PerTeam)),
                 new JsonSerializerOptions(JsonSerializerDefaults.Web)));
             await db.SaveChangesAsync(cancellationToken);

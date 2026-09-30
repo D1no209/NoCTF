@@ -22,14 +22,14 @@ internal static class CurrentRunnerRegistration
             now,
             capacity.MemoryBytes,
             capacity.MemoryBytes,
-            capacity.NanoCpus,
+            capacity.CpuMillicores,
             0,
             0,
             capacity.PidsLimit,
             0);
         var amount = new RunnerObservedResourceAmount(
             capacity.MemoryBytes,
-            capacity.NanoCpus,
+            capacity.CpuMillicores,
             capacity.PidsLimit);
         var zero = new RunnerObservedResourceAmount(0, 0, 0);
         var snapshot = new RunnerAdmissionSnapshot(

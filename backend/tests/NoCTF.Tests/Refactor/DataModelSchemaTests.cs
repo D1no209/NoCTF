@@ -92,7 +92,8 @@ public sealed class DataModelSchemaTests
                     migrations.Add(reader.GetString(0));
             }
 
-            await Assert.That(migrations).Count().IsEqualTo(7);
+            await using var migrationModel = new NoCtfDbContext(options);
+            await Assert.That(migrations).Count().IsEqualTo(migrationModel.Database.GetMigrations().Count());
             await Assert.That(migrations[0]).EndsWith("_InitialBaseline");
             await Assert.That(migrations[1]).EndsWith("_CompetitionProgression");
             await Assert.That(migrations[2]).EndsWith("_PersistedSsoFlows");

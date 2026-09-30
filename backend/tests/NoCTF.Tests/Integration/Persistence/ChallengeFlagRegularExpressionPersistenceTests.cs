@@ -122,9 +122,7 @@ public sealed class ChallengeFlagRegularExpressionPersistenceTests
                     ChallengeId = challengeId,
                     Allocation = PersistedRuntimeAllocation.PerTeam,
                     FlagSource = PersistedRuntimeFlagSource.PerTeam,
-                    Image = "registry.example/challenge:v1",
-                    FlagEnvironmentVariableName = "FLAG",
-                    Capabilities = [new() { ChallengeId = challengeId, Name = "ALL" }]
+                    Services = [new ChallengeRuntimeService { Name = "main", Image = "registry.example/challenge:v1" }],
                 }
             };
             var bank = new ChallengeBankStore(db);

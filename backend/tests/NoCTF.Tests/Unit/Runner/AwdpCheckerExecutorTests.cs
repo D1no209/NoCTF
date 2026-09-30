@@ -8,29 +8,15 @@ namespace NoCTF.Tests.Unit.Runner;
 public sealed class AwdpCheckerExecutorTests
 {
     [Test]
-    [Arguments(false)]
-    [Arguments(true)]
-    public async Task Checker_runs_as_an_isolated_one_shot_on_the_target_network(bool allowRoot)
+    public async Task Checker_runs_as_an_attached_one_shot_on_the_target_network()
     {
         var runner = new RecordingOneShotRunner();
         var executor = new AwdpCheckerExecutor(new RecordingCatalog(runner));
-        var work = new AwdpCheckerWork(
-            Guid.Parse("11111111-1111-1111-1111-111111111111"),
-            RuntimeProvider.Docker,
-            "checker:latest",
-            ["/checker"],
-            new Dictionary<string, string>
+        var work = new AwdpCheckerWork(Guid.Parse("11111111-1111-1111-1111-111111111111"), RuntimeProvider.Docker, "checker:latest", ["/checker"], new Dictionary<string, string>
             {
                 ["SAFE_SETTING"] = "allowed",
                 ["TARGET_HOST"] = "must-not-win"
-            },
-            "network-1",
-            "target.internal",
-            30,
-            new Uri("https://api.example/api/internal/v1/awdp/fix-results"),
-            "callback-token",
-            TimeSpan.FromSeconds(20),
-            AllowRoot: allowRoot);
+            }, new ContainerReceipt(Guid.Parse("11111111-1111-1111-1111-111111111111"), RuntimeProvider.Docker, "target-resource", RuntimeStatus.Running, new Dictionary<int, int>(), null, "target.internal", NetworkId: "network-1", RuntimeInstanceId: Guid.Parse("11111111-1111-1111-1111-111111111111")), "target.internal", 30, new Uri("https://api.example/api/internal/v1/awdp/fix-results"), "callback-token", TimeSpan.FromSeconds(20));
 
         var outcome = await executor.ExecuteAsync(work, null, CancellationToken.None);
 
@@ -42,11 +28,6 @@ public sealed class AwdpCheckerExecutorTests
         await Assert.That(request.Environment["NOCTF_CALLBACK_TOKEN"]).IsEqualTo("callback-token");
         await Assert.That(request.Environment).DoesNotContainKey("OBJECT_KEY");
         await Assert.That(request.Labels).IsEmpty();
-        await Assert.That(request.Security.RunAsNonRoot).IsEqualTo(!allowRoot);
-        await Assert.That(request.Security.NoNewPrivileges).IsTrue();
-        await Assert.That(request.Security.ReadonlyRootfs).IsTrue();
-        await Assert.That(request.Security.CapDrop).IsEmpty();
-        await Assert.That(request.Security.CapAdd).IsEmpty();
         await Assert.That(request.NetworkPurpose)
             .IsEqualTo(ContainerNetworkPurpose.AwdpVerification);
         await Assert.That(request.PortMappings).IsEmpty();
@@ -92,24 +73,12 @@ public sealed class AwdpCheckerExecutorTests
             .IsEqualTo(NoCTF.Domain.Gameplay.AwdpFixOutcome.ServiceAbnormal);
     }
 
-    private static AwdpCheckerWork Work() => new(
-        Guid.Parse("11111111-1111-1111-1111-111111111111"),
-        RuntimeProvider.Docker,
-        "checker:latest",
-        ["/checker"],
-        new Dictionary<string, string>(),
-        "network-1",
-        "target.internal",
-        30,
-        new Uri("https://api.example/api/internal/v1/awdp/fix-results"),
-        "callback-token",
-        TimeSpan.FromSeconds(20));
+    private static AwdpCheckerWork Work() => new(Guid.Parse("11111111-1111-1111-1111-111111111111"), RuntimeProvider.Docker, "checker:latest", ["/checker"], new Dictionary<string, string>(), new ContainerReceipt(Guid.Parse("11111111-1111-1111-1111-111111111111"), RuntimeProvider.Docker, "target-resource", RuntimeStatus.Running, new Dictionary<int, int>(), null, "target.internal", NetworkId: "network-1", RuntimeInstanceId: Guid.Parse("11111111-1111-1111-1111-111111111111")), "target.internal", 30, new Uri("https://api.example/api/internal/v1/awdp/fix-results"), "callback-token", TimeSpan.FromSeconds(20));
 
     private sealed class RecordingCatalog(IOneShotJobRunner runner) : IOneShotRuntimeProviderCatalog
     {
         public IOneShotJobRunner OneShot(RuntimeProvider provider) => runner;
-        public IAttachedOneShotJobRunner Attached(RuntimeProvider provider) =>
-            throw new NotSupportedException();
+        public IAttachedOneShotJobRunner Attached(RuntimeProvider provider) => new TestAttachedJobRunner(runner);
     }
 
     private sealed class RecordingOneShotRunner : IOneShotJobRunner

@@ -134,12 +134,8 @@ public sealed class CtfPatchVerificationTargetPersistenceTests
         var teamId = Guid.CreateVersion7();
         var runtime = new ChallengeRuntimeTemplate(
             RuntimeAllocation.PerTeam,
-            new ContainerRuntimeDefinition(
-                "ctf-patch-target:test",
-                PortMappings: new Dictionary<int, int> { [8080] = 0 },
-                Security: new(false, false, false, ["ALL"], []),
-                InternalPorts: [8080]),
-            new RuntimeResourceLimits(256 * 1024 * 1024, 250_000_000, 128),
+            new ContainerRuntimeDefinition([new RuntimeServiceDefinition("main", "ctf-patch-target:test", InternalPorts: [8080])]),
+            new RuntimeResourceLimits(256 * 1024 * 1024, 250, 128),
             TtlSeconds: 900,
             OperationTimeoutSeconds: 120,
             UrlBindings:

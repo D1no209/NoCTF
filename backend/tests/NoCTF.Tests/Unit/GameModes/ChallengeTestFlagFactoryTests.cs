@@ -58,12 +58,9 @@ public sealed class ChallengeTestFlagFactoryTests
     private static ChallengeRuntimeTemplate Runtime(RuntimeFlagSource flagSource) =>
         new(
             RuntimeAllocation.PerTeam,
-            new ContainerRuntimeDefinition(
-                "challenge:test",
-                Security: ContainerSecurityPolicy.Default,
-                FlagEnvironmentVariableName: flagSource == RuntimeFlagSource.PerTeam
+            new ContainerRuntimeDefinition([new RuntimeServiceDefinition("main", "challenge:test", FlagEnvironmentVariableName: flagSource == RuntimeFlagSource.PerTeam
                     ? "CHALLENGE_FLAG"
-                    : null),
-            new RuntimeResourceLimits(67_108_864, 100_000_000, 64),
+                    : null)]),
+            new RuntimeResourceLimits(67_108_864, 100, 64),
             FlagSource: flagSource);
 }

@@ -31,17 +31,7 @@ public sealed class ContainerRuntimeHandlerTests
         var message = new ProvisionContainerRuntime(
             runtimeInstanceId,
             RunnerId: "runner-a",
-            Definition: new ContainerRequest(
-                runtimeInstanceId,
-                RuntimeProvider.Docker,
-                "challenge:latest",
-                [],
-                new Dictionary<string, string>(),
-                new Dictionary<string, string>(),
-                new Dictionary<int, int>(),
-                new RuntimeResourceLimits(128 * 1024 * 1024, 100_000_000, 64),
-                new ContainerSecurityPolicy(false, false, true, [], []),
-                Ttl: null));
+            Definition: RuntimeReceiptTestData.Request(new ContainerRequest(runtimeInstanceId, RuntimeProvider.Docker, "challenge:latest", [], new Dictionary<string, string>(), new Dictionary<string, string>(), new Dictionary<int, int>(), new RuntimeResourceLimits(128 * 1024 * 1024, 100, 64), Ttl: null)));
 
         var result = await handler.ProvisionContainerAsync(message, CancellationToken.None);
 
@@ -80,7 +70,7 @@ public sealed class ContainerRuntimeHandlerTests
             capacity,
             new FixedWorkReader(new(
                 RuntimeProvider.Docker,
-                ContainerRuntimeReceiptData.From(receipt))),
+                RuntimeReceiptTestData.From(receipt))),
             reconciler);
         var message = new StopContainerRuntime(runtimeInstanceId, "runner-a");
 
@@ -126,17 +116,7 @@ public sealed class ContainerRuntimeHandlerTests
         var message = new ProvisionContainerRuntime(
             runtimeInstanceId,
             RunnerId: "runner-a",
-            Definition: new ContainerRequest(
-                runtimeInstanceId,
-                RuntimeProvider.Docker,
-                "challenge:latest",
-                [],
-                new Dictionary<string, string>(),
-                new Dictionary<string, string>(),
-                new Dictionary<int, int>(),
-                new RuntimeResourceLimits(128 * 1024 * 1024, 100_000_000, 64),
-                new ContainerSecurityPolicy(false, false, false, [], []),
-                Ttl: null));
+            Definition: RuntimeReceiptTestData.Request(new ContainerRequest(runtimeInstanceId, RuntimeProvider.Docker, "challenge:latest", [], new Dictionary<string, string>(), new Dictionary<string, string>(), new Dictionary<int, int>(), new RuntimeResourceLimits(128 * 1024 * 1024, 100, 64), Ttl: null)));
 
         var result = await handler.ProvisionContainerAsync(message, CancellationToken.None);
 
@@ -169,7 +149,7 @@ public sealed class ContainerRuntimeHandlerTests
             capacity,
             new FixedWorkReader(new(
                 RuntimeProvider.Docker,
-                ContainerRuntimeReceiptData.From(receipt))));
+                RuntimeReceiptTestData.From(receipt))));
 
         var result = await handler.StopContainerAsync(
             new StopContainerRuntime(runtimeInstanceId, "runner-a"),
@@ -261,7 +241,7 @@ public sealed class ContainerRuntimeHandlerTests
             capacity,
             new FixedWorkReader(new(
                 RuntimeProvider.Docker,
-                ContainerRuntimeReceiptData.From(receipt),
+                RuntimeReceiptTestData.From(receipt),
                 RuntimeKind.Container)),
             reconciler);
         var message = new ForceTerminateRuntime(
@@ -442,8 +422,7 @@ public sealed class ContainerRuntimeHandlerTests
 
         public IContainerSandboxLifecycle Sandbox(RuntimeProvider provider) => sandbox;
 
-        public IComposeRuntime Compose(RuntimeProvider provider) =>
-            throw new NotSupportedException();
+        public IContainerRuntime Runtime(RuntimeProvider provider) => new TestNamedContainerRuntime(lifecycle, sandbox);
 
         public IOvaRuntime Appliance(RuntimeProvider provider) =>
             throw new NotSupportedException();

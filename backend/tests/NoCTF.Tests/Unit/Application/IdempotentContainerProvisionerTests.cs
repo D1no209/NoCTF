@@ -52,15 +52,5 @@ public sealed class IdempotentContainerProvisionerTests
         await lifecycle.Received(1).EnsureRunningAsync(request, cancellationToken);
     }
 
-    private static ContainerRequest CreateRequest() => new(
-        Guid.CreateVersion7(),
-        RuntimeProvider.Docker,
-        "example/runtime:latest",
-        [],
-        new Dictionary<string, string>(),
-        new Dictionary<string, string>(),
-        new Dictionary<int, int> { [8080] = 31000 },
-        new RuntimeResourceLimits(1024, 100, 10),
-        new ContainerSecurityPolicy(true, true, true, ["ALL"], []),
-        null);
+    private static ContainerRequest CreateRequest() => new(Guid.CreateVersion7(), RuntimeProvider.Docker, "example/runtime:latest", [], new Dictionary<string, string>(), new Dictionary<string, string>(), new Dictionary<int, int> { [8080] = 31000 }, new RuntimeResourceLimits(1024, 100, 10), null);
 }

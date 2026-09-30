@@ -51,7 +51,7 @@ public sealed class RuntimeWriteBackOrderingTests
                 RuntimeProvider.Docker,
                 RuntimeReceiptTestData.ContainerData(runtime.Id) with
                 {
-                    PortMappings = new Dictionary<int, int> { [8080] = 49152 }
+                    Services = [new("main", "test-runtime", RuntimeStatus.Running, new Dictionary<int, int> { [8080] = 49152 }, "runtime.internal")]
                 },
                 [new RuntimeAccessEndpointMapping(0, "127.0.0.1:49152", null, null)],
                 null,
@@ -63,7 +63,7 @@ public sealed class RuntimeWriteBackOrderingTests
             var receipt = await db.Set<RuntimeReceipt>().AsNoTracking()
                 .SingleAsync(row => row.RuntimeInstanceId == runtime.Id, ct);
             await Assert.That(persisted.State).IsEqualTo(RuntimeState.Running);
-            await Assert.That(receipt.PortMappings.Select(port => port.HostPort))
+            await Assert.That(receipt.Services.SelectMany(service => service.PublishedPorts).Select(port => port.HostPort))
                 .Contains(49152);
         });
     }
@@ -107,7 +107,7 @@ public sealed class RuntimeWriteBackOrderingTests
             var receipt = await db.Set<RuntimeReceipt>().AsNoTracking()
                 .SingleAsync(item => item.RuntimeInstanceId == runtime.Id, ct);
             await Assert.That(receipt).IsTypeOf<ContainerRuntimeReceipt>();
-            await Assert.That(((ContainerRuntimeReceipt)receipt).ResourceId)
+            await Assert.That(((ContainerRuntimeReceipt)receipt).Services[0].ResourceId)
                 .IsEqualTo("test-runtime");
             await Assert.That(receipt.OperationId).IsEqualTo(receiptOperationId);
             await Assert.That(await db.CompetitionEvents.CountAsync(ct)).IsEqualTo(before);

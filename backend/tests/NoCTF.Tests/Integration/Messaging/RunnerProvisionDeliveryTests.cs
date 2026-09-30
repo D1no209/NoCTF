@@ -115,9 +115,7 @@ public sealed class RunnerProvisionDeliveryTests
             try
             {
                 var id = Guid.CreateVersion7();
-                var command = new ProvisionContainerRuntime(id, runnerId, new ContainerRequest(id, RuntimeProvider.Docker,
-                    "fixture:unused", [], new Dictionary<string, string>(), new Dictionary<string, string>(),
-                    new Dictionary<int, int>(), new(67108864, 100000000, 64), new(true, false, true, ["ALL"], []), null));
+                var command = new ProvisionContainerRuntime(id, runnerId, RuntimeReceiptTestData.Request(new ContainerRequest(id, RuntimeProvider.Docker, "fixture:unused", [], new Dictionary<string, string>(), new Dictionary<string, string>(), new Dictionary<int, int>(), new(67108864, 100000000, 64), null)));
                 await host.Services.GetRequiredService<IMessageBus>().EndpointFor(new Uri("nats://subject/" + subject)).SendAsync(command);
                 await called.Task.WaitAsync(TimeSpan.FromSeconds(20), ct);
                 var result = await probe.Result.Task.WaitAsync(TimeSpan.FromSeconds(20), ct);

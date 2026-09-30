@@ -323,7 +323,7 @@ public sealed class AwdRoundCoordinationTests
                     greenRuntimeId,
                     "runner-a",
                     RuntimeProvider.Docker,
-                    ContainerRuntimeReceiptData.From(new ContainerReceipt(
+                    RuntimeReceiptTestData.From(new ContainerReceipt(
                         greenRuntimeId,
                         RuntimeProvider.Docker,
                         "green-container",

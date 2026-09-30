@@ -25,7 +25,7 @@ public sealed class RuntimeCapacityAllocationTests
         var main = Allocation(new(RuntimeWorkloadKind.Runtime, runtime, runtime));
         var document = RuntimeCapacityAllocations.Empty.Add(main);
         await Assert.That(() => document.Add(main with { RunnerId = "other" })).Throws<InvalidOperationException>();
-        await Assert.That(() => document.Add(main with { Budget = main.Budget with { NanoCpus = 1 } }))
+        await Assert.That(() => document.Add(main with { Budget = main.Budget with { CpuMillicores = 1 } }))
             .Throws<InvalidOperationException>();
     }
 

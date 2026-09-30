@@ -147,7 +147,7 @@ public sealed class ChallengeTestRuntimePersistenceTests
             var updatedDefinition = (CtfChallengeDefinition)(await db.Challenges.AsNoTracking()
                 .SingleAsync(challenge => challenge.Id == fixture.ChallengeId, cancellationToken))
                 .Definition!;
-            ((ContainerChallengeRuntimeTemplate)updatedDefinition.Runtime!).Image =
+            ((ContainerChallengeRuntimeTemplate)updatedDefinition.Runtime!).Services[0].Image =
                 "challenge:test-v2";
             var definitionBlocked = await new ChallengeBankStore(db).UpdateAsync(new(
                 fixture.ChallengeId,
@@ -207,7 +207,7 @@ public sealed class ChallengeTestRuntimePersistenceTests
                 TimeProvider.System,
                 cancellationToken);
             var provision = outbox.RunnerNodeMessages.OfType<ProvisionContainerRuntime>().Single();
-            await Assert.That(provision.Definition.Environment["CHALLENGE_FLAG"])
+            await Assert.That(provision.Definition.Services[0].Environment!["CHALLENGE_FLAG"])
                 .IsEqualTo(flag.Flag);
             await Assert.That(provision.Definition.Labels["noctf.io/job-kind"])
                 .IsEqualTo("challenge-test-runtime");
@@ -367,12 +367,8 @@ public sealed class ChallengeTestRuntimePersistenceTests
                     null,
                     Runtime: new ChallengeRuntimeTemplate(
                         RuntimeAllocation.PerTeam,
-                        new ContainerRuntimeDefinition(
-                            "challenge:test",
-                            Security: new(false, false, false, ["ALL"], []),
-                            FlagEnvironmentVariableName: "CHALLENGE_FLAG",
-                            PortMappings: new Dictionary<int, int> { [31337] = 0 }),
-                        new RuntimeResourceLimits(67_108_864, 100_000_000, 64),
+                        new ContainerRuntimeDefinition([new RuntimeServiceDefinition("main", "challenge:test", FlagEnvironmentVariableName: "CHALLENGE_FLAG")]),
+                        new RuntimeResourceLimits(67_108_864, 100, 64),
                         TtlSeconds: 3600,
                         UrlBindings:
                         [

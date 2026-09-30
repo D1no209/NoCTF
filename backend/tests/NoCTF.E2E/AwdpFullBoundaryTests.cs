@@ -703,31 +703,8 @@ public sealed class AwdpFullBoundaryTests
             {
                 kind = "Container",
                 allocation = "PerTeam",
-                container = new
-                {
-                    image = targetImage,
-                    command = Array.Empty<string>(),
-                    environment = new Dictionary<string, string>(),
-                    labels = new Dictionary<string, string>(),
-                    portMappings = new[] { new { containerPort = 8080, hostPort = 0 } },
-                    flagEnvironmentVariableName = "FLAG",
-                    security = new
-                    {
-                        noNewPrivileges = true,
-                        readonlyRootfs = false,
-                        runAsNonRoot = true,
-                        capDrop = Array.Empty<string>(),
-                        capAdd = Array.Empty<string>()
-                    },
-                    internalPorts = new[] { 8080 }
-                },
+                container = new { services = new[] { new { name = "main", cpuCores = 0.1m, memoryMiB = 64L, image = targetImage, command = Array.Empty<string>(), environment = new Dictionary<string, string>(), internalPorts = new[] { 8080 }, flagEnvironmentVariableName = "FLAG" } } },
                 egressPolicy = "Isolated",
-                limits = new
-                {
-                    memoryBytes = 67_108_864L,
-                    nanoCpus = 100_000_000L,
-                    pidsLimit = 64L
-                },
                 ttlSeconds = 600,
                 operationTimeoutSeconds = 60,
                 urlBindings = new[]
@@ -737,7 +714,7 @@ public sealed class AwdpFullBoundaryTests
                         urlTemplate = "http://{HOST}:{PORT}/",
                         exposure = "OwnerOnly",
                         containerPort = 8080,
-                        serviceName = (string?)null,
+                        serviceName = "main",
                         vmId = (string?)null,
                         guestPort = (int?)null,
                         isControlCheck = false
@@ -754,7 +731,7 @@ public sealed class AwdpFullBoundaryTests
                 command = Array.Empty<string>(),
                 environment = new Dictionary<string, string>(),
                 timeoutSeconds = 20,
-                targetServiceName = (string?)null
+                targetServiceName = "main"
             },
             readyTimeoutSeconds = 10,
             maximumPatchUploadBytes = 1_048_576L

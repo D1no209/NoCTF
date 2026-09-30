@@ -59,7 +59,7 @@ public sealed class RunnerPressurePolicyTests
 
         await Assert.That(result.Capacity!.ObservedTotal)
             .IsEqualTo(new RunnerObservedResourceAmount(8L * 1024 * 1024 * 1024, 4_000_000_000, 4096));
-        await Assert.That(result.Capacity.ObservedAvailable.NanoCpus).IsEqualTo(3_800_000_000);
+        await Assert.That(result.Capacity.ObservedAvailable.CpuMillicores).IsEqualTo(3_800_000_000);
         await Assert.That(result.Capacity.SafetyHeadroom)
             .IsEqualTo(new RunnerObservedResourceAmount(858_993_460, 400_000_000, 410));
         await Assert.That(result.Capacity.AdmissionAvailable)

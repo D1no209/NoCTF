@@ -67,22 +67,16 @@ public sealed class AwdFlagInjectionHandlerTests
     }
 
     [Test]
-    public async Task Compose_receipt_uses_compose_exec_and_expands_the_raw_template_outside_the_message()
+    public async Task Named_service_receipt_uses_service_exec_and_expands_the_raw_template_outside_the_message()
     {
-        var compose = new RecordingComposeRuntime();
-        var catalog = new StubProviderCatalog(compose);
+        var runtime = new RecordingNamedRuntime();
+        var catalog = new StubProviderCatalog(runtime);
         var executor = new AwdFlagInjectionExecutor(catalog);
-        var receipt = new ComposeReceipt(
-            Guid.NewGuid(),
-            RuntimeProvider.Docker,
-            "project",
-            "namespace",
-            "localhost",
-            DateTimeOffset.UtcNow);
+        var receipt = new ContainerDeploymentReceipt(Guid.NewGuid(), RuntimeProvider.Docker, "project", "namespace", "localhost", DateTimeOffset.UtcNow, [new("web", "web-resource", RuntimeStatus.Running, new Dictionary<int, int>(), "web")]);
         var work = CreateWork() with
         {
-            RuntimeKind = RuntimeKind.Compose,
-            ProviderReceipt = ComposeRuntimeReceiptData.From(receipt),
+            RuntimeKind = RuntimeKind.Container,
+            ProviderReceipt = RuntimeReceiptTestData.From(receipt),
             Flag = "flag{a'b}",
             CommandTemplate = "set-flag ${FLAG}",
             ServiceName = "web"
@@ -91,8 +85,8 @@ public sealed class AwdFlagInjectionHandlerTests
         var result = await executor.ExecuteAsync(work, CancellationToken.None);
 
         await Assert.That(result.ExitCode).IsEqualTo(0);
-        await Assert.That(compose.ServiceName).IsEqualTo("web");
-        await Assert.That(compose.Command).IsEquivalentTo([
+        await Assert.That(runtime.ServiceName).IsEqualTo("web");
+        await Assert.That(runtime.Command).IsEquivalentTo([
             "/bin/sh", "-c", "set-flag flag{a'b}"]);
     }
 
@@ -222,28 +216,28 @@ public sealed class AwdFlagInjectionHandlerTests
         public Task FlushOutgoingMessagesAsync() => Task.CompletedTask;
     }
 
-    private sealed class StubProviderCatalog(RecordingComposeRuntime compose) : IRuntimeProviderCatalog
+    private sealed class StubProviderCatalog(RecordingNamedRuntime runtime) : IRuntimeProviderCatalog
     {
         public IContainerLifecycle Containers(RuntimeProvider provider) => throw new NotSupportedException();
         public IContainerSandboxLifecycle Sandbox(RuntimeProvider provider) => throw new NotSupportedException();
-        public IComposeRuntime Compose(RuntimeProvider provider) => compose;
+        public IContainerRuntime Runtime(RuntimeProvider provider) => runtime;
 
         public IOvaRuntime Appliance(RuntimeProvider provider) =>
             throw new NotSupportedException();
     }
 
-    private sealed class RecordingComposeRuntime : IComposeRuntime
+    private sealed class RecordingNamedRuntime : IContainerRuntime
     {
         public string? ServiceName { get; private set; }
         public IReadOnlyList<string>? Command { get; private set; }
-        public Task<ComposeReceipt> UpAsync(ComposeRequest request, CancellationToken cancellationToken) =>
+        public Task<ContainerDeploymentReceipt> UpAsync(ContainerRuntimeRequest request, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
-        public Task DownAsync(ComposeReceipt receipt, CancellationToken cancellationToken) =>
+        public Task DownAsync(ContainerDeploymentReceipt receipt, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
-        public Task<ComposeStatus?> GetStatusAsync(ComposeReceipt receipt, CancellationToken cancellationToken) =>
+        public Task<ContainerRuntimeStatus?> GetStatusAsync(ContainerDeploymentReceipt receipt, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
         public Task<ContainerExecResult> ExecAsync(
-            ComposeReceipt receipt,
+            ContainerDeploymentReceipt receipt,
             string serviceName,
             IReadOnlyList<string> command,
             TimeSpan timeout,

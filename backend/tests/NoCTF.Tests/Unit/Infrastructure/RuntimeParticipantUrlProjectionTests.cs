@@ -47,8 +47,7 @@ public sealed class RuntimeParticipantUrlProjectionTests
             Runtime = new ContainerChallengeRuntimeTemplate
             {
                 Allocation = PersistedRuntimeAllocation.PerTeam,
-                Image = "example.invalid/runtime:test",
-                Capabilities = [new() { Add = false, Name = "ALL" }],
+                Services = [new ChallengeRuntimeService { Name = "main", Image = "example.invalid/runtime:test" }],
                 UrlBindings = bindings.Select((binding, position) => new ChallengeRuntimeUrlBinding
                 {
                     Position = position,

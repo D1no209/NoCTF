@@ -44,9 +44,7 @@ public sealed class KubernetesCapacityObservationTests
             var policy = new RuntimeResourceBudgetPolicy();
             var limits = policy.EffectiveLimit(new(64 * 1024 * 1024, 201_000_001, 128), RuntimeProvider.Kubernetes);
             var budget = policy.Calculate(limits, RuntimeProvider.Kubernetes);
-            var receipt = await lifecycle.CreateAsync(new(id, RuntimeProvider.Kubernetes, "busybox:1.36.1", ["sleep", "180"],
-                new Dictionary<string, string>(), new Dictionary<string, string>(), new Dictionary<int, int>(), limits,
-                new(true, false, false, ["ALL"], []), null, OperationTimeout: TimeSpan.FromMinutes(2), Budget: budget), ct);
+            var receipt = await lifecycle.CreateAsync(new(id, RuntimeProvider.Kubernetes, "busybox:1.36.1", ["sleep", "180"], new Dictionary<string, string>(), new Dictionary<string, string>(), new Dictionary<int, int>(), limits, null, OperationTimeout: TimeSpan.FromMinutes(2), Budget: budget), ct);
             try
             {
                 var pod = await client.CoreV1.ReadNamespacedPodAsync(receipt.ResourceId, ns, cancellationToken: ct);
@@ -68,7 +66,7 @@ public sealed class KubernetesCapacityObservationTests
                     snapshot = await observer.SampleAsync(ct);
                 }
                 await Assert.That(snapshot.State).IsEqualTo(RunnerAdmissionState.Ready);
-                await Assert.That(snapshot.Observation!.NanoCpus).IsEqualTo(eligible.Items.Sum(node => (long)(node.Status.Allocatable["cpu"].ToDecimal() * 1_000_000_000m)));
+                await Assert.That(snapshot.Observation!.CpuMillicores).IsEqualTo(eligible.Items.Sum(node => (long)(node.Status.Allocatable["cpu"].ToDecimal() * 1_000_000_000m)));
                 await Assert.That(snapshot.Observation.MemoryTotalBytes).IsEqualTo(eligible.Items.Sum(node => (long)node.Status.Allocatable["memory"].ToDecimal()));
                 await Assert.That(snapshot.Observation.PidsUsed).IsNull();
                 await Assert.That(snapshot.Observation.PidsCapacity).IsNull();

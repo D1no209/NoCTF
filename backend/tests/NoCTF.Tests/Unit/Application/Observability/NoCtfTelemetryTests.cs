@@ -253,8 +253,8 @@ public sealed class NoCtfTelemetryTests
             online: true,
             availableMemoryBytes: 100,
             totalMemoryBytes: 200,
-            availableNanoCpus: 2,
-            totalNanoCpus: 4,
+            availableCpuMillicores: 2,
+            totalCpuMillicores: 4,
             availablePids: 10,
             totalPids: 20);
         NoCtfTelemetry.UpdateRunnerCapacitySnapshot(
@@ -263,8 +263,8 @@ public sealed class NoCtfTelemetryTests
             online: true,
             availableMemoryBytes: 300,
             totalMemoryBytes: 600,
-            availableNanoCpus: 6,
-            totalNanoCpus: 8,
+            availableCpuMillicores: 6,
+            totalCpuMillicores: 8,
             availablePids: 30,
             totalPids: 40);
         NoCtfTelemetry.UpdateRunnerCapacitySnapshot(
@@ -273,8 +273,8 @@ public sealed class NoCtfTelemetryTests
             online: false,
             availableMemoryBytes: 999,
             totalMemoryBytes: 999,
-            availableNanoCpus: 999,
-            totalNanoCpus: 999,
+            availableCpuMillicores: 999,
+            totalCpuMillicores: 999,
             availablePids: 999,
             totalPids: 999);
 

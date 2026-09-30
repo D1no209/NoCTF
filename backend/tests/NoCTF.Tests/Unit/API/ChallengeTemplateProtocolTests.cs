@@ -67,9 +67,8 @@ public sealed class ChallengeTemplateProtocolTests
     }
 
     [Test]
-    [Arguments("""{"ova":{"sourceUrl":"https://example.test/a.ova","sha256":"abc"},"kind":"Ova"}""")]
-    [Arguments("""{"compose":{"composeYaml":"services: {}","environment":{},"labels":{},"flagEnvironmentVariables":{},"serviceResources":[]},"kind":"Compose"}""")]
-    [Arguments("""{"container":{"image":"alpine","command":[],"environment":{},"labels":{},"portMappings":[],"security":{"noNewPrivileges":false,"readonlyRootfs":false,"runAsNonRoot":false,"capDrop":[],"capAdd":[]},"flagEnvironmentVariableName":null,"internalPorts":[]},"kind":"Container"}""")]
+    [Arguments("""{"ova":{"sourceUrl":"https://example.test/a.ova","sha256":"abc"},"limits":{"memoryBytes":512,"cpuMillicores":500,"pidsLimit":256},"kind":"Ova"}""")]
+    [Arguments("""{"container":{"services":[{"name":"main","image":"alpine"}]},"kind":"Container"}""")]
     public async Task Runtime_branch_is_validated_with_kind_after_payload(string json)
     {
         var contract = JsonSerializer.Deserialize<ChallengeRuntimeContract>(json, JsonOptions);

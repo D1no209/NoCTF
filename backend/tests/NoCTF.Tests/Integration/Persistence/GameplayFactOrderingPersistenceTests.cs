@@ -32,13 +32,13 @@ public sealed class GameplayFactOrderingPersistenceTests
 {
     [Test]
     [Arguments(GameMode.Ctf, GameplayFactKind.FlagAttempt, RuntimePurpose.Player, RuntimeKind.Container, false)]
-    [Arguments(GameMode.Ctf, GameplayFactKind.FlagAttempt, RuntimePurpose.Player, RuntimeKind.Compose, false)]
+    [Arguments(GameMode.Ctf, GameplayFactKind.FlagAttempt, RuntimePurpose.Player, RuntimeKind.Container, false)]
     [Arguments(GameMode.Awdp, GameplayFactKind.BreakAttempt, RuntimePurpose.AwdpAttack, RuntimeKind.Container, false)]
-    [Arguments(GameMode.Awdp, GameplayFactKind.BreakAttempt, RuntimePurpose.AwdpAttack, RuntimeKind.Compose, false)]
+    [Arguments(GameMode.Awdp, GameplayFactKind.BreakAttempt, RuntimePurpose.AwdpAttack, RuntimeKind.Container, false)]
     [Arguments(GameMode.Ctf, GameplayFactKind.FlagAttempt, RuntimePurpose.Player, RuntimeKind.Container, true)]
-    [Arguments(GameMode.Ctf, GameplayFactKind.FlagAttempt, RuntimePurpose.Player, RuntimeKind.Compose, true)]
+    [Arguments(GameMode.Ctf, GameplayFactKind.FlagAttempt, RuntimePurpose.Player, RuntimeKind.Container, true)]
     [Arguments(GameMode.Awdp, GameplayFactKind.BreakAttempt, RuntimePurpose.AwdpAttack, RuntimeKind.Container, true)]
-    [Arguments(GameMode.Awdp, GameplayFactKind.BreakAttempt, RuntimePurpose.AwdpAttack, RuntimeKind.Compose, true)]
+    [Arguments(GameMode.Awdp, GameplayFactKind.BreakAttempt, RuntimePurpose.AwdpAttack, RuntimeKind.Container, true)]
     [Timeout(300_000)]
     public async Task Old_correct_submission_never_stops_a_reopened_runtime_but_TTL_still_does(
         GameMode mode, GameplayFactKind kind, RuntimePurpose purpose, RuntimeKind runtimeKind,

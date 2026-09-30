@@ -50,8 +50,8 @@ public sealed class GitOpsTemplateFixtureTests
             var fixtures = JsonNode.Parse(await File.ReadAllTextAsync(output, ct))!.AsArray();
             await Assert.That(fixtures.Select(item => item!["scenario"]!.GetValue<string>()).ToArray())
                 .IsEquivalentTo([
-                    "Ctf/None", "Ctf/Container", "Ctf/Compose", "Awd/Container",
-                    "Awd/Compose", "Awdp/Container", "Koh/Container", "Awdp/CheckerFixInput"
+                    "Ctf/None", "Ctf/Container", "Ctf/Services", "Awd/Container",
+                    "Awd/Services", "Awdp/Container", "Koh/Container", "Awdp/CheckerFixInput"
                 ]);
             var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)
             {

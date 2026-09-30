@@ -108,11 +108,8 @@ public sealed class AwdConfigurationTests
         RuntimeExposure exposure) =>
         new(
             RuntimeAllocation.PerTeam,
-            new ContainerRuntimeDefinition(
-                "registry.example/awd:v1",
-                Security: ContainerSecurityPolicy.Default,
-                PortMappings: new Dictionary<int, int> { [8080] = 0 }),
-            Limits: new(268_435_456, 500_000_000, 128),
+            new ContainerRuntimeDefinition([new RuntimeServiceDefinition("main", "registry.example/awd:v1")]),
+            Limits: new(268_435_456, 500, 128),
             UrlBindings:
             [
                 new("nc {HOST} {PORT}", exposure, ContainerPort: 8080)

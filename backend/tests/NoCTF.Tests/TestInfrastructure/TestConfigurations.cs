@@ -188,7 +188,7 @@ internal static class TestConfigurations
         }, value.Runtime, value.PatchEntrypoint, value.PatchCommand,
             value.PatchTimeoutSeconds, value.Checker, value.ReadyTimeoutSeconds,
             value.MaximumPatchUploadBytes, value.FlagTemplate,
-            value.CheckerFixInput, value.CheckerAllowRoot);
+            value.CheckerFixInput);
 
     private static ChallengeDefinition Definition(AwdChallengeConfiguration value)
     {
@@ -198,7 +198,7 @@ internal static class TestConfigurations
             FlagInjectionTimeoutSeconds = value.FlagInjection?.TimeoutSeconds,
             FlagInjectionServiceName = value.FlagInjection?.ServiceName
         }, value.Runtime, null, null, null, value.Checker?.Job, null, null, value.FlagTemplate,
-            false, value.CheckerAllowRoot);
+            false);
         if (result.Checker is not null)
             result.Checker.TargetServiceName = value.Checker?.TargetServiceName;
         return result;
@@ -208,11 +208,11 @@ internal static class TestConfigurations
         CommonDefinition(new AwdpChallengeDefinition(), value.Runtime,
             value.PatchEntrypoint, value.PatchCommand, value.PatchTimeoutSeconds,
             value.Checker, value.ReadyTimeoutSeconds, value.MaximumPatchUploadBytes, value.FlagTemplate,
-            value.CheckerFixInput, value.CheckerAllowRoot);
+            value.CheckerFixInput);
 
     private static ChallengeDefinition Definition(KohChallengeConfiguration value) =>
         CommonDefinition(new KohChallengeDefinition(), value.Runtime,
-            null, null, null, null, null, null, null, false, false);
+            null, null, null, null, null, null, null, false);
 
     private static T Common<T>(T value, NoCTF.GameModes.Flags.PerTeamFlagTemplate? flag)
         where T : CompetitionModeConfiguration
@@ -239,8 +239,7 @@ internal static class TestConfigurations
         int? readyTimeoutSeconds,
         long? maximumPatchUploadBytes,
         NoCTF.GameModes.Flags.PerTeamFlagTemplate? flagTemplate,
-        bool checkerFixInput,
-        bool checkerAllowRoot) where T : ChallengeDefinition
+        bool checkerFixInput) where T : ChallengeDefinition
     {
         value.Runtime = Runtime(runtime);
         value.PatchEntrypoint = patchEntrypoint;
@@ -250,7 +249,6 @@ internal static class TestConfigurations
         value.HasFlagTemplate = flagTemplate is not null;
         value.FlagTemplate = Flag(flagTemplate);
         value.CheckerFixInput = checkerFixInput;
-        value.CheckerAllowRoot = checkerAllowRoot;
         value.Checker = checker is null ? null : new ChallengeCheckerDefinition
         {
             Image = checker.Image,
@@ -288,52 +286,16 @@ internal static class TestConfigurations
         {
             ContainerRuntimeDefinition container => new ContainerChallengeRuntimeTemplate
             {
-                Image = container.Image,
-                Security = new ContainerSecurityPolicyValue
+                Services = container.Services.Select((service, position) => new ChallengeRuntimeService
                 {
-                    NoNewPrivileges = container.Security.NoNewPrivileges,
-                    ReadonlyRootfs = container.Security.ReadonlyRootfs,
-                    RunAsNonRoot = container.Security.RunAsNonRoot
-                },
-                FlagEnvironmentVariableName = container.FlagEnvironmentVariableName,
-                Capabilities = container.Security.CapDrop.Select(name =>
-                        new ChallengeRuntimeCapability { Name = name })
-                    .Concat(container.Security.CapAdd.Select(name =>
-                        new ChallengeRuntimeCapability { Name = name, Add = true })).ToList(),
-                PortMappings = (container.PortMappings
-                        ?? new Dictionary<int, int>()).Select(pair =>
-                    new ChallengeRuntimePortMapping
-                    {
-                        ContainerPort = pair.Key,
-                        HostPort = pair.Value
-                    }).ToList(),
-                InternalPorts = (container.InternalPorts ?? []).Select(port =>
-                    new ChallengeRuntimeInternalPort { Port = port }).ToList(),
-                CommandItems = (container.Command ?? []).Select((item, position) =>
-                    new ChallengeRuntimeCommandItem { Position = position, Value = item }).ToList(),
-                KeyValues = Values(container.Environment, ChallengeRuntimeKeyValueKind.Environment)
-                    .Concat(Values(container.Labels, ChallengeRuntimeKeyValueKind.Label)).ToList(),
+                    Name = service.Name, Position = position, Image = service.Image, CpuCores = service.CpuCores, MemoryMiB = service.MemoryMiB,
+                    FlagEnvironmentVariableName = service.FlagEnvironmentVariableName,
+                    Commands = (service.Command ?? []).Select((item, index) => new ChallengeRuntimeServiceCommand { Position = index, Value = item })
+                        .Concat((service.Arguments ?? []).Select((item, index) => new ChallengeRuntimeServiceCommand { Position = index, Value = item, IsArgument = true })).ToList(),
+                    Environment = (service.Environment ?? new Dictionary<string, string>()).Select(item => new ChallengeRuntimeServiceEnvironment { Name = item.Key, Value = item.Value }).ToList(),
+                    InternalPorts = (service.InternalPorts ?? []).Select(port => new ChallengeRuntimeServicePort { Port = port }).ToList()
+                }).ToList(),
                 EgressPolicy = (PersistedRuntimeEgressPolicy)container.EgressPolicy
-            },
-            ComposeRuntimeDefinition compose => new ComposeChallengeRuntimeTemplate
-            {
-                ComposeYaml = compose.ComposeYaml,
-                ServiceResources = compose.ServiceResources.Select(pair =>
-                    new ComposeServiceResource
-                    {
-                        ServiceName = pair.Key,
-                        Limits = new RuntimeResourceLimitsValue
-                        {
-                            MemoryBytes = pair.Value.MemoryBytes,
-                            NanoCpus = pair.Value.NanoCpus,
-                            PidsLimit = pair.Value.PidsLimit
-                        }
-                    }).ToList(),
-                KeyValues = Values(compose.Environment, ChallengeRuntimeKeyValueKind.Environment)
-                    .Concat(Values(compose.Labels, ChallengeRuntimeKeyValueKind.Label))
-                    .Concat(Values(compose.FlagEnvironmentVariables,
-                        ChallengeRuntimeKeyValueKind.FlagEnvironmentVariable)).ToList(),
-                EgressPolicy = (PersistedRuntimeEgressPolicy)compose.EgressPolicy
             },
             OvaRuntimeDefinition ova => new OvaChallengeRuntimeTemplate
             {
@@ -343,15 +305,10 @@ internal static class TestConfigurations
             _ => throw new ArgumentOutOfRangeException(nameof(value))
         };
         runtime.Allocation = (PersistedRuntimeAllocation)value.Allocation;
-        runtime.HasExplicitLimits = value.Limits is not null;
-        if (value.Limits is not null)
+        if (runtime is OvaChallengeRuntimeTemplate ovaResources && value.Limits is { } limits)
         {
-            runtime.Limits = new RuntimeResourceLimitsValue
-            {
-                MemoryBytes = value.Limits.MemoryBytes,
-                NanoCpus = value.Limits.NanoCpus,
-                PidsLimit = value.Limits.PidsLimit
-            };
+            ovaResources.HasExplicitLimits = true;
+            ovaResources.Limits = new() { MemoryBytes = limits.MemoryBytes, CpuMillicores = limits.CpuMillicores, PidsLimit = limits.PidsLimit };
         }
         runtime.TtlSeconds = value.TtlSeconds;
         runtime.OperationTimeoutSeconds = value.OperationTimeoutSeconds;
@@ -363,7 +320,7 @@ internal static class TestConfigurations
                 UrlTemplate = binding.UrlTemplate,
                 Exposure = (PersistedRuntimeExposure)binding.Exposure,
                 ContainerPort = binding.ContainerPort,
-                ServiceName = binding.ServiceName,
+                ServiceName = binding.ServiceName ?? (value.Definition is ContainerRuntimeDefinition ? "main" : null),
                 VmId = binding.VmId,
                 GuestPort = binding.GuestPort
             }).ToList();
@@ -377,23 +334,13 @@ internal static class TestConfigurations
                 UrlTemplate = binding.UrlTemplate,
                 Exposure = (PersistedRuntimeExposure)binding.Exposure,
                 ContainerPort = binding.ContainerPort,
-                ServiceName = binding.ServiceName,
+                ServiceName = binding.ServiceName ?? (value.Definition is ContainerRuntimeDefinition ? "main" : null),
                 VmId = binding.VmId,
                 GuestPort = binding.GuestPort
             });
         }
         return runtime;
     }
-
-    private static IEnumerable<ChallengeRuntimeKeyValue> Values(
-        IReadOnlyDictionary<string, string>? values,
-        ChallengeRuntimeKeyValueKind kind) => (values ?? new Dictionary<string, string>())
-        .Select(item => new ChallengeRuntimeKeyValue
-        {
-            Kind = kind,
-            Key = item.Key,
-            Value = item.Value
-        });
 
     private static ScoreCurveValue Curve(ScoreCurveConfiguration? value) => value is null
         ? new()

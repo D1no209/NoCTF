@@ -131,7 +131,7 @@ public sealed class CtfFullBoundaryTests
             cancellationToken);
         var hintId = hint.GetProperty("id").GetGuid();
 
-        var composeTemplate = await SendJsonAsync(
+        var servicesTemplate = await SendJsonAsync(
             admin,
             HttpMethod.Post,
             "/api/v1/admin/challenges",
@@ -139,26 +139,26 @@ public sealed class CtfFullBoundaryTests
             {
                 mode = "Ctf",
                 visibility = "Private",
-                title = "Compose Injected Flag Runtime",
-                description = "Reads a generated per-team Flag from a real multi-service Docker Compose runtime.",
+                title = "Services Injected Flag Runtime",
+                description = "Reads a generated per-team Flag from a real multi-service Docker Services runtime.",
                 direction = "Web",
-                definition = BuildComposeDefinition(runtimeImage)
+                definition = BuildNamedServicesDefinition(runtimeImage)
             },
             HttpStatusCode.Created,
             cancellationToken);
-        var composeChallenge = await SendJsonAsync(
+        var servicesChallenge = await SendJsonAsync(
             admin,
             HttpMethod.Post,
             $"/api/v1/admin/competitions/{competitionId}/challenges",
             new
             {
-                challengeId = composeTemplate.GetProperty("id").GetGuid(),
+                challengeId = servicesTemplate.GetProperty("id").GetGuid(),
                 order = 1
             },
             HttpStatusCode.Created,
             cancellationToken);
-        var composeCompetitionChallengeId = composeChallenge.GetProperty("id").GetGuid();
-        var composeConfiguration = new
+        var servicesCompetitionChallengeId = servicesChallenge.GetProperty("id").GetGuid();
+        var servicesConfiguration = new
         {
             mode = "Ctf",
             ctf = new
@@ -171,7 +171,7 @@ public sealed class CtfFullBoundaryTests
         await SendJsonAsync(
             admin,
             HttpMethod.Patch,
-            $"/api/v1/admin/competitions/{competitionId}/challenges/{composeCompetitionChallengeId}",
+            $"/api/v1/admin/competitions/{competitionId}/challenges/{servicesCompetitionChallengeId}",
             new
             {
                 presentation = new
@@ -180,7 +180,7 @@ public sealed class CtfFullBoundaryTests
                     order = 1,
                     isPublished = true
                 },
-                rules = new { configuration = composeConfiguration }
+                rules = new { configuration = servicesConfiguration }
             },
             HttpStatusCode.OK,
             cancellationToken);
@@ -358,7 +358,7 @@ public sealed class CtfFullBoundaryTests
         await Assert.That(detailWithoutRuntime.GetProperty("hasRuntime").GetBoolean()).IsTrue();
 
         Guid? runtimeInstanceId = null;
-        Guid? composeRuntimeInstanceId = null;
+        Guid? servicesRuntimeInstanceId = null;
         try
         {
             var runtimeAccepted = await SendJsonAsync(
@@ -379,29 +379,29 @@ public sealed class CtfFullBoundaryTests
             var flag = await PollTextAsync(runtimeUrl, TimeSpan.FromSeconds(30), cancellationToken);
             await Assert.That(flag).StartsWith("flag{");
 
-            var composeRuntimeAccepted = await SendJsonAsync(
+            var servicesRuntimeAccepted = await SendJsonAsync(
                 player,
                 HttpMethod.Post,
-                $"/api/v1/competitions/{competitionId}/challenges/{composeCompetitionChallengeId}/runtimes",
+                $"/api/v1/competitions/{competitionId}/challenges/{servicesCompetitionChallengeId}/runtimes",
                 new { replacesRuntimeId = (Guid?)null },
                 HttpStatusCode.Accepted,
                 cancellationToken);
-            composeRuntimeInstanceId = composeRuntimeAccepted
+            servicesRuntimeInstanceId = servicesRuntimeAccepted
                 .GetProperty("runtimeInstanceId")
                 .GetGuid();
-            var composeRuntime = await PollJsonAsync(
+            var servicesRuntime = await PollJsonAsync(
                 player,
-                $"/api/v1/competitions/{competitionId}/challenges/{composeCompetitionChallengeId}/runtimes/current",
+                $"/api/v1/competitions/{competitionId}/challenges/{servicesCompetitionChallengeId}/runtimes/current",
                 value => value.GetProperty("state").GetString() == "Running",
                 TimeSpan.FromSeconds(90),
                 cancellationToken);
-            var composeRuntimeUrl = E2ELifecycle.FirstDirectAddress(composeRuntime);
-            var composeFlag = await PollTextAsync(
-                composeRuntimeUrl,
+            var servicesRuntimeUrl = E2ELifecycle.FirstDirectAddress(servicesRuntime);
+            var servicesFlag = await PollTextAsync(
+                servicesRuntimeUrl,
                 TimeSpan.FromSeconds(30),
                 cancellationToken);
-            await Assert.That(composeFlag).StartsWith("flag{");
-            await Assert.That(composeFlag).IsNotEqualTo(flag);
+            await Assert.That(servicesFlag).StartsWith("flag{");
+            await Assert.That(servicesFlag).IsNotEqualTo(flag);
 
             var wrongGameplayFactAccepted = await SendJsonAsync(
                 teammate,
@@ -611,7 +611,7 @@ public sealed class CtfFullBoundaryTests
             foreach (var runtime in new[]
             {
                 (ChallengeId: competitionChallengeId, RuntimeId: runtimeInstanceId),
-                (ChallengeId: composeCompetitionChallengeId, RuntimeId: composeRuntimeInstanceId)
+                (ChallengeId: servicesCompetitionChallengeId, RuntimeId: servicesRuntimeInstanceId)
             })
             {
                 if (runtime.RuntimeId is null)
@@ -649,24 +649,8 @@ public sealed class CtfFullBoundaryTests
             {
                 kind = "Container",
                 allocation = "PerTeam",
-                container = new
-                {
-                    image = runtimeImage,
-                    command = Array.Empty<string>(),
-                    environment = new Dictionary<string, string>(),
-                    labels = new Dictionary<string, string>(),
-                    portMappings = new[] { new { containerPort = 8080, hostPort = 0 } },
-                    security = SecureContainerPolicy(),
-                    flagEnvironmentVariableName = "FLAG",
-                    internalPorts = Array.Empty<int>()
-                },
+                container = new { services = new[] { new { name = "main", cpuCores = 0.1m, memoryMiB = 64L, image = runtimeImage, command = Array.Empty<string>(), environment = new Dictionary<string, string>(), internalPorts = Array.Empty<int>(), flagEnvironmentVariableName = "FLAG" } } },
                 egressPolicy = "Isolated",
-                limits = new
-                {
-                    memoryBytes = 67_108_864L,
-                    nanoCpus = 100_000_000L,
-                    pidsLimit = 64L
-                },
                 ttlSeconds = 300,
                 operationTimeoutSeconds = 60,
                 urlBindings = new[]
@@ -676,7 +660,7 @@ public sealed class CtfFullBoundaryTests
                         urlTemplate = "http://{HOST}:{PORT}/",
                         exposure = "OwnerOnly",
                         containerPort = 8080,
-                        serviceName = (string?)null,
+                        serviceName = "main",
                         vmId = (string?)null,
                         guestPort = (int?)null,
                         isControlCheck = false
@@ -686,87 +670,19 @@ public sealed class CtfFullBoundaryTests
             }
         };
 
-    private static object BuildComposeDefinition(string runtimeImage) =>
-        new
-        {
-            mode = "Ctf",
-            ctf = new { interactionKind = "FlagSubmission" },
-            runtime = new
-            {
-                kind = "Compose",
-                allocation = "PerTeam",
-                compose = new
-                {
-                    composeYaml = $$"""
-                        services:
-                          web:
-                            image: "{{runtimeImage}}"
-                          db:
-                            image: busybox:1.37
-                            command:
-                              - sleep
-                              - "300"
-                        """,
-                    serviceResources = new object[]
-                {
-                    new
-                    {
-                        serviceName = "web",
-                        limits = new
-                        {
-                            memoryBytes = 67_108_864L,
-                            nanoCpus = 100_000_000L,
-                            pidsLimit = 64L
-                        }
-                    },
-                    new
-                    {
-                        serviceName = "db",
-                        limits = new
-                        {
-                            memoryBytes = 67_108_864L,
-                            nanoCpus = 100_000_000L,
-                            pidsLimit = 64L
-                        }
-                    }
-                    },
-                    environment = new Dictionary<string, string>(),
-                    labels = new Dictionary<string, string>(),
-                    flagEnvironmentVariables = new Dictionary<string, string> { ["web"] = "FLAG" }
-                },
-                egressPolicy = "Isolated",
-                limits = new
-                {
-                    memoryBytes = 134_217_728L,
-                    nanoCpus = 200_000_000L,
-                    pidsLimit = 128L
-                },
-                ttlSeconds = 300,
-                operationTimeoutSeconds = 60,
-                urlBindings = new[]
-                {
-                    new
-                    {
-                        urlTemplate = "http://{HOST}:{PORT}/",
-                        exposure = "OwnerOnly",
-                        containerPort = 8080,
-                        serviceName = "web",
-                        vmId = (string?)null,
-                        guestPort = (int?)null,
-                        isControlCheck = false
-                    }
-                },
-                flagSource = "PerTeam"
-            }
-        };
-
-    private static object SecureContainerPolicy() => new
+    private static object BuildNamedServicesDefinition(string runtimeImage) => new
     {
-        noNewPrivileges = true,
-        readonlyRootfs = true,
-        runAsNonRoot = true,
-        capDrop = Array.Empty<string>(),
-        capAdd = Array.Empty<string>()
+        mode = "Ctf", ctf = new { interactionKind = "FlagSubmission" },
+        runtime = new
+        {
+            kind = "Container", allocation = "PerTeam", egressPolicy = "Isolated", ttlSeconds = 300, operationTimeoutSeconds = 60, flagSource = "PerTeam",
+            container = new { services = new object[]
+            {
+                new { name = "web", image = runtimeImage, cpuCores = .1m, memoryMiB = 64L, flagEnvironmentVariableName = "FLAG" },
+                new { name = "db", image = "busybox:1.37", cpuCores = .1m, memoryMiB = 64L, command = new[] { "sleep" }, arguments = new[] { "300" } }
+            } },
+            urlBindings = new[] { new { urlTemplate = "http://{HOST}:{PORT}/", exposure = "OwnerOnly", containerPort = 8080, serviceName = "web", isControlCheck = false } }
+        }
     };
 
     private static async Task AssertSpaDocumentAsync(

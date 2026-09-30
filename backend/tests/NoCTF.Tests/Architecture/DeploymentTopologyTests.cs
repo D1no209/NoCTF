@@ -140,7 +140,7 @@ public sealed class DeploymentTopologyTests
         foreach (var legacySetting in new[]
                  {
                      "Runner__Capacity__MemoryBytes",
-                     "Runner__Capacity__NanoCpus",
+                     "Runner__Capacity__CpuMillicores",
                      "Runner__Capacity__PidsLimit",
                      "Runtime__CpuOvercommitFactor",
                      "Runner__ApiKey",
@@ -411,24 +411,17 @@ public sealed class DeploymentTopologyTests
             .Where(line => line.StartsWith("FROM ", StringComparison.Ordinal)
                 && !line.StartsWith("FROM runtime ", StringComparison.Ordinal))
             .ToArray();
-        await Assert.That(externalBaseImages).Count().IsEqualTo(5);
+        await Assert.That(externalBaseImages).Count().IsEqualTo(3);
         await Assert.That(externalBaseImages.All(line =>
             System.Text.RegularExpressions.Regex.IsMatch(
                 line,
                 "^FROM [^ ]+@sha256:[a-f0-9]{64} AS [^ ]+$"))).IsTrue();
         await Assert.That(dockerfile).Contains(
             "FROM docker.m.daocloud.io/oven/bun:1.3.14@sha256:");
-        await Assert.That(dockerfile).Contains(
-            "FROM docker.m.daocloud.io/docker:28.5.1-cli@sha256:");
-        await Assert.That(dockerfile).DoesNotContain(
-            "FROM docker:28.5.1-cli@sha256:");
-        await Assert.That(dockerfile).Contains("sha256sum -c -");
-        await Assert.That(dockerfile).Contains("KOMPOSE_SHA256=");
+        await Assert.That(dockerfile).DoesNotContain("kompose");
+        await Assert.That(dockerfile).DoesNotContain("docker-compose");
         await Assert.That(dockerfile).Contains("https://archive.ubuntu.com/ubuntu");
         await Assert.That(dockerfile).Contains("https://security.ubuntu.com/ubuntu");
-        await Assert.That(dockerfile).Contains("--retry-all-errors");
-        await Assert.That(dockerfile).Contains("--speed-time 30");
-        await Assert.That(dockerfile).Contains("COPY backend/docker-assets/");
 
         var externalRuntimeImages = deploymentFiles
             .SelectMany(content => content.Split('\n'))

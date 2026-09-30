@@ -139,19 +139,7 @@ public sealed class AwdpCanonicalFixInputFlowTests
             "fix.sh",
             ["/bin/sh", "/noctf/fix/fix.sh"],
             TimeSpan.FromSeconds(30),
-            new AwdpCheckerWork(
-                message.RuntimeInstanceId,
-                RuntimeProvider.Docker,
-                "checker:latest",
-                ["/checker"],
-                new Dictionary<string, string>(),
-                "network-1",
-                "target",
-                30,
-                new Uri("https://api.example/results"),
-                "callback-token",
-                TimeSpan.FromSeconds(30),
-                FixInputEnabled: true));
+            new AwdpCheckerWork(message.RuntimeInstanceId, RuntimeProvider.Docker, "checker:latest", ["/checker"], new Dictionary<string, string>(), new ContainerReceipt(message.RuntimeInstanceId, RuntimeProvider.Docker, "target-resource", RuntimeStatus.Running, new Dictionary<int, int>(), null, "target", NetworkId: "network-1", RuntimeInstanceId: message.RuntimeInstanceId), "target", 30, new Uri("https://api.example/results"), "callback-token", TimeSpan.FromSeconds(30), FixInputEnabled: true));
         var reader = Substitute.For<IAwdpFixWorkReader>();
         reader.ClaimAsync(message, Arg.Any<CancellationToken>())
             .Returns(new AwdpFixWorkClaim(
@@ -238,7 +226,7 @@ public sealed class AwdpCanonicalFixInputFlowTests
         public IContainerSandboxLifecycle Sandbox(RuntimeProvider provider) => sandbox;
         public IContainerLifecycle Containers(RuntimeProvider provider) =>
             throw new NotSupportedException();
-        public IComposeRuntime Compose(RuntimeProvider provider) =>
+        public IContainerRuntime Runtime(RuntimeProvider provider) =>
             throw new NotSupportedException();
         public IOvaRuntime Appliance(RuntimeProvider provider) =>
             throw new NotSupportedException();

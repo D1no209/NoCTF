@@ -200,11 +200,8 @@ public sealed class ParticipantRuntimeScopePersistenceTests
             new AwdChallengeConfiguration(
                 Runtime: new ChallengeRuntimeTemplate(
                     RuntimeAllocation.PerTeam,
-                    new ContainerRuntimeDefinition(
-                        "scope-test:latest",
-                        PortMappings: new Dictionary<int, int> { [31337] = 0 },
-                        Security: new(false, false, false, ["ALL"], [])),
-                    new RuntimeResourceLimits(67_108_864, 100_000_000, 64),
+                    new ContainerRuntimeDefinition([new RuntimeServiceDefinition("main", "scope-test:latest")]),
+                    new RuntimeResourceLimits(67_108_864, 100, 64),
                     UrlBindings:
                     [
                         new RuntimeUrlBinding(

@@ -7,10 +7,10 @@ public sealed class RunnerNodeMessageContractTests
 {
     [Test]
     [Arguments(typeof(ProvisionContainerRuntime))]
-    [Arguments(typeof(ProvisionComposeRuntime))]
+    [Arguments(typeof(ProvisionContainerRuntime))]
     [Arguments(typeof(ProvisionOvaRuntime))]
     [Arguments(typeof(StopContainerRuntime))]
-    [Arguments(typeof(StopComposeRuntime))]
+    [Arguments(typeof(StopContainerRuntime))]
     [Arguments(typeof(StopOvaRuntime))]
     [Arguments(typeof(ForceTerminateRuntime))]
     [Arguments(typeof(ReconcileRuntimeResources))]
@@ -28,7 +28,7 @@ public sealed class RunnerNodeMessageContractTests
 
     [Test]
     [Arguments(typeof(StopContainerRuntime))]
-    [Arguments(typeof(StopComposeRuntime))]
+    [Arguments(typeof(StopContainerRuntime))]
     [Arguments(typeof(StopOvaRuntime))]
     [Arguments(typeof(ForceTerminateRuntime))]
     public async Task Stop_work_does_not_persist_the_provider_receipt(Type messageType)
