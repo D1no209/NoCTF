@@ -238,7 +238,7 @@ Important ConfigMap values:
   for the Namespace containing the API callback Pod
 - `Runtime__Kubernetes__CallbackPodLabelKey/Value`: exact label selector for
   the API callback Pod; it must match `backend-deployment.yaml`
-- `Runtime__Kubernetes__PodPidsLimit`: must equal the kubelet Pool-wide value
+- `Runtime__Execution__ProcessesPerService`: must equal the kubelet Pool-wide value
 - `Runtime__Kubernetes__NetworkPolicyRequired`: must be `true`
 - `Runtime__Kubernetes__ProtectedCidrs__*`: every Pod, Service, node-management,
   platform-infrastructure, and other non-public IPv4 CIDR that challenge workloads
@@ -338,3 +338,5 @@ The ingress-nginx namespace label `kubernetes.io/metadata.name: ingress-nginx` m
 ```bash
 kubectl get namespace ingress-nginx --show-labels
 ```
+
+Container Runtime uses native named Pods. Multi-service discovery adds one headless Service; single-service environments do not. See [Runtime services](../../docs/runtime-services.md).

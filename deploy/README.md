@@ -142,3 +142,7 @@ readiness 掩盖。
 `observability/README.md` 配置私有 `9464` 指标监听器及 Loki OTLP 日志接收端，并独立部署 Prometheus/Grafana/Loki；
 平台本身不查询 Prometheus，也不提供内嵌监控页面。
 本文件只约束平台部署栈；题目运行时的 Docker 随机端口发布与沙箱规则不因此更改。
+
+### 题目 Runtime 网络
+
+平台部署额外创建 `${COMPOSE_PROJECT_NAME}-challenges`（普通 bridge）与 `${COMPOSE_PROJECT_NAME}-runtime-callback`（internal bridge）。只让 Host 接入这两个网络，数据库、Redis 和 NATS 不加入。单服务题目和 Checker 复用它们；多服务题目由 Docker SDK 创建实例专属网络。对应环境变量为 `Runtime__Docker__Network`、`Runtime__Docker__CallbackNetwork` 和 `Runtime__Execution__ProcessesPerService`。此处的 Compose 仅用于平台部署，不是题目编排契约。

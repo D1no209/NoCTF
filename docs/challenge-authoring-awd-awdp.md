@@ -49,24 +49,17 @@ ENTRYPOINT ["python", "-B", "/app/server.py"]
 - 运行时安装软件或临时访问平台数据库、Redis、对象存储；
 - 固定宿主端口、固定容器名称或特定 Runner 主机名。
 
-### 2.2 资源与安全选项
+### 2.2 服务与资源
 
-每个 Runtime 必须设置正数的内存、CPU 和 PID 上限。建议从最小可用值开始压测，再保留 20%～30% 峰值余量。
-
-安全选项的兼容规则如下：
-
-- `no-new-privileges`、只读根文件系统和非 root 运行可以按题目兼容性选择。
-- 开启非 root 时，Docker 镜像必须声明数字形式且非零的 `USER`。
-- 开启只读根文件系统时，题目需要写入的数据必须放在平台允许的可写位置或内存文件系统中；先在真实 Runner 上验证 Flag 注入和修复脚本。
-- `capAdd` 没有需求时保持空数组；不要为了“省事”授予额外 capability。
+容器环境统一使用命名服务列表。单容器填写一个名为 `main` 的服务；多容器为各服务填写唯一名称和镜像。资源按服务配置，默认 0.5 核和 512 MiB；CPU 步长为 0.001 核。PID 限制属于平台部署配置，不由出题人填写。容器及 Checker 的安全开关均已删除，运行身份遵循镜像默认用户。
 
 ### 2.3 网络、端口和地址
 
-- Container 的对外端口在“对外端口”中声明；内部仅供 Checker 访问的端口放在“内部端口”。
-- 选手看到的访问入口是显示模板，只能使用 `{HOST}`、`{PORT}` 占位符，但不限制协议形式；例如可以填写 `http://{HOST}:{PORT}/` 或 `nc {HOST} {PORT}`。只有平台内部 Control Check 才必须展开为绝对 URL。
-- `OwnerOnly` 地址只返回给本队；AWD 攻防入口需要 `Participants`，硬化期结束后平台才会向参赛队伍提供对手入口。
-- `Isolated` 表示题目网络与其他 Runtime/平台网络隔离，不应把它理解为绝对的无公网保证；题目本身仍不得依赖外网。
-- Checker 与目标在隔离网络内通信，不通过选手看到的公网随机端口。
+对外入口只在 Runtime 级清单中配置，每项明确引用服务名和容器端口。无需再在服务内声明公开端口，宿主端口由平台随机分配。显示模板可填写 `http://{HOST}:{PORT}/` 或 `nc {HOST} {PORT}`。内部端口仅供 Checker 等平台操作使用。
+
+Docker 单服务复用共享题目网络，多服务才建立实例专属网络和服务别名。Kubernetes 单服务不建立内部发现 Service，多服务通过实例 headless Service 解析服务名称。Docker 的 `Isolated` 不保证禁止公网访问。
+
+完整接口、部署要求和示例见 [容器 Runtime 与命名服务](runtime-services.md)。
 
 ## 3. AWD 出题规范
 
@@ -77,7 +70,7 @@ ENTRYPOINT ["python", "-B", "/app/server.py"]
 AWD 只允许：
 
 - `PerTeam` 分配；
-- Container 或 Compose Runtime；
+- Container Runtime（一个或多个命名服务）；
 - `AwdRotation` Flag 来源；
 - 平台生成、精确匹配的动态 Flag。
 
@@ -86,7 +79,7 @@ AWD 只允许：
 ### 3.2 推荐出题流程
 
 1. 在题库中新建 `AWD` 模板，完成题面和附件。
-2. 配置 Container 或 Compose Runtime，设定资源、内部/公网端口、URL 和安全选项。
+2. 配置 Container Runtime（一个或多个命名服务），设定资源、内部/公网端口、URL 和安全选项。
 3. 配置 Flag 注入命令。
 4. 配置 Checker 镜像、超时和目标服务。
 5. 在题库“运行环境”页启动题目测试容器，验证镜像拉取、入口展开和测试 Flag 注入；停止后 Runner 保留镜像缓存，可用于赛前预热。

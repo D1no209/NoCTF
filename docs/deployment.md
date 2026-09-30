@@ -66,7 +66,7 @@ Runner 管理端口只在内部网络。Checker callback API 可达，但严格 
 
 官方清单不部署额外 callback 服务。Docker 拆分进程中的 `backend` 和单进程中的 `noctf` 容器使用
 `scoring-callback-gateway` 角色标签作为稳定 callback 身份；Runner 把所有当前运行且精确匹配该标签
-的 API role 容器临时接入每次 Checker 独立的 internal network。Kubernetes 使用
+的 API role 容器临时接入部署级固定的 internal callback network。Kubernetes 使用
 `backend-service.noctf.svc.<clusterDomain>`，并由 Runtime 侧 egress 与平台侧 ingress 的 Namespace +
 Pod 双 selector 将路径限制到可信 AWD/AWDP Checker 和 API Pod 的 callback 端口。修改 Compose 服务名、
 Kubernetes Namespace、Service、cluster domain 或 callback 标签时，必须同步修改
@@ -154,10 +154,10 @@ API CORS 继续使用精确 Origin+credentials。
 
 Runtime 网段与平台数据网隔离；默认拒绝横向访问和云元数据。Runner 仅允许必要 PostgreSQL/Redis/Provider/内部 API 流量；Patch archive 通过绑定单 GameplayFact/PatchUpload 的内部 API 读取，不开放对象存储通用网络/凭据。
 
-Docker 公开 Runtime 不把题目容器接入 `noctf-network`。每个 Runtime 使用独立的普通
-user-defined bridge network；题目 Container/Compose service 直接发布配置中声明的 TCP
+Docker 公开 Runtime 不把题目容器接入 `noctf-network`。单服务 Runtime 复用部署级题目 bridge，多服务 Runtime 使用独立的普通
+user-defined bridge network；题目服务 直接发布配置中声明的 TCP
 端口，宿主端口固定请求 `0`，由 Docker 分配随机端口。Runner 从实际端口映射展开公开
-URL，Stop/Reset/失败回滚按 Runtime identity 清理容器、Compose project 与独立 network。
+URL，Stop/Reset/失败回滚按 Runtime identity 清理服务容器与实例独占 network。
 当前架构不创建 HAProxy/ingress proxy，也不要求部署 ingress proxy 镜像。
 
 ## 请求大小
@@ -193,3 +193,5 @@ Runner 容量事实均依赖 Redis。Runtime 题目本身不使用平台 Health 
 [备份恢复](backup-recovery.md)。当前工具生成离散恢复点，不是 PITR。Redis 可丢失并重建。
 外部通知接收方不属于 NoCTF 部署拓扑。赛事 Webhook 默认只连接公开 HTTPS 地址；需要访问
 内网接收方时，运维必须通过 `Webhooks__PrivateNetworkAllowList` 精确放行主机、IP 或 CIDR。
+
+容器 Runtime 的最新模型、共享网络与切换要求见 [命名服务运行环境](runtime-services.md)。

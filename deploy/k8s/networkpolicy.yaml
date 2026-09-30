@@ -154,7 +154,6 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app: backend
       noctf.io/runtime-proxy-gateway: "true"
   policyTypes:
     - Egress

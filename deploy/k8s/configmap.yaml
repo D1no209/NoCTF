@@ -44,7 +44,7 @@ data:
   RunnerScoring__CallbackBaseUrl: "http://backend-service.noctf.svc.cluster.local:8080"
   Runtime__Kubernetes__Namespace: "runtime"
   Runtime__Kubernetes__PublicHost: "noctf.local"
-  Runtime__Kubernetes__PodPidsLimit: "512"
+  Runtime__Execution__ProcessesPerService: "512"
   Runtime__Kubernetes__ClusterDomain: "cluster.local"
   Runtime__Kubernetes__ClusterDnsServiceAddress: "10.43.0.10"
   Runtime__Kubernetes__CallbackNamespaceLabelKey: "kubernetes.io/metadata.name"

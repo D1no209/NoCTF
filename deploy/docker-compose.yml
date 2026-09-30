@@ -108,6 +108,9 @@ services:
         aliases: [noctf]
       panel:
         aliases: [noctf-web]
+      challenges: {}
+      callbacks:
+        aliases: [noctf]
 
 networks:
   default:
@@ -115,3 +118,10 @@ networks:
   panel:
     external: true
     name: 1panel-network
+  challenges:
+    name: ${COMPOSE_PROJECT_NAME:-noctf}-challenges
+    driver: bridge
+  callbacks:
+    name: ${COMPOSE_PROJECT_NAME:-noctf}-runtime-callback
+    driver: bridge
+    internal: true

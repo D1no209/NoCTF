@@ -31,10 +31,22 @@ try {
 
     Push-Location $backendRoot
     try {
+        $generatedAttributesPath = Join-Path $backendRoot 'src\NoCTF.Host\Internal\Generated\WolverineHandlers\.gitattributes'
+        $generatedAttributes = if (Test-Path -LiteralPath $generatedAttributesPath) {
+            [IO.File]::ReadAllBytes($generatedAttributesPath)
+        } else { $null }
         dotnet build .\src\NoCTF.Host\NoCTF.Host.csproj `
             -c $Configuration --no-restore -p:NoCtfGenerateWolverineHandlers=true -v:q
         if ($LASTEXITCODE -ne 0) {
             throw "Wolverine codegen bootstrap build failed (exit code $LASTEXITCODE)."
+        }
+        # Let JasperFx remove obsolete adapters after handler removals or signature changes.
+        $cleanupOutput = dotnet run --project .\src\NoCTF.Host\NoCTF.Host.csproj `
+            -c $Configuration --no-build --no-launch-profile -- codegen delete 2>&1
+        $cleanupExitCode = $LASTEXITCODE
+        $cleanupOutput | ForEach-Object { Write-Host $_ }
+        if ($cleanupExitCode -ne 0 -or ($cleanupOutput -join "`n") -match '(?m)^ERROR:') {
+            throw "Wolverine handler cleanup failed (exit code $cleanupExitCode)."
         }
         $output = dotnet run --project .\src\NoCTF.Host\NoCTF.Host.csproj `
             -c $Configuration --no-build --no-launch-profile -- codegen write 2>&1
@@ -43,6 +55,9 @@ try {
         # JasperFx can report a generation ERROR while the process exits zero.
         if ($exitCode -ne 0 -or ($output -join "`n") -match '(?m)^ERROR:') {
             throw "Wolverine handler generation failed (exit code $exitCode)."
+        }
+        if ($null -ne $generatedAttributes) {
+            [IO.File]::WriteAllBytes($generatedAttributesPath, $generatedAttributes)
         }
     }
     finally {

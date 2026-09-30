@@ -1,6 +1,8 @@
+> 容器配置以 [命名服务契约](runtime-services.md) 为准；本文的容器示例已统一为服务列表，不提供旧配置兼容导入。
+
 # 比赛题目 GitHub 仓库与 GitOps 管理设计
 
-> 当前平台契约：题目 Runtime、Checker 和 Compose service 镜像由受信任的出题人配置，tag 与
+> 当前平台契约：题目 Runtime、Checker 和 命名服务 镜像由受信任的出题人配置，tag 与
 > digest 均可直接保存和运行；NoCTF 不解析 tag、不强制固定 digest，也不设置 Registry allowlist。
 > 本文后续的 digest 解析是可选 GitOps 工作流自身采用的严格构建策略，不是 NoCTF API、发布或
 > 开赛门禁。未启用该仓库策略时，管理员可以继续使用普通镜像 tag。
@@ -14,7 +16,7 @@ NoCTF 只提供普通用户认证和普通管理 API。仓库中的 GitHub Actio
 - 从 Issue 创建题目分支、目录和 Draft PR；
 - 校验仓库 Manifest；
 - 发现本次修改影响的题目和镜像；
-- 构建 Runtime、Compose service 和 Checker 镜像；
+- 构建 Runtime、命名服务 和 Checker 镜像；
 - 推送 GHCR，并按需推送自定义 Docker Registry；
 - 把构建产物解析为不可变镜像 digest；
 - 按依赖顺序调用 NoCTF 现有的普通 Challenge、Attachment、Flag、CompetitionChallenge 和 Hint API；
@@ -111,7 +113,7 @@ competition.yml.challenges[]     -> CompetitionChallenge
 - `challenge.yml`：Challenge 模板、仓库构建定义和静态资源清单；
 - `statement.md`：选手题面；
 - `attachments/`：最终交付给选手的静态附件；
-- `runtime/`：Runtime 或 Compose service 的 Docker build context；
+- `runtime/`：Runtime 或 命名服务 的 Docker build context；
 - `checker/`：AWD/AWDP one-shot Checker 的 Docker build context；
 - `tests/`：仓库 CI 执行的题目自测；
 - `solution/`：题解和内部材料，不上传 NoCTF，也不作为选手附件。
@@ -258,7 +260,7 @@ Issue Form 至少收集：
 - Direction；
 - slug；
 - GameMode；
-- Runtime 类型：None、Container 或 Compose；
+- Runtime 类型：None 或 Container（一个或多个命名服务）；
 - 初始 Order；
 - 题目负责人；
 - 简短说明。
@@ -440,15 +442,14 @@ flags:
 
 ```yaml
 mode: Ctf
-
 build:
   images:
-    - key: runtime
-      context: runtime
-      dockerfile: runtime/Dockerfile
-      target: runtime
-      platforms: [linux/amd64]
-
+  - key: runtime
+    context: runtime
+    dockerfile: runtime/Dockerfile
+    target: runtime
+    platforms:
+    - linux/amd64
 runtime:
   allocation: PerTeam
   flagSource: PerTeam
@@ -464,10 +465,10 @@ runtime:
     nanoCpus: 500000000
     pidsLimit: 128
   endpoints:
-    - name: web
-      protocol: Http
-      containerPort: 8080
-      exposure: OwnerOnly
+  - name: web
+    protocol: Http
+    containerPort: 8080
+    exposure: OwnerOnly
 ```
 
 CTF 不允许 Checker。仓库脚本根据逻辑 endpoint 生成 NoCTF 当前 Runtime Definition 所需的动态公开端口配置，题目作者不填写 host port。
@@ -486,18 +487,18 @@ Container 示例：
 
 ```yaml
 mode: Awd
-
 build:
   images:
-    - key: runtime
-      context: runtime
-      dockerfile: runtime/Dockerfile
-      platforms: [linux/amd64]
-    - key: checker
-      context: checker
-      dockerfile: checker/Dockerfile
-      platforms: [linux/amd64]
-
+  - key: runtime
+    context: runtime
+    dockerfile: runtime/Dockerfile
+    platforms:
+    - linux/amd64
+  - key: checker
+    context: checker
+    dockerfile: checker/Dockerfile
+    platforms:
+    - linux/amd64
 runtime:
   allocation: PerTeam
   flagSource: AwdRotation
@@ -509,11 +510,9 @@ runtime:
     memoryBytes: 536870912
     nanoCpus: 1000000000
     pidsLimit: 256
-
 flagInjection:
   command: /app/set-flag '${FLAG}'
   timeoutSeconds: 30
-
 checker:
   job:
     image:
@@ -566,18 +565,18 @@ AWDP Challenge Definition 管理：
 
 ```yaml
 mode: Awdp
-
 build:
   images:
-    - key: target
-      context: runtime
-      dockerfile: runtime/Dockerfile
-      platforms: [linux/amd64]
-    - key: checker
-      context: checker
-      dockerfile: checker/Dockerfile
-      platforms: [linux/amd64]
-
+  - key: target
+    context: runtime
+    dockerfile: runtime/Dockerfile
+    platforms:
+    - linux/amd64
+  - key: checker
+    context: checker
+    dockerfile: checker/Dockerfile
+    platforms:
+    - linux/amd64
 runtime:
   allocation: PerTeam
   flagSource: PerTeam
@@ -586,23 +585,22 @@ runtime:
     image:
       build: target
     flagEnvironmentVariableName: FLAG
-    internalPorts: [8080]
+    internalPorts:
+    - 8080
   limits:
     memoryBytes: 536870912
     nanoCpus: 1000000000
     pidsLimit: 256
   endpoints:
-    - name: web
-      protocol: Http
-      containerPort: 8080
-      exposure: OwnerOnly
-
+  - name: web
+    protocol: Http
+    containerPort: 8080
+    exposure: OwnerOnly
 patch:
   entrypoint: fix.sh
   command: []
   timeoutSeconds: 60
   readyTimeoutSeconds: 30
-
 checker:
   image:
     build: checker
@@ -630,14 +628,13 @@ KoH Challenge 使用 Shared Runtime：
 
 ```yaml
 mode: Koh
-
 build:
   images:
-    - key: hill
-      context: runtime
-      dockerfile: runtime/Dockerfile
-      platforms: [linux/amd64]
-
+  - key: hill
+    context: runtime
+    dockerfile: runtime/Dockerfile
+    platforms:
+    - linux/amd64
 runtime:
   allocation: Shared
   definition:
@@ -649,10 +646,10 @@ runtime:
     nanoCpus: 1000000000
     pidsLimit: 256
   endpoints:
-    - name: public
-      protocol: Http
-      containerPort: 8080
-      exposure: Participants
+  - name: public
+    protocol: Http
+    containerPort: 8080
+    exposure: Participants
   controlCheck:
     protocol: Http
     containerPort: 8080
@@ -689,7 +686,7 @@ build:
 - 默认 platform 为 `linux/amd64`；
 - Manifest 中所有 `image.build` 必须引用已声明 key；
 - 未由仓库构建的外部镜像必须使用 digest；
-- Runtime、Compose service 和 Checker 共用相同 build key 解析机制。
+- Runtime、命名服务 和 Checker 共用相同 build key 解析机制。
 
 ### Compose 源文件
 
@@ -722,14 +719,14 @@ runtime:
 Action：
 
 1. 读取 `runtime/compose.yml`；
-2. 校验 `serviceImages` 与 Compose services 一一匹配；
+2. 校验 `serviceImages` 与 命名服务s 一一匹配；
 3. 将 build key 替换为本次构建得到的 digest；
 4. 将 external digest 注入对应 service；
 5. 删除任何仓库构建字段；
 6. 生成 NoCTF `ComposeRuntimeDefinition.ComposeYaml`；
 7. 再执行 NoCTF 当前 Compose policy 等价校验。
 
-最终发送给 NoCTF 的每个 Compose service 都有明确、不可变的 `image: registry/...@sha256:...`。
+最终发送给 NoCTF 的每个 命名服务 都有明确、不可变的 `image: registry/...@sha256:...`。
 
 ## 变化发现
 
@@ -1036,7 +1033,7 @@ PR 必须检查：
 - build key、context、Dockerfile 和 target；
 - 外部镜像必须使用 digest；
 - Container/Compose Runtime 约束；
-- Compose service image 物化结果；
+- 命名服务 image 物化结果；
 - AWD Checker 不声明目标 URL/port；
 - AWDP 唯一 internal port；
 - KoH Shared Runtime 和 Control Check；
@@ -1068,7 +1065,7 @@ permissions:
 8. inspect 并记录每个 Registry digest；
 9. 上传 image-map artifacts；
 10. 合并本次 image-map 与复用的 digest map；
-11. 将 build 引用和 Compose serviceImages 物化为 selected digest；
+11. 将 build 引用和 命名服务Images 物化为 selected digest；
 12. 计算普通 API 调用计划；
 13. 调用 NoCTF。
 

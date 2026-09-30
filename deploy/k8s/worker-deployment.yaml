@@ -15,6 +15,7 @@ spec:
     metadata:
       labels:
         app: worker
+        noctf.io/runtime-proxy-gateway: "true"
     spec:
       automountServiceAccountToken: false
       securityContext:
