@@ -5,6 +5,7 @@ export const maximumLocaleLayoutControls = 96
 export const maximumLocaleLayoutCandidates = 256
 
 const localeResizeSelector = [
+  '[data-top-nav-slot]',
   "[data-slot='button']:not([data-top-nav-item])",
   "[data-slot='action-button']",
   "[data-slot='badge']",
@@ -41,12 +42,22 @@ function visibleControls(): Map<HTMLElement, number> {
 
 /** Smooth intrinsic-width changes caused by replacing localized control labels. */
 export async function animateLocaleLayout(update: () => void): Promise<void> {
-  if (!import.meta.client || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  if (!import.meta.client) {
     update()
     return
   }
 
   const widths = visibleControls()
+  for (const control of widths.keys()) {
+    activeAnimations.get(control)?.cancel()
+    activeAnimations.delete(control)
+    delete control.dataset.localeResizing
+  }
+
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    update()
+    return
+  }
 
   update()
   await nextTick()
@@ -56,7 +67,6 @@ export async function animateLocaleLayout(update: () => void): Promise<void> {
     const nextWidth = control.getBoundingClientRect().width
     if (Math.abs(nextWidth - previousWidth) < 0.5) continue
 
-    activeAnimations.get(control)?.cancel()
     control.dataset.localeResizing = 'true'
     const animation = control.animate(
       [
