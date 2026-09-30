@@ -232,7 +232,6 @@ internal static class LegacyConverters
             ReadyTimeoutSeconds = value.ReadyTimeoutSeconds,
             MaximumPatchUploadBytes = value.MaximumPatchUploadBytes,
             CheckerFixInput = value.CheckerFixInput,
-            CheckerAllowRoot = value.CheckerAllowRoot,
             HasFlagTemplate = value.FlagTemplate is not null,
             FlagTemplate = Flag(value.FlagTemplate),
             Checker = value.Checker is null ? null : new ChallengeCheckerDefinition
@@ -286,7 +285,6 @@ internal static class LegacyConverters
             FlagInjectionCommand = value.FlagInjection?.Command,
             FlagInjectionTimeoutSeconds = value.FlagInjection?.TimeoutSeconds,
             FlagInjectionServiceName = value.FlagInjection?.ServiceName,
-            CheckerAllowRoot = value.CheckerAllowRoot,
             HasFlagTemplate = value.FlagTemplate is not null,
             FlagTemplate = Flag(value.FlagTemplate)
         };
@@ -304,7 +302,6 @@ internal static class LegacyConverters
             ReadyTimeoutSeconds = value.ReadyTimeoutSeconds,
             MaximumPatchUploadBytes = value.MaximumPatchUploadBytes,
             CheckerFixInput = value.CheckerFixInput,
-            CheckerAllowRoot = value.CheckerAllowRoot,
             HasFlagTemplate = value.FlagTemplate is not null,
             FlagTemplate = Flag(value.FlagTemplate),
             Checker = Checker(challengeId, value.Checker),
@@ -442,48 +439,31 @@ internal static class LegacyConverters
         {
             ContainerRuntimeDefinition container => new ContainerChallengeRuntimeTemplate
             {
-                Image = container.Image,
-                Security = new ContainerSecurityPolicyValue
+                Services = container.Services.Select((service, position) => new ChallengeRuntimeService
                 {
-                    NoNewPrivileges = container.Security.NoNewPrivileges,
-                    ReadonlyRootfs = container.Security.ReadonlyRootfs,
-                    RunAsNonRoot = container.Security.RunAsNonRoot
-                },
-                FlagEnvironmentVariableName = container.FlagEnvironmentVariableName,
-                Capabilities = container.Security.CapDrop
-                    .Where(name => !string.Equals(name, "ALL", StringComparison.OrdinalIgnoreCase))
-                    .Select(name =>
-                        new ChallengeRuntimeCapability { Name = name })
-                    .Concat(container.Security.CapAdd.Select(name =>
-                        new ChallengeRuntimeCapability { Name = name, Add = true })).ToList(),
-                PortMappings = (container.PortMappings ?? new Dictionary<int, int>()).Select(pair =>
-                    new ChallengeRuntimePortMapping
-                    {
-                        ContainerPort = pair.Key,
-                        HostPort = pair.Value
-                    }).ToList(),
-                InternalPorts = (container.InternalPorts ?? []).Select(port =>
-                    new ChallengeRuntimeInternalPort { Port = port }).ToList(),
-                CommandItems = (container.Command ?? []).Select((item, position) =>
-                    new ChallengeRuntimeCommandItem { Position = position, Value = item }).ToList(),
-                KeyValues = Values(container.Environment, ChallengeRuntimeKeyValueKind.Environment)
-                    .Concat(Values(container.Labels, ChallengeRuntimeKeyValueKind.Label)).ToList(),
+                    ChallengeId = challengeId,
+                    Name = service.Name,
+                    Position = position,
+                    Image = service.Image,
+                    CpuCores = service.CpuCores,
+                    MemoryMiB = service.MemoryMiB,
+                    FlagEnvironmentVariableName = service.FlagEnvironmentVariableName,
+                    Commands = (service.Command ?? []).Select((item, index) =>
+                        new ChallengeRuntimeServiceCommand
+                        { ChallengeId = challengeId, ServiceName = service.Name, Position = index, Value = item })
+                        .Concat((service.Arguments ?? []).Select((item, index) =>
+                            new ChallengeRuntimeServiceCommand
+                            { ChallengeId = challengeId, ServiceName = service.Name, IsArgument = true, Position = index, Value = item }))
+                        .ToList(),
+                    Environment = (service.Environment ?? new Dictionary<string, string>())
+                        .OrderBy(item => item.Key, StringComparer.Ordinal)
+                        .Select(item => new ChallengeRuntimeServiceEnvironment
+                        { ChallengeId = challengeId, ServiceName = service.Name, Name = item.Key, Value = item.Value }).ToList(),
+                    InternalPorts = (service.InternalPorts ?? []).Select(port =>
+                        new ChallengeRuntimeServicePort
+                        { ChallengeId = challengeId, ServiceName = service.Name, Port = port }).ToList()
+                }).ToList(),
                 EgressPolicy = (PersistedRuntimeEgressPolicy)container.EgressPolicy
-            },
-            ComposeRuntimeDefinition compose => new ComposeChallengeRuntimeTemplate
-            {
-                ComposeYaml = compose.ComposeYaml,
-                ServiceResources = compose.ServiceResources.Select(pair =>
-                    new ComposeServiceResource
-                    {
-                        ServiceName = pair.Key,
-                        Limits = Limits(pair.Value)
-                    }).ToList(),
-                KeyValues = Values(compose.Environment, ChallengeRuntimeKeyValueKind.Environment)
-                    .Concat(Values(compose.Labels, ChallengeRuntimeKeyValueKind.Label))
-                    .Concat(Values(compose.FlagEnvironmentVariables,
-                        ChallengeRuntimeKeyValueKind.FlagEnvironmentVariable)).ToList(),
-                EgressPolicy = (PersistedRuntimeEgressPolicy)compose.EgressPolicy
             },
             OvaRuntimeDefinition ova => new OvaChallengeRuntimeTemplate
             {
@@ -495,8 +475,11 @@ internal static class LegacyConverters
         };
         runtime.ChallengeId = challengeId;
         runtime.Allocation = (PersistedRuntimeAllocation)value.Allocation;
-        runtime.HasExplicitLimits = value.Limits is not null;
-        runtime.Limits = value.Limits is null ? new RuntimeResourceLimitsValue() : Limits(value.Limits);
+        if (runtime is OvaChallengeRuntimeTemplate resources)
+        {
+            resources.HasExplicitLimits = value.Limits is not null;
+            resources.Limits = value.Limits is null ? new RuntimeResourceLimitsValue() : Limits(value.Limits);
+        }
         runtime.TtlSeconds = value.TtlSeconds;
         runtime.OperationTimeoutSeconds = value.OperationTimeoutSeconds;
         runtime.FlagSource = (PersistedRuntimeFlagSource)value.FlagSource;
@@ -534,22 +517,10 @@ internal static class LegacyConverters
         return runtime;
     }
 
-    private static IEnumerable<ChallengeRuntimeKeyValue> Values(
-        IReadOnlyDictionary<string, string>? values,
-        ChallengeRuntimeKeyValueKind kind) =>
-        (values ?? new Dictionary<string, string>())
-        .OrderBy(item => item.Key, StringComparer.Ordinal)
-        .Select(item => new ChallengeRuntimeKeyValue
-        {
-            Kind = kind,
-            Key = item.Key,
-            Value = item.Value
-        });
-
     private static RuntimeResourceLimitsValue Limits(RuntimeResourceLimits value) => new()
     {
         MemoryBytes = value.MemoryBytes,
-        NanoCpus = value.NanoCpus,
+        CpuMillicores = value.CpuMillicores,
         PidsLimit = value.PidsLimit
     };
 

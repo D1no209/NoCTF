@@ -298,11 +298,7 @@ internal static class Program
         runtime.RuntimeKind switch
         {
             RuntimeKind.Container => ContainerRuntimeReceiptData.From(
-                    JsonSerializer.Deserialize<ContainerReceipt>(json, JsonOptions)
-                    ?? throw new InvalidOperationException($"Runtime {runtime.Id} receipt is invalid."))
-                .ToEntity(runtime.Id),
-            RuntimeKind.Compose => ComposeRuntimeReceiptData.From(
-                    JsonSerializer.Deserialize<ComposeReceipt>(json, JsonOptions)
+                    JsonSerializer.Deserialize<ContainerDeploymentReceipt>(json, JsonOptions)
                     ?? throw new InvalidOperationException($"Runtime {runtime.Id} receipt is invalid."))
                 .ToEntity(runtime.Id),
             RuntimeKind.OvaVm => OvaRuntimeReceiptData.From(

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.GameModes.Awd.Configuration;
@@ -33,6 +34,23 @@ internal static class ConverterFixtures
             WithVersion(new KohConfiguration(30, 25), 1),
             WithVersion(new KohChallengeConfiguration(), 1),
             id);
+        var runtime = new ChallengeRuntimeTemplate(RuntimeAllocation.PerTeam,
+            new ContainerRuntimeDefinition([
+                new RuntimeServiceDefinition("web", "example/web:1", 0.25m, 128,
+                    ["serve"], ["--port", "8080"], new Dictionary<string, string> { ["MODE"] = "test" }, [8080], "FLAG"),
+                new RuntimeServiceDefinition("db", "example/db:1", 0.5m, 256)
+            ]));
+        var runtimeDefinition = LegacyConverters.Definition(id, GameMode.Koh,
+            WithVersion(new KohChallengeConfiguration(Runtime: runtime), 1));
+        if (runtimeDefinition.Runtime is not ContainerChallengeRuntimeTemplate { Services.Count: 2 } container
+            || container.Services[0] is not { Name: "web", CpuCores: 0.25m, MemoryMiB: 128, FlagEnvironmentVariableName: "FLAG" }
+            || container.Services[1] is not { Name: "db", Position: 1 }
+            || container.Services[0].Commands.Count != 3
+            || container.Services[0].Environment.Single().Value != "test"
+            || container.Services[0].InternalPorts.Single().Port != 8080
+            || container.Services.Any(service => service.ChallengeId != id)
+            || container.Services[0].Commands.Any(command => command.ChallengeId != id || command.ServiceName != "web"))
+            throw new InvalidOperationException("Named Runtime services were not preserved by the converter.");
         foreach (var mode in new[] { GameMode.Awd, GameMode.Awdp, GameMode.Koh })
         {
             try
