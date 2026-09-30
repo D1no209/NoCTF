@@ -19,7 +19,7 @@ public enum AwdpAttackProvisioningPlanState
 
 public sealed record AwdpAttackProvisioningPlan(
     AwdpAttackProvisioningPlanState State,
-    ContainerRequest? Definition = null);
+    ContainerRuntimeRequest? Definition = null);
 
 public interface IAwdpAttackProvisioningPlanReader
 {
@@ -104,23 +104,12 @@ public sealed class AwdpAttackProvisioningPlanReader(IDbContextFactory<NoCtfDbCo
         {
             return new(AwdpAttackProvisioningPlanState.Invalid);
         }
-        if (template is not
-            {
-                FlagSource: RuntimeFlagSource.PerTeam,
-                Definition: ContainerRuntimeDefinition
-                {
-                    FlagEnvironmentVariableName: { Length: > 0 } variable
-                }
-            })
-        {
-            return new(AwdpAttackProvisioningPlanState.Invalid);
-        }
-
-        if (!message.Definition.Environment.TryGetValue(variable, out var injectedFlag)
+        if (template is not { FlagSource: RuntimeFlagSource.PerTeam, Definition: ContainerRuntimeDefinition { Services.Count: 1 } definition }
+            || definition.Services[0].FlagEnvironmentVariableName is not { Length: > 0 } variable
+            || message.Definition.Services.Count != 1
+            || message.Definition.Services[0].Environment?.TryGetValue(variable, out var injectedFlag) != true
             || !string.Equals(injectedFlag, flag, StringComparison.Ordinal))
-        {
             return new(AwdpAttackProvisioningPlanState.Invalid);
-        }
 
         return new(AwdpAttackProvisioningPlanState.Ready, message.Definition);
     }

@@ -5,14 +5,12 @@ using Docker.DotNet.Models;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Application.Observability;
 using NoCTF.Domain.Runtime;
-using NoCTF.Runtime.Docker.Compose;
 using NoCTF.Runtime.Docker.Containers;
 
 namespace NoCTF.Runtime.Docker;
 
 public sealed class DockerRuntimeResourceReconciler(
-    DockerRuntimeOptions options,
-    DockerComposeRuntime compose) : IRuntimeManagedResourceReconciler,
+    DockerRuntimeOptions options) : IRuntimeManagedResourceReconciler,
     IRuntimeProviderAvailabilityProbe, IRuntimeProxyNetworkReconciler, IDisposable
 {
     private readonly DockerClient client = new DockerClientBuilder()
@@ -29,24 +27,10 @@ public sealed class DockerRuntimeResourceReconciler(
     {
         if (runtimeInstanceId == Guid.Empty)
             throw new ArgumentOutOfRangeException(nameof(runtimeInstanceId));
-        if (runtimeKind == RuntimeKind.Compose)
-        {
-            var receipt = (providerReceipt as ComposeRuntimeReceiptData)?.ToReceipt()
-                ?? throw new InvalidOperationException(
-                    "Docker Compose Runtime receipt is invalid.");
-            await compose.EnsureRuntimeProxyGatewaysAsync(receipt, cancellationToken);
-            return;
-        }
-        if (runtimeKind != RuntimeKind.Container)
-            throw new InvalidOperationException(
-                "Docker Runtime proxy reconciliation supports Container and Compose only.");
-        var container = (providerReceipt as ContainerRuntimeReceiptData)?.ToReceipt()
-            ?? throw new InvalidOperationException("Docker Container Runtime receipt is invalid.");
-        if (container.RuntimeInstanceId != runtimeInstanceId
-            || string.IsNullOrWhiteSpace(container.NetworkId))
-            throw new InvalidOperationException(
-                "Docker Container Runtime receipt has no owned proxy network.");
-        await ConnectRuntimeProxyGatewaysAsync(container.NetworkId, cancellationToken);
+        if (runtimeKind != RuntimeKind.Container) throw new InvalidOperationException("Docker proxy reconciliation supports container runtimes.");
+        var receipt = (providerReceipt as ContainerRuntimeReceiptData)?.ToReceipt() ?? throw new InvalidOperationException("Invalid container receipt.");
+        if (receipt.OperationId != runtimeInstanceId) throw new InvalidOperationException("Runtime receipt has another owner.");
+        await ConnectRuntimeProxyGatewaysAsync(receipt.OwnedNetworkId ?? options.NetworkName, cancellationToken);
     }
 
     public async Task<bool?> WorkloadExistsAsync(RuntimeWorkloadIdentity identity, CancellationToken cancellationToken)
@@ -64,11 +48,17 @@ public sealed class DockerRuntimeResourceReconciler(
         {
             Filters = IdentityFilters(new(identity.RuntimeInstanceId))
         }, cancellationToken);
-        return networks.Any(network => network.Name == $"noctf-callback-{identity.OperationId:N}");
+        return !identity.IsAuxiliary && networks.Any(network => TryReadIdentity(network.Labels, out var owner) && owner.RuntimeInstanceId == identity.RuntimeInstanceId);
     }
 
-    public async Task CheckAvailabilityAsync(CancellationToken cancellationToken) =>
+    public async Task CheckAvailabilityAsync(CancellationToken cancellationToken)
+    {
         await client.System.PingAsync(cancellationToken);
+        var challenges = await client.Networks.InspectNetworkAsync(options.NetworkName, cancellationToken);
+        var callbacks = await client.Networks.InspectNetworkAsync(options.CallbackNetworkName, cancellationToken);
+        if (challenges.Driver != "bridge" || challenges.Internal || !callbacks.Internal || challenges.ID == callbacks.ID)
+            throw new InvalidOperationException("Deployment challenge and callback networks must be separate normal/internal bridges.");
+    }
 
     public async Task<IReadOnlyList<RuntimeResourceIdentity>> ListManagedAsync(
         CancellationToken cancellationToken)
@@ -93,7 +83,6 @@ public sealed class DockerRuntimeResourceReconciler(
                 identities.Add(identity);
         }
 
-        identities.UnionWith(await compose.ListManagedAsync(cancellationToken));
         return identities.ToArray();
     }
 
@@ -117,19 +106,6 @@ public sealed class DockerRuntimeResourceReconciler(
         if (identity.RuntimeInstanceId == Guid.Empty)
             throw new ArgumentOutOfRangeException(nameof(identity));
         var warnings = new List<Exception>();
-        try
-        {
-            await compose.DestroyByIdentityAsync(identity, mode, policy, cancellationToken);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception exception)
-        {
-            warnings.Add(exception);
-        }
-
         var forceStarted = Stopwatch.GetTimestamp();
         using var force = CreateStageToken(cancellationToken, policy.ForceDeleteTimeout);
         var filters = IdentityFilters(identity);

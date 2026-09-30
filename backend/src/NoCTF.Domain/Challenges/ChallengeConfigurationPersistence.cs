@@ -17,7 +17,6 @@ public abstract class ChallengeDefinition
     public int? ReadyTimeoutSeconds { get; set; }
     public long? MaximumPatchUploadBytes { get; set; }
     public bool CheckerFixInput { get; set; }
-    public bool CheckerAllowRoot { get; set; }
     public bool HasFlagTemplate { get; set; }
     public FlagTemplateValue FlagTemplate { get; set; } = new();
     public ChallengeCheckerDefinition? Checker { get; set; }
@@ -75,15 +74,11 @@ public abstract class ChallengeRuntimeTemplateEntity
     public Guid ChallengeId { get; set; }
     public RuntimeKind RuntimeKind { get; private set; }
     public PersistedRuntimeAllocation Allocation { get; set; }
-    public RuntimeResourceLimitsValue Limits { get; set; } = new();
-    public bool HasExplicitLimits { get; set; }
     public int? TtlSeconds { get; set; }
     public int? OperationTimeoutSeconds { get; set; }
     public PersistedRuntimeFlagSource FlagSource { get; set; }
     public PersistedRuntimeEgressPolicy EgressPolicy { get; set; }
     public List<ChallengeRuntimeUrlBinding> UrlBindings { get; set; } = [];
-    public List<ChallengeRuntimeKeyValue> KeyValues { get; set; } = [];
-    public List<ChallengeRuntimeCommandItem> CommandItems { get; set; } = [];
 }
 
 public enum PersistedRuntimeAllocation : short { Shared, PerTeam }
@@ -94,87 +89,63 @@ public enum PersistedRuntimeExposure : short { OwnerOnly, Participants }
 public sealed class RuntimeResourceLimitsValue
 {
     public long MemoryBytes { get; set; }
-    public long NanoCpus { get; set; }
+    public long CpuMillicores { get; set; }
     public long PidsLimit { get; set; }
-}
-
-public sealed class ContainerSecurityPolicyValue
-{
-    public bool NoNewPrivileges { get; set; }
-    public bool ReadonlyRootfs { get; set; }
-    public bool RunAsNonRoot { get; set; }
 }
 
 [PersistentDiscriminator("container")]
 public sealed class ContainerChallengeRuntimeTemplate()
     : ChallengeRuntimeTemplateEntity(RuntimeKind.Container)
 {
-    public string Image { get; set; } = string.Empty;
-    public string? FlagEnvironmentVariableName { get; set; }
-    public ContainerSecurityPolicyValue Security { get; set; } = new();
-    public List<ChallengeRuntimeCapability> Capabilities { get; set; } = [];
-    public List<ChallengeRuntimePortMapping> PortMappings { get; set; } = [];
-    public List<ChallengeRuntimeInternalPort> InternalPorts { get; set; } = [];
+    public List<ChallengeRuntimeService> Services { get; set; } = [];
 }
 
-[PersistentDiscriminator("compose")]
-public sealed class ComposeChallengeRuntimeTemplate()
-    : ChallengeRuntimeTemplateEntity(RuntimeKind.Compose)
+public sealed class ChallengeRuntimeService
 {
-    public string ComposeYaml { get; set; } = string.Empty;
-    public List<ComposeServiceResource> ServiceResources { get; set; } = [];
+    public Guid ChallengeId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public int Position { get; set; }
+    public string Image { get; set; } = string.Empty;
+    public decimal CpuCores { get; set; } = 0.5m;
+    public long MemoryMiB { get; set; } = 512;
+    public string? FlagEnvironmentVariableName { get; set; }
+    public List<ChallengeRuntimeServiceCommand> Commands { get; set; } = [];
+    public List<ChallengeRuntimeServiceEnvironment> Environment { get; set; } = [];
+    public List<ChallengeRuntimeServicePort> InternalPorts { get; set; } = [];
+}
+
+public sealed class ChallengeRuntimeServiceCommand
+{
+    public Guid ChallengeId { get; set; }
+    public string ServiceName { get; set; } = string.Empty;
+    public bool IsArgument { get; set; }
+    public int Position { get; set; }
+    public string Value { get; set; } = string.Empty;
+}
+
+public sealed class ChallengeRuntimeServiceEnvironment
+{
+    public Guid ChallengeId { get; set; }
+    public string ServiceName { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string Value { get; set; } = string.Empty;
+}
+
+public sealed class ChallengeRuntimeServicePort
+{
+    public Guid ChallengeId { get; set; }
+    public string ServiceName { get; set; } = string.Empty;
+    public int Port { get; set; }
 }
 
 [PersistentDiscriminator("ova")]
 public sealed class OvaChallengeRuntimeTemplate()
     : ChallengeRuntimeTemplateEntity(RuntimeKind.OvaVm)
 {
+    public RuntimeResourceLimitsValue Limits { get; set; } = new();
+    public bool HasExplicitLimits { get; set; }
     public string OvaSourceUrl { get; set; } = string.Empty;
     public string Sha256 { get; set; } = string.Empty;
-}
-
-public enum ChallengeRuntimeKeyValueKind : short { Environment, Label, FlagEnvironmentVariable }
-
-public sealed class ChallengeRuntimeKeyValue
-{
-    public Guid ChallengeId { get; set; }
-    public ChallengeRuntimeKeyValueKind Kind { get; set; }
-    public string Key { get; set; } = string.Empty;
-    public string Value { get; set; } = string.Empty;
-}
-
-public sealed class ChallengeRuntimeCommandItem
-{
-    public Guid ChallengeId { get; set; }
-    public int Position { get; set; }
-    public string Value { get; set; } = string.Empty;
-}
-
-public sealed class ChallengeRuntimeCapability
-{
-    public Guid ChallengeId { get; set; }
-    public bool Add { get; set; }
-    public string Name { get; set; } = string.Empty;
-}
-
-public sealed class ChallengeRuntimePortMapping
-{
-    public Guid ChallengeId { get; set; }
-    public int ContainerPort { get; set; }
-    public int HostPort { get; set; }
-}
-
-public sealed class ChallengeRuntimeInternalPort
-{
-    public Guid ChallengeId { get; set; }
-    public int Port { get; set; }
-}
-
-public sealed class ComposeServiceResource
-{
-    public Guid ChallengeId { get; set; }
-    public string ServiceName { get; set; } = string.Empty;
-    public RuntimeResourceLimitsValue Limits { get; set; } = new();
 }
 
 public sealed class ChallengeRuntimeUrlBinding

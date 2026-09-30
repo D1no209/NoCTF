@@ -33,7 +33,8 @@ public sealed record RunnerAvailabilityRegistration(
     RunnerAdmissionSnapshot Admission,
     RunnerAdmissionOptions AdmissionOptions,
     bool Reconciled = false,
-    ulong ResourceDomainFencingToken = 0);
+    ulong ResourceDomainFencingToken = 0,
+    long ProcessesPerService = 256);
 
 public sealed class NatsRunnerAvailabilityRegistry(
     INatsConnection connection, TimeProvider clock)
@@ -75,8 +76,8 @@ public sealed class NatsRunnerAvailabilityRegistry(
             outcome == RunnerAvailabilityRegistrationOutcome.Online,
             capacity?.AdmissionAvailable.MemoryBytes ?? 0,
             capacity?.ObservedTotal.MemoryBytes ?? 0,
-            capacity?.AdmissionAvailable.NanoCpus ?? 0,
-            capacity?.ObservedTotal.NanoCpus ?? 0,
+            capacity?.AdmissionAvailable.CpuMillicores ?? 0,
+            capacity?.ObservedTotal.CpuMillicores ?? 0,
             capacity?.AdmissionAvailable.PidsLimit ?? 0,
             capacity?.ObservedTotal.PidsLimit ?? 0);
         return outcome;

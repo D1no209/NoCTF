@@ -5,7 +5,6 @@ namespace NoCTF.Domain.Runtime;
 public enum RuntimeWorkloadKind : short
 {
     Runtime,
-    Compose,
     VerificationTarget,
     AwdChecker,
     PatchChecker
@@ -56,11 +55,11 @@ public readonly record struct RuntimeWorkloadIdentity(
     }
 }
 
-public sealed record RuntimeResourceAmount(long MemoryBytes, long NanoCpus, long PidsLimit)
+public sealed record RuntimeResourceAmount(long MemoryBytes, long CpuMillicores, long PidsLimit)
 {
     public void Validate()
     {
-        if (MemoryBytes <= 0 || NanoCpus <= 0 || PidsLimit <= 0)
+        if (MemoryBytes <= 0 || CpuMillicores <= 0 || PidsLimit <= 0)
             throw new InvalidOperationException("Allocation resource amounts must be positive.");
     }
 }
@@ -85,7 +84,7 @@ public sealed record RuntimeCapacityAllocation(
         Budget.Validate();
         Limit.Validate();
         if (Budget.MemoryBytes != Limit.MemoryBytes || Budget.PidsLimit != Limit.PidsLimit
-            || Budget.NanoCpus > Limit.NanoCpus)
+            || Budget.CpuMillicores > Limit.CpuMillicores)
             throw new InvalidOperationException("Only CPU may use a budget below its workload limit.");
     }
 }

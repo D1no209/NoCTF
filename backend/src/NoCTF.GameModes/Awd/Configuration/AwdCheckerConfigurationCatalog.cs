@@ -7,7 +7,6 @@ namespace NoCTF.GameModes.Awd.Configuration;
 public sealed record AwdCheckerSettings(
     int CheckerIntervalSeconds,
     RunnerJobConfiguration? Checker,
-    bool CheckerAllowRoot = false,
     string? TargetServiceName = null);
 
 public sealed class AwdCheckerConfigurationCatalog
@@ -33,7 +32,6 @@ public sealed class AwdCheckerConfigurationCatalog
         return new(
             rules.CheckerIntervalSeconds ?? competition.CheckerIntervalSeconds,
             checker,
-            definition.CheckerAllowRoot,
             definition.Checker?.TargetServiceName);
     }
 }

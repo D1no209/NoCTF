@@ -3,30 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace NoCTF.Application.Runtime.Provisioning;
 
-public sealed record RuntimeResourceLimits(long MemoryBytes, long NanoCpus, long PidsLimit);
-public sealed record ContainerSecurityPolicy(
-    bool NoNewPrivileges,
-    bool ReadonlyRootfs,
-    bool RunAsNonRoot,
-    IReadOnlyList<string> CapDrop,
-    IReadOnlyList<string> CapAdd)
-{
-    public static ContainerSecurityPolicy Default { get; } =
-        new(false, false, false, [], []);
-
-    public ContainerSecurityPolicy NormalizeCapabilities() => this with
-    {
-        CapDrop = Normalize(CapDrop),
-        CapAdd = Normalize(CapAdd)
-    };
-
-    private static IReadOnlyList<string> Normalize(IReadOnlyList<string>? capabilities) =>
-        capabilities?
-            .Where(capability => !string.IsNullOrWhiteSpace(capability))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray() ?? [];
-}
-
+public sealed record RuntimeResourceLimits(long MemoryBytes, long CpuMillicores, long PidsLimit);
 public sealed class RuntimeConfigurationException(string message) : Exception(message);
 
 public enum RuntimeAllocation
@@ -46,12 +23,6 @@ public enum RuntimeFlagSource
     Static,
     PerTeam,
     AwdRotation
-}
-
-public enum ContainerNetworkIsolation
-{
-    Shared,
-    Isolated
 }
 
 public enum RuntimeEgressPolicy
@@ -79,7 +50,6 @@ public sealed record RuntimeInternalEndpointBinding(string? ServiceName = null);
 
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "kind")]
 [JsonDerivedType(typeof(ContainerRuntimeDefinition), "container")]
-[JsonDerivedType(typeof(ComposeRuntimeDefinition), "compose")]
 [JsonDerivedType(typeof(OvaRuntimeDefinition), "ova")]
 public abstract record ChallengeRuntimeDefinition
 {
@@ -88,29 +58,10 @@ public abstract record ChallengeRuntimeDefinition
 }
 
 public sealed record ContainerRuntimeDefinition(
-    string Image,
-    ContainerSecurityPolicy Security,
-    IReadOnlyList<string>? Command = null,
-    IReadOnlyDictionary<string, string>? Environment = null,
-    IReadOnlyDictionary<string, string>? Labels = null,
-    IReadOnlyDictionary<int, int>? PortMappings = null,
-    string? FlagEnvironmentVariableName = null,
-    RuntimeEgressPolicy EgressPolicy = RuntimeEgressPolicy.Isolated,
-    IReadOnlyList<int>? InternalPorts = null) : ChallengeRuntimeDefinition
+    IReadOnlyList<RuntimeServiceDefinition> Services,
+    RuntimeEgressPolicy EgressPolicy = RuntimeEgressPolicy.Isolated) : ChallengeRuntimeDefinition
 {
     public override RuntimeKind RuntimeKind => RuntimeKind.Container;
-}
-
-public sealed record ComposeRuntimeDefinition(
-    string ComposeYaml,
-    IReadOnlyDictionary<string, RuntimeResourceLimits> ServiceResources,
-    IReadOnlyDictionary<string, string>? Environment = null,
-    IReadOnlyDictionary<string, string>? Labels = null,
-    IReadOnlyDictionary<string, string>? FlagEnvironmentVariables = null,
-    RuntimeEgressPolicy EgressPolicy = RuntimeEgressPolicy.Isolated)
-    : ChallengeRuntimeDefinition
-{
-    public override RuntimeKind RuntimeKind => RuntimeKind.Compose;
 }
 
 public sealed record OvaRuntimeDefinition(
@@ -168,12 +119,10 @@ public sealed record ContainerRequest(
     IReadOnlyDictionary<string, string> Labels,
     IReadOnlyDictionary<int, int> PortMappings,
     RuntimeResourceLimits Limits,
-    ContainerSecurityPolicy Security,
     TimeSpan? Ttl,
     RunnerScoringCallback? ScoringCallback = null,
     string? NetworkName = null,
     TimeSpan? OperationTimeout = null,
-    ContainerNetworkIsolation NetworkIsolation = ContainerNetworkIsolation.Shared,
     IReadOnlyList<int>? InternalPorts = null,
     bool AllowInternalCallback = false,
     Guid? RuntimeInstanceId = null,
@@ -183,7 +132,11 @@ public sealed record ContainerRequest(
     RuntimeEgressPolicy EgressPolicy = RuntimeEgressPolicy.Isolated,
     ContainerNetworkPurpose NetworkPurpose = ContainerNetworkPurpose.PersistentRuntime,
     RuntimeResourceLimits? Budget = null,
-    RuntimeAccessMode AccessMode = RuntimeAccessMode.Direct)
+    RuntimeAccessMode AccessMode = RuntimeAccessMode.Direct,
+    IReadOnlyList<string>? Arguments = null,
+    string? ServiceName = null,
+    bool RegisterServiceAlias = false,
+    string? DiscoveryServiceName = null)
 {
     public IReadOnlyList<int> ContainerPorts =>
         [.. PortMappings.Keys.Concat(InternalPorts ?? []).Distinct().Order()];
@@ -329,18 +282,12 @@ public sealed record AttachedContainerRuntimeTarget(
     ContainerReceipt Receipt)
     : AttachedRuntimeTarget(Identity);
 
-public sealed record AttachedComposeRuntimeTarget(
-    RuntimeResourceIdentity Identity,
-    ComposeReceipt Receipt,
-    string ServiceName)
-    : AttachedRuntimeTarget(Identity);
-
 public interface IAttachedOneShotJobRunner
 {
-    Task<OneShotResult> RunAttachedAsync(
-        ContainerRequest request,
-        AttachedRuntimeTarget target,
-        CancellationToken cancellationToken);
+    Task<OneShotResult> RunAttachedAsync(ContainerRequest request, AttachedRuntimeTarget target, CancellationToken cancellationToken);
+    Task<OneShotResult> RunAttachedAsync(ContainerRequest request, AttachedRuntimeTarget target, OneShotInputArchive? input, CancellationToken cancellationToken) => input is null
+        ? RunAttachedAsync(request, target, cancellationToken)
+        : throw new NotSupportedException("This job runner cannot prepare an input archive.");
 }
 
 public interface IRuntimeManagedResourceReconciler

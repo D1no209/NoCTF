@@ -38,6 +38,5 @@ public sealed record CtfChallengeConfiguration(
     RunnerJobConfiguration? Checker = null,
     int? ReadyTimeoutSeconds = null,
     long? MaximumPatchUploadBytes = null,
-    bool CheckerFixInput = false,
-    bool CheckerAllowRoot = false)
+    bool CheckerFixInput = false)
 ;

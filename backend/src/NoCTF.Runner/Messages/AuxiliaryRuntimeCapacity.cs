@@ -28,7 +28,8 @@ public sealed class AuxiliaryRuntimeCapacity(
     IPostCommitMessagePublisher outbox,
     ICompetitionEventRecorder events,
     TimeProvider clock,
-    ILogger<AuxiliaryRuntimeCapacity> logger)
+    ILogger<AuxiliaryRuntimeCapacity> logger,
+    RuntimeExecutionOptions? executionOptions = null)
 {
     public async Task<OneShotResult> RunAsync(ContainerRequest request, RuntimeWorkloadIdentity identity,
         Guid factId, Func<ContainerRequest, CancellationToken, Task<OneShotResult>> execute, CancellationToken ct)
@@ -36,7 +37,7 @@ public sealed class AuxiliaryRuntimeCapacity(
         using var mutation = await mutations.EnterWorkloadAsync(identity, ct);
         var limits = request.Limits;
         var claim = await capacity.TryClaimForRunnerAsync(new(identity.RuntimeInstanceId, runnerOptions.Value.Pool,
-            limits.MemoryBytes, limits.NanoCpus, limits.PidsLimit, identity, factId), runnerOptions.Value.Id, ct);
+            limits.MemoryBytes, limits.CpuMillicores, limits.PidsLimit, identity, factId, ProcessesPerService: executionOptions?.ProcessesPerService ?? 256), runnerOptions.Value.Id, ct);
         if (claim.Availability != RunnerCapacityAvailability.Claimed)
             throw new RunnerCapacityUnavailableException(claim.Failure ?? RunnerAdmissionFailure.NoEligibleRunner);
         var labels = request.Labels.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);

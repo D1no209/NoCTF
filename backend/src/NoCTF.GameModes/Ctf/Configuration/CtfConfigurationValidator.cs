@@ -119,8 +119,7 @@ public static class CtfConfigurationValidator
             || configuration.Checker is not null
             || configuration.ReadyTimeoutSeconds is not null
             || configuration.MaximumPatchUploadBytes is not null
-            || configuration.CheckerFixInput
-            || configuration.CheckerAllowRoot;
+            || configuration.CheckerFixInput;
         if (configuration.InteractionKind == CtfInteractionKind.FlagSubmission)
         {
             if (hasPatchDefinition)
@@ -136,7 +135,8 @@ public static class CtfConfigurationValidator
             errors.Add("CTF PatchVerification requires a Docker or Kubernetes Container runtime.");
         }
         if (configuration.Runtime?.Definition is ContainerRuntimeDefinition
-            { InternalPorts: not { Count: 1 } })
+            { Services: var services }
+            && (services.Count != 1 || services[0].InternalPorts is not { Count: 1 }))
         {
             errors.Add("CTF PatchVerification Runtime must declare exactly one InternalPort.");
         }
@@ -187,8 +187,6 @@ public static class CtfConfigurationValidator
         }
         if (configuration.CheckerFixInput && configuration.Checker is null)
             errors.Add("CheckerFixInput requires Checker.");
-        if (configuration.CheckerAllowRoot && configuration.Checker is null)
-            errors.Add("CheckerAllowRoot requires Checker.");
         if (configuration.Checker is { TimeoutSeconds: > 0 } checker)
         {
             var patchTimeout = configuration.PatchTimeoutSeconds

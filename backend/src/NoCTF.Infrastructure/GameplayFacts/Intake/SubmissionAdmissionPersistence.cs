@@ -130,7 +130,7 @@ internal static class GameplayFactAdmissionPersistence
             var template = runtimeTemplates.Get(scope.ChallengeDefinition);
             if (template is not null)
             {
-                if (template.RuntimeKind is not (RuntimeKind.Container or RuntimeKind.Compose))
+                if (template.RuntimeKind is not (RuntimeKind.Container))
                 {
                     practiceRuntimeState = PracticeRuntimeAdmissionState.Unsupported;
                 }

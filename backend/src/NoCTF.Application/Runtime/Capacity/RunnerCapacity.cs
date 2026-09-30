@@ -44,11 +44,12 @@ public sealed record RunnerCapacityRequest(
     Guid RuntimeInstanceId,
     string Pool,
     long MemoryBytes,
-    long NanoCpus,
+    long CpuMillicores,
     long PidsLimit,
     RuntimeWorkloadIdentity? Workload = null,
     Guid? GameplayFactId = null,
-    RuntimeResourceAmount? Limit = null)
+    RuntimeResourceAmount? Limit = null,
+    long ProcessesPerService = 256)
 {
     public string ClaimSuffix => Workload?.Key ?? RuntimeInstanceId.ToString("N");
 }

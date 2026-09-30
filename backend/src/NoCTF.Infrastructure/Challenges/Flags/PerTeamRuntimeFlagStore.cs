@@ -144,7 +144,7 @@ public sealed class PerTeamRuntimeFlagStore(
                 FlagSource: NoCTF.Application.Runtime.Provisioning.RuntimeFlagSource.PerTeam,
                 Definition: NoCTF.Application.Runtime.Provisioning.ContainerRuntimeDefinition
                 {
-                    FlagEnvironmentVariableName.Length: > 0
+                    Services: [{ FlagEnvironmentVariableName.Length: > 0 }]
                 }
             })
         {

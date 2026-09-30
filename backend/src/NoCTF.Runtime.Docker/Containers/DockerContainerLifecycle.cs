@@ -69,18 +69,18 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                 HostPort = pair.Value.ToString(
                     System.Globalization.CultureInfo.InvariantCulture)
             }]);
-        var containerName = $"noctf-{request.OperationId:N}";
+        var containerName = ContainerName(request);
         CreateContainerResponse? response = null;
         try
         {
             var image = await EnsureImageAvailableAsync(request.Image, cancellationToken);
-            ValidateRunAsNonRoot(request.Security, image.Config?.User);
             var labels = BuildLabels(request);
             response = await client.Containers.CreateContainerAsync(new CreateContainerParameters
             {
                 Name = containerName,
                 Image = request.Image,
-                Cmd = request.Command.ToList(),
+                Entrypoint = request.Command.Count == 0 ? null! : request.Command.ToList(),
+                Cmd = request.Arguments is not { Count: > 0 } ? null! : request.Arguments.ToList(),
                 Env = request.Environment.Select(pair => $"{pair.Key}={pair.Value}").ToList(),
                 Labels = labels,
                 ExposedPorts = exposedPorts,
@@ -90,7 +90,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                     {
                         EndpointsConfig = new Dictionary<string, EndpointSettings>
                         {
-                            [request.NetworkName] = new() { Aliases = ["target"] }
+                            [request.NetworkName] = new() { Aliases = request.RegisterServiceAlias ? [request.ServiceName!] : [] }
                         }
                     }
                     : null,
@@ -99,7 +99,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                     PortBindings = bindings,
                     NetworkMode = request.NetworkName ?? options.NetworkName,
                     Memory = request.Limits.MemoryBytes,
-                    NanoCPUs = request.Limits.NanoCpus,
+                    NanoCPUs = checked(request.Limits.CpuMillicores * 1_000_000),
                     PidsLimit = request.Limits.PidsLimit,
                     LogConfig = new LogConfig
                     {
@@ -112,13 +112,9 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                                 CultureInfo.InvariantCulture)
                         }
                     },
-                    SecurityOpt = request.Security.NoNewPrivileges ? ["no-new-privileges:true"] : [],
-                    ReadonlyRootfs = request.Security.ReadonlyRootfs,
-                    CapDrop = request.Security.CapDrop.ToList(),
-                    CapAdd = request.Security.CapAdd?.ToList() ?? []
                 }
             }, cancellationToken);
-            if (SupportsWsrx(request.AccessMode))
+            if (SupportsWsrx(request.AccessMode) || request.ControlCheckUrlBinding is not null)
             {
                 if (string.IsNullOrWhiteSpace(request.NetworkName))
                     throw new InvalidOperationException(
@@ -163,9 +159,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                 options.PublicHost,
                 SupportsWsrx(request.AccessMode)
                     ? ResolveInternalAddress(created, request.NetworkName)
-                    : request.NetworkPurpose == ContainerNetworkPurpose.PersistentRuntime
-                        ? "target"
-                        : containerName,
+                    : ResolveInternalAddress(created, request.NetworkName),
                 RuntimeInstanceId: request.RuntimeInstanceId);
         }
         catch
@@ -222,7 +216,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                 "Docker runtime cannot reconcile another provider.");
         ValidatePortMappings(request);
 
-        var resourceName = $"noctf-{request.OperationId:N}";
+        var resourceName = ContainerName(request);
         ContainerInspectResponse? existing;
         try
         {
@@ -274,10 +268,8 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             return await CreateAsync(request, cancellationToken);
         }
 
-        var internalHost = request.NetworkPurpose == ContainerNetworkPurpose.PersistentRuntime
-            ? "target"
-            : resourceName;
-        if (SupportsWsrx(request.AccessMode))
+        var internalHost = ResolveInternalAddress(existing, request.NetworkName);
+        if (SupportsWsrx(request.AccessMode) || request.ControlCheckUrlBinding is not null)
         {
             if (string.IsNullOrWhiteSpace(request.NetworkName))
                 throw new InvalidOperationException(
@@ -341,6 +333,16 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         RuntimeTerminationPolicy policy,
         CancellationToken cancellationToken)
     {
+        if (receipt.RuntimeInstanceId is Guid runtimeId)
+        {
+            try
+            {
+                var actual = await client.Containers.InspectContainerAsync(receipt.ResourceId, cancellationToken);
+                if (!HasResourceIdentity(actual.Config?.Labels, new(runtimeId)))
+                    throw new InvalidOperationException("Runtime cleanup cannot delete another owner's container.");
+            }
+            catch (DockerContainerNotFoundException) { }
+        }
         var warnings = new List<Exception>();
         var gracefulSucceeded = false;
         if (mode == RuntimeTerminationMode.GracefulThenForce)
@@ -754,6 +756,9 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
     {
         try
         {
+            var network = await client.Networks.InspectNetworkAsync(networkId, cancellationToken);
+            if (network.Name == options.NetworkName || network.Name == options.CallbackNetworkName)
+                throw new InvalidOperationException("Deployment-owned networks cannot be deleted by Runtime cleanup.");
             await client.Networks.DeleteNetworkAsync(networkId, cancellationToken);
         }
         catch (DockerApiException exception)
@@ -852,84 +857,33 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
 
     public void Dispose() => client.Dispose();
 
-    private async Task<string> ResolveContainerTargetNetworkAsync(
-        AttachedContainerRuntimeTarget target,
-        CancellationToken cancellationToken)
+    private static string ContainerName(ContainerRequest request) => request.ServiceName is null
+        ? $"noctf-{request.OperationId:N}" : NamedContainerRuntime.ResourceName(request.RuntimeInstanceId ?? request.OperationId, request.ServiceName);
+
+    public async Task EnsureSharedRuntimeNetworkAsync(RuntimeAccessMode mode, CancellationToken cancellationToken)
     {
-        var receipt = target.Receipt;
-        if (receipt.Provider != RuntimeProvider.Docker
-            || receipt.RuntimeInstanceId != target.Identity.RuntimeInstanceId
-            || string.IsNullOrWhiteSpace(receipt.NetworkId))
-            throw new InvalidOperationException(
-                "The attached Container receipt has a different ownership identity.");
-        var network = await client.Networks.InspectNetworkAsync(
-            receipt.NetworkId,
-            cancellationToken);
-        if (!HasResourceIdentity(network.Labels, target.Identity)
-            || !HasNetworkPurpose(network.Labels, "persistent-runtime"))
-            throw new InvalidOperationException(
-                "The attached Container network has a different ownership identity.");
-        return network.ID;
+        var network = await client.Networks.InspectNetworkAsync(options.NetworkName, cancellationToken);
+        if (network.Driver != "bridge" || network.Internal) throw new InvalidOperationException("The deployment challenge network must be a normal bridge.");
+        if (SupportsWsrx(mode)) await ConnectRuntimeProxyGatewaysAsync(network.ID, cancellationToken);
     }
 
-    private async Task<string> ResolveComposeTargetNetworkAsync(
-        AttachedComposeRuntimeTarget target,
-        CancellationToken cancellationToken)
+    public Task DisconnectProxyGatewaysAsync(string networkId, CancellationToken cancellationToken) => DisconnectRuntimeProxyGatewaysAsync(networkId, cancellationToken);
+
+
+    private async Task<string> ResolveContainerTargetNetworkAsync(AttachedContainerRuntimeTarget target, CancellationToken cancellationToken)
     {
         var receipt = target.Receipt;
-        if (receipt.Provider != RuntimeProvider.Docker
-            || receipt.OperationId != target.Identity.RuntimeInstanceId
-            || string.IsNullOrWhiteSpace(receipt.ProjectName)
-            || string.IsNullOrWhiteSpace(target.ServiceName))
-            throw new InvalidOperationException(
-                "The attached Compose receipt has a different ownership identity.");
-        var containers = await client.Containers.ListContainersAsync(
-            new ContainersListParameters
-            {
-                All = true,
-                Filters = new Dictionary<string, IDictionary<string, bool>>
-                {
-                    ["label"] = new Dictionary<string, bool>
-                    {
-                        [$"com.docker.compose.project={receipt.ProjectName}"] = true,
-                        [$"com.docker.compose.service={target.ServiceName}"] = true
-                    }
-                }
-            },
-            cancellationToken);
-        var container = containers.SingleOrDefault(item =>
-            HasResourceIdentity(item.Labels, target.Identity)
-            && HasJobKind(item.Labels, "persistent-runtime"))
-            ?? throw new InvalidOperationException(
-                "The attached Compose service was not found with the required ownership identity.");
-        var inspected = await client.Containers.InspectContainerAsync(
-            container.ID,
-            cancellationToken);
-        var networkIds = inspected.NetworkSettings?.Networks?.Values
-            .Select(endpoint => endpoint.NetworkID)
-            .Where(id => !string.IsNullOrWhiteSpace(id))
-            .Distinct(StringComparer.Ordinal)
-            .ToArray() ?? [];
-        var owned = new List<NetworkResponse>();
-        foreach (var networkId in networkIds)
-        {
-            var network = await client.Networks.InspectNetworkAsync(
-                networkId,
-                cancellationToken);
-            if (HasResourceIdentity(network.Labels, target.Identity)
-                && HasJobKind(network.Labels, "persistent-runtime")
-                && HasLabel(
-                    network.Labels,
-                    "com.docker.compose.project",
-                    receipt.ProjectName))
-                owned.Add(network);
-        }
-        return owned
-            .OrderBy(network => network.Name, StringComparer.Ordinal)
-            .Select(network => network.ID)
-            .FirstOrDefault()
-            ?? throw new InvalidOperationException(
-                "The attached Compose service has no owned runtime network.");
+        if (receipt.Provider != RuntimeProvider.Docker || receipt.RuntimeInstanceId != target.Identity.RuntimeInstanceId)
+            throw new InvalidOperationException("Attached service receipt has a different ownership identity.");
+        var container = await client.Containers.InspectContainerAsync(receipt.ResourceId, cancellationToken);
+        if (!HasResourceIdentity(container.Config?.Labels, target.Identity))
+            throw new InvalidOperationException("Attached service belongs to another Runtime.");
+        var networks = container.NetworkSettings?.Networks ?? throw new InvalidOperationException("Container network metadata is absent.");
+        var owned = await FindNetworkAsync($"noctf-rt-{target.Identity.RuntimeInstanceId:N}", cancellationToken);
+        if (owned is not null && HasResourceIdentity(owned.Labels, target.Identity) && networks.Values.Any(endpoint => endpoint.NetworkID == owned.ID))
+            return owned.ID;
+        if (networks.TryGetValue(options.NetworkName, out var shared)) return shared.NetworkID;
+        throw new InvalidOperationException("Attached service has no Runtime network.");
     }
 
     private async Task ConnectInternalCallbackAsync(
@@ -948,59 +902,23 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         }
         var callbackContainers = await ResolveInternalCallbackContainersAsync(cancellationToken);
 
-        var networkName = CallbackNetworkName(request.OperationId);
-        var network = await FindNetworkAsync(networkName, cancellationToken);
-        if (network is null)
-        {
-            _ = await client.Networks.CreateNetworkAsync(new NetworksCreateParameters
-            {
-                Name = networkName,
-                Internal = true,
-                Labels = new Dictionary<string, string>
-                {
-                    ["noctf.io/network-purpose"] = CallbackNetworkPurpose(request),
-                    ["noctf.io/managed"] = "true",
-                    ["noctf.io/job-kind"] = JobKind(request.NetworkPurpose),
-                    ["noctf.io/runtime-instance-id"] = (request.RuntimeInstanceId
-                        ?? request.OperationId).ToString("D")
-                }
-            }, cancellationToken);
-            network = await client.Networks.InspectNetworkAsync(networkName, cancellationToken);
-        }
-        if (!network.Internal
-            || network.Labels is null
-            || !network.Labels.TryGetValue("noctf.io/network-purpose", out var purpose)
-            || !string.Equals(purpose, CallbackNetworkPurpose(request), StringComparison.Ordinal)
-            || !HasResourceIdentity(network.Labels, new RuntimeResourceIdentity(
-                request.RuntimeInstanceId ?? request.OperationId)))
-            throw new InvalidOperationException("The checker callback network is not an internal managed network.");
-
+        var network = await client.Networks.InspectNetworkAsync(options.CallbackNetworkName, cancellationToken);
+        if (!network.Internal) throw new InvalidOperationException("The deployment callback network must be internal.");
         foreach (var callbackContainerId in callbackContainers)
+            await EnsureNetworkConnectionAsync(network.ID, callbackContainerId, callback is null ? [] : [callback.Host], cancellationToken);
+        await EnsureNetworkConnectionAsync(network.ID, checkerContainerId, [], cancellationToken);
+    }
+
+    private async Task EnsureNetworkConnectionAsync(string networkId, string containerId, IList<string> aliases, CancellationToken cancellationToken)
+    {
+        var current = await client.Networks.InspectNetworkAsync(networkId, cancellationToken);
+        if (current.Containers?.ContainsKey(containerId) == true) return;
+        try { await client.Networks.ConnectNetworkAsync(networkId, new() { Container = containerId, EndpointConfig = new() { Aliases = aliases } }, cancellationToken); }
+        catch (DockerApiException) when (!cancellationToken.IsCancellationRequested)
         {
-            if (network.Containers?.ContainsKey(callbackContainerId) == true)
-                continue;
-            await client.Networks.ConnectNetworkAsync(network.ID, new NetworkConnectParameters
-            {
-                Container = callbackContainerId,
-                EndpointConfig = new EndpointSettings
-                {
-                    Aliases = callback is null ? [] : [callback.Host]
-                }
-            }, cancellationToken);
+            current = await client.Networks.InspectNetworkAsync(networkId, cancellationToken);
+            if (current.Containers?.ContainsKey(containerId) != true) throw;
         }
-        await client.Networks.ConnectNetworkAsync(
-            network.ID,
-            new NetworkConnectParameters
-            {
-                Container = checkerContainerId,
-                EndpointConfig = new EndpointSettings
-                {
-                    Aliases = request.NetworkPurpose == ContainerNetworkPurpose.PersistentRuntime
-                        ? ["target"]
-                        : []
-                }
-            },
-            cancellationToken);
     }
 
     private async Task<IReadOnlyList<string>> ResolveInternalCallbackContainersAsync(
@@ -1054,16 +972,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                 "The configured callback container does not carry the required role label.");
     }
 
-    private async Task DeleteCallbackNetworkAsync(
-        Guid operationId,
-        RuntimeResourceIdentity identity,
-        CancellationToken cancellationToken)
-    {
-        var network = await FindNetworkAsync(CallbackNetworkName(operationId), cancellationToken);
-        if (network is null || !HasResourceIdentity(network.Labels, identity))
-            return;
-        await DeleteNetworkAsync(network, cancellationToken);
-    }
+    private static Task DeleteCallbackNetworkAsync(Guid operationId, RuntimeResourceIdentity identity, CancellationToken cancellationToken) => Task.CompletedTask;
 
     private async Task DeleteNetworkAsync(
         NetworkResponse network,
@@ -1159,34 +1068,6 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             || !HasPublishedPortBindings(container.NetworkSettings?.Ports, request.PortMappings))
             throw new InvalidOperationException(
                 $"Docker Container '{resourceName}' has a different ownership identity, purpose, or published port contract.");
-        ValidateRunAsNonRoot(request.Security, container.Config?.User);
-    }
-
-    private static void ValidateRunAsNonRoot(
-        ContainerSecurityPolicy security,
-        string? imageUser)
-    {
-        if (!security.RunAsNonRoot)
-            return;
-
-        var parts = imageUser?.Split(':', StringSplitOptions.None);
-        if (parts is not { Length: 1 or 2 }
-            || !uint.TryParse(
-                parts[0],
-                NumberStyles.None,
-                CultureInfo.InvariantCulture,
-                out var uid)
-            || uid == 0
-            || parts.Length == 2
-            && !uint.TryParse(
-                parts[1],
-                NumberStyles.None,
-                CultureInfo.InvariantCulture,
-                out _))
-        {
-            throw new RuntimeConfigurationException(
-                "Docker RunAsNonRoot requires the image Config.User to be a numeric non-zero UID or UID:GID.");
-        }
     }
 
     private static bool HasPublishedPortBindings(
@@ -1249,9 +1130,13 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         }
     }
 
+    public Task<OneShotResult> RunAttachedAsync(ContainerRequest request, AttachedRuntimeTarget target, CancellationToken cancellationToken) =>
+        RunAttachedAsync(request, target, null, cancellationToken);
+
     public async Task<OneShotResult> RunAttachedAsync(
         ContainerRequest request,
         AttachedRuntimeTarget target,
+        OneShotInputArchive? input,
         CancellationToken cancellationToken)
     {
         if (request.Provider != RuntimeProvider.Docker)
@@ -1261,8 +1146,6 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         {
             AttachedContainerRuntimeTarget container =>
                 await ResolveContainerTargetNetworkAsync(container, cancellationToken),
-            AttachedComposeRuntimeTarget compose =>
-                await ResolveComposeTargetNetworkAsync(compose, cancellationToken),
             _ => throw new InvalidOperationException("The attached Runtime target is unsupported.")
         };
         return await RunAsync(
@@ -1271,9 +1154,9 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                 NetworkName = networkId,
                 AllowInternalCallback = true,
                 RuntimeInstanceId = target.Identity.RuntimeInstanceId,
-                NetworkPurpose = ContainerNetworkPurpose.AwdChecker
+                NetworkPurpose = request.NetworkPurpose
             },
-            null,
+            input,
             cancellationToken);
     }
 
@@ -1281,6 +1164,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
     private static Dictionary<string, string> BuildLabels(ContainerRequest request)
     {
         var labels = request.Labels.ToDictionary(pair => pair.Key, pair => pair.Value);
+        labels["noctf.io/job-kind"] = JobKind(request.NetworkPurpose);
         if (request.AllowInternalCallback)
         {
             labels["noctf.io/managed"] = "true";
@@ -1375,10 +1259,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         {
             if (network.Containers?.ContainsKey(gateway) == true)
                 continue;
-            await client.Networks.ConnectNetworkAsync(
-                network.ID,
-                new NetworkConnectParameters { Container = gateway },
-                cancellationToken);
+            await EnsureNetworkConnectionAsync(network.ID, gateway, [], cancellationToken);
         }
     }
 
@@ -1398,7 +1279,8 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         {
             return;
         }
-        var gateways = await ResolveRuntimeProxyContainersAsync(cancellationToken);
+        if (network.Name == options.NetworkName || network.Name == options.CallbackNetworkName) return;
+        var gateways = await ResolveRuntimeProxyContainersAsync(cancellationToken, requireAny: false);
         foreach (var gateway in gateways)
         {
             if (network.Containers?.ContainsKey(gateway) != true)

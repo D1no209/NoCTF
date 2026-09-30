@@ -20,7 +20,8 @@ public sealed class RunnerAvailabilityPublisher(
     RunnerResourceMutationCoordinator mutations,
     IEnumerable<IRuntimeManagedResourceReconciler> reconcilers,
     RunnerResourceObserver observer,
-    RunnerProviderHealthState? providerHealth = null) : BackgroundService
+    RunnerProviderHealthState? providerHealth = null,
+    RuntimeExecutionOptions? executionOptions = null) : BackgroundService
 {
     private static readonly string Version =
         typeof(RunnerProgramMarker).Assembly
@@ -131,7 +132,7 @@ public sealed class RunnerAvailabilityPublisher(
                 admission,
                 options.Admission,
                 initialReconciliationComplete,
-                observer.ResourceDomainFencingToken);
+                observer.ResourceDomainFencingToken, executionOptions?.ProcessesPerService ?? 256);
         var result = await registry.RegisterAsync(registration, cancellationToken);
         if (result == RunnerAvailabilityRegistrationOutcome.OfflineCapacityUntrusted
             && admission.Capacity is not null)

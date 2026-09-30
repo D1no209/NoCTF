@@ -622,8 +622,8 @@ public static class NoCtfTelemetry
         bool online,
         long availableMemoryBytes,
         long totalMemoryBytes,
-        long availableNanoCpus,
-        long totalNanoCpus,
+        long availableCpuMillicores,
+        long totalCpuMillicores,
         long availablePids,
         long totalPids)
     {
@@ -634,8 +634,8 @@ public static class NoCtfTelemetry
             online,
             ClampAvailable(online, availableMemoryBytes, totalMemoryBytes),
             Math.Max(0, totalMemoryBytes),
-            ClampAvailable(online, availableNanoCpus, totalNanoCpus),
-            Math.Max(0, totalNanoCpus),
+            ClampAvailable(online, availableCpuMillicores, totalCpuMillicores),
+            Math.Max(0, totalCpuMillicores),
             ClampAvailable(online, availablePids, totalPids),
             Math.Max(0, totalPids));
     }
@@ -667,7 +667,7 @@ public static class NoCtfTelemetry
                     group.Key,
                     "cpu",
                     group.Where(snapshot => snapshot.Online).Sum(snapshot =>
-                        total ? snapshot.TotalNanoCpus : snapshot.AvailableNanoCpus)),
+                        total ? snapshot.TotalCpuMillicores : snapshot.AvailableCpuMillicores)),
                 RunnerCapacityMeasurement(
                     group.Key,
                     "pids",
@@ -691,8 +691,8 @@ public static class NoCtfTelemetry
         bool Online,
         long AvailableMemoryBytes,
         long TotalMemoryBytes,
-        long AvailableNanoCpus,
-        long TotalNanoCpus,
+        long AvailableCpuMillicores,
+        long TotalCpuMillicores,
         long AvailablePids,
         long TotalPids);
 }

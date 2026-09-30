@@ -47,8 +47,7 @@ public sealed record AwdChallengeConfiguration(
     ChallengeRuntimeTemplate? Runtime = null,
     AwdCheckerConfiguration? Checker = null,
     AwdFlagInjectionConfiguration? FlagInjection = null,
-    PerTeamFlagTemplate? FlagTemplate = null,
-    bool CheckerAllowRoot = false)
+    PerTeamFlagTemplate? FlagTemplate = null)
 ;
 
 public sealed record AwdCheckerConfiguration(

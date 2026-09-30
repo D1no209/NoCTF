@@ -12,18 +12,14 @@ public static class ChallengeDefinitionGraph
         if (definition.Runtime is null) return;
         definition.Runtime.ChallengeId = challengeId;
         foreach (var item in definition.Runtime.UrlBindings) item.ChallengeId = challengeId;
-        foreach (var item in definition.Runtime.KeyValues) item.ChallengeId = challengeId;
-        foreach (var item in definition.Runtime.CommandItems) item.ChallengeId = challengeId;
         if (definition.Runtime is ContainerChallengeRuntimeTemplate container)
-        {
-            foreach (var item in container.Capabilities) item.ChallengeId = challengeId;
-            foreach (var item in container.PortMappings) item.ChallengeId = challengeId;
-            foreach (var item in container.InternalPorts) item.ChallengeId = challengeId;
-        }
-        else if (definition.Runtime is ComposeChallengeRuntimeTemplate compose)
-        {
-            foreach (var item in compose.ServiceResources) item.ChallengeId = challengeId;
-        }
+            foreach (var service in container.Services)
+            {
+                service.ChallengeId = challengeId;
+                foreach (var item in service.Commands) { item.ChallengeId = challengeId; item.ServiceName = service.Name; }
+                foreach (var item in service.Environment) { item.ChallengeId = challengeId; item.ServiceName = service.Name; }
+                foreach (var item in service.InternalPorts) { item.ChallengeId = challengeId; item.ServiceName = service.Name; }
+            }
     }
 }
 
@@ -38,7 +34,6 @@ public static class ChallengeDefinitionStructuralComparer
             || left.ReadyTimeoutSeconds != right.ReadyTimeoutSeconds
             || left.MaximumPatchUploadBytes != right.MaximumPatchUploadBytes
             || left.CheckerFixInput != right.CheckerFixInput
-            || left.CheckerAllowRoot != right.CheckerAllowRoot
             || left.HasFlagTemplate != right.HasFlagTemplate
             || left.FlagTemplate.Header != right.FlagTemplate.Header
             || left.FlagTemplate.BodyTemplate != right.FlagTemplate.BodyTemplate
@@ -80,10 +75,6 @@ public static class ChallengeDefinitionStructuralComparer
         if (ReferenceEquals(left, right)) return true;
         if (left is null || right is null || left.GetType() != right.GetType()) return false;
         if (left.Allocation != right.Allocation
-            || left.Limits.MemoryBytes != right.Limits.MemoryBytes
-            || left.Limits.NanoCpus != right.Limits.NanoCpus
-            || left.Limits.PidsLimit != right.Limits.PidsLimit
-            || left.HasExplicitLimits != right.HasExplicitLimits
             || left.TtlSeconds != right.TtlSeconds
             || left.OperationTimeoutSeconds != right.OperationTimeoutSeconds
             || left.FlagSource != right.FlagSource
@@ -91,30 +82,23 @@ public static class ChallengeDefinitionStructuralComparer
             || !SequenceEqual(left.UrlBindings, right.UrlBindings, item => (
                 item.Position, item.IsControlCheck, item.UrlTemplate, item.Exposure,
                 item.ContainerPort, item.ServiceName, item.VmId, item.GuestPort))
-            || !SequenceEqual(left.KeyValues, right.KeyValues,
-                item => (item.Kind, item.Key, item.Value))
-            || !SequenceEqual(left.CommandItems, right.CommandItems,
-                item => (item.Position, item.Value)))
+)
             return false;
         return (left, right) switch
         {
             (ContainerChallengeRuntimeTemplate a, ContainerChallengeRuntimeTemplate b) =>
-                a.Image == b.Image
-                && a.FlagEnvironmentVariableName == b.FlagEnvironmentVariableName
-                && a.Security.NoNewPrivileges == b.Security.NoNewPrivileges
-                && a.Security.ReadonlyRootfs == b.Security.ReadonlyRootfs
-                && a.Security.RunAsNonRoot == b.Security.RunAsNonRoot
-                && SequenceEqual(a.Capabilities, b.Capabilities, item => (item.Add, item.Name))
-                && SequenceEqual(a.PortMappings, b.PortMappings,
-                    item => (item.ContainerPort, item.HostPort))
-                && SequenceEqual(a.InternalPorts, b.InternalPorts, item => item.Port),
-            (ComposeChallengeRuntimeTemplate a, ComposeChallengeRuntimeTemplate b) =>
-                a.ComposeYaml == b.ComposeYaml
-                && SequenceEqual(a.ServiceResources, b.ServiceResources, item => (
-                    item.ServiceName, item.Limits.MemoryBytes,
-                    item.Limits.NanoCpus, item.Limits.PidsLimit)),
+                a.Services.Count == b.Services.Count && a.Services.OrderBy(item => item.Position)
+                    .Zip(b.Services.OrderBy(item => item.Position)).All(pair =>
+                        pair.First.Name == pair.Second.Name && pair.First.Image == pair.Second.Image
+                        && pair.First.CpuCores == pair.Second.CpuCores && pair.First.MemoryMiB == pair.Second.MemoryMiB
+                        && pair.First.FlagEnvironmentVariableName == pair.Second.FlagEnvironmentVariableName
+                        && SequenceEqual(pair.First.Commands, pair.Second.Commands, item => (item.IsArgument, item.Position, item.Value))
+                        && SequenceEqual(pair.First.Environment, pair.Second.Environment, item => (item.Name, item.Value))
+                        && SequenceEqual(pair.First.InternalPorts, pair.Second.InternalPorts, item => item.Port)),
             (OvaChallengeRuntimeTemplate a, OvaChallengeRuntimeTemplate b) =>
-                a.OvaSourceUrl == b.OvaSourceUrl && a.Sha256 == b.Sha256,
+                a.OvaSourceUrl == b.OvaSourceUrl && a.Sha256 == b.Sha256
+                && a.Limits.MemoryBytes == b.Limits.MemoryBytes && a.Limits.CpuMillicores == b.Limits.CpuMillicores
+                && a.Limits.PidsLimit == b.Limits.PidsLimit && a.HasExplicitLimits == b.HasExplicitLimits,
             _ => false
         };
     }

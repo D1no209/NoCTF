@@ -34,8 +34,6 @@ public static class RuntimeReceiptCleanup
         {
             RuntimeKind.Container => CleanupContainerAsync(
                 providers, identity, provider, providerReceipt, mode, policy, cancellationToken),
-            RuntimeKind.Compose => CleanupComposeAsync(
-                providers, identity, provider, providerReceipt, mode, policy, cancellationToken),
             RuntimeKind.OvaVm => CleanupOvaAsync(
                 providers, identity, provider, providerReceipt, mode, policy, cancellationToken),
             _ => throw new ArgumentOutOfRangeException(nameof(runtimeKind), runtimeKind, null)
@@ -70,62 +68,15 @@ public static class RuntimeReceiptCleanup
         var receipt = (providerReceipt as ContainerRuntimeReceiptData)?.ToReceipt()
             ?? throw new InvalidOperationException("Container receipt type is invalid.");
         if (receipt.Provider != provider
-            || receipt.RuntimeInstanceId != identity.RuntimeInstanceId
-            || string.IsNullOrWhiteSpace(receipt.ResourceId))
+            || receipt.OperationId != identity.RuntimeInstanceId
+            || string.IsNullOrWhiteSpace(receipt.ProjectName)
+)
         {
             throw new InvalidOperationException(
                 "Container receipt does not match the Runtime assignment.");
         }
 
-        var lifecycle = providers.Containers(provider);
-        var sandbox = providers.Sandbox(provider);
-        await IsolatedContainerProvisioner.DestroyAsync(
-            lifecycle,
-            sandbox,
-            receipt,
-            mode,
-            policy,
-            cancellationToken);
-    }
-
-    public static async Task CleanupComposeAsync(
-        IRuntimeProviderCatalog providers,
-        RuntimeResourceIdentity identity,
-        RuntimeProvider provider,
-        RuntimeReceiptData providerReceipt,
-        CancellationToken cancellationToken)
-    {
-        await CleanupComposeAsync(
-            providers,
-            identity,
-            provider,
-            providerReceipt,
-            RuntimeTerminationMode.GracefulThenForce,
-            RuntimeTerminationPolicy.Default,
-            cancellationToken);
-    }
-
-    public static async Task CleanupComposeAsync(
-        IRuntimeProviderCatalog providers,
-        RuntimeResourceIdentity identity,
-        RuntimeProvider provider,
-        RuntimeReceiptData providerReceipt,
-        RuntimeTerminationMode mode,
-        RuntimeTerminationPolicy policy,
-        CancellationToken cancellationToken)
-    {
-        var receipt = (providerReceipt as ComposeRuntimeReceiptData)?.ToReceipt()
-            ?? throw new InvalidOperationException("Compose receipt type is invalid.");
-        if (receipt.Provider != provider
-            || receipt.OperationId != identity.RuntimeInstanceId
-            || string.IsNullOrWhiteSpace(receipt.ProjectName)
-            || string.IsNullOrWhiteSpace(receipt.Namespace))
-        {
-            throw new InvalidOperationException(
-                "Compose receipt does not match the Runtime assignment.");
-        }
-
-        var runtime = providers.Compose(provider);
+        var runtime = providers.Runtime(provider);
         await runtime.DownAsync(receipt, mode, policy, cancellationToken);
     }
 

@@ -3,8 +3,6 @@
     <ProjectReference Include="../NoCTF.Application/NoCTF.Application.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="CliWrap" />
     <PackageReference Include="Docker.DotNet.Enhanced" />
-    <PackageReference Include="YamlDotNet" />
   </ItemGroup>
 </Project>

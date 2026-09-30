@@ -5,6 +5,5 @@
   <ItemGroup>
     <PackageReference Include="FluentStorage" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
-    <PackageReference Include="YamlDotNet" />
   </ItemGroup>
 </Project>

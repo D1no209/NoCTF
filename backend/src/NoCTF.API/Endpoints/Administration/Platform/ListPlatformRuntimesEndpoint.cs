@@ -30,8 +30,8 @@ public sealed class ListPlatformRuntimesValidator : Validator<ListPlatformRuntim
             or RuntimeStateProtocol.Running or RuntimeStateProtocol.Stopping)
             .WithMessage("State must be Queued, Provisioning, Running or Stopping.");
         RuleFor(request => request.RuntimeKind).Must(value => value is null
-            or RuntimeKindProtocol.Container or RuntimeKindProtocol.Compose)
-            .WithMessage("RuntimeKind must be Container or Compose.");
+            or RuntimeKindProtocol.Container)
+            .WithMessage("RuntimeKind must be Container.");
     }
 }
 
@@ -71,7 +71,7 @@ public sealed class ListPlatformRuntimesEndpoint(
         {
             summary.Summary = "Lists active runtime containers across the platform.";
             summary.Description =
-                "Returns offset-paged Container and Compose runtimes in active lifecycle states to platform administrators. "
+                "Returns offset-paged Container runtimes in active lifecycle states to platform administrators. "
                 + "Supports scope, state, kind and case-insensitive title/team search, including Fix target team attribution.";
         });
     }

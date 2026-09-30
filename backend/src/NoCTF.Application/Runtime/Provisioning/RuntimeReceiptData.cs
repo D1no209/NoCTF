@@ -5,46 +5,21 @@ namespace NoCTF.Application.Runtime.Provisioning;
 public abstract record RuntimeReceiptData(Guid OperationId, RuntimeProvider Provider);
 
 public sealed record ContainerRuntimeReceiptData(
-    Guid OperationId,
-    RuntimeProvider Provider,
-    string ResourceId,
-    RuntimeStatus Status,
-    IReadOnlyDictionary<int, int> PortMappings,
-    string? PublicHost,
-    string? InternalHost,
-    string? NetworkId,
-    Guid RuntimeInstanceId) : RuntimeReceiptData(OperationId, Provider)
+    Guid OperationId, RuntimeProvider Provider, string ProjectName, string Namespace, string PublicHost,
+    DateTimeOffset CreatedAt, IReadOnlyList<ContainerServiceStatus> Services,
+    string? OwnedNetworkId = null, string? DiscoveryServiceName = null) : RuntimeReceiptData(OperationId, Provider)
 {
-    public static ContainerRuntimeReceiptData From(ContainerReceipt receipt) => new(
-        receipt.OperationId,
-        receipt.Provider,
-        receipt.ResourceId,
-        receipt.Status,
-        receipt.PortMappings,
-        receipt.PublicHost,
-        receipt.InternalHost,
-        receipt.NetworkId,
-        receipt.RuntimeInstanceId ?? receipt.OperationId);
-
-    public ContainerReceipt ToReceipt() => new(
-        OperationId, Provider, ResourceId, Status, PortMappings, PublicHost, InternalHost,
-        NetworkId, RuntimeInstanceId);
-}
-
-public sealed record ComposeRuntimeReceiptData(
-    Guid OperationId,
-    RuntimeProvider Provider,
-    string ProjectName,
-    string Namespace,
-    string PublicHost,
-    DateTimeOffset CreatedAt) : RuntimeReceiptData(OperationId, Provider)
-{
-    public static ComposeRuntimeReceiptData From(ComposeReceipt receipt) => new(
-        receipt.OperationId, receipt.Provider, receipt.ProjectName, receipt.Namespace,
-        receipt.PublicHost, receipt.CreatedAt);
-
-    public ComposeReceipt ToReceipt() => new(
-        OperationId, Provider, ProjectName, Namespace, PublicHost, CreatedAt);
+    public static ContainerRuntimeReceiptData From(ContainerDeploymentReceipt receipt) => new(
+        receipt.OperationId, receipt.Provider, receipt.ProjectName, receipt.Namespace, receipt.PublicHost,
+        receipt.CreatedAt, receipt.Services, receipt.OwnedNetworkId, receipt.DiscoveryServiceName);
+    public ContainerDeploymentReceipt ToReceipt() => new(OperationId, Provider, ProjectName, Namespace, PublicHost,
+        CreatedAt, Services, OwnedNetworkId, DiscoveryServiceName);
+    public ContainerReceipt ServiceReceipt(string serviceName)
+    {
+        var service = Services.SingleOrDefault(service => service.Name == serviceName)
+            ?? throw new InvalidDataException("The target Runtime service is absent.");
+        return NamedContainerRuntime.ServiceReceipt(ToReceipt(), service);
+    }
 }
 
 public sealed record OvaRuntimeReceiptData(
@@ -69,31 +44,15 @@ public static class RuntimeReceiptDataMapping
     {
         ContainerRuntimeReceiptData receipt => new ContainerRuntimeReceipt
         {
-            RuntimeInstanceId = runtimeInstanceId,
-            OperationId = receipt.OperationId,
-            Provider = receipt.Provider,
-            ResourceId = receipt.ResourceId,
-            Status = receipt.Status,
-            PublicHost = receipt.PublicHost,
-            InternalHost = receipt.InternalHost,
-            NetworkId = receipt.NetworkId,
-            PortMappings = receipt.PortMappings.OrderBy(item => item.Key).Select(item =>
-                new ContainerRuntimeReceiptPort
-                {
-                    Id = Guid.CreateVersion7(),
-                    ContainerPort = item.Key,
-                    HostPort = item.Value
-                }).ToList()
-        },
-        ComposeRuntimeReceiptData receipt => new ComposeRuntimeReceipt
-        {
-            RuntimeInstanceId = runtimeInstanceId,
-            OperationId = receipt.OperationId,
-            Provider = receipt.Provider,
-            ProjectName = receipt.ProjectName,
-            Namespace = receipt.Namespace,
-            PublicHost = receipt.PublicHost,
-            CreatedAt = receipt.CreatedAt
+            RuntimeInstanceId = runtimeInstanceId, OperationId = receipt.OperationId, Provider = receipt.Provider,
+            ProjectName = receipt.ProjectName, Namespace = receipt.Namespace, PublicHost = receipt.PublicHost,
+            CreatedAt = receipt.CreatedAt, OwnedNetworkId = receipt.OwnedNetworkId, DiscoveryServiceName = receipt.DiscoveryServiceName,
+            Services = receipt.Services.Select(service => new ContainerRuntimeReceiptService
+            {
+                Id = Guid.CreateVersion7(), Name = service.Name, ResourceId = service.ResourceId, Status = service.Status, InternalHost = service.InternalHost,
+                PublishedPorts = service.PublishedPorts.Select(port => new ContainerRuntimeReceiptPort
+                { Id = Guid.CreateVersion7(), ContainerPort = port.Key, HostPort = port.Value }).ToList()
+            }).ToList()
         },
         OvaRuntimeReceiptData receipt => new OvaRuntimeReceiptEntity
         {
@@ -117,12 +76,10 @@ public static class RuntimeReceiptDataMapping
     public static RuntimeReceiptData ToData(this RuntimeReceipt value) => value switch
     {
         ContainerRuntimeReceipt receipt => new ContainerRuntimeReceiptData(
-            receipt.OperationId, receipt.Provider, receipt.ResourceId, receipt.Status,
-            receipt.PortMappings.ToDictionary(item => item.ContainerPort, item => item.HostPort),
-            receipt.PublicHost, receipt.InternalHost, receipt.NetworkId, receipt.RuntimeInstanceId),
-        ComposeRuntimeReceipt receipt => new ComposeRuntimeReceiptData(
-            receipt.OperationId, receipt.Provider, receipt.ProjectName, receipt.Namespace,
-            receipt.PublicHost, receipt.CreatedAt),
+            receipt.OperationId, receipt.Provider, receipt.ProjectName, receipt.Namespace, receipt.PublicHost, receipt.CreatedAt,
+            receipt.Services.Select(service => new ContainerServiceStatus(service.Name, service.ResourceId, service.Status,
+                service.PublishedPorts.ToDictionary(port => port.ContainerPort, port => port.HostPort), service.InternalHost)).ToArray(),
+            receipt.OwnedNetworkId, receipt.DiscoveryServiceName),
         OvaRuntimeReceiptEntity receipt => new OvaRuntimeReceiptData(
             receipt.OperationId, receipt.Provider, receipt.NetworkId, receipt.NetworkCidr,
             receipt.VirtualMachines.Select(machine => new OvaVirtualMachineReceipt(

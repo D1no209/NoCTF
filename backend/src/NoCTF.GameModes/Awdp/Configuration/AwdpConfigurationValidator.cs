@@ -82,8 +82,6 @@ public static class AwdpConfigurationValidator
         ValidateChecker(configuration.Checker, errors);
         if (configuration.CheckerFixInput && configuration.Checker is null)
             errors.Add("CheckerFixInput requires Checker.");
-        if (configuration.CheckerAllowRoot && configuration.Checker is null)
-            errors.Add("CheckerAllowRoot requires Checker.");
         return errors;
     }
 
@@ -131,8 +129,6 @@ public static class AwdpConfigurationValidator
         ValidateChecker(configuration.Checker, errors);
         if (configuration.CheckerFixInput && configuration.Checker is null)
             errors.Add("CheckerFixInput requires Checker.");
-        if (configuration.CheckerAllowRoot && configuration.Checker is null)
-            errors.Add("CheckerAllowRoot requires Checker.");
         return errors;
     }
 
@@ -261,54 +257,16 @@ public static class AwdpConfigurationValidator
         if (allowsAttackExposure
             && runtime is { FlagSource: not NoCTF.Application.Runtime.Provisioning.RuntimeFlagSource.PerTeam })
             errors.Add("AWDP player Runtime FlagSource must be PerTeam.");
-        if (runtime is not null
-            && runtime.Definition is not NoCTF.Application.Runtime.Provisioning.ContainerRuntimeDefinition)
-            errors.Add("AWDP requires a Docker or Kubernetes Container runtime.");
-        if (!allowsAttackExposure
-            && (runtime?.Definition is NoCTF.Application.Runtime.Provisioning.ContainerRuntimeDefinition
-            {
-                PortMappings: { Count: > 0 }
-            }
-            || runtime?.UrlBindings is { Count: > 0 }))
-        {
-            errors.Add(
-                "AWDP disposable targets cannot configure public ports or URLs.");
-        }
-        if (runtime?.Definition is NoCTF.Application.Runtime.Provisioning.ContainerRuntimeDefinition
-            { InternalPorts: not { Count: 1 } })
-        {
-            errors.Add("AWDP target Runtime must declare exactly one InternalPort.");
-        }
-        if (allowsAttackExposure
-            && runtime?.Definition is NoCTF.Application.Runtime.Provisioning.ContainerRuntimeDefinition
-            {
-                PortMappings: not { Count: 1 }
-            })
-            errors.Add("AWDP player Runtime must publish exactly one attack port.");
-        if (allowsAttackExposure
-            && runtime?.Definition is NoCTF.Application.Runtime.Provisioning.ContainerRuntimeDefinition
-            {
-                PortMappings: { Count: 1 } portMappings,
-                InternalPorts: { Count: 1 } internalPorts
-            }
-            && portMappings.Keys.Single() != internalPorts[0])
-            errors.Add("AWDP player Runtime must publish its single checker target port.");
-        if (allowsAttackExposure
-            && runtime is not null
-            && runtime.UrlBindings is not { Count: > 0 })
-            errors.Add("AWDP player Runtime must publish an OwnerOnly access URL.");
-        if (allowsAttackExposure
-            && runtime?.UrlBindings?.Any(binding =>
-                binding.Exposure != NoCTF.Application.Runtime.Provisioning.RuntimeExposure.OwnerOnly) == true)
-            errors.Add("AWDP player Runtime URL bindings must use OwnerOnly exposure.");
-        if (allowsAttackExposure
-            && runtime?.Definition is NoCTF.Application.Runtime.Provisioning.ContainerRuntimeDefinition
-            {
-                InternalPorts: { Count: 1 } internalPortsForUrl
-            }
-            && runtime.UrlBindings?.Any(binding =>
-                binding.ContainerPort != internalPortsForUrl[0]) == true)
-            errors.Add("AWDP player Runtime URL bindings must target its checker port.");
+        if (runtime is null) return;
+        if (runtime.Definition is not NoCTF.Application.Runtime.Provisioning.ContainerRuntimeDefinition { Services.Count: 1 } definition)
+        { errors.Add("AWDP requires exactly one Runtime service."); return; }
+        var service = definition.Services[0];
+        if (service.InternalPorts is not { Count: 1 }) errors.Add("AWDP requires exactly one internal target port.");
+        if (!allowsAttackExposure && runtime.UrlBindings is { Count: > 0 }) errors.Add("Disposable targets cannot expose public entries.");
+        if (allowsAttackExposure && runtime.UrlBindings is not { Count: > 0 }) errors.Add("AWDP requires an OwnerOnly attack entry.");
+        if (allowsAttackExposure && runtime.UrlBindings?.Any(binding => binding.Exposure != NoCTF.Application.Runtime.Provisioning.RuntimeExposure.OwnerOnly
+            || binding.ServiceName != service.Name || service.InternalPorts is not { Count: 1 } || binding.ContainerPort != service.InternalPorts[0]) == true)
+            errors.Add("AWDP entries must use OwnerOnly exposure and target the single checker port.");
     }
 
     private static void ValidateChecker(

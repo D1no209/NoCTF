@@ -3,8 +3,6 @@
     <ProjectReference Include="../NoCTF.Application/NoCTF.Application.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="CliWrap" />
     <PackageReference Include="KubernetesClient" />
-    <PackageReference Include="YamlDotNet" />
   </ItemGroup>
 </Project>

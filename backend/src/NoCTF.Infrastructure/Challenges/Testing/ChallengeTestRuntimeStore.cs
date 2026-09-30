@@ -82,7 +82,7 @@ public sealed class ChallengeTestRuntimeStore(
             {
                 template = templates.Get(challenge.Definition);
                 if (template is null
-                    || template.RuntimeKind is not RuntimeKind.Container and not RuntimeKind.Compose)
+                    || template.RuntimeKind is not RuntimeKind.Container)
                 {
                     return new(null, RuntimeMutationFailure.Unsupported);
                 }

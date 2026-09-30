@@ -4,7 +4,7 @@ namespace NoCTF.Runtime.Docker.Containers;
 
 public sealed record DockerRuntimeOptions(
     string Endpoint = "npipe://./pipe/docker_engine",
-    string NetworkName = "noctf",
+    string NetworkName = "noctf-challenges",
     string PublicHost = "localhost",
     string CallbackContainerName = "",
     string CallbackContainerLabelKey = "noctf.io/internal-role",
@@ -15,4 +15,5 @@ public sealed record DockerRuntimeOptions(
     string ProxyContainerName = "",
     string ProxyContainerLabelKey = "noctf.io/runtime-proxy-gateway",
     string ProxyContainerLabelValue = "true",
-    string? RegistryConfigDirectory = null);
+    string? RegistryConfigDirectory = null,
+    string CallbackNetworkName = "noctf-runtime-callback");

@@ -9404,7 +9404,7 @@
           "Admin"
         ],
         "summary": "Lists active runtime containers across the platform.",
-        "description": "Returns offset-paged Container and Compose runtimes in active lifecycle states to platform administrators. Supports scope, state, kind and case-insensitive title/team search, including Fix target team attribution.",
+        "description": "Returns offset-paged Container runtimes in active lifecycle states to platform administrators. Supports scope, state, kind and case-insensitive title/team search, including Fix target team attribution.",
         "operationId": "AdminPlatformListActiveRuntimes",
         "parameters": [
           {
@@ -16555,12 +16555,10 @@
         "description": "",
         "x-enumNames": [
           "Container",
-          "Compose",
           "OvaVm"
         ],
         "enum": [
           "Container",
-          "Compose",
           "OvaVm"
         ]
       },
@@ -23247,7 +23245,6 @@
         "description": "",
         "x-enumNames": [
           "Runtime",
-          "Compose",
           "VerificationTarget",
           "AwdChecker",
           "PatchChecker"
@@ -23256,8 +23253,7 @@
           0,
           1,
           2,
-          3,
-          4
+          3
         ]
       },
       "NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeResourceAmountResponse": {
@@ -23268,7 +23264,7 @@
             "type": "integer",
             "format": "int64"
           },
-          "nanoCpus": {
+          "cpuMillicores": {
             "type": "integer",
             "format": "int64"
           },
@@ -28770,9 +28766,6 @@
           "checkerFixInput": {
             "type": "boolean"
           },
-          "checkerAllowRoot": {
-            "type": "boolean"
-          },
           "ctf": {
             "nullable": true,
             "oneOf": [
@@ -28821,7 +28814,12 @@
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankRuntimeAllocationProtocol"
           },
           "limits": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankRuntimeResourceLimitsContract"
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankRuntimeResourceLimitsContract"
+              }
+            ]
           },
           "ttlSeconds": {
             "type": "integer",
@@ -28853,14 +28851,6 @@
               }
             ]
           },
-          "compose": {
-            "nullable": true,
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankComposeChallengeRuntimeContract"
-              }
-            ]
-          },
           "ova": {
             "nullable": true,
             "oneOf": [
@@ -28876,12 +28866,10 @@
         "description": "",
         "x-enumNames": [
           "Container",
-          "Compose",
           "Ova"
         ],
         "enum": [
           "Container",
-          "Compose",
           "Ova"
         ]
       },
@@ -28905,7 +28893,7 @@
             "type": "integer",
             "format": "int64"
           },
-          "nanoCpus": {
+          "cpuMillicores": {
             "type": "integer",
             "format": "int64"
           },
@@ -28990,20 +28978,46 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "image",
-          "command",
-          "environment",
-          "labels",
-          "portMappings",
-          "security",
-          "flagEnvironmentVariableName",
-          "internalPorts"
+          "services"
         ],
         "properties": {
+          "services": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankRuntimeServiceContract"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankRuntimeServiceContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "image"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
           "image": {
             "type": "string"
           },
+          "cpuCores": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "memoryMiB": {
+            "type": "integer",
+            "format": "int64"
+          },
           "command": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "arguments": {
             "type": "array",
             "items": {
               "type": "string"
@@ -29014,21 +29028,6 @@
             "additionalProperties": {
               "type": "string"
             }
-          },
-          "labels": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "string"
-            }
-          },
-          "portMappings": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankRuntimePortMappingContract"
-            }
-          },
-          "security": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankContainerSecurityContract"
           },
           "flagEnvironmentVariableName": {
             "type": "string",
@@ -29040,99 +29039,6 @@
               "type": "integer",
               "format": "int32"
             }
-          }
-        }
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankRuntimePortMappingContract": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "containerPort": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "hostPort": {
-            "type": "integer",
-            "format": "int32"
-          }
-        }
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankContainerSecurityContract": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "noNewPrivileges": {
-            "type": "boolean"
-          },
-          "readonlyRootfs": {
-            "type": "boolean"
-          },
-          "runAsNonRoot": {
-            "type": "boolean"
-          },
-          "capDrop": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "capAdd": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankComposeChallengeRuntimeContract": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "composeYaml",
-          "environment",
-          "labels",
-          "flagEnvironmentVariables",
-          "serviceResources"
-        ],
-        "properties": {
-          "composeYaml": {
-            "type": "string"
-          },
-          "environment": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "string"
-            }
-          },
-          "labels": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "string"
-            }
-          },
-          "flagEnvironmentVariables": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "string"
-            }
-          },
-          "serviceResources": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankComposeServiceResourceContract"
-            }
-          }
-        }
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankComposeServiceResourceContract": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "serviceName": {
-            "type": "string"
-          },
-          "limits": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankRuntimeResourceLimitsContract"
           }
         }
       },

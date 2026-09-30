@@ -235,7 +235,7 @@ internal static partial class BackendMessageOperations
                     || instance.State == RuntimeState.Provisioning
                     || instance.State == RuntimeState.Running)
                 && (instance.RuntimeKind == RuntimeKind.Container
-                    || instance.RuntimeKind == RuntimeKind.Compose)
+)
                 && (instance.Purpose == RuntimePurpose.Player
                     && db.Competitions.Any(competition =>
                         competition.Id == instance.CompetitionId
@@ -441,7 +441,6 @@ internal static partial class BackendMessageOperations
         provision switch
         {
             ProvisionContainerRuntime message => outbox.PublishToRunnerNodeAsync(message),
-            ProvisionComposeRuntime message => outbox.PublishToRunnerNodeAsync(message),
             ProvisionOvaRuntime message => outbox.PublishToRunnerNodeAsync(message),
             _ => throw new InvalidOperationException(
                 $"Unsupported runtime provision type '{provision.GetType().Name}'.")
@@ -481,11 +480,6 @@ internal static partial class BackendMessageOperations
         {
             RuntimeKind.Container => outbox.PublishToRunnerNodeAsync(
                 new StopContainerRuntime(
-                    instance.Id,
-                    runnerId,
-                    requestedAt)),
-            RuntimeKind.Compose => outbox.PublishToRunnerNodeAsync(
-                new StopComposeRuntime(
                     instance.Id,
                     runnerId,
                     requestedAt)),

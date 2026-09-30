@@ -112,21 +112,10 @@ public sealed class AwdFlagInjectionExecutor(IRuntimeProviderCatalog providers)
         IReadOnlyList<string> command = ["/bin/sh", "-c", expanded];
         return work.RuntimeKind switch
         {
-            RuntimeKind.Container => providers.Sandbox(work.RuntimeProvider).ExecAsync(
-                (work.ProviderReceipt as ContainerRuntimeReceiptData)?.ToReceipt()
-                    ?? throw new InvalidDataException("Container receipt is invalid."),
-                command,
-                work.Timeout,
-                cancellationToken),
-            RuntimeKind.Compose => providers.Compose(work.RuntimeProvider).ExecAsync(
-                (work.ProviderReceipt as ComposeRuntimeReceiptData)?.ToReceipt()
-                    ?? throw new InvalidDataException("Compose receipt is invalid."),
-                work.ServiceName
-                    ?? throw new InvalidDataException("Compose flag injection requires a service name."),
-                command,
-                work.Timeout,
-                cancellationToken),
-            _ => throw new NotSupportedException("AWD flag injection only supports Container and Compose runtimes.")
+            RuntimeKind.Container => providers.Runtime(work.RuntimeProvider).ExecAsync(
+                (work.ProviderReceipt as ContainerRuntimeReceiptData)?.ToReceipt() ?? throw new InvalidDataException("Container receipt is invalid."),
+                work.ServiceName ?? throw new InvalidDataException("Flag injection requires a service name."), command, work.Timeout, cancellationToken),
+            _ => throw new NotSupportedException("AWD flag injection only supports Container runtimes.")
         };
     }
 

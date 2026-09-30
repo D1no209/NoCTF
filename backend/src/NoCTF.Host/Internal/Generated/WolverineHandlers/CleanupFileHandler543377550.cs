@@ -2,6 +2,8 @@
 #pragma warning disable
 using FluentStorage.Storage;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using NoCTF.Application.Notifications;
 using System;
 
 namespace Internal.Generated.WolverineHandlers
@@ -12,12 +14,16 @@ namespace Internal.Generated.WolverineHandlers
     {
         private readonly FluentStorage.Storage.IStore _store;
         private readonly Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> _dbContextOptionsOfNoCtfDbContext;
+        private readonly Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> _loggerOfNoCtfDbContext;
+        private readonly NoCTF.Application.Notifications.INotificationChangePublisher _notificationChangePublisher;
         private readonly System.TimeProvider _timeProvider;
 
-        public CleanupFileHandler543377550(FluentStorage.Storage.IStore store, Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, System.TimeProvider timeProvider)
+        public CleanupFileHandler543377550(FluentStorage.Storage.IStore store, Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, System.TimeProvider timeProvider)
         {
             _store = store;
             _dbContextOptionsOfNoCtfDbContext = dbContextOptionsOfNoCtfDbContext;
+            _loggerOfNoCtfDbContext = loggerOfNoCtfDbContext;
+            _notificationChangePublisher = notificationChangePublisher;
             _timeProvider = timeProvider;
         }
 
@@ -25,7 +31,7 @@ namespace Internal.Generated.WolverineHandlers
 
         public override async System.Threading.Tasks.Task HandleAsync(Wolverine.Runtime.MessageContext context, System.Threading.CancellationToken cancellation)
         {
-            await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider);
+            await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider, _notificationChangePublisher, _loggerOfNoCtfDbContext);
             // The actual message body
             var cleanupFile = (NoCTF.Application.Messaging.CleanupFile)context.Envelope.Message;
 

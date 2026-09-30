@@ -7,7 +7,7 @@ using NoCTF.GameModes.PatchVerification.Runtime;
 
 public static class AwdpTargetDefinitionFactory
 {
-    public static ContainerRequest Create(
+    public static ContainerRuntimeRequest Create(
         Guid operationId,
         ChallengeRuntimeTemplate template,
         RuntimeProvider provider,

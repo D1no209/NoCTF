@@ -78,7 +78,7 @@ public sealed class KubernetesContainerLifecycle(
             throw new ArgumentOutOfRangeException(nameof(request), request.Provider, "Kubernetes runtime cannot create another provider.");
         ValidateContainerRequest(request);
 
-        var name = $"noctf-{request.OperationId:N}";
+        var name = ContainerName(request);
         var labels = request.Labels.ToDictionary(pair => pair.Key, pair => pair.Value);
         labels["noctf.io/runtime-id"] = name;
         if (request.NetworkName is not null) labels["noctf.io/sandbox"] = request.NetworkName;
@@ -113,26 +113,25 @@ public sealed class KubernetesContainerLifecycle(
                 [
                     new V1Container
                     {
-                        Name = "challenge",
+                        Name = request.ServiceName ?? "challenge",
                         Image = request.Image,
-                        Command = request.Command.ToList(),
+                        Command = request.Command.Count == 0 ? null : request.Command.ToList(),
+                        Args = request.Arguments is not { Count: > 0 } ? null : request.Arguments.ToList(),
                         ImagePullPolicy = options.ImagePullPolicy,
                         Env = request.Environment.Select(pair => new V1EnvVar { Name = pair.Key, Value = pair.Value }).ToList(),
                         Ports = request.ContainerPorts.Select(port => new V1ContainerPort { ContainerPort = port }).ToList(),
-                        SecurityContext = new V1SecurityContext
-                        {
-                            AllowPrivilegeEscalation = !request.Security.NoNewPrivileges,
-                            ReadOnlyRootFilesystem = request.Security.ReadonlyRootfs,
-                            RunAsNonRoot = request.Security.RunAsNonRoot,
-                            Capabilities = new V1Capabilities
-                            {
-                                Drop = request.Security.CapDrop.ToList(),
-                                Add = request.Security.CapAdd?.ToList() ?? []
-                            }
-                        },
                         Resources = KubernetesWorkloadResources.Create(request.Limits, request.Budget)
                     }
                 ],
+                Hostname = request.DiscoveryServiceName is null ? null : request.ServiceName,
+                Subdomain = request.DiscoveryServiceName,
+                DnsPolicy = request.DiscoveryServiceName is null ? "ClusterFirst" : "None",
+                DnsConfig = request.DiscoveryServiceName is null ? null : new V1PodDNSConfig
+                {
+                    Nameservers = [options.ClusterDnsServiceAddress],
+                    Searches = [$"{request.DiscoveryServiceName}.{options.Namespace}.svc.{options.ClusterDomain}", $"{options.Namespace}.svc.{options.ClusterDomain}", $"svc.{options.ClusterDomain}", options.ClusterDomain],
+                    Options = [new V1PodDNSConfigOption { Name = "ndots", Value = "5" }]
+                },
                 RestartPolicy = "Never"
             }
         };
@@ -164,7 +163,7 @@ public sealed class KubernetesContainerLifecycle(
                 createdServices);
             return new(request.OperationId, RuntimeProvider.Kubernetes, name, RuntimeStatus.Pending,
                 services.PublishedPorts, options.PublicHost,
-                services.InternalHost ?? $"{name}.{options.Namespace}.svc",
+                services.InternalHost ?? podCreation.Resource.Status?.PodIP,
                 RuntimeInstanceId: request.RuntimeInstanceId);
         }
         catch
@@ -196,7 +195,7 @@ public sealed class KubernetesContainerLifecycle(
                 "Kubernetes runtime cannot reconcile another provider.");
         ValidateContainerRequest(request);
 
-        var name = $"noctf-{request.OperationId:N}";
+        var name = ContainerName(request);
         V1Pod? pod;
         try
         {
@@ -275,7 +274,7 @@ public sealed class KubernetesContainerLifecycle(
             RuntimeStatus.Running,
             services.PublishedPorts,
             options.PublicHost,
-            services.InternalHost ?? $"{name}.{options.Namespace}.svc",
+            services.InternalHost ?? (await client.CoreV1.ReadNamespacedPodAsync(name, options.Namespace, cancellationToken: cancellationToken)).Status?.PodIP,
             RuntimeInstanceId: request.RuntimeInstanceId);
     }
 
@@ -294,6 +293,16 @@ public sealed class KubernetesContainerLifecycle(
         RuntimeTerminationPolicy policy,
         CancellationToken cancellationToken)
     {
+        if (receipt.RuntimeInstanceId is Guid runtimeId)
+        {
+            try
+            {
+                var actual = await client.CoreV1.ReadNamespacedPodAsync(receipt.ResourceId, options.Namespace, cancellationToken: cancellationToken);
+                if (!HasResourceIdentity(actual.Metadata.Labels, new(runtimeId)))
+                    throw new InvalidOperationException("Runtime cleanup cannot delete another owner's Pod.");
+            }
+            catch (k8s.Autorest.HttpOperationException exception) when (exception.Response.StatusCode == System.Net.HttpStatusCode.NotFound) { }
+        }
         var warnings = new List<Exception>();
         var networkStarted = Stopwatch.GetTimestamp();
         using (var network = CreateStageToken(cancellationToken, policy.NetworkCleanupTimeout))
@@ -560,7 +569,6 @@ public sealed class KubernetesContainerLifecycle(
                 {
                     AllowPrivilegeEscalation = false,
                     ReadOnlyRootFilesystem = true,
-                    RunAsNonRoot = request.Security.RunAsNonRoot,
                     Capabilities = new V1Capabilities { Drop = [], Add = [] }
                 },
                 Resources = checker.Resources,
@@ -668,9 +676,13 @@ public sealed class KubernetesContainerLifecycle(
         }
     }
 
+    public Task<OneShotResult> RunAttachedAsync(ContainerRequest request, AttachedRuntimeTarget target, CancellationToken cancellationToken) =>
+        RunAttachedAsync(request, target, null, cancellationToken);
+
     public async Task<OneShotResult> RunAttachedAsync(
         ContainerRequest request,
         AttachedRuntimeTarget target,
+        OneShotInputArchive? input,
         CancellationToken cancellationToken)
     {
         if (request.Provider != RuntimeProvider.Kubernetes)
@@ -681,9 +693,6 @@ public sealed class KubernetesContainerLifecycle(
         {
             case AttachedContainerRuntimeTarget container:
                 sandbox = await ValidateContainerTargetAsync(container, cancellationToken);
-                break;
-            case AttachedComposeRuntimeTarget compose:
-                await ValidateComposeTargetAsync(compose, cancellationToken);
                 break;
             default:
                 throw new InvalidOperationException("The attached Runtime target is unsupported.");
@@ -702,9 +711,9 @@ public sealed class KubernetesContainerLifecycle(
                 NetworkName = sandbox,
                 AllowInternalCallback = true,
                 RuntimeInstanceId = target.Identity.RuntimeInstanceId,
-                NetworkPurpose = ContainerNetworkPurpose.AwdChecker
+                NetworkPurpose = request.NetworkPurpose
             },
-            null,
+            input,
             cancellationToken);
     }
 
@@ -715,49 +724,14 @@ public sealed class KubernetesContainerLifecycle(
         var receipt = target.Receipt;
         if (receipt.Provider != RuntimeProvider.Kubernetes
             || receipt.RuntimeInstanceId != target.Identity.RuntimeInstanceId
-            || string.IsNullOrWhiteSpace(receipt.NetworkId)
             || string.IsNullOrWhiteSpace(receipt.ResourceId))
             throw new InvalidOperationException(
                 "The attached Container receipt has a different ownership identity.");
-        var policy = await client.NetworkingV1.ReadNamespacedNetworkPolicyAsync(
-            receipt.NetworkId,
-            options.Namespace,
-            cancellationToken: cancellationToken);
-        var pod = await client.CoreV1.ReadNamespacedPodAsync(
-            receipt.ResourceId,
-            options.Namespace,
-            cancellationToken: cancellationToken);
-        if (!HasResourceIdentity(policy.Metadata.Labels, target.Identity)
-            || !HasNetworkPurpose(policy.Metadata.Labels, NetworkPurposePersistentRuntime)
-            || !HasResourceIdentity(pod.Metadata.Labels, target.Identity)
-            || !HasLabel(pod.Metadata.Labels, "noctf.io/sandbox", receipt.NetworkId))
-            throw new InvalidOperationException(
-                "The attached Container resources have a different ownership identity.");
-        return receipt.NetworkId;
-    }
-
-    private async Task ValidateComposeTargetAsync(
-        AttachedComposeRuntimeTarget target,
-        CancellationToken cancellationToken)
-    {
-        var receipt = target.Receipt;
-        if (receipt.Provider != RuntimeProvider.Kubernetes
-            || receipt.OperationId != target.Identity.RuntimeInstanceId
-            || !string.Equals(receipt.Namespace, options.Namespace, StringComparison.Ordinal)
-            || string.IsNullOrWhiteSpace(target.ServiceName))
-            throw new InvalidOperationException(
-                "The attached Compose receipt has a different ownership identity.");
-        var selector = $"noctf.io/managed=true,"
-            + $"noctf.io/runtime-instance-id={target.Identity.RuntimeInstanceId:D},"
-            + $"noctf.io/compose-service={target.ServiceName}";
-        var deployments = await client.AppsV1.ListNamespacedDeploymentAsync(
-            options.Namespace,
-            labelSelector: selector,
-            cancellationToken: cancellationToken);
-        if (deployments.Items.Count != 1
-            || !HasResourceIdentity(deployments.Items[0].Metadata.Labels, target.Identity))
-            throw new InvalidOperationException(
-                "The attached Compose service was not found with the required ownership identity.");
+        var pod = await client.CoreV1.ReadNamespacedPodAsync(receipt.ResourceId, options.Namespace, cancellationToken: cancellationToken);
+        if (!HasResourceIdentity(pod.Metadata.Labels, target.Identity)
+            || !pod.Metadata.Labels.TryGetValue("noctf.io/sandbox", out var policy))
+            throw new InvalidOperationException("Attached service belongs to another Runtime.");
+        return policy;
     }
 
     public async Task<string> CreateIsolatedNetworkAsync(
@@ -1044,13 +1018,16 @@ public sealed class KubernetesContainerLifecycle(
             var pod = await client.CoreV1.ReadNamespacedPodAsync(resourceId, options.Namespace, cancellationToken: cancellationToken);
             var phase = ToRuntimeStatus(pod.Status?.Phase);
             return new(Guid.Empty, RuntimeProvider.Kubernetes, resourceId, phase, new Dictionary<int, int>(), options.PublicHost,
-                $"{resourceId}.{options.Namespace}.svc");
+                pod.Status?.PodIP);
         }
         catch (k8s.Autorest.HttpOperationException exception) when (exception.Response.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
             return null;
         }
     }
+
+    private static string ContainerName(ContainerRequest request) => request.ServiceName is null
+        ? $"noctf-{request.OperationId:N}" : NamedContainerRuntime.ResourceName(request.RuntimeInstanceId ?? request.OperationId, request.ServiceName);
 
     private static RuntimeStatus ToRuntimeStatus(string? phase) => phase?.ToLowerInvariant() switch
     {
@@ -1188,23 +1165,7 @@ public sealed class KubernetesContainerLifecycle(
             await EnsurePublicServiceAbsentAsync(name, request, cancellationToken);
         if (request.ContainerPorts.Count == 0)
             return new(null, new Dictionary<int, int>());
-        if (request.NetworkName is null)
-            throw new InvalidOperationException(
-                "A Kubernetes Container service requires an isolated Runtime network.");
-
-        var identity = new RuntimeResourceIdentity(
-            request.RuntimeInstanceId ?? request.OperationId);
-        var internalService = await EnsureServiceAsync(
-            name,
-            name,
-            labels,
-            identity,
-            InternalServiceRole,
-            ServiceTypeClusterIp,
-            request.ContainerPorts,
-            requireAssignedNodePorts: false,
-            cancellationToken,
-            createdServices);
+        var identity = new RuntimeResourceIdentity(request.RuntimeInstanceId ?? request.OperationId);
         IReadOnlyDictionary<int, int> publishedPorts = new Dictionary<int, int>();
         if (request.PortMappings.Count > 0)
         {
@@ -1223,7 +1184,7 @@ public sealed class KubernetesContainerLifecycle(
                 port => port.Port,
                 port => port.NodePort!.Value);
         }
-        return new(internalService.Spec.ClusterIP, publishedPorts);
+        return new(null, publishedPorts);
     }
 
     private async Task<V1Service> EnsureServiceAsync(
@@ -1714,6 +1675,7 @@ public sealed class KubernetesContainerLifecycle(
     {
         ContainerNetworkPurpose.AwdChecker => NetworkPurposeAwdChecker,
         ContainerNetworkPurpose.AwdpVerification => NetworkPurposeAwdpChecker,
+        ContainerNetworkPurpose.PersistentRuntime => NetworkPurposePersistentRuntime,
         _ => throw new InvalidOperationException(
             "Only scoring checker containers can request an internal callback.")
     };
@@ -1820,6 +1782,7 @@ public sealed class KubernetesContainerLifecycle(
 
     private static int GetCallbackPort(ContainerRequest request)
     {
+        if (request.ScoringCallback is { } configured) return configured.Url.Port;
         if (!request.Environment.TryGetValue("NOCTF_CALLBACK_URL", out var callbackText)
             || !Uri.TryCreate(callbackText, UriKind.Absolute, out var callback)
             || callback.Scheme is not ("http" or "https"))

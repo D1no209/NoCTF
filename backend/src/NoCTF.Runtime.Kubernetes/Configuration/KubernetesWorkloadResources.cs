@@ -13,7 +13,7 @@ public static class KubernetesWorkloadResources
         var policy = new RuntimeResourceBudgetPolicy();
         limits = policy.EffectiveLimit(limits, RuntimeProvider.Kubernetes);
         budget = policy.EffectiveLimit(budget ?? limits, RuntimeProvider.Kubernetes);
-        if (budget.MemoryBytes != limits.MemoryBytes || budget.NanoCpus > limits.NanoCpus)
+        if (budget.MemoryBytes != limits.MemoryBytes || budget.CpuMillicores > limits.CpuMillicores)
             throw new InvalidOperationException("Kubernetes requests must preserve memory and not exceed CPU limits.");
         return new V1ResourceRequirements
         {
@@ -25,6 +25,6 @@ public static class KubernetesWorkloadResources
     private static Dictionary<string, ResourceQuantity> Values(RuntimeResourceLimits resource) => new()
     {
         ["memory"] = new(resource.MemoryBytes.ToString(CultureInfo.InvariantCulture)),
-        ["cpu"] = new($"{resource.NanoCpus / 1_000_000}m")
+        ["cpu"] = new($"{resource.CpuMillicores}m")
     };
 }

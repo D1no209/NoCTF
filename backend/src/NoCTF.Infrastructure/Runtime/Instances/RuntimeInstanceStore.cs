@@ -435,10 +435,10 @@ public sealed class RuntimeInstanceStore(
         var template = templates.Get(scope.Definition)
             ?? throw new InvalidOperationException("The challenge does not define a runtime template.");
         if (PurposeFor(scope) == RuntimePurpose.Practice
-            && template.RuntimeKind is not RuntimeKind.Container and not RuntimeKind.Compose)
+            && template.RuntimeKind is not RuntimeKind.Container)
         {
             throw new InvalidOperationException(
-                "Practice mode supports only Container and Compose Runtime templates.");
+                "Practice mode supports only Container Runtime templates.");
         }
         var id = Guid.CreateVersion7(command.Now);
         if (scope.Mode == GameMode.Ctf

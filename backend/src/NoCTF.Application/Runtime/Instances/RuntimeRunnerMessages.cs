@@ -6,12 +6,7 @@ namespace NoCTF.Application.Runtime.Instances;
 public sealed record ProvisionContainerRuntime(
     Guid RuntimeInstanceId,
     string RunnerId,
-    ContainerRequest Definition) : IRuntimeProvisionMessage;
-
-public sealed record ProvisionComposeRuntime(
-    Guid RuntimeInstanceId,
-    string RunnerId,
-    ComposeRequest Definition) : IRuntimeProvisionMessage;
+    ContainerRuntimeRequest Definition) : IRuntimeProvisionMessage;
 
 public sealed record ProvisionOvaRuntime(
     Guid RuntimeInstanceId,
@@ -19,11 +14,6 @@ public sealed record ProvisionOvaRuntime(
     OvaRuntimeRequest Definition) : IRuntimeProvisionMessage;
 
 public sealed record StopContainerRuntime(
-    Guid RuntimeInstanceId,
-    string RunnerId,
-    DateTimeOffset RequestedAt = default) : IRuntimeStopMessage;
-
-public sealed record StopComposeRuntime(
     Guid RuntimeInstanceId,
     string RunnerId,
     DateTimeOffset RequestedAt = default) : IRuntimeStopMessage;

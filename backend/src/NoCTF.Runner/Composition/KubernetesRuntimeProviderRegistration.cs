@@ -1,7 +1,7 @@
 using k8s;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Runtime.Kubernetes;
-using NoCTF.Runtime.Kubernetes.Compose;
+using NoCTF.Runtime.Kubernetes.Services;
 using NoCTF.Runtime.Kubernetes.Configuration;
 using NoCTF.Runtime.Kubernetes.Containers;
 using NoCTF.Runtime.Kubernetes.Networking;
@@ -22,7 +22,7 @@ internal static class KubernetesRuntimeProviderRegistration
             configuration["Runtime:Kubernetes:CallbackPodLabelKey"] ?? "noctf.io/internal-role",
             configuration["Runtime:Kubernetes:CallbackPodLabelValue"] ?? "awdp-callback",
             isActiveProvider
-                ? configuration.GetValue<long>("Runtime:Kubernetes:PodPidsLimit")
+                ? (configuration.GetValue<long?>("Runtime:Execution:ProcessesPerService") ?? 256)
                 : 0,
             isActiveProvider
                 ? configuration["Runtime:Kubernetes:ClusterDomain"] ?? string.Empty
@@ -56,8 +56,7 @@ internal static class KubernetesRuntimeProviderRegistration
         if (isActiveProvider)
             services.AddHostedService<KubernetesRuntimePoolStartupCheck>();
         services.AddSingleton<KubernetesContainerLifecycle>();
-        services.AddSingleton<IKomposeConverter>(new KomposeConverter());
-        services.AddSingleton<KubernetesComposeRuntime>();
+        services.AddSingleton<KubernetesContainerRuntime>();
         services.AddSingleton<KubernetesRuntimeResourceReconciler>();
         services.AddSingleton<IRuntimeProviderAvailabilityProbe>(provider =>
             provider.GetRequiredService<KubernetesRuntimeResourceReconciler>());
@@ -72,7 +71,7 @@ internal static class KubernetesRuntimeProviderRegistration
     {
         if (!isActiveProvider)
             return;
-        if (configuration.GetValue<long>("Runtime:Kubernetes:PodPidsLimit") <= 0
+        if ((configuration.GetValue<long?>("Runtime:Execution:ProcessesPerService") ?? 256) <= 0
             || string.IsNullOrWhiteSpace(configuration["Runtime:Kubernetes:ClusterDomain"])
             || string.IsNullOrWhiteSpace(
                 configuration["Runtime:Kubernetes:ClusterDnsServiceAddress"])

@@ -204,10 +204,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("challenge_id");
 
-                    b.Property<bool>("CheckerAllowRoot")
-                        .HasColumnType("boolean")
-                        .HasColumnName("checker_allow_root");
-
                     b.Property<bool>("CheckerFixInput")
                         .HasColumnType("boolean")
                         .HasColumnName("checker_fix_input");
@@ -408,31 +404,64 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.ToTable("challenge_managers", (string)null);
                 });
 
-            modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeRuntimeCapability", b =>
+            modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeRuntimeService", b =>
                 {
                     b.Property<Guid>("ChallengeId")
                         .HasColumnType("uuid")
                         .HasColumnName("challenge_id");
-
-                    b.Property<bool>("Add")
-                        .HasColumnType("boolean")
-                        .HasColumnName("add");
 
                     b.Property<string>("Name")
-                        .HasColumnType("text")
+                        .HasMaxLength(63)
+                        .HasColumnType("character varying(63)")
                         .HasColumnName("name");
 
-                    b.HasKey("ChallengeId", "Add", "Name")
-                        .HasName("pk_challenge_runtime_capabilities");
+                    b.Property<decimal>("CpuCores")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("numeric(12,3)")
+                        .HasColumnName("cpu_cores");
 
-                    b.ToTable("challenge_runtime_capabilities", (string)null);
+                    b.Property<string>("FlagEnvironmentVariableName")
+                        .HasColumnType("text")
+                        .HasColumnName("flag_environment_variable_name");
+
+                    b.Property<string>("Image")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("image");
+
+                    b.Property<long>("MemoryMiB")
+                        .HasColumnType("bigint")
+                        .HasColumnName("memory_mi_b");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.HasKey("ChallengeId", "Name")
+                        .HasName("pk_challenge_runtime_services");
+
+                    b.HasIndex("ChallengeId", "Position")
+                        .IsUnique()
+                        .HasDatabaseName("ix_challenge_runtime_services_challenge_id_position");
+
+                    b.ToTable("challenge_runtime_services", (string)null);
                 });
 
-            modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeRuntimeCommandItem", b =>
+            modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeRuntimeServiceCommand", b =>
                 {
                     b.Property<Guid>("ChallengeId")
                         .HasColumnType("uuid")
                         .HasColumnName("challenge_id");
+
+                    b.Property<string>("ServiceName")
+                        .HasMaxLength(63)
+                        .HasColumnType("character varying(63)")
+                        .HasColumnName("service_name");
+
+                    b.Property<bool>("IsArgument")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_argument");
 
                     b.Property<int>("Position")
                         .HasColumnType("integer")
@@ -443,71 +472,58 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("text")
                         .HasColumnName("value");
 
-                    b.HasKey("ChallengeId", "Position")
-                        .HasName("pk_challenge_runtime_command_items");
+                    b.HasKey("ChallengeId", "ServiceName", "IsArgument", "Position")
+                        .HasName("pk_challenge_runtime_service_commands");
 
-                    b.ToTable("challenge_runtime_command_items", (string)null);
+                    b.ToTable("challenge_runtime_service_commands", (string)null);
                 });
 
-            modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeRuntimeInternalPort", b =>
+            modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeRuntimeServiceEnvironment", b =>
                 {
                     b.Property<Guid>("ChallengeId")
                         .HasColumnType("uuid")
                         .HasColumnName("challenge_id");
 
-                    b.Property<int>("Port")
-                        .HasColumnType("integer")
-                        .HasColumnName("port");
+                    b.Property<string>("ServiceName")
+                        .HasMaxLength(63)
+                        .HasColumnType("character varying(63)")
+                        .HasColumnName("service_name");
 
-                    b.HasKey("ChallengeId", "Port")
-                        .HasName("pk_challenge_runtime_internal_ports");
-
-                    b.ToTable("challenge_runtime_internal_ports", (string)null);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeRuntimeKeyValue", b =>
-                {
-                    b.Property<Guid>("ChallengeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("challenge_id");
-
-                    b.Property<short>("Kind")
-                        .HasColumnType("smallint")
-                        .HasColumnName("kind");
-
-                    b.Property<string>("Key")
-                        .HasColumnType("text")
-                        .HasColumnName("key");
+                    b.Property<string>("Name")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("name");
 
                     b.Property<string>("Value")
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("value");
 
-                    b.HasKey("ChallengeId", "Kind", "Key")
-                        .HasName("pk_challenge_runtime_key_values");
+                    b.HasKey("ChallengeId", "ServiceName", "Name")
+                        .HasName("pk_challenge_runtime_service_environment");
 
-                    b.ToTable("challenge_runtime_key_values", (string)null);
+                    b.ToTable("challenge_runtime_service_environment", (string)null);
                 });
 
-            modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeRuntimePortMapping", b =>
+            modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeRuntimeServicePort", b =>
                 {
                     b.Property<Guid>("ChallengeId")
                         .HasColumnType("uuid")
                         .HasColumnName("challenge_id");
 
-                    b.Property<int>("ContainerPort")
+                    b.Property<string>("ServiceName")
+                        .HasMaxLength(63)
+                        .HasColumnType("character varying(63)")
+                        .HasColumnName("service_name");
+
+                    b.Property<int>("Port")
                         .HasColumnType("integer")
-                        .HasColumnName("container_port");
+                        .HasColumnName("port");
 
-                    b.Property<int>("HostPort")
-                        .HasColumnType("integer")
-                        .HasColumnName("host_port");
+                    b.HasKey("ChallengeId", "ServiceName", "Port")
+                        .HasName("pk_challenge_runtime_service_internal_ports");
 
-                    b.HasKey("ChallengeId", "ContainerPort")
-                        .HasName("pk_challenge_runtime_port_mappings");
-
-                    b.ToTable("challenge_runtime_port_mappings", (string)null);
+                    b.ToTable("challenge_runtime_service_internal_ports", (string)null);
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeRuntimeTemplateEntity", b =>
@@ -528,10 +544,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("smallint")
                         .HasColumnName("flag_source");
 
-                    b.Property<bool>("HasExplicitLimits")
-                        .HasColumnType("boolean")
-                        .HasColumnName("has_explicit_limits");
-
                     b.Property<int?>("OperationTimeoutSeconds")
                         .HasColumnType("integer")
                         .HasColumnName("operation_timeout_seconds");
@@ -543,23 +555,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Property<int?>("TtlSeconds")
                         .HasColumnType("integer")
                         .HasColumnName("ttl_seconds");
-
-                    b.ComplexProperty(typeof(Dictionary<string, object>), "Limits", "NoCTF.Domain.Challenges.ChallengeRuntimeTemplateEntity.Limits#RuntimeResourceLimitsValue", b1 =>
-                        {
-                            b1.IsRequired();
-
-                            b1.Property<long>("MemoryBytes")
-                                .HasColumnType("bigint")
-                                .HasColumnName("limits_memory_bytes");
-
-                            b1.Property<long>("NanoCpus")
-                                .HasColumnType("bigint")
-                                .HasColumnName("limits_nano_cpus");
-
-                            b1.Property<long>("PidsLimit")
-                                .HasColumnType("bigint")
-                                .HasColumnName("limits_pids_limit");
-                        });
 
                     b.HasKey("ChallengeId")
                         .HasName("pk_challenge_runtime_templates");
@@ -922,39 +917,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.HasDiscriminator<string>("Mode");
 
                     b.UseTphMappingStrategy();
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Challenges.ComposeServiceResource", b =>
-                {
-                    b.Property<Guid>("ChallengeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("challenge_id");
-
-                    b.Property<string>("ServiceName")
-                        .HasColumnType("text")
-                        .HasColumnName("service_name");
-
-                    b.ComplexProperty(typeof(Dictionary<string, object>), "Limits", "NoCTF.Domain.Challenges.ComposeServiceResource.Limits#RuntimeResourceLimitsValue", b1 =>
-                        {
-                            b1.IsRequired();
-
-                            b1.Property<long>("MemoryBytes")
-                                .HasColumnType("bigint")
-                                .HasColumnName("limits_memory_bytes");
-
-                            b1.Property<long>("NanoCpus")
-                                .HasColumnType("bigint")
-                                .HasColumnName("limits_nano_cpus");
-
-                            b1.Property<long>("PidsLimit")
-                                .HasColumnType("bigint")
-                                .HasColumnName("limits_pids_limit");
-                        });
-
-                    b.HasKey("ChallengeId", "ServiceName")
-                        .HasName("pk_compose_service_resources");
-
-                    b.ToTable("compose_service_resources", (string)null);
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Commands.CommandReceipt", b =>
@@ -3916,49 +3878,9 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.HasDiscriminator().HasValue((short)0);
                 });
 
-            modelBuilder.Entity("NoCTF.Domain.Challenges.ComposeChallengeRuntimeTemplate", b =>
-                {
-                    b.HasBaseType("NoCTF.Domain.Challenges.ChallengeRuntimeTemplateEntity");
-
-                    b.Property<string>("ComposeYaml")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("compose_yaml");
-
-                    b.ToTable("challenge_runtime_templates", (string)null);
-
-                    b.HasDiscriminator().HasValue((short)1);
-                });
-
             modelBuilder.Entity("NoCTF.Domain.Challenges.ContainerChallengeRuntimeTemplate", b =>
                 {
                     b.HasBaseType("NoCTF.Domain.Challenges.ChallengeRuntimeTemplateEntity");
-
-                    b.Property<string>("FlagEnvironmentVariableName")
-                        .HasColumnType("text")
-                        .HasColumnName("flag_environment_variable_name");
-
-                    b.Property<string>("Image")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("image");
-
-                    b.ComplexProperty(typeof(Dictionary<string, object>), "Security", "NoCTF.Domain.Challenges.ContainerChallengeRuntimeTemplate.Security#ContainerSecurityPolicyValue", b1 =>
-                        {
-                            b1.IsRequired();
-
-                            b1.Property<bool>("NoNewPrivileges")
-                                .HasColumnType("boolean")
-                                .HasColumnName("security_no_new_privileges");
-
-                            b1.Property<bool>("ReadonlyRootfs")
-                                .HasColumnType("boolean")
-                                .HasColumnName("security_readonly_rootfs");
-
-                            b1.Property<bool>("RunAsNonRoot")
-                                .HasColumnType("boolean")
-                                .HasColumnName("security_run_as_non_root");
-                        });
 
                     b.ToTable("challenge_runtime_templates", (string)null);
 
@@ -3968,6 +3890,10 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
             modelBuilder.Entity("NoCTF.Domain.Challenges.OvaChallengeRuntimeTemplate", b =>
                 {
                     b.HasBaseType("NoCTF.Domain.Challenges.ChallengeRuntimeTemplateEntity");
+
+                    b.Property<bool>("HasExplicitLimits")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_explicit_limits");
 
                     b.Property<string>("OvaSourceUrl")
                         .IsRequired()
@@ -3979,9 +3905,26 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("text")
                         .HasColumnName("sha256");
 
+                    b.ComplexProperty(typeof(Dictionary<string, object>), "Limits", "NoCTF.Domain.Challenges.OvaChallengeRuntimeTemplate.Limits#RuntimeResourceLimitsValue", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<long>("CpuMillicores")
+                                .HasColumnType("bigint")
+                                .HasColumnName("limits_cpu_millicores");
+
+                            b1.Property<long>("MemoryBytes")
+                                .HasColumnType("bigint")
+                                .HasColumnName("limits_memory_bytes");
+
+                            b1.Property<long>("PidsLimit")
+                                .HasColumnType("bigint")
+                                .HasColumnName("limits_pids_limit");
+                        });
+
                     b.ToTable("challenge_runtime_templates", (string)null);
 
-                    b.HasDiscriminator().HasValue((short)2);
+                    b.HasDiscriminator().HasValue((short)1);
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Challenges.AwdCompetitionChallenge", b =>
@@ -5379,7 +5322,7 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.HasDiscriminator().HasValue((short)4);
                 });
 
-            modelBuilder.Entity("NoCTF.Domain.Runtime.ComposeRuntimeReceipt", b =>
+            modelBuilder.Entity("NoCTF.Domain.Runtime.ContainerRuntimeReceipt", b =>
                 {
                     b.HasBaseType("NoCTF.Domain.Runtime.RuntimeReceipt");
 
@@ -5387,11 +5330,21 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("DiscoveryServiceName")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("discovery_service_name");
+
                     b.Property<string>("Namespace")
                         .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)")
                         .HasColumnName("namespace");
+
+                    b.Property<string>("OwnedNetworkId")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("owned_network_id");
 
                     b.Property<string>("ProjectName")
                         .IsRequired()
@@ -5408,48 +5361,7 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.ToTable("runtime_receipts", null, t =>
                         {
                             t.Property("CreatedAt")
-                                .HasColumnName("compose_runtime_receipt_created_at");
-
-                            t.Property("PublicHost")
-                                .HasColumnName("compose_runtime_receipt_public_host");
-                        });
-
-                    b.HasDiscriminator().HasValue("compose");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Runtime.ContainerRuntimeReceipt", b =>
-                {
-                    b.HasBaseType("NoCTF.Domain.Runtime.RuntimeReceipt");
-
-                    b.Property<string>("InternalHost")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("internal_host");
-
-                    b.Property<string>("NetworkId")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)")
-                        .HasColumnName("network_id");
-
-                    b.Property<string>("PublicHost")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("public_host");
-
-                    b.Property<string>("ResourceId")
-                        .IsRequired()
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)")
-                        .HasColumnName("resource_id");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer")
-                        .HasColumnName("status");
-
-                    b.ToTable("runtime_receipts", null, t =>
-                        {
-                            t.Property("NetworkId")
-                                .HasColumnName("container_runtime_receipt_network_id");
+                                .HasColumnName("container_runtime_receipt_created_at");
                         });
 
                     b.HasDiscriminator().HasValue("container");
@@ -5570,54 +5482,44 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasConstraintName("fk_challenge_managers_challenges_challenge_id");
                 });
 
-            modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeRuntimeCapability", b =>
+            modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeRuntimeService", b =>
                 {
                     b.HasOne("NoCTF.Domain.Challenges.ContainerChallengeRuntimeTemplate", null)
-                        .WithMany("Capabilities")
+                        .WithMany("Services")
                         .HasForeignKey("ChallengeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
-                        .HasConstraintName("fk_challenge_runtime_capabilities_challenge_runtime_templates_");
+                        .HasConstraintName("fk_challenge_runtime_services_challenge_runtime_templates_chal");
                 });
 
-            modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeRuntimeCommandItem", b =>
+            modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeRuntimeServiceCommand", b =>
                 {
-                    b.HasOne("NoCTF.Domain.Challenges.ChallengeRuntimeTemplateEntity", null)
-                        .WithMany("CommandItems")
-                        .HasForeignKey("ChallengeId")
+                    b.HasOne("NoCTF.Domain.Challenges.ChallengeRuntimeService", null)
+                        .WithMany("Commands")
+                        .HasForeignKey("ChallengeId", "ServiceName")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
-                        .HasConstraintName("fk_challenge_runtime_command_items_challenge_runtime_templates");
+                        .HasConstraintName("fk_challenge_runtime_service_commands_challenge_runtime_servic");
                 });
 
-            modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeRuntimeInternalPort", b =>
+            modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeRuntimeServiceEnvironment", b =>
                 {
-                    b.HasOne("NoCTF.Domain.Challenges.ContainerChallengeRuntimeTemplate", null)
+                    b.HasOne("NoCTF.Domain.Challenges.ChallengeRuntimeService", null)
+                        .WithMany("Environment")
+                        .HasForeignKey("ChallengeId", "ServiceName")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_challenge_runtime_service_environment_challenge_runtime_ser");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeRuntimeServicePort", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Challenges.ChallengeRuntimeService", null)
                         .WithMany("InternalPorts")
-                        .HasForeignKey("ChallengeId")
+                        .HasForeignKey("ChallengeId", "ServiceName")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
-                        .HasConstraintName("fk_challenge_runtime_internal_ports_challenge_runtime_template");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeRuntimeKeyValue", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Challenges.ChallengeRuntimeTemplateEntity", null)
-                        .WithMany("KeyValues")
-                        .HasForeignKey("ChallengeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_challenge_runtime_key_values_challenge_runtime_templates_ch");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeRuntimePortMapping", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Challenges.ContainerChallengeRuntimeTemplate", null)
-                        .WithMany("PortMappings")
-                        .HasForeignKey("ChallengeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_challenge_runtime_port_mappings_challenge_runtime_templates");
+                        .HasConstraintName("fk_challenge_runtime_service_internal_ports_challenge_runtime_");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeRuntimeTemplateEntity", b =>
@@ -5720,16 +5622,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_competition_challenge_rules_competition_challenges_competit");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Challenges.ComposeServiceResource", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Challenges.ComposeChallengeRuntimeTemplate", null)
-                        .WithMany("ServiceResources")
-                        .HasForeignKey("ChallengeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_compose_service_resources_challenge_runtime_templates_chall");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Commands.CommandReceiptGameplayFactResult", b =>
@@ -6446,13 +6338,13 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                                 .HasColumnType("uuid")
                                 .HasColumnName("id");
 
+                            b1.Property<long>("BudgetCpuMillicores")
+                                .HasColumnType("bigint")
+                                .HasColumnName("budget_cpu_millicores");
+
                             b1.Property<long>("BudgetMemoryBytes")
                                 .HasColumnType("bigint")
                                 .HasColumnName("budget_memory_bytes");
-
-                            b1.Property<long>("BudgetNanoCpus")
-                                .HasColumnType("bigint")
-                                .HasColumnName("budget_nano_cpus");
 
                             b1.Property<long>("BudgetPidsLimit")
                                 .HasColumnType("bigint")
@@ -6462,13 +6354,13 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                                 .HasColumnType("uuid")
                                 .HasColumnName("gameplay_fact_id");
 
+                            b1.Property<long>("LimitCpuMillicores")
+                                .HasColumnType("bigint")
+                                .HasColumnName("limit_cpu_millicores");
+
                             b1.Property<long>("LimitMemoryBytes")
                                 .HasColumnType("bigint")
                                 .HasColumnName("limit_memory_bytes");
-
-                            b1.Property<long>("LimitNanoCpus")
-                                .HasColumnType("bigint")
-                                .HasColumnName("limit_nano_cpus");
 
                             b1.Property<long>("LimitPidsLimit")
                                 .HasColumnType("bigint")
@@ -6572,42 +6464,88 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_runtime_receipts_runtime_instances_runtime_instance_id");
 
-                    b.OwnsMany("NoCTF.Domain.Runtime.ContainerRuntimeReceiptPort", "PortMappings", b1 =>
+                    b.OwnsMany("NoCTF.Domain.Runtime.ContainerRuntimeReceiptService", "Services", b1 =>
                         {
                             b1.Property<Guid>("Id")
-                                .ValueGeneratedOnAdd()
                                 .HasColumnType("uuid")
                                 .HasColumnName("id");
 
-                            b1.Property<int>("ContainerPort")
-                                .HasColumnType("integer")
-                                .HasColumnName("container_port");
+                            b1.Property<string>("InternalHost")
+                                .HasMaxLength(255)
+                                .HasColumnType("character varying(255)")
+                                .HasColumnName("internal_host");
 
-                            b1.Property<int>("HostPort")
+                            b1.Property<string>("Name")
+                                .IsRequired()
+                                .HasMaxLength(63)
+                                .HasColumnType("character varying(63)")
+                                .HasColumnName("name");
+
+                            b1.Property<string>("ResourceId")
+                                .IsRequired()
+                                .HasMaxLength(512)
+                                .HasColumnType("character varying(512)")
+                                .HasColumnName("resource_id");
+
+                            b1.Property<int>("Status")
                                 .HasColumnType("integer")
-                                .HasColumnName("host_port");
+                                .HasColumnName("status");
 
                             b1.Property<Guid>("runtime_instance_id")
                                 .HasColumnType("uuid")
                                 .HasColumnName("runtime_instance_id");
 
                             b1.HasKey("Id")
-                                .HasName("pk_runtime_receipt_ports");
+                                .HasName("pk_runtime_receipt_services");
 
-                            b1.HasIndex("runtime_instance_id")
-                                .HasDatabaseName("ix_runtime_receipt_ports_runtime_instance_id");
+                            b1.HasIndex("runtime_instance_id", "Name")
+                                .IsUnique()
+                                .HasDatabaseName("ix_runtime_receipt_services_runtime_instance_id_name");
 
-                            b1.ToTable("runtime_receipt_ports", (string)null);
+                            b1.ToTable("runtime_receipt_services", (string)null);
 
                             b1.WithOwner()
                                 .HasForeignKey("runtime_instance_id")
-                                .HasConstraintName("fk_runtime_receipt_ports_runtime_receipts_runtime_instance_id");
+                                .HasConstraintName("fk_runtime_receipt_services_runtime_receipts_runtime_instance_");
+
+                            b1.OwnsMany("NoCTF.Domain.Runtime.ContainerRuntimeReceiptPort", "PublishedPorts", b2 =>
+                                {
+                                    b2.Property<Guid>("Id")
+                                        .HasColumnType("uuid")
+                                        .HasColumnName("id");
+
+                                    b2.Property<int>("ContainerPort")
+                                        .HasColumnType("integer")
+                                        .HasColumnName("container_port");
+
+                                    b2.Property<int>("HostPort")
+                                        .HasColumnType("integer")
+                                        .HasColumnName("host_port");
+
+                                    b2.Property<Guid>("service_id")
+                                        .HasColumnType("uuid")
+                                        .HasColumnName("service_id");
+
+                                    b2.HasKey("Id")
+                                        .HasName("pk_runtime_receipt_service_ports");
+
+                                    b2.HasIndex("service_id", "ContainerPort")
+                                        .IsUnique()
+                                        .HasDatabaseName("ix_runtime_receipt_service_ports_service_id_container_port");
+
+                                    b2.ToTable("runtime_receipt_service_ports", (string)null);
+
+                                    b2.WithOwner()
+                                        .HasForeignKey("service_id")
+                                        .HasConstraintName("fk_runtime_receipt_service_ports_runtime_receipt_services_serv");
+                                });
+
+                            b1.Navigation("PublishedPorts");
                         });
 
                     b.OwnsMany("NoCTF.Domain.Runtime.OvaRuntimeReceiptMachine", "VirtualMachines", b1 =>
                         {
                             b1.Property<Guid>("Id")
-                                .ValueGeneratedOnAdd()
                                 .HasColumnType("uuid")
                                 .HasColumnName("id");
 
@@ -6646,7 +6584,7 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                                 .HasConstraintName("fk_runtime_receipt_virtual_machines_runtime_receipts_runtime_i");
                         });
 
-                    b.Navigation("PortMappings");
+                    b.Navigation("Services");
 
                     b.Navigation("VirtualMachines");
                 });
@@ -6749,12 +6687,17 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Navigation("StringItems");
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeRuntimeService", b =>
+                {
+                    b.Navigation("Commands");
+
+                    b.Navigation("Environment");
+
+                    b.Navigation("InternalPorts");
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Challenges.ChallengeRuntimeTemplateEntity", b =>
                 {
-                    b.Navigation("CommandItems");
-
-                    b.Navigation("KeyValues");
-
                     b.Navigation("UrlBindings");
                 });
 
@@ -6823,18 +6766,9 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Navigation("Members");
                 });
 
-            modelBuilder.Entity("NoCTF.Domain.Challenges.ComposeChallengeRuntimeTemplate", b =>
-                {
-                    b.Navigation("ServiceResources");
-                });
-
             modelBuilder.Entity("NoCTF.Domain.Challenges.ContainerChallengeRuntimeTemplate", b =>
                 {
-                    b.Navigation("Capabilities");
-
-                    b.Navigation("InternalPorts");
-
-                    b.Navigation("PortMappings");
+                    b.Navigation("Services");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Competitions.CtfCompetitionModeConfiguration", b =>

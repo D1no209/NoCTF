@@ -35,110 +35,6 @@ public sealed class RuntimeProviderHandler(
 {
     private readonly TimeProvider timeProvider = configuredTimeProvider ?? TimeProvider.System;
 
-    public async Task<object?> ProvisionContainerAsync(
-        ProvisionContainerRuntime message,
-        CancellationToken cancellationToken)
-    {
-        using var mutation = mutations is null ? null : await mutations.EnterWorkloadAsync(new(RuntimeWorkloadKind.Runtime, message.RuntimeInstanceId, message.RuntimeInstanceId), cancellationToken);
-        ValidateAssignment(message);
-        var workStatus = await workReader.ReadProvisionStatusAsync(message, cancellationToken);
-        if (workStatus != RuntimeProvisionWorkStatus.Current)
-        {
-            if (workStatus == RuntimeProvisionWorkStatus.AssignmentRetained) return null;
-            if (workStatus == RuntimeProvisionWorkStatus.StopRequested)
-                return await CancelProvisionAsync(
-                    message,
-                    message.Definition.Provider,
-                    cancellationToken);
-            if (workStatus == RuntimeProvisionWorkStatus.AssignmentAbsent)
-                await capacity.ReleaseAsync(
-                    message.RuntimeInstanceId,
-                    message.RunnerId,
-                    cancellationToken);
-            return new RuntimeProvisionFailed(
-                message.RuntimeInstanceId,
-                RuntimeFailureCode.RunnerUnavailable,
-                message.RunnerId);
-        }
-        observer?.EnsureFreshAdmission();
-        if (!await capacity.CanCreateAsync(message.RuntimeInstanceId, message.RunnerId, cancellationToken))
-            throw new TimeoutException("Runtime allocation is waiting for capacity recovery.");
-        RuntimeFailureCode? failureCode = null;
-        try
-        {
-            var awdpPlan = awdpAttackPlans is null
-                ? new AwdpAttackProvisioningPlan(AwdpAttackProvisioningPlanState.NotApplicable)
-                : await awdpAttackPlans.ReadAsync(message, cancellationToken);
-            if (awdpPlan.State == AwdpAttackProvisioningPlanState.Invalid)
-                throw new RuntimeConfigurationException(
-                    "The AWDP attack Runtime provisioning plan is invalid.");
-            var definition = awdpPlan.Definition ?? message.Definition;
-            var receipt = await IsolatedContainerProvisioner.ProvisionAsync(
-                providers.Containers(definition.Provider),
-                providers.Sandbox(definition.Provider),
-                definition,
-                timeProvider.GetUtcNow(),
-                cancellationToken);
-            providerHealth?.ReportSuccess(definition.Provider);
-            ExpandedRuntimeAccess? expanded = null;
-            try
-            {
-                expanded = RuntimeUrlExpander.ExpandContainer(
-                    receipt,
-                    definition.UrlBindings,
-                    definition.AccessMode);
-            }
-            catch (InvalidOperationException)
-            {
-                failureCode = RuntimeFailureCode.UrlExpansionFailed;
-            }
-            if (expanded is not null)
-                return new RuntimeProvisioned(
-                    message.RuntimeInstanceId,
-                    message.RunnerId,
-                    receipt.Provider,
-                    ContainerRuntimeReceiptData.From(receipt),
-                    expanded.AccessEndpoints,
-                    definition.Ttl is { } ttl ? timeProvider.GetUtcNow().Add(ttl) : null,
-                    definition.Provider == RuntimeProvider.Docker
-                        && definition.AccessMode is RuntimeAccessMode.Direct
-                            or RuntimeAccessMode.DirectAndWsrx
-                        ? receipt.PortMappings
-                            .OrderBy(mapping => mapping.Key)
-                            .Select(mapping => new RuntimePublishedPortMapping(
-                                null,
-                                mapping.Key,
-                                mapping.Value))
-                            .ToArray()
-                        : null);
-        }
-        catch (RuntimeConfigurationException)
-        {
-            failureCode = RuntimeFailureCode.InvalidConfiguration;
-        }
-        catch (TimeoutException)
-        {
-            failureCode = RuntimeFailureCode.ProvisionTimeout;
-            providerHealth?.ReportFailure(
-                message.Definition.Provider,
-                RunnerProviderFailureKind.ProvisionTimedOut,
-                message.RuntimeInstanceId);
-        }
-        catch (InvalidOperationException)
-        {
-            failureCode = RuntimeFailureCode.ProviderRejected;
-            providerHealth?.ReportFailure(
-                message.Definition.Provider,
-                RunnerProviderFailureKind.ProvisionRejected,
-                message.RuntimeInstanceId);
-        }
-        return await CompleteProvisionFailureAsync(
-            message,
-            message.Definition.Provider,
-            failureCode ?? throw new InvalidOperationException("Runtime failure code is unavailable."),
-            cancellationToken);
-    }
-
     public async Task<object> StopContainerAsync(
         StopContainerRuntime message,
         CancellationToken cancellationToken)
@@ -282,8 +178,8 @@ public sealed class RuntimeProviderHandler(
         }
     }
 
-    public async Task<object?> ProvisionComposeAsync(
-        ProvisionComposeRuntime message,
+    public async Task<object?> ProvisionContainerAsync(
+        ProvisionContainerRuntime message,
         CancellationToken cancellationToken)
     {
         using var mutation = mutations is null ? null : await mutations.EnterWorkloadAsync(new(RuntimeWorkloadKind.Runtime, message.RuntimeInstanceId, message.RuntimeInstanceId), cancellationToken);
@@ -313,7 +209,10 @@ public sealed class RuntimeProviderHandler(
         RuntimeFailureCode? failureCode = null;
         try
         {
-            var runtime = providers.Compose(message.Definition.Provider);
+            var awdpPlan = awdpAttackPlans is null ? new AwdpAttackProvisioningPlan(AwdpAttackProvisioningPlanState.NotApplicable)
+                : await awdpAttackPlans.ReadAsync(message, cancellationToken);
+            if (awdpPlan.State == AwdpAttackProvisioningPlanState.Invalid) throw new RuntimeConfigurationException("The AWDP attack Runtime plan is invalid.");
+            var runtime = providers.Runtime(message.Definition.Provider);
             var receipt = await runtime.UpAsync(message.Definition, cancellationToken);
             var status = await runtime.GetStatusAsync(receipt, cancellationToken);
             if (status?.Status != RuntimeStatus.Running)
@@ -330,7 +229,7 @@ public sealed class RuntimeProviderHandler(
                 ExpandedRuntimeAccess? expanded = null;
                 try
                 {
-                    expanded = RuntimeUrlExpander.ExpandCompose(
+                    expanded = RuntimeUrlExpander.ExpandContainer(
                         receipt,
                         status,
                         message.Definition.UrlBindings,
@@ -345,7 +244,7 @@ public sealed class RuntimeProviderHandler(
                         message.RuntimeInstanceId,
                         message.RunnerId,
                         receipt.Provider,
-                        ComposeRuntimeReceiptData.From(receipt),
+                        ContainerRuntimeReceiptData.From(receipt),
                         expanded.AccessEndpoints,
                         message.Definition.Ttl is { } ttl
                             ? timeProvider.GetUtcNow().Add(ttl)
@@ -353,9 +252,13 @@ public sealed class RuntimeProviderHandler(
                         message.Definition.Provider == RuntimeProvider.Docker
                             && message.Definition.AccessMode is RuntimeAccessMode.Direct
                                 or RuntimeAccessMode.DirectAndWsrx
-                                ? ReadComposePublishedPorts(message.Definition, status)
+                                ? ReadContainerPublishedPorts(message.Definition, status)
                                 : null);
             }
+        }
+        catch (RuntimeConfigurationException)
+        {
+            failureCode = RuntimeFailureCode.InvalidConfiguration;
         }
         catch (TimeoutException)
         {
@@ -378,58 +281,6 @@ public sealed class RuntimeProviderHandler(
             message.Definition.Provider,
             failureCode ?? throw new InvalidOperationException("Runtime failure code is unavailable."),
             cancellationToken);
-    }
-
-    public async Task<object> StopComposeAsync(
-        StopComposeRuntime message,
-        CancellationToken cancellationToken)
-    {
-        using var mutation = mutations is null ? null : await mutations.EnterWorkloadAsync(new(RuntimeWorkloadKind.Runtime, message.RuntimeInstanceId, message.RuntimeInstanceId), cancellationToken);
-        ValidateAssignment(message);
-        RuntimeStopWork? work = null;
-        var started = Stopwatch.GetTimestamp();
-        try
-        {
-            work = await workReader.ReadStopAsync(message, cancellationToken);
-            if (work is null)
-                return StopSucceeded(message, work);
-            RecordStopQueueDelay(message, work);
-            if (work.ProviderReceipt is { } receiptJson)
-            {
-                await RuntimeReceiptCleanup.CleanupComposeAsync(
-                    providers,
-                    new(message.RuntimeInstanceId),
-                    work.Provider,
-                    receiptJson,
-                    RuntimeTerminationMode.GracefulThenForce,
-                    runnerOptions.Value.Cleanup.ToPolicy(),
-                    cancellationToken);
-            }
-            else
-            {
-                await DestroyUnreceiptedRuntimeAsync(
-                    message.RuntimeInstanceId,
-                    work,
-                    cancellationToken);
-            }
-            await ReleaseStopCapacityOrThrowAsync(
-                message.RuntimeInstanceId,
-                cancellationToken);
-            RecordStopTotal(work, "success", started);
-            return StopSucceeded(message, work);
-        }
-        catch (InvalidOperationException)
-        {
-            if (work is not null)
-            {
-                RecordStopTotal(work, "failed", started);
-                providerHealth?.ReportFailure(
-                    work.Provider,
-                    RunnerProviderFailureKind.CleanupFailed,
-                    message.RuntimeInstanceId);
-            }
-            return StopFailed(message, work);
-        }
     }
 
     public async Task<object?> ProvisionOvaAsync(
@@ -729,12 +580,11 @@ public sealed class RuntimeProviderHandler(
                 "Runtime capacity belongs to a different Runner assignment.");
     }
 
-    private static IReadOnlyList<RuntimePublishedPortMapping> ReadComposePublishedPorts(
-        ComposeRequest request,
-        ComposeStatus status)
+    private static IReadOnlyList<RuntimePublishedPortMapping> ReadContainerPublishedPorts(
+        ContainerRuntimeRequest request,
+        ContainerRuntimeStatus status)
     {
         var targets = (request.UrlBindings ?? [])
-            .Append(request.ControlCheckUrlBinding)
             .Where(binding => binding?.ServiceName is not null
                 && binding.ContainerPort is not null)
             .Select(binding => new
@@ -755,7 +605,7 @@ public sealed class RuntimeProviderHandler(
             if (!service.PublishedPorts.TryGetValue(target.ContainerPort, out var hostPort)
                 || hostPort is < 1 or > 65535)
                 throw new InvalidOperationException(
-                    $"Docker Compose did not publish {target.ServiceName}:{target.ContainerPort}.");
+                    $"Docker did not publish {target.ServiceName}:{target.ContainerPort}.");
             return new RuntimePublishedPortMapping(
                 target.ServiceName,
                 target.ContainerPort,
@@ -1500,11 +1350,6 @@ internal static class RuntimeWriteBackOperations
         {
             RuntimeKind.Container => outbox.PublishToRunnerNodeAsync(
                 new StopContainerRuntime(
-                    instance.Id,
-                    runnerId,
-                    requestedAt)),
-            RuntimeKind.Compose => outbox.PublishToRunnerNodeAsync(
-                new StopComposeRuntime(
                     instance.Id,
                     runnerId,
                     requestedAt)),

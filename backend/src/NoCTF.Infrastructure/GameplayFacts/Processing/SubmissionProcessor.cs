@@ -164,7 +164,7 @@ public sealed class GameplayFactProcessor(
         CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(
-            IsolationLevel.ReadCommitted, cancellationToken);
+            IsolationLevel.Serializable, cancellationToken);
         var requested = await db.GameplayFacts.AsNoTracking().SingleOrDefaultAsync(
             item => item.Id == requestedGameplayFactId, cancellationToken);
         if (requested is null)
@@ -764,8 +764,7 @@ public sealed class GameplayFactProcessor(
                 // Judge completion/redelivery can arrive after a reset or a fresh start.
                 // Only instances already created at submission intake belong to this solve.
                 && instance.CreatedAt <= submission.OccurredAt
-                && (instance.RuntimeKind == RuntimeKind.Container
-                    || instance.RuntimeKind == RuntimeKind.Compose)
+                && (instance.RuntimeKind == RuntimeKind.Container)
                 && (instance.State == RuntimeState.Queued
                     || instance.State == RuntimeState.Provisioning
                     || instance.State == RuntimeState.Running

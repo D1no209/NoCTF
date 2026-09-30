@@ -1,6 +1,6 @@
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Runtime.Docker;
-using NoCTF.Runtime.Docker.Compose;
+using NoCTF.Runtime.Docker.Services;
 using NoCTF.Runtime.Docker.Containers;
 
 namespace NoCTF.Runner.Composition;
@@ -13,7 +13,7 @@ internal static class DockerRuntimeProviderRegistration
     {
         var options = new DockerRuntimeOptions(
             configuration["Runtime:Docker:Endpoint"] ?? "npipe://./pipe/docker_engine",
-            configuration["Runtime:Docker:Network"] ?? "noctf",
+            configuration["Runtime:Docker:Network"] ?? "noctf-challenges",
             configuration["Runtime:Docker:PublicHost"] ?? "localhost",
             configuration["Runtime:Docker:CallbackContainer"] ?? string.Empty,
             configuration["Runtime:Docker:CallbackContainerLabelKey"] ?? "noctf.io/internal-role",
@@ -26,7 +26,8 @@ internal static class DockerRuntimeProviderRegistration
             configuration["Runtime:Docker:ProxyContainer"] ?? string.Empty,
             configuration["Runtime:Docker:ProxyContainerLabelKey"]
                 ?? "noctf.io/runtime-proxy-gateway",
-            configuration["Runtime:Docker:ProxyContainerLabelValue"] ?? "true");
+            configuration["Runtime:Docker:ProxyContainerLabelValue"] ?? "true",
+            CallbackNetworkName: configuration["Runtime:Docker:CallbackNetwork"] ?? "noctf-runtime-callback");
         if (options.RuntimeLogMaxSizeBytes <= 0
             || options.RuntimeLogMaxFiles <= 0
             || options.OneShotOutputLimitBytesPerStream <= 0
@@ -39,7 +40,7 @@ internal static class DockerRuntimeProviderRegistration
 
         services.AddSingleton(options);
         services.AddSingleton<DockerContainerLifecycle>();
-        services.AddSingleton<DockerComposeRuntime>();
+        services.AddSingleton<DockerContainerRuntime>();
         services.AddSingleton<DockerRuntimeResourceReconciler>();
         services.AddSingleton<IRuntimeProviderAvailabilityProbe>(provider =>
             provider.GetRequiredService<DockerRuntimeResourceReconciler>());

@@ -1,252 +1,52 @@
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Provisioning;
+using NoCTF.Application.Runtime.Capacity;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Runtime;
-using NoCTF.GameModes.Awd.Configuration;
 
 namespace NoCTF.Worker.Runtime;
 
 public static class RuntimeClaimFactory
 {
-    public static IRuntimeProvisionMessage Create(
-        RuntimeInstance instance,
-        string runnerId,
-        GameMode mode,
-        ChallengeRuntimeTemplate template,
-        ChallengeDefinition? challengeDefinition,
-        string? perTeamFlag = null)
+    public static IRuntimeProvisionMessage Create(RuntimeInstance instance, string runnerId, GameMode mode,
+        ChallengeRuntimeTemplate template, ChallengeDefinition? challengeDefinition, string? perTeamFlag = null, long processLimit = 256)
     {
-        var fixedFlag = ResolvePerTeamFlag(mode, template, perTeamFlag);
-        var checkerTarget = ResolveAwdCheckerTarget(mode, challengeDefinition);
-        var limits = template.Limits
-            ?? new RuntimeResourceLimits(512 * 1024 * 1024, 500_000_000, 256);
-        TimeSpan? ttl = template.TtlSeconds is > 0
-            ? TimeSpan.FromSeconds(template.TtlSeconds.Value)
-            : null;
-        var operationTimeout = template.OperationTimeoutSeconds is > 0
-            ? TimeSpan.FromSeconds(template.OperationTimeoutSeconds.Value)
-            : TimeSpan.FromMinutes(2);
-        return template.Definition switch
+        var ttl = template.TtlSeconds is > 0 ? TimeSpan.FromSeconds(template.TtlSeconds.Value) : (TimeSpan?)null;
+        var timeout = TimeSpan.FromSeconds(template.OperationTimeoutSeconds ?? 120);
+        var labels = new Dictionary<string, string>
         {
-            ContainerRuntimeDefinition definition
-                when instance.RuntimeProvider is RuntimeProvider.Docker or RuntimeProvider.Kubernetes =>
-                new ProvisionContainerRuntime(
-                    instance.Id,
-                    runnerId,
-                    new ContainerRequest(
-                        instance.Id,
-                        instance.RuntimeProvider,
-                        definition.Image,
-                        definition.Command ?? [],
-                        ContainerEnvironment(definition, fixedFlag),
-                        MergeLabels(definition.Labels, instance),
-                        ContainerPortMappings(
-                            instance.RuntimeProvider,
-                            definition.PortMappings,
-                            instance.AccessMode),
-                        limits,
-                        NormalizeSecurity(definition.Security),
-                        ttl,
-                        OperationTimeout: operationTimeout,
-                        NetworkIsolation: ContainerNetworkIsolation.Isolated,
-                        InternalPorts: InternalPorts(
-                            mode,
-                            template,
-                            definition,
-                            instance.AccessMode),
-                        AllowInternalCallback: mode == GameMode.Koh,
-                        RuntimeInstanceId: instance.Id,
-                        UrlBindings: template.UrlBindings,
-                        ControlCheckUrlBinding: mode == GameMode.Koh
-                            ? template.ControlCheckUrlBinding
-                            : null,
-                        AwdCheckerTargetBinding: checkerTarget,
-                        EgressPolicy: definition.EgressPolicy,
-                        AccessMode: instance.AccessMode)),
-            ComposeRuntimeDefinition definition
-                when instance.RuntimeProvider is RuntimeProvider.Docker or RuntimeProvider.Kubernetes =>
-                new ProvisionComposeRuntime(
-                    instance.Id,
-                    runnerId,
-                    new ComposeRequest(
-                        instance.Id,
-                        instance.RuntimeProvider,
-                        ResourceName(instance),
-                        definition.ComposeYaml,
-                        definition.Environment ?? new Dictionary<string, string>(),
-                        MergeLabels(definition.Labels, instance),
-                        definition.ServiceResources,
-                        limits,
-                        ttl,
-                        operationTimeout,
-                        template.UrlBindings,
-                        mode == GameMode.Koh ? template.ControlCheckUrlBinding : null,
-                        checkerTarget,
-                        ServiceEnvironment(definition, fixedFlag),
-                        definition.EgressPolicy,
-                        AccessMode: instance.AccessMode)),
-            OvaRuntimeDefinition definition when instance.RuntimeProvider == RuntimeProvider.Libvirt =>
-                new ProvisionOvaRuntime(
-                    instance.Id,
-                    runnerId,
-                    new OvaRuntimeRequest(
-                        instance.Id,
-                        ParseOvaSource(definition.OvaSourceUrl),
-                        definition.Sha256.ToLowerInvariant(),
-                        ResourceName(instance),
-                        limits,
-                        ttl,
-                        operationTimeout,
-                        template.UrlBindings,
-                        mode == GameMode.Koh
-                            ? template.ControlCheckUrlBinding
-                            : null)),
-            _ => throw new InvalidOperationException(
-                "Runtime definition and provider are incompatible.")
+            ["noctf.io/managed"] = "true", ["noctf.io/runtime-instance-id"] = instance.Id.ToString("D"),
+            ["noctf.io/purpose"] = instance.Purpose.ToString(), ["noctf.io/job-kind"] = "persistent-runtime"
         };
-    }
-
-    private static RuntimeInternalEndpointBinding? ResolveAwdCheckerTarget(
-        GameMode mode,
-        ChallengeDefinition? challengeDefinition)
-    {
-        if (mode != GameMode.Awd)
-            return null;
-        var checker = challengeDefinition as AwdChallengeDefinition;
-        if (checker is null)
-            return null;
-        return checker.Checker?.TargetServiceName switch
+        if (instance.CompetitionId is Guid competitionId) labels["noctf.io/competition-id"] = competitionId.ToString("D");
+        if (instance.CompetitionChallengeId is Guid competitionChallengeId) labels["noctf.io/competition-challenge-id"] = competitionChallengeId.ToString("D");
+        if (instance.ChallengeId is Guid challengeId) labels["noctf.io/challenge-id"] = challengeId.ToString("D");
+        if (instance.TeamId is Guid teamId) labels["noctf.io/team-id"] = teamId.ToString("D");
+        if (instance.Purpose == RuntimePurpose.TemplateTest) labels["noctf.io/job-kind"] = "challenge-test-runtime";
+        if (instance.AccessMode != RuntimeAccessMode.Direct) labels["noctf.io/runtime-proxy-target"] = "true";
+        if (template.Definition is ContainerRuntimeDefinition container
+            && instance.RuntimeProvider is RuntimeProvider.Docker or RuntimeProvider.Kubernetes)
         {
-            { Length: > 0 } serviceName => new(serviceName),
-            _ => new()
-        };
-    }
-
-    private static IReadOnlyList<int>? InternalPorts(
-        GameMode mode,
-        ChallengeRuntimeTemplate template,
-        ContainerRuntimeDefinition definition,
-        RuntimeAccessMode accessMode)
-    {
-        var ports = new List<int>(definition.InternalPorts ?? []);
-        if (accessMode is RuntimeAccessMode.DirectAndWsrx or RuntimeAccessMode.WsrxOnly)
-        {
-            ports.AddRange((template.UrlBindings ?? [])
-                .Select(binding => binding.ContainerPort)
-                .OfType<int>());
-        }
-        if (mode == GameMode.Koh
-            && template.ControlCheckUrlBinding?.ContainerPort is int controlPort)
-            ports.Add(controlPort);
-        return ports.Count == 0 ? null : ports.Distinct().Order().ToArray();
-    }
-
-    private static IReadOnlyDictionary<int, int> ContainerPortMappings(
-        RuntimeProvider provider,
-        IReadOnlyDictionary<int, int>? configured,
-        RuntimeAccessMode accessMode)
-    {
-        if (configured is null || configured.Count == 0
-            || accessMode == RuntimeAccessMode.WsrxOnly)
-            return new Dictionary<int, int>();
-        return provider == RuntimeProvider.Docker
-            ? configured.Keys.ToDictionary(port => port, _ => 0)
-            : configured;
-    }
-
-    private static ContainerSecurityPolicy NormalizeSecurity(
-        ContainerSecurityPolicy security) => security.NormalizeCapabilities();
-
-    private static string? ResolvePerTeamFlag(
-        GameMode mode,
-        ChallengeRuntimeTemplate template,
-        string? perTeamFlag)
-    {
-        if (mode is not (GameMode.Ctf or GameMode.Awdp)
-            || template.FlagSource != RuntimeFlagSource.PerTeam)
-            return null;
-        return !string.IsNullOrEmpty(perTeamFlag)
-            ? perTeamFlag
-            : throw new InvalidOperationException(
-                "A PerTeam runtime requires its fixed team flag.");
-    }
-
-    private static IReadOnlyDictionary<string, string> ContainerEnvironment(
-        ContainerRuntimeDefinition definition,
-        string? fixedFlag)
-    {
-        var environment = definition.Environment is null
-            ? new Dictionary<string, string>(StringComparer.Ordinal)
-            : new Dictionary<string, string>(definition.Environment, StringComparer.Ordinal);
-        if (fixedFlag is not null)
-        {
-            var variable = definition.FlagEnvironmentVariableName
-                ?? throw new InvalidOperationException(
-                    "A PerTeam Container runtime requires a flag environment variable.");
-            environment[variable] = fixedFlag;
-        }
-        return environment;
-    }
-
-    private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>?
-        ServiceEnvironment(
-            ComposeRuntimeDefinition definition,
-            string? fixedFlag)
-    {
-        if (fixedFlag is null)
-            return null;
-        var targets = definition.FlagEnvironmentVariables;
-        if (targets is null || targets.Count == 0)
-        {
-            throw new InvalidOperationException(
-                "A PerTeam Compose runtime requires flag environment variables.");
-        }
-        return targets.ToDictionary(
-            target => target.Key,
-            target => (IReadOnlyDictionary<string, string>)new Dictionary<string, string>(
-                StringComparer.Ordinal)
+            var needsFlag = mode is GameMode.Ctf or GameMode.Awdp && template.FlagSource == RuntimeFlagSource.PerTeam;
+            if (needsFlag && string.IsNullOrEmpty(perTeamFlag)) throw new RuntimeConfigurationException("PerTeam Runtime requires its fixed team Flag.");
+            var services = container.Services.Select(service =>
             {
-                [target.Value] = fixedFlag
-            },
-            StringComparer.Ordinal);
-    }
-
-    private static Uri ParseOvaSource(string source)
-    {
-        if (!Uri.TryCreate(source, UriKind.Absolute, out var uri))
-            throw new InvalidOperationException("OVA source must be an absolute URI.");
-        return uri;
-    }
-
-    private static string ResourceName(RuntimeInstance instance) =>
-        $"noctf-{instance.Id:N}";
-
-    private static IReadOnlyDictionary<string, string> MergeLabels(
-        IReadOnlyDictionary<string, string>? configured,
-        RuntimeInstance instance)
-    {
-        var labels = configured is null
-            ? new Dictionary<string, string>(StringComparer.Ordinal)
-            : new Dictionary<string, string>(configured, StringComparer.Ordinal);
-        labels["noctf.io/managed"] = "true";
-        labels["noctf.io/job-kind"] = instance.Purpose == RuntimePurpose.TemplateTest
-            ? "challenge-test-runtime"
-            : "persistent-runtime";
-        labels["noctf.io/runtime-instance-id"] = instance.Id.ToString("D");
-        if (instance.CompetitionId is Guid competitionId)
-            labels["noctf.io/competition-id"] = competitionId.ToString("D");
-        if (instance.CompetitionChallengeId is Guid competitionChallengeId)
-            labels["noctf.io/competition-challenge-id"] = competitionChallengeId.ToString("D");
-        if (instance.ChallengeId is Guid challengeId)
-            labels["noctf.io/challenge-id"] = challengeId.ToString("D");
-        if (instance.TeamId is Guid teamId)
-            labels["noctf.io/team-id"] = teamId.ToString("D");
-        if (instance.AccessMode is RuntimeAccessMode.DirectAndWsrx
-            or RuntimeAccessMode.WsrxOnly)
-        {
-            labels["noctf.io/runtime-proxy-target"] = "true";
+                var environment = new Dictionary<string, string>(service.Environment ?? new Dictionary<string, string>(), StringComparer.Ordinal);
+                if (needsFlag && service.FlagEnvironmentVariableName is { } variable) environment[variable] = perTeamFlag!;
+                return service with { Environment = environment };
+            }).ToArray();
+            return new ProvisionContainerRuntime(instance.Id, runnerId, new ContainerRuntimeRequest(instance.Id,
+                instance.RuntimeProvider, services, labels, RuntimeResourceBudgetPolicy.Sum(services.Select(service => service.Resources(processLimit))),
+                ttl, timeout, template.UrlBindings, mode == GameMode.Koh ? template.ControlCheckUrlBinding : null,
+                mode == GameMode.Awd && challengeDefinition?.Checker is { } checker ? new(checker.TargetServiceName) : null,
+                container.EgressPolicy, instance.AccessMode));
         }
-        return labels;
+        if (template.Definition is OvaRuntimeDefinition ova && instance.RuntimeProvider == RuntimeProvider.Libvirt)
+            return new ProvisionOvaRuntime(instance.Id, runnerId, new OvaRuntimeRequest(instance.Id,
+                new Uri(ova.OvaSourceUrl, UriKind.Absolute), ova.Sha256.ToLowerInvariant(), $"noctf-rt-{instance.Id:N}",
+                template.Limits ?? new(512 * 1024 * 1024, 500, processLimit), ttl, timeout, template.UrlBindings,
+                mode == GameMode.Koh ? template.ControlCheckUrlBinding : null));
+        throw new RuntimeConfigurationException("Runtime definition and provider are incompatible.");
     }
 }

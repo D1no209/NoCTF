@@ -2,6 +2,7 @@
 #pragma warning disable
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using NoCTF.Application.Notifications;
 using NoCTF.GameModes.Awd.Configuration;
 using System;
 
@@ -13,18 +14,22 @@ namespace Internal.Generated.WolverineHandlers
     {
         private readonly Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> _dbContextOptionsOfNoCtfDbContext;
         private readonly Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> _loggerOfWolverinePostCommitMessagePublisher;
+        private readonly Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> _loggerOfNoCtfDbContext;
         private readonly Microsoft.Extensions.Logging.ILogger<NoCTF.Worker.AwdMessageHandler> _loggerOfAwdMessageHandler;
+        private readonly NoCTF.Application.Notifications.INotificationChangePublisher _notificationChangePublisher;
         private readonly NoCTF.GameModes.Awd.Configuration.AwdCheckerConfigurationCatalog _awdCheckerConfigurationCatalog;
         private readonly NoCTF.GameModes.Awd.Configuration.IAwdRoundConfigurationCatalog _awdRoundConfigurationCatalog;
         private readonly System.TimeProvider _timeProvider1;
         private readonly System.TimeProvider _timeProvider2;
         private readonly System.TimeProvider _timeProvider3;
 
-        public AwdCheckerCallbackMissingHandler932959428(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Worker.AwdMessageHandler> loggerOfAwdMessageHandler, NoCTF.GameModes.Awd.Configuration.AwdCheckerConfigurationCatalog awdCheckerConfigurationCatalog, NoCTF.GameModes.Awd.Configuration.IAwdRoundConfigurationCatalog awdRoundConfigurationCatalog, System.TimeProvider __timeProvider1, System.TimeProvider __timeProvider2, System.TimeProvider __timeProvider3)
+        public AwdCheckerCallbackMissingHandler932959428(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Worker.AwdMessageHandler> loggerOfAwdMessageHandler, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.GameModes.Awd.Configuration.AwdCheckerConfigurationCatalog awdCheckerConfigurationCatalog, NoCTF.GameModes.Awd.Configuration.IAwdRoundConfigurationCatalog awdRoundConfigurationCatalog, System.TimeProvider __timeProvider1, System.TimeProvider __timeProvider2, System.TimeProvider __timeProvider3)
         {
             _dbContextOptionsOfNoCtfDbContext = dbContextOptionsOfNoCtfDbContext;
             _loggerOfWolverinePostCommitMessagePublisher = loggerOfWolverinePostCommitMessagePublisher;
+            _loggerOfNoCtfDbContext = loggerOfNoCtfDbContext;
             _loggerOfAwdMessageHandler = loggerOfAwdMessageHandler;
+            _notificationChangePublisher = notificationChangePublisher;
             _awdCheckerConfigurationCatalog = awdCheckerConfigurationCatalog;
             _awdRoundConfigurationCatalog = awdRoundConfigurationCatalog;
             _timeProvider1 = __timeProvider1;
@@ -36,7 +41,7 @@ namespace Internal.Generated.WolverineHandlers
 
         public override async System.Threading.Tasks.Task HandleAsync(Wolverine.Runtime.MessageContext context, System.Threading.CancellationToken cancellation)
         {
-            await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider1);
+            await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider1, _notificationChangePublisher, _loggerOfNoCtfDbContext);
             var progressionReconciler = new NoCTF.Infrastructure.Competitions.Progression.ProgressionReconciler(noCtfDbContext);
             var postCommitDispatchStatus = new NoCTF.Application.Messaging.PostCommitDispatchStatus();
             var wolverinePostCommitMessagePublisher = new NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher(context, noCtfDbContext, _loggerOfWolverinePostCommitMessagePublisher, postCommitDispatchStatus);

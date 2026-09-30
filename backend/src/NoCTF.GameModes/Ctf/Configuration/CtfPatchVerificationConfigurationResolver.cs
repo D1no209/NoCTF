@@ -16,8 +16,7 @@ public sealed record CtfPatchVerificationConfiguration(
     int ReadyTimeoutSeconds,
     long MaximumPatchUploadBytes,
     int MaxPatchAttempts,
-    bool CheckerFixInput,
-    bool CheckerAllowRoot);
+    bool CheckerFixInput);
 
 public static class CtfPatchVerificationConfigurationResolver
 {
@@ -48,7 +47,6 @@ public static class CtfPatchVerificationConfigurationResolver
                 ?? PatchVerificationExecutionBudget.DefaultReadyTimeoutSeconds,
             definition.MaximumPatchUploadBytes ?? DefaultMaximumPatchUploadBytes,
             rules.MaxPatchAttempts ?? DefaultMaxPatchAttempts,
-            definition.CheckerFixInput,
-            definition.CheckerAllowRoot);
+            definition.CheckerFixInput);
     }
 }

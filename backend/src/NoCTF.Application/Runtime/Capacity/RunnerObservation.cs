@@ -7,7 +7,7 @@ public sealed record RunnerResourceObservation(
     DateTimeOffset ObservedAt,
     long MemoryTotalBytes,
     long MemoryAvailableBytes,
-    long NanoCpus,
+    long CpuMillicores,
     double CpuUsageRatio,
     long? PidsUsed,
     long? PidsCapacity,
@@ -15,7 +15,7 @@ public sealed record RunnerResourceObservation(
     bool ProviderPressure = false,
     bool PidPressureConditionAvailable = false);
 
-public sealed record RunnerObservedResourceAmount(long MemoryBytes, long NanoCpus, long? PidsLimit);
+public sealed record RunnerObservedResourceAmount(long MemoryBytes, long CpuMillicores, long? PidsLimit);
 
 public sealed record RunnerCapacityProjection(
     RunnerObservedResourceAmount ObservedTotal,
@@ -70,7 +70,7 @@ public sealed class RunnerPressurePolicy(RunnerAdmissionOptions options)
     public RunnerAdmissionSnapshot Evaluate(RunnerResourceObservation? sample, DateTimeOffset now)
     {
         if (sample is null || now - sample.ObservedAt > TimeSpan.FromSeconds(options.FreshnessSeconds)
-            || sample.ObservedAt > now || sample.MemoryTotalBytes <= 0 || sample.NanoCpus <= 0
+            || sample.ObservedAt > now || sample.MemoryTotalBytes <= 0 || sample.CpuMillicores <= 0
             || sample.MemoryAvailableBytes < 0 || !double.IsFinite(sample.CpuUsageRatio)
             || sample.CpuUsageRatio is < 0 or > 1
             || sample.PidsCapacity is <= 0 || sample.PidsUsed is < 0)
@@ -114,8 +114,8 @@ public sealed class RunnerPressurePolicy(RunnerAdmissionOptions options)
     {
         var memoryTotal = sample.MemoryTotalBytes;
         var memoryAvailable = Math.Min(sample.MemoryAvailableBytes, memoryTotal);
-        var cpuAvailable = ScaleFloor(sample.NanoCpus, 1 - sample.CpuUsageRatio);
-        var cpuHeadroom = ScaleCeiling(sample.NanoCpus, 1 - options.CpuHighRatio);
+        var cpuAvailable = ScaleFloor(sample.CpuMillicores, 1 - sample.CpuUsageRatio);
+        var cpuHeadroom = ScaleCeiling(sample.CpuMillicores, 1 - options.CpuHighRatio);
         var memoryHeadroom = ScaleCeiling(memoryTotal, options.MemoryLowRatio);
         long? pidsTotal = sample.PidsUsed is not null ? sample.PidsCapacity : null;
         long? pidsAvailable = pidsTotal is long total && sample.PidsUsed is long used
@@ -123,7 +123,7 @@ public sealed class RunnerPressurePolicy(RunnerAdmissionOptions options)
         long? pidsHeadroom = pidsTotal is long pidCapacity
             ? ScaleCeiling(pidCapacity, 1 - options.PidsHighRatio) : null;
         return new(
-            new(memoryTotal, sample.NanoCpus, pidsTotal),
+            new(memoryTotal, sample.CpuMillicores, pidsTotal),
             new(memoryAvailable, cpuAvailable, pidsAvailable),
             new(memoryHeadroom, cpuHeadroom, pidsHeadroom),
             new(

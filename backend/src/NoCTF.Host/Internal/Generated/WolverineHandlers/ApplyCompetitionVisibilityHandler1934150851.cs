@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using NoCTF.Application.Challenges.Configuration;
 using NoCTF.Application.Competitions.Configuration;
+using NoCTF.Application.Notifications;
 using NoCTF.Infrastructure.Competitions.Management;
 using System;
 using ZiggyCreatures.Caching.Fusion;
@@ -16,20 +17,24 @@ namespace Internal.Generated.WolverineHandlers
     {
         private readonly Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> _dbContextOptionsOfNoCtfDbContext;
         private readonly Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> _loggerOfWolverinePostCommitMessagePublisher;
+        private readonly Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> _loggerOfNoCtfDbContext;
         private readonly NoCTF.Application.Challenges.Configuration.IChallengeConfigurationCatalog _challengeConfigurationCatalog;
         private readonly NoCTF.Application.Competitions.Configuration.ICompetitionConfigurationValidator _competitionConfigurationValidator;
+        private readonly NoCTF.Application.Notifications.INotificationChangePublisher _notificationChangePublisher;
         private readonly NoCTF.Infrastructure.Competitions.Management.CompetitionReadModelCache _competitionReadModelCache;
         private readonly System.TimeProvider _timeProvider1;
         private readonly System.TimeProvider _timeProvider2;
         private readonly System.TimeProvider _timeProvider3;
         private readonly ZiggyCreatures.Caching.Fusion.IFusionCacheProvider _fusionCacheProvider;
 
-        public ApplyCompetitionVisibilityHandler1934150851(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, NoCTF.Application.Challenges.Configuration.IChallengeConfigurationCatalog challengeConfigurationCatalog, NoCTF.Application.Competitions.Configuration.ICompetitionConfigurationValidator competitionConfigurationValidator, NoCTF.Infrastructure.Competitions.Management.CompetitionReadModelCache competitionReadModelCache, System.TimeProvider __timeProvider1, System.TimeProvider __timeProvider2, System.TimeProvider __timeProvider3, ZiggyCreatures.Caching.Fusion.IFusionCacheProvider fusionCacheProvider)
+        public ApplyCompetitionVisibilityHandler1934150851(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, NoCTF.Application.Challenges.Configuration.IChallengeConfigurationCatalog challengeConfigurationCatalog, NoCTF.Application.Competitions.Configuration.ICompetitionConfigurationValidator competitionConfigurationValidator, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.Infrastructure.Competitions.Management.CompetitionReadModelCache competitionReadModelCache, System.TimeProvider __timeProvider1, System.TimeProvider __timeProvider2, System.TimeProvider __timeProvider3, ZiggyCreatures.Caching.Fusion.IFusionCacheProvider fusionCacheProvider)
         {
             _dbContextOptionsOfNoCtfDbContext = dbContextOptionsOfNoCtfDbContext;
             _loggerOfWolverinePostCommitMessagePublisher = loggerOfWolverinePostCommitMessagePublisher;
+            _loggerOfNoCtfDbContext = loggerOfNoCtfDbContext;
             _challengeConfigurationCatalog = challengeConfigurationCatalog;
             _competitionConfigurationValidator = competitionConfigurationValidator;
+            _notificationChangePublisher = notificationChangePublisher;
             _competitionReadModelCache = competitionReadModelCache;
             _timeProvider1 = __timeProvider1;
             _timeProvider2 = __timeProvider2;
@@ -42,7 +47,7 @@ namespace Internal.Generated.WolverineHandlers
         public override async System.Threading.Tasks.Task HandleAsync(Wolverine.Runtime.MessageContext context, System.Threading.CancellationToken cancellation)
         {
             var fileReferenceLock = new NoCTF.Infrastructure.Storage.FileReferenceLock();
-            await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider1);
+            await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider1, _notificationChangePublisher, _loggerOfNoCtfDbContext);
             var postCommitDispatchStatus = new NoCTF.Application.Messaging.PostCommitDispatchStatus();
             var wolverinePostCommitMessagePublisher = new NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher(context, noCtfDbContext, _loggerOfWolverinePostCommitMessagePublisher, postCommitDispatchStatus);
             var platformConfigurationStore = new NoCTF.Infrastructure.Administration.PlatformConfigurationStore(noCtfDbContext, _fusionCacheProvider, wolverinePostCommitMessagePublisher, fileReferenceLock);

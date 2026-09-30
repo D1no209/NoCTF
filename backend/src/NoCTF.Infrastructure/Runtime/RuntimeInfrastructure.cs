@@ -24,7 +24,10 @@ internal static class RuntimeInfrastructure
         IConfiguration configuration,
         bool development)
     {
-        services.AddSingleton(new RuntimeResourceBudgetPolicy());
+        services.AddOptions<RuntimeExecutionOptions>().Bind(configuration.GetSection("Runtime:Execution"))
+            .Validate(options => options.ProcessesPerService > 0, "ProcessesPerService must be positive.").ValidateOnStart();
+        services.AddSingleton(provider => provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<RuntimeExecutionOptions>>().Value);
+        services.AddSingleton<RuntimeResourceBudgetPolicy>();
         var proxyOptions = configuration.GetSection("RuntimeProxy")
             .Get<RuntimeProxyOptions>() ?? new RuntimeProxyOptions();
         if (proxyOptions.MaximumConnectionsPerRuntime is < 1 or > 512

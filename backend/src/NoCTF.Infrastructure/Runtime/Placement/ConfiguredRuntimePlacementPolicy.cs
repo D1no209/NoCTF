@@ -17,9 +17,9 @@ public sealed class ConfiguredRuntimePlacementPolicy : IRuntimePlacementPolicy
 
     public RuntimePlacement Resolve(RuntimeKind runtimeKind) => runtimeKind switch
     {
-        RuntimeKind.Container or RuntimeKind.Compose => containerPlacement,
+        RuntimeKind.Container => containerPlacement,
         RuntimeKind.OvaVm => throw new InvalidOperationException(
-            "The configured platform supports only Container and Compose runtimes."),
+            "The configured platform supports only Container runtimes."),
         _ => throw new ArgumentOutOfRangeException(nameof(runtimeKind), runtimeKind, null)
     };
 }

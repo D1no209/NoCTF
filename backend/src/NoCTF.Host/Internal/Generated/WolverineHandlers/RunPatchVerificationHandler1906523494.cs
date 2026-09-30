@@ -5,6 +5,8 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NoCTF.Application.Authentication;
+using NoCTF.Application.Notifications;
+using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Infrastructure.Runtime.Capacity;
 using NoCTF.Runner.Composition;
 using NoCTF.Runner.Messages;
@@ -22,11 +24,15 @@ namespace Internal.Generated.WolverineHandlers
         private readonly Microsoft.EntityFrameworkCore.IDbContextFactory<NoCTF.Infrastructure.Persistence.NoCtfDbContext> _dbContextFactoryOfNoCtfDbContext;
         private readonly Microsoft.Extensions.Hosting.IHostApplicationLifetime _hostApplicationLifetime;
         private readonly Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> _loggerOfWolverinePostCommitMessagePublisher;
+        private readonly Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> _loggerOfNoCtfDbContext;
         private readonly Microsoft.Extensions.Logging.ILogger<NoCTF.Runner.Messages.AuxiliaryRuntimeCapacity> _loggerOfAuxiliaryRuntimeCapacity;
         private readonly Microsoft.Extensions.Logging.ILogger<NoCTF.Runner.Messages.AwdpFixVerificationHandler> _loggerOfAwdpFixVerificationHandler;
         private readonly Microsoft.Extensions.Options.IOptions<NoCTF.Infrastructure.Authentication.RunnerScoringOptions> _optionsOfRunnerScoringOptions;
         private readonly Microsoft.Extensions.Options.IOptions<NoCTF.Runner.Composition.RunnerOptions> _optionsOfRunnerOptions;
         private readonly NoCTF.Application.Authentication.IRunnerScoringTokenIssuer _runnerScoringTokenIssuer;
+        private readonly NoCTF.Application.Notifications.INotificationChangePublisher _notificationChangePublisher;
+        private readonly NoCTF.Application.Runtime.Provisioning.RuntimeExecutionOptions _runtimeExecutionOptions1;
+        private readonly NoCTF.Application.Runtime.Provisioning.RuntimeExecutionOptions _runtimeExecutionOptions2;
         private readonly NoCTF.Infrastructure.Runtime.Capacity.NatsRunnerAvailabilityRegistry _natsRunnerAvailabilityRegistry;
         private readonly NoCTF.Infrastructure.Runtime.Capacity.RunnerCapacityLedgerCoordinator _runnerCapacityLedgerCoordinator;
         private readonly NoCTF.Infrastructure.Runtime.Capacity.RunnerResourceMutationCoordinator _runnerResourceMutationCoordinator;
@@ -38,17 +44,21 @@ namespace Internal.Generated.WolverineHandlers
         private readonly System.TimeProvider _timeProvider;
         private readonly ZiggyCreatures.Caching.Fusion.IFusionCacheProvider _fusionCacheProvider;
 
-        public RunPatchVerificationHandler1906523494(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.EntityFrameworkCore.IDbContextFactory<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextFactoryOfNoCtfDbContext, Microsoft.Extensions.Hosting.IHostApplicationLifetime hostApplicationLifetime, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Runner.Messages.AuxiliaryRuntimeCapacity> loggerOfAuxiliaryRuntimeCapacity, Microsoft.Extensions.Logging.ILogger<NoCTF.Runner.Messages.AwdpFixVerificationHandler> loggerOfAwdpFixVerificationHandler, Microsoft.Extensions.Options.IOptions<NoCTF.Infrastructure.Authentication.RunnerScoringOptions> optionsOfRunnerScoringOptions, Microsoft.Extensions.Options.IOptions<NoCTF.Runner.Composition.RunnerOptions> optionsOfRunnerOptions, NoCTF.Application.Authentication.IRunnerScoringTokenIssuer runnerScoringTokenIssuer, NoCTF.Infrastructure.Runtime.Capacity.NatsRunnerAvailabilityRegistry natsRunnerAvailabilityRegistry, NoCTF.Infrastructure.Runtime.Capacity.RunnerCapacityLedgerCoordinator runnerCapacityLedgerCoordinator, NoCTF.Infrastructure.Runtime.Capacity.RunnerResourceMutationCoordinator runnerResourceMutationCoordinator, NoCTF.Runner.Composition.FixArchivePreparer fixArchivePreparer, NoCTF.Runner.Composition.IOneShotRuntimeProviderCatalog oneShotRuntimeProviderCatalog, NoCTF.Runner.Composition.IRuntimeProviderCatalog runtimeProviderCatalog, NoCTF.Runner.Messages.AwdpFixArchiveDownloader awdpFixArchiveDownloader, System.Collections.Generic.IEnumerable<NoCTF.Application.Runtime.Provisioning.IRuntimeManagedResourceReconciler> runtimeManagedResourceReconcilerIEnumerable, System.TimeProvider timeProvider, ZiggyCreatures.Caching.Fusion.IFusionCacheProvider fusionCacheProvider)
+        public RunPatchVerificationHandler1906523494(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.EntityFrameworkCore.IDbContextFactory<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextFactoryOfNoCtfDbContext, Microsoft.Extensions.Hosting.IHostApplicationLifetime hostApplicationLifetime, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Runner.Messages.AuxiliaryRuntimeCapacity> loggerOfAuxiliaryRuntimeCapacity, Microsoft.Extensions.Logging.ILogger<NoCTF.Runner.Messages.AwdpFixVerificationHandler> loggerOfAwdpFixVerificationHandler, Microsoft.Extensions.Options.IOptions<NoCTF.Infrastructure.Authentication.RunnerScoringOptions> optionsOfRunnerScoringOptions, Microsoft.Extensions.Options.IOptions<NoCTF.Runner.Composition.RunnerOptions> optionsOfRunnerOptions, NoCTF.Application.Authentication.IRunnerScoringTokenIssuer runnerScoringTokenIssuer, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.Application.Runtime.Provisioning.RuntimeExecutionOptions __runtimeExecutionOptions1, NoCTF.Application.Runtime.Provisioning.RuntimeExecutionOptions __runtimeExecutionOptions2, NoCTF.Infrastructure.Runtime.Capacity.NatsRunnerAvailabilityRegistry natsRunnerAvailabilityRegistry, NoCTF.Infrastructure.Runtime.Capacity.RunnerCapacityLedgerCoordinator runnerCapacityLedgerCoordinator, NoCTF.Infrastructure.Runtime.Capacity.RunnerResourceMutationCoordinator runnerResourceMutationCoordinator, NoCTF.Runner.Composition.FixArchivePreparer fixArchivePreparer, NoCTF.Runner.Composition.IOneShotRuntimeProviderCatalog oneShotRuntimeProviderCatalog, NoCTF.Runner.Composition.IRuntimeProviderCatalog runtimeProviderCatalog, NoCTF.Runner.Messages.AwdpFixArchiveDownloader awdpFixArchiveDownloader, System.Collections.Generic.IEnumerable<NoCTF.Application.Runtime.Provisioning.IRuntimeManagedResourceReconciler> runtimeManagedResourceReconcilerIEnumerable, System.TimeProvider timeProvider, ZiggyCreatures.Caching.Fusion.IFusionCacheProvider fusionCacheProvider)
         {
             _dbContextOptionsOfNoCtfDbContext = dbContextOptionsOfNoCtfDbContext;
             _dbContextFactoryOfNoCtfDbContext = dbContextFactoryOfNoCtfDbContext;
             _hostApplicationLifetime = hostApplicationLifetime;
             _loggerOfWolverinePostCommitMessagePublisher = loggerOfWolverinePostCommitMessagePublisher;
+            _loggerOfNoCtfDbContext = loggerOfNoCtfDbContext;
             _loggerOfAuxiliaryRuntimeCapacity = loggerOfAuxiliaryRuntimeCapacity;
             _loggerOfAwdpFixVerificationHandler = loggerOfAwdpFixVerificationHandler;
             _optionsOfRunnerScoringOptions = optionsOfRunnerScoringOptions;
             _optionsOfRunnerOptions = optionsOfRunnerOptions;
             _runnerScoringTokenIssuer = runnerScoringTokenIssuer;
+            _notificationChangePublisher = notificationChangePublisher;
+            _runtimeExecutionOptions1 = __runtimeExecutionOptions1;
+            _runtimeExecutionOptions2 = __runtimeExecutionOptions2;
             _natsRunnerAvailabilityRegistry = natsRunnerAvailabilityRegistry;
             _runnerCapacityLedgerCoordinator = runnerCapacityLedgerCoordinator;
             _runnerResourceMutationCoordinator = runnerResourceMutationCoordinator;
@@ -65,14 +75,14 @@ namespace Internal.Generated.WolverineHandlers
 
         public override async System.Threading.Tasks.Task HandleAsync(Wolverine.Runtime.MessageContext context, System.Threading.CancellationToken cancellation)
         {
-            await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider);
+            await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider, _notificationChangePublisher, _loggerOfNoCtfDbContext);
             var postCommitDispatchStatus = new NoCTF.Application.Messaging.PostCommitDispatchStatus();
             var wolverinePostCommitMessagePublisher = new NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher(context, noCtfDbContext, _loggerOfWolverinePostCommitMessagePublisher, postCommitDispatchStatus);
             var competitionEventStore = new NoCTF.Infrastructure.Competitions.Events.CompetitionEventStore(noCtfDbContext, wolverinePostCommitMessagePublisher, _timeProvider);
             var persistedRunnerCapacityGate = new NoCTF.Infrastructure.Runtime.Capacity.PersistedRunnerCapacityGate(noCtfDbContext, _natsRunnerAvailabilityRegistry, _fusionCacheProvider, wolverinePostCommitMessagePublisher, _runnerCapacityLedgerCoordinator);
-            var auxiliaryRuntimeCapacity = new NoCTF.Runner.Messages.AuxiliaryRuntimeCapacity(persistedRunnerCapacityGate, _optionsOfRunnerOptions, _runtimeManagedResourceReconcilerIEnumerable, _runnerResourceMutationCoordinator, noCtfDbContext, wolverinePostCommitMessagePublisher, competitionEventStore, _timeProvider, _loggerOfAuxiliaryRuntimeCapacity);
+            var auxiliaryRuntimeCapacity = new NoCTF.Runner.Messages.AuxiliaryRuntimeCapacity(persistedRunnerCapacityGate, _optionsOfRunnerOptions, _runtimeManagedResourceReconcilerIEnumerable, _runnerResourceMutationCoordinator, noCtfDbContext, wolverinePostCommitMessagePublisher, competitionEventStore, _timeProvider, _loggerOfAuxiliaryRuntimeCapacity, _runtimeExecutionOptions1);
             var awdpFixExecutionFence = new NoCTF.Infrastructure.GameplayFacts.Processing.AwdpFixExecutionFence(noCtfDbContext, _timeProvider);
-            var awdpCheckerExecutor = new NoCTF.Runner.Messages.AwdpCheckerExecutor(_oneShotRuntimeProviderCatalog, auxiliaryRuntimeCapacity);
+            var awdpCheckerExecutor = new NoCTF.Runner.Messages.AwdpCheckerExecutor(_oneShotRuntimeProviderCatalog, auxiliaryRuntimeCapacity, _runtimeExecutionOptions2);
             var awdpFixWorkReader = new NoCTF.Runner.Messages.AwdpFixWorkReader(_dbContextFactoryOfNoCtfDbContext, awdpFixExecutionFence, _runnerScoringTokenIssuer, _optionsOfRunnerScoringOptions, _timeProvider);
             // The actual message body
             var runPatchVerification = (NoCTF.Application.Messaging.RunPatchVerification)context.Envelope.Message;

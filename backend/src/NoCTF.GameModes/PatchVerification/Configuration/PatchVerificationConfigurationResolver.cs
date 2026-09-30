@@ -17,8 +17,7 @@ public sealed record PatchVerificationConfiguration(
     long MaximumPatchUploadBytes,
     int MaximumAttempts,
     bool RequiresBreak,
-    bool CheckerFixInput,
-    bool CheckerAllowRoot);
+    bool CheckerFixInput);
 
 public static class PatchVerificationConfigurationResolver
 {
@@ -57,8 +56,7 @@ public static class PatchVerificationConfigurationResolver
                 configuration.MaximumPatchUploadBytes,
                 configuration.MaxFixSubmissions,
                 configuration.RequireBreakBeforeFix,
-                configuration.CheckerFixInput,
-                configuration.CheckerAllowRoot);
+                configuration.CheckerFixInput);
     }
 
     private static PatchVerificationConfiguration? ResolveCtf(
@@ -78,8 +76,7 @@ public static class PatchVerificationConfigurationResolver
                 configuration.MaximumPatchUploadBytes,
                 configuration.MaxPatchAttempts,
                 false,
-                configuration.CheckerFixInput,
-                configuration.CheckerAllowRoot);
+                configuration.CheckerFixInput);
     }
 
 }

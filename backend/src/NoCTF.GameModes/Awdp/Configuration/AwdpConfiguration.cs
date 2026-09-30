@@ -38,8 +38,7 @@ public sealed record AwdpChallengeConfiguration(
     EvaluationDispatchMode? EvaluationDispatchMode = null,
     long? MaximumPatchUploadBytes = null,
     PerTeamFlagTemplate? FlagTemplate = null,
-    bool CheckerFixInput = false,
-    bool CheckerAllowRoot = false)
+    bool CheckerFixInput = false)
 {
     public static AwdpChallengeConfiguration Empty { get; } = new(
         null,
@@ -68,5 +67,4 @@ public sealed record AwdpEffectiveConfiguration(
     int ReadyTimeoutSeconds,
     long MaximumPatchUploadBytes,
     PerTeamFlagTemplate FlagTemplate,
-    bool CheckerFixInput,
-    bool CheckerAllowRoot = false);
+    bool CheckerFixInput);

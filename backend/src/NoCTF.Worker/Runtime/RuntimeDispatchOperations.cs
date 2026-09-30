@@ -226,22 +226,13 @@ internal static partial class BackendMessageOperations
         }
 
         var limits = template.Limits
-            ?? new RuntimeResourceLimits(512 * 1024 * 1024, 500_000_000, 256);
+            ?? new RuntimeResourceLimits(512 * 1024 * 1024, 500, 256);
         RuntimeResourceLimits budget;
         try
         {
-            if (template.Definition is ComposeRuntimeDefinition compose)
-            {
-                var pids = limits.PidsLimit;
-                limits = RuntimeResourceBudgetPolicy.Sum(compose.ServiceResources.Values
-                    .Select(value => budgets.EffectiveLimit(value, instance.RuntimeProvider)), pids);
-                budget = RuntimeResourceBudgetPolicy.Sum(budgets.ForCompose(compose.ServiceResources, instance.RuntimeProvider).Values, pids);
-            }
-            else
-            {
-                limits = budgets.EffectiveLimit(limits, instance.RuntimeProvider);
-                budget = budgets.Calculate(limits, instance.RuntimeProvider);
-            }
+            limits = template.Definition is ContainerRuntimeDefinition container
+                ? budgets.ForServices(container) : budgets.EffectiveLimit(limits, instance.RuntimeProvider);
+            budget = budgets.Calculate(limits, instance.RuntimeProvider);
         }
         catch (Exception exception) when (exception is InvalidOperationException or OverflowException)
         {
@@ -265,9 +256,9 @@ internal static partial class BackendMessageOperations
             instance.Id,
             placement.RunnerPool,
             budget.MemoryBytes,
-            budget.NanoCpus,
+            budget.CpuMillicores,
             budget.PidsLimit,
-            Limit: RuntimeResourceBudgetPolicy.ToAmount(limits)), cancellationToken);
+            Limit: RuntimeResourceBudgetPolicy.ToAmount(limits), ProcessesPerService: budgets.ProcessesPerService), cancellationToken);
         NoCtfTelemetry.RecordRuntimeDispatchStage(
             RuntimeDispatchPerformanceStage.CapacityClaim,
             Stopwatch.GetElapsedTime(claimStarted).TotalSeconds);
@@ -292,16 +283,7 @@ internal static partial class BackendMessageOperations
                     instance.Id,
                     template,
                     instance.RuntimeProvider,
-                    instance.Purpose);
-                if (instance.RuntimeProvider == RuntimeProvider.Docker)
-                {
-                    definition = definition with
-                    {
-                        PortMappings = definition.PortMappings.Keys.ToDictionary(
-                            port => port,
-                            _ => 0)
-                    };
-                }
+                    instance.Purpose, budgets.ProcessesPerService);
                 provision = new ProvisionContainerRuntime(
                     instance.Id,
                     runnerId,
@@ -315,7 +297,7 @@ internal static partial class BackendMessageOperations
                     target.Mode,
                     template,
                     target.Definition,
-                    perTeamFlag);
+                    perTeamFlag, budgets.ProcessesPerService);
             }
             var stored = await db.RuntimeInstances.AsNoTracking().Where(runtime => runtime.Id == instance.Id)
                 .Select(runtime => runtime.CapacityAllocations)
@@ -325,26 +307,6 @@ internal static partial class BackendMessageOperations
                 NoCTF.Infrastructure.Runtime.Capacity.PersistedRunnerCapacityGate.PrimaryIdentity(instance), instance.GameplayFactId,
                 runnerId, runnerId, RuntimeResourceBudgetPolicy.ToAmount(budget), RuntimeResourceBudgetPolicy.ToAmount(limits));
             var committed = allocation.Budget;
-            provision = provision switch
-            {
-                ProvisionContainerRuntime container => container with
-                {
-                    Definition = container.Definition with
-                    {
-                        Limits = budgets.EffectiveLimit(container.Definition.Limits, instance.RuntimeProvider),
-                        Budget = RuntimeResourceBudgetPolicy.ToLimits(committed)
-                    }
-                },
-                ProvisionComposeRuntime compose => compose with
-                {
-                    Definition = compose.Definition with
-                    {
-                        ServiceBudgets = RuntimeResourceBudgetPolicy.RecreateComposeBudgets(
-                            compose.Definition.ServiceResources, instance.RuntimeProvider, committed)
-                    }
-                },
-                _ => provision
-            };
             if (!RuntimeProvisionCapacity.Matches(allocation, provision))
                 throw new InvalidOperationException("Provider request resources differ from the committed allocation.");
         }

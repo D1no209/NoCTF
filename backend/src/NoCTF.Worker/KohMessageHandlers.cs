@@ -131,13 +131,10 @@ public sealed class KohPollingHandler(
             || string.IsNullOrWhiteSpace(receipt.PublicHost)
             || binding.ContainerPort is not int port)
             return null;
-        var published = receipt.PortMappings.SingleOrDefault(mapping =>
-            mapping.ContainerPort == port)?.HostPort;
-        if (published is not > 0)
-            return null;
-        var expanded = binding.UrlTemplate
-            .Replace("{HOST}", receipt.PublicHost, StringComparison.Ordinal)
-            .Replace("{PORT}", published.Value.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal);
+        var service = receipt.Services.SingleOrDefault(service => service.Name == binding.ServiceName);
+        if (string.IsNullOrWhiteSpace(service?.InternalHost)) return null;
+        var expanded = binding.UrlTemplate.Replace("{HOST}", service.InternalHost, StringComparison.Ordinal)
+            .Replace("{PORT}", port.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal);
         return Uri.TryCreate(expanded, UriKind.Absolute, out var uri) ? uri : null;
     }
 

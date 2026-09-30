@@ -16,11 +16,19 @@ internal sealed class RuntimeReceiptConfiguration : IEntityTypeConfiguration<Run
                      .Where(entry => entry.Hierarchy == typeof(RuntimeReceipt)))
             discriminator.HasValue(entry.Leaf, entry.Value);
 
-        builder.OwnsMany(receipt => receipt.PortMappings, ports =>
+        builder.OwnsMany(receipt => receipt.Services, services =>
         {
-            ports.ToTable("runtime_receipt_ports");
-            ports.WithOwner().HasForeignKey("runtime_instance_id");
-            ports.HasKey(port => port.Id);
+            services.ToTable("runtime_receipt_services");
+            services.WithOwner().HasForeignKey("runtime_instance_id");
+            services.HasKey(service => service.Id);
+            services.HasIndex("runtime_instance_id", nameof(ContainerRuntimeReceiptService.Name)).IsUnique();
+            services.OwnsMany(service => service.PublishedPorts, ports =>
+            {
+                ports.ToTable("runtime_receipt_service_ports");
+                ports.WithOwner().HasForeignKey("service_id");
+                ports.HasKey(port => port.Id);
+                ports.HasIndex("service_id", nameof(ContainerRuntimeReceiptPort.ContainerPort)).IsUnique();
+            });
         });
         builder.OwnsMany(receipt => receipt.VirtualMachines, machines =>
         {

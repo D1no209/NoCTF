@@ -19,20 +19,6 @@ public sealed class ContainerRuntimeMessageHandler(RuntimeProviderHandler runtim
         runtime.StopContainerAsync(message, cancellationToken);
 }
 [NonTransactional]
-public sealed class ComposeRuntimeMessageHandler(RuntimeProviderHandler runtime)
-{
-    public Task<object?> Handle(
-        ProvisionComposeRuntime message,
-        CancellationToken cancellationToken) =>
-        runtime.ProvisionComposeAsync(message, cancellationToken);
-
-    public Task<object> Handle(
-        StopComposeRuntime message,
-        CancellationToken cancellationToken) =>
-        runtime.StopComposeAsync(message, cancellationToken);
-}
-
-[NonTransactional]
 public sealed class OvaRuntimeMessageHandler(RuntimeProviderHandler runtime)
 {
     public Task<object?> Handle(

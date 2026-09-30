@@ -25,7 +25,8 @@ public sealed class KubernetesRuntimeResourceReconciler(
         var pods = await client.CoreV1.ListNamespacedPodAsync(options.Namespace, labelSelector: selector, cancellationToken: cancellationToken);
         var services = await client.CoreV1.ListNamespacedServiceAsync(options.Namespace, labelSelector: selector, cancellationToken: cancellationToken);
         var policies = await client.NetworkingV1.ListNamespacedNetworkPolicyAsync(options.Namespace, labelSelector: selector, cancellationToken: cancellationToken);
-        return pods.Items.Any(item => item.Metadata.Name == name)
+        return (!identity.IsAuxiliary && (pods.Items.Count > 0 || services.Items.Count > 0 || policies.Items.Count > 0))
+            || pods.Items.Any(item => item.Metadata.Name == name)
             || services.Items.Any(item => item.Metadata.Name == name || item.Metadata.Name == name + "-public")
             || policies.Items.Any(item => item.Metadata.Name == name + "-callback");
     }

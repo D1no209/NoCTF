@@ -45,8 +45,7 @@ public static class TypedGameModeConfiguration
             ReadyTimeoutSeconds: patch ? value.ReadyTimeoutSeconds : null,
             MaximumPatchUploadBytes: patch ? value.MaximumPatchUploadBytes : null,
             FlagTemplate: value.HasFlagTemplate ? Flag(value.FlagTemplate) : null,
-            CheckerFixInput: patch && value.CheckerFixInput,
-            CheckerAllowRoot: patch && value.CheckerAllowRoot);
+            CheckerFixInput: patch && value.CheckerFixInput);
     }
 
     public static AwdConfiguration Awd(AwdCompetitionModeConfiguration value) => new(
@@ -83,8 +82,7 @@ public static class TypedGameModeConfiguration
                 value.FlagInjectionCommand,
                 value.FlagInjectionTimeoutSeconds ?? 30,
                 value.FlagInjectionServiceName),
-        FlagTemplate: value.HasFlagTemplate ? Flag(value.FlagTemplate) : null,
-        CheckerAllowRoot: value.CheckerAllowRoot);
+        FlagTemplate: value.HasFlagTemplate ? Flag(value.FlagTemplate) : null);
 
     public static AwdpConfiguration Awdp(AwdpCompetitionModeConfiguration value) => new(
         value.RoundDurationSeconds,
@@ -127,8 +125,7 @@ public static class TypedGameModeConfiguration
         ReadyTimeoutSeconds: value.ReadyTimeoutSeconds,
         MaximumPatchUploadBytes: value.MaximumPatchUploadBytes,
         FlagTemplate: value.HasFlagTemplate ? Flag(value.FlagTemplate) : null,
-        CheckerFixInput: value.CheckerFixInput,
-        CheckerAllowRoot: value.CheckerAllowRoot);
+        CheckerFixInput: value.CheckerFixInput);
 
     public static KohConfiguration Koh(KohCompetitionModeConfiguration value) => new(
         value.PollIntervalSeconds,
@@ -153,43 +150,21 @@ public static class TypedGameModeConfiguration
             value switch
             {
                 ContainerChallengeRuntimeTemplate container => new ContainerRuntimeDefinition(
-                    container.Image,
-                    new ContainerSecurityPolicy(
-                        container.Security.NoNewPrivileges,
-                        container.Security.ReadonlyRootfs,
-                        container.Security.RunAsNonRoot,
-                        container.Capabilities.Where(item => !item.Add)
-                            .Select(item => item.Name).ToArray(),
-                        container.Capabilities.Where(item => item.Add)
-                            .Select(item => item.Name).ToArray()),
-                    container.CommandItems.OrderBy(item => item.Position)
-                        .Select(item => item.Value).ToArray(),
-                    Values(container, ChallengeRuntimeKeyValueKind.Environment),
-                    Values(container, ChallengeRuntimeKeyValueKind.Label),
-                    container.PortMappings.ToDictionary(
-                        item => item.ContainerPort, item => item.HostPort),
-                    container.FlagEnvironmentVariableName,
-                    (RuntimeEgressPolicy)container.EgressPolicy,
-                    container.InternalPorts.Select(item => item.Port).ToArray()),
-                ComposeChallengeRuntimeTemplate compose => new ComposeRuntimeDefinition(
-                    compose.ComposeYaml,
-                    compose.ServiceResources.ToDictionary(
-                        item => item.ServiceName,
-                        item => new RuntimeResourceLimits(
-                            item.Limits.MemoryBytes, item.Limits.NanoCpus, item.Limits.PidsLimit),
-                        StringComparer.Ordinal),
-                    Values(compose, ChallengeRuntimeKeyValueKind.Environment),
-                    Values(compose, ChallengeRuntimeKeyValueKind.Label),
-                    Values(compose, ChallengeRuntimeKeyValueKind.FlagEnvironmentVariable),
-                    (RuntimeEgressPolicy)compose.EgressPolicy),
+                    container.Services.OrderBy(service => service.Position).Select(service => new RuntimeServiceDefinition(
+                        service.Name, service.Image, service.CpuCores, service.MemoryMiB,
+                        service.Commands.Where(item => !item.IsArgument).OrderBy(item => item.Position).Select(item => item.Value).ToArray(),
+                        service.Commands.Where(item => item.IsArgument).OrderBy(item => item.Position).Select(item => item.Value).ToArray(),
+                        service.Environment.ToDictionary(item => item.Name, item => item.Value, StringComparer.Ordinal),
+                        service.InternalPorts.Select(item => item.Port).ToArray(), service.FlagEnvironmentVariableName)).ToArray(),
+                    (RuntimeEgressPolicy)container.EgressPolicy),
                 OvaChallengeRuntimeTemplate ova => new OvaRuntimeDefinition(
                     ova.OvaSourceUrl, ova.Sha256),
                 _ => throw new InvalidOperationException(
                     $"Unsupported Runtime template {value.GetType().Name}.")
             },
-            value.HasExplicitLimits
+            value is OvaChallengeRuntimeTemplate { HasExplicitLimits: true } resources
                 ? new RuntimeResourceLimits(
-                    value.Limits.MemoryBytes, value.Limits.NanoCpus, value.Limits.PidsLimit)
+                    resources.Limits.MemoryBytes, resources.Limits.CpuMillicores, resources.Limits.PidsLimit)
                 : null,
             value.TtlSeconds,
             value.OperationTimeoutSeconds,
@@ -216,11 +191,6 @@ public static class TypedGameModeConfiguration
         value.ServiceName,
         value.VmId,
         value.GuestPort);
-
-    private static IReadOnlyDictionary<string, string> Values(
-        ChallengeRuntimeTemplateEntity value,
-        ChallengeRuntimeKeyValueKind kind) => value.KeyValues.Where(item => item.Kind == kind)
-            .ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal);
 
     private static string[] Strings(
         ChallengeDefinition value,

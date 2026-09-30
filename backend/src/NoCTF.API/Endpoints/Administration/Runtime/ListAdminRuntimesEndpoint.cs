@@ -71,7 +71,7 @@ public sealed record AdminRuntimeAllocationResponse(Guid OperationId,
 
 public sealed record AdminRuntimeResourceAmountResponse(
     long MemoryBytes,
-    long NanoCpus,
+    long CpuMillicores,
     long PidsLimit);
 
 public sealed record AdminRuntimeListResponse(
@@ -108,8 +108,8 @@ internal static class AdminRuntimeMapping
             WaitingReason = view.WaitingReason is { } reason ? RuntimeProtocolMapper.ToProtocol(reason) : null,
             Capacity = includeCapacity ? view.Capacity?.Items.Select(item => new AdminRuntimeAllocationResponse(
                 item.Identity.OperationId, item.Identity.Kind,
-                new(item.Limit.MemoryBytes, item.Limit.NanoCpus, item.Limit.PidsLimit),
-                new(item.Budget.MemoryBytes, item.Budget.NanoCpus, item.Budget.PidsLimit))).ToArray() : null
+                new(item.Limit.MemoryBytes, item.Limit.CpuMillicores, item.Limit.PidsLimit),
+                new(item.Budget.MemoryBytes, item.Budget.CpuMillicores, item.Budget.PidsLimit))).ToArray() : null
         };
     }
 }

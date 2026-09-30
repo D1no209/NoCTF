@@ -16,75 +16,31 @@ public sealed record ExpandedRuntimeAccess(
 public static class RuntimeUrlExpander
 {
     public static ExpandedRuntimeAccess ExpandContainer(
-        ContainerReceipt receipt,
+        ContainerDeploymentReceipt receipt,
+        ContainerRuntimeStatus status,
         IReadOnlyList<RuntimeUrlBinding>? bindings)
     {
         var endpoints = new List<RuntimeAccessEndpointMapping>();
         var index = 0;
         foreach (var binding in bindings ?? [])
         {
-            var directAddress = PublishesDirect(requestedMode: null)
-                ? ExpandPublicContainerBinding(receipt, binding)
-                : null;
-            endpoints.Add(new(
-                index++,
-                directAddress,
-                null,
-                null));
-        }
-        return ToResult(endpoints);
-    }
-
-    public static ExpandedRuntimeAccess ExpandContainer(
-        ContainerReceipt receipt,
-        IReadOnlyList<RuntimeUrlBinding>? bindings,
-        RuntimeAccessMode accessMode)
-    {
-        var endpoints = new List<RuntimeAccessEndpointMapping>();
-        var index = 0;
-        foreach (var binding in bindings ?? [])
-        {
-            var containerPort = binding.ContainerPort
-                ?? throw new InvalidOperationException("Container URL binding requires ContainerPort.");
-            endpoints.Add(new(
-                index++,
-                PublishesDirect(accessMode)
-                    ? ExpandPublicContainerBinding(receipt, binding)
-                    : null,
-                SupportsWsrx(accessMode)
-                    ? RequiredInternalHost(receipt.InternalHost)
-                    : null,
-                SupportsWsrx(accessMode) ? containerPort : null));
-        }
-        return ToResult(endpoints);
-    }
-
-    public static ExpandedRuntimeAccess ExpandCompose(
-        ComposeReceipt receipt,
-        ComposeStatus status,
-        IReadOnlyList<RuntimeUrlBinding>? bindings)
-    {
-        var endpoints = new List<RuntimeAccessEndpointMapping>();
-        var index = 0;
-        foreach (var binding in bindings ?? [])
-        {
-            var service = FindComposeService(status, binding);
+            var service = FindContainerService(status, binding);
             var containerPort = binding.ContainerPort
                 ?? throw new InvalidOperationException(
-                    "Compose URL binding requires ContainerPort.");
+                    "Container URL binding requires ContainerPort.");
             if (!service.PublishedPorts.TryGetValue(containerPort, out var publicPort)
                 || publicPort is < 1 or > 65535)
                 throw new InvalidOperationException(
-                    "Compose URL binding has no dynamic public port.");
+                    "Container URL binding has no dynamic public port.");
             var url = ExpandAccessUrl(binding.UrlTemplate, receipt.PublicHost, publicPort);
             endpoints.Add(new(index++, url, null, null));
         }
         return ToResult(endpoints);
     }
 
-    public static ExpandedRuntimeAccess ExpandCompose(
-        ComposeReceipt receipt,
-        ComposeStatus status,
+    public static ExpandedRuntimeAccess ExpandContainer(
+        ContainerDeploymentReceipt receipt,
+        ContainerRuntimeStatus status,
         IReadOnlyList<RuntimeUrlBinding>? bindings,
         RuntimeAccessMode accessMode)
     {
@@ -92,16 +48,16 @@ public static class RuntimeUrlExpander
         var index = 0;
         foreach (var binding in bindings ?? [])
         {
-            var service = FindComposeService(status, binding);
+            var service = FindContainerService(status, binding);
             var containerPort = binding.ContainerPort
-                ?? throw new InvalidOperationException("Compose URL binding requires ContainerPort.");
+                ?? throw new InvalidOperationException("Container URL binding requires ContainerPort.");
             string? directAddress = null;
             if (PublishesDirect(accessMode))
             {
                 if (!service.PublishedPorts.TryGetValue(containerPort, out var publicPort)
                     || publicPort is < 1 or > 65535)
                     throw new InvalidOperationException(
-                        "Compose URL binding has no dynamic public port.");
+                        "Container URL binding has no dynamic public port.");
                 directAddress = ExpandAccessUrl(
                     binding.UrlTemplate,
                     receipt.PublicHost,
@@ -133,20 +89,20 @@ public static class RuntimeUrlExpander
             new RuntimeAccessEndpointMapping(index, address, null, null)).ToArray());
     }
 
-    private static ComposeServiceStatus FindComposeService(
-        ComposeStatus status,
+    private static ContainerServiceStatus FindContainerService(
+        ContainerRuntimeStatus status,
         RuntimeUrlBinding binding)
     {
         if (string.IsNullOrWhiteSpace(binding.ServiceName))
             throw new InvalidOperationException(
-                "Compose URL binding requires ServiceName.");
+                "Container URL binding requires ServiceName.");
         return status.Services.SingleOrDefault(service =>
                    string.Equals(
                        service.Name,
                        binding.ServiceName,
                        StringComparison.Ordinal))
                ?? throw new InvalidOperationException(
-                   $"Compose service '{binding.ServiceName}' was not found.");
+                   $"Runtime service '{binding.ServiceName}' was not found.");
     }
 
     private static OvaVirtualMachineReceipt FindOvaVirtualMachine(

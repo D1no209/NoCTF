@@ -4,7 +4,7 @@ using Docker.DotNet.Models;
 
 namespace NoCTF.Runtime.Docker.Containers;
 
-/// <summary>Reads the same per-registry Docker login file used by the Compose CLI.</summary>
+/// <summary>Reads deployment-owned Docker registry credentials.</summary>
 public static class DockerRegistryAuthentication
 {
     public static AuthConfig Read(string image, string? configDirectory = null)

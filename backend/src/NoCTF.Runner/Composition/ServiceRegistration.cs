@@ -1,10 +1,10 @@
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Application.Runtime.Capacity;
 using NoCTF.Application.Runtime.Instances;
-using NoCTF.Runtime.Docker.Compose;
+using NoCTF.Runtime.Docker.Services;
 using NoCTF.Runtime.Docker.Containers;
 using NoCTF.Runtime.Docker;
-using NoCTF.Runtime.Kubernetes.Compose;
+using NoCTF.Runtime.Kubernetes.Services;
 using NoCTF.Runtime.Kubernetes.Configuration;
 using NoCTF.Runtime.Kubernetes.Containers;
 using NoCTF.Runtime.Kubernetes;
@@ -130,7 +130,6 @@ public static class ServiceRegistration
         services.AddSingleton<IAwdCheckerWorkReader, AwdCheckerWorkReader>();
         services.AddScoped<RuntimeProviderHandler>();
         services.AddScoped<ContainerRuntimeMessageHandler>();
-        services.AddScoped<ComposeRuntimeMessageHandler>();
         services.AddScoped<OvaRuntimeMessageHandler>();
         services.AddScoped<RuntimeTerminationMessageHandler>();
         services.AddScoped<RuntimeProvisionWriteBackMessageHandler>();

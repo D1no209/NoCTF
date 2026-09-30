@@ -243,9 +243,9 @@ public static class OvfApplianceParser
         try
         {
             var memory = machines.Sum(machine => machine.MemoryBytes);
-            var nanoCpus = machines.Sum(machine =>
-                checked((long)machine.VirtualCpuCount * 1_000_000_000L));
-            if (memory > limits.MemoryBytes || nanoCpus > limits.NanoCpus)
+            var cpuMillicores = machines.Sum(machine =>
+                checked((long)machine.VirtualCpuCount * 1000L));
+            if (memory > limits.MemoryBytes || cpuMillicores > limits.CpuMillicores)
                 throw new InvalidOperationException(
                     "OVF virtual machine resources exceed the Runtime total limits.");
         }

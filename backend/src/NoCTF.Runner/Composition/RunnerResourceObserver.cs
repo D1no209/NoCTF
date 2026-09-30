@@ -140,7 +140,7 @@ public sealed class RunnerResourceObserver(
             var info = await docker.System.GetSystemInfoAsync(ct);
             if (string.IsNullOrWhiteSpace(await File.ReadAllTextAsync(policy.HostIdentityPath, ct))) return null;
             domain = "docker:" + info.ID;
-            cpuLimit = checked(info.NCPU * 1_000_000_000L);
+            cpuLimit = checked(info.NCPU * 1000L);
             memoryLimit = info.MemTotal;
         }
         else
@@ -157,7 +157,7 @@ public sealed class RunnerResourceObserver(
         var stat = await File.ReadAllLinesAsync(Path.Combine(policy.HostProcRoot, "stat"), ct);
         if (cpuLimit == long.MaxValue)
             cpuLimit = checked(stat.Count(line => line.Length > 3 && line.StartsWith("cpu", StringComparison.Ordinal)
-                && char.IsAsciiDigit(line[3])) * 1_000_000_000L);
+                && char.IsAsciiDigit(line[3])) * 1000L);
         var counters = stat[0]
             .Split(' ', StringSplitOptions.RemoveEmptyEntries).Skip(1).Take(8)
             .Select(value => long.Parse(value, CultureInfo.InvariantCulture)).ToArray();
@@ -203,7 +203,7 @@ public sealed class RunnerResourceObserver(
             if (values[0] != "max")
             {
                 cpuLimit = Math.Min(cpuLimit, checked((long)(decimal.Parse(values[0], CultureInfo.InvariantCulture)
-                    / decimal.Parse(values[1], CultureInfo.InvariantCulture) * 1_000_000_000m)));
+                    / decimal.Parse(values[1], CultureInfo.InvariantCulture) * 1000m)));
                 var cpuCounters = await File.ReadAllLinesAsync(Path.Combine(cgroup, "cpu.stat"), ct);
                 var usedCpu = long.Parse(cpuCounters.Single(line => line.StartsWith("usage_usec ", StringComparison.Ordinal))
                     .Split(' ', StringSplitOptions.RemoveEmptyEntries)[1], CultureInfo.InvariantCulture);
@@ -212,7 +212,7 @@ public sealed class RunnerResourceObserver(
                 previousCgroupCpu = (usedCpu, now);
                 if (before is null || now <= before.Value.At) return null;
                 usage = Math.Max(usage, (usedCpu - before.Value.Microseconds) / 1_000_000d
-                    / (now - before.Value.At).TotalSeconds / (cpuLimit / 1_000_000_000d));
+                    / (now - before.Value.At).TotalSeconds / (cpuLimit / 1000d));
             }
         }
         return new(domain, clock.GetUtcNow(), memoryTotal, Math.Min(memoryAvailable, memoryTotal), cpuLimit,
@@ -244,9 +244,9 @@ public sealed class RunnerResourceObserver(
                 || !node.Status.Conditions.Any(condition => condition.Type == "PIDPressure" && condition.Status is "True" or "False")
                 || !samples.TryGetValue(node.Metadata.Name, out var sample)) return null;
             memory = checked(memory + (long)node.Status.Allocatable["memory"].ToDecimal());
-            cpus = checked(cpus + (long)(node.Status.Allocatable["cpu"].ToDecimal() * 1_000_000_000m));
+            cpus = checked(cpus + (long)(node.Status.Allocatable["cpu"].ToDecimal() * 1000m));
             usedMemory = checked(usedMemory + (long)new k8s.Models.ResourceQuantity(sample.GetProperty("usage").GetProperty("memory").GetString()).ToDecimal());
-            usedCpus = checked(usedCpus + (long)(new k8s.Models.ResourceQuantity(sample.GetProperty("usage").GetProperty("cpu").GetString()).ToDecimal() * 1_000_000_000m));
+            usedCpus = checked(usedCpus + (long)(new k8s.Models.ResourceQuantity(sample.GetProperty("usage").GetProperty("cpu").GetString()).ToDecimal() * 1000m));
             var at = sample.GetProperty("timestamp").GetDateTimeOffset();
             if (at < observedAt) observedAt = at;
             nodePressure |= node.Status.Conditions.Any(condition => condition.Status == "True"

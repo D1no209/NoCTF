@@ -1,8 +1,8 @@
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Runtime;
-using NoCTF.Runtime.Docker.Compose;
+using NoCTF.Runtime.Docker.Services;
 using NoCTF.Runtime.Docker.Containers;
-using NoCTF.Runtime.Kubernetes.Compose;
+using NoCTF.Runtime.Kubernetes.Services;
 using NoCTF.Runtime.Kubernetes.Containers;
 
 namespace NoCTF.Runner.Composition;
@@ -21,15 +21,15 @@ public interface IContainerRuntimeProviderCatalog
 public interface IRuntimeProviderCatalog : IContainerRuntimeProviderCatalog
 {
     IContainerSandboxLifecycle Sandbox(RuntimeProvider provider);
-    IComposeRuntime Compose(RuntimeProvider provider);
+    IContainerRuntime Runtime(RuntimeProvider provider);
     IOvaRuntime Appliance(RuntimeProvider provider);
 }
 
 public sealed class RuntimeProviderCatalog(
     DockerContainerLifecycle dockerContainers,
     KubernetesContainerLifecycle kubernetesContainers,
-    DockerComposeRuntime dockerCompose,
-    KubernetesComposeRuntime kubernetesCompose,
+    DockerContainerRuntime dockerRuntime,
+    KubernetesContainerRuntime kubernetesRuntime,
     IEnumerable<IOvaRuntime> appliances)
     : IOneShotRuntimeProviderCatalog, IRuntimeProviderCatalog
 {
@@ -40,10 +40,10 @@ public sealed class RuntimeProviderCatalog(
         _ => throw new UnsupportedRuntimeProviderException(provider)
     };
 
-    public IComposeRuntime Compose(RuntimeProvider provider) => provider switch
+    public IContainerRuntime Runtime(RuntimeProvider provider) => provider switch
     {
-        RuntimeProvider.Docker => dockerCompose,
-        RuntimeProvider.Kubernetes => kubernetesCompose,
+        RuntimeProvider.Docker => dockerRuntime,
+        RuntimeProvider.Kubernetes => kubernetesRuntime,
         _ => throw new UnsupportedRuntimeProviderException(provider)
     };
 

@@ -34,7 +34,7 @@ public sealed record AwdCheckerWork(
     string CallbackToken,
     DateTimeOffset Deadline,
     TimeSpan Timeout,
-    bool AllowRoot = false);
+    string TargetServiceName);
 
 public interface IAwdCheckerWorkReader
 {
@@ -117,7 +117,7 @@ public sealed class AwdCheckerWorkReader(
             return null;
         var settings = configurations.Get(competition, rules, definition);
         if (settings.Checker is not { } checker
-            || target.Runtime.RuntimeKind is not (RuntimeKind.Container or RuntimeKind.Compose))
+            || target.Runtime.RuntimeKind is not (RuntimeKind.Container))
             return null;
         var targetHost = await ResolveTargetHostAsync(
             target.Runtime.RuntimeKind,
@@ -158,8 +158,7 @@ public sealed class AwdCheckerWorkReader(
             message.Deadline,
             TimeSpan.FromSeconds(checker.TimeoutSeconds) < remaining
                 ? TimeSpan.FromSeconds(checker.TimeoutSeconds)
-                : remaining,
-            settings.CheckerAllowRoot);
+                : remaining, settings.TargetServiceName!);
     }
 
     private static async Task<string?> ResolveTargetHostAsync(
@@ -171,38 +170,19 @@ public sealed class AwdCheckerWorkReader(
         IRuntimeProviderCatalog providers,
         CancellationToken cancellationToken)
     {
-        if (kind == RuntimeKind.Container)
-        {
-            var receipt = (providerReceipt as ContainerRuntimeReceiptData)?.ToReceipt();
-            return receipt is not null
-                && receipt.Provider == provider
-                && receipt.RuntimeInstanceId == runtimeInstanceId
-                ? receipt.InternalHost
-                : null;
-        }
-
-        var composeReceipt = (providerReceipt as ComposeRuntimeReceiptData)?.ToReceipt();
-        if (composeReceipt is null
-            || composeReceipt.Provider != provider
-            || composeReceipt.OperationId != runtimeInstanceId)
-            return null;
-        var status = await providers.Compose(provider).GetStatusAsync(
-            composeReceipt,
-            cancellationToken);
-        if (status is null)
-            return null;
-        return status.Services.SingleOrDefault(service =>
-            string.Equals(service.Name, targetServiceName, StringComparison.Ordinal))?.InternalHost
-            ?? (targetServiceName is null && status.Services.Count == 1
-                ? status.Services[0].InternalHost
-                : null);
+        if (kind != RuntimeKind.Container || providerReceipt is not ContainerRuntimeReceiptData receipt
+            || receipt.Provider != provider || receipt.OperationId != runtimeInstanceId || targetServiceName is null) return null;
+        var status = await providers.Runtime(provider).GetStatusAsync(receipt.ToReceipt(), cancellationToken);
+        return status?.Services.SingleOrDefault(service => service.Name == targetServiceName)?.InternalHost;
     }
+
 }
 
 public sealed class AwdCheckerExecutor(
     IOneShotRuntimeProviderCatalog providers,
     IHttpClientFactory httpClients,
-    AuxiliaryRuntimeCapacity? capacity = null)
+    AuxiliaryRuntimeCapacity? capacity = null,
+    RuntimeExecutionOptions? executionOptions = null)
     : IAwdCheckerExecutor
 {
     public async Task<AwdCheckerExecutionOutcome> ExecuteAsync(
@@ -223,8 +203,7 @@ public sealed class AwdCheckerExecutor(
             environment,
             new Dictionary<string, string>(),
             new Dictionary<int, int>(),
-            new RuntimeResourceLimits(256 * 1024 * 1024, 250_000_000, 128),
-            new ContainerSecurityPolicy(true, true, !work.AllowRoot, [], []),
+            new RuntimeResourceLimits(256 * 1024 * 1024, 250, executionOptions?.ProcessesPerService ?? 256),
             work.Timeout,
             OperationTimeout: work.Timeout,
             AllowInternalCallback: true,
@@ -282,46 +261,9 @@ public sealed class AwdCheckerExecutor(
 
     private static AttachedRuntimeTarget? CreateTarget(AwdCheckerWork work)
     {
-        try
-        {
-            var identity = new RuntimeResourceIdentity(work.RuntimeInstanceId);
-            return work.RuntimeKind switch
-            {
-                RuntimeKind.Container => CreateContainerTarget(work, identity),
-                RuntimeKind.Compose => CreateComposeTarget(work, identity),
-                _ => null
-            };
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-    }
-
-    private static AttachedContainerRuntimeTarget? CreateContainerTarget(
-        AwdCheckerWork work,
-        RuntimeResourceIdentity identity)
-    {
-        var receipt = (work.ProviderReceipt as ContainerRuntimeReceiptData)?.ToReceipt();
-        return receipt is not null
-            && receipt.Provider == work.Provider
-            && receipt.RuntimeInstanceId == identity.RuntimeInstanceId
-            && !string.IsNullOrWhiteSpace(receipt.NetworkId)
-                ? new(identity, receipt)
-                : null;
-    }
-
-    private static AttachedComposeRuntimeTarget? CreateComposeTarget(
-        AwdCheckerWork work,
-        RuntimeResourceIdentity identity)
-    {
-        var receipt = (work.ProviderReceipt as ComposeRuntimeReceiptData)?.ToReceipt();
-        return receipt is not null
-            && receipt.Provider == work.Provider
-            && receipt.OperationId == identity.RuntimeInstanceId
-            && !string.IsNullOrWhiteSpace(work.TargetHost)
-                ? new(identity, receipt, work.TargetHost)
-                : null;
+        if (work.RuntimeKind != RuntimeKind.Container || work.ProviderReceipt is not ContainerRuntimeReceiptData receipt
+            || receipt.Provider != work.Provider || receipt.OperationId != work.RuntimeInstanceId) return null;
+        return new AttachedContainerRuntimeTarget(new(work.RuntimeInstanceId), receipt.ServiceReceipt(work.TargetServiceName));
     }
 
     private static Guid CreateOperationId(Guid runtimeInstanceId, Guid gameplayFactId)

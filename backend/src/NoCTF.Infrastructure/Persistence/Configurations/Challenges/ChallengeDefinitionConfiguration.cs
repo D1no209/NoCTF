@@ -80,50 +80,74 @@ internal sealed class ChallengeRuntimeTemplateConfiguration
         builder.HasKey(runtime => runtime.ChallengeId);
         builder.HasDiscriminator(runtime => runtime.RuntimeKind)
             .HasValue<ContainerChallengeRuntimeTemplate>(RuntimeKind.Container)
-            .HasValue<ComposeChallengeRuntimeTemplate>(RuntimeKind.Compose)
             .HasValue<OvaChallengeRuntimeTemplate>(RuntimeKind.OvaVm);
         builder.Property(runtime => runtime.Allocation).HasConversion<short>();
         builder.Property(runtime => runtime.FlagSource).HasConversion<short>();
         builder.Property(runtime => runtime.EgressPolicy).HasConversion<short>();
-        builder.ComplexProperty(runtime => runtime.Limits);
         builder.HasMany(runtime => runtime.UrlBindings).WithOne()
             .HasForeignKey(binding => binding.ChallengeId).OnDelete(DeleteBehavior.Cascade);
         builder.Navigation(runtime => runtime.UrlBindings).AutoInclude();
-        builder.HasMany(runtime => runtime.KeyValues).WithOne()
-            .HasForeignKey(value => value.ChallengeId).OnDelete(DeleteBehavior.Cascade);
-        builder.Navigation(runtime => runtime.KeyValues).AutoInclude();
-        builder.HasMany(runtime => runtime.CommandItems).WithOne()
-            .HasForeignKey(item => item.ChallengeId).OnDelete(DeleteBehavior.Cascade);
-        builder.Navigation(runtime => runtime.CommandItems).AutoInclude();
+
     }
 }
 
-internal sealed class ContainerChallengeRuntimeTemplateConfiguration
-    : IEntityTypeConfiguration<ContainerChallengeRuntimeTemplate>
+internal sealed class ContainerChallengeRuntimeTemplateConfiguration : IEntityTypeConfiguration<ContainerChallengeRuntimeTemplate>
 {
     public void Configure(EntityTypeBuilder<ContainerChallengeRuntimeTemplate> builder)
     {
-        builder.ComplexProperty(runtime => runtime.Security);
-        builder.HasMany(runtime => runtime.Capabilities).WithOne()
-            .HasForeignKey(capability => capability.ChallengeId).OnDelete(DeleteBehavior.Cascade);
-        builder.Navigation(runtime => runtime.Capabilities).AutoInclude();
-        builder.HasMany(runtime => runtime.PortMappings).WithOne()
-            .HasForeignKey(mapping => mapping.ChallengeId).OnDelete(DeleteBehavior.Cascade);
-        builder.Navigation(runtime => runtime.PortMappings).AutoInclude();
-        builder.HasMany(runtime => runtime.InternalPorts).WithOne()
-            .HasForeignKey(port => port.ChallengeId).OnDelete(DeleteBehavior.Cascade);
-        builder.Navigation(runtime => runtime.InternalPorts).AutoInclude();
+        builder.HasMany(runtime => runtime.Services).WithOne().HasForeignKey(service => service.ChallengeId).OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(runtime => runtime.Services).AutoInclude();
     }
 }
 
-internal sealed class ComposeChallengeRuntimeTemplateConfiguration
-    : IEntityTypeConfiguration<ComposeChallengeRuntimeTemplate>
+internal sealed class ChallengeRuntimeServiceConfiguration : IEntityTypeConfiguration<ChallengeRuntimeService>
 {
-    public void Configure(EntityTypeBuilder<ComposeChallengeRuntimeTemplate> builder)
+    public void Configure(EntityTypeBuilder<ChallengeRuntimeService> builder)
     {
-        builder.HasMany(runtime => runtime.ServiceResources).WithOne()
-            .HasForeignKey(resource => resource.ChallengeId).OnDelete(DeleteBehavior.Cascade);
-        builder.Navigation(runtime => runtime.ServiceResources).AutoInclude();
+        builder.ToTable("challenge_runtime_services");
+        builder.HasKey(service => new { service.ChallengeId, service.Name });
+        builder.HasIndex(service => new { service.ChallengeId, service.Position }).IsUnique();
+        builder.Property(service => service.Name).HasMaxLength(63);
+        builder.Property(service => service.Image).HasMaxLength(512);
+        builder.Property(service => service.CpuCores).HasPrecision(12, 3);
+        builder.HasMany(service => service.Commands).WithOne().HasForeignKey(item => new { item.ChallengeId, item.ServiceName }).OnDelete(DeleteBehavior.Cascade);
+        builder.HasMany(service => service.Environment).WithOne().HasForeignKey(item => new { item.ChallengeId, item.ServiceName }).OnDelete(DeleteBehavior.Cascade);
+        builder.HasMany(service => service.InternalPorts).WithOne().HasForeignKey(item => new { item.ChallengeId, item.ServiceName }).OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(service => service.Commands).AutoInclude();
+        builder.Navigation(service => service.Environment).AutoInclude();
+        builder.Navigation(service => service.InternalPorts).AutoInclude();
+    }
+}
+
+internal sealed class ChallengeRuntimeServiceCommandConfiguration : IEntityTypeConfiguration<ChallengeRuntimeServiceCommand>
+{
+    public void Configure(EntityTypeBuilder<ChallengeRuntimeServiceCommand> builder)
+    {
+        builder.ToTable("challenge_runtime_service_commands");
+        builder.HasKey(item => new { item.ChallengeId, item.ServiceName, item.IsArgument, item.Position });
+        builder.Property(item => item.Position).ValueGeneratedNever();
+        builder.Property(item => item.ServiceName).HasMaxLength(63);
+    }
+}
+
+internal sealed class ChallengeRuntimeServiceEnvironmentConfiguration : IEntityTypeConfiguration<ChallengeRuntimeServiceEnvironment>
+{
+    public void Configure(EntityTypeBuilder<ChallengeRuntimeServiceEnvironment> builder)
+    {
+        builder.ToTable("challenge_runtime_service_environment");
+        builder.HasKey(item => new { item.ChallengeId, item.ServiceName, item.Name });
+        builder.Property(item => item.ServiceName).HasMaxLength(63);
+        builder.Property(item => item.Name).HasMaxLength(256);
+    }
+}
+
+internal sealed class ChallengeRuntimeServicePortConfiguration : IEntityTypeConfiguration<ChallengeRuntimeServicePort>
+{
+    public void Configure(EntityTypeBuilder<ChallengeRuntimeServicePort> builder)
+    {
+        builder.ToTable("challenge_runtime_service_internal_ports");
+        builder.HasKey(item => new { item.ChallengeId, item.ServiceName, item.Port });
+        builder.Property(item => item.ServiceName).HasMaxLength(63);
     }
 }
 
@@ -139,67 +163,9 @@ internal sealed class ChallengeRuntimeUrlBindingConfiguration
     }
 }
 
-internal sealed class ChallengeRuntimeKeyValueConfiguration
-    : IEntityTypeConfiguration<ChallengeRuntimeKeyValue>
+internal sealed class OvaChallengeRuntimeTemplateConfiguration : IEntityTypeConfiguration<OvaChallengeRuntimeTemplate>
 {
-    public void Configure(EntityTypeBuilder<ChallengeRuntimeKeyValue> builder)
-    {
-        builder.ToTable("challenge_runtime_key_values");
-        builder.HasKey(value => new { value.ChallengeId, value.Kind, value.Key });
-        builder.Property(value => value.Kind).HasConversion<short>();
-    }
-}
-
-internal sealed class ChallengeRuntimeCommandItemConfiguration
-    : IEntityTypeConfiguration<ChallengeRuntimeCommandItem>
-{
-    public void Configure(EntityTypeBuilder<ChallengeRuntimeCommandItem> builder)
-    {
-        builder.ToTable("challenge_runtime_command_items");
-        builder.HasKey(item => new { item.ChallengeId, item.Position });
-        builder.Property(item => item.Position).ValueGeneratedNever();
-    }
-}
-
-internal sealed class ChallengeRuntimeCapabilityConfiguration
-    : IEntityTypeConfiguration<ChallengeRuntimeCapability>
-{
-    public void Configure(EntityTypeBuilder<ChallengeRuntimeCapability> builder)
-    {
-        builder.ToTable("challenge_runtime_capabilities");
-        builder.HasKey(capability => new { capability.ChallengeId, capability.Add, capability.Name });
-    }
-}
-
-internal sealed class ChallengeRuntimePortMappingConfiguration
-    : IEntityTypeConfiguration<ChallengeRuntimePortMapping>
-{
-    public void Configure(EntityTypeBuilder<ChallengeRuntimePortMapping> builder)
-    {
-        builder.ToTable("challenge_runtime_port_mappings");
-        builder.HasKey(mapping => new { mapping.ChallengeId, mapping.ContainerPort });
-    }
-}
-
-internal sealed class ChallengeRuntimeInternalPortConfiguration
-    : IEntityTypeConfiguration<ChallengeRuntimeInternalPort>
-{
-    public void Configure(EntityTypeBuilder<ChallengeRuntimeInternalPort> builder)
-    {
-        builder.ToTable("challenge_runtime_internal_ports");
-        builder.HasKey(port => new { port.ChallengeId, port.Port });
-    }
-}
-
-internal sealed class ComposeServiceResourceConfiguration
-    : IEntityTypeConfiguration<ComposeServiceResource>
-{
-    public void Configure(EntityTypeBuilder<ComposeServiceResource> builder)
-    {
-        builder.ToTable("compose_service_resources");
-        builder.HasKey(resource => new { resource.ChallengeId, resource.ServiceName });
-        builder.ComplexProperty(resource => resource.Limits);
-    }
+    public void Configure(EntityTypeBuilder<OvaChallengeRuntimeTemplate> builder) => builder.ComplexProperty(runtime => runtime.Limits);
 }
 
 internal sealed class CompetitionChallengeRulesConfiguration

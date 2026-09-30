@@ -161,6 +161,7 @@ public sealed class PersistedRunnerCapacityGate(
                 return new(RunnerCapacityAvailability.Unavailable);
             }
 
+            eligible = eligible.Where(candidate => candidate.ProcessesPerService == request.ProcessesPerService).ToArray();
             using var ledgerLease = await ledgerCoordinator.EnterAsync(ct);
             await using var transaction = db.Database.CurrentTransaction is null
                 ? await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct)
@@ -207,9 +208,9 @@ public sealed class PersistedRunnerCapacityGate(
                 item => item.Identity == identity);
             var limit = existing?.Limit ?? request.Limit
                 ?? new RuntimeResourceAmount(
-                    request.MemoryBytes, request.NanoCpus, request.PidsLimit);
+                    request.MemoryBytes, request.CpuMillicores, request.PidsLimit);
             var budget = existing?.Budget ?? new RuntimeResourceAmount(
-                request.MemoryBytes, request.NanoCpus, request.PidsLimit);
+                request.MemoryBytes, request.CpuMillicores, request.PidsLimit);
             limit.Validate();
             budget.Validate();
             if (existing is not null)
@@ -313,7 +314,7 @@ public sealed class PersistedRunnerCapacityGate(
     {
         var projection = candidate.Admission.Capacity!;
         if (requested.MemoryBytes > projection.ObservedTotal.MemoryBytes
-            || requested.NanoCpus > projection.ObservedTotal.NanoCpus
+            || requested.CpuMillicores > projection.ObservedTotal.CpuMillicores
             || projection.ObservedTotal.PidsLimit is long totalPids
                 && requested.PidsLimit > totalPids)
             return RunnerAdmissionFailure.RequestExceedsNodeCapacity;
@@ -324,13 +325,13 @@ public sealed class PersistedRunnerCapacityGate(
         if (starting >= maximum)
             return RunnerAdmissionFailure.StartupConcurrencyLimited;
         var reservedMemory = reservations.Sum(item => item.Limit.MemoryBytes);
-        var reservedCpu = reservations.Sum(item => item.Limit.NanoCpus);
+        var reservedCpu = reservations.Sum(item => item.Limit.CpuMillicores);
         var reservedPids = reservations.Sum(item => item.Limit.PidsLimit);
         if (requested.MemoryBytes > Math.Max(0,
                 projection.AdmissionAvailable.MemoryBytes - reservedMemory))
             return RunnerAdmissionFailure.MemoryActualCapacityInsufficient;
-        if (requested.NanoCpus > Math.Max(0,
-                projection.AdmissionAvailable.NanoCpus - reservedCpu))
+        if (requested.CpuMillicores > Math.Max(0,
+                projection.AdmissionAvailable.CpuMillicores - reservedCpu))
             return RunnerAdmissionFailure.CpuActualCapacityInsufficient;
         if (projection.AdmissionAvailable.PidsLimit is long availablePids
             && requested.PidsLimit > Math.Max(0, availablePids - reservedPids))
@@ -344,15 +345,15 @@ public sealed class PersistedRunnerCapacityGate(
         return Math.Max(
             1d - (double)capacity.AdmissionAvailable.MemoryBytes
                 / Math.Max(1, capacity.ObservedTotal.MemoryBytes),
-            1d - (double)capacity.AdmissionAvailable.NanoCpus
-                / Math.Max(1, capacity.ObservedTotal.NanoCpus));
+            1d - (double)capacity.AdmissionAvailable.CpuMillicores
+                / Math.Max(1, capacity.ObservedTotal.CpuMillicores));
     }
 
     private static void ValidateRequest(RunnerCapacityRequest request)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(request.Pool);
         if (request.RuntimeInstanceId == Guid.Empty || request.MemoryBytes <= 0
-            || request.NanoCpus <= 0 || request.PidsLimit <= 0)
+            || request.CpuMillicores <= 0 || request.PidsLimit <= 0)
             throw new ArgumentOutOfRangeException(nameof(request));
         if (request.Workload is { } identity)
         {
@@ -442,8 +443,7 @@ public sealed class PersistedRunnerCapacityGate(
     public static RuntimeWorkloadIdentity PrimaryIdentity(RuntimeInstance runtime) => new(
         runtime.Purpose is RuntimePurpose.AwdpTarget or RuntimePurpose.PatchVerificationTarget
             ? RuntimeWorkloadKind.VerificationTarget
-            : runtime.RuntimeKind == RuntimeKind.Compose
-                ? RuntimeWorkloadKind.Compose : RuntimeWorkloadKind.Runtime,
+            : RuntimeWorkloadKind.Runtime,
         runtime.Id, runtime.Id);
 
     private static string WaitingKey(Guid runtimeId) =>

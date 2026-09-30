@@ -7,7 +7,6 @@ namespace NoCTF.Domain.Runtime;
 public enum RuntimeKind : short
 {
     Container,
-    Compose,
     OvaVm
 }
 
@@ -102,10 +101,10 @@ public sealed class RuntimeCapacityAllocationEntry
     [MaxLength(256)] public string ResourceDomain { get; set; } = string.Empty;
     [MaxLength(128)] public string RunnerId { get; set; } = string.Empty;
     public long BudgetMemoryBytes { get; set; }
-    public long BudgetNanoCpus { get; set; }
+    public long BudgetCpuMillicores { get; set; }
     public long BudgetPidsLimit { get; set; }
     public long LimitMemoryBytes { get; set; }
-    public long LimitNanoCpus { get; set; }
+    public long LimitCpuMillicores { get; set; }
     public long LimitPidsLimit { get; set; }
 
     public static RuntimeCapacityAllocationEntry FromValue(RuntimeCapacityAllocation value) => new()
@@ -118,10 +117,10 @@ public sealed class RuntimeCapacityAllocationEntry
         ResourceDomain = value.ResourceDomain,
         RunnerId = value.RunnerId,
         BudgetMemoryBytes = value.Budget.MemoryBytes,
-        BudgetNanoCpus = value.Budget.NanoCpus,
+        BudgetCpuMillicores = value.Budget.CpuMillicores,
         BudgetPidsLimit = value.Budget.PidsLimit,
         LimitMemoryBytes = value.Limit.MemoryBytes,
-        LimitNanoCpus = value.Limit.NanoCpus,
+        LimitCpuMillicores = value.Limit.CpuMillicores,
         LimitPidsLimit = value.Limit.PidsLimit
     };
 
@@ -130,8 +129,8 @@ public sealed class RuntimeCapacityAllocationEntry
         GameplayFactId,
         ResourceDomain,
         RunnerId,
-        new(BudgetMemoryBytes, BudgetNanoCpus, BudgetPidsLimit),
-        new(LimitMemoryBytes, LimitNanoCpus, LimitPidsLimit));
+        new(BudgetMemoryBytes, BudgetCpuMillicores, BudgetPidsLimit),
+        new(LimitMemoryBytes, LimitCpuMillicores, LimitPidsLimit));
 }
 
 [PersistentHierarchy]

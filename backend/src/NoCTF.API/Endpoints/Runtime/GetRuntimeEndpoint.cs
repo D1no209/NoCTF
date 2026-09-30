@@ -13,7 +13,6 @@ namespace NoCTF.API.Endpoints.Runtime;
 public enum RuntimeKindProtocol
 {
     Container,
-    Compose,
     OvaVm
 }
 

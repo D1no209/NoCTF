@@ -180,7 +180,7 @@ public sealed class AdminRuntimeStore(
         CancellationToken ct)
     {
         var query = db.RuntimeInstances.AsNoTracking().Where(item =>
-            (item.RuntimeKind == RuntimeKind.Container || item.RuntimeKind == RuntimeKind.Compose)
+            (item.RuntimeKind == RuntimeKind.Container)
             && (item.State == RuntimeState.Queued || item.State == RuntimeState.Provisioning
                 || item.State == RuntimeState.Running || item.State == RuntimeState.Stopping));
         if (filter.Scope is PlatformRuntimeScope scope)
@@ -290,8 +290,7 @@ public sealed class AdminRuntimeStore(
     {
         var query = db.RuntimeInstances.AsNoTracking()
             .Where(item =>
-                (item.RuntimeKind == RuntimeKind.Container
-                    || item.RuntimeKind == RuntimeKind.Compose)
+                (item.RuntimeKind == RuntimeKind.Container)
                 && (item.State == RuntimeState.Queued
                     || item.State == RuntimeState.Provisioning
                     || item.State == RuntimeState.Running

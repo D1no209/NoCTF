@@ -27,14 +27,13 @@ public sealed record AwdpCheckerWork(
     string Image,
     IReadOnlyList<string> Command,
     IReadOnlyDictionary<string, string> Environment,
-    string NetworkId,
+    ContainerReceipt TargetReceipt,
     string TargetHost,
     int TargetReadyTimeoutSeconds,
     Uri CallbackUrl,
     string CallbackToken,
     TimeSpan Timeout,
     bool FixInputEnabled = false,
-    bool AllowRoot = false,
     Guid? GameplayFactId = null)
 {
     public override string ToString() =>
@@ -291,11 +290,9 @@ public sealed class AwdpFixWorkReader(
             return new(AwdpFixExecutionFenceDisposition.Superseded);
         var checker = settings.Checker;
         var receipt = (target.Runtime.ProviderReceipt?.ToData()
-            as ContainerRuntimeReceiptData)?.ToReceipt();
-        if (receipt?.NetworkId is not { Length: > 0 } networkId
-            || receipt.InternalHost is not { Length: > 0 } targetHost)
-            return new(AwdpFixExecutionFenceDisposition.Superseded);
-
+            as ContainerRuntimeReceiptData);
+        if (receipt?.Services is not { Count: 1 } || receipt.Services[0].InternalHost is not { Length: > 0 } targetHost) return new(AwdpFixExecutionFenceDisposition.Superseded);
+        var targetReceipt = receipt.ServiceReceipt(receipt.Services[0].Name);
         var baseUri = scoringOptions.Value.CallbackBaseUrl
             ?? throw new InvalidOperationException(
                 "RunnerScoring:CallbackBaseUrl must be configured as an absolute HTTP(S) URI.");
@@ -333,7 +330,7 @@ public sealed class AwdpFixWorkReader(
                     target.File.FileName,
                     target.File.ByteLength,
                     target.File.Sha256),
-                receipt,
+                targetReceipt,
                 settings.PatchEntrypoint,
                 patchCommand,
                 TimeSpan.FromSeconds(settings.PatchTimeoutSeconds),
@@ -343,7 +340,7 @@ public sealed class AwdpFixWorkReader(
                     checker.Image,
                     checker.Command ?? [],
                     checker.Environment ?? new Dictionary<string, string>(),
-                    networkId,
+                    targetReceipt,
                     targetHost,
                     settings.ReadyTimeoutSeconds,
                     new Uri(baseUri, target.Mode == GameMode.Ctf
@@ -352,12 +349,11 @@ public sealed class AwdpFixWorkReader(
                     callbackToken,
                     timeout,
                     settings.CheckerFixInput,
-                    settings.CheckerAllowRoot,
                     message.GameplayFactId)));
     }
 }
 
-public sealed class AwdpCheckerExecutor(IOneShotRuntimeProviderCatalog providers, AuxiliaryRuntimeCapacity? capacity = null)
+public sealed class AwdpCheckerExecutor(IOneShotRuntimeProviderCatalog providers, AuxiliaryRuntimeCapacity? capacity = null, RuntimeExecutionOptions? executionOptions = null)
     : IAwdpCheckerExecutor
 {
     public Task<AwdpCheckerExecutionOutcome> ExecuteAsync(
@@ -387,10 +383,8 @@ public sealed class AwdpCheckerExecutor(IOneShotRuntimeProviderCatalog providers
             environment,
             new Dictionary<string, string>(),
             new Dictionary<int, int>(),
-            new RuntimeResourceLimits(256 * 1024 * 1024, 250_000_000, 128),
-            new ContainerSecurityPolicy(true, input is null, !work.AllowRoot, [], []),
+            new RuntimeResourceLimits(256 * 1024 * 1024, 250, executionOptions?.ProcessesPerService ?? 256),
             work.Timeout,
-            NetworkName: work.NetworkId,
             OperationTimeout: work.Timeout,
             AllowInternalCallback: true,
             RuntimeInstanceId: work.RuntimeInstanceId,
@@ -399,13 +393,14 @@ public sealed class AwdpCheckerExecutor(IOneShotRuntimeProviderCatalog providers
         timeout.CancelAfter(work.Timeout);
         try
         {
-            var runner = providers.OneShot(work.Provider);
+            var runner = providers.Attached(work.Provider);
+            var target = new AttachedContainerRuntimeTarget(new(work.RuntimeInstanceId), work.TargetReceipt);
             var result = capacity is null
-                ? await runner.RunAsync(request, input, timeout.Token)
+                ? await runner.RunAttachedAsync(request, target, input, timeout.Token)
                 : await capacity.RunAsync(request,
                     new(RuntimeWorkloadKind.PatchChecker, work.RuntimeInstanceId, request.OperationId),
                     work.GameplayFactId ?? throw new InvalidOperationException("Checker capacity requires a gameplay fact."),
-                    (reserved, token) => runner.RunAsync(reserved, input, token), timeout.Token);
+                    (reserved, token) => runner.RunAttachedAsync(reserved, target, input, token), timeout.Token);
             return result.ExitCode == 0
                 ? AwdpCheckerExecutionOutcome.Completed
                 : AwdpCheckerExecutionOutcome.AbnormalExit;

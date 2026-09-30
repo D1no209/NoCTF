@@ -52,8 +52,8 @@ public static class AwdConfigurationValidator
         if (configuration.Runtime is { FlagSource: not RuntimeFlagSource.AwdRotation })
             errors.Add("AWD runtimes must use AwdRotation flags.");
         if (configuration.Runtime?.Definition is not null
-            and not (ContainerRuntimeDefinition or ComposeRuntimeDefinition))
-            errors.Add("AWD runtimes only support Container or Compose.");
+            and not (ContainerRuntimeDefinition))
+            errors.Add("AWD runtimes only support Container.");
         if (configuration.Runtime is not null
             && !(configuration.Runtime.UrlBindings ?? []).Any(binding =>
                 binding is not null
@@ -66,8 +66,6 @@ public static class AwdConfigurationValidator
             "Checker"));
         if (configuration.Checker is { } checker)
             ValidateChecker(configuration.Runtime, checker, errors);
-        if (configuration.CheckerAllowRoot && configuration.Checker is null)
-            errors.Add("CheckerAllowRoot requires Checker.");
         if (configuration.Runtime is not null && configuration.FlagInjection is null)
             errors.Add("FlagInjection is required when Runtime is configured.");
         if (configuration.FlagInjection is { } injection)
@@ -81,9 +79,11 @@ public static class AwdConfigurationValidator
                 errors.Add(
                     $"FlagInjection.TimeoutSeconds must be between 1 and {AwdFlagInjectionExecutionBudget.MaximumCommandTimeoutSeconds}.");
             }
-            if (configuration.Runtime?.Definition is ComposeRuntimeDefinition
+            if (configuration.Runtime?.Definition is ContainerRuntimeDefinition
                 && string.IsNullOrWhiteSpace(injection.ServiceName))
-                errors.Add("FlagInjection.ServiceName is required for Compose runtimes.");
+                errors.Add("FlagInjection.ServiceName is required for container runtimes.");
+            if (configuration.Runtime?.Definition is ContainerRuntimeDefinition services && !services.Services.Any(service => service.Name == injection.ServiceName))
+                errors.Add("FlagInjection.ServiceName must reference an existing service.");
         }
         return errors;
     }
@@ -100,15 +100,8 @@ public static class AwdConfigurationValidator
             errors.Add("Runtime is required when Checker is configured.");
             return;
         }
-        switch (runtime.Definition)
-        {
-            case ContainerRuntimeDefinition when checker.TargetServiceName is null:
-                break;
-            case ComposeRuntimeDefinition when !string.IsNullOrWhiteSpace(checker.TargetServiceName):
-                break;
-            default:
-                errors.Add("Checker.TargetServiceName is required only for Compose Runtime.");
-                break;
-        }
+        if (runtime.Definition is not ContainerRuntimeDefinition container
+            || !container.Services.Any(service => service.Name == checker.TargetServiceName))
+            errors.Add("Checker.TargetServiceName must reference an existing Runtime service.");
     }
 }
