@@ -101,6 +101,8 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                     Memory = request.Limits.MemoryBytes,
                     NanoCPUs = checked(request.Limits.CpuMillicores * 1_000_000),
                     PidsLimit = request.Limits.PidsLimit,
+                    CapDrop = request.NetworkPurpose == ContainerNetworkPurpose.PersistentRuntime ? null! : ["ALL"],
+                    SecurityOpt = request.NetworkPurpose == ContainerNetworkPurpose.PersistentRuntime ? null! : ["no-new-privileges:true"],
                     LogConfig = new LogConfig
                     {
                         Type = "local",
@@ -157,9 +159,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             return new(request.OperationId, RuntimeProvider.Docker, response.ID, status,
                 ReadPublishedPorts(created, request.PortMappings.Keys),
                 options.PublicHost,
-                SupportsWsrx(request.AccessMode)
-                    ? ResolveInternalAddress(created, request.NetworkName)
-                    : ResolveInternalAddress(created, request.NetworkName),
+                ResolveInternalAddress(created, request.NetworkName ?? options.NetworkName),
                 RuntimeInstanceId: request.RuntimeInstanceId);
         }
         catch
@@ -268,7 +268,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             return await CreateAsync(request, cancellationToken);
         }
 
-        var internalHost = ResolveInternalAddress(existing, request.NetworkName);
+        var internalHost = ResolveInternalAddress(existing, request.NetworkName ?? options.NetworkName);
         if (SupportsWsrx(request.AccessMode) || request.ControlCheckUrlBinding is not null)
         {
             if (string.IsNullOrWhiteSpace(request.NetworkName))
@@ -1164,14 +1164,10 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
     private static Dictionary<string, string> BuildLabels(ContainerRequest request)
     {
         var labels = request.Labels.ToDictionary(pair => pair.Key, pair => pair.Value);
+        labels["noctf.io/managed"] = "true";
         labels["noctf.io/job-kind"] = JobKind(request.NetworkPurpose);
-        if (request.AllowInternalCallback)
-        {
-            labels["noctf.io/managed"] = "true";
-            labels["noctf.io/job-kind"] = JobKind(request.NetworkPurpose);
-            labels["noctf.io/runtime-instance-id"] = (request.RuntimeInstanceId
-                ?? request.OperationId).ToString("D");
-        }
+        labels["noctf.io/runtime-instance-id"] = (request.RuntimeInstanceId
+            ?? request.OperationId).ToString("D");
         return labels;
     }
 
@@ -1357,10 +1353,12 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         }
     }
 
-    private static string ResolveInternalAddress(
+    private static string? ResolveInternalAddress(
         ContainerInspectResponse container,
         string? requestedNetwork)
     {
+        if (string.Equals(requestedNetwork, "none", StringComparison.Ordinal))
+            return null;
         var networks = container.NetworkSettings?.Networks
             ?? throw new InvalidOperationException(
                 "Docker Runtime has no network attachment metadata.");

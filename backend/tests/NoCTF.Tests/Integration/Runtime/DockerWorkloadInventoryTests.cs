@@ -32,7 +32,9 @@ public sealed class DockerWorkloadInventoryTests
             {
                 await Assert.That((await lifecycle.EnsureRunningAsync(request, ct)).ResourceId).IsEqualTo(receipt.ResourceId);
                 var wrongLabels = new Dictionary<string, string>(labels) { ["noctf.io/job-kind"] = "another-purpose" };
-                await Assert.That(async () => await lifecycle.EnsureRunningAsync(request with { Labels = wrongLabels }, ct)).Throws<InvalidOperationException>();
+                await Assert.That((await lifecycle.EnsureRunningAsync(request with { Labels = wrongLabels }, ct)).ResourceId).IsEqualTo(receipt.ResourceId);
+                await Assert.That(async () => await lifecycle.EnsureRunningAsync(
+                    request with { NetworkPurpose = ContainerNetworkPurpose.AwdChecker }, ct)).Throws<InvalidOperationException>();
                 await Assert.That((await lifecycle.GetAsync(RuntimeProvider.Docker, receipt.ResourceId, ct))!.Status).IsEqualTo(RuntimeStatus.Running);
             }
             finally { await lifecycle.DestroyAsync(receipt, CancellationToken.None); }
