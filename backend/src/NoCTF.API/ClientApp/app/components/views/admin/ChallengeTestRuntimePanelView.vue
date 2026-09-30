@@ -7,7 +7,8 @@ const { Check, Clipboard, FlaskConical, RefreshCw, runtime, loading, loadError, 
 </script>
 
 <template>
-  <section class="mt-6 flex flex-col gap-4 border-t pt-6" aria-labelledby="challenge-test-runtime-title">
+  <section class="mt-2 flex flex-col gap-3 pt-4" aria-labelledby="challenge-test-runtime-title">
+    <Separator />
     <header class="flex flex-wrap items-start justify-between gap-3">
       <div class="flex items-start gap-3">
         <span class="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -15,9 +16,6 @@ const { Check, Clipboard, FlaskConical, RefreshCw, runtime, loading, loadError, 
         </span>
         <div>
           <h3 id="challenge-test-runtime-title" class="text-base font-semibold">{{ $t('ui.challengeTestContainer') }}</h3>
-          <p class="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
-            {{ $t('ui.startARealContainerFromTheLatestSavedDefinitionTo') }}
-          </p>
         </div>
       </div>
       <div class="flex items-center gap-2">
@@ -31,9 +29,6 @@ const { Check, Clipboard, FlaskConical, RefreshCw, runtime, loading, loadError, 
     <Alert v-if="definitionDirty">
       <AlertDescription>{{ $t('ui.theRuntimeDefinitionHasUnsavedChangesSaveThemBeforeStarting') }}</AlertDescription>
     </Alert>
-    <p class="text-xs leading-5 text-muted-foreground">
-      {{ $t('ui.stoppingATestInstanceRemovesItsContainerAndNetworkBut') }}
-    </p>
     <Skeleton v-if="loading" class="h-28 w-full" />
     <Alert v-else-if="loadError" variant="destructive">
       <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
@@ -98,9 +93,11 @@ const { Check, Clipboard, FlaskConical, RefreshCw, runtime, loading, loadError, 
         <Button v-else-if="runtime?.state === 'Stopping'" type="button" disabled>
           <Spinner data-icon="inline-start" />{{ $t('ui.stopping') }}
         </Button>
-        <Button v-if="active" type="button" variant="outline" :disabled="busy" @click="stop">
-          {{ $t('ui.stop') }}
-        </Button>
+        <Hint v-if="active" :content="$t('ui.stoppingATestInstanceRemovesItsContainerAndNetworkBut')">
+          <Button type="button" variant="outline" :disabled="busy" @click="stop">
+            {{ $t('ui.stop') }}
+          </Button>
+        </Hint>
         <Button
           v-if="active"
           type="button"

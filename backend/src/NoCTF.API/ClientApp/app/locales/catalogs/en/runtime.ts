@@ -1,5 +1,22 @@
 /** Runtime locale chunk. Keep keys stable across languages. */
 export const messages = {
+  "ui.runtimeTopology": 'Service topology',
+  "ui.runtimeServiceCount": '{count} services',
+  "ui.runtimeUnnamedService": 'Service {index}',
+  "ui.runtimeImageNotSet": 'Image not set',
+  "ui.runtimeServiceNotFound": 'Service not specified',
+  "ui.runtimeNoAccessEntries": 'No access entries',
+  "ui.runtimeServicesInvalid": 'Define 1 to 64 services with unique lowercase DNS names.',
+  "ui.runtimeServiceResourcesInvalid": 'Each service needs positive memory and CPU in increments of 0.001 cores.',
+  "ui.runtimeServiceReferenceInvalid": 'Select an existing target service.',
+
+  "ui.runtimeServices": 'Container services',
+  "ui.runtimeServiceName": 'Service name',
+  "ui.runtimeServiceTarget": 'Select the target service for this operation.',
+  "ui.addRuntimeService": 'Add service',
+  "ui.runtimeArguments": 'Startup arguments',
+  "ui.runtimeServiceInUse": 'This service is referenced by an entry, checker, or Flag injection.',
+
   "runtime.teamInstancesTitle": "Team instances",
   "runtime.noActiveTeamInstances": "Your team has no active challenge containers",
   "runtime.expiresAt": "Expires: {time}",
@@ -120,7 +137,7 @@ export const messages = {
   "ui.failedToLoadTheEnvironmentStatus": "Failed to load the environment status",
   "ui.activeContainersLoaded": "{count} active containers loaded",
   "ui.thePageRefreshesAutomaticallyEvery10Seconds": "The page refreshes automatically every 10 seconds",
-  "ui.queuedProvisioningRunningAndStoppingContainerOrComposeInstancesAppear": "Queued, provisioning, running, and stopping Container or Compose instances appear here.",
+  "ui.queuedProvisioningRunningAndStoppingContainerOrComposeInstancesAppear": "Queued, provisioning, running, and stopping Container instances appear here.",
   "ui.competitionChallenge": "Competition / challenge",
   "ui.placement": "Placement",
   "ui.runnerNotAssigned": "Runner not assigned",

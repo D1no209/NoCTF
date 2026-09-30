@@ -1,22 +1,11 @@
 import { date, id, model, now, type Data } from '../schema'
 import { mockRuntimeEndpoint } from '../runtime'
+import { defaultDefinition } from '../../app/utils/game-config'
 
 export function mockDefinition(mode: string) {
-  const common = {
-    mode,
-    runtime: null,
-    checker: null,
-    patchEntrypoint: null,
-    patchCommand: [],
-    patchTimeoutSeconds: null,
-    readyTimeoutSeconds: null,
-    maximumPatchUploadBytes: mode === 'Awdp' ? 268_435_456 : null,
-    checkerFixInput: false,
-    checkerAllowRoot: false,
-  }
-  if (mode === 'Ctf') return { ...common, interactionKind: 'FlagSubmission' }
-  if (mode === 'Awd') return { ...common, flagInjection: null }
-  return common
+  if (mode !== 'Ctf' && mode !== 'Awd' && mode !== 'Awdp' && mode !== 'Koh')
+    throw new Error('Unsupported mock game mode')
+  return defaultDefinition(mode)
 }
 
 export function mockModeConfiguration(mode: string) {

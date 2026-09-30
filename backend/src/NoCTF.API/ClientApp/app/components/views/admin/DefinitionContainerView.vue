@@ -1,144 +1,76 @@
 <script setup lang="ts">
 import { toRefs } from 'vue'
 import type { DefinitionContainerViewState } from '~/features/admin/useDefinitionContainer'
-
 const viewProps = defineProps<{ state: DefinitionContainerViewState }>()
-const { isAwdp, showFlagEnvironmentVariable, hasAdvanced, hasMetadata, hasSecurity, definition, disabled, onUpdateModelValueDefinitionCommand, onUpdateModelValueDefinitionContainerPorts, onUpdateModelValueDefinitionInternalPorts, onUpdateModelValueDefinitionEnvironment, onUpdateModelValueDefinitionLabels, onUpdateModelValueDefinitionSecurityCapDrop, onUpdateModelValueDefinitionSecurityCapAdd } = toRefs(viewProps.state)
+const { definition, disabled, singleServiceOnly, showFlagEnvironmentVariable, serviceNameInputId, serviceImageInputId, selectedServiceIndex, selectedService, selectedServiceId, topology, advancedOpen, selectService, addService, canRemove, removeService, renameService, updateService } = toRefs(viewProps.state)
 </script>
 
 <template>
   <FieldGroup>
-    <DefinitionSection :title="$t('ui.basics')" :collapsible="false" accent-title>
-      <Field>
-        <FieldLabel>{{ $t('ui.mirror') }}</FieldLabel>
-        <Input
-          v-model="definition.image"
-          :placeholder="$t('ui.registryExampleComChallengeLatest')"
-          class="font-mono text-sm"
-          :disabled="disabled"
-        />
-      </Field>
-    </DefinitionSection>
-
-    <DefinitionSection :title="$t('ui.network')" :collapsible="false" accent-title>
-      <div class="grid gap-4" :class="isAwdp ? 'sm:grid-cols-2' : ''">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <h3 class="text-sm font-semibold">{{ $t('ui.runtimeTopology') }}</h3>
+      <div class="flex items-center gap-2">
+        <Badge variant="secondary">{{ $t('ui.runtimeServiceCount', { count: definition.services.length }) }}</Badge>
+        <Button v-if="!disabled && !singleServiceOnly" type="button" variant="outline" size="sm" :disabled="definition.services.length >= 64" @click="addService">{{ $t('ui.addRuntimeService') }}</Button>
+      </div>
+    </div>
+    <ConnectionCanvas
+      :nodes="topology.nodes"
+      :edges="topology.edges"
+      :selected-id="selectedServiceId"
+      :label="$t('ui.runtimeTopology')"
+      :source-label="$t('ui.runtimeServices')"
+      :target-label="$t('ui.accessEntrance')"
+      @select="selectService"
+    />
+    <FieldSet v-if="selectedService" :key="selectedServiceIndex">
+      <FieldLegend class="flex w-full items-center justify-between gap-2 text-sm">
+        <span class="truncate font-mono font-semibold">{{ selectedService.name || $t('ui.runtimeServices') }}</span>
+        <Button v-if="!disabled && definition.services.length > 1" type="button" variant="ghost" size="sm" :aria-label="$t('ui.removeItem', { index: selectedServiceIndex + 1 })" :disabled="!canRemove(selectedServiceIndex)" @click="removeService(selectedServiceIndex)">{{ $t('ui.delete') }}</Button>
+      </FieldLegend>
+      <FieldGroup class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
         <Field>
-          <FieldLabel>{{ $t('ui.externalPort') }}</FieldLabel>
-          <NumberListEditor
-            :model-value="definition.containerPorts"
-            :placeholder="$t('ui.containerPort')"
-            :add-label="$t('ui.addPort')"
-            :disabled="disabled"
-            @update:model-value="onUpdateModelValueDefinitionContainerPorts"
-          />
+          <FieldLabel :for="serviceNameInputId">{{ $t('ui.runtimeServiceName') }}</FieldLabel>
+          <Input :id="serviceNameInputId" :model-value="selectedService.name" :disabled="disabled" @update:model-value="renameService(selectedServiceIndex, String($event ?? ''))" />
         </Field>
-        <Field v-if="isAwdp">
+        <Field>
+          <FieldLabel :for="serviceImageInputId">{{ $t('ui.mirror') }}</FieldLabel>
+          <Input :id="serviceImageInputId" v-model="selectedService.image" :placeholder="$t('ui.registryExampleComChallengeLatest')" :disabled="disabled" />
+        </Field>
+      </FieldGroup>
+      <DefinitionSection :title="$t('ui.advancedSettings')" :default-open="advancedOpen" accent-title>
+        <FieldGroup class="grid gap-4 sm:grid-cols-2">
+          <Field>
+            <FieldLabel>{{ $t('ui.memoryMib') }}</FieldLabel>
+            <NullableNumberInput v-model="selectedService.memoryMiB" :min="1" :disabled="disabled" />
+          </Field>
+          <Field>
+            <FieldLabel>{{ $t('ui.cpuCore') }}</FieldLabel>
+            <NullableNumberInput v-model="selectedService.cpuCores" :min="0.001" step="0.001" :disabled="disabled" />
+          </Field>
+        </FieldGroup>
+        <Field>
+          <FieldLabel>{{ $t('ui.startCommand') }}</FieldLabel>
+          <StringListEditor :model-value="selectedService.command" :disabled="disabled" @update:model-value="updateService(selectedServiceIndex, 'command', $event)" />
+        </Field>
+        <Field>
+          <FieldLabel>{{ $t('ui.runtimeArguments') }}</FieldLabel>
+          <StringListEditor :model-value="selectedService.arguments" :disabled="disabled" @update:model-value="updateService(selectedServiceIndex, 'arguments', $event)" />
+        </Field>
+        <Field>
+          <FieldLabel>{{ $t('ui.environmentVariables') }}</FieldLabel>
+          <KeyValueEditor :model-value="selectedService.environment" :disabled="disabled" @update:model-value="updateService(selectedServiceIndex, 'environment', $event)" />
+        </Field>
+        <Field>
           <FieldLabel>{{ $t('ui.internalPort') }}</FieldLabel>
-          <NumberListEditor
-            :model-value="definition.internalPorts"
-            :placeholder="$t('ui.onlyPortsReachableWithinThePlatform')"
-            :add-label="$t('ui.addInternalPort')"
-            :disabled="disabled"
-            @update:model-value="onUpdateModelValueDefinitionInternalPorts"
-          />
+          <NumberListEditor :model-value="selectedService.internalPorts" :disabled="disabled" @update:model-value="updateService(selectedServiceIndex, 'internalPorts', $event)" />
         </Field>
-      </div>
-    </DefinitionSection>
-
-    <DefinitionSection :title="$t('ui.advancedSettings')" :default-open="hasAdvanced" accent-title>
-      <Field>
-        <FieldLabel>{{ $t('ui.startCommand') }}</FieldLabel>
-        <StringListEditor
-          :model-value="definition.command"
-          :placeholder="$t('ui.parametersSuchAsPort')"
-          :add-label="$t('ui.addParameters')"
-          :disabled="disabled"
-          @update:model-value="onUpdateModelValueDefinitionCommand"
-        />
-      </Field>
-      <Field v-if="showFlagEnvironmentVariable">
-        <FieldLabel>{{ $t('ui.flagEnvironmentVariableName') }}</FieldLabel>
-        <Input
-          v-model="definition.flagEnvironmentVariableName"
-          :placeholder="$t('ui.flag')"
-          class="font-mono text-sm sm:max-w-xs"
-          :disabled="disabled"
-        />
-      </Field>
-      <Field v-if="!isAwdp">
-        <FieldLabel>{{ $t('ui.internalPortOptional') }}</FieldLabel>
-        <NumberListEditor
-          :model-value="definition.internalPorts"
-          :placeholder="$t('ui.onlyPortsReachableWithinThePlatform')"
-          :add-label="$t('ui.addInternalPort')"
-          :disabled="disabled"
-          @update:model-value="onUpdateModelValueDefinitionInternalPorts"
-        />
-      </Field>
-    </DefinitionSection>
-
-    <DefinitionSection :title="$t('ui.environmentMetadata')" :default-open="hasMetadata" accent-title>
-      <Field>
-        <FieldLabel>{{ $t('ui.environmentVariables') }}</FieldLabel>
-        <KeyValueEditor
-          :model-value="definition.environment"
-          :key-placeholder="$t('ui.variableName')"
-          :value-placeholder="$t('ui.value')"
-          :add-label="$t('ui.addEnvironmentVariables')"
-          :disabled="disabled"
-          @update:model-value="onUpdateModelValueDefinitionEnvironment"
-        />
-      </Field>
-      <Field>
-        <FieldLabel>{{ $t('ui.label') }}</FieldLabel>
-        <KeyValueEditor
-          :model-value="definition.labels"
-          :key-placeholder="$t('ui.tagName')"
-          :value-placeholder="$t('ui.value')"
-          :add-label="$t('ui.addTag')"
-          :disabled="disabled"
-          @update:model-value="onUpdateModelValueDefinitionLabels"
-        />
-      </Field>
-    </DefinitionSection>
-
-    <DefinitionSection :title="$t('ui.securityOptions')" :default-open="hasSecurity" accent-title>
-      <div class="grid gap-3 sm:grid-cols-3">
-        <Field orientation="horizontal">
-          <Switch id="sec-no-new-privileges" v-model="definition.security.noNewPrivileges" :disabled="disabled" />
-          <FieldLabel for="sec-no-new-privileges" class="font-normal">{{ $t('ui.disablePrivilegeEscalationNoNewPrivileges') }}</FieldLabel>
+        <Field v-if="showFlagEnvironmentVariable">
+          <FieldLabel>{{ $t('ui.flagEnvironmentVariableName') }}</FieldLabel>
+          <Input v-model="selectedService.flagEnvironmentVariableName" :disabled="disabled" />
         </Field>
-        <Field orientation="horizontal">
-          <Switch id="sec-readonly-rootfs" v-model="definition.security.readonlyRootfs" :disabled="disabled" />
-          <FieldLabel for="sec-readonly-rootfs" class="font-normal">{{ $t('ui.readOnlyRootFileSystem') }}</FieldLabel>
-        </Field>
-        <Field orientation="horizontal">
-          <Switch id="sec-run-as-non-root" v-model="definition.security.runAsNonRoot" :disabled="disabled" />
-          <FieldLabel for="sec-run-as-non-root" class="font-normal">{{ $t('ui.runAsNonRootUser') }}</FieldLabel>
-        </Field>
-      </div>
-      <div class="grid gap-4 sm:grid-cols-2">
-        <Field>
-          <FieldLabel>{{ $t('ui.capabilityToRemoveCapDrop') }}</FieldLabel>
-          <StringListEditor
-            :model-value="definition.security.capDrop"
-            :placeholder="$t('ui.suchAsNetRaw')"
-            :add-label="$t('ui.addRemoveItems')"
-            :disabled="disabled"
-            @update:model-value="onUpdateModelValueDefinitionSecurityCapDrop"
-          />
-        </Field>
-        <Field>
-          <FieldLabel>{{ $t('ui.addedCapabilitiesCapAdd') }}</FieldLabel>
-          <StringListEditor
-            :model-value="definition.security.capAdd"
-            :placeholder="$t('ui.suchAsSysPtrace')"
-            :add-label="$t('ui.addCapabilities')"
-            :disabled="disabled"
-            @update:model-value="onUpdateModelValueDefinitionSecurityCapAdd"
-          />
-        </Field>
-      </div>
-    </DefinitionSection>
+      </DefinitionSection>
+      <FieldDescription v-if="definition.services.length > 1 && !canRemove(selectedServiceIndex)">{{ $t('ui.runtimeServiceInUse') }}</FieldDescription>
+    </FieldSet>
   </FieldGroup>
 </template>

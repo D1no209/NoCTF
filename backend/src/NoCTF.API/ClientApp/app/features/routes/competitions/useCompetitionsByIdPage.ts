@@ -9,7 +9,7 @@ import { createTrailingRefresh } from '../../../lib/latest-page-refresh'
 import CompetitionCountdownComponent from '../../competitions/CompetitionCountdown.vue'
 import LifecycleBadgeComponent from '../../competitions/LifecycleBadge.vue'
 import { useCompetitionAnnouncementCatchUp } from '../../competition/useCompetitionAnnouncementCatchUp'
-import { competitionPath } from '../../../utils/app-routes'
+import { competitionPath, isCompetitionOverviewPath } from '../../../utils/app-routes'
 
 /** Owns state, effects and commands for CompetitionsByIdPage. */
 export function useCompetitionsByIdPage() {
@@ -18,7 +18,7 @@ export function useCompetitionsByIdPage() {
 
   const competitionId = computed(() => route.params.id as string)
 
-  const isOverview = computed(() => route.path === competitionPath(competitionId.value))
+  const isOverview = computed(() => isCompetitionOverviewPath(route.path))
 
   const isControlScreen = computed(() => [
     `/competitions/${competitionId.value}/live`,
@@ -163,6 +163,7 @@ export function useCompetitionsByIdPage() {
   watch(
     () => user.value?.userId,
     () => {
+      if (isOverview.value) return
       if (!isWriteUpReview.value) void refreshMyTeam()
       void refreshMissedAnnouncements()
     },
@@ -171,6 +172,7 @@ export function useCompetitionsByIdPage() {
   let unwatch: (() => void) | undefined
 
   onMounted(() => {
+    if (isOverview.value) return
     unwatch = watchCompetition(competitionId.value, {
       competitionLifecycleChanged: () => {
         void refresh()
@@ -254,6 +256,7 @@ export function useCompetitionsByIdPage() {
 
 
   async function initialize() {
+    if (isOverview.value) return
     await refresh()
     if (!isWriteUpReview.value) await refreshMyTeam()
     await refreshMissedAnnouncements()

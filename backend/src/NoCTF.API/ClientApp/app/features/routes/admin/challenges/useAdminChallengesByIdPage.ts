@@ -12,6 +12,7 @@ import { applyCtfInteraction, CtfInteraction, defaultDefinition, definitionContr
 import AdminDateTimeComponent from '../../../admin/AdminDateTime.vue'
 import AdminGameModeBadgeComponent from '../../../admin/AdminGameModeBadge.vue'
 import ChallengeTestRuntimePanelComponent from '../../../admin/ChallengeTestRuntimePanel.vue'
+import ChallengeCompetitionPlacementsComponent from '../../../admin/ChallengeCompetitionPlacements.vue'
 import DefinitionCheckerSectionComponent from '../../../admin/DefinitionCheckerSection.vue'
 import DefinitionFlagInjectionSectionComponent from '../../../admin/DefinitionFlagInjectionSection.vue'
 import DefinitionFlagTemplateSectionComponent from '../../../admin/DefinitionFlagTemplateSection.vue'
@@ -30,6 +31,7 @@ export function useAdminChallengesByIdPage() {
   const route = useRoute()
 
   const challengeId = route.params.id as string
+  const selectedSection = ref('basic')
 
   const { canOrganize } = useAuth()
   const { configuration: platformConfiguration } = usePlatform()
@@ -750,6 +752,7 @@ export function useAdminChallengesByIdPage() {
   const AdminGameModeBadge = markRaw(AdminGameModeBadgeComponent)
 
   const ChallengeTestRuntimePanel = markRaw(ChallengeTestRuntimePanelComponent)
+  const ChallengeCompetitionPlacements = markRaw(ChallengeCompetitionPlacementsComponent)
 
   const DefinitionCheckerSection = markRaw(DefinitionCheckerSectionComponent)
 
@@ -771,6 +774,7 @@ export function useAdminChallengesByIdPage() {
       Trash2,
       Upload,
       challengeId,
+      selectedSection,
       canOrganize,
       template,
       loading,
@@ -848,6 +852,7 @@ export function useAdminChallengesByIdPage() {
       AdminDateTime,
       AdminGameModeBadge,
       ChallengeTestRuntimePanel,
+      ChallengeCompetitionPlacements,
       DefinitionCheckerSection,
       DefinitionFlagInjectionSection,
       DefinitionFlagTemplateSection,

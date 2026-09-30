@@ -1,5 +1,22 @@
 /** Runtime locale chunk. Keep keys stable across languages. */
 export const messages = {
+  "ui.runtimeTopology": '服务拓扑',
+  "ui.runtimeServiceCount": '{count} 个服务',
+  "ui.runtimeUnnamedService": '服务 {index}',
+  "ui.runtimeImageNotSet": '未设置镜像',
+  "ui.runtimeServiceNotFound": '未指定服务',
+  "ui.runtimeNoAccessEntries": '暂无访问入口',
+  "ui.runtimeServicesInvalid": '服务列表需要 1 至 64 项，且名称为唯一的小写 DNS 名称。',
+  "ui.runtimeServiceResourcesInvalid": '每项服务需要正数内存和 CPU，CPU 步长为 0.001 核。',
+  "ui.runtimeServiceReferenceInvalid": '请选择已定义的目标服务。',
+
+  "ui.runtimeServices": '容器服务',
+  "ui.runtimeServiceName": '服务名称',
+  "ui.runtimeServiceTarget": '选择此操作的目标服务。',
+  "ui.addRuntimeService": '添加服务',
+  "ui.runtimeArguments": '启动参数',
+  "ui.runtimeServiceInUse": '该服务仍被访问入口、Checker 或 Flag 注入引用。',
+
   "runtime.teamInstancesTitle": "队伍实例",
   "runtime.noActiveTeamInstances": "本队目前没有活动中的题目容器",
   "runtime.expiresAt": "到期：{time}",
@@ -120,7 +137,7 @@ export const messages = {
   "ui.failedToLoadTheEnvironmentStatus": "加载环境状态失败",
   "ui.activeContainersLoaded": "当前已载入 {count} 个活动容器",
   "ui.thePageRefreshesAutomaticallyEvery10Seconds": "页面每 10 秒自动刷新",
-  "ui.queuedProvisioningRunningAndStoppingContainerOrComposeInstancesAppear": "排队、创建中、运行中和停止中的 Container/Compose 实例会显示在这里。",
+  "ui.queuedProvisioningRunningAndStoppingContainerOrComposeInstancesAppear": "排队、创建中、运行中和停止中的 Container 实例会显示在这里。",
   "ui.competitionChallenge": "赛事 / 题目",
   "ui.placement": "运行位置",
   "ui.runnerNotAssigned": "尚未分配 Runner",

@@ -1,204 +1,69 @@
-import { proxyRefs } from 'vue'
-import { markRaw, toRefs } from 'vue'
-
-import type { GameModeValue, RuntimeTemplateModel } from '../../utils/game-config'
-import { bytesToMib, coresToNanoCpus, CtfInteraction, DEFAULT_RUNTIME_MEMORY_BYTES, DEFAULT_RUNTIME_NANO_CPUS, DEFAULT_RUNTIME_OPERATION_TIMEOUT_SECONDS, DEFAULT_RUNTIME_PIDS_LIMIT, DEFAULT_RUNTIME_TTL_SECONDS, emptyContainerDefinition, emptyComposeDefinition, emptyOvaDefinition, FlagSource, mibToBytes, nanoCpusToCores, RuntimeAllocation, UrlExposure } from '../../utils/game-config'
-import DefinitionComposeComponent from './DefinitionCompose.vue'
+import { computed, markRaw, toRefs, watch } from 'vue'
+import type { DefinitionModel, GameModeValue, RuntimeTemplateModel } from '../../utils/game-config'
+import { bytesToMib, coresToMillicores, CtfInteraction, emptyContainerDefinition, emptyOvaDefinition, FlagSource, mibToBytes, cpuMillicoresToCores, RuntimeAllocation, UrlExposure } from '../../utils/game-config'
 import DefinitionContainerComponent from './DefinitionContainer.vue'
 import UrlBindingListComponent from './UrlBindingList.vue'
 
-/** Owns state, effects and commands for DefinitionRuntime. */
-export function useDefinitionRuntime(props: Readonly<Omit<{
-  runtime: RuntimeTemplateModel
-  mode: GameModeValue
-  interactionKind: number
-  disabled?: boolean
-}, "disabled"> & Required<Pick<{
-  runtime: RuntimeTemplateModel
-  mode: GameModeValue
-  interactionKind: number
-  disabled?: boolean
-}, "disabled">>>) {
-  const isCompose = computed(() => props.runtime.definition.kind === 'compose')
-  const isPatchVerification = computed(() =>
-    props.mode === 'Ctf'
-    && props.interactionKind === CtfInteraction.PatchVerification,
-  )
-  const showDynamicFlagInjection = computed(() =>
-    props.mode === 'Ctf' && !isPatchVerification.value,
-  )
-  const dynamicFlagInjection = computed(() =>
-    props.runtime.flagSource === FlagSource.PerTeam,
-  )
-
-  const kindOptions = computed(() =>
-    props.mode === 'Awdp' || isPatchVerification.value
-      ? [{ value: 'container', label: translate("ui.singleContainer") }]
-      : [
-          { value: 'container', label: translate("ui.singleContainer") },
-          { value: 'compose', label: 'Docker Compose' },
-          { value: 'ova', label: 'OVA VM' },
-        ],
-  )
-
+export function useDefinitionRuntime(props: Readonly<{
+  runtime: RuntimeTemplateModel; model: DefinitionModel; mode: GameModeValue; interactionKind: number; disabled: boolean
+}>) {
+  const isPatchVerification = computed(() => props.mode === 'Ctf' && props.interactionKind === CtfInteraction.PatchVerification)
+  const singleServiceOnly = computed(() => props.mode === 'Awdp' || isPatchVerification.value)
+  const hasServices = computed(() => props.runtime.definition.kind === 'container')
+  const serviceNames = computed(() => props.runtime.definition.kind === 'container' ? props.runtime.definition.services.map(service => service.name) : [])
+  const showDynamicFlagInjection = computed(() => props.mode === 'Ctf' && !isPatchVerification.value)
+  const dynamicFlagInjection = computed(() => props.runtime.flagSource === FlagSource.PerTeam)
+  const kindOptions = computed(() => singleServiceOnly.value
+    ? [{ value: 'container', label: translate('ui.runtimeServices') }]
+    : [{ value: 'container', label: translate('ui.runtimeServices') }, { value: 'ova', label: translate('ui.virtualMachine') }])
+  const exposureOptions = computed(() => props.mode === 'Ctf' || props.mode === 'Awdp'
+    ? [{ value: UrlExposure.OwnerOnly, label: 'ui.onlyVisibleToTheTeamItself' }]
+    : [{ value: UrlExposure.OwnerOnly, label: 'ui.onlyVisibleToTheTeamItself' }, { value: UrlExposure.Participants, label: 'ui.visibleToAllContestants' }])
+  const flagSourceOptions = computed(() => [
+    { value: FlagSource.Static, label: translate('ui.staticFlagTemplatePreset') },
+    { value: FlagSource.PerTeam, label: translate('ui.independentFlagForEachTeam') },
+    { value: FlagSource.AwdRotation, label: translate('ui.alternateByRoundAwd') },
+  ])
+  function synchronizeFlagInjection(): void {
+    if (props.runtime.definition.kind !== 'container') return
+    if (props.runtime.flagSource !== FlagSource.PerTeam)
+      for (const service of props.runtime.definition.services) service.flagEnvironmentVariableName = ''
+    else if (!props.runtime.definition.services.some(service => service.flagEnvironmentVariableName.trim()))
+      props.runtime.definition.services[0]!.flagEnvironmentVariableName = 'FLAG'
+  }
   function switchKind(kind: string): void {
     if (kind === props.runtime.definition.kind) return
-    props.runtime.definition = kind === 'compose'
-      ? emptyComposeDefinition()
-      : kind === 'ova'
-        ? emptyOvaDefinition()
-        : emptyContainerDefinition(
-          props.mode === 'Awdp'
-          || props.mode === 'Ctf' && !isPatchVerification.value,
-        )
-    synchronizeFlagInjection(props.runtime)
+    props.runtime.definition = kind === 'ova' ? emptyOvaDefinition() : emptyContainerDefinition()
+    synchronizeFlagInjection()
   }
-
-  const flagSourceOptions = computed(() => {
-    const all = [
-      { value: FlagSource.Static, label: translate("ui.staticFlagTemplatePreset") },
-      { value: FlagSource.PerTeam, label: translate("ui.independentFlagForEachTeam") },
-      { value: FlagSource.AwdRotation, label: translate("ui.alternateByRoundAwd") },
-    ]
-    return props.mode === 'Ctf' || props.mode === 'Awdp' ? all.slice(0, 2) : all
-  })
-
-  const exposureOptions = computed(() => {
-    if (props.mode === 'Ctf' || props.mode === 'Awdp') {
-      return [{ value: UrlExposure.OwnerOnly, label: translate("ui.onlyVisibleToTheTeamItself") }]
-    }
-    return [
-      { value: UrlExposure.OwnerOnly, label: translate("ui.onlyVisibleToTheTeamItself") },
-      { value: UrlExposure.Participants, label: translate("ui.visibleToAllContestants") },
-    ]
-  })
-
-  const controlBindingList = computed({
-    get: () => (props.runtime.controlCheckUrlBinding ? [props.runtime.controlCheckUrlBinding] : []),
-    set: (list) => {
-      props.runtime.controlCheckUrlBinding = list[0] ?? null
-    },
-  })
-
-  const hasCustomRuntimePolicy = computed(() =>
-    props.runtime.limits.memoryBytes !== DEFAULT_RUNTIME_MEMORY_BYTES
-    || props.runtime.limits.nanoCpus !== DEFAULT_RUNTIME_NANO_CPUS
-    || props.runtime.limits.pidsLimit !== DEFAULT_RUNTIME_PIDS_LIMIT
-    || props.runtime.ttlSeconds !== DEFAULT_RUNTIME_TTL_SECONDS
-    || props.runtime.operationTimeoutSeconds !== DEFAULT_RUNTIME_OPERATION_TIMEOUT_SECONDS,
-  )
-
-  watch(
-    [() => props.mode, () => props.interactionKind],
-    ([mode, interactionKind]) => {
-      const runtime = props.runtime
-      runtime.allocation = mode === 'Koh' ? RuntimeAllocation.Shared : RuntimeAllocation.PerTeam
-      if (mode !== 'Koh') runtime.controlCheckUrlBinding = null
-      if (mode === 'Ctf') {
-        const patchVerification = interactionKind === CtfInteraction.PatchVerification
-        if (patchVerification && runtime.definition.kind === 'compose')
-          runtime.definition = emptyContainerDefinition(false)
-        if (patchVerification) {
-          runtime.flagSource = FlagSource.Static
-        }
-        else if (runtime.flagSource !== FlagSource.Static
-          && runtime.flagSource !== FlagSource.PerTeam) {
-          runtime.flagSource = FlagSource.PerTeam
-        }
-        synchronizeFlagInjection(runtime)
-        for (const binding of runtime.urlBindings) binding.exposure = UrlExposure.OwnerOnly
-      }
-      if (mode === 'Awdp') {
-        runtime.flagSource = FlagSource.PerTeam
-        if (runtime.definition.kind === 'container'
-          && !runtime.definition.flagEnvironmentVariableName.trim()) {
-          runtime.definition.flagEnvironmentVariableName = 'FLAG'
-        }
-        for (const binding of runtime.urlBindings) binding.exposure = UrlExposure.OwnerOnly
-        if (runtime.definition.kind === 'compose') {
-          runtime.definition = emptyContainerDefinition(true)
-        }
-      }
-    },
-    { immediate: true },
-  )
-
-  const DefinitionCompose = markRaw(DefinitionComposeComponent)
-
-  const DefinitionContainer = markRaw(DefinitionContainerComponent)
-
-  const UrlBindingList = markRaw(UrlBindingListComponent)
-
-  const viewBindings = {
-      ...toRefs(props),
-      bytesToMib,
-      coresToNanoCpus,
-      mibToBytes,
-      nanoCpusToCores,
-      RuntimeAllocation,
-      UrlExposure,
-      isCompose,
-      isPatchVerification,
-      showDynamicFlagInjection,
-      dynamicFlagInjection,
-      kindOptions,
-      switchKind,
-      flagSourceOptions,
-      exposureOptions,
-      controlBindingList,
-      hasCustomRuntimePolicy,
-      DefinitionCompose,
-      DefinitionContainer,
-      UrlBindingList
-    }
-  const viewState = proxyRefs(viewBindings)
-
-  function onUpdateModelValueRuntimeLimitsMemoryBytes(value: Parameters<typeof mibToBytes>[0]) {
-    viewState.runtime!.limits!.memoryBytes = mibToBytes(value)
-  }
-
-  function onUpdateModelValueRuntimeLimitsNanoCpus(value: Parameters<typeof coresToNanoCpus>[0]) {
-    viewState.runtime!.limits!.nanoCpus = coresToNanoCpus(value)
-  }
-
-  function onUpdateModelValueRuntimeLimitsPidsLimit(value: NonNullable<NonNullable<typeof viewState.runtime>['limits']>['pidsLimit']) {
-    viewState.runtime!.limits!.pidsLimit = value
-  }
-
-  function onUpdateModelValueRuntimeTtlSeconds(value: NonNullable<typeof viewState.runtime>['ttlSeconds']) {
-    viewState.runtime!.ttlSeconds = value
-  }
-
-  function onUpdateModelValueRuntimeOperationTimeoutSeconds(value: NonNullable<typeof viewState.runtime>['operationTimeoutSeconds']) {
-    viewState.runtime!.operationTimeoutSeconds = value
-  }
-
-  function onUpdateModelValueRuntimeFlagSource(value: Parameters<typeof Number>[0]) {
-    viewState.runtime!.flagSource = Number(value)
-  }
-
   function setDynamicFlagInjection(enabled: boolean): void {
     props.runtime.flagSource = enabled ? FlagSource.PerTeam : FlagSource.Static
-    synchronizeFlagInjection(props.runtime)
+    synchronizeFlagInjection()
   }
-
-  function onUpdateModelValueRuntimeUrlBindings(value: NonNullable<typeof viewState.runtime>['urlBindings']) {
-    viewState.runtime!.urlBindings = value
-  }
-
-  return { ...viewBindings, onUpdateModelValueRuntimeLimitsMemoryBytes, onUpdateModelValueRuntimeLimitsNanoCpus, onUpdateModelValueRuntimeLimitsPidsLimit, onUpdateModelValueRuntimeTtlSeconds, onUpdateModelValueRuntimeOperationTimeoutSeconds, onUpdateModelValueRuntimeFlagSource, setDynamicFlagInjection, onUpdateModelValueRuntimeUrlBindings }
+  const controlBindingList = computed({
+    get: () => props.runtime.controlCheckUrlBinding ? [props.runtime.controlCheckUrlBinding] : [],
+    set: (list) => { props.runtime.controlCheckUrlBinding = list[0] ?? null },
+  })
+  watch([() => props.mode, () => props.interactionKind], ([mode]) => {
+    props.runtime.allocation = mode === 'Koh' ? RuntimeAllocation.Shared : RuntimeAllocation.PerTeam
+    if (mode !== 'Koh') props.runtime.controlCheckUrlBinding = null
+    if (mode === 'Awd') props.runtime.flagSource = FlagSource.AwdRotation
+    if (mode === 'Awdp') props.runtime.flagSource = FlagSource.PerTeam
+    if (isPatchVerification.value) props.runtime.flagSource = FlagSource.Static
+    synchronizeFlagInjection()
+  }, { immediate: true })
+  function onUpdateModelValueRuntimeTtlSeconds(value: number | null): void { props.runtime.ttlSeconds = value }
+  function onUpdateModelValueRuntimeOperationTimeoutSeconds(value: number | null): void { props.runtime.operationTimeoutSeconds = value }
+  function onUpdateModelValueRuntimeFlagSource(value: unknown): void { props.runtime.flagSource = Number(value); synchronizeFlagInjection() }
+  function onUpdateModelValueRuntimeUrlBindings(value: RuntimeTemplateModel['urlBindings']): void { props.runtime.urlBindings = value }
+  function onUpdateModelValueRuntimeLimitsMemoryBytes(value: number | null): void { props.runtime.limits.memoryBytes = mibToBytes(value) }
+  function onUpdateModelValueRuntimeLimitsCpuMillicores(value: number | null): void { props.runtime.limits.cpuMillicores = coresToMillicores(value) }
+  function onUpdateModelValueRuntimeLimitsPidsLimit(value: number | null): void { props.runtime.limits.pidsLimit = value }
+  return { ...toRefs(props), RuntimeAllocation, UrlExposure, singleServiceOnly, hasServices, serviceNames, showDynamicFlagInjection,
+    dynamicFlagInjection, kindOptions, switchKind, flagSourceOptions, exposureOptions, controlBindingList,
+    bytesToMib, cpuMillicoresToCores, setDynamicFlagInjection,
+    DefinitionContainer: markRaw(DefinitionContainerComponent), UrlBindingList: markRaw(UrlBindingListComponent),
+    onUpdateModelValueRuntimeTtlSeconds, onUpdateModelValueRuntimeOperationTimeoutSeconds, onUpdateModelValueRuntimeFlagSource,
+    onUpdateModelValueRuntimeUrlBindings, onUpdateModelValueRuntimeLimitsMemoryBytes, onUpdateModelValueRuntimeLimitsCpuMillicores, onUpdateModelValueRuntimeLimitsPidsLimit }
 }
-
-function synchronizeFlagInjection(runtime: RuntimeTemplateModel): void {
-  const enabled = runtime.flagSource === FlagSource.PerTeam
-  if (runtime.definition.kind === 'container') {
-    runtime.definition.flagEnvironmentVariableName = enabled
-      ? runtime.definition.flagEnvironmentVariableName.trim() || 'FLAG'
-      : ''
-    return
-  }
-  if (runtime.definition.kind === 'compose' && !enabled)
-    runtime.definition.flagEnvironmentVariables = {}
-}
-
-export type DefinitionRuntimeViewState = import('vue').ShallowUnwrapRef<Awaited<ReturnType<typeof useDefinitionRuntime>>>
+export type DefinitionRuntimeViewState = import('vue').ShallowUnwrapRef<ReturnType<typeof useDefinitionRuntime>>

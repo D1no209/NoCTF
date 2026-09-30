@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import Feature from '~/features/routes/competitions/CompetitionsByIdPage.vue'
+import { competitionPageKey } from '~/utils/app-routes'
 
 definePageMeta({
-  key: route => route.params.id as string,
+  path: '/competitions/:id?',
+  key: competitionPageKey,
 })
 </script>
 

@@ -129,12 +129,6 @@ export function validateChallengeTemplateDraft(draft: ChallengeTemplateDraft): s
   const model = draft.definition
   if (draft.mode === 'Awdp' && model.checkerFixInput && !model.checkerJob)
     addIssue(issues, translate("ui.enableTheCheckerBeforeProvidingItWithTheFixPackage"))
-  const usesPatchChecker = draft.mode === 'Awdp'
-    || draft.mode === 'Ctf'
-      && model.interactionKind === CtfInteraction.PatchVerification
-  if (model.checkerAllowRoot
-    && ((draft.mode === 'Awd' && !model.checker) || (usesPatchChecker && !model.checkerJob)))
-    addIssue(issues, translate("ui.enableTheCheckerBeforeAllowingItToRunAsRoot"))
   const runtime = model.runtime
   if (!runtime) {
     validateRunnerJob(
@@ -147,9 +141,9 @@ export function validateChallengeTemplateDraft(draft: ChallengeTemplateDraft): s
     return issues
   }
 
-  if (runtime.limits.memoryBytes === null || runtime.limits.memoryBytes <= 0
-    || runtime.limits.nanoCpus === null || runtime.limits.nanoCpus <= 0
-    || runtime.limits.pidsLimit === null || runtime.limits.pidsLimit <= 0) {
+  if (runtime.definition.kind === 'ova' && (runtime.limits.memoryBytes === null || runtime.limits.memoryBytes <= 0
+    || runtime.limits.cpuMillicores === null || runtime.limits.cpuMillicores <= 0
+    || runtime.limits.pidsLimit === null || runtime.limits.pidsLimit <= 0)) {
     addIssue(issues, translate("ui.runtimeMemoryCpuAndProcessLimitsMustBePositive"))
   }
   if (runtime.ttlSeconds !== null && (runtime.ttlSeconds < 1 || runtime.ttlSeconds > 604800))
@@ -163,29 +157,27 @@ export function validateChallengeTemplateDraft(draft: ChallengeTemplateDraft): s
   let publicPorts: number[] = []
   let internalPorts: number[] = []
   if (definition.kind === 'container') {
-    if (!definition.image.trim()) addIssue(issues, translate("ui.containerImageIsRequired"))
-    else if (definition.image.length > 512) addIssue(issues, translate("ui.containerImageCannotExceed512Characters"))
-    publicPorts = [...new Set(definition.containerPorts.filter(validPort))]
-    internalPorts = definition.internalPorts.filter(validPort)
-    if (definition.containerPorts.some(port => port !== null && !validPort(port)))
-      addIssue(issues, translate("ui.publishedPortsMustBeIntegersBetween1And65535"))
-    if (definition.internalPorts.some(port => port !== null && !validPort(port)))
-      addIssue(issues, translate("ui.internalPortsMustBeIntegersBetween1And65535"))
-    if (new Set(internalPorts).size !== internalPorts.length)
-      addIssue(issues, translate("ui.internalPortsCannotContainDuplicates"))
-    validateEnvironment(issues, definition.environment, translate("ui.runtimeEnvironment"))
-    if (runtime.flagSource === FlagSource.PerTeam) {
-      const flagVariable = definition.flagEnvironmentVariableName.trim()
-      if (!flagVariable) addIssue(issues, translate("ui.perTeamFlagsRequireAFlagEnvironmentVariableName"))
-      else if (!environmentNamePattern.test(flagVariable))
-        addIssue(issues, translate("ui.theFlagEnvironmentVariableNameIsInvalid"))
-      else if (flagVariable.toUpperCase().startsWith('NOCTF_'))
-        addIssue(issues, translate("ui.theFlagEnvironmentVariableNameCannotUseTheNoctfPrefix"))
+    const services = definition.services
+    if (services.length < 1 || services.length > 64 || new Set(services.map(service => service.name)).size !== services.length)
+      addIssue(issues, translate('ui.runtimeServicesInvalid'))
+    for (const service of services) {
+      if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(service.name)) addIssue(issues, translate('ui.runtimeServicesInvalid'))
+      if (!service.image.trim()) addIssue(issues, translate('ui.containerImageIsRequired'))
+      if (service.image.length > 512) addIssue(issues, translate('ui.containerImageCannotExceed512Characters'))
+      if (service.cpuCores === null || service.cpuCores <= 0 || Math.abs(service.cpuCores * 1000 - Math.round(service.cpuCores * 1000)) > 1e-8
+        || service.memoryMiB === null || !Number.isSafeInteger(service.memoryMiB) || service.memoryMiB <= 0)
+        addIssue(issues, translate('ui.runtimeServiceResourcesInvalid'))
+      if (service.internalPorts.some(port => !validPort(port)) || new Set(service.internalPorts).size !== service.internalPorts.length)
+        addIssue(issues, translate('ui.internalPortsMustBeIntegersBetween1And65535'))
+      validateEnvironment(issues, service.environment, translate('ui.runtimeEnvironment'))
+      if (service.flagEnvironmentVariableName && (!environmentNamePattern.test(service.flagEnvironmentVariableName)
+        || service.flagEnvironmentVariableName.toUpperCase().startsWith('NOCTF_')))
+        addIssue(issues, translate('ui.theFlagEnvironmentVariableNameIsInvalid'))
     }
-  }
-  else if (definition.kind === 'compose') {
-    if (!definition.composeYaml.trim()) addIssue(issues, translate("ui.dockerComposeContentIsRequired"))
-    validateEnvironment(issues, definition.environment, translate("ui.runtimeEnvironment"))
+    if (runtime.flagSource === FlagSource.PerTeam && !services.some(service => service.flagEnvironmentVariableName.trim()))
+      addIssue(issues, translate('ui.perTeamFlagsRequireAFlagEnvironmentVariableName'))
+    internalPorts = services[0]?.internalPorts.filter(validPort) ?? []
+    publicPorts = [...new Set(runtime.urlBindings.map(binding => binding.containerPort).filter(validPort))]
   }
   else {
     if (!definition.sourceUrl.trim()) addIssue(issues, 'OVA URL is required.')
@@ -197,12 +189,9 @@ export function validateChallengeTemplateDraft(draft: ChallengeTemplateDraft): s
     validateAccessDisplayTemplate(issues, binding.urlTemplate)
     if (!validPort(binding.containerPort))
       addIssue(issues, translate("ui.everyAccessUrlMustSpecifyAValidContainerPort"))
-    if (definition.kind === 'container' && validPort(binding.containerPort)
-      && !publicPorts.includes(binding.containerPort)) {
-      addIssue(issues, translate("ui.theAccessUrlPortMustAlsoAppearInThePublished"))
-    }
-    if (definition.kind === 'compose' && !binding.serviceName.trim())
-      addIssue(issues, translate("ui.composeAccessUrlsRequireAServiceName"))
+    if (definition.kind === 'container' && !definition.services.some(service => service.name === binding.serviceName))
+      addIssue(issues, translate('ui.runtimeServiceReferenceInvalid'))
+
   }
 
   switch (draft.mode) {
@@ -212,7 +201,7 @@ export function validateChallengeTemplateDraft(draft: ChallengeTemplateDraft): s
       if (model.interactionKind === CtfInteraction.PatchVerification) {
         if (runtime.flagSource !== FlagSource.Static)
           addIssue(issues, translate("ui.ctfPatchVerificationRuntimesCannotInjectFlags"))
-        if (definition.kind !== 'container')
+        if (definition.kind !== 'container' || definition.services.length !== 1)
           addIssue(issues, translate("ui.ctfPatchVerificationOnlySupportsSingleContainerRuntimes"))
         if (internalPorts.length !== 1)
           addIssue(issues, translate("ui.ctfPatchVerificationRequiresExactlyOneInternalPort"))
@@ -243,19 +232,19 @@ export function validateChallengeTemplateDraft(draft: ChallengeTemplateDraft): s
           || model.flagInjection.timeoutSeconds < 1
           || model.flagInjection.timeoutSeconds > 300)
           addIssue(issues, translate("ui.theAwdFlagInjectionTimeoutMustBeBetween1And"))
-        if (definition.kind === 'compose' && !model.flagInjection.serviceName.trim())
-          addIssue(issues, translate("ui.aComposeRuntimeRequiresAFlagInjectionTargetService"))
+        if (definition.kind === 'container' && !definition.services.some(service => service.name === model.flagInjection?.serviceName))
+          addIssue(issues, translate("ui.runtimeServiceReferenceInvalid"))
       }
       validateRunnerJob(issues, model.checker?.job ?? null, translate('Checker'))
-      if (model.checker && definition.kind === 'compose' && !model.checker.targetServiceName.trim())
-        addIssue(issues, translate("ui.aComposeCheckerRequiresATargetServiceName"))
+      if (model.checker && definition.kind === 'container' && !definition.services.some(service => service.name === model.checker?.targetServiceName))
+        addIssue(issues, translate("ui.runtimeServiceReferenceInvalid"))
       break
     case 'Awdp':
       if (runtime.allocation !== RuntimeAllocation.PerTeam)
         addIssue(issues, translate("ui.awdpRuntimesMustUsePerTeamAllocation"))
       if (runtime.flagSource !== FlagSource.PerTeam)
         addIssue(issues, translate("ui.awdpRuntimesMustUsePerTeamFlags"))
-      if (definition.kind !== 'container')
+      if (definition.kind !== 'container' || definition.services.length !== 1)
         addIssue(issues, translate("ui.awdpOnlySupportsSingleContainerRuntimes"))
       if (internalPorts.length !== 1)
         addIssue(issues, translate("ui.awdpRequiresExactlyOneInternalPort"))

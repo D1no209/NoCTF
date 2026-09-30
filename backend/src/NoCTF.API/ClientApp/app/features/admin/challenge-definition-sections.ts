@@ -35,7 +35,6 @@ export function mergeChallengeModeDefinition(
   persisted.readyTimeoutSeconds = draft.readyTimeoutSeconds
   persisted.maximumPatchUploadBytes = draft.maximumPatchUploadBytes
   persisted.checkerFixInput = draft.checkerFixInput
-  persisted.checkerAllowRoot = draft.checkerAllowRoot
   if (draftMode === 'Ctf')
     applyCtfInteraction(persisted, draft.interactionKind)
   return persisted

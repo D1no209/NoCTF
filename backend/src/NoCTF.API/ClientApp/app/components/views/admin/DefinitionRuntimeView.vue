@@ -3,13 +3,13 @@ import { toRefs } from 'vue'
 import type { DefinitionRuntimeViewState } from '~/features/admin/useDefinitionRuntime'
 
 const viewProps = defineProps<{ state: DefinitionRuntimeViewState }>()
-const { bytesToMib, nanoCpusToCores, RuntimeAllocation, UrlExposure, isCompose, showDynamicFlagInjection, dynamicFlagInjection, kindOptions, switchKind, flagSourceOptions, exposureOptions, controlBindingList, hasCustomRuntimePolicy, DefinitionCompose, DefinitionContainer, UrlBindingList, runtime, mode, disabled, onUpdateModelValueRuntimeLimitsMemoryBytes, onUpdateModelValueRuntimeLimitsNanoCpus, onUpdateModelValueRuntimeLimitsPidsLimit, onUpdateModelValueRuntimeTtlSeconds, onUpdateModelValueRuntimeOperationTimeoutSeconds, onUpdateModelValueRuntimeFlagSource, setDynamicFlagInjection, onUpdateModelValueRuntimeUrlBindings } = toRefs(viewProps.state)
+const { bytesToMib, cpuMillicoresToCores, RuntimeAllocation, UrlExposure, hasServices, showDynamicFlagInjection, dynamicFlagInjection, kindOptions, switchKind, flagSourceOptions, exposureOptions, controlBindingList, singleServiceOnly, serviceNames, model, DefinitionContainer, UrlBindingList, runtime, mode, disabled, onUpdateModelValueRuntimeLimitsMemoryBytes, onUpdateModelValueRuntimeLimitsCpuMillicores, onUpdateModelValueRuntimeLimitsPidsLimit, onUpdateModelValueRuntimeTtlSeconds, onUpdateModelValueRuntimeOperationTimeoutSeconds, onUpdateModelValueRuntimeFlagSource, setDynamicFlagInjection, onUpdateModelValueRuntimeUrlBindings } = toRefs(viewProps.state)
 </script>
 
 <template>
   <FieldGroup>
     <div class="flex flex-wrap items-end gap-4">
-      <Field class="min-w-60 flex-1">
+      <Field class="min-w-0 flex-1">
         <FieldLabel>{{ $t('ui.operatingEnvironmentType') }}</FieldLabel>
         <Select
           :model-value="runtime.definition.kind"
@@ -40,28 +40,19 @@ const { bytesToMib, nanoCpusToCores, RuntimeAllocation, UrlExposure, isCompose, 
         :disabled="disabled"
         @update:model-value="setDynamicFlagInjection($event === true)"
       />
-      <div class="space-y-1">
+      <div>
         <FieldLabel for="ctf-dynamic-flag-injection" class="font-normal">
           {{ $t('ui.dynamicFlagInjection') }}
         </FieldLabel>
-        <FieldDescription>
-          {{ dynamicFlagInjection
-            ? $t('ui.dynamicFlagInjectionEnabledDescription')
-            : $t('ui.dynamicFlagInjectionDisabledDescription') }}
-        </FieldDescription>
       </div>
     </Field>
 
     <component :is="DefinitionContainer"
       v-if="runtime.definition.kind === 'container'"
       :definition="runtime.definition"
+      :model="model"
+      :single-service-only="singleServiceOnly"
       :mode="mode"
-      :flag-source="runtime.flagSource"
-      :disabled="disabled"
-    />
-    <component :is="DefinitionCompose"
-      v-else-if="runtime.definition.kind === 'compose'"
-      :definition="runtime.definition"
       :flag-source="runtime.flagSource"
       :disabled="disabled"
     />
@@ -96,7 +87,8 @@ const { bytesToMib, nanoCpusToCores, RuntimeAllocation, UrlExposure, isCompose, 
         <component :is="UrlBindingList"
           :model-value="runtime.urlBindings"
           :exposure-options="exposureOptions"
-          :show-service-name="isCompose"
+          :show-service-name="hasServices"
+          :service-names="serviceNames"
           :disabled="disabled"
           @update:model-value="onUpdateModelValueRuntimeUrlBindings"
         />
@@ -106,7 +98,8 @@ const { bytesToMib, nanoCpusToCores, RuntimeAllocation, UrlExposure, isCompose, 
         <component :is="UrlBindingList"
           v-model="controlBindingList"
           :exposure-options="[{ value: UrlExposure.Participants, label: $t('ui.platformCheckUsage') }]"
-          :show-service-name="isCompose"
+          :show-service-name="hasServices"
+          :service-names="serviceNames"
           :add-label="$t('ui.setUpControlCheckEntry')"
           :allow-custom-display="false"
           :disabled="disabled"
@@ -114,9 +107,9 @@ const { bytesToMib, nanoCpusToCores, RuntimeAllocation, UrlExposure, isCompose, 
       </Field>
     </DefinitionSection>
 
-    <DefinitionSection :title="$t('ui.resourcesLifecycle')" :default-open="hasCustomRuntimePolicy" accent-title>
+    <DefinitionSection :title="$t('ui.resourcesLifecycle')"  accent-title>
       <div class="grid gap-4 sm:grid-cols-3">
-        <Field>
+        <Field v-if="runtime.definition.kind === 'ova'">
           <FieldLabel>{{ $t('ui.memoryMib') }}</FieldLabel>
           <NullableNumberInput
             :model-value="bytesToMib(runtime.limits.memoryBytes)"
@@ -126,18 +119,18 @@ const { bytesToMib, nanoCpusToCores, RuntimeAllocation, UrlExposure, isCompose, 
             @update:model-value="onUpdateModelValueRuntimeLimitsMemoryBytes"
           />
         </Field>
-        <Field>
+        <Field v-if="runtime.definition.kind === 'ova'">
           <FieldLabel>{{ $t('ui.cpuCore') }}</FieldLabel>
           <NullableNumberInput
-            :model-value="nanoCpusToCores(runtime.limits.nanoCpus)"
+            :model-value="cpuMillicoresToCores(runtime.limits.cpuMillicores)"
             :min="0"
             step="0.1"
             :placeholder="$t('ui.05')"
             :disabled="disabled"
-            @update:model-value="onUpdateModelValueRuntimeLimitsNanoCpus"
+            @update:model-value="onUpdateModelValueRuntimeLimitsCpuMillicores"
           />
         </Field>
-        <Field>
+        <Field v-if="runtime.definition.kind === 'ova'">
           <FieldLabel>{{ $t('ui.maximumNumberOfProcesses') }}</FieldLabel>
           <NullableNumberInput
             :model-value="runtime.limits.pidsLimit"

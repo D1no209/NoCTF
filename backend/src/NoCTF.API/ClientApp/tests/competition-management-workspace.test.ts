@@ -4,10 +4,10 @@ import { sourceFile } from './support/feature-source'
 test('competition management keeps navigation fixed and scrolls animated content', async () => {
   const shell = await sourceFile(
     new URL('../app/pages/admin/competitions/[id].vue', import.meta.url),
-  ).text()
+  ).text().then(source => source.replace(/\r\n/g, '\n'))
   const workspace = await Bun.file(
     new URL('../app/components/views/app/settings-workspace.css', import.meta.url),
-  ).text()
+  ).text().then(source => source.replace(/\r\n/g, '\n'))
 
   expect(shell).toContain('const activePath = computed(() => route.path)')
   expect(shell).toContain('data-workspace-scroll-content')
@@ -22,16 +22,16 @@ test('competition management keeps navigation fixed and scrolls animated content
 test('challenge, team and progression management use page scroll instead of nested workspace scroll', async () => {
   const shell = await sourceFile(
     new URL('../app/pages/admin/competitions/[id].vue', import.meta.url),
-  ).text()
+  ).text().then(source => source.replace(/\r\n/g, '\n'))
   const scrollSurface = await Bun.file(
     new URL('../app/components/ui/scroll-area/ScrollSurface.vue', import.meta.url),
-  ).text()
+  ).text().then(source => source.replace(/\r\n/g, '\n'))
   const layout = await sourceFile(
     new URL('../app/layouts/default.vue', import.meta.url),
-  ).text()
+  ).text().then(source => source.replace(/\r\n/g, '\n'))
   const workspace = await Bun.file(
     new URL('../app/components/views/app/settings-workspace.css', import.meta.url),
-  ).text()
+  ).text().then(source => source.replace(/\r\n/g, '\n'))
 
   expect(shell).toContain('activePath.value === `${base}/teams`')
   expect(shell).toContain('activePath.value === `${base}/challenges`')
@@ -51,16 +51,16 @@ test('challenge, team and progression management use page scroll instead of nest
 test('workspace navigation collapses to an accessible desktop icon rail without changing its route selection', async () => {
   const feature = await sourceFile(
     new URL('../app/features/app/useAppWorkspaceNav.ts', import.meta.url),
-  ).text()
+  ).text().then(source => source.replace(/\r\n/g, '\n'))
   const view = await sourceFile(
     new URL('../app/components/views/app/AppWorkspaceNavView.vue', import.meta.url),
-  ).text()
+  ).text().then(source => source.replace(/\r\n/g, '\n'))
   const workspace = await Bun.file(
     new URL('../app/components/views/app/settings-workspace.css', import.meta.url),
-  ).text()
+  ).text().then(source => source.replace(/\r\n/g, '\n'))
   const item = await sourceFile(
     new URL('../app/components/ui/selection-list/WaveSelectionItem.vue', import.meta.url),
-  ).text()
+  ).text().then(source => source.replace(/\r\n/g, '\n'))
 
   expect(feature).toContain("useMediaQuery('(min-width: 1024px)')")
   expect(feature).toContain('isDesktop.value && collapsed.value')
@@ -82,7 +82,7 @@ test('related competition settings share continuous cards', async () => {
     'leaderboard',
     'exports',
     'permissions',
-  ].map(name => sourceFile(new URL(`../app/pages/admin/competitions/[id]/${name}.vue`, import.meta.url)).text()))
+  ].map(name => sourceFile(new URL(`../app/pages/admin/competitions/[id]/${name}.vue`, import.meta.url)).text().then(source => source.replace(/\r\n/g, '\n'))))
 
   for (const page of pages) expect(page.match(/<Card(?:\s|>)/g)).toHaveLength(1)
   expect(pages[0]).toContain('id="competition-lifecycle-management"')

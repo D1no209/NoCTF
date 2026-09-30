@@ -261,7 +261,7 @@ describe('player progression workspace', () => {
     expect(badgeRow).not.toContain('badge.description')
     expect(view).toContain(':aria-expanded="selectedBadgeId === badge.id"')
     expect(feature).toContain('selectedBadgeId.value = selectedBadgeId.value === badgeId ? null : badgeId')
-    expect(feature).toContain('selectedBadgeId.value = null\n    badgeSheetOpen.value = true')
+    expect(feature).toMatch(/selectedBadgeId\.value = null\r?\n    badgeSheetOpen\.value = true/)
   })
 })
 

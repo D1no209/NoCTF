@@ -7,14 +7,27 @@ const { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn
 </script>
 
 <template>
-  <div v-if="competition" class="flex h-full min-h-0 flex-col overflow-hidden">
-    <!-- Hero -->
-    <div data-slot="competition-overview-hero" class="@container/overview shrink-0 overflow-hidden">
-      <div class="grid @3xl/overview:grid-cols-[minmax(0,1fr)_15rem]">
-        <CoverImage :src="posterUrl" :alt="$t('ui.competitionPoster')" loading="eager" fetchpriority="high" class="min-w-0 self-start">
-        <div class="relative isolate flex min-w-0 flex-col gap-5 p-6 sm:p-8">
+  <ScrollDock v-if="competition" :label="$t('competitionBrowser.details')">
+    <template #backdrop>
+      <CoverImage :src="posterUrl" :alt="$t('ui.competitionPoster')" loading="eager" fetchpriority="high" class="h-full">
+        <div class="h-full" />
+      </CoverImage>
+    </template>
+    <template #intro>
+        <div data-slot="competition-overview-hero" class="relative isolate flex min-h-40 min-w-0 flex-col justify-end gap-3 p-6 sm:p-8">
           <TypeWatermark :text="gameModeLabel(competition.mode)" placement="top" class="text-primary" />
           <span class="sr-only">{{ gameModeLabel(competition.mode) }}</span>
+
+        </div>
+    </template>
+    <template #header>
+      <div data-slot="competition-overview-meta" class="@container/overview">
+        <div class="grid gap-5 p-5 sm:px-8 @3xl/overview:grid-cols-[minmax(0,1fr)_15rem]">
+          <div class="flex min-w-0 flex-col gap-3">
+          <Hint :content="competition.title">
+            <h2 data-scroll-dock-item data-scroll-dock-flex data-scroll-dock-order="0" data-scroll-dock-scale="0.76" tabindex="0" class="text-display w-fit max-w-full text-2xl sm:text-3xl">{{ competition.title }}</h2>
+          </Hint>
+          <div data-scroll-dock-secondary class="flex w-fit max-w-full flex-col gap-3">
           <div class="flex flex-wrap items-center gap-2">
             <component :is="LifecycleBadge" :status="competition.status" />
             <Badge v-if="competition.accessMode === 'StaffOnly'" variant="secondary">
@@ -22,28 +35,30 @@ const { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn
             </Badge>
           </div>
 
-          <h2 class="text-display text-2xl sm:text-3xl">{{ competition.title }}</h2>
-
           <p class="flex flex-wrap items-center gap-2 font-mono text-xs text-muted-foreground tabular-nums sm:text-sm">
             <CalendarRange class="size-4 shrink-0" />
             {{ formatDateTime(competition.startTime) }} ~ {{ formatDateTime(competition.endTime) }}
           </p>
 
-          <div v-if="countdown" class="flex flex-wrap items-end gap-x-3 gap-y-1">
-            <span v-if="countdown.ms > 0" class="flex items-center gap-1.5 pb-2 text-sm text-muted-foreground">
-              <Clock class="size-4" />
-              {{ countdown.label }}
-            </span>
-            <span class="font-mono text-3xl font-semibold text-primary tabular-nums sm:text-4xl">
-              {{ countdown.ms > 0 ? formatDuration(countdown.ms) : countdown.label }}
-            </span>
-          </div>
 
           <p v-if="practiceOpen" class="text-sm text-muted-foreground">
             {{ $t('ui.postCompetitionPracticeIsOpenToApprovedNonBannedParticipating') }}
           </p>
 
-          <div class="flex flex-wrap items-center gap-3 pt-1">
+          <FieldDescription v-if="myTeam && tracksEnabled">{{ $t('ui.currentTrack', { track: myTeam.trackName ?? myTeam.trackKey ?? '-' }) }}</FieldDescription>
+
+          </div>
+          <div v-if="countdown" data-scroll-dock-item data-scroll-dock-order="1" data-scroll-dock-scale="0.82" class="flex w-fit max-w-full flex-wrap items-end gap-x-3 gap-y-1">
+            <span v-if="countdown.ms > 0" class="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Clock class="size-4" />
+              {{ countdown.label }}
+            </span>
+            <span class="font-mono text-xl font-semibold text-primary tabular-nums sm:text-2xl">
+              {{ countdown.ms > 0 ? formatDuration(countdown.ms) : countdown.label }}
+            </span>
+          </div>
+
+          <div data-scroll-dock-item data-scroll-dock-order="2" data-scroll-dock-scale="0.86" class="flex w-fit max-w-full flex-wrap items-center gap-3 pt-1">
             <template v-if="!managementOnly">
             <template v-if="!teamLoaded">
               <Skeleton class="h-10 w-32" />
@@ -248,11 +263,8 @@ const { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn
               <NuxtLink :to="`/admin/competitions/${competitionId}`"><Settings data-icon="inline-start" />{{ $t('ui.manageCompetition') }}</NuxtLink>
             </Button>
           </div>
-          <FieldDescription v-if="myTeam && tracksEnabled">{{ $t('ui.currentTrack', { track: myTeam.trackName ?? myTeam.trackKey ?? '-' }) }}</FieldDescription>
-        </div>
-        </CoverImage>
-
-        <dl class="flex flex-col justify-center gap-4 border-t p-6 sm:p-8 @3xl/overview:border-t-0 @3xl/overview:border-l @3xl/overview:p-6">
+          </div>
+        <dl data-scroll-dock-secondary class="flex w-fit max-w-full flex-col justify-center gap-3">
           <div class="flex items-center justify-between gap-4">
             <dt class="flex items-center gap-2 text-xs text-muted-foreground">
               <Users class="size-3.5" />
@@ -290,10 +302,9 @@ const { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn
             </dd>
           </div>
         </dl>
+        </div>
       </div>
-    </div>
-
-    <ScrollSurface axis="y" class="min-h-0 flex-1" :aria-label="$t('competitionBrowser.details')">
+    </template>
       <div data-slot="competition-overview-body" class="flex flex-col gap-6">
         <Alert v-if="detailError" variant="destructive"><AlertDescription>{{ $message(detailError) }}<Button variant="outline" size="sm" @click="refreshCompetition">{{ $t('ui.retry') }}</Button></AlertDescription></Alert>
 
@@ -325,6 +336,5 @@ const { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn
           </div>
         </section>
       </div>
-    </ScrollSurface>
-  </div>
+  </ScrollDock>
 </template>

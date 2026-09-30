@@ -9,7 +9,6 @@ describe('frontend audit closeout', () => {
 
   test('definition editor delete buttons expose localized accessible names', async () => {
     const paths = [
-      '../app/features/admin/DefinitionCompose.vue',
       '../app/components/ui/list-editor/KeyValueEditor.vue',
       '../app/features/admin/UrlBindingList.vue',
       '../app/components/ui/list-editor/StringListEditor.vue',

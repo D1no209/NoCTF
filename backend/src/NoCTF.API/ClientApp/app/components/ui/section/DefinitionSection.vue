@@ -20,7 +20,7 @@ const openValue = ref(props.defaultOpen ? 'content' : '')
 </script>
 
 <template>
-  <section v-if="!collapsible" class="rounded-md border">
+  <section v-if="!collapsible" data-slot="definition-section" class="rounded-md">
     <header class="px-4 pt-3">
       <h3 :class="accentTitle ? 'text-base font-semibold text-primary' : 'text-sm font-medium'">{{ title }}</h3>
       <p v-if="hint" class="text-muted-foreground mt-0.5 text-xs">{{ hint }}</p>
@@ -31,7 +31,7 @@ const openValue = ref(props.defaultOpen ? 'content' : '')
       </FieldGroup>
     </div>
   </section>
-  <Accordion v-else v-model="openValue" type="single" collapsible class="rounded-md border">
+  <Accordion v-else v-model="openValue" data-slot="definition-section" type="single" collapsible class="rounded-md">
     <AccordionItem value="content" class="border-b-0">
       <AccordionTrigger class="px-4 py-3 hover:no-underline">
         <span class="flex flex-col gap-0.5">

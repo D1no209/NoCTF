@@ -6,10 +6,10 @@ describe('platform runtime administration', () => {
   test('adds an administrator-only global container inventory to the platform workspace', async () => {
     const shell = await sourceFile(
       new URL('../app/pages/admin/platform.vue', import.meta.url),
-    ).text()
+    ).text().then(source => source.replace(/\r\n/g, '\n'))
     const page = await sourceFile(
       new URL('../app/pages/admin/platform/runtimes.vue', import.meta.url),
-    ).text()
+    ).text().then(source => source.replace(/\r\n/g, '\n'))
 
     expect(shell).toContain("'/admin/platform/runtimes'")
     expect(page).toContain("definePageMeta({ middleware: 'platform-admin' })")
@@ -36,8 +36,8 @@ describe('platform runtime administration', () => {
   })
 
   test('uses a compact filter form, wrapping cells and a detail sheet instead of an oversized card table', async () => {
-    const page = await sourceFile(new URL('../app/pages/admin/platform/runtimes.vue', import.meta.url)).text()
-    const workspace = await sourceFile(new URL('../app/features/app/AppWorkspaceNav.vue', import.meta.url)).text()
+    const page = await sourceFile(new URL('../app/pages/admin/platform/runtimes.vue', import.meta.url)).text().then(source => source.replace(/\r\n/g, '\n'))
+    const workspace = await sourceFile(new URL('../app/features/app/AppWorkspaceNav.vue', import.meta.url)).text().then(source => source.replace(/\r\n/g, '\n'))
     expect(workspace).toContain('<ChoiceSidebar')
     expect(workspace).toContain('class="settings-workspace-layout"')
     expect(workspace).not.toContain('<SidebarInset')
@@ -54,7 +54,7 @@ describe('platform runtime administration', () => {
   test('keeps destructive runtime targets until the generated SDK request completes', async () => {
     const page = await sourceFile(
       new URL('../app/pages/admin/platform/runtimes.vue', import.meta.url),
-    ).text()
+    ).text().then(source => source.replace(/\r\n/g, '\n'))
 
     expect(page).toContain(':open="terminateTarget !== null"')
     expect(page).toContain('if (!open && !viewState.terminatePending) viewState.terminateTarget = null')

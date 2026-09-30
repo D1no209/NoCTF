@@ -3,15 +3,15 @@ import { toRefs } from 'vue'
 import type { AdminChallengesByIdPageViewState } from '~/features/routes/admin/challenges/useAdminChallengesByIdPage'
 
 const viewProps = defineProps<{ state: AdminChallengesByIdPageViewState }>()
-const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template, loading, loadError, form, saving, basicSaveErrors, runtimeSaveErrors, definitionSaveErrors, deleting, restoring, isDeleted, titleInvalid, directionInvalid, definitionModel, definitionParseFailed, runtimeDefinitionModel, runtimeDefinitionParseFailed, hasModeDefinition, usesRuntimeFlagInjection, runtimeDisabled, runtimeDefinitionDirty, CtfInteraction, showInteractionKind, setInteractionKind, changeMode, resetRuntimeDefinition, resetModeDefinition, saveBasic, saveRuntimeDefinition, saveModeDefinition, removeTemplate, restoreTemplate, attachments, attachmentsLoading, attachmentsIncludeDeleted, attachmentDeliveryPolicy, uploading, uploadInput, randomBatchOpen, randomUploading, randomDownloadFileName, randomFiles, randomUploadInput, deletingAttachment, attachmentActionPending, requestAttachmentDeliveryPolicy, uploadAttachment, selectRandomFiles, uploadRandomBatch, confirmDeleteAttachment, restoreAttachment, formatBytes, flags, supportsRegularExpression, flagsLoading, flagsIncludeDeleted, flagCreating, flagForm, deletingFlag, flagActionPending, staticFlags, systemFlags, createFlag, confirmDeleteFlag, restoreFlag, managersText, permissionsSaving, newOwnerId, transferOpen, transferring, savePermissions, transferOwner, AdminDateTime, AdminGameModeBadge, ChallengeTestRuntimePanel, DefinitionCheckerSection, DefinitionFlagInjectionSection, DefinitionFlagTemplateSection, DefinitionPatchSection, DefinitionRuntimeSection, setUploadInputRef, setRandomUploadInputRef, onBlurFormDirection, onClickRandomBatchOpen, onClickDeletingAttachment, onClickDeletingFlag, onClickTransferOpen, onUpdateOpenDeletingAttachment, onClickRandomBatchOpen2, onUpdateOpenDeletingFlag } = toRefs(viewProps.state)
+const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canOrganize, template, loading, loadError, form, saving, basicSaveErrors, runtimeSaveErrors, definitionSaveErrors, deleting, restoring, isDeleted, titleInvalid, directionInvalid, definitionModel, definitionParseFailed, runtimeDefinitionModel, runtimeDefinitionParseFailed, hasModeDefinition, usesRuntimeFlagInjection, runtimeDisabled, runtimeDefinitionDirty, CtfInteraction, showInteractionKind, setInteractionKind, changeMode, resetRuntimeDefinition, resetModeDefinition, saveBasic, saveRuntimeDefinition, saveModeDefinition, removeTemplate, restoreTemplate, attachments, attachmentsLoading, attachmentsIncludeDeleted, attachmentDeliveryPolicy, uploading, uploadInput, randomBatchOpen, randomUploading, randomDownloadFileName, randomFiles, randomUploadInput, deletingAttachment, attachmentActionPending, requestAttachmentDeliveryPolicy, uploadAttachment, selectRandomFiles, uploadRandomBatch, confirmDeleteAttachment, restoreAttachment, formatBytes, flags, supportsRegularExpression, flagsLoading, flagsIncludeDeleted, flagCreating, flagForm, deletingFlag, flagActionPending, staticFlags, systemFlags, createFlag, confirmDeleteFlag, restoreFlag, managersText, permissionsSaving, newOwnerId, transferOpen, transferring, savePermissions, transferOwner, AdminDateTime, AdminGameModeBadge, ChallengeTestRuntimePanel, ChallengeCompetitionPlacements, DefinitionCheckerSection, DefinitionFlagInjectionSection, DefinitionFlagTemplateSection, DefinitionPatchSection, DefinitionRuntimeSection, setUploadInputRef, setRandomUploadInputRef, onBlurFormDirection, onClickRandomBatchOpen, onClickDeletingAttachment, onClickDeletingFlag, onClickTransferOpen, onUpdateOpenDeletingAttachment, onClickRandomBatchOpen2, onUpdateOpenDeletingFlag } = toRefs(viewProps.state)
 </script>
 
 <template>
-  <div class="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8">
+  <div data-contained-workspace-page data-slot="challenge-template-workspace" class="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-5">
     <div class="flex items-center gap-2 text-sm text-muted-foreground">
       <NuxtLink to="/admin/challenges" class="hover:underline">{{ $t('ui.challengeLibrary2') }}</NuxtLink>
       <span>/</span>
-      <span>{{ template?.title ?? challengeId }}</span>
+      <span class="min-w-0 truncate">{{ template?.title ?? challengeId }}</span>
     </div>
 
     <Alert v-if="!canOrganize" variant="destructive">
@@ -30,8 +30,8 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template
 
       <template v-else-if="template">
         <div class="flex flex-wrap items-center justify-between gap-4">
-          <div class="flex items-center gap-3">
-            <h1 class="text-2xl font-semibold">{{ template.title }}</h1>
+          <div class="flex min-w-0 items-center gap-3">
+            <h1 class="truncate text-2xl font-semibold">{{ template.title }}</h1>
             <component :is="AdminGameModeBadge" :mode="template.mode" />
             <Badge v-if="isDeleted" variant="destructive">{{ $t('ui.deleted') }}</Badge>
           </div>
@@ -62,11 +62,11 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template
         </div>
 
         <Tabs
-          default-value="basic"
+          v-model="selectedSection"
           orientation="vertical"
-          class="grid items-start gap-6 lg:grid-cols-[14rem_minmax(0,1fr)]"
+          class="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-4 lg:grid-cols-[12rem_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)] lg:gap-6"
         >
-          <aside class="border-b pb-4 lg:sticky lg:top-20 lg:border-r lg:border-b-0 lg:pr-4 lg:pb-0">
+          <ScrollSurface as="aside" axis="y" class="min-h-0 overflow-y-auto lg:pr-2" :aria-label="$t('ui.challengeLibrary2')">
             <TabsList class="grid h-auto w-full grid-cols-2 items-stretch gap-1 bg-transparent p-0 sm:grid-cols-3 lg:flex lg:flex-col">
               <TabsTrigger value="basic" class="w-full justify-start px-3 py-2">{{ $t('ui.basicInformation') }}</TabsTrigger>
               <TabsTrigger value="runtime" class="w-full justify-start px-3 py-2">{{ $t('ui.runtimeEnvironment') }}</TabsTrigger>
@@ -80,13 +80,18 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template
                 <Badge variant="secondary" class="ml-auto">{{ flags.length }}</Badge>
               </TabsTrigger>
               <TabsTrigger value="permissions" class="w-full justify-start px-3 py-2">{{ $t('ui.permissions') }}</TabsTrigger>
+              <TabsTrigger value="placements" class="w-full justify-start px-3 py-2">{{ $t('placements.title') }}</TabsTrigger>
             </TabsList>
-          </aside>
+          </ScrollSurface>
 
-          <div class="min-w-0">
+          <div data-slot="challenge-template-panels" class="min-h-0 min-w-0">
+          <TabsContent value="placements" class="mt-0">
+            <component :is="ChallengeCompetitionPlacements" :challenge-id="challengeId" :mode="template.mode ?? 'Ctf'" :disabled="isDeleted" />
+          </TabsContent>
           <TabsContent value="basic" class="mt-0">
             <Card>
-              <CardContent class="pt-6">
+              <ScrollSurface axis="y" :reset-key="selectedSection" class="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+              <CardContent>
                 <Alert v-if="basicSaveErrors.length" variant="destructive" class="mb-4">
                   <AlertTitle>{{ $t('ui.unableToSaveTheChallengeTemplate') }}</AlertTitle>
                   <AlertDescription>
@@ -97,6 +102,7 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template
                 </Alert>
                 <UiForm validation="feature" @submit.prevent="saveBasic">
                   <FieldGroup>
+                    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
                     <Field :data-invalid="titleInvalid || undefined">
                       <FieldLabel for="edit-title">{{ $t('ui.title') }}</FieldLabel>
                       <Input
@@ -134,6 +140,7 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template
                         :disabled="isDeleted"
                       />
                     </Field>
+                    </div>
                     <div class="grid min-w-0 gap-4 xl:grid-cols-2">
                       <Field>
                         <FieldLabel for="edit-description">{{ $t('ui.question') }}</FieldLabel>
@@ -153,12 +160,24 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template
                   </FieldGroup>
                 </UiForm>
               </CardContent>
+              </ScrollSurface>
             </Card>
           </TabsContent>
 
           <TabsContent value="runtime" class="mt-0">
             <Card>
-              <CardContent class="pt-6">
+              <CardHeader v-if="!isDeleted" class="shrink-0">
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <Button type="button" variant="outline" size="sm" @click="resetRuntimeDefinition">
+                      <RotateCcw data-icon="inline-start" /> {{ $t('ui.resetToCurrentModeDefinition') }}
+                    </Button>
+                    <Button data-testid="runtime-definition-save" type="button" size="sm" :disabled="saving" @click="saveRuntimeDefinition">
+                      <Spinner v-if="saving" data-icon="inline-start" /> {{ $t('ui.saveChanges') }}
+                    </Button>
+                  </div>
+              </CardHeader>
+              <ScrollSurface axis="y" :reset-key="selectedSection" class="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+              <CardContent>
                 <Alert v-if="runtimeSaveErrors.length" variant="destructive" class="mb-4">
                   <AlertTitle>{{ $t('ui.unableToSaveTheChallengeTemplate') }}</AlertTitle>
                   <AlertDescription>
@@ -176,14 +195,6 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template
                   </AlertDescription>
                 </Alert>
                 <FieldGroup v-else-if="runtimeDefinitionModel">
-                  <div v-if="!isDeleted" class="flex flex-wrap items-center justify-between gap-2">
-                    <Button type="button" variant="outline" size="sm" @click="resetRuntimeDefinition">
-                      <RotateCcw data-icon="inline-start" /> {{ $t('ui.resetToCurrentModeDefinition') }}
-                    </Button>
-                    <Button data-testid="runtime-definition-save" type="button" size="sm" :disabled="saving" @click="saveRuntimeDefinition">
-                      <Spinner v-if="saving" data-icon="inline-start" /> {{ $t('ui.saveChanges') }}
-                    </Button>
-                  </div>
                   <component :is="DefinitionRuntimeSection" :model="runtimeDefinitionModel" :mode="template.mode ?? 'Ctf'" :disabled="isDeleted" />
                   <component :is="ChallengeTestRuntimePanel"
                     v-if="runtimeDefinitionModel.runtime && !isDeleted"
@@ -192,12 +203,24 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template
                   />
                 </FieldGroup>
               </CardContent>
+              </ScrollSurface>
             </Card>
           </TabsContent>
 
           <TabsContent value="definition" class="mt-0">
             <Card>
-              <CardContent class="pt-6">
+              <CardHeader v-if="!isDeleted" class="shrink-0">
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <Button type="button" variant="outline" size="sm" @click="resetModeDefinition">
+                      <RotateCcw data-icon="inline-start" /> {{ $t('ui.resetToCurrentModeDefinition') }}
+                    </Button>
+                    <Button data-testid="mode-definition-save" type="button" size="sm" :disabled="saving" @click="saveModeDefinition">
+                      <Spinner v-if="saving" data-icon="inline-start" /> {{ $t('ui.saveChanges') }}
+                    </Button>
+                  </div>
+              </CardHeader>
+              <ScrollSurface axis="y" :reset-key="selectedSection" class="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+              <CardContent>
                 <Alert v-if="definitionSaveErrors.length" variant="destructive" class="mb-4">
                   <AlertTitle>{{ $t('ui.unableToSaveTheChallengeTemplate') }}</AlertTitle>
                   <AlertDescription>
@@ -215,14 +238,6 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template
                   </AlertDescription>
                 </Alert>
                 <FieldGroup v-else-if="definitionModel">
-                  <div v-if="!isDeleted" class="flex flex-wrap items-center justify-between gap-2">
-                    <Button type="button" variant="outline" size="sm" @click="resetModeDefinition">
-                      <RotateCcw data-icon="inline-start" /> {{ $t('ui.resetToCurrentModeDefinition') }}
-                    </Button>
-                    <Button data-testid="mode-definition-save" type="button" size="sm" :disabled="saving" @click="saveModeDefinition">
-                      <Spinner v-if="saving" data-icon="inline-start" /> {{ $t('ui.saveChanges') }}
-                    </Button>
-                  </div>
                   <Alert v-if="hasModeDefinition && runtimeDisabled">
                     <AlertDescription>{{ $t('ui.theFollowingConfigurationsWillNotTakeEffectWhileTheRuntime') }}</AlertDescription>
                   </Alert>
@@ -288,6 +303,7 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template
                   <FieldDescription v-else> {{ $t('ui.definitionModificationsWillTakeEffectOnInstancesThatAreStarted') }} </FieldDescription>
                 </FieldGroup>
               </CardContent>
+              </ScrollSurface>
             </Card>
           </TabsContent>
 
@@ -349,6 +365,7 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template
                   </div>
                 </div>
               </CardHeader>
+              <ScrollSurface axis="y" :reset-key="selectedSection" class="min-h-0 flex-1 overflow-y-auto overscroll-contain">
               <CardContent>
                 <div v-if="attachmentsLoading" class="flex flex-col gap-2">
                   <Skeleton v-for="i in 3" :key="i" class="h-10 w-full" />
@@ -417,6 +434,7 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template
                   </TableBody>
                 </Table>
               </CardContent>
+              </ScrollSurface>
             </Card>
           </TabsContent>
 
@@ -428,11 +446,11 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template
                   <Label for="flags-include-deleted">{{ $t('ui.showDeleted') }}</Label>
                 </div>
               </CardHeader>
+              <ScrollSurface axis="y" :reset-key="selectedSection" class="min-h-0 flex-1 overflow-y-auto overscroll-contain">
               <CardContent>
                 <section v-if="!usesRuntimeFlagInjection" class="mb-6 flex flex-col gap-4" aria-labelledby="add-static-flag-title">
                   <div>
                     <h3 id="add-static-flag-title" class="text-sm font-semibold">{{ $t('ui.addFlag2') }}</h3>
-                    <p class="text-sm text-muted-foreground">{{ $t('ui.templateLevelStaticFlagWhichCanBeReferencedWhenInstantiated') }}</p>
                   </div>
                   <UiForm validation="feature" @submit.prevent="createFlag">
                     <div class="grid gap-4 lg:grid-cols-[minmax(12rem,16rem)_minmax(0,1fr)_auto] lg:items-end">
@@ -515,7 +533,6 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template
                   <section v-if="systemFlags.length > 0" class="space-y-2">
                     <div>
                       <h3 class="text-sm font-semibold">{{ $t('ui.systemGeneratedDynamicFlags') }}</h3>
-                      <p class="text-sm text-muted-foreground">{{ $t('ui.automaticallyLinkedToAnAttachmentTeamRoundOrRuntimeBy') }}</p>
                     </div>
                     <Table>
                       <TableHeader>
@@ -550,17 +567,19 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template
                   </section>
                 </div>
               </CardContent>
+              </ScrollSurface>
             </Card>
           </TabsContent>
 
           <TabsContent value="permissions" class="mt-0">
-            <div class="grid gap-6 lg:grid-cols-2">
+            <div class="grid h-full min-h-0 gap-4 lg:grid-cols-2">
               <Card>
                 <CardHeader>
                   <CardTitle>{{ $t('ui.templatePermissions') }}</CardTitle>
                   <CardDescription>{{ $t('ui.thePersonInChargeHasAllPermissionsTheAdministratorCan') }}</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <ScrollSurface axis="y" :reset-key="selectedSection" class="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+              <CardContent>
                   <FieldGroup>
                     <Field>
                       <FieldLabel>{{ $t('ui.responsiblePersonId') }}</FieldLabel>
@@ -584,13 +603,15 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template
                     </Field>
                   </FieldGroup>
                 </CardContent>
+                </ScrollSurface>
               </Card>
               <Card>
                 <CardHeader>
                   <CardTitle>{{ $t('ui.transferPerson') }}</CardTitle>
                   <CardDescription>{{ $t('ui.transferTheTemplateOwnerToAnotherOrganizerOrAdministratorEffective') }}</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <ScrollSurface axis="y" :reset-key="selectedSection" class="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+              <CardContent>
                   <FieldGroup>
                     <Field>
                       <FieldLabel for="new-owner">{{ $t('ui.newPersonInChargeUserId') }}</FieldLabel>
@@ -607,6 +628,7 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, canOrganize, template
                     </Field>
                   </FieldGroup>
                 </CardContent>
+                </ScrollSurface>
               </Card>
             </div>
           </TabsContent>

@@ -18,7 +18,7 @@ describe('competition deletion actions', () => {
       new URL('../app/pages/admin/competitions/[id]/index.vue', import.meta.url),
     ).text()
     const [listPage, sidebar] = await Promise.all([
-      sourceFile(new URL('../app/pages/competitions/index.vue', import.meta.url)).text(),
+      sourceFile(new URL('../app/pages/competitions/[id]/index.vue', import.meta.url)).text(),
       sourceFile(new URL('../app/features/competitions/CompetitionSidebar.vue', import.meta.url)).text(),
     ])
 

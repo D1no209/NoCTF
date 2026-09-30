@@ -25,6 +25,6 @@ export function runnerFailureLabel(value?: NoCtfapiEndpointsRuntimeRunnerAdmissi
 export function formatCapacityAmount(
   value?: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResourceAmountResponse | null,
 ): string {
-  if (value?.nanoCpus == null || value.memoryBytes == null) return '—'
-  return `${(value.nanoCpus / 1_000_000_000).toFixed(3)} / ${(value.memoryBytes / 1_048_576).toFixed(0)} / ${value.pidsLimit ?? '—'}`
+  if (value?.cpuMillicores == null || value.memoryBytes == null) return '—'
+  return `${(value.cpuMillicores / 1000).toFixed(3)} / ${(value.memoryBytes / 1_048_576).toFixed(0)} / ${value.pidsLimit ?? '—'}`
 }

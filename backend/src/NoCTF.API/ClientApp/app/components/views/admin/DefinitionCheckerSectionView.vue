@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { DefinitionCheckerSectionViewState } from '~/features/admin/useDefinitionCheckerSection'
 
 const viewProps = defineProps<{ state: DefinitionCheckerSectionViewState }>()
-const { isCompose, toggleChecker, toggleCheckerJob, RunnerJobEditor, model, mode, disabled } = toRefs(viewProps.state)
+const { hasServices, serviceNames, toggleChecker, toggleCheckerJob, RunnerJobEditor, model, mode, disabled } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -20,15 +20,13 @@ const { isCompose, toggleChecker, toggleCheckerJob, RunnerJobEditor, model, mode
     </Field>
     <template v-if="model.checker">
       <component :is="RunnerJobEditor" :job="model.checker.job" :disabled="disabled" />
-      <Field v-if="isCompose">
+      <Field v-if="hasServices">
         <FieldLabel>{{ $t('ui.targetServiceName') }}</FieldLabel>
-        <Input
-          v-model="model.checker.targetServiceName"
-          :placeholder="$t('ui.serviceNameInCompose')"
-          class="font-mono text-sm"
-          :disabled="disabled"
-        />
-        <FieldDescription>{{ $t('ui.theComposeOperatingEnvironmentMustSpecifyTheServiceToBe') }}</FieldDescription>
+        <Select v-model="model.checker.targetServiceName" :disabled="disabled">
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent><SelectGroup><SelectItem v-for="name in serviceNames" :key="name" :value="name">{{ name }}</SelectItem></SelectGroup></SelectContent>
+        </Select>
+        <FieldDescription>{{ $t('ui.runtimeServiceTarget') }}</FieldDescription>
       </Field>
     </template>
   </FieldSet>
@@ -64,17 +62,4 @@ const { isCompose, toggleChecker, toggleCheckerJob, RunnerJobEditor, model, mode
       {{ $t('ui.enableTheOneShotFixCheckerBeforeProvidingItWith') }}
     </FieldDescription>
   </FieldSet>
-
-  <FieldGroup v-if="(mode === 'Awd' && model.checker) || ((mode === 'Awdp' || mode === 'Ctf') && model.checkerJob)">
-    <Field orientation="horizontal" :data-disabled="disabled">
-      <Switch id="def-checker-allow-root" v-model="model.checkerAllowRoot" :disabled="disabled" />
-      <FieldContent>
-        <FieldLabel for="def-checker-allow-root">{{ $t('ui.allowTheCheckerToRunAsRoot') }}</FieldLabel>
-        <FieldDescription>
-          {{ $t('ui.offByDefaultTheImageMustDeclareANonzeroNumeric') }}
-          {{ $t('ui.enableOnlyForTrustedCheckersNetworkIsolationCapabilityLimitsAnd') }}
-        </FieldDescription>
-      </FieldContent>
-    </Field>
-  </FieldGroup>
 </template>

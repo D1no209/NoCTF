@@ -5,6 +5,7 @@ import { useContentSwap } from '../app/motion/useContentSwap'
 import {
   competitionChallengePath,
   competitionPath,
+  competitionPageKey,
   competitionsPath,
 } from '../app/utils/app-routes'
 
@@ -87,14 +88,29 @@ test('film swaps leave before entering and release the reserved height after com
   expect(motion.frameStyle.value.minHeight).toBeUndefined()
 })
 
-test('competition details keep the opaque hero outside the scrolling body', async () => {
+test('competition details scroll the poster and dock the metadata inside one surface', async () => {
   const page = await Bun.file(new URL('../app/components/views/page/competitions/CompetitionsIndexPageView.vue', import.meta.url)).text()
   const overview = await Bun.file(new URL('../app/components/views/competitions/CompetitionOverviewView.vue', import.meta.url)).text()
   const css = await Bun.file(new URL('../app/assets/css/main.css', import.meta.url)).text()
+  const dock = await Bun.file(new URL('../app/components/ui/scroll-area/ScrollDock.vue', import.meta.url)).text()
 
   expect(page).not.toContain('<ScrollSurface :key="selectedId')
-  expect(overview.indexOf('data-slot="competition-overview-hero"')).toBeLessThan(overview.indexOf('<ScrollSurface axis="y"'))
+  expect(overview).toContain('<ScrollDock v-if="competition"')
+  expect(overview).toContain('<template #intro>')
+  expect(overview).toContain('<template #header>')
+  expect(dock).toContain('data-scroll-dock-viewport')
+  expect(dock.indexOf('data-scroll-dock-viewport')).toBeLessThan(dock.indexOf('data-scroll-dock-intro'))
   expect(overview).toContain('data-slot="competition-overview-body"')
-  expect(css).toContain("[data-slot='competition-overview-hero'] { background: var(--card); }")
+  expect(overview).toContain('data-scroll-dock-order="0"')
+  expect(overview).toContain('data-scroll-dock-secondary')
+  expect(css).not.toContain("[data-scroll-dock-header][data-pinned='true']")
   expect(css).toContain('--card-opacity: 45%;')
+})
+
+test('root, filter and entity selections reuse the browser while participant workspaces keep their identity', () => {
+  const root = competitionPageKey({ path: '/competitions', params: {} })
+  expect(competitionPageKey({ path: '/competitions/live', params: { id: 'live' } })).toBe(root)
+  expect(competitionPageKey({ path: '/competitions/past', params: { id: 'past' } })).toBe(root)
+  expect(competitionPageKey({ path: '/competitions/live/challenges', params: { id: 'live' } })).toBe('live')
+  expect(competitionPageKey({ path: '/competitions/past/leaderboard', params: { id: 'past' } })).toBe('past')
 })

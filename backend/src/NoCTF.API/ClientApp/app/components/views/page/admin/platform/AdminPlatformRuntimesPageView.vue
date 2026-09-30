@@ -59,7 +59,6 @@ const { formatCapacityAmount, runnerFailureLabel, ExternalLink, RuntimeAccessUrl
                 <SelectContent><SelectGroup>
                   <SelectItem value="all">{{ $t('ui.typeAll') }}</SelectItem>
                   <SelectItem value="Container">{{ $t('ui.container') }}</SelectItem>
-                  <SelectItem value="Compose">{{ $t('ui.compose') }}</SelectItem>
                 </SelectGroup></SelectContent>
               </Select>
             </Field>

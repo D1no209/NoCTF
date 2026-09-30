@@ -52,7 +52,6 @@ const { canWrite, isAdministrator, challengeOptions, teamOptions, runtimeTeamLab
           <SelectContent>
             <SelectGroup>
               <SelectItem value="Container">{{ $t('ui.container') }}</SelectItem>
-              <SelectItem value="Compose">{{ $t('ui.compose') }}</SelectItem>
               <SelectItem value="OvaVm">{{ $t('ui.virtualMachine') }}</SelectItem>
             </SelectGroup>
           </SelectContent>

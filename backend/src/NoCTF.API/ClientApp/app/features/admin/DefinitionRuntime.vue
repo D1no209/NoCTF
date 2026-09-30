@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { bindViewState } from '~/features/shared/view-state'
-import type { GameModeValue, RuntimeTemplateModel } from '~/utils/game-config'
+import type { DefinitionModel, GameModeValue, RuntimeTemplateModel } from '~/utils/game-config'
 
 import { useDefinitionRuntime } from './useDefinitionRuntime'
 import View from '~/components/views/admin/DefinitionRuntimeView.vue'
 
 const props = withDefaults(defineProps<{
+  model: DefinitionModel
   runtime: RuntimeTemplateModel
   mode: GameModeValue
   interactionKind: number

@@ -3,9 +3,9 @@ import { formatCapacityAmount, runnerFailureLabel } from '../app/features/shared
 
 test('capacity amounts preserve exact values and unknown PID observations', () => {
   expect(formatCapacityAmount(null)).toBe('—')
-  expect(formatCapacityAmount({ nanoCpus: 0, memoryBytes: 0, pidsLimit: 0 })).toBe('0.000 / 0 / 0')
-  expect(formatCapacityAmount({ nanoCpus: -250000000, memoryBytes: -1048576, pidsLimit: -1 })).toBe('-0.250 / -1 / -1')
-  expect(formatCapacityAmount({ nanoCpus: 1000000000, memoryBytes: 1048576, pidsLimit: null })).toBe('1.000 / 1 / —')
+  expect(formatCapacityAmount({ cpuMillicores: 0, memoryBytes: 0, pidsLimit: 0 })).toBe('0.000 / 0 / 0')
+  expect(formatCapacityAmount({ cpuMillicores: -250, memoryBytes: -1048576, pidsLimit: -1 })).toBe('-0.250 / -1 / -1')
+  expect(formatCapacityAmount({ cpuMillicores: 1000, memoryBytes: 1048576, pidsLimit: null })).toBe('1.000 / 1 / —')
 })
 
 test('node pressure and accounting shortages have distinct explanations', () => {

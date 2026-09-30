@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { UrlBindingListViewState } from '~/features/admin/useUrlBindingList'
 
 const viewProps = defineProps<{ state: UrlBindingListViewState }>()
-const { Plus, X, displayTemplateOptions, update, remove, add, modelValue, exposureOptions, showServiceName, addLabel, allowCustomDisplay, disabled } = toRefs(viewProps.state)
+const { Plus, X, displayTemplateOptions, update, remove, add, modelValue, exposureOptions, showServiceName, serviceNames, addLabel, allowCustomDisplay, disabled } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -75,20 +75,18 @@ const { Plus, X, displayTemplateOptions, update, remove, add, modelValue, exposu
               :model-value="binding.containerPort"
               :min="1"
               :max="65535"
-              :placeholder="$t('ui.parseFromPortMapping')"
+              :placeholder="$t('ui.containerPort')"
               :disabled="disabled"
               @update:model-value="update(index, { containerPort: $event })"
             />
           </Field>
           <Field v-if="showServiceName">
-            <FieldLabel>{{ $t('ui.serviceNameCompose') }}</FieldLabel>
-            <Input
-              :model-value="binding.serviceName"
-              :placeholder="$t('ui.serviceNameInCompose')"
-              class="font-mono text-sm"
-              :disabled="disabled"
-              @update:model-value="update(index, { serviceName: String($event ?? '') })"
-            />
+            <FieldLabel>{{ $t('ui.runtimeServiceName') }}</FieldLabel>
+            <Select :model-value="binding.serviceName" :disabled="disabled"
+              @update:model-value="update(index, { serviceName: String($event ?? '') })">
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent><SelectGroup><SelectItem v-for="name in serviceNames" :key="name" :value="name">{{ name }}</SelectItem></SelectGroup></SelectContent>
+            </Select>
           </Field>
         </div>
         <Button

@@ -9,11 +9,9 @@ import {
   challengeRuleFields,
   competitionConfigFields,
   CtfInteraction,
-  defaultContainerSecurity,
   defaultDefinition,
   definitionContractToModel,
   definitionModelToContract,
-  emptyComposeDefinition,
   emptyContainerDefinition,
   emptyDefinition,
   emptyOvaDefinition,
@@ -30,9 +28,10 @@ import {
 } from '../app/features/admin/challenge-definition-sections'
 
 describe('typed game configuration contracts', () => {
-  test('new container definitions do not drop capabilities by default', () => {
-    expect(defaultContainerSecurity().capDrop).toEqual([])
-    expect(emptyContainerDefinition().security.capDrop).toEqual([])
+  test('new environments default to one named service with portable resource units', () => {
+    expect(emptyContainerDefinition().services).toHaveLength(1)
+    expect(emptyContainerDefinition().services[0]).toMatchObject({ name: 'main', cpuCores: 0.5, memoryMiB: 512 })
+    expect('security' in emptyContainerDefinition()).toBeFalse()
   })
 
   test.each(['Ctf', 'Awd', 'Awdp', 'Koh'] as const)('%s defaults select one typed branch without a schema version', (mode) => {
@@ -55,8 +54,8 @@ describe('typed game configuration contracts', () => {
     expect(payload.runtime?.container).toBeDefined()
   })
 
-  test('Compose and Ova runtimes each serialize only their matching branch', () => {
-    for (const definition of [emptyComposeDefinition(), emptyOvaDefinition()]) {
+  test('Ova runtimes serialize only their matching branch', () => {
+    for (const definition of [emptyOvaDefinition()]) {
       const model = emptyDefinition('Ctf')
       model.runtime = emptyRuntimeTemplate('Ctf')
       model.runtime.definition = definition
@@ -64,7 +63,7 @@ describe('typed game configuration contracts', () => {
         runtime?: Record<string, unknown>
       }
       expect(payload.runtime?.[String(payload.runtime.kind).toLowerCase()]).toBeDefined()
-      expect(['container', 'compose', 'ova'].filter(key => payload.runtime?.[key] != null)).toHaveLength(1)
+      expect(['container', 'ova'].filter(key => payload.runtime?.[key] != null)).toHaveLength(1)
       const restored = definitionContractToModel(payload as ReturnType<typeof definitionModelToContract>, 'Ctf')
       expect(restored.runtime?.definition.kind).toBe(definition.kind)
     }
@@ -118,23 +117,19 @@ describe('typed game configuration contracts', () => {
     expect(payload.definition.runtime.container).toBeDefined()
   })
 
-  test('container security and runtime fields round-trip through the typed contract', () => {
+  test('named services, resources and the single public entry list round-trip', () => {
     const model = emptyDefinition('Ctf')
     model.runtime = emptyRuntimeTemplate('Ctf')
-    model.runtime.flagSource = FlagSource.PerTeam
     model.runtime.definition = emptyContainerDefinition(true)
-    model.runtime.definition.security.capDrop = ['ALL', 'NET_RAW']
-    model.runtime.definition.security.capAdd = ['CHOWN']
-    model.runtime.definition.containerPorts = [8080]
-
+    model.runtime.definition.services[0]!.image = 'challenge:latest'
+    model.runtime.definition.services[0]!.cpuCores = 0.501
+    model.runtime.urlBindings = [{ serviceName: 'main', containerPort: 8080, urlTemplate: 'nc {HOST} {PORT}', exposure: UrlExposure.OwnerOnly }]
     const contract = definitionModelToContract('Ctf', model)
     const restored = definitionContractToModel(contract, 'Ctf')
-
-    expect(restored.runtime?.definition.kind).toBe('container')
-    if (restored.runtime?.definition.kind !== 'container') throw new Error('Expected container Runtime.')
-    expect(restored.runtime.definition.security.capDrop).toEqual(['ALL', 'NET_RAW'])
-    expect(restored.runtime.definition.security.capAdd).toEqual(['CHOWN'])
-    expect(restored.runtime.definition.containerPorts).toEqual([8080])
+    expect(restored.runtime?.definition).toEqual(model.runtime.definition)
+    expect(restored.runtime?.urlBindings).toEqual(model.runtime.urlBindings)
+    expect(contract.runtime?.limits).toBeNull()
+    expect('portMappings' in contract.runtime!.container!).toBeFalse()
   })
 
   test('definition flag template is not lost while editing', () => {
@@ -229,13 +224,13 @@ describe('typed game configuration contracts', () => {
   test('section merges preserve untouched typed state', () => {
     const persisted = emptyDefinition('Awdp')
     persisted.runtime = emptyRuntimeTemplate('Awdp')
-    persisted.checkerAllowRoot = true
+    persisted.checkerFixInput = true
     const runtimeDraft = structuredClone(persisted)
     if (!runtimeDraft.runtime) throw new Error('Expected Runtime defaults.')
     runtimeDraft.runtime.ttlSeconds = 120
 
     const runtimeMerged = mergeChallengeRuntimeDefinition(persisted, runtimeDraft)
-    expect(runtimeMerged.checkerAllowRoot).toBeTrue()
+    expect(runtimeMerged.checkerFixInput).toBeTrue()
     expect(runtimeMerged.runtime?.ttlSeconds).toBe(120)
 
     const modeDraft = structuredClone(runtimeMerged)

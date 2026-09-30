@@ -1,15 +1,17 @@
 import { expect, test } from 'bun:test'
 import { sourceFile } from './support/feature-source'
 
-test('competition overviews render a versioned poster URL without waiting for a blob request', async () => {
+test('public competition posters use versioned URLs while private posters use authenticated reads', async () => {
   const overview = await sourceFile('app/features/competitions/useCompetitionOverview.ts').text()
   const view = await sourceFile('app/components/views/competitions/CompetitionOverviewView.vue').text()
   const cover = await sourceFile('app/components/ui/media/CoverImage.vue').text()
   const contract = await sourceFile('../Endpoints/Competitions/GetCompetitionEndpoint.cs').text()
   const endpoint = await sourceFile('../Endpoints/Competitions/GetCompetitionPosterEndpoint.cs').text()
 
-  expect(overview).toContain('computed(() => competition.value.posterUrl ?? null)')
-  expect(overview).not.toContain('useCompetitionPoster')
+  expect(overview).toContain("competition.value.accessMode === 'StaffOnly'")
+  expect(overview).toContain('? protectedPoster.posterUrl.value : competition.value.posterUrl ?? null')
+  expect(overview).toContain('useCompetitionPoster(competitionId)')
+  expect(overview).toContain('posterActorId !== user.value?.userId')
   expect(view).toContain('<CoverImage :src="posterUrl"')
   expect(view).not.toContain(':pending="posterLoading"')
   expect(cover.match(/pointer-events-none/g)?.length).toBeGreaterThanOrEqual(3)

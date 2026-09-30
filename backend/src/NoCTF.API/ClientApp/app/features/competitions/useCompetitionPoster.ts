@@ -13,6 +13,13 @@ export function useCompetitionPoster(competitionId: string) {
     posterUrl.value = null
   }
 
+  function cancelPoster(): void {
+    generation += 1
+    clearPoster()
+    posterLoading.value = false
+    posterError.value = null
+  }
+
   async function refreshPoster(): Promise<void> {
     const current = ++generation
     posterLoading.value = true
@@ -45,8 +52,7 @@ export function useCompetitionPoster(competitionId: string) {
   }
 
   onUnmounted(() => {
-    generation += 1
-    clearPoster()
+    cancelPoster()
   })
 
   return {
@@ -55,5 +61,6 @@ export function useCompetitionPoster(competitionId: string) {
     posterError,
     refreshPoster,
     clearPoster,
+    cancelPoster,
   }
 }

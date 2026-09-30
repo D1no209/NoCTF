@@ -4,8 +4,8 @@ import { id } from '../mock/schema'
 
 describe('competition runtime administration pagination', () => {
   test('uses numbered offset pages and resets to the first page when filters are applied', async () => {
-    const controller = await Bun.file(new URL('../app/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdRuntimesPage.ts', import.meta.url)).text()
-    const view = await Bun.file(new URL('../app/components/views/page/admin/competitions/[id]/AdminCompetitionsByIdRuntimesPageView.vue', import.meta.url)).text()
+    const controller = await Bun.file(new URL('../app/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdRuntimesPage.ts', import.meta.url)).text().then(source => source.replace(/\r\n/g, '\n'))
+    const view = await Bun.file(new URL('../app/components/views/page/admin/competitions/[id]/AdminCompetitionsByIdRuntimesPageView.vue', import.meta.url)).text().then(source => source.replace(/\r\n/g, '\n'))
 
     expect(controller).toContain('useOffsetPagination<NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse>')
     expect(controller).toContain('offset,\n        limit,\n        desc,')

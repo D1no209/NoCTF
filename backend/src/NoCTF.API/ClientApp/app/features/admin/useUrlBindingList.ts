@@ -12,23 +12,25 @@ export function useUrlBindingList(props: Readonly<Omit<{
   modelValue: UrlBindingModel[]
   /** 允许的暴露范围;只传一个值时锁定。 */
   exposureOptions?: { value: number; label: string }[]
-  /** Compose 运行时需要选择服务名。 */
+  /** 容器运行时的服务选择。 */
   showServiceName?: boolean
+  serviceNames?: string[]
   addLabel?: string
   /** 访问入口使用连接格式预设；控制检查入口仍要求 URL。 */
   allowCustomDisplay?: boolean
   disabled?: boolean
-}, "exposureOptions" | "showServiceName" | "addLabel" | "allowCustomDisplay" | "disabled"> & Required<Pick<{
+}, "exposureOptions" | "showServiceName" | "serviceNames" | "addLabel" | "allowCustomDisplay" | "disabled"> & Required<Pick<{
   modelValue: UrlBindingModel[]
   /** 允许的暴露范围;只传一个值时锁定。 */
   exposureOptions?: { value: number; label: string }[]
-  /** Compose 运行时需要选择服务名。 */
+  /** 容器运行时的服务选择。 */
   showServiceName?: boolean
+  serviceNames?: string[]
   addLabel?: string
   /** 访问入口使用连接格式预设；控制检查入口仍要求 URL。 */
   allowCustomDisplay?: boolean
   disabled?: boolean
-}, "exposureOptions" | "showServiceName" | "addLabel" | "allowCustomDisplay" | "disabled">>>,
+}, "exposureOptions" | "showServiceName" | "serviceNames" | "addLabel" | "allowCustomDisplay" | "disabled">>>,
 emit: { (event: "update:modelValue", ...args: [value: UrlBindingModel[]]): void }) {
   function update(index: number, patch: Partial<UrlBindingModel>): void {
     const next = props.modelValue.map((binding, i) => (i === index ? { ...binding, ...patch } : binding))
@@ -46,7 +48,7 @@ emit: { (event: "update:modelValue", ...args: [value: UrlBindingModel[]]): void 
         urlTemplate: HTTP_DISPLAY_TEMPLATE,
         exposure: props.exposureOptions[0]?.value ?? UrlExposure.Participants,
         containerPort: null,
-        serviceName: '',
+        serviceName: props.serviceNames[0] ?? '',
       },
     ])
   }

@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { DefinitionFlagInjectionSectionViewState } from '~/features/admin/useDefinitionFlagInjectionSection'
 
 const viewProps = defineProps<{ state: DefinitionFlagInjectionSectionViewState }>()
-const { isCompose, toggleFlagInjection, model, disabled, onUpdateModelValueTimeoutSeconds } = toRefs(viewProps.state)
+const { hasServices, serviceNames, toggleFlagInjection, model, disabled, onUpdateModelValueTimeoutSeconds } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -41,14 +41,12 @@ const { isCompose, toggleFlagInjection, model, disabled, onUpdateModelValueTimeo
             @update:model-value="onUpdateModelValueTimeoutSeconds"
           />
         </Field>
-        <Field v-if="isCompose">
+        <Field v-if="hasServices">
           <FieldLabel>{{ $t('ui.targetServiceName') }}</FieldLabel>
-          <Input
-            v-model="model.flagInjection.serviceName"
-            :placeholder="$t('ui.serviceNameInCompose')"
-            class="font-mono text-sm"
-            :disabled="disabled"
-          />
+          <Select v-model="model.flagInjection.serviceName" :disabled="disabled">
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent><SelectGroup><SelectItem v-for="name in serviceNames" :key="name" :value="name">{{ name }}</SelectItem></SelectGroup></SelectContent>
+        </Select>
           <FieldDescription>{{ $t('ui.theComposeOperatingEnvironmentMustSpecifyTheInjectionTargetService') }}</FieldDescription>
         </Field>
       </div>

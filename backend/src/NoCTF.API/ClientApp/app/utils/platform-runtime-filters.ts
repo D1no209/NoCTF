@@ -4,7 +4,7 @@ export interface PlatformRuntimeFilters {
   search: string
   scope: 'all' | 'Competition' | 'ChallengeTest'
   state: 'all' | 'Queued' | 'Provisioning' | 'Running' | 'Stopping'
-  kind: 'all' | 'Container' | 'Compose'
+  kind: 'all' | 'Container'
 }
 
 export function emptyPlatformRuntimeFilters(): PlatformRuntimeFilters {

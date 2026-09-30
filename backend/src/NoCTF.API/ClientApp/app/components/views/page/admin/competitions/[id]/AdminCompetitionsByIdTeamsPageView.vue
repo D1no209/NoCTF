@@ -34,7 +34,7 @@ const { competitionId, canJudge, canWrite, teams, search, loading, pageLoading, 
         </TableHeader>
         <TableBody>
           <TableRow v-for="t in teams" :key="t.id">
-            <TableCell v-if="tracksEnabled">
+            <TableCell>
               <ActionButton
                 type="button"
                 class="rounded-sm font-medium underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -43,7 +43,7 @@ const { competitionId, canJudge, canWrite, teams, search, loading, pageLoading, 
                 {{ displayTeamName(t) }}
               </ActionButton>
             </TableCell>
-            <TableCell>
+            <TableCell v-if="tracksEnabled">
               <Select
                 v-if="canWrite"
                 :model-value="t.trackKey"

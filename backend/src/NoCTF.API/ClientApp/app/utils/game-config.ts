@@ -80,16 +80,8 @@ export const EVALUATION_DISPATCH_MODES = [
 
 export interface RuntimeLimitsModel {
   memoryBytes: number | null
-  nanoCpus: number | null
+  cpuMillicores: number | null
   pidsLimit: number | null
-}
-
-export interface SecurityModel {
-  noNewPrivileges: boolean
-  readonlyRootfs: boolean
-  runAsNonRoot: boolean
-  capDrop: string[]
-  capAdd: string[]
 }
 
 export interface UrlBindingModel {
@@ -99,34 +91,21 @@ export interface UrlBindingModel {
   serviceName: string
 }
 
-export interface ContainerDefinitionModel {
-  kind: 'container'
+export interface RuntimeServiceModel {
+  name: string
   image: string
+  cpuCores: number | null
+  memoryMiB: number | null
   command: string[]
+  arguments: string[]
   environment: Record<string, string>
-  labels: Record<string, string>
-  /** 容器端口列表(host 端口恒为 0,由 Docker 随机分配)。 */
-  containerPorts: Array<number | null>
-  security: SecurityModel
   flagEnvironmentVariableName: string
   internalPorts: Array<number | null>
 }
 
-export interface ComposeServiceResourceModel {
-  service: string
-  memoryBytes: number | null
-  nanoCpus: number | null
-  pidsLimit: number | null
-}
-
-export interface ComposeDefinitionModel {
-  kind: 'compose'
-  composeYaml: string
-  serviceResources: ComposeServiceResourceModel[]
-  environment: Record<string, string>
-  labels: Record<string, string>
-  /** service -> 环境变量名。 */
-  flagEnvironmentVariables: Record<string, string>
+export interface ContainerDefinitionModel {
+  kind: 'container'
+  services: RuntimeServiceModel[]
 }
 
 export interface OvaDefinitionModel {
@@ -135,7 +114,7 @@ export interface OvaDefinitionModel {
   sha256: string
 }
 
-export type RuntimeDefinitionModel = ContainerDefinitionModel | ComposeDefinitionModel | OvaDefinitionModel
+export type RuntimeDefinitionModel = ContainerDefinitionModel | OvaDefinitionModel
 
 export interface RuntimeTemplateModel {
   allocation: number
@@ -182,56 +161,36 @@ export interface DefinitionModel {
   readyTimeoutSeconds: number | null
   maximumPatchUploadBytes: number | null
   checkerFixInput: boolean
-  checkerAllowRoot: boolean
 }
 
 export const DEFAULT_MAXIMUM_PATCH_UPLOAD_BYTES = 256 * 1024 * 1024
 export const DEFAULT_CTF_PATCH_UPLOAD_BYTES = 64 * 1024 * 1024
 export const HARD_MAXIMUM_PATCH_UPLOAD_BYTES = 1024 * 1024 * 1024
 export const DEFAULT_RUNTIME_MEMORY_BYTES = 256 * 1024 * 1024
-export const DEFAULT_RUNTIME_NANO_CPUS = 500_000_000
+export const DEFAULT_RUNTIME_CPU_MILLICORES = 500
 export const DEFAULT_RUNTIME_PIDS_LIMIT = 128
 export const DEFAULT_RUNTIME_TTL_SECONDS = 3600
 export const DEFAULT_RUNTIME_OPERATION_TIMEOUT_SECONDS = 60
 
-export function defaultContainerSecurity(): SecurityModel {
-  return {
-    noNewPrivileges: false,
-    readonlyRootfs: false,
-    runAsNonRoot: false,
-    capDrop: [],
-    capAdd: [],
-  }
-}
-
 export function defaultRuntimeLimits(): RuntimeLimitsModel {
   return {
     memoryBytes: DEFAULT_RUNTIME_MEMORY_BYTES,
-    nanoCpus: DEFAULT_RUNTIME_NANO_CPUS,
+    cpuMillicores: DEFAULT_RUNTIME_CPU_MILLICORES,
     pidsLimit: DEFAULT_RUNTIME_PIDS_LIMIT,
   }
 }
 
-export function emptyContainerDefinition(withFlagInjection = false): ContainerDefinitionModel {
-  return {
-    kind: 'container',
-    image: '',
-    command: [],
-    environment: {},
-    labels: {},
-    containerPorts: [null],
-    security: defaultContainerSecurity(),
-    flagEnvironmentVariableName: withFlagInjection ? 'FLAG' : '',
-    internalPorts: [],
-  }
+export function emptyRuntimeService(name = 'main', withFlagInjection = false): RuntimeServiceModel {
+  return { name, image: '', cpuCores: 0.5, memoryMiB: 512, command: [], arguments: [], environment: {},
+    flagEnvironmentVariableName: withFlagInjection ? 'FLAG' : '', internalPorts: [] }
 }
 
-export function emptyComposeDefinition(): ComposeDefinitionModel {
-  return { kind: 'compose', composeYaml: '', serviceResources: [], environment: {}, labels: {}, flagEnvironmentVariables: {} }
+export function emptyContainerDefinition(withFlagInjection = false): ContainerDefinitionModel {
+  return { kind: 'container', services: [emptyRuntimeService('main', withFlagInjection)] }
 }
 
 export function emptyUrlBinding(): UrlBindingModel {
-  return { urlTemplate: 'http://{HOST}:{PORT}', exposure: UrlExposure.Participants, containerPort: null, serviceName: '' }
+  return { urlTemplate: 'http://{HOST}:{PORT}', exposure: UrlExposure.Participants, containerPort: null, serviceName: 'main' }
 }
 
 export function emptyRuntimeTemplate(mode: GameModeValue): RuntimeTemplateModel {
@@ -277,7 +236,6 @@ export function emptyDefinition(mode: GameModeValue): DefinitionModel {
     readyTimeoutSeconds: null,
     maximumPatchUploadBytes: mode === 'Awdp' ? DEFAULT_MAXIMUM_PATCH_UPLOAD_BYTES : null,
     checkerFixInput: false,
-    checkerAllowRoot: false,
   }
 }
 
@@ -305,9 +263,6 @@ function asStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : []
 }
 
-function asNumberArray(value: unknown): number[] {
-  return Array.isArray(value) ? value.filter((v): v is number => typeof v === 'number' && Number.isFinite(v)) : []
-}
 
 function asStringMap(value: unknown): Record<string, string> {
   const obj = asObject(value)
@@ -370,60 +325,19 @@ function definitionContractRuntime(
 ): RuntimeTemplateModel {
   const value = runtime as Record<string, unknown>
   let definition: RuntimeDefinitionModel
-  if (runtime.kind === 'Compose') {
-    const compose = asObject(runtime.compose)
-    if (!compose || runtime.container || runtime.ova) throw new Error('Invalid Compose Runtime contract.')
-    definition = {
-      kind: 'compose',
-      composeYaml: asString(compose.composeYaml),
-      serviceResources: Array.isArray(compose.serviceResources)
-        ? compose.serviceResources.map((entry) => {
-            const item = asObject(entry) ?? {}
-            const limits = asObject(item.limits) ?? {}
-            return {
-              service: asString(item.serviceName),
-              memoryBytes: asNumber(limits.memoryBytes),
-              nanoCpus: asNumber(limits.nanoCpus),
-              pidsLimit: asNumber(limits.pidsLimit),
-            }
-          })
-        : [],
-      environment: asStringMap(compose.environment),
-      labels: asStringMap(compose.labels),
-      flagEnvironmentVariables: asStringMap(compose.flagEnvironmentVariables),
-    }
-  }
-  else if (runtime.kind === 'Ova') {
-    const ova = asObject(runtime.ova)
-    if (!ova || runtime.container || runtime.compose) throw new Error('Invalid Ova Runtime contract.')
-    definition = {
-      kind: 'ova',
-      sourceUrl: asString(ova.sourceUrl),
-      sha256: asString(ova.sha256),
-    }
+  if (runtime.kind === 'Ova') {
+    if (!runtime.ova || runtime.container) throw new Error('Invalid Ova Runtime contract.')
+    definition = { kind: 'ova', sourceUrl: runtime.ova.sourceUrl, sha256: runtime.ova.sha256 }
   }
   else if (runtime.kind === 'Container') {
-    const container = asObject(runtime.container)
-    if (!container || runtime.compose || runtime.ova) throw new Error('Invalid Container Runtime contract.')
-    const security = asObject(container.security) ?? {}
+    if (!runtime.container || runtime.ova) throw new Error('Invalid Container Runtime contract.')
     definition = {
       kind: 'container',
-      image: asString(container.image),
-      command: asStringArray(container.command),
-      environment: asStringMap(container.environment),
-      labels: asStringMap(container.labels),
-      containerPorts: Array.isArray(container.portMappings)
-        ? container.portMappings.map(entry => asNumber(asObject(entry)?.containerPort))
-        : [],
-      security: {
-        noNewPrivileges: asBool(security.noNewPrivileges),
-        readonlyRootfs: asBool(security.readonlyRootfs),
-        runAsNonRoot: asBool(security.runAsNonRoot),
-        capDrop: asStringArray(security.capDrop),
-        capAdd: asStringArray(security.capAdd),
-      },
-      flagEnvironmentVariableName: asString(container.flagEnvironmentVariableName),
-      internalPorts: asNumberArray(container.internalPorts),
+      services: runtime.container.services.map(service => ({
+        name: service.name, image: service.image, cpuCores: service.cpuCores ?? 0.5, memoryMiB: service.memoryMiB ?? 512,
+        command: [...(service.command ?? [])], arguments: [...(service.arguments ?? [])], environment: { ...(service.environment ?? {}) },
+        flagEnvironmentVariableName: service.flagEnvironmentVariableName ?? '', internalPorts: [...(service.internalPorts ?? [])],
+      })),
     }
   }
   else throw new Error('Unknown Runtime kind.')
@@ -434,7 +348,7 @@ function definitionContractRuntime(
     definition,
     limits: {
       memoryBytes: asNumber(limits.memoryBytes),
-      nanoCpus: asNumber(limits.nanoCpus),
+      cpuMillicores: asNumber(limits.cpuMillicores),
       pidsLimit: asNumber(limits.pidsLimit),
     },
     ttlSeconds: asNumber(value.ttlSeconds),
@@ -493,7 +407,6 @@ export function definitionContractToModel(
   model.readyTimeoutSeconds = asNumber(contract.readyTimeoutSeconds)
   model.maximumPatchUploadBytes = asNumber(contract.maximumPatchUploadBytes)
   model.checkerFixInput = contract.checkerFixInput === true
-  model.checkerAllowRoot = contract.checkerAllowRoot === true
   return model
 }
 
@@ -507,7 +420,7 @@ export function applyCtfInteraction(
     if (model.runtime.definition.kind !== 'container')
       model.runtime.definition = emptyContainerDefinition(false)
     model.runtime.flagSource = FlagSource.Static
-    model.runtime.definition.flagEnvironmentVariableName = ''
+    for (const service of model.runtime.definition.services) service.flagEnvironmentVariableName = ''
     model.checkerJob ??= emptyRunnerJob()
     model.maximumPatchUploadBytes ??= DEFAULT_CTF_PATCH_UPLOAD_BYTES
     model.flagTemplate = null
@@ -520,11 +433,10 @@ export function applyCtfInteraction(
   model.maximumPatchUploadBytes = null
   model.checkerJob = null
   model.checkerFixInput = false
-  model.checkerAllowRoot = false
   if (model.runtime) {
     model.runtime.flagSource = FlagSource.PerTeam
     if (model.runtime.definition.kind === 'container')
-      model.runtime.definition.flagEnvironmentVariableName = 'FLAG'
+      model.runtime.definition.services[0]!.flagEnvironmentVariableName = 'FLAG'
   }
 }
 
@@ -783,11 +695,11 @@ function runtimeModelToContract(
 ): NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeContract {
   const common = {
     allocation: runtime.allocation === RuntimeAllocation.Shared ? 'Shared' as const : 'PerTeam' as const,
-    limits: {
+    limits: runtime.definition.kind === 'ova' ? {
       memoryBytes: runtime.limits.memoryBytes ?? 0,
-      nanoCpus: runtime.limits.nanoCpus ?? 0,
+      cpuMillicores: runtime.limits.cpuMillicores ?? 0,
       pidsLimit: runtime.limits.pidsLimit ?? 0,
-    },
+    } : null,
     ttlSeconds: runtime.ttlSeconds,
     operationTimeoutSeconds: runtime.operationTimeoutSeconds,
     flagSource: runtime.flagSource === FlagSource.PerTeam
@@ -821,26 +733,6 @@ function runtimeModelToContract(
         : []),
     ],
   }
-  if (runtime.definition.kind === 'compose') {
-    return {
-      kind: 'Compose',
-      ...common,
-      compose: {
-        composeYaml: runtime.definition.composeYaml,
-        environment: runtime.definition.environment,
-        labels: runtime.definition.labels,
-        flagEnvironmentVariables: runtime.definition.flagEnvironmentVariables,
-        serviceResources: runtime.definition.serviceResources.map(item => ({
-          serviceName: item.service,
-          limits: {
-            memoryBytes: item.memoryBytes ?? 0,
-            nanoCpus: item.nanoCpus ?? 0,
-            pidsLimit: item.pidsLimit ?? 0,
-          },
-        })),
-      },
-    }
-  }
   if (runtime.definition.kind === 'ova') {
     return {
       kind: 'Ova',
@@ -852,25 +744,15 @@ function runtimeModelToContract(
     kind: 'Container',
     ...common,
     container: {
-      image: runtime.definition.image,
-      command: runtime.definition.command,
-      environment: runtime.definition.environment,
-      labels: runtime.definition.labels,
-      portMappings: runtime.definition.containerPorts
-        .filter((port): port is number => port !== null)
-        .map(port => ({ containerPort: port, hostPort: 0 })),
-      security: {
-        noNewPrivileges: runtime.definition.security.noNewPrivileges,
-        readonlyRootfs: runtime.definition.security.readonlyRootfs,
-        runAsNonRoot: runtime.definition.security.runAsNonRoot,
-        capDrop: runtime.definition.security.capDrop,
-        capAdd: runtime.definition.security.capAdd,
-      },
-      flagEnvironmentVariableName: runtime.definition.flagEnvironmentVariableName || null,
-      internalPorts: runtime.definition.internalPorts
-        .filter((port): port is number => port !== null),
+      services: runtime.definition.services.map(service => ({
+        name: service.name, image: service.image, cpuCores: service.cpuCores ?? 0, memoryMiB: service.memoryMiB ?? 0,
+        command: service.command, arguments: service.arguments, environment: service.environment,
+        flagEnvironmentVariableName: service.flagEnvironmentVariableName || null,
+        internalPorts: service.internalPorts.filter((port): port is number => port !== null),
+      })),
     },
   }
+
 }
 
 function runnerJobContract(job: RunnerJobModel, targetServiceName: string | null = null) {
@@ -905,7 +787,6 @@ export function definitionModelToContract(
     readyTimeoutSeconds: model.readyTimeoutSeconds,
     maximumPatchUploadBytes: model.maximumPatchUploadBytes,
     checkerFixInput: model.checkerFixInput,
-    checkerAllowRoot: model.checkerAllowRoot,
   }
   switch (mode) {
     case 'Ctf':
@@ -1055,11 +936,30 @@ export function mibToBytes(mib: number | null): number | null {
   return mib === null ? null : Math.round(mib * 1048576)
 }
 
-/** 将 nanoCpus 转换为核数显示值。 */
-export function nanoCpusToCores(nanoCpus: number | null): number | null {
-  return nanoCpus === null ? null : nanoCpus / 1e9
+/** 将 cpuMillicores 转换为核数显示值。 */
+export function cpuMillicoresToCores(cpuMillicores: number | null): number | null {
+  return cpuMillicores === null ? null : cpuMillicores / 1000
 }
 
-export function coresToNanoCpus(cores: number | null): number | null {
-  return cores === null ? null : Math.round(cores * 1e9)
+export function coresToMillicores(cores: number | null): number | null {
+  return cores === null ? null : Math.round(cores * 1000)
+}
+
+/** A service cannot be removed while any operation refers to it. */
+export function runtimeServiceIsReferenced(model: DefinitionModel, name: string): boolean {
+  return !!model.runtime?.urlBindings.some(binding => binding.serviceName === name)
+    || model.runtime?.controlCheckUrlBinding?.serviceName === name
+    || model.checker?.targetServiceName === name || model.flagInjection?.serviceName === name
+}
+
+/** Rename the service and all references in one editor operation. */
+export function renameRuntimeService(model: DefinitionModel, oldName: string, name: string): void {
+  if (model.runtime?.definition.kind !== 'container') return
+  const service = model.runtime.definition.services.find(service => service.name === oldName)
+  if (!service) return
+  service.name = name
+  for (const binding of model.runtime.urlBindings) if (binding.serviceName === oldName) binding.serviceName = name
+  if (model.runtime.controlCheckUrlBinding?.serviceName === oldName) model.runtime.controlCheckUrlBinding.serviceName = name
+  if (model.checker?.targetServiceName === oldName) model.checker.targetServiceName = name
+  if (model.flagInjection?.serviceName === oldName) model.flagInjection.serviceName = name
 }

@@ -7,6 +7,7 @@ import { adminGetCompetition, getCompetitionEndpoint, createTeamEndpoint, getMyT
 import type { NoCtfapiEndpointsAdministrationCompetitionsAdminCompetitionResponse, NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../api'
 import { teamMembershipErrorMessage, teamRegistrationErrorMessage } from '../../lib/competition-track'
 import LifecycleBadgeComponent from './LifecycleBadge.vue'
+import { useCompetitionPoster } from './useCompetitionPoster'
 
 /** Owns state, effects and commands for CompetitionOverview. */
 export function useCompetitionOverview(
@@ -20,7 +21,16 @@ export function useCompetitionOverview(
   const detailError = ref<string | null>(null)
   const reads = new AbortController()
   onUnmounted(() => reads.abort())
-  const posterUrl = computed(() => competition.value.posterUrl ?? null)
+  const protectedPoster = useCompetitionPoster(competitionId)
+  const posterUrl = computed(() => competition.value.accessMode === 'StaffOnly'
+    ? protectedPoster.posterUrl.value : competition.value.posterUrl ?? null)
+  let posterActorId = user.value?.userId
+  watch([() => competition.value.accessMode, () => competition.value.posterUrl, () => user.value?.userId], () => {
+    if (posterActorId !== user.value?.userId) protectedPoster.cancelPoster()
+    posterActorId = user.value?.userId
+    if (competition.value.accessMode === 'StaffOnly' && competition.value.posterUrl && user.value) void protectedPoster.refreshPoster()
+    else protectedPoster.cancelPoster()
+  }, { immediate: true })
   async function refreshCompetition() {
     detailError.value = null
     try {
@@ -175,10 +185,8 @@ export function useCompetitionOverview(
   const countdown = computed(() => {
     const c = competition.value
     if (!c) return null
-    const start = new Date(c.startTime ?? '').getTime()
     const end = new Date(c.endTime ?? '').getTime()
-    if (Number.isNaN(start) || Number.isNaN(end)) return null
-    if (now.value < start) return { label: translate("ui.fromStart"), ms: start - now.value }
+    if (Number.isNaN(end)) return null
     if (now.value < end) return { label: translate("ui.fromTheEnd"), ms: end - now.value }
     return { label: translate("ui.finished"), ms: 0 }
   })

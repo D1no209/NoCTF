@@ -14,24 +14,23 @@ export function useDefinitionCheckerSection(props: Readonly<Omit<{
   mode: GameModeValue
   disabled?: boolean
 }, "disabled">>>) {
-  const isCompose = computed(() => props.model.runtime?.definition.kind === 'compose')
+  const hasServices = computed(() => props.model.runtime?.definition.kind === 'container')
 
   function toggleChecker(enabled: boolean): void {
     props.model.checker = enabled ? { job: emptyRunnerJob(), targetServiceName: '' } : null
-    if (!enabled) props.model.checkerAllowRoot = false
   }
 
   function toggleCheckerJob(enabled: boolean): void {
     props.model.checkerJob = enabled ? emptyRunnerJob() : null
     if (!enabled) props.model.checkerFixInput = false
-    if (!enabled) props.model.checkerAllowRoot = false
   }
 
   const RunnerJobEditor = markRaw(RunnerJobEditorComponent)
 
   return {
       ...toRefs(props),
-      isCompose,
+      hasServices,
+      serviceNames: computed(() => props.model.runtime?.definition.kind === 'container' ? props.model.runtime.definition.services.map(service => service.name) : []),
       toggleChecker,
       toggleCheckerJob,
       RunnerJobEditor

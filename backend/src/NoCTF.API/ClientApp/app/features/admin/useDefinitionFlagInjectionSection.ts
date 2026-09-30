@@ -10,7 +10,7 @@ export function useDefinitionFlagInjectionSection(props: Readonly<Omit<{
   model: DefinitionModel
   disabled?: boolean
 }, "disabled">>>) {
-  const isCompose = computed(() => props.model.runtime?.definition.kind === 'compose')
+  const hasServices = computed(() => props.model.runtime?.definition.kind === 'container')
 
   function toggleFlagInjection(enabled: boolean): void {
     props.model.flagInjection = enabled ? { command: '', timeoutSeconds: null, serviceName: '' } : null
@@ -18,7 +18,8 @@ export function useDefinitionFlagInjectionSection(props: Readonly<Omit<{
 
   const viewBindings = {
       ...toRefs(props),
-      isCompose,
+      hasServices,
+      serviceNames: computed(() => props.model.runtime?.definition.kind === 'container' ? props.model.runtime.definition.services.map(service => service.name) : []),
       toggleFlagInjection
     }
   function onUpdateModelValueTimeoutSeconds(value: number | null) {

@@ -344,7 +344,7 @@ export type NoCtfapiEndpointsRuntimeRuntimeResponse = {
     waitingReason?: NoCtfapiEndpointsRuntimeRunnerAdmissionFailureProtocol | null;
 };
 
-export type NoCtfapiEndpointsRuntimeRuntimeKindProtocol = 'Container' | 'Compose' | 'OvaVm';
+export type NoCtfapiEndpointsRuntimeRuntimeKindProtocol = 'Container' | 'OvaVm';
 
 export type NoCtfapiEndpointsRuntimeRuntimeProviderProtocol = 'Docker' | 'Kubernetes' | 'Libvirt';
 
@@ -1983,11 +1983,11 @@ export type NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeAllocationResponse
     budget?: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResourceAmountResponse;
 };
 
-export type NoCtfDomainRuntimeRuntimeWorkloadKind = 0 | 1 | 2 | 3 | 4;
+export type NoCtfDomainRuntimeRuntimeWorkloadKind = 0 | 1 | 2 | 3;
 
 export type NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResourceAmountResponse = {
     memoryBytes?: number;
-    nanoCpus?: number;
+    cpuMillicores?: number;
     pidsLimit?: number;
 };
 
@@ -3408,7 +3408,6 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContr
     readyTimeoutSeconds?: number | null;
     maximumPatchUploadBytes?: number | null;
     checkerFixInput?: boolean;
-    checkerAllowRoot?: boolean;
     ctf?: NoCtfapiEndpointsAdministrationChallengeBankCtfChallengeDefinitionContract | null;
     awd?: NoCtfapiEndpointsAdministrationChallengeBankAwdChallengeDefinitionContract | null;
     awdp?: NoCtfapiEndpointsAdministrationChallengeBankAwdpChallengeDefinitionContract | null;
@@ -3418,24 +3417,23 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContr
 export type NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeContract = {
     kind: NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeKindProtocol;
     allocation?: NoCtfapiEndpointsAdministrationChallengeBankRuntimeAllocationProtocol;
-    limits?: NoCtfapiEndpointsAdministrationChallengeBankRuntimeResourceLimitsContract;
+    limits?: NoCtfapiEndpointsAdministrationChallengeBankRuntimeResourceLimitsContract | null;
     ttlSeconds?: number | null;
     operationTimeoutSeconds?: number | null;
     flagSource?: NoCtfapiEndpointsAdministrationChallengeBankRuntimeFlagSourceProtocol;
     egressPolicy?: NoCtfapiEndpointsAdministrationChallengeBankRuntimeEgressPolicyProtocol;
     urlBindings?: Array<NoCtfapiEndpointsAdministrationChallengeBankRuntimeUrlBindingContract>;
     container?: NoCtfapiEndpointsAdministrationChallengeBankContainerChallengeRuntimeContract | null;
-    compose?: NoCtfapiEndpointsAdministrationChallengeBankComposeChallengeRuntimeContract | null;
     ova?: NoCtfapiEndpointsAdministrationChallengeBankOvaChallengeRuntimeContract | null;
 };
 
-export type NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeKindProtocol = 'Container' | 'Compose' | 'Ova';
+export type NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeKindProtocol = 'Container' | 'Ova';
 
 export type NoCtfapiEndpointsAdministrationChallengeBankRuntimeAllocationProtocol = 'Shared' | 'PerTeam';
 
 export type NoCtfapiEndpointsAdministrationChallengeBankRuntimeResourceLimitsContract = {
     memoryBytes?: number;
-    nanoCpus?: number;
+    cpuMillicores?: number;
     pidsLimit?: number;
 };
 
@@ -3456,50 +3454,21 @@ export type NoCtfapiEndpointsAdministrationChallengeBankRuntimeUrlBindingContrac
 export type NoCtfapiEndpointsAdministrationChallengeBankRuntimeExposureProtocol = 'OwnerOnly' | 'Participants';
 
 export type NoCtfapiEndpointsAdministrationChallengeBankContainerChallengeRuntimeContract = {
+    services: Array<NoCtfapiEndpointsAdministrationChallengeBankRuntimeServiceContract>;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankRuntimeServiceContract = {
+    name: string;
     image: string;
-    command: Array<string>;
-    environment: {
+    cpuCores?: number;
+    memoryMiB?: number;
+    command?: Array<string>;
+    arguments?: Array<string>;
+    environment?: {
         [key: string]: string;
     };
-    labels: {
-        [key: string]: string;
-    };
-    portMappings: Array<NoCtfapiEndpointsAdministrationChallengeBankRuntimePortMappingContract>;
-    security: NoCtfapiEndpointsAdministrationChallengeBankContainerSecurityContract;
-    flagEnvironmentVariableName: string | null;
-    internalPorts: Array<number>;
-};
-
-export type NoCtfapiEndpointsAdministrationChallengeBankRuntimePortMappingContract = {
-    containerPort?: number;
-    hostPort?: number;
-};
-
-export type NoCtfapiEndpointsAdministrationChallengeBankContainerSecurityContract = {
-    noNewPrivileges?: boolean;
-    readonlyRootfs?: boolean;
-    runAsNonRoot?: boolean;
-    capDrop?: Array<string>;
-    capAdd?: Array<string>;
-};
-
-export type NoCtfapiEndpointsAdministrationChallengeBankComposeChallengeRuntimeContract = {
-    composeYaml: string;
-    environment: {
-        [key: string]: string;
-    };
-    labels: {
-        [key: string]: string;
-    };
-    flagEnvironmentVariables: {
-        [key: string]: string;
-    };
-    serviceResources: Array<NoCtfapiEndpointsAdministrationChallengeBankComposeServiceResourceContract>;
-};
-
-export type NoCtfapiEndpointsAdministrationChallengeBankComposeServiceResourceContract = {
-    serviceName?: string;
-    limits?: NoCtfapiEndpointsAdministrationChallengeBankRuntimeResourceLimitsContract;
+    flagEnvironmentVariableName?: string | null;
+    internalPorts?: Array<number>;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengeBankOvaChallengeRuntimeContract = {

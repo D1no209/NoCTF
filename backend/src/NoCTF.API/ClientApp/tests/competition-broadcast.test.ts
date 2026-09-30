@@ -227,7 +227,7 @@ describe('competition broadcast projection', () => {
 describe('competition administration entry', () => {
   test('loads the administrator list inside the public competition browser without role probing', async () => {
     const [page, overview] = await Promise.all([
-      sourceFile(new URL('../app/pages/competitions/index.vue', import.meta.url)).text(),
+      sourceFile(new URL('../app/pages/competitions/[id]/index.vue', import.meta.url)).text(),
       sourceFile(new URL('../app/features/competitions/CompetitionOverview.vue', import.meta.url)).text(),
     ])
 

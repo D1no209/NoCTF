@@ -56,7 +56,7 @@ export const GameplayFactResultLabel = {
 } satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol, string>
 
 export const RuntimeKindLabel = {
-  Container: "ui.container", Compose: 'Compose', OvaVm: "ui.virtualMachine",
+  Container: "ui.container", OvaVm: "ui.virtualMachine",
 } satisfies Record<NoCtfapiEndpointsRuntimeRuntimeKindProtocol, string>
 
 export const RuntimeProviderLabel = {

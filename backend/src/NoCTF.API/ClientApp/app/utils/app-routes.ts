@@ -5,6 +5,15 @@ function routeSegment(value: string): string {
 export const competitionsPath = '/competitions'
 export const notificationsPath = '/notifications'
 
+export function isCompetitionOverviewPath(path: string): boolean {
+  return /^\/competitions(?:\/[^/]+)?\/?$/.test(path)
+}
+
+export function competitionPageKey(route: { path: string; params: Record<string, string | string[] | undefined> }): string {
+  if (isCompetitionOverviewPath(route.path)) return 'competition-browser'
+  return typeof route.params.id === 'string' ? route.params.id : route.path
+}
+
 export function competitionPath(competitionId: string): string {
   return `${competitionsPath}/${routeSegment(competitionId)}`
 }

@@ -2,7 +2,7 @@
 import { useContentSwap, type ContentSwapPreset } from '~/motion/useContentSwap'
 
 const props = withDefaults(defineProps<{ identity: string | number; preset?: ContentSwapPreset }>(), { preset: 'film-up' })
-const { frameClass, frameStyle, transition } = useContentSwap(props.preset)
+const { frameClass, frameStyle, transition } = useContentSwap(() => props.preset)
 </script>
 
 <template>

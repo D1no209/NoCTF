@@ -10,8 +10,9 @@ const props = withDefaults(defineProps<{
   modelValue: UrlBindingModel[]
   /** 允许的暴露范围;只传一个值时锁定。 */
   exposureOptions?: { value: number; label: string }[]
-  /** Compose 运行时需要选择服务名。 */
+  /** 容器运行时的服务选择。 */
   showServiceName?: boolean
+  serviceNames?: string[]
   addLabel?: string
   /** 访问入口使用连接格式预设；控制检查入口仍要求 URL。 */
   allowCustomDisplay?: boolean
@@ -22,6 +23,7 @@ const props = withDefaults(defineProps<{
     { value: UrlExposure.Participants, label: "ui.visibleToAllContestants" },
   ],
   showServiceName: false,
+  serviceNames: () => [],
   addLabel: translate("ui.addAccessPortal"),
   allowCustomDisplay: true,
   disabled: false,

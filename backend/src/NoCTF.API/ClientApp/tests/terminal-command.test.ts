@@ -21,8 +21,8 @@ test('terminal prevents empty and blocked submissions and supports batch newline
 })
 
 test('terminal exposes the themed flag placeholder without covering it with the synthetic caret', async () => {
-  const terminal = await Bun.file(new URL('../app/components/ui/terminal/TerminalCommand.vue', import.meta.url)).text()
-  const css = await Bun.file(new URL('../app/assets/css/main.css', import.meta.url)).text()
+  const terminal = await Bun.file(new URL('../app/components/ui/terminal/TerminalCommand.vue', import.meta.url)).text().then(source => source.replace(/\r\n/g, '\n'))
+  const css = await Bun.file(new URL('../app/assets/css/main.css', import.meta.url)).text().then(source => source.replace(/\r\n/g, '\n'))
 
   expect(terminal).toContain(':placeholder="placeholder"')
   expect(terminal).toContain('!blocked && !placeholder')
@@ -32,7 +32,7 @@ test('terminal exposes the themed flag placeholder without covering it with the 
 })
 
 test('all platform font roles resolve to Microsoft YaHei without loading a competing web font', async () => {
-  const css = await Bun.file(new URL('../app/assets/css/main.css', import.meta.url)).text()
+  const css = await Bun.file(new URL('../app/assets/css/main.css', import.meta.url)).text().then(source => source.replace(/\r\n/g, '\n'))
 
   expect(css).toContain("--font-sans: 'Microsoft YaHei', '微软雅黑', 'Microsoft YaHei UI', sans-serif")
   expect(css).toContain("--font-heading: 'Microsoft YaHei', '微软雅黑', 'Microsoft YaHei UI', sans-serif")

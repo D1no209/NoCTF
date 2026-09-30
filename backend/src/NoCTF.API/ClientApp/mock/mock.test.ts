@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { createMockApi } from './api'
 import { createMockRealtime } from './realtime'
 import { id, operations, resolve, responseSchema, type Data } from './schema'
+import { availablePlacementCompetitions, projectChallengePlacements, writablePlacementCompetitions } from '../app/features/admin/challenge-competition-placements'
 
 const base = 'http://127.0.0.1:5081'
 const competition = `/api/v1/competitions/${id(2)}`
@@ -39,6 +40,25 @@ function validate(schema: Data | undefined, value: any, path = '$') {
 }
 
 describe('isolated Mock API', () => {
+  test('quick placement adds an existing template to an empty managed competition and exposes its instance link', async () => {
+    const { send } = await setup()
+    const created = await (await send('/api/v1/admin/competitions', 'POST', {
+      title: 'Placement test', mode: 'Ctf', startTime: '2026-10-01T00:00:00Z', endTime: '2026-10-02T00:00:00Z',
+    })).json()
+    const list = await (await send('/api/v1/admin/competitions?includeDeleted=false')).json()
+    const target = writablePlacementCompetitions(list.items).find(item => item.id === created.id)!
+    const path = `/api/v1/admin/competitions/${created.id}/challenges`
+    const before = await (await send(path + '?includeDeleted=false')).json()
+    const projection = projectChallengePlacements(target, before.items, id(3, 2))
+    expect(availablePlacementCompetitions([projection], 'Ctf')).toHaveLength(1)
+    const added = await send(path, 'POST', { challengeId: id(3, 2), customTitle: null, order: projection.nextOrder })
+    expect(added.status).toBe(201)
+    const after = await (await send(path + '?includeDeleted=false')).json()
+    const placed = projectChallengePlacements(target, after.items, id(3, 2))
+    expect(placed.instances).toHaveLength(1)
+    expect(placed.instances[0]!.id).not.toBe(id(3, 2))
+    expect(availablePlacementCompetitions([placed], 'Ctf')).toHaveLength(0)
+  })
   test('lists only the signed-in team active runtimes with pagination', async () => {
     const { send } = await setup('player')
     const path = `${competition}/teams/me/runtimes?offset=0&limit=5&desc=true`

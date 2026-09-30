@@ -2623,7 +2623,7 @@ export const adminPlatformListLogs = <ThrowOnError extends boolean = false>(opti
 /**
  * Lists active runtime containers across the platform.
  *
- * Returns offset-paged Container and Compose runtimes in active lifecycle states to platform administrators. Supports scope, state, kind and case-insensitive title/team search, including Fix target team attribution.
+ * Returns offset-paged Container runtimes in active lifecycle states to platform administrators. Supports scope, state, kind and case-insensitive title/team search, including Fix target team attribution.
  */
 export const adminPlatformListActiveRuntimes = <ThrowOnError extends boolean = false>(options: Options<AdminPlatformListActiveRuntimesData, ThrowOnError>): RequestResult<AdminPlatformListActiveRuntimesResponses, AdminPlatformListActiveRuntimesErrors, ThrowOnError> => (options.client ?? client).get<AdminPlatformListActiveRuntimesResponses, AdminPlatformListActiveRuntimesErrors, ThrowOnError>({
     security: [{
