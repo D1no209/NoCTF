@@ -11,6 +11,7 @@ public sealed class DataModelSchemaTests
     private static readonly string[] RequiredTables =
     [
         "active_runtime_slots",
+        "active_team_memberships",
         "challenge_definitions",
         "challenge_runtime_templates",
         "challenges",

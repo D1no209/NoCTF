@@ -24,6 +24,92 @@ namespace NoCTF.Tests.Integration.Persistence;
 [Category("Integration")]
 public sealed class TeamMutationConcurrencyPersistenceTests
 {
+    public enum Departure { Leave, Removed, Dissolved }
+
+    [Test, Arguments(Departure.Leave), Arguments(Departure.Removed), Arguments(Departure.Dissolved), Timeout(120_000)]
+    public async Task Departed_user_can_join_another_team(Departure departure, CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193").Build();
+            await postgres.StartAsync(ct);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>().UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention().Options;
+            await using (var db = new NoCtfDbContext(options)) await db.Database.EnsureCreatedAsync(ct);
+            var now = DateTimeOffset.UtcNow;
+            var owner = User(Guid.NewGuid(), "rejoin-owner", now);
+            var captain = User(Guid.NewGuid(), "rejoin-captain", now);
+            var participant = User(Guid.NewGuid(), "rejoin-participant", now);
+            var competition = Competition(Guid.NewGuid(), owner.Id, "Rejoin", now);
+            var original = Team(Guid.NewGuid(), competition.Id,
+                departure == Departure.Dissolved ? participant.Id : captain.Id, "Original", new string('A', 32), now);
+            original.MemberIds = [original.CaptainId, participant.Id];
+            original.RegistrationStatus = TeamRegistrationStatus.Unregistered;
+            var target = Team(Guid.NewGuid(), competition.Id, owner.Id, "Target", new string('B', 32), now);
+            target.RegistrationStatus = TeamRegistrationStatus.Unregistered;
+            await SeedAsync(options, [owner, captain, participant], [competition], [original, target], ct);
+            await using (var db = new NoCtfDbContext(options))
+            {
+                if (departure == Departure.Dissolved)
+                    await Assert.That(await new TeamRegistrationStore(db, new NoopOutbox()).SoftDeleteAsync(
+                        competition.Id, original.Id, participant.Id, now.AddSeconds(1), ct)).IsNull();
+                else
+                {
+                    var store = new TeamMembershipStore(db, new NoopOutbox());
+                    await Assert.That(departure == Departure.Leave
+                        ? await store.LeaveAsync(competition.Id, participant.Id, ct)
+                        : await store.RemoveMemberAsync(competition.Id, original.Id, participant.Id, captain.Id, ct)).IsNull();
+                }
+            }
+            await using (var db = new NoCtfDbContext(options))
+                await Assert.That(await new TeamMembershipStore(db, new NoopOutbox()).JoinByInvitationAsync(
+                    competition.Id, target.InvitationToken, participant.Id, now.AddSeconds(2), ct)).IsNull();
+            await using (var db = new NoCtfDbContext(options))
+            {
+                var membership = await db.Set<TeamMember>().AsNoTracking()
+                    .SingleAsync(member => member.TeamId == target.Id && member.UserId == participant.Id, ct);
+                await Assert.That(membership.CompetitionId).IsEqualTo(competition.Id);
+                await Assert.That(await db.Teams.CountAsync(team => team.Members.Any(member => member.UserId == participant.Id), ct))
+                    .IsEqualTo(1);
+                if (departure == Departure.Dissolved)
+                {
+                    var archived = await db.Teams.IgnoreQueryFilters().AsNoTracking().SingleAsync(team => team.Id == original.Id, ct);
+                    await Assert.That(archived.Members.Any(member => member.UserId == archived.CaptainId)).IsTrue();
+                }
+            }
+        });
+    }
+
+    [Test, Timeout(120_000)]
+    public async Task Collection_only_joins_reserve_membership_in_each_actual_competition(CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193").Build();
+            await postgres.StartAsync(ct);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>().UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention().Options;
+            await using (var db = new NoCtfDbContext(options)) await db.Database.EnsureCreatedAsync(ct);
+            var now = DateTimeOffset.UtcNow;
+            var owner = User(Guid.NewGuid(), "scopes-owner", now);
+            var participant = User(Guid.NewGuid(), "scopes-participant", now);
+            var competitions = new[] { Competition(Guid.NewGuid(), owner.Id, "First", now), Competition(Guid.NewGuid(), owner.Id, "Second", now) };
+            var teams = competitions.Select((competition, index) => Team(Guid.NewGuid(), competition.Id, owner.Id,
+                "Target", new string((char)('C' + index), 32), now)).ToArray();
+            foreach (var team in teams) team.RegistrationStatus = TeamRegistrationStatus.Unregistered;
+            await SeedAsync(options, [owner, participant], competitions, teams, ct);
+            foreach (var team in teams)
+            {
+                await using var db = new NoCtfDbContext(options);
+                await Assert.That(await new TeamMembershipStore(db, new NoopOutbox()).JoinByInvitationAsync(
+                    team.CompetitionId, team.InvitationToken, participant.Id, now, ct)).IsNull();
+            }
+            await using var verification = new NoCtfDbContext(options);
+            var members = await verification.Set<TeamMember>().Where(member => member.UserId == participant.Id).ToListAsync(ct);
+            await Assert.That(members.Select(member => member.CompetitionId).Distinct().Count()).IsEqualTo(2);
+        });
+    }
+
     [Test]
     [Timeout(300_000)]
     public async Task Competition_team_mutations_are_serialized_per_competition(
@@ -52,6 +138,65 @@ public sealed class TeamMutationConcurrencyPersistenceTests
             await AvatarChangesReturnTeamToUnregisteredAsync(options, cancellationToken);
             await InvitationReadAuthorizationAsync(options, cancellationToken);
             await BannedTeamRejectsOrganizationMutationsAsync(options, cancellationToken);
+        });
+    }
+
+    [Test, Timeout(120_000)]
+    public async Task Membership_baseline_repairs_legacy_scope_and_preserves_archived_captains(CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193").Build();
+            await postgres.StartAsync(ct);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>().UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention().Options;
+            await using (var db = new NoCtfDbContext(options)) await db.Database.EnsureCreatedAsync(ct);
+            var now = DateTimeOffset.UtcNow;
+            var owner = User(Guid.NewGuid(), "baseline-owner", now);
+            var participant = User(Guid.NewGuid(), "baseline-participant", now);
+            var competition = Competition(Guid.NewGuid(), owner.Id, "Membership baseline", now);
+            var archived = Team(Guid.NewGuid(), competition.Id, participant.Id, "Archived", new string('E', 32), now);
+            archived.DeletedAt = now;
+            var active = Team(Guid.NewGuid(), competition.Id, owner.Id, "Active", new string('F', 32), now);
+            active.MemberIds = [owner.Id, participant.Id];
+            await SeedAsync(options, [owner, participant], [competition], [archived, active], ct);
+            await using (var db = new NoCtfDbContext(options))
+            {
+                await db.Set<ActiveTeamMembership>().ExecuteDeleteAsync(ct);
+                await db.Set<TeamMember>().Where(member => member.TeamId == active.Id && member.UserId == participant.Id)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(member => member.CompetitionId, Guid.Empty), ct);
+            }
+            await Task.WhenAll(Enumerable.Range(0, 3).Select(async _ =>
+            {
+                await using var db = new NoCtfDbContext(options);
+                await TeamMembershipBaseline.InitializeAsync(db, ct);
+            }));
+            await using (var db = new NoCtfDbContext(options)) await TeamMembershipBaseline.InitializeAsync(db, ct);
+            await using (var db = new NoCtfDbContext(options))
+            {
+                var memberships = await db.Set<ActiveTeamMembership>().ToArrayAsync(ct);
+                await Assert.That(memberships.Length).IsEqualTo(2);
+                await Assert.That(memberships.All(member => member.TeamId == active.Id && member.CompetitionId == competition.Id)).IsTrue();
+                var history = await db.Teams.IgnoreQueryFilters().SingleAsync(team => team.Id == archived.Id, ct);
+                await Assert.That(history.CaptainMembership!.UserId).IsEqualTo(participant.Id);
+                await Assert.That(history.Members.Single().ActiveMembership).IsNull();
+                var repaired = await db.Set<TeamMember>().SingleAsync(member => member.TeamId == active.Id && member.UserId == participant.Id, ct);
+                await Assert.That(repaired.CompetitionId).IsEqualTo(competition.Id);
+            }
+            await using (var db = new NoCtfDbContext(options))
+            {
+                var partial = await db.Teams.IgnoreAutoIncludes().SingleAsync(team => team.Id == active.Id, ct);
+                await Assert.That(db.Entry(partial).Collection(team => team.Members).IsLoaded).IsFalse();
+                var user = await db.Users.SingleAsync(user => user.Id == owner.Id, ct);
+                user.UserName = "baseline-owner-updated";
+                await db.SaveChangesAsync(ct);
+            }
+            await using (var db = new NoCtfDbContext(options))
+            {
+                var duplicate = Team(Guid.NewGuid(), competition.Id, participant.Id, "Duplicate", new string('G', 32), now);
+                db.Teams.Add(duplicate);
+                await Assert.That(async () => await db.SaveChangesAsync(ct)).Throws<DbUpdateException>();
+            }
         });
     }
 

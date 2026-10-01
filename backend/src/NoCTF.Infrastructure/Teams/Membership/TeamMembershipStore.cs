@@ -49,6 +49,14 @@ public sealed class TeamMembershipStore(
                     TimeSpan.FromMilliseconds(Random.Shared.Next(5, 31)),
                     ct);
             }
+            catch (DbUpdateException exception) when (!RelationalRetry.IsTransientConcurrency(exception))
+            {
+                db.ChangeTracker.Clear();
+                if (await db.Teams.AsNoTracking().AnyAsync(team => team.CompetitionId == competitionId
+                        && team.Members.Any(member => member.UserId == userId), ct))
+                    return TeamMembershipFailure.UserAlreadyRegistered;
+                throw;
+            }
         }
         return TeamMembershipFailure.MembershipConflict;
     }

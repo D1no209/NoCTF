@@ -28,6 +28,7 @@ public static class ServiceRegistration
         await using var scope = services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
         await db.Database.MigrateAsync(cancellationToken);
+        await Teams.Membership.TeamMembershipBaseline.InitializeAsync(db, cancellationToken);
         await scope.ServiceProvider.GetRequiredService<AdministratorBootstrapper>()
             .SeedAsync(cancellationToken);
     }

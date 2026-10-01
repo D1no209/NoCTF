@@ -210,14 +210,29 @@ public sealed class NoCtfDbContext(
 
     private void SynchronizeTeamMemberships()
     {
+        var changedMembershipTeams = ChangeTracker.Entries<TeamMember>()
+            .Where(entry => entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
+            .Select(entry => entry.Entity.TeamId).ToHashSet();
         foreach (var entry in ChangeTracker.Entries<Team>()
-                     .Where(entry => entry.State is EntityState.Added or EntityState.Modified))
+                     .Where(entry => entry.State is not (EntityState.Deleted or EntityState.Detached)))
         {
             var team = entry.Entity;
+            if (entry.State == EntityState.Unchanged && !changedMembershipTeams.Contains(team.Id)
+                && !entry.Collection(item => item.Members).IsLoaded)
+                continue;
+            if (entry.State == EntityState.Unchanged && changedMembershipTeams.Contains(team.Id))
+                entry.Property(nameof(Team.ConcurrencyStamp)).IsModified = true;
             foreach (var member in team.Members)
             {
                 member.TeamId = team.Id;
                 member.CompetitionId = team.CompetitionId;
+                if (team.DeletedAt is not null)
+                    member.ActiveMembership = null;
+                else
+                    member.ActiveMembership ??= new ActiveTeamMembership
+                    {
+                        TeamId = team.Id, CompetitionId = team.CompetitionId, UserId = member.UserId
+                    };
             }
             if (!team.Members.Any(member => member.UserId == team.CaptainId))
                 throw new InvalidOperationException("A team captain must be a team member.");

@@ -142,9 +142,9 @@ public sealed class TeamRegistrationStore(
         {
             await transaction.RollbackAsync(ct);
             db.ChangeTracker.Clear();
-            if (await db.Set<TeamMember>().AsNoTracking().AnyAsync(member =>
-                    member.CompetitionId == command.CompetitionId
-                    && member.UserId == command.UserId,
+            if (await db.Teams.AsNoTracking().AnyAsync(team =>
+                    team.CompetitionId == command.CompetitionId
+                    && team.Members.Any(member => member.UserId == command.UserId),
                     ct))
                 return new(null, TeamRegistrationFailure.UserAlreadyRegistered);
             return new(null, TeamRegistrationFailure.TeamNameOrMembershipConflict);

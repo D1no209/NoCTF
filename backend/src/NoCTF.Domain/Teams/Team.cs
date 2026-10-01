@@ -54,6 +54,15 @@ public sealed class TeamMember
     public Guid TeamId { get; set; }
     public Guid CompetitionId { get; set; }
     public Guid UserId { get; set; }
+    public ActiveTeamMembership? ActiveMembership { get; set; }
+}
+
+/// <summary>Reserves a user's current team in one competition while retaining archived membership.</summary>
+public sealed class ActiveTeamMembership
+{
+    public Guid CompetitionId { get; set; }
+    public Guid UserId { get; set; }
+    public Guid TeamId { get; set; }
 }
 
 public sealed class TeamCaptain

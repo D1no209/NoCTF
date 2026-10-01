@@ -50,10 +50,24 @@ internal sealed class TeamMemberConfiguration : IEntityTypeConfiguration<TeamMem
         builder.ToTable("team_members");
         builder.HasKey(member => new { member.TeamId, member.UserId });
         builder.HasIndex(member => member.UserId);
-        builder.HasIndex(member => new { member.CompetitionId, member.UserId }).IsUnique();
+        builder.HasIndex(member => new { member.CompetitionId, member.UserId });
+        builder.HasOne(member => member.ActiveMembership).WithOne()
+            .HasForeignKey<ActiveTeamMembership>(membership => new { membership.TeamId, membership.UserId })
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(member => member.ActiveMembership).AutoInclude();
         builder.HasOne<NoCTF.Domain.Identity.User>().WithMany()
             .HasForeignKey(member => member.UserId)
             .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class ActiveTeamMembershipConfiguration : IEntityTypeConfiguration<ActiveTeamMembership>
+{
+    public void Configure(EntityTypeBuilder<ActiveTeamMembership> builder)
+    {
+        builder.ToTable("active_team_memberships");
+        builder.HasKey(membership => new { membership.CompetitionId, membership.UserId });
+        builder.HasIndex(membership => new { membership.TeamId, membership.UserId }).IsUnique();
     }
 }
 
