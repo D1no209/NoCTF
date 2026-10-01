@@ -82,6 +82,7 @@ internal static class TestConfigurations
         Common(new CtfCompetitionModeConfiguration
         {
             DefaultScoreCurve = Curve(value.DefaultScoreCurve),
+            ScoreSettlementMode = value.ScoreSettlementMode,
             BloodRewards = value.BloodRewards.Select((reward, position) =>
                 new CompetitionBloodReward
                 {
@@ -130,6 +131,7 @@ internal static class TestConfigurations
     private static CompetitionChallengeRules Rules(CtfChallengeConfiguration value) =>
         CommonRules(new CtfCompetitionChallengeRules
         {
+            ScoreSettlementMode = value.ScoreSettlementMode,
             HasScoreCurve = value.ScoreCurve is not null,
             ScoreCurve = Curve(value.ScoreCurve),
             MaxFlagAttempts = value.MaxFlagAttempts,

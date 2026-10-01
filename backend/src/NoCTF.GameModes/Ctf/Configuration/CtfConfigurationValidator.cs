@@ -17,6 +17,8 @@ public static class CtfConfigurationValidator
     public static IReadOnlyList<string> Validate(CtfConfiguration configuration, int eligibleTeamCount)
     {
         var errors = ScoreCurve.Validate(configuration.DefaultScoreCurve, eligibleTeamCount).ToList();
+        if (!Enum.IsDefined(configuration.ScoreSettlementMode))
+            errors.Add("ScoreSettlementMode is invalid.");
         if (configuration.WrongSubmissionPenalty is < 0 or > ScoreValueLimits.MaximumConfiguredValue)
             errors.Add($"WrongSubmissionPenalty must be between zero and {ScoreValueLimits.MaximumConfiguredValue}.");
         if (configuration.BloodRewards.Count > 3)
@@ -46,6 +48,8 @@ public static class CtfConfigurationValidator
         var errors = configuration.ScoreCurve is null
             ? []
             : ScoreCurve.Validate(configuration.ScoreCurve, eligibleTeamCount).ToList();
+        if (configuration.ScoreSettlementMode is { } settlement && !Enum.IsDefined(settlement))
+            errors.Add("ScoreSettlementMode is invalid.");
         if (configuration.WrongSubmissionPenalty is < 0 or > ScoreValueLimits.MaximumConfiguredValue)
             errors.Add($"WrongSubmissionPenalty must be between zero and {ScoreValueLimits.MaximumConfiguredValue}.");
         if (configuration.BloodRewards is { } rewards)

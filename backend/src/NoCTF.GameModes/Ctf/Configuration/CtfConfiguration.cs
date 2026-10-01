@@ -1,6 +1,7 @@
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Application.Runtime.Configuration;
 using NoCTF.Domain.Challenges;
+using NoCTF.Domain.Competitions;
 using NoCTF.GameModes.Flags;
 using NoCTF.GameModes.Scoring;
 
@@ -20,7 +21,8 @@ public sealed record CtfConfiguration(
     ScoreCurveConfiguration DefaultScoreCurve,
     IReadOnlyList<BloodReward> BloodRewards,
     long WrongSubmissionPenalty = 0,
-    PerTeamFlagTemplate? FlagTemplate = null)
+    PerTeamFlagTemplate? FlagTemplate = null,
+    CtfScoreSettlementMode ScoreSettlementMode = CtfScoreSettlementMode.DynamicRecalculation)
 ;
 
 public sealed record CtfChallengeConfiguration(
@@ -38,5 +40,6 @@ public sealed record CtfChallengeConfiguration(
     RunnerJobConfiguration? Checker = null,
     int? ReadyTimeoutSeconds = null,
     long? MaximumPatchUploadBytes = null,
-    bool CheckerFixInput = false)
+    bool CheckerFixInput = false,
+    CtfScoreSettlementMode? ScoreSettlementMode = null)
 ;

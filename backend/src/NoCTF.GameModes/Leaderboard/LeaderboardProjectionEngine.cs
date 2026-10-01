@@ -50,7 +50,9 @@ public sealed class LeaderboardProjectionEngine(
                         bloodRank)
                     {
                         AttackScore = item.AttackScore,
-                        DefenseScore = item.DefenseScore
+                        DefenseScore = item.DefenseScore,
+                        BasePoints = item.BasePoints,
+                        BloodAwardPoints = item.BloodAwardPoints
                     };
                 })
                 .OrderBy(item => item.CompetitionChallengeId)

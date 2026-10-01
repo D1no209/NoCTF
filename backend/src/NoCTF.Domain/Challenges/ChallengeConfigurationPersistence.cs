@@ -197,7 +197,10 @@ public abstract class CompetitionChallengeRules
 }
 
 [PersistentDiscriminator("ctf")]
-public sealed class CtfCompetitionChallengeRules() : CompetitionChallengeRules(GameMode.Ctf);
+public sealed class CtfCompetitionChallengeRules() : CompetitionChallengeRules(GameMode.Ctf)
+{
+    public CtfScoreSettlementMode? ScoreSettlementMode { get; set; }
+}
 [PersistentDiscriminator("awd")]
 public sealed class AwdCompetitionChallengeRules() : CompetitionChallengeRules(GameMode.Awd);
 [PersistentDiscriminator("awdp")]

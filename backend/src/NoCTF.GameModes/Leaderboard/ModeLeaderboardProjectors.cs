@@ -77,42 +77,57 @@ internal static class CtfLeaderboardProjection
             {
                 var configuration = challengeConfigurations[pair.Key];
                 var curve = configuration.ScoreCurve ?? defaults.DefaultScoreCurve;
-                var solveCount = Math.Max(1, currentSolveCounts.GetValueOrDefault(pair.Key));
+                var settlement = configuration.ScoreSettlementMode ?? defaults.ScoreSettlementMode;
+                var solveCount = settlement == CtfScoreSettlementMode.AtSolve
+                    ? checked(currentSolveCounts.GetValueOrDefault(pair.Key) + 1)
+                    : Math.Max(1, currentSolveCounts.GetValueOrDefault(pair.Key));
                 return ScoreCurve.Evaluate(curve, solveCount, dynamicTeams.Count);
             });
 
-        var awarded = new Dictionary<Guid, List<(LeaderboardGameplayFact Fact, long Points, int SolveOrdinal)>>();
+        var awarded = new Dictionary<Guid, List<(LeaderboardGameplayFact Fact, long Points, int SolveOrdinal, long BasePoints, long BloodPoints)>>();
         var bloodSolveNumber = new Dictionary<Guid, int>();
+        var precedingDynamicSolves = new Dictionary<Guid, int>();
         foreach (var solve in solves)
         {
             var challengeId = solve.CompetitionChallengeId!.Value;
             var configuration = challengeConfigurations.GetValueOrDefault(challengeId)
                 ?? defaultChallengeConfiguration;
             var curve = configuration.ScoreCurve ?? defaults.DefaultScoreCurve;
+            var atSolve = (configuration.ScoreSettlementMode ?? defaults.ScoreSettlementMode) == CtfScoreSettlementMode.AtSolve;
+            var priceOrdinal = checked(precedingDynamicSolves.GetValueOrDefault(challengeId) + 1);
+            if (dynamicTeams.Contains(solve.TeamId!.Value))
+                precedingDynamicSolves[challengeId] = priceOrdinal;
             if (!validTeams.TryGetValue(solve.TeamId!.Value, out var team))
+            {
+                if (atSolve && CtfCompletionEligibility.EarnsBlood(activeTeams[solve.TeamId.Value]))
+                    bloodSolveNumber[challengeId] = checked(bloodSolveNumber.GetValueOrDefault(challengeId) + 1);
                 continue;
+            }
             var bloodIndex = bloodSolveNumber.GetValueOrDefault(challengeId);
             var solveOrdinal = team.EarnsBlood ? checked(bloodIndex + 1) : 0;
             var score = ScoreCurve.Evaluate(
                 curve,
-                Math.Max(1, currentSolveCounts.GetValueOrDefault(challengeId)),
+                atSolve ? priceOrdinal : Math.Max(1, currentSolveCounts.GetValueOrDefault(challengeId)),
                 dynamicTeams.Count);
+            var basePoints = score;
+            var bloodPoints = 0L;
             if (team.EarnsBlood)
             {
-                score = checked(score + BloodRewardAt(
+                bloodPoints = BloodRewardAt(
                     configuration.BloodRewards ?? defaults.BloodRewards,
                     bloodIndex,
                     score,
-                    () => currentSolveCounts.GetValueOrDefault(challengeId) == solveOrdinal
+                    () => atSolve || currentSolveCounts.GetValueOrDefault(challengeId) == solveOrdinal
                         ? score
                         : ScoreCurve.Evaluate(curve, solveOrdinal, dynamicTeams.Count),
-                    curve));
+                    curve);
+                score = checked(score + bloodPoints);
                 bloodSolveNumber[challengeId] = bloodIndex + 1;
             }
             var teamId = solve.TeamId!.Value;
             if (!awarded.TryGetValue(teamId, out var teamSolves))
                 awarded[teamId] = teamSolves = [];
-            teamSolves.Add((solve, score, solveOrdinal));
+            teamSolves.Add((solve, score, solveOrdinal, basePoints, bloodPoints));
         }
 
         var wrongFacts = input.GameplayFacts
@@ -177,7 +192,8 @@ internal static class CtfLeaderboardProjection
                 item.Fact.CompetitionChallengeId!.Value,
                 item.Points,
                 item.Fact.OccurredAt,
-                string.IsNullOrWhiteSpace(item.Fact.SubmitterName) ? null : item.Fact.SubmitterName)))
+                string.IsNullOrWhiteSpace(item.Fact.SubmitterName) ? null : item.Fact.SubmitterName)
+            { BasePoints = item.BasePoints, BloodAwardPoints = item.BloodPoints }))
             .ToList());
         return (entries, cells, currentScores);
     }

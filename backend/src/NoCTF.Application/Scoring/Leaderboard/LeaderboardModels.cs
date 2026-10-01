@@ -28,6 +28,8 @@ public sealed record LeaderboardCell(
 {
     public long? AttackScore { get; init; }
     public long? DefenseScore { get; init; }
+    public long? BasePoints { get; init; }
+    public long? BloodAwardPoints { get; init; }
 }
 
 /// <summary>Projection-only cell before it is attached to a ranked team row.</summary>
@@ -40,6 +42,8 @@ public sealed record LeaderboardCellFact(
 {
     public long? AttackScore { get; init; }
     public long? DefenseScore { get; init; }
+    public long? BasePoints { get; init; }
+    public long? BloodAwardPoints { get; init; }
 }
 
 public sealed record LeaderboardChallengeInfo(

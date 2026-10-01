@@ -19,7 +19,8 @@ public static class TypedGameModeConfiguration
         value.BloodRewards.OrderBy(item => item.Position).Select(item =>
             new BloodReward((BloodRewardPolicy)item.Policy, item.Value)).ToArray(),
         value.WrongSubmissionPenalty,
-        Flag(value.FlagTemplate));
+        Flag(value.FlagTemplate),
+        value.ScoreSettlementMode);
 
     public static CtfChallengeConfiguration Ctf(CtfCompetitionChallengeRules value) => new(
         value.HasScoreCurve ? Curve(value.ScoreCurve) : null,
@@ -28,7 +29,8 @@ public static class TypedGameModeConfiguration
         value.MaxFlagAttempts,
         WrongSubmissionPenalty: value.WrongSubmissionPenalty,
         FlagTemplate: value.HasFlagTemplate ? Flag(value.FlagTemplate) : null,
-        MaxPatchAttempts: value.MaxPatchAttempts);
+        MaxPatchAttempts: value.MaxPatchAttempts,
+        ScoreSettlementMode: value.ScoreSettlementMode);
 
     public static CtfChallengeConfiguration Ctf(CtfChallengeDefinition value)
     {

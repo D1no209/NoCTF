@@ -58,6 +58,7 @@ public sealed class CompetitionBloodReward
 public sealed class CtfCompetitionModeConfiguration()
     : CompetitionModeConfiguration(GameMode.Ctf)
 {
+    public CtfScoreSettlementMode ScoreSettlementMode { get; set; }
     public ScoreCurveValue DefaultScoreCurve { get; set; } = new();
     public List<CompetitionBloodReward> BloodRewards { get; set; } = [];
     public long WrongSubmissionPenalty { get; set; }

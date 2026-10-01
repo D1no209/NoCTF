@@ -541,8 +541,9 @@ internal static class NormalizedScoreboardProjection
                                 : 0L;
                             var earned = isAwardedSolve ? Math.Max(0, solvePoints) : 0L;
                             var award = isAwardedSolve ? AwardFrom(aggregateCell?.BloodRank) : null;
-                            var basePoints = currentScores.GetValueOrDefault(group.Key.Item2) ?? earned;
-                            var awardPoints = award is null ? 0L : Math.Max(0, earned - basePoints);
+                            var basePoints = aggregateCell?.BasePoints ?? currentScores.GetValueOrDefault(group.Key.Item2) ?? earned;
+                            var awardPoints = award is null ? 0L : Math.Min(earned,
+                                Math.Max(0, aggregateCell?.BloodAwardPoints ?? earned - basePoints));
                             slot.AddFact(
                                 fact,
                                 ScoreboardEntryKind.Solve,
