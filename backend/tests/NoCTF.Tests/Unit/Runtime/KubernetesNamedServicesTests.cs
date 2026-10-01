@@ -38,6 +38,7 @@ public sealed class KubernetesNamedServicesTests
         foreach (var pod in pods)
         {
             await Assert.That(pod["spec"]!["containers"]!.AsArray().Count).IsEqualTo(1);
+            await Assert.That(pod["spec"]!["containers"]![0]!["imagePullPolicy"]!.GetValue<string>()).IsEqualTo("Always");
             await Assert.That(pod["spec"]!["containers"]![0]!["securityContext"]).IsNull();
             if (count > 1)
             {

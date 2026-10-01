@@ -50,7 +50,6 @@ public sealed class KubernetesOneShotInputArchiveTests
             var options = new KubernetesRuntimeOptions(
                 Namespace: namespaceName,
                 PublicHost: "node.test",
-                ImagePullPolicy: "IfNotPresent",
                 PodPidsLimit: 512,
                 ClusterDomain: "cluster.local",
                 ClusterDnsServiceAddress: kubeDns.Spec.ClusterIP

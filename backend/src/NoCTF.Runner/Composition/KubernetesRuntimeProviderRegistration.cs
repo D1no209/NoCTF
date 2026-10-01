@@ -18,7 +18,6 @@ internal static class KubernetesRuntimeProviderRegistration
         var options = new KubernetesRuntimeOptions(
             configuration["Runtime:Kubernetes:Namespace"] ?? "noctf",
             configuration["Runtime:Kubernetes:PublicHost"] ?? "localhost",
-            configuration["Runtime:Kubernetes:ImagePullPolicy"] ?? "IfNotPresent",
             configuration["Runtime:Kubernetes:CallbackPodLabelKey"] ?? "noctf.io/internal-role",
             configuration["Runtime:Kubernetes:CallbackPodLabelValue"] ?? "awdp-callback",
             isActiveProvider

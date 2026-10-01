@@ -117,7 +117,7 @@ public sealed class KubernetesContainerLifecycle(
                         Image = request.Image,
                         Command = request.Command.Count == 0 ? null : request.Command.ToList(),
                         Args = request.Arguments is not { Count: > 0 } ? null : request.Arguments.ToList(),
-                        ImagePullPolicy = options.ImagePullPolicy,
+                        ImagePullPolicy = "Always",
                         Env = request.Environment.Select(pair => new V1EnvVar { Name = pair.Key, Value = pair.Value }).ToList(),
                         Ports = request.ContainerPorts.Select(port => new V1ContainerPort { ContainerPort = port }).ToList(),
                         Resources = KubernetesWorkloadResources.Create(request.Limits, request.Budget)
@@ -558,7 +558,7 @@ public sealed class KubernetesContainerLifecycle(
             {
                 Name = OneShotInputInitializerName,
                 Image = request.Image,
-                ImagePullPolicy = options.ImagePullPolicy,
+                ImagePullPolicy = "Always",
                 Command =
                 [
                     "/bin/sh",

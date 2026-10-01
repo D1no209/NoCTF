@@ -12,6 +12,28 @@ namespace NoCTF.Tests.Unit.Runtime;
 public sealed class KubernetesContainerLifecycleTests
 {
     [Test]
+    public async Task Input_preparation_and_checker_containers_both_always_pull_their_image()
+    {
+        var (client, core, _) = CreateClient();
+        V1Pod? createdPod = null;
+        core.CreateNamespacedPodWithHttpMessagesAsync(
+                Arg.Do<V1Pod>(pod => createdPod = pod),
+                Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string?>(),
+                Arg.Any<bool?>(), Arg.Any<IReadOnlyDictionary<string, IReadOnlyList<string>>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<HttpOperationResponse<V1Pod>>(new InvalidOperationException("Capture pod before execution.")));
+        var lifecycle = new KubernetesContainerLifecycle(client,
+            new KubernetesRuntimeOptions(ClusterDnsServiceAddress: "10.96.0.10"));
+        using var archive = new MemoryStream();
+        await Assert.That(async () => await lifecycle.RunAsync(CheckerRequest(),
+            new OneShotInputArchive(archive, OneShotInputArchive.RootDestinationPath), CancellationToken.None))
+            .Throws<InvalidOperationException>();
+        await Assert.That(createdPod).IsNotNull();
+        await Assert.That(createdPod!.Spec.Containers.Single().ImagePullPolicy).IsEqualTo("Always");
+        await Assert.That(createdPod.Spec.InitContainers.Single().ImagePullPolicy).IsEqualTo("Always");
+    }
+
+    [Test]
     [Arguments(
         ContainerNetworkPurpose.AwdpVerification,
         "awdp-checker",

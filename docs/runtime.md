@@ -70,6 +70,8 @@ JetStream 至少一次投递的重投由业务唯一约束、状态检查和当�
 
 ## 创建、停止与恢复
 
+所有新建容器统一使用 Always Pull：Docker 在创建前向 Registry 拉取并刷新镜像引用；Kubernetes 的业务容器与输入准备 init container 均设置 `imagePullPolicy: Always`。该策略覆盖题库测试、比赛／练习环境和一次性 Checker／判题任务，不能通过旧的 `Runtime:Kubernetes:ImagePullPolicy` 配置降级。拉取失败时创建失败，不回退到旧镜像；已缓存且内容一致的镜像层仍可复用，停止环境不会删除镜像缓存。
+
 Worker 创建 Runtime 时：
 
 1. 在业务事务中创建 `Queued` 事实，成功提交后发布 JetStream 调度消息；若提交后发布前崩溃，由当前 Pending 状态重新派发；
