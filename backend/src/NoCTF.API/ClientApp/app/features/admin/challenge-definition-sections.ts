@@ -1,3 +1,4 @@
+import { toRaw } from 'vue'
 import type { DefinitionModel, GameModeValue } from '../../utils/game-config'
 import {
   applyCtfInteraction,
@@ -8,8 +9,8 @@ export function mergeChallengeRuntimeDefinition(
   persisted: DefinitionModel,
   draft: DefinitionModel,
 ): DefinitionModel {
-  const merged = structuredClone(persisted)
-  merged.runtime = structuredClone(draft.runtime)
+  const merged = structuredClone(toRaw(persisted))
+  merged.runtime = structuredClone(toRaw(draft.runtime))
   return merged
 }
 
@@ -20,23 +21,24 @@ export function mergeChallengeModeDefinition(
   draftMode: GameModeValue,
   draft: DefinitionModel,
 ): DefinitionModel {
+  const savedDraft = structuredClone(toRaw(draft))
   if (draftMode !== persistedMode)
-    return structuredClone(draft)
+    return savedDraft
 
-  const persisted = structuredClone(persistedDefinition)
-  persisted.interactionKind = draft.interactionKind
-  persisted.checker = draft.checker
-  persisted.checkerJob = draft.checkerJob
-  persisted.flagInjection = draft.flagInjection
-  persisted.flagTemplate = draft.flagTemplate
-  persisted.patchEntrypoint = draft.patchEntrypoint
-  persisted.patchCommand = draft.patchCommand
-  persisted.patchTimeoutSeconds = draft.patchTimeoutSeconds
-  persisted.readyTimeoutSeconds = draft.readyTimeoutSeconds
-  persisted.maximumPatchUploadBytes = draft.maximumPatchUploadBytes
-  persisted.checkerFixInput = draft.checkerFixInput
+  const persisted = structuredClone(toRaw(persistedDefinition))
+  persisted.interactionKind = savedDraft.interactionKind
+  persisted.checker = savedDraft.checker
+  persisted.checkerJob = savedDraft.checkerJob
+  persisted.flagInjection = savedDraft.flagInjection
+  persisted.flagTemplate = savedDraft.flagTemplate
+  persisted.patchEntrypoint = savedDraft.patchEntrypoint
+  persisted.patchCommand = savedDraft.patchCommand
+  persisted.patchTimeoutSeconds = savedDraft.patchTimeoutSeconds
+  persisted.readyTimeoutSeconds = savedDraft.readyTimeoutSeconds
+  persisted.maximumPatchUploadBytes = savedDraft.maximumPatchUploadBytes
+  persisted.checkerFixInput = savedDraft.checkerFixInput
   if (draftMode === 'Ctf')
-    applyCtfInteraction(persisted, draft.interactionKind)
+    applyCtfInteraction(persisted, savedDraft.interactionKind)
   return persisted
 }
 
