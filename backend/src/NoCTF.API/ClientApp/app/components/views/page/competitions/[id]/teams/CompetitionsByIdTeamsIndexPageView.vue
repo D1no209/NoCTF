@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { CompetitionsByIdTeamsIndexPageViewState } from '~/features/routes/competitions/[id]/teams/useCompetitionsByIdTeamsIndexPage'
 
 const viewProps = defineProps<{ state: CompetitionsByIdTeamsIndexPageViewState }>()
-const { competitionId, teams, loading, error, teamDisplayNames } = toRefs(viewProps.state)
+const { competitionId, teams, loading, error, teamDisplayNames, initialized, page, pageLimit, pageCount, total, loadPage, setPageSize } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -16,14 +16,14 @@ const { competitionId, teams, loading, error, teamDisplayNames } = toRefs(viewPr
       <Skeleton v-for="i in 6" :key="i" class="h-24 w-full" />
     </div>
 
-    <Empty v-else-if="!teams.length" class="border py-12">
+    <Empty v-else-if="!error && !teams.length" class="border py-12">
       <EmptyHeader>
         <EmptyTitle>{{ $t('ui.thereIsNoRegistrationTeamYet') }}</EmptyTitle>
         <EmptyDescription>{{ $t('ui.beTheFirstTeamToSignUpToCompete') }}</EmptyDescription>
       </EmptyHeader>
     </Empty>
 
-    <div v-else class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div v-else-if="teams.length" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <NuxtLink
         v-for="team in teams"
         :key="team.id"
@@ -54,5 +54,15 @@ const { competitionId, teams, loading, error, teamDisplayNames } = toRefs(viewPr
         </Card>
       </NuxtLink>
     </div>
+    <OffsetPagination
+      v-if="initialized && total > 0"
+      :page="page"
+      :page-count="pageCount"
+      :total="total"
+      :limit="pageLimit"
+      :loading="loading"
+      @update:page="loadPage"
+      @update:limit="setPageSize"
+    />
   </div>
 </template>
