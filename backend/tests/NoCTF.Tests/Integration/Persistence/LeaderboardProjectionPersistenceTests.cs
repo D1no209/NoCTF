@@ -40,6 +40,105 @@ namespace NoCTF.Tests.Integration.Persistence;
 public sealed class LeaderboardProjectionPersistenceTests
 {
     [Test, Timeout(300_000)]
+    public async Task Ctf_settlement_events_reprice_running_history_merge_and_rebuild_after_cache_loss(CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193").Build();
+            await using var nats = new ContainerBuilder("docker.m.daocloud.io/library/nats:2.12.2-alpine@sha256:2d5fce3229ae5741f4ef9225aff95dc4dc036455931eaf77a3eec33fddaa192d")
+                .WithPortBinding(4222, assignRandomHostPort: true).WithCommand("-js")
+                .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(4222)).Build();
+            await Task.WhenAll(postgres.StartAsync(ct), nats.StartAsync(ct));
+            await using var connection = new NatsConnection(new NatsOpts { Url = $"nats://{nats.Hostname}:{nats.GetMappedPublicPort(4222)}" });
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>().UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention().Options;
+            await using var db = new NoCtfDbContext(options);
+            await db.Database.EnsureCreatedAsync(ct);
+            var now = DateTimeOffset.UtcNow;
+            var clock = new FakeTimeProvider(now);
+            var owner = CreateUser(now);
+            var secondUser = CreateUser(now.AddTicks(1));
+            secondUser.UserName = "second"; secondUser.NormalizedUserName = "SECOND"; secondUser.Email = "second@example.test";
+            var fixture = CreateFixture(GameMode.Ctf, 0, owner.Id, now);
+            var second = CreateFixture(GameMode.Ctf, 1, secondUser.Id, now).Team;
+            second.CompetitionId = fixture.Competition.Id;
+            CtfCompetitionModeConfiguration Configuration(CtfScoreSettlementMode mode, long initial = 500) => new()
+            {
+                ScoreSettlementMode = mode,
+                DefaultScoreCurve = new() { InitialPoints = initial, MinimumPoints = 100, DecayTeamCount = 5, DecayMode = PersistedScoreDecayMode.Linear },
+                BloodRewards = [new() { Policy = CompetitionBloodRewardPolicy.CurrentPointsPercentage, Value = 10 },
+                    new() { Position = 1, Policy = CompetitionBloodRewardPolicy.CurrentPointsPercentage, Value = 10 }]
+            };
+            fixture.Competition.ModeConfiguration = Configuration(CtfScoreSettlementMode.DynamicRecalculation);
+            var firstFact = fixture.Facts[0]; firstFact.Result = GameplayFactResult.Correct;
+            var secondFact = fixture.Facts[1]; secondFact.Result = GameplayFactResult.Correct;
+            secondFact.TeamId = second.Id; secondFact.ActorUserId = secondUser.Id;
+            db.Users.AddRange(owner, secondUser); db.Competitions.Add(fixture.Competition);
+            db.Challenges.Add(fixture.Challenge); db.CompetitionChallenges.Add(fixture.CompetitionChallenge);
+            db.Teams.AddRange(fixture.Team, second); db.GameplayFacts.AddRange(firstFact, secondFact);
+            await db.SaveChangesAsync(ct);
+            using var cacheServices = new ServiceCollection().AddFusionCache(NoCtfCacheNames.Leaderboards).Services.BuildServiceProvider();
+            var cacheProvider = cacheServices.GetRequiredService<IFusionCacheProvider>();
+            var publisher = Substitute.For<ILeaderboardRefreshPublisher>();
+            var cache = new FusionLeaderboardCache(db, new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()), publisher,
+                cacheProvider, new NatsLeaderboardPublicationFence(connection, cacheProvider), clock: clock);
+            var queue = new NoCTF.Infrastructure.Messaging.LeaderboardProjectionMergeQueue();
+            var handler = new CompetitionEventLeaderboardMessageHandler(cache, queue, clock);
+            var outbox = new NoCTF.Infrastructure.Messaging.NoOpPostCommitMessagePublisher();
+            var recorder = new NoCTF.Infrastructure.Competitions.Events.CompetitionEventStore(db, outbox);
+            var competitionStore = new NoCTF.Infrastructure.Competitions.Configuration.CompetitionConfigurationStore(db, outbox, recorder);
+            var challengeStore = new NoCTF.Infrastructure.Challenges.Configuration.ChallengeConfigurationStore(db, outbox, recorder);
+            var handled = new HashSet<Guid>();
+            async Task<ScoreboardProjection> Reproject()
+            {
+                foreach (var change in await db.CompetitionEvents.AsNoTracking().ToListAsync(ct))
+                    if (handled.Add(change.Id))
+                        await handler.Handle(new(change.CompetitionId, change.Id, change.Kind, change.Level, change.OccurredAt), ct);
+                clock.Advance(TimeSpan.FromMilliseconds(500));
+                await Assert.That(queue.TakeDue(clock.GetUtcNow())).IsEquivalentTo([fixture.Competition.Id]);
+                await new LeaderboardMessageHandler(cache).Handle(new(fixture.Competition.Id), ct);
+                return (await cache.GetScoreboardAsync(fixture.Competition.Id, ct))!;
+            }
+            long Score(ScoreboardProjection projection, Guid team) => projection.Snapshot.Teams.Single(item => item.TeamId == team).TotalScore;
+            var original = (await cache.GetScoreboardAsync(fixture.Competition.Id, ct))!;
+            await Assert.That(Score(original, fixture.Team.Id)).IsEqualTo(440);
+            await competitionStore.TryUpdateAsync(fixture.Competition.Id, Configuration(CtfScoreSettlementMode.AtSolve), true, now, ct);
+            var fixedResult = await Reproject();
+            await Assert.That(Score(fixedResult, fixture.Team.Id)).IsEqualTo(550);
+            await Assert.That(Score(fixedResult, second.Id)).IsEqualTo(440);
+            await Assert.That(fixedResult.Snapshot.CurrentChallengeScores.Single().Score).IsEqualTo(300);
+            await challengeStore.TryUpdateAsync(fixture.Competition.Id, fixture.CompetitionChallenge.Id,
+                new CtfCompetitionChallengeRules { ScoreSettlementMode = CtfScoreSettlementMode.DynamicRecalculation }, now, ct);
+            await Assert.That(Score(await Reproject(), fixture.Team.Id)).IsEqualTo(440);
+            await challengeStore.TryUpdateAsync(fixture.Competition.Id, fixture.CompetitionChallenge.Id, new CtfCompetitionChallengeRules(), now, ct);
+            await Assert.That(Score(await Reproject(), fixture.Team.Id)).IsEqualTo(550);
+            await competitionStore.TryUpdateAsync(fixture.Competition.Id, Configuration(CtfScoreSettlementMode.AtSolve, 600), true, now, ct);
+            await competitionStore.TryUpdateAsync(fixture.Competition.Id, Configuration(CtfScoreSettlementMode.AtSolve, 700), true, now, ct);
+            var latest = await Reproject();
+            await Assert.That(Score(latest, fixture.Team.Id)).IsEqualTo(770);
+            await Assert.That(Score(latest, second.Id)).IsEqualTo(605);
+            firstFact.Result = GameplayFactResult.Wrong;
+            await recorder.RecordAsync(new(fixture.Competition.Id, CompetitionEventKind.GameplayFactAdjudicated,
+                CompetitionEventLevel.Information, CompetitionEventVisibility.Staff, now, GameplayFactId: firstFact.Id), ct);
+            await db.SaveChangesAsync(ct);
+            var rejudged = await Reproject();
+            await Assert.That(Score(rejudged, fixture.Team.Id)).IsEqualTo(0);
+            await Assert.That(Score(rejudged, second.Id)).IsEqualTo(770);
+            await cacheProvider.GetCache(NoCtfCacheNames.Leaderboards).RemoveAsync(
+                $"scoreboard:published:{fixture.Competition.Id:N}:{rejudged.Snapshot.Version}", token: ct);
+            var rebuilt = (await cache.GetScoreboardAsync(fixture.Competition.Id, ct))!;
+            await Assert.That(Score(rebuilt, second.Id)).IsEqualTo(770);
+            await Assert.That(rebuilt.Snapshot.Version).IsGreaterThan(original.Snapshot.Version);
+            var entry = rebuilt.Snapshot.Teams.Single(team => team.TeamId == second.Id).Slots.SelectMany(slot => slot.Entries).Single();
+            await Assert.That(entry.EarnedPoints).IsEqualTo(770);
+            await Assert.That(entry.AwardPoints).IsEqualTo(70);
+            var trends = (await new BuildScoreboardTrends(new ScoreboardTrendFactReader(db)).ExecuteAsync(rebuilt, ct))!;
+            await Assert.That(trends.Teams.Single(team => team.TeamId == second.Id).Points.Last().Score).IsEqualTo(770);
+            await publisher.Received().PublishAsync(Arg.Is<ScoreboardProjection>(projection => projection != null && projection.Snapshot.Version == rebuilt.Snapshot.Version), ct);
+        });
+    }
+
+    [Test, Timeout(300_000)]
     public async Task Frozen_webhook_projection_keeps_team_and_challenge_names_after_live_edits(
         CancellationToken ct)
     {

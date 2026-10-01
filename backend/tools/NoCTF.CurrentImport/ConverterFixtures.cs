@@ -5,6 +5,7 @@ using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Awdp.Configuration;
+using NoCTF.GameModes.Ctf.Configuration;
 using NoCTF.GameModes.Koh.Configuration;
 using NoCTF.GameModes.Scoring;
 
@@ -18,6 +19,13 @@ internal static class ConverterFixtures
     {
         const string unsupported = "{\"schemaVersion\":0}";
         var id = Guid.CreateVersion7();
+        var ctf = LegacyConverters.Competition(id, GameMode.Ctf, WithVersion(
+            new CtfConfiguration(ScoreCurveConfiguration.Default, [], ScoreSettlementMode: CtfScoreSettlementMode.AtSolve), 2));
+        var ctfRules = LegacyConverters.Rules(id, GameMode.Ctf, WithVersion(
+            new CtfChallengeConfiguration(null, null, ScoreSettlementMode: CtfScoreSettlementMode.AtSolve), 2));
+        if (((CtfCompetitionModeConfiguration)ctf).ScoreSettlementMode != CtfScoreSettlementMode.AtSolve
+            || ((CtfCompetitionChallengeRules)ctfRules).ScoreSettlementMode != CtfScoreSettlementMode.AtSolve)
+            throw new InvalidOperationException("CTF settlement mode was not preserved by the converter.");
         ValidateMode(
             GameMode.Awd,
             WithVersion(AwdConfiguration.Default, 2),

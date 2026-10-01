@@ -43,6 +43,7 @@ internal static class LegacyConverters
         {
             CompetitionId = competitionId,
             DefaultScoreCurve = Curve(value.DefaultScoreCurve),
+            ScoreSettlementMode = value.ScoreSettlementMode,
             BloodRewards = value.BloodRewards.Select((reward, position) =>
                 new CompetitionBloodReward
                 {
@@ -132,6 +133,7 @@ internal static class LegacyConverters
         {
             CompetitionChallengeId = competitionChallengeId,
             HasScoreCurve = value.ScoreCurve is not null,
+            ScoreSettlementMode = value.ScoreSettlementMode,
             ScoreCurve = Curve(value.ScoreCurve),
             MaxFlagAttempts = value.MaxFlagAttempts,
             MaxPatchAttempts = value.MaxPatchAttempts,

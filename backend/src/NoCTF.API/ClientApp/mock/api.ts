@@ -406,7 +406,7 @@ export function createMockApi() {
       else if (route === '/admin/platform/information') value = { version: 'MOCK / local-memory', contributors: [] }
       else if (route === '/admin/competitions/{competitionId}') value = {
         competition: { ...competition, administrationRole: user?.role === 'Administrator' ? 'Owner' : user?.role === 'Organizer' ? 'Manager' : null },
-        modeConfiguration: { competitionId: competition!.id, mode: competition!.mode, competitionStatus: competition!.status, configuration: mockModeConfiguration(String(competition!.mode)), updatedAt: now() },
+        modeConfiguration: { competitionId: competition!.id, mode: competition!.mode, competitionStatus: competition!.status, configuration: state.settings.get(`mode-configuration:${p.competitionId}`) ?? mockModeConfiguration(String(competition!.mode)), updatedAt: now() },
         tracks: state.settings.get(`/competitions/{competitionId}/tracks${p.competitionId}`) ?? { mode: competition!.mode, enabled: competition!.tracksEnabled ?? false, canUpdate: competition!.status !== 'Finished', items: [] },
         permissions: { competitionId: competition!.id, ownerId: competition!.ownerId, managerIds: [], judgeIds: [], observerIds: [] },
         leaderboardVisibility: { competitionId: competition!.id, effectiveVisibility: 'Normal', frozenStartAt: null, hiddenStartAt: null },
@@ -416,7 +416,7 @@ export function createMockApi() {
         challenge,
         mode: competition!.mode,
         competitionStatus: competition!.status,
-        rules: mockRules(String(competition!.mode)),
+        rules: state.settings.get(`challenge-rules:${p.competitionChallengeId}`) ?? mockRules(String(competition!.mode)),
       }
       else if (cleanRoute === '/competitions') {
         const visibleCompetitions = route.startsWith('/admin') || competitionStaff
@@ -685,12 +685,12 @@ export function createMockApi() {
       }
       else if (route === '/admin/competitions/{competitionId}' && request.method === 'PATCH') {
         if (body.metadata) Object.assign(competition!, body.metadata)
-        if (body.modeConfiguration) state.settings.set(`${route}/configuration`, body.modeConfiguration)
+        if (body.modeConfiguration) state.settings.set(`mode-configuration:${p.competitionId}`, body.modeConfiguration.configuration)
         if (body.tracks) {
           competition!.tracksEnabled = body.tracks.enabled
           state.settings.set(`/competitions/{competitionId}/tracks${p.competitionId}`, { mode: competition!.mode, enabled: body.tracks.enabled, canUpdate: competition!.status !== 'Finished', items: body.tracks.tracks })
         }
-        value = { competition, modeConfiguration: body.modeConfiguration ?? { competitionId: competition!.id, mode: competition!.mode, competitionStatus: competition!.status, configuration: mockModeConfiguration(String(competition!.mode)), updatedAt: now() }, tracks: state.settings.get(`/competitions/{competitionId}/tracks${p.competitionId}`) ?? { enabled: competition!.tracksEnabled ?? false, canUpdate: competition!.status !== 'Finished', items: [] }, permissions: body.permissions ?? null, leaderboardVisibility: body.leaderboardVisibility ?? { effectiveVisibility: 'Normal' }, capabilities: { canObserve: true, canModerate: true, canManagePermissions: true } }
+        value = { competition, modeConfiguration: { competitionId: competition!.id, mode: competition!.mode, competitionStatus: competition!.status, configuration: state.settings.get(`mode-configuration:${p.competitionId}`) ?? mockModeConfiguration(String(competition!.mode)), updatedAt: now() }, tracks: state.settings.get(`/competitions/{competitionId}/tracks${p.competitionId}`) ?? { enabled: competition!.tracksEnabled ?? false, canUpdate: competition!.status !== 'Finished', items: [] }, permissions: body.permissions ?? null, leaderboardVisibility: body.leaderboardVisibility ?? { effectiveVisibility: 'Normal' }, capabilities: { canObserve: true, canModerate: true, canManagePermissions: true } }
       }
       else if (route === '/admin/competitions/{competitionId}/status' && request.method === 'PUT') { competition!.status = body.status; value = {} }
       else if (route === '/admin/competitions/{competitionId}/gameplay-facts/manual-adjustments') {
@@ -713,7 +713,12 @@ export function createMockApi() {
         if (!source) return problem(400, '选择同赛制的演示模板 / Select a template in the same mode')
         value = { ...state.challenges[0], ...body, id: body.id ?? crypto.randomUUID(), competitionId: competition!.id, title: body.customTitle ?? source.title, description: source.description, direction: source.direction, challengeId: source.id }; state.challenges.push(value)
       }
-      else if (route === '/admin/competitions/{competitionId}/challenges/{competitionChallengeId}' && request.method === 'PATCH') { if (body.presentation) Object.assign(challenge!, body.presentation, { title: body.presentation.customTitle ?? challenge!.title }); value = { challenge, mode: competition!.mode, competitionStatus: competition!.status, rules: body.rules?.configuration ?? mockRules(String(competition!.mode)) } }
+      else if (route === '/admin/competitions/{competitionId}/challenges/{competitionChallengeId}' && request.method === 'PATCH') {
+        if (body.presentation) Object.assign(challenge!, body.presentation, { title: body.presentation.customTitle ?? challenge!.title })
+        if (body.rules) state.settings.set(`challenge-rules:${p.competitionChallengeId}`, body.rules.configuration)
+        value = { challenge, mode: competition!.mode, competitionStatus: competition!.status,
+          rules: state.settings.get(`challenge-rules:${p.competitionChallengeId}`) ?? mockRules(String(competition!.mode)) }
+      }
       else if (cleanRoute === '/competitions/{competitionId}/teams' && request.method === 'POST') {
         if (myTeam) return problem(409, '已加入队伍，请先退出 / Already in a team')
         value = { ...state.teams[0], ...body, id: body.id ?? crypto.randomUUID(), competitionId: p.competitionId, captainId: user!.userId, memberIds: [user!.userId], registrationStatus: 'Unregistered', registeredAt: now() }; state.teams.push(value); invitationTokens.set(value.id, crypto.randomUUID().replaceAll('-', ''))

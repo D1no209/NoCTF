@@ -13,9 +13,12 @@ export function mockModeConfiguration(mode: string) {
   if (mode === 'Ctf') return {
     mode,
     flagTemplate,
-    defaultScoreCurve: { initialPoints: 500, minimumPoints: 100, decayTeamCount: 10, decayMode: 'Quadratic', customExpression: null },
-    bloodRewards: [],
-    wrongSubmissionPenalty: 0,
+    ctf: {
+      scoreSettlementMode: 'DynamicRecalculation',
+      defaultScoreCurve: { initialPoints: 500, minimumPoints: 100, decayTeamCount: 10, decayMode: 'Quadratic', customExpression: null },
+      bloodRewards: [],
+      wrongSubmissionPenalty: 0,
+    },
   }
   if (mode === 'Awd') return {
     mode, flagTemplate, hardeningDurationSeconds: 0, roundDurationSeconds: 300,
@@ -34,6 +37,7 @@ export function mockModeConfiguration(mode: string) {
 }
 
 export function mockRules(mode: string) {
+  if (mode === 'Ctf') return { mode, ctf: { scoreSettlementMode: null } }
   return { mode }
 }
 

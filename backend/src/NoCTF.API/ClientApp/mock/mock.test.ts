@@ -40,6 +40,23 @@ function validate(schema: Data | undefined, value: any, path = '$') {
 }
 
 describe('isolated Mock API', () => {
+  test('CTF scoring configuration and independent overrides persist across management reads', async () => {
+    const { send } = await setup()
+    const route = `/api/v1/admin/competitions/${id(2)}`
+    const current = await (await send(route)).json()
+    expect(current.modeConfiguration.configuration.ctf.scoreSettlementMode).toBe('DynamicRecalculation')
+    const configuration = current.modeConfiguration.configuration
+    configuration.ctf.scoreSettlementMode = 'AtSolve'
+    expect((await send(route, 'PATCH', { modeConfiguration: { configuration } })).status).toBe(200)
+    const saved = await (await send(route)).json()
+    expect(saved.modeConfiguration.configuration.ctf.scoreSettlementMode).toBe('AtSolve')
+    const challenge = (await (await send(`/api/v1/admin/competitions/${id(2)}/challenges`)).json()).items[0]
+    const challengeRoute = `${route}/challenges/${challenge.id}`
+    expect((await send(challengeRoute, 'PATCH', { rules: { configuration: { mode: 'Ctf', ctf: { scoreSettlementMode: 'DynamicRecalculation' } } } })).status).toBe(200)
+    expect((await (await send(challengeRoute)).json()).rules.ctf.scoreSettlementMode).toBe('DynamicRecalculation')
+    await send(challengeRoute, 'PATCH', { rules: { configuration: { mode: 'Ctf', ctf: { scoreSettlementMode: null } } } })
+    expect((await (await send(challengeRoute)).json()).rules.ctf.scoreSettlementMode).toBeNull()
+  })
   test('quick placement adds an existing template to an empty managed competition and exposes its instance link', async () => {
     const { send } = await setup()
     const created = await (await send('/api/v1/admin/competitions', 'POST', {
