@@ -16,6 +16,65 @@ namespace NoCTF.Tests.Integration.Persistence;
 [Category("Integration")]
 public sealed class ConfigurationLastWriteWinsTests
 {
+    [Test, Timeout(120_000)]
+    public async Task Running_ctf_settlement_changes_persist_and_identical_or_rolled_back_saves_emit_no_event(CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193").Build();
+            await postgres.StartAsync(ct);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>().UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention().Options;
+            var ids = await SeedAsync(options, ct);
+            await using (var db = new NoCtfDbContext(options))
+                await db.Competitions.Where(competition => competition.Id == ids.CompetitionId)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(competition => competition.Status, CompetitionStatus.Running), ct);
+            var now = DateTimeOffset.UtcNow;
+            await using (var db = new NoCtfDbContext(options))
+            {
+                var outbox = new NoOpPostCommitMessagePublisher();
+                var store = new CompetitionConfigurationStore(db, outbox, new CompetitionEventStore(db, outbox));
+                var current = (await store.FindAsync(ids.CompetitionId, ct))!;
+                var configuration = (CtfCompetitionModeConfiguration)current.Configuration;
+                configuration.ScoreSettlementMode = CtfScoreSettlementMode.AtSolve;
+                configuration.DefaultScoreCurve.InitialPoints = 800;
+                configuration.BloodRewards = [new() { Policy = CompetitionBloodRewardPolicy.CurrentPointsPercentage, Value = 10 }];
+                await Assert.That((await store.TryUpdateAsync(ids.CompetitionId, configuration, true, now, ct)).Failure).IsNull();
+                var persisted = (CtfCompetitionModeConfiguration)(await store.FindAsync(ids.CompetitionId, ct))!.Configuration;
+                await Assert.That(persisted.ScoreSettlementMode).IsEqualTo(CtfScoreSettlementMode.AtSolve);
+                await Assert.That(persisted.DefaultScoreCurve.InitialPoints).IsEqualTo(800);
+                var count = await db.CompetitionEvents.CountAsync(ct);
+                await store.TryUpdateAsync(ids.CompetitionId, persisted, true, now.AddSeconds(1), ct);
+                await Assert.That(await db.CompetitionEvents.CountAsync(ct)).IsEqualTo(count);
+                await using var transaction = await db.Database.BeginTransactionAsync(ct);
+                var rollbackConfiguration = (CtfCompetitionModeConfiguration)(await store.FindAsync(ids.CompetitionId, ct))!.Configuration;
+                rollbackConfiguration.ScoreSettlementMode = CtfScoreSettlementMode.DynamicRecalculation;
+                await store.TryUpdateAsync(ids.CompetitionId, rollbackConfiguration, true, now.AddSeconds(2), ct);
+                await transaction.RollbackAsync(ct);
+            }
+            await using (var db = new NoCtfDbContext(options))
+            {
+                var outbox = new NoOpPostCommitMessagePublisher();
+                var store = new ChallengeConfigurationStore(db, outbox, new CompetitionEventStore(db, outbox));
+                var rules = new CtfCompetitionChallengeRules { ScoreSettlementMode = CtfScoreSettlementMode.DynamicRecalculation };
+                await Assert.That((await store.TryUpdateAsync(ids.CompetitionId, ids.CompetitionChallengeId, rules, now, ct)).Failure).IsNull();
+                var before = await db.CompetitionEvents.CountAsync(ct);
+                var current = (await store.FindAsync(ids.CompetitionId, ids.CompetitionChallengeId, ct))!;
+                await Assert.That(((CtfCompetitionChallengeRules)current.Rules).ScoreSettlementMode).IsEqualTo(CtfScoreSettlementMode.DynamicRecalculation);
+                await store.TryUpdateAsync(ids.CompetitionId, ids.CompetitionChallengeId, current.Rules, now.AddSeconds(1), ct);
+                await Assert.That(await db.CompetitionEvents.CountAsync(ct)).IsEqualTo(before);
+                ((CtfCompetitionChallengeRules)current.Rules).ScoreSettlementMode = null;
+                await store.TryUpdateAsync(ids.CompetitionId, ids.CompetitionChallengeId, current.Rules, now.AddSeconds(2), ct);
+            }
+            await using var verification = new NoCtfDbContext(options);
+            var competition = await verification.Competitions.AsNoTracking().SingleAsync(ct);
+            var challenge = await verification.CompetitionChallenges.AsNoTracking().SingleAsync(ct);
+            await Assert.That(((CtfCompetitionModeConfiguration)competition.ModeConfiguration!).ScoreSettlementMode).IsEqualTo(CtfScoreSettlementMode.AtSolve);
+            await Assert.That(((CtfCompetitionChallengeRules)challenge.Rules!).ScoreSettlementMode).IsNull();
+            await Assert.That(await verification.CompetitionEvents.CountAsync(ct)).IsEqualTo(3);
+        });
+    }
+
     [Test]
     [Timeout(300_000)]
     public async Task Cross_configuration_updates_apply_without_revision_fences(

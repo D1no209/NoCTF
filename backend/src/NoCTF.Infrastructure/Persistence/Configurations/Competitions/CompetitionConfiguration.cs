@@ -98,6 +98,8 @@ internal sealed class CtfCompetitionModeConfigurationEntityConfiguration
 {
     public void Configure(EntityTypeBuilder<CtfCompetitionModeConfiguration> builder)
     {
+        builder.Property(configuration => configuration.ScoreSettlementMode)
+            .HasDefaultValue(CtfScoreSettlementMode.DynamicRecalculation);
         builder.ComplexProperty(configuration => configuration.DefaultScoreCurve,
             curve => curve.Property(value => value.DecayMode).HasConversion<short>());
         builder.HasMany(configuration => configuration.BloodRewards)

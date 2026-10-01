@@ -64,7 +64,7 @@ describe('platform locale', () => {
       enumLabel(CompetitionStatusLabel, 'Draft'),
       bloodRankLabel('First'),
       translate(ATTACK_REWARD_MODES[0].label),
-      competitionConfigFields('Ctf')[0]?.label ?? '',
+      competitionConfigFields('Ctf').find(field => field.key === 'defaultScoreCurve')?.label ?? '',
       translate(competitionQuestionRoleLabel.Judge),
     ]))
 

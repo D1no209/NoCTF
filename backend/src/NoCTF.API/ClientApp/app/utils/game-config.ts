@@ -4,6 +4,7 @@ import type {
   NoCtfapiEndpointsAdministrationCompetitionsBloodRewardPolicyProtocol,
   NoCtfapiEndpointsAdministrationCompetitionsEvaluationDispatchModeProtocol,
   NoCtfapiEndpointsAdministrationCompetitionsScoreDecayModeProtocol,
+  NoCtfapiEndpointsAdministrationCompetitionsCtfScoreSettlementModeProtocol,
   NoCtfapiEndpointsCompetitionsGameModeProtocol,
 } from '../api'
 import { translate } from './i18n'
@@ -54,6 +55,11 @@ export const ATTACK_REWARD_MODES = [
   { value: 'FixedPerAttack', label: "ui.fixedScoreForEachAttack" },
   { value: 'SplitVictimDefensePool', label: "ui.divideTheVictimDefensePool" },
 ] as const
+
+export const CTF_SCORE_SETTLEMENT_MODES = [
+  { value: 'DynamicRecalculation', label: 'ui.ctfDynamicRecalculation' },
+  { value: 'AtSolve', label: 'ui.ctfAtSolve' },
+] as const satisfies readonly { value: NoCtfapiEndpointsAdministrationCompetitionsCtfScoreSettlementModeProtocol, label: string }[]
 
 export const BLOOD_REWARD_POLICIES = [
   { value: BloodRewardPolicy.FixedPoints, label: "ui.fixedPoints" },
@@ -534,6 +540,7 @@ export function competitionConfigFields(mode: GameModeValue): ConfigFieldDef[] {
   switch (mode) {
     case 'Ctf':
       return [
+        { key: 'scoreSettlementMode', label: translate('ui.ctfScoreSettlementMode'), type: 'select', options: CTF_SCORE_SETTLEMENT_MODES, defaultValue: 'DynamicRecalculation', description: translate('ui.ctfScoreSettlementHint') },
         { key: 'defaultScoreCurve', label: translate("ui.defaultScoreCurve"), type: 'pointsCurve', defaultValue: POINTS_CURVE_DEFAULT, description: translate("ui.challengesWithoutAnOverrideInheritThisDecayCurve") },
         { key: 'bloodRewards', label: translate("ui.bloodListReward"), type: 'bloodRewards', defaultValue: [], description: translate("ui.additionalRewardsForTheFirstThreeProblemSolvingTeamsUp") },
         { key: 'wrongSubmissionPenalty', label: translate("ui.pointsDeductedForIncorrectSubmission"), type: 'int', min: 0, defaultValue: 0 },
@@ -578,6 +585,7 @@ export function challengeRuleFields(mode: GameModeValue): ConfigFieldDef[] {
   switch (mode) {
     case 'Ctf':
       return [
+        { key: 'scoreSettlementMode', label: translate('ui.ctfScoreSettlementMode'), type: 'select', options: CTF_SCORE_SETTLEMENT_MODES, defaultValue: 'DynamicRecalculation', description: translate('ui.ctfScoreSettlementHint') },
         { key: 'scoreCurve', label: translate("ui.scoreCurve"), type: 'pointsCurve' },
         { key: 'bloodRewards', label: translate("ui.bloodListReward"), type: 'bloodRewards', description: translate("ui.upTo3Items") },
         { key: 'maxFlagAttempts', label: translate("ui.flagMaximumNumberOfSubmissions"), type: 'int', min: 1 },

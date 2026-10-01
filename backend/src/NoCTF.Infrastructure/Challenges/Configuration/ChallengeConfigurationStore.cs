@@ -77,8 +77,17 @@ public sealed class ChallengeConfigurationStore(
         if (tracked.Mode != rules.Mode || tracked.Rules.GetType() != rules.GetType())
             throw new InvalidOperationException("Challenge rules type does not match its mode.");
         rules.CompetitionChallengeId = challengeId;
+        var bloodChanged = !tracked.Rules.BloodRewards.OrderBy(item => item.Position).Select(item => (item.Policy, item.Value))
+            .SequenceEqual(rules.BloodRewards.OrderBy(item => item.Position).Select(item => (item.Policy, item.Value)));
         db.Entry(tracked.Rules).CurrentValues.SetValues(rules);
-        if (tracked.Rules.BloodRewards.Count > 0 || rules.BloodRewards.Count > 0)
+        db.ChangeTracker.DetectChanges();
+        if (db.Entry(tracked.Rules).State == EntityState.Unchanged && !bloodChanged)
+        {
+            var unchanged = await FindAsync(competitionId, challengeId, ct);
+            await transaction.CommitAsync(ct);
+            return new(unchanged);
+        }
+        if (bloodChanged)
         {
             db.Set<CompetitionChallengeBloodReward>().RemoveRange(tracked.Rules.BloodRewards);
             tracked.Rules.BloodRewards = rules.BloodRewards.Select((reward, position) =>

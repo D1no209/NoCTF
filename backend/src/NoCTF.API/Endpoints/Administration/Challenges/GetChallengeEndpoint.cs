@@ -29,6 +29,7 @@ public sealed class CompetitionChallengeRulesContract
 }
 public sealed class CtfCompetitionChallengeRulesContract
 {
+    public CtfScoreSettlementModeProtocol? ScoreSettlementMode { get; set; }
     public ScoreCurveContract? ScoreCurve { get; set; }
     public IReadOnlyList<BloodRewardContract>? BloodRewards { get; set; }
     public int? MaxFlagAttempts { get; set; }
@@ -78,6 +79,7 @@ public static class CompetitionChallengeRulesContractMapper
         return count == 1 && (contract.Mode switch
         {
             GameModeProtocol.Ctf => contract.Ctf is not null
+                && (contract.Ctf.ScoreSettlementMode is null || Enum.IsDefined(contract.Ctf.ScoreSettlementMode.Value))
                 && (contract.Ctf.BloodRewards is null
                     || contract.Ctf.BloodRewards.All(item => item is not null))
                 && ValidFlagTemplate(contract.Ctf.FlagTemplate),
@@ -119,9 +121,10 @@ public static class CompetitionChallengeRulesContractMapper
             : null;
         switch (value)
         {
-            case CtfCompetitionChallengeRules:
+            case CtfCompetitionChallengeRules ctf:
                 result.Ctf = new CtfCompetitionChallengeRulesContract
                 {
+                    ScoreSettlementMode = ctf.ScoreSettlementMode is null ? null : (CtfScoreSettlementModeProtocol)ctf.ScoreSettlementMode.Value,
                     ScoreCurve = value.HasScoreCurve ? Curve(value.ScoreCurve) : null,
                     BloodRewards = value.BloodRewards.Count == 0 ? null : value.BloodRewards
                         .OrderBy(item => item.Position)
@@ -183,6 +186,7 @@ public static class CompetitionChallengeRulesContractMapper
         {
             GameModeProtocol.Ctf => new CtfCompetitionChallengeRules
             {
+                ScoreSettlementMode = value.Ctf!.ScoreSettlementMode is null ? null : (CtfScoreSettlementMode)value.Ctf.ScoreSettlementMode.Value,
                 HasScoreCurve = value.Ctf!.ScoreCurve is not null,
                 ScoreCurve = value.Ctf.ScoreCurve is { } curve ? Curve(curve) : new(),
                 BloodRewards = (value.Ctf.BloodRewards ?? []).Select((reward, position) =>

@@ -18,6 +18,8 @@ namespace NoCTF.API.Endpoints.Administration.Competitions;
 
 [JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<ScoreDecayModeProtocol>))]
 public enum ScoreDecayModeProtocol { Fixed, Linear, Quadratic, Exponential, Logarithmic, Custom }
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<CtfScoreSettlementModeProtocol>))]
+public enum CtfScoreSettlementModeProtocol { DynamicRecalculation, AtSolve }
 [JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<BloodRewardPolicyProtocol>))]
 public enum BloodRewardPolicyProtocol { FixedPoints, InitialPointsPercentage, SolveTimePointsPercentage, CurrentPointsPercentage }
 [JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<AwdAttackRewardModeProtocol>))]
@@ -46,7 +48,8 @@ public sealed class CompetitionModeConfigurationContract
 public sealed record CtfCompetitionModeConfigurationContract(
     ScoreCurveContract DefaultScoreCurve,
     IReadOnlyList<BloodRewardContract> BloodRewards,
-    long WrongSubmissionPenalty);
+    long WrongSubmissionPenalty,
+    CtfScoreSettlementModeProtocol ScoreSettlementMode = CtfScoreSettlementModeProtocol.DynamicRecalculation);
 public sealed record AwdCompetitionModeConfigurationContract(
     int HardeningDurationSeconds,
     int RoundDurationSeconds,
@@ -104,6 +107,7 @@ public static class CompetitionModeConfigurationContractMapper
         {
             GameModeProtocol.Ctf => contract.Ctf is
                 { DefaultScoreCurve: not null, BloodRewards: not null }
+                && Enum.IsDefined(contract.Ctf.ScoreSettlementMode)
                 && contract.Ctf.BloodRewards.All(item => item is not null),
             GameModeProtocol.Awd => contract.Awd is not null,
             GameModeProtocol.Awdp => contract.Awdp is
@@ -143,7 +147,8 @@ public static class CompetitionModeConfigurationContractMapper
                     ctf.BloodRewards.OrderBy(item => item.Position)
                         .Select(item => new BloodRewardContract(
                             (BloodRewardPolicyProtocol)item.Policy, item.Value)).ToArray(),
-                    ctf.WrongSubmissionPenalty);
+                    ctf.WrongSubmissionPenalty,
+                    (CtfScoreSettlementModeProtocol)ctf.ScoreSettlementMode);
                 break;
             case AwdCompetitionModeConfiguration awd:
                 result.Awd = new(
@@ -179,6 +184,7 @@ public static class CompetitionModeConfigurationContractMapper
         {
             GameModeProtocol.Ctf => new CtfCompetitionModeConfiguration
             {
+                ScoreSettlementMode = (CtfScoreSettlementMode)value.Ctf!.ScoreSettlementMode,
                 DefaultScoreCurve = Curve(value.Ctf!.DefaultScoreCurve),
                 BloodRewards = value.Ctf.BloodRewards.Select((reward, position) =>
                     new CompetitionBloodReward

@@ -64,9 +64,20 @@ public sealed class CompetitionConfigurationStore(
             || tracked.ModeConfiguration.GetType() != configuration.GetType())
             throw new InvalidOperationException("Competition configuration type does not match its mode.");
         configuration.CompetitionId = competitionId;
+        var bloodChanged = tracked.ModeConfiguration is CtfCompetitionModeConfiguration beforeCtf
+            && configuration is CtfCompetitionModeConfiguration afterCtf
+            && !beforeCtf.BloodRewards.OrderBy(item => item.Position).Select(item => (item.Policy, item.Value))
+                .SequenceEqual(afterCtf.BloodRewards.OrderBy(item => item.Position).Select(item => (item.Policy, item.Value)));
         db.Entry(tracked.ModeConfiguration).CurrentValues.SetValues(configuration);
+        db.ChangeTracker.DetectChanges();
+        if (db.Entry(tracked.ModeConfiguration).State == EntityState.Unchanged && !bloodChanged)
+        {
+            var unchanged = await FindAsync(competitionId, ct);
+            await transaction.CommitAsync(ct);
+            return new(unchanged);
+        }
         if (tracked.ModeConfiguration is CtfCompetitionModeConfiguration currentCtf
-            && configuration is CtfCompetitionModeConfiguration nextCtf)
+            && configuration is CtfCompetitionModeConfiguration nextCtf && bloodChanged)
         {
             db.Set<CompetitionBloodReward>().RemoveRange(currentCtf.BloodRewards);
             currentCtf.BloodRewards = nextCtf.BloodRewards.Select((reward, position) =>

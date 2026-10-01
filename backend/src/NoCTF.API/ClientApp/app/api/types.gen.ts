@@ -2788,6 +2788,7 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCtfCompetitionModeConfigu
     defaultScoreCurve?: NoCtfapiEndpointsAdministrationCompetitionsScoreCurveContract;
     bloodRewards?: Array<NoCtfapiEndpointsAdministrationCompetitionsBloodRewardContract>;
     wrongSubmissionPenalty?: number;
+    scoreSettlementMode?: NoCtfapiEndpointsAdministrationCompetitionsCtfScoreSettlementModeProtocol;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsScoreCurveContract = {
@@ -2806,6 +2807,8 @@ export type NoCtfapiEndpointsAdministrationCompetitionsBloodRewardContract = {
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsBloodRewardPolicyProtocol = 'FixedPoints' | 'InitialPointsPercentage' | 'SolveTimePointsPercentage' | 'CurrentPointsPercentage';
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCtfScoreSettlementModeProtocol = 'DynamicRecalculation' | 'AtSolve';
 
 export type NoCtfapiEndpointsAdministrationCompetitionsAwdCompetitionModeConfigurationContract = {
     hardeningDurationSeconds?: number;
@@ -3257,6 +3260,7 @@ export type NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesCo
 };
 
 export type NoCtfapiEndpointsAdministrationChallengesCtfCompetitionChallengeRulesContract = {
+    scoreSettlementMode?: NoCtfapiEndpointsAdministrationCompetitionsCtfScoreSettlementModeProtocol | null;
     scoreCurve?: NoCtfapiEndpointsAdministrationCompetitionsScoreCurveContract | null;
     bloodRewards?: Array<NoCtfapiEndpointsAdministrationCompetitionsBloodRewardContract> | null;
     maxFlagAttempts?: number | null;

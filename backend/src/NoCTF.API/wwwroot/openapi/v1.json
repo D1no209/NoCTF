@@ -26441,6 +26441,9 @@
           "wrongSubmissionPenalty": {
             "type": "integer",
             "format": "int64"
+          },
+          "scoreSettlementMode": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCtfScoreSettlementModeProtocol"
           }
         }
       },
@@ -26516,6 +26519,18 @@
           "InitialPointsPercentage",
           "SolveTimePointsPercentage",
           "CurrentPointsPercentage"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCtfScoreSettlementModeProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "DynamicRecalculation",
+          "AtSolve"
+        ],
+        "enum": [
+          "DynamicRecalculation",
+          "AtSolve"
         ]
       },
       "NoCTFAPIEndpointsAdministrationCompetitionsAwdCompetitionModeConfigurationContract": {
@@ -28189,6 +28204,14 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
+          "scoreSettlementMode": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCtfScoreSettlementModeProtocol"
+              }
+            ]
+          },
           "scoreCurve": {
             "nullable": true,
             "oneOf": [

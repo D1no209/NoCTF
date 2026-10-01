@@ -19,6 +19,7 @@ public static class CtfConfigurationValidator
         var errors = ScoreCurve.Validate(configuration.DefaultScoreCurve, eligibleTeamCount).ToList();
         if (!Enum.IsDefined(configuration.ScoreSettlementMode))
             errors.Add("ScoreSettlementMode is invalid.");
+        ValidateNextPrice(configuration.DefaultScoreCurve, configuration.ScoreSettlementMode, eligibleTeamCount, errors);
         if (configuration.WrongSubmissionPenalty is < 0 or > ScoreValueLimits.MaximumConfiguredValue)
             errors.Add($"WrongSubmissionPenalty must be between zero and {ScoreValueLimits.MaximumConfiguredValue}.");
         if (configuration.BloodRewards.Count > 3)
@@ -98,7 +99,28 @@ public static class CtfConfigurationValidator
         var effectiveCurve = configuration.ScoreCurve ?? competitionConfiguration?.DefaultScoreCurve;
         if (effectiveCurve is not null && configuration.ScoreCurve is null)
             errors.AddRange(ScoreCurve.Validate(effectiveCurve, eligibleTeamCount));
+        if (effectiveCurve is not null)
+            ValidateNextPrice(effectiveCurve,
+                configuration.ScoreSettlementMode ?? competitionConfiguration?.ScoreSettlementMode
+                    ?? NoCTF.Domain.Competitions.CtfScoreSettlementMode.DynamicRecalculation,
+                eligibleTeamCount, errors);
         return errors;
+    }
+
+    private static void ValidateNextPrice(ScoreCurveConfiguration curve,
+        NoCTF.Domain.Competitions.CtfScoreSettlementMode settlement, int eligibleTeamCount, List<string> errors)
+    {
+        if (settlement != NoCTF.Domain.Competitions.CtfScoreSettlementMode.AtSolve
+            || curve.DecayMode != ScoreDecayMode.Custom || errors.Count != 0)
+            return;
+        try
+        {
+            _ = ScoreCurve.Evaluate(curve, checked(eligibleTeamCount + 1), eligibleTeamCount);
+        }
+        catch (Exception exception) when (ScoreCurveExpression.IsValidationException(exception))
+        {
+            errors.Add($"CustomExpression is invalid for the next-solve price: {exception.Message}");
+        }
     }
 
     private static void ValidateMaxAttempts(int? maxAttempts, ICollection<string> errors)
