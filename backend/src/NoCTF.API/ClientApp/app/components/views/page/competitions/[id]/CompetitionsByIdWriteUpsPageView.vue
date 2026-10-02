@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { CompetitionsByIdWriteUpsPageViewState } from '~/features/routes/competitions/[id]/useCompetitionsByIdWriteUpsPage'
 
 const viewProps = defineProps<{ state: CompetitionsByIdWriteUpsPageViewState }>()
-const { ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, RefreshCw, Scale, competitionId, review, loading, loadError, teamOptions, selectedTeamId, selected, canJudge, previewUrl, previewLoading, previewError, downloadPending, load, selectTeam, download, selectedChallengeId, adjustmentDelta, adjustmentPending, adjustmentRefreshing, adjustmentBusy, adjustmentError, submitAdjustment, clearAdjustmentError, selectChallenge, deduction, openDeduction, setDeductionOpen, confirmDeduction, consultationOpen, consultationChallengeId, consultationTitle, consultationBody, consultationPending, consultationError, openConsultation, submitConsultation, setConsultationOpen, clearConsultationError } = toRefs(viewProps.state)
+const { ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, RefreshCw, Scale, competitionId, management, review, loading, loadError, teamOptions, selectedTeamId, selected, canJudge, previewUrl, previewLoading, previewError, downloadPending, load, selectTeam, download, selectedChallengeId, adjustmentDelta, adjustmentPending, adjustmentRefreshing, adjustmentBusy, adjustmentError, submitAdjustment, clearAdjustmentError, selectChallenge, deduction, openDeduction, setDeductionOpen, confirmDeduction, consultationOpen, consultationChallengeId, consultationTitle, consultationBody, consultationPending, consultationError, openConsultation, submitConsultation, setConsultationOpen, clearConsultationError } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -22,7 +22,7 @@ const { ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, Ref
         <template #header>
           <header class="flex flex-col gap-2 pr-10">
             <div class="flex items-center gap-2">
-              <Button variant="ghost" size="icon-sm" as-child>
+              <Button v-if="!management" variant="ghost" size="icon-sm" as-child>
                 <NuxtLink :to="competitionPath(competitionId)" :aria-label="$t('ui.backToCompetition')">
                   <ArrowLeft />
                 </NuxtLink>

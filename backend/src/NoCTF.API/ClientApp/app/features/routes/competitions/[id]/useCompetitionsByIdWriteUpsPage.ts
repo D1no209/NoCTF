@@ -10,10 +10,11 @@ type ReviewItem = NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpReviewItemResponse
 type ChallengeScore = NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpChallengeScoreResponse
 
 /** Owns staff WriteUp review, authenticated PDF preview, score decisions and consultation creation. */
-export function useCompetitionsByIdWriteUpsPage() {
+export function useCompetitionsByIdWriteUpsPage(options: { management?: boolean } = {}) {
   const route = useRoute()
   const router = useRouter()
   const competitionId = route.params.id as string
+  const management = options.management === true
 
   const review = ref<NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpReviewResponse | null>(null)
   const loading = ref(true)
@@ -336,6 +337,7 @@ export function useCompetitionsByIdWriteUpsPage() {
     RefreshCw,
     Scale,
     competitionId,
+    management,
     review,
     loading,
     loadError,

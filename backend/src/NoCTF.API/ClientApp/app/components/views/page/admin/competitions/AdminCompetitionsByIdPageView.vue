@@ -3,14 +3,14 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdPageViewState } from '~/features/routes/admin/competitions/useAdminCompetitionsByIdPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdPageViewState }>()
-const { Megaphone, competition, role, loading, error, canAnnounce, announcementOpen, announcementTitle, announcementBody, announcementAudience, announcementPending, announcementError, RoleLabel, publishAnnouncement, setAnnouncementOpen, navGroups, activePath, isProgressionPage, usesPageScroll, CompetitionStatusBadge, GameModeBadge, AppWorkspaceNav, onClickAnnouncementOpen, onInputAnnouncementError } = toRefs(viewProps.state)
+const { Megaphone, competition, role, loading, error, canAnnounce, announcementOpen, announcementTitle, announcementBody, announcementAudience, announcementPending, announcementError, RoleLabel, publishAnnouncement, setAnnouncementOpen, navGroups, activePath, isProgressionPage, isWriteUpReview, usesPageScroll, CompetitionStatusBadge, GameModeBadge, AppWorkspaceNav, onClickAnnouncementOpen, onInputAnnouncementError } = toRefs(viewProps.state)
 </script>
 
 <template>
   <component :is="AppWorkspaceNav" v-if="competition" :groups="navGroups" :title="competition.title">
     <div :data-workspace-scroll-content="usesPageScroll ? undefined : ''" data-competition-management-workspace
       class="mx-auto flex w-full flex-col gap-6 px-4 pt-8 md:px-6"
-      :class="[isProgressionPage ? 'max-w-none' : 'max-w-6xl', usesPageScroll ? 'pb-8' : 'h-full min-h-0']">
+      :class="[isProgressionPage || isWriteUpReview ? 'max-w-none' : 'max-w-6xl', usesPageScroll ? 'pb-8' : 'h-full min-h-0']">
       <div class="flex shrink-0 flex-wrap items-center justify-between gap-3">
         <div class="flex flex-wrap items-center gap-3">
           <h1 class="text-display text-2xl">{{ competition.title }}</h1>
@@ -24,7 +24,8 @@ const { Megaphone, competition, role, loading, error, canAnnounce, announcementO
       <ScrollSurface axis="y" :enabled="!usesPageScroll" :reset-key="activePath" class="w-full"
         :class="usesPageScroll ? 'overflow-visible' : 'min-h-0 flex-1 overscroll-contain pr-3'"
         :aria-label="$t('ui.competitionAdmin')">
-        <div class="px-1 pb-8">
+        <div :data-admin-writeup-review-workspace="isWriteUpReview ? '' : undefined"
+          :class="isWriteUpReview ? 'h-full min-h-0 px-1 pb-1' : 'px-1 pb-8'">
           <MotionSwap :identity="activePath" preset="film-up">
             <NuxtPage />
           </MotionSwap>

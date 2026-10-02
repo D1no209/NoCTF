@@ -1,7 +1,7 @@
 import { proxyRefs } from 'vue'
 import { markRaw } from 'vue'
 
-import { Activity, Container, Download, FileCheck, GitBranch, KeyRound, LayoutDashboard, Megaphone, Network, Orbit, Puzzle, Settings, ShieldAlert, Trophy, Users, Webhook } from '@lucide/vue'
+import { Activity, ClipboardCheck, Container, Download, FileCheck, GitBranch, KeyRound, LayoutDashboard, Megaphone, Network, Orbit, Puzzle, Settings, ShieldAlert, Trophy, Users, Webhook } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { adminCreateCompetitionAnnouncement, adminGetCompetition } from '../../../../api'
 import type { NoCtfapiEndpointsAdministrationCompetitionsAnnouncementAudience, NoCtfapiEndpointsCompetitionsCompetitionResponse } from '../../../../api'
@@ -24,6 +24,8 @@ export function useAdminCompetitionsByIdPage() {
 
   const isProgressionPage = computed(() => activePath.value ===
     `${base}/progression`)
+
+  const isWriteUpReview = computed(() => activePath.value === `${base}/writeups`)
 
   const usesPageScroll = computed(() => activePath.value === `${base}/teams`
     || activePath.value === `${base}/challenges`
@@ -163,6 +165,7 @@ export function useAdminCompetitionsByIdPage() {
     {
       label: translate("ui.management"),
       items: [
+        { to: `${base}/writeups`, label: translate('writeUp.review'), icon: ClipboardCheck },
         { to: `${base}/exports`, label: translate("ui.export"), icon: Download },
         { to: `${base}/webhooks`, label: translate("webhook.title"), icon: Webhook },
         ...(competition.value?.mode === 'Ctf'
@@ -207,6 +210,7 @@ export function useAdminCompetitionsByIdPage() {
       navGroups,
       activePath,
       isProgressionPage,
+      isWriteUpReview,
       usesPageScroll,
       CompetitionStatusBadge,
       GameModeBadge,
