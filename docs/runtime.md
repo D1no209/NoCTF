@@ -70,7 +70,7 @@ JetStream 至少一次投递的重投由业务唯一约束、状态检查和当�
 
 ## 创建、停止与恢复
 
-所有新建容器统一使用 Always Pull：Docker 在创建前向 Registry 拉取并刷新镜像引用；Kubernetes 的业务容器与输入准备 init container 均设置 `imagePullPolicy: Always`。该策略覆盖题库测试、比赛／练习环境和一次性 Checker／判题任务，不能通过旧的 `Runtime:Kubernetes:ImagePullPolicy` 配置降级。拉取失败时创建失败，不回退到旧镜像；已缓存且内容一致的镜像层仍可复用，停止环境不会删除镜像缓存。
+Docker 支持部署侧安装的本地镜像：不含 `/` 的镜像引用（如 `webcry`、`webcry:latest`）在本地存在时直接使用，不访问 Registry；本地不存在时尝试拉取。带仓库路径的引用（如 `registry.example/challenge:latest`、`library/nginx:alpine`）在每次创建前拉取刷新，失败时不回退到旧缓存。该语义覆盖题库测试、比赛／练习环境和一次性 Checker／判题任务。Kubernetes 的业务容器与输入准备 init container 仍设置 `imagePullPolicy: Always`，不能通过旧的 `Runtime:Kubernetes:ImagePullPolicy` 配置降级。停止环境不会删除镜像缓存。
 
 Worker 创建 Runtime 时：
 

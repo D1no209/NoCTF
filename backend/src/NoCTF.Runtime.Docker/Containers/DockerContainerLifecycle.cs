@@ -295,6 +295,17 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         string image,
         CancellationToken cancellationToken)
     {
+        if (!image.Contains('/'))
+        {
+            try
+            {
+                return await client.Images.InspectImageAsync(image, cancellationToken);
+            }
+            catch (DockerImageNotFoundException)
+            {
+                // An unqualified image may be installed locally without a registry source.
+            }
+        }
         var progress = new ImagePullProgress();
         await client.Images.CreateImageAsync(
             new ImagesCreateParameters { FromImage = image },
