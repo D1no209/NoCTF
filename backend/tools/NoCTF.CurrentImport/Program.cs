@@ -52,6 +52,19 @@ internal static class Program
             Console.WriteLine("Legacy mode converter fixtures passed.");
             return;
         }
+        if (args is ["--repair-user-lifecycle-audits", var expectedCount])
+        {
+            var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__PostgreSql")
+                ?? throw new InvalidOperationException("ConnectionStrings__PostgreSql is required.");
+            var repairOptions = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(connectionString).UseSnakeCaseNamingConvention().Options;
+            await using var repairDb = new NoCtfDbContext(repairOptions);
+            var repaired = await UserLifecycleAuditRepair.RunAsync(
+                repairDb, int.Parse(expectedCount, System.Globalization.CultureInfo.InvariantCulture),
+                CancellationToken.None);
+            Console.WriteLine($"Repaired {repaired} imported lifecycle audit representations.");
+            return;
+        }
         var arguments = Arguments.Parse(args);
         using var archive = await MigrationArchive.OpenAsync(
             arguments.ArchivePath,
@@ -520,7 +533,7 @@ internal static class Program
         item.TrafficTruncated = OptionalBool(payload, "truncated");
     }
 
-    private static void ApplyContent(Notification item, JsonElement content)
+    internal static void ApplyContent(Notification item, JsonElement content)
     {
         RequireVersion(content, 1, item.Id);
         ApplyMatchingProperties(item, content, "schemaVersion", "id", "kind",
@@ -535,9 +548,22 @@ internal static class Program
             ?? OptionalEnum<CompetitionQuestionStatus>(content, "status")
             ?? item.QuestionStatus;
         item.QuestionActorRole = OptionalEnum<CompetitionQuestionParticipantRole>(content, "actorRole");
-        item.ActionValue = OptionalInt(content, "kind")
-            ?? OptionalInt(content, "action")
-            ?? OptionalInt(content, "bloodRank");
+        if (item.Kind == NotificationKind.UserAccountLifecycleChanged)
+        {
+            var action = OptionalEnum<UserAccountLifecycleAction>(content, "action")
+                ?? item.UserLifecycleAction
+                ?? throw new InvalidOperationException("Lifecycle audit content has no action.");
+            if (!Enum.IsDefined(action))
+                throw new InvalidOperationException("Lifecycle audit content has an invalid action.");
+            item.UserLifecycleAction = action;
+            item.ActionValue = null;
+        }
+        else
+        {
+            item.ActionValue = OptionalInt(content, "kind")
+                ?? OptionalInt(content, "action")
+                ?? OptionalInt(content, "bloodRank");
+        }
         item.SsoProtocol = OptionalEnum<SsoProtocol>(content, "protocol");
         item.SsoProviderId ??= OptionalGuid(content, "providerId");
         item.UserId ??= OptionalGuid(content, "targetUserId");

@@ -45,6 +45,7 @@ public sealed class ChallengeAttachmentStore(
         CancellationToken ct)
     {
         var challenge = await WriteAuthorized(actorId, isAdministrator, includeDeleted)
+            .AsSplitQuery()
             .Include(item => item.Attachments)
             .ThenInclude(item => item.File)
             .SingleOrDefaultAsync(item => item.Id == challengeId, ct);

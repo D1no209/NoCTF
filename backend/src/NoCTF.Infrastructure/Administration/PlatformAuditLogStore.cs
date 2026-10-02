@@ -113,6 +113,7 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
                 .ToArray();
             var competitionTitles = await db.Competitions.AsNoTracking()
                 .Where(item => competitionIds.Contains(item.Id))
+                .Select(item => new { item.Id, item.Title })
                 .ToDictionaryAsync(item => item.Id, item => item.Title, ct);
             items.AddRange(eventItems.Select(item => new PlatformAuditView(
                 item.Id,

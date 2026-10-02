@@ -6,6 +6,9 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="NoCTF.Tests" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../../src/NoCTF.Infrastructure/NoCTF.Infrastructure.csproj" />
     <ProjectReference Include="../../src/NoCTF.Persistence.PostgreSql/NoCTF.Persistence.PostgreSql.csproj" />
     <ProjectReference Include="../../src/NoCTF.GameModes/NoCTF.GameModes.csproj" />
