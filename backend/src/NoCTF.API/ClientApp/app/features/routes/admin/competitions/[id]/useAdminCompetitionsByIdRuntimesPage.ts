@@ -1,4 +1,7 @@
 import { proxyRefs } from 'vue'
+import { useAdminDetailRoute } from '~/features/admin/useAdminDetailRoute'
+import { adminRuntimeTeamPath, adminRuntimeChallengePath } from '~/features/admin/admin-navigation'
+import RuntimeFlagsPanelComponent from '~/features/admin/RuntimeFlagsPanel.vue'
 import { markRaw } from 'vue'
 
 import { toast } from 'vue-sonner'
@@ -94,20 +97,23 @@ export function useAdminCompetitionsByIdRuntimesPage() {
     return refreshRuntimeList()
   }
 
-  const detail = ref<NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse | null>(null)
-
-  const detailOpen = ref(false)
-
-  const detailLoading = ref(false)
-
+  const selection = useAdminDetailRoute<NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse>('runtimeId', `/admin/competitions/${competitionId}/runtimes`, async (runtimeInstanceId, signal) => {
+    const { data, error } = await adminGetRuntime({ path: { runtimeInstanceId }, signal })
+    if (error || !data) throw error ?? new Error(translate('adminNavigation.notFound'))
+    if (data.competitionId !== competitionId) throw new Error(translate('adminNavigation.notFound'))
+    return data
+  })
+  const { data: detail, open: detailOpen, loading: detailLoading, error: detailError } = selection
+  const flagQueryTarget = ref<string | null>(null)
+  const RuntimeFlagsPanel = markRaw(RuntimeFlagsPanelComponent)
   async function openDetail(id?: string) {
+    flagQueryTarget.value = null
+    if (id) await selection.select(id)
+  }
+  async function openFlagQuery(id?: string) {
     if (!id) return
-    detailOpen.value = true
-    detailLoading.value = true
-    const { data, error } = await adminGetRuntime({ path: { runtimeInstanceId: id } })
-    if (error) toast.error(parseApiError(error).message)
-    else detail.value = data ?? null
-    detailLoading.value = false
+    flagQueryTarget.value = id
+    await selection.select(id)
   }
 
   const runtimeOperations = createRuntimeOperationCoordinator({
@@ -361,6 +367,7 @@ export function useAdminCompetitionsByIdRuntimesPage() {
   const RuntimeAccessUrl = markRaw(RuntimeAccessUrlComponent)
 
   const viewBindings = {
+      RuntimeFlagsPanel, flagQueryTarget, openFlagQuery, adminRuntimeTeamPath, adminRuntimeChallengePath, detailError,
       canWrite,
       isAdministrator,
       challengeOptions,

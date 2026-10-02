@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdCheatsPageViewState } from '~/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdCheatsPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdCheatsPageViewState }>()
-const { filterStatus, filterFrom, filterTo, filterError, pendingCount, items, loading, listError, hasMore, initialized, loadNextPage, applyFilters, detail, detailOpen, detailLoading, showFlag, openDetail, ActionMeta, resolutionAction, canSubmitResolution, resolutionError, resolutionOpen, resolutionPending, resolutionReason, remainingCharacters, resolutionTargetLabel, openAction, handleResolutionSubmit, handleResolutionOpen, onClickShowFlag } = toRefs(viewProps.state)
+const { adminUserPath, adminTeamPath, adminChallengePath, competitionId, filterStatus, filterFrom, filterTo, filterError, pendingCount, items, loading, listError, hasMore, initialized, loadNextPage, applyFilters, detail, detailOpen, detailLoading, showFlag, openDetail, ActionMeta, resolutionAction, canSubmitResolution, resolutionError, resolutionOpen, resolutionPending, resolutionReason, remainingCharacters, resolutionTargetLabel, openAction, handleResolutionSubmit, handleResolutionOpen, onClickShowFlag } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -61,11 +61,11 @@ const { filterStatus, filterFrom, filterTo, filterError, pendingCount, items, lo
         <TableBody>
           <TableRow v-for="i in items" :key="i.gameplayFactId">
             <TableCell class="font-medium">
-              {{ i.sourceTeamName }}
+              <NuxtLink :to="adminTeamPath(competitionId, i.sourceTeamId)" class="hover:underline">{{ i.sourceTeamName }}</NuxtLink>
               <Badge v-if="i.sourceTeamIsBanned" variant="destructive" class="ml-1">{{ $t('ui.banned2') }}</Badge>
             </TableCell>
-            <TableCell>{{ i.ownerTeamName ?? $t('ui.multipleTeamsOrUndetermined') }}</TableCell>
-            <TableCell>{{ i.challengeTitle }}</TableCell>
+            <TableCell><NuxtLink v-if="i.ownerTeamId" :to="adminTeamPath(competitionId, i.ownerTeamId)" class="hover:underline">{{ i.ownerTeamName }}</NuxtLink><span v-else>{{ i.ownerTeamName ?? $t('ui.multipleTeamsOrUndetermined') }}</span></TableCell>
+            <TableCell><NuxtLink :to="adminChallengePath(competitionId, i.competitionChallengeId)" class="hover:underline">{{ i.challengeTitle }}</NuxtLink></TableCell>
             <TableCell>{{ enumLabel(GameplayFactKindLabel, i.gameplayFactKind) }}</TableCell>
             <TableCell>
               <Badge :variant="i.status === 'Pending' ? 'secondary' : i.status === 'Confirmed' ? 'destructive' : 'outline'">
@@ -93,17 +93,17 @@ const { filterStatus, filterFrom, filterTo, filterError, pendingCount, items, lo
         </SheetHeader>
         <Skeleton v-if="detailLoading" class="mx-4 h-48" />
         <div v-else-if="detail" class="flex flex-col gap-3 px-4 pb-4 text-sm">
-          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.sourceTeam') }}</span><span>{{ detail.sourceTeamName }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.flagOwner') }}</span><span>{{ detail.ownerTeamName ?? $t('ui.multipleTeamsOrUndetermined') }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.challenge') }}</span><span>{{ detail.challengeTitle }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.author') }}</span><span>{{ detail.submittedByUserName }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.sourceTeam') }}</span><NuxtLink v-if="detail.sourceTeamId" :to="adminTeamPath(competitionId, detail.sourceTeamId)" class="hover:underline">{{ detail.sourceTeamName }}</NuxtLink><span v-else>{{ detail.sourceTeamName }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.flagOwner') }}</span><NuxtLink v-if="detail.ownerTeamId" :to="adminTeamPath(competitionId, detail.ownerTeamId)" class="hover:underline">{{ detail.ownerTeamName ?? $t('ui.multipleTeamsOrUndetermined') }}</NuxtLink><span v-else>{{ detail.ownerTeamName ?? $t('ui.multipleTeamsOrUndetermined') }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.challenge') }}</span><NuxtLink v-if="detail.competitionChallengeId" :to="adminChallengePath(competitionId, detail.competitionChallengeId)" class="hover:underline">{{ detail.challengeTitle }}</NuxtLink><span v-else>{{ detail.challengeTitle }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.author') }}</span><NuxtLink v-if="detail.actorUserId" :to="adminUserPath(detail.actorUserId)" class="hover:underline">{{ detail.submittedByUserName }}</NuxtLink><span v-else>{{ detail.submittedByUserName }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.type') }}</span><span>{{ enumLabel(GameplayFactKindLabel, detail.gameplayFactKind) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.result') }}</span><span>{{ enumLabel(GameplayFactResultLabel, detail.result) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.status') }}</span><span>{{ enumLabel(CheatIncidentStatusLabel, detail.status) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.submissionTime') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.submittedAt) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.detectionTime') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.detectedAt) }}</span></div>
           <template v-if="detail.resolvedByUserName">
-            <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.processor') }}</span><span>{{ detail.resolvedByUserName }}</span></div>
+            <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.processor') }}</span><NuxtLink v-if="detail.resolvedByUserId" :to="adminUserPath(detail.resolvedByUserId)" class="hover:underline">{{ detail.resolvedByUserName }}</NuxtLink><span v-else>{{ detail.resolvedByUserName }}</span></div>
             <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.processingTime') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.resolvedAt) }}</span></div>
             <div class="flex flex-col gap-1"><span class="text-muted-foreground">{{ $t('ui.reasonsForProcessing') }}</span><span class="whitespace-pre-wrap">{{ detail.resolutionReason }}</span></div>
           </template>

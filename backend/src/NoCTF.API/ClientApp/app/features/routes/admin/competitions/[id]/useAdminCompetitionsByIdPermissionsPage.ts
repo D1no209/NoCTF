@@ -1,3 +1,4 @@
+import { adminUserPath } from '~/features/admin/admin-navigation'
 import { proxyRefs } from 'vue'
 
 import { X } from '@lucide/vue'
@@ -151,6 +152,8 @@ export function useAdminCompetitionsByIdPermissionsPage() {
   onMounted(load)
 
   const viewBindings = {
+      competitionId,
+      adminUserPath,
       X,
       canManagePermissions,
       permissions,

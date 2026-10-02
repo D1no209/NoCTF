@@ -1,3 +1,4 @@
+import { adminUserPath, adminTeamPath, adminChallengePath } from '~/features/admin/admin-navigation'
 import { proxyRefs } from 'vue'
 
 import { toast } from 'vue-sonner'
@@ -395,6 +396,8 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
   })
 
   const viewBindings = {
+      competitionId,
+      adminUserPath, adminTeamPath, adminChallengePath,
       previewIncludeInformational, previewScanned, previewCounts,
       evidenceOpen, evidenceTarget, evidenceRows, evidenceCursor, evidenceLoading, evidenceError, openEvidence, loadEvidence,
       adjudicationSeverity, adjudicationSeverityLabel, adjudicationClassificationLabel, adjudicationCompletenessLabel, adjudicationEventLabel, adjudicationVariant,

@@ -12,11 +12,11 @@ describe('platform runtime administration', () => {
     ).text().then(source => source.replace(/\r\n/g, '\n'))
 
     expect(shell).toContain("'/admin/platform/runtimes'")
-    expect(page).toContain("definePageMeta({ middleware: 'platform-admin' })")
+    expect(page).toContain("definePageMeta({ middleware: 'platform-admin', path: '/admin/platform/runtimes/:runtimeId?'")
     expect(page).toContain('adminPlatformListActiveRuntimes')
     expect(page).toContain('adminTerminateRuntime')
     expect(page).toContain('adminCreateRuntimeForceTermination')
-    expect(page).toContain("item.scope === 'ChallengeTest'")
+    expect(page).toContain('item.runtime?.competitionId')
     expect(page).toContain('v-else-if="detail.runtime?.challengeId"')
     expect(page).toContain('`/admin/challenges/${detail.runtime.challengeId}`')
     expect(page).toContain('useOffsetPagination<PlatformRuntime>')

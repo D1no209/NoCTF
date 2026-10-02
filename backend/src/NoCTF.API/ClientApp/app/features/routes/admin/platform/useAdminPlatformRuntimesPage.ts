@@ -1,8 +1,11 @@
 import { markRaw, proxyRefs } from 'vue'
+import { useAdminDetailRoute } from '~/features/admin/useAdminDetailRoute'
+import { adminCompetitionPath, adminRuntimeTeamPath, adminRuntimeChallengePath, adminRuntimePath } from '~/features/admin/admin-navigation'
+import RuntimeFlagsPanelComponent from '~/features/admin/RuntimeFlagsPanel.vue'
 
 import { ExternalLink, RefreshCw } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import { adminCreateRuntimeForceTermination, adminPlatformListActiveRuntimes, adminTerminateRuntime } from '../../../../api'
+import { adminGetRuntime, adminGetCompetition, adminGetCompetitionChallenge, adminChallengeBankGetTemplate, adminCreateRuntimeForceTermination, adminPlatformListActiveRuntimes, adminTerminateRuntime } from '../../../../api'
 import type { NoCtfapiEndpointsAdministrationPlatformPlatformRuntimeResponse, NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse } from '../../../../api'
 import { useOffsetPagination } from '../../../../composables/useOffsetPagination'
 import { adminRuntimeTeamLabel } from '../../../../utils/admin-runtime'
@@ -18,8 +21,6 @@ export function useAdminPlatformRuntimesPage() {
 
   const appliedQuery = ref(platformRuntimeQuery(filters))
 
-  const detailTarget = ref<PlatformRuntime | null>(null)
-
   const pagination = useOffsetPagination<PlatformRuntime>(async ({ offset, limit, desc }) => {
     const { data, error: requestError } = await adminPlatformListActiveRuntimes({
       query: { ...appliedQuery.value, offset, limit, desc },
@@ -34,7 +35,36 @@ export function useAdminPlatformRuntimesPage() {
     await pagination.loadPage(pagination.page.value)
   }
 
-  const detail = computed(() => items.value.find(item => item.runtime?.id === detailTarget.value?.runtime?.id) ?? detailTarget.value)
+  const selection = useAdminDetailRoute<PlatformRuntime>('runtimeId', '/admin/platform/runtimes', async (runtimeInstanceId, signal) => {
+    const { data, error } = await adminGetRuntime({ path: { runtimeInstanceId }, signal })
+    if (error || !data) throw error ?? new Error(translate('adminNavigation.notFound'))
+    const known = items.value.find(item => item.runtime?.id === runtimeInstanceId)
+    if (known) return { ...known, runtime: data }
+    const competition = data.competitionId ? await adminGetCompetition({ path: { competitionId: data.competitionId }, signal }) : null
+    let challengeTitle = data.challengeId ?? data.competitionChallengeId ?? ''
+    if (data.competitionId && data.competitionChallengeId) {
+      const challenge = await adminGetCompetitionChallenge({ path: { competitionId: data.competitionId, competitionChallengeId: data.competitionChallengeId }, query: { includeDeleted: true }, signal })
+      challengeTitle = challenge.data?.challenge?.title ?? challengeTitle
+    }
+    else if (data.challengeId) {
+      const challenge = await adminChallengeBankGetTemplate({ path: { challengeId: data.challengeId }, query: { includeDeleted: true }, signal })
+      challengeTitle = challenge.data?.title ?? challengeTitle
+    }
+    return { runtime: data, scope: data.purpose === 'TemplateTest' ? 'ChallengeTest' : 'Competition',
+      competitionTitle: competition?.data?.competition?.title ?? data.competitionId, challengeTitle }
+  })
+  const { data: detailTarget, open: detailOpen, loading: detailLoading, error: detailError } = selection
+  const detail = computed(() => {
+    if (!detailTarget.value) return null
+    return items.value.find(item => item.runtime?.id === detailTarget.value?.runtime?.id) ?? detailTarget.value
+  })
+  const flagQueryTarget = ref<string | null>(null)
+  const RuntimeFlagsPanel = markRaw(RuntimeFlagsPanelComponent)
+  async function openFlagQuery(item: PlatformRuntime) {
+    if (!item.runtime?.id) return
+    flagQueryTarget.value = item.runtime.id
+    await selection.select(item.runtime.id)
+  }
 
   async function applyFilters(): Promise<void> {
     appliedQuery.value = platformRuntimeQuery(filters)
@@ -163,6 +193,7 @@ export function useAdminPlatformRuntimesPage() {
   const RuntimeAccessUrl = markRaw(RuntimeAccessUrlComponent)
 
   const viewBindings = {
+      RuntimeFlagsPanel, flagQueryTarget, openFlagQuery, adminCompetitionPath, adminRuntimeTeamPath, adminRuntimeChallengePath, adminRuntimePath, detailOpen, detailLoading, detailError,
       formatCapacityAmount, runnerFailureLabel, ExternalLink, RuntimeAccessUrl,
       RefreshCw,
       filters,
@@ -200,11 +231,12 @@ export function useAdminPlatformRuntimesPage() {
   const viewState = proxyRefs(viewBindings)
 
   function onClickDetailTarget(value: typeof viewState.detailTarget) {
-    viewState.detailTarget = value
+    flagQueryTarget.value = null
+    if (value?.runtime?.id) void selection.select(value.runtime.id)
   }
 
   function onUpdateOpenDetailTarget(open: boolean) {
-     if (!open) viewState.detailTarget = null
+     selection.close(open)
   }
 
   function onUpdateOpenTerminateTarget(open: boolean) {

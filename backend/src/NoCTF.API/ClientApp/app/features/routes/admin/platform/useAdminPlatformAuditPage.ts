@@ -1,3 +1,4 @@
+import { adminUserPath, adminTeamPath, adminAuditSubjectPath } from '~/features/admin/admin-navigation'
 import { markRaw } from 'vue'
 
 import { Download } from '@lucide/vue'
@@ -93,6 +94,7 @@ export function useAdminPlatformAuditPage() {
   const AdminDateTime = markRaw(AdminDateTimeComponent)
 
   return {
+      adminUserPath, adminTeamPath, adminAuditSubjectPath,
       Download,
       platformAuditActionText,
       KIND_LABELS,

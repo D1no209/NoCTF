@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdPermissionsPageViewState } from '~/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdPermissionsPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdPermissionsPageViewState }>()
-const { X, canManagePermissions, permissions, candidates, loading, error, candidateName, search, filteredCandidates, assigned, add, remove, saving, save, transferTarget, transferConfirm, transferring, transfer, roles, onClickTransferConfirm } = toRefs(viewProps.state)
+const { adminUserPath, X, canManagePermissions, permissions, candidates, loading, error, candidateName, search, filteredCandidates, assigned, add, remove, saving, save, transferTarget, transferConfirm, transferring, transfer, roles, onClickTransferConfirm } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -22,7 +22,7 @@ const { X, canManagePermissions, permissions, candidates, loading, error, candid
         <CardHeader>
           <CardTitle>{{ $t('ui.collaborationPermissions') }}</CardTitle>
           <CardDescription>
-            {{ $t('ui.owner2', { owner: candidateName(permissions.ownerId ?? '') }) }}
+            <span>{{ $t('ui.competitionLeader') }}: </span><NuxtLink v-if="permissions.ownerId" :to="adminUserPath(permissions.ownerId)" class="hover:underline">{{ candidateName(permissions.ownerId) }}</NuxtLink>
           </CardDescription>
         </CardHeader>
         <CardContent class="flex flex-col gap-6">
@@ -30,7 +30,7 @@ const { X, canManagePermissions, permissions, candidates, loading, error, candid
             <h3 class="text-sm font-medium">{{ $t(r.label) }}</h3>
             <div class="flex flex-wrap items-center gap-2">
               <Badge v-for="id in r.list.value" :key="id" variant="secondary" class="gap-1">
-                {{ candidateName(id) }}
+                <NuxtLink :to="adminUserPath(id)" class="hover:underline">{{ candidateName(id) }}</NuxtLink>
                 <ActionButton
                   v-if="canManagePermissions"
                   type="button"
@@ -58,7 +58,7 @@ const { X, canManagePermissions, permissions, candidates, loading, error, candid
                 class="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
               >
                 <span>
-                  {{ c.userName }}
+                  <NuxtLink :to="adminUserPath(c.id)" class="hover:underline">{{ c.userName }}</NuxtLink>
                   <span v-if="!c.emailVerified" class="text-muted-foreground">{{ $t('ui.emailNotVerified') }}</span>
                 </span>
                 <div class="flex items-center gap-1">

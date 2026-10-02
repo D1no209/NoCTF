@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdSubmissionsPageViewState } from '~/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdSubmissionsPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdSubmissionsPageViewState }>()
-const { previewIncludeInformational, previewScanned, previewCounts, evidenceOpen, evidenceTarget, evidenceRows, evidenceCursor, evidenceLoading, evidenceError, openEvidence, loadEvidence, adjudicationSeverity, adjudicationSeverityLabel, adjudicationClassificationLabel, adjudicationCompletenessLabel, adjudicationEventLabel, adjudicationVariant, Download, canWrite, canJudge, isAdministrator, canDownloadPatch, patchDownloading, patchErrors, downloadPatch, gameplayFactKindOptions, gameplayFactStateOptions, gameplayFactResultOptions, challengeOptions, teamOptions, teamName, challengeTitle, filterChallenge, filterTeam, filterKind, filterState, filterResult, filterFlag, previewItems, previewCursor, previewLoading, previewError, previewInitialized, differenceLabels, bloodRankLabel, loadPreview, items, loading, listError, hasMore, loadMore, initialized, applyFilters, detail, detailOpen, detailLoading, detailError, openDetail, actionPending, rejudgeOne, batchTarget, rejudgeBatch, queueEvaluation, flagDialog, flagResult, flagError, flagPending, openFlagAccess, closeFlagAccess, accessFlag, onClickFilterChallenge, onUpdateOpenChange } = toRefs(viewProps.state)
+const { adminUserPath, adminTeamPath, adminChallengePath, competitionId, previewIncludeInformational, previewScanned, previewCounts, evidenceOpen, evidenceTarget, evidenceRows, evidenceCursor, evidenceLoading, evidenceError, openEvidence, loadEvidence, adjudicationSeverity, adjudicationSeverityLabel, adjudicationClassificationLabel, adjudicationCompletenessLabel, adjudicationEventLabel, adjudicationVariant, Download, canWrite, canJudge, isAdministrator, canDownloadPatch, patchDownloading, patchErrors, downloadPatch, gameplayFactKindOptions, gameplayFactStateOptions, gameplayFactResultOptions, challengeOptions, teamOptions, teamName, challengeTitle, filterChallenge, filterTeam, filterKind, filterState, filterResult, filterFlag, previewItems, previewCursor, previewLoading, previewError, previewInitialized, differenceLabels, bloodRankLabel, loadPreview, items, loading, listError, hasMore, loadMore, initialized, applyFilters, detail, detailOpen, detailLoading, detailError, openDetail, actionPending, rejudgeOne, batchTarget, rejudgeBatch, queueEvaluation, flagDialog, flagResult, flagError, flagPending, openFlagAccess, closeFlagAccess, accessFlag, onClickFilterChallenge, onUpdateOpenChange } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -215,8 +215,8 @@ const { previewIncludeInformational, previewScanned, previewCounts, evidenceOpen
         </TableHeader>
         <TableBody>
           <TableRow v-for="s in items" :key="s.id">
-            <TableCell class="font-medium">{{ teamName(s.teamId) }}</TableCell>
-            <TableCell>{{ challengeTitle(s.competitionChallengeId) }}</TableCell>
+            <TableCell class="font-medium"><NuxtLink v-if="s.teamId" :to="adminTeamPath(competitionId, s.teamId)" class="hover:underline">{{ teamName(s.teamId) }}</NuxtLink><span v-else>{{ teamName(s.teamId) }}</span></TableCell>
+            <TableCell><NuxtLink v-if="s.competitionChallengeId" :to="adminChallengePath(competitionId, s.competitionChallengeId)" class="hover:underline">{{ challengeTitle(s.competitionChallengeId) }}</NuxtLink><span v-else>{{ challengeTitle(s.competitionChallengeId) }}</span></TableCell>
             <TableCell>{{ enumLabel(GameplayFactKindLabel, s.kind) }}</TableCell>
             <TableCell>
               <Badge :variant="s.state === 'Completed' ? 'default' : s.state === 'PlatformFailed' ? 'destructive' : 'secondary'">
@@ -268,9 +268,9 @@ const { previewIncludeInformational, previewScanned, previewCounts, evidenceOpen
         <Skeleton v-if="detailLoading" class="mx-4 h-48" />
         <Alert v-else-if="detailError" variant="destructive" class="mx-4"><AlertDescription>{{ $message(detailError) }}</AlertDescription></Alert>
         <div v-else-if="detail" class="flex flex-col gap-3 px-4 pb-4 text-sm">
-          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.team') }}</span><span>{{ teamName(detail.teamId) }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.challenge') }}</span><span>{{ challengeTitle(detail.competitionChallengeId) }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.perpetrator') }}</span><span class="font-mono text-xs">{{ detail.actorUserId ?? '-' }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.team') }}</span><NuxtLink v-if="detail.teamId" :to="adminTeamPath(competitionId, detail.teamId)" class="hover:underline">{{ teamName(detail.teamId) }}</NuxtLink><span v-else>{{ teamName(detail.teamId) }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.challenge') }}</span><NuxtLink v-if="detail.competitionChallengeId" :to="adminChallengePath(competitionId, detail.competitionChallengeId)" class="hover:underline">{{ challengeTitle(detail.competitionChallengeId) }}</NuxtLink><span v-else>{{ challengeTitle(detail.competitionChallengeId) }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.perpetrator') }}</span><NuxtLink v-if="detail.actorUserId" :to="adminUserPath(detail.actorUserId)" class="font-mono text-xs hover:underline">{{ detail.actorUserId }}</NuxtLink><span v-else>-</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.type') }}</span><span>{{ enumLabel(GameplayFactKindLabel, detail.kind) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.reviewStatus') }}</span><span>{{ enumLabel(GameplayFactStateLabel, detail.state) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.result') }}</span><span>{{ detail.result !== null && detail.result !== undefined ? enumLabel(GameplayFactResultLabel, detail.result) : '-' }}</span></div>

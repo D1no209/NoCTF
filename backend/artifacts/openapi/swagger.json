@@ -6658,6 +6658,72 @@
         ]
       }
     },
+    "/api/v1/admin/competitions/{competitionId}/teams/{teamId}": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Gets a competition team for management, including pending and internal teams.",
+        "description": "Loads one team by its competition-scoped identity for authorized observers without depending on list pagination or public visibility.",
+        "operationId": "AdminGetTeam",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsTeamsTeamResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/competitions/{competitionId}/teams/{teamId}/invitation-token": {
       "get": {
         "tags": [
@@ -7842,6 +7908,97 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/runtimes/{runtimeInstanceId}/flags": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Queries current and historical flags applicable to one runtime.",
+        "description": "Returns paginated protected flag records and their typed scope and validity to authorized administrators or template managers. Responses must not be cached.",
+        "operationId": "AdminListRuntimeFlags",
+        "parameters": [
+          {
+            "name": "runtimeInstanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "includeHistory",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "desc",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationRuntimeRuntimeFlagListResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
           },
           "401": {
             "description": "Unauthorized"
@@ -22726,6 +22883,10 @@
           }
         }
       },
+      "NoCTFAPIEndpointsAdministrationTeamsGetAdminTeamRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
       "NoCTFAPIEndpointsAdministrationTeamsAdminTeamInvitationResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -23295,6 +23456,176 @@
         }
       },
       "NoCTFAPIEndpointsAdministrationRuntimeListAdminRuntimesRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFAPIPaginationPaginationRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationRuntimeRuntimeFlagListResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationRuntimeRuntimeFlagResponse"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationRuntimeRuntimeFlagResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "flag": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagResponse"
+          },
+          "source": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationRuntimeRuntimeFlagSourceProtocol"
+          },
+          "state": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationRuntimeRuntimeFlagStateProtocol"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "challengeId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "competitionChallengeId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "teamId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "flag": {
+            "type": "string"
+          },
+          "matchKind": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol"
+          },
+          "specificationKind": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankSpecificationKindProtocol"
+              }
+            ]
+          },
+          "specificationId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "validStart": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "deletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "systemManaged": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Exact",
+          "RegularExpression"
+        ],
+        "enum": [
+          "Exact",
+          "RegularExpression"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankSpecificationKindProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Attachment",
+          "AwdRound",
+          "RuntimeDefinition",
+          "Hint",
+          "RuntimeInstance"
+        ],
+        "enum": [
+          "Attachment",
+          "AwdRound",
+          "RuntimeDefinition",
+          "Hint",
+          "RuntimeInstance"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationRuntimeRuntimeFlagSourceProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Instance",
+          "Team",
+          "Static",
+          "AwdRound"
+        ],
+        "enum": [
+          "Instance",
+          "Team",
+          "Static",
+          "AwdRound"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationRuntimeRuntimeFlagStateProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Active",
+          "Scheduled",
+          "Expired",
+          "Deleted"
+        ],
+        "enum": [
+          "Active",
+          "Scheduled",
+          "Expired",
+          "Deleted"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationRuntimeListRuntimeFlagsRequest": {
         "allOf": [
           {
             "$ref": "#/components/schemas/NoCTFAPIPaginationPaginationRequest"
@@ -28385,102 +28716,6 @@
       "NoCTFAPIEndpointsAdministrationChallengesGetAdminChallengeRequest": {
         "type": "object",
         "additionalProperties": false
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "guid"
-          },
-          "challengeId": {
-            "type": "string",
-            "format": "guid",
-            "nullable": true
-          },
-          "competitionChallengeId": {
-            "type": "string",
-            "format": "guid",
-            "nullable": true
-          },
-          "teamId": {
-            "type": "string",
-            "format": "guid",
-            "nullable": true
-          },
-          "flag": {
-            "type": "string"
-          },
-          "matchKind": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol"
-          },
-          "specificationKind": {
-            "nullable": true,
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankSpecificationKindProtocol"
-              }
-            ]
-          },
-          "specificationId": {
-            "type": "string",
-            "format": "guid",
-            "nullable": true
-          },
-          "validStart": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "validUntil": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "deletedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "systemManaged": {
-            "type": "boolean"
-          }
-        }
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "Exact",
-          "RegularExpression"
-        ],
-        "enum": [
-          "Exact",
-          "RegularExpression"
-        ]
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankSpecificationKindProtocol": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "Attachment",
-          "AwdRound",
-          "RuntimeDefinition",
-          "Hint",
-          "RuntimeInstance"
-        ],
-        "enum": [
-          "Attachment",
-          "AwdRound",
-          "RuntimeDefinition",
-          "Hint",
-          "RuntimeInstance"
-        ]
       },
       "NoCTFAPIEndpointsAdministrationChallengesGetCompetitionChallengeFlagRequest": {
         "type": "object",

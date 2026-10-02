@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdTrafficCapturesPageViewState } from '~/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdTrafficCapturesPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdTrafficCapturesPageViewState }>()
-const { Download, RefreshCw, Trash2, canWrite, competition, challengeOptions, teamOptions, filterChallenge, filterTeam, filterRuntime, filterTruncated, selectedRuntimeIds, exporting, deleteTarget, deleting, items, loading, listError, page, pageCount, total, pageLimit, loadPage, setPageSize, formatBytes, adminFormatDateTime, applyFilters, onToggleSelected, isSelected, openDelete, setDeleteOpen, downloadCapture, exportSelected, confirmDelete, challengeTitle, teamName } = toRefs(viewProps.state)
+const { adminTeamPath, adminChallengePath, adminRuntimePath, competitionId, Download, RefreshCw, Trash2, canWrite, competition, challengeOptions, teamOptions, filterChallenge, filterTeam, filterRuntime, filterTruncated, selectedRuntimeIds, exporting, deleteTarget, deleting, items, loading, listError, page, pageCount, total, pageLimit, loadPage, setPageSize, formatBytes, adminFormatDateTime, applyFilters, onToggleSelected, isSelected, openDelete, setDeleteOpen, downloadCapture, exportSelected, confirmDelete, challengeTitle, teamName } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -75,9 +75,9 @@ const { Download, RefreshCw, Trash2, canWrite, competition, challengeOptions, te
             <TableCell>
               <Checkbox :model-value="isSelected(item.runtimeInstanceId)" @update:model-value="onToggleSelected(item, $event)" />
             </TableCell>
-            <TableCell>{{ challengeTitle(item) }}</TableCell>
-            <TableCell>{{ teamName(item) }}</TableCell>
-            <TableCell class="font-mono text-xs">{{ item.runtimeInstanceId }}</TableCell>
+            <TableCell><NuxtLink v-if="item.competitionChallengeId" :to="adminChallengePath(competitionId, item.competitionChallengeId)" class="hover:underline">{{ challengeTitle(item) }}</NuxtLink><span v-else>{{ challengeTitle(item) }}</span></TableCell>
+            <TableCell><NuxtLink v-if="item.teamId" :to="adminTeamPath(competitionId, item.teamId)" class="hover:underline">{{ teamName(item) }}</NuxtLink><span v-else>{{ teamName(item) }}</span></TableCell>
+            <TableCell class="font-mono text-xs"><NuxtLink :to="adminRuntimePath(competitionId, item.runtimeInstanceId)" class="hover:underline">{{ item.runtimeInstanceId }}</NuxtLink></TableCell>
             <TableCell class="font-mono tabular-nums">{{ formatBytes(item.byteLength) }}</TableCell>
             <TableCell class="font-mono tabular-nums">{{ item.segmentCount ?? 0 }}</TableCell>
             <TableCell>

@@ -1,4 +1,5 @@
 import { markRaw } from 'vue'
+import { useAdminDetailRoute } from '~/features/admin/useAdminDetailRoute'
 
 import { Copy, KeyRound, LogIn, Plus, Trash2, Unlink } from '@lucide/vue'
 import { toast } from 'vue-sonner'
@@ -140,11 +141,12 @@ export function useAdminPlatformUsersPage() {
     await load()
   }
 
-  const detailOpen = ref(false)
-
-  const detailLoading = ref(false)
-
-  const detail = ref<PlatformUser | null>(null)
+  const selection = useAdminDetailRoute<PlatformUser>('userId', '/admin/platform/users', async (userId, signal) => {
+    const { data, error } = await adminPlatformGetUser({ path: { userId }, signal })
+    if (error || !data?.user) throw error ?? new Error(translate('adminNavigation.notFound'))
+    return data.user
+  })
+  const { open: detailOpen, loading: detailLoading, data: detail, error: detailError } = selection
 
   const pendingRole = ref('User')
 
@@ -174,36 +176,18 @@ export function useAdminPlatformUsersPage() {
 
   const issuedToken = ref<IssuedToken | null>(null)
 
-  const detailRequests = createLatestRequestGuard()
-
   const tokenIssueRequests = createLatestRequestGuard()
 
-  watch(detailOpen, (open) => {
-    if (open) return
-    detailRequests.invalidate()
-    detailLoading.value = false
+  watch(detail, (target) => {
+    if (!target) return
+    pendingRole.value = target.role ?? 'User'
+    if (target.accountStatus === 'Active' || target.accountStatus === 'Banned' || target.accountStatus === 'Disabled')
+      pendingAccountStatus.value = target.accountStatus
+    pendingEmailVerification.value = target.emailVerified ? 'Verified' : 'Unverified'
   })
 
   async function openDetail(user: PlatformUser): Promise<void> {
-    if (!user.id) return
-    const request = detailRequests.begin()
-    detailOpen.value = true
-    detailLoading.value = true
-    detail.value = null
-    const { data, error } = await adminPlatformGetUser({ path: { userId: user.id } })
-    if (!detailRequests.isCurrent(request)) return
-    detailLoading.value = false
-    if (error) {
-      toast.error(parseApiError(error).message)
-      detailOpen.value = false
-      return
-    }
-    detail.value = data?.user ?? null
-    pendingRole.value = data?.user?.role ?? 'User'
-    if (data?.user?.accountStatus === 'Active' || data?.user?.accountStatus === 'Banned' || data?.user?.accountStatus === 'Disabled') {
-      pendingAccountStatus.value = data.user.accountStatus
-    }
-    pendingEmailVerification.value = data?.user?.emailVerified ? 'Verified' : 'Unverified'
+    if (user.id) await selection.select(user.id)
   }
 
   function openToken(target: PlatformUser, intent: TokenIntent): void {
@@ -293,15 +277,16 @@ export function useAdminPlatformUsersPage() {
       await navigateTo('/auth/login')
       return
     }
-    detail.value = { ...target, ssoBinding: null }
+    if (selection.selectedId.value === target.id) detail.value = { ...target, ssoBinding: null }
     await load()
   }
 
   async function saveRole(): Promise<void> {
     if (!detail.value?.id) return
+    const targetId = detail.value.id
     roleSaving.value = true
     const { data, error, response } = await adminPlatformPatchUser({
-      path: { userId: detail.value.id },
+      path: { userId: targetId },
       body: { role: pendingRole.value as 'User' | 'Organizer' | 'Administrator' },
     })
     roleSaving.value = false
@@ -314,7 +299,7 @@ export function useAdminPlatformUsersPage() {
       }
       return
     }
-    detail.value = data?.user ?? detail.value
+    if (selection.selectedId.value === targetId) detail.value = data?.user ?? detail.value
     toast.success(translate("ui.roleUpdated"))
     await load()
   }
@@ -332,9 +317,10 @@ export function useAdminPlatformUsersPage() {
 
   async function saveAccountStatus(): Promise<void> {
     if (!detail.value?.id || detail.value.accountStatus === 'Anonymized') return
+    const targetId = detail.value.id
     accountStatusSaving.value = true
     const { data, error } = await adminPlatformPatchUser({
-      path: { userId: detail.value.id },
+      path: { userId: targetId },
       body: { accountStatus: pendingAccountStatus.value },
     })
     accountStatusSaving.value = false
@@ -345,7 +331,7 @@ export function useAdminPlatformUsersPage() {
     }
 
     if (data?.user) {
-      detail.value = data.user
+      if (selection.selectedId.value === targetId) detail.value = data.user
       const index = users.value.findIndex(user => user.id === data.user?.id)
       if (index >= 0) users.value.splice(index, 1, data.user)
     }
@@ -356,9 +342,10 @@ export function useAdminPlatformUsersPage() {
 
   async function saveEmailVerification(): Promise<void> {
     if (!detail.value?.id || detail.value.accountStatus === 'Anonymized') return
+    const targetId = detail.value.id
     emailVerificationSaving.value = true
     const { data, error } = await adminPlatformPatchUser({
-      path: { userId: detail.value.id },
+      path: { userId: targetId },
       body: { emailVerified: pendingEmailVerification.value === 'Verified' },
     })
     emailVerificationSaving.value = false
@@ -371,7 +358,7 @@ export function useAdminPlatformUsersPage() {
     }
 
     if (data?.user) {
-      detail.value = data.user
+      if (selection.selectedId.value === targetId) detail.value = data.user
       const index = users.value.findIndex(user => user.id === data.user?.id)
       if (index >= 0) users.value.splice(index, 1, data.user)
     }
@@ -497,6 +484,7 @@ export function useAdminPlatformUsersPage() {
       openCreateBot,
       setCreateBotOpen,
       createBot,
+      detailError,
       detailOpen,
       detailLoading,
       detail,

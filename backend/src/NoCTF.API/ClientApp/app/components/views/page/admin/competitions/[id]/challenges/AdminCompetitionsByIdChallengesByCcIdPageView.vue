@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdChallengesByCcIdPageViewState } from '~/features/routes/admin/competitions/[id]/challenges/useAdminCompetitionsByIdChallengesByCcIdPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdChallengesByCcIdPageViewState }>()
-const { Plus, competitionId, competition, canWrite, canJudge, challenge, loading, loadError, activeSection, sectionOptions, editCustomTitle, editOrder, editPublished, savingEdit, saveEdit, config, configLoading, savingConfig, inheritedConfiguration, saveConfig, hints, hintsLoading, hintsLoadError, includeDeletedHints, hintDialogOpen, editingHint, hintForm, hintError, savingHint, pendingHintId, openHintDialog, saveHint, deleteHint, restoreHint, scoringLoading, scoringError, scoringSearch, loadChallengeTeamScoring, scoringPage, scoringPageCount, scoringTotal, scoringPageLimit, scoringPageLoading, loadScoringPage, setScoringPageSize, scoringDisplayNames, scoringRows, adjustmentTarget, adjustmentDelta, adjustmentPending, adjustmentError, adjustmentValid, openAdjustment, closeAdjustment, submitAdjustment, ChallengeRulesEditor, hiddenRuleKeys, onClickAdjustmentTarget, onClickHintDialogOpen } = toRefs(viewProps.state)
+const { adminTeamPath, adminTemplatePath, Plus, competitionId, competition, canWrite, canJudge, challenge, loading, loadError, activeSection, sectionOptions, editCustomTitle, editOrder, editPublished, savingEdit, saveEdit, config, configLoading, savingConfig, inheritedConfiguration, saveConfig, hints, hintsLoading, hintsLoadError, includeDeletedHints, hintDialogOpen, editingHint, hintForm, hintError, savingHint, pendingHintId, openHintDialog, saveHint, deleteHint, restoreHint, scoringLoading, scoringError, scoringSearch, loadChallengeTeamScoring, scoringPage, scoringPageCount, scoringTotal, scoringPageLimit, scoringPageLoading, loadScoringPage, setScoringPageSize, scoringDisplayNames, scoringRows, adjustmentTarget, adjustmentDelta, adjustmentPending, adjustmentError, adjustmentValid, openAdjustment, closeAdjustment, submitAdjustment, ChallengeRulesEditor, hiddenRuleKeys, onClickAdjustmentTarget, onClickHintDialogOpen } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -24,6 +24,7 @@ const { Plus, competitionId, competition, canWrite, canJudge, challenge, loading
           {{ challenge.isPublished ? $t('ui.published') : $t('ui.unpublished') }}
         </Badge>
         <Badge variant="secondary">{{ directionLabel(challenge.direction) }}</Badge>
+        <NuxtLink v-if="challenge.challengeId" :to="adminTemplatePath(challenge.challengeId)" class="text-sm hover:underline">{{ $t('ui.challengeTemplate') }}</NuxtLink>
       </div>
 
       <div data-challenge-editor-workspace>
@@ -189,7 +190,7 @@ const { Plus, competitionId, competition, canWrite, canJudge, challenge, loading
                 <TableRow v-for="row in scoringRows" :key="row.team.id">
                   <TableCell>
                     <div class="flex items-center gap-2">
-                      <span class="font-medium">{{ teamDisplayName(row.team, scoringDisplayNames) }}</span>
+                      <NuxtLink :to="adminTeamPath(competitionId, row.team.id)" class="font-medium hover:underline">{{ teamDisplayName(row.team, scoringDisplayNames) }}</NuxtLink>
                       <Badge v-if="row.team.isBanned" variant="destructive">{{ $t('ui.banned2') }}</Badge>
                     </div>
                   </TableCell>

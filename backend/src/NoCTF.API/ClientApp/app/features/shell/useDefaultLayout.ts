@@ -1,4 +1,5 @@
 import { markRaw } from 'vue'
+import { adminWorkspacePath } from '~/features/admin/admin-navigation'
 
 import { Bell, Database, Flag, ShieldAlert } from '@lucide/vue'
 import PlatformGearIconComponent from '../../components/ui/icons/PlatformGearIcon.vue'
@@ -27,7 +28,7 @@ export function useDefaultLayout() {
 
   const route = useRoute()
   const isHome = computed(() => route.path === '/')
-  const routePath = computed(() => route.path)
+  const routePath = computed(() => adminWorkspacePath(route.path))
   const {
     wallpaperActive,
     wallpaperStyle,

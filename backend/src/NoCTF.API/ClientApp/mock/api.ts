@@ -401,7 +401,11 @@ export function createMockApi() {
             })),
         }
       }
-      else if (route === '/admin/platform/users/{userId}') value = { user: state.users.find(u => u.userId === p.userId), schoolIdentity: state.settings.get(`${p.userId}/school-identity`) ?? { fullName: null, studentNumber: null } }
+      else if (route === '/admin/platform/users/{userId}') {
+        const target = state.users.find(u => u.userId === p.userId)
+        if (!target) return problem(404, 'Mock user not found')
+        value = { user: { ...target, id: target.userId, accountStatus: 'Active', createdAt: date(-720) }, schoolIdentity: state.settings.get(`${p.userId}/school-identity`) ?? { fullName: null, studentNumber: null } }
+      }
       else if (route === '/admin/platform/users') value = list(state.users.map(u => ({ ...u, id: u.userId, accountStatus: 'Active', createdAt: date(-720) })), url)
       else if (route === '/admin/platform/information') value = { version: 'MOCK / local-memory', contributors: [] }
       else if (route === '/admin/competitions/{competitionId}') value = {
@@ -483,7 +487,10 @@ export function createMockApi() {
         value = myTeam
       }
       else if (cleanRoute === '/competitions/{competitionId}/teams') value = list(state.teams.filter(t => t.competitionId === p.competitionId), url)
-      else if (cleanRoute === '/competitions/{competitionId}/teams/{teamId}') value = team
+      else if (cleanRoute === '/competitions/{competitionId}/teams/{teamId}') {
+        if (!team) return problem(404, 'Mock team not found')
+        value = team
+      }
       else if (cleanRoute === '/competitions/{competitionId}/tracks') value = state.settings.get(cleanRoute + p.competitionId) ?? { items: [model('TracksCompetitionTrackResponse', {
         key: 'open', name: '公开赛道 / Open', isDefault: true, isPublicSelectable: true, earnsScore: true, earnsBlood: true,
         affectsDynamicChallengeScore: true, visibleOnLeaderboard: true, affectsCompetitiveResults: true, isViewerTrack: true,
@@ -516,7 +523,22 @@ export function createMockApi() {
         value = [...state.runtimes].reverse().find(r => r.competitionChallengeId === challenge?.id && r.challengeId === template?.id)
         if (!value) return problem(404, '演示实例未启动 / No active Mock runtime')
       }
-      else if (route === '/admin/runtimes/{runtimeInstanceId}' || route.endsWith('/runtimes/{runtimeInstanceId}')) value = state.runtimes.find(r => r.id === p.runtimeInstanceId)
+      else if (route === '/admin/runtimes/{runtimeInstanceId}/flags') {
+        const runtime = state.runtimes.find(item => item.id === p.runtimeInstanceId)
+        if (!runtime) return problem(404, 'Mock runtime not found')
+        const index = state.runtimes.indexOf(runtime)
+        const flags = [
+          { flag: { id: id(30, index * 2 + 1), competitionChallengeId: runtime.competitionChallengeId, challengeId: null,
+            teamId: runtime.teamId, flag: 'flag{mock_success}', matchKind: 'Exact', createdAt: date(-1), validStart: date(-1), validUntil: date(24), deletedAt: null }, source: 'Team', state: 'Active' },
+          { flag: { id: id(30, index * 2 + 2), competitionChallengeId: runtime.competitionChallengeId, challengeId: null,
+            teamId: runtime.teamId, flag: 'flag{mock_expired}', matchKind: 'Exact', createdAt: date(-2), validStart: date(-2), validUntil: date(-1), deletedAt: null }, source: 'Team', state: 'Expired' },
+        ]
+        value = list(url.searchParams.get('includeHistory') === 'true' ? flags : flags.slice(0, 1), url)
+      }
+      else if (route === '/admin/runtimes/{runtimeInstanceId}' || route.endsWith('/runtimes/{runtimeInstanceId}')) {
+        value = state.runtimes.find(r => r.id === p.runtimeInstanceId)
+        if (!value) return problem(404, 'Mock runtime not found')
+      }
       else if (route.endsWith('/runtimes')) value = list(state.runtimes.filter(r => !p.competitionId || r.competitionId === p.competitionId).map(r => route.startsWith('/admin/platform') ? { runtime: r, scope: 'Competition', competitionTitle: competition?.title ?? state.competitions[0]!.title, challengeTitle: 'Mock runtime' } : r), url)
       else if (route.endsWith('/permissions') && competition) value = { competitionId: competition.id, ownerId: competition.ownerId, managerIds: [id(1, 2)], judgeIds: [], observerIds: [] }
       else if (route.endsWith('/permission-candidates')) value = { items: state.users }

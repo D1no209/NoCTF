@@ -1833,6 +1833,10 @@ export type NoCtfapiEndpointsAdministrationTeamsCorrectTeamBanRequest = {
     reason?: string;
 };
 
+export type NoCtfapiEndpointsAdministrationTeamsGetAdminTeamRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsAdministrationTeamsAdminTeamInvitationResponse = {
     invitationToken?: string;
 };
@@ -1998,6 +2002,43 @@ export type NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeListResponse = {
 };
 
 export type NoCtfapiEndpointsAdministrationRuntimeListAdminRuntimesRequest = NoCtfapiPaginationPaginationRequest & {};
+
+export type NoCtfapiEndpointsAdministrationRuntimeRuntimeFlagListResponse = {
+    items?: Array<NoCtfapiEndpointsAdministrationRuntimeRuntimeFlagResponse>;
+    total?: number;
+};
+
+export type NoCtfapiEndpointsAdministrationRuntimeRuntimeFlagResponse = {
+    flag?: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse;
+    source?: NoCtfapiEndpointsAdministrationRuntimeRuntimeFlagSourceProtocol;
+    state?: NoCtfapiEndpointsAdministrationRuntimeRuntimeFlagStateProtocol;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse = {
+    id?: string;
+    challengeId?: string | null;
+    competitionChallengeId?: string | null;
+    teamId?: string | null;
+    flag?: string;
+    matchKind?: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol;
+    specificationKind?: NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol | null;
+    specificationId?: string | null;
+    validStart?: string | null;
+    validUntil?: string | null;
+    deletedAt?: string | null;
+    createdAt?: string;
+    systemManaged?: boolean;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol = 'Exact' | 'RegularExpression';
+
+export type NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol = 'Attachment' | 'AwdRound' | 'RuntimeDefinition' | 'Hint' | 'RuntimeInstance';
+
+export type NoCtfapiEndpointsAdministrationRuntimeRuntimeFlagSourceProtocol = 'Instance' | 'Team' | 'Static' | 'AwdRound';
+
+export type NoCtfapiEndpointsAdministrationRuntimeRuntimeFlagStateProtocol = 'Active' | 'Scheduled' | 'Expired' | 'Deleted';
+
+export type NoCtfapiEndpointsAdministrationRuntimeListRuntimeFlagsRequest = NoCtfapiPaginationPaginationRequest & {};
 
 export type NoCtfapiEndpointsAdministrationRuntimeRuntimeTrafficCaptureListResponse = {
     items?: Array<NoCtfapiEndpointsAdministrationRuntimeRuntimeTrafficCaptureResponse>;
@@ -3300,26 +3341,6 @@ export type NoCtfapiEndpointsAdministrationChallengesKohCompetitionChallengeRule
 export type NoCtfapiEndpointsAdministrationChallengesGetAdminChallengeRequest = {
     [key: string]: never;
 };
-
-export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse = {
-    id?: string;
-    challengeId?: string | null;
-    competitionChallengeId?: string | null;
-    teamId?: string | null;
-    flag?: string;
-    matchKind?: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol;
-    specificationKind?: NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol | null;
-    specificationId?: string | null;
-    validStart?: string | null;
-    validUntil?: string | null;
-    deletedAt?: string | null;
-    createdAt?: string;
-    systemManaged?: boolean;
-};
-
-export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol = 'Exact' | 'RegularExpression';
-
-export type NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol = 'Attachment' | 'AwdRound' | 'RuntimeDefinition' | 'Hint' | 'RuntimeInstance';
 
 export type NoCtfapiEndpointsAdministrationChallengesGetCompetitionChallengeFlagRequest = {
     [key: string]: never;
@@ -7307,6 +7328,46 @@ export type AdminCorrectTeamBanResponses = {
 
 export type AdminCorrectTeamBanResponse = AdminCorrectTeamBanResponses[keyof AdminCorrectTeamBanResponses];
 
+export type AdminGetTeamData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        teamId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/teams/{teamId}';
+};
+
+export type AdminGetTeamErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminGetTeamError = AdminGetTeamErrors[keyof AdminGetTeamErrors];
+
+export type AdminGetTeamResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsTeamsTeamResponse;
+};
+
+export type AdminGetTeamResponse = AdminGetTeamResponses[keyof AdminGetTeamResponses];
+
 export type AdminGetTeamInvitationData = {
     body?: never;
     path: {
@@ -7913,6 +7974,50 @@ export type AdminListRuntimesResponses = {
 };
 
 export type AdminListRuntimesResponse = AdminListRuntimesResponses[keyof AdminListRuntimesResponses];
+
+export type AdminListRuntimeFlagsData = {
+    body?: never;
+    path: {
+        runtimeInstanceId: string;
+    };
+    query: {
+        includeHistory: boolean;
+        offset: number;
+        limit: number;
+        desc: boolean;
+    };
+    url: '/api/v1/admin/runtimes/{runtimeInstanceId}/flags';
+};
+
+export type AdminListRuntimeFlagsErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminListRuntimeFlagsError = AdminListRuntimeFlagsErrors[keyof AdminListRuntimeFlagsErrors];
+
+export type AdminListRuntimeFlagsResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationRuntimeRuntimeFlagListResponse;
+};
+
+export type AdminListRuntimeFlagsResponse = AdminListRuntimeFlagsResponses[keyof AdminListRuntimeFlagsResponses];
 
 export type AdminListRuntimeTrafficCapturesData = {
     body?: never;

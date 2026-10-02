@@ -5,6 +5,7 @@ import { toast } from 'vue-sonner'
 import { adminChallengeBankCreateTestRuntime, adminChallengeBankExtendTestRuntime, adminChallengeBankGetTestRuntime, adminChallengeBankStopTestRuntime } from '../../api'
 import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeTestRuntimeAcceptedResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeTestRuntimeResponse, NoCtfapiEndpointsAdministrationChallengeBankRuntimeTestFlagStateProtocol } from '../../api'
 import type { ChallengeTestRuntimeLoadOutcome, ChallengeTestRuntimeMutationKind, PendingChallengeTestRuntimeMutation } from '../../utils/challenge-test-runtime-polling'
+import RuntimeFlagsPanelComponent from './RuntimeFlagsPanel.vue'
 import RuntimeAccessUrlComponent from '../challenges/RuntimeAccessUrl.vue'
 import { createRuntimeExtensionRequest, isRuntimeExtensionTooEarly, parseRuntimeExtensionMinutes } from '../../lib/runtime-extension'
 
@@ -251,6 +252,7 @@ export function useChallengeTestRuntimePanel(props: Readonly<{
     }
   }
 
+  const RuntimeFlagsPanel = markRaw(RuntimeFlagsPanelComponent)
   const RuntimeAccessUrl = markRaw(RuntimeAccessUrlComponent)
 
   return {
@@ -282,6 +284,7 @@ export function useChallengeTestRuntimePanel(props: Readonly<{
       stateVariant,
       flagVariant,
       flagStateLabel,
+      RuntimeFlagsPanel,
       RuntimeAccessUrl
     }
 }

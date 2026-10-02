@@ -1,3 +1,4 @@
+import { adminTeamPath, adminChallengePath, adminRuntimePath } from '~/features/admin/admin-navigation'
 import { Download, RefreshCw, Trash2 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import {
@@ -168,6 +169,8 @@ export function useAdminCompetitionsByIdTrafficCapturesPage() {
   })
 
   return {
+      adminTeamPath, adminChallengePath, adminRuntimePath,
+      competitionId,
     Download,
     RefreshCw,
     Trash2,

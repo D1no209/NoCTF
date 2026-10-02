@@ -352,6 +352,7 @@ Judge/Observer 必须完成邮箱验证；资格或角色冲突返回 typed 409�
 
 ```text
 GET  /api/v1/admin/competitions/{competitionId}/teams
+GET  /api/v1/admin/competitions/{competitionId}/teams/{teamId}
 POST /api/v1/admin/competitions/{competitionId}/teams/{teamId}/correct-ban
 GET  /api/v1/admin/competitions/{competitionId}/team-ban-appeals
 PUT  /api/v1/admin/competitions/{competitionId}/team-ban-appeals/{appealId}/resolution
@@ -399,6 +400,7 @@ Runtime。测试实例沿用正式 Runner 的镜像拉取、资源限制、安�
 ```text
 GET  /api/v1/admin/competitions/{competitionId}/runtimes
 GET  /api/v1/admin/runtimes/{runtimeInstanceId}
+GET  /api/v1/admin/runtimes/{runtimeInstanceId}/flags
 DELETE /api/v1/admin/runtimes/{runtimeInstanceId}
 POST /api/v1/admin/runtimes/{runtimeInstanceId}/force-terminations
 POST /api/v1/admin/competitions/{competitionId}/teams/{teamId}/challenges/{competitionChallengeId}/runtimes

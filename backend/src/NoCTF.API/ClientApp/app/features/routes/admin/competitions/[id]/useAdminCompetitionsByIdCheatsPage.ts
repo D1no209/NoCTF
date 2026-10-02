@@ -1,3 +1,4 @@
+import { adminUserPath, adminTeamPath, adminChallengePath } from '~/features/admin/admin-navigation'
 import { proxyRefs } from 'vue'
 
 import { toast } from 'vue-sonner'
@@ -182,6 +183,8 @@ export function useAdminCompetitionsByIdCheatsPage() {
   })
 
   const viewBindings = {
+      competitionId,
+      adminUserPath, adminTeamPath, adminChallengePath,
       filterStatus,
       filterFrom,
       filterTo,

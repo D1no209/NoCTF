@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminPlatformRuntimesPageViewState } from '~/features/routes/admin/platform/useAdminPlatformRuntimesPage'
 
 const viewProps = defineProps<{ state: AdminPlatformRuntimesPageViewState }>()
-const { formatCapacityAmount, runnerFailureLabel, ExternalLink, RuntimeAccessUrl, RefreshCw, filters, detailTarget, items, loading, error, initialized, refresh, page, pageCount, total, pageLimit, loadPage, setPageSize, detail, applyFilters, clearFilters, terminateTarget, terminatePending, terminationError, forceTerminateTarget, forceTerminateReason, forceTerminateConfirmed, forceTerminatePending, forceTerminationError, teamLabel, stateBadgeVariant, canTerminate, openTermination, openForceTermination, submitTermination, submitForceTermination, onClickDetailTarget, onUpdateOpenDetailTarget, onUpdateOpenTerminateTarget, onUpdateOpenForceTerminateTarget } = toRefs(viewProps.state)
+const { RuntimeFlagsPanel, flagQueryTarget, openFlagQuery, adminCompetitionPath, adminRuntimeTeamPath, adminRuntimeChallengePath, adminRuntimePath, detailOpen, detailLoading, detailError, formatCapacityAmount, runnerFailureLabel, ExternalLink, RuntimeAccessUrl, RefreshCw, filters, items, loading, error, initialized, refresh, page, pageCount, total, pageLimit, loadPage, setPageSize, detail, applyFilters, clearFilters, terminateTarget, terminatePending, terminationError, forceTerminateTarget, forceTerminateReason, forceTerminateConfirmed, forceTerminatePending, forceTerminationError, teamLabel, stateBadgeVariant, canTerminate, openTermination, openForceTermination, submitTermination, submitForceTermination, onClickDetailTarget, onUpdateOpenDetailTarget, onUpdateOpenTerminateTarget, onUpdateOpenForceTerminateTarget } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -103,11 +103,11 @@ const { formatCapacityAmount, runnerFailureLabel, ExternalLink, RuntimeAccessUrl
         </TableHeader>
         <TableBody>
           <TableRow v-for="item in items" :key="item.runtime?.id">
-            <TableCell class="whitespace-normal break-words font-medium">{{ teamLabel(item) }}</TableCell>
+            <TableCell class="whitespace-normal break-words font-medium"><NuxtLink v-if="adminRuntimeTeamPath(item.runtime)" :to="adminRuntimeTeamPath(item.runtime)" class="hover:underline">{{ teamLabel(item) }}</NuxtLink><span v-else>{{ teamLabel(item) }}</span></TableCell>
             <TableCell class="whitespace-normal break-words">
               <div class="grid gap-1">
-                <span>{{ item.challengeTitle ?? '-' }}</span>
-                <span class="text-xs text-muted-foreground">{{ item.scope === 'ChallengeTest' ? $t('ui.challengeTest') : item.competitionTitle ?? '-' }}</span>
+                <NuxtLink v-if="adminRuntimeChallengePath(item.runtime)" :to="adminRuntimeChallengePath(item.runtime)" class="hover:underline">{{ item.challengeTitle ?? '-' }}</NuxtLink><span v-else>{{ item.challengeTitle ?? '-' }}</span>
+                <NuxtLink v-if="item.runtime?.competitionId" :to="adminCompetitionPath(item.runtime.competitionId)" class="text-xs text-muted-foreground hover:underline">{{ item.competitionTitle ?? item.runtime.competitionId }}</NuxtLink><span v-else class="text-xs text-muted-foreground">{{ $t('ui.challengeTest') }}</span>
               </div>
             </TableCell>
             <TableCell class="whitespace-normal break-words">
@@ -124,6 +124,7 @@ const { formatCapacityAmount, runnerFailureLabel, ExternalLink, RuntimeAccessUrl
             <TableCell class="text-right">
               <div class="flex flex-wrap justify-end gap-1">
                 <Button variant="ghost" size="sm" @click="onClickDetailTarget(item)">{{ $t('ui.details') }}</Button>
+                <Button variant="ghost" size="sm" @click="openFlagQuery(item)">{{ $t('runtimeFlags.query') }}</Button>
                 <Button
                   v-if="canTerminate(item)"
                   variant="destructive"
@@ -158,17 +159,19 @@ const { formatCapacityAmount, runnerFailureLabel, ExternalLink, RuntimeAccessUrl
       />
     </template>
 
-    <Sheet :open="detailTarget !== null" @update:open="onUpdateOpenDetailTarget">
+    <Sheet :open="detailOpen" @update:open="onUpdateOpenDetailTarget">
       <SheetContent data-scroll-surface class="overflow-y-auto">
         <SheetHeader>
           <SheetTitle>{{ $t('ui.runtimeDetails') }}</SheetTitle>
           <SheetDescription class="break-all font-mono text-xs">{{ detail?.runtime?.id }}</SheetDescription>
         </SheetHeader>
-        <div v-if="detail" class="flex flex-col gap-4 px-4 pb-4 text-sm">
+        <Skeleton v-if="detailLoading" class="mx-4 h-48" />
+        <Alert v-else-if="detailError" variant="destructive"><AlertDescription>{{ $message(detailError) }}</AlertDescription></Alert>
+        <div v-else-if="detail" class="flex flex-col gap-4 px-4 pb-4 text-sm">
           <dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-3">
-            <dt class="text-muted-foreground">{{ $t('ui.team') }}</dt><dd class="break-words">{{ teamLabel(detail) }}</dd>
+            <dt class="text-muted-foreground">{{ $t('ui.team') }}</dt><dd class="break-words"><NuxtLink v-if="adminRuntimeTeamPath(detail.runtime)" :to="adminRuntimeTeamPath(detail.runtime)" class="hover:underline">{{ teamLabel(detail) }}</NuxtLink><span v-else>{{ teamLabel(detail) }}</span></dd>
             <dt class="text-muted-foreground">{{ $t('ui.competitionChallenge') }}</dt>
-            <dd class="break-words">{{ detail.challengeTitle }}<p class="mt-1 text-xs text-muted-foreground">{{ detail.competitionTitle ?? $t('ui.challengeTest') }}</p></dd>
+            <dd class="break-words"><NuxtLink v-if="adminRuntimeChallengePath(detail.runtime)" :to="adminRuntimeChallengePath(detail.runtime)" class="hover:underline">{{ detail.challengeTitle }}</NuxtLink><p class="mt-1 text-xs text-muted-foreground"><NuxtLink v-if="detail.runtime?.competitionId" :to="adminCompetitionPath(detail.runtime.competitionId)" class="hover:underline">{{ detail.competitionTitle }}</NuxtLink><span v-else>{{ $t('ui.challengeTest') }}</span></p></dd>
             <dt class="text-muted-foreground">{{ $t('ui.type') }}</dt><dd>{{ enumLabel(RuntimeKindLabel, detail.runtime?.runtimeKind) }}</dd>
             <dt class="text-muted-foreground">{{ $t('ui.status') }}</dt><dd><Badge :variant="stateBadgeVariant(detail.runtime?.state)">{{ enumLabel(RuntimeStateLabel, detail.runtime?.state) }}</Badge></dd>
             <dt class="text-muted-foreground">{{ $t('ui.placement') }}</dt><dd class="break-all">{{ enumLabel(RuntimeProviderLabel, detail.runtime?.provider) }}<p class="mt-1 font-mono text-xs">{{ detail.runtime?.runnerId ?? $t('ui.runnerNotAssigned') }}</p></dd>
@@ -191,8 +194,9 @@ const { formatCapacityAmount, runnerFailureLabel, ExternalLink, RuntimeAccessUrl
             <component :is="RuntimeAccessUrl" v-for="access in detail.runtime.accesses" :key="`${access.directAddress}:${access.webSocketAddress}`" :access="access" />
           </template>
           <Separator />
+          <component :is="RuntimeFlagsPanel" v-if="detail.runtime?.id" :key="detail.runtime.id" :runtime-id="detail.runtime.id" :auto-load="flagQueryTarget === detail.runtime.id" />
           <Button v-if="detail.runtime?.competitionId" variant="outline" as-child>
-            <NuxtLink :to="`/admin/competitions/${detail.runtime.competitionId}/runtimes`"><ExternalLink data-icon="inline-start" />{{ $t('ui.competitionRuntimes') }}</NuxtLink>
+            <NuxtLink :to="adminRuntimePath(detail.runtime.competitionId, detail.runtime.id)"><ExternalLink data-icon="inline-start" />{{ $t('ui.competitionRuntimes') }}</NuxtLink>
           </Button>
           <Button v-else-if="detail.runtime?.challengeId" variant="outline" as-child>
             <NuxtLink :to="`/admin/challenges/${detail.runtime.challengeId}`"><ExternalLink data-icon="inline-start" />{{ $t('ui.challengeTemplate') }}</NuxtLink>

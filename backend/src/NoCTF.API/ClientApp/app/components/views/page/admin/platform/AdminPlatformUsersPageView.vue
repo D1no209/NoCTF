@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminPlatformUsersPageViewState } from '~/features/routes/admin/platform/useAdminPlatformUsersPage'
 
 const viewProps = defineProps<{ state: AdminPlatformUsersPageViewState }>()
-const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageLoading, loadError, search, roleFilter, ssoProviders, ssoProviderFilter, ROLE_LABELS, STATUS_LABELS, MANAGED_ACCOUNT_STATUS_OPTIONS, REFERENCE_LABELS, filteredUsers, page, pageCount, total, pageLimit, loadPage, setPageSize, createBotOpen, creatingBot, botName, botRole, openCreateBot, setCreateBotOpen, createBot, detailOpen, detailLoading, detail, pendingRole, pendingAccountStatus, pendingEmailVerification, roleSaving, accountStatusSaving, emailVerificationSaving, invalidating, ssoUnbinding, tokenOpen, tokenIntent, identitySwitchActive, tokenIssuing, tokenExpiresInSeconds, issuedToken, openToken, setTokenOpen, issueToken, copyIssuedToken, openDetail, saveRole, saveAccountStatus, saveEmailVerification, invalidateTokens, unbindManagedSsoIdentity, deleteOpen, previewLoading, preview, deletionMode, deletionReason, deleting, startDelete, confirmDelete, PrivateAccountPanel, AdminDateTime } = toRefs(viewProps.state)
+const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageLoading, loadError, search, roleFilter, ssoProviders, ssoProviderFilter, ROLE_LABELS, STATUS_LABELS, MANAGED_ACCOUNT_STATUS_OPTIONS, REFERENCE_LABELS, filteredUsers, page, pageCount, total, pageLimit, loadPage, setPageSize, createBotOpen, creatingBot, botName, botRole, openCreateBot, setCreateBotOpen, createBot, detailError, detailOpen, detailLoading, detail, pendingRole, pendingAccountStatus, pendingEmailVerification, roleSaving, accountStatusSaving, emailVerificationSaving, invalidating, ssoUnbinding, tokenOpen, tokenIntent, identitySwitchActive, tokenIssuing, tokenExpiresInSeconds, issuedToken, openToken, setTokenOpen, issueToken, copyIssuedToken, openDetail, saveRole, saveAccountStatus, saveEmailVerification, invalidateTokens, unbindManagedSsoIdentity, deleteOpen, previewLoading, preview, deletionMode, deletionReason, deleting, startDelete, confirmDelete, PrivateAccountPanel, AdminDateTime } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -176,6 +176,7 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
         <div v-if="detailLoading" class="flex flex-col gap-3 p-6">
           <Skeleton v-for="i in 5" :key="i" class="h-8 w-full" />
         </div>
+        <Alert v-else-if="detailError" variant="destructive" class="m-6"><AlertDescription>{{ $message(detailError) }}</AlertDescription></Alert>
         <ScrollSurface as="div" v-else-if="detail" :key="detail.id" class="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-6">
           <section class="flex flex-col gap-4" aria-labelledby="user-account-overview">
             <h3 id="user-account-overview" class="font-semibold">{{ $t('ui.accountInformation') }}</h3>

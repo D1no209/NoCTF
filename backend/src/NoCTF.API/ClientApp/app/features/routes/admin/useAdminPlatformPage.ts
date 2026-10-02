@@ -1,4 +1,5 @@
 import { markRaw } from 'vue'
+import { adminWorkspacePath } from '~/features/admin/admin-navigation'
 
 import { Beaker, Container, History, Info, KeyRound, MailCheck, ScrollText, Users } from '@lucide/vue'
 import type { WorkspaceNavGroup } from '../../app/workspace-nav'
@@ -8,7 +9,7 @@ import AppWorkspaceNavComponent from '../../app/AppWorkspaceNav.vue'
 export function useAdminPlatformPage() {
   const route = useRoute()
 
-  const activePath = computed(() => route.path)
+  const activePath = computed(() => adminWorkspacePath(route.path))
 
   const navGroups = computed<WorkspaceNavGroup[]>(() => [
     {

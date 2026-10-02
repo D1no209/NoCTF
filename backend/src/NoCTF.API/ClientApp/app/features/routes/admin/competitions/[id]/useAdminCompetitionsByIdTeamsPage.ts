@@ -1,8 +1,11 @@
 import { proxyRefs } from 'vue'
+import { createLatestRequestGuard } from '~/lib/latest-request'
+import { useAdminDetailRoute } from '~/features/admin/useAdminDetailRoute'
+import { adminUserPath } from '~/features/admin/admin-navigation'
 import { markRaw } from 'vue'
 
 import { toast } from 'vue-sonner'
-import { adminCreateManualAdjustment, adminCorrectTeamBan, adminGetCompetition, adminGetTeamInvitation, adminListCompetitionChallenges, adminListTeamBanAppeals, adminListTeams, adminResolveTeamBanAppeal, patchCompetitionTeam, userProfileGet } from '../../../../../api'
+import { adminGetTeam, adminCreateManualAdjustment, adminCorrectTeamBan, adminGetCompetition, adminGetTeamInvitation, adminListCompetitionChallenges, adminListTeamBanAppeals, adminListTeams, adminResolveTeamBanAppeal, patchCompetitionTeam, userProfileGet } from '../../../../../api'
 import type { NoCtfapiEndpointsAdministrationTeamsAdminTeamBanCaseResponse, NoCtfapiEndpointsAuthenticationPublicUserProfileResponse, NoCtfapiEndpointsChallengesChallengeSummaryResponse, NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../../../api'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
 import { competitionTrackErrorMessage } from '../../../../../lib/competition-track'
@@ -36,7 +39,12 @@ export function useAdminCompetitionsByIdTeamsPage() {
     { value: 'Rejected', label: "ui.rejected" },
   ] as const
 
-  const selectedTeam = ref<NoCtfapiEndpointsTeamsTeamResponse | null>(null)
+  const selection = useAdminDetailRoute<NoCtfapiEndpointsTeamsTeamResponse>('teamId', `/admin/competitions/${competitionId}/teams`, async (teamId, signal) => {
+    const { data, error } = await adminGetTeam({ path: { competitionId, teamId }, signal })
+    if (error || !data) throw error ?? new Error(translate('adminNavigation.notFound'))
+    return data
+  })
+  const { data: selectedTeam, open: teamDetailOpen, loading: teamLoading, error: teamDetailError } = selection
 
   const teamMembers = ref<NoCtfapiEndpointsAuthenticationPublicUserProfileResponse[]>([])
 
@@ -49,6 +57,9 @@ export function useAdminCompetitionsByIdTeamsPage() {
   const teamInvitationError = ref<string | null>(null)
 
   const expandedMemberId = ref<string | null>(null)
+  const memberRequests = createLatestRequestGuard()
+  const invitationRequests = createLatestRequestGuard()
+  onScopeDispose(() => { memberRequests.invalidate(); invitationRequests.invalidate() })
 
   function setExpandedMember(value: unknown): void {
     expandedMemberId.value = typeof value === 'string' ? value : null
@@ -57,6 +68,7 @@ export function useAdminCompetitionsByIdTeamsPage() {
   async function loadTeamInvitation(
     team: NoCtfapiEndpointsTeamsTeamResponse | null = selectedTeam.value,
   ): Promise<void> {
+    const request = invitationRequests.begin()
     teamInvitationToken.value = null
     teamInvitationError.value = null
     if (!canWrite.value || !team?.id) return
@@ -65,7 +77,7 @@ export function useAdminCompetitionsByIdTeamsPage() {
       const { data, error: requestError } = await adminGetTeamInvitation({
         path: { competitionId, teamId: team.id },
       })
-      if (selectedTeam.value?.id !== team.id) return
+      if (!invitationRequests.isCurrent(request) || selectedTeam.value?.id !== team.id) return
       if (requestError || !data?.invitationToken) {
         teamInvitationError.value = parseApiError(
           requestError,
@@ -76,7 +88,7 @@ export function useAdminCompetitionsByIdTeamsPage() {
       teamInvitationToken.value = data.invitationToken
     }
     catch (requestError) {
-      if (selectedTeam.value?.id === team.id) {
+      if (invitationRequests.isCurrent(request) && selectedTeam.value?.id === team.id) {
         teamInvitationError.value = parseApiError(
           requestError,
           translate('ui.failedToLoadInvitationCode'),
@@ -84,7 +96,7 @@ export function useAdminCompetitionsByIdTeamsPage() {
       }
     }
     finally {
-      if (selectedTeam.value?.id === team.id) teamInvitationLoading.value = false
+      if (invitationRequests.isCurrent(request) && selectedTeam.value?.id === team.id) teamInvitationLoading.value = false
     }
   }
 
@@ -197,19 +209,34 @@ export function useAdminCompetitionsByIdTeamsPage() {
     }
   }
 
-  async function openTeamDetail(team: NoCtfapiEndpointsTeamsTeamResponse): Promise<void> {
-    selectedTeam.value = team
+  async function loadTeamMembers(team: NoCtfapiEndpointsTeamsTeamResponse): Promise<void> {
+    const request = memberRequests.begin()
     expandedMemberId.value = null
     teamMembers.value = []
     teamDetailLoading.value = true
     void loadTeamInvitation(team)
     const memberIds = team.memberIds ?? []
     const responses = await Promise.all(memberIds.map(userId => userProfileGet({ path: { userId } })))
-    if (selectedTeam.value?.id === team.id) {
+    if (memberRequests.isCurrent(request) && selectedTeam.value?.id === team.id) {
       teamMembers.value = responses.flatMap(response => response.data ? [response.data] : [])
       teamDetailLoading.value = false
     }
   }
+
+  async function openTeamDetail(team: NoCtfapiEndpointsTeamsTeamResponse): Promise<void> {
+    if (team.id) await selection.select(team.id)
+  }
+  watch(selectedTeam, (team) => {
+    memberRequests.invalidate()
+    invitationRequests.invalidate()
+    teamMembers.value = []
+    expandedMemberId.value = null
+    teamInvitationToken.value = null
+    teamInvitationError.value = null
+    teamInvitationLoading.value = false
+    teamDetailLoading.value = false
+    if (team) void loadTeamMembers(team)
+  }, { flush: 'sync' })
 
   async function load() {
     loading.value = true
@@ -409,6 +436,7 @@ export function useAdminCompetitionsByIdTeamsPage() {
   const PrivateAccountPanel = markRaw(PrivateAccountPanelComponent)
 
   const viewBindings = {
+      adminUserPath, teamDetailOpen, teamLoading, teamDetailError,
       competitionId,
       canJudge,
       canWrite,
@@ -475,6 +503,7 @@ export function useAdminCompetitionsByIdTeamsPage() {
   const viewState = proxyRefs(viewBindings)
 
   function onUpdateOpenOpen(open: boolean) {
+     selection.close(open)
      if (!open) {
        viewState.selectedTeam = null
        viewState.teamInvitationToken = null

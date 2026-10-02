@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import Feature from '~/features/routes/admin/platform/AdminPlatformUsersPage.vue'
-definePageMeta({ middleware: 'platform-admin' })
+definePageMeta({ middleware: 'platform-admin', path: '/admin/platform/users/:userId?', key: 'admin-platform-users' })
 </script>
 
 <template>

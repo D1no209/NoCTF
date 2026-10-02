@@ -1,3 +1,4 @@
+import { adminTeamPath, adminTemplatePath } from '~/features/admin/admin-navigation'
 import { proxyRefs } from 'vue'
 import { markRaw } from 'vue'
 
@@ -499,6 +500,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
   const ChallengeRulesEditor = markRaw(ChallengeRulesEditorComponent)
 
   const viewBindings = {
+      adminTeamPath, adminTemplatePath,
       Plus,
       competitionId,
       competition,

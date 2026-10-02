@@ -1,4 +1,5 @@
 import { proxyRefs } from 'vue'
+import { adminWorkspacePath } from '~/features/admin/admin-navigation'
 import { markRaw } from 'vue'
 
 import { Activity, ClipboardCheck, Container, Download, FileCheck, GitBranch, KeyRound, LayoutDashboard, Megaphone, Network, Orbit, Puzzle, Settings, ShieldAlert, Trophy, Users, Webhook } from '@lucide/vue'
@@ -16,7 +17,7 @@ import AppWorkspaceNavComponent from '../../../app/AppWorkspaceNav.vue'
 export function useAdminCompetitionsByIdPage() {
   const route = useRoute()
 
-  const activePath = computed(() => route.path)
+  const activePath = computed(() => adminWorkspacePath(route.path))
 
   const competitionId = route.params.id as string
 
@@ -28,6 +29,7 @@ export function useAdminCompetitionsByIdPage() {
   const isWriteUpReview = computed(() => activePath.value === `${base}/writeups`)
 
   const usesPageScroll = computed(() => activePath.value === `${base}/teams`
+    || activePath.value.startsWith(`${base}/teams/`)
     || activePath.value === `${base}/challenges`
     || activePath.value.startsWith(`${base}/challenges/`)
     || isProgressionPage.value)

@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { ChallengeTestRuntimePanelViewState } from '~/features/admin/useChallengeTestRuntimePanel'
 
 const viewProps = defineProps<{ state: ChallengeTestRuntimePanelViewState }>()
-const { Check, Clipboard, FlaskConical, RefreshCw, runtime, loading, loadError, copied, extendMinutes, extendMinutesInvalid, renewalTooEarly, validExtension, timedOut, retryLoad, start, stop, reset, extend, copyTestFlag, active, canStart, busy, ttl, canExtend, stateVariant, flagVariant, flagStateLabel, RuntimeAccessUrl, definitionDirty } = toRefs(viewProps.state)
+const { Check, Clipboard, FlaskConical, RefreshCw, runtime, loading, loadError, copied, extendMinutes, extendMinutesInvalid, renewalTooEarly, validExtension, timedOut, retryLoad, start, stop, reset, extend, copyTestFlag, active, canStart, busy, ttl, canExtend, stateVariant, flagVariant, flagStateLabel, RuntimeFlagsPanel, RuntimeAccessUrl, definitionDirty } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -120,6 +120,7 @@ const { Check, Clipboard, FlaskConical, RefreshCw, runtime, loading, loadError, 
           <FieldDescription v-if="renewalTooEarly">{{ $t('ui.renewalAvailableInFinalTenMinutes') }}</FieldDescription>
         </div>
       </div>
+      <component :is="RuntimeFlagsPanel" v-if="runtime?.id" :key="runtime.id" :runtime-id="runtime.id" />
     </template>
   </section>
 </template>

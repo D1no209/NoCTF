@@ -9,7 +9,7 @@ test('competition management keeps navigation fixed and scrolls animated content
     new URL('../app/components/views/app/settings-workspace.css', import.meta.url),
   ).text().then(source => source.replace(/\r\n/g, '\n'))
 
-  expect(shell).toContain('const activePath = computed(() => route.path)')
+  expect(shell).toContain('const activePath = computed(() => adminWorkspacePath(route.path))')
   expect(shell).toContain('data-workspace-scroll-content')
   expect(shell).toContain('data-competition-management-workspace')
   expect(shell).toContain('<ScrollSurface axis="y"')

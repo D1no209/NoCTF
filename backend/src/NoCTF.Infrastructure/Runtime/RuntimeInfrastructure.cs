@@ -103,6 +103,8 @@ internal static class RuntimeInfrastructure
         services.AddScoped<ListRuntimeTargets>();
         services.AddScoped<IAdminRuntimeStore, AdminRuntimeStore>();
         services.AddScoped<ManageAdminRuntimes>();
+        services.AddScoped<NoCTF.Application.Runtime.Flags.IRuntimeFlagReader, NoCTF.Infrastructure.Runtime.Flags.RuntimeFlagReader>();
+        services.AddScoped<NoCTF.Application.Runtime.Flags.QueryRuntimeFlags>();
         return services;
     }
 }

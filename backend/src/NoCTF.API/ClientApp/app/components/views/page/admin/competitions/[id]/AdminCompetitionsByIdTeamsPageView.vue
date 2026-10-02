@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdTeamsPageViewState } from '~/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdTeamsPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdTeamsPageViewState }>()
-const { competitionId, canJudge, canWrite, teams, search, loading, pageLoading, error, page, pageCount, total, pageLimit, loadPage, setPageSize, pendingId, tracks, tracksEnabled, registrationStatusOptions, selectedTeam, teamMembers, teamDetailLoading, teamInvitationToken, teamInvitationLoading, teamInvitationError, reloadTeamInvitation, copyTeamInvitation, expandedMemberId, setExpandedMember, teamDisplayNames, displayTeamName, scoreAdjustmentTeam, scoreAdjustmentChallenges, scoreAdjustmentChallengeId, scoreAdjustmentDelta, scoreAdjustmentLoading, scoreAdjustmentPending, scoreAdjustmentError, scoreAdjustmentValid, openScoreAdjustment, closeScoreAdjustment, submitScoreAdjustment, openTeamDetail, assignTrackValue, setRegistrationStatusValue, banDialog, banReason, banAnnouncePublicly, banPending, banReasonValid, openBan, submitBan, appeals, appealsLoading, appealsError, appealDialog, appealReason, appealPending, openAppeal, submitAppeal, PrivateAccountPanel, onUpdateOpenOpen, onClickScoreAdjustmentTeam, onUpdateOpenBanDialog, onClickBanDialog, onUpdateOpenAppealDialog, onClickAppealDialog } = toRefs(viewProps.state)
+const { adminUserPath, teamDetailOpen, teamLoading, teamDetailError, competitionId, canJudge, canWrite, teams, search, loading, pageLoading, error, page, pageCount, total, pageLimit, loadPage, setPageSize, pendingId, tracks, tracksEnabled, registrationStatusOptions, selectedTeam, teamMembers, teamDetailLoading, teamInvitationToken, teamInvitationLoading, teamInvitationError, reloadTeamInvitation, copyTeamInvitation, expandedMemberId, setExpandedMember, teamDisplayNames, displayTeamName, scoreAdjustmentTeam, scoreAdjustmentChallenges, scoreAdjustmentChallengeId, scoreAdjustmentDelta, scoreAdjustmentLoading, scoreAdjustmentPending, scoreAdjustmentError, scoreAdjustmentValid, openScoreAdjustment, closeScoreAdjustment, submitScoreAdjustment, openTeamDetail, assignTrackValue, setRegistrationStatusValue, banDialog, banReason, banAnnouncePublicly, banPending, banReasonValid, openBan, submitBan, appeals, appealsLoading, appealsError, appealDialog, appealReason, appealPending, openAppeal, submitAppeal, PrivateAccountPanel, onUpdateOpenOpen, onClickScoreAdjustmentTeam, onUpdateOpenBanDialog, onClickBanDialog, onUpdateOpenAppealDialog, onClickAppealDialog } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -117,13 +117,15 @@ const { competitionId, canJudge, canWrite, teams, search, loading, pageLoading, 
       />
     </div>
 
-    <Sheet :open="selectedTeam !== null" @update:open="onUpdateOpenOpen">
+    <Sheet :open="teamDetailOpen" @update:open="onUpdateOpenOpen">
       <SheetContent data-scroll-surface class="overflow-y-auto sm:max-w-lg">
         <SheetHeader>
           <SheetTitle>{{ $t('ui.teamDetails') }}</SheetTitle>
           <SheetDescription>{{ selectedTeam ? displayTeamName(selectedTeam) : '' }}</SheetDescription>
         </SheetHeader>
-        <div v-if="selectedTeam" class="mt-6 flex flex-col gap-6">
+        <Skeleton v-if="teamLoading" class="mt-6 h-48" />
+        <Alert v-else-if="teamDetailError" variant="destructive"><AlertDescription>{{ $message(teamDetailError) }}</AlertDescription></Alert>
+        <div v-else-if="selectedTeam" class="mt-6 flex flex-col gap-6">
           <dl class="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-4 gap-y-3 text-sm">
             <dt v-if="tracksEnabled" class="text-muted-foreground">{{ $t('ui.tracks') }}</dt>
             <dd v-if="tracksEnabled">{{ selectedTeam.trackName ?? selectedTeam.trackKey }}</dd>
@@ -172,9 +174,10 @@ const { competitionId, canJudge, canWrite, teams, search, loading, pageLoading, 
                     <AvatarFallback>{{ member.userName?.slice(0, 2) }}</AvatarFallback>
                   </Avatar>
                   <div class="min-w-0 flex-1">
-                    <NuxtLink :to="`/users/${member.userId}`" class="font-medium hover:underline">
+                    <NuxtLink :to="adminUserPath(member.userId)" class="font-medium hover:underline">
                       {{ member.userName }}
                     </NuxtLink>
+                    <NuxtLink :to="`/users/${member.userId}`" class="ml-3 text-xs text-muted-foreground hover:underline">{{ $t('adminNavigation.publicProfile') }}</NuxtLink>
                   </div>
                   <Badge v-if="member.userId === selectedTeam.captainId" variant="secondary">{{ $t('ui.captain') }}</Badge>
                 </div>

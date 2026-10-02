@@ -6,7 +6,7 @@ test('platform sections use the stable competition-style content swap', async ()
     new URL('../app/pages/admin/platform.vue', import.meta.url),
   ).text()
 
-  expect(shell).toContain('const activePath = computed(() => route.path)')
+  expect(shell).toContain('const activePath = computed(() => adminWorkspacePath(route.path))')
   expect(shell).toContain('<MotionSwap :identity="activePath" preset="film-up">')
   expect(shell).toContain('<NuxtPage />')
   expect(shell).toContain('data-platform-workspace-content')
