@@ -34,4 +34,4 @@ Saving changed mode/curve/blood/penalty/override configuration commits the exist
 - EF model drift check reports no pending changes; migrations and SDK were generated with their tools.
 - Import converter fixture verification preserves the new mode.
 
-Implementation milestones and detailed validation boundaries are recorded in HANDOFF.md. No production release is authorized by the implementation request.
+Implementation milestones and detailed validation boundaries are recorded in HANDOFF.md. The implementation request did not authorize deployment; the later explicit manual rollout is recorded in [the production deployment report](operations/2026-10-02-ctf-scoring-manual-deployment.md).
