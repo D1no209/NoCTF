@@ -19,8 +19,10 @@ public static class PostgreSqlPersistence
         var connectionString = configuration.GetConnectionString("PostgreSql")
             ?? throw new InvalidOperationException("ConnectionStrings:PostgreSql is required.");
         void Configure(DbContextOptionsBuilder options) => options
-                .UseNpgsql(connectionString, npgsql => npgsql.MigrationsAssembly(
-                    typeof(PostgreSqlPersistence).Assembly.FullName))
+                .UseNpgsql(connectionString, npgsql => npgsql
+                    .MigrationsAssembly(typeof(PostgreSqlPersistence).Assembly.FullName)
+                    // Aggregate decisions keep one statement's snapshot; bounded read projections opt into splitting.
+                    .UseQuerySplittingBehavior(QuerySplittingBehavior.SingleQuery))
                 .UseSnakeCaseNamingConvention();
         services.AddDbContext<NoCtfDbContext>(Configure,
             contextLifetime: ServiceLifetime.Scoped,

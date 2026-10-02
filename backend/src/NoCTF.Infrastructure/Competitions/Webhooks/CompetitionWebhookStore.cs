@@ -26,7 +26,7 @@ public sealed class CompetitionWebhookStore(
         bool descending,
         CancellationToken cancellationToken)
     {
-        var configuration = await db.Competitions.AsNoTracking()
+        var configuration = await db.Competitions.AsNoTracking().AsSplitQuery()
             .Where(item => item.Id == competitionId)
             .Select(item => item.WebhookConfiguration)
             .SingleOrDefaultAsync(cancellationToken);

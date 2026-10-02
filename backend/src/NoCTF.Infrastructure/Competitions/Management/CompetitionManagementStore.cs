@@ -242,7 +242,7 @@ public sealed class CompetitionManagementStore(
             .ToArrayAsync(ct);
 
     private IQueryable<Competition> EntityQuery(bool includeDraft) =>
-        db.Competitions.AsNoTracking()
+        db.Competitions.AsNoTracking().AsSplitQuery()
             .Where(x => x.DeletedAt == null && (includeDraft || x.Status != CompetitionStatus.Draft));
 
     private static IQueryable<CompetitionView> Project(IQueryable<Competition> query) =>

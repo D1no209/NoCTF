@@ -63,6 +63,17 @@ public sealed class AdminRuntimeEmptyPagePersistenceTests
                 runtime.RuntimeProvider = RuntimeProvider.Docker;
                 runtime.State = RuntimeState.Queued;
                 runtime.CreatedAt = now;
+                runtime.PublishedPorts.Add(new RuntimePublishedPort
+                {
+                    Id = Guid.CreateVersion7(), ServiceName = "web", ContainerPort = 8080, HostPort = 32123
+                });
+                runtime.AccessEndpoints.Add(new RuntimeAccessEndpoint
+                {
+                    BindingIndex = 0, DirectAddress = "runtime.example.test:32123", TargetHost = "web", TargetPort = 8080
+                });
+                runtime.CapacityAllocationEntries.Add(RuntimeCapacityAllocationEntry.FromValue(new(
+                    new(RuntimeWorkloadKind.Runtime, runtimeId, runtimeId), null, "docker:test", "runner",
+                    new(128, 100, 64), new(128, 100, 64))));
                 setup.RuntimeInstances.Add(runtime);
                 await setup.SaveChangesAsync(cancellationToken);
             }
@@ -71,6 +82,7 @@ public sealed class AdminRuntimeEmptyPagePersistenceTests
             var measuredOptions = new DbContextOptionsBuilder<NoCtfDbContext>()
                 .UseNpgsql(postgres.GetConnectionString())
                 .UseSnakeCaseNamingConvention()
+                .ConfigureWarnings(warnings => warnings.Throw(RelationalEventId.MultipleCollectionIncludeWarning))
                 .AddInterceptors(counter)
                 .Options;
             await using var db = new NoCtfDbContext(measuredOptions);
@@ -86,7 +98,13 @@ public sealed class AdminRuntimeEmptyPagePersistenceTests
 
             await Assert.That(page.Total).IsEqualTo(1);
             await Assert.That(page.Items.Single().Runtime.Id).IsEqualTo(runtimeId);
-            await Assert.That(counter.ReaderCount).IsLessThanOrEqualTo(4);
+            var runtimeView = page.Items.Single().Runtime;
+            await Assert.That(runtimeView.PublishedPorts!.Single().HostPort).IsEqualTo(32123);
+            await Assert.That(runtimeView.AccessEndpoints!.Single().TargetHost).IsEqualTo("web");
+            await Assert.That(runtimeView.Capacity!.Items.Single().RunnerId).IsEqualTo("runner");
+            // Count, root projection, three collection queries and the template title lookup.
+            await Assert.That(counter.ReaderCount).IsLessThanOrEqualTo(6);
+            await Assert.That(counter.Commands.Any(sql => sql.Contains("runtime_receipts", StringComparison.Ordinal))).IsFalse();
         });
     }
 
@@ -136,6 +154,7 @@ public sealed class AdminRuntimeEmptyPagePersistenceTests
     private sealed class QueryCounter : DbCommandInterceptor
     {
         public int ReaderCount { get; private set; }
+        public List<string> Commands { get; } = [];
 
         public override ValueTask<DbDataReader> ReaderExecutedAsync(
             DbCommand command,
@@ -144,6 +163,7 @@ public sealed class AdminRuntimeEmptyPagePersistenceTests
             CancellationToken cancellationToken = default)
         {
             ReaderCount++;
+            Commands.Add(command.CommandText);
             return ValueTask.FromResult(result);
         }
     }

@@ -891,10 +891,12 @@ public sealed class CompetitionQuestionStore(
             .ToArray();
         var names = await db.Users.IgnoreQueryFilters().AsNoTracking()
             .Where(user => actorIds.Contains(user.Id))
+            .Select(user => new { user.Id, user.UserName })
             .ToDictionaryAsync(user => user.Id, user => user.UserName, ct);
         var teamIds = questions.Select(input => input.Question.Root.TeamId).Distinct().ToArray();
         var teamNames = await db.Teams.IgnoreQueryFilters().AsNoTracking()
             .Where(team => teamIds.Contains(team.Id))
+            .Select(team => new { team.Id, team.Name })
             .ToDictionaryAsync(team => team.Id, team => team.Name, ct);
         var challengeIds = questions
             .Select(input => input.Question.Root.CompetitionChallengeId)
@@ -920,6 +922,7 @@ public sealed class CompetitionQuestionStore(
             .ToArray();
         var participantMessageLimits = await db.Competitions.IgnoreQueryFilters().AsNoTracking()
             .Where(competition => competitionIds.Contains(competition.Id))
+            .Select(competition => new { competition.Id, competition.MaxParticipantMessagesBeforeHandlerReply })
             .ToDictionaryAsync(
                 competition => competition.Id,
                 competition => competition.MaxParticipantMessagesBeforeHandlerReply,

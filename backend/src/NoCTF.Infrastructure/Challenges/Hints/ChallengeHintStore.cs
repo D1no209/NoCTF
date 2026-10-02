@@ -38,7 +38,7 @@ public sealed class ChallengeHintStore(
     {
         if (!await ScopeExistsAsync(competitionId, competitionChallengeId, ct))
             return null;
-        var entity = await db.CompetitionChallenges
+        var entity = await db.CompetitionChallenges.AsSplitQuery()
             .SingleAsync(challenge => challenge.Id == competitionChallengeId, ct);
         return entity.Hints.Where(hint => includeDeleted || hint.HiddenAt == null)
             .Select(hint => Map(hint, entity.Id, entity.UpdatedAt)).ToArray();
@@ -53,7 +53,7 @@ public sealed class ChallengeHintStore(
     {
         if (!await ScopeExistsAsync(competitionId, competitionChallengeId, ct))
             return null;
-        var entity = await db.CompetitionChallenges
+        var entity = await db.CompetitionChallenges.AsSplitQuery()
             .SingleAsync(challenge => challenge.Id == competitionChallengeId, ct);
         var hint = entity.Hints.SingleOrDefault(item =>
             item.Id == hintId && (includeDeleted || item.HiddenAt == null));

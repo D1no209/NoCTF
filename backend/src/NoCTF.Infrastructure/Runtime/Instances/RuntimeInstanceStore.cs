@@ -147,7 +147,7 @@ public sealed class RuntimeInstanceStore(
             : scope.Mode == GameMode.Awdp
                 ? RuntimePurpose.AwdpAttack
                 : RuntimePurpose.Player;
-        var runtime = await db.RuntimeInstances.AsNoTracking()
+        var runtime = await db.RuntimeInstances.AsNoTracking().AsSplitQuery()
             .Where(instance =>
                 instance.CompetitionId == competitionId &&
                 instance.CompetitionChallengeId == competitionChallengeId &&

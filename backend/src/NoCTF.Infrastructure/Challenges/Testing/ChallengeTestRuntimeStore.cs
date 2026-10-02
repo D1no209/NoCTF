@@ -29,7 +29,7 @@ public sealed class ChallengeTestRuntimeStore(
         if (!await CanManageAsync(challengeId, actorUserId, isAdministrator, cancellationToken))
             return null;
 
-        var runtime = await db.RuntimeInstances.AsNoTracking()
+        var runtime = await db.RuntimeInstances.AsNoTracking().AsSplitQuery()
             .Where(instance =>
                 instance.ChallengeId == challengeId
                 && instance.Purpose == RuntimePurpose.TemplateTest)

@@ -57,7 +57,7 @@ public sealed class AdminRuntimeStore(
         bool desc,
         CancellationToken ct)
     {
-        var query = db.RuntimeInstances.AsNoTracking()
+        var query = db.RuntimeInstances.AsNoTracking().AsSplitQuery()
             .Where(item => item.CompetitionId == filter.CompetitionId);
         if (filter.CompetitionChallengeId is Guid challengeId) query = query.Where(item => item.CompetitionChallengeId == challengeId);
         if (filter.TeamId is Guid teamId) query = query.Where(item => item.TeamId == teamId);
@@ -93,7 +93,7 @@ public sealed class AdminRuntimeStore(
                         endpoint.DirectAddress, endpoint.TargetHost, endpoint.TargetPort)).ToArray(),
                 item.TrafficCaptureEnabled,
                 item.TrafficCaptureLimitBytes,
-                item.TrafficCaptureReservedBytes) { Capacity = item.CapacityAllocations })
+                item.TrafficCaptureReservedBytes) { Capacity = new RuntimeCapacityAllocations(item.CapacityAllocationEntries.OrderBy(allocation => allocation.Id).Select(allocation => allocation.ToValue()).ToArray()) })
             .ToListAsync(ct);
         return new RuntimeInstanceListPage(await AddTeamAttributionAsync(items, ct), total);
     }
@@ -107,7 +107,7 @@ public sealed class AdminRuntimeStore(
         int offset = 0,
         bool desc = true)
     {
-        var query = db.RuntimeInstances.AsNoTracking()
+        var query = db.RuntimeInstances.AsNoTracking().AsSplitQuery()
             .Where(item => item.CompetitionId == filter.CompetitionId);
         if (filter.CompetitionChallengeId is Guid challengeId)
             query = query.Where(item => item.CompetitionChallengeId == challengeId);
@@ -167,7 +167,7 @@ public sealed class AdminRuntimeStore(
                         endpoint.DirectAddress, endpoint.TargetHost, endpoint.TargetPort)).ToArray(),
                 item.TrafficCaptureEnabled,
                 item.TrafficCaptureLimitBytes,
-                item.TrafficCaptureReservedBytes) { Capacity = item.CapacityAllocations })
+                item.TrafficCaptureReservedBytes) { Capacity = new RuntimeCapacityAllocations(item.CapacityAllocationEntries.OrderBy(allocation => allocation.Id).Select(allocation => allocation.ToValue()).ToArray()) })
             .ToListAsync(ct);
         return await AddTeamAttributionAsync(items, ct);
     }
@@ -179,7 +179,7 @@ public sealed class AdminRuntimeStore(
         bool desc,
         CancellationToken ct)
     {
-        var query = db.RuntimeInstances.AsNoTracking().Where(item =>
+        var query = db.RuntimeInstances.AsNoTracking().AsSplitQuery().Where(item =>
             (item.RuntimeKind == RuntimeKind.Container)
             && (item.State == RuntimeState.Queued || item.State == RuntimeState.Provisioning
                 || item.State == RuntimeState.Running || item.State == RuntimeState.Stopping));
@@ -232,7 +232,7 @@ public sealed class AdminRuntimeStore(
                     endpoint.DirectAddress, endpoint.TargetHost, endpoint.TargetPort)).ToArray(),
             item.TrafficCaptureEnabled,
             item.TrafficCaptureLimitBytes,
-            item.TrafficCaptureReservedBytes) { Capacity = item.CapacityAllocations },
+            item.TrafficCaptureReservedBytes) { Capacity = new RuntimeCapacityAllocations(item.CapacityAllocationEntries.OrderBy(allocation => allocation.Id).Select(allocation => allocation.ToValue()).ToArray()) },
             SourceTeamId = item.TeamId
                 ?? db.GameplayFacts.AsNoTracking()
                     .Where(fact => fact.Id == item.GameplayFactId)
@@ -256,6 +256,7 @@ public sealed class AdminRuntimeStore(
         var titles = competitionIdsForTitles.Length == 0
             ? new Dictionary<Guid, string>()
             : await db.Competitions.IgnoreQueryFilters().Where(item => competitionIdsForTitles.Contains(item.Id))
+                .Select(item => new { item.Id, item.Title })
                 .ToDictionaryAsync(item => item.Id, item => item.Title, ct);
         var challengeIdsForTitles = attributed.Select(item => item.CompetitionChallengeId).OfType<Guid>().Distinct().ToArray();
         var challengeTitles = challengeIdsForTitles.Length == 0
@@ -268,6 +269,7 @@ public sealed class AdminRuntimeStore(
         var templateTitles = templateIds.Length == 0
             ? new Dictionary<Guid, string>()
             : await db.Challenges.IgnoreQueryFilters().Where(item => templateIds.Contains(item.Id))
+                .Select(item => new { item.Id, item.Title })
                 .ToDictionaryAsync(item => item.Id, item => item.Title, ct);
         var result = attributed.Select(runtime => new PlatformRuntimeInstanceView(
             runtime,
@@ -288,7 +290,7 @@ public sealed class AdminRuntimeStore(
         int offset = 0,
         bool desc = true)
     {
-        var query = db.RuntimeInstances.AsNoTracking()
+        var query = db.RuntimeInstances.AsNoTracking().AsSplitQuery()
             .Where(item =>
                 (item.RuntimeKind == RuntimeKind.Container)
                 && (item.State == RuntimeState.Queued
@@ -373,7 +375,7 @@ public sealed class AdminRuntimeStore(
                         endpoint.DirectAddress, endpoint.TargetHost, endpoint.TargetPort)).ToArray(),
                 item.TrafficCaptureEnabled,
                 item.TrafficCaptureLimitBytes,
-                item.TrafficCaptureReservedBytes) { Capacity = item.CapacityAllocations })
+                item.TrafficCaptureReservedBytes) { Capacity = new RuntimeCapacityAllocations(item.CapacityAllocationEntries.OrderBy(allocation => allocation.Id).Select(allocation => allocation.ToValue()).ToArray()) })
             .ToListAsync(ct);
         if (runtimes.Count == 0)
             return [];
@@ -390,6 +392,7 @@ public sealed class AdminRuntimeStore(
                 .IgnoreQueryFilters()
                 .AsNoTracking()
                 .Where(competition => competitionIds.Contains(competition.Id))
+                .Select(competition => new { competition.Id, competition.Title })
                 .ToDictionaryAsync(
                     competition => competition.Id,
                     competition => competition.Title,
@@ -426,6 +429,7 @@ public sealed class AdminRuntimeStore(
                 .IgnoreQueryFilters()
                 .AsNoTracking()
                 .Where(challenge => templateChallengeIds.Contains(challenge.Id))
+                .Select(challenge => new { challenge.Id, challenge.Title })
                 .ToDictionaryAsync(challenge => challenge.Id, challenge => challenge.Title, ct);
 
         return attributed.Select(runtime => runtime.ChallengeId is Guid templateChallengeId
@@ -465,7 +469,7 @@ public sealed class AdminRuntimeStore(
         Guid? competitionId,
         CancellationToken ct)
     {
-        var item = await db.RuntimeInstances.AsNoTracking()
+        var item = await db.RuntimeInstances.AsNoTracking().AsSplitQuery()
             .Where(item => item.Id == runtimeInstanceId
                 && (competitionId == null || item.CompetitionId == competitionId))
             .Select(item => new RuntimeInstanceView(
@@ -501,7 +505,7 @@ public sealed class AdminRuntimeStore(
                         endpoint.DirectAddress, endpoint.TargetHost, endpoint.TargetPort)).ToArray(),
                 item.TrafficCaptureEnabled,
                 item.TrafficCaptureLimitBytes,
-                item.TrafficCaptureReservedBytes) { Capacity = item.CapacityAllocations })
+                item.TrafficCaptureReservedBytes) { Capacity = new RuntimeCapacityAllocations(item.CapacityAllocationEntries.OrderBy(allocation => allocation.Id).Select(allocation => allocation.ToValue()).ToArray()) })
             .SingleOrDefaultAsync(ct);
         if (item is null)
             return null;
@@ -1227,6 +1231,7 @@ public sealed class AdminRuntimeStore(
             ? new Dictionary<Guid, string>()
             : await db.Teams.IgnoreQueryFilters().AsNoTracking()
                 .Where(team => sourceTeamIds.Contains(team.Id))
+                .Select(team => new { team.Id, team.Name })
                 .ToDictionaryAsync(team => team.Id, team => team.Name, ct);
 
         return runtimes.Select(runtime =>
