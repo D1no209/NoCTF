@@ -24,6 +24,8 @@ internal static class NotificationInfrastructure
         services.AddScoped<ICompetitionAnnouncementPublisher>(provider =>
             provider.GetRequiredService<CompetitionNotificationDelivery>());
         services.AddScoped<PublishCompetitionAnnouncement>();
+        services.AddScoped<ICompetitionAnnouncementManagementStore, Announcements.CompetitionAnnouncementManagementStore>();
+        services.AddScoped<ManageCompetitionAnnouncements>();
         if (!development && services.Any(descriptor => descriptor.ServiceType == typeof(INatsConnection)))
             services.AddSingleton<INotificationChangePublisher, NatsNotificationChangePublisher>();
         else

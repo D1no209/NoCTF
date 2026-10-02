@@ -58,13 +58,8 @@ export function useAdminPlatformRuntimesPage() {
     if (!detailTarget.value) return null
     return items.value.find(item => item.runtime?.id === detailTarget.value?.runtime?.id) ?? detailTarget.value
   })
-  const flagQueryTarget = ref<string | null>(null)
   const RuntimeFlagsPanel = markRaw(RuntimeFlagsPanelComponent)
-  async function openFlagQuery(item: PlatformRuntime) {
-    if (!item.runtime?.id) return
-    flagQueryTarget.value = item.runtime.id
-    await selection.select(item.runtime.id)
-  }
+
 
   async function applyFilters(): Promise<void> {
     appliedQuery.value = platformRuntimeQuery(filters)
@@ -193,7 +188,7 @@ export function useAdminPlatformRuntimesPage() {
   const RuntimeAccessUrl = markRaw(RuntimeAccessUrlComponent)
 
   const viewBindings = {
-      RuntimeFlagsPanel, flagQueryTarget, openFlagQuery, adminCompetitionPath, adminRuntimeTeamPath, adminRuntimeChallengePath, adminRuntimePath, detailOpen, detailLoading, detailError,
+      RuntimeFlagsPanel, adminCompetitionPath, adminRuntimeTeamPath, adminRuntimeChallengePath, adminRuntimePath, detailOpen, detailLoading, detailError,
       formatCapacityAmount, runnerFailureLabel, ExternalLink, RuntimeAccessUrl,
       RefreshCw,
       filters,
@@ -231,7 +226,6 @@ export function useAdminPlatformRuntimesPage() {
   const viewState = proxyRefs(viewBindings)
 
   function onClickDetailTarget(value: typeof viewState.detailTarget) {
-    flagQueryTarget.value = null
     if (value?.runtime?.id) void selection.select(value.runtime.id)
   }
 

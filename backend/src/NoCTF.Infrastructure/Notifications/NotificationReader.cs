@@ -5,6 +5,7 @@ using NoCTF.Domain.Identity;
 using NoCTF.Domain.Notifications;
 using NoCTF.Domain.Shared;
 using NoCTF.Domain.Teams;
+using NoCTF.Infrastructure.Notifications.Announcements;
 
 namespace NoCTF.Infrastructure.Notifications;
 
@@ -166,7 +167,7 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
                     && notification.TargetType != NotificationTargetType.User)
             .OrderBy(notification => notification.SentAt)
             .ThenBy(notification => notification.Id);
-        return await ProjectAsync(thread, ct);
+        return await ProjectAsync(CompetitionAnnouncementProjection.ActiveMessages(db, thread), ct);
     }
 
     private async Task<IReadOnlyList<NotificationView>> ProjectAsync(
@@ -188,6 +189,7 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
         var sourceNames = await db.Users.IgnoreQueryFilters().AsNoTracking()
             .Where(user => sourceIds.Contains(user.Id))
             .ToDictionaryAsync(user => user.Id, user => user.UserName, ct);
+        var changes = await CompetitionAnnouncementProjection.LatestAsync(db, notifications, ct);
         return notifications.Select(notification => new NotificationView(
                 notification.Id,
                 notification.SourceType,
@@ -195,7 +197,7 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
                 notification.TargetType,
                 notification.TargetId,
                 notification.Kind,
-                NotificationContentProjection.Create(notification),
+                CompetitionAnnouncementProjection.Content(notification, changes.GetValueOrDefault(notification.Id)),
                 notification.RelatedType,
                 notification.RelatedId,
                 notification.ThreadRootId,
@@ -211,7 +213,7 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
         CancellationToken ct)
     {
         if (!db.Database.IsRelational())
-            return await VisibleToInMemoryAsync(userId, ct);
+            return CompetitionAnnouncementProjection.ActiveMessages(db, await VisibleToInMemoryAsync(userId, ct));
         var activeAdministrator = db.Users.IgnoreQueryFilters().Any(user =>
             user.Id == userId
             && user.Role == UserRole.Administrator
@@ -244,6 +246,7 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
                     && root.RelatedId != null
                     && inaccessibleStaffCompetitionIds.Contains(root.RelatedId.Value))));
 
+        audienceVisible = CompetitionAnnouncementProjection.ActiveMessages(db, audienceVisible);
         var directlyVisibleRootIds = audienceVisible
             .Where(notification =>
                 notification.TargetType == NotificationTargetType.User
@@ -276,7 +279,7 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
             .Select(notification => notification.ThreadRootId ?? notification.Id);
         var visibleRootIds = directlyVisibleRootIds.Union(participatedRootIds);
 
-        return audienceVisible
+        var visible = audienceVisible
             .Where(notification => visibleRootIds.Contains(
                 notification.ThreadRootId ?? notification.Id))
             .Where(item =>
@@ -286,6 +289,7 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
                 && item.Kind != NotificationKind.PlatformUserTokensInvalidated
                 && item.Kind != NotificationKind.SsoProviderConfigurationChanged
                 && item.Kind != NotificationKind.SsoExternalIdentityBindingChanged);
+        return visible;
     }
 
     private async Task<IQueryable<Notification>> VisibleToInMemoryAsync(
@@ -339,7 +343,9 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
                     || competition.Collaborators.Any(collaborator => collaborator.Role == NoCTF.Domain.Competitions.CompetitionCollaboratorRole.Observer && collaborator.UserId == userId));
         }
 
-        var audienceVisible = notifications.Where(IsAudienceVisible).ToArray();
+        var audienceVisible = notifications.Where(IsAudienceVisible)
+            .Where(item => !CompetitionAnnouncementProjection.IsChange(item)
+                || !notifications.Any(root => root.Id == item.ThreadRootId && root.Kind == NotificationKind.CompetitionAnnouncement)).ToArray();
         var audienceVisibleIds = audienceVisible
             .Select(notification => notification.Id)
             .ToHashSet();

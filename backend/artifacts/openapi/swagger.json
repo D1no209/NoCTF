@@ -11155,6 +11155,94 @@
             "Bearer": []
           }
         ]
+      },
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Lists competition announcements for management.",
+        "description": "Returns current announcement content and withdrawal state to authorized observers with offset pagination.",
+        "operationId": "AdminListCompetitionAnnouncements",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeWithdrawn",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "desc",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsManagedAnnouncementListResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
       }
     },
     "/api/v1/admin/competitions/{competitionId}/badges": {
@@ -11587,6 +11675,140 @@
           },
           "403": {
             "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/competitions/{competitionId}/announcements/{announcementId}": {
+      "delete": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Withdraws a competition announcement.",
+        "description": "Authorized judges can withdraw an announcement from inbox and public readers while retaining its immutable history. Repeated withdrawals are idempotent.",
+        "operationId": "AdminDeleteCompetitionAnnouncement",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "announcementId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Edits a published competition announcement.",
+        "description": "Authorized judges can update title and body. The original audience and history are retained; inbox and public readers receive current content.",
+        "operationId": "AdminUpdateCompetitionAnnouncement",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "announcementId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "UpdateCompetitionAnnouncementRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsUpdateCompetitionAnnouncementRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsManagedAnnouncementResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -26423,6 +26645,10 @@
         "type": "object",
         "additionalProperties": false
       },
+      "NoCTFAPIEndpointsAdministrationCompetitionsDeleteCompetitionAnnouncementRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
       "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionBadgeConflictResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -27240,6 +27466,84 @@
         "type": "object",
         "additionalProperties": false
       },
+      "NoCTFAPIEndpointsAdministrationCompetitionsManagedAnnouncementListResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsManagedAnnouncementResponse"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsManagedAnnouncementResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "audience": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAnnouncementAudience"
+          },
+          "state": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsManagedAnnouncementStateProtocol"
+          },
+          "authorId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "authorName": {
+            "type": "string",
+            "nullable": true
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsManagedAnnouncementStateProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Published",
+          "Withdrawn"
+        ],
+        "enum": [
+          "Published",
+          "Withdrawn"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsListCompetitionAnnouncementsRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFAPIPaginationPaginationRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
+      },
       "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionBadgeListContract": {
         "type": "object",
         "additionalProperties": false,
@@ -27903,6 +28207,28 @@
             "items": {
               "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsProgressionEdgeContract"
             }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsUpdateCompetitionAnnouncementRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "body"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 0,
+            "nullable": false
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 16000,
+            "minLength": 0,
+            "nullable": false
           }
         }
       },

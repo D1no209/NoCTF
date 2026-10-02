@@ -12,13 +12,18 @@ export function isNotificationUnread(
   return latestId !== null && latestId !== lastReadId
 }
 
-export function newNotificationNotices<T extends { id?: string | null }>(
+export function newNotificationNotices<T extends { id?: string | null; sentAt?: string }>(
   newestFirst: readonly T[],
   previousId: string | null,
   maximum = 3,
+  previousSentAt?: string | null,
 ): T[] {
   const previousIndex = newestFirst.findIndex(item => item.id === previousId)
-  return (previousIndex < 0 ? newestFirst : newestFirst.slice(0, previousIndex))
+  const candidates = previousIndex < 0 && previousSentAt
+    ? newestFirst.filter(item => item.sentAt && (Date.parse(item.sentAt) > Date.parse(previousSentAt)
+      || Date.parse(item.sentAt) === Date.parse(previousSentAt) && (item.id ?? '') > (previousId ?? '')))
+    : previousIndex < 0 ? newestFirst : newestFirst.slice(0, previousIndex)
+  return candidates
     .slice(0, maximum)
     .toReversed()
 }

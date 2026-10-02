@@ -5,6 +5,7 @@ using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Notifications;
 using NoCTF.Domain.Shared;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Infrastructure.Notifications.Announcements;
 
 namespace NoCTF.Infrastructure.Notifications;
 
@@ -40,6 +41,7 @@ public sealed class PublicCompetitionAnnouncementReader(NoCtfDbContext db)
                     && competitionEvent.Visibility == CompetitionEventVisibility.Public
                     && competitionEvent.SubjectType == EntityReferenceKind.Notification
                     && competitionEvent.SubjectId == notification.Id));
+        query = CompetitionAnnouncementProjection.ActiveMessages(db, query);
         if (beforePublishedAt is { } publishedAt && beforeId is { } id)
         {
             query = query.Where(notification =>
@@ -52,26 +54,23 @@ public sealed class PublicCompetitionAnnouncementReader(NoCtfDbContext db)
             .OrderByDescending(notification => notification.SentAt)
             .ThenByDescending(notification => notification.Id)
             .Take(limit)
-            .Select(notification => new
-            {
-                notification.Id,
-                notification.Title,
-                notification.Body,
-                notification.SentAt
-            })
             .ToArrayAsync(ct);
+        var changes = await CompetitionAnnouncementProjection.LatestAsync(db, rows, ct);
         var items = rows.Select(row =>
         {
-            if (string.IsNullOrWhiteSpace(row.Title)
-                || string.IsNullOrWhiteSpace(row.Body))
+            var change = changes.GetValueOrDefault(row.Id);
+            var title = CompetitionAnnouncementProjection.Title(row, change);
+            var body = CompetitionAnnouncementProjection.Body(row, change);
+            if (string.IsNullOrWhiteSpace(title)
+                || string.IsNullOrWhiteSpace(body))
             {
                 throw new InvalidOperationException(
                     "Competition announcement content is incomplete.");
             }
             return new PublicCompetitionAnnouncementView(
                 row.Id,
-                row.Title,
-                row.Body,
+                title,
+                body,
                 row.SentAt);
         }).ToArray();
         return new(PublicCompetitionAnnouncementReadState.Available, items);

@@ -52,15 +52,17 @@ export function useDefaultLayout() {
   let unwatchNotifications: (() => void) | undefined
   let notificationBaselineReady = false
   let lastNotificationId: string | null = null
+  let lastNotificationSentAt: string | null = null
 
   async function refreshNotifications(showNotice: boolean): Promise<void> {
     const notifications = await refreshUnread()
     if (notifications === undefined) return
     const latestId = notifications[0]?.id ?? null
     if (showNotice && notificationBaselineReady && latestId !== lastNotificationId)
-      for (const notification of newNotificationNotices(notifications, lastNotificationId))
+      for (const notification of newNotificationNotices(notifications, lastNotificationId, 3, lastNotificationSentAt))
         showNotificationNotice(notification)
     lastNotificationId = latestId
+    lastNotificationSentAt = notifications[0]?.sentAt ?? lastNotificationSentAt
     notificationBaselineReady = true
   }
 
@@ -105,6 +107,7 @@ export function useDefaultLayout() {
     () => {
       notificationBaselineReady = false
       lastNotificationId = null
+      lastNotificationSentAt = null
       void refreshNotifications(false)
       subscribeNotifications()
     },

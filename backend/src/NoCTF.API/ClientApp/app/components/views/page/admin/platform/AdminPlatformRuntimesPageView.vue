@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminPlatformRuntimesPageViewState } from '~/features/routes/admin/platform/useAdminPlatformRuntimesPage'
 
 const viewProps = defineProps<{ state: AdminPlatformRuntimesPageViewState }>()
-const { RuntimeFlagsPanel, flagQueryTarget, openFlagQuery, adminCompetitionPath, adminRuntimeTeamPath, adminRuntimeChallengePath, adminRuntimePath, detailOpen, detailLoading, detailError, formatCapacityAmount, runnerFailureLabel, ExternalLink, RuntimeAccessUrl, RefreshCw, filters, items, loading, error, initialized, refresh, page, pageCount, total, pageLimit, loadPage, setPageSize, detail, applyFilters, clearFilters, terminateTarget, terminatePending, terminationError, forceTerminateTarget, forceTerminateReason, forceTerminateConfirmed, forceTerminatePending, forceTerminationError, teamLabel, stateBadgeVariant, canTerminate, openTermination, openForceTermination, submitTermination, submitForceTermination, onClickDetailTarget, onUpdateOpenDetailTarget, onUpdateOpenTerminateTarget, onUpdateOpenForceTerminateTarget } = toRefs(viewProps.state)
+const { RuntimeFlagsPanel, adminCompetitionPath, adminRuntimeTeamPath, adminRuntimeChallengePath, adminRuntimePath, detailOpen, detailLoading, detailError, formatCapacityAmount, runnerFailureLabel, ExternalLink, RuntimeAccessUrl, RefreshCw, filters, items, loading, error, initialized, refresh, page, pageCount, total, pageLimit, loadPage, setPageSize, detail, applyFilters, clearFilters, terminateTarget, terminatePending, terminationError, forceTerminateTarget, forceTerminateReason, forceTerminateConfirmed, forceTerminatePending, forceTerminationError, teamLabel, stateBadgeVariant, canTerminate, openTermination, openForceTermination, submitTermination, submitForceTermination, onClickDetailTarget, onUpdateOpenDetailTarget, onUpdateOpenTerminateTarget, onUpdateOpenForceTerminateTarget } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -124,7 +124,6 @@ const { RuntimeFlagsPanel, flagQueryTarget, openFlagQuery, adminCompetitionPath,
             <TableCell class="text-right">
               <div class="flex flex-wrap justify-end gap-1">
                 <Button variant="ghost" size="sm" @click="onClickDetailTarget(item)">{{ $t('ui.details') }}</Button>
-                <Button variant="ghost" size="sm" @click="openFlagQuery(item)">{{ $t('runtimeFlags.query') }}</Button>
                 <Button
                   v-if="canTerminate(item)"
                   variant="destructive"
@@ -194,7 +193,7 @@ const { RuntimeFlagsPanel, flagQueryTarget, openFlagQuery, adminCompetitionPath,
             <component :is="RuntimeAccessUrl" v-for="access in detail.runtime.accesses" :key="`${access.directAddress}:${access.webSocketAddress}`" :access="access" />
           </template>
           <Separator />
-          <component :is="RuntimeFlagsPanel" v-if="detail.runtime?.id" :key="detail.runtime.id" :runtime-id="detail.runtime.id" :auto-load="flagQueryTarget === detail.runtime.id" />
+          <component :is="RuntimeFlagsPanel" v-if="detail.runtime?.id" :key="detail.runtime.id" :runtime-id="detail.runtime.id" />
           <Button v-if="detail.runtime?.competitionId" variant="outline" as-child>
             <NuxtLink :to="adminRuntimePath(detail.runtime.competitionId, detail.runtime.id)"><ExternalLink data-icon="inline-start" />{{ $t('ui.competitionRuntimes') }}</NuxtLink>
           </Button>

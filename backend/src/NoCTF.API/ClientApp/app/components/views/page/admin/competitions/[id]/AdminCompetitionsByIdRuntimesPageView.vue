@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdRuntimesPageViewState } from '~/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdRuntimesPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdRuntimesPageViewState }>()
-const { RuntimeFlagsPanel, flagQueryTarget, openFlagQuery, adminRuntimeTeamPath, adminRuntimeChallengePath, detailError, canWrite, isAdministrator, challengeOptions, teamOptions, runtimeTeamLabel, isPlayerManagedRuntime, challengeTitle, filterChallenge, filterTeam, filterState, filterKind, items, loading, listError, initialized, page, pageCount, total, pageLimit, loadPage, setPageSize, applyFilters, detail, detailOpen, detailLoading, openDetail, opMessage, isRuntimePending, isRuntimeOperationPending, runRuntimeOp, terminateDialog, terminatePending, canTerminate, submitTermination, forceTerminateDialog, forceTerminateReason, forceTerminateConfirmed, forceTerminatePending, openForceTermination, submitForceTermination, extendDialog, extendSeconds, extendPending, canExtendRuntime, renewalHint, submitExtend, RuntimeAccessUrl, onClickFilterChallenge, onClickTerminateDialog, onClickExtendDialog, onUpdateOpenExtendDialog, onClickExtendDialog2, onUpdateOpenTerminateDialog, onUpdateOpenForceTerminateDialog } = toRefs(viewProps.state)
+const { RuntimeFlagsPanel, adminRuntimeTeamPath, adminRuntimeChallengePath, detailError, canWrite, isAdministrator, challengeOptions, teamOptions, runtimeTeamLabel, isPlayerManagedRuntime, challengeTitle, filterChallenge, filterTeam, filterState, filterKind, items, loading, listError, initialized, page, pageCount, total, pageLimit, loadPage, setPageSize, applyFilters, detail, detailOpen, detailLoading, openDetail, opMessage, isRuntimePending, isRuntimeOperationPending, runRuntimeOp, terminateDialog, terminatePending, canTerminate, submitTermination, forceTerminateDialog, forceTerminateReason, forceTerminateConfirmed, forceTerminatePending, openForceTermination, submitForceTermination, extendDialog, extendSeconds, extendPending, canExtendRuntime, renewalHint, submitExtend, RuntimeAccessUrl, onClickFilterChallenge, onClickTerminateDialog, onClickExtendDialog, onUpdateOpenExtendDialog, onClickExtendDialog2, onUpdateOpenTerminateDialog, onUpdateOpenForceTerminateDialog } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -101,7 +101,6 @@ const { RuntimeFlagsPanel, flagQueryTarget, openFlagQuery, adminRuntimeTeamPath,
             <TableCell class="text-right">
               <div class="flex flex-wrap justify-end gap-1">
                 <Button variant="ghost" size="sm" @click="openDetail(rt.id)">{{ $t('ui.details') }}</Button>
-                  <Button variant="ghost" size="sm" @click="openFlagQuery(rt.id)">{{ $t('runtimeFlags.query') }}</Button>
                 <template v-if="canWrite">
                   <Button
                     v-if="isPlayerManagedRuntime(rt) && (rt.state === 'Stopped' || rt.state === 'Failed')"
@@ -162,7 +161,7 @@ const { RuntimeFlagsPanel, flagQueryTarget, openFlagQuery, adminRuntimeTeamPath,
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.runningTime') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.runningAt) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.expirationTime') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.expiresAt) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.stopTime') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.stoppedAt) }}</span></div>
-          <component :is="RuntimeFlagsPanel" v-if="detail.id" :key="detail.id" :runtime-id="detail.id" :auto-load="flagQueryTarget === detail.id" />
+          <component :is="RuntimeFlagsPanel" v-if="detail.id" :key="detail.id" :runtime-id="detail.id" />
           <template v-if="detail.accesses?.length">
             <Separator />
             <p class="text-muted-foreground">{{ $t('ui.accessAddress') }}</p>

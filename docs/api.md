@@ -182,6 +182,9 @@ GET  /api/v1/competitions/{competitionId}/questions/{threadRootId}
 POST /api/v1/competitions/{competitionId}/questions/{threadRootId}/messages
 PUT  /api/v1/competitions/{competitionId}/questions/{threadRootId}/status
 POST /api/v1/admin/competitions/{competitionId}/announcements
+GET  /api/v1/admin/competitions/{competitionId}/announcements
+PATCH /api/v1/admin/competitions/{competitionId}/announcements/{announcementId}
+DELETE /api/v1/admin/competitions/{competitionId}/announcements/{announcementId}
 GET  /api/v1/competitions/{competitionId}/announcements
 GET  /api/v1/notifications/{notificationId}/thread
 GET  /api/v1/competitions/{competitionId}/events

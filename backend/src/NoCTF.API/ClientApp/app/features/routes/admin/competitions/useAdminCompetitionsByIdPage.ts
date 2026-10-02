@@ -1,11 +1,9 @@
-import { proxyRefs } from 'vue'
 import { adminWorkspacePath } from '~/features/admin/admin-navigation'
 import { markRaw } from 'vue'
 
-import { Activity, ClipboardCheck, Container, Download, FileCheck, GitBranch, KeyRound, LayoutDashboard, Megaphone, Network, Orbit, Puzzle, Settings, ShieldAlert, Trophy, Users, Webhook } from '@lucide/vue'
-import { toast } from 'vue-sonner'
-import { adminCreateCompetitionAnnouncement, adminGetCompetition } from '../../../../api'
-import type { NoCtfapiEndpointsAdministrationCompetitionsAnnouncementAudience, NoCtfapiEndpointsCompetitionsCompetitionResponse } from '../../../../api'
+import { Activity, ClipboardCheck, Container, Download, FileCheck, GitBranch, KeyRound, LayoutDashboard, Mail, Network, Orbit, Puzzle, Settings, ShieldAlert, Trophy, Users, Webhook } from '@lucide/vue'
+import { adminGetCompetition } from '../../../../api'
+import type { NoCtfapiEndpointsCompetitionsCompetitionResponse } from '../../../../api'
 import type { WorkspaceNavGroup } from '../../../app/workspace-nav'
 import { CompetitionAdminKey } from '../../../../lib/admin-competition'
 import type { CompetitionAdminRole } from '../../../../lib/admin-competition'
@@ -50,20 +48,6 @@ export function useAdminCompetitionsByIdPage() {
 
   const canManagePermissions = computed(() => role.value === 'Owner')
 
-  const canAnnounce = computed(() => role.value !== 'Observer')
-
-  const announcementOpen = ref(false)
-
-  const announcementTitle = ref('')
-
-  const announcementBody = ref('')
-
-  const announcementAudience = ref<NoCtfapiEndpointsAdministrationCompetitionsAnnouncementAudience>('Participants')
-
-  const announcementPending = ref(false)
-
-  const announcementError = ref<string | null>(null)
-
   const RoleLabel: Record<CompetitionAdminRole, string> = {
     Owner: "ui.owner",
     Manager: "ui.administrator",
@@ -88,45 +72,6 @@ export function useAdminCompetitionsByIdPage() {
     }
     const protocolRole = competition.value?.administrationRole
     role.value = protocolRole ?? 'Observer'
-  }
-
-  async function publishAnnouncement() {
-    if (announcementPending.value) return
-    const title = announcementTitle.value.trim()
-    const body = announcementBody.value.trim()
-    announcementError.value = !title
-      ? translate("ui.pleaseEnterANotificationTitle")
-      : !body
-        ? translate("ui.pleaseEnterNotificationContent")
-        : null
-    if (announcementError.value) return
-
-    announcementPending.value = true
-    try {
-      const { error: requestError } = await adminCreateCompetitionAnnouncement({
-        path: { competitionId },
-        body: { title, body, audience: announcementAudience.value },
-      })
-      if (requestError) throw requestError
-      toast.success(translate("ui.competitionNoticeHasBeenReleased"))
-      announcementOpen.value = false
-      announcementTitle.value = ''
-      announcementBody.value = ''
-      announcementError.value = null
-    }
-    catch (requestError) {
-      announcementError.value = parseApiError(requestError, translate("ui.failedToPostContestNotification")).message
-      toast.error(announcementError.value)
-    }
-    finally {
-      announcementPending.value = false
-    }
-  }
-
-  function setAnnouncementOpen(open: boolean) {
-    if (announcementPending.value) return
-    announcementOpen.value = open
-    if (!open) announcementError.value = null
   }
 
   provide(CompetitionAdminKey, {
@@ -167,6 +112,7 @@ export function useAdminCompetitionsByIdPage() {
     {
       label: translate("ui.management"),
       items: [
+        { to: `${base}/announcements`, label: translate('announcements.title'), icon: Mail },
         { to: `${base}/writeups`, label: translate('writeUp.review'), icon: ClipboardCheck },
         { to: `${base}/exports`, label: translate("ui.export"), icon: Download },
         { to: `${base}/webhooks`, label: translate("webhook.title"), icon: Webhook },
@@ -194,21 +140,12 @@ export function useAdminCompetitionsByIdPage() {
   const AppWorkspaceNav = markRaw(AppWorkspaceNavComponent)
 
   const viewBindings = {
-      Megaphone,
+      Mail,
       competition,
       role,
       loading,
       error,
-      canAnnounce,
-      announcementOpen,
-      announcementTitle,
-      announcementBody,
-      announcementAudience,
-      announcementPending,
-      announcementError,
       RoleLabel,
-      publishAnnouncement,
-      setAnnouncementOpen,
       navGroups,
       activePath,
       isProgressionPage,
@@ -218,17 +155,7 @@ export function useAdminCompetitionsByIdPage() {
       GameModeBadge,
       AppWorkspaceNav
     }
-  const viewState = proxyRefs(viewBindings)
-
-  function onClickAnnouncementOpen(value: typeof viewState.announcementOpen) {
-    viewState.announcementOpen = value
-  }
-
-  function onInputAnnouncementError(value: typeof viewState.announcementError) {
-    viewState.announcementError = value
-  }
-
-  return { ...viewBindings, onClickAnnouncementOpen, onInputAnnouncementError }
+  return viewBindings
 }
 
 export type AdminCompetitionsByIdPageViewState = import('vue').ShallowUnwrapRef<Awaited<ReturnType<typeof useAdminCompetitionsByIdPage>>>

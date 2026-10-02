@@ -225,6 +225,8 @@ export function useNotificationCenter() {
       if (requestError || !data) throw requestError
       thread.value = data.items ?? []
       threadError.value = null
+      const updated = data.items?.find(item => item.id === current.id)
+      if (updated) selected.value = updated
     }
     catch (failure) {
       if (!threadRequests.isCurrent(request) || selected.value?.id !== current.id) return

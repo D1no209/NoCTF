@@ -61,13 +61,13 @@ describe('notification unread state', () => {
 describe('competition announcement access', () => {
   test('exposes the generated announcement SDK to judges and uses participant delivery by default', async () => {
     const page = await sourceFile(
-      new URL('../app/pages/admin/competitions/[id].vue', import.meta.url),
+      new URL('../app/pages/admin/competitions/[id]/announcements.vue', import.meta.url),
     ).text()
     const endpoint = await sourceFile(
       new URL('../../Endpoints/Administration/Competitions/CreateCompetitionAnnouncementEndpoint.cs', import.meta.url),
     ).text()
 
-    expect(page).toContain("const canAnnounce = computed(() => role.value !== 'Observer')")
+    expect(page).toContain('canJudge')
     expect(page).toContain("adminCreateCompetitionAnnouncement({")
     expect(page).toContain("('Participants')")
     expect(endpoint).toContain('authorizer.CanJudgeAsync(')
@@ -81,4 +81,11 @@ describe('competition announcement access', () => {
     expect(labels).toContain("const announcementBody = typeof payload.body === 'string'")
     expect(labels).toContain('`${announcementTitle}：${announcementBody}`')
   })
+})
+
+test('withdrawing the newest notice does not replay older inbox messages', () => {
+  const older = [{ id: '2', sentAt: '2026-10-02T10:00:00Z' }, { id: '1', sentAt: '2026-10-02T09:00:00Z' }]
+  expect(newNotificationNotices(older, '3', 3, '2026-10-02T11:00:00Z')).toEqual([])
+  expect(newNotificationNotices([{ id: '4', sentAt: '2026-10-02T12:00:00Z' }, ...older], '3', 3, '2026-10-02T11:00:00Z'))
+    .toEqual([{ id: '4', sentAt: '2026-10-02T12:00:00Z' }])
 })

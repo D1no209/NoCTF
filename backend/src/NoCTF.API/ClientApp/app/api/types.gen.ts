@@ -2735,6 +2735,10 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCreateCompetitionWebhookT
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsAdministrationCompetitionsDeleteCompetitionAnnouncementRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionBadgeConflictResponse = {
     code?: string;
     detail?: string;
@@ -2966,6 +2970,27 @@ export type NoCtfapiEndpointsAdministrationCompetitionsListAdminCompetitionsRequ
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsAdministrationCompetitionsManagedAnnouncementListResponse = {
+    items?: Array<NoCtfapiEndpointsAdministrationCompetitionsManagedAnnouncementResponse>;
+    total?: number;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsManagedAnnouncementResponse = {
+    id?: string;
+    title?: string;
+    body?: string;
+    audience?: NoCtfapiEndpointsAdministrationCompetitionsAnnouncementAudience;
+    state?: NoCtfapiEndpointsAdministrationCompetitionsManagedAnnouncementStateProtocol;
+    authorId?: string | null;
+    authorName?: string | null;
+    publishedAt?: string;
+    updatedAt?: string;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsManagedAnnouncementStateProtocol = 'Published' | 'Withdrawn';
+
+export type NoCtfapiEndpointsAdministrationCompetitionsListCompetitionAnnouncementsRequest = NoCtfapiPaginationPaginationRequest & {};
+
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionBadgeListContract = {
     items?: Array<NoCtfapiEndpointsAdministrationCompetitionsCompetitionBadgeContract>;
 };
@@ -3133,6 +3158,11 @@ export type NoCtfapiEndpointsAdministrationCompetitionsSaveCompetitionProgressio
     showPlayerMap?: boolean;
     nodes?: Array<NoCtfapiEndpointsAdministrationCompetitionsProgressionNodeContract>;
     edges?: Array<NoCtfapiEndpointsAdministrationCompetitionsProgressionEdgeContract>;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionAnnouncementRequest = {
+    title: string;
+    body: string;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionBadgeRequest = {
@@ -9523,6 +9553,50 @@ export type AdminCompetitionPosterReplaceResponses = {
 
 export type AdminCompetitionPosterReplaceResponse = AdminCompetitionPosterReplaceResponses[keyof AdminCompetitionPosterReplaceResponses];
 
+export type AdminListCompetitionAnnouncementsData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query: {
+        includeWithdrawn: boolean;
+        offset: number;
+        limit: number;
+        desc: boolean;
+    };
+    url: '/api/v1/admin/competitions/{competitionId}/announcements';
+};
+
+export type AdminListCompetitionAnnouncementsErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminListCompetitionAnnouncementsError = AdminListCompetitionAnnouncementsErrors[keyof AdminListCompetitionAnnouncementsErrors];
+
+export type AdminListCompetitionAnnouncementsResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationCompetitionsManagedAnnouncementListResponse;
+};
+
+export type AdminListCompetitionAnnouncementsResponse = AdminListCompetitionAnnouncementsResponses[keyof AdminListCompetitionAnnouncementsResponses];
+
 export type AdminCreateCompetitionAnnouncementData = {
     body: NoCtfapiEndpointsAdministrationCompetitionsCreateCompetitionAnnouncementRequest;
     path: {
@@ -9809,6 +9883,86 @@ export type AdminCreateCompetitionWebhookTestDeliveryResponses = {
 };
 
 export type AdminCreateCompetitionWebhookTestDeliveryResponse = AdminCreateCompetitionWebhookTestDeliveryResponses[keyof AdminCreateCompetitionWebhookTestDeliveryResponses];
+
+export type AdminDeleteCompetitionAnnouncementData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        announcementId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/announcements/{announcementId}';
+};
+
+export type AdminDeleteCompetitionAnnouncementErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminDeleteCompetitionAnnouncementError = AdminDeleteCompetitionAnnouncementErrors[keyof AdminDeleteCompetitionAnnouncementErrors];
+
+export type AdminDeleteCompetitionAnnouncementResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type AdminDeleteCompetitionAnnouncementResponse = AdminDeleteCompetitionAnnouncementResponses[keyof AdminDeleteCompetitionAnnouncementResponses];
+
+export type AdminUpdateCompetitionAnnouncementData = {
+    body: NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionAnnouncementRequest;
+    path: {
+        competitionId: string;
+        announcementId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/announcements/{announcementId}';
+};
+
+export type AdminUpdateCompetitionAnnouncementErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminUpdateCompetitionAnnouncementError = AdminUpdateCompetitionAnnouncementErrors[keyof AdminUpdateCompetitionAnnouncementErrors];
+
+export type AdminUpdateCompetitionAnnouncementResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationCompetitionsManagedAnnouncementResponse;
+};
+
+export type AdminUpdateCompetitionAnnouncementResponse = AdminUpdateCompetitionAnnouncementResponses[keyof AdminUpdateCompetitionAnnouncementResponses];
 
 export type AdminDeleteCompetitionBadgeData = {
     body?: never;

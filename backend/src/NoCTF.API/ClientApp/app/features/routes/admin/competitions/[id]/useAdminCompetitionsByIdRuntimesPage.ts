@@ -104,17 +104,11 @@ export function useAdminCompetitionsByIdRuntimesPage() {
     return data
   })
   const { data: detail, open: detailOpen, loading: detailLoading, error: detailError } = selection
-  const flagQueryTarget = ref<string | null>(null)
   const RuntimeFlagsPanel = markRaw(RuntimeFlagsPanelComponent)
   async function openDetail(id?: string) {
-    flagQueryTarget.value = null
     if (id) await selection.select(id)
   }
-  async function openFlagQuery(id?: string) {
-    if (!id) return
-    flagQueryTarget.value = id
-    await selection.select(id)
-  }
+
 
   const runtimeOperations = createRuntimeOperationCoordinator({
     maxAttempts: 50,
@@ -367,7 +361,7 @@ export function useAdminCompetitionsByIdRuntimesPage() {
   const RuntimeAccessUrl = markRaw(RuntimeAccessUrlComponent)
 
   const viewBindings = {
-      RuntimeFlagsPanel, flagQueryTarget, openFlagQuery, adminRuntimeTeamPath, adminRuntimeChallengePath, detailError,
+      RuntimeFlagsPanel, adminRuntimeTeamPath, adminRuntimeChallengePath, detailError,
       canWrite,
       isAdministrator,
       challengeOptions,

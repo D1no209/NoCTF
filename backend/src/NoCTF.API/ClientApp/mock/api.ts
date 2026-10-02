@@ -5,11 +5,17 @@ import { questionActorRole, questionView } from './questions'
 import { mockAttachmentResponse } from './attachments'
 import { mockRuntimeEndpoint } from './runtime'
 
-function shape(schema: Data | undefined, value: any): any {
+function shape(schema: Data | undefined, value: any, skipDiscriminator = false): any {
   if (!schema) return value
   if (value == null) return schema.nullable ? null : sample(schema)
   const type = resolve(schema)
-  if (type.oneOf) return shape(type.oneOf[0], value)
+  if (type.allOf) return Object.assign({}, ...type.allOf.map((part: Data) => shape(part, value, true)))
+  if (!skipDiscriminator && type.discriminator?.mapping?.[value.type])
+    return shape({ $ref: type.discriminator.mapping[value.type] }, value)
+  if (type.oneOf) {
+    const mapped = type.discriminator?.mapping?.[value.type]
+    return shape(mapped ? { $ref: mapped } : type.oneOf[0], value)
+  }
   if (type.type === 'array') return Array.isArray(value) ? value.map(item => shape(type.items, item)) : []
   if (type.properties) return Object.fromEntries(Object.entries(type.properties).map(([key, field]) => [key, shape(field as Data, value[key] ?? sample(field as Data))]))
   return value
@@ -40,6 +46,15 @@ function mockWriteUpPdf(teamName: string): Blob {
 
 export function createMockApi() {
   const state = createFixtures()
+  const announcementChanges = new Map<string, { state: 'Published' | 'Withdrawn'; updatedAt: string }>()
+  const managedAnnouncement = (notification: Data) => ({
+    id: notification.id, title: notification.content?.title ?? '', body: notification.content?.body ?? '',
+    audience: notification.targetType === 1 ? 'Collaborators' : 'Participants',
+    state: announcementChanges.get(notification.id)?.state ?? 'Published',
+    updatedAt: announcementChanges.get(notification.id)?.updatedAt ?? notification.sentAt,
+    publishedAt: notification.sentAt, authorId: notification.sourceId,
+    authorName: state.users.find(user => user.userId === notification.sourceId)?.userName ?? notification.sourceDisplayName,
+  })
   const invitationTokens = new Map(state.teams.map((team, index) => [
     team.id,
     `mock${String(index + 1).padStart(28, '0')}`,
@@ -221,6 +236,8 @@ export function createMockApi() {
     const team = state.teams.find(t => t.id === p.teamId && t.competitionId === p.competitionId)
     const myTeam = state.teams.find(t => t.competitionId === p.competitionId && t.memberIds.includes(user?.userId))
     const cleanRoute = route.replace('/admin/competitions', '/competitions')
+    if (route.startsWith('/admin/competitions/{competitionId}/announcements') && !competitionStaff)
+      return problem(403, 'Mock announcement management requires staff permissions')
     let value: any
     let status = Number(Object.keys(operation.responses).find(key => /^2\d\d$/.test(key)) ?? 200)
     let changed = false
@@ -496,7 +513,23 @@ export function createMockApi() {
         affectsDynamicChallengeScore: true, visibleOnLeaderboard: true, affectsCompetitiveResults: true, isViewerTrack: true,
       })] }
       else if (cleanRoute.includes('/leaderboard')) value = leaderboardRead(state, cleanRoute.split('/leaderboard')[1]!, p.competitionId!)
-      else if (route === '/notifications' || route === '/notifications/feed') value = { ...list(state.notifications.filter(n => !url.searchParams.get('competitionId') || n.targetId === url.searchParams.get('competitionId')), url), ...(route.endsWith('/feed') ? { nextCursor: 'mock:feed' } : {}) }
+      else if (route === '/admin/competitions/{competitionId}/announcements') {
+        value = list(state.notifications.filter(item => item.kind === 'CompetitionAnnouncement' && item.sourceType === 1
+          && item.targetId === p.competitionId && (url.searchParams.get('includeWithdrawn') === 'true'
+            || announcementChanges.get(item.id)?.state !== 'Withdrawn')).map(managedAnnouncement), url)
+      }
+      else if (route === '/competitions/{competitionId}/announcements') {
+        if (competition?.status === 'Draft' || competition?.accessMode === 'StaffOnly') return problem(404, 'Mock competition not public')
+        value = list(state.notifications.filter(item => item.kind === 'CompetitionAnnouncement' && item.targetId === p.competitionId
+          && item.targetType === 2 && announcementChanges.get(item.id)?.state !== 'Withdrawn')
+          .map(item => ({ id: item.id, title: item.content?.title ?? '', body: item.content?.body ?? '', publishedAt: item.sentAt })), url)
+      }
+      else if (route === '/notifications/{notificationId}/thread') {
+        const notification = state.notifications.find(item => item.id === p.notificationId)
+        if (!notification || announcementChanges.get(notification.id)?.state === 'Withdrawn') return problem(404, 'Mock notification withdrawn or missing')
+        value = { items: [notification] }
+      }
+      else if (route === '/notifications' || route === '/notifications/feed') value = { ...list(state.notifications.filter(n => announcementChanges.get(n.id)?.state !== 'Withdrawn' && (!url.searchParams.get('competitionId') || n.targetId === url.searchParams.get('competitionId'))), url), ...(route.endsWith('/feed') ? { nextCursor: 'mock:feed' } : {}) }
       else if (cleanRoute.endsWith('/questions')) value = list(state.questions.filter(q => q.competitionId === p.competitionId).map(q => questionView(q, user, myTeam)), url)
       else if (cleanRoute.endsWith('/questions/{threadRootId}')) {
         const question = state.questions.find(q => q.threadRootId === p.threadRootId && q.competitionId === p.competitionId)
@@ -872,8 +905,26 @@ export function createMockApi() {
         question.updatedAt = now(); question.lastActorRole = actorRole; question.lastActorDisplayName = user!.userName
         value = questionView(question, user, myTeam)
       }
-      else if (route === '/admin/competitions/{competitionId}/announcements') {
-        value = model('NotificationsNotificationResponse', { id: crypto.randomUUID(), sourceType: 2, sourceId: p.competitionId, targetType: 2, targetId: p.competitionId, kind: 'CompetitionAnnouncement', content: body, sentAt: now(), sourceDisplayName: user!.userName }); state.notifications.unshift(value)
+      else if (route === '/admin/competitions/{competitionId}/announcements' && request.method === 'POST') {
+        if (!body.title?.trim() || !body.body?.trim() || body.title.length > 160 || body.body.length > 16000) return problem(400, 'Mock notification content is required')
+        value = model('NotificationsNotificationResponse', { id: crypto.randomUUID(), sourceType: 1, sourceId: user!.userId,
+          targetType: body.audience === 'Collaborators' ? 1 : 2, targetId: p.competitionId, kind: 'CompetitionAnnouncement',
+          content: { type: 'competition-announcement', title: body.title.trim(), body: body.body.trim() }, sentAt: now(), sourceDisplayName: user!.userName }); state.notifications.unshift(value)
+        for (const notify of notificationChanges) notify()
+      }
+      else if (route === '/admin/competitions/{competitionId}/announcements/{announcementId}') {
+        const notification = state.notifications.find(item => item.id === p.announcementId && item.targetId === p.competitionId
+          && item.kind === 'CompetitionAnnouncement' && item.sourceType === 1)
+        if (!notification) return problem(404, 'Mock announcement not found')
+        if (announcementChanges.get(notification.id)?.state === 'Withdrawn' && request.method !== 'DELETE') return problem(409, 'Mock announcement has been withdrawn')
+        if (request.method === 'PATCH') {
+          if (!body.title?.trim() || !body.body?.trim() || body.title.length > 160 || body.body.length > 16000) return problem(400, 'Mock notification content is required')
+          notification.content = { ...notification.content, title: body.title.trim(), body: body.body.trim() }
+          announcementChanges.set(notification.id, { state: 'Published', updatedAt: now() })
+          value = managedAnnouncement(notification)
+        }
+        else if (request.method === 'DELETE') announcementChanges.set(notification.id, { state: 'Withdrawn', updatedAt: now() })
+        else return problem(405, 'Mock method not allowed')
         for (const notify of notificationChanges) notify()
       }
       else return problem(501, `尚未模拟此操作，未调用真实服务 / Mock operation not implemented: ${request.method} ${route}`)
