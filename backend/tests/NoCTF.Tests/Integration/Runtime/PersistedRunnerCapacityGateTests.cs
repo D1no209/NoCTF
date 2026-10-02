@@ -205,6 +205,12 @@ public sealed class PersistedRunnerCapacityGateTests
                     .IsEqualTo(RunnerCapacityReleaseOutcome.OwnerMismatch);
                 await Assert.That(await gate.ReleaseAsync(id, "runner", ct))
                     .IsEqualTo(RunnerCapacityReleaseOutcome.Released);
+                var publishedAfterRelease = outbox.Messages.Count;
+                await Assert.That(await gate.ReleaseAsync(id, "runner", ct))
+                    .IsEqualTo(RunnerCapacityReleaseOutcome.AlreadyReleased);
+                await Assert.That(outbox.Messages.Count).IsEqualTo(publishedAfterRelease);
+                await Assert.That(await gate.ReleaseAsync(Guid.NewGuid(), "runner", ct))
+                    .IsEqualTo(RunnerCapacityReleaseOutcome.RecoveryRequired);
             }
             await using (var verify = new NoCtfDbContext(options))
             {

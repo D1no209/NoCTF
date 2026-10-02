@@ -373,8 +373,8 @@ public sealed class PersistedRunnerCapacityGate(
         if (runtime is null) return RunnerCapacityReleaseOutcome.RecoveryRequired;
         var primary = runtime.CapacityAllocations.Items.SingleOrDefault(
             item => !item.Identity.IsAuxiliary);
-        return primary is null ? RunnerCapacityReleaseOutcome.RecoveryRequired
-            : await ReleaseWorkloadAsync(primary.Identity, runnerId, ct);
+        return await ReleaseWorkloadAsync(
+            primary?.Identity ?? PrimaryIdentity(runtime), runnerId, ct);
     }
 
     public async Task<RunnerCapacityReleaseOutcome> ReleaseWorkloadAsync(
