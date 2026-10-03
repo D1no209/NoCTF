@@ -10,6 +10,8 @@ $previousEnvironment = $env:ASPNETCORE_ENVIRONMENT
 $previousRedis = $env:ConnectionStrings__Redis
 $previousNats = $env:ConnectionStrings__Nats
 $previousPostgreSql = $env:ConnectionStrings__PostgreSql
+$previousAuthenticationSigningKey = $env:Authentication__SigningKey
+$previousSigningKey = $env:RunnerScoring__SigningKey
 $previousCallbackBaseUrl = $env:RunnerScoring__CallbackBaseUrl
 $previousWebhookBaseUrl = $env:Webhooks__PublicBaseUrl
 $previousRunnerId = $env:Runner__Id
@@ -23,6 +25,8 @@ try {
     $env:ConnectionStrings__Redis = 'localhost:6379'
     $env:ConnectionStrings__Nats = 'nats://localhost:4222'
     $env:ConnectionStrings__PostgreSql = 'Host=localhost;Database=noctf_codegen;Username=postgres;Password=unused'
+    $env:Authentication__SigningKey = [Convert]::ToBase64String([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+    $env:RunnerScoring__SigningKey = [Convert]::ToBase64String([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
     $env:RunnerScoring__CallbackBaseUrl = 'http://localhost:5080'
     $env:Webhooks__PublicBaseUrl = 'https://noctf.invalid'
     $env:Runner__Id = 'codegen-runner'
@@ -69,6 +73,8 @@ finally {
     $env:ConnectionStrings__Redis = $previousRedis
     $env:ConnectionStrings__Nats = $previousNats
     $env:ConnectionStrings__PostgreSql = $previousPostgreSql
+    $env:Authentication__SigningKey = $previousAuthenticationSigningKey
+    $env:RunnerScoring__SigningKey = $previousSigningKey
     $env:RunnerScoring__CallbackBaseUrl = $previousCallbackBaseUrl
     $env:Webhooks__PublicBaseUrl = $previousWebhookBaseUrl
     $env:Runner__Id = $previousRunnerId

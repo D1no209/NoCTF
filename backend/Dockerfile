@@ -13,9 +13,11 @@ WORKDIR /src/backend
 RUN dotnet restore src/NoCTF.Host/NoCTF.Host.csproj
 RUN dotnet build src/NoCTF.Host/NoCTF.Host.csproj -c Release --no-restore -p:NoCtfGenerateWolverineHandlers=true
 RUN export ASPNETCORE_ENVIRONMENT=Production \
+    Authentication__SigningKey="$(head -c 32 /dev/urandom | base64)" \
     ConnectionStrings__Redis=localhost:6379 \
     ConnectionStrings__Nats=nats://localhost:4222 \
     ConnectionStrings__PostgreSql='Host=localhost;Database=noctf_codegen;Username=postgres;Password=unused' \
+    RunnerScoring__SigningKey="$(head -c 32 /dev/urandom | base64)" \
     RunnerScoring__CallbackBaseUrl=http://localhost:5080 \
     Webhooks__PublicBaseUrl=https://noctf.invalid \
     Runner__Id=codegen-runner \

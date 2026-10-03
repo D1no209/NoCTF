@@ -118,4 +118,3 @@ specs/                     authoritative product and engineering specifications
 - [Development guide](specs/development.md)
 - [Testing guide](specs/testing.md)
 - [Challenge repository GitOps](specs/challenge-repository-gitops.md)
-- [Current backend handoff](NoCTF-backend-handoff-2026-07-24.md)

@@ -33,5 +33,3 @@ Saving changed mode/curve/blood/penalty/override configuration commits the exist
 - Frontend: 650 tests, typecheck, architecture audit and production generation pass. Mock browser verifies Running global save/reload and challenge override/restored inheritance.
 - EF model drift check reports no pending changes; migrations and SDK were generated with their tools.
 - Import converter fixture verification preserves the new mode.
-
-Implementation milestones and detailed validation boundaries are recorded in HANDOFF.md. The implementation request did not authorize deployment; the later explicit manual rollout is recorded in [the production deployment report](operations/2026-10-02-ctf-scoring-manual-deployment.md).

@@ -61,5 +61,4 @@
 - 当前证据与精确命令：[`specs/data-model-wolverine-stage0-baseline.md`](specs/data-model-wolverine-stage0-baseline.md)
 - Wolverine Spike：[`specs/wolverine-6.29.2-spike.md`](specs/wolverine-6.29.2-spike.md)
 - 切换与回滚：[`specs/data-model-wolverine-cutover.md`](specs/data-model-wolverine-cutover.md)
-- 最新进度：[`HANDOFF.md`](HANDOFF.md)
 - 阶段 11 验证：[`specs/data-model-wolverine-stage11-validation.md`](specs/data-model-wolverine-stage11-validation.md)

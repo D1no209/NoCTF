@@ -8,7 +8,6 @@
 2. [`AGENTS.md`](AGENTS.md)
 3. [`specs/README.md`](specs/README.md)
 4. [`PLAN.md`](PLAN.md)
-5. [`HANDOFF.md`](HANDOFF.md)
 
 ## 当前阶段：阶段 11
 
