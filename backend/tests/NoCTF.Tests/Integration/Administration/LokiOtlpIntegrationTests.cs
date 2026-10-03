@@ -97,7 +97,7 @@ public sealed class LokiOtlpIntegrationTests
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory);
              directory is not null; directory = directory.Parent)
         {
-            var path = Path.Combine(directory.FullName, "deploy", "observability",
+            var path = Path.Combine(directory.FullName, "deploy", "shared", "observability",
                 "loki", "loki.yml");
             if (File.Exists(path)) return path;
         }
