@@ -84,6 +84,7 @@ internal static class NormalizedScoreboardProjection
             challenge.Id.ToString("N"),
             $"{challenge.Title.Length}:{challenge.Title}",
             $"{challenge.Direction.Length}:{challenge.Direction}",
+            challenge.DirectionIcon ?? string.Empty,
             challenge.Order.ToString(System.Globalization.CultureInfo.InvariantCulture),
             challenge.IsPublished ? "1" : "0")));
         var catalog = new ScoreboardChallengeCatalog(
@@ -95,7 +96,7 @@ internal static class NormalizedScoreboardProjection
                 challenge.Direction,
                 challenge.Direction,
                 challenge.Order,
-                challenge.IsPublished)).ToArray());
+                challenge.IsPublished, challenge.DirectionIcon)).ToArray());
 
         var roundProjection = BuildRounds(scoreboardInput, aggregate, projectedAt);
         var columns = BuildColumns(input.Mode, challenges, roundProjection.Rounds);

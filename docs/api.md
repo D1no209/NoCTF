@@ -280,6 +280,8 @@ CTF 开放四个动作；AWD 玩家 GET/Reset，Start/Stop 由平台生命周期
 GET  /api/v1/admin/competitions
 POST /api/v1/admin/competitions
 GET  /api/v1/admin/competitions/{competitionId}
+GET  /api/v1/admin/competitions/{competitionId}/directions
+PUT  /api/v1/admin/competitions/{competitionId}/directions
 PATCH /api/v1/admin/competitions/{competitionId}
 PUT  /api/v1/admin/competitions/{competitionId}/status
 DELETE /api/v1/admin/competitions/{competitionId}
@@ -648,3 +650,7 @@ GET /api/v1/admin/competitions/{competitionId}/teams/{teamId}/invitation-token
 GET /api/v1/users/{userId}/profile-cover
 PUT /api/v1/auth/me/profile-cover
 ```
+
+比赛方向目录由管理端独立配置；新比赛和升级后的既有比赛提供默认方向。
+`PUT /admin/competitions/{competitionId}/directions` 的 `items` 按展示顺序包含 `id`、`name` 和 `icon`（Lucide 名称后缀）。名称不可重复，图标必须存在于当前包。使用中的方向（含软删除题目）不能移除。
+题目 PATCH 的 `presentation.directionId` 选择本比赛目录中的方向，省略时保留当前选择。题目详情、列表和计分目录返回有效方向名称及 `directionIcon`；目录修改不改变全局题库模板。

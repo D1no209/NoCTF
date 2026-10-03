@@ -29,6 +29,7 @@ public static class ServiceRegistration
         var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
         await db.Database.MigrateAsync(cancellationToken);
         await Teams.Membership.TeamMembershipBaseline.InitializeAsync(db, cancellationToken);
+        await Competitions.Directions.CompetitionDirectionBaseline.InitializeAsync(db, cancellationToken);
         await scope.ServiceProvider.GetRequiredService<AdministratorBootstrapper>()
             .SeedAsync(cancellationToken);
     }

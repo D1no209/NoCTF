@@ -228,7 +228,7 @@ public sealed class FusionLeaderboardCache(
             .Where(instance => templates.ContainsKey(instance.ChallengeId))
             .Select(instance => new LeaderboardChallengeFact(
                 instance.Id,
-                templates[instance.ChallengeId].Direction,
+                instance.Direction?.Name ?? templates[instance.ChallengeId].Direction,
                 instance.CustomTitle ?? templates[instance.ChallengeId].Title,
                 false,
                 instance.Rules,
@@ -237,7 +237,8 @@ public sealed class FusionLeaderboardCache(
                 templates[instance.ChallengeId].Definition,
                 templates[instance.ChallengeId].Definition is CtfChallengeDefinition ctf
                     ? ctf.InteractionKind
-                    : CtfInteractionKind.FlagSubmission))
+                    : CtfInteractionKind.FlagSubmission,
+                instance.Direction?.Icon))
             .ToList();
 
         var hintCosts = challengeEntities

@@ -46,6 +46,13 @@ function mockWriteUpPdf(teamName: string): Blob {
 
 export function createMockApi() {
   const state = createFixtures()
+  const directionIcons: Record<string, string> = { Misc: 'puzzle', Web: 'globe', Crypto: 'key-round', Pwn: 'bug', Reverse: 'binary', Penetration: 'scan-search', Forensics: 'scan-search', OSINT: 'search', AI: 'bot', Mobile: 'smartphone', IoT: 'cpu', Hardware: 'circuit-board', Cloud: 'cloud', Blockchain: 'link-2' }
+  const directionCatalogs = new Map(state.competitions.map(competition => [competition.id,
+    Object.entries(directionIcons).map(([name, icon]) => ({ id: crypto.randomUUID(), name, icon }))]))
+  for (const challenge of state.challenges) {
+    const direction = directionCatalogs.get(challenge.competitionId)?.find(item => item.name.toLowerCase() === String(challenge.direction).toLowerCase())
+    if (direction) Object.assign(challenge, { directionId: direction.id, direction: direction.name, directionIcon: direction.icon })
+  }
   const announcementChanges = new Map<string, { state: 'Published' | 'Withdrawn'; updatedAt: string }>()
   const managedAnnouncement = (notification: Data) => ({
     id: notification.id, title: notification.content?.title ?? '', body: notification.content?.body ?? '',
@@ -133,6 +140,8 @@ export function createMockApi() {
       title: item.title,
       customTitle: item.customTitle ?? null,
       direction: item.direction,
+      directionId: item.directionId ?? null,
+      directionIcon: item.directionIcon ?? null,
       order: item.order,
       isPublished: item.isPublished,
       deletedAt: item.deletedAt ?? null,
@@ -513,6 +522,7 @@ export function createMockApi() {
         affectsDynamicChallengeScore: true, visibleOnLeaderboard: true, affectsCompetitiveResults: true, isViewerTrack: true,
       })] }
       else if (cleanRoute.includes('/leaderboard')) value = leaderboardRead(state, cleanRoute.split('/leaderboard')[1]!, p.competitionId!)
+      else if (route === '/admin/competitions/{competitionId}/directions') value = { items: directionCatalogs.get(competition!.id) ?? [] }
       else if (route === '/admin/competitions/{competitionId}/announcements') {
         value = list(state.notifications.filter(item => item.kind === 'CompetitionAnnouncement' && item.sourceType === 1
           && item.targetId === p.competitionId && (url.searchParams.get('includeWithdrawn') === 'true'
@@ -763,13 +773,31 @@ export function createMockApi() {
       }
       else if (route === '/admin/challenges' && request.method === 'POST') { value = { ...state.templates[0], ...body, id: body.id ?? crypto.randomUUID(), ownerId: user!.userId, createdAt: now(), updatedAt: now() }; state.templates.push(value) }
       else if (route === '/admin/challenges/{challengeId}' && request.method === 'PATCH') { if (body.content) Object.assign(template!, body.content, { updatedAt: now() }); if (body.permissions) Object.assign(template!, body.permissions); value = template; state.challenges.filter(c => c.challengeId === template!.id).forEach(c => Object.assign(c, { title: template!.title, description: template!.description, direction: template!.direction })) }
+      else if (route === '/admin/competitions/{competitionId}/directions' && request.method === 'PUT') {
+        const ids = new Set(body.items.map((item: Data) => item.id))
+        if (state.challenges.some(c => c.competitionId === competition!.id && c.directionId && !ids.has(c.directionId))) return Response.json({ code: 'DirectionInUse' }, { status: 409 })
+        directionCatalogs.set(competition!.id, body.items)
+        for (const c of state.challenges.filter(c => c.competitionId === competition!.id)) {
+          const selected = body.items.find((item: Data) => item.id === c.directionId)
+          if (selected) Object.assign(c, { direction: selected.name, directionIcon: selected.icon })
+        }
+        value = { items: body.items }
+      }
       else if (route === '/admin/competitions/{competitionId}/challenges' && request.method === 'POST') {
         const source = state.templates.find(t => t.id === body.challengeId && t.mode === competition!.mode)
         if (!source) return problem(400, '选择同赛制的演示模板 / Select a template in the same mode')
-        value = { ...state.challenges[0], ...body, id: body.id ?? crypto.randomUUID(), competitionId: competition!.id, title: body.customTitle ?? source.title, description: source.description, direction: source.direction, challengeId: source.id }; state.challenges.push(value)
+        value = { ...state.challenges[0], ...body, id: body.id ?? crypto.randomUUID(), competitionId: competition!.id, title: body.customTitle ?? source.title, description: source.description, direction: source.direction, challengeId: source.id };
+        const direction = directionCatalogs.get(competition!.id)?.find(item => item.name.toLowerCase() === String(source.direction).toLowerCase())
+        Object.assign(value, { directionId: direction?.id ?? null, directionIcon: direction?.icon ?? null })
+        state.challenges.push(value)
       }
       else if (route === '/admin/competitions/{competitionId}/challenges/{competitionChallengeId}' && request.method === 'PATCH') {
-        if (body.presentation) Object.assign(challenge!, body.presentation, { title: body.presentation.customTitle ?? challenge!.title })
+        if (body.presentation) {
+          const selected = directionCatalogs.get(competition!.id)?.find(item => item.id === body.presentation.directionId)
+          if (body.presentation.directionId && !selected) return problem(400, 'InvalidDirection')
+          Object.assign(challenge!, body.presentation, { title: body.presentation.customTitle ?? challenge!.title })
+          if (selected) Object.assign(challenge!, { direction: selected.name, directionIcon: selected.icon })
+        }
         if (body.rules) state.settings.set(`challenge-rules:${p.competitionChallengeId}`, body.rules.configuration)
         value = { challenge, mode: competition!.mode, competitionStatus: competition!.status,
           rules: state.settings.get(`challenge-rules:${p.competitionChallengeId}`) ?? mockRules(String(competition!.mode)) }

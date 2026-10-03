@@ -2,7 +2,7 @@
 import { toRefs } from 'vue'
 import type { CompetitionChallengeNavigatorViewState } from '~/features/competition/useCompetitionChallengeNavigator'
 const viewProps = defineProps<{ state: CompetitionChallengeNavigatorViewState }>()
-const { ShieldCheck, Swords, Users, directionGlyph, isCtf, isAwdp, loading, error, dataScope, hideSolved, hideLocked, search, board, progressFor, currentScore, bloodsFor, bloodTooltip, progressIcon, progressIconLabel, emptyLabel, groupOptions, listOptions, selectChallenge, competitionId, selectedChallengeId } = toRefs(viewProps.state)
+const { ShieldCheck, Swords, Users, directionGlyph, groupIcon, isCtf, isAwdp, loading, error, dataScope, hideSolved, hideLocked, search, board, progressFor, currentScore, bloodsFor, bloodTooltip, progressIcon, progressIconLabel, emptyLabel, groupOptions, listOptions, selectChallenge, competitionId, selectedChallengeId } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -32,7 +32,7 @@ const { ShieldCheck, Swords, Users, directionGlyph, isCtf, isAwdp, loading, erro
     </template>
     <template #group="{ group }">
       <span class="inline-flex items-center gap-2 font-semibold" :class="directionWatermarkClass(group.value)">
-        <TechnicalIcon :name="directionGlyph(group.value)" />
+        <LucideIcon v-if="groupIcon(group.value)" :name="groupIcon(group.value)!" /><TechnicalIcon v-else :name="directionGlyph(group.value)" />
         <span>{{ group.label }}</span>
       </span>
     </template>
@@ -44,11 +44,12 @@ const { ShieldCheck, Swords, Users, directionGlyph, isCtf, isAwdp, loading, erro
         <span data-challenge-item-panel class="relative isolate flex h-28 min-w-0 flex-col px-3 py-2">
           <IconWatermark
             :name="directionGlyph(item.challenge.direction)"
+            :icon="item.challenge.directionIcon"
             size="compact"
             class="noctf-motion-challenge-watermark"
             :class="directionWatermarkClass(item.challenge.direction)"
           />
-          <span class="sr-only">{{ directionLabel(item.challenge.direction) }}</span>
+          <span class="sr-only">{{ item.challenge.direction }}</span>
           <span data-challenge-item-summary class="relative z-10 flex h-6 min-w-0 items-center gap-2 font-sans text-sm font-bold italic text-primary">
             <span class="min-w-0 flex-1 truncate">{{ item.challenge.title }}</span>
             <Badge v-if="item.challenge.locked" variant="outline" class="shrink-0 text-[0.625rem] not-italic">

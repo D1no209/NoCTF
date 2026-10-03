@@ -13,7 +13,8 @@ public sealed record ScoreboardChallengeCatalogItemResponse(
     string Direction,
     string Category,
     int Order,
-    bool Published);
+    bool Published,
+    string? DirectionIcon = null);
 
 public sealed record ScoreboardChallengeCatalogResponse(
     Guid CompetitionId,
@@ -65,7 +66,7 @@ public sealed class GetScoreboardChallengeCatalogEndpoint(
                 item.Direction,
                 item.Category,
                 item.Order,
-                item.IsPublished)).ToArray()));
+                item.IsPublished, item.DirectionIcon)).ToArray()));
     }
 
     private Accepted<LeaderboardProcessingProtocolResponse> Processing(Guid competitionId)

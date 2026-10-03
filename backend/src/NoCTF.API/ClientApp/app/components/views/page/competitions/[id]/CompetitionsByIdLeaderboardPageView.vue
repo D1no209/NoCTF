@@ -78,7 +78,7 @@ const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, 
                   <TableHead :rowspan="isCtf ? 1 : 2" class="sticky left-20 z-30 w-56 min-w-56 max-w-56 bg-card">{{ $t('ui.teams') }}</TableHead>
                   <TableHead :rowspan="isCtf ? 1 : 2" data-scoreboard-frozen-corner="top-end" class="sticky left-76 z-30 w-28 min-w-28 max-w-28 border-r bg-card text-right">{{ $t('ui.totalScore') }}</TableHead>
                   <TableHead v-for="group in columnGroups" :key="group.competitionChallengeId" :colspan="group.columns.length" class="border-l px-4 text-center">
-                    <span class="inline-flex items-center gap-1.5 whitespace-nowrap"><component :is="directionIcon(group.challenge?.direction)" class="size-4" :class="directionTextClass(group.challenge?.direction)" />{{ group.challenge?.title ?? $t('ui.unknownQuestion') }}</span>
+                    <span class="inline-flex items-center gap-1.5 whitespace-nowrap"><LucideIcon v-if="group.challenge?.directionIcon" :name="group.challenge.directionIcon" class="size-4" :class="directionTextClass(group.challenge.direction)" /><component v-else :is="directionIcon(group.challenge?.direction)" class="size-4" :class="directionTextClass(group.challenge?.direction)" />{{ group.challenge?.title ?? $t('ui.unknownQuestion') }}</span>
                   </TableHead>
                 </TableRow>
                 <TableRow v-if="!isCtf"><template v-for="group in columnGroups" :key="`${group.competitionChallengeId}-rounds`"><TableHead v-for="column in group.columns" :key="column.index" class="min-w-28 border-l px-3 text-center">{{ roundLabel(column) }}</TableHead></template></TableRow>

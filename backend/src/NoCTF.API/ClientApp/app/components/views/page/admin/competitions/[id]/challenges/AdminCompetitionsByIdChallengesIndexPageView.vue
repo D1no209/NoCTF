@@ -104,7 +104,7 @@ const { Plus, competitionId, competition, canWrite, items, loading, error, inclu
           </TableCell>
           <TableCell>
             <Badge variant="outline" :class="directionBadgeClass(c.direction)">
-              {{ directionLabel(c.direction) }}
+              <LucideIcon v-if="c.directionIcon" :name="c.directionIcon" />{{ c.direction || '' }}
             </Badge>
           </TableCell>
           <TableCell>

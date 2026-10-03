@@ -33,7 +33,7 @@ public partial class OpenApiRouteDriftTests
             .ToArray();
 
         await Assert.That(actual).IsEquivalentTo(expected);
-        await Assert.That(actual).Count().IsEqualTo(240);
+        await Assert.That(actual).Count().IsEqualTo(242);
 
         var operationIds = swagger.RootElement.GetProperty("paths")
             .EnumerateObject()

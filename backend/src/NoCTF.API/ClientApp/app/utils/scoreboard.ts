@@ -246,7 +246,7 @@ export function scoreboardDirectionGroups(
 ): ScoreboardDirectionGroup[] {
   const directions = new Map<string, ScoreboardDirectionGroup>()
   for (const group of columnGroups) {
-    const name = directionLabel(group.challenge?.direction) || translate("ui.uncategorized")
+    const name = (group.challenge?.directionIcon ? group.challenge.direction : directionLabel(group.challenge?.direction)) || translate("ui.uncategorized")
     const key = directionKey(name)
     const existing = directions.get(key)
     if (existing) existing.groups.push(group)

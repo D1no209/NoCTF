@@ -35,6 +35,11 @@ internal sealed class CompetitionChallengeConfiguration : IEntityTypeConfigurati
             .HasForeignKey(item => new { item.ChallengeId, item.Mode })
             .HasPrincipalKey(challenge => new { challenge.Id, challenge.Mode })
             .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(item => item.Direction).WithMany()
+            .HasForeignKey(item => new { item.CompetitionId, item.DirectionId })
+            .HasPrincipalKey(direction => new { direction.CompetitionId, direction.Id })
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.Navigation(item => item.Direction).AutoInclude();
         builder.HasIndex(item => new { item.CompetitionId, item.Order }).IsUnique();
         builder.HasIndex(item => item.NormalizedCustomTitle);
         builder.HasIndex(item => new { item.CompetitionId, item.ChallengeId }).IsUnique();

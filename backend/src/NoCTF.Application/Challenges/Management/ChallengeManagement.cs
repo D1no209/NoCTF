@@ -19,7 +19,8 @@ public sealed record UpdateCompetitionChallengeCommand(
     int Order,
     bool IsPublished,
     DateTimeOffset UpdatedAt,
-    string? CustomTitle = null);
+    string? CustomTitle = null,
+    Guid? DirectionId = null);
 
 public sealed record ChallengeView(
     Guid Id,
@@ -36,6 +37,8 @@ public sealed record ChallengeView(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt)
 {
+    public Guid? DirectionId { get; init; }
+    public string? DirectionIcon { get; init; }
     public bool UsesDynamicFlag { get; init; }
     public CtfInteractionKind InteractionKind { get; init; }
 }
@@ -50,13 +53,16 @@ public sealed record CompetitionChallengeSummaryView(
     int Order,
     bool IsPublished,
     DateTimeOffset? DeletedAt,
-    CtfInteractionKind InteractionKind);
+    CtfInteractionKind InteractionKind,
+    Guid? DirectionId = null,
+    string? DirectionIcon = null);
 
 public enum ChallengeMutationFailure
 {
     InvalidChallengeId,
     InvalidTitle,
     InvalidOrder,
+    InvalidDirection,
     CompetitionNotFound,
     TemplateNotFound,
     TemplateModeMismatch,

@@ -60,7 +60,9 @@ public sealed record ChallengeResponse(
     GameplayFactResultProtocol? PatchVerificationResult = null,
     GameplayFactFailureCodeProtocol? PatchVerificationFailureCode = null,
     Guid? PatchVerificationRuntimeInstanceId = null,
-    RuntimeStateProtocol? PatchVerificationRuntimeState = null);
+    RuntimeStateProtocol? PatchVerificationRuntimeState = null,
+    Guid? DirectionId = null,
+    string? DirectionIcon = null);
 
 public sealed record ParticipantChallengeHintResponse(
     Guid Id,
@@ -88,7 +90,9 @@ public sealed record ChallengeSummaryResponse(
     CtfInteractionKindProtocol InteractionKind,
     bool Locked = false,
     int PrerequisitesSatisfied = 0,
-    int PrerequisitesTotal = 0);
+    int PrerequisitesTotal = 0,
+    Guid? DirectionId = null,
+    string? DirectionIcon = null);
 
 internal static class ChallengeMapper
 {
@@ -150,7 +154,9 @@ internal static class ChallengeMapper
             patchVerification?.RuntimeInstanceId,
             patchVerification?.RuntimeState is { } patchRuntimeState
                 ? RuntimeProtocolMapper.ToProtocol(patchRuntimeState)
-                : null);
+                : null,
+            view.DirectionId,
+            view.DirectionIcon);
 
     public static CtfInteractionKindProtocol ToProtocol(CtfInteractionKind kind) => kind switch
     {
@@ -174,7 +180,7 @@ internal static class ChallengeMapper
                 view.Order,
                 view.IsPublished,
                 view.DeletedAt,
-                ToProtocol(view.InteractionKind))).ToArray(),
+                ToProtocol(view.InteractionKind), DirectionId: view.DirectionId, DirectionIcon: view.DirectionIcon)).ToArray(),
             CompetitionProtocolMapper.ToProtocol(visibility),
             ScoreboardProtocolMapper.ToProtocol(dataScope));
 }

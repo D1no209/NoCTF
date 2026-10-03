@@ -32,7 +32,7 @@ export default defineNuxtConfig({
       // Keep the original warnings in the browser console for diagnosis.
       forwardConsole: false,
       proxy: Object.fromEntries(['/api', '/hubs', '/health'].map(path => [path, {
-        target: 'http://127.0.0.1:5081', changeOrigin: true, ws: false,
+        target: environment?.NUXT_API_PROXY_TARGET ?? 'http://127.0.0.1:5081', changeOrigin: true, ws: false,
       }])),
     },
   },

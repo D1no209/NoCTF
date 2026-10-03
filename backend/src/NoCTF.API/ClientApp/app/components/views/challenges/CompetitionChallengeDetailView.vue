@@ -20,7 +20,8 @@ const { Dice5, FileDown, History, ctx, isLoggedIn, user, challenge, loading, err
 
     <div v-else-if="challenge" class="flex flex-col">
       <header class="relative isolate flex min-h-28 flex-wrap items-center gap-3 overflow-hidden pb-5">
-        <TypeWatermark :text="directionLabel(challenge.direction)" :class="directionWatermarkClass(challenge.direction)" />
+        <TypeWatermark :text="challenge.direction || ''" :class="directionWatermarkClass(challenge.direction)" />
+        <LucideIcon v-if="challenge.directionIcon" :name="challenge.directionIcon" class="relative z-10" :class="directionTextClass(challenge.direction)" />
         <h2 class="relative z-10 font-sans text-2xl font-bold italic">{{ challenge.title }}</h2>
         <RemainingAttempts
           v-if="isLoggedIn && challenge.remainingFlagAttempts !== null && challenge.remainingFlagAttempts !== undefined"
@@ -40,7 +41,7 @@ const { Dice5, FileDown, History, ctx, isLoggedIn, user, challenge, loading, err
             </ScrollSurface>
           </DialogContent>
         </Dialog>
-        <span class="sr-only">{{ directionLabel(challenge.direction) }}</span>
+        <span class="sr-only">{{ challenge.direction || '' }}</span>
         <Badge v-if="mode === 'Awdp'" variant="secondary">{{ $t('ui.scoresSettleByRound') }}</Badge>
       </header>
 

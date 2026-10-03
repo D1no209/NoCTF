@@ -247,6 +247,8 @@ public sealed class NoCtfDbContext(
         foreach (var entry in ChangeTracker.Entries<Competition>()
                      .Where(entry => entry.State is EntityState.Added or EntityState.Modified))
         {
+            if (entry.State == EntityState.Added && entry.Entity.Directions.Count == 0)
+                entry.Entity.Directions = NoCTF.Domain.Competitions.Directions.CompetitionDirectionDefaults.Create(entry.Entity.Id);
             if (entry.State == EntityState.Added && entry.Entity.Tracks.Count == 0)
                 entry.Entity.Tracks = CompetitionTrackConfiguration.ToPersisted(
                     CompetitionTrackConfiguration.DefaultFor(entry.Entity.Mode),

@@ -56,6 +56,7 @@ public sealed class CompetitionChallengePresentationPatchRequest
     public required string? CustomTitle { get; set; }
     public required int Order { get; set; }
     public required bool IsPublished { get; set; }
+    public Guid? DirectionId { get; set; }
 }
 
 public sealed class CompetitionChallengeRulesPatchRequest
@@ -107,6 +108,7 @@ public static partial class CompetitionChallengePatchMapper
     [MapperIgnoreTarget(nameof(CompetitionChallenge.ConcurrencyStamp))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.CompetitionId))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.ChallengeId))]
+    [MapperIgnoreTarget(nameof(CompetitionChallenge.Direction))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.Rules))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.Mode))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.UpdatedAt))]
@@ -117,7 +119,9 @@ public static partial class CompetitionChallengePatchMapper
         CompetitionChallengePresentationPatchRequest request,
         [MappingTarget] CompetitionChallenge target);
 
+    [MapperIgnoreTarget(nameof(CompetitionChallenge.DirectionId))]
     [MapperIgnoreSource(nameof(CompetitionChallengeRulesPatchRequest.Configuration))]
+    [MapperIgnoreTarget(nameof(CompetitionChallenge.Direction))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.Rules))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.Mode))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.Id))]
@@ -190,6 +194,7 @@ public sealed class PatchCompetitionChallengeEndpoint(
         target.Id = current.Id;
         target.CompetitionId = current.CompetitionId;
         target.ChallengeId = current.ChallengeId;
+        target.DirectionId = current.DirectionId;
         target.CustomTitle = current.CustomTitle;
         target.Order = current.Order;
         target.IsPublished = current.IsPublished;
@@ -219,7 +224,8 @@ public sealed class PatchCompetitionChallengeEndpoint(
                     target.Order,
                     target.IsPublished,
                     timeProvider.GetUtcNow(),
-                    target.CustomTitle), transactionCt);
+                    target.CustomTitle,
+                    request.Presentation!.DirectionId), transactionCt);
                 if (result.Challenge is null)
                 {
                     Results<Ok<AdminCompetitionChallengeResponse>, NotFound,

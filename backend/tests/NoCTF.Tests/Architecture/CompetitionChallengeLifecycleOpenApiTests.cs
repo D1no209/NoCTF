@@ -85,7 +85,7 @@ public sealed class CompetitionChallengeLifecycleOpenApiTests
         var presentation = ResolveSchema(root,
             presentationProperty.GetProperty("oneOf").EnumerateArray().First());
         await Assert.That(PropertyNames(presentation))
-            .IsEquivalentTo(["customTitle", "order", "isPublished"]);
+            .IsEquivalentTo(["customTitle", "order", "isPublished", "directionId"]);
     }
 
     [Test]

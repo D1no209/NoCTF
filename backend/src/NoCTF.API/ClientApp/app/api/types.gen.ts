@@ -1200,6 +1200,7 @@ export type NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogItemResponse 
     category?: string;
     order?: number;
     published?: boolean;
+    directionIcon?: string | null;
 };
 
 export type NoCtfapiEndpointsCompetitionsGetScoreboardChallengeCatalogRequest = {
@@ -1415,6 +1416,8 @@ export type NoCtfapiEndpointsChallengesChallengeResponse = {
     patchVerificationFailureCode?: NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol | null;
     patchVerificationRuntimeInstanceId?: string | null;
     patchVerificationRuntimeState?: NoCtfapiEndpointsRuntimeRuntimeStateProtocol | null;
+    directionId?: string | null;
+    directionIcon?: string | null;
 };
 
 export type NoCtfapiEndpointsChallengesParticipantChallengeHintResponse = {
@@ -1471,6 +1474,8 @@ export type NoCtfapiEndpointsChallengesChallengeSummaryResponse = {
     locked?: boolean;
     prerequisitesSatisfied?: number;
     prerequisitesTotal?: number;
+    directionId?: string | null;
+    directionIcon?: string | null;
 };
 
 export type NoCtfapiEndpointsChallengesListChallengesRequest = {
@@ -2918,6 +2923,20 @@ export type NoCtfapiEndpointsAdministrationCompetitionsAdminCompetitionCapabilit
     canManagePermissions?: boolean;
 };
 
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionDirectionsResponse = {
+    items?: Array<NoCtfapiEndpointsAdministrationCompetitionsCompetitionDirectionResponse>;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionDirectionResponse = {
+    id?: string;
+    name?: string;
+    icon?: string;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsGetCompetitionDirectionsRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionProgressionContract = {
     competitionId?: string;
     enabled?: boolean;
@@ -3145,6 +3164,17 @@ export type NoCtfapiEndpointsAdministrationCompetitionsRotateCompetitionWebhookS
 
 export type NoCtfapiEndpointsAdministrationCompetitionsRotateCompetitionWebhookSecretRequest = {
     [key: string]: never;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionDirectionFailureResponse = {
+    code: NoCtfApplicationCompetitionsDirectionsCompetitionDirectionFailure;
+    detail: string;
+};
+
+export type NoCtfApplicationCompetitionsDirectionsCompetitionDirectionFailure = 'CompetitionNotFound' | 'InvalidCatalog' | 'InvalidIcon' | 'DirectionInUse' | 'NameConflict';
+
+export type NoCtfapiEndpointsAdministrationCompetitionsSaveCompetitionDirectionsRequest = {
+    items: Array<NoCtfapiEndpointsAdministrationCompetitionsCompetitionDirectionResponse>;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsProgressionSaveProblem = {
@@ -3410,6 +3440,7 @@ export type NoCtfapiEndpointsAdministrationChallengesCompetitionChallengePresent
     customTitle: string | null;
     order: number;
     isPublished: boolean;
+    directionId?: string | null;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesPatchRequest = {
@@ -10294,6 +10325,79 @@ export type AdminGenerateMissingFlagsResponses = {
 };
 
 export type AdminGenerateMissingFlagsResponse = AdminGenerateMissingFlagsResponses[keyof AdminGenerateMissingFlagsResponses];
+
+export type AdminGetCompetitionDirectionsData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/directions';
+};
+
+export type AdminGetCompetitionDirectionsErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminGetCompetitionDirectionsResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationCompetitionsCompetitionDirectionsResponse;
+};
+
+export type AdminGetCompetitionDirectionsResponse = AdminGetCompetitionDirectionsResponses[keyof AdminGetCompetitionDirectionsResponses];
+
+export type AdminSaveCompetitionDirectionsData = {
+    body: NoCtfapiEndpointsAdministrationCompetitionsSaveCompetitionDirectionsRequest;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/directions';
+};
+
+export type AdminSaveCompetitionDirectionsErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsAdministrationCompetitionsCompetitionDirectionFailureResponse;
+};
+
+export type AdminSaveCompetitionDirectionsError = AdminSaveCompetitionDirectionsErrors[keyof AdminSaveCompetitionDirectionsErrors];
+
+export type AdminSaveCompetitionDirectionsResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationCompetitionsCompetitionDirectionsResponse;
+};
+
+export type AdminSaveCompetitionDirectionsResponse = AdminSaveCompetitionDirectionsResponses[keyof AdminSaveCompetitionDirectionsResponses];
 
 export type AdminGetCompetitionProgressionData = {
     body?: never;

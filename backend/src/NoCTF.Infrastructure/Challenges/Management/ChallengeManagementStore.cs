@@ -92,6 +92,8 @@ public sealed class ChallengeManagementStore(
         entity.Id = entityId;
         entity.CompetitionId = command.CompetitionId;
         entity.ChallengeId = command.ChallengeId;
+        entity.Direction = await ResolveDirectionAsync(command.CompetitionId, template.Direction, ct);
+        entity.DirectionId = entity.Direction.Id;
         entity.CustomTitle = command.CustomTitle;
         entity.Order = command.Order;
         entity.Rules = rules;
@@ -170,14 +172,16 @@ public sealed class ChallengeManagementStore(
                 item.Instance.ChallengeId,
                 item.Instance.CustomTitle ?? item.Template.Title,
                 item.Instance.CustomTitle,
-                item.Template.Direction,
+                item.Instance.Direction != null ? item.Instance.Direction.Name : item.Template.Direction,
                 item.Instance.Order,
                 item.Instance.IsPublished,
                 item.Instance.DeletedAt,
                 db.Set<CtfChallengeDefinition>().AsNoTracking()
                     .Where(definition => definition.ChallengeId == item.Template.Id)
                     .Select(definition => definition.InteractionKind)
-                    .FirstOrDefault()))
+                    .FirstOrDefault(),
+                item.Instance.DirectionId,
+                item.Instance.Direction != null ? item.Instance.Direction.Icon : null))
             .ToArrayAsync(ct);
     }
 
@@ -196,6 +200,14 @@ public sealed class ChallengeManagementStore(
                 item.CompetitionId == command.CompetitionId, ct);
         if (entity is null)
             return new(null, ChallengeMutationFailure.ChallengeNotFound);
+        if (command.DirectionId is Guid directionId)
+        {
+            var direction = await db.Set<NoCTF.Domain.Competitions.Directions.CompetitionDirection>()
+                .SingleOrDefaultAsync(item => item.CompetitionId == command.CompetitionId && item.Id == directionId, ct);
+            if (direction is null) return new(null, ChallengeMutationFailure.InvalidDirection);
+            entity.Direction = direction;
+            entity.DirectionId = direction.Id;
+        }
         var wasPublished = entity.IsPublished;
         var becamePublished = !wasPublished && command.IsPublished;
         if (becamePublished)
@@ -243,7 +255,7 @@ public sealed class ChallengeManagementStore(
                     command.CompetitionId,
                     entity.Id,
                     entity.CustomTitle ?? publishedTemplate.Title,
-                    publishedTemplate.Direction,
+                    entity.Direction?.Name ?? publishedTemplate.Direction,
                     command.UpdatedAt));
             }
             await transaction.CommitAsync(ct);
@@ -398,14 +410,16 @@ public sealed class ChallengeManagementStore(
                 item.Instance.CustomTitle ?? item.Template.Title,
                 item.Instance.CustomTitle,
                 item.Template.Description,
-                item.Template.Direction,
+                item.Instance.Direction != null ? item.Instance.Direction.Name : item.Template.Direction,
                 item.Instance.Order,
                 item.Instance.IsPublished,
                 item.Instance.DeletedAt,
                 item.Template.Mode,
                 item.Template.Definition,
                 item.Template.CreatedAt,
-                item.Instance.UpdatedAt))
+                item.Instance.UpdatedAt,
+                item.Instance.DirectionId,
+                item.Instance.Direction != null ? item.Instance.Direction.Icon : null))
             .AsSplitQuery();
     }
 
@@ -419,7 +433,7 @@ public sealed class ChallengeManagementStore(
             instance.CustomTitle ?? template.Title,
             instance.CustomTitle,
             template.Description,
-            template.Direction,
+            instance.Direction?.Name ?? template.Direction,
             instance.Order,
             instance.IsPublished,
             instance.DeletedAt,
@@ -427,6 +441,8 @@ public sealed class ChallengeManagementStore(
             template.CreatedAt,
             instance.UpdatedAt)
         {
+            DirectionId = instance.DirectionId,
+            DirectionIcon = instance.Direction?.Icon,
             UsesDynamicFlag = runtime is { FlagSource: not RuntimeFlagSource.Static },
             InteractionKind = GetInteractionKind(template.Definition)
         };
@@ -450,9 +466,24 @@ public sealed class ChallengeManagementStore(
             projection.CreatedAt,
             projection.UpdatedAt)
         {
+            DirectionId = projection.DirectionId,
+            DirectionIcon = projection.DirectionIcon,
             UsesDynamicFlag = runtime is { FlagSource: not RuntimeFlagSource.Static },
             InteractionKind = GetInteractionKind(projection.Definition)
         };
+    }
+
+    private async Task<NoCTF.Domain.Competitions.Directions.CompetitionDirection> ResolveDirectionAsync(Guid competitionId, string name, CancellationToken ct)
+    {
+        var canonical = NoCTF.Domain.Competitions.Directions.CompetitionDirectionDefaults.CanonicalName(name);
+        var direction = await db.Set<NoCTF.Domain.Competitions.Directions.CompetitionDirection>()
+            .Where(item => item.CompetitionId == competitionId && (item.TemplateDirection ?? item.NormalizedName) == canonical)
+            .OrderByDescending(item => item.TemplateDirection == canonical).ThenBy(item => item.Position).FirstOrDefaultAsync(ct);
+        if (direction is not null) return direction;
+        // Importing a template must not recreate directions the competition removed.
+        return await db.Set<NoCTF.Domain.Competitions.Directions.CompetitionDirection>()
+            .Where(item => item.CompetitionId == competitionId)
+            .OrderByDescending(item => item.NormalizedName == "MISC").ThenBy(item => item.Position).FirstAsync(ct);
     }
 
     private static CtfInteractionKind GetInteractionKind(ChallengeDefinition? definition) =>
@@ -478,7 +509,9 @@ public sealed class ChallengeManagementStore(
         GameMode Mode,
         ChallengeDefinition? Definition,
         DateTimeOffset CreatedAt,
-        DateTimeOffset UpdatedAt);
+        DateTimeOffset UpdatedAt,
+        Guid? DirectionId,
+        string? DirectionIcon);
 
     private async Task<ChallengeMutationFailure?> FindCompetitionChallengeConflictAsync(
         Guid id,

@@ -91,6 +91,7 @@ export function useAdminCompetitionsByIdPage() {
         { to: base, label: translate("ui.overview"), icon: LayoutDashboard, exact: true },
         { to: `${base}/configuration`, label: translate("ui.configuration"), icon: Settings },
         { to: `${base}/tracks`, label: translate("ui.tracks"), icon: GitBranch },
+        { to: `${base}/directions`, label: translate('directionSettings.title'), icon: Puzzle },
         { to: `${base}/challenges`, label: translate("ui.challenge"), icon: Puzzle },
         { to: `${base}/teams`, label: translate("ui.teamManagement"), icon: Users },
       ],

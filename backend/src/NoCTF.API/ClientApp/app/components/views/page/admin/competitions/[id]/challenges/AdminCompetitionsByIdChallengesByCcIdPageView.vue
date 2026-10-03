@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdChallengesByCcIdPageViewState } from '~/features/routes/admin/competitions/[id]/challenges/useAdminCompetitionsByIdChallengesByCcIdPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdChallengesByCcIdPageViewState }>()
-const { adminTeamPath, adminTemplatePath, Plus, competitionId, competition, canWrite, canJudge, challenge, loading, loadError, activeSection, sectionOptions, editCustomTitle, editOrder, editPublished, savingEdit, saveEdit, config, configLoading, savingConfig, inheritedConfiguration, saveConfig, hints, hintsLoading, hintsLoadError, includeDeletedHints, hintDialogOpen, editingHint, hintForm, hintError, savingHint, pendingHintId, openHintDialog, saveHint, deleteHint, restoreHint, scoringLoading, scoringError, scoringSearch, loadChallengeTeamScoring, scoringPage, scoringPageCount, scoringTotal, scoringPageLimit, scoringPageLoading, loadScoringPage, setScoringPageSize, scoringDisplayNames, scoringRows, adjustmentTarget, adjustmentDelta, adjustmentPending, adjustmentError, adjustmentValid, openAdjustment, closeAdjustment, submitAdjustment, ChallengeRulesEditor, hiddenRuleKeys, onClickAdjustmentTarget, onClickHintDialogOpen } = toRefs(viewProps.state)
+const { adminTeamPath, adminTemplatePath, Plus, competitionId, competition, canWrite, canJudge, challenge, loading, loadError, activeSection, sectionOptions, directions, directionLoading, directionError, editDirectionId, loadDirections, editCustomTitle, editOrder, editPublished, savingEdit, saveEdit, config, configLoading, savingConfig, inheritedConfiguration, saveConfig, hints, hintsLoading, hintsLoadError, includeDeletedHints, hintDialogOpen, editingHint, hintForm, hintError, savingHint, pendingHintId, openHintDialog, saveHint, deleteHint, restoreHint, scoringLoading, scoringError, scoringSearch, loadChallengeTeamScoring, scoringPage, scoringPageCount, scoringTotal, scoringPageLimit, scoringPageLoading, loadScoringPage, setScoringPageSize, scoringDisplayNames, scoringRows, adjustmentTarget, adjustmentDelta, adjustmentPending, adjustmentError, adjustmentValid, openAdjustment, closeAdjustment, submitAdjustment, ChallengeRulesEditor, hiddenRuleKeys, onClickAdjustmentTarget, onClickHintDialogOpen } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -23,7 +23,7 @@ const { adminTeamPath, adminTemplatePath, Plus, competitionId, competition, canW
         <Badge :variant="challenge.isPublished ? 'default' : 'outline'">
           {{ challenge.isPublished ? $t('ui.published') : $t('ui.unpublished') }}
         </Badge>
-        <Badge variant="secondary">{{ directionLabel(challenge.direction) }}</Badge>
+        <Badge variant="secondary"><span class="inline-flex items-center gap-1.5"><LucideIcon v-if="challenge.directionIcon" :name="challenge.directionIcon" class="size-3.5" />{{ challenge.direction }}</span></Badge>
         <NuxtLink v-if="challenge.challengeId" :to="adminTemplatePath(challenge.challengeId)" class="text-sm hover:underline">{{ $t('ui.challengeTemplate') }}</NuxtLink>
       </div>
 
@@ -59,6 +59,14 @@ const { adminTeamPath, adminTemplatePath, Plus, competitionId, competition, canW
                     <FieldDescription>{{ $t('ui.changesTheDisplayNameForThisCompetitionOnlyAndDoes') }}</FieldDescription>
                   </Field>
                   <Field>
+                    <FieldLabel for="cc-direction">{{ $t('directionSettings.title') }}</FieldLabel>
+                    <Select v-model="editDirectionId" :disabled="!canWrite || directionLoading || savingEdit || !!directionError">
+                      <SelectTrigger id="cc-direction"><SelectValue :placeholder="$t('directionSettings.choose')" /></SelectTrigger>
+                      <SelectContent><SelectGroup><SelectItem v-for="direction in directions" :key="direction.id" :value="direction.id || ''"><span class="inline-flex items-center gap-2"><LucideIcon :name="direction.icon || 'flag'" class="size-4" />{{ direction.name }}</span></SelectItem></SelectGroup></SelectContent>
+                    </Select>
+                    <Alert v-if="directionError" variant="destructive"><AlertDescription>{{ $message(directionError) }}<Button type="button" variant="ghost" size="sm" @click="loadDirections">{{ $t('ui.refresh') }}</Button></AlertDescription></Alert>
+                  </Field>
+                  <Field>
                     <FieldLabel for="cc-order">{{ $t('ui.order') }}</FieldLabel>
                     <NumberInput id="cc-order" v-model.number="editOrder"  min="0" :readonly="!canWrite" />
                   </Field>
@@ -67,7 +75,7 @@ const { adminTeamPath, adminTemplatePath, Plus, competitionId, competition, canW
                     <FieldLabel for="cc-published" class="font-normal">{{ $t('ui.publishTheQuestionVisibleToPlayers') }}</FieldLabel>
                   </Field>
                   <Field v-if="canWrite">
-                    <Button type="submit" :disabled="savingEdit">
+                    <Button type="submit" :disabled="savingEdit || directionLoading || !!directionError">
                       <Spinner v-if="savingEdit" data-icon="inline-start" /> {{ $t('ui.saveSettings') }} </Button>
                   </Field>
                 </FieldGroup>

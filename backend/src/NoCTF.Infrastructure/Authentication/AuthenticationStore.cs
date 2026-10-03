@@ -190,7 +190,8 @@ public sealed class AuthenticationStore(
                 (fact, competitionChallenge) => new
                 {
                     fact.CompetitionChallengeId,
-                    competitionChallenge.ChallengeId
+                    competitionChallenge.ChallengeId,
+                    DirectionName = competitionChallenge.Direction != null ? competitionChallenge.Direction.Name : null
                 })
             .Join(
                 db.Challenges.AsNoTracking().Where(challenge => challenge.DeletedAt == null),
@@ -199,7 +200,7 @@ public sealed class AuthenticationStore(
                 (item, challenge) => new
                 {
                     item.CompetitionChallengeId,
-                    challenge.Direction
+                    Direction = item.DirectionName ?? challenge.Direction
                 })
             .GroupBy(item => item.Direction)
             .Select(group => new
@@ -221,12 +222,12 @@ public sealed class AuthenticationStore(
                     || competition.Status == CompetitionStatus.Finished),
                 item => item.CompetitionId,
                 competition => competition.Id,
-                (item, _) => item.ChallengeId)
+                (item, _) => new { item.ChallengeId, DirectionName = item.Direction != null ? item.Direction.Name : null })
             .Join(db.Challenges.AsNoTracking()
                     .Where(challenge => challenge.DeletedAt == null),
-                challengeId => challengeId,
+                item => item.ChallengeId,
                 challenge => challenge.Id,
-                (_, challenge) => challenge.Direction)
+                (item, challenge) => item.DirectionName ?? challenge.Direction)
             .Distinct()
             .ToArrayAsync(ct);
         var completedByDirection = directionRows.ToDictionary(

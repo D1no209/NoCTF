@@ -26,7 +26,7 @@ import {
 } from '../../../../../lib/progression-graph'
 import type { ProgressionSelectionChange } from '../../../../../lib/progression-graph'
 import { buildProgressionLayout as calculateProgressionLayout } from '../../../../../lib/progression-layout'
-import { directionKey, directionLabel } from '../../../../../utils/directions'
+import { directionKey } from '../../../../../utils/directions'
 import ProgressionCanvasComponent from '~/components/ui/progression/ProgressionCanvas.vue'
 import { markRaw } from 'vue'
 
@@ -100,7 +100,7 @@ export function useAdminCompetitionsByIdProgressionPage() {
   const challengeDirections = computed(() => [...new Set(challenges.value
     .map(challenge => directionKey(challenge.direction))
     .filter(Boolean))]
-    .map(value => ({ value, label: directionLabel(value) }))
+    .map(value => ({ value, label: value }))
     .sort((left, right) => left.label.localeCompare(right.label)))
   const filteredChallenges = computed(() => {
     const keyword = challengeSearch.value.trim().toLocaleLowerCase()

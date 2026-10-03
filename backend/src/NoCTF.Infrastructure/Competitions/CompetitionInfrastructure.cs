@@ -41,6 +41,8 @@ internal static class CompetitionInfrastructure
         IConfiguration configuration,
         bool development)
     {
+        services.AddScoped<NoCTF.Application.Competitions.Directions.ICompetitionDirectionStore, Directions.CompetitionDirectionStore>();
+        services.AddScoped<NoCTF.Application.Competitions.Directions.ManageCompetitionDirections>();
         services.AddScoped<ICompetitionLifecycleStore, CompetitionLifecycleStore>();
         services.AddScoped<ICompetitionProgressionStore, CompetitionProgressionStore>();
         services.AddSingleton<ProgressionGraphReadCache>();

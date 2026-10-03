@@ -113,7 +113,7 @@ describe('case-insensitive challenge directions', () => {
 
   test('normalizes navigator groups before collapse/filter operations and normalizes editor values', async () => {
     const navigator = await sourceFile(new URL('../app/features/competition/CompetitionChallengeNavigator.vue', import.meta.url)).text()
-    expect(navigator).toContain("const direction = directionLabel(item.direction) || translate(\"ui.uncategorized\")")
+    expect(navigator).toContain("item.directionId ? item.direction : directionLabel(item.direction)")
     expect(navigator).toContain('grouped.get(direction)')
     expect(navigator).toContain('@update:model-value="selectChallenge"')
     const editor = await sourceFile(new URL('../app/pages/admin/challenges/[id].vue', import.meta.url)).text()

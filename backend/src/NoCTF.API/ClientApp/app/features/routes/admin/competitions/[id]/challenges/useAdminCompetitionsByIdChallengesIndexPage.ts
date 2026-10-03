@@ -30,7 +30,7 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
   const directionOptions = computed(() => [...new Set(items.value
     .map(item => item.direction)
     .filter((direction): direction is string => Boolean(direction)))]
-    .map(value => ({ value, label: directionLabel(value) }))
+    .map(value => ({ value, label: value }))
     .sort((left, right) => left.label.localeCompare(right.label)))
 
   const filteredItems = computed(() => {

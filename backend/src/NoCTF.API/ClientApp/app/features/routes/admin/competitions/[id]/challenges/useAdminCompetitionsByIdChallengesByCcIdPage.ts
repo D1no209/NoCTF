@@ -4,7 +4,7 @@ import { markRaw } from 'vue'
 
 import { Plus } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import { adminCreateManualAdjustment, adminCreateCompetitionChallengeHint, adminDeleteCompetitionChallengeHint, adminGetCompetition, adminGetCompetitionChallenge, adminListGameplayFacts, adminListCompetitionChallengeHints, adminListTeams, adminPatchCompetitionChallenge, adminRestoreCompetitionChallengeHint, adminUpdateCompetitionChallengeHint, getLeaderboardEndpoint, getScoreboardSchemaEndpoint } from '../../../../../../api'
+import { adminGetCompetitionDirections, adminCreateManualAdjustment, adminCreateCompetitionChallengeHint, adminDeleteCompetitionChallengeHint, adminGetCompetition, adminGetCompetitionChallenge, adminListGameplayFacts, adminListCompetitionChallengeHints, adminListTeams, adminPatchCompetitionChallenge, adminRestoreCompetitionChallengeHint, adminUpdateCompetitionChallengeHint, getLeaderboardEndpoint, getScoreboardSchemaEndpoint } from '../../../../../../api'
 import type { NoCtfapiEndpointsAdministrationChallengesChallengeHintResponse, NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract, NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract, NoCtfapiEndpointsChallengesChallengeResponse, NoCtfapiEndpointsCompetitionsGameModeProtocol, NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse, NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse, NoCtfapiEndpointsGameplayFactsGameplayFactListResponse, NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../../../../api'
 import { useOffsetPagination } from '../../../../../../composables/useOffsetPagination'
 import { useCompetitionAdmin } from '../../../../../../lib/admin-competition'
@@ -66,6 +66,18 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
     loading.value = false
   }
 
+  const directions = ref<import('~/api').NoCtfapiEndpointsAdministrationCompetitionsCompetitionDirectionResponse[]>([])
+  const directionLoading = ref(true)
+  const directionError = ref<string | null>(null)
+  const editDirectionId = ref('')
+  const directionRequest = new AbortController()
+  async function loadDirections() {
+    const { data, error } = await adminGetCompetitionDirections({ path: { competitionId }, signal: directionRequest.signal })
+    if (directionRequest.signal.aborted) return
+    directionLoading.value = false
+    directionError.value = error || !data ? parseApiError(error).message : null
+    directions.value = data?.items ?? []
+  }
   const editCustomTitle = ref('')
 
   const editOrder = ref(0)
@@ -76,6 +88,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
 
   watch(challenge, (c) => {
     if (!c) return
+    editDirectionId.value = c.directionId ?? ''
     editCustomTitle.value = c.customTitle ?? ''
     editOrder.value = c.order ?? 0
     editPublished.value = c.isPublished ?? false
@@ -91,6 +104,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
           customTitle: editCustomTitle.value.trim() || null,
           order: editOrder.value,
           isPublished: editPublished.value,
+          directionId: editDirectionId.value || undefined,
         } },
       })
       if (error) throw error
@@ -486,6 +500,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
   }
 
   onMounted(() => {
+    void loadDirections()
     void loadChallenge()
     void loadConfig()
     void loadHints()
@@ -493,6 +508,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
   })
 
   onBeforeUnmount(() => {
+    directionRequest.abort()
     if (scoringSearchTimer) clearTimeout(scoringSearchTimer)
     scoringPagination.reset()
   })
@@ -511,6 +527,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
       loadError,
       activeSection,
       sectionOptions,
+      directions, directionLoading, directionError, editDirectionId, loadDirections,
       editCustomTitle,
       editOrder,
       editPublished,

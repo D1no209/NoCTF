@@ -67,7 +67,7 @@ public sealed class ProgressionPlayerReader(
                 {
                     item.Id,
                     Title = item.CustomTitle ?? challenge.Title,
-                    challenge.Direction
+                    Direction = item.Direction != null ? item.Direction.Name : challenge.Direction
                 })
             .ToDictionaryAsync(item => item.Id, ct);
         var allBadgeIds = graph.Nodes

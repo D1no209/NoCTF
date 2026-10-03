@@ -51,6 +51,7 @@ export interface AwdpTeamChallengeState {
   competitionChallengeId: string
   title: string
   direction: string
+  directionIcon?: string | null
   attackScore: number
   defenseScore: number
   attackOutcome: AwdpControlOutcome | 'idle'
@@ -279,7 +280,8 @@ export function awdpTeamChallengeStates(
     return {
       competitionChallengeId: challengeId,
       title: challenge.title ?? '—',
-      direction: directionLabel(challenge.direction) || 'Misc',
+      direction: challenge.directionIcon ? challenge.direction || 'Misc' : directionLabel(challenge.direction) || 'Misc',
+      directionIcon: challenge.directionIcon,
       attackScore,
       defenseScore,
       attackOutcome,

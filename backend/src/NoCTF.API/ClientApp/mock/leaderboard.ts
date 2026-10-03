@@ -87,7 +87,7 @@ export function leaderboardRead(state: MockState, suffix: string, competitionId:
     columns: challenges.map((c, index) => ({ index, competitionChallengeId: c.id, roundId: null })),
   })
   if (suffix === '/challenges') return {
-    competitionId, revision: 'mock-1', items: challenges.map((c, index) => ({ id: c.id, title: c.title, direction: c.direction, category: c.direction, order: index, published: c.isPublished })),
+    competitionId, revision: 'mock-1', items: challenges.map((c, index) => ({ id: c.id, title: c.title, direction: c.direction, directionIcon: c.directionIcon, category: c.direction, order: index, published: c.isPublished })),
   }
   if (suffix === '/trends') return {
     competitionId, version: String(state.facts.length + 1), generatedAt: now(), dataAsOf: now(),

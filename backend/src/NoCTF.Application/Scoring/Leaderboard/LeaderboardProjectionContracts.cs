@@ -42,7 +42,8 @@ public sealed record LeaderboardChallengeFact(
     int Order = 0,
     bool IsPublished = true,
     ChallengeDefinition? Definition = null,
-    CtfInteractionKind InteractionKind = CtfInteractionKind.FlagSubmission);
+    CtfInteractionKind InteractionKind = CtfInteractionKind.FlagSubmission,
+    string? DirectionIcon = null);
 
 public sealed record LeaderboardGameplayFact(
     Guid GameplayFactId,

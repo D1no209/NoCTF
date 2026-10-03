@@ -85,3 +85,7 @@ test('account popover is a compact square launcher with a profile entry', async 
   expect(account).toContain(":aria-label=\"$t('profile.openProfile')\"")
   expect(account).not.toContain("{{ $t('profile.openProfile') }}")
 })
+
+test('profile direction labels preserve configured capitalization', () => {
+  expect(buildProfileDirectionRows([{ direction: 'Web / Research Lab', successfulChallengeCount: 2 }])[0]?.label).toBe('Web / Research Lab')
+})

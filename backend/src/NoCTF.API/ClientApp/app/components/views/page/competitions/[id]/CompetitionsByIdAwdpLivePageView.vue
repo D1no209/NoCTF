@@ -132,7 +132,7 @@ const { Activity, ChevronLeft, ChevronRight, Clock3, Expand, Minimize, Radio, Re
                   :class="isChallengeFocused(challenge.competitionChallengeId) && 'event-focus'"
                 >
                   <div class="challenge-identity">
-                    <span class="challenge-icon"><component :is="directionIcon(challenge.direction)" /></span>
+                    <span class="challenge-icon"><LucideIcon v-if="challenge.directionIcon" :name="challenge.directionIcon" /><component v-else :is="directionIcon(challenge.direction)" /></span>
                     <div><span>{{ challenge.direction }}</span><Hint :content="challenge.title" ><strong >{{ challenge.title }}</strong></Hint></div>
                   </div>
                   <dl>

@@ -252,7 +252,7 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
   const groups = computed(() => {
     const grouped = new Map<string, Challenge[]>()
     for (const item of items.value) {
-      const direction = directionLabel(item.direction) || translate("ui.uncategorized")
+      const direction = (item.directionId ? item.direction : directionLabel(item.direction)) || translate("ui.uncategorized")
       const challenges = grouped.get(direction) ?? []
       challenges.push(item)
       grouped.set(direction, challenges)
@@ -285,6 +285,7 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
   const groupOptions = computed(() => visibleGroups.value.map(group => ({
     value: group.direction,
     label: group.direction,
+    icon: group.challenges[0]?.directionIcon,
     items: group.challenges.filter(challenge => Boolean(challenge.id))
       .map(challenge => ({ value: challenge.id!, label: challenge.title ?? '', challenge })),
   })))
@@ -301,8 +302,10 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
     emit('select', challengeId)
   }
 
+  function groupIcon(name: string) { return items.value.find(item => (item.directionId ? item.direction : directionLabel(item.direction)) === name)?.directionIcon }
+
   return {
-      directionGlyph,
+      groupIcon, directionGlyph,
       ...toRefs(props),
       ShieldCheck,
       Swords,

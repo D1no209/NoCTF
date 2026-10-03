@@ -55,6 +55,7 @@ public abstract class Competition : IConcurrencyTracked
     }
     public bool TracksEnabled { get; set; }
     public List<CompetitionTrackDefinition> Tracks { get; set; } = [];
+    public List<Directions.CompetitionDirection> Directions { get; set; } = [];
     public DateTimeOffset? FrozenStartAt { get; set; }
     public DateTimeOffset? HiddenStartAt { get; set; }
     [MaxLength(32)]

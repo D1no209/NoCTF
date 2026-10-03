@@ -6,4 +6,7 @@
     <PackageReference Include="FluentStorage" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Competitions/Directions/lucide-icons.txt" />
+  </ItemGroup>
 </Project>

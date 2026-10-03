@@ -640,6 +640,10 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("deleted_at");
 
+                    b.Property<Guid?>("DirectionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("direction_id");
+
                     b.Property<bool>("IsPublished")
                         .HasColumnType("boolean")
                         .HasColumnName("is_published");
@@ -675,6 +679,9 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.HasIndex("CompetitionId", "ChallengeId")
                         .IsUnique()
                         .HasDatabaseName("ix_competition_challenges_competition_id_challenge_id");
+
+                    b.HasIndex("CompetitionId", "DirectionId")
+                        .HasDatabaseName("ix_competition_challenges_competition_id_direction_id");
 
                     b.HasIndex("CompetitionId", "Mode")
                         .HasDatabaseName("ix_competition_challenges_competition_id_mode");
@@ -1286,6 +1293,57 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.HasDiscriminator<string>("Mode");
 
                     b.UseTphMappingStrategy();
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Directions.CompetitionDirection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<string>("Icon")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("icon");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(96)
+                        .HasColumnType("character varying(96)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("NormalizedName")
+                        .IsRequired()
+                        .HasMaxLength(96)
+                        .HasColumnType("character varying(96)")
+                        .HasColumnName("normalized_name");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<string>("TemplateDirection")
+                        .HasMaxLength(96)
+                        .HasColumnType("character varying(96)")
+                        .HasColumnName("template_direction");
+
+                    b.HasKey("Id")
+                        .HasName("pk_competition_directions");
+
+                    b.HasAlternateKey("CompetitionId", "Id")
+                        .HasName("ak_competition_direction_competition_id_id");
+
+                    b.HasIndex("CompetitionId", "NormalizedName")
+                        .IsUnique()
+                        .HasDatabaseName("ix_competition_directions_competition_id_normalized_name");
+
+                    b.ToTable("competition_directions", (string)null);
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Competitions.Events.CompetitionEvent", b =>
@@ -5585,6 +5643,13 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_competition_challenges_challenges_challenge_id_mode");
 
+                    b.HasOne("NoCTF.Domain.Competitions.Directions.CompetitionDirection", "Direction")
+                        .WithMany()
+                        .HasForeignKey("CompetitionId", "DirectionId")
+                        .HasPrincipalKey("CompetitionId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_competition_challenges_competition_direction_competition_id");
+
                     b.HasOne("NoCTF.Domain.Competitions.Competition", null)
                         .WithMany()
                         .HasForeignKey("CompetitionId", "Mode")
@@ -5633,6 +5698,8 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                                 .HasForeignKey("competition_challenge_id")
                                 .HasConstraintName("fk_competition_challenge_hints_competition_challenges_competit");
                         });
+
+                    b.Navigation("Direction");
 
                     b.Navigation("Hints");
                 });
@@ -5862,6 +5929,16 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_competition_mode_configurations_competitions_competition_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Directions.CompetitionDirection", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Competitions.Competition", null)
+                        .WithMany("Directions")
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_competition_directions_competitions_competition_id");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Competitions.Events.CompetitionEvent", b =>
@@ -6762,6 +6839,8 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
             modelBuilder.Entity("NoCTF.Domain.Competitions.Competition", b =>
                 {
                     b.Navigation("Collaborators");
+
+                    b.Navigation("Directions");
 
                     b.Navigation("ModeConfiguration");
                 });

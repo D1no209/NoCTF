@@ -4,7 +4,7 @@ import { createMockRealtime } from './realtime'
 const api = createMockApi()
 const realtime = createMockRealtime(api)
 const server = Bun.serve({
-  hostname: '127.0.0.1', port: 5081, idleTimeout: 30,
+  hostname: '127.0.0.1', port: Number(process.env.NOCTF_MOCK_API_PORT ?? 5081), idleTimeout: 30,
   async fetch(request) {
     try {
       if (new URL(request.url).pathname.startsWith('/hubs/')) return await realtime(request)

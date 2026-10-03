@@ -12387,6 +12387,131 @@
         ]
       }
     },
+    "/api/v1/admin/competitions/{competitionId}/directions": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Lists competition challenge directions.",
+        "description": "Returns this competition’s ordered direction names and Lucide icon suffixes to authorized observers.",
+        "operationId": "AdminGetCompetitionDirections",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionDirectionsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Saves competition challenge directions.",
+        "description": "Replaces the ordered direction catalog; rejects unavailable Lucide icons and removal of directions still referenced by challenges.",
+        "operationId": "AdminSaveCompetitionDirections",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "SaveCompetitionDirectionsRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsSaveCompetitionDirectionsRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionDirectionsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionDirectionFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/competitions/{competitionId}/progression": {
       "get": {
         "tags": [
@@ -20729,6 +20854,10 @@
           },
           "published": {
             "type": "boolean"
+          },
+          "directionIcon": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -21705,6 +21834,15 @@
                 "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeStateProtocol"
               }
             ]
+          },
+          "directionId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "directionIcon": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -21888,6 +22026,15 @@
           "prerequisitesTotal": {
             "type": "integer",
             "format": "int32"
+          },
+          "directionId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "directionIcon": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -27306,6 +27453,38 @@
           }
         }
       },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionDirectionsResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionDirectionResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionDirectionResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "icon": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsGetCompetitionDirectionsRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
       "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionProgressionContract": {
         "type": "object",
         "additionalProperties": false,
@@ -28167,6 +28346,57 @@
       "NoCTFAPIEndpointsAdministrationCompetitionsRotateCompetitionWebhookSecretRequest": {
         "type": "object",
         "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionDirectionFailureResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "detail"
+        ],
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NoCTFApplicationCompetitionsDirectionsCompetitionDirectionFailure"
+          },
+          "detail": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "NoCTFApplicationCompetitionsDirectionsCompetitionDirectionFailure": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "CompetitionNotFound",
+          "InvalidCatalog",
+          "InvalidIcon",
+          "DirectionInUse",
+          "NameConflict"
+        ],
+        "enum": [
+          "CompetitionNotFound",
+          "InvalidCatalog",
+          "InvalidIcon",
+          "DirectionInUse",
+          "NameConflict"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsSaveCompetitionDirectionsRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "nullable": false,
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionDirectionResponse"
+            }
+          }
+        }
       },
       "NoCTFAPIEndpointsAdministrationCompetitionsProgressionSaveProblem": {
         "type": "object",
@@ -29134,6 +29364,11 @@
           },
           "isPublished": {
             "type": "boolean"
+          },
+          "directionId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
           }
         }
       },
