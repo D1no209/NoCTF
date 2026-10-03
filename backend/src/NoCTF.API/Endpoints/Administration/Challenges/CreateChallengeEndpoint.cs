@@ -15,6 +15,7 @@ public sealed class CreateChallengeRequest
     public Guid ChallengeId { get; set; }
     public string? CustomTitle { get; set; }
     public int Order { get; set; }
+    public IReadOnlyList<string>? Tags { get; set; }
 }
 
 public sealed class CreateChallengeValidator : Validator<CreateChallengeRequest>
@@ -27,6 +28,8 @@ public sealed class CreateChallengeValidator : Validator<CreateChallengeRequest>
         RuleFor(request => request.ChallengeId).NotEmpty();
         RuleFor(request => request.CustomTitle).MaximumLength(160);
         RuleFor(request => request.Order).GreaterThanOrEqualTo(0);
+        RuleFor(request => request.Tags).Must(tags => NoCTF.Domain.Challenges.CompetitionChallengeTags.TryNormalize(tags, out _))
+            .WithMessage("Use at most 20 nonblank tags, each up to 40 characters.");
     }
 }
 
@@ -75,7 +78,7 @@ public sealed class CreateChallengeEndpoint(
             request.ChallengeId,
             request.Order,
             timeProvider.GetUtcNow(),
-            request.CustomTitle), ct);
+            request.CustomTitle, request.Tags), ct);
         if (result.Challenge is not null)
         {
             var response = ChallengeMapper.ToResponse(result.Challenge);
@@ -97,6 +100,7 @@ public sealed class CreateChallengeEndpoint(
                     CompetitionChallengeConflictMapper.ToResponse(result.Failure.Value)),
             ChallengeMutationFailure.InvalidChallengeId
                 or ChallengeMutationFailure.InvalidTitle
+                or ChallengeMutationFailure.InvalidTags
                 or ChallengeMutationFailure.InvalidOrder
                 or ChallengeMutationFailure.TemplateModeMismatch =>
                 TypedResults.Problem(

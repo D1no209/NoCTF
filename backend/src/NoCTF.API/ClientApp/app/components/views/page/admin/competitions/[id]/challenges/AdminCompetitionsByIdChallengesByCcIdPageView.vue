@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdChallengesByCcIdPageViewState } from '~/features/routes/admin/competitions/[id]/challenges/useAdminCompetitionsByIdChallengesByCcIdPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdChallengesByCcIdPageViewState }>()
-const { adminTeamPath, adminTemplatePath, Plus, competitionId, competition, canWrite, canJudge, challenge, loading, loadError, activeSection, sectionOptions, directions, directionLoading, directionError, editDirectionId, loadDirections, editCustomTitle, editOrder, editPublished, savingEdit, saveEdit, config, configLoading, savingConfig, inheritedConfiguration, saveConfig, hints, hintsLoading, hintsLoadError, includeDeletedHints, hintDialogOpen, editingHint, hintForm, hintError, savingHint, pendingHintId, openHintDialog, saveHint, deleteHint, restoreHint, scoringLoading, scoringError, scoringSearch, loadChallengeTeamScoring, scoringPage, scoringPageCount, scoringTotal, scoringPageLimit, scoringPageLoading, loadScoringPage, setScoringPageSize, scoringDisplayNames, scoringRows, adjustmentTarget, adjustmentDelta, adjustmentPending, adjustmentError, adjustmentValid, openAdjustment, closeAdjustment, submitAdjustment, ChallengeRulesEditor, hiddenRuleKeys, onClickAdjustmentTarget, onClickHintDialogOpen } = toRefs(viewProps.state)
+const { adminTeamPath, adminTemplatePath, Plus, competitionId, competition, canWrite, canJudge, challenge, loading, loadError, activeSection, sectionOptions, directions, directionLoading, directionError, editDirectionId, loadDirections, editCustomTitle, editTags, tagOptions, updateEditTags, editOrder, editPublished, savingEdit, saveEdit, config, configLoading, savingConfig, inheritedConfiguration, saveConfig, hints, hintsLoading, hintsLoadError, includeDeletedHints, hintDialogOpen, editingHint, hintForm, hintError, savingHint, pendingHintId, openHintDialog, saveHint, deleteHint, restoreHint, scoringLoading, scoringError, scoringSearch, loadChallengeTeamScoring, scoringPage, scoringPageCount, scoringTotal, scoringPageLimit, scoringPageLoading, loadScoringPage, setScoringPageSize, scoringDisplayNames, scoringRows, adjustmentTarget, adjustmentDelta, adjustmentPending, adjustmentError, adjustmentValid, openAdjustment, closeAdjustment, submitAdjustment, ChallengeRulesEditor, hiddenRuleKeys, onClickAdjustmentTarget, onClickHintDialogOpen } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -65,6 +65,10 @@ const { adminTeamPath, adminTemplatePath, Plus, competitionId, competition, canW
                       <SelectContent><SelectGroup><SelectItem v-for="direction in directions" :key="direction.id" :value="direction.id || ''"><span class="inline-flex items-center gap-2"><LucideIcon :name="direction.icon || 'flag'" class="size-4" />{{ direction.name }}</span></SelectItem></SelectGroup></SelectContent>
                     </Select>
                     <Alert v-if="directionError" variant="destructive"><AlertDescription>{{ $message(directionError) }}<Button type="button" variant="ghost" size="sm" @click="loadDirections">{{ $t('ui.refresh') }}</Button></AlertDescription></Alert>
+                  </Field>
+                  <Field>
+                    <FieldLabel>{{ $t('challengeTags.label') }}</FieldLabel>
+                    <TagPicker :model-value="editTags" :options="tagOptions" :label="$t('challengeTags.edit')" allow-create :disabled="!canWrite || savingEdit" @update:model-value="updateEditTags" />
                   </Field>
                   <Field>
                     <FieldLabel for="cc-order">{{ $t('ui.order') }}</FieldLabel>

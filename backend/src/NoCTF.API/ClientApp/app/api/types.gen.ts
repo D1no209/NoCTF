@@ -1418,6 +1418,7 @@ export type NoCtfapiEndpointsChallengesChallengeResponse = {
     patchVerificationRuntimeState?: NoCtfapiEndpointsRuntimeRuntimeStateProtocol | null;
     directionId?: string | null;
     directionIcon?: string | null;
+    tags?: Array<string>;
 };
 
 export type NoCtfapiEndpointsChallengesParticipantChallengeHintResponse = {
@@ -1476,6 +1477,7 @@ export type NoCtfapiEndpointsChallengesChallengeSummaryResponse = {
     prerequisitesTotal?: number;
     directionId?: string | null;
     directionIcon?: string | null;
+    tags?: Array<string>;
 };
 
 export type NoCtfapiEndpointsChallengesListChallengesRequest = {
@@ -3321,6 +3323,7 @@ export type NoCtfapiEndpointsAdministrationChallengesCreateChallengeRequest = {
     challengeId: string;
     customTitle?: string | null;
     order?: number;
+    tags?: Array<string> | null;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengesChallengeHintResponse = {
@@ -3441,6 +3444,7 @@ export type NoCtfapiEndpointsAdministrationChallengesCompetitionChallengePresent
     order: number;
     isPublished: boolean;
     directionId?: string | null;
+    tags?: Array<string> | null;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesPatchRequest = {

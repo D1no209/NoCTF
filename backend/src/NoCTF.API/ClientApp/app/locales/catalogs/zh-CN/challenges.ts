@@ -1,5 +1,15 @@
 /** Runtime locale chunk. Keep keys stable across languages. */
 export const messages = {
+  "challengeTags.label": "标签",
+  "challengeTags.filter": "按标签筛选",
+  "challengeTags.edit": "选择或添加标签",
+  "challengeTags.search": "搜索标签",
+  "challengeTags.add": "添加“{name}”",
+  "challengeTags.remove": "移除标签“{name}”",
+  "challengeTags.clear": "清空标签",
+  "challengeTags.noOptions": "没有匹配的标签",
+  "challengeTags.invalid": "每题最多 20 个标签，每个最多 40 个字符，标签不能为空。",
+
   "challengeNavigator.noMatches": "没有匹配的题目",
   "challengeNavigator.hideLocked": "隐藏未解锁",
   "challengeNavigator.noUnlockedChallenges": "没有已解锁的题目",

@@ -50,5 +50,13 @@ internal sealed class CompetitionChallengeConfiguration : IEntityTypeConfigurati
             hints.HasKey(hint => hint.Id);
             hints.Property(hint => hint.Content).IsRequired();
         });
+        builder.OwnsMany(item => item.Tags, tags =>
+        {
+            tags.ToTable("competition_challenge_tags");
+            tags.WithOwner().HasForeignKey("competition_challenge_id");
+            tags.HasKey(tag => tag.Id);
+            tags.Property(tag => tag.Id).ValueGeneratedNever();
+            tags.HasIndex("competition_challenge_id", nameof(CompetitionChallengeTag.NormalizedName)).IsUnique();
+        });
     }
 }

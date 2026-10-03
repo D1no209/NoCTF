@@ -1,3 +1,4 @@
+import { challengeTagOptions, uniqueTags, validChallengeTags } from '~/lib/challenge-tags'
 import { proxyRefs } from 'vue'
 
 import { Plus } from '@lucide/vue'
@@ -145,6 +146,13 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
     if (hidden && addedTemplateIds.value.has(selectedTemplateId.value)) selectedTemplateId.value = ''
   })
 
+  const newTags = ref<string[]>([])
+  const tagOptions = computed(() => challengeTagOptions(items.value.filter(item => !item.deletedAt)))
+  function updateNewTags(tags: string[]) {
+    if (!validChallengeTags(tags)) { toast.error(translate('challengeTags.invalid')); return }
+    newTags.value = uniqueTags(tags)
+  }
+
   async function openAdd() {
     addOpen.value = true
     addError.value = null
@@ -152,6 +160,7 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
     templateSearch.value = ''
     hideAddedTemplates.value = false
     newCustomTitle.value = ''
+    newTags.value = []
     newOrder.value = (items.value.filter(i => !i.deletedAt).map(i => i.order ?? 0).reduce((m, o) => Math.max(m, o), 0) || 0) + 1
     templatesLoading.value = true
     const { data, error: e } = await adminChallengeBankListTemplates({ query: { includeDeleted: false, direction: null, keyword: null, offset: 0, limit: 200, desc: false } })
@@ -174,6 +183,7 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
           challengeId: selectedTemplateId.value,
           customTitle: newCustomTitle.value.trim() || null,
           order: newOrder.value,
+          tags: newTags.value,
         },
       })
       if (error) {
@@ -321,6 +331,7 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
       templateSearch,
       hideAddedTemplates,
       newCustomTitle,
+      newTags, tagOptions, updateNewTags,
       newOrder,
       adding,
       addError,

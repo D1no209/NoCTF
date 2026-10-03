@@ -40,6 +40,23 @@ function validate(schema: Data | undefined, value: any, path = '$') {
 }
 
 describe('isolated Mock API', () => {
+  test('competition tags round-trip in list and detail and survive unrelated patches', async () => {
+    const { send } = await setup()
+    const root = `/api/v1/admin/competitions/${id(2)}/challenges`
+    const current = (await (await send(root)).json()).items[0]
+    const path = `${root}/${current.id}`
+    const presentation = { customTitle: null, order: current.order, isPublished: true }
+    expect((await send(path, 'PATCH', { presentation: { ...presentation, tags: [' Web ', 'web', 'SQL'] } })).status).toBe(200)
+    expect((await (await send(path)).json()).challenge.tags).toEqual(['Web', 'SQL'])
+    await send(path, 'PATCH', { presentation: { ...presentation, tags: null } })
+    await send(path, 'PATCH', { presentation })
+    await send(path, 'PATCH', { rules: { configuration: { mode: 'Ctf', ctf: { scoreSettlementMode: null } } } })
+    expect((await (await send(root)).json()).items[0].tags).toEqual(['Web', 'SQL'])
+    expect((await (await send(`/api/v1/competitions/${id(2)}/challenges/${current.id}`)).json()).tags).toEqual(['Web', 'SQL'])
+    expect((await send(path, 'PATCH', { presentation: { ...presentation, tags: [' '] } })).status).toBe(400)
+    await send(path, 'PATCH', { presentation: { ...presentation, tags: [] } })
+    expect((await (await send(path)).json()).challenge.tags).toEqual([])
+  })
   test('CTF scoring configuration and independent overrides persist across management reads', async () => {
     const { send } = await setup()
     const route = `/api/v1/admin/competitions/${id(2)}`

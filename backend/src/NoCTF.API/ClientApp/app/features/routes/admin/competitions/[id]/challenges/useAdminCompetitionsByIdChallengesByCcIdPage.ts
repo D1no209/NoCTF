@@ -1,10 +1,11 @@
+import { challengeTagOptions, uniqueTags, validChallengeTags } from '~/lib/challenge-tags'
 import { adminTeamPath, adminTemplatePath } from '~/features/admin/admin-navigation'
 import { proxyRefs } from 'vue'
 import { markRaw } from 'vue'
 
 import { Plus } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import { adminGetCompetitionDirections, adminCreateManualAdjustment, adminCreateCompetitionChallengeHint, adminDeleteCompetitionChallengeHint, adminGetCompetition, adminGetCompetitionChallenge, adminListGameplayFacts, adminListCompetitionChallengeHints, adminListTeams, adminPatchCompetitionChallenge, adminRestoreCompetitionChallengeHint, adminUpdateCompetitionChallengeHint, getLeaderboardEndpoint, getScoreboardSchemaEndpoint } from '../../../../../../api'
+import { adminListCompetitionChallenges, adminGetCompetitionDirections, adminCreateManualAdjustment, adminCreateCompetitionChallengeHint, adminDeleteCompetitionChallengeHint, adminGetCompetition, adminGetCompetitionChallenge, adminListGameplayFacts, adminListCompetitionChallengeHints, adminListTeams, adminPatchCompetitionChallenge, adminRestoreCompetitionChallengeHint, adminUpdateCompetitionChallengeHint, getLeaderboardEndpoint, getScoreboardSchemaEndpoint } from '../../../../../../api'
 import type { NoCtfapiEndpointsAdministrationChallengesChallengeHintResponse, NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract, NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract, NoCtfapiEndpointsChallengesChallengeResponse, NoCtfapiEndpointsCompetitionsGameModeProtocol, NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse, NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse, NoCtfapiEndpointsGameplayFactsGameplayFactListResponse, NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../../../../api'
 import { useOffsetPagination } from '../../../../../../composables/useOffsetPagination'
 import { useCompetitionAdmin } from '../../../../../../lib/admin-competition'
@@ -79,6 +80,21 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
     directions.value = data?.items ?? []
   }
   const editCustomTitle = ref('')
+  const editTags = ref<string[]>([])
+  const tagSuggestions = ref<string[]>([])
+  const tagOptions = computed(() => uniqueTags([...tagSuggestions.value, ...(challenge.value?.tags ?? [])]))
+  function updateEditTags(tags: string[]) {
+    if (!validChallengeTags(tags)) { toast.error(translate('challengeTags.invalid')); return }
+    editTags.value = uniqueTags(tags)
+  }
+  async function loadTagSuggestions() {
+    const { data, error } = await adminListCompetitionChallenges({
+      path: { competitionId }, query: { includeDeleted: false }, signal: directionRequest.signal,
+    })
+    if (directionRequest.signal.aborted) return
+    if (error) toast.error(parseApiError(error).message)
+    else tagSuggestions.value = challengeTagOptions(data?.items ?? [])
+  }
 
   const editOrder = ref(0)
 
@@ -90,6 +106,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
     if (!c) return
     editDirectionId.value = c.directionId ?? ''
     editCustomTitle.value = c.customTitle ?? ''
+    editTags.value = [...(c.tags ?? [])]
     editOrder.value = c.order ?? 0
     editPublished.value = c.isPublished ?? false
   }, { immediate: true })
@@ -105,10 +122,12 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
           order: editOrder.value,
           isPublished: editPublished.value,
           directionId: editDirectionId.value || undefined,
+          tags: editTags.value,
         } },
       })
       if (error) throw error
       challenge.value = data?.challenge ?? challenge.value
+      void loadTagSuggestions()
       toast.success(translate("ui.questionSettingsSaved"))
     }
     catch (e) {
@@ -501,6 +520,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
 
   onMounted(() => {
     void loadDirections()
+    void loadTagSuggestions()
     void loadChallenge()
     void loadConfig()
     void loadHints()
@@ -529,6 +549,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
       sectionOptions,
       directions, directionLoading, directionError, editDirectionId, loadDirections,
       editCustomTitle,
+      editTags, tagOptions, updateEditTags,
       editOrder,
       editPublished,
       savingEdit,

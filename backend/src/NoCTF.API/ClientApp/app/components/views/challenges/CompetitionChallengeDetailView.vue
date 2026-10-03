@@ -43,6 +43,9 @@ const { Dice5, FileDown, History, ctx, isLoggedIn, user, challenge, loading, err
         </Dialog>
         <span class="sr-only">{{ challenge.direction || '' }}</span>
         <Badge v-if="mode === 'Awdp'" variant="secondary">{{ $t('ui.scoresSettleByRound') }}</Badge>
+        <div v-if="challenge.tags?.length" class="relative z-10 flex basis-full flex-wrap gap-1.5" :aria-label="$t('challengeTags.label')">
+          <Badge v-for="tag in challenge.tags" :key="tag" variant="secondary" class="max-w-full break-words whitespace-normal">{{ tag }}</Badge>
+        </div>
       </header>
 
       <section v-if="challenge.description" class="border-b py-5" :aria-label="challenge.title">

@@ -11,7 +11,8 @@ public sealed record CreateCompetitionChallengeCommand(
     Guid ChallengeId,
     int Order,
     DateTimeOffset CreatedAt,
-    string? CustomTitle = null);
+    string? CustomTitle = null,
+    IReadOnlyList<string>? Tags = null);
 
 public sealed record UpdateCompetitionChallengeCommand(
     Guid CompetitionId,
@@ -20,7 +21,8 @@ public sealed record UpdateCompetitionChallengeCommand(
     bool IsPublished,
     DateTimeOffset UpdatedAt,
     string? CustomTitle = null,
-    Guid? DirectionId = null);
+    Guid? DirectionId = null,
+    IReadOnlyList<string>? Tags = null);
 
 public sealed record ChallengeView(
     Guid Id,
@@ -38,6 +40,7 @@ public sealed record ChallengeView(
     DateTimeOffset UpdatedAt)
 {
     public Guid? DirectionId { get; init; }
+    public IReadOnlyList<string> Tags { get; init; } = [];
     public string? DirectionIcon { get; init; }
     public bool UsesDynamicFlag { get; init; }
     public CtfInteractionKind InteractionKind { get; init; }
@@ -55,7 +58,10 @@ public sealed record CompetitionChallengeSummaryView(
     DateTimeOffset? DeletedAt,
     CtfInteractionKind InteractionKind,
     Guid? DirectionId = null,
-    string? DirectionIcon = null);
+    string? DirectionIcon = null)
+{
+    public IReadOnlyList<string> Tags { get; init; } = [];
+}
 
 public enum ChallengeMutationFailure
 {
@@ -63,6 +69,7 @@ public enum ChallengeMutationFailure
     InvalidTitle,
     InvalidOrder,
     InvalidDirection,
+    InvalidTags,
     CompetitionNotFound,
     TemplateNotFound,
     TemplateModeMismatch,
@@ -149,13 +156,15 @@ public sealed class CreateChallenge(
             return new(null, ChallengeMutationFailure.InvalidTitle);
         if (command.Order < 0)
             return new(null, ChallengeMutationFailure.InvalidOrder);
+        if (!CompetitionChallengeTags.TryNormalize(command.Tags, out var tags))
+            return new(null, ChallengeMutationFailure.InvalidTags);
 
         var competition = await store.GetCompetitionAsync(command.CompetitionId, ct);
         if (competition is null)
             return new(null, ChallengeMutationFailure.CompetitionNotFound);
 
         return await store.CreateAsync(
-            command with { CustomTitle = customTitle },
+            command with { CustomTitle = customTitle, Tags = tags },
             configurationCatalog.CreateDefaultRules(
                 competition.Mode,
                 command.CompetitionChallengeId ?? Guid.Empty),
@@ -200,7 +209,13 @@ public sealed class UpdateChallenge(IChallengeManagementStore store)
             return new(null, ChallengeMutationFailure.InvalidTitle);
         if (command.Order < 0)
             return new(null, ChallengeMutationFailure.InvalidOrder);
-        var result = await store.UpdateAsync(command with { CustomTitle = customTitle }, ct);
+        if (!CompetitionChallengeTags.TryNormalize(command.Tags, out var tags))
+            return new(null, ChallengeMutationFailure.InvalidTags);
+        var result = await store.UpdateAsync(command with
+        {
+            CustomTitle = customTitle,
+            Tags = command.Tags is null ? null : tags
+        }, ct);
         if (result.Challenge is null)
             return result;
 

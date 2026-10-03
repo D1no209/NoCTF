@@ -58,6 +58,9 @@ public sealed class ChallengeAudienceEndpointTests
         await Assert.That(detail.StatusCode).IsEqualTo(HttpStatusCode.OK);
         var response = await detail.Content.ReadFromJsonAsync<ChallengeResponse>();
         await Assert.That(response?.UsesDynamicFlag).IsTrue();
+        await Assert.That(response!.Tags.SequenceEqual(["Web", "SQL"])).IsTrue();
+        var listed = await list.Content.ReadFromJsonAsync<ChallengeListResponse>();
+        await Assert.That(listed!.Items.Single().Tags.SequenceEqual(response.Tags)).IsTrue();
         await Assert.That(response?.Hints?.Count).IsEqualTo(2);
         await Assert.That(response!.Hints!.Single(hint => hint.Cost == 0).Content).IsEqualTo("Public hint");
         await Assert.That(response.Hints!.Single(hint => hint.Cost == 20).Content).IsNull();
@@ -179,6 +182,7 @@ public sealed class ChallengeAudienceEndpointTests
             DateTimeOffset.UtcNow,
             DateTimeOffset.UtcNow)
         {
+            Tags = ["Web", "SQL"],
             UsesDynamicFlag = true
         };
 
@@ -200,7 +204,7 @@ public sealed class ChallengeAudienceEndpointTests
                 new(challenge.Id, challenge.CompetitionId, challenge.ChallengeId,
                     challenge.Title, challenge.CustomTitle, challenge.Direction,
                     challenge.Order, challenge.IsPublished, challenge.DeletedAt,
-                    challenge.InteractionKind)
+                    challenge.InteractionKind) { Tags = challenge.Tags }
             ]);
         }
 

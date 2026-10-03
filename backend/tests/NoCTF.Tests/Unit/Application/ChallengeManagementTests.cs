@@ -8,6 +8,41 @@ namespace NoCTF.Tests.Unit.Application;
 public class ChallengeManagementTests
 {
     [Test]
+    public async Task Tags_are_normalized_for_create_and_update_without_turning_omission_into_clear()
+    {
+        var store = new Store();
+        await new CreateChallenge(store, new Catalog()).ExecuteAsync(
+            CreateCommand() with { Tags = [" Web ", "web", " SQL "] });
+        await Assert.That(store.LastTags!.SequenceEqual(["Web", "SQL"])).IsTrue();
+        await new UpdateChallenge(store).ExecuteAsync(UpdateCommand());
+        await Assert.That(store.LastTags).IsNull();
+        await new UpdateChallenge(store).ExecuteAsync(UpdateCommand() with { Tags = [] });
+        await Assert.That(store.LastTags!.Count).IsEqualTo(0);
+        await new UpdateChallenge(store).ExecuteAsync(UpdateCommand() with { Tags = [" SQL ", "sql"] });
+        await Assert.That(store.LastTags!.SequenceEqual(["SQL"])).IsTrue();
+    }
+
+    [Test]
+    [Arguments("blank")]
+    [Arguments("length")]
+    [Arguments("count")]
+    public async Task Invalid_tags_are_rejected_before_the_store(string invalidCase)
+    {
+        string[] tags = invalidCase switch
+        {
+            "blank" => ["   "],
+            "length" => [new string('x', 41)],
+            _ => Enumerable.Range(0, 21).Select(index => $"tag{index}").ToArray()
+        };
+        var store = new Store();
+        var create = await new CreateChallenge(store, new Catalog()).ExecuteAsync(CreateCommand() with { Tags = tags });
+        var update = await new UpdateChallenge(store).ExecuteAsync(UpdateCommand() with { Tags = tags });
+        await Assert.That(create.Failure).IsEqualTo(ChallengeMutationFailure.InvalidTags);
+        await Assert.That(update.Failure).IsEqualTo(ChallengeMutationFailure.InvalidTags);
+        await Assert.That(store.CreateCalls + store.MutationCalls).IsEqualTo(0);
+    }
+
+    [Test]
     [Arguments(CompetitionStatus.Running)]
     [Arguments(CompetitionStatus.Paused)]
     [Arguments(CompetitionStatus.Finished)]
@@ -239,6 +274,7 @@ public class ChallengeManagementTests
         public int MutationCalls { get; private set; }
         public bool? LastIncludeUnpublished { get; private set; }
         public string? LastCustomTitle { get; private set; }
+        public IReadOnlyList<string>? LastTags { get; private set; }
 
         public Task<ChallengeCompetitionContext?> GetCompetitionAsync(
             Guid competitionId,
@@ -252,6 +288,7 @@ public class ChallengeManagementTests
         {
             CreateCalls++;
             LastCustomTitle = command.CustomTitle;
+            LastTags = command.Tags;
             return Task.FromResult(CreateResult ?? new ChallengeMutationResult(challenge, null));
         }
 
@@ -287,6 +324,7 @@ public class ChallengeManagementTests
         {
             MutationCalls++;
             LastCustomTitle = command.CustomTitle;
+            LastTags = command.Tags;
             return Task.FromResult(MutationFailure is null
                 ? new ChallengeMutationResult(challenge)
                 : new ChallengeMutationResult(null, MutationFailure));

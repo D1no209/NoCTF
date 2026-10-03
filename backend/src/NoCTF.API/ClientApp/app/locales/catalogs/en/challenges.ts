@@ -1,5 +1,15 @@
 /** Runtime locale chunk. Keep keys stable across languages. */
 export const messages = {
+  "challengeTags.label": "Tags",
+  "challengeTags.filter": "Filter by tags",
+  "challengeTags.edit": "Choose or add tags",
+  "challengeTags.search": "Search tags",
+  "challengeTags.add": "Add “{name}”",
+  "challengeTags.remove": "Remove tag “{name}”",
+  "challengeTags.clear": "Clear tags",
+  "challengeTags.noOptions": "No matching tags",
+  "challengeTags.invalid": "Use at most 20 nonblank tags, each up to 40 characters.",
+
   "challengeNavigator.noMatches": "No matching challenges",
   "challengeNavigator.hideLocked": "Hide locked",
   "challengeNavigator.noUnlockedChallenges": "No unlocked challenges",

@@ -57,6 +57,7 @@ public sealed class CompetitionChallengePresentationPatchRequest
     public required int Order { get; set; }
     public required bool IsPublished { get; set; }
     public Guid? DirectionId { get; set; }
+    public IReadOnlyList<string>? Tags { get; set; }
 }
 
 public sealed class CompetitionChallengeRulesPatchRequest
@@ -88,6 +89,10 @@ public sealed class PatchCompetitionChallengeValidator
             .WithMessage("At least one competition-challenge section is required.");
         RuleFor(request => request.Presentation!.CustomTitle).MaximumLength(160)
             .When(request => request.Presentation is not null);
+        RuleFor(request => request.Presentation!.Tags)
+            .Must(tags => CompetitionChallengeTags.TryNormalize(tags, out _))
+            .When(request => request.Presentation is not null)
+            .WithMessage("Use at most 20 nonblank tags, each up to 40 characters.");
         RuleFor(request => request.Presentation!.Order).GreaterThanOrEqualTo(0)
             .When(request => request.Presentation is not null);
         RuleFor(request => request.Rules!.Configuration).NotNull()
@@ -113,8 +118,10 @@ public static partial class CompetitionChallengePatchMapper
     [MapperIgnoreTarget(nameof(CompetitionChallenge.Mode))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.UpdatedAt))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.DeletedAt))]
+    [MapperIgnoreTarget(nameof(CompetitionChallenge.Tags))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.Hints))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.NormalizedCustomTitle))]
+    [MapperIgnoreSource(nameof(CompetitionChallengePresentationPatchRequest.Tags))]
     public static partial void ApplyPresentationAsCompetitionModerator(
         CompetitionChallengePresentationPatchRequest request,
         [MappingTarget] CompetitionChallenge target);
@@ -133,6 +140,7 @@ public static partial class CompetitionChallengePatchMapper
     [MapperIgnoreTarget(nameof(CompetitionChallenge.IsPublished))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.UpdatedAt))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.DeletedAt))]
+    [MapperIgnoreTarget(nameof(CompetitionChallenge.Tags))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.Hints))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.NormalizedCustomTitle))]
     public static partial void ApplyRulesAsCompetitionModerator(
@@ -225,7 +233,8 @@ public sealed class PatchCompetitionChallengeEndpoint(
                     target.IsPublished,
                     timeProvider.GetUtcNow(),
                     target.CustomTitle,
-                    request.Presentation!.DirectionId), transactionCt);
+                    request.Presentation!.DirectionId,
+                    request.Presentation.Tags), transactionCt);
                 if (result.Challenge is null)
                 {
                     Results<Ok<AdminCompetitionChallengeResponse>, NotFound,

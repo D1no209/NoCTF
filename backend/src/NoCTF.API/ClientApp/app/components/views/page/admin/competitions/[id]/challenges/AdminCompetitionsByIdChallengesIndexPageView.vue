@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdChallengesIndexPageViewState } from '~/features/routes/admin/competitions/[id]/challenges/useAdminCompetitionsByIdChallengesIndexPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdChallengesIndexPageViewState }>()
-const { Plus, competitionId, competition, canWrite, items, loading, error, includeDeleted, search, directionFilter, directionOptions, statusFilter, filteredItems, pageItems, page, pageLimit, pageCount, total, loadPage, setPageSize, pendingId, addOpen, templatesLoading, selectedTemplateId, templateSearch, hideAddedTemplates, newCustomTitle, newOrder, adding, addError, modeTemplates, visibleModeTemplates, openAdd, addChallenge, deleteTarget, deletePending, deleteError, closeDeleteDialog, beginDeleteChallenge, removeChallenge, restoreChallenge, setChallengePublished, onClickAddOpen } = toRefs(viewProps.state)
+const { Plus, competitionId, competition, canWrite, items, loading, error, includeDeleted, search, directionFilter, directionOptions, statusFilter, filteredItems, pageItems, page, pageLimit, pageCount, total, loadPage, setPageSize, pendingId, addOpen, templatesLoading, selectedTemplateId, templateSearch, hideAddedTemplates, newCustomTitle, newTags, tagOptions, updateNewTags, newOrder, adding, addError, modeTemplates, visibleModeTemplates, openAdd, addChallenge, deleteTarget, deletePending, deleteError, closeDeleteDialog, beginDeleteChallenge, removeChallenge, restoreChallenge, setChallengePublished, onClickAddOpen } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -219,6 +219,10 @@ const { Plus, competitionId, competition, canWrite, items, loading, error, inclu
               :placeholder="$t('ui.leaveBlankToUseTheQuestionBankTemplateTitle')"
             />
             <FieldDescription>{{ $t('ui.changesTheDisplayNameForThisCompetitionOnlyAndDoes') }}</FieldDescription>
+          </Field>
+          <Field>
+            <FieldLabel>{{ $t('challengeTags.label') }}</FieldLabel>
+            <TagPicker :model-value="newTags" :options="tagOptions" :label="$t('challengeTags.edit')" allow-create :disabled="adding" @update:model-value="updateNewTags" />
           </Field>
           <Field>
             <FieldLabel for="new-order">{{ $t('ui.order') }}</FieldLabel>

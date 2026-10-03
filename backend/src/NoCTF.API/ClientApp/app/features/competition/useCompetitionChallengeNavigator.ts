@@ -1,3 +1,4 @@
+import { challengeTagOptions, matchesAllTags, tagsFromQuery, uniqueTags } from '../../lib/challenge-tags'
 import { toRefs } from 'vue'
 
 import { ShieldCheck, Swords, Users } from '@lucide/vue'
@@ -14,11 +15,12 @@ type BloodRank = 'First' | 'Second' | 'Third'
 const bloodOrder: Record<BloodRank, number> = { First: 0, Second: 1, Third: 2 }
 
 export function isChallengeVisible(
-  challenge: Pick<Challenge, 'title' | 'locked'>,
-  filters: { hideSolved: boolean; hideLocked: boolean; solvedByMyTeam: boolean; search: string },
+  challenge: Pick<Challenge, 'title' | 'locked' | 'tags'>,
+  filters: { hideSolved: boolean; hideLocked: boolean; solvedByMyTeam: boolean; search: string; tags?: readonly string[] },
 ): boolean {
   return (!filters.hideSolved || !filters.solvedByMyTeam)
     && (!filters.hideLocked || !challenge.locked)
+    && matchesAllTags(challenge.tags ?? [], filters.tags ?? [])
     && (!filters.search || (challenge.title ?? '').toLocaleLowerCase().includes(filters.search))
 }
 
@@ -87,6 +89,17 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
   const hidesLockedChallenges = computed(() => isCtf.value && hideLocked.value)
 
   const search = ref('')
+  const route = useRoute()
+  const router = useRouter()
+  const selectedTags = computed(() => tagsFromQuery(route.query.tag))
+  const tagOptions = computed(() => challengeTagOptions(items.value))
+  function updateSelectedTags(tags: string[]) {
+    const names = uniqueTags(tags)
+    const query = { ...route.query }
+    if (names.length) query.tag = names
+    else delete query.tag
+    void router.replace({ query })
+  }
 
   let initialized = false
   let unwatch: (() => void) | undefined
@@ -273,11 +286,12 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
         hideLocked: hidesLockedChallenges.value,
         solvedByMyTeam: hideSolved.value && !!progressFor(challenge.id)?.solvedByMyTeam,
         search: normalizedSearch.value,
+        tags: selectedTags.value,
       })),
     }))
     .filter(group => group.challenges.length > 0))
 
-  const emptyLabel = computed(() => normalizedSearch.value || (hideSolved.value && hidesLockedChallenges.value)
+  const emptyLabel = computed(() => normalizedSearch.value || selectedTags.value.length || (hideSolved.value && hidesLockedChallenges.value)
     ? translate('challengeNavigator.noMatches')
     : hidesLockedChallenges.value ? translate('challengeNavigator.noUnlockedChallenges')
       : hideSolved.value ? translate('ui.noUnsolvedChallenges') : translate('ui.thereAreNoPublishedTopicsYet'))
@@ -321,6 +335,7 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
       hideSolved,
       hideLocked,
       search,
+      selectedTags, tagOptions, updateSelectedTags,
       board,
       progressFor,
       awdpProgressLabel,

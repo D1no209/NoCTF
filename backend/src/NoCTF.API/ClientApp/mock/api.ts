@@ -4,6 +4,7 @@ import { leaderboardRead } from './leaderboard'
 import { questionActorRole, questionView } from './questions'
 import { mockAttachmentResponse } from './attachments'
 import { mockRuntimeEndpoint } from './runtime'
+import { uniqueTags, validChallengeTags } from '../app/lib/challenge-tags'
 
 function shape(schema: Data | undefined, value: any, skipDiscriminator = false): any {
   if (!schema) return value
@@ -139,6 +140,7 @@ export function createMockApi() {
       challengeId: item.challengeId,
       title: item.title,
       customTitle: item.customTitle ?? null,
+      tags: item.tags ?? [],
       direction: item.direction,
       directionId: item.directionId ?? null,
       directionIcon: item.directionIcon ?? null,
@@ -784,18 +786,23 @@ export function createMockApi() {
         value = { items: body.items }
       }
       else if (route === '/admin/competitions/{competitionId}/challenges' && request.method === 'POST') {
+        if (!validChallengeTags(body.tags ?? [])) return problem(400, 'InvalidTags')
         const source = state.templates.find(t => t.id === body.challengeId && t.mode === competition!.mode)
         if (!source) return problem(400, '选择同赛制的演示模板 / Select a template in the same mode')
         value = { ...state.challenges[0], ...body, id: body.id ?? crypto.randomUUID(), competitionId: competition!.id, title: body.customTitle ?? source.title, description: source.description, direction: source.direction, challengeId: source.id };
         const direction = directionCatalogs.get(competition!.id)?.find(item => item.name.toLowerCase() === String(source.direction).toLowerCase())
         Object.assign(value, { directionId: direction?.id ?? null, directionIcon: direction?.icon ?? null })
+        value.tags = uniqueTags(body.tags ?? [])
         state.challenges.push(value)
       }
       else if (route === '/admin/competitions/{competitionId}/challenges/{competitionChallengeId}' && request.method === 'PATCH') {
         if (body.presentation) {
+          if (body.presentation.tags != null && !validChallengeTags(body.presentation.tags)) return problem(400, 'InvalidTags')
           const selected = directionCatalogs.get(competition!.id)?.find(item => item.id === body.presentation.directionId)
           if (body.presentation.directionId && !selected) return problem(400, 'InvalidDirection')
-          Object.assign(challenge!, body.presentation, { title: body.presentation.customTitle ?? challenge!.title })
+          const { tags, ...presentation } = body.presentation
+          Object.assign(challenge!, presentation, { title: presentation.customTitle ?? challenge!.title })
+          if (tags != null) challenge!.tags = uniqueTags(tags)
           if (selected) Object.assign(challenge!, { direction: selected.name, directionIcon: selected.icon })
         }
         if (body.rules) state.settings.set(`challenge-rules:${p.competitionChallengeId}`, body.rules.configuration)

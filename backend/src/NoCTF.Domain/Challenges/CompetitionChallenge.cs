@@ -28,6 +28,7 @@ public abstract class CompetitionChallenge : IConcurrencyTracked
     public DateTimeOffset UpdatedAt { get; set; }
     public DateTimeOffset? DeletedAt { get; set; }
     public List<CompetitionChallengeHint> Hints { get; set; } = [];
+    public List<CompetitionChallengeTag> Tags { get; set; } = [];
 }
 
 public sealed class CompetitionChallengeHint

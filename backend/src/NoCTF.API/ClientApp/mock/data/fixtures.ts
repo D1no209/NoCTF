@@ -121,6 +121,7 @@ export function createFixtures() {
   const challenges = competitions.flatMap((competition, ci) => templates.filter(template => template.mode === competition.mode).map((template, index) => model('ChallengesChallengeResponse', {
     id: id(4, ci * 100 + index + 1), competitionId: competition.id, challengeId: template.id,
     title: template.title, direction: template.direction, description: template.description, order: index,
+      tags: index % 3 === 0 ? ["Beginner", "HTTP"] : index % 3 === 1 ? ["Beginner", "SQL"] : [],
     isPublished: true, hasRuntime: true, usesDynamicFlag: false, accesses: [],
     createdAt: date(-24), updatedAt: date(-3), leaderboardVisibility: 'Normal', dataScope: 'Live',
     maximumFlagAttempts: 20,

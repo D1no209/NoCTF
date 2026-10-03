@@ -2,7 +2,7 @@
 import { toRefs } from 'vue'
 import type { CompetitionChallengeNavigatorViewState } from '~/features/competition/useCompetitionChallengeNavigator'
 const viewProps = defineProps<{ state: CompetitionChallengeNavigatorViewState }>()
-const { ShieldCheck, Swords, Users, directionGlyph, groupIcon, isCtf, isAwdp, loading, error, dataScope, hideSolved, hideLocked, search, board, progressFor, currentScore, bloodsFor, bloodTooltip, progressIcon, progressIconLabel, emptyLabel, groupOptions, listOptions, selectChallenge, competitionId, selectedChallengeId } = toRefs(viewProps.state)
+const { ShieldCheck, Swords, Users, directionGlyph, groupIcon, isCtf, isAwdp, loading, error, dataScope, hideSolved, hideLocked, search, selectedTags, tagOptions, updateSelectedTags, board, progressFor, currentScore, bloodsFor, bloodTooltip, progressIcon, progressIconLabel, emptyLabel, groupOptions, listOptions, selectChallenge, competitionId, selectedChallengeId } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -13,6 +13,7 @@ const { ShieldCheck, Swords, Users, directionGlyph, groupIcon, isCtf, isAwdp, lo
           <h2 class="shrink-0 text-base font-semibold">{{ $t('ui.challengeList') }}</h2>
           <Input :id="`challenge-search-${competitionId}`" v-model="search" class="min-w-0 flex-1" :placeholder="$t('challengeNavigator.searchPlaceholder')" :aria-label="$t('challengeNavigator.searchPlaceholder')" />
         </div>
+        <TagPicker :model-value="selectedTags" :options="tagOptions" :label="$t('challengeTags.filter')" @update:model-value="updateSelectedTags" />
         <div class="flex items-center justify-between gap-3">
           <Label :for="`hide-solved-${competitionId}`" class="cursor-pointer text-xs font-medium">{{ $t('ui.hideSolved') }}</Label>
           <Switch :id="`hide-solved-${competitionId}`" v-model="hideSolved" />

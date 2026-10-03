@@ -94,6 +94,7 @@ public sealed class ChallengeManagementStore(
         entity.ChallengeId = command.ChallengeId;
         entity.Direction = await ResolveDirectionAsync(command.CompetitionId, template.Direction, ct);
         entity.DirectionId = entity.Direction.Id;
+        if (command.Tags is not null) CompetitionChallengeTags.Replace(entity.Tags, command.Tags);
         entity.CustomTitle = command.CustomTitle;
         entity.Order = command.Order;
         entity.Rules = rules;
@@ -181,7 +182,10 @@ public sealed class ChallengeManagementStore(
                     .Select(definition => definition.InteractionKind)
                     .FirstOrDefault(),
                 item.Instance.DirectionId,
-                item.Instance.Direction != null ? item.Instance.Direction.Icon : null))
+                item.Instance.Direction != null ? item.Instance.Direction.Icon : null)
+            {
+                Tags = item.Instance.Tags.OrderBy(tag => tag.Position).Select(tag => tag.Name).ToArray()
+            })
             .ToArrayAsync(ct);
     }
 
@@ -224,6 +228,7 @@ public sealed class ChallengeManagementStore(
                 return new(null, ChallengeMutationFailure.ExperimentalFeatureDisabled);
             }
         }
+        if (command.Tags is not null) CompetitionChallengeTags.Replace(entity.Tags, command.Tags);
         entity.CustomTitle = command.CustomTitle;
         entity.Order = command.Order;
         entity.IsPublished = command.IsPublished;
@@ -419,7 +424,8 @@ public sealed class ChallengeManagementStore(
                 item.Template.CreatedAt,
                 item.Instance.UpdatedAt,
                 item.Instance.DirectionId,
-                item.Instance.Direction != null ? item.Instance.Direction.Icon : null))
+                item.Instance.Direction != null ? item.Instance.Direction.Icon : null,
+                item.Instance.Tags.OrderBy(tag => tag.Position).Select(tag => tag.Name).ToArray()))
             .AsSplitQuery();
     }
 
@@ -441,6 +447,7 @@ public sealed class ChallengeManagementStore(
             template.CreatedAt,
             instance.UpdatedAt)
         {
+            Tags = instance.Tags.OrderBy(tag => tag.Position).Select(tag => tag.Name).ToArray(),
             DirectionId = instance.DirectionId,
             DirectionIcon = instance.Direction?.Icon,
             UsesDynamicFlag = runtime is { FlagSource: not RuntimeFlagSource.Static },
@@ -466,6 +473,7 @@ public sealed class ChallengeManagementStore(
             projection.CreatedAt,
             projection.UpdatedAt)
         {
+            Tags = projection.Tags,
             DirectionId = projection.DirectionId,
             DirectionIcon = projection.DirectionIcon,
             UsesDynamicFlag = runtime is { FlagSource: not RuntimeFlagSource.Static },
@@ -511,7 +519,8 @@ public sealed class ChallengeManagementStore(
         DateTimeOffset CreatedAt,
         DateTimeOffset UpdatedAt,
         Guid? DirectionId,
-        string? DirectionIcon);
+        string? DirectionIcon,
+        IReadOnlyList<string> Tags);
 
     private async Task<ChallengeMutationFailure?> FindCompetitionChallengeConflictAsync(
         Guid id,
