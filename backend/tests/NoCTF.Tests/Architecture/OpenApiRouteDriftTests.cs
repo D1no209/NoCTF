@@ -9,7 +9,7 @@ public partial class OpenApiRouteDriftTests
     {
         var backend = FindBackendRoot();
         var swaggerPath = Path.Combine(backend, "artifacts", "openapi", "swagger.json");
-        var apiDocumentPath = Path.GetFullPath(Path.Combine(backend, "..", "docs", "api.md"));
+        var apiDocumentPath = Path.GetFullPath(Path.Combine(backend, "..", "specs", "api.md"));
         await Assert.That(File.Exists(swaggerPath)).IsTrue();
         await Assert.That(File.Exists(apiDocumentPath)).IsTrue();
 

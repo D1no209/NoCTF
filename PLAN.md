@@ -1,6 +1,6 @@
 # NoCTF 数据模型与 Wolverine 调度简化实施计划
 
-> 权威语义：[`docs/data-model-wolverine-simplification.md`](docs/data-model-wolverine-simplification.md)。
+> 权威语义：[`specs/data-model-wolverine-simplification.md`](specs/data-model-wolverine-simplification.md)。
 > 本计划只记录迁移顺序和门禁，不重新定义产品语义。
 
 ## 当前状态
@@ -58,8 +58,8 @@
 
 ## 恢复入口
 
-- 当前证据与精确命令：[`docs/data-model-wolverine-stage0-baseline.md`](docs/data-model-wolverine-stage0-baseline.md)
-- Wolverine Spike：[`docs/wolverine-6.29.2-spike.md`](docs/wolverine-6.29.2-spike.md)
-- 切换与回滚：[`docs/data-model-wolverine-cutover.md`](docs/data-model-wolverine-cutover.md)
+- 当前证据与精确命令：[`specs/data-model-wolverine-stage0-baseline.md`](specs/data-model-wolverine-stage0-baseline.md)
+- Wolverine Spike：[`specs/wolverine-6.29.2-spike.md`](specs/wolverine-6.29.2-spike.md)
+- 切换与回滚：[`specs/data-model-wolverine-cutover.md`](specs/data-model-wolverine-cutover.md)
 - 最新进度：[`HANDOFF.md`](HANDOFF.md)
-- 阶段 11 验证：[`docs/data-model-wolverine-stage11-validation.md`](docs/data-model-wolverine-stage11-validation.md)
+- 阶段 11 验证：[`specs/data-model-wolverine-stage11-validation.md`](specs/data-model-wolverine-stage11-validation.md)

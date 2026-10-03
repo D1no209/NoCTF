@@ -4,9 +4,9 @@
 
 ## 权威来源
 
-1. [`docs/data-model-wolverine-simplification.md`](docs/data-model-wolverine-simplification.md)
+1. [`specs/data-model-wolverine-simplification.md`](specs/data-model-wolverine-simplification.md)
 2. [`AGENTS.md`](AGENTS.md)
-3. [`docs/README.md`](docs/README.md)
+3. [`specs/README.md`](specs/README.md)
 4. [`PLAN.md`](PLAN.md)
 5. [`HANDOFF.md`](HANDOFF.md)
 
@@ -75,7 +75,7 @@
 - [ ] 生产快照转换、停机切换、负责人签字与 Go/No-Go（当前未授权生产操作）。
 
 阶段 11 的本地证据和两个明确跳过的真实 provider 测试见
-[`docs/data-model-wolverine-stage11-validation.md`](docs/data-model-wolverine-stage11-validation.md)。不得把未授权项目报告为通过。
+[`specs/data-model-wolverine-stage11-validation.md`](specs/data-model-wolverine-stage11-validation.md)。不得把未授权项目报告为通过。
 
 ## 当前禁止事项
 

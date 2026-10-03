@@ -2,7 +2,7 @@
 
 NoCTF is a competition platform for CTF, AWD, AWDP, and KoH, built with .NET 10
 and Nuxt 4. The current product and architecture contract lives in
-[the authoritative documentation index](docs/README.md).
+[the authoritative documentation index](specs/README.md).
 
 ## Capabilities
 
@@ -103,19 +103,19 @@ backend/
     NoCTF.Modeling.Generators/    TPH leaf/catalog compile-time generation and diagnostics
   tests/NoCTF.Tests/       unit, architecture, and integration tests
 deploy/                    Docker, Kubernetes, shared recovery/configuration assets
-docs/                      authoritative product and engineering specifications
+specs/                     authoritative product and engineering specifications
 ```
 
 ## Documentation
 
-- [Documentation index and authority](docs/README.md)
-- [Product and domain model](docs/product-domain.md)
-- [System architecture](docs/architecture.md)
-- [Processes, messaging, and concurrency](docs/processes-messaging.md)
-- [Runtime contract](docs/runtime.md)
-- [API reference](docs/api.md)
-- [Deployment boundary](docs/deployment.md)
-- [Development guide](docs/development.md)
-- [Testing guide](docs/testing.md)
-- [Challenge repository GitOps](docs/challenge-repository-gitops.md)
+- [Documentation index and authority](specs/README.md)
+- [Product and domain model](specs/product-domain.md)
+- [System architecture](specs/architecture.md)
+- [Processes, messaging, and concurrency](specs/processes-messaging.md)
+- [Runtime contract](specs/runtime.md)
+- [API reference](specs/api.md)
+- [Deployment boundary](specs/deployment.md)
+- [Development guide](specs/development.md)
+- [Testing guide](specs/testing.md)
+- [Challenge repository GitOps](specs/challenge-repository-gitops.md)
 - [Current backend handoff](NoCTF-backend-handoff-2026-07-24.md)

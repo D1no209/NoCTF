@@ -1,7 +1,7 @@
 # NoCTF project context
 
 The authoritative product and engineering specifications start at
-[`docs/README.md`](docs/README.md). This file is a compact vocabulary guide, not
+[`specs/README.md`](specs/README.md). This file is a compact vocabulary guide, not
 an independent source of requirements.
 
 ## Domain glossary

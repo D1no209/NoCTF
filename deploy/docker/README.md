@@ -63,7 +63,7 @@ docker --context YOUR_CONTEXT compose --env-file .env -f docker-compose.yml -f c
 
 ## 恢复与回退
 
-见[一致工具](../shared/recovery/README.md)和[完整流程](../../docs/backup-recovery.md)。
+见[一致工具](../shared/recovery/README.md)和[完整流程](../../specs/backup-recovery.md)。
 停止写入后备份 PG、文件/RustFS、停止后的 JetStream，并外部保管密钥。
 不从运行中的 PG/NATS 目录复制，不用空目录替代旧卷、不全局 prune。
 schema/数据回退需要同一恢复点，不只是退镜像；生产只人工部署审查后的 CI digest，CI 不登录服务器。

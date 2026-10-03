@@ -90,7 +90,7 @@ are platform settings shared by Runtime and Checker Pods, not authoring fields.
 
 Production uses static StorageClass `noctf-retain`. Provision a Retain PV with
 platform-node affinity per PVC, or replace the class with your CSI provisioner
-while keeping Retain semantics. See [operations](../../docs/kubernetes-operations.md).
+while keeping Retain semantics. See [operations](../../specs/kubernetes-operations.md).
 Node-local volumes require their original node after failure; stateful-service
 HA is outside this first release. API/Worker default to 2 replicas, Runner to 1.
 PostgreSQL, Redis, NATS JetStream, RustFS and monitoring use persistent single
@@ -147,7 +147,7 @@ allocatable slots, managed/Pending/Unschedulable/image-pull-blocked Pods and
 Runtime NodePorts; EF remains the authoritative allocation ledger.
 Record passed/failed/not-run phases explicitly. Local 50-Pod success does not
 prove 1,000-Pod production capacity. Isolation/recovery and cutover are in the
-[operations runbook](../../docs/kubernetes-operations.md).
+[operations runbook](../../specs/kubernetes-operations.md).
 
 `Report-Capacity.ps1` counts remaining requests, Pod slots and global NodePorts
 with 20% headroom. Its service CPU/memory are planning inputs, not measured

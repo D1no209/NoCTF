@@ -43,7 +43,7 @@ docker --context YOUR_CONTEXT run --rm --network YOUR_PRIVATE_NETWORK \
 
 恢复用 `restore` 与验签/解密参数，指向空隔离目标；不能改源挂载进行原地恢复。
 恢复完成仍停写，启动 NATS 验证 live 状态，再验收对应 Host。
-完整停写、切换、回退见[运行手册](../../../docs/backup-recovery.md)。
+完整停写、切换、回退见[运行手册](../../../specs/backup-recovery.md)。
 
 ## 独立演练
 
