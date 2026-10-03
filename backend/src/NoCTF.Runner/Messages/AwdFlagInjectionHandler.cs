@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Challenges;
@@ -127,7 +128,8 @@ public sealed class AwdFlagInjectionHandler(
     IAwdFlagInjectionExecutor executor,
     IPostCommitMessagePublisher outbox,
     IOptions<RunnerOptions> runnerOptions,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    ILogger<AwdFlagInjectionHandler>? logger = null)
 {
     public async Task<MessageExecutionOutcome> Handle(
         InjectAwdFlag message,
@@ -139,7 +141,10 @@ public sealed class AwdFlagInjectionHandler(
             runnerOptions.Value.Id);
         var work = await reader.ReadAsync(message, cancellationToken);
         if (work is null)
+        {
+            logger?.LogDebug("AWD Flag injection superseded for Runtime {RuntimeInstanceId}.", message.RuntimeInstanceId);
             return MessageExecutionOutcome.Superseded;
+        }
 
         var now = timeProvider.GetUtcNow();
         if (now >= message.ValidUntil)
@@ -153,12 +158,16 @@ public sealed class AwdFlagInjectionHandler(
         {
             throw;
         }
-        catch
+        catch (Exception exception)
         {
+            logger?.LogWarning("AWD Flag injection provider failed with {FailureType} for Runtime {RuntimeInstanceId}.",
+                exception.GetType().Name, message.RuntimeInstanceId);
             return await RetryOrRecordFailureAsync(message, work.CompetitionId);
         }
         if (!result.TimedOut && result.ExitCode == 0)
             return MessageExecutionOutcome.Applied;
+        logger?.LogWarning("AWD Flag injection failed with exit code {ExitCode}, timed out {TimedOut}, for Runtime {RuntimeInstanceId}.",
+            result.ExitCode, result.TimedOut, message.RuntimeInstanceId);
         return await RetryOrRecordFailureAsync(message, work.CompetitionId);
     }
 

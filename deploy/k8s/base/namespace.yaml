@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: noctf
+  labels:
+    noctf.io/purpose: platform
+    app.kubernetes.io/part-of: noctf

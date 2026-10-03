@@ -1,0 +1,48 @@
+{
+  "kind": {
+    "version": "0.33.0",
+    "windowsAmd64Sha256": "4b22adaa135368c5a465d56bbd8e520cbea87272a06ca00b6078e7b81515c9fc"
+  },
+  "helm": {
+    "version": "3.19.0",
+    "windowsAmd64ArchiveSha256": "6488630c2e5d5945ed990fa02fd9e99f9c6792cdbcd79eb264b6cfb90179d2d1",
+    "windowsAmd64ExecutableSha256": "a18c49a4cd16f8b162031159eff6b4d657e04ec2df0c2be5544ad11ddf8fae79"
+  },
+  "kubernetes": {
+    "version": "1.36.4",
+    "image": "kindest/node:v1.36.4@sha256:099e049362a1526b2db71494e1947aae99bd16290d7c895f2b7ea312e3cbfaed"
+  },
+  "cilium": {
+    "version": "1.20.2",
+    "chartDigest": "sha256:a7c12d330dd96bfcda3bf057b24be8f36566c34868265f930f776dff6f42d838"
+  },
+  "envoyGateway": {
+    "version": "1.9.2",
+    "chartDigest": "sha256:be034275b55deeddd6b7bc1f4da6eeb02b8efc418a4a29e2b1977851b24b1e63"
+  },
+  "metricsServer": {
+    "version": "0.9.0",
+    "source": "https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.9.0/components.yaml",
+    "sourceSha256": "1cec29a5267809306a2c6ec74a3e449abbb705b4a8beed0c8a1963910f72c79b"
+  },
+  "rustfs": {
+    "version": "1.0.0",
+    "image": "rustfs/rustfs:1.0.0@sha256:8cc9801755448b71a786705ce76692c77e14936cccd87cf2fc31842e58f4d1ff"
+  },
+  "natsExporter": {
+    "version": "0.20.1",
+    "image": "docker.m.daocloud.io/natsio/prometheus-nats-exporter:0.20.1@sha256:4fbf6dacb84780a45a1c3af9b1080c69451a288d20902deae671b80717bb8f61"
+  },
+  "recovery": {
+    "format": "noctf.disaster-recovery/2",
+    "requirementsLockSha256": "fd1c9dae10061b7f645b87aedc832ae2b836bbd253b6c49a14c1d8dd51702550",
+    "postgresBaseImage": "postgres@sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229"
+  },
+  "dockerImages": {
+    "POSTGRES_IMAGE": "postgres:16.14@sha256:95206741a5b214807675e14165369d05b93a9cf692223b616d07cca227e74b0b",
+    "REDIS_IMAGE": "redis:7.4.9@sha256:a8f08480e1f88f2647fed492d1178c06abb0d0c1fbf02c682a61e2f483fb3954",
+    "NATS_IMAGE": "docker.m.daocloud.io/library/nats:2.12.2-alpine@sha256:2d5fce3229ae5741f4ef9225aff95dc4dc036455931eaf77a3eec33fddaa192d",
+    "REGISTRY_IMAGE": "registry:3.0.0@sha256:6c5666b861f3505b116bb9aa9b25175e71210414bd010d92035ff64018f9457e",
+    "RUSTFS_IMAGE": "rustfs/rustfs:1.0.0@sha256:8cc9801755448b71a786705ce76692c77e14936cccd87cf2fc31842e58f4d1ff"
+  }
+}

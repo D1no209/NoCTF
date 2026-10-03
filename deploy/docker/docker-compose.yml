@@ -1,0 +1,125 @@
+name: ${COMPOSE_PROJECT_NAME:-noctf}
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:?Set POSTGRES_IMAGE in .env}
+    restart: unless-stopped
+    env_file:
+      - ./env/postgres/.env
+    volumes:
+      - type: bind
+        source: ./data/postgres
+        target: /var/lib/postgresql/data
+        bind:
+          create_host_path: false
+
+  redis:
+    image: ${REDIS_IMAGE:?Set REDIS_IMAGE in .env}
+    restart: unless-stopped
+    command: [redis-server, --appendonly, "yes", --appendfsync, everysec, --maxmemory, "${REDIS_MAXMEMORY:-512mb}", --maxmemory-policy, allkeys-lru]
+    mem_limit: ${REDIS_MEMORY_LIMIT:-1g}
+    volumes:
+      - type: bind
+        source: ./data/redis
+        target: /data
+        bind:
+          create_host_path: false
+
+  nats:
+    image: ${NATS_IMAGE:?Set NATS_IMAGE in .env}
+    restart: unless-stopped
+    command: [-js, -sd, /data, -m, "8222"]
+    volumes:
+      - type: bind
+        source: ./data/nats
+        target: /data
+        bind:
+          create_host_path: false
+
+  registry:
+    image: ${REGISTRY_IMAGE:?Set REGISTRY_IMAGE in .env}
+    restart: unless-stopped
+    env_file:
+      - ./env/registry/.env
+    volumes:
+      - type: bind
+        source: ./data/registry
+        target: /var/lib/registry
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./config/registry/auth
+        target: /auth
+        bind:
+          create_host_path: false
+    networks:
+      default:
+        aliases: [registry, noctf-registry]
+      panel:
+        aliases: [noctf-registry]
+
+  noctf:
+    image: ${NOCTF_PLATFORM_IMAGE:?Set the GitHub CI image in .env}
+    restart: unless-stopped
+    env_file:
+      - ./env/noctf/.env
+    labels:
+      noctf.io/internal-role: scoring-callback-gateway
+      noctf.io/runtime-proxy-gateway: "true"
+    depends_on: [postgres, redis, nats]
+    volumes:
+      - type: bind
+        source: ./data/uploads
+        target: /app/uploads
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./config/docker
+        target: /app/docker-config
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /proc
+        target: /host/proc
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /sys/fs/cgroup
+        target: /host/sys/fs/cgroup
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /etc/machine-id
+        target: /host/etc/machine-id
+        read_only: true
+        bind:
+          create_host_path: false
+    networks:
+      default:
+        aliases: [noctf]
+      panel:
+        aliases: [noctf-web]
+      challenges: {}
+      callbacks:
+        aliases: [noctf]
+
+networks:
+  default:
+    name: ${COMPOSE_PROJECT_NAME:-noctf}-network
+  panel:
+    external: true
+    name: 1panel-network
+  challenges:
+    name: ${COMPOSE_PROJECT_NAME:-noctf}-challenges
+    driver: bridge
+  callbacks:
+    name: ${COMPOSE_PROJECT_NAME:-noctf}-runtime-callback
+    driver: bridge
+    internal: true

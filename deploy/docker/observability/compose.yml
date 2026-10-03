@@ -1,0 +1,169 @@
+name: ${OBSERVABILITY_PROJECT_NAME:-noctf-observability}
+services:
+  prometheus:
+    image: ${PROMETHEUS_IMAGE:?Set PROMETHEUS_IMAGE in .env}
+    restart: unless-stopped
+    command:
+    - --config.file=/etc/prometheus/prometheus.yml
+    - --storage.tsdb.path=/prometheus
+    - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION_TIME:-7d}
+    - --storage.tsdb.retention.size=${PROMETHEUS_RETENTION_SIZE:-2GB}
+    volumes:
+    - type: bind
+      source: ./prometheus
+      target: /etc/prometheus
+      read_only: true
+    - type: bind
+      source: ${OBSERVABILITY_DATA_ROOT:?Set OBSERVABILITY_DATA_ROOT}/prometheus
+      target: /prometheus
+      bind:
+        create_host_path: false
+    - type: bind
+      source: ${NOCTF_SHARED_ROOT:?Set NOCTF_SHARED_ROOT}/prometheus/rules
+      target: /etc/prometheus/rules
+      read_only: true
+      bind:
+        create_host_path: false
+    ports:
+    - 127.0.0.1:${PROMETHEUS_PORT:-9090}:9090
+    networks:
+    - observability
+    - noctf
+  grafana:
+    image: ${GRAFANA_IMAGE:?Set GRAFANA_IMAGE in .env}
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana-admin-password
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
+      GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
+      GF_PLUGINS_PREINSTALL_AUTO_UPDATE: 'false'
+      GF_AUTH_ANONYMOUS_ENABLED: 'false'
+      GF_SECURITY_COOKIE_SECURE: 'true'
+      GF_SECURITY_COOKIE_SAMESITE: strict
+      GF_SECURITY_ALLOW_EMBEDDING: 'false'
+      GF_SERVER_DOMAIN: ${GRAFANA_PUBLIC_HOST:?Set GRAFANA_PUBLIC_HOST}
+      GF_SERVER_ROOT_URL: ${GRAFANA_PUBLIC_URL:?Set GRAFANA_PUBLIC_URL}
+      GF_SERVER_ENFORCE_DOMAIN: 'true'
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/noctf-performance.json
+    volumes:
+    - type: bind
+      source: ./grafana/provisioning
+      target: /etc/grafana/provisioning
+      read_only: true
+    - type: bind
+      source: ${NOCTF_SHARED_ROOT:?Set NOCTF_SHARED_ROOT}/grafana/dashboards
+      target: /var/lib/grafana/dashboards
+      read_only: true
+    - type: bind
+      source: ${OBSERVABILITY_DATA_ROOT:?Set OBSERVABILITY_DATA_ROOT}/grafana
+      target: /var/lib/grafana
+      bind:
+        create_host_path: false
+    - type: bind
+      source: ${OBSERVABILITY_SECRET_ROOT:?Set OBSERVABILITY_SECRET_ROOT}/grafana-admin-password
+      target: /run/secrets/grafana-admin-password
+      read_only: true
+      bind:
+        create_host_path: false
+    ports:
+    - 127.0.0.1:${GRAFANA_PORT:-3001}:3000
+    networks:
+      observability: null
+      panel:
+        aliases:
+        - noctf-grafana
+  loki:
+    image: ${LOKI_IMAGE:?Set LOKI_IMAGE in .env}
+    restart: unless-stopped
+    command:
+    - -config.file=/etc/loki/loki.yml
+    volumes:
+    - type: bind
+      source: ${NOCTF_SHARED_ROOT:?Set NOCTF_SHARED_ROOT}/loki/loki.yml
+      target: /etc/loki/loki.yml
+      read_only: true
+    - type: bind
+      source: ${OBSERVABILITY_DATA_ROOT:?Set OBSERVABILITY_DATA_ROOT}/loki
+      target: /loki
+      bind:
+        create_host_path: false
+    networks:
+    - observability
+    - noctf
+  postgres-exporter:
+    image: ${POSTGRES_EXPORTER_IMAGE:?Set POSTGRES_EXPORTER_IMAGE in .env}
+    restart: unless-stopped
+    command:
+    - --config.file=/etc/postgres-exporter/postgres_exporter.yml
+    environment:
+      DATA_SOURCE_URI: ${POSTGRES_EXPORTER_URI:?Set POSTGRES_EXPORTER_URI}
+      DATA_SOURCE_USER: ${POSTGRES_EXPORTER_USER:?Set POSTGRES_EXPORTER_USER}
+      DATA_SOURCE_PASS_FILE: /run/secrets/postgres-exporter-password
+    volumes:
+    - type: bind
+      source: ./postgres-exporter/postgres_exporter.yml
+      target: /etc/postgres-exporter/postgres_exporter.yml
+      read_only: true
+      bind:
+        create_host_path: false
+    - type: bind
+      source: ${OBSERVABILITY_SECRET_ROOT:?Set OBSERVABILITY_SECRET_ROOT}/postgres-exporter-password
+      target: /run/secrets/postgres-exporter-password
+      read_only: true
+      bind:
+        create_host_path: false
+    networks:
+    - noctf
+  redis-exporter:
+    image: ${REDIS_EXPORTER_IMAGE:?Set REDIS_EXPORTER_IMAGE in .env}
+    restart: unless-stopped
+    environment:
+      REDIS_ADDR: ${REDIS_EXPORTER_ADDR:-redis://redis:6379}
+    networks:
+    - noctf
+  nats-exporter:
+    image: ${NATS_EXPORTER_IMAGE:?Set NATS_EXPORTER_IMAGE in .env}
+    restart: unless-stopped
+    command:
+    - -varz
+    - -jsz=all
+    - http://nats:8222
+    networks:
+    - noctf
+  node-exporter:
+    image: ${NODE_EXPORTER_IMAGE:?Set NODE_EXPORTER_IMAGE in .env}
+    restart: unless-stopped
+    command:
+    - --path.rootfs=/host
+    - --path.udev.data=/host/run/udev/data
+    - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|var/lib/docker/.+|var/lib/containers/storage/.+)($$|/)
+    volumes:
+    - type: bind
+      source: /
+      target: /host
+      read_only: true
+    networks:
+    - observability
+  blackbox-exporter:
+    image: ${BLACKBOX_EXPORTER_IMAGE:?Set BLACKBOX_EXPORTER_IMAGE in .env}
+    restart: unless-stopped
+    command:
+    - --config.file=/etc/blackbox-exporter/config.yml
+    volumes:
+    - type: bind
+      source: ./blackbox/config.yml
+      target: /etc/blackbox-exporter/config.yml
+      read_only: true
+    networks:
+    - observability
+    - noctf
+networks:
+  observability: null
+  noctf:
+    external: true
+    name: ${NOCTF_NETWORK_NAME:-noctf-network}
+  panel:
+    external: true
+    name: 1panel-network

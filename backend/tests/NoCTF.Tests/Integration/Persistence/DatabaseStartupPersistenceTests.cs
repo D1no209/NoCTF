@@ -13,9 +13,31 @@ namespace NoCTF.Tests.Integration.Persistence;
 [Category("Integration")]
 public sealed class DatabaseStartupPersistenceTests
 {
+    [Test, Timeout(300_000)]
+    public async Task Startup_rejects_invalid_database_credentials_before_initialization(CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+                .WithDatabase("noctf_invalid_startup").WithUsername("postgres").WithPassword("valid-test-password").Build();
+            await postgres.StartAsync(ct);
+            var connection = new Npgsql.NpgsqlConnectionStringBuilder(postgres.GetConnectionString()) { Password = "invalid-test-password" };
+            var services = new ServiceCollection();
+            services.AddLogging();
+            services.AddDbContext<NoCtfDbContext>(options => options.UseNpgsql(connection.ConnectionString,
+                npgsql => npgsql.MigrationsAssembly(typeof(NoCTF.Persistence.PostgreSql.PostgreSqlPersistence).Assembly.FullName)).UseSnakeCaseNamingConvention());
+            await using var provider = services.BuildServiceProvider();
+            var exception = await Assert.That(async () => await DatabaseStartup.InitializeAsync(provider,
+                    new ConfigurationBuilder().Build(), ct)).Throws<Npgsql.PostgresException>();
+            await Assert.That(exception!.SqlState).IsEqualTo("28P01");
+        });
+    }
+
     [Test]
+    [Arguments(1)]
+    [Arguments(4)]
     [Timeout(300_000)]
-    public async Task Startup_migrates_empty_database_and_preserves_existing_administrator(CancellationToken ct)
+    public async Task Startup_migrates_empty_database_and_preserves_existing_administrator(int replicas, CancellationToken ct)
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
@@ -39,7 +61,8 @@ public sealed class DatabaseStartupPersistenceTests
             services.AddScoped<AdministratorBootstrapper>();
             await using var provider = services.BuildServiceProvider();
             var configuration = new ConfigurationBuilder().Build();
-            await DatabaseStartup.InitializeAsync(provider, configuration, ct);
+            await Task.WhenAll(Enumerable.Range(0, replicas)
+                .Select(_ => DatabaseStartup.InitializeAsync(provider, configuration, ct)));
             Guid originalId;
             string originalHash;
             await using (var scope = provider.CreateAsyncScope())

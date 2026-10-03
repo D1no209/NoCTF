@@ -102,6 +102,10 @@ public sealed class KubernetesContainerLifecycle(
             Spec = new V1PodSpec
             {
                 AutomountServiceAccountToken = false,
+                ImagePullSecrets = (options.ImagePullSecrets ?? [])
+                    .Distinct(StringComparer.Ordinal)
+                    .Select(name => new V1LocalObjectReference { Name = name })
+                    .ToList(),
                 EnableServiceLinks = false,
                 NodeSelector = new Dictionary<string, string>
                 {
@@ -137,6 +141,9 @@ public sealed class KubernetesContainerLifecycle(
         };
         if (prepareOneShotInput)
             ConfigureOneShotInput(pod.Spec, request);
+        else if (request.NetworkPurpose is ContainerNetworkPurpose.AwdpVerification
+                 or ContainerNetworkPurpose.PersistentRuntime)
+            ConfigureFixWorkspace(pod.Spec);
         V1Pod? createdPod = null;
         var createdCallbackPolicies = new List<V1NetworkPolicy>();
         var createdServices = new List<V1Service>();
@@ -528,30 +535,8 @@ public sealed class KubernetesContainerLifecycle(
         V1PodSpec specification,
         ContainerRequest request)
     {
+        ConfigureFixWorkspace(specification);
         var checker = specification.Containers.Single();
-        specification.Volumes =
-        [
-            .. (specification.Volumes ?? []),
-            new V1Volume
-            {
-                Name = OneShotInputVolumeName,
-                EmptyDir = new V1EmptyDirVolumeSource()
-            }
-        ];
-        checker.VolumeMounts =
-        [
-            .. (checker.VolumeMounts ?? []),
-            new V1VolumeMount
-            {
-                Name = OneShotInputVolumeName,
-                MountPath = "/noctf"
-            }
-        ];
-        specification.SecurityContext = new V1PodSecurityContext
-        {
-            FsGroup = 65_532,
-            FsGroupChangePolicy = "OnRootMismatch"
-        };
         specification.InitContainers =
         [
             new V1Container
@@ -584,6 +569,37 @@ public sealed class KubernetesContainerLifecycle(
         ];
     }
 
+    private static void ConfigureFixWorkspace(V1PodSpec specification)
+    {
+        // The image's non-root user must be able to receive canonical Fix input.
+        // Keep the platform workspace on a Pod-owned volume rather than requiring
+        // images to make their root filesystem writable at /noctf.
+        var checker = specification.Containers.Single();
+        specification.Volumes =
+        [
+            .. (specification.Volumes ?? []),
+            new V1Volume
+            {
+                Name = OneShotInputVolumeName,
+                EmptyDir = new V1EmptyDirVolumeSource()
+            }
+        ];
+        checker.VolumeMounts =
+        [
+            .. (checker.VolumeMounts ?? []),
+            new V1VolumeMount
+            {
+                Name = OneShotInputVolumeName,
+                MountPath = "/noctf"
+            }
+        ];
+        specification.SecurityContext = new V1PodSecurityContext
+        {
+            FsGroup = 65_532,
+            FsGroupChangePolicy = "OnRootMismatch"
+        };
+    }
+
     private async Task PrepareOneShotInputAsync(
         string podName,
         OneShotInputArchive input,
@@ -596,32 +612,34 @@ public sealed class KubernetesContainerLifecycle(
         try
         {
             await WaitUntilInputInitializerRunningAsync(podName, cancellationToken);
-            using var demuxer = await client.MuxedStreamNamespacedPodExecAsync(
+            using var socket = await client.WebSocketNamespacedPodExecAsync(
                 podName,
                 options.Namespace,
                 [
                     "/bin/sh",
                     "-c",
-                    $"tar -xf - -C /input && touch {OneShotInputReadyFile}"
+                    $"tar -xf - -C /input/noctf --strip-components=1 && touch {OneShotInputReadyFile}"
                 ],
                 OneShotInputInitializerName,
-                true,
-                false,
-                false,
-                false,
+                stderr: false,
+                stdin: true,
+                stdout: true,
+                tty: false,
+                webSocketSubProtocol: KubernetesExecInput.Protocol,
                 cancellationToken: cancellationToken);
+            using var demuxer = new StreamDemuxer(socket);
             demuxer.Start();
-            using var standardInput = demuxer.GetStream(null, ChannelIndex.StdIn);
+            using var output = demuxer.GetStream(ChannelIndex.StdOut, null);
+            var outputTask = output.CopyToAsync(Stream.Null, cancellationToken);
             using var error = demuxer.GetStream(ChannelIndex.Error, null);
             var statusTask = ReadExecStatusAsync(error, cancellationToken);
-            await input.Archive.CopyToAsync(standardInput, cancellationToken);
-            await standardInput.FlushAsync(cancellationToken);
-            standardInput.Dispose();
-            if (await statusTask != 0)
+            await KubernetesExecInput.CopyAsync(socket, input.Archive, cancellationToken);
+            if (await statusTask.WaitAsync(cancellationToken) != 0)
             {
                 throw new OneShotInputPreparationException(
                     "Kubernetes could not extract the one-shot input archive.");
             }
+            await outputTask.WaitAsync(cancellationToken);
             input.MarkPreparationCompleted();
             inputActivity?.SetStatus(System.Diagnostics.ActivityStatusCode.Ok);
         }
@@ -930,17 +948,19 @@ public sealed class KubernetesContainerLifecycle(
         ContainerReceipt receipt, Stream tarArchive, CancellationToken cancellationToken)
     {
         await WaitUntilRunningAsync(receipt.ResourceId, cancellationToken);
-        using var demuxer = await client.MuxedStreamNamespacedPodExecAsync(
-            receipt.ResourceId, options.Namespace, ["/bin/sh", "-c", "mkdir -p /noctf/fix && tar -xf - -C /"],
-            "challenge", true, false, false, false, cancellationToken: cancellationToken);
+        using var socket = await client.WebSocketNamespacedPodExecAsync(
+            receipt.ResourceId, options.Namespace, ["/bin/sh", "-c", "mkdir -p /noctf/fix && tar -xf - -C /noctf --strip-components=1"],
+            container: null, stderr: false, stdin: true, stdout: true, tty: false,
+            webSocketSubProtocol: KubernetesExecInput.Protocol, cancellationToken: cancellationToken);
+        using var demuxer = new StreamDemuxer(socket);
         demuxer.Start();
-        using var standardInput = demuxer.GetStream(null, ChannelIndex.StdIn);
+        using var output = demuxer.GetStream(ChannelIndex.StdOut, null);
+        var outputTask = output.CopyToAsync(Stream.Null, cancellationToken);
         using var error = demuxer.GetStream(ChannelIndex.Error, null);
         var statusTask = ReadExecStatusAsync(error, cancellationToken);
-        await tarArchive.CopyToAsync(standardInput, cancellationToken);
-        await standardInput.FlushAsync(cancellationToken);
-        standardInput.Dispose();
-        var exitCode = await statusTask;
+        await KubernetesExecInput.CopyAsync(socket, tarArchive, cancellationToken);
+        var exitCode = await statusTask.WaitAsync(cancellationToken);
+        await outputTask.WaitAsync(cancellationToken);
         if (exitCode != 0) throw new InvalidOperationException("Kubernetes could not extract the Fix archive.");
     }
 
@@ -971,19 +991,25 @@ public sealed class KubernetesContainerLifecycle(
         try
         {
             await WaitUntilRunningAsync(receipt.ResourceId, timeoutSource.Token);
-            using var demuxer = await client.MuxedStreamNamespacedPodExecAsync(
-                receipt.ResourceId, options.Namespace, WithTimeout(command, timeout), "challenge",
-                standardInput is not null, false, false, false, cancellationToken: timeoutSource.Token);
+            using var socket = await client.WebSocketNamespacedPodExecAsync(
+                receipt.ResourceId, options.Namespace, WithTimeout(command, timeout), null,
+                stderr: false, stdin: standardInput is not null, stdout: true, tty: false,
+                webSocketSubProtocol: KubernetesExecInput.Protocol, cancellationToken: timeoutSource.Token);
+            using var demuxer = new StreamDemuxer(socket);
             demuxer.Start();
+            // Kubernetes rejects an exec without any stdin/stdout/stderr stream.
+            // Drain output without retaining or logging protected Flag content.
+            using var output = demuxer.GetStream(ChannelIndex.StdOut, null);
+            var outputTask = output.CopyToAsync(Stream.Null, timeoutSource.Token);
             using var error = demuxer.GetStream(ChannelIndex.Error, null);
             var statusTask = ReadExecStatusAsync(error, timeoutSource.Token);
             if (standardInput is { } inputMemory)
             {
-                using var input = demuxer.GetStream(null, ChannelIndex.StdIn);
-                await input.WriteAsync(inputMemory, timeoutSource.Token);
-                await input.FlushAsync(timeoutSource.Token);
+                using var input = new MemoryStream(inputMemory.ToArray());
+                await KubernetesExecInput.CopyAsync(socket, input, timeoutSource.Token);
             }
             var exitCode = await statusTask.WaitAsync(timeoutSource.Token);
+            await outputTask.WaitAsync(timeoutSource.Token);
             if (exitCode != ExecTimeoutExitCode) return new(exitCode, false);
             await StopPodAfterExecTimeoutAsync(receipt);
             return new(-1, true);
@@ -1893,7 +1919,8 @@ public sealed class KubernetesContainerLifecycle(
     {
         using var reader = new StreamReader(error);
         var content = await reader.ReadToEndAsync(cancellationToken);
-        if (string.IsNullOrWhiteSpace(content)) return 0;
+        if (string.IsNullOrWhiteSpace(content))
+            throw new InvalidOperationException("Kubernetes exec ended without an exit status.");
         using var document = JsonDocument.Parse(content);
         if (document.RootElement.TryGetProperty("status", out var status)
             && string.Equals(status.GetString(), "Success", StringComparison.OrdinalIgnoreCase))

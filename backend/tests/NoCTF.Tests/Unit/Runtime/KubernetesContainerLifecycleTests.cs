@@ -23,13 +23,14 @@ public sealed class KubernetesContainerLifecycleTests
                 Arg.Any<CancellationToken>())
             .Returns(Task.FromException<HttpOperationResponse<V1Pod>>(new InvalidOperationException("Capture pod before execution.")));
         var lifecycle = new KubernetesContainerLifecycle(client,
-            new KubernetesRuntimeOptions(ClusterDnsServiceAddress: "10.96.0.10"));
+            new KubernetesRuntimeOptions(ClusterDnsServiceAddress: "10.96.0.10", ImagePullSecrets: ["challenge-registry"]));
         using var archive = new MemoryStream();
         await Assert.That(async () => await lifecycle.RunAsync(CheckerRequest(),
             new OneShotInputArchive(archive, OneShotInputArchive.RootDestinationPath), CancellationToken.None))
             .Throws<InvalidOperationException>();
         await Assert.That(createdPod).IsNotNull();
         await Assert.That(createdPod!.Spec.Containers.Single().ImagePullPolicy).IsEqualTo("Always");
+        await Assert.That(createdPod.Spec.ImagePullSecrets.Single().Name).IsEqualTo("challenge-registry");
         await Assert.That(createdPod.Spec.InitContainers.Single().ImagePullPolicy).IsEqualTo("Always");
     }
 
@@ -96,6 +97,14 @@ public sealed class KubernetesContainerLifecycleTests
             .IsEqualTo(jobKind);
         await Assert.That(createdPod.Metadata.Labels["noctf.io/purpose"])
             .IsEqualTo(purpose);
+        if (networkPurpose == ContainerNetworkPurpose.AwdpVerification)
+        {
+            await Assert.That(createdPod.Spec.Containers.Single().VolumeMounts.Single().MountPath)
+                .IsEqualTo("/noctf");
+            await Assert.That(createdPod.Spec.Volumes.Single().EmptyDir).IsNotNull();
+            await Assert.That(createdPod.Spec.SecurityContext.FsGroup).IsEqualTo(65_532L);
+            await Assert.That(createdPod.Spec.InitContainers).IsNull();
+        }
         await Assert.That(createdPolicy!.Spec.PodSelector.MatchLabels.All(label =>
             createdPod.Metadata.Labels.TryGetValue(label.Key, out var value)
             && string.Equals(value, label.Value, StringComparison.Ordinal))).IsTrue();

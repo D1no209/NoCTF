@@ -1,135 +1,33 @@
-# PostgreSQL、NATS JetStream 与对象存储备份恢复
+# PostgreSQL、文件/RustFS 与 JetStream 一致恢复
 
-## 恢复边界
+[恢复工具 v2](../deploy/shared/recovery/README.md) 包含当前 EF 创建的 public schema、迁移历史、
+本地文件或 S3 对象，以及停止后的 JetStream 文件/校验和。旧 Wolverine 数据库 schema 已移除，
+旧 v1 不被描述为完整恢复点。age 加密、Minisign 签名、密钥外部保管；不是在线 PITR。
 
-NoCTF 的灾难恢复点由三部分组成：
+## 停写与备份
 
-- PostgreSQL 业务 schema；
-- NATS JetStream stream/consumer 配置与持久卷；
-- 当前 S3-compatible bucket 中的全部对象及其 `Content-Type`、`x-amz-meta-sha256` 元数据。
+1. 核对项目/context、Host digest、PG major、存储和外部 Secret 集。
+2. 停止所有 Api/Worker/Runner 和维护命令，等待 Provider/事务/消息结束；保持 PG/文件服务可读。
+   工具发现其他 PG client 会拒绝，文件/S3 的其他写入者也必须停止。
+3. 捕获 stream/consumer/KV/pending 状态后停止 NATS，确认容器/Pod 已停止；禁止复制运行目录。
+   K8s 用已停写 PVC 的维护挂载或一致快照，不直接猜测节点路径。
+4. 将 PG、文件/RustFS、离线 JetStream 合入一个加密签名产物；凭据仅只读文件，不出现在参数/日志。
+5. 复制到独立故障域，外部保管平台、S3/PG、age、签名密钥。Redis 可重建，不纳入恢复。
+   保留、异地复制、调度、RPO/RTO 由目标运维设定。
 
-Wolverine durable queue、scheduled message 和 dead letter 位于 JetStream，必须与 PostgreSQL 业务事实
-和对象存储一起纳入恢复流程。不得把 JetStream 队列当成 Redis 缓存。Redis 不进入备份：恢复后由
-PostgreSQL 事实、在线 Runner 和正常流量重建排行榜缓存、限流、
-SignalR backplane、心跳与容量。
+## 恢复、切换和回退
 
-本仓库提供外部运维工具，不新增应用端点、后台页面或业务表。工具创建离散的、应用停写的一致性
-恢复点，不提供在线 PITR。当前参考目标是 RPO 不超过 24 小时、RTO 不超过 4 小时、恢复点保留
-30 天；生产调度、保留删除、异地复制和告警由目标环境落地。若要求更小 RPO，必须另行设计
-PostgreSQL WAL/PITR 与对象版本的一致性协议，不能把本工具描述为 PITR。
+1. 停止目标所有角色和 NATS，避免启动自动迁移提前创建表。
+2. 验证签名、格式、Secret 集、存储类型、PG major、对应 Host image。
+   只允许空数据库、空文件根/bucket、空 JetStream 目录，不覆盖或合并。
+3. 恢复后比较迁移历史、逐表行数、文件/对象 key、SHA、metadata/Content-Type、JetStream 文件清单。
+   部分恢复失败时保持停写，不自动启动。
+4. 启动恢复 NATS，核验 streams/consumers/KV/pending 与 ack，等待旧短租约到期并核验 fencing。
+5. 用恢复点 image 启动自动迁移，先验证对应 schema，再考虑另行升级。
+   验收登录/刷新、文件、业务记录、投递、排行榜、新 Runtime 后切换入口。
+6. 只启用目标一次，源保持停写；不能两端同时接收业务。
 
-## 安全契约
-
-- 备份文件必须使用 `age` recipient 加密并通过独立 Minisign key 签名；工具不会生成明文最终
-  产物。恢复会先验证签名，不能把 age recipient 的加密完整性误当成来源认证。
-- 自动化使用的 Minisign secret key 文件本身不设置交互式口令，必须由 Secret 管理系统加密保存、
-  只读挂载并限制到备份身份；恢复环境只分发 public key。
-- PostgreSQL、S3 与 age 私钥只通过只读文件挂载。工具不会把凭据写入 manifest 或日志。
-- manifest 只记录非秘密的 `secretSetId`。恢复者必须提供完全相同的外部 Secret 集标识。
-- JWT signing key、Runner scoring key、S3/数据库凭据、age identity、Minisign signing key 和
-  `EmailVerification__EncryptionKey` 不在
-  备份中，必须在独立 Secret 管理系统中备份。邮箱 SMTP 密码、SSO Client Secret 与共享
-  Data Protection 密钥环在数据库中为密文；缺少原 `EmailVerification__EncryptionKey` 时无法解密。
-- 加密备份必须复制到与运行集群不同的故障域。至少保留一份不可由 NoCTF 运行身份删除的副本。
-- 恢复工具只接受空数据库和空 bucket，不支持覆盖、合并或原地恢复。
-
-## 构建工具
-
-从仓库根目录构建固定 PostgreSQL 16 与 MinIO Client digest 的工具镜像：
-
-```bash
-docker build -t noctf-recovery:local deploy/recovery
-```
-
-工具需要网络访问源或目标 PostgreSQL/S3。下面示例中的 `/run/noctf-recovery` 是只读 Secret
-挂载，`/backup` 是加密产物目录；不要把真实凭据放进命令行、镜像或仓库。
-源数据库身份至少需要 `CONNECT`、应用 schema 的 `USAGE`、表 `SELECT`、sequence
-读取及查看其他连接的权限；源 S3 身份只需要目标 bucket 的 List/Get/Head。恢复身份必须能在空
-database 创建 schema/table 并向空 bucket Put/Head/Get/List。生产环境应为两条路径配置不同的
-最小权限身份。
-
-## 创建恢复点
-
-1. 停止所有承载 Api、Worker、Runner 角色的进程和 migration job，等待当前事务与 Provider 操作结束。
-2. 确认没有人工客户端或其他写入者连接数据库。工具也会在备份前后检查其他 PostgreSQL client
-   connection；发现任意连接即失败并删除未完成产物。
-3. 运行备份：
-
-```bash
-docker run --rm \
-  --network <operations-network> \
-  -v /run/noctf-recovery:/run/secrets:ro \
-  -v /var/backups/noctf:/backup \
-  noctf-recovery:local backup \
-  --postgres-host <postgres-host> \
-  --postgres-database noctf \
-  --postgres-user <backup-user> \
-  --postgres-password-file /run/secrets/postgres-password \
-  --postgres-ssl-mode verify-full \
-  --s3-endpoint https://<s3-endpoint> \
-  --s3-bucket noctf \
-  --s3-access-key-file /run/secrets/s3-access-key \
-  --s3-secret-key-file /run/secrets/s3-secret-key \
-  --age-recipients-file /run/secrets/age-recipients.txt \
-  --minisign-secret-key-file /run/secrets/minisign.key \
-  --secret-set-id <vault-snapshot-id> \
-  --output /backup/noctf-<utc-timestamp>.tar.gz.age
-```
-
-4. 只在命令成功且加密文件及其 `.minisig` 签名已复制到独立故障域后恢复应用进程。
-5. 调度器按目标环境实现 30 天保留和失败告警；不得让 NoCTF 应用身份拥有异地备份删除权限。
-
-产物内含 `manifest.json`、PostgreSQL custom dump、逐表行数、对象内容、对象元数据索引和全部文件
-SHA-256。manifest 不含数据库/S3 地址和凭据。
-
-## 隔离恢复
-
-1. 创建全新的 PostgreSQL 16 database 与全新的空 bucket。保持所有 Api、Worker、Runner 角色停止。
-2. 恢复与 manifest 的 `secretSetId` 对应的外部 Secret 集。不要先运行 EF migration；目标数据库
-   必须为空。
-3. 运行恢复，目标 database 和 bucket 名必须与 manifest 一致：
-
-```bash
-docker run --rm \
-  --network <isolated-recovery-network> \
-  -v /run/noctf-recovery:/run/secrets:ro \
-  -v /var/backups/noctf:/backup:ro \
-  noctf-recovery:local restore \
-  --input /backup/noctf-<utc-timestamp>.tar.gz.age \
-  --age-identity-file /run/secrets/age-identity.txt \
-  --minisign-public-key-file /run/secrets/minisign.pub \
-  --secret-set-id <vault-snapshot-id> \
-  --postgres-host <new-postgres-host> \
-  --postgres-database noctf \
-  --postgres-user <restore-owner> \
-  --postgres-password-file /run/secrets/postgres-password \
-  --postgres-ssl-mode verify-full \
-  --s3-endpoint https://<new-s3-endpoint> \
-  --s3-bucket noctf \
-  --s3-access-key-file /run/secrets/s3-access-key \
-  --s3-secret-key-file /run/secrets/s3-secret-key
-```
-
-恢复会先验证 age 完整性、安全归档路径、manifest、全部 SHA-256 与外部 Secret 集标识，然后拒绝
-任何非空目标。写入完成后会再次比较所有受保护 schema 的逐表行数，并下载每个对象核验 key、
-内容 SHA-256、`Content-Type` 与 SHA-256 元数据。
-
-4. 人工核验比赛、用户、`competition_events`、待处理 GameplayFact、JetStream scheduled/dead-letter
-   数量、consumer 状态和关键附件。记录备份时间、开始/完成时间、操作者和验证结果。
-5. 先用备份时相同的应用版本验收，再按正常 migration 流程升级。验收通过前不得让新旧环境同时
-   消费同一队列或操作同一 Runtime provider。
-6. 先恢复 NATS stream/consumer/KV 并启动包含 Worker 的宿主，确认调度租约与 JetStream endpoint ready，
-   再启动各 Runner 节点和 API；全合一部署只需启动 Host。所有外部副作用仍必须依赖业务幂等键、
-   状态转换和唯一约束，不使用持久化 ProcessingVersion 栅栏。
-
-## 自动恢复演练
-
-以下命令只创建带唯一名称的临时 Docker network/container/image，退出时精确删除这些临时资源：
-
-```bash
-bash deploy/recovery/rehearse.sh
-```
-
-演练覆盖两个隔离 PostgreSQL、两个隔离 MinIO、JetStream/KV 恢复点、比赛永久事件、多个对象
-及其元数据、快照后源数据变化、恢复后逐表/逐对象验证、加密文件篡改拒绝和非空目标拒绝。它不
-连接开发或生产 NoCTF 服务。
+schema/数据回退需冻结目标并恢复同一 PG、对象/文件、密钥、JetStream 恢复点。
+退镜像不等于退 schema，新增写入的处理由运维明确决定。
+`rehearse.sh` 用唯一临时资源、真实 EF schema、Local 与 RustFS、durable consumer/KV/pending，
+校验篡改/非空目标拒绝并清理自身资源；不是生产迁移已完成的证明。

@@ -43,6 +43,12 @@ if (Directory.Exists(apiConfigurationRoot))
         .AddEnvironmentVariables()
         .AddCommandLine(args);
 }
+if (args.Contains("--initialize-storage-only", StringComparer.OrdinalIgnoreCase))
+{
+    using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+    await NoCTF.Hosting.Storage.StorageInitialization.InitializeAsync(builder.Configuration, timeout.Token);
+    return;
+}
 var migrateOnly = args.Contains("--migrate-only", StringComparer.OrdinalIgnoreCase);
 var roles = migrateOnly || exportOpenApi
     ? HostRoles.Only(HostRole.Api)
@@ -104,6 +110,7 @@ builder.UseWolverine(options =>
             options.StubAllExternalTransports();
     }
 });
+builder.Services.AddNoCtfDatabaseStartup(builder.Configuration);
 builder.Services.AddNoCtfRoleHealthChecks(
     builder.Configuration,
     roles,
@@ -121,13 +128,12 @@ if (generateHandlers)
 }
 if (migrateOnly)
 {
-    await app.Services.InitializeNoCtfAsync();
+    await DatabaseStartup.InitializeAsync(app.Services, app.Configuration, app.Lifetime.ApplicationStopping);
     return;
 }
 if (!exportOpenApi)
     app.UseNoCtfObservability();
-if (!exportOpenApi && (development || app.Configuration.GetValue("Database:AutoMigrate", false))
-    && (roles.Has(HostRole.Api) || roles.Has(HostRole.Worker)))
+if (!exportOpenApi && (development || app.Configuration.GetValue("Database:AutoMigrate", false)))
     await DatabaseStartup.InitializeAsync(app.Services, app.Configuration, app.Lifetime.ApplicationStopping);
 if (roles.Has(HostRole.Api))
 {

@@ -1,0 +1,119 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: noctf-runner
+  namespace: noctf
+  labels:
+    app.kubernetes.io/part-of: noctf
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: noctf-runner
+  namespace: runtime
+  labels:
+    app.kubernetes.io/part-of: noctf
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["get", "create"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list", "create", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "create", "delete"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["get", "list", "create", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: noctf-runner
+  namespace: runtime
+  labels:
+    app.kubernetes.io/part-of: noctf
+subjects:
+  - kind: ServiceAccount
+    name: noctf-runner
+    namespace: noctf
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: noctf-runner
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: noctf-runner-cilium-policy-check
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/part-of: noctf
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["cilium-config"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["services"]
+    resourceNames: ["kube-dns"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: noctf-runner-cilium-policy-check
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/part-of: noctf
+subjects:
+  - kind: ServiceAccount
+    name: noctf-runner
+    namespace: noctf
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: noctf-runner-cilium-policy-check
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: noctf-runner-node-attestation
+  labels:
+    app.kubernetes.io/part-of: noctf
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    resourceNames: ["kube-system"]
+    verbs: ["get"]
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["nodes"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: noctf-runner-node-attestation
+  labels:
+    app.kubernetes.io/part-of: noctf
+subjects:
+  - kind: ServiceAccount
+    name: noctf-runner
+    namespace: noctf
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: noctf-runner-node-attestation

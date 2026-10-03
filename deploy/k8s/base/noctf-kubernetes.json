@@ -1,0 +1,160 @@
+{
+  "uid": "noctf-kubernetes",
+  "title": "NoCTF Kubernetes",
+  "editable": false,
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "15s",
+  "timezone": "browser",
+  "tags": [
+    "noctf",
+    "kubernetes"
+  ],
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Platform metrics targets",
+      "description": "1 means Prometheus can reach the private role metrics listener; 0 means scrape failure.",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 0
+        }
+      },
+      "targets": [
+        {
+          "expr": "up{job=\"noctf\"}",
+          "legendFormat": "{{role}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Runtime Pods and allocatable slots",
+      "description": "Slots belong to eligible nodes. Reserve system/checker/reset headroom; this is not a supported-capacity claim.",
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 24,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 0
+        }
+      },
+      "targets": [
+        {
+          "expr": "max(noctf_kubernetes_pods_managed{role=\"runner\"})",
+          "legendFormat": "Managed Pods",
+          "refId": "A"
+        },
+        {
+          "expr": "max(noctf_kubernetes_pod_slots_allocatable{role=\"runner\"})",
+          "legendFormat": "Allocatable slots",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Runtime scheduling failures",
+      "description": "Current managed Pod counts. Check redacted diagnosis for stable scheduling reasons.",
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 24,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 0
+        }
+      },
+      "targets": [
+        {
+          "expr": "max(noctf_kubernetes_pods_pending{role=\"runner\"})",
+          "legendFormat": "Pending",
+          "refId": "A"
+        },
+        {
+          "expr": "max(noctf_kubernetes_pods_unschedulable{role=\"runner\"})",
+          "legendFormat": "Unschedulable",
+          "refId": "B"
+        },
+        {
+          "expr": "max(noctf_kubernetes_pods_image_pull_blocked{role=\"runner\"})",
+          "legendFormat": "Image pull blocked",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Published Runtime NodePorts",
+      "description": "Distinct managed Runtime ports; also budget platform/unmanaged ports across the whole cluster using Report-Capacity.ps1.",
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 24,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 0
+        }
+      },
+      "targets": [
+        {
+          "expr": "max(noctf_kubernetes_nodeports_published{role=\"runner\"})",
+          "legendFormat": "Runtime NodePorts",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}

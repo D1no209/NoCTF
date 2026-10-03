@@ -39,7 +39,7 @@ public sealed class ObservabilityDashboardContractTests
     public async Task Performance_dashboard_uses_available_metrics_and_stable_ranked_tables()
     {
         using var document = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(
-            RepositoryRoot, "deploy", "observability", "grafana", "dashboards",
+            RepositoryRoot, "deploy", "shared", "observability", "grafana", "dashboards",
             "noctf-performance.json")));
         var root = document.RootElement;
         var panels = root.GetProperty("panels").EnumerateArray().ToArray();
@@ -90,7 +90,7 @@ public sealed class ObservabilityDashboardContractTests
     public async Task Cap_dashboard_separates_provider_latency_from_browser_solve_time()
     {
         using var document = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(
-            RepositoryRoot, "deploy", "observability", "grafana", "dashboards",
+            RepositoryRoot, "deploy", "shared", "observability", "grafana", "dashboards",
             "noctf-cap.json")));
         var panels = document.RootElement.GetProperty("panels").EnumerateArray().ToArray();
 
@@ -108,7 +108,7 @@ public sealed class ObservabilityDashboardContractTests
             .Contains("noctf_cap_siteverify_failures_total");
 
         var dashboard = await File.ReadAllTextAsync(Path.Combine(
-            RepositoryRoot, "deploy", "observability", "grafana", "dashboards",
+            RepositoryRoot, "deploy", "shared", "observability", "grafana", "dashboards",
             "noctf-cap.json"));
         await Assert.That(dashboard).DoesNotContain("siteKey").And.DoesNotContain("token");
     }
@@ -117,10 +117,10 @@ public sealed class ObservabilityDashboardContractTests
     public async Task Performance_alerts_use_consistent_ratios_and_minimum_samples()
     {
         var rules = await File.ReadAllTextAsync(Path.Combine(
-            RepositoryRoot, "deploy", "observability", "prometheus", "rules",
+            RepositoryRoot, "deploy", "shared", "observability", "prometheus", "rules",
             "recording-rules.yml"));
         var alerts = await File.ReadAllTextAsync(Path.Combine(
-            RepositoryRoot, "deploy", "observability", "prometheus", "rules",
+            RepositoryRoot, "deploy", "shared", "observability", "prometheus", "rules",
             "alerts.yml"));
 
         await Assert.That(rules).Contains(

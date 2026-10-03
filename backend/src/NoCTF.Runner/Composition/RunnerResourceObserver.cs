@@ -8,6 +8,8 @@ using NoCTF.Application.Runtime.Capacity;
 using NoCTF.Domain.Runtime;
 using NoCTF.Runtime.Docker.Containers;
 using NoCTF.Infrastructure.Messaging;
+using NoCTF.Runtime.Kubernetes.Capacity;
+using NoCTF.Application.Observability;
 
 namespace NoCTF.Runner.Composition;
 
@@ -234,6 +236,12 @@ public sealed class RunnerResourceObserver(
         var nodePressure = false;
         var pods = await kubernetes.CoreV1.ListNamespacedPodAsync(kubernetesOptions.Namespace,
             labelSelector: "noctf.io/managed=true", cancellationToken: ct);
+        var services = await kubernetes.CoreV1.ListNamespacedServiceAsync(kubernetesOptions.Namespace,
+            labelSelector: "noctf.io/managed=true", cancellationToken: ct);
+        var scheduling = KubernetesSchedulingObservation.Read(nodes.Items, pods.Items, services.Items);
+        NoCtfTelemetry.SetKubernetesSchedulingSnapshot(scheduling.AllocatablePodSlots,
+            scheduling.ManagedPods, scheduling.PendingPods, scheduling.UnschedulablePods,
+            scheduling.ImagePullBlockedPods, scheduling.PublishedNodePorts);
         foreach (var status in pods.Items.SelectMany(pod => pod.Status?.ContainerStatuses ?? []))
         foreach (var terminated in new[] { status.State?.Terminated, status.LastState?.Terminated })
             nodePressure |= terminated?.Reason == "OOMKilled" && terminated.FinishedAt is { } finished

@@ -44,7 +44,18 @@ internal static class KubernetesRuntimeProviderRegistration
                 : "kubernetes.io/metadata.name",
             isActiveProvider
                 ? configuration["Runtime:Kubernetes:CallbackNamespaceLabelValue"] ?? string.Empty
-                : "noctf");
+                : "noctf",
+            configuration.GetSection("Runtime:Kubernetes:ImagePullSecrets")
+                .GetChildren()
+                .Select(section => section.Value ?? string.Empty)
+                .ToArray());
+        foreach (var name in options.ImagePullSecrets ?? [])
+        {
+            if (name.Length is < 1 or > 253
+                || !System.Text.RegularExpressions.Regex.IsMatch(
+                    name, @"\A[a-z0-9](?:[-a-z0-9]*[a-z0-9])?(?:\.[a-z0-9](?:[-a-z0-9]*[a-z0-9])?)*\z"))
+                throw new InvalidOperationException("Runtime:Kubernetes:ImagePullSecrets must contain Kubernetes Secret names.");
+        }
         ValidateActiveProvider(configuration, isActiveProvider);
 
         services.AddSingleton(options);

@@ -18,9 +18,12 @@ public sealed class KubernetesNamedServicesIntegrationTests
     {
         if (Environment.GetEnvironmentVariable("NOCTF_KUBERNETES_INTEGRATION") != "true")
             Skip.Test("Real Kubernetes integration requires NOCTF_KUBERNETES_INTEGRATION=true and a configured cluster.");
-        using var client = new Kubernetes(KubernetesClientConfiguration.BuildDefaultConfig());
+        var context = Required("NOCTF_KUBERNETES_CONTEXT");
+        if (context == "docker-desktop") throw new InvalidOperationException("Use an isolated integration cluster.");
+        using var client = new Kubernetes(KubernetesClientConfiguration.BuildConfigFromConfigFile(currentContext: context));
         var scope = $"noctf-it-{Guid.NewGuid():N}";
-        await client.CoreV1.CreateNamespaceAsync(new() { Metadata = new() { Name = scope } }, cancellationToken: ct);
+        await client.CoreV1.CreateNamespaceAsync(new() { Metadata = new() { Name = scope,
+            Labels = new Dictionary<string, string> { ["noctf.io/purpose"] = "challenge-runtime" } } }, cancellationToken: ct);
         try
         {
             await client.NetworkingV1.CreateNamespacedNetworkPolicyAsync(new()
@@ -34,15 +37,32 @@ public sealed class KubernetesNamedServicesIntegrationTests
                 ClusterDnsServiceAddress: Required("NOCTF_KUBERNETES_CLUSTER_DNS"), ProtectedCidrs: ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]);
             var containers = new KubernetesContainerLifecycle(client, options);
             var runtime = new KubernetesContainerRuntime(client, containers, options);
-            var single = await runtime.UpAsync(Request([new("main", "nginx:alpine")], options), ct);
-            var group = await runtime.UpAsync(Request([new("web", "nginx:alpine"), new("db", "alpine:latest", Command: ["sleep"], Arguments: ["300"])], options), ct);
+            var image = Required("NOCTF_KUBERNETES_TEST_IMAGE");
+            var single = await runtime.UpAsync(Request([new("main", image)], options), ct);
+            var group = await runtime.UpAsync(Request([new("web", image), new("db", image, Command: ["sleep"], Arguments: ["300"])], options), ct);
             await Assert.That(single.DiscoveryServiceName).IsNull();
             await Assert.That(group.DiscoveryServiceName).IsNotNull();
             var services = await client.CoreV1.ListNamespacedServiceAsync(scope, cancellationToken: ct);
             await Assert.That(services.Items.Count(service => service.Spec.ClusterIP == "None")).IsEqualTo(1);
-            var check = await runtime.ExecAsync(group, "web", ["sh", "-c", $"getent hosts db | grep -F '{group.Services[1].InternalHost}'"], TimeSpan.FromSeconds(10), ct);
+            var check = await runtime.ExecAsync(group, "web", ["sh", "-c", $"nslookup db | grep -F '{group.Services[1].InternalHost}'"], TimeSpan.FromSeconds(10), ct);
             await Assert.That(check.ExitCode).IsEqualTo(0);
-            using var http = new HttpClient();
+            var inside = await runtime.ExecAsync(group, "db", ["sh", "-c",
+                $"wget -q -T 3 -O /dev/null http://{group.Services[0].InternalHost}:80/"], TimeSpan.FromSeconds(10), ct);
+            await Assert.That(inside.ExitCode).IsEqualTo(0);
+            var storage = await client.CoreV1.ReadNamespacedServiceAsync("rustfs", "noctf", cancellationToken: ct);
+            foreach (var url in new[]
+                     {
+                         $"http://{single.Services[0].InternalHost}:80/",
+                         $"http://{storage.Spec.ClusterIP}:9000/health",
+                         "http://169.254.169.254/latest/meta-data/"
+                     })
+            {
+                var blocked = await runtime.ExecAsync(group, "web", ["sh", "-c",
+                    $"if wget -q -T 2 -t 1 -O /dev/null '{url}'; then exit 1; else exit 0; fi"], TimeSpan.FromSeconds(8), ct);
+                await Assert.That(blocked.ExitCode).IsEqualTo(0);
+                await Assert.That(blocked.TimedOut).IsFalse();
+            }
+            using var http = new HttpClient(new SocketsHttpHandler { UseProxy = false });
             foreach (var receipt in new[] { single, group })
             {
                 using var response = await http.GetAsync($"http://{options.PublicHost}:{receipt.Services[0].PublishedPorts[80]}/", ct);

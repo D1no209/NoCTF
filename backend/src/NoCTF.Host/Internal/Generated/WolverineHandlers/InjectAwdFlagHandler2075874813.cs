@@ -16,17 +16,19 @@ namespace Internal.Generated.WolverineHandlers
         private readonly Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> _dbContextOptionsOfNoCtfDbContext;
         private readonly Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> _loggerOfWolverinePostCommitMessagePublisher;
         private readonly Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> _loggerOfNoCtfDbContext;
+        private readonly Microsoft.Extensions.Logging.ILogger<NoCTF.Runner.Messages.AwdFlagInjectionHandler> _loggerOfAwdFlagInjectionHandler;
         private readonly Microsoft.Extensions.Options.IOptions<NoCTF.Runner.Composition.RunnerOptions> _optionsOfRunnerOptions;
         private readonly NoCTF.Application.Notifications.INotificationChangePublisher _notificationChangePublisher;
         private readonly NoCTF.Runner.Messages.IAwdFlagInjectionExecutor _awdFlagInjectionExecutor;
         private readonly NoCTF.Runner.Messages.IAwdFlagInjectionWorkReader _awdFlagInjectionWorkReader;
         private readonly System.TimeProvider _timeProvider;
 
-        public InjectAwdFlagHandler2075874813(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, Microsoft.Extensions.Options.IOptions<NoCTF.Runner.Composition.RunnerOptions> optionsOfRunnerOptions, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.Runner.Messages.IAwdFlagInjectionExecutor awdFlagInjectionExecutor, NoCTF.Runner.Messages.IAwdFlagInjectionWorkReader awdFlagInjectionWorkReader, System.TimeProvider timeProvider)
+        public InjectAwdFlagHandler2075874813(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Runner.Messages.AwdFlagInjectionHandler> loggerOfAwdFlagInjectionHandler, Microsoft.Extensions.Options.IOptions<NoCTF.Runner.Composition.RunnerOptions> optionsOfRunnerOptions, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.Runner.Messages.IAwdFlagInjectionExecutor awdFlagInjectionExecutor, NoCTF.Runner.Messages.IAwdFlagInjectionWorkReader awdFlagInjectionWorkReader, System.TimeProvider timeProvider)
         {
             _dbContextOptionsOfNoCtfDbContext = dbContextOptionsOfNoCtfDbContext;
             _loggerOfWolverinePostCommitMessagePublisher = loggerOfWolverinePostCommitMessagePublisher;
             _loggerOfNoCtfDbContext = loggerOfNoCtfDbContext;
+            _loggerOfAwdFlagInjectionHandler = loggerOfAwdFlagInjectionHandler;
             _optionsOfRunnerOptions = optionsOfRunnerOptions;
             _notificationChangePublisher = notificationChangePublisher;
             _awdFlagInjectionExecutor = awdFlagInjectionExecutor;
@@ -46,7 +48,7 @@ namespace Internal.Generated.WolverineHandlers
 
             System.Diagnostics.Activity.Current?.SetTag("message.handler", "NoCTF.Runner.Messages.AwdFlagInjectionHandler");
             System.Diagnostics.Activity.Current?.SetTag("handler.type", "NoCTF.Runner.Messages.AwdFlagInjectionHandler");
-            var awdFlagInjectionHandler = new NoCTF.Runner.Messages.AwdFlagInjectionHandler(_awdFlagInjectionWorkReader, _awdFlagInjectionExecutor, wolverinePostCommitMessagePublisher, _optionsOfRunnerOptions, _timeProvider);
+            var awdFlagInjectionHandler = new NoCTF.Runner.Messages.AwdFlagInjectionHandler(_awdFlagInjectionWorkReader, _awdFlagInjectionExecutor, wolverinePostCommitMessagePublisher, _optionsOfRunnerOptions, _timeProvider, _loggerOfAwdFlagInjectionHandler);
             
             // The actual message execution
             var outgoing1 = await awdFlagInjectionHandler.Handle(injectAwdFlag, cancellation).ConfigureAwait(false);

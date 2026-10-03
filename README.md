@@ -51,10 +51,18 @@ not add an HAProxy or ingress-proxy layer for Docker runtimes.
 - Backend: .NET 10, FastEndpoints, EF Core 10, Npgsql/PostgreSQL, Wolverine, SignalR.
 - Frontend: Nuxt 4, Vue 3, TypeScript, Vite, and Bun.
 - Infrastructure: PostgreSQL, Redis, local or S3-compatible object storage.
-- Runtime providers: Docker Container/Compose, Kubernetes Container/Compose, Libvirt/OVA.
+- Runtime providers: Docker named-service Containers, Kubernetes service Pods, Libvirt/OVA.
 - Tests: TUnit, NSubstitute, and Testcontainers against real dependencies.
 
-## Production Docker Compose
+## Deployment
+
+Use `bash deploy/configure.sh` for interactive Linux/WSL Docker or existing Kubernetes configuration. Both deployments automatically migrate on Host startup. See [all deployment entrypoints](deploy/README.md).
+
+### Deployment
+
+Use `bash deploy/configure.sh` for interactive Linux/WSL Docker or existing Kubernetes configuration. Both deployments automatically migrate on Host startup. See [all deployment entrypoints](deploy/README.md).
+
+### Production Docker Compose
 
 The single Compose definition contains the combined NoCTF Host, PostgreSQL, Redis, NATS,
 and an authenticated Registry. It uses prebuilt images and directory bind mounts only.
@@ -62,9 +70,9 @@ No ports are published/exposed; operations connects its reverse proxy through th
 `1panel-network` aliases `noctf-web:8080` and `noctf-registry:5000`.
 
 ```bash
-bash deploy/init-layout.sh /opt/noctf
+bash deploy/docker/init-layout.sh /opt/noctf
 # Fill /opt/noctf/.env with the CI image digest, existing/new secrets and real host names.
-# Prepare Registry bcrypt credentials and Docker login as described in deploy/README.md.
+# Prepare Registry bcrypt credentials and Docker login as described in deploy/docker/README.md.
 cd /opt/noctf
 docker compose config --quiet
 docker compose up -d
@@ -72,8 +80,8 @@ docker compose up -d
 
 Migration runs inside NoCTF at startup; image health checks are in the Dockerfile.
 Telemetry/exporters and proxy configuration are not part of the core deployment.
-Use the independent [Prometheus/Grafana stack](deploy/observability/README.md) when
-operational monitoring is required. Read [deployment instructions](deploy/README.md)
+Use the independent [Prometheus/Grafana stack](deploy/docker/observability/README.md) when
+operational monitoring is required. Read [Docker deployment](deploy/docker/README.md)
 before migrating an existing installation:
 never replace an existing named volume with an empty directory.
 
@@ -94,7 +102,7 @@ backend/
     NoCTF.Persistence.Sqlite/     isolated test-only provider
     NoCTF.Modeling.Generators/    TPH leaf/catalog compile-time generation and diagnostics
   tests/NoCTF.Tests/       unit, architecture, and integration tests
-deploy/                    local Compose and Kubernetes manifests
+deploy/                    Docker, Kubernetes, shared recovery/configuration assets
 docs/                      authoritative product and engineering specifications
 ```
 

@@ -1,0 +1,134 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: prometheus
+  namespace: noctf
+  labels:
+    app.kubernetes.io/part-of: noctf
+spec:
+  serviceName: prometheus
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      automountServiceAccountToken: true
+      nodeSelector:
+        noctf.io/node-role: platform
+      containers:
+      - name: prometheus
+        image: prom/prometheus:v3.14.0@sha256:5ce7540c3c00ef4ab0c9d2c995c6a5b9c421f44b4a115d97a2c7af3b1c21cbb0
+        ports:
+        - containerPort: 9090
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: '1'
+            memory: 1Gi
+        volumeMounts:
+        - name: data
+          mountPath: /prometheus
+        - name: config
+          mountPath: /etc/prometheus
+        - name: rules
+          mountPath: /etc/prometheus/rules
+        args:
+        - --config.file=/etc/prometheus/prometheus.yml
+        - --storage.tsdb.path=/prometheus
+        - --storage.tsdb.retention.time=7d
+        - --storage.tsdb.retention.size=2GB
+        readinessProbe:
+          httpGet:
+            path: /-/ready
+            port: 9090
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: prometheus-pvc
+      - name: config
+        configMap:
+          name: prometheus-config
+      - name: rules
+        configMap:
+          name: prometheus-rules
+      serviceAccountName: noctf-prometheus
+      securityContext:
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: noctf
+  labels:
+    app.kubernetes.io/part-of: noctf
+spec:
+  selector:
+    app: prometheus
+  ports:
+  - name: http
+    port: 9090
+    targetPort: 9090
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prometheus-pvc
+  namespace: noctf
+  labels:
+    app.kubernetes.io/part-of: noctf
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: noctf-prometheus
+  namespace: noctf
+  labels:
+    app.kubernetes.io/part-of: noctf
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: noctf-prometheus
+  namespace: noctf
+  labels:
+    app.kubernetes.io/part-of: noctf
+rules:
+- apiGroups:
+  - ''
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: noctf-prometheus
+  namespace: noctf
+  labels:
+    app.kubernetes.io/part-of: noctf
+subjects:
+- kind: ServiceAccount
+  name: noctf-prometheus
+  namespace: noctf
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: noctf-prometheus

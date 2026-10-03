@@ -4,5 +4,6 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="KubernetesClient" />
+    <InternalsVisibleTo Include="NoCTF.Tests" />
   </ItemGroup>
 </Project>

@@ -1,0 +1,9 @@
+services:
+  noctf:
+    environment:
+      ASPNETCORE_HTTP_PORTS: "8080;9464"
+      Observability__Enabled: "true"
+      Observability__MetricsPort: "9464"
+      Observability__LokiBaseUrl: http://loki:3100/
+      Observability__RequireLoki: "true"
+      OTEL_SDK_DISABLED: "false"

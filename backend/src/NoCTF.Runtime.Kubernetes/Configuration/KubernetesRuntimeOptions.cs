@@ -11,7 +11,8 @@ public sealed record KubernetesRuntimeOptions(
     bool NetworkPolicyRequired = true,
     IReadOnlyList<string>? ProtectedCidrs = null,
     string CallbackNamespaceLabelKey = "kubernetes.io/metadata.name",
-    string CallbackNamespaceLabelValue = "noctf")
+    string CallbackNamespaceLabelValue = "noctf",
+    IReadOnlyList<string>? ImagePullSecrets = null)
 {
     public const string PodPidsLimitNodeLabel = "noctf.io/pod-pids-limit";
 }

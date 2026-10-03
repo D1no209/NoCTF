@@ -26,7 +26,7 @@ public sealed class RedisBoundaryRulesTests
         await Assert.That(infrastructure)
             .DoesNotContain("<PackageReference Include=\"StackExchange.Redis\"");
         await Assert.That(File.Exists(Path.Combine(root,
-            "deploy", "observability", "postgres-exporter", "queries.yml"))).IsFalse();
+            "deploy", "docker", "observability", "postgres-exporter", "queries.yml"))).IsFalse();
     }
 
     private static string FindRepositoryRoot()

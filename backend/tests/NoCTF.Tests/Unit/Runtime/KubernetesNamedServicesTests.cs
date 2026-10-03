@@ -21,7 +21,8 @@ public sealed class KubernetesNamedServicesTests
         using var api = new RecordingApi();
         using var client = new Kubernetes(new KubernetesClientConfiguration { Host = "http://runtime.test" }, [api]);
         var options = new KubernetesRuntimeOptions(Namespace: "runtime", PodPidsLimit: 256,
-            ClusterDomain: "cluster.local", ClusterDnsServiceAddress: "10.96.0.10", ProtectedCidrs: ["10.0.0.0/8"]);
+            ClusterDomain: "cluster.local", ClusterDnsServiceAddress: "10.96.0.10", ProtectedCidrs: ["10.0.0.0/8"],
+            ImagePullSecrets: ["challenge-registry"]);
         var containers = new KubernetesContainerLifecycle(client, options);
         var runtime = new KubernetesContainerRuntime(client, containers, options);
         RuntimeServiceDefinition[] services = count == 1 ? [new("main", "nginx")] : [new("web", "nginx"), new("db", "alpine")];
@@ -38,8 +39,11 @@ public sealed class KubernetesNamedServicesTests
         foreach (var pod in pods)
         {
             await Assert.That(pod["spec"]!["containers"]!.AsArray().Count).IsEqualTo(1);
+            await Assert.That(pod["spec"]!["imagePullSecrets"]![0]!["name"]!.GetValue<string>()).IsEqualTo("challenge-registry");
             await Assert.That(pod["spec"]!["containers"]![0]!["imagePullPolicy"]!.GetValue<string>()).IsEqualTo("Always");
             await Assert.That(pod["spec"]!["containers"]![0]!["securityContext"]).IsNull();
+            await Assert.That(pod["spec"]!["containers"]![0]!["volumeMounts"]![0]!["mountPath"]!.GetValue<string>()).IsEqualTo("/noctf");
+            await Assert.That(pod["spec"]!["securityContext"]!["fsGroup"]!.GetValue<long>()).IsEqualTo(65_532L);
             if (count > 1)
             {
                 await Assert.That(pod["spec"]!["subdomain"]!.GetValue<string>()).IsEqualTo(request.ProjectName);

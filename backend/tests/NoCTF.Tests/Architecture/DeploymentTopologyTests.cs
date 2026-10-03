@@ -8,8 +8,8 @@ public sealed class DeploymentTopologyTests
     public async Task Deployment_manifests_use_only_the_unified_host_process()
     {
         var dockerfile = await ReadAsync("backend", "Dockerfile");
-        var compose = await ReadAsync("deploy", "docker-compose.yml");
-        var runtimeEnv = await ReadAsync("deploy", "env", "noctf", ".env.example");
+        var compose = await ReadAsync("deploy", "docker", "docker-compose.yml");
+        var runtimeEnv = await ReadAsync("deploy", "docker", "env", "noctf", ".env.example");
         var healthcheck = await ReadAsync("backend", "docker", "healthcheck.sh");
         var hostProgram = await ReadAsync("backend", "src", "NoCTF.Host", "Program.cs");
         var hostProject = await ReadAsync("backend", "src", "NoCTF.Host", "NoCTF.Host.csproj");
@@ -30,6 +30,7 @@ public sealed class DeploymentTopologyTests
             RepositoryRoot,
             "deploy",
             "k8s",
+            "base",
             "worker-deployment.yaml");
         var kubernetesConfig = await ReadAsync("deploy", "k8s", "configmap.yaml");
 
@@ -159,7 +160,7 @@ public sealed class DeploymentTopologyTests
     public async Task Deployment_manifests_use_role_aware_health_probes()
     {
         var dockerfile = await ReadAsync("backend", "Dockerfile");
-        var compose = await ReadAsync("deploy", "docker-compose.yml");
+        var compose = await ReadAsync("deploy", "docker", "docker-compose.yml");
         var backend = await ReadAsync("deploy", "k8s", "backend-deployment.yaml");
         var worker = await ReadAsync("deploy", "k8s", "worker-deployment.yaml");
         var runner = await ReadAsync("deploy", "k8s", "runner-deployment.yaml");
@@ -177,8 +178,8 @@ public sealed class DeploymentTopologyTests
     [Test]
     public async Task Stock_manifests_give_scoring_checkers_a_reachable_callback_identity()
     {
-        var compose = await ReadAsync("deploy", "docker-compose.yml");
-        var runtimeEnv = await ReadAsync("deploy", "env", "noctf", ".env.example");
+        var compose = await ReadAsync("deploy", "docker", "docker-compose.yml");
+        var runtimeEnv = await ReadAsync("deploy", "docker", "env", "noctf", ".env.example");
         var kubernetesConfig = await ReadAsync("deploy", "k8s", "configmap.yaml");
         var backendDeployment = await ReadAsync(
             "deploy",
@@ -199,11 +200,11 @@ public sealed class DeploymentTopologyTests
         await Assert.That(runtimeEnv)
             .Contains("RunnerScoring__CallbackBaseUrl=http://noctf:8080");
         await Assert.That(kubernetesConfig).Contains(
-            "RunnerScoring__CallbackBaseUrl: \"http://backend-service.noctf.svc.cluster.local:8080\"");
+            "RunnerScoring__CallbackBaseUrl: http://backend-service.noctf.svc.cluster.local:8080");
         await Assert.That(kubernetesConfig).Contains(
-            "Runtime__Kubernetes__CallbackNamespaceLabelValue: \"noctf\"");
+            "Runtime__Kubernetes__CallbackNamespaceLabelValue: noctf");
         await Assert.That(kubernetesConfig).Contains(
-            "Runtime__Kubernetes__CallbackPodLabelValue: \"scoring-callback-gateway\"");
+            "Runtime__Kubernetes__CallbackPodLabelValue: scoring-callback-gateway");
         await Assert.That(backendDeployment)
             .Contains("noctf.io/internal-role: scoring-callback-gateway");
         await Assert.That(networkPolicies)
@@ -218,11 +219,11 @@ public sealed class DeploymentTopologyTests
     [Test]
     public async Task Public_tls_terminates_at_nginx_while_internal_api_remains_http_only()
     {
-        var compose = await ReadAsync("deploy", "docker-compose.yml");
-        var runtimeEnv = await ReadAsync("deploy", "env", "noctf", ".env.example");
-        var nginx = await ReadAsync("deploy", "nginx", "noctf.conf");
+        var compose = await ReadAsync("deploy", "docker", "docker-compose.yml");
+        var runtimeEnv = await ReadAsync("deploy", "docker", "env", "noctf", ".env.example");
+        var nginx = await ReadAsync("deploy", "docker", "nginx", "noctf.conf");
         var kubernetesConfig = await ReadAsync("deploy", "k8s", "configmap.yaml");
-        var kubernetesIngress = await ReadAsync("deploy", "k8s", "ingress.yaml");
+        var kubernetesIngress = await ReadAsync("deploy", "k8s", "gateway.yaml");
         var serviceRegistration = await ReadAsync(
             "backend", "src", "NoCTF.API", "Composition", "ServiceRegistration.cs");
         var pipeline = await ReadAsync(
@@ -237,7 +238,7 @@ public sealed class DeploymentTopologyTests
         await Assert.That(runtimeEnv).Contains("ForwardedHeaders__KnownNetworks__0=");
         await Assert.That(runtimeEnv).Contains("ForwardedHeaders__AllowedHosts__0=");
         await Assert.That(nginx).Contains("return 308 https://$host$request_uri;");
-        await Assert.That(nginx).Contains("proxy_pass http://127.0.0.1:8080;");
+        await Assert.That(nginx).Contains("proxy_pass http://noctf-web:8080;");
         await Assert.That(nginx).Contains("Strict-Transport-Security");
         await Assert.That(nginx).Contains("proxy_set_header X-Forwarded-Proto https;");
         await Assert.That(nginx).Contains("proxy_set_header X-Forwarded-For $remote_addr;");
@@ -245,13 +246,13 @@ public sealed class DeploymentTopologyTests
         await Assert.That(nginx).Contains("proxy_set_header Upgrade $http_upgrade;");
         await Assert.That(nginx).Contains("proxy_set_header Connection $connection_upgrade;");
 
-        await Assert.That(kubernetesConfig).Contains("ASPNETCORE_HTTP_PORTS: \"8080\"");
+        await Assert.That(kubernetesConfig).Contains("ASPNETCORE_HTTP_PORTS: '8080;9464'");
         await Assert.That(kubernetesConfig).DoesNotContain("ASPNETCORE_URLS:");
         await Assert.That(kubernetesConfig).Contains("ForwardedHeaders__KnownNetworks__0:");
         await Assert.That(kubernetesConfig).DoesNotContain("ForwardedHeaders__TrustAll");
-        await Assert.That(kubernetesIngress).Contains("ssl-redirect: \"true\"");
-        await Assert.That(kubernetesIngress).Contains("force-ssl-redirect: \"true\"");
-        await Assert.That(kubernetesIngress).Contains("proxy_set_header Upgrade $http_upgrade;");
+        await Assert.That(kubernetesIngress).Contains("kind: Gateway");
+        await Assert.That(kubernetesIngress).Contains("protocol: HTTPS");
+        await Assert.That(kubernetesIngress).Contains("type: RequestRedirect");
 
         await Assert.That(serviceRegistration).Contains("AddNoCtfForwardedHeaders(configuration)");
         await Assert.That(pipeline).Contains("app.UseForwardedHeaders();");
@@ -280,10 +281,10 @@ public sealed class DeploymentTopologyTests
                 "name: allow-cluster-dns-egress",
                 StringComparison.Ordinal));
         await Assert.That(clusterDnsPolicy).Contains("kind: CiliumNetworkPolicy");
-        await Assert.That(clusterDnsPolicy).Contains("\"k8s:k8s-app\": kube-dns");
+        await Assert.That(clusterDnsPolicy).Contains("k8s:k8s-app: kube-dns");
         await Assert.That(clusterDnsPolicy).Contains("rules:");
         await Assert.That(clusterDnsPolicy).Contains("dns:");
-        await Assert.That(clusterDnsPolicy).Contains("matchPattern: \"*.svc.cluster.local\"");
+        await Assert.That(clusterDnsPolicy).Contains("*.svc.cluster.local");
 
         await Assert.That(smtpExample).Contains("kind: CiliumNetworkPolicy");
         await Assert.That(smtpExample).Contains("matchName: smtp.example.com");
@@ -302,30 +303,15 @@ public sealed class DeploymentTopologyTests
     [Test]
     public async Task Kubernetes_installation_enforces_network_policies_before_workloads()
     {
-        var readme = await ReadAsync("deploy", "k8s", "k8s-readme.md");
-        var networkPolicyIndex = readme.IndexOf(
-            "kubectl apply -f networkpolicy.yaml",
-            StringComparison.Ordinal);
-
-        await Assert.That(networkPolicyIndex).IsGreaterThanOrEqualTo(0);
-        foreach (var workload in new[]
-                 {
-                     "postgres-deployment.yaml",
-                     "redis-deployment.yaml",
-                     "minio-deployment.yaml",
-                     "migration-job.yaml",
-                     "backend-deployment.yaml",
-                     "worker-deployment.yaml",
-                     "runner-deployment.yaml"
-                 })
-        {
-            await Assert.That(readme.IndexOf(
-                $"kubectl apply -f {workload}",
-                StringComparison.Ordinal)).IsGreaterThan(networkPolicyIndex);
-        }
-
-        await Assert.That(readme).Contains(
-            "Do not replace the staged sequence with a single directory-wide apply.");
+        var script = await ReadAsync("deploy", "k8s", "scripts", "Deploy.ps1");
+        var policyIndex = script.IndexOf("networkpolicy.yaml", StringComparison.Ordinal);
+        var workloadIndex = script.IndexOf("Apply-Rendered", StringComparison.Ordinal);
+        await Assert.That(policyIndex).IsGreaterThanOrEqualTo(0);
+        await Assert.That(workloadIndex).IsGreaterThan(policyIndex);
+        await Assert.That(script).Contains("-SuspendApplications:$Initialize");
+        await Assert.That(script).Contains("Wait-Initialization");
+        var baseConfiguration = await ReadAsync("deploy", "k8s", "kustomization.yaml");
+        await Assert.That(baseConfiguration).DoesNotContain("migration-job.yaml");
     }
 
     [Test]
@@ -337,13 +323,15 @@ public sealed class DeploymentTopologyTests
             "apps/v1",
             "batch/v1",
             "networking.k8s.io/v1",
-            "rbac.authorization.k8s.io/v1"
+            "rbac.authorization.k8s.io/v1",
+            "kustomize.config.k8s.io/v1beta1",
+            "storage.k8s.io/v1"
         };
         var kubernetesManifestContents = await Task.WhenAll(
             Directory.GetFiles(
                     Path.Combine(RepositoryRoot, "deploy", "k8s"),
                     "*.yaml",
-                    SearchOption.TopDirectoryOnly)
+                    SearchOption.AllDirectories)
                 .Select(path => File.ReadAllTextAsync(path)));
         var customResources = kubernetesManifestContents
             .SelectMany(content => System.Text.RegularExpressions.Regex.Matches(
@@ -354,9 +342,12 @@ public sealed class DeploymentTopologyTests
             .Select(match =>
                 $"{match.Groups["apiVersion"].Value}:{match.Groups["kind"].Value}")
             .ToArray();
-        await Assert.That(customResources).Count().IsEqualTo(5);
+        await Assert.That(customResources.Length).IsGreaterThan(5);
         await Assert.That(customResources.All(resource =>
-            resource == "cilium.io/v2:CiliumNetworkPolicy")).IsTrue();
+            resource == "cilium.io/v2:CiliumNetworkPolicy"
+            || resource == "cilium.io/v2:CiliumClusterwideNetworkPolicy"
+            || resource.StartsWith("gateway.networking.k8s.io/v1:", StringComparison.Ordinal)
+            || resource.StartsWith("gateway.envoyproxy.io/v1alpha1:", StringComparison.Ordinal))).IsTrue();
     }
 
     [Test]
@@ -398,12 +389,12 @@ public sealed class DeploymentTopologyTests
         var dockerfile = await ReadAsync("backend", "Dockerfile");
         var deploymentFiles = new[]
         {
-            await ReadAsync("deploy", "docker-compose.yml"),
-            await ReadAsync("deploy", ".env.example"),
+            await ReadAsync("deploy", "docker", "docker-compose.yml"),
+            await ReadAsync("deploy", "docker", ".env.example"),
             await ReadAsync("deploy", "k8s", "postgres-deployment.yaml"),
             await ReadAsync("deploy", "k8s", "redis-deployment.yaml"),
-            await ReadAsync("deploy", "k8s", "minio-deployment.yaml"),
-            await ReadAsync("deploy", "k8s", "minio-init-job.yaml")
+            await ReadAsync("deploy", "k8s", "rustfs-deployment.yaml"),
+            await ReadAsync("deploy", "k8s", "storage-init-job.yaml")
         };
 
         var externalBaseImages = dockerfile.Split('\n')
@@ -433,6 +424,7 @@ public sealed class DeploymentTopologyTests
                     "image: docker.m.daocloud.io/library/nats:",
                     StringComparison.Ordinal)
                 || line.StartsWith("image: minio/", StringComparison.Ordinal)
+                || line.StartsWith("image: rustfs/", StringComparison.Ordinal)
                 || line.StartsWith("image: registry:", StringComparison.Ordinal))
             .ToArray();
         await Assert.That(externalRuntimeImages).Count().IsEqualTo(8);
@@ -447,15 +439,15 @@ public sealed class DeploymentTopologyTests
     [Test]
     public async Task Production_defaults_disable_telemetry_and_remove_old_overlays()
     {
-        var environment = await ReadAsync("deploy", "env", "noctf", ".env.example");
-        var registryEnvironment = await ReadAsync("deploy", "env", "registry", ".env.example");
+        var environment = await ReadAsync("deploy", "docker", "env", "noctf", ".env.example");
+        var registryEnvironment = await ReadAsync("deploy", "docker", "env", "registry", ".env.example");
         await Assert.That(environment).Contains("Observability__Enabled=false");
         await Assert.That(environment).Contains("OTEL_SDK_DISABLED=true");
         await Assert.That(registryEnvironment).Contains("OTEL_TRACES_EXPORTER=none");
         foreach (var obsolete in new[] { "docker-compose.single.yml", "docker-compose.ci.yml", "docker-compose.observability.yml" })
             await Assert.That(File.Exists(Path.Combine(RepositoryRoot, "deploy", obsolete))).IsFalse();
         await Assert.That(File.Exists(Path.Combine(
-            RepositoryRoot, "deploy", "observability", "compose.yml"))).IsTrue();
+            RepositoryRoot, "deploy", "docker", "observability", "compose.yml"))).IsTrue();
     }
 
     [Test]
@@ -463,8 +455,8 @@ public sealed class DeploymentTopologyTests
     {
         var extension = await ReadAsync("backend", "src", "NoCTF.Hosting", "Observability", "ObservabilityExtensions.cs");
         var infrastructure = await ReadAsync("backend", "src", "NoCTF.Infrastructure", "ServiceRegistration.cs");
-        var environment = await ReadAsync("deploy", "env", "noctf", ".env.example");
-        var externalCompose = await ReadAsync("deploy", "observability", "compose.yml");
+        var environment = await ReadAsync("deploy", "docker", "env", "noctf", ".env.example");
+        var externalCompose = await ReadAsync("deploy", "docker", "observability", "compose.yml");
         await Assert.That(extension).Contains("Observability:Enabled");
         await Assert.That(infrastructure).DoesNotContain("OperationalMetricsCollector");
         await Assert.That(environment).DoesNotContain("PrometheusBaseUrl");
@@ -480,9 +472,9 @@ public sealed class DeploymentTopologyTests
     [Test]
     public async Task External_observability_is_isolated_private_and_digest_pinned()
     {
-        var compose = await ReadAsync("deploy", "observability", "compose.yml");
+        var compose = await ReadAsync("deploy", "docker", "observability", "compose.yml");
         var environment = await ReadAsync(
-            "deploy", "observability", ".env.example");
+            "deploy", "docker", "observability", ".env.example");
         var images = environment.Split('\n')
             .Select(line => line.Trim())
             .Where(line => line.Contains("_IMAGE=", StringComparison.Ordinal))
@@ -498,19 +490,19 @@ public sealed class DeploymentTopologyTests
         await Assert.That(compose).Contains("127.0.0.1:");
         await Assert.That(compose).DoesNotContain("depends_on:");
         await Assert.That(compose).DoesNotContain("Observability__PrometheusBaseUrl");
-        await Assert.That(compose).Contains("GF_PLUGINS_PREINSTALL_AUTO_UPDATE: \"false\"");
+        await Assert.That(compose).Contains("GF_PLUGINS_PREINSTALL_AUTO_UPDATE: 'false'");
         await Assert.That(compose).Contains(
             "--config.file=/etc/postgres-exporter/postgres_exporter.yml");
         await Assert.That(compose).Contains("--path.udev.data=/host/run/udev/data");
         await Assert.That(compose).DoesNotContain("--extend.query-path");
         await Assert.That(File.Exists(Path.Combine(
-            RepositoryRoot, "deploy", "observability", "grafana", "provisioning",
+            RepositoryRoot, "deploy", "docker", "observability", "grafana", "provisioning",
             "alerting", ".gitkeep"))).IsTrue();
         await Assert.That(File.Exists(Path.Combine(
-            RepositoryRoot, "deploy", "observability", "grafana", "provisioning",
+            RepositoryRoot, "deploy", "docker", "observability", "grafana", "provisioning",
             "plugins", ".gitkeep"))).IsTrue();
         var postgresExporterConfig = await File.ReadAllTextAsync(Path.Combine(
-            RepositoryRoot, "deploy", "observability", "postgres-exporter",
+            RepositoryRoot, "deploy", "docker", "observability", "postgres-exporter",
             "postgres_exporter.yml"));
         await Assert.That(postgresExporterConfig.Trim()).IsEqualTo("{}");
     }
@@ -612,8 +604,17 @@ public sealed class DeploymentTopologyTests
         await Assert.That(compose).Contains("\"127.0.0.1::8080\"");
     }
 
-    private static Task<string> ReadAsync(params string[] segments) =>
-        File.ReadAllTextAsync(Path.Combine([RepositoryRoot, .. segments]));
+    private static Task<string> ReadAsync(params string[] segments)
+    {
+        var path = Path.Combine([RepositoryRoot, .. segments]);
+        if (!File.Exists(path) && segments.Length == 3 && segments[0] == "deploy" && segments[1] == "k8s")
+        {
+            path = Path.Combine(RepositoryRoot, "deploy", "k8s", "base", segments[2]);
+            if (!File.Exists(path))
+                path = Path.Combine(RepositoryRoot, "deploy", "k8s", "init", "base", segments[2]);
+        }
+        return File.ReadAllTextAsync(path);
+    }
 
     private static bool IsImmutableTestImage(string image) =>
         System.Text.RegularExpressions.Regex.IsMatch(

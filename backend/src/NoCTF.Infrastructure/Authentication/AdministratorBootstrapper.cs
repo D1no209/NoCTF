@@ -1,4 +1,5 @@
 using System.Net.Mail;
+using System.Data.Common;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -52,7 +53,20 @@ public sealed class AdministratorBootstrapper(
         };
         administrator.PasswordHash = passwordHasher.HashPassword(administrator, password);
         db.Users.Add(administrator);
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException exception) when (exception.GetBaseException() is DbException { SqlState: "23505" })
+        {
+            db.Entry(administrator).State = EntityState.Detached;
+            // Multiple roles can finish the migration lock and seed together.
+            // Only the same administrator's unique-key winner is idempotent.
+            var winner = await db.Users.AsNoTracking().SingleOrDefaultAsync(user =>
+                user.NormalizedUserName == normalizedUserName, ct);
+            if (winner is not { Role: UserRole.Administrator } || winner.Email != email)
+                throw;
+        }
     }
 
     private static void Validate(string userName, string email, string password)

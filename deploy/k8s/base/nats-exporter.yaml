@@ -1,0 +1,129 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nats-exporter
+  namespace: noctf
+  labels:
+    app.kubernetes.io/part-of: noctf
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nats-exporter
+  template:
+    metadata:
+      labels:
+        app: nats-exporter
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+        noctf.io/node-role: platform
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: exporter
+        image: docker.m.daocloud.io/natsio/prometheus-nats-exporter:0.20.1@sha256:4fbf6dacb84780a45a1c3af9b1080c69451a288d20902deae671b80717bb8f61
+        args: [-varz, -jsz=all, http://nats:8222]
+        ports:
+        - name: metrics
+          containerPort: 7777
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: [ALL]
+        resources:
+          requests:
+            cpu: 20m
+            memory: 32Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+        readinessProbe:
+          httpGet:
+            path: /metrics
+            port: metrics
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nats-exporter
+  namespace: noctf
+  labels:
+    app.kubernetes.io/part-of: noctf
+spec:
+  selector:
+    app: nats-exporter
+  ports:
+  - name: metrics
+    port: 7777
+    targetPort: metrics
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: nats-exporter-private
+  namespace: noctf
+spec:
+  podSelector:
+    matchLabels:
+      app: nats-exporter
+  policyTypes: [Ingress, Egress]
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: prometheus
+    ports:
+    - protocol: TCP
+      port: 7777
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: nats
+    ports:
+    - protocol: TCP
+      port: 8222
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: nats-monitoring-from-exporter
+  namespace: noctf
+spec:
+  podSelector:
+    matchLabels:
+      app: nats
+  policyTypes: [Ingress]
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: nats-exporter
+    ports:
+    - protocol: TCP
+      port: 8222
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: prometheus-to-nats-exporter
+  namespace: noctf
+spec:
+  podSelector:
+    matchLabels:
+      app: prometheus
+  policyTypes: [Egress]
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: nats-exporter
+    ports:
+    - protocol: TCP
+      port: 7777

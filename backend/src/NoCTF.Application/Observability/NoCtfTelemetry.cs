@@ -199,6 +199,12 @@ public static class NoCtfTelemetry
     private static readonly ConcurrentDictionary<string, RunnerCapacitySnapshot> RunnerCapacitySnapshots =
         new(StringComparer.Ordinal);
     private static long runtimeWaitingCount;
+    private static long kubernetesPodSlots;
+    private static long kubernetesManagedPods;
+    private static long kubernetesPendingPods;
+    private static long kubernetesUnschedulablePods;
+    private static long kubernetesImagePullBlockedPods;
+    private static long kubernetesPublishedNodePorts;
     private static long runtimeWaitingOldestAgeSeconds;
     private static long webhookPendingCount;
     private static long webhookOldestPendingAgeSeconds;
@@ -213,6 +219,12 @@ public static class NoCtfTelemetry
 
     static NoCtfTelemetry()
     {
+        Meter.CreateObservableGauge("noctf.kubernetes.pod_slots.allocatable", () => Volatile.Read(ref kubernetesPodSlots));
+        Meter.CreateObservableGauge("noctf.kubernetes.pods.managed", () => Volatile.Read(ref kubernetesManagedPods));
+        Meter.CreateObservableGauge("noctf.kubernetes.pods.pending", () => Volatile.Read(ref kubernetesPendingPods));
+        Meter.CreateObservableGauge("noctf.kubernetes.pods.unschedulable", () => Volatile.Read(ref kubernetesUnschedulablePods));
+        Meter.CreateObservableGauge("noctf.kubernetes.pods.image_pull_blocked", () => Volatile.Read(ref kubernetesImagePullBlockedPods));
+        Meter.CreateObservableGauge("noctf.kubernetes.nodeports.published", () => Volatile.Read(ref kubernetesPublishedNodePorts));
         Meter.CreateObservableGauge(
             "noctf.runner.online",
             ObserveRunnerOnline,
@@ -253,6 +265,17 @@ public static class NoCtfTelemetry
     {
         Volatile.Write(ref runtimeWaitingCount, Math.Max(0, count));
         Volatile.Write(ref runtimeWaitingOldestAgeSeconds, Math.Max(0, oldestAgeSeconds));
+    }
+
+    public static void SetKubernetesSchedulingSnapshot(long slots, long managed, long pending,
+        long unschedulable, long imagePullBlocked, long nodePorts)
+    {
+        Volatile.Write(ref kubernetesPodSlots, slots);
+        Volatile.Write(ref kubernetesManagedPods, managed);
+        Volatile.Write(ref kubernetesPendingPods, pending);
+        Volatile.Write(ref kubernetesUnschedulablePods, unschedulable);
+        Volatile.Write(ref kubernetesImagePullBlockedPods, imagePullBlocked);
+        Volatile.Write(ref kubernetesPublishedNodePorts, nodePorts);
     }
 
     public static void SetWebhookPendingSnapshot(

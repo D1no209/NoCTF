@@ -28,7 +28,10 @@ public sealed class KubernetesOneShotInputArchiveTests
             Skip.Test("Integration skipped: NOCTF_KUBERNETES_INTEGRATION is not enabled.");
         }
 
-        using var client = new Kubernetes(KubernetesClientConfiguration.BuildDefaultConfig());
+        var context = Environment.GetEnvironmentVariable("NOCTF_KUBERNETES_CONTEXT")
+            ?? throw new InvalidOperationException("An explicit integration context is required.");
+        if (context == "docker-desktop") throw new InvalidOperationException("Use an isolated integration cluster.");
+        using var client = new Kubernetes(KubernetesClientConfiguration.BuildConfigFromConfigFile(currentContext: context));
         var namespaceName = $"noctf-input-it-{Guid.NewGuid():N}";
         await client.CoreV1.CreateNamespaceAsync(new V1Namespace
         {
@@ -50,7 +53,7 @@ public sealed class KubernetesOneShotInputArchiveTests
             var options = new KubernetesRuntimeOptions(
                 Namespace: namespaceName,
                 PublicHost: "node.test",
-                PodPidsLimit: 512,
+                PodPidsLimit: long.Parse(Environment.GetEnvironmentVariable("NOCTF_KUBERNETES_POD_PIDS_LIMIT") ?? "256", System.Globalization.CultureInfo.InvariantCulture),
                 ClusterDomain: "cluster.local",
                 ClusterDnsServiceAddress: kubeDns.Spec.ClusterIP
                     ?? throw new InvalidOperationException("kube-dns Service has no ClusterIP."),
@@ -134,7 +137,8 @@ public sealed class KubernetesOneShotInputArchiveTests
         }
     }
 
-    private static ContainerRequest Request(Guid operationId) => new(operationId, RuntimeProvider.Kubernetes, "busybox:1.36.1", [
+    private static ContainerRequest Request(Guid operationId) => new(operationId, RuntimeProvider.Kubernetes,
+        Environment.GetEnvironmentVariable("NOCTF_KUBERNETES_TEST_IMAGE") ?? "busybox:1.36.1", [
             "/bin/sh",
             "-c",
             "test -f /noctf/fix/fix.sh && test \"$(wc -c < /noctf/fix/blob.bin)\" -eq 2097152"

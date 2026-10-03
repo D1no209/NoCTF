@@ -1,0 +1,99 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: runner
+  namespace: noctf
+  labels:
+    app: runner
+    app.kubernetes.io/part-of: noctf
+spec:
+  serviceName: runner-headless
+  podManagementPolicy: Parallel
+  replicas: 1
+  selector:
+    matchLabels:
+      app: runner
+  template:
+    metadata:
+      labels:
+        app: runner
+    spec:
+      serviceAccountName: noctf-runner
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1654
+        runAsGroup: 1654
+        fsGroup: 1654
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: runner
+        image: noctf-host:dev
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        ports:
+        - containerPort: 8080
+        - name: metrics
+          containerPort: 9464
+        envFrom:
+        - configMapRef:
+            name: noctf-config
+        env:
+        - name: Hosting__Roles__0
+          value: Runner
+        - name: Runner__Id
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: noctf-secrets
+              key: db-password
+        - name: ConnectionStrings__PostgreSql
+          value: Host=postgres;Port=5432;Database=noctf;Username=postgres;Password=$(DB_PASSWORD)
+        - name: RunnerScoring__SigningKey
+          valueFrom:
+            secretKeyRef:
+              name: noctf-secrets
+              key: runner-scoring-key
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: '2'
+            memory: 1Gi
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        startupProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+          periodSeconds: 5
+          failureThreshold: 60
+      volumes:
+      - name: tmp
+        emptyDir:
+          sizeLimit: 256Mi
+      nodeSelector:
+        noctf.io/node-role: platform
+      terminationGracePeriodSeconds: 60

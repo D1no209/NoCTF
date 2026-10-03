@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: loki
+  namespace: noctf
+  labels:
+    app.kubernetes.io/part-of: noctf
+spec:
+  serviceName: loki
+  replicas: 1
+  selector:
+    matchLabels:
+      app: loki
+  template:
+    metadata:
+      labels:
+        app: loki
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector:
+        noctf.io/node-role: platform
+      containers:
+      - name: loki
+        image: grafana/loki:3.6.0@sha256:6a705de65df88aa0d90a44779606b0042722c86637335a73858f65f9fe9f9557
+        ports:
+        - containerPort: 3100
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: '1'
+            memory: 1Gi
+        volumeMounts:
+        - name: data
+          mountPath: /loki
+        - name: config
+          mountPath: /etc/loki
+        args:
+        - -config.file=/etc/loki/loki.yml
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 3100
+          initialDelaySeconds: 15
+          periodSeconds: 5
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: loki-pvc
+      - name: config
+        configMap:
+          name: loki-config
+      securityContext:
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: loki
+  namespace: noctf
+  labels:
+    app.kubernetes.io/part-of: noctf
+spec:
+  selector:
+    app: loki
+  ports:
+  - name: http
+    port: 3100
+    targetPort: 3100
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: loki-pvc
+  namespace: noctf
+  labels:
+    app.kubernetes.io/part-of: noctf
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi

@@ -1,0 +1,33 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- ../../base
+patches:
+- target:
+    kind: HTTPRoute
+    name: platform
+  patch: '[{"op": "replace", "path": "/spec/hostnames", "value": ["noctf.local"]}]'
+- target:
+    kind: HTTPRoute
+    name: files
+  patch: '[{"op": "replace", "path": "/spec/hostnames", "value": ["files.noctf.local"]}]'
+- target:
+    kind: HTTPRoute
+    name: https-redirect
+  patch: '[{"op": "replace", "path": "/spec/rules/0/filters/0/requestRedirect/port",
+    "value": 8443}]'
+- target:
+    kind: ConfigMap
+    name: noctf-config
+  patch: "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: noctf-config\n  namespace:\
+    \ noctf\ndata:\n  Runtime__Kubernetes__PublicHost: 127.0.0.1\n  Storage__PublicBaseUrl:\
+    \ https://files.noctf.local:8443\n  Webhooks__PublicBaseUrl: https://noctf.local:8443\n\
+    \  HumanVerification__Validation__PublicOrigin: https://noctf.local:8443\n  Cors__AllowedOrigins__0:\
+    \ https://noctf.local:8443\n  Authentication__RefreshAllowedOrigins__0: https://noctf.local:8443\n\
+    \  ForwardedHeaders__AllowedHosts__0: noctf.local\n  Runner__Admission__MainStartupConcurrency:\
+    \ '4'\n"
+- target:
+    kind: EnvoyProxy
+    name: noctf
+  patch: '[{"op": "add", "path": "/spec/provider/kubernetes/envoyService/patch/value/spec/externalTrafficPolicy",
+    "value": "Cluster"}]'

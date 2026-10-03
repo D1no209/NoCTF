@@ -21,7 +21,7 @@ public sealed class KohFullBoundaryTests
         using var anonymous = CreateClient(baseUrl);
         using var admin = CreateClient(baseUrl, await LoginAsync(
             anonymous,
-            "koh-e2e-admin",
+            E2EHttpClient.AdminUserName("koh-e2e-admin"),
             RequiredEnvironment("NOCTF_E2E_ADMIN_PASSWORD"),
             cancellationToken));
 
@@ -414,6 +414,8 @@ public sealed class KohFullBoundaryTests
         string teamName,
         CancellationToken cancellationToken)
     {
+        userName = E2EHttpClient.UniqueIdentity(userName);
+        email = E2EHttpClient.UniqueIdentity(email);
         await SendJsonAsync(anonymous, HttpMethod.Post, "/api/v1/auth/register",
             new { userName, email, password }, HttpStatusCode.Created, cancellationToken);
         var client = CreateClient(baseUrl, await LoginAsync(
@@ -543,10 +545,7 @@ public sealed class KohFullBoundaryTests
 
     private static HttpClient CreateClient(string baseUrl, string? token = null)
     {
-        var client = new HttpClient { BaseAddress = new Uri(baseUrl), Timeout = TimeSpan.FromSeconds(15) };
-        if (token is not null)
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        return client;
+        return E2EHttpClient.Create(baseUrl, token);
     }
 
     private static string RequiredEnvironment(string name) =>

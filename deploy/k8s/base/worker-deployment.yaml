@@ -1,0 +1,113 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: noctf
+  labels:
+    app: worker
+    app.kubernetes.io/part-of: noctf
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1654
+        runAsGroup: 1654
+        seccompProfile:
+          type: RuntimeDefault
+        fsGroup: 1654
+      containers:
+      - name: worker
+        image: noctf-host:dev
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        ports:
+        - containerPort: 8080
+        - name: metrics
+          containerPort: 9464
+        envFrom:
+        - configMapRef:
+            name: noctf-config
+        env:
+        - name: Hosting__Roles__0
+          value: Worker
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: noctf-secrets
+              key: db-password
+        - name: ConnectionStrings__PostgreSql
+          value: Host=postgres;Port=5432;Database=noctf;Username=postgres;Password=$(DB_PASSWORD)
+        - name: Authentication__SigningKey
+          valueFrom:
+            secretKeyRef:
+              name: noctf-secrets
+              key: jwt-secret
+        - name: RunnerScoring__SigningKey
+          valueFrom:
+            secretKeyRef:
+              name: noctf-secrets
+              key: runner-scoring-key
+        - name: EmailVerification__EncryptionKey
+          valueFrom:
+            secretKeyRef:
+              name: noctf-secrets
+              key: email-verification-encryption-key
+        - name: Storage__S3__AccessKey
+          valueFrom:
+            secretKeyRef:
+              name: noctf-secrets
+              key: s3-access-key
+        - name: Storage__S3__SecretKey
+          valueFrom:
+            secretKeyRef:
+              name: noctf-secrets
+              key: s3-secret-key
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: '2'
+            memory: 2Gi
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        startupProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+          periodSeconds: 5
+          failureThreshold: 60
+      volumes:
+      - name: tmp
+        emptyDir:
+          sizeLimit: 128Mi
+      nodeSelector:
+        noctf.io/node-role: platform
+      terminationGracePeriodSeconds: 60

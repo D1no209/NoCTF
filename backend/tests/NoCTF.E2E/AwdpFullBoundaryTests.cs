@@ -16,7 +16,9 @@ public sealed class AwdpFullBoundaryTests
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     [Test]
-    [Timeout(600_000)]
+    // Includes deliberate 65/90-second patches, checker deadlines and settled
+    // round windows across external Kubernetes scheduling boundaries.
+    [Timeout(900_000)]
     public async Task Awdp_v4_keeps_attack_runtime_fix_verification_and_round_scoring_independent(
         CancellationToken cancellationToken)
     {
@@ -26,7 +28,7 @@ public sealed class AwdpFullBoundaryTests
         using var anonymous = CreateClient(baseUrl);
         using var admin = CreateClient(baseUrl, await LoginAsync(
             anonymous,
-            "awdp-e2e-admin",
+            E2EHttpClient.AdminUserName("awdp-e2e-admin"),
             RequiredEnvironment("NOCTF_E2E_ADMIN_PASSWORD"),
             cancellationToken));
 
@@ -744,21 +746,23 @@ public sealed class AwdpFullBoundaryTests
         string suffix,
         CancellationToken cancellationToken)
     {
+        var userName = E2EHttpClient.UniqueIdentity($"awdp-{suffix}");
+        var email = E2EHttpClient.UniqueIdentity($"{suffix}@awdp-e2e.test");
         await SendJsonAsync(
             anonymous,
             HttpMethod.Post,
             "/api/v1/auth/register",
             new
             {
-                userName = $"awdp-{suffix}",
-                email = $"{suffix}@awdp-e2e.test",
+                userName,
+                email,
                 password = $"awdp-{suffix}-password"
             },
             HttpStatusCode.Created,
             cancellationToken);
         var client = CreateClient(baseUrl, await LoginAsync(
             anonymous,
-            $"awdp-{suffix}",
+            userName,
             $"awdp-{suffix}-password",
             cancellationToken));
         var team = await SendJsonAsync(
@@ -1519,13 +1523,8 @@ public sealed class AwdpFullBoundaryTests
 
     private static HttpClient CreateClient(string baseUrl, string? token = null)
     {
-        var client = new HttpClient
-        {
-            BaseAddress = new Uri(baseUrl),
-            Timeout = TimeSpan.FromSeconds(30)
-        };
-        if (token is not null)
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var client = E2EHttpClient.Create(baseUrl, token);
+        client.Timeout = TimeSpan.FromSeconds(30);
         return client;
     }
 

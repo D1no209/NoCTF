@@ -1,0 +1,42 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: storage-init
+  namespace: noctf
+  labels:
+    app: storage-init
+    app.kubernetes.io/part-of: noctf
+spec:
+  backoffLimit: 6
+  template:
+    metadata:
+      labels:
+        app: storage-init
+    spec:
+      restartPolicy: OnFailure
+      automountServiceAccountToken: false
+      containers:
+      - name: storage-init
+        image: noctf-host:dev
+        imagePullPolicy: IfNotPresent
+        command:
+        - dotnet
+        - NoCTF.Host.dll
+        - --initialize-storage-only
+        env:
+        - name: Storage__S3__AccessKey
+          valueFrom:
+            secretKeyRef:
+              name: noctf-secrets
+              key: s3-access-key
+        - name: Storage__S3__SecretKey
+          valueFrom:
+            secretKeyRef:
+              name: noctf-secrets
+              key: s3-secret-key
+        envFrom:
+        - configMapRef:
+            name: noctf-config
+      nodeSelector:
+        noctf.io/node-role: platform
+  activeDeadlineSeconds: 600

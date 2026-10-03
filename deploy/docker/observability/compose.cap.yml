@@ -1,0 +1,18 @@
+services:
+  cap-valkey-exporter:
+    image: ${REDIS_EXPORTER_IMAGE:?Set REDIS_EXPORTER_IMAGE in .env}
+    restart: unless-stopped
+    environment:
+      REDIS_ADDR: redis://valkey:6379
+    networks:
+    - observability
+    - cap-internal
+  blackbox-exporter:
+    networks:
+    - observability
+    - noctf
+    - cap-internal
+networks:
+  cap-internal:
+    external: true
+    name: ${CAP_NETWORK_NAME:-noctf-cap-internal}

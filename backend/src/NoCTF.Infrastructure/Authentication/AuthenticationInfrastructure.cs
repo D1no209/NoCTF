@@ -40,12 +40,7 @@ internal static class AuthenticationInfrastructure
                 || options.CallbackBaseUrl.Scheme is "http" or "https",
                 "RunnerScoring:CallbackBaseUrl must be an absolute HTTP(S) URI.")
             .ValidateOnStart();
-        services.AddOptions<SeedAdministratorOptions>()
-            .Bind(configuration.GetSection(SeedAdministratorOptions.SectionName))
-            .Validate(options => string.IsNullOrWhiteSpace(options.Password)
-                    || options.Password.Length is >= 8 and <= 1024,
-                "SeedAdmin:Password must contain 8 to 1024 characters when configured.")
-            .ValidateOnStart();
+        services.AddNoCtfDatabaseStartup(configuration);
         services.AddOptions<EmailVerificationProtectionOptions>()
             .Bind(configuration.GetSection(EmailVerificationProtectionOptions.SectionName))
             .Validate(options => allowDevelopmentProtection
@@ -127,8 +122,6 @@ internal static class AuthenticationInfrastructure
         services.AddScoped<NoCTF.Application.Authentication.Privacy.AccountPrivacy>();
         services.Configure<PasswordHasherOptions>(options =>
             options.IterationCount = 210_000);
-        services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
-        services.AddScoped<AdministratorBootstrapper>();
         services.AddScoped<RegisterUser>();
         services.AddScoped<GetCurrentUser>();
         services.AddScoped<GetPublicUserProfile>();

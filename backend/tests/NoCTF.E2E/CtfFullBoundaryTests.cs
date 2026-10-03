@@ -13,7 +13,7 @@ public sealed class CtfFullBoundaryTests
 
     [Test]
     [Timeout(300_000)]
-    public async Task Ctf_flow_crosses_http_worker_runner_minio_and_docker(
+    public async Task Ctf_flow_crosses_http_worker_runner_object_storage_and_runtime(
         CancellationToken cancellationToken)
     {
         var baseUrl = RequiredEnvironment("NOCTF_E2E_BASE_URL");
@@ -29,9 +29,26 @@ public sealed class CtfFullBoundaryTests
         }
         using var admin = CreateClient(baseUrl, await LoginAsync(
             anonymous,
-            "ctf-e2e-admin",
+            E2EHttpClient.AdminUserName("ctf-e2e-admin"),
             RequiredEnvironment("NOCTF_E2E_ADMIN_PASSWORD"),
             cancellationToken));
+
+        using (var untrusted = new HttpRequestMessage(HttpMethod.Post, "/api/v1/auth/refresh"))
+        {
+            untrusted.Headers.Add("Origin", "https://untrusted.invalid");
+            using var rejected = await anonymous.SendAsync(untrusted, cancellationToken);
+            await Assert.That(rejected.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
+        }
+        using (var trusted = new HttpRequestMessage(HttpMethod.Post, "/api/v1/auth/refresh"))
+        {
+            trusted.Headers.Add("Origin", baseUrl);
+            using var refreshed = await anonymous.SendAsync(trusted, cancellationToken);
+            await Assert.That(refreshed.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        }
+        using (var logs = await admin.GetAsync("/api/v1/admin/platform/logs?MinimumLevel=Information&Limit=1", cancellationToken))
+            await Assert.That(logs.StatusCode).IsEqualTo(
+                Environment.GetEnvironmentVariable("NOCTF_E2E_EXPECT_LOGS_UNAVAILABLE") == "true"
+                    ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.OK);
 
         var now = DateTimeOffset.UtcNow;
         var competition = await SendJsonAsync(
@@ -52,6 +69,10 @@ public sealed class CtfFullBoundaryTests
             HttpStatusCode.Created,
             cancellationToken);
         var competitionId = competition.GetProperty("id").GetGuid();
+        var metadata = System.Text.Json.Nodes.JsonNode.Parse(competition.GetRawText())!.AsObject();
+        metadata["runtimeAccessMode"] = "DirectAndWsrx";
+        await SendJsonAsync(admin, HttpMethod.Patch, $"/api/v1/admin/competitions/{competitionId}",
+            new { metadata }, HttpStatusCode.OK, cancellationToken);
 
         var template = await SendJsonAsync(
             admin,
@@ -191,12 +212,12 @@ public sealed class CtfFullBoundaryTests
             anonymous,
             HttpMethod.Post,
             "/api/v1/auth/register",
-            new { userName = "ctf-player", email = "player@ctf-e2e.test", password = "ctf-player-password" },
+            new { userName = E2EHttpClient.UniqueIdentity("ctf-player"), email = E2EHttpClient.UniqueIdentity("player@ctf-e2e.test"), password = "ctf-player-password" },
             HttpStatusCode.Created,
             cancellationToken);
         using var player = CreateClient(baseUrl, await LoginAsync(
             anonymous,
-            "ctf-player",
+            E2EHttpClient.UniqueIdentity("ctf-player"),
             "ctf-player-password",
             cancellationToken));
         var team = await SendJsonAsync(
@@ -215,15 +236,15 @@ public sealed class CtfFullBoundaryTests
             "/api/v1/auth/register",
             new
             {
-                userName = "ctf-teammate",
-                email = "teammate@ctf-e2e.test",
+                userName = E2EHttpClient.UniqueIdentity("ctf-teammate"),
+                email = E2EHttpClient.UniqueIdentity("teammate@ctf-e2e.test"),
                 password = "ctf-teammate-password"
             },
             HttpStatusCode.Created,
             cancellationToken);
         using var teammate = CreateClient(baseUrl, await LoginAsync(
             anonymous,
-            "ctf-teammate",
+            E2EHttpClient.UniqueIdentity("ctf-teammate"),
             "ctf-teammate-password",
             cancellationToken));
         var originalInvitation = await GetJsonAsync(
@@ -332,6 +353,15 @@ public sealed class CtfFullBoundaryTests
         await E2ELifecycle.SetStatusAsync(
             admin, competitionId, "Published", cancellationToken);
         await E2ELifecycle.StartOrObserveRunningAsync(admin, competitionId, cancellationToken);
+        using var scoreboardSocket = new E2ECompetitionSocket();
+        var signalrBaseUrl = Environment.GetEnvironmentVariable("NOCTF_E2E_SIGNALR_BASE_URL");
+        await scoreboardSocket.JoinAsync(string.IsNullOrWhiteSpace(signalrBaseUrl) ? baseUrl : signalrBaseUrl,
+            admin.DefaultRequestHeaders.Authorization!.Parameter!, competitionId, cancellationToken);
+        using var secondScoreboardSocket = Environment.GetEnvironmentVariable("NOCTF_E2E_SIGNALR_SECOND_BASE_URL") is { Length: > 0 }
+            ? new E2ECompetitionSocket() : null;
+        if (secondScoreboardSocket is not null)
+            await secondScoreboardSocket.JoinAsync(Environment.GetEnvironmentVariable("NOCTF_E2E_SIGNALR_SECOND_BASE_URL")!,
+                admin.DefaultRequestHeaders.Authorization!.Parameter!, competitionId, cancellationToken);
 
         var listedAttachments = await GetJsonAsync(
             player,
@@ -378,6 +408,8 @@ public sealed class CtfFullBoundaryTests
             var runtimeUrl = E2ELifecycle.FirstDirectAddress(runtime);
             var flag = await PollTextAsync(runtimeUrl, TimeSpan.FromSeconds(30), cancellationToken);
             await Assert.That(flag).StartsWith("flag{");
+            await AssertWsrxHttpAsync(baseUrl, player.DefaultRequestHeaders.Authorization!.Parameter!,
+                runtimeInstanceId.Value, cancellationToken);
 
             var servicesRuntimeAccepted = await SendJsonAsync(
                 player,
@@ -448,6 +480,9 @@ public sealed class CtfFullBoundaryTests
                 TimeSpan.FromSeconds(60),
                 cancellationToken);
             await Assert.That(submission.GetProperty("result").GetString()).IsEqualTo("Correct");
+            await scoreboardSocket.WaitForScoreboardAsync(competitionId, cancellationToken);
+            if (secondScoreboardSocket is not null)
+                await secondScoreboardSocket.WaitForScoreboardAsync(competitionId, cancellationToken);
             var evaluatedAt = submission.GetProperty("updatedAt").GetDateTimeOffset();
             var activeProgression = await PollJsonAsync(
                 player,
@@ -634,10 +669,32 @@ public sealed class CtfFullBoundaryTests
 
     private static HttpClient CreateClient(string baseUrl, string? token = null)
     {
-        var client = new HttpClient { BaseAddress = new Uri(baseUrl), Timeout = TimeSpan.FromSeconds(15) };
-        if (token is not null)
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        return client;
+        return E2EHttpClient.Create(baseUrl, token);
+    }
+
+    private static async Task AssertWsrxHttpAsync(string baseUrl, string token, Guid runtimeId, CancellationToken ct)
+    {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        deadline.CancelAfter(TimeSpan.FromSeconds(20));
+        using var socket = new System.Net.WebSockets.ClientWebSocket();
+        socket.Options.SetRequestHeader("Authorization", $"Bearer {token}");
+        using var transport = new HttpMessageInvoker(E2EHttpClient.CreateHandler());
+        var url = new UriBuilder(baseUrl) { Scheme = new Uri(baseUrl).Scheme == "https" ? "wss" : "ws", Path = $"/api/v1/runtime-proxies/{runtimeId}/0" };
+        await socket.ConnectAsync(url.Uri, transport, deadline.Token);
+        await socket.SendAsync("GET / HTTP/1.1\r\nHost: challenge\r\nConnection: close\r\n\r\n"u8.ToArray().AsMemory(),
+            System.Net.WebSockets.WebSocketMessageType.Binary, true, deadline.Token);
+        var buffer = new byte[4096];
+        var response = "";
+        while (!response.Contains("\r\n\r\n", StringComparison.Ordinal))
+        {
+            var received = await socket.ReceiveAsync(buffer.AsMemory(), deadline.Token);
+            if (received.MessageType == System.Net.WebSockets.WebSocketMessageType.Close)
+                throw new InvalidOperationException("WSRX closed before the target HTTP response.");
+            response += Encoding.ASCII.GetString(buffer, 0, received.Count);
+            if (response.Length > 8192) throw new InvalidOperationException("WSRX response exceeded the test bound.");
+        }
+        await Assert.That(response.StartsWith("HTTP/1.0 200", StringComparison.Ordinal)
+            || response.StartsWith("HTTP/1.1 200", StringComparison.Ordinal)).IsTrue();
     }
 
     private static object BuildContainerDefinition(string runtimeImage) =>
@@ -679,7 +736,7 @@ public sealed class CtfFullBoundaryTests
             container = new { services = new object[]
             {
                 new { name = "web", image = runtimeImage, cpuCores = .1m, memoryMiB = 64L, flagEnvironmentVariableName = "FLAG" },
-                new { name = "db", image = "busybox:1.37", cpuCores = .1m, memoryMiB = 64L, command = new[] { "sleep" }, arguments = new[] { "300" } }
+                new { name = "db", image = Environment.GetEnvironmentVariable("NOCTF_E2E_SIDECAR_IMAGE") ?? "busybox:1.37", cpuCores = .1m, memoryMiB = 64L, command = new[] { "sleep" }, arguments = new[] { "300" } }
             } },
             urlBindings = new[] { new { urlTemplate = "http://{HOST}:{PORT}/", exposure = "OwnerOnly", containerPort = 8080, serviceName = "web", isControlCheck = false } }
         }

@@ -12,7 +12,7 @@ public sealed class ComposeDeploymentContractTests
     public async Task Compose_renders_five_services_with_directory_mounts_and_scoped_environment_files()
     {
         var repository = FindRepositoryRoot();
-        var source = Path.Combine(repository, "deploy");
+        var source = Path.Combine(repository, "deploy", "docker");
         var root = Path.Combine(Path.GetTempPath(), "noctf-compose-contract", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         try
@@ -71,8 +71,8 @@ public sealed class ComposeDeploymentContractTests
             await Assert.That(services.GetProperty("noctf").GetProperty("environment").GetProperty("Database__AutoMigrate").GetString()).IsEqualTo("true");
             await Assert.That(services.GetProperty("noctf").GetProperty("environment").GetProperty("Observability__Enabled").GetString()).IsEqualTo("false");
             var raw = await File.ReadAllTextAsync(Path.Combine(source, "docker-compose.yml"));
-            await Assert.That(raw).Contains("Observability__LokiBaseUrl: http://loki:3100/");
-            await Assert.That(raw).Contains("Observability__RequireLoki: \"true\"");
+            await Assert.That(raw).DoesNotContain("Observability__RequireLoki:");
+            await Assert.That(services.GetProperty("noctf").GetProperty("environment").GetProperty("Observability__RequireLoki").GetString()).IsEqualTo("false");
             await Assert.That(raw).DoesNotContain("POSTGRES_PASSWORD:");
         }
         finally { Directory.Delete(root, true); }
@@ -91,7 +91,7 @@ public sealed class ComposeDeploymentContractTests
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "deploy", "docker-compose.yml")))
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "deploy", "docker", "docker-compose.yml")))
             directory = directory.Parent;
         return directory?.FullName ?? throw new DirectoryNotFoundException("NoCTF repository was not found.");
     }

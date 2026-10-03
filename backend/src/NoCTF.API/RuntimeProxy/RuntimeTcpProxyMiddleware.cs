@@ -93,24 +93,34 @@ public sealed class RuntimeTcpProxyMiddleware(
             webSocket,
             capture,
             lifetime.Token);
-        _ = await Task.WhenAny(upstream, downstream);
-        await lifetime.CancelAsync();
-        await ObserveAsync(upstream);
-        await ObserveAsync(downstream);
+        var completed = await Task.WhenAny(upstream, downstream);
+        // Cancelling a pending WebSocket receive aborts its transport. Send the
+        // close frame after the final TCP bytes, then briefly allow the peer's
+        // acknowledgement before cancelling the remaining copy direction.
         if (webSocket.State is WebSocketState.Open or WebSocketState.CloseReceived)
         {
+            using var closing = new CancellationTokenSource(TimeSpan.FromSeconds(2));
             try
             {
                 await webSocket.CloseOutputAsync(
                     WebSocketCloseStatus.NormalClosure,
                     null,
-                    CancellationToken.None);
+                    closing.Token);
+                if (completed == downstream)
+                    await ObserveAsync(upstream).WaitAsync(closing.Token);
             }
             catch (WebSocketException)
             {
                 // The peer already closed the transport.
             }
+            catch (OperationCanceledException) when (closing.IsCancellationRequested)
+            {
+                // A peer that does not acknowledge cannot hold the proxy lease.
+            }
         }
+        await lifetime.CancelAsync();
+        await ObserveAsync(upstream);
+        await ObserveAsync(downstream);
     }
 
     private async Task CopyWebSocketToTcpAsync(

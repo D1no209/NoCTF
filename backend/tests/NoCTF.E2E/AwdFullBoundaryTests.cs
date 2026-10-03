@@ -21,7 +21,7 @@ public sealed class AwdFullBoundaryTests
         using var anonymous = CreateClient(baseUrl);
         using var admin = CreateClient(baseUrl, await LoginAsync(
             anonymous,
-            "awd-e2e-admin",
+            E2EHttpClient.AdminUserName("awd-e2e-admin"),
             RequiredEnvironment("NOCTF_E2E_ADMIN_PASSWORD"),
             cancellationToken));
 
@@ -442,6 +442,8 @@ public sealed class AwdFullBoundaryTests
         string teamName,
         CancellationToken cancellationToken)
     {
+        userName = E2EHttpClient.UniqueIdentity(userName);
+        email = E2EHttpClient.UniqueIdentity(email);
         await SendJsonAsync(
             anonymous,
             HttpMethod.Post,
@@ -639,10 +641,7 @@ public sealed class AwdFullBoundaryTests
 
     private static HttpClient CreateClient(string baseUrl, string? token = null)
     {
-        var client = new HttpClient { BaseAddress = new Uri(baseUrl), Timeout = TimeSpan.FromSeconds(15) };
-        if (token is not null)
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        return client;
+        return E2EHttpClient.Create(baseUrl, token);
     }
 
     private static async Task<string> LoginAsync(

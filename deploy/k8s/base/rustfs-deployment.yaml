@@ -1,0 +1,103 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: rustfs
+  namespace: noctf
+  labels:
+    app: rustfs
+    app.kubernetes.io/part-of: noctf
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rustfs
+  template:
+    metadata:
+      labels:
+        app: rustfs
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - name: rustfs
+        image: rustfs/rustfs:1.0.0@sha256:8cc9801755448b71a786705ce76692c77e14936cccd87cf2fc31842e58f4d1ff
+        imagePullPolicy: IfNotPresent
+        args:
+        - /data
+        ports:
+        - containerPort: 9000
+        - containerPort: 9001
+        env:
+        - name: RUSTFS_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: noctf-secrets
+              key: s3-access-key
+        - name: RUSTFS_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: noctf-secrets
+              key: s3-secret-key
+        - name: RUSTFS_CONSOLE_ENABLE
+          value: 'true'
+        - name: RUSTFS_ADDRESS
+          value: :9000
+        - name: RUSTFS_CONSOLE_ADDRESS
+          value: :9001
+        - name: RUSTFS_REGION
+          value: us-east-1
+        - name: RUSTFS_OBS_LOGGER_LEVEL
+          value: warn
+        - name: RUSTFS_OBS_LOG_DIRECTORY
+          value: /logs
+        volumeMounts:
+        - name: rustfs-data
+          mountPath: /data
+        - name: logs
+          mountPath: /logs
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: '2'
+            memory: 1Gi
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 9000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 9000
+          initialDelaySeconds: 20
+          periodSeconds: 20
+        startupProbe:
+          httpGet:
+            path: /health/ready
+            port: 9000
+          periodSeconds: 5
+          failureThreshold: 60
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: rustfs-data
+        persistentVolumeClaim:
+          claimName: rustfs-pvc
+      - name: logs
+        emptyDir:
+          sizeLimit: 128Mi
+      nodeSelector:
+        noctf.io/node-role: platform
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+  serviceName: rustfs
