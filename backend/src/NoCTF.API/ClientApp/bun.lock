@@ -10,7 +10,7 @@
         "@lucide/vue": "^1.43.0",
         "@microsoft/kiota-abstractions": "1.0.0-preview.102",
         "@microsoft/kiota-http-fetchlibrary": "1.0.0-preview.102",
-        "@microsoft/kiota-serialization-form": "1.0.0-preview.102",
+        "@microsoft/kiota-serialization-form": "1.0.0-preview.109",
         "@microsoft/kiota-serialization-json": "1.0.0-preview.102",
         "@microsoft/kiota-serialization-multipart": "1.0.0-preview.102",
         "@microsoft/kiota-serialization-text": "1.0.0-preview.102",
@@ -262,7 +262,7 @@
 
     "@microsoft/kiota-http-fetchlibrary": ["@microsoft/kiota-http-fetchlibrary@1.0.0-preview.102", "", { "dependencies": { "@microsoft/kiota-abstractions": "^1.0.0-preview.102", "@opentelemetry/api": "^1.7.0", "tslib": "^2.6.2" } }, "sha512-oXfrPOWkIR2/Gs700n00EY3VDc+Qgz6y7ZiA/f8FHJsnwSjZ017xcWFw2PLzJItczVsad0pq/N5DYnoF6Co11Q=="],
 
-    "@microsoft/kiota-serialization-form": ["@microsoft/kiota-serialization-form@1.0.0-preview.102", "", { "dependencies": { "@microsoft/kiota-abstractions": "^1.0.0-preview.102", "tslib": "^2.6.2" } }, "sha512-1w70XAA/F4RgbyNbRAaZCjLAOiKQjdiQDYlNZC9x8g7xgd7tNqYqowt/auQS1A9SZOrT626q6+Gr2xKKyW3wOg=="],
+    "@microsoft/kiota-serialization-form": ["@microsoft/kiota-serialization-form@1.0.0-preview.109", "", { "dependencies": { "@microsoft/kiota-abstractions": "^1.0.0-preview.109", "tslib": "^2.6.2" } }, "sha512-U1XixT9+ANDcYXrUmSxhQDRj+e0bsEv8SwPMfw7bFSknFTou+/bNifphov9LunbQiOrrvFx2Y+DxX52bC0sLWg=="],
 
     "@microsoft/kiota-serialization-json": ["@microsoft/kiota-serialization-json@1.0.0-preview.102", "", { "dependencies": { "@microsoft/kiota-abstractions": "^1.0.0-preview.102", "tslib": "^2.6.2" } }, "sha512-YpIt5pXNX13ND736oJFf0wBYPAafCv+CAE17Fa1HcS1drCdXx8ELPQ5GxGDbQG7J5LIMDgUtBOUmf5R/FrMQ6A=="],
 
