@@ -102,4 +102,4 @@ Nuxt 4 SPA(`ssr: false`),Bun 管理依赖,TypeScript strict,Vue 用 `<script set
 - `RequestPolicyOption` 传递 signal/cache/每请求元数据；排行榜使用 `ProjectionResponseOption` 区分 202 与完成模型，不能把处理中响应强转成快照。
 - 上传使用 `multipartBody`，下载使用 `nativeResponse` 和下载工具；API 路由仅由生成代码构造。原生 fetch 仅存在于 `lib/api.ts`。
 - Kiota 的日期为 `Date`；在功能层构建请求日期，在展示/浏览器边界使用 `dateObject`、`dateIso`、`dateTimestamp`。字典模型通过 `additionalData` 读写。
-- FastEndpoints 8.2 固定 Kiota Builder 1.29；TS 运行库固定 preview.102，并覆盖传递的 abstractions 版本。preview.103 及以上的集合反序列化签名与此生成器不兼容。
+- FastEndpoints 8.2 使用 Kiota Builder 1.29.1 安全补丁；TS 运行库固定 preview.102，并覆盖传递的 abstractions 版本。preview.103 及以上的集合反序列化签名与此生成器不兼容。

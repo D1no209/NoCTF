@@ -131,7 +131,7 @@ bun run api:check
 
 `api:check` 构建 Host 一次，分别运行两个生成进程，再检查文档和 SDK 的内容漂移及未跟踪文件。`backend/scripts/Verify-Backend.ps1` 和 PR 的 `api-contracts` 门禁调用相同检查。Endpoint、文档、SDK 和调用方在同一变更中提交。普通构建、发布和 Docker 使用已提交 SDK，不隐式改写源码。
 
-FastEndpoints 8.2 固定使用 Kiota Builder 1.29；TypeScript 运行库固定为 preview.102，abstractions 的传递版本也被锁定。preview.103 起更改了基础集合反序列化签名，不能直接升级。FE 8.2 文档规范化仅处理 nullable 引用及被移除的 IFormFile 组件引用；本地化 ProblemDetails 扩展由单独 schema transformer 描述，枚举、绑定和验证仍使用 FE 原生能力。生成代码不手工修补。Nuxt 设置 `verbatimModuleSyntax: false`，由 TypeScript 消除 Kiota 1.29 生成的纯类型枚举导入；配置变化后运行 `bun run postinstall` 刷新 Nuxt 类型配置。
+FastEndpoints 8.2 使用 Kiota Builder 1.29.1 安全补丁；TypeScript 运行库固定为 preview.102，abstractions 的传递版本也被锁定。preview.103 起更改了基础集合反序列化签名，不能直接升级。FE 8.2 文档规范化仅处理 nullable 引用及被移除的 IFormFile 组件引用；本地化 ProblemDetails 扩展由单独 schema transformer 描述，枚举、绑定和验证仍使用 FE 原生能力。生成代码不手工修补。Nuxt 设置 `verbatimModuleSyntax: false`，由 TypeScript 消除 Kiota 1.29 生成的纯类型枚举导入；配置变化后运行 `bun run postinstall` 刷新 Nuxt 类型配置。
 
 前端测试和 typecheck 在本地开发与提交前执行；涉及前端与翻译的 PR 由
 `localization.yml` 执行 typecheck、architecture audit、测试及静态构建。

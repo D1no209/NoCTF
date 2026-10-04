@@ -6,6 +6,18 @@ namespace NoCTF.Tests.Architecture;
 public sealed class KiotaOpenApiContractTests
 {
     [Test]
+    public async Task Schemas_do_not_restrict_non_null_values_to_a_null_constant()
+    {
+        using var document = await ReadDocument();
+        var invalidEnums = Descendants(document.RootElement)
+            .Where(value => value.ValueKind == JsonValueKind.Object
+                && value.TryGetProperty("enum", out var values)
+                && values.GetArrayLength() == 1 && values[0].ValueKind == JsonValueKind.Null)
+            .ToArray();
+        await Assert.That(invalidEnums.Length).IsEqualTo(0);
+    }
+
+    [Test]
     public async Task Both_validation_problem_variants_describe_localized_field_messages()
     {
         using var document = await ReadDocument();

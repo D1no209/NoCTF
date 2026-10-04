@@ -1,11 +1,16 @@
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
+using System.Reflection;
 
 namespace NoCTF.API.OpenApi;
 
 /// <summary>Normalizes FE 8.2 nullable references and its orphaned operation-local form-file references.</summary>
 public sealed class OpenApiReferenceDocumentTransformer : IOpenApiDocumentTransformer
 {
+    private static readonly PropertyInfo[] SchemaProperties = typeof(OpenApiSchema).GetProperties()
+        .Where(property => property.GetMethod?.IsPublic == true && property.SetMethod?.IsPublic == true
+            && property.Name != nameof(OpenApiSchema.Const)).ToArray();
+
     public Task TransformAsync(OpenApiDocument document, OpenApiDocumentTransformerContext context, CancellationToken ct)
     {
         if (document.Components?.Schemas is { } schemas)
@@ -23,6 +28,14 @@ public sealed class OpenApiReferenceDocumentTransformer : IOpenApiDocumentTransf
             && document.Components?.Schemas?.ContainsKey(id) != true)
             return new OpenApiSchema { Type = JsonSchemaType.String, Format = "binary" };
         if (value is not OpenApiSchema schema) return value;
+        // FE 8.2's fallback clone assigns every public property, including an absent Const.
+        // OpenAPI.NET 2.12 distinguishes absent Const from explicit null; the latter emits enum:[null].
+        // Copy public schema state without assigning an absent constant. Do not alter actual enums.
+        var normalized = new OpenApiSchema();
+        foreach (var property in SchemaProperties)
+            property.SetValue(normalized, property.GetValue(schema));
+        if (schema.Const is not null) normalized.Const = schema.Const;
+        schema = normalized;
         if (schema.OneOf is { Count: 1 } && schema.OneOf[0] is OpenApiSchemaReference
             && schema.Type is { } type && type.HasFlag(JsonSchemaType.Null))
         {
