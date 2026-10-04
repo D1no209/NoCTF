@@ -56,7 +56,7 @@ The base NoCTF Compose enables the NATS monitoring listener on internal port
 
 Prometheus and Grafana bind only to 127.0.0.1 by default. Loki has no published
 port and is reachable only on the private Compose networks. Grafana also joins
-the existing `1panel-network` as `noctf-grafana` so an independently configured
+the existing `noctf-proxy` as `noctf-grafana` so an independently configured
 TLS reverse proxy can reach it. Require Grafana login; do not publish Prometheus,
 exporters or the NoCTF metrics listener.
 

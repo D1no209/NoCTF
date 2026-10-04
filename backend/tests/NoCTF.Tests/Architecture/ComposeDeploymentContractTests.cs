@@ -61,8 +61,8 @@ public sealed class ComposeDeploymentContractTests
                 foreach (var volume in service.Value.GetProperty("volumes").EnumerateArray())
                     await Assert.That(volume.GetProperty("type").GetString()).IsEqualTo("bind");
             }
-            await Assert.That(json.RootElement.GetProperty("networks").GetProperty("panel").GetProperty("name").GetString()).IsEqualTo("1panel-network");
-            await Assert.That(services.GetProperty("registry").GetProperty("networks").GetProperty("panel").GetProperty("aliases")
+            await Assert.That(json.RootElement.GetProperty("networks").GetProperty("proxy").GetProperty("name").GetString()).IsEqualTo("noctf-proxy");
+            await Assert.That(services.GetProperty("registry").GetProperty("networks").GetProperty("proxy").GetProperty("aliases")
                 .EnumerateArray().Select(item => item.GetString())).Contains("noctf-registry");
             await Assert.That(services.GetProperty("registry").GetProperty("networks").GetProperty("default").GetProperty("aliases")
                 .EnumerateArray().Select(item => item.GetString())).Contains("registry");

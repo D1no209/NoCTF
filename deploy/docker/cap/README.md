@@ -1,6 +1,6 @@
 # NoCTF self-hosted Cap
 
-This directory operates Cap Standalone separately from the NoCTF application stack. It publishes no host port. Only Cap joins `1panel-network`; its dedicated Valkey remains on the internal `noctf-cap-internal` network.
+This directory operates Cap Standalone separately from the NoCTF application stack. It publishes no host port. Only Cap joins `noctf-proxy`; its dedicated Valkey remains on the internal `noctf-cap-internal` network.
 
 ## Pinned software
 
@@ -17,7 +17,7 @@ Clone the official Cap repository, check out the pinned commit, and run `build-i
 3. Run `docker compose --env-file .env -f compose.yml config --quiet`, then `docker compose --env-file .env -f compose.yml up -d`.
 4. Insert `noctf-cap.nginx.conf` into the existing NoCTF TLS server block. Back up the live file, run `nginx -t`, and reload only after it succeeds.
 5. Open `/cap/` with the administrator key, create a site key, and configure exact CORS plus `difficulty=4`, `challengeCount=80`, instrumentation enabled, obfuscation level `1`, automated-browser blocking disabled, and RSW disabled.
-6. In the Cap dashboard, create a dedicated API key for NoCTF workload management. Configure NoCTF with browser server URL `https://YOUR_PUBLIC_HOST/cap`, API-only `HumanVerification__Cap__BackendServerUrl=http://noctf-cap:3000`, and API-only `HumanVerification__Cap__ManagementApiKey=<dedicated API key>`. The API must share `1panel-network` with Cap. Store the site verification secret through the platform administrator API; never add that secret to this stack or the NoCTF environment file. Never give NoCTF Cap's broader `ADMIN_KEY`.
+6. In the Cap dashboard, create a dedicated API key for NoCTF workload management. Configure NoCTF with browser server URL `https://YOUR_PUBLIC_HOST/cap`, API-only `HumanVerification__Cap__BackendServerUrl=http://noctf-cap:3000`, and API-only `HumanVerification__Cap__ManagementApiKey=<dedicated API key>`. The API must share `noctf-proxy` with Cap. Store the site verification secret through the platform administrator API; never add that secret to this stack or the NoCTF environment file. Never give NoCTF Cap's broader `ADMIN_KEY`.
 
 The platform administrator page reads and updates the active Site Key through Cap's internal management API. It exposes Cap's native `difficulty` range 1–8 and `challengeCount` range 1–500, shows the expected average SHA-256 attempts, and keeps Cap's `saltSize` at its upstream-managed value of 32. Changes affect newly issued challenges; signed challenges already issued retain their original workload.
 

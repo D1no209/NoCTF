@@ -4,6 +4,9 @@ NoCTF is a competition platform for CTF, AWD, AWDP, and KoH, built with .NET 10
 and Nuxt 4. The current product and architecture contract lives in
 [the authoritative documentation index](specs/README.md).
 
+Read the [platform user manual](https://d1no209.github.io/NoCTF/) for installation,
+player, challenge-bank, competition, platform, and operations guides.
+
 ## Capabilities
 
 - Four built-in game modes: CTF, AWD, AWDP, and KoH.
@@ -67,7 +70,7 @@ Use `bash deploy/configure.sh` for interactive Linux/WSL Docker or existing Kube
 The single Compose definition contains the combined NoCTF Host, PostgreSQL, Redis, NATS,
 and an authenticated Registry. It uses prebuilt images and directory bind mounts only.
 No ports are published/exposed; operations connects its reverse proxy through the existing
-`1panel-network` aliases `noctf-web:8080` and `noctf-registry:5000`.
+`noctf-proxy` aliases `noctf-web:8080` and `noctf-registry:5000`.
 
 ```bash
 bash deploy/docker/init-layout.sh /opt/noctf

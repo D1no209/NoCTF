@@ -288,7 +288,7 @@ def check(s):
 def deploy(s):
     check(s); directory=Path(s['directory'])
     if s['target']=='docker':
-        run(['docker','--context',s['context'],'network','inspect','1panel-network'],s)
+        run(['docker','--context',s['context'],'network','inspect','noctf-proxy'],s)
         run(compose(s)+['up','-d','postgres','redis','nats','registry']+(['rustfs'] if s['storage']=='s3' else []),s)
         deadline=time.monotonic()+180
         while subprocess.run(compose(s)+['exec','-T','postgres','pg_isready','-U','noctf','-d','noctf'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL).returncode:

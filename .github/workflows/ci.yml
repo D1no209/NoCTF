@@ -94,6 +94,7 @@ jobs:
             type=raw,value=sha-${{ github.sha }}
 
       - name: Build and push image
+        id: build
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           context: .
@@ -106,3 +107,58 @@ jobs:
           labels: ${{ steps.metadata.outputs.labels }}
           cache-from: type=gha,scope=noctf-host
           cache-to: type=gha,mode=max,scope=noctf-host,ignore-error=true
+
+      - name: Package deployment configuration
+        id: deployment
+        env:
+          IMAGE_NAMES: ${{ steps.images.outputs.names }}
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+          IMAGE_VERSION: ${{ steps.images.outputs.version }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          package_root="$RUNNER_TEMP/noctf-deployment"
+          mkdir -p "$package_root"
+          # Export only tracked deployment files, including .env.example templates.
+          git archive HEAD deploy | tar -x -C "$package_root"
+          export PACKAGE_ROOT="$package_root"
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          digest = os.environ['IMAGE_DIGEST']
+          if not re.fullmatch(r'sha256:[a-f0-9]{64}', digest):
+              raise SystemExit('The published Host image digest is missing or invalid.')
+          images = [name + '@' + digest for name in os.environ['IMAGE_NAMES'].splitlines() if name]
+          if not images:
+              raise SystemExit('No published image repository was recorded.')
+          metadata = {
+              'revision': os.environ['GITHUB_SHA'],
+              'version': os.environ['IMAGE_VERSION'],
+              'image': images[0],
+              'images': images,
+          }
+          (Path(os.environ['PACKAGE_ROOT']) / 'deployment.json').write_text(
+              json.dumps(metadata, indent=2) + '\n', encoding='utf-8')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as summary:
+              summary.write('## Install NoCTF\n\nDownload the matching `noctf-deploy-' +
+                            metadata['revision'] + '` artifact below.\n\n')
+              summary.write('Published complete Host images:\n\n')
+              for image in images:
+                  summary.write('- `' + image + '`\n')
+          PY
+          archive="noctf-deploy-$GITHUB_SHA.tar.gz"
+          tar -czf "$RUNNER_TEMP/$archive" -C "$package_root" deploy deployment.json
+          (cd "$RUNNER_TEMP" && sha256sum "$archive" > "$archive.sha256")
+          echo "archive=$archive" >> "$GITHUB_OUTPUT"
+
+      - name: Upload deployment configuration
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: noctf-deploy-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/${{ steps.deployment.outputs.archive }}
+            ${{ runner.temp }}/${{ steps.deployment.outputs.archive }}.sha256
+          if-no-files-found: error

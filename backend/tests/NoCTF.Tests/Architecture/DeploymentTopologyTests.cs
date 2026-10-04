@@ -229,7 +229,7 @@ public sealed class DeploymentTopologyTests
         var pipeline = await ReadAsync(
             "backend", "src", "NoCTF.API", "Composition", "PipelineConfiguration.cs");
 
-        await Assert.That(compose).Contains("name: 1panel-network");
+        await Assert.That(compose).Contains("name: noctf-proxy");
         await Assert.That(compose).Contains("aliases: [noctf-web]");
         await Assert.That(compose).DoesNotContain("ports:");
         await Assert.That(compose).DoesNotContain("expose:");
