@@ -42,16 +42,16 @@
              CopyToOutputDirectory="PreserveNewest"
              CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
-  <Target Name="DebugEnsureNodeEnv"
+  <Target Name="DebugEnsureBunEnv"
           BeforeTargets="Build"
-          Condition="'$(Configuration)' == 'Debug' And !Exists('$(SpaRoot)node_modules')">
-    <Exec Command="node --version" ContinueOnError="true">
-      <Output TaskParameter="ExitCode" PropertyName="NodeErrorCode" />
+          Condition="'$(Configuration)' == 'Debug' And '$(BuildSpaOnPublish)' == 'true' And !Exists('$(SpaRoot)node_modules')">
+    <Exec Command="bun --version" ContinueOnError="true">
+      <Output TaskParameter="ExitCode" PropertyName="BunErrorCode" />
     </Exec>
-    <Error Condition="'$(NodeErrorCode)' != '0'"
-           Text="Node.js is required to build and run the ClientApp. Install Node.js and restart your command prompt or IDE." />
-    <Message Importance="high" Text="Restoring ClientApp dependencies using npm..." />
-    <Exec WorkingDirectory="$(SpaRoot)" Command="npm install --no-package-lock" />
+    <Error Condition="'$(BunErrorCode)' != '0'"
+           Text="Bun is required to build and run the ClientApp. Install Bun and restart your command prompt or IDE." />
+    <Message Importance="high" Text="Restoring ClientApp dependencies using Bun..." />
+    <Exec WorkingDirectory="$(SpaRoot)" Command="bun install --frozen-lockfile" />
   </Target>
   <Target Name="PublishRunNuxt"
           AfterTargets="ComputeFilesToPublish"
