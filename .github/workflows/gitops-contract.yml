@@ -35,16 +35,16 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Check out NoCTF
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           path: noctf
       - name: Check out pinned GitOps repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: D1no209/NoCTF-Challenge-Template
           ref: 794651c0bf158fa98fdacf88cb0f3a52b9db4b2b
           path: template
-      - uses: actions/setup-dotnet@d4c94342e560b34958eacfc5d055d21461ed1c5d
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         with:
           dotnet-version: 10.0.x
       - name: Validate GitOps OpenAPI contract
