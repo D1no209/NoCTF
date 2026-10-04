@@ -1,0 +1,39 @@
+name: Bug report
+description: Report a reproducible platform problem.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For vulnerabilities, follow SECURITY.md and use private reporting instead of this form.
+        Reproduce with synthetic data and omit credentials or production logs.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Include the deployment roles and runtime provider when relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Include the smallest isolated setup that demonstrates the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Observed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Redacted logs or screenshots
+      description: Use mock data for screenshots. Remove passwords, tokens and protected Flags.

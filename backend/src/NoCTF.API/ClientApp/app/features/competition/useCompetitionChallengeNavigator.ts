@@ -1,22 +1,28 @@
+
+import { ResponseMetadata, RequestPolicyOption } from '../../lib/api'
+
+import { api } from '../../lib/api'
+import { message as describeMessage } from '../../utils/i18n'
+import type { UiMessage } from '../../utils/i18n'
 import { challengeTagOptions, matchesAllTags, tagsFromQuery, uniqueTags } from '../../lib/challenge-tags'
 import { toRefs } from 'vue'
 
 import { ShieldCheck, Swords, Users } from '@lucide/vue'
-import { getMyTeamEndpoint, listChallengesEndpoint } from '../../api'
-import type { NoCtfapiEndpointsChallengesChallengeSummaryResponse, NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol } from '../../api'
+
+import type { NoCTFAPIEndpointsChallengesChallengeSummaryResponse, NoCTFAPIEndpointsCompetitionsLeaderboardDataScopeProtocol } from '../../api/models'
 import { bloodRankLabel } from '../leaderboard/types'
 import { directionGlyph } from '../../utils/directions'
 import { challengeProgressIcon } from './challenge-progress-icon'
 import { scoreboardBreakdown, scoreboardColumnsForChallenge, scoreboardCurrentChallengeScore, scoreboardSlot } from '../../utils/scoreboard'
 import { createTrailingRefresh } from '../../lib/latest-page-refresh'
 
-type Challenge = NoCtfapiEndpointsChallengesChallengeSummaryResponse
+type Challenge = NoCTFAPIEndpointsChallengesChallengeSummaryResponse
 type BloodRank = 'First' | 'Second' | 'Third'
 const bloodOrder: Record<BloodRank, number> = { First: 0, Second: 1, Third: 2 }
 
 export function isChallengeVisible(
   challenge: Pick<Challenge, 'title' | 'locked' | 'tags'>,
-  filters: { hideSolved: boolean; hideLocked: boolean; solvedByMyTeam: boolean; search: string; tags?: readonly string[] },
+  filters: { hideSolved: boolean; hideLocked: boolean; solvedByMyTeam: boolean; search: string; tags?: readonly string[] | null },
 ): boolean {
   return (!filters.hideSolved || !filters.solvedByMyTeam)
     && (!filters.hideLocked || !challenge.locked)
@@ -76,9 +82,9 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
 
   const loading = ref(true)
 
-  const error = ref<string | null>(null)
+  const error = ref<UiMessage | null>(null)
 
-  const dataScope = ref<NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol>('Live')
+  const dataScope = ref<NoCTFAPIEndpointsCompetitionsLeaderboardDataScopeProtocol>('Live')
 
   const myTeamId = ref<string | null>(null)
 
@@ -111,20 +117,19 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
       myTeamId.value = null
       return
     }
-    const { data, error: requestError } = await getMyTeamEndpoint({
-      path: { competitionId: props.competitionId },
-    })
+    let requestError: unknown;
+    const data = await api.api.v1.competitions.byCompetitionId(props.competitionId).teams.me.get().catch(cause => { requestError = cause; return undefined });
     myTeamId.value = requestError ? null : data?.id ?? null
   }
 
   async function loadChallenges(): Promise<void> {
-    const { data, error: requestError, response } = await listChallengesEndpoint({
-      path: { competitionId: props.competitionId },
-    })
+    let requestError: unknown;
+    const response = new ResponseMetadata();
+    const data = await api.api.v1.competitions.byCompetitionId(props.competitionId).challenges.get({ options: [new RequestPolicyOption({ response: response })] }).catch(cause => { requestError = cause; return undefined });
     loading.value = false
     if (requestError || !data) {
       if (response?.status === 404) items.value = []
-      error.value = parseApiError(requestError, translate("ui.failedToLoadQuestion")).message
+      error.value = parseApiError(requestError, describeMessage("challenges.error.loadQuestionFailed")).displayMessage
       if (!initialized) emit('ready', null)
       return
     }
@@ -175,7 +180,7 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
         let teamAttack = false
         let teamDefense = false
         for (const column of columns) {
-          if (column.index === undefined) continue
+          if (column.index == null) continue
           const slot = scoreboardSlot(team, column.index)
           if (!slot) continue
           teamSolved ||= (scoreboardBreakdown(slot, 'Solve')?.successfulCount ?? 0) > 0
@@ -212,7 +217,7 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
     return progress
   })
 
-  function progressFor(challengeId?: string): ChallengeProgress | null {
+  function progressFor(challengeId?: string | null): ChallengeProgress | null {
     if (!board.snapshot.value || board.snapshot.value.dataScope === 'Hidden') return null
     return progressByChallenge.value.get(challengeId ?? '') ?? {
       solveCount: 0,
@@ -228,29 +233,29 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
 
   function awdpProgressLabel(progress: ChallengeProgress | null): string | null {
     if (!progress) return null
-    if (progress.attackSucceeded && progress.defenseSucceeded) return translate("ui.attackAndDefenseSucceeded")
-    if (progress.attackSucceeded) return translate("ui.attackSucceeded")
-    if (progress.defenseSucceeded) return translate("ui.defenseSucceeded")
+    if (progress.attackSucceeded && progress.defenseSucceeded) return translate("common.label.attackDefenseSucceeded")
+    if (progress.attackSucceeded) return translate("common.label.attackSucceeded")
+    if (progress.defenseSucceeded) return translate("common.label.defenseSucceeded")
     return null
   }
 
-  function progressIcon(challengeId?: string) {
+  function progressIcon(challengeId?: string | null) {
     return challengeProgressIcon(progressFor(challengeId), isAwdp.value)
   }
 
-  function progressIconLabel(challengeId?: string): string | null {
+  function progressIconLabel(challengeId?: string | null): string | null {
     const progress = progressFor(challengeId)
     if (!progress) return null
     if (isAwdp.value) return awdpProgressLabel(progress)
     if (!progress.solvedByMyTeam) return null
-    return progress.bloodRank ? bloodRankLabel(progress.bloodRank) : translate("ui.solved")
+    return progress.bloodRank ? bloodRankLabel(progress.bloodRank) : translate("common.label.solved.competitionChallengeNavigator")
   }
 
-  function currentScore(challengeId?: string): number | null {
+  function currentScore(challengeId?: string | null): number | null {
     return scoreboardCurrentChallengeScore(board.snapshot.value, challengeId)
   }
 
-  function bloodsFor(challengeId?: string): ChallengeBloodMark[] {
+  function bloodsFor(challengeId?: string | null): ChallengeBloodMark[] {
     return progressFor(challengeId)?.bloods ?? []
   }
 
@@ -259,13 +264,13 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
   }
 
   function bloodTeamName(blood: ChallengeBloodMark): string {
-    return blood.teamName ?? `${translate('ui.teamId')}: ${blood.teamId}`
+    return blood.teamName ?? `${translate('common.label.teamId')}: ${blood.teamId}`
   }
 
   const groups = computed(() => {
     const grouped = new Map<string, Challenge[]>()
     for (const item of items.value) {
-      const direction = (item.directionId ? item.direction : directionLabel(item.direction)) || translate("ui.uncategorized")
+      const direction = (item.directionId ? item.direction : directionLabel(item.direction)) || translate("common.label.uncategorized")
       const challenges = grouped.get(direction) ?? []
       challenges.push(item)
       grouped.set(direction, challenges)
@@ -294,7 +299,7 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
   const emptyLabel = computed(() => normalizedSearch.value || selectedTags.value.length || (hideSolved.value && hidesLockedChallenges.value)
     ? translate('challengeNavigator.noMatches')
     : hidesLockedChallenges.value ? translate('challengeNavigator.noUnlockedChallenges')
-      : hideSolved.value ? translate('ui.noUnsolvedChallenges') : translate('ui.thereAreNoPublishedTopicsYet'))
+      : hideSolved.value ? translate('challenges.label.unsolvedChallenges') : translate('challenges.competitionChallenge.description.therePublishedTopicsYet'))
 
   const groupOptions = computed(() => visibleGroups.value.map(group => ({
     value: group.direction,

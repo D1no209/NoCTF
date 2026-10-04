@@ -34,7 +34,7 @@ describe('admin list error presentation', () => {
   test('team appeals preserve the previous result and expose refresh failures', async () => {
     const source = await pageSource('admin/competitions/[id]/teams.vue')
 
-    expect(source).toContain('appealsError.value = parseApiError(error).message')
+    expect(source).toContain('appealsError.value = parseApiError(error).displayMessage')
     expect(source).toContain('appeals.value = data.items ?? []')
     expect(source).toContain('<Alert v-if="appealsError" variant="destructive">')
     expect(source).toContain('!appealsError && appeals.length === 0')
@@ -44,10 +44,10 @@ describe('admin list error presentation', () => {
   test('competition archives download directly and preserve the form on failure', async () => {
     const source = await pageSource('admin/competitions/[id]/exports.vue')
 
-    expect(source).toContain('adminExportCompetitionArchive({')
+    expect(source).toMatch(/api\.api\.v1\.admin\.competitions\.byCompetitionId\([^)]*\)\.dataExport\.post\(/)
     expect(source).toContain('if (exportingArchive.value) return')
     expect(source).toContain('exportReason.value = \'\'')
-    expect(source).toContain('toast.error(parseApiError(e).message)')
+    expect(source).toContain('toast.error(parseApiError(e).displayMessage)')
     const catchBody = source.slice(source.indexOf('catch (e)'), source.indexOf('finally'))
     expect(catchBody).not.toContain('exportReason.value = \'\'')
   })
@@ -55,7 +55,7 @@ describe('admin list error presentation', () => {
   test('competition challenge hints keep loaded rows visible beside load failures', async () => {
     const source = await pageSource('admin/competitions/[id]/challenges/[ccId].vue')
 
-    expect(source).toContain('hintsLoadError.value = parseApiError(error).message')
+    expect(source).toContain('hintsLoadError.value = parseApiError(error).displayMessage')
     expect(source).toContain('<Alert v-if="hintsLoadError" variant="destructive">')
     expect(source).toContain('!hintsLoadError && hints.length === 0')
     expect(source).toContain('v-else-if="hints.length > 0"')
@@ -65,9 +65,9 @@ describe('admin list error presentation', () => {
   test('platform audit archives download directly without an asynchronous task list', async () => {
     const source = await pageSource('admin/platform/audit.vue')
 
-    expect(source).toContain('adminExportPlatformAuditArchive({')
+    expect(source).toMatch(/api\.api\.v1\.admin\.platform\.auditLogs\.dataExport\.post\(/)
     expect(source).toContain('if (exportingArchive.value) return')
-    expect(source).toContain('toast.error(parseApiError(e).message)')
+    expect(source).toContain('toast.error(parseApiError(e).displayMessage)')
     expect(source).not.toContain('exports_.value')
   })
 })

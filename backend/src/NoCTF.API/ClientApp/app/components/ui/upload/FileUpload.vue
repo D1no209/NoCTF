@@ -1,9 +1,10 @@
-<script setup lang="ts">
+<script setup lang="ts">import type { UiMessage } from '../../../utils/i18n'
+
 import { Upload, X } from '@lucide/vue'
 import { computed, ref } from 'vue'
 
 defineOptions({ inheritAttrs: false })
-const props = defineProps<{ accept?: string; multiple?: boolean; disabled?: boolean; id?: string; required?: boolean; pending?: boolean; progress?: number | null; error?: string | null }>()
+const props = defineProps<{ accept?: string; multiple?: boolean; disabled?: boolean; id?: string; required?: boolean; pending?: boolean; progress?: number | null; error?: UiMessage | null }>()
 const emit = defineEmits<{ change: [event: Event] }>()
 const input = ref<HTMLInputElement | null>(null)
 const files = ref<File[]>([])

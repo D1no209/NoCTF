@@ -30,7 +30,7 @@ describe('keyboard and icon accessibility', () => {
     const dialog = await source('../app/components/ui/dialog/DialogContent.vue')
     const sheet = await source('../app/components/ui/sheet/SheetContent.vue')
 
-    expect(dialog).toContain(":aria-label=\"$t('ui.close')\"")
-    expect(sheet).toContain(":aria-label=\"$t('ui.close')\"")
+    expect(dialog).toContain(":aria-label=\"$t('common.action.close')\"")
+    expect(sheet).toContain(":aria-label=\"$t('common.action.close')\"")
   })
 })

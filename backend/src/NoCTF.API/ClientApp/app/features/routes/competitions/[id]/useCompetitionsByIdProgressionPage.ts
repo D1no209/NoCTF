@@ -1,6 +1,10 @@
+
+import { api } from '../../../../lib/api'
+import { message as describeMessage } from '../../../../utils/i18n'
+import type { UiMessage } from '../../../../utils/i18n'
 import type { Edge, Node } from '@vue-flow/core'
-import { getPlayerCompetitionProgression } from '../../../../api'
-import type { NoCtfapiEndpointsCompetitionsPlayerProgressionContract } from '../../../../api'
+
+import type { NoCTFAPIEndpointsCompetitionsPlayerProgressionContract } from '../../../../api/models'
 import { buildProgressionLayout as calculateProgressionLayout } from '../../../../lib/progression-layout'
 import { progressionTopologyKey } from '../../../../lib/progression-layout'
 import { chooseProgressionFocus, unsatisfiedProgressionEdges } from '../../../../lib/progression-graph'
@@ -10,7 +14,7 @@ import { markRaw, nextTick } from 'vue'
 
 type ReadData = {
   title: string, description?: string | null, kind: 0 | 1, resourceId: string
-  active: boolean, complete: boolean, visited: boolean, firstOpenedAt?: string | null
+  active: boolean, complete: boolean, visited: boolean, firstOpenedAt?: Date | string | null
   requiresPrerequisites: boolean
   imageUrl?: string | null
 }
@@ -20,9 +24,9 @@ type ReadEdge = Edge<{ condition: 0 | 1 }>
 export function useCompetitionsByIdProgressionPage() {
   const route = useRoute()
   const competitionId = route.params.id as string
-  const data = ref<NoCtfapiEndpointsCompetitionsPlayerProgressionContract | null>(null)
+  const data = ref<NoCTFAPIEndpointsCompetitionsPlayerProgressionContract | null>(null)
   const loading = ref(true)
-  const error = ref<string | null>(null)
+  const error = ref<UiMessage | null>(null)
   const nodes = shallowRef<ReadNode[]>([])
   const edges = shallowRef<ReadEdge[]>([])
   const direction = ref<ProgressionLayoutDirection>('RIGHT')
@@ -70,25 +74,26 @@ export function useCompetitionsByIdProgressionPage() {
   async function load() {
     const generation = ++loadGeneration
     if (!data.value) loading.value = true
-    const result = await getPlayerCompetitionProgression({ path: { competitionId } })
+    let resultError: unknown;
+    const result = await api.api.v1.competitions.byCompetitionId(competitionId).progression.get().catch(cause => { resultError = cause; return undefined });
     if (generation !== loadGeneration) return
-    if (!result.data || result.error) {
+    if (!result || resultError) {
       loading.value = false
-      error.value = parseApiError(result.error, translate('progression.loadFailed')).message
+      error.value = parseApiError(resultError, describeMessage('progression.loadFailed')).displayMessage
       return
     }
-    if (result.data.nodes?.some(node => !node.id || !node.resourceId
+    if (result.nodes?.some(node => !node.id || !node.resourceId
       || typeof node.requiresPrerequisites !== 'boolean'
       || (node.kind !== 0 && node.kind !== 1))
-      || result.data.edges?.some(edge => !edge.id || !edge.sourceNodeId || !edge.targetNodeId
+      || result.edges?.some(edge => !edge.id || !edge.sourceNodeId || !edge.targetNodeId
         || (edge.condition !== 0 && edge.condition !== 1))) {
       loading.value = false
-      error.value = translate('progression.loadFailed')
+      error.value = describeMessage('progression.loadFailed')
       return
     }
-    data.value = result.data
+    data.value = result
     error.value = null
-    const incomingNodes: ReadNode[] = (result.data.nodes ?? []).map(node => ({
+    const incomingNodes: ReadNode[] = (result.nodes ?? []).map(node => ({
       id: node.id!, type: 'read-progression', position: { x: 0, y: 0 },
       data: {
         title: node.title ?? '', description: node.description,
@@ -99,7 +104,7 @@ export function useCompetitionsByIdProgressionPage() {
         imageUrl: node.imageUrl,
       },
     }))
-    const incomingEdges: ReadEdge[] = (result.data.edges ?? []).map(edge => ({
+    const incomingEdges: ReadEdge[] = (result.edges ?? []).map(edge => ({
       id: edge.id!, source: edge.sourceNodeId!, target: edge.targetNodeId!,
       type: 'smoothstep',
       class: edge.condition === 1 ? 'progression-incomplete-edge' : undefined,
@@ -134,7 +139,7 @@ export function useCompetitionsByIdProgressionPage() {
         initialFocusNodeId.value = selectedNodeId.value ?? currentProgressNodeId.value
       }
       catch {
-        error.value = translate('progression.layoutFailed')
+        error.value = describeMessage('progression.layoutFailed')
       }
     }
     loading.value = false

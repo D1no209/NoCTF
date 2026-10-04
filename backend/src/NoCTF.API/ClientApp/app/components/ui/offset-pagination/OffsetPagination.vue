@@ -32,11 +32,11 @@ function selectLimit(value: unknown): void {
 <template>
   <div class="flex flex-wrap items-center justify-between gap-3 pt-4" aria-live="polite">
     <span class="text-sm text-muted-foreground">
-      {{ $t('ui.total') }}: {{ total }}
+      {{ $t('common.label.total') }}: {{ total }}
     </span>
     <div class="flex flex-wrap items-center gap-2">
       <Select :model-value="String(limit)" :disabled="loading" @update:model-value="selectLimit">
-        <SelectTrigger class="h-9 w-24" :aria-label="$t('ui.itemsPerPage')"><SelectValue /></SelectTrigger>
+        <SelectTrigger class="h-9 w-24" :aria-label="$t('common.label.itemsPage')"><SelectValue /></SelectTrigger>
         <SelectContent>
           <SelectItem v-for="size in [10, 20, 50, 100]" :key="size" :value="String(size)">{{ size }}</SelectItem>
         </SelectContent>
@@ -45,9 +45,9 @@ function selectLimit(value: unknown): void {
         variant="outline"
         size="sm"
         :disabled="loading || page <= 1"
-        :aria-label="$t('ui.previousPage')"
+        :aria-label="$t('common.label.previousPage')"
         @click="emit('update:page', page - 1)"
-      >{{ $t('ui.previousPage') }}</Button>
+      >{{ $t('common.label.previousPage') }}</Button>
       <template v-for="(item, index) in visiblePages" :key="`${item}-${index}`">
         <span v-if="index > 0 && item - visiblePages[index - 1]! > 1" class="px-1 text-muted-foreground">…</span>
         <Button
@@ -63,9 +63,9 @@ function selectLimit(value: unknown): void {
         variant="outline"
         size="sm"
         :disabled="loading || page >= pageCount"
-        :aria-label="$t('ui.nextPage')"
+        :aria-label="$t('common.label.nextPage')"
         @click="emit('update:page', page + 1)"
-      >{{ $t('ui.nextPage') }}</Button>
+      >{{ $t('common.label.nextPage') }}</Button>
     </div>
   </div>
 </template>

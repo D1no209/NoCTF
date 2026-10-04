@@ -12,7 +12,7 @@ export function useWaveMotion(root: Ref<HTMLElement | null>, selected: () => str
   let focusValue: string | null = null
   let frame: number | undefined
   let dirty = true
-  let items: Array<{ element: HTMLElement; center: number; value: string; offset?: string; scale?: string }> = []
+  let items: Array<{ element: HTMLElement; center: number; value: string; offset?: string | null; scale?: string | null }> = []
   let resize: ResizeObserver | undefined
   let mutation: MutationObserver | undefined
   let media: MediaQueryList | undefined

@@ -1,10 +1,6 @@
+import { currentLocale } from '../utils/i18n'
 import * as signalR from '@microsoft/signalr'
-import type {
-  NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol,
-  NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol,
-  NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol,
-  NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse,
-} from '../api'
+import type { NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol, NoCTFAPIEndpointsCompetitionsEventsCompetitionEventKindProtocol, NoCTFAPIEndpointsCompetitionsEventsCompetitionEventLevelProtocol, NoCTFAPIEndpointsGameplayFactsGameplayFactStatusResponse } from '../api/models'
 import { getAccessToken, getRealtimeAccessToken } from '../lib/session'
 import { startRealtimeWithRetry } from '../lib/realtime-retry'
 
@@ -24,21 +20,21 @@ export interface ScoreboardUpdatedNotification {
 
 export interface CompetitionLifecycleChangedNotification {
   competitionId: string
-  from: NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol
-  to: NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol
+  from: NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol
+  to: NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol
   occurredAt: string
 }
 
 export interface CompetitionEventChangedNotification {
   competitionId: string
   eventId: string
-  kind: NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol
-  level: NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol
+  kind: NoCTFAPIEndpointsCompetitionsEventsCompetitionEventKindProtocol
+  level: NoCTFAPIEndpointsCompetitionsEventsCompetitionEventLevelProtocol
   occurredAt: string
 }
 
 export type GameplayFactStateChangedNotification = Required<
-  NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse
+  NoCTFAPIEndpointsGameplayFactsGameplayFactStatusResponse
 >
 
 export interface CompetitionHubClientEvents {
@@ -108,6 +104,7 @@ function ensureConnection(): signalR.HubConnection {
   if (connection) return connection
   const hub = new signalR.HubConnectionBuilder()
     .withUrl('/hubs/v1/competitions', {
+      headers: { 'Accept-Language': currentLocale() },
       accessTokenFactory: getRealtimeAccessToken,
       // 开发环境经 Vite ws 代理转发 SignalR WebSocket 会被重置并拖垮 Nuxt 进程,
       // dev 下跳过 WebSockets 走 SSE/长轮询;生产直连后端,不受影响。

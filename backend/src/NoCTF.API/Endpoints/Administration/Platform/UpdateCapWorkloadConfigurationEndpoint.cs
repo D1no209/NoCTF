@@ -37,8 +37,7 @@ public sealed class UpdateCapWorkloadConfigurationEndpoint(
         Roles("Administrator");
         Description(builder => builder.WithName(
             "AdminPlatformUpdateCapWorkloadConfiguration"));
-        Summary(summary => summary.Summary =
-            "Updates and confirms the active CAP site's proof-of-work configuration.");
+        Summary(summary => { summary.Summary = "Updates and confirms the active CAP site's proof-of-work configuration."; summary.Description = summary.Summary; });
     }
 
     public override async Task<

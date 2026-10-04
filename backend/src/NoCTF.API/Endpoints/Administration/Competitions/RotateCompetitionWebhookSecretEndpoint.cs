@@ -26,6 +26,12 @@ public sealed class RotateCompetitionWebhookSecretEndpoint(
 {
     public override void Configure()
     {
+        Summary(summary =>
+        {
+            summary.Summary = "Replaces the secret used to sign competition webhook deliveries.";
+            summary.Description = summary.Summary;
+        });
+
         Post("/admin/competitions/{competitionId}/webhooks/{targetId}/rotate-secret");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("AdminRotateCompetitionWebhookSecret"));

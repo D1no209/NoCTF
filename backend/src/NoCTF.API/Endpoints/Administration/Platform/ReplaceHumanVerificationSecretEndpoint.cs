@@ -62,13 +62,11 @@ public sealed class ReplaceHumanVerificationSecretEndpoint(
                 HumanVerificationConfigurationError.CapProviderUnavailable);
             var invalidConfiguration = result.Errors.Contains(
                 HumanVerificationConfigurationError.CapConfigurationInvalid);
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: unavailable
                     ? StatusCodes.Status503ServiceUnavailable
                     : StatusCodes.Status400BadRequest,
-                title: unavailable
-                    ? "Cap is unavailable."
-                    : "Human verification secret is invalid.",
+                title: ApiMessages.For(unavailable ? PlatformProblemCode.CapProviderUnavailable : invalidConfiguration ? PlatformProblemCode.CapConfigurationInvalid : PlatformProblemCode.HumanVerificationSecretInvalid),
                 extensions: new Dictionary<string, object?>
                 {
                     ["code"] = unavailable

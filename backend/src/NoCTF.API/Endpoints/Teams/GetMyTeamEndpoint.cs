@@ -13,6 +13,12 @@ public sealed class GetMyTeamEndpoint(GetMyTeam get, IUserContext user, LinkGene
 {
     public override void Configure()
     {
+        Summary(summary =>
+        {
+            summary.Summary = "Returns the current participant team in the selected competition.";
+            summary.Description = summary.Summary;
+        });
+
         Get("/competitions/{competitionId}/teams/me");
         AuthSchemes("Bearer");
     }

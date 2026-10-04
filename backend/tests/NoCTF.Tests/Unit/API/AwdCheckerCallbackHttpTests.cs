@@ -4,7 +4,7 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using FastEndpoints;
-using FastEndpoints.Swagger;
+using FastEndpoints.OpenApi;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -109,7 +109,7 @@ public sealed class AwdCheckerCallbackHttpTests
                 type == typeof(RecordAwdCheckResultEndpoint)
                 || type == typeof(RecordAwdCheckResultValidator);
         });
-        builder.Services.SwaggerDocument();
+        builder.Services.OpenApiDocument();
         builder.Services.AddSingleton(new TestClaims(claims));
         builder.Services
             .AddAuthentication(options =>

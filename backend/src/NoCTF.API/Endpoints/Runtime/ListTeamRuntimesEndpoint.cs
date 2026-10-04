@@ -29,7 +29,7 @@ public sealed class ListTeamRuntimesEndpoint(
         Get("/competitions/{competitionId}/teams/me/runtimes");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("ListMyTeamRuntimes"));
-        Summary(summary => summary.Summary = "Lists the current team's active challenge runtimes.");
+        Summary(summary => { summary.Summary = "Lists the current team's active challenge runtimes."; summary.Description = summary.Summary; });
     }
 
     public override async Task<Results<Ok<ArrayResult<TeamRuntimeListItemResponse>>, NotFound>> ExecuteAsync(

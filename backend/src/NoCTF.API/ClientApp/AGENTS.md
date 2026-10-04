@@ -7,22 +7,24 @@ Nuxt 4 SPA(`ssr: false`),Bun 管理依赖,TypeScript strict,Vue 用 `<script set
 - `bun run dev`:开发(端口 3000,vite proxy 把 `/api`、`/hubs`、`/health` 转发到 `http://localhost:5080`)。
 - `bun run typecheck`:全量类型检查,改动后必须通过。
 - `bun run audit:architecture`:检查 i18n、渲染层、路由壳与 UI 原语边界；改动后必须通过。`bun test` 包含同一架构检查及行为回归。
-- `bun run api:gen`:从 `../wwwroot/openapi/v1.json` 重新生成 API SDK 到 `app/api/`(@hey-api/openapi-ts,配置在 `openapi-ts.config.ts`)。后端接口变更后先重新导出 OpenAPI(`dotnet run -- --export-openapi`)再跑此命令;生成产物提交入库。
+- `bun run api:gen`:构建 NoCTF.Host，通过 FastEndpoints.OpenApi.Kiota 直接从应用的 `v1` 文档生成 TypeScript SDK 到 `app/api/`，不读取导出的 JSON；生成源码提交入库，不手改。
+- `bun run api:export`:独立导出契约到 `backend/artifacts/openapi/v1.json`。
+- `bun run api:check`:构建一次，重新导出文档并生成 SDK，拒绝内容漂移和未跟踪产物。普通 build/publish 不隐式运行生成。
 - shadcn-vue 组件用 `bunx --bun shadcn-vue@latest add <name>` 添加(CLI 一律走 bunx)。
 
 ## 结构(app/ 下)
 
-- `api/`:hey-api 生成产物(sdk.gen.ts / types.gen.ts / client),不要手改。
+- `api/`:Kiota 生成的 `noCtfClient.ts`、request builders 和 `models/`。仅生成源码入库；含临时路径的 `kiota-lock.json` 不入库。
 - `components/ui/`:唯一的共享 UI 原语目录，shadcn-vue 与项目通用控件均在此处。只有此目录自动导入，无前缀(`<Button>` 等)。新增通用交互控件必须集中放在这里，禁止页面或业务组件私建按钮、输入框、弹层、表格等原语。
 - `components/views/`:纯渲染视图。setup 只声明 props、类型和 `toRefs` 绑定；不请求 API，不访问会话，不创建业务状态、watch、轮询或事件处理函数。模板允许布局 HTML、原语组合、条件渲染、列表、i18n、格式化、v-model 与命令转发；禁止事件中的赋值、控制流和业务转换。通过类型引用功能层契约可以，但禁止运行时导入功能层。
 - `features/<领域>/`:功能逻辑与组合入口。`use<Name>.ts` 管理状态、校验、转换、权限判断、API、轮询、订阅和事件处理；`<Name>.vue` 只连接 props/emits/model、控制器和对应 View。子功能组件由控制器显式提供，视图通过 `<component :is>` 渲染，禁止隐式自动导入业务组件。`features/routes/` 对应路由功能，`features/shell/` 对应应用壳，`features/shared/view-state.ts` 统一连接功能状态与视图。所有 Vue 文件名保持唯一。
 - `features/app/`:应用工作区组合与导航契约；`AppWorkspaceNav` 与 `workspace-nav.ts` 的 `WorkspaceNavGroup` 在这里。
 - `composables/`:`useAuth`(会话/角色)、`usePlatform`(品牌)、`useCursorPagination`(keyset「加载更多」)、`usePolling`(202+statusUrl 轮询)、`useCompetitionHub` / `usePlatformLogHub`(SignalR 实时失效)。管理配置使用生成 SDK 的 `mode`/`kind` 枚举加互斥 nullable 分支对象，不维护自由 JSON model。
-- `lib/`:`session.ts`(内存 access token + refresh 单飞,供拦截器使用,禁 localStorage)、`admin-competition.ts`(竞赛管理角色注入)。
+- `lib/`:`api.ts`(Kiota adapter、请求策略、认证重试、原生响应；禁止恢复旧 SDK 返回包装)、`session.ts`(内存 access token + refresh 单飞,供拦截器使用,禁 localStorage)、`admin-competition.ts`(竞赛管理角色注入)。
 - `utils/`:`api-error.ts`(ApiError/parseApiError/statusErrorMessage,problem+json 解析与空响应体的状态码兜底文案)、`labels.ts`(枚举中文标签)、`admin-format.ts`、`download.ts`(带 Bearer 的 blob 下载)。模式配置必须使用生成 SDK 的强类型结构，禁止自建 JSON schema 兼容器。
 - `middleware/`:`auth` / `guest` / `platform-admin`,经 `definePageMeta` 使用。
 - `pages/`、`layouts/`、`app.vue`:仅路由/布局元数据与功能入口组合，不持有业务代码或私有原语。路由仍为公开区、选手区、认证、竞赛管理、题库与平台管理；账户功能由顶栏 `features/account/AccountPanel` 承载，不建立独立账户设置页。
-- `locales/zh-CN.ts`、`locales/en.ts`:使用同一组稳定资源 key，中英文 key 与插值参数必须一致。修改文案不修改 key。页面、组件、默认属性、占位符、无障碍名称、通知与错误文案不得硬编码中文或英文；用户内容、协议值、URL 和代码示例数据按其真实语义处理，不翻译用户内容。
+- `locales/catalogs/<locale>/*.json`:按功能拆分的语义化资源，英文为源语言；`locales/en.ts` 定义 `MessageKey`，`zh-CN.ts` 合并英文回退。修改文案不修改 key，不用原文、整句转写、`ui.*` 或数字后缀 key。非空译文的插值参数必须与英文一致。页面、组件、默认属性、占位符、无障碍名称、通知与错误文案不得硬编码中文或英文；用户内容、协议值、URL 和代码示例数据按其真实语义处理，不翻译用户内容。`api.json` 由 API 的 `Localization/Catalogs` 生成，不手改；`bun run locales:prepare` 更新生成资源。
 
 ## 约定
 
@@ -82,7 +84,7 @@ Nuxt 4 SPA(`ssr: false`),Bun 管理依赖,TypeScript strict,Vue 用 `<script set
 - 主题默认深色,切换走 `useTheme()`(vueuse `vueuse-color-scheme` 持久化,nuxt.config head 脚本防首帧闪烁);浅色品牌蓝、深色 #39FF14 token 与两套配色在 `assets/css/main.css`,背景刻意带蓝色调、不做纯白。
 - 排版约定:标题用 `text-display` 工具类(main.css 定义,字重+字距),全局 h1-h3 已带 `tracking-tight`;终端光标闪烁用 `animate-blink`(如品牌 wordmark `> name _`,见 layouts/default.vue);数据用 `font-mono`（字体同样映射为微软雅黑）+ `tabular-nums`。
 - 页面、分区与列表标题只显示标题和必要业务状态；不在标题下重复解释页面用途、内容范围或键盘操作。会影响决策的权限、风险、表单约束、错误与空状态反馈继续保留。
-- 新 UI 文案在两个 locale 文件同时添加资源；静态文案用稳定 key 调用 `$t` / `t` / `translate`。配置标签保存 key，渲染时翻译，禁止在模块加载时固定当前语言。已解析的错误/反馈用 `$message` 渲染，已知中英文反馈随语言切换，未知服务端文本和用户内容原样保留。不得恢复中文原文作 key。
+- 新 UI 文案在英文功能 JSON 添加完整资源，在中文资源添加对应翻译（缺失或空译文回退英文）；静态文案用稳定 key 调用 `$t` / `t`。配置标签保存 key，渲染时翻译，禁止在模块加载时固定当前语言。已解析的错误/反馈保存 `message(key, arguments)` / `ApiError.displayMessage`，用 `$message` 渲染；通知用 `utils/message-toast`。不得根据原文匹配错误或恢复中文原文作 key。具体错误、字段校验和操作级 fallback 保持原有优先级。
 - 题目方向(Web/Pwn/Crypto 等)的图标与颜色一律走 `utils/directions.ts` 映射表(`directionIcon`/`directionTextClass`/`directionBadgeClass`),禁止局部硬编码方向色;分数、排名、时间等数据用 `font-mono`(JetBrains Mono)+ `tabular-nums`。
 - 项目自绘的静态 SVG 资源统一放在 `app/assets/svg/` 下，方向图标放在 `directions/`、装饰图样放在 `decorations/`；Vue/TypeScript 只通过资源 URL 引用，不内联 path 数据。数据驱动的动态图表不作为静态资源处理。
 - 题目列表详细态使用共享 IconWatermark 显示方向 SVG 水印，收缩态隐藏水印，方向文字只作为辅助技术文本；分组标题继续显示小图标和方向名称。Mock 为每个支持方向提供一题和一个可下载附件，数据与下载内容仅放在 mock/。
@@ -93,3 +95,11 @@ Nuxt 4 SPA(`ssr: false`),Bun 管理依赖,TypeScript strict,Vue 用 `<script set
 - Markdown 统一通过 `lib/markdown.ts` 解析与清洗，Fence 代码使用 `lib/markdown-highlighter.ts` 的 Highlight.js core 按需语言注册；未知语言保持转义纯文本。高亮的 `hljs-*` 类和 `data-language` 必须进入明确清洗白名单。标题、列表、引用、代码、表格、媒体、折叠块与分隔线的装饰集中在 main.css 的 `.markdown-content` 规则中，不在业务页面重复定义。
 - 发布构建由 `NoCTF.API.csproj` 驱动(`bun install --frozen-lockfile` + `bun run generate`),产物在 `.output/public`。
 - 改依赖后提交更新后的 `bun.lock`。
+
+## API 客户端契约
+
+- 使用 `api` 的生成 request builders 直接返回模型或抛出错误；不创建旧函数名/模型名别名或 `{ data, error, response }` 兼容层。
+- `RequestPolicyOption` 传递 signal/cache/每请求元数据；排行榜使用 `ProjectionResponseOption` 区分 202 与完成模型，不能把处理中响应强转成快照。
+- 上传使用 `multipartBody`，下载使用 `nativeResponse` 和下载工具；API 路由仅由生成代码构造。原生 fetch 仅存在于 `lib/api.ts`。
+- Kiota 的日期为 `Date`；在功能层构建请求日期，在展示/浏览器边界使用 `dateObject`、`dateIso`、`dateTimestamp`。字典模型通过 `additionalData` 读写。
+- FastEndpoints 8.2 固定 Kiota Builder 1.29；TS 运行库固定 preview.102，并覆盖传递的 abstractions 版本。preview.103 及以上的集合反序列化签名与此生成器不兼容。

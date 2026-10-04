@@ -1,8 +1,5 @@
 import type { InjectionKey } from 'vue'
-import type {
-  NoCtfapiEndpointsCompetitionsCompetitionAdministrationRoleProtocol,
-  NoCtfapiEndpointsCompetitionsCompetitionResponse,
-} from '../api'
+import type { NoCTFAPIEndpointsCompetitionsCompetitionAdministrationRoleProtocol, NoCTFAPIEndpointsCompetitionsCompetitionResponse } from '../api/models'
 
 /**
  * My role inside one competition, derived in the [id] shell:
@@ -11,11 +8,11 @@ import type {
  * - Judge: can adjudicate incidents, bans, and ban appeals
  * - Observer: read-only UI
  */
-export type CompetitionAdminRole = NoCtfapiEndpointsCompetitionsCompetitionAdministrationRoleProtocol
+export type CompetitionAdminRole = NoCTFAPIEndpointsCompetitionsCompetitionAdministrationRoleProtocol
 
 export interface CompetitionAdminContext {
   competitionId: string
-  competition: Ref<NoCtfapiEndpointsCompetitionsCompetitionResponse | null>
+  competition: Ref<NoCTFAPIEndpointsCompetitionsCompetitionResponse | null>
   role: Ref<CompetitionAdminRole>
   /** owner or manager: show write controls. */
   canWrite: ComputedRef<boolean>

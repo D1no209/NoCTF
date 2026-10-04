@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security policy
+    url: https://github.com/D1no209/NoCTF/security/policy
+    about: Follow the private reporting process for vulnerabilities.

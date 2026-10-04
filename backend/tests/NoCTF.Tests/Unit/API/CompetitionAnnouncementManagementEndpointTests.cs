@@ -3,7 +3,7 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using FastEndpoints;
-using FastEndpoints.Swagger;
+using FastEndpoints.OpenApi;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -95,7 +95,7 @@ public sealed class CompetitionAnnouncementManagementEndpointTests
                 || type==typeof(UpdateCompetitionAnnouncementEndpoint) || type==typeof(UpdateCompetitionAnnouncementValidator)
                 || type==typeof(DeleteCompetitionAnnouncementEndpoint) || type==typeof(DeleteCompetitionAnnouncementValidator);
         });
-        builder.Services.SwaggerDocument();
+        builder.Services.OpenApiDocument();
         builder.Services.AddAuthentication("Bearer").AddScheme<AuthenticationSchemeOptions, TestBearer>("Bearer",_=>{});
         builder.Services.AddAuthorization();
         builder.Services.AddSingleton(Substitute.For<IUserContext>());

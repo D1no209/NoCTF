@@ -65,7 +65,7 @@ public sealed class ListPlatformLogsValidator : Validator<ListPlatformLogsReques
                 request.From is null || request.To is null
                 || request.From <= request.To
                 && request.To - request.From <= TimeSpan.FromDays(14))
-            .WithMessage("The platform log query range must be between zero and 14 days.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.ListPlatformLogsValidationPlatformLogQueryRange)).WithErrorCode(ApiMessages.Key(ApiMessageId.ListPlatformLogsValidationPlatformLogQueryRange));
     }
 }
 
@@ -166,9 +166,9 @@ public sealed class ListPlatformLogsEndpoint(
                 filterKey,
                 out var position))
         {
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
-                title: "Invalid cursor.");
+                title: ApiMessages.Get(ApiMessageId.InvalidCursor));
         }
         var result = await platform.QueryLogsAsync(
             new(
@@ -196,10 +196,10 @@ public sealed class ListPlatformLogsEndpoint(
                         CursorEndpoint,
                         filterKey,
                         result.NextCursor)))
-            : TypedResults.Problem(
+            : ApiProblems.Problem(
                 statusCode: StatusCodes.Status503ServiceUnavailable,
-                title: "Platform logs are unavailable.",
-                detail: "The bounded Redis log history could not be queried.");
+                title: ApiMessages.Get(ApiMessageId.ExportPlatformLogsTitlePlatformLogsUnavailable),
+                detail: ApiMessages.Get(ApiMessageId.ListPlatformLogsDetailBoundedRedisLogHistory));
     }
 
     internal static string FilterKey(ListPlatformLogsRequest request) =>

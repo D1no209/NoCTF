@@ -4,7 +4,7 @@ import { describe, expect, test } from 'bun:test'
 describe('frontend audit closeout', () => {
   test('platform logs default to Warning', async () => {
     const page = await sourceFile(new URL('../app/pages/admin/platform/logs.vue', import.meta.url)).text()
-    expect(page).toContain("ref<NoCtfapiEndpointsAdministrationPlatformPlatformLogLevelProtocol>('Warning')")
+    expect(page).toContain("ref<NoCTFAPIEndpointsAdministrationPlatformPlatformLogLevelProtocol>('Warning')")
   })
 
   test('definition editor delete buttons expose localized accessible names', async () => {
@@ -17,7 +17,7 @@ describe('frontend audit closeout', () => {
 
     for (const path of paths) {
       const component = await sourceFile(new URL(path, import.meta.url)).text()
-      expect(component).toContain(":aria-label=\"$t('ui.removeItem', { index: index + 1 })\"")
+      expect(component).toContain(":aria-label=\"$t('common.label.removeItem', { index: index + 1 })\"")
       expect(component).toMatch(/<X class="size-4" aria-hidden="true" \/>/)
     }
   })

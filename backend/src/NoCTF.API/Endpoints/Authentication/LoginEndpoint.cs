@@ -19,6 +19,10 @@ public sealed record LoginResponse(
 
 public sealed class LoginRequest
 {
+    /// <summary>One-time verification token; optional when platform policy disables verification. Maximum 4096 characters.</summary>
+    [FromHeader("X-NoCTF-Human-Verification", IsRequired = false, RemoveFromSchema = true)]
+    public string? HumanVerificationToken { get; set; }
+
     public string Login { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
 }
@@ -37,6 +41,18 @@ public sealed class LoginEndpoint(LoginUser login, IOptions<RefreshHttpOptions> 
 {
     public override void Configure()
     {
+        Summary(summary =>
+        {
+            summary.Params["X-NoCTF-Human-Verification"] = "One-time verification token, at most 4096 characters. Required only when the configured platform policy enables verification for this operation.";
+            summary.Summary = "Authenticates credentials and issues an access token and HttpOnly refresh cookie.";
+            summary.Description = summary.Summary;
+        });
+
+        Description(builder => builder
+            .Produces(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable));
+
         Post("/auth/login");
         AllowAnonymous();
         Options(builder => builder.WithMetadata(new NoCTF.API.Security.ProtectedEntryMetadata(NoCTF.API.Security.ProtectedEntry.Authentication)));

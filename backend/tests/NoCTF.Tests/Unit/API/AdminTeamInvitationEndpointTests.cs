@@ -3,7 +3,7 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using FastEndpoints;
-using FastEndpoints.Swagger;
+using FastEndpoints.OpenApi;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -84,7 +84,7 @@ public sealed class AdminTeamInvitationEndpointTests
             options.Assemblies = [typeof(GetAdminTeamInvitationEndpoint).Assembly];
             options.Filter = type => type == typeof(GetAdminTeamInvitationEndpoint);
         });
-        builder.Services.SwaggerDocument();
+        builder.Services.OpenApiDocument();
         builder.Services
             .AddAuthentication(options =>
             {

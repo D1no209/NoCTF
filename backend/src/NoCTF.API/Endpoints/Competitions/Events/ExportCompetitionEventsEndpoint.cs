@@ -30,7 +30,7 @@ public sealed class ExportCompetitionEventsValidator
         RuleFor(request => request).Must(request =>
                 request.From <= request.To
                 && request.To - request.From <= TimeSpan.FromDays(31))
-            .WithMessage("The export range must be between zero and 31 days.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.ExportCompetitionEventsValidationExportRangeBetweenZero)).WithErrorCode(ApiMessages.Key(ApiMessageId.ExportCompetitionEventsValidationExportRangeBetweenZero));
     }
 }
 
@@ -83,9 +83,9 @@ public sealed class ExportCompetitionEventsEndpoint(
         if (result.State != CompetitionEventReadState.Available
             || result.Export is null)
         {
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
-                title: "Invalid competition event export.");
+                title: ApiMessages.Get(ApiMessageId.ExportCompetitionEventsTitleInvalidCompetitionEventExport));
         }
         return TypedResults.Stream(
             result.Export.Content,

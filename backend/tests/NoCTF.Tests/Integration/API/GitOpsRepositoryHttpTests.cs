@@ -212,7 +212,7 @@ public sealed class GitOpsRepositoryHttpTests
         var key = Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["OpenApi:Exporting"] = "true", ["Authentication:SigningKey"] = key,
+            ["OpenApi:Generating"] = "true", ["Authentication:SigningKey"] = key,
             ["RunnerScoring:SigningKey"] = key, ["Storage:LocalRoot"] = Path.Combine(temporary, "storage"),
             ["Database:Provider"] = "PostgreSql", ["ConnectionStrings:PostgreSql"] = connection
         });

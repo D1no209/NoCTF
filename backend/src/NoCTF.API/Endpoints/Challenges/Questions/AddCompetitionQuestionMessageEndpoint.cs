@@ -75,9 +75,9 @@ public sealed class AddCompetitionQuestionMessageEndpoint(
                 or CompetitionQuestionFailure.ParticipantMessageLimitReached => TypedResults.Conflict(
                     CompetitionQuestionFailureMapper.ToResponse(result)),
             CompetitionQuestionFailure.InvalidRequest
-                or CompetitionQuestionFailure.SpamRejected => TypedResults.Problem(
+                or CompetitionQuestionFailure.SpamRejected => ApiProblems.Problem(
                     statusCode: StatusCodes.Status400BadRequest,
-                    title: "Competition question message was rejected.",
+                    title: ApiMessages.Get(ApiMessageId.AddCompetitionQuestionMessageTitleCompetitionQuestionMessageWas),
                     extensions: new Dictionary<string, object?>
                     {
                         ["code"] = CompetitionQuestionFailureMapper.ToCode(result.Failure.Value)

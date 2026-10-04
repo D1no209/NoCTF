@@ -31,7 +31,7 @@ public sealed class ListSsoProvidersEndpoint(ManageSsoProviders management)
         Get("/auth/sso/providers");
         AllowAnonymous();
         Description(builder => builder.WithName("Authentication_SsoListProviders"));
-        Summary(summary => summary.Summary = "Lists enabled SSO providers that allow platform login.");
+        Summary(summary => { summary.Summary = "Lists enabled SSO providers that allow platform login."; summary.Description = summary.Summary; });
     }
 
     public override async Task<Ok<PublicSsoProviderListResponse>> ExecuteAsync(CancellationToken ct)

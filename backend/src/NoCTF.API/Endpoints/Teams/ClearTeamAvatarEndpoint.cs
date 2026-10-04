@@ -16,7 +16,7 @@ public sealed class ClearTeamAvatarEndpoint(
         Delete("/competitions/{competitionId}/teams/{teamId}/avatar");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("TeamAvatar_Clear"));
-        Summary(summary => summary.Summary = "Clears a team's avatar and queues unreferenced File cleanup.");
+        Summary(summary => { summary.Summary = "Clears a team's avatar and queues unreferenced File cleanup."; summary.Description = summary.Summary; });
     }
 
     public override async Task<Results<NoContent, NotFound, ForbidHttpResult,

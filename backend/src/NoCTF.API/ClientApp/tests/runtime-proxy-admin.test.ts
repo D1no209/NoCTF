@@ -40,10 +40,10 @@ describe('Runtime WSRX administration', () => {
     ])
 
     for (const operation of [
-      'adminListRuntimeTrafficCaptures',
-      'adminDownloadRuntimeTrafficCapture',
-      'adminExportRuntimeTrafficCaptures',
-      'adminDeleteRuntimeTrafficCapture',
+      '.trafficCaptures.get(',
+      '.file.get(',
+      '.exportEscaped.post(',
+      '.trafficCaptures.byRuntimeInstanceId(',
     ]) expect(feature).toContain(operation)
     expect(view).toContain('<OffsetPagination')
     expect(view).toContain('<AlertDialog')

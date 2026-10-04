@@ -1,38 +1,29 @@
-import { FlaskConical, Plus, RotateCw } from '@lucide/vue'
-import { toast } from 'vue-sonner'
-import {
-  adminPlatformSsoBeginAuthenticationTest,
-  adminPlatformSsoCreateProvider,
-  adminPlatformSsoGetConfiguration,
-  adminPlatformSsoPatchConfiguration,
-  adminPlatformSsoReplaceProviderSecret,
-  adminPlatformSsoTestProviderConnection,
-  adminPlatformSsoUpdateProvider,
-} from '../../../../api'
-import type {
-  NoCtfapiEndpointsAdministrationPlatformSsoConfigurationResponse,
-  NoCtfapiEndpointsAdministrationPlatformSsoProviderResponse,
-  NoCtfapiEndpointsAdministrationPlatformSsoProviderWriteRequest,
-  NoCtfapiEndpointsAdministrationPlatformSsoProtocolProtocol,
-} from '../../../../api'
 
-type Configuration = NoCtfapiEndpointsAdministrationPlatformSsoConfigurationResponse
-type Provider = NoCtfapiEndpointsAdministrationPlatformSsoProviderResponse
+import { api } from '../../../../lib/api'
+import { message as describeMessage } from '../../../../utils/i18n'
+import type { UiMessage } from '../../../../utils/i18n'
+import { FlaskConical, Plus, RotateCw } from '@lucide/vue'
+import { toast } from '../../../../utils/message-toast'
+
+import type { NoCTFAPIEndpointsAdministrationPlatformSsoConfigurationResponse, NoCTFAPIEndpointsAdministrationPlatformSsoProviderResponse, NoCTFAPIEndpointsAdministrationPlatformCreateSsoProviderRequest, NoCTFAPIEndpointsAdministrationPlatformSsoProtocolProtocol } from '../../../../api/models'
+
+type Configuration = NoCTFAPIEndpointsAdministrationPlatformSsoConfigurationResponse
+type Provider = NoCTFAPIEndpointsAdministrationPlatformSsoProviderResponse
 
 export function useAdminPlatformAuthenticationPage() {
   const configuration = ref<Configuration | null>(null)
   const loading = ref(true)
-  const loadError = ref<string | null>(null)
+  const loadError = ref<UiMessage | null>(null)
   const globalSaving = ref(false)
   const globalForm = reactive({ enabled: false, publicBaseUrl: '' })
   const providerOpen = ref(false)
   const providerSaving = ref(false)
-  const providerError = ref<string | null>(null)
+  const providerError = ref<UiMessage | null>(null)
   const providerForm = reactive({
     id: '',
     name: '',
     iconUrl: '',
-    protocol: 'Oidc' as NoCtfapiEndpointsAdministrationPlatformSsoProtocolProtocol,
+    protocol: 'Oidc' as NoCTFAPIEndpointsAdministrationPlatformSsoProtocolProtocol,
     enabled: false,
     allowLogin: true,
     allowBinding: true,
@@ -64,10 +55,11 @@ export function useAdminPlatformAuthenticationPage() {
   async function load() {
     loading.value = true
     loadError.value = null
-    const { data, error } = await adminPlatformSsoGetConfiguration()
+    let error: unknown;
+    const data = await api.api.v1.admin.platform.sso.get().catch(cause => { error = cause; return undefined });
     loading.value = false
     if (error || !data) {
-      loadError.value = parseApiError(error, translate('sso.configurationUnavailable')).message
+      loadError.value = parseApiError(error, describeMessage('sso.configurationUnavailable')).displayMessage
       return
     }
     sync(data)
@@ -76,19 +68,18 @@ export function useAdminPlatformAuthenticationPage() {
   async function saveGlobal() {
     if (globalSaving.value) return
     globalSaving.value = true
-    const { data, error } = await adminPlatformSsoPatchConfiguration({
-      body: {
+    let error: unknown;
+    const data = await api.api.v1.admin.platform.sso.patch({
         enabled: globalForm.enabled,
         publicBaseUrl: globalForm.publicBaseUrl.trim(),
-      },
-    })
+      }).catch(cause => { error = cause; return undefined });
     globalSaving.value = false
     if (error || !data) {
-      toast.error(parseApiError(error, translate('sso.configurationSaveFailed')).message)
+      toast.error(parseApiError(error, describeMessage('sso.configurationSaveFailed')).displayMessage)
       return
     }
     sync(data)
-    toast.success(translate('sso.configurationSaved'))
+    toast.success(describeMessage('sso.configurationSaved'))
   }
 
   function resetProviderForm() {
@@ -134,7 +125,7 @@ export function useAdminPlatformAuthenticationPage() {
     providerOpen.value = true
   }
 
-  function providerRequest(): NoCtfapiEndpointsAdministrationPlatformSsoProviderWriteRequest {
+  function providerRequest(): NoCTFAPIEndpointsAdministrationPlatformCreateSsoProviderRequest {
     const common = {
       name: providerForm.name.trim(),
       iconUrl: providerForm.iconUrl.trim() || null,
@@ -175,20 +166,18 @@ export function useAdminPlatformAuthenticationPage() {
     if (providerSaving.value) return
     providerSaving.value = true
     providerError.value = null
-    const response = providerForm.id
-      ? await adminPlatformSsoUpdateProvider({
-          path: { providerId: providerForm.id },
-          body: providerRequest(),
-        })
-      : await adminPlatformSsoCreateProvider({ body: providerRequest() })
+    let responseError: unknown;
+    const response = await (providerForm.id
+      ? api.api.v1.admin.platform.sso.providers.byProviderId(providerForm.id).put(providerRequest())
+      : api.api.v1.admin.platform.sso.providers.post(providerRequest())).catch(cause => { responseError = cause; return undefined });
     providerSaving.value = false
-    if (response.error || !response.data) {
-      providerError.value = parseApiError(response.error, translate('sso.providerSaveFailed')).message
+    if (responseError || !response) {
+      providerError.value = parseApiError(responseError, describeMessage('sso.providerSaveFailed')).displayMessage
       return
     }
-    sync(response.data)
+    sync(response)
     providerOpen.value = false
-    toast.success(translate('sso.providerSaved'))
+    toast.success(describeMessage('sso.providerSaved'))
   }
 
   function openSecret(provider: Provider) {
@@ -201,44 +190,40 @@ export function useAdminPlatformAuthenticationPage() {
     const providerId = secretProvider.value?.id
     if (!providerId || !secret.value || secretSaving.value) return
     secretSaving.value = true
-    const { data, error } = await adminPlatformSsoReplaceProviderSecret({
-      path: { providerId },
-      body: { secret: secret.value },
-    })
+    let error: unknown;
+    const data = await api.api.v1.admin.platform.sso.providers.byProviderId(providerId).secret.put({ secret: secret.value }).catch(cause => { error = cause; return undefined });
     secretSaving.value = false
     if (error || !data) {
-      toast.error(parseApiError(error, translate('sso.secretReplaceFailed')).message)
+      toast.error(parseApiError(error, describeMessage('sso.secretReplaceFailed')).displayMessage)
       return
     }
     sync(data)
     secret.value = ''
     secretOpen.value = false
-    toast.success(translate('sso.secretReplaced'))
+    toast.success(describeMessage('sso.secretReplaced'))
   }
 
   async function testConnection(provider: Provider) {
     if (!provider.id || testingId.value) return
     testingId.value = provider.id
-    const { data, error } = await adminPlatformSsoTestProviderConnection({
-      path: { providerId: provider.id },
-    })
+    let error: unknown;
+    const data = await api.api.v1.admin.platform.sso.providers.byProviderId(provider.id).connectionTests.post().catch(cause => { error = cause; return undefined });
     testingId.value = null
     if (error || !data?.succeeded) {
-      toast.error(data?.failureCode ?? parseApiError(error, translate('sso.connectionTestFailed')).message)
+      toast.error(data?.failureCode ?? parseApiError(error, describeMessage('sso.connectionTestFailed')).displayMessage)
       return
     }
-    toast.success(translate('sso.connectionTestSuccessful'))
+    toast.success(describeMessage('sso.connectionTestSuccessful'))
   }
 
   async function testAuthentication(provider: Provider) {
     if (!provider.id || testingId.value) return
     testingId.value = provider.id
-    const { data, error } = await adminPlatformSsoBeginAuthenticationTest({
-      path: { providerId: provider.id },
-    })
+    let error: unknown;
+    const data = await api.api.v1.admin.platform.sso.providers.byProviderId(provider.id).authenticationTests.post().catch(cause => { error = cause; return undefined });
     if (error || !data?.authorizationUrl) {
       testingId.value = null
-      toast.error(parseApiError(error, translate('sso.authenticationTestFailed')).message)
+      toast.error(parseApiError(error, describeMessage('sso.authenticationTestFailed')).displayMessage)
       return
     }
     window.location.assign(data.authorizationUrl)

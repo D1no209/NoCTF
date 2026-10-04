@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { bindViewState } from '~/features/shared/view-state'
-import type { NoCtfapiEndpointsCompetitionsGameModeProtocol } from '~/api'
+import type { NoCTFAPIEndpointsCompetitionsGameModeProtocol } from '~/api/models'
 import { useGameModeBadge } from './useGameModeBadge'
 import View from '~/components/views/admin/GameModeBadgeView.vue'
 
-const props = defineProps<{ mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol | null }>()
+const props = defineProps<{ mode?: NoCTFAPIEndpointsCompetitionsGameModeProtocol | null }>()
 const state = bindViewState(useGameModeBadge(props))
 
 </script>

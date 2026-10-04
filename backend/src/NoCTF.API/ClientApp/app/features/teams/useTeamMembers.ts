@@ -1,23 +1,29 @@
+
+import { api } from '../../lib/api'
+
+
+import { message as describeMessage } from '../../utils/i18n'
+import type { UiMessage } from '../../utils/i18n'
 import { toRefs } from 'vue'
 
-import { toast } from 'vue-sonner'
+import { toast } from '../../utils/message-toast'
 import { Crown, UserMinus } from '@lucide/vue'
-import { patchCompetitionTeam, userProfileGet } from '../../api'
-import type { NoCtfapiEndpointsAuthenticationPublicUserProfileResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../api'
+
+import type { NoCTFAPIEndpointsAuthenticationPublicUserProfileResponse, NoCTFAPIEndpointsTeamsTeamResponse } from '../../api/models'
 
 /** Owns state, effects and commands for TeamMembers. */
 export function useTeamMembers(props: Readonly<{
   competitionId: string
-  team: NoCtfapiEndpointsTeamsTeamResponse
+  team: NoCTFAPIEndpointsTeamsTeamResponse
   /** 队长视角:可移除成员 */
   canManage?: boolean
 }>,
 emit: { (event: "changed", ...args: []): void }) {
-  const profiles = ref<Record<string, NoCtfapiEndpointsAuthenticationPublicUserProfileResponse>>({})
+  const profiles = ref<Record<string, NoCTFAPIEndpointsAuthenticationPublicUserProfileResponse>>({})
 
   const loaded = ref(false)
 
-  const loadError = ref<string | null>(null)
+  const loadError = ref<UiMessage | null>(null)
 
   const removing = ref<string | null>(null)
 
@@ -27,7 +33,8 @@ emit: { (event: "changed", ...args: []): void }) {
     loadError.value = null
     const entries = await Promise.all(
       ids.map(async (id) => {
-        const { data, error } = await userProfileGet({ path: { userId: id } })
+        let error: unknown;
+        const data = await api.api.v1.users.byUserId(id).get().catch(cause => { error = cause; return undefined });
         return { id, data, error }
       }),
     )
@@ -38,7 +45,7 @@ emit: { (event: "changed", ...args: []): void }) {
     )
     const failures = entries.filter(entry => entry.error || !entry.data).length
     if (failures > 0) {
-      loadError.value = translate("ui.profilesForTeamMembersCouldNotBeLoadedUserIdentifiers", {
+      loadError.value = describeMessage("competitions.teamMembers.description.profilesTeamMembersCould", {
         count: failures,
       })
     }
@@ -49,21 +56,19 @@ emit: { (event: "changed", ...args: []): void }) {
 
   async function remove(userId: string) {
     removing.value = userId
-    const { error } = await patchCompetitionTeam({
-      path: { competitionId: props.competitionId, teamId: props.team.id! },
-      body: {
+    let error: unknown;
+    await api.api.v1.competitions.byCompetitionId(props.competitionId).teams.byTeamId(props.team.id!).patch({
         membership: {
           captainId: props.team.captainId!,
           memberIds: (props.team.memberIds ?? []).filter(id => id !== userId),
         },
-      },
-    })
+      }).catch(cause => { error = cause; return undefined });
     removing.value = null
     if (error) {
-      toast.error(parseApiError(error, translate("ui.failedToRemoveMember")).message)
+      toast.error(parseApiError(error, describeMessage("competitions.error.removeMemberFailed")).displayMessage)
       return
     }
-    toast.success(translate("ui.memberRemoved"))
+    toast.success(describeMessage("competitions.label.memberRemoved"))
     emit('changed')
   }
 

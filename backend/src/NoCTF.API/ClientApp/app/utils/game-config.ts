@@ -1,17 +1,9 @@
-import type {
-  NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract,
-  NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeContract,
-  NoCtfapiEndpointsAdministrationCompetitionsBloodRewardPolicyProtocol,
-  NoCtfapiEndpointsAdministrationCompetitionsEvaluationDispatchModeProtocol,
-  NoCtfapiEndpointsAdministrationCompetitionsScoreDecayModeProtocol,
-  NoCtfapiEndpointsAdministrationCompetitionsCtfScoreSettlementModeProtocol,
-  NoCtfapiEndpointsCompetitionsGameModeProtocol,
-} from '../api'
+import type { NoCTFAPIEndpointsAdministrationChallengeBankChallengeDefinitionContract, NoCTFAPIEndpointsAdministrationChallengeBankChallengeRuntimeContract, NoCTFAPIEndpointsAdministrationCompetitionsBloodRewardPolicyProtocol, NoCTFAPIEndpointsAdministrationCompetitionsEvaluationDispatchModeProtocol, NoCTFAPIEndpointsAdministrationCompetitionsScoreDecayModeProtocol, NoCTFAPIEndpointsAdministrationCompetitionsCtfScoreSettlementModeProtocol, NoCTFAPIEndpointsCompetitionsGameModeProtocol } from '../api/models'
 import { translate } from './i18n'
 
 /** Strongly typed editor models for the OpenAPI game-mode contracts. */
 
-export type GameModeValue = NoCtfapiEndpointsCompetitionsGameModeProtocol
+export type GameModeValue = NoCTFAPIEndpointsCompetitionsGameModeProtocol
 
 // ---------- Editor enums ----------
 
@@ -38,13 +30,13 @@ export const CtfInteraction = { FlagSubmission: 0, PatchVerification: 1 } as con
 
 const scoreDecayProtocols = [
   'Fixed', 'Linear', 'Quadratic', 'Exponential', 'Logarithmic', 'Custom',
-] as const satisfies readonly NoCtfapiEndpointsAdministrationCompetitionsScoreDecayModeProtocol[]
+] as const satisfies readonly NoCTFAPIEndpointsAdministrationCompetitionsScoreDecayModeProtocol[]
 const bloodRewardProtocols = [
   'FixedPoints', 'InitialPointsPercentage', 'SolveTimePointsPercentage', 'CurrentPointsPercentage',
-] as const satisfies readonly NoCtfapiEndpointsAdministrationCompetitionsBloodRewardPolicyProtocol[]
+] as const satisfies readonly NoCTFAPIEndpointsAdministrationCompetitionsBloodRewardPolicyProtocol[]
 const evaluationDispatchProtocols = [
   'Automatic', 'Manual',
-] as const satisfies readonly NoCtfapiEndpointsAdministrationCompetitionsEvaluationDispatchModeProtocol[]
+] as const satisfies readonly NoCTFAPIEndpointsAdministrationCompetitionsEvaluationDispatchModeProtocol[]
 
 function protocolIndex(value: unknown, names: readonly string[], fallback: number): number {
   const index = names.indexOf(value as string)
@@ -52,34 +44,34 @@ function protocolIndex(value: unknown, names: readonly string[], fallback: numbe
 }
 
 export const ATTACK_REWARD_MODES = [
-  { value: 'FixedPerAttack', label: "ui.fixedScoreForEachAttack" },
-  { value: 'SplitVictimDefensePool', label: "ui.divideTheVictimDefensePool" },
+  { value: 'FixedPerAttack', label: "common.label.fixedScoreAttack" },
+  { value: 'SplitVictimDefensePool', label: "common.label.divideVictimDefensePool" },
 ] as const
 
 export const CTF_SCORE_SETTLEMENT_MODES = [
-  { value: 'DynamicRecalculation', label: 'ui.ctfDynamicRecalculation' },
-  { value: 'AtSolve', label: 'ui.ctfAtSolve' },
-] as const satisfies readonly { value: NoCtfapiEndpointsAdministrationCompetitionsCtfScoreSettlementModeProtocol, label: string }[]
+  { value: 'DynamicRecalculation', label: 'common.label.ctfDynamicRecalculation' },
+  { value: 'AtSolve', label: 'common.label.ctfSolve' },
+] as const satisfies readonly { value: NoCTFAPIEndpointsAdministrationCompetitionsCtfScoreSettlementModeProtocol, label: string }[]
 
 export const BLOOD_REWARD_POLICIES = [
-  { value: BloodRewardPolicy.FixedPoints, label: "ui.fixedPoints" },
-  { value: BloodRewardPolicy.InitialPointsPercentage, label: "ui.initialScorePercentage" },
-  { value: BloodRewardPolicy.SolveTimePointsPercentage, label: "ui.problemSolvingTimeScoreValuePercentage" },
-  { value: BloodRewardPolicy.CurrentPointsPercentage, label: "ui.currentScorePercentage" },
+  { value: BloodRewardPolicy.FixedPoints, label: "common.label.fixedPoints" },
+  { value: BloodRewardPolicy.InitialPointsPercentage, label: "common.label.initialScorePercentage" },
+  { value: BloodRewardPolicy.SolveTimePointsPercentage, label: "common.description.problemSolvingTimeScore" },
+  { value: BloodRewardPolicy.CurrentPointsPercentage, label: "common.label.scorePercentage" },
 ] as const
 
 export const SCORE_DECAY_MODES = [
-  { value: ScoreDecayMode.Fixed, label: "ui.fixedPoints" },
-  { value: ScoreDecayMode.Linear, label: "ui.linearDecay" },
-  { value: ScoreDecayMode.Quadratic, label: "ui.quadraticDecay" },
-  { value: ScoreDecayMode.Exponential, label: "ui.exponentialDecay" },
-  { value: ScoreDecayMode.Logarithmic, label: "ui.logarithmicDecay" },
-  { value: ScoreDecayMode.Custom, label: "ui.customFormula" },
+  { value: ScoreDecayMode.Fixed, label: "common.label.fixedPoints" },
+  { value: ScoreDecayMode.Linear, label: "common.label.linearDecay" },
+  { value: ScoreDecayMode.Quadratic, label: "common.label.quadraticDecay" },
+  { value: ScoreDecayMode.Exponential, label: "common.label.exponentialDecay" },
+  { value: ScoreDecayMode.Logarithmic, label: "common.label.logarithmicDecay" },
+  { value: ScoreDecayMode.Custom, label: "common.label.customFormula" },
 ] as const
 
 export const EVALUATION_DISPATCH_MODES = [
-  { value: EvaluationDispatch.Automatic, label: "ui.automaticAssessment" },
-  { value: EvaluationDispatch.ManualBatch, label: "ui.manualBatchEvaluation" },
+  { value: EvaluationDispatch.Automatic, label: "common.label.automaticAssessment" },
+  { value: EvaluationDispatch.ManualBatch, label: "common.label.manualBatchEvaluation" },
 ] as const
 
 // ---------- 题目模板 Definition 模型 ----------
@@ -327,23 +319,24 @@ function protocolFlagSource(value: unknown): number {
 }
 
 function definitionContractRuntime(
-  runtime: NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeContract,
+  runtime: NoCTFAPIEndpointsAdministrationChallengeBankChallengeRuntimeContract,
 ): RuntimeTemplateModel {
   const value = runtime as Record<string, unknown>
   let definition: RuntimeDefinitionModel
   if (runtime.kind === 'Ova') {
     if (!runtime.ova || runtime.container) throw new Error('Invalid Ova Runtime contract.')
-    definition = { kind: 'ova', sourceUrl: runtime.ova.sourceUrl, sha256: runtime.ova.sha256 }
+    definition = { kind: 'ova', sourceUrl: runtime.ova.sourceUrl ?? '', sha256: runtime.ova.sha256 ?? '' }
   }
   else if (runtime.kind === 'Container') {
-    if (!runtime.container || runtime.ova) throw new Error('Invalid Container Runtime contract.')
+    if (!runtime.container?.services?.length || runtime.ova) throw new Error('Invalid Container Runtime contract.')
     definition = {
       kind: 'container',
-      services: runtime.container.services.map(service => ({
-        name: service.name, image: service.image, cpuCores: service.cpuCores ?? 0.5, memoryMiB: service.memoryMiB ?? 512,
-        command: [...(service.command ?? [])], arguments: [...(service.arguments ?? [])], environment: { ...(service.environment ?? {}) },
+      services: runtime.container.services.map(service => {
+        return ({
+        name: service.name ?? '', image: service.image ?? '', cpuCores: service.cpuCores ?? 0.5, memoryMiB: service.memoryMiB ?? 512,
+        command: [...(service.command ?? [])], arguments: [...(service.arguments ?? [])], environment: Object.fromEntries(Object.entries(service.environment?.additionalData ?? {}).filter((entry): entry is [string, string] => typeof entry[1] === 'string')),
         flagEnvironmentVariableName: service.flagEnvironmentVariableName ?? '', internalPorts: [...(service.internalPorts ?? [])],
-      })),
+      }) }),
     }
   }
   else throw new Error('Unknown Runtime kind.')
@@ -368,7 +361,7 @@ function definitionContractRuntime(
 }
 
 export function definitionContractToModel(
-  contract: NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract,
+  contract: NoCTFAPIEndpointsAdministrationChallengeBankChallengeDefinitionContract,
   mode: GameModeValue,
 ): DefinitionModel {
   if (contract.mode !== mode) throw new Error('Challenge definition mode does not match the editor.')
@@ -386,7 +379,7 @@ export function definitionContractToModel(
     const job = {
       image: asString(checker.image),
       command: asStringArray(checker.command),
-      environment: asStringMap(checker.environment),
+      environment: asStringMap(asObject(checker.environment)?.additionalData),
       timeoutSeconds: asNumber(checker.timeoutSeconds),
     }
     if (mode === 'Awd') {
@@ -469,10 +462,10 @@ export interface ConfigFieldDef {
   key: string
   label: string
   type: ConfigFieldType
-  description?: string
-  placeholder?: string
-  min?: number
-  max?: number
+  description?: string | null
+  placeholder?: string | null
+  min?: number | null
+  max?: number | null
   options?: readonly ConfigFieldOption[]
   /** 缺省值(竞赛配置缺失字段时回填)。 */
   defaultValue?: unknown
@@ -540,42 +533,42 @@ export function competitionConfigFields(mode: GameModeValue): ConfigFieldDef[] {
   switch (mode) {
     case 'Ctf':
       return [
-        { key: 'scoreSettlementMode', label: translate('ui.ctfScoreSettlementMode'), type: 'select', options: CTF_SCORE_SETTLEMENT_MODES, defaultValue: 'DynamicRecalculation', description: translate('ui.ctfScoreSettlementHint') },
-        { key: 'defaultScoreCurve', label: translate("ui.defaultScoreCurve"), type: 'pointsCurve', defaultValue: POINTS_CURVE_DEFAULT, description: translate("ui.challengesWithoutAnOverrideInheritThisDecayCurve") },
-        { key: 'bloodRewards', label: translate("ui.bloodListReward"), type: 'bloodRewards', defaultValue: [], description: translate("ui.additionalRewardsForTheFirstThreeProblemSolvingTeamsUp") },
-        { key: 'wrongSubmissionPenalty', label: translate("ui.pointsDeductedForIncorrectSubmission"), type: 'int', min: 0, defaultValue: 0 },
-        { key: 'flagTemplate', label: translate("ui.dynamicFlagTemplate"), type: 'flagTemplate', description: translate("ui.onlyUsedForEachFleetOfContainerFlagsGeneratedBy") },
+        { key: 'scoreSettlementMode', label: translate('common.label.ctfScoreSettlementMode'), type: 'select', options: CTF_SCORE_SETTLEMENT_MODES, defaultValue: 'DynamicRecalculation', description: translate('common.label.ctfScoreSettlementHint') },
+        { key: 'defaultScoreCurve', label: translate("common.label.defaultScoreCurve"), type: 'pointsCurve', defaultValue: POINTS_CURVE_DEFAULT, description: translate("common.description.challengesOverrideInheritDecay") },
+        { key: 'bloodRewards', label: translate("common.label.bloodListReward"), type: 'bloodRewards', defaultValue: [], description: translate("common.description.additionalRewardsFirstThree") },
+        { key: 'wrongSubmissionPenalty', label: translate("common.error.pointsDeductedSubmissionFailed"), type: 'int', min: 0, defaultValue: 0 },
+        { key: 'flagTemplate', label: translate("common.label.dynamicFlagTemplate"), type: 'flagTemplate', description: translate("common.description.fleetContainerFlagsGenerated") },
       ]
     case 'Awd':
       return [
-        { key: 'hardeningDurationSeconds', label: translate("ui.reinforcementPhaseDurationSeconds"), type: 'int', min: 0, defaultValue: 0, description: translate("ui.reinforcementTimeAfterTheStartOfTheGameDuringWhich") },
-        { key: 'roundDurationSeconds', label: translate("ui.roundDurationSeconds"), type: 'int', min: 1, defaultValue: 300 },
-        { key: 'attackRewardMode', label: translate("ui.attackScoringMethod"), type: 'select', options: ATTACK_REWARD_MODES, defaultValue: 'FixedPerAttack' },
-        { key: 'attackPoints', label: translate("ui.scorePerAttack"), type: 'int', min: 0, defaultValue: 50 },
-        { key: 'victimDefensePoolPoints', label: translate("ui.victimDefensePool"), type: 'int', min: 0, defaultValue: 100 },
-        { key: 'checkerIntervalSeconds', label: translate("ui.checkIntervalSeconds"), type: 'int', min: 1, defaultValue: 30 },
-        { key: 'serviceHealthyPoints', label: translate("ui.serviceNormalScore"), type: 'int', min: 0, defaultValue: 100 },
-        { key: 'serviceUnhealthyPenalty', label: translate("ui.pointsDeductedForAbnormalService"), type: 'int', min: 0, defaultValue: 50 },
-        { key: 'flagTemplate', label: translate("ui.teamFlagTemplate"), type: 'flagTemplate', description: translate("ui.optionalUsedToGenerateFlagsForEachTeamForEach") },
+        { key: 'hardeningDurationSeconds', label: translate("common.label.reinforcementPhaseDurationSeconds"), type: 'int', min: 0, defaultValue: 0, description: translate("common.description.reinforcementTimeStartGame") },
+        { key: 'roundDurationSeconds', label: translate("common.label.roundDurationSeconds"), type: 'int', min: 1, defaultValue: 300 },
+        { key: 'attackRewardMode', label: translate("common.label.attackScoringMethod"), type: 'select', options: ATTACK_REWARD_MODES, defaultValue: 'FixedPerAttack' },
+        { key: 'attackPoints', label: translate("common.label.scoreAttack"), type: 'int', min: 0, defaultValue: 50 },
+        { key: 'victimDefensePoolPoints', label: translate("common.label.victimDefensePool"), type: 'int', min: 0, defaultValue: 100 },
+        { key: 'checkerIntervalSeconds', label: translate("common.label.checkIntervalSeconds"), type: 'int', min: 1, defaultValue: 30 },
+        { key: 'serviceHealthyPoints', label: translate("common.label.serviceNormalScore"), type: 'int', min: 0, defaultValue: 100 },
+        { key: 'serviceUnhealthyPenalty', label: translate("common.label.pointsDeductedAbnormalService"), type: 'int', min: 0, defaultValue: 50 },
+        { key: 'flagTemplate', label: translate("common.label.teamFlagTemplate"), type: 'flagTemplate', description: translate("common.description.optionalGenerateFlagsTeam") },
       ]
     case 'Awdp':
       return [
-        { key: 'roundDurationSeconds', label: translate("ui.roundDurationSeconds"), type: 'int', min: 1, defaultValue: 300 },
-        { key: 'breakScoreCurve', label: translate("ui.breakScoreCurve"), type: 'pointsCurve', defaultValue: POINTS_CURVE_DEFAULT, description: translate("ui.settleEachRoundIndependentlyFromThatRoundSSuccessfulAttacking") },
-        { key: 'fixScoreCurve', label: translate("ui.fixScoreCurve"), type: 'pointsCurve', defaultValue: POINTS_CURVE_DEFAULT, description: translate("ui.settleEachRoundIndependentlyFromThatRoundSSuccessfulFixing") },
-        { key: 'requireBreakBeforeFix', label: translate("ui.requireBreakBeforeFix"), type: 'bool', defaultValue: false },
-        { key: 'maxBreakSubmissions', label: translate("ui.breakMaximumNumberOfSubmissions"), type: 'int', min: 1, defaultValue: 10 },
-        { key: 'maxFixSubmissions', label: translate("ui.fixMaximumNumberOfSubmissions"), type: 'int', min: 1, defaultValue: 10 },
-        { key: 'flagWrongPenalty', label: translate("ui.wrongFlagPenalty"), type: 'int', min: 0, defaultValue: 0 },
-        { key: 'exploitSucceededPenalty', label: translate("ui.exploitSuccessPenalty"), type: 'int', min: 0, defaultValue: 0 },
-        { key: 'serviceAbnormalPenalty', label: translate("ui.pointsDeductedForAbnormalService"), type: 'int', min: 0, defaultValue: 0 },
-        { key: 'evaluationDispatchMode', label: translate("ui.evaluationSchedulingMethod"), type: 'select', options: EVALUATION_DISPATCH_MODES, defaultValue: EvaluationDispatch.Automatic },
-        { key: 'flagTemplate', label: translate("ui.breakFlagTemplate"), type: 'flagTemplate', description: translate("ui.optionalUsedToGenerateDynamicFlagsForEachTeamS") },
+        { key: 'roundDurationSeconds', label: translate("common.label.roundDurationSeconds"), type: 'int', min: 1, defaultValue: 300 },
+        { key: 'breakScoreCurve', label: translate("common.label.breakScoreCurve"), type: 'pointsCurve', defaultValue: POINTS_CURVE_DEFAULT, description: translate("common.description.settleRoundIndependentlyRound") },
+        { key: 'fixScoreCurve', label: translate("common.label.fixScoreCurve"), type: 'pointsCurve', defaultValue: POINTS_CURVE_DEFAULT, description: translate("common.description.settleRoundIndependentlyRound.gameConfig") },
+        { key: 'requireBreakBeforeFix', label: translate("common.label.requireBreakFix"), type: 'bool', defaultValue: false },
+        { key: 'maxBreakSubmissions', label: translate("common.label.breakMaximumNumberSubmissions"), type: 'int', min: 1, defaultValue: 10 },
+        { key: 'maxFixSubmissions', label: translate("common.label.fixMaximumNumberSubmissions"), type: 'int', min: 1, defaultValue: 10 },
+        { key: 'flagWrongPenalty', label: translate("common.label.wrongFlagPenalty"), type: 'int', min: 0, defaultValue: 0 },
+        { key: 'exploitSucceededPenalty', label: translate("common.label.exploitSuccessPenalty"), type: 'int', min: 0, defaultValue: 0 },
+        { key: 'serviceAbnormalPenalty', label: translate("common.label.pointsDeductedAbnormalService"), type: 'int', min: 0, defaultValue: 0 },
+        { key: 'evaluationDispatchMode', label: translate("common.label.evaluationSchedulingMethod"), type: 'select', options: EVALUATION_DISPATCH_MODES, defaultValue: EvaluationDispatch.Automatic },
+        { key: 'flagTemplate', label: translate("common.label.breakFlagTemplate"), type: 'flagTemplate', description: translate("common.description.optionalGenerateDynamicFlags") },
       ]
     case 'Koh':
       return [
-        { key: 'pollIntervalSeconds', label: translate("ui.controlCheckIntervalSeconds"), type: 'int', min: 1, defaultValue: 5 },
-        { key: 'controlPointsPerInterval', label: translate("ui.controlScorePerInterval"), type: 'int', min: 0, defaultValue: 10 },
+        { key: 'pollIntervalSeconds', label: translate("common.label.controlCheckIntervalSeconds"), type: 'int', min: 1, defaultValue: 5 },
+        { key: 'controlPointsPerInterval', label: translate("common.label.controlScoreInterval"), type: 'int', min: 0, defaultValue: 10 },
       ]
   }
 }
@@ -585,41 +578,41 @@ export function challengeRuleFields(mode: GameModeValue): ConfigFieldDef[] {
   switch (mode) {
     case 'Ctf':
       return [
-        { key: 'scoreSettlementMode', label: translate('ui.ctfScoreSettlementMode'), type: 'select', options: CTF_SCORE_SETTLEMENT_MODES, defaultValue: 'DynamicRecalculation', description: translate('ui.ctfScoreSettlementHint') },
-        { key: 'scoreCurve', label: translate("ui.scoreCurve"), type: 'pointsCurve' },
-        { key: 'bloodRewards', label: translate("ui.bloodListReward"), type: 'bloodRewards', description: translate("ui.upTo3Items") },
-        { key: 'maxFlagAttempts', label: translate("ui.flagMaximumNumberOfSubmissions"), type: 'int', min: 1 },
-        { key: 'maxPatchAttempts', label: translate("ui.patchMaximumNumberOfSubmissions"), type: 'int', min: 1, defaultValue: 10 },
-        { key: 'wrongSubmissionPenalty', label: translate("ui.pointsDeductedForIncorrectSubmission"), type: 'int', min: 0 },
-        { key: 'flagTemplate', label: translate("ui.dynamicFlagTemplate"), type: 'flagTemplate', description: translate("ui.usedOnlyForFuturePerTeamRuntimeFlagsGeneratedFor") },
+        { key: 'scoreSettlementMode', label: translate('common.label.ctfScoreSettlementMode'), type: 'select', options: CTF_SCORE_SETTLEMENT_MODES, defaultValue: 'DynamicRecalculation', description: translate('common.label.ctfScoreSettlementHint') },
+        { key: 'scoreCurve', label: translate("common.label.scoreCurve"), type: 'pointsCurve' },
+        { key: 'bloodRewards', label: translate("common.label.bloodListReward"), type: 'bloodRewards', description: translate("common.label.items") },
+        { key: 'maxFlagAttempts', label: translate("common.label.flagMaximumNumberSubmissions"), type: 'int', min: 1 },
+        { key: 'maxPatchAttempts', label: translate("common.label.patchMaximumNumberSubmissions"), type: 'int', min: 1, defaultValue: 10 },
+        { key: 'wrongSubmissionPenalty', label: translate("common.error.pointsDeductedSubmissionFailed"), type: 'int', min: 0 },
+        { key: 'flagTemplate', label: translate("common.label.dynamicFlagTemplate"), type: 'flagTemplate', description: translate("common.description.futureTeamRuntimeFlags") },
       ]
     case 'Awd':
       return [
-        { key: 'attackRewardMode', label: translate("ui.attackScoringMethod"), type: 'select', options: ATTACK_REWARD_MODES },
-        { key: 'attackPoints', label: translate("ui.scorePerAttack"), type: 'int', min: 0 },
-        { key: 'victimDefensePoolPoints', label: translate("ui.victimDefensePool"), type: 'int', min: 0 },
-        { key: 'checkerIntervalSeconds', label: translate("ui.checkIntervalSeconds"), type: 'int', min: 1 },
-        { key: 'serviceHealthyPoints', label: translate("ui.serviceNormalScore"), type: 'int', min: 0 },
-        { key: 'serviceUnhealthyPenalty', label: translate("ui.pointsDeductedForAbnormalService"), type: 'int', min: 0 },
-        { key: 'flagTemplate', label: translate("ui.teamFlagTemplate"), type: 'flagTemplate', description: translate("ui.usedOnlyForFuturePerTeamPerRoundFlagsGenerated") },
+        { key: 'attackRewardMode', label: translate("common.label.attackScoringMethod"), type: 'select', options: ATTACK_REWARD_MODES },
+        { key: 'attackPoints', label: translate("common.label.scoreAttack"), type: 'int', min: 0 },
+        { key: 'victimDefensePoolPoints', label: translate("common.label.victimDefensePool"), type: 'int', min: 0 },
+        { key: 'checkerIntervalSeconds', label: translate("common.label.checkIntervalSeconds"), type: 'int', min: 1 },
+        { key: 'serviceHealthyPoints', label: translate("common.label.serviceNormalScore"), type: 'int', min: 0 },
+        { key: 'serviceUnhealthyPenalty', label: translate("common.label.pointsDeductedAbnormalService"), type: 'int', min: 0 },
+        { key: 'flagTemplate', label: translate("common.label.teamFlagTemplate"), type: 'flagTemplate', description: translate("common.description.futureTeamRoundFlags") },
       ]
     case 'Awdp':
       return [
-        { key: 'breakScoreCurve', label: translate("ui.breakScoreCurve"), type: 'pointsCurve' },
-        { key: 'fixScoreCurve', label: translate("ui.fixScoreCurve"), type: 'pointsCurve' },
-        { key: 'requireBreakBeforeFix', label: translate("ui.requireBreakBeforeFix"), type: 'bool' },
-        { key: 'maxBreakSubmissions', label: translate("ui.breakMaximumNumberOfSubmissions"), type: 'int', min: 1 },
-        { key: 'maxFixSubmissions', label: translate("ui.fixMaximumNumberOfSubmissions"), type: 'int', min: 1 },
-        { key: 'flagWrongPenalty', label: translate("ui.wrongFlagPenalty"), type: 'int', min: 0 },
-        { key: 'exploitSucceededPenalty', label: translate("ui.exploitSuccessPenalty"), type: 'int', min: 0 },
-        { key: 'serviceAbnormalPenalty', label: translate("ui.pointsDeductedForAbnormalService"), type: 'int', min: 0 },
-        { key: 'evaluationDispatchMode', label: translate("ui.evaluationSchedulingMethod"), type: 'select', options: EVALUATION_DISPATCH_MODES },
-        { key: 'flagTemplate', label: translate("ui.breakFlagTemplate"), type: 'flagTemplate', description: translate("ui.usedOnlyForFuturePerTeamAttackInstanceFlagsGenerated") },
+        { key: 'breakScoreCurve', label: translate("common.label.breakScoreCurve"), type: 'pointsCurve' },
+        { key: 'fixScoreCurve', label: translate("common.label.fixScoreCurve"), type: 'pointsCurve' },
+        { key: 'requireBreakBeforeFix', label: translate("common.label.requireBreakFix"), type: 'bool' },
+        { key: 'maxBreakSubmissions', label: translate("common.label.breakMaximumNumberSubmissions"), type: 'int', min: 1 },
+        { key: 'maxFixSubmissions', label: translate("common.label.fixMaximumNumberSubmissions"), type: 'int', min: 1 },
+        { key: 'flagWrongPenalty', label: translate("common.label.wrongFlagPenalty"), type: 'int', min: 0 },
+        { key: 'exploitSucceededPenalty', label: translate("common.label.exploitSuccessPenalty"), type: 'int', min: 0 },
+        { key: 'serviceAbnormalPenalty', label: translate("common.label.pointsDeductedAbnormalService"), type: 'int', min: 0 },
+        { key: 'evaluationDispatchMode', label: translate("common.label.evaluationSchedulingMethod"), type: 'select', options: EVALUATION_DISPATCH_MODES },
+        { key: 'flagTemplate', label: translate("common.label.breakFlagTemplate"), type: 'flagTemplate', description: translate("common.description.futureTeamAttackInstance") },
       ]
     case 'Koh':
       return [
-        { key: 'pollIntervalSeconds', label: translate("ui.controlCheckIntervalSeconds"), type: 'int', min: 1 },
-        { key: 'controlPointsPerInterval', label: translate("ui.controlScorePerInterval"), type: 'int', min: 0 },
+        { key: 'pollIntervalSeconds', label: translate("common.label.controlCheckIntervalSeconds"), type: 'int', min: 1 },
+        { key: 'controlPointsPerInterval', label: translate("common.label.controlScoreInterval"), type: 'int', min: 0 },
       ]
   }
 }
@@ -700,7 +693,7 @@ function readFieldValue(field: ConfigFieldDef, raw: unknown): unknown {
 
 function runtimeModelToContract(
   runtime: RuntimeTemplateModel,
-): NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeContract {
+): NoCTFAPIEndpointsAdministrationChallengeBankChallengeRuntimeContract {
   const common = {
     allocation: runtime.allocation === RuntimeAllocation.Shared ? 'Shared' as const : 'PerTeam' as const,
     limits: runtime.definition.kind === 'ova' ? {
@@ -753,8 +746,8 @@ function runtimeModelToContract(
     ...common,
     container: {
       services: runtime.definition.services.map(service => ({
-        name: service.name, image: service.image, cpuCores: service.cpuCores ?? 0, memoryMiB: service.memoryMiB ?? 0,
-        command: service.command, arguments: service.arguments, environment: service.environment,
+        name: service.name ?? '', image: service.image ?? '', cpuCores: service.cpuCores ?? 0, memoryMiB: service.memoryMiB ?? 0,
+        command: service.command, arguments: service.arguments, environment: { additionalData: service.environment },
         flagEnvironmentVariableName: service.flagEnvironmentVariableName || null,
         internalPorts: service.internalPorts.filter((port): port is number => port !== null),
       })),
@@ -767,7 +760,7 @@ function runnerJobContract(job: RunnerJobModel, targetServiceName: string | null
   return {
     image: job.image,
     command: job.command,
-    environment: job.environment,
+    environment: { additionalData: job.environment },
     timeoutSeconds: job.timeoutSeconds ?? 60,
     targetServiceName,
   }
@@ -776,7 +769,7 @@ function runnerJobContract(job: RunnerJobModel, targetServiceName: string | null
 export function definitionModelToContract(
   mode: GameModeValue,
   model: DefinitionModel,
-): NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract {
+): NoCTFAPIEndpointsAdministrationChallengeBankChallengeDefinitionContract {
   const common = {
     flagTemplate: model.flagTemplate ? {
       header: model.flagTemplate.header,
@@ -824,7 +817,7 @@ export function definitionModelToContract(
   }
 }
 
-export function defaultDefinition(mode: GameModeValue): NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract {
+export function defaultDefinition(mode: GameModeValue): NoCTFAPIEndpointsAdministrationChallengeBankChallengeDefinitionContract {
   return definitionModelToContract(mode, emptyDefinition(mode))
 }
 

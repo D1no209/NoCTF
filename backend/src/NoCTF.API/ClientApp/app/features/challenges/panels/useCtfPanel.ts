@@ -1,18 +1,20 @@
+
+import { api } from '../../../lib/api'
 import { markRaw, toRefs } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import { isCtfPracticeOpen } from '../../../lib/competition-participation'
-import { getPatchVerificationEndpoint } from '../../../api'
-import type { NoCtfapiEndpointsChallengesChallengeResponse, NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsGameplayFactsPatchVerificationStateResponse } from '../../../api'
+
+import type { NoCTFAPIEndpointsChallengesChallengeResponse, NoCTFAPIEndpointsCompetitionsCompetitionResponse, NoCTFAPIEndpointsGameplayFactsPatchVerificationStateResponse } from '../../../api/models'
 import FlagSubmitComponent from '../FlagSubmit.vue'
 import FixSubmitComponent from '../FixSubmit.vue'
 import RuntimeCardComponent from '../RuntimeCard.vue'
 
 /** Owns state, effects and commands for CtfPanel. */
 export function useCtfPanel(props: Readonly<{
-  competition: NoCtfapiEndpointsCompetitionsCompetitionResponse
-  challenge: NoCtfapiEndpointsChallengesChallengeResponse
-  flagDockTarget?: string
-  runtimeDockTarget?: string
+  competition: NoCTFAPIEndpointsCompetitionsCompetitionResponse
+  challenge: NoCTFAPIEndpointsChallengesChallengeResponse
+  flagDockTarget?: string | null
+  runtimeDockTarget?: string | null
 }>,
 emit: { (event: "submitted", ...args: []): void; (event: "remainingChanged", ...args: [remaining: number | null]): void }) {
   const practiceOpen = computed(() => isCtfPracticeOpen(props.competition))
@@ -23,7 +25,7 @@ emit: { (event: "submitted", ...args: []): void; (event: "remainingChanged", ...
     ? props.challenge.patchVerificationAvailable === true
     : props.competition.status === 'Running' || practiceOpen.value)
 
-  const patchVerification = ref<NoCtfapiEndpointsGameplayFactsPatchVerificationStateResponse>({
+  const patchVerification = ref<NoCTFAPIEndpointsGameplayFactsPatchVerificationStateResponse>({
     patchVerificationAvailable: props.challenge.patchVerificationAvailable,
     maximumAttempts: props.challenge.maximumPatchAttempts ?? undefined,
     acceptedAttempts: props.challenge.acceptedPatchAttempts ?? undefined,
@@ -37,12 +39,8 @@ emit: { (event: "submitted", ...args: []): void; (event: "remainingChanged", ...
 
   async function refreshPatchVerification(): Promise<boolean> {
     if (!isPatchVerification.value || !props.competition.id || !props.challenge.id) return true
-    const { data, error } = await getPatchVerificationEndpoint({
-      path: {
-        competitionId: props.competition.id,
-        competitionChallengeId: props.challenge.id,
-      },
-    })
+    let error: unknown;
+    const data = await api.api.v1.competitions.byCompetitionId(props.competition.id).challenges.byCompetitionChallengeId(props.challenge.id).patchVerification.get().catch(cause => { error = cause; return undefined });
     if (error || !data) throw parseApiError(error)
     patchVerification.value = data
     emit('remainingChanged', data.remainingAttempts ?? null)
@@ -63,15 +61,15 @@ emit: { (event: "submitted", ...args: []): void; (event: "remainingChanged", ...
 
   const patchOutcome = computed(() => {
     if (patchVerification.value.verificationState === 'PlatformFailed')
-      return { message: translate('ui.patchVerificationPlatformError'), variant: 'destructive' as const }
+      return { message: translate('common.error.patchVerificationPlatformFailed'), variant: 'destructive' as const }
     if (patchVerification.value.verificationResult === 'Correct')
-      return { message: translate('ui.patchVerificationSucceeded'), variant: 'default' as const }
+      return { message: translate('challenges.label.patchVerificationSucceeded'), variant: 'default' as const }
     if (patchVerification.value.verificationResult !== 'Wrong') return null
     const key = patchVerification.value.verificationFailureCode === 'PatchStillExploitable'
-      ? 'ui.patchStillExploitable'
+      ? 'common.label.patchStillExploitable'
       : patchVerification.value.verificationFailureCode === 'PatchServiceAbnormal'
-        ? 'ui.patchServiceAbnormal'
-        : 'ui.patchExecutionFailed'
+        ? 'common.label.patchServiceAbnormal'
+        : 'common.error.patchExecutionFailed'
     return { message: translate(key), variant: 'destructive' as const }
   })
 

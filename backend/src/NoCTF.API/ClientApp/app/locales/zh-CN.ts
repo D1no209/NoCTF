@@ -1,15 +1,16 @@
-import { messages as CoreMessages } from './catalogs/zh-CN/core'
-import { messages as CompetitionsMessages } from './catalogs/zh-CN/competitions'
-import { messages as ChallengesMessages } from './catalogs/zh-CN/challenges'
-import { messages as LeaderboardMessages } from './catalogs/zh-CN/leaderboard'
-import { messages as AdministrationMessages } from './catalogs/zh-CN/administration'
-import { messages as AccountMessages } from './catalogs/zh-CN/account'
-import { messages as NotificationsMessages } from './catalogs/zh-CN/notifications'
-import { messages as RuntimeMessages } from './catalogs/zh-CN/runtime'
-import { messages as WriteupsMessages } from './catalogs/zh-CN/writeups'
+import { englishMessages } from './en'
+import CoreMessages from './catalogs/zh-CN/core.json'
+import CompetitionsMessages from './catalogs/zh-CN/competitions.json'
+import ChallengesMessages from './catalogs/zh-CN/challenges.json'
+import LeaderboardMessages from './catalogs/zh-CN/leaderboard.json'
+import AdministrationMessages from './catalogs/zh-CN/administration.json'
+import AccountMessages from './catalogs/zh-CN/account.json'
+import NotificationsMessages from './catalogs/zh-CN/notifications.json'
+import RuntimeMessages from './catalogs/zh-CN/runtime.json'
+import WriteupsMessages from './catalogs/zh-CN/writeups.json'
+import ApiMessages from './catalogs/zh-CN/api.json'
 
-/** Canonical build-time catalog. Runtime code loads feature chunks from locales/catalogs. */
-export const chineseMessages = {
+const translatedMessages = {
   ...CoreMessages,
   ...CompetitionsMessages,
   ...ChallengesMessages,
@@ -19,5 +20,10 @@ export const chineseMessages = {
   ...NotificationsMessages,
   ...RuntimeMessages,
   ...WriteupsMessages,
-} as const
-export type MessageKey = keyof typeof chineseMessages
+  ...ApiMessages,
+}
+export const chineseMessages = {
+  ...englishMessages,
+  ...Object.fromEntries(Object.entries(translatedMessages).filter(([, value]) => value.trim())),
+}
+export type { MessageKey } from './en'

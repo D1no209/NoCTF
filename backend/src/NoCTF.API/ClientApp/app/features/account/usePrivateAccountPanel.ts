@@ -1,24 +1,27 @@
+
+import { api } from '../../lib/api'
+import type { UiMessage } from '../../utils/i18n'
 import { markRaw, toRefs } from 'vue'
 
 import { LockKeyhole } from '@lucide/vue'
-import { adminGetPrivatePlatformUser, adminGetPrivateTeamMember } from '../../api'
-import type { NoCtfapiEndpointsAdministrationPlatformPrivateAccountResponse } from '../../api'
+
+import type { NoCTFAPIEndpointsAdministrationPlatformPrivateAccountResponse } from '../../api/models'
 import { summarizeAccountSources } from '../../utils/account-source-summary'
 import AdminDateTimeComponent from '../admin/AdminDateTime.vue'
 
 /** Owns state, effects and commands for PrivateAccountPanel. */
-export function usePrivateAccountPanel(props: Readonly<Omit<{ userId: string, competitionId?: string, teamId?: string, showActivities?: boolean }, "showActivities"> & Required<Pick<{ userId: string, competitionId?: string, teamId?: string, showActivities?: boolean }, "showActivities">>>) {
-  const data = ref<NoCtfapiEndpointsAdministrationPlatformPrivateAccountResponse | null>(null)
+export function usePrivateAccountPanel(props: Readonly<Omit<{ userId: string, competitionId?: string | null, teamId?: string | null, showActivities?: boolean }, "showActivities"> & Required<Pick<{ userId: string, competitionId?: string | null, teamId?: string | null, showActivities?: boolean }, "showActivities">>>) {
+  const data = ref<NoCTFAPIEndpointsAdministrationPlatformPrivateAccountResponse | null>(null)
 
   const loading = ref(false)
 
-  const error = ref<string | null>(null)
+  const error = ref<UiMessage | null>(null)
 
   let revision = 0
 
   const commonSources = computed(() => summarizeAccountSources(data.value?.activities ?? []))
 
-  const kinds: Record<string, string> = { Registered: "ui.registrationSuccessful", LoggedIn: "ui.loginSuccessful", LoginFailed: "ui.signInFailed", FlagSubmitted: "ui.flagSubmission", PatchUploaded: "ui.patchUpload" }
+  const kinds: Record<string, string> = { Registered: "common.label.registrationSuccessful", LoggedIn: "common.label.loginSuccessful", LoginFailed: "auth.login.failed", FlagSubmitted: "administration.label.flagSubmission", PatchUploaded: "common.label.patchUpload" }
 
   async function load() {
     const ticket = ++revision
@@ -26,14 +29,15 @@ export function usePrivateAccountPanel(props: Readonly<Omit<{ userId: string, co
     loading.value = true
     error.value = null
     try {
-      const result = props.competitionId && props.teamId
-        ? await adminGetPrivateTeamMember({ path: { competitionId: props.competitionId, teamId: props.teamId, userId: props.userId } })
-        : await adminGetPrivatePlatformUser({ path: { userId: props.userId } })
+      let resultError: unknown;
+      const result = await (props.competitionId && props.teamId
+        ? api.api.v1.admin.competitions.byCompetitionId(props.competitionId).teams.byTeamId(props.teamId).members.byUserId(props.userId).privateProfile.get()
+        : api.api.v1.admin.platform.users.byUserId(props.userId).activity.get()).catch(cause => { resultError = cause; return undefined });
       if (ticket !== revision) return
-      if (result.error) throw result.error
-      data.value = result.data ?? null
+      if (resultError) throw resultError
+      data.value = result ?? null
     }
-    catch (e) { if (ticket === revision) error.value = parseApiError(e).message }
+    catch (e) { if (ticket === revision) error.value = parseApiError(e).displayMessage }
     finally { if (ticket === revision) loading.value = false }
   }
 

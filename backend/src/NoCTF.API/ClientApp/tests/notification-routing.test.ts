@@ -1,14 +1,14 @@
 import { sourceFile } from './support/feature-source'
 import { afterEach, describe, expect, test } from 'bun:test'
-import type { NoCtfapiEndpointsNotificationsNotificationResponse } from '../app/api'
+import type { NoCTFAPIEndpointsNotificationsNotificationResponse } from '../app/api/models'
 import { setLocale } from '../app/utils/i18n'
 import { notificationBody, notificationThreadRootId, notificationTargetPath } from '../app/utils/labels'
 
 function notification(
-  kind: NoCtfapiEndpointsNotificationsNotificationResponse['kind'],
+  kind: NoCTFAPIEndpointsNotificationsNotificationResponse['kind'],
   competitionId?: string,
   content: Record<string, unknown> = {},
-): NoCtfapiEndpointsNotificationsNotificationResponse {
+): NoCTFAPIEndpointsNotificationsNotificationResponse {
   return {
     id: 'notification-1',
     kind,
@@ -63,7 +63,7 @@ describe('notificationTargetPath', () => {
   })
 
   test('routes an immutable question root using its related competition metadata', () => {
-    const root: NoCtfapiEndpointsNotificationsNotificationResponse = {
+    const root: NoCTFAPIEndpointsNotificationsNotificationResponse = {
       id: 'question-1',
       kind: 'QuestionOpened',
       relatedId: 'competition-1',
@@ -135,12 +135,12 @@ describe('notificationTargetPath', () => {
     const component = await sourceFile(
       new URL('../app/features/notifications/NotificationCenter.vue', import.meta.url),
     ).text()
-    expect(component).toContain('readNotificationThreadEndpoint({')
+    expect(component).toMatch(/api\.api\.v1\.notifications\.byNotificationId\([^)]*\)\.thread\.get\(/)
     expect(component).toContain("scope: 'Inbox'")
     expect(component).toContain('notificationTargetPath(actionTarget.value)')
     expect(component).toContain('sourceLabel(selected)')
     expect(component).toContain('notificationBody(selected)')
-    expect(component).toContain('path: { notificationId: selectedId }')
+    expect(component).toContain('.notifications.byNotificationId(selectedId)')
     expect(component).toContain('data.items?.find(item => item.id === selectedId)')
     expect(component).toContain('routeError.value = parseApiError')
   })

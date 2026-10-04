@@ -2,7 +2,7 @@
 import type { SelectRootEmits, SelectRootProps } from 'reka-ui'
 import { SelectRoot, useForwardPropsEmits } from 'reka-ui'
 import { computed } from 'vue'
-import { currentLocale } from '~/utils/i18n'
+import { currentLocale } from '../../../utils/i18n'
 
 const props = defineProps<SelectRootProps>()
 const emits = defineEmits<SelectRootEmits>()

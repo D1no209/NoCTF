@@ -42,8 +42,8 @@ const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
       }"
     >
       <SheetHeader class="sr-only">
-        <SheetTitle>{{ $t('ui.sidebar') }}</SheetTitle>
-        <SheetDescription>{{ $t('ui.displaysTheMobileSidebar') }}</SheetDescription>
+        <SheetTitle>{{ $t('common.label.sidebar') }}</SheetTitle>
+        <SheetDescription>{{ $t('common.label.displaysMobileSidebar') }}</SheetDescription>
       </SheetHeader>
       <div class="flex h-full w-full flex-col">
         <slot />

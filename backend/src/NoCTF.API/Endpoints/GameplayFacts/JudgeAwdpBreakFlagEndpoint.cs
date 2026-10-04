@@ -28,6 +28,10 @@ public enum AwdpBreakFlagJudgementFailureCodeProtocol
 
 public sealed class JudgeAwdpBreakFlagRequest
 {
+    /// <summary>One-time verification token; optional when platform policy disables verification. Maximum 4096 characters.</summary>
+    [FromHeader("X-NoCTF-Human-Verification", IsRequired = false, RemoveFromSchema = true)]
+    public string? HumanVerificationToken { get; set; }
+
     public string Flag { get; set; } = string.Empty;
 }
 
@@ -42,7 +46,12 @@ public sealed record AwdpBreakFlagJudgementResponse(
 
 public sealed record AwdpBreakFlagJudgementConflictResponse(
     AwdpBreakFlagJudgementFailureCodeProtocol Code,
-    string Detail);
+    string Detail)
+{
+    public string Detail { get; init; } = ApiMessages.Localize(Code, Detail, ApiMessages.NoArguments);
+    public string MessageKey => ApiMessages.For(Code).Key;
+    public IReadOnlyDictionary<string, object?> MessageArguments => ApiMessages.NoArguments;
+}
 
 public sealed class JudgeAwdpBreakFlagEndpoint(
     JudgeAwdpBreakFlag judge,
@@ -53,6 +62,10 @@ public sealed class JudgeAwdpBreakFlagEndpoint(
 {
     public override void Configure()
     {
+        Description(builder => builder
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable));
+
         Post("/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-break-flag-judgement");
         AuthSchemes("Bearer");
         Options(options => options.WithMetadata(
@@ -62,6 +75,7 @@ public sealed class JudgeAwdpBreakFlagEndpoint(
         Description(builder => builder.WithName("JudgeAwdpBreakFlag"));
         Summary(summary =>
         {
+            summary.Params["X-NoCTF-Human-Verification"] = "One-time verification token, at most 4096 characters. Required only when the configured platform policy enables verification for this operation.";
             summary.Summary = "Checks an AWDP Break Flag after the attack achievement succeeded.";
             summary.Description =
                 "Returns only correctness. It never creates GameplayFact, score, event, notification, cheat incident or Runtime changes.";
@@ -97,9 +111,9 @@ public sealed class JudgeAwdpBreakFlagEndpoint(
                 TypedResults.Conflict(new AwdpBreakFlagJudgementConflictResponse(
                     AwdpBreakFlagJudgementFailureCodeProtocol.AchievementNotSucceeded,
                     "The team must complete a successful Break on this challenge before its Flag can be checked.")),
-            AwdpBreakFlagJudgementFailureCode.FlagInvalid => TypedResults.Problem(
+            AwdpBreakFlagJudgementFailureCode.FlagInvalid => ApiProblems.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
-                title: "AWDP Break Flag was not accepted.",
+                title: ApiMessages.Get(ApiMessageId.JudgeAwdpBreakFlagTitleAwdpBreakFlagWas),
                 extensions: new Dictionary<string, object?>
                 {
                     ["code"] = AwdpBreakFlagJudgementFailureCodeProtocol.FlagInvalid

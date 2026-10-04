@@ -20,6 +20,12 @@ public sealed class GetTeamInvitationEndpoint(GetTeamInvitation get, IUserContex
 {
     public override void Configure()
     {
+        Summary(summary =>
+        {
+            summary.Summary = "Returns the current team invitation token to an authorized captain.";
+            summary.Description = summary.Summary;
+        });
+
         Get("/competitions/{competitionId}/teams/{teamId}/invitation-token");
         AuthSchemes("Bearer");
     }
@@ -44,8 +50,8 @@ public sealed class GetTeamInvitationEndpoint(GetTeamInvitation get, IUserContex
             return TypedResults.Forbid();
         return result.Succeeded
             ? TypedResults.Ok(new GetTeamInvitationResponse(result.Value!))
-            : TypedResults.Problem(
+            : ApiProblems.Problem(
                 statusCode: StatusCodes.Status409Conflict,
-                detail: result.ErrorMessage);
+                detail: ApiMessages.For(result.FailureCode));
     }
 }

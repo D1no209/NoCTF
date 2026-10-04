@@ -39,6 +39,12 @@ public sealed class UpdateCompetitionWebhookEndpoint(
 {
     public override void Configure()
     {
+        Summary(summary =>
+        {
+            summary.Summary = "Updates the destination and event subscriptions of a competition webhook.";
+            summary.Description = summary.Summary;
+        });
+
         Put("/admin/competitions/{competitionId}/webhooks/{targetId}");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("AdminUpdateCompetitionWebhook"));

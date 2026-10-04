@@ -30,7 +30,12 @@ public enum CompletePasswordResetFailureCode
 }
 
 public sealed record CompletePasswordResetFailureResponse(
-    CompletePasswordResetFailureCode Code);
+    CompletePasswordResetFailureCode Code)
+{
+    public string Detail => ApiMessages.For(Code).Text;
+    public string MessageKey => ApiMessages.For(Code).Key;
+    public IReadOnlyDictionary<string, object?> MessageArguments => ApiMessages.NoArguments;
+}
 
 public sealed class CompletePasswordResetEndpoint(
     CompletePasswordReset completePasswordReset,

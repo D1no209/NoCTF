@@ -39,7 +39,7 @@ public static class ServiceRegistration
         IConfiguration configuration,
         bool development = false)
     {
-        var exporting = configuration.GetValue<bool>("OpenApi:Exporting");
+        var exporting = configuration.GetValue<bool>("OpenApi:Generating");
 
         services.AddNoCtfCaching(configuration, development);
         services.AddNoCtfPersistence(configuration, exporting, development);

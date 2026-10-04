@@ -112,10 +112,10 @@ public sealed class ListCompetitionEventsValidator
                 && request.To is DateTimeOffset to
                 && from <= to
                 && to - from <= TimeSpan.FromDays(31))
-            .WithMessage("Specify no event range for staff history, or a range between zero and 31 days.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.ListCompetitionEventsValidationSpecifyEventRangeStaff)).WithErrorCode(ApiMessages.Key(ApiMessageId.ListCompetitionEventsValidationSpecifyEventRangeStaff));
         RuleFor(request => request).Must(request =>
                 request.Kind is null || request.Kinds is null or { Length: 0 })
-            .WithMessage("Specify either kind or kinds, not both.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.ListCompetitionEventsValidationSpecifyEitherKindKinds)).WithErrorCode(ApiMessages.Key(ApiMessageId.ListCompetitionEventsValidationSpecifyEitherKindKinds));
     }
 }
 
@@ -201,9 +201,9 @@ public sealed class ListCompetitionEventsEndpoint(
                 filterKey,
                 out var position))
         {
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
-                title: "Invalid cursor.");
+                title: ApiMessages.Get(ApiMessageId.InvalidCursor));
         }
 
         var offsetMode = string.IsNullOrWhiteSpace(request.Cursor);
@@ -233,9 +233,9 @@ public sealed class ListCompetitionEventsEndpoint(
             || result.AccessLevel is null
             || result.Items is null)
         {
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
-                title: "Invalid competition event query.");
+                title: ApiMessages.Get(ApiMessageId.ListCompetitionEventsTitleInvalidCompetitionEventQuery));
         }
 
         var nextCursor = result.Items.Count == request.Limit

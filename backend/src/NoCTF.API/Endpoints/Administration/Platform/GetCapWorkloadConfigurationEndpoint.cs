@@ -35,10 +35,10 @@ internal static class CapWorkloadConfigurationHttpMapping
         configuration.ExpectedHashAttempts);
 
     public static ProblemHttpResult ToProblem(
-        CapWorkloadConfigurationError error) => TypedResults.Problem(
+        CapWorkloadConfigurationError error) => ApiProblems.Problem(
         statusCode: Status(error),
-        title: "CAP workload configuration is unavailable.",
-        detail: Detail(error),
+        title: ApiMessages.Get(ApiMessageId.GetCapWorkloadConfigurationTitleCapWorkloadConfigurationUnavailable),
+        detail: ApiMessages.For(ToProtocol(error)),
         extensions: new Dictionary<string, object?>
         {
             ["code"] = ToProtocol(error)
@@ -112,8 +112,7 @@ public sealed class GetCapWorkloadConfigurationEndpoint(
         Roles("Administrator");
         Description(builder => builder.WithName(
             "AdminPlatformGetCapWorkloadConfiguration"));
-        Summary(summary => summary.Summary =
-            "Returns the active CAP site's proof-of-work configuration.");
+        Summary(summary => { summary.Summary = "Returns the active CAP site's proof-of-work configuration."; summary.Description = summary.Summary; });
     }
 
     public override async Task<

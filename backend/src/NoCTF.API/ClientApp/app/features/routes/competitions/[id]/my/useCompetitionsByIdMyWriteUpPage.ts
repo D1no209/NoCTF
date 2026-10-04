@@ -1,10 +1,17 @@
+import { dateTimestamp } from '../../../../../utils/date-value'
+
+import { ResponseMetadata, RequestPolicyOption, nativeResponse } from '../../../../../lib/api'
+
+import { api, multipartBody, } from '../../../../../lib/api'
+import { message as describeMessage } from '../../../../../utils/i18n'
+import type { UiMessage } from '../../../../../utils/i18n'
 import { markRaw } from 'vue'
 import { useNow } from '@vueuse/core'
 import { Download, Eye, FileText } from '@lucide/vue'
-import { toast } from 'vue-sonner'
+import { toast } from '../../../../../utils/message-toast'
 
-import { downloadMyTeamWriteUp, getMyTeamWriteUp, replaceMyTeamWriteUp } from '../../../../../api'
-import type { NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpResponse } from '../../../../../api'
+
+import type { NoCTFAPIEndpointsTeamsWriteUpsTeamWriteUpResponse } from '../../../../../api/models'
 import { downloadSdkFile, readProtectedDownload } from '../../../../../utils/download'
 import CompetitionParticipantWorkspaceComponent from '../../../../competition/CompetitionParticipantWorkspace.vue'
 
@@ -25,20 +32,20 @@ export function useCompetitionsByIdMyWriteUpPage() {
   )
   const submissionClosed = computed(() => {
     if (!submissionDeadlineAt.value) return false
-    const deadline = Date.parse(submissionDeadlineAt.value)
+    const deadline = dateTimestamp(submissionDeadlineAt.value)
     return Number.isFinite(deadline) && now.value.getTime() > deadline
   })
 
-  const writeUp = ref<NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpResponse | null>(null)
+  const writeUp = ref<NoCTFAPIEndpointsTeamsWriteUpsTeamWriteUpResponse | null>(null)
   const selectedFile = ref<File | null>(null)
   const uploadInputKey = ref(0)
   const loading = ref(true)
-  const loadError = ref<string | null>(null)
-  const uploadError = ref<string | null>(null)
+  const loadError = ref<UiMessage | null>(null)
+  const uploadError = ref<UiMessage | null>(null)
   const uploadPending = ref(false)
   const previewUrl = ref<string | null>(null)
   const previewLoading = ref(false)
-  const previewError = ref<string | null>(null)
+  const previewError = ref<UiMessage | null>(null)
   const downloadPending = ref(false)
   let selectionRequest = 0
   let previewRequest = 0
@@ -51,16 +58,16 @@ export function useCompetitionsByIdMyWriteUpPage() {
   async function load() {
     loading.value = true
     loadError.value = null
-    const { data, error, response } = await getMyTeamWriteUp({
-      path: { competitionId },
-    })
+    let error: unknown;
+    const response = new ResponseMetadata();
+    const data = await api.api.v1.competitions.byCompetitionId(competitionId).teams.me.writeup.get({ options: [new RequestPolicyOption({ response: response })] }).catch(cause => { error = cause; return undefined });
     loading.value = false
     if (response?.status === 404) {
       writeUp.value = null
       return
     }
     if (error || !data) {
-      loadError.value = parseApiError(error, translate('writeUp.loadFailed')).message
+      loadError.value = parseApiError(error, describeMessage('writeUp.loadFailed')).displayMessage
       return
     }
     writeUp.value = data
@@ -73,19 +80,19 @@ export function useCompetitionsByIdMyWriteUpPage() {
     uploadError.value = null
     if (!file) return
     if (!file.name.toLowerCase().endsWith('.pdf') || file.type !== 'application/pdf') {
-      uploadError.value = translate('writeUp.pdfOnly')
+      uploadError.value = describeMessage('writeUp.pdfOnly')
       selectedFile.value = null
       return
     }
     if (file.size > maximumWriteUpBytes) {
-      uploadError.value = translate('writeUp.tooLarge', { size: formatBytes(maximumWriteUpBytes) })
+      uploadError.value = describeMessage('writeUp.tooLarge', { size: formatBytes(maximumWriteUpBytes) })
       selectedFile.value = null
       return
     }
     const header = new Uint8Array(await file.slice(0, 5).arrayBuffer())
     if (request !== selectionRequest) return
     if (new TextDecoder('ascii').decode(header) !== '%PDF-') {
-      uploadError.value = translate('writeUp.invalidPdf')
+      uploadError.value = describeMessage('writeUp.invalidPdf')
       selectedFile.value = null
     }
   }
@@ -95,10 +102,8 @@ export function useCompetitionsByIdMyWriteUpPage() {
     uploadPending.value = true
     uploadError.value = null
     try {
-      const { data, error } = await replaceMyTeamWriteUp({
-        path: { competitionId },
-        body: { file: selectedFile.value },
-      })
+      let error: unknown;
+      const data = await api.api.v1.competitions.byCompetitionId(competitionId).teams.me.writeup.put(await multipartBody({ file: selectedFile.value })).catch(cause => { error = cause; return undefined });
       if (error || !data) throw error
       writeUp.value = data
       selectedFile.value = null
@@ -106,10 +111,10 @@ export function useCompetitionsByIdMyWriteUpPage() {
       uploadInputKey.value++
       previewRequest++
       releasePreview()
-      toast.success(translate('writeUp.uploaded'))
+      toast.success(describeMessage('writeUp.uploaded'))
     }
     catch (error) {
-      uploadError.value = parseApiError(error, translate('writeUp.uploadFailed')).message
+      uploadError.value = parseApiError(error, describeMessage('writeUp.uploadFailed')).displayMessage
       toast.error(uploadError.value)
     }
     finally {
@@ -124,10 +129,7 @@ export function useCompetitionsByIdMyWriteUpPage() {
     previewError.value = null
     try {
       const result = await readProtectedDownload(
-        () => downloadMyTeamWriteUp({
-          path: { competitionId },
-          parseAs: 'blob',
-        }),
+        () => nativeResponse(responseOptions => api.api.v1.competitions.byCompetitionId(competitionId).teams.me.writeup.content.get({ options: [...responseOptions] })),
         writeUp.value.fileName ?? 'writeup.pdf',
       )
       if (request !== previewRequest) return
@@ -136,7 +138,7 @@ export function useCompetitionsByIdMyWriteUpPage() {
     }
     catch (error) {
       if (request === previewRequest)
-        previewError.value = parseApiError(error, translate('writeUp.previewFailed')).message
+        previewError.value = parseApiError(error, describeMessage('writeUp.previewFailed')).displayMessage
     }
     finally {
       if (request === previewRequest) previewLoading.value = false
@@ -148,15 +150,12 @@ export function useCompetitionsByIdMyWriteUpPage() {
     downloadPending.value = true
     try {
       await downloadSdkFile(
-        downloadMyTeamWriteUp({
-          path: { competitionId },
-          parseAs: 'blob',
-        }),
+        nativeResponse(responseOptions => api.api.v1.competitions.byCompetitionId(competitionId).teams.me.writeup.content.get({ options: [...responseOptions] })),
         writeUp.value.fileName ?? 'writeup.pdf',
       )
     }
     catch (error) {
-      toast.error(parseApiError(error, translate('writeUp.downloadFailed')).message)
+      toast.error(parseApiError(error, describeMessage('writeUp.downloadFailed')).displayMessage)
     }
     finally {
       downloadPending.value = false

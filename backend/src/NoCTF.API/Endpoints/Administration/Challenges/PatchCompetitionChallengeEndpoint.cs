@@ -30,7 +30,13 @@ public enum CompetitionChallengeConflictCode
 
 public sealed record CompetitionChallengeConflictResponse(
     [property: Required, JsonRequired] CompetitionChallengeConflictCode Code,
-    [property: Required, JsonRequired] string Detail);
+    string Detail)
+{
+    [Required, JsonRequired]
+    public string Detail { get; init; } = ApiMessages.Localize(Code, Detail, ApiMessages.NoArguments);
+    public string MessageKey => ApiMessages.For(Code).Key;
+    public IReadOnlyDictionary<string, object?> MessageArguments => ApiMessages.NoArguments;
+}
 
 internal static class CompetitionChallengeConflictMapper
 {
@@ -86,13 +92,13 @@ public sealed class PatchCompetitionChallengeValidator
     {
         RuleFor(request => request)
             .Must(request => request.Presentation is not null || request.Rules is not null)
-            .WithMessage("At least one competition-challenge section is required.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.PatchCompetitionChallengeValidationLeastOneCompetitionChallenge)).WithErrorCode(ApiMessages.Key(ApiMessageId.PatchCompetitionChallengeValidationLeastOneCompetitionChallenge));
         RuleFor(request => request.Presentation!.CustomTitle).MaximumLength(160)
             .When(request => request.Presentation is not null);
         RuleFor(request => request.Presentation!.Tags)
             .Must(tags => CompetitionChallengeTags.TryNormalize(tags, out _))
             .When(request => request.Presentation is not null)
-            .WithMessage("Use at most 20 nonblank tags, each up to 40 characters.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.PatchCompetitionChallengeValidationUseMostNonblankTags)).WithErrorCode(ApiMessages.Key(ApiMessageId.PatchCompetitionChallengeValidationUseMostNonblankTags));
         RuleFor(request => request.Presentation!.Order).GreaterThanOrEqualTo(0)
             .When(request => request.Presentation is not null);
         RuleFor(request => request.Rules!.Configuration).NotNull()
@@ -100,7 +106,7 @@ public sealed class PatchCompetitionChallengeValidator
         RuleFor(request => request.Rules!.Configuration)
             .Must(CompetitionChallengeRulesContractMapper.HasValidShape)
             .When(request => request.Rules is not null)
-            .WithMessage("Rules must contain exactly the branch matching their mode.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.PatchCompetitionChallengeValidationRulesContainExactlyBranch)).WithErrorCode(ApiMessages.Key(ApiMessageId.PatchCompetitionChallengeValidationRulesContainExactlyBranch));
     }
 }
 
@@ -166,7 +172,7 @@ public sealed class PatchCompetitionChallengeEndpoint(
         Patch("/admin/competitions/{competitionId}/challenges/{competitionChallengeId}");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("AdminPatchCompetitionChallenge"));
-        Summary(summary => summary.Summary = "Updates selected competition-challenge sections.");
+        Summary(summary => { summary.Summary = "Updates selected competition-challenge sections."; summary.Description = summary.Summary; });
     }
 
     public override async Task<Results<Ok<AdminCompetitionChallengeResponse>, NotFound,
@@ -193,10 +199,10 @@ public sealed class PatchCompetitionChallengeEndpoint(
             return TypedResults.NotFound();
         if ((sections & CompetitionChallengePatchSection.Rules) != 0
             && request.Rules!.Configuration.Mode != (GameModeProtocol)configuration.Mode)
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
-                title: "Challenge rules were not updated.",
-                detail: "Rules mode must match the competition mode.");
+                title: ApiMessages.Get(ApiMessageId.PatchCompetitionChallengeTitleChallengeRulesWereUpdated),
+                detail: ApiMessages.Get(ApiMessageId.PatchCompetitionChallengeDetailRulesModeMatchCompetition));
 
         var target = CompetitionChallengeGeneratedCatalog.Create(configuration.Mode);
         target.Id = current.Id;
@@ -247,10 +253,10 @@ public sealed class PatchCompetitionChallengeEndpoint(
                             ChallengeMutationFailure.ChallengeOrderConflict =>
                                 TypedResults.Conflict(CompetitionChallengeConflictMapper.ToResponse(
                                     result.Failure.Value)),
-                            _ => TypedResults.Problem(
+                            _ => ApiProblems.Problem(
                                 statusCode: StatusCodes.Status400BadRequest,
-                                title: "Competition challenge was not updated.",
-                                detail: result.Failure?.ToString())
+                                title: ApiMessages.Get(ApiMessageId.PatchCompetitionChallengeTitleCompetitionChallengeWasUpdated),
+                                detail: ApiMessages.For(result.Failure))
                         };
                     return AtomicAggregatePatchDecision<Results<Ok<AdminCompetitionChallengeResponse>,
                         NotFound, ForbidHttpResult, Conflict<CompetitionChallengeConflictResponse>,
@@ -279,10 +285,10 @@ public sealed class PatchCompetitionChallengeEndpoint(
                                 CompetitionChallengeConflictCode.LifecycleStateConflict,
                                 result.ErrorMessage
                                     ?? "Challenge rules are locked by the competition lifecycle.")),
-                        _ => TypedResults.Problem(
+                        _ => ApiProblems.Problem(
                             statusCode: StatusCodes.Status400BadRequest,
-                            title: "Challenge rules are invalid.",
-                            detail: result.ErrorMessage,
+                            title: ApiMessages.Get(ApiMessageId.PatchCompetitionChallengeTitleChallengeRulesInvalid),
+                            detail: ApiMessages.For(result.FailureCode),
                             extensions: new Dictionary<string, object?>
                             {
                                 ["code"] = result.FailureCode?.ToString()

@@ -17,6 +17,12 @@ public sealed class HealthEndpoint : EndpointWithoutRequest<Ok<HealthResponse>>
 {
     public override void Configure()
     {
+        Summary(summary =>
+        {
+            summary.Summary = "Reports API process liveness without accessing business storage.";
+            summary.Description = summary.Summary;
+        });
+
         Get("/health");
         RoutePrefixOverride(string.Empty);
         AllowAnonymous();

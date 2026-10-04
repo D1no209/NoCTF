@@ -3,7 +3,7 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using FastEndpoints;
-using FastEndpoints.Swagger;
+using FastEndpoints.OpenApi;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -132,7 +132,7 @@ public sealed class PlatformRuntimeEndpointTests
             options.Filter = type => type == typeof(ListPlatformRuntimesEndpoint)
                 || type == typeof(ListPlatformRuntimesValidator) || type == typeof(GetAdminRuntimeEndpoint);
         });
-        builder.Services.SwaggerDocument();
+        builder.Services.OpenApiDocument();
         builder.Services.AddAuthentication("Bearer")
             .AddScheme<AuthenticationSchemeOptions, TestBearer>("Bearer", _ => { });
         builder.Services.AddAuthorization();

@@ -109,7 +109,7 @@ describe('runtime administration operation wiring', () => {
       new URL('../app/pages/admin/competitions/[id]/runtimes.vue', import.meta.url),
     ).text()
 
-    expect(source.match(/const shouldNotify = runtimeOperations\.isActive\(token\)\s+runtimeOperations\.finish\(token\)\s+if \(shouldNotify\) toast\.error\(parseApiError\(e\)\.message\)/g)?.length).toBe(4)
+    expect(source.match(/const shouldNotify = runtimeOperations\.isActive\(token\)\s+runtimeOperations\.finish\(token\)\s+if \(shouldNotify\) toast\.error\(parseApiError\(e\)\.displayMessage\)/g)?.length).toBe(4)
     expect(source).toContain("markRuntimeStopping(rt.id)")
     expect(source).toContain("? { ...item, state: 'Stopping' }")
   })

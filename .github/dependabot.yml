@@ -1,0 +1,38 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      actions:
+        patterns: ['*']
+
+  - package-ecosystem: nuget
+    directory: /backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: '*'
+        update-types: [version-update:semver-major]
+    groups:
+      dotnet:
+        patterns: ['*']
+        update-types: [minor, patch]
+
+  - package-ecosystem: bun
+    directories:
+      - /backend/src/NoCTF.API/ClientApp
+      - /docs
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: '*'
+        update-types: [version-update:semver-major]
+    groups:
+      javascript:
+        patterns: ['*']
+        update-types: [minor, patch]

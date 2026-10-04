@@ -11,19 +11,19 @@ const { Activity, Crosshair, RadioTower, Shield, animationComponent, event, queu
     <header class="hud-heading stage-heading">
       <div class="hud-title">
         <RadioTower class="hud-title-icon" />
-        <span id="awdp-stage-title">{{ $t('ui.centralEventStage') }}</span>
+        <span id="awdp-stage-title">{{ $t('competitions.label.centralEventStage') }}</span>
       </div>
-      <div class="stage-queue"><i />{{ $t('ui.queue') }} {{ queueLength }}</div>
+      <div class="stage-queue"><i />{{ $t('competitions.label.queue') }} {{ queueLength }}</div>
     </header>
 
     <div class="stage-viewport" aria-live="assertive">
       <Transition name="stage-swap" mode="out-in">
-        <div v-if="event && animationComponent" :key="event.id" class="stage-event">
+        <div v-if="event && animationComponent" :key="event.id ?? undefined" class="stage-event">
           <div class="stage-event-copy">
-            <span>{{ event.action === 'attack' ? $t('ui.attackVerification') : $t('ui.defenseVerification') }}</span>
+            <span>{{ event.action === 'attack' ? $t('competitions.label.attackVerification') : $t('common.label.defenseVerification') }}</span>
             <strong>
               {{ event.teamName }}
-              <b :class="event.outcome">{{ event.outcome === 'success' ? $t('ui.success') : $t('ui.failed') }}</b>
+              <b :class="event.outcome">{{ event.outcome === 'success' ? $t('competitions.label.success') : $t('common.error.failed') }}</b>
             </strong>
             <small>{{ event.challengeTitle }}</small>
           </div>
@@ -37,8 +37,8 @@ const { Activity, Crosshair, RadioTower, Shield, animationComponent, event, queu
           <div class="idle-core"><Activity /></div>
           <Crosshair class="idle-mark idle-mark-left" />
           <Shield class="idle-mark idle-mark-right" />
-          <strong>{{ $t('ui.awaitingVerifiedOperation') }}</strong>
-          <span>{{ $t('ui.verifiedAttackAndDefenseResultsPlayHereInEventOrder') }}</span>
+          <strong>{{ $t('competitions.label.awaitingVerified') }}</strong>
+          <span>{{ $t('competitions.awdpEvent.description.verifiedAttackDefenseResults') }}</span>
         </div>
       </Transition>
       <div class="stage-scanline" aria-hidden="true" />
@@ -46,8 +46,8 @@ const { Activity, Crosshair, RadioTower, Shield, animationComponent, event, queu
     </div>
 
     <footer class="stage-footer">
-      <span><i class="live-dot" /> {{ $t('ui.liveVerifiedFeed') }}</span>
-      <span>{{ event ? formatDateTime(event.occurredAt) : $t('ui.standingBy') }}</span>
+      <span><i class="live-dot" /> {{ $t('competitions.label.liveVerifiedFeed') }}</span>
+      <span>{{ event ? formatDateTime(event.occurredAt) : $t('competitions.label.standing') }}</span>
     </footer>
   </section>
 </template>

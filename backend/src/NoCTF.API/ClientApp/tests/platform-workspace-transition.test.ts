@@ -31,7 +31,7 @@ test('audit export shares the existing filter action row', async () => {
     new URL('../app/pages/admin/platform/audit.vue', import.meta.url),
   ).text()
 
-  expect(audit).toContain("$t('ui.downloadAuditArchive')")
-  expect(audit).not.toContain("$t('ui.auditDataExport')")
-  expect(audit).not.toContain("$t('ui.generateAnAuditArchiveSynchronouslyFromTheCurrentFiltersAnd')")
+  expect(audit).toContain("$t('administration.label.downloadAuditArchive')")
+  expect(audit).not.toContain("$t('common.label.auditDataExport')")
+  expect(audit).not.toContain("$t('common.description.generateAuditArchiveSynchronously')")
 })

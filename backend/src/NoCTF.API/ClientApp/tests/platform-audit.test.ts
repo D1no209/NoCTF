@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test'
-import type { NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse } from '../app/api'
+import type { NoCTFAPIEndpointsAdministrationPlatformPlatformAuditLogResponse } from '../app/api/models'
 import { platformAuditActionText } from '../app/utils/platform-audit'
 
-function audit(overrides: Partial<NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse>) {
+function audit(overrides: Partial<NoCTFAPIEndpointsAdministrationPlatformPlatformAuditLogResponse>) {
   return {
     id: 'audit-1',
     kind: 'CompetitionEvent',
@@ -10,7 +10,7 @@ function audit(overrides: Partial<NoCtfapiEndpointsAdministrationPlatformPlatfor
     automatic: false,
     occurredAt: '2026-08-22T00:00:00Z',
     ...overrides,
-  } as NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse
+  } as NoCTFAPIEndpointsAdministrationPlatformPlatformAuditLogResponse
 }
 
 describe('platform audit operation labels', () => {

@@ -54,7 +54,12 @@ public enum PlatformUserDeletionConflictCode
 public sealed record PlatformUserDeletionConflictResponse(
     PlatformUserDeletionConflictCode Code,
     string Detail,
-    PlatformUserDeletionPreviewResponse? Preview);
+    PlatformUserDeletionPreviewResponse? Preview)
+{
+    public string Detail { get; init; } = ApiMessages.Localize(Code, Detail, ApiMessages.NoArguments);
+    public string MessageKey => ApiMessages.For(Code).Key;
+    public IReadOnlyDictionary<string, object?> MessageArguments => ApiMessages.NoArguments;
+}
 
 public sealed class DeletePlatformUserEndpoint(
     ManageUserAccounts accounts,
@@ -120,10 +125,10 @@ public sealed class DeletePlatformUserEndpoint(
             UserDeletionState.AlreadyAnonymized => Conflict(
                 PlatformUserDeletionConflictCode.AlreadyAnonymized,
                 result.Preview),
-            UserDeletionState.ReasonInvalid => TypedResults.Problem(
+            UserDeletionState.ReasonInvalid => ApiProblems.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
-                title: "Deletion reason is invalid.",
-                detail: "A reason between 3 and 500 characters is required."),
+                title: ApiMessages.Get(ApiMessageId.DeletePlatformUserTitleDeletionReasonInvalid),
+                detail: ApiMessages.Get(ApiMessageId.DeletePlatformUserDetailReasonBetweenCharactersRequired)),
             _ => throw new InvalidOperationException(
                 $"Unsupported platform user deletion state: {result.State}.")
         };

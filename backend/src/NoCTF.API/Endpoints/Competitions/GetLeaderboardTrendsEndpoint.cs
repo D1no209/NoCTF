@@ -47,7 +47,7 @@ public sealed class GetLeaderboardTrendsEndpoint(
     {
         Get("/competitions/{competitionId}/leaderboard/trends");
         AllowAnonymous();
-        Summary(summary => summary.Summary = "Get CTF team score trends from the authoritative scoreboard projection.");
+        Summary(summary => { summary.Summary = "Get CTF team score trends from the authoritative scoreboard projection."; summary.Description = summary.Summary; });
     }
 
     public override async Task<Results<Ok<ScoreboardTrendsResponse>, Accepted<LeaderboardProcessingProtocolResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(
@@ -91,9 +91,9 @@ public sealed class GetLeaderboardTrendsEndpoint(
             var status = await leaderboard.GetStatusAsync(request.CompetitionId, cancellationToken);
             if (status.LastFailureAt is not null)
             {
-                return TypedResults.Problem(
+                return ApiProblems.Problem(
                     statusCode: StatusCodes.Status503ServiceUnavailable,
-                    title: "Leaderboard projection is unavailable.",
+                    title: ApiMessages.Get(ApiMessageId.GetLeaderboardTrendsTitleLeaderboardProjectionUnavailable),
                     extensions: new Dictionary<string, object?>
                     {
                         ["code"] = LeaderboardProblemCode.LeaderboardProjectionFailed

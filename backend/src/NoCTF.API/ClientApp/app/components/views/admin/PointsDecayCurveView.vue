@@ -9,9 +9,9 @@ const { ScoreDecayMode, width, height, inset, tooltipBox, preview, formatInteger
 <template>
   <figure v-if="preview" class="col-span-full border border-border bg-muted/20 px-4 py-3">
     <figcaption class="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-      <span>{{ $t('ui.scoreDecayCurvePreview') }} · {{ $t(preview.modeLabel) }}</span>
+      <span>{{ $t('administration.label.scoreDecayCurvePreview') }} · {{ translate(preview.modeLabel) }}</span>
       <span class="font-mono tabular-nums">
-        {{ formatInteger(preview.initialPoints) }} → {{ formatInteger(preview.minimumPoints) }} {{ $t('ui.pts2') }}
+        {{ formatInteger(preview.initialPoints) }} → {{ formatInteger(preview.minimumPoints) }} {{ $t('common.label.pts.scoreTrendChart') }}
       </span>
     </figcaption>
     <svg
@@ -20,7 +20,7 @@ const { ScoreDecayMode, width, height, inset, tooltipBox, preview, formatInteger
       :viewBox="`0 0 ${width} ${height}`"
       role="img"
       tabindex="0"
-      :aria-label="$t('ui.theScoreDecaysAsMoreTeamsSolveTheChallengeUse')"
+      :aria-label="$t('administration.pointsDecay.description.scoreDecaysTeamsSolve')"
       preserveAspectRatio="xMidYMid meet"
       @pointermove="onPointerMove"
       @pointerleave="onPointerLeave"
@@ -66,8 +66,8 @@ const { ScoreDecayMode, width, height, inset, tooltipBox, preview, formatInteger
           text-anchor="middle"
           class="fill-muted-foreground text-[12px] font-mono tabular-nums"
         >{{ tick.count }}</text>
-        <text :x="inset.left" :y="inset.top - 13" class="fill-muted-foreground text-[12px] font-medium">{{ $t('ui.roundedScore') }} {{ $t('ui.pts3') }}</text>
-        <text :x="width - inset.right" :y="height - 13" text-anchor="end" class="fill-muted-foreground text-[12px] font-medium">{{ $t('ui.solvedTeams') }}</text>
+        <text :x="inset.left" :y="inset.top - 13" class="fill-muted-foreground text-[12px] font-medium">{{ $t('administration.label.roundedScore') }} {{ $t('administration.label.pts') }}</text>
+        <text :x="width - inset.right" :y="height - 13" text-anchor="end" class="fill-muted-foreground text-[12px] font-medium">{{ $t('administration.label.solvedTeams') }}</text>
       </g>
       <polyline
         :points="preview.points"
@@ -90,15 +90,15 @@ const { ScoreDecayMode, width, height, inset, tooltipBox, preview, formatInteger
       <circle :cx="preview.active.x" :cy="preview.active.y" r="5" class="fill-background stroke-primary" stroke-width="3" />
       <g :transform="tooltipTransform">
         <rect :width="tooltipBox.width" :height="tooltipBox.height" rx="4" class="fill-popover stroke-border" />
-        <text x="11" y="19" class="fill-muted-foreground text-[11px]">{{ $t('ui.solvedTeam', { count: preview.active.count }) }}</text>
-        <text x="11" y="38" class="fill-popover-foreground text-[14px] font-mono font-semibold tabular-nums">{{ formatInteger(preview.active.score) }} {{ $t('ui.pts2') }}</text>
+        <text x="11" y="19" class="fill-muted-foreground text-[11px]">{{ $t('administration.label.solvedTeam', { count: preview.active.count }) }}</text>
+        <text x="11" y="38" class="fill-popover-foreground text-[14px] font-mono font-semibold tabular-nums">{{ formatInteger(preview.active.score) }} {{ $t('common.label.pts.scoreTrendChart') }}</text>
       </g>
     </svg>
     <p class="mt-1 text-xs text-muted-foreground">
-      {{ $t('ui.hoverTheCurveToInspectTheRoundedScoreAtEach2') }}
+      {{ $t('administration.pointsDecay.description.hoverCurveInspectRounded') }}
     </p>
   </figure>
   <div v-else-if="curve.decayMode === ScoreDecayMode.Custom" class="border border-dashed border-border bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
-    {{ $t('ui.theServerValidatesEveryPointOfACustomFormulaIt') }}
+    {{ $t('administration.pointsDecay.description.serverValidatesEveryPoint') }}
   </div>
 </template>

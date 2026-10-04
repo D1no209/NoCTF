@@ -86,9 +86,9 @@ internal static class SynchronousArchiveHttpResults
             SynchronousArchiveFailure.TimeLimitExceeded => StatusCodes.Status408RequestTimeout,
             _ => StatusCodes.Status500InternalServerError
         };
-        return TypedResults.Problem(
+        return ApiProblems.Problem(
             statusCode: status,
-            title: "The synchronous archive could not be generated.",
+            title: ApiMessages.Get(ApiMessageId.ExportCompetitionArchiveTitleSynchronousArchiveCouldGenerated),
             extensions: new Dictionary<string, object?> { ["code"] = code.ToString() });
     }
 }

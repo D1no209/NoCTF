@@ -1,8 +1,8 @@
 export interface FieldConstraint {
   label: string
   validity: Pick<ValidityState, 'valid' | 'valueMissing' | 'typeMismatch' | 'tooShort' | 'tooLong' | 'rangeUnderflow' | 'rangeOverflow' | 'stepMismatch' | 'patternMismatch' | 'customError' | 'badInput'>
-  min?: string
-  max?: string
+  min?: string | null
+  max?: string | null
   minLength?: number
   maxLength?: number
 }

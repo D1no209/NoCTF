@@ -7,7 +7,7 @@ const { competition, role, loading, error, RoleLabel, navGroups, activePath, isP
 </script>
 
 <template>
-  <component :is="AppWorkspaceNav" v-if="competition" :groups="navGroups" :title="competition.title">
+  <component :is="AppWorkspaceNav" v-if="competition" :groups="navGroups" :title="competition.title ?? undefined">
     <div :data-workspace-scroll-content="usesPageScroll ? undefined : ''" data-competition-management-workspace
       class="mx-auto flex w-full flex-col gap-6 px-4 pt-8 md:px-6"
       :class="[isProgressionPage || isWriteUpReview ? 'max-w-none' : 'max-w-6xl', usesPageScroll ? 'pb-8' : 'h-full min-h-0']">
@@ -16,12 +16,12 @@ const { competition, role, loading, error, RoleLabel, navGroups, activePath, isP
           <h1 class="text-display text-2xl">{{ competition.title }}</h1>
           <component :is="GameModeBadge" :mode="competition.mode" />
           <component :is="CompetitionStatusBadge" :status="competition.status" />
-          <Badge variant="outline">{{ $t('ui.myRole', { role: $t(RoleLabel[role]) }) }}</Badge>
+          <Badge variant="outline">{{ $t('administration.label.myRole', { role: translate(RoleLabel[role]) }) }}</Badge>
         </div>
       </div>
       <ScrollSurface axis="y" :enabled="!usesPageScroll" :reset-key="activePath" class="w-full"
         :class="usesPageScroll ? 'overflow-visible' : 'min-h-0 flex-1 overscroll-contain pr-3'"
-        :aria-label="$t('ui.competitionAdmin')">
+        :aria-label="$t('navigation.competitionAdmin')">
         <div :data-admin-writeup-review-workspace="isWriteUpReview ? '' : undefined"
           :class="isWriteUpReview ? 'h-full min-h-0 px-1 pb-1' : 'px-1 pb-8'">
           <MotionSwap :identity="activePath" preset="film-up">
@@ -40,7 +40,7 @@ const { competition, role, loading, error, RoleLabel, navGroups, activePath, isP
       <Skeleton class="h-64 w-full" />
     </div>
     <Alert v-else variant="destructive">
-      <AlertDescription>{{ error ?? $t('ui.loadingCompetitionFailed') }}</AlertDescription>
+      <AlertDescription>{{ error ?? $t('common.error.loadingCompetitionFailed') }}</AlertDescription>
     </Alert>
   </div>
 </template>

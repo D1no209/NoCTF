@@ -94,7 +94,7 @@ public sealed class ListPlatformAuditLogsValidator : Validator<ListPlatformAudit
             .When(request => !string.IsNullOrWhiteSpace(request.Cursor));
         RuleFor(request => request).Must(request =>
                 request.From is null || request.To is null || request.From <= request.To)
-            .WithMessage("From must not be later than To.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.ListPlatformAuditLogsValidationLater)).WithErrorCode(ApiMessages.Key(ApiMessageId.ListPlatformAuditLogsValidationLater));
     }
 }
 
@@ -165,9 +165,9 @@ public sealed class ListPlatformAuditLogsEndpoint(
         var filterKey = FilterKey(request);
         if (!cursors.TryDecode(request.Cursor, CursorEndpoint, filterKey, out var position))
         {
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
-                title: "Invalid cursor.");
+                title: ApiMessages.Get(ApiMessageId.InvalidCursor));
         }
         var items = await platform.QueryAuditsAsync(
                 new(

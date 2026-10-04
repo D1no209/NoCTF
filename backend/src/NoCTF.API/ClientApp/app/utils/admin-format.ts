@@ -1,21 +1,5 @@
-import { toast } from 'vue-sonner'
-import type {
-  NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol,
-  NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentStatusProtocol,
-  NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol,
-  NoCtfapiEndpointsCompetitionsGameModeProtocol,
-  NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol,
-  NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol,
-  NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol,
-  NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol,
-  NoCtfapiEndpointsRuntimeRuntimeKindProtocol,
-  NoCtfapiEndpointsRuntimeRuntimeFailureCodeProtocol,
-  NoCtfapiEndpointsRuntimeRuntimeProviderProtocol,
-  NoCtfapiEndpointsRuntimeRuntimeStateProtocol,
-  NoCtfapiEndpointsTeamsTeamBanAppealStatusProtocol,
-  NoCtfapiEndpointsTeamsTeamBanSourceProtocol,
-  NoCtfapiEndpointsTeamsTeamRegistrationStatusProtocol,
-} from '../api'
+import { toast } from './message-toast'
+import type { NoCTFAPIEndpointsAdministrationChallengeBankSpecificationKindProtocol, NoCTFAPIEndpointsAdministrationCheatIncidentsCheatIncidentStatusProtocol, NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol, NoCTFAPIEndpointsCompetitionsGameModeProtocol, NoCTFAPIEndpointsCompetitionsLeaderboardVisibilityProtocol, NoCTFAPIEndpointsGameplayFactsGameplayFactKindProtocol, NoCTFAPIEndpointsGameplayFactsGameplayFactResultProtocol, NoCTFAPIEndpointsGameplayFactsGameplayFactStateProtocol, NoCTFAPIEndpointsRuntimeRuntimeKindProtocol, NoCTFAPIEndpointsRuntimeRuntimeFailureCodeProtocol, NoCTFAPIEndpointsRuntimeRuntimeProviderProtocol, NoCTFAPIEndpointsRuntimeRuntimeStateProtocol, NoCTFAPIEndpointsTeamsTeamBanAppealStatusProtocol, NoCTFAPIEndpointsTeamsTeamBanSourceProtocol, NoCTFAPIEndpointsTeamsTeamRegistrationStatusProtocol } from '../api/models'
 import { parseApiError } from './api-error'
 import { localeTag, translate } from './i18n'
 
@@ -23,71 +7,71 @@ import { localeTag, translate } from './i18n'
 
 export const GameModeLabel = {
   Ctf: 'CTF', Awd: 'AWD', Awdp: 'AWDP', Koh: 'KoH',
-} satisfies Record<NoCtfapiEndpointsCompetitionsGameModeProtocol, string>
+} satisfies Record<NoCTFAPIEndpointsCompetitionsGameModeProtocol, string>
 
 export const CompetitionStatusLabel = {
-  Draft: "ui.draft", Visible: "ui.visible", Published: "ui.published", Running: "ui.running", Paused: "ui.suspended", Finished: "ui.finished",
-} satisfies Record<NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol, string>
+  Draft: "common.label.draft", Visible: "common.label.visible", Published: "administration.label.published", Running: "common.label.running", Paused: "common.label.suspended", Finished: "common.label.finished",
+} satisfies Record<NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol, string>
 
 export const TeamRegistrationStatusLabel = {
-  Pending: "ui.pendingApproval", Approved: "ui.passed", Rejected: "ui.rejected", Unregistered: "ui.notRegistered",
-} satisfies Record<NoCtfapiEndpointsTeamsTeamRegistrationStatusProtocol, string>
+  Pending: "common.label.pendingApproval", Approved: "common.label.passed", Rejected: "common.label.rejected", Unregistered: "common.label.registered",
+} satisfies Record<NoCTFAPIEndpointsTeamsTeamRegistrationStatusProtocol, string>
 
 export const TeamBanSourceLabel = {
-  ManualModeration: "ui.manualBan", CheatIncident: "ui.cheatIncident",
-} satisfies Record<NoCtfapiEndpointsTeamsTeamBanSourceProtocol, string>
+  ManualModeration: "common.label.manualBan", CheatIncident: "common.label.cheatIncident",
+} satisfies Record<NoCTFAPIEndpointsTeamsTeamBanSourceProtocol, string>
 
 export const TeamBanAppealStatusLabel = {
-  Submitted: "ui.pendingDecision", Upheld: "ui.maintained", Accepted: "ui.accepted",
-} satisfies Record<NoCtfapiEndpointsTeamsTeamBanAppealStatusProtocol, string>
+  Submitted: "common.label.pendingDecision", Upheld: "common.label.maintained", Accepted: "common.label.accepted",
+} satisfies Record<NoCTFAPIEndpointsTeamsTeamBanAppealStatusProtocol, string>
 
 export const GameplayFactKindLabel = {
-  FlagAttempt: 'Flag', BreakAttempt: 'Break', FixAttempt: 'Fix', HintUnlock: "ui.promptToUnlock",
-  ManualAdjustment: "ui.manualAdjustment", AwdServiceTransition: "ui.awdServiceStatus", KohControlObservation: "ui.kohControlObservation",
-} satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol, string>
+  FlagAttempt: 'Flag', BreakAttempt: 'Break', FixAttempt: 'Fix', HintUnlock: "common.label.promptUnlock",
+  ManualAdjustment: "common.label.manualAdjustment", AwdServiceTransition: "common.label.awdServiceStatus", KohControlObservation: "common.label.kohControlObservation",
+} satisfies Record<NoCTFAPIEndpointsGameplayFactsGameplayFactKindProtocol, string>
 
 export const GameplayFactStateLabel = {
-  Pending: "ui.pending", Queued: "ui.queuing", Processing: "ui.underEvaluation", Completed: "ui.completed", PlatformFailed: "ui.platformFailed",
-} satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol, string>
+  Pending: "administration.label.pending", Queued: "common.label.queuing", Processing: "common.label.underEvaluation", Completed: "common.label.completed", PlatformFailed: "common.error.platformFailed.adminFormat",
+} satisfies Record<NoCTFAPIEndpointsGameplayFactsGameplayFactStateProtocol, string>
 
 export const GameplayFactResultLabel = {
-  Correct: "ui.correct", Wrong: "ui.wrong", Duplicate: "ui.repeat", AttemptsExhausted: "ui.exhausted", Rejected: "ui.rejected",
-  Unlocked: "ui.unlocked", Applied: "ui.applied", ServiceUp: "ui.serviceIsNormal", ServiceDown: "ui.serviceException", Controlled: "ui.controlled", Uncontrolled: "ui.uncontrolled",
-} satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol, string>
+  Correct: "common.label.correct", Wrong: "common.label.wrong", Duplicate: "common.label.repeat", AttemptsExhausted: "common.label.exhausted", Rejected: "common.label.rejected",
+  Unlocked: "common.label.unlocked", Applied: "common.label.applied", ServiceUp: "common.label.serviceNormal", ServiceDown: "common.label.serviceException", Controlled: "common.label.controlled", Uncontrolled: "common.label.uncontrolled",
+} satisfies Record<NoCTFAPIEndpointsGameplayFactsGameplayFactResultProtocol, string>
 
 export const RuntimeKindLabel = {
-  Container: "ui.container", OvaVm: "ui.virtualMachine",
-} satisfies Record<NoCtfapiEndpointsRuntimeRuntimeKindProtocol, string>
+  Container: "runtime.label.container", OvaVm: "runtime.label.virtualMachine",
+} satisfies Record<NoCTFAPIEndpointsRuntimeRuntimeKindProtocol, string>
 
 export const RuntimeProviderLabel = {
   Docker: 'Docker', Kubernetes: 'Kubernetes', Libvirt: 'Libvirt',
-} satisfies Record<NoCtfapiEndpointsRuntimeRuntimeProviderProtocol, string>
+} satisfies Record<NoCTFAPIEndpointsRuntimeRuntimeProviderProtocol, string>
 
 export const RuntimeStateLabel = {
-  Queued: "ui.queuing", Provisioning: "ui.inPreparation", Running: "ui.running2", Stopping: "ui.stopping", Stopped: "ui.stopped", Failed: "ui.failed",
-} satisfies Record<NoCtfapiEndpointsRuntimeRuntimeStateProtocol, string>
+  Queued: "common.label.queuing", Provisioning: "runtime.label.preparation", Running: "common.label.running.adminFormat", Stopping: "common.label.stopping", Stopped: "common.label.stopped", Failed: "common.error.failed",
+} satisfies Record<NoCTFAPIEndpointsRuntimeRuntimeStateProtocol, string>
 
 export const RuntimeFailureCodeLabel = {
-  InvalidConfiguration: "ui.invalidRuntimeConfiguration",
-  RunnerUnavailable: "ui.runnerUnavailable",
-  ProviderUnavailable: "ui.runtimeProviderUnavailable",
-  ProvisionTimeout: "ui.runtimeProvisioningTimedOut",
-  ProviderRejected: "ui.runtimeProviderRejectedTheRequest",
-  CleanupFailed: "ui.resourceCleanupFailed",
-  UrlExpansionFailed: "ui.accessUrlExpansionFailed",
-} satisfies Record<NoCtfapiEndpointsRuntimeRuntimeFailureCodeProtocol, string>
+  InvalidConfiguration: "common.error.runtimeConfigurationInvalid",
+  RunnerUnavailable: "common.error.runnerUnavailable",
+  ProviderUnavailable: "common.error.runtimeProviderUnavailable",
+  ProvisionTimeout: "common.label.runtimeProvisioningTimedOut",
+  ProviderRejected: "common.label.runtimeProviderRejected",
+  CleanupFailed: "common.error.resourceCleanupFailed",
+  UrlExpansionFailed: "common.error.accessUrlExpansionFailed",
+} satisfies Record<NoCTFAPIEndpointsRuntimeRuntimeFailureCodeProtocol, string>
 
 export const CheatIncidentStatusLabel = {
-  Pending: "ui.pending", Confirmed: "ui.confirmed", Dismissed: "ui.dismissed", Superseded: "ui.superseded", Corrected: "ui.corrected",
-} satisfies Record<NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentStatusProtocol, string>
+  Pending: "administration.label.pending", Confirmed: "administration.label.confirmed", Dismissed: "common.label.dismissed", Superseded: "administration.label.superseded", Corrected: "administration.label.corrected",
+} satisfies Record<NoCTFAPIEndpointsAdministrationCheatIncidentsCheatIncidentStatusProtocol, string>
 
 export const LeaderboardVisibilityLabel = {
-  Normal: "ui.normal", Frozen: "ui.freeze", Blackout: "ui.cover2",
-} satisfies Record<NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol, string>
+  Normal: "administration.label.normal", Frozen: "common.label.freeze", Blackout: "common.label.cover",
+} satisfies Record<NoCTFAPIEndpointsCompetitionsLeaderboardVisibilityProtocol, string>
 
 export const SpecificationKindLabel = {
-  Attachment: "ui.accessories", AwdRound: "ui.awdRounds", RuntimeDefinition: "ui.runtimeDefinition", RuntimeInstance: "ui.runtime2", Hint: "ui.hint",
-} satisfies Record<NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol, string>
+  Attachment: "common.label.accessories", AwdRound: "common.label.awdRounds", RuntimeDefinition: "common.label.runtimeDefinition", RuntimeInstance: "common.label.runtime", Hint: "administration.label.hint",
+} satisfies Record<NoCTFAPIEndpointsAdministrationChallengeBankSpecificationKindProtocol, string>
 
 export function enumLabel<T extends string>(
   map: Readonly<Record<T, string>>,
@@ -97,22 +81,22 @@ export function enumLabel<T extends string>(
   return translate(map[value])
 }
 
-export function adminFormatDateTime(value: string | null | undefined): string {
+export function adminFormatDateTime(value: string | Date | null | undefined): string {
   if (!value) return '—'
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
+  if (Number.isNaN(date.getTime())) return String(value)
   return date.toLocaleString(localeTag(), { hour12: false })
 }
 
 /** Convert a datetime-local input value to an ISO string, or undefined when empty. */
-export function localInputToIso(value: string): string | undefined {
+export function localInputToIso(value: string): string | null | undefined {
   if (!value) return undefined
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? undefined : date.toISOString()
 }
 
 /** Convert an ISO string to a datetime-local input value (local timezone). */
-export function isoToLocalInput(value: string | null | undefined): string {
+export function isoToLocalInput(value: string | Date | null | undefined): string {
   if (!value) return ''
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ''
@@ -122,5 +106,5 @@ export function isoToLocalInput(value: string | null | undefined): string {
 
 /** Show an administrative write failure without inventing transport-level conflict semantics. */
 export function toastWriteError(error: unknown): void {
-  toast.error(parseApiError(error).message)
+  toast.error(parseApiError(error).displayMessage)
 }

@@ -1,11 +1,13 @@
 
+import { api } from '../../../../../lib/api'
+import { message as describeMessage } from '../../../../../utils/i18n'
 
-import { listCompetitionTeamsEndpoint } from '../../../../../api'
-import type { NoCtfapiEndpointsTeamsTeamResponse } from '../../../../../api'
+
+
+import type { NoCTFAPIEndpointsTeamsTeamResponse } from '../../../../../api/models'
 import { computed, ref } from 'vue'
 import { useOffsetPagination } from '../../../../../composables/useOffsetPagination'
 import { parseApiError } from '../../../../../utils/api-error'
-import { translate } from '../../../../../utils/i18n'
 import { buildTeamDisplayNames } from '../../../../../utils/team-display'
 
 /** Owns state, effects and commands for CompetitionsByIdTeamsIndexPage. */
@@ -14,12 +16,13 @@ export function useCompetitionsByIdTeamsIndexPage() {
 
   const competitionId = route.params.id as string
 
-  const allTeams = ref<NoCtfapiEndpointsTeamsTeamResponse[] | null>(null)
-  const pagination = useOffsetPagination<NoCtfapiEndpointsTeamsTeamResponse>(async ({ offset, limit }) => {
+  const allTeams = ref<NoCTFAPIEndpointsTeamsTeamResponse[] | null>(null)
+  const pagination = useOffsetPagination<NoCTFAPIEndpointsTeamsTeamResponse>(async ({ offset, limit }) => {
     if (allTeams.value === null) {
-      const { data, error: requestError } = await listCompetitionTeamsEndpoint({ path: { competitionId } })
+      let requestError: unknown;
+      const data = await api.api.v1.competitions.byCompetitionId(competitionId).teams.get().catch(cause => { requestError = cause; return undefined });
       if (requestError || !data)
-        throw parseApiError(requestError, translate('ui.failedToLoadTeamList'))
+        throw parseApiError(requestError, describeMessage('competitions.competitionsBy.error.loadTeamListFailed'))
       allTeams.value = data.items ?? []
     }
     return { items: allTeams.value.slice(offset, offset + limit), total: allTeams.value.length }

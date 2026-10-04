@@ -3,51 +3,51 @@ import { translate } from '../../utils/i18n'
 /** 排行榜页面内部使用的结构化类型(对应后端 LeaderboardProtocolResponse 的 camelCase JSON)。 */
 
 export interface TrendPoint {
-  at?: string
-  score?: number
+  at?: Date | string | null
+  score?: number | null
 }
 
 export interface SolveRecordItem {
-  competitionChallengeId?: string
-  at?: string
-  points?: number
-  solveOrdinal?: number
+  competitionChallengeId?: string | null
+  at?: Date | string | null
+  points?: number | null
+  solveOrdinal?: number | null
   submitterName?: string | null
 }
 
 export interface TrendSeries {
-  teamId?: string
-  teamName?: string
+  teamId?: string | null
+  teamName?: string | null
   points?: TrendPoint[]
   solves?: SolveRecordItem[]
 }
 
 export interface ChallengeInfo {
-  competitionChallengeId?: string
-  title?: string
-  direction?: string
+  competitionChallengeId?: string | null
+  title?: string | null
+  direction?: string | null
 }
 
 export interface LeaderboardCell {
-  competitionChallengeId?: string
-  score?: number
-  attackScore?: number
-  defenseScore?: number
+  competitionChallengeId?: string | null
+  score?: number | null
+  attackScore?: number | null
+  defenseScore?: number | null
   solvedAt?: string | null
   solverName?: string | null
   bloodRank?: string | null
 }
 
 export interface MatrixEntry {
-  rank?: number
-  teamId?: string
-  teamName?: string
-  trackKey?: string
-  score?: number
-  attackScore?: number
-  defenseScore?: number
-  penaltyScore?: number
-  solveCount?: number
+  rank?: number | null
+  teamId?: string | null
+  teamName?: string | null
+  trackKey?: string | null
+  score?: number | null
+  attackScore?: number | null
+  defenseScore?: number | null
+  penaltyScore?: number | null
+  solveCount?: number | null
   lastScoreAt?: string | null
   cells?: LeaderboardCell[]
 }
@@ -57,7 +57,7 @@ export function normalizeChallengeKey(value?: string | null): string {
   return (value ?? '').replace(/[^0-9a-f]/gi, '').toLowerCase()
 }
 
-const bloodRankLabelKey: Record<string, string> = { First: "ui.firstBlood", Second: "ui.secondBlood", Third: "ui.thirdBlood" }
+const bloodRankLabelKey: Record<string, string> = { First: "common.label.firstBlood", Second: "common.label.secondBlood", Third: "common.label.thirdBlood" }
 
 export function bloodRankLabel(rank?: string | null): string {
   const key = rank ? bloodRankLabelKey[rank] : undefined
@@ -74,7 +74,7 @@ export const medalRankClass: Record<number, string> = {
 }
 
 /** 血榜名次 → Medal 图标着色;非前三名返回 undefined(调用方自行兜底)。 */
-export function medalBloodRankClass(bloodRank?: string | null): string | undefined {
+export function medalBloodRankClass(bloodRank?: string | null): string | null | undefined {
   const normalized = bloodRank?.replace(/Blood$/, '')
   const index = normalized
     ? bloodRankOrder.indexOf(normalized as (typeof bloodRankOrder)[number])

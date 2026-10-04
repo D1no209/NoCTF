@@ -1,22 +1,24 @@
+
+import { api } from '../../lib/api'
+import { message as describeMessage } from '../../utils/i18n'
 import { computed, onScopeDispose, ref, watch } from 'vue'
-import { toast } from 'vue-sonner'
-import { adminListRuntimeFlags } from '~/api'
-import type { NoCtfapiEndpointsAdministrationRuntimeRuntimeFlagResponse } from '~/api'
+import { toast } from '../../utils/message-toast'
+
+import type { NoCTFAPIEndpointsAdministrationRuntimeRuntimeFlagResponse } from '~/api/models'
 import { useOffsetPagination } from '~/composables/useOffsetPagination'
 import { adminFormatDateTime } from '~/utils/admin-format'
-import { translate } from '~/utils/i18n'
 import { parseApiError } from '~/utils/api-error'
 
-type RuntimeFlag = NoCtfapiEndpointsAdministrationRuntimeRuntimeFlagResponse
+type RuntimeFlag = NoCTFAPIEndpointsAdministrationRuntimeRuntimeFlagResponse
 
 export function useRuntimeFlagsPanel(props: Readonly<{ runtimeId: string; autoLoad: boolean }>) {
   const queried = ref(false)
   const includeHistory = ref(false)
   const revealed = ref(new Set<string>())
   const pagination = useOffsetPagination<RuntimeFlag>(async ({ offset, limit }) => {
-    const { data, error } = await adminListRuntimeFlags({ path: { runtimeInstanceId: props.runtimeId },
-      query: { includeHistory: includeHistory.value, offset, limit, desc: true } })
-    if (error || !data) throw parseApiError(error, translate('runtimeFlags.failed'))
+    let error: unknown;
+    const data = await api.api.v1.admin.runtimes.byRuntimeInstanceId(props.runtimeId).flags.get({ queryParameters: { includeHistory: includeHistory.value, offset, limit, desc: true } }).catch(cause => { error = cause; return undefined });
+    if (error || !data) throw parseApiError(error, describeMessage('runtimeFlags.failed'))
     return { items: data.items ?? [], total: data.total ?? 0 }
   })
   function load() {
@@ -60,9 +62,9 @@ export function useRuntimeFlagsPanel(props: Readonly<{ runtimeId: string; autoLo
     if (!item.flag?.flag) return
     try {
       await navigator.clipboard.writeText(item.flag.flag)
-      toast.success(translate('ui.copiedToClipboard'))
+      toast.success(describeMessage('common.label.copiedClipboard'))
     }
-    catch { toast.error(translate('ui.copyFailedPleaseManuallySelectCopy')) }
+    catch { toast.error(describeMessage('common.kohPanel.error.copyManuallySelectFailed')) }
   }
   return { queried, includeHistory, rows, load, toggle, copy, adminFormatDateTime,
     loading: pagination.loading, error: computed(() => pagination.error.value?.message ?? null),

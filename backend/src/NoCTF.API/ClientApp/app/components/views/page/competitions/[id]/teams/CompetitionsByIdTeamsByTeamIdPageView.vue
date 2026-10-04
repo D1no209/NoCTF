@@ -30,13 +30,13 @@ const { competitionId, team, loading, error, TeamMembers } = toRefs(viewProps.st
           {{ teamRegistrationStatusLabel(team.registrationStatus) }}
         </Badge>
         <Badge variant="outline">{{ team.trackName ?? team.trackKey }}</Badge>
-        <Badge v-if="team.isBanned" variant="destructive">{{ $t('ui.banned2') }}</Badge>
+        <Badge v-if="team.isBanned" variant="destructive">{{ $t('common.label.banned') }}</Badge>
       </div>
-      <p class="text-sm text-muted-foreground">{{ $t('ui.registeredAt', { time: formatDateTime(team.registeredAt) }) }}</p>
+      <p class="text-sm text-muted-foreground">{{ $t('competitions.label.registered', { time: formatDateTime(team.registeredAt) }) }}</p>
 
       <Card>
         <CardHeader>
-          <CardTitle class="text-base">{{ $t('ui.members3', { count: team.memberIds?.length ?? 0 }) }}</CardTitle>
+          <CardTitle class="text-base">{{ $t('common.label.members.teamPageView', { count: team.memberIds?.length ?? 0 }) }}</CardTitle>
         </CardHeader>
         <CardContent>
           <component :is="TeamMembers" :competition-id="competitionId" :team="team" />

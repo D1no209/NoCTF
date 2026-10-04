@@ -9,7 +9,7 @@ const { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn
 <template>
   <ScrollDock v-if="competition" :label="$t('competitionBrowser.details')">
     <template #backdrop>
-      <CoverImage :src="posterUrl" :alt="$t('ui.competitionPoster')" loading="eager" fetchpriority="high" class="h-full">
+      <CoverImage :src="posterUrl" :alt="$t('common.label.competitionPoster')" loading="eager" fetchpriority="high" class="h-full">
         <div class="h-full" />
       </CoverImage>
     </template>
@@ -29,7 +29,7 @@ const { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn
           </Hint>
           <div data-scroll-dock-secondary class="flex w-fit max-w-full flex-col gap-3">
           <div class="flex flex-wrap items-center gap-2">
-            <component :is="LifecycleBadge" :status="competition.status" />
+            <component :is="LifecycleBadge" :status="competition.status ?? undefined" />
             <Badge v-if="competition.accessMode === 'StaffOnly'" variant="secondary">
               <EyeOff class="size-3" />{{ $t('competitionAccess.badge') }}
             </Badge>
@@ -42,10 +42,10 @@ const { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn
 
 
           <p v-if="practiceOpen" class="text-sm text-muted-foreground">
-            {{ $t('ui.postCompetitionPracticeIsOpenToApprovedNonBannedParticipating') }}
+            {{ $t('competitions.competitionOverview.description.postCompetitionPracticeOpen') }}
           </p>
 
-          <FieldDescription v-if="myTeam && tracksEnabled">{{ $t('ui.currentTrack', { track: myTeam.trackName ?? myTeam.trackKey ?? '-' }) }}</FieldDescription>
+          <FieldDescription v-if="myTeam && tracksEnabled">{{ $t('competitions.label.track', { track: myTeam.trackName ?? myTeam.trackKey ?? '-' }) }}</FieldDescription>
 
           </div>
           <div v-if="countdown" data-scroll-dock-item data-scroll-dock-order="1" data-scroll-dock-scale="0.82" class="flex w-fit max-w-full flex-wrap items-end gap-x-3 gap-y-1">
@@ -67,7 +67,7 @@ const { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn
             <template v-else-if="!isLoggedIn">
               <Button as-child>
                 <NuxtLink :to="{ path: '/auth/login', query: { redirect: competitionPath(competitionId) } }">
-                  <LogIn data-icon="inline-start" /> {{ practiceOpen ? $t('ui.signInToPractice') : $t('ui.signUpAfterLoginRegister') }} </NuxtLink>
+                  <LogIn data-icon="inline-start" /> {{ practiceOpen ? $t('competitions.label.signPractice') : $t('competitions.competitionOverview.label.signLoginRegister') }} </NuxtLink>
               </Button>
             </template>
 
@@ -76,7 +76,7 @@ const { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn
                 <AlertDescription class="flex items-center gap-3">
                   <span>{{ $message(teamLoadError) }}</span>
                   <Button type="button" size="sm" variant="outline" @click="loadMyTeam">
-                    {{ $t('ui.retry') }}
+                    {{ $t('common.label.retry') }}
                   </Button>
                 </AlertDescription>
               </Alert>
@@ -86,39 +86,39 @@ const { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn
               <Dialog v-if="teamRegistrationOpen" v-model:open="createOpen">
                 <DialogTrigger as-child>
                   <Button>
-                    <UserPlus data-icon="inline-start" /> {{ practiceOpen ? $t('ui.createPracticeTeam') : $t('ui.signUpNow') }} </Button>
+                    <UserPlus data-icon="inline-start" /> {{ practiceOpen ? $t('competitions.label.createPracticeTeam') : $t('competitions.label.signNow') }} </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>{{ $t('ui.createATeam') }}</DialogTitle>
-                    <DialogDescription>{{ $t('ui.afterTheTeamIsCreatedYouBecomeTheLeaderAnd') }}</DialogDescription>
+                    <DialogTitle>{{ $t('competitions.label.createTeam') }}</DialogTitle>
+                    <DialogDescription>{{ $t('competitions.competitionOverview.description.teamCreatedBecomeLeader') }}</DialogDescription>
                   </DialogHeader>
                   <UiForm validation="feature" @submit.prevent="submitCreate">
                     <FieldGroup>
                       <Field>
-                        <FieldLabel for="team-name">{{ $t('ui.teamName2') }}</FieldLabel>
+                        <FieldLabel for="team-name">{{ $t('competitions.label.teamName') }}</FieldLabel>
                         <Input id="team-name" v-model="createName" required maxlength="64" />
                       </Field>
                       <Field v-if="tracksEnabled && !tracksLoaded">
                         <Skeleton class="h-10 w-full" />
-                        <FieldDescription>{{ $t('ui.loadingAvailableCompetitionTracks') }}</FieldDescription>
+                        <FieldDescription>{{ $t('competitions.label.loadingAvailableCompetitionTracks') }}</FieldDescription>
                       </Field>
                       <Field v-else-if="tracksEnabled && trackLoadError">
                         <Alert variant="destructive">
                           <AlertDescription class="flex items-center justify-between gap-3">
                             <span>{{ $message(trackLoadError) }}</span>
                             <Button type="button" size="sm" variant="outline" @click="loadRegistrationOptions">
-                              {{ $t('ui.retry') }}
+                              {{ $t('common.label.retry') }}
                             </Button>
                           </AlertDescription>
                         </Alert>
                       </Field>
                       <Field v-else-if="tracksEnabled && selectableTracks.length > 0">
-                        <FieldLabel for="team-track">{{ $t('ui.competitionTrack') }}</FieldLabel>
+                        <FieldLabel for="team-track">{{ $t('competitions.label.competitionTrack') }}</FieldLabel>
                         <Select v-model="createTrackKey" required>
-                          <SelectTrigger id="team-track"><SelectValue :placeholder="$t('ui.selectATrack')" /></SelectTrigger>
+                          <SelectTrigger id="team-track"><SelectValue :placeholder="$t('common.label.selectTrack')" /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem v-for="track in selectableTracks" :key="track.key" :value="track.key!">
+                            <SelectItem v-for="track in selectableTracks" :key="track.key ?? undefined" :value="track.key!">
                               <span class="flex items-center gap-2">
                                 <span>{{ track.name }}</span>
                                 <Badge v-if="track.requiredSsoProviderId" variant="outline">{{ track.requiredSsoProviderName }}</Badge>
@@ -126,15 +126,15 @@ const { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn
                             </SelectItem>
                           </SelectContent>
                         </Select>
-                        <FieldDescription>{{ $t('ui.selectTheTrackThisTeamWillEnterCompetitionAdministratorsCan') }}</FieldDescription>
+                        <FieldDescription>{{ $t('competitions.competitionOverview.description.selectTrackTeamEnter') }}</FieldDescription>
                       </Field>
                       <Field v-else-if="tracksEnabled">
                         <Alert variant="destructive">
-                          <AlertDescription>{{ $t('ui.noCompetitionTracksAreCurrentlyOpenForRegistration') }}</AlertDescription>
+                          <AlertDescription>{{ $t('competitions.competitionOverview.description.competitionTracksCurrentlyOpen') }}</AlertDescription>
                         </Alert>
                       </Field>
                       <FieldDescription v-if="tracksEnabled && (selectedCreateTrack?.requiredSsoProviderId || selectedCreateTrack?.requiresInvitationCode)">
-                        {{ $t('ui.trackRequirementsCheckedOnRegistration') }}
+                        {{ $t('competitions.competitionOverview.label.trackRequirementsCheckedRegistration') }}
                       </FieldDescription>
                       <p v-if="createValidationError" role="alert" class="text-sm text-destructive">
                         {{ $message(createValidationError) }}
@@ -145,7 +145,7 @@ const { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn
                           class="w-full"
                           :disabled="createPending || (tracksEnabled && (!tracksLoaded || Boolean(trackLoadError) || selectableTracks.length === 0))"
                         >
-                          <Spinner v-if="createPending" data-icon="inline-start" /> {{ $t('ui.create') }} </Button>
+                          <Spinner v-if="createPending" data-icon="inline-start" /> {{ $t('common.action.create') }} </Button>
                       </Field>
                     </FieldGroup>
                   </UiForm>
@@ -153,29 +153,29 @@ const { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn
               </Dialog>
 
               <Alert v-else class="w-auto">
-                <AlertDescription>{{ $t('ui.newTeamCreationIsClosedForTheCurrentCompetitionStage') }}</AlertDescription>
+                <AlertDescription>{{ $t('competitions.competitionOverview.description.newTeamCreationClosed') }}</AlertDescription>
               </Alert>
 
               <Dialog v-model:open="joinOpen">
                 <DialogTrigger as-child>
                   <Button variant="outline">
-                    <KeyRound data-icon="inline-start" /> {{ $t('ui.joinWithInvitationCode') }} </Button>
+                    <KeyRound data-icon="inline-start" /> {{ $t('competitions.label.joinInvitationCode') }} </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>{{ $t('ui.joinTheTeam') }}</DialogTitle>
-                    <DialogDescription>{{ $t('ui.enterThe32DigitInvitationCodeSharedWithYouBy') }}</DialogDescription>
+                    <DialogTitle>{{ $t('competitions.label.joinTeam') }}</DialogTitle>
+                    <DialogDescription>{{ $t('competitions.competitionOverview.description.enterDigitInvitationCode') }}</DialogDescription>
                   </DialogHeader>
                   <UiForm @submit.prevent="submitJoin">
                     <FieldGroup>
                       <Field>
-                        <FieldLabel for="invitation-token">{{ $t('ui.invitationCode') }}</FieldLabel>
+                        <FieldLabel for="invitation-token">{{ $t('competitions.label.invitationCode') }}</FieldLabel>
                         <Input id="invitation-token" v-model="joinToken" required minlength="32" maxlength="32" autocomplete="off" />
                       </Field>
                       <p v-if="joinValidationError" role="alert" class="text-sm text-destructive">{{ $message(joinValidationError) }}</p>
                       <Field>
                         <Button type="submit" class="w-full" :disabled="joinPending">
-                          <Spinner v-if="joinPending" data-icon="inline-start" /> {{ $t('ui.join') }} </Button>
+                          <Spinner v-if="joinPending" data-icon="inline-start" /> {{ $t('competitions.label.join') }} </Button>
                       </Field>
                     </FieldGroup>
                   </UiForm>
@@ -185,20 +185,20 @@ const { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn
 
             <template v-else>
               <Button v-if="canParticipate" as-child>
-                <NuxtLink :to="`/competitions/${competitionId}/challenges`"> {{ practiceOpen ? $t('ui.enterPractice') : $t('ui.enterTheCompetition') }} <ArrowRight data-icon="inline-end" />
+                <NuxtLink :to="`/competitions/${competitionId}/challenges`"> {{ practiceOpen ? $t('competitions.label.enterPractice') : $t('competitions.label.enterCompetition') }} <ArrowRight data-icon="inline-end" />
                 </NuxtLink>
               </Button>
               <Dialog v-if="canSubmitRegistration" :open="registrationOpen" @update:open="setRegistrationOpen">
                 <DialogTrigger as-child>
                   <Button @click="openRegistration">
-                    <ShieldCheck data-icon="inline-start" />{{ $t('ui.submitRegistration') }}
+                    <ShieldCheck data-icon="inline-start" />{{ $t('competitions.label.submitRegistration') }}
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>{{ $t('ui.submitRegistration') }}</DialogTitle>
+                    <DialogTitle>{{ $t('competitions.label.submitRegistration') }}</DialogTitle>
                     <DialogDescription>
-                      {{ requiresManualReview ? $t('ui.registrationWillEnterPendingReview') : $t('ui.registrationWillBeAutomaticallyApproved') }}
+                      {{ requiresManualReview ? $t('competitions.competitionOverview.label.registrationEnterPendingReview') : $t('competitions.competitionOverview.label.registrationAutomaticallyApproved') }}
                     </DialogDescription>
                   </DialogHeader>
                   <UiForm validation="feature" @submit.prevent="submitRegistration">
@@ -208,25 +208,25 @@ const { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn
                       </Alert>
                       <Field v-if="tracksEnabled && !tracksLoaded">
                         <Skeleton class="h-10 w-full" />
-                        <FieldDescription>{{ $t('ui.loadingAvailableCompetitionTracks') }}</FieldDescription>
+                        <FieldDescription>{{ $t('competitions.label.loadingAvailableCompetitionTracks') }}</FieldDescription>
                       </Field>
                       <Alert v-else-if="tracksEnabled && trackLoadError" variant="destructive">
                         <AlertDescription class="flex items-center justify-between gap-3">
                           <span>{{ $message(trackLoadError) }}</span>
                           <Button type="button" size="sm" variant="outline" @click="loadRegistrationOptions">
-                            {{ $t('ui.retry') }}
+                            {{ $t('common.label.retry') }}
                           </Button>
                         </AlertDescription>
                       </Alert>
                       <Field v-else-if="tracksEnabled && registrationTrack">
-                        <FieldLabel>{{ $t('ui.competitionTrack') }}</FieldLabel>
+                        <FieldLabel>{{ $t('competitions.label.competitionTrack') }}</FieldLabel>
                         <div class="flex items-center gap-2">
                           <span class="font-medium">{{ registrationTrack.name ?? myTeam?.trackName ?? myTeam?.trackKey }}</span>
                           <Badge v-if="registrationTrack.requiredSsoProviderId" variant="outline">{{ registrationTrack.requiredSsoProviderName }}</Badge>
                         </div>
                       </Field>
                       <Alert v-else-if="tracksEnabled" variant="destructive">
-                        <AlertDescription>{{ $t('ui.noCompetitionTracksAreCurrentlyOpenForRegistration') }}</AlertDescription>
+                        <AlertDescription>{{ $t('competitions.competitionOverview.description.competitionTracksCurrentlyOpen') }}</AlertDescription>
                       </Alert>
                       <Alert v-if="registrationTrack?.meetsSsoRequirement === false">
                         <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
@@ -237,7 +237,7 @@ const { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn
                         </AlertDescription>
                       </Alert>
                       <Field v-if="registrationTrack?.requiresInvitationCode">
-                        <FieldLabel for="competition-registration-track-code">{{ $t('ui.trackInvitationCode') }}</FieldLabel>
+                        <FieldLabel for="competition-registration-track-code">{{ $t('common.label.trackInvitationCode') }}</FieldLabel>
                         <Input
                           id="competition-registration-track-code"
                           v-model="registrationInvitationCode"
@@ -248,19 +248,19 @@ const { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn
                         />
                       </Field>
                       <Button type="submit" :disabled="registrationPending || !registrationValid">
-                        <Spinner v-if="registrationPending" data-icon="inline-start" />{{ $t('ui.submitRegistration') }}
+                        <Spinner v-if="registrationPending" data-icon="inline-start" />{{ $t('competitions.label.submitRegistration') }}
                       </Button>
                     </FieldGroup>
                   </UiForm>
                 </DialogContent>
               </Dialog>
               <Button as-child variant="outline">
-                <NuxtLink :to="`/competitions/${competitionId}/my/team`">{{ $t('ui.myTeam') }}</NuxtLink>
+                <NuxtLink :to="`/competitions/${competitionId}/my/team`">{{ $t('competitions.label.myTeam') }}</NuxtLink>
               </Button>
             </template>
             </template>
             <Button v-if="isAdministrator" as-child variant="outline">
-              <NuxtLink :to="`/admin/competitions/${competitionId}`"><Settings data-icon="inline-start" />{{ $t('ui.manageCompetition') }}</NuxtLink>
+              <NuxtLink :to="`/admin/competitions/${competitionId}`"><Settings data-icon="inline-start" />{{ $t('competitions.label.manageCompetition') }}</NuxtLink>
             </Button>
           </div>
           </div>
@@ -268,37 +268,37 @@ const { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn
           <div class="flex items-center justify-between gap-4">
             <dt class="flex items-center gap-2 text-xs text-muted-foreground">
               <Users class="size-3.5" />
-              {{ $t('ui.teamSizeLimit2') }}
+              {{ $t('competitions.label.teamSizeLimit') }}
             </dt>
             <dd class="font-mono text-sm tabular-nums">
-              {{ $t('ui.members4', { count: competition.maxTeamMembers ?? '-' }) }}
+              {{ $t('competitions.label.members.competitionOverviewView', { count: competition.maxTeamMembers ?? '-' }) }}
             </dd>
           </div>
           <div class="flex items-center justify-between gap-4">
             <dt class="flex items-center gap-2 text-xs text-muted-foreground">
               <Box class="size-3.5" />
-              {{ $t('ui.concurrentEnvironments') }}
+              {{ $t('competitions.label.concurrentEnvironments') }}
             </dt>
             <dd class="font-mono text-sm tabular-nums">
-              {{ $t('ui.message2', { count: competition.maxConcurrentRuntimeInstancesPerTeam ?? '-' }) }}
+              {{ $t('competitions.runtime.limitValue', { count: competition.maxConcurrentRuntimeInstancesPerTeam ?? '-' }) }}
             </dd>
           </div>
           <div class="flex items-center justify-between gap-4">
             <dt class="flex items-center gap-2 text-xs text-muted-foreground">
               <ShieldCheck class="size-3.5" />
-              {{ $t('ui.approval') }}
+              {{ $t('competitions.label.approval') }}
             </dt>
             <dd class="text-sm">
-              {{ competition.teamRegistrationAutoApprove ? $t('ui.registrationAutomaticallyPasses') : $t('ui.registrationIsSubjectToReview') }}
+              {{ competition.teamRegistrationAutoApprove ? $t('competitions.label.registrationAutomaticallyPasses') : $t('competitions.competitionOverview.label.registrationSubjectReview') }}
             </dd>
           </div>
           <div v-if="approvedTeamCount !== null" class="flex items-center justify-between gap-4">
             <dt class="flex items-center gap-2 text-xs text-muted-foreground">
               <Trophy class="size-3.5" />
-              {{ $t('ui.registeredTeams') }}
+              {{ $t('competitions.label.registeredTeams') }}
             </dt>
             <dd class="font-mono text-sm tabular-nums">
-              {{ $t('ui.teams3', { count: approvedTeamCount }) }}
+              {{ $t('competitions.label.teams', { count: approvedTeamCount }) }}
             </dd>
           </div>
         </dl>
@@ -306,33 +306,33 @@ const { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn
       </div>
     </template>
       <div data-slot="competition-overview-body" class="flex flex-col gap-6">
-        <Alert v-if="detailError" variant="destructive"><AlertDescription>{{ $message(detailError) }}<Button variant="outline" size="sm" @click="refreshCompetition">{{ $t('ui.retry') }}</Button></AlertDescription></Alert>
+        <Alert v-if="detailError" variant="destructive"><AlertDescription>{{ $message(detailError) }}<Button variant="outline" size="sm" @click="refreshCompetition">{{ $t('common.label.retry') }}</Button></AlertDescription></Alert>
 
         <!-- 我的队伍状态提示 -->
         <Alert v-if="myTeam && myTeam.registrationStatus === 'Pending'">
           <ShieldCheck class="size-4" />
           <AlertDescription>
-            {{ $t('ui.teamSRegistrationWasSubmittedYouCanCompeteAfterOrganizer', { team: myTeam.name ?? '-' }) }}
+            {{ $t('competitions.competitionOverview.description.teamSRegistrationWas', { team: myTeam.name ?? '-' }) }}
           </AlertDescription>
         </Alert>
         <Alert v-else-if="myTeam && myTeam.registrationStatus === 'Rejected'" variant="destructive">
           <AlertDescription>
-            {{ $t('ui.message11') }}{{ myTeam.name }}{{ $t('ui.message12') }}{{ isCaptain ? $t('ui.youCanModifyTheInformationOnTheMyTeamPage') : '' }}。
+            {{ $t('competitions.registration.teamPrefix') }}{{ myTeam.name }}{{ $t('competitions.registration.rejectedSuffix') }}{{ isCaptain ? $t('competitions.competitionOverview.description.modifyInformationMyTeam') : '' }}。
           </AlertDescription>
         </Alert>
         <Alert v-else-if="myTeam?.isBanned" variant="destructive">
-          <AlertDescription>{{ $t('ui.teamHasBeenBannedContactTheOrganizersIfYouWant', { team: myTeam.name ?? '-' }) }}</AlertDescription>
+          <AlertDescription>{{ $t('competitions.competitionOverview.description.teamBannedContactOrganizers', { team: myTeam.name ?? '-' }) }}</AlertDescription>
         </Alert>
 
         <!-- 竞赛介绍 -->
-        <section class="border-t px-6 py-6 sm:px-8" :aria-label="$t('ui.competitionIntroduction')">
+        <section class="border-t px-6 py-6 sm:px-8" :aria-label="$t('competitions.label.competitionIntroduction')">
           <header class="mb-4">
             <h3 class="flex items-center gap-2 text-base font-semibold">
-              <FileText class="size-4" /> {{ $t('ui.competitionIntroduction') }} </h3>
+              <FileText class="size-4" /> {{ $t('competitions.label.competitionIntroduction') }} </h3>
           </header>
           <div>
             <MarkdownContent v-if="competition.description" :source="competition.description" />
-            <p v-else class="text-sm text-muted-foreground">{{ $t('ui.theOrganizersHaveNotYetFilledOutTheCompetitionDescription') }}</p>
+            <p v-else class="text-sm text-muted-foreground">{{ $t('competitions.competitionOverview.description.organizersYetFilledOut') }}</p>
           </div>
         </section>
       </div>

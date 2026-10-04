@@ -47,9 +47,9 @@ public sealed class UpdateChallengeHintEndpoint(
             return TypedResults.NotFound();
         return result.Succeeded
             ? TypedResults.Ok(ChallengeHintMapping.ToResponse(result.Value!))
-            : TypedResults.Problem(
+            : ApiProblems.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
-                title: "Hint was not updated.",
-                detail: result.ErrorMessage);
+                title: ApiMessages.Get(ApiMessageId.UpdateChallengeHintTitleHintWasUpdated),
+                detail: ApiMessages.For(result.FailureCode));
     }
 }

@@ -1,20 +1,24 @@
+import { dateObject } from '../../../../utils/date-value'
+
+import { api, nativeResponse } from '../../../../lib/api'
+import { message as describeMessage } from '../../../../utils/i18n'
 import { adminUserPath, adminTeamPath, adminAuditSubjectPath } from '~/features/admin/admin-navigation'
 import { markRaw } from 'vue'
 
 import { Download } from '@lucide/vue'
-import { toast } from 'vue-sonner'
-import { adminExportPlatformAuditArchive, adminPlatformListAuditLogs } from '../../../../api'
-import type { NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse, NoCtfapiEndpointsAdministrationPlatformPlatformAuditKindProtocol } from '../../../../api'
+import { toast } from '../../../../utils/message-toast'
+
+import type { NoCTFAPIEndpointsAdministrationPlatformPlatformAuditLogResponse, NoCTFAPIEndpointsAdministrationPlatformPlatformAuditKindProtocol } from '../../../../api/models'
 import { downloadSdkFile } from '../../../../utils/download'
 import { platformAuditActionText } from '../../../../utils/platform-audit'
 import AdminDateTimeComponent from '../../../admin/AdminDateTime.vue'
 
-type AuditLog = NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse
+type AuditLog = NoCTFAPIEndpointsAdministrationPlatformPlatformAuditLogResponse
 
 /** Owns state, effects and commands for AdminPlatformAuditPage. */
 export function useAdminPlatformAuditPage() {
   const KIND_LABELS: Record<string, string> = {
-    CompetitionLifecycle: "ui.competitionLifeCycle", UserAccountLifecycle: "ui.accountLifeCycle", PlatformAdministration: "ui.platformAdmin", CompetitionAdministration: "ui.competitionAdmin", CompetitionLeaderboardVisibility: "ui.listVisibility", CompetitionEvent: "ui.competitionEvent",
+    CompetitionLifecycle: "administration.label.competitionLifeCycle", UserAccountLifecycle: "administration.label.accountLifeCycle", PlatformAdministration: "common.label.platformAdmin", CompetitionAdministration: "navigation.competitionAdmin", CompetitionLeaderboardVisibility: "administration.label.listVisibility", CompetitionEvent: "administration.label.competitionEvent",
   }
 
   const kind = ref('all')
@@ -34,19 +38,18 @@ export function useAdminPlatformAuditPage() {
   }
 
   const { items, loading, error: listError, hasMore, initialized, loadMore, reset } = useCursorPagination<AuditLog>(async (cursor) => {
-    const { data, error } = await adminPlatformListAuditLogs({
-      query: {
-        kind: kind.value === 'all'
+    let error: unknown;
+    const data = await api.api.v1.admin.platform.auditLogs.get({ queryParameters: {
+        kind: (kind.value === 'all'
           ? null
-          : kind.value as NoCtfapiEndpointsAdministrationPlatformPlatformAuditKindProtocol,
-        from: toIso(from.value),
-        to: toIso(to.value),
-        actorId: actorId.value.trim() || null,
-        competitionId: competitionId.value.trim() || null,
-        cursor,
+          : kind.value as NoCTFAPIEndpointsAdministrationPlatformPlatformAuditKindProtocol) ?? undefined,
+        from: dateObject(toIso(from.value) ?? undefined),
+        to: dateObject(toIso(to.value) ?? undefined),
+        actorId: actorId.value.trim() || undefined,
+        competitionId: competitionId.value.trim() || undefined,
+        cursor: cursor ?? undefined,
         limit: 50,
-      },
-    })
+      } }).catch(cause => { error = cause; return undefined });
     if (error || !data) throw parseApiError(error)
     return { items: data.items ?? [], nextCursor: data.nextCursor ?? null }
   })
@@ -63,24 +66,21 @@ export function useAdminPlatformAuditPage() {
     exportingArchive.value = true
     try {
       await downloadSdkFile(
-        adminExportPlatformAuditArchive({
-          body: {
+        nativeResponse(responseOptions => api.api.v1.admin.platform.auditLogs.dataExport.post({
             kind: kind.value === 'all'
               ? null
-              : kind.value as NoCtfapiEndpointsAdministrationPlatformPlatformAuditKindProtocol,
+              : kind.value as NoCTFAPIEndpointsAdministrationPlatformPlatformAuditKindProtocol,
             actorId: actorId.value.trim() || null,
             competitionId: competitionId.value.trim() || null,
-            from: toIso(from.value),
-            to: toIso(to.value),
-          },
-          parseAs: 'blob',
-        }),
+            from: dateObject(toIso(from.value)),
+            to: dateObject(toIso(to.value)),
+          }, { options: [...responseOptions] })),
         'platform-audit-archive.zip',
       )
-      toast.success(translate("ui.theAuditArchiveDownloadHasStarted"))
+      toast.success(describeMessage("administration.platformAudit.description.auditArchiveDownloadStarted"))
     }
     catch (e) {
-      toast.error(parseApiError(e).message)
+      toast.error(parseApiError(e).displayMessage)
     }
     finally {
       exportingArchive.value = false

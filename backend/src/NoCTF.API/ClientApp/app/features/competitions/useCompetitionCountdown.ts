@@ -1,12 +1,12 @@
 import { toRefs } from 'vue'
 
-import type { NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol } from '../../api'
+import type { NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol } from '../../api/models'
 
 /** Owns state, effects and commands for CompetitionCountdown. */
 export function useCompetitionCountdown(props: Readonly<{
-  startTime?: string
-  endTime?: string
-  status?: NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol
+  startTime?: string | null
+  endTime?: string | null
+  status?: NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol | null
 }>) {
   const now = ref(Date.now())
 
@@ -25,10 +25,10 @@ export function useCompetitionCountdown(props: Readonly<{
   const text = computed(() => {
     const start = props.startTime ? new Date(props.startTime).getTime() : null
     const end = props.endTime ? new Date(props.endTime).getTime() : null
-    if (props.status === 'Finished') return translate("ui.finished")
-    if (start !== null && now.value < start) return translate("ui.startsIn", { duration: formatDuration(start - now.value) })
-    if (end !== null && now.value < end) return translate("ui.endsIn", { duration: formatDuration(end - now.value) })
-    if (end !== null) return translate("ui.finished")
+    if (props.status === 'Finished') return translate("common.label.finished")
+    if (start !== null && now.value < start) return translate("competitions.label.starts", { duration: formatDuration(start - now.value) })
+    if (end !== null && now.value < end) return translate("competitions.label.ends", { duration: formatDuration(end - now.value) })
+    if (end !== null) return translate("common.label.finished")
     return ''
   })
 

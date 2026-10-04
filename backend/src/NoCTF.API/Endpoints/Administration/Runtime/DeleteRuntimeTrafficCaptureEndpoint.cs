@@ -13,7 +13,12 @@ public sealed class DeleteRuntimeTrafficCaptureRequest
     public Guid RuntimeInstanceId { get; set; }
 }
 
-public sealed record RuntimeTrafficCaptureConflictResponse(string Detail);
+public sealed record RuntimeTrafficCaptureConflictResponse(string Detail)
+{
+    public string Detail { get; init; } = ApiMessages.Localize(ApiMessageId.RuntimeTrafficCaptureConflict, Detail);
+    public string MessageKey => ApiMessages.Key(ApiMessageId.RuntimeTrafficCaptureConflict);
+    public IReadOnlyDictionary<string, object?> MessageArguments => ApiMessages.NoArguments;
+}
 
 public sealed class DeleteRuntimeTrafficCaptureEndpoint(
     ManageRuntimeTrafficCaptures captures,
@@ -29,7 +34,7 @@ public sealed class DeleteRuntimeTrafficCaptureEndpoint(
         Delete("/admin/competitions/{competitionId}/traffic-captures/{runtimeInstanceId}");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("AdminDeleteRuntimeTrafficCapture"));
-        Summary(summary => summary.Summary = "Deletes one terminal Runtime capture.");
+        Summary(summary => { summary.Summary = "Deletes one terminal Runtime capture."; summary.Description = summary.Summary; });
     }
 
     public override async Task<Results<NoContent, NotFound, ForbidHttpResult,

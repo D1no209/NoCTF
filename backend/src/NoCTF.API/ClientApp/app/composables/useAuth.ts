@@ -1,11 +1,9 @@
-import {
-  getMeEndpoint,
-  loginEndpoint,
-  logoutAllEndpoint,
-  logoutEndpoint,
-  authenticationSsoCompleteLogin,
-} from '../api'
-import type { NoCtfapiEndpointsAuthenticationCurrentUserResponse } from '../api'
+
+import { api } from '../lib/api'
+
+
+
+import type { NoCTFAPIEndpointsAuthenticationCurrentUserResponse } from '../api/models'
 import {
   beginImpersonationAccessToken,
   clearImpersonationAccessToken,
@@ -15,7 +13,7 @@ import {
   setAccessToken,
 } from '../lib/session'
 
-export type CurrentUser = NoCtfapiEndpointsAuthenticationCurrentUserResponse
+export type CurrentUser = NoCTFAPIEndpointsAuthenticationCurrentUserResponse
 
 export type ImpersonationSession = {
   administratorUserId: string
@@ -49,7 +47,8 @@ export function useAuth() {
   }
 
   async function fetchMe(): Promise<void> {
-    const { data, error } = await getMeEndpoint()
+    let error: unknown;
+    const data = await api.api.v1.auth.me.get().catch(cause => { error = cause; return undefined });
     if (error || !data) {
       user.value = null
       setAccessToken(null)
@@ -75,10 +74,8 @@ export function useAuth() {
     password: string,
     humanVerificationHeaders: Record<string, string>,
   ): Promise<void> {
-    const { data, error } = await loginEndpoint({
-      headers: humanVerificationHeaders,
-      body: { login, password },
-    })
+    let error: unknown;
+    const data = await api.api.v1.auth.login.post({ login, password }, { headers: humanVerificationHeaders }).catch(cause => { error = cause; return undefined });
     if (error || !data?.accessToken) {
       throw parseApiError(error)
     }
@@ -91,7 +88,7 @@ export function useAuth() {
       await endImpersonation()
       return
     }
-    await logoutEndpoint().catch(() => undefined)
+    await api.api.v1.auth.logout.post().catch(() => undefined)
     invalidate()
     await navigateTo('/')
   }
@@ -102,15 +99,14 @@ export function useAuth() {
       await endImpersonation()
       return
     }
-    await logoutAllEndpoint().catch(() => undefined)
+    await api.api.v1.auth.logoutAll.post().catch(() => undefined)
     invalidate()
     await navigateTo('/auth/login')
   }
 
   async function completeSsoLogin(flowId: string): Promise<string> {
-    const { data, error } = await authenticationSsoCompleteLogin({
-      path: { flowId },
-    })
+    let error: unknown;
+    const data = await api.api.v1.auth.sso.flows.byFlowId(flowId).completeLogin.post().catch(cause => { error = cause; return undefined });
     if (error || !data?.accessToken)
       throw parseApiError(error)
     setAccessToken(data.accessToken)
@@ -127,11 +123,11 @@ export function useAuth() {
   }): Promise<void> {
     const administrator = user.value
     if (!administrator?.userId || administrator.role !== 'Administrator')
-      throw new Error(translate("ui.administratorSessionRequired"))
+      throw new Error(translate("common.validation.administratorSessionRequired"))
     if (impersonation.value)
-      throw new Error(translate("ui.identitySwitchAlreadyActive"))
+      throw new Error(translate("common.label.identitySwitchAlreadyActive"))
     if (!beginImpersonationAccessToken(input.accessToken, input.expiresAt))
-      throw new Error(translate("ui.administratorSessionRequired"))
+      throw new Error(translate("common.validation.administratorSessionRequired"))
     impersonation.value = {
       administratorUserId: administrator.userId,
       administratorUserName: administrator.userName ?? administrator.userId,
@@ -143,7 +139,7 @@ export function useAuth() {
     await fetchMe()
     if (user.value?.userId !== input.targetUserId) {
       await endImpersonation()
-      throw new Error(translate("ui.impersonatedIdentityCouldNotBeVerified"))
+      throw new Error(translate("common.auth.description.impersonatedIdentityCouldVerified"))
     }
     await navigateTo('/')
   }

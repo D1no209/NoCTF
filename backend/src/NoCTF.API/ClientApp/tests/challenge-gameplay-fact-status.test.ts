@@ -1,11 +1,11 @@
 import { describe, expect, test } from 'bun:test'
-import type { NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse } from '../app/api'
+import type { NoCTFAPIEndpointsGameplayFactsGameplayFactStatusResponse } from '../app/api/models'
 import { createChallengeGameplayFactStatusReader } from '../app/features/challenges/challenge-gameplay-fact-status'
 
 describe('challenge gameplay fact status reads', () => {
   test('shares one pending request for the same competition and fact', async () => {
     let calls = 0
-    let complete!: (status: NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse) => void
+    let complete!: (status: NoCTFAPIEndpointsGameplayFactsGameplayFactStatusResponse) => void
     const reader = createChallengeGameplayFactStatusReader(undefined, () => {
       calls++
       if (calls > 1) return Promise.resolve({ state: 'Completed', result: 'Correct' })

@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { bindViewState } from '~/features/shared/view-state'
-import type { NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol } from '~/api'
+import type { NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol } from '~/api/models'
 
 import { useCompetitionStatusBadge } from './useCompetitionStatusBadge'
 import View from '~/components/views/admin/CompetitionStatusBadgeView.vue'
 
-const props = defineProps<{ status?: NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol | null }>()
+const props = defineProps<{ status?: NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol | null }>()
 const state = bindViewState(useCompetitionStatusBadge(props))
 
 </script>

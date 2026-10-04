@@ -19,7 +19,7 @@ public sealed class PreviewTeamWriteUpEndpoint(
             NoCTF.Application.Observability.ApiRequestKind.Download)));
         Description(builder => builder
             .WithName("PreviewTeamWriteUp")
-            .Produces<TeamWriteUpBinaryResponse>(
+            .Produces<byte[]>(
                 StatusCodes.Status200OK,
                 TeamWriteUpRules.ContentType)
             .Produces(StatusCodes.Status401Unauthorized));

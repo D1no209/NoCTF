@@ -15,6 +15,12 @@ public sealed class GetCompetitionBadgeImageEndpoint(ManageCompetitionBadges bad
 {
     public override void Configure()
     {
+        Summary(summary =>
+        {
+            summary.Summary = "Streams the image belonging to a visible competition badge.";
+            summary.Description = summary.Summary;
+        });
+
         Get("/competitions/{competitionId}/badges/{badgeId}/image");
         AllowAnonymous();
         Description(builder => builder.WithName("GetCompetitionBadgeImage"));

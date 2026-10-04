@@ -17,8 +17,7 @@ public sealed class AdminUnbindSsoIdentityEndpoint(
         AuthSchemes("Bearer");
         Roles("Administrator");
         Description(builder => builder.WithName("AdminPlatformUnbindSsoIdentity"));
-        Summary(summary => summary.Summary =
-            "Removes a user's external identity binding and revokes their sessions.");
+        Summary(summary => { summary.Summary = "Removes a user's external identity binding and revokes their sessions."; summary.Description = summary.Summary; });
     }
 
     public override async Task<Results<NoContent, NotFound, ProblemHttpResult>> ExecuteAsync(

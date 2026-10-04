@@ -1,10 +1,7 @@
-import type {
-  NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictCode,
-  NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictResponse,
-} from '../api'
+import type { NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeConflictCode, NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeConflictResponse } from '../api/models'
 import { translate } from '../utils/i18n'
 
-function readConflictCode(error: unknown): NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictCode | undefined {
+function readConflictCode(error: unknown): NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeConflictCode | undefined {
   if (!error || typeof error !== 'object' || !('code' in error))
     return undefined
 
@@ -21,17 +18,17 @@ function readConflictCode(error: unknown): NoCtfapiEndpointsAdministrationChalle
   }
 }
 
-export function competitionChallengeConflictMessage(error: unknown): string | undefined {
-  const code: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictResponse['code'] | undefined
+export function competitionChallengeConflictMessage(error: unknown): string | null | undefined {
+  const code: NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeConflictResponse['code'] | undefined
     = readConflictCode(error)
 
   switch (code) {
     case 'ChallengeTemplateConflict':
-      return translate("ui.thisChallengeIsAlreadyInTheCompetitionEditTheExisting")
+      return translate("challenges.competitionChallenge.description.challengeAlreadyCompetitionEdit")
     case 'ChallengeOrderConflict':
-      return translate("ui.thisOrderIsAlreadyUsedByAnotherChallengeChooseA")
+      return translate("challenges.competitionChallenge.description.orderAlreadyAnotherChallenge")
     case 'ResourceIdConflict':
-      return translate("ui.theChallengeResourceIdentifierConflictsWithAnExistingResourceAdd")
+      return translate("challenges.competitionChallenge.description.challengeResourceIdentifierConflicts")
     default:
       return undefined
   }

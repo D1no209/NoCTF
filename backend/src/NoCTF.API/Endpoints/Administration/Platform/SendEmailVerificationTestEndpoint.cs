@@ -33,20 +33,20 @@ public sealed class SendEmailVerificationTestEndpoint(
             return state switch
             {
                 EmailVerificationDeliveryState.Sent => TypedResults.NoContent(),
-                EmailVerificationDeliveryState.RecipientNotFound => TypedResults.Problem(
+                EmailVerificationDeliveryState.RecipientNotFound => ApiProblems.Problem(
                     statusCode: StatusCodes.Status404NotFound,
-                    title: "Administrator account was not found."),
-                EmailVerificationDeliveryState.Disabled => TypedResults.Problem(
+                    title: ApiMessages.Get(ApiMessageId.SendEmailVerificationTestTitleAdministratorAccountWasFound)),
+                EmailVerificationDeliveryState.Disabled => ApiProblems.Problem(
                     statusCode: StatusCodes.Status409Conflict,
-                    title: "Email verification is disabled.",
-                    detail: "Enable and save email verification before sending a test message.",
+                    title: ApiMessages.Get(ApiMessageId.SendEmailVerificationTestTitleEmailVerificationDisabled),
+                    detail: ApiMessages.Get(ApiMessageId.SendEmailVerificationTestDetailEnableSaveEmailVerification),
                     extensions: new Dictionary<string, object?>
                     {
                         ["code"] = PlatformProblemCode.EmailVerificationDisabled
                     }),
-                _ => TypedResults.Problem(
+                _ => ApiProblems.Problem(
                     statusCode: StatusCodes.Status409Conflict,
-                    title: "SMTP delivery is not configured.",
+                    title: ApiMessages.Get(ApiMessageId.SendEmailVerificationTestTitleSmtpDeliveryConfigured),
                     extensions: new Dictionary<string, object?>
                     {
                         ["code"] = PlatformProblemCode.EmailDeliveryNotConfigured
@@ -55,10 +55,10 @@ public sealed class SendEmailVerificationTestEndpoint(
         }
         catch (EmailVerificationDeliveryException exception)
         {
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: StatusCodes.Status503ServiceUnavailable,
-                title: "SMTP test delivery failed.",
-                detail: "Check the SMTP host, credentials, encryption mode, and network access.",
+                title: ApiMessages.Get(ApiMessageId.SendEmailVerificationTestTitleSmtpTestDeliveryFailed),
+                detail: ApiMessages.Get(ApiMessageId.SendEmailVerificationTestDetailCheckSmtpHostCredentials),
                 extensions: new Dictionary<string, object?>
                 {
                     ["code"] = PlatformProblemCode.SmtpDeliveryFailed,

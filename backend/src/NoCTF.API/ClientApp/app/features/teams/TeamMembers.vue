@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { bindViewState } from '~/features/shared/view-state'
 
-import type { NoCtfapiEndpointsTeamsTeamResponse } from '~/api'
+import type { NoCTFAPIEndpointsTeamsTeamResponse } from '~/api/models'
 import { useTeamMembers } from './useTeamMembers'
 import View from '~/components/views/teams/TeamMembersView.vue'
 
 const props = defineProps<{
   competitionId: string
-  team: NoCtfapiEndpointsTeamsTeamResponse
+  team: NoCTFAPIEndpointsTeamsTeamResponse
   /** 队长视角:可移除成员 */
   canManage?: boolean
 }>()

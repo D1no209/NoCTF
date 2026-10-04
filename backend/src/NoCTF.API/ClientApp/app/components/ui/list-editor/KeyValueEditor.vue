@@ -8,9 +8,9 @@ const props = withDefaults(defineProps<{
   addLabel?: string
   disabled?: boolean
 }>(), {
-  keyPlaceholder: translate("ui.key"),
-  valuePlaceholder: translate("ui.value"),
-  addLabel: translate("ui.addAnItem"),
+  keyPlaceholder: translate("common.label.key"),
+  valuePlaceholder: translate("common.label.valueEditor"),
+  addLabel: translate("common.label.addItem"),
   disabled: false,
 })
 
@@ -70,14 +70,14 @@ function remove(index: number): void {
     <div v-for="(row, index) in rows" :key="index" class="flex items-center gap-2">
       <Input
         v-model="row.key"
-        :placeholder="$t(keyPlaceholder)"
+        :placeholder="translate(keyPlaceholder)"
         :disabled="disabled"
         class="font-mono text-sm"
         @blur="commit"
       />
       <Input
         v-model="row.value"
-        :placeholder="$t(valuePlaceholder)"
+        :placeholder="translate(valuePlaceholder)"
         :disabled="disabled"
         class="font-mono text-sm"
         @blur="commit"
@@ -88,7 +88,7 @@ function remove(index: number): void {
         variant="ghost"
         size="icon"
         class="shrink-0"
-        :aria-label="$t('ui.removeItem', { index: index + 1 })"
+        :aria-label="$t('common.label.removeItem', { index: index + 1 })"
         @click="remove(index)"
       >
         <X class="size-4" aria-hidden="true" />
@@ -103,7 +103,7 @@ function remove(index: number): void {
       @click="add"
     >
       <Plus data-icon="inline-start" />
-      {{ $t(addLabel) }}
+      {{ translate(addLabel) }}
     </Button>
   </div>
 </template>

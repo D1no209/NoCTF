@@ -23,7 +23,12 @@ public enum CompetitionResourceManagerConflictCode
 public sealed record CompetitionResourceManagerConflictResponse(
     CompetitionResourceManagerConflictCode Code,
     string Detail,
-    IReadOnlyList<Guid> UserIds);
+    IReadOnlyList<Guid> UserIds)
+{
+    public string Detail { get; init; } = ApiMessages.Localize(Code, Detail, ApiMessages.NoArguments);
+    public string MessageKey => ApiMessages.For(Code).Key;
+    public IReadOnlyDictionary<string, object?> MessageArguments => ApiMessages.NoArguments;
+}
 
 internal static class CompetitionResourceManagerConflictMapper
 {
@@ -122,10 +127,10 @@ public sealed class CreateCompetitionEndpoint(CreateCompetition create, IUserCon
                     $"/api/v1/admin/competitions/{result.Competition!.Id}",
                     CompetitionMapper.ToResponse(result.Competition, timeProvider.GetUtcNow())),
             CompetitionCreationState.InvalidRequest =>
-                TypedResults.Problem(
+                ApiProblems.Problem(
                     statusCode: StatusCodes.Status400BadRequest,
-                    title: "Competition was not created.",
-                    detail: result.Detail),
+                    title: ApiMessages.Get(ApiMessageId.CreateCompetitionTitleCompetitionWasCreated),
+                    detail: ApiMessages.Get(ApiMessageId.CreateCompetitionTitleCompetitionWasCreated)),
             CompetitionCreationState.UserNotFound =>
                 TypedResults.Conflict(
                     CompetitionResourceManagerConflictMapper.ToResponse(

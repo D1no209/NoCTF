@@ -13,8 +13,8 @@ public sealed class RequestSafetyExceptionHandler(ILogger<RequestSafetyException
         { await RequestAdmissionMiddleware.WriteFailure(context, admission); return true; }
         if (exception is RequestReplayConflictException)
         {
-            await TypedResults.Problem(statusCode: 409, title: "请求标识冲突",
-                detail: "该 Idempotency-Key 已用于不同的请求内容，请为新的操作生成新的标识。",
+            await ApiProblems.Problem(statusCode: 409, title: ApiMessages.Get(ApiMessageId.RequestSafetyExceptionHandlerTitleRequestSafetyExceptionHandler),
+                detail: ApiMessages.Get(ApiMessageId.RequestSafetyExceptionHandlerDetailIdempotencyKey),
                 extensions: new Dictionary<string, object?> { ["code"] = "IdempotencyPayloadMismatch" }).ExecuteAsync(context);
             return true;
         }
@@ -25,8 +25,8 @@ public sealed class RequestSafetyExceptionHandler(ILogger<RequestSafetyException
         logger.LogWarning("Transactional request contention: {ExceptionType}, cause {CauseType}; request {TraceId}.",
             exception.GetType().Name, cause.GetType().Name, context.TraceIdentifier);
         context.Response.Headers.RetryAfter = "1";
-        await TypedResults.Problem(statusCode: 503, title: "操作正在竞争资源",
-            detail: "本次事务未完成，请稍后使用相同的请求标识重试。",
+        await ApiProblems.Problem(statusCode: 503, title: ApiMessages.Get(ApiMessageId.RequestSafetyExceptionHandlerTitleRequestSafetyExceptionHandler),
+            detail: ApiMessages.Get(ApiMessageId.RequestSafetyExceptionHandlerDetailRequestSafetyExceptionHandler),
             extensions: new Dictionary<string, object?> { ["code"] = "TransactionBusy" }).ExecuteAsync(context);
         return true;
     }

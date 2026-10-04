@@ -11,12 +11,12 @@ describe('participant copy density', () => {
       sourceFile(new URL('../app/features/challenges/panels/KohPanel.vue', import.meta.url)).text(),
     ])
 
-    expect(detail).not.toContain("$t('ui.question')")
-    expect(detail).not.toContain("$t('ui.thereAreNoAttachmentsForThisQuestion')")
-    expect(runtime).not.toContain("ui.theEnvironmentHasNotBeenStartedYetClickStartEnvironment")
-    expect(awd).not.toContain("ui.awdModeProtectYourOwnServiceFromBeingAttackedAnd")
-    expect(awdp).not.toContain("ui.submitOneDynamicFlagObtainedFromTheCurrentAttackInstance")
-    expect(koh).not.toContain("ui.kohModeCaptureTheHillAndMaintainControlToScore")
+    expect(detail).not.toContain("$t('administration.label.question')")
+    expect(detail).not.toContain("$t('common.description.thereAttachmentsQuestion')")
+    expect(runtime).not.toContain("common.description.environmentStartedYetClick")
+    expect(awd).not.toContain("common.description.awdModeProtectOwn")
+    expect(awdp).not.toContain("common.description.submitOneDynamicFlag")
+    expect(koh).not.toContain("common.description.kohModeCaptureHill")
   })
 
   test('does not explain invitation-token implementation beside the action', async () => {
@@ -24,11 +24,11 @@ describe('participant copy density', () => {
       new URL('../app/pages/competitions/[id]/my/team.vue', import.meta.url),
     ).text()
 
-    expect(teamPage).not.toContain("ui.theInvitationCodeIsGeneratedWhenCreatingATeamFor")
-    expect(teamPage).toContain('getTeamInvitationEndpoint({')
+    expect(teamPage).not.toContain("common.description.invitationCodeGeneratedCreating")
+    expect(teamPage).toMatch(/api\.api\.v1\.competitions\.byCompetitionId\([^)]*\)\.teams\.byTeamId\([^)]*\)\.invitationToken\.get\(/)
     expect(teamPage).toContain('invitationToken.value = data.invitationToken')
     expect(teamPage).toContain('v-else-if="invitationToken"')
-    expect(teamPage).toContain("$t('ui.rotateInvitationCode')")
+    expect(teamPage).toContain("$t('competitions.label.rotateInvitationCode')")
     expect(teamPage).toContain('v-if="isCaptain && !team.isBanned"')
     expect(teamPage).toContain(':can-manage="isCaptain && !team.isBanned && canEditOrganization"')
     expect(teamPage).toContain('v-if="!team.isBanned"')

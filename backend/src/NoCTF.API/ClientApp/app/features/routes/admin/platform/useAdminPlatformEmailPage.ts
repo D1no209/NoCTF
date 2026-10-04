@@ -1,15 +1,19 @@
+
+import { api } from '../../../../lib/api'
+import { message as describeMessage } from '../../../../utils/i18n'
+import type { UiMessage } from '../../../../utils/i18n'
 import { proxyRefs } from 'vue'
 import { markRaw } from 'vue'
 
 import { KeyRound, RefreshCw, Send, ShieldCheck } from '@lucide/vue'
-import { toast } from 'vue-sonner'
-import { adminPlatformGetCapWorkloadConfiguration, adminPlatformGetConfiguration, adminPlatformPatchConfiguration, adminPlatformReplaceEmailVerificationPassword, adminPlatformReplaceHumanVerificationSecret, adminPlatformSendEmailVerificationTest, adminPlatformUpdateCapWorkloadConfiguration } from '../../../../api'
-import type { NoCtfapiEndpointsAdministrationPlatformAdminHumanVerificationConfigurationResponse, NoCtfapiEndpointsAdministrationPlatformCapWorkloadConfigurationResponse, NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfigurationResponse, NoCtfapiEndpointsAdministrationPlatformSmtpSecurityModeProtocol, NoCtfapiEndpointsPlatformHumanVerificationProviderProtocol } from '../../../../api'
+import { toast } from '../../../../utils/message-toast'
+
+import type { NoCTFAPIEndpointsAdministrationPlatformAdminHumanVerificationConfigurationResponse, NoCTFAPIEndpointsAdministrationPlatformCapWorkloadConfigurationResponse, NoCTFAPIEndpointsAdministrationPlatformEmailVerificationConfigurationResponse, NoCTFAPIEndpointsAdministrationPlatformSmtpSecurityModeProtocol, NoCTFAPIEndpointsPlatformHumanVerificationProviderProtocol } from '../../../../api/models'
 import AdminDateTimeComponent from '../../../admin/AdminDateTime.vue'
 
-type EmailConfiguration = NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfigurationResponse
-type HumanVerificationConfiguration = NoCtfapiEndpointsAdministrationPlatformAdminHumanVerificationConfigurationResponse
-type CapWorkloadConfiguration = NoCtfapiEndpointsAdministrationPlatformCapWorkloadConfigurationResponse
+type EmailConfiguration = NoCTFAPIEndpointsAdministrationPlatformEmailVerificationConfigurationResponse
+type HumanVerificationConfiguration = NoCTFAPIEndpointsAdministrationPlatformAdminHumanVerificationConfigurationResponse
+type CapWorkloadConfiguration = NoCTFAPIEndpointsAdministrationPlatformCapWorkloadConfigurationResponse
 
 /** Owns state, effects and commands for AdminPlatformEmailPage. */
 export function useAdminPlatformEmailPage() {
@@ -23,7 +27,7 @@ export function useAdminPlatformEmailPage() {
     enabled: false,
     runtimeEnabled: true,
     evaluationEnabled: true,
-    provider: 'None' as NoCtfapiEndpointsPlatformHumanVerificationProviderProtocol,
+    provider: 'None' as NoCTFAPIEndpointsPlatformHumanVerificationProviderProtocol,
     capServerUrl: '',
     capSiteKey: '',
     turnstileSiteKey: '',
@@ -48,7 +52,7 @@ export function useAdminPlatformEmailPage() {
   const capWorkloadSaved = ref('')
   const capWorkloadLoading = ref(false)
   const capWorkloadSaving = ref(false)
-  const capWorkloadError = ref<string | null>(null)
+  const capWorkloadError = ref<UiMessage | null>(null)
 
   function capWorkloadRequest() {
     return {
@@ -76,10 +80,10 @@ export function useAdminPlatformEmailPage() {
     new Intl.NumberFormat().format(capExpectedHashAttempts.value))
   const capWorkloadRiskLabel = computed(() => {
     if (capExpectedHashAttempts.value < 10_000_000)
-      return translate('ui.capWorkloadRiskNormal')
+      return translate('administration.label.capWorkloadRiskNormal')
     if (capExpectedHashAttempts.value < 100_000_000)
-      return translate('ui.capWorkloadRiskHigh')
-    return translate('ui.capWorkloadRiskExtreme')
+      return translate('administration.label.capWorkloadRiskHigh')
+    return translate('administration.label.capWorkloadRiskExtreme')
   })
   const capWorkloadRiskVariant = computed(() => capExpectedHashAttempts.value >= 100_000_000
     ? 'destructive' as const
@@ -91,14 +95,15 @@ export function useAdminPlatformEmailPage() {
     if (humanForm.provider !== 'Cap') return
     capWorkloadLoading.value = true
     capWorkloadError.value = null
-    const { data, error } = await adminPlatformGetCapWorkloadConfiguration()
+    let error: unknown;
+    const data = await api.api.v1.admin.platform.humanVerification.capWorkload.get().catch(cause => { error = cause; return undefined });
     capWorkloadLoading.value = false
     if (error || !data) {
       capWorkload.value = null
       capWorkloadError.value = parseApiError(
         error,
-        translate('ui.capWorkloadConfigurationUnavailable'),
-      ).message
+        describeMessage('administration.error.capWorkloadConfigurationUnavailable'),
+      ).displayMessage
       return
     }
     syncCapWorkload(data)
@@ -108,19 +113,18 @@ export function useAdminPlatformEmailPage() {
     if (!capWorkloadDirty.value || !capWorkloadValid.value
       || capWorkloadSaving.value || humanVerificationDirty.value) return
     capWorkloadSaving.value = true
-    const { data, error } = await adminPlatformUpdateCapWorkloadConfiguration({
-      body: capWorkloadRequest(),
-    })
+    let error: unknown;
+    const data = await api.api.v1.admin.platform.humanVerification.capWorkload.put(capWorkloadRequest()).catch(cause => { error = cause; return undefined });
     capWorkloadSaving.value = false
     if (error || !data) {
       toast.error(parseApiError(
         error,
-        translate('ui.capWorkloadConfigurationUnavailable'),
-      ).message)
+        describeMessage('administration.error.capWorkloadConfigurationUnavailable'),
+      ).displayMessage)
       return
     }
     syncCapWorkload(data)
-    toast.success(translate('ui.capWorkloadConfigurationSaved'))
+    toast.success(describeMessage('administration.label.capWorkloadConfigurationSaved'))
   }
 
   function humanVerificationRequest() {
@@ -177,7 +181,7 @@ export function useAdminPlatformEmailPage() {
   const humanVerificationProviderLabel = computed(() => {
     if (humanForm.provider === 'Cap') return 'CAP'
     if (humanForm.provider === 'Turnstile') return 'Cloudflare Turnstile'
-    return translate('ui.disabled')
+    return translate('administration.label.disabled')
   })
 
   watch(() => humanForm.provider, provider => {
@@ -186,7 +190,7 @@ export function useAdminPlatformEmailPage() {
 
   const loading = ref(true)
 
-  const loadError = ref<string | null>(null)
+  const loadError = ref<UiMessage | null>(null)
 
   const form = reactive({
     enabled: false,
@@ -198,7 +202,7 @@ export function useAdminPlatformEmailPage() {
     passwordResetMaxRequestsPerHour: 5,
     smtpHost: '',
     smtpPort: 587,
-    smtpSecurityMode: 'StartTls' as NoCtfapiEndpointsAdministrationPlatformSmtpSecurityModeProtocol,
+    smtpSecurityMode: 'StartTls' as NoCTFAPIEndpointsAdministrationPlatformSmtpSecurityModeProtocol,
     smtpUserName: '',
     smtpFromAddress: '',
     smtpFromName: '',
@@ -245,10 +249,11 @@ export function useAdminPlatformEmailPage() {
   async function load(): Promise<void> {
     loading.value = true
     loadError.value = null
-    const { data, error } = await adminPlatformGetConfiguration()
+    let error: unknown;
+    const data = await api.api.v1.admin.platform.configuration.get().catch(cause => { error = cause; return undefined });
     loading.value = false
     if (error || !data) {
-      loadError.value = parseApiError(error).message
+      loadError.value = parseApiError(error).displayMessage
       return
     }
     humanVerification.value = data.humanVerification ?? null
@@ -262,12 +267,11 @@ export function useAdminPlatformEmailPage() {
     if (!humanVerification.value || humanVerificationSaving.value
       || !humanVerificationDirty.value) return
     humanVerificationSaving.value = true
-    const { data, error } = await adminPlatformPatchConfiguration({
-      body: { humanVerification: humanVerificationRequest() },
-    })
+    let error: unknown;
+    const data = await api.api.v1.admin.platform.configuration.patch({ humanVerification: humanVerificationRequest() }).catch(cause => { error = cause; return undefined });
     humanVerificationSaving.value = false
     if (error) {
-      toast.error(parseApiError(error).message)
+      toast.error(parseApiError(error).displayMessage)
       return
     }
     if (data?.humanVerification) {
@@ -276,74 +280,72 @@ export function useAdminPlatformEmailPage() {
     }
     await refreshPlatform()
     if (humanForm.provider === 'Cap') await loadCapWorkload()
-    toast.success(translate('ui.humanVerificationConfigurationSaved'))
+    toast.success(describeMessage('administration.label.humanVerificationConfigurationSaved'))
   }
 
   async function replaceHumanVerificationSecret(): Promise<void> {
     if (humanForm.provider === 'None' || !humanSecret.value
       || humanSecretSaving.value) return
     humanSecretSaving.value = true
-    const { data, error } = await adminPlatformReplaceHumanVerificationSecret({
-      body: {
+    let error: unknown;
+    const data = await api.api.v1.admin.platform.humanVerification.secret.put({
         provider: humanForm.provider,
         secret: humanSecret.value,
-      },
-    })
+      }).catch(cause => { error = cause; return undefined });
     humanSecretSaving.value = false
     if (error) {
-      toast.error(parseApiError(error).message)
+      toast.error(parseApiError(error).displayMessage)
       return
     }
     if (data) humanVerification.value = data
     humanSecret.value = ''
     humanSecretOpen.value = false
-    toast.success(translate('ui.humanVerificationSecretUpdated'))
+    toast.success(describeMessage('administration.label.humanVerificationSecretUpdated'))
   }
 
   async function save(): Promise<void> {
     if (!configuration.value) return
     saving.value = true
-    const { data, error } = await adminPlatformPatchConfiguration({
-      body: { emailVerification: emailVerificationRequest() },
-    })
+    let error: unknown;
+    const data = await api.api.v1.admin.platform.configuration.patch({ emailVerification: emailVerificationRequest() }).catch(cause => { error = cause; return undefined });
     saving.value = false
     if (error) {
-      toast.error(parseApiError(error).message)
+      toast.error(parseApiError(error).displayMessage)
       return
     }
     if (data?.emailVerification) {
       configuration.value = data.emailVerification
       syncForm(data.emailVerification)
     }
-    toast.success(translate("ui.emailVerificationConfigurationSaved"))
+    toast.success(describeMessage("administration.label.emailVerificationConfigurationSaved"))
   }
 
   async function replacePassword(): Promise<void> {
     if (!configuration.value || !newPassword.value) return
     passwordSaving.value = true
-    const { data, error } = await adminPlatformReplaceEmailVerificationPassword({
-      body: { password: newPassword.value },
-    })
+    let error: unknown;
+    const data = await api.api.v1.admin.platform.emailVerification.password.put({ password: newPassword.value }).catch(cause => { error = cause; return undefined });
     passwordSaving.value = false
     if (error) {
-      toast.error(parseApiError(error).message)
+      toast.error(parseApiError(error).displayMessage)
       return
     }
     passwordOpen.value = false
     newPassword.value = ''
     if (data) configuration.value = data
-    toast.success(translate("ui.smtpPasswordUpdated"))
+    toast.success(describeMessage("administration.label.smtpPasswordUpdated"))
   }
 
   async function sendTest(): Promise<void> {
     sendingTest.value = true
-    const { error } = await adminPlatformSendEmailVerificationTest()
+    let error: unknown;
+    await api.api.v1.admin.platform.emailVerification.test.post().catch(cause => { error = cause; return undefined });
     sendingTest.value = false
     if (error) {
-      toast.error(parseApiError(error, translate("ui.testEmailFailedToSend")).message)
+      toast.error(parseApiError(error, describeMessage("administration.platformEmail.error.testEmailSendFailed")).displayMessage)
       return
     }
-    toast.success(translate("ui.theTestEmailHasBeenSentToTheCurrentAdministrator"))
+    toast.success(describeMessage("administration.platformEmail.description.testEmailSentAdministrator"))
   }
 
   onMounted(() => {

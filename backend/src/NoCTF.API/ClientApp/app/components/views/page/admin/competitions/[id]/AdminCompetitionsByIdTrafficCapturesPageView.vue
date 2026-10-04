@@ -27,17 +27,17 @@ const { adminTeamPath, adminChallengePath, adminRuntimePath, competitionId, Down
       </Alert>
       <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <Select v-model="filterChallenge">
-          <SelectTrigger :aria-label="$t('ui.challenge')"><SelectValue :placeholder="$t('ui.challenge')" /></SelectTrigger>
+          <SelectTrigger :aria-label="$t('common.label.challenge.pageTitle')"><SelectValue :placeholder="$t('common.label.challenge.pageTitle')" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{{ $t('runtime.allChallenges') }}</SelectItem>
-            <SelectItem v-for="option in challengeOptions" :key="option.id" :value="option.id">{{ option.title }}</SelectItem>
+            <SelectItem v-for="option in challengeOptions" :key="option.id ?? undefined" :value="option.id">{{ option.title }}</SelectItem>
           </SelectContent>
         </Select>
         <Select v-model="filterTeam">
-          <SelectTrigger :aria-label="$t('ui.team')"><SelectValue :placeholder="$t('ui.team')" /></SelectTrigger>
+          <SelectTrigger :aria-label="$t('common.label.team')"><SelectValue :placeholder="$t('common.label.team')" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{{ $t('runtime.allTeams') }}</SelectItem>
-            <SelectItem v-for="option in teamOptions" :key="option.id" :value="option.id">{{ option.name }}</SelectItem>
+            <SelectItem v-for="option in teamOptions" :key="option.id ?? undefined" :value="option.id">{{ option.name }}</SelectItem>
           </SelectContent>
         </Select>
         <Input v-model="filterRuntime" :placeholder="$t('runtime.runtimeId')" />
@@ -52,7 +52,7 @@ const { adminTeamPath, adminChallengePath, adminRuntimePath, competitionId, Down
       </div>
       <div class="flex justify-end">
         <Button variant="outline" :disabled="loading" @click="applyFilters">
-          <RefreshCw data-icon="inline-start" />{{ $t('ui.applyFilters') }}
+          <RefreshCw data-icon="inline-start" />{{ $t('common.label.applyFilters') }}
         </Button>
       </div>
       <Alert v-if="listError" variant="destructive"><AlertDescription>{{ listError }}</AlertDescription></Alert>
@@ -60,18 +60,18 @@ const { adminTeamPath, adminChallengePath, adminRuntimePath, competitionId, Down
         <TableHeader>
           <TableRow>
             <TableHead class="w-10"><span class="sr-only">{{ $t('runtime.selectCapture') }}</span></TableHead>
-            <TableHead>{{ $t('ui.challenge') }}</TableHead>
-            <TableHead>{{ $t('ui.team') }}</TableHead>
-            <TableHead>{{ $t('ui.runtime') }}</TableHead>
-            <TableHead>{{ $t('ui.fileSize') }}</TableHead>
+            <TableHead>{{ $t('common.label.challenge.pageTitle') }}</TableHead>
+            <TableHead>{{ $t('common.label.team') }}</TableHead>
+            <TableHead>{{ $t('administration.label.runtime') }}</TableHead>
+            <TableHead>{{ $t('common.label.fileSize') }}</TableHead>
             <TableHead>{{ $t('runtime.captureConnections') }}</TableHead>
             <TableHead>{{ $t('runtime.captureState') }}</TableHead>
-            <TableHead>{{ $t('ui.updateTime') }}</TableHead>
-            <TableHead class="text-right">{{ $t('ui.actions') }}</TableHead>
+            <TableHead>{{ $t('administration.label.updateTime') }}</TableHead>
+            <TableHead class="text-right">{{ $t('common.label.actions') }}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          <TableRow v-for="item in items" :key="item.runtimeInstanceId">
+          <TableRow v-for="item in items" :key="item.runtimeInstanceId ?? undefined">
             <TableCell>
               <Checkbox :model-value="isSelected(item.runtimeInstanceId)" @update:model-value="onToggleSelected(item, $event)" />
             </TableCell>
@@ -88,10 +88,10 @@ const { adminTeamPath, adminChallengePath, adminRuntimePath, competitionId, Down
             <TableCell class="font-mono text-xs">{{ adminFormatDateTime(item.updatedAt) }}</TableCell>
             <TableCell>
               <div class="flex justify-end gap-1">
-                <Button size="icon" variant="ghost" :aria-label="$t('ui.download')" @click="downloadCapture(item)">
+                <Button size="icon" variant="ghost" :aria-label="$t('writeups.label.download')" @click="downloadCapture(item)">
                   <Download class="size-4" />
                 </Button>
-                <Button v-if="canWrite" size="icon" variant="ghost" :disabled="item.runtimeState === 'Running' || item.runtimeState === 'Provisioning' || item.runtimeState === 'Queued' || item.runtimeState === 'Stopping'" :aria-label="$t('ui.delete')" @click="openDelete(item)">
+                <Button v-if="canWrite" size="icon" variant="ghost" :disabled="item.runtimeState === 'Running' || item.runtimeState === 'Provisioning' || item.runtimeState === 'Queued' || item.runtimeState === 'Stopping'" :aria-label="$t('common.action.delete')" @click="openDelete(item)">
                   <Trash2 class="size-4" />
                 </Button>
               </div>
@@ -113,9 +113,9 @@ const { adminTeamPath, adminChallengePath, adminRuntimePath, competitionId, Down
         <AlertDialogDescription>{{ $t('runtime.deleteCaptureDescription') }}</AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
-        <AlertDialogCancel :disabled="deleting">{{ $t('ui.cancel') }}</AlertDialogCancel>
+        <AlertDialogCancel :disabled="deleting">{{ $t('common.action.cancel') }}</AlertDialogCancel>
         <Button variant="destructive" :disabled="deleting" @click="confirmDelete">
-          <Spinner v-if="deleting" data-icon="inline-start" />{{ $t('ui.delete') }}
+          <Spinner v-if="deleting" data-icon="inline-start" />{{ $t('common.action.delete') }}
         </Button>
       </AlertDialogFooter>
     </AlertDialogContent>

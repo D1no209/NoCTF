@@ -3,13 +3,17 @@
     <OutputType>Library</OutputType>
     <SpaRoot>ClientApp\</SpaRoot>
     <SpaProxyServerUrl>http://127.0.0.1:3000</SpaProxyServerUrl>
-    <SpaProxyLaunchCommand>npm start</SpaProxyLaunchCommand>
+    <SpaProxyLaunchCommand>bun run dev</SpaProxyLaunchCommand>
     <BuildSpaOnPublish Condition="'$(BuildSpaOnPublish)' == ''">true</BuildSpaOnPublish>
     <DefaultItemExcludes>
       $(DefaultItemExcludes);$(SpaRoot)node_modules\**;$(SpaRoot).nuxt\**;$(SpaRoot).output\**
     </DefaultItemExcludes>
     <NoWarn>$(NoWarn);NU1608</NoWarn>
   </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Localization/Catalogs/en/api.json" LogicalName="NoCTF.API.Localization.Catalogs.en.api.json" WithCulture="false" />
+    <EmbeddedResource Include="Localization/Catalogs/zh-CN/api.json" LogicalName="NoCTF.API.Localization.Catalogs.zh-CN.api.json" WithCulture="false" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../NoCTF.Application/NoCTF.Application.csproj" />
     <ProjectReference Include="../NoCTF.GameModes/NoCTF.GameModes.csproj" />
@@ -19,7 +23,8 @@
   <ItemGroup>
     <PackageReference Include="FastEndpoints" />
     <PackageReference Include="FastEndpoints.Security" />
-    <PackageReference Include="FastEndpoints.Swagger" />
+    <PackageReference Include="FastEndpoints.OpenApi" />
+    <PackageReference Include="Scalar.AspNetCore" />
     <PackageReference Include="Microsoft.AspNetCore.SpaProxy" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
     <PackageReference Include="Riok.Mapperly" PrivateAssets="all" />
@@ -40,14 +45,14 @@
   </ItemGroup>
   <Target Name="DebugEnsureNodeEnv"
           BeforeTargets="Build"
-          Condition="'$(Configuration)' == 'Debug' And !Exists('$(SpaRoot)node_modules')">
-    <Exec Command="node --version" ContinueOnError="true">
-      <Output TaskParameter="ExitCode" PropertyName="NodeErrorCode" />
+          Condition="'$(Configuration)' == 'Debug' And '$(BuildSpaOnPublish)' != 'false' And !Exists('$(SpaRoot)node_modules')">
+    <Exec Command="bun --version" ContinueOnError="true">
+      <Output TaskParameter="ExitCode" PropertyName="BunErrorCode" />
     </Exec>
-    <Error Condition="'$(NodeErrorCode)' != '0'"
-           Text="Node.js is required to build and run the ClientApp. Install Node.js and restart your command prompt or IDE." />
-    <Message Importance="high" Text="Restoring ClientApp dependencies using npm..." />
-    <Exec WorkingDirectory="$(SpaRoot)" Command="npm install --no-package-lock" />
+    <Error Condition="'$(BunErrorCode)' != '0'"
+           Text="Bun is required to build and run the ClientApp. Install Bun and restart your command prompt or IDE." />
+    <Message Importance="high" Text="Restoring ClientApp dependencies using Bun..." />
+    <Exec WorkingDirectory="$(SpaRoot)" Command="bun install --frozen-lockfile" />
   </Target>
   <Target Name="PublishRunNuxt"
           AfterTargets="ComputeFilesToPublish"

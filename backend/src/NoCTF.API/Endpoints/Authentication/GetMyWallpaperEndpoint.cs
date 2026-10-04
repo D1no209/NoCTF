@@ -17,7 +17,7 @@ public sealed class GetMyWallpaperEndpoint(
         Get("/auth/me/wallpaper");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("Authentication_GetMyWallpaper"));
-        Summary(summary => summary.Summary = "Returns the current user's uploaded wallpaper.");
+        Summary(summary => { summary.Summary = "Returns the current user's uploaded wallpaper."; summary.Description = summary.Summary; });
     }
 
     public override async Task<Results<FileStreamHttpResult, NotFound>> ExecuteAsync(

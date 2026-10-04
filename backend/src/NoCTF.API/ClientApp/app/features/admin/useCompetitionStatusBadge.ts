@@ -1,10 +1,10 @@
 import { toRefs } from 'vue'
 
-import type { NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol } from '../../api'
+import type { NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol } from '../../api/models'
 import type { BadgeVariants } from '../../components/ui/badge'
 
 /** Owns state, effects and commands for CompetitionStatusBadge. */
-export function useCompetitionStatusBadge(props: Readonly<{ status?: NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol | null }>) {
+export function useCompetitionStatusBadge(props: Readonly<{ status?: NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol | null }>) {
   const label = computed(() => enumLabel(CompetitionStatusLabel, props.status))
 
   const variant = computed<BadgeVariants['variant']>(() => {

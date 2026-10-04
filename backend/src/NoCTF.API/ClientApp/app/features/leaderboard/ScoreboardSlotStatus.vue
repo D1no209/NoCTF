@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { bindViewState } from '~/features/shared/view-state'
 
-import type { NoCtfapiEndpointsCompetitionsGameModeProtocol, NoCtfapiEndpointsCompetitionsScoreboardSlotResponse } from '~/api'
+import type { NoCTFAPIEndpointsCompetitionsGameModeProtocol, NoCTFAPIEndpointsCompetitionsScoreboardSlotResponse } from '~/api/models'
 
 import { useScoreboardSlotStatus } from './useScoreboardSlotStatus'
 import View from '~/components/views/leaderboard/ScoreboardSlotStatusView.vue'
 
 const props = defineProps<{
-  mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol | null
-  slot: NoCtfapiEndpointsCompetitionsScoreboardSlotResponse
+  mode?: NoCTFAPIEndpointsCompetitionsGameModeProtocol | null
+  slot: NoCTFAPIEndpointsCompetitionsScoreboardSlotResponse
 }>()
 const state = bindViewState(useScoreboardSlotStatus(props))
 

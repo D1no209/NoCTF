@@ -69,6 +69,7 @@ public sealed class SubmissionRateLimitingHttpTests
     private static async Task<WebApplication> CreateApplicationAsync(int submissionPerUserPerMinute)
     {
         var builder = WebApplication.CreateBuilder();
+        builder.Configuration["Pagination:SigningKey"] = new string('k', 64);
         builder.WebHost.UseTestServer();
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {

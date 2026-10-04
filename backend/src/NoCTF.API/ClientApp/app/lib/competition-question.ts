@@ -1,66 +1,62 @@
-import type {
-  NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionAccessCode,
-  NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureCode,
-  NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureResponse,
-  NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode,
-  NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse,
-} from '../api'
+import { dateTimestamp } from '../utils/date-value'
+import type { UiMessage } from '../utils/i18n'
+import type { NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionAccessCode, NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionFailureCode, NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionFailureResponse, NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode, NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionResponse } from '../api/models'
 import { parseApiError } from '../utils/api-error'
 import { translate } from '../utils/i18n'
 
-type FailureCode = NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureCode
-type FailurePayload = NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureResponse
-type ParticipantRole = NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode
-type QuestionAccess = NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionAccessCode
-type CompetitionQuestion = NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse
+type FailureCode = NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionFailureCode
+type FailurePayload = NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionFailureResponse
+type ParticipantRole = NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode
+type QuestionAccess = NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionAccessCode
+type CompetitionQuestion = NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionResponse
 
 const staticFailureMessages = {
-  InvalidRequest: "ui.theQuestionContentOrRequestIsInvalidCheckItAnd",
-  SpamRejected: "ui.theQuestionAppearsDuplicatedOrUnclearPleaseProvideAClearer",
-  CompetitionNotAcceptingQuestions: "ui.questionsCannotBeOpenedInTheCurrentCompetitionState",
-  TeamNotEligible: "ui.thisTeamIsNotEligibleToOpenAQuestion",
-  InvalidChallengeReference: "ui.theLinkedChallengeIsInvalidUnpublishedOrBelongsToAnother",
-  InvalidTransition: "ui.thisActionIsNotAllowedInTheCurrentQuestionState",
-  QuestionClosed: "ui.thisQuestionIsClosedOpenANewQuestionToContinue",
+  InvalidRequest: "common.competitionQuestion.error.questionContentCheckInvalid",
+  SpamRejected: "common.competitionQuestion.description.questionAppearsDuplicatedUnclear",
+  CompetitionNotAcceptingQuestions: "common.competitionQuestion.validation.questionsOpenedFormat",
+  TeamNotEligible: "common.competitionQuestion.description.teamEligibleOpenQuestion",
+  InvalidChallengeReference: "common.competitionQuestion.error.linkedChallengeUnpublishedInvalid",
+  InvalidTransition: "common.competitionQuestion.description.actionAllowedQuestionState",
+  QuestionClosed: "common.competitionQuestion.description.questionClosedOpenNew",
 } satisfies Partial<Record<FailureCode, string>>
 
 export const competitionQuestionRoleLabel = {
-  Asker: "ui.participant",
-  Participant: "ui.participant",
-  Handler: "ui.staff",
-  Judge: "ui.judge",
-  ChallengeOwner: "ui.challengeOwner",
-  CompetitionManager: "ui.competitionManager",
-  PlatformAdministrator: "ui.platformAdministrator",
+  Asker: "common.label.participant",
+  Participant: "common.label.participant",
+  Handler: "common.label.staff",
+  Judge: "common.label.judge",
+  ChallengeOwner: "common.label.challengeOwner",
+  CompetitionManager: "common.label.competitionManager",
+  PlatformAdministrator: "notifications.label.platformAdministrator",
 } satisfies Record<ParticipantRole, string>
 
-export function isCompetitionQuestionHandlerRole(role?: ParticipantRole): boolean {
+export function isCompetitionQuestionHandlerRole(role?: ParticipantRole | null): boolean {
   return role !== undefined && role !== 'Asker' && role !== 'Participant'
 }
 
 export function competitionQuestionErrorMessage(
   error: unknown,
   fallback: string,
-): string {
+): UiMessage {
   const payload = asFailurePayload(error)
   if (!payload?.code)
-    return parseApiError(error, fallback).message
+    return parseApiError(error, fallback).displayMessage
 
   const limit = payload.limit ?? undefined
   if (payload.code === 'TeamActiveQuestionLimitReached')
-    return translate("ui.yourTeamAlreadyHasActiveQuestionsResolveAnExistingOne", { limit: limit ?? 5 })
+    return translate("notifications.competitionQuestion.description.teamAlreadyActiveQuestions", { limit: limit ?? 5 })
   if (payload.code === 'ParticipantMessageLimitReached')
-    return translate("ui.youCanSendUpToConsecutiveMessagesBeforeAStaff", { limit: limit ?? 3 })
+    return translate("notifications.competitionQuestion.description.sendConsecutiveMessagesStaff", { limit: limit ?? 3 })
 
   const message = staticFailureMessages[payload.code]
   return message ? translate(message) : fallback
 }
 
 export function competitionQuestionUnreadCount(
-  updatedAt: string | undefined,
-  seenUpdatedAt: string | undefined,
-  lastActorRole: ParticipantRole | undefined,
-  access: QuestionAccess | undefined,
+  updatedAt: Date | string | null | undefined,
+  seenUpdatedAt: string | null | undefined,
+  lastActorRole: ParticipantRole | null | undefined,
+  access: QuestionAccess | null | undefined,
 ): number {
   if (seenUpdatedAt !== undefined)
     return questionTime(updatedAt) > questionTime(seenUpdatedAt) ? 1 : 0
@@ -109,8 +105,8 @@ function questionTimestamp(question: CompetitionQuestion): number {
   return questionTime(question.updatedAt)
 }
 
-function questionTime(value: string | undefined): number {
-  const timestamp = Date.parse(value ?? '')
+function questionTime(value: Date | string | null | undefined): number {
+  const timestamp = dateTimestamp(value ?? '')
   return Number.isFinite(timestamp) ? timestamp : 0
 }
 

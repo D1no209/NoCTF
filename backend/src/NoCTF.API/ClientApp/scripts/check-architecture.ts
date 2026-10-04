@@ -5,6 +5,7 @@ import { parse as parseTemplate } from '@vue/compiler-dom'
 import ts from 'typescript'
 import { chineseMessages } from '../app/locales/zh-CN'
 import { englishMessages } from '../app/locales/en'
+import { validateTranslations, readCatalog } from '../../../../scripts/Validate-Translations'
 
 export interface ArchitectureIssue { file: string; rule: string; detail: string }
 const visibleAttributes = new Set(['title', 'aria-label', 'aria-description', 'alt', 'placeholder', 'label', 'description'])
@@ -170,6 +171,21 @@ export function auditArchitecture(appRoot = resolve('app')): ArchitectureIssue[]
     const source = readFileSync(file, 'utf8')
     if (/\bwindow\.(?:alert|confirm|prompt)\s*\(/.test(source))
       issues.push({ file: relative(appRoot, file), rule: 'native-defaults', detail: 'Route app confirmations through the shared dialog system' })
+    const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true)
+    const visit = (node: ts.Node) => {
+      if (ts.isCallExpression(node) && ['t', 'translate', 'message'].includes(node.expression.getText(ast))) {
+        const key = node.arguments[0]
+        if (key && ts.isStringLiteral(key) && !(key.text in englishMessages))
+          issues.push({ file: relative(appRoot, file), rule: 'i18n-key', detail: `Unknown message key: ${key.text}` })
+      }
+      if (ts.isCallExpression(node) && /^toast\.(success|error|info|warning)$/.test(node.expression.getText(ast))) {
+        const text = node.arguments[0]
+        if (text && ts.isStringLiteral(text) && text.text.trim())
+          issues.push({ file: relative(appRoot, file), rule: 'i18n', detail: 'Toast text must use a semantic message descriptor' })
+      }
+      ts.forEachChild(node, visit)
+    }
+    visit(ast)
   }
   const primitives = new Set(vueFiles.filter(file => relative(appRoot, file).replaceAll('\\', '/').startsWith('components/ui/')).map(file => basename(file, '.vue')))
   const frameworkComponents = new Set(['NuxtPage', 'NuxtLayout', 'NuxtLink', 'ClientOnly', 'Transition', 'TransitionGroup', 'KeepAlive', 'Suspense', 'Teleport'])
@@ -183,6 +199,16 @@ export function auditArchitecture(appRoot = resolve('app')): ArchitectureIssue[]
     }
   }
   const zhKeys = Object.keys(chineseMessages).sort(), enKeys = Object.keys(englishMessages).sort()
+  try {
+    validateTranslations(resolve(appRoot, '../../../../..'))
+    for (const locale of ['en', 'zh-CN']) {
+      const source = readCatalog(resolve(appRoot, `../../Localization/Catalogs/${locale}/api.json`))
+      const generated = readCatalog(resolve(appRoot, `locales/catalogs/${locale}/api.json`))
+      if (JSON.stringify(source) !== JSON.stringify(generated))
+        issues.push({ file: 'locales', rule: 'i18n-generated', detail: 'HTTP catalog copy is stale; run locales:prepare' })
+    }
+  }
+  catch (error) { issues.push({ file: 'locales', rule: 'i18n-catalog', detail: String(error) }) }
   if (JSON.stringify(zhKeys) !== JSON.stringify(enKeys)) issues.push({ file: 'locales', rule: 'i18n-key', detail: 'Locale catalogs must have exactly the same keys' })
   for (const key of zhKeys) {
     const tokens = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map(match => match[1]).sort()

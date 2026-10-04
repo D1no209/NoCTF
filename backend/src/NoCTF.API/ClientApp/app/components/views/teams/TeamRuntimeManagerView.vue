@@ -11,14 +11,14 @@ const { RefreshCw, RuntimeCard, competitionId, items, loading, error, initialize
     <CardHeader class="flex flex-row items-center justify-between gap-3">
       <CardTitle id="team-runtimes-title" class="text-base">{{ $t('runtime.teamInstancesTitle') }}</CardTitle>
       <Button type="button" size="sm" variant="outline" :disabled="loading" @click="refresh">
-        <RefreshCw data-icon="inline-start" />{{ $t('ui.refresh') }}
+        <RefreshCw data-icon="inline-start" />{{ $t('common.label.refresh') }}
       </Button>
     </CardHeader>
     <CardContent class="flex flex-col gap-4">
       <Alert v-if="error" variant="destructive">
         <AlertDescription class="flex flex-wrap items-center justify-between gap-2">
           <span>{{ $message(error.message) }}</span>
-          <Button type="button" size="sm" variant="outline" @click="refresh">{{ $t('ui.retry') }}</Button>
+          <Button type="button" size="sm" variant="outline" @click="refresh">{{ $t('common.label.retry') }}</Button>
         </AlertDescription>
       </Alert>
       <Skeleton v-if="loading && !initialized" class="h-44 w-full" />
@@ -29,7 +29,7 @@ const { RefreshCw, RuntimeCard, competitionId, items, loading, error, initialize
       </Empty>
       <template v-else-if="items.length">
         <ul class="flex min-w-0 flex-col gap-2" :aria-label="$t('runtime.teamInstancesTitle')">
-          <li v-for="item in items" :key="item.runtime?.id" class="min-w-0">
+          <li v-for="item in items" :key="(item.runtime?.id) ?? undefined" class="min-w-0">
             <Button
               type="button"
               :variant="selected?.runtime?.id === item.runtime?.id ? 'secondary' : 'ghost'"
@@ -51,7 +51,7 @@ const { RefreshCw, RuntimeCard, competitionId, items, loading, error, initialize
             >
               <component
                 :is="RuntimeCard"
-                :key="item.runtime.competitionChallengeId"
+                :key="item.runtime.competitionChallengeId ?? undefined"
                 :competition-id="competitionId"
                 :competition-challenge-id="item.runtime.competitionChallengeId"
                 controls="full"

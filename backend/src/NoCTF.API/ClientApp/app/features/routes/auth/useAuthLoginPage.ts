@@ -1,8 +1,12 @@
-import { toast } from 'vue-sonner'
+
+import { api } from '../../../lib/api'
+import { message as describeMessage } from '../../../utils/i18n'
+import type { UiMessage } from '../../../utils/i18n'
+import { toast } from '../../../utils/message-toast'
 import { useHumanVerification } from '~/features/security/useHumanVerification'
 import { useAuthThemeArtwork } from './useAuthThemeArtwork'
-import { authenticationSsoBeginLogin, authenticationSsoListProviders } from '~/api'
-import type { NoCtfapiEndpointsAuthenticationPublicSsoProviderResponse } from '~/api'
+
+import type { NoCTFAPIEndpointsAuthenticationPublicSsoProviderResponse } from '~/api/models'
 
 /** Owns the standalone login page workflow. */
 export function useAuthLoginPage() {
@@ -17,7 +21,7 @@ export function useAuthLoginPage() {
   const { configuration } = usePlatform()
   const loginName = ref('')
   const password = ref('')
-  const error = ref<string | null>(null)
+  const error = ref<UiMessage | null>(null)
   const pending = ref(false)
   const capVerified = ref(false)
   const lastCapChallengeId = ref(0)
@@ -35,7 +39,7 @@ export function useAuthLoginPage() {
         state: failed ? 'error' as const : 'running' as const,
         progress: inlineCap.value.progress,
         label: inlineCap.value.errorMessage
-          ?? translate('ui.computingProofOfWorkProgress', { progress: inlineCap.value.progress }),
+          ?? translate('common.authLogin.label.computingProofWorkProgress', { progress: inlineCap.value.progress }),
       }
     }
     if (!capVerified.value) return null
@@ -43,18 +47,18 @@ export function useAuthLoginPage() {
       id: lastCapChallengeId.value,
       state: 'success' as const,
       progress: 100,
-      label: translate('ui.verificationComplete'),
+      label: translate('common.label.verificationComplete'),
     }
   })
   const capCanRetry = computed(() => capVerification.value?.state === 'error')
   const submitDisabled = computed(() => pending.value && !capCanRetry.value)
-  const ssoProviders = ref<NoCtfapiEndpointsAuthenticationPublicSsoProviderResponse[]>([])
+  const ssoProviders = ref<NoCTFAPIEndpointsAuthenticationPublicSsoProviderResponse[]>([])
   const ssoLoading = ref(true)
   const ssoPendingId = ref<string | null>(null)
 
   async function loadSsoProviders() {
     ssoLoading.value = true
-    const { data } = await authenticationSsoListProviders()
+    const data = await api.api.v1.auth.sso.providers.get();
     ssoProviders.value = data?.items ?? []
     ssoLoading.value = false
   }
@@ -68,14 +72,13 @@ export function useAuthLoginPage() {
       ? candidate
       : '/'
     try {
-      const { data, error: requestError } = await authenticationSsoBeginLogin({
-        body: { providerId, returnPath },
-      })
+      let requestError: unknown;
+      const data = await api.api.v1.auth.sso.login.flows.post({ providerId, returnPath }).catch(cause => { requestError = cause; return undefined });
       if (requestError || !data?.authorizationUrl) throw requestError
       window.location.assign(data.authorizationUrl)
     }
     catch (requestError) {
-      error.value = parseApiError(requestError, translate('sso.loginStartFailed')).message
+      error.value = parseApiError(requestError, describeMessage('sso.loginStartFailed')).displayMessage
       ssoPendingId.value = null
     }
   }
@@ -89,7 +92,7 @@ export function useAuthLoginPage() {
     }
     error.value = null
     if (!loginName.value || !password.value) {
-      error.value = translate('ui.pleaseEnterUsernameEmailAndPassword')
+      error.value = describeMessage('common.authLogin.description.enterUsernameEmailPassword')
       return
     }
     pending.value = true
@@ -103,7 +106,7 @@ export function useAuthLoginPage() {
       }
       await login(loginName.value, password.value, verificationHeaders)
       password.value = ''
-      toast.success(translate('ui.loginSuccessful'))
+      toast.success(describeMessage('common.label.loginSuccessful'))
       const candidate = route.query.redirect
       const redirect = typeof candidate === 'string' && candidate.startsWith('/') && !candidate.startsWith('//')
         ? candidate
@@ -111,7 +114,7 @@ export function useAuthLoginPage() {
       await navigateTo(redirect)
     }
     catch (requestError) {
-      error.value = parseApiError(requestError, translate('ui.loginFailedPleaseCheckUsernameOrPassword')).message
+      error.value = parseApiError(requestError, describeMessage('auth.login.invalidCredentials')).displayMessage
     }
     finally {
       pending.value = false

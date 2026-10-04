@@ -9,6 +9,6 @@ defineProps<{ count: number }>()
       <span data-slot="remaining-attempt-count" :data-critical="count < 5 || undefined">{{ count }}</span>
       {{ $t('attempts.remainingSuffix') }}
     </span>
-    <span class="sr-only">{{ $t('ui.submissionsRemaining', { count }) }}</span>
+    <span class="sr-only">{{ $t('common.label.submissionsRemaining', { count }) }}</span>
   </span>
 </template>

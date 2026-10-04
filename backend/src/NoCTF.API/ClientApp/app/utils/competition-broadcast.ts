@@ -1,7 +1,4 @@
-import type {
-  NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol,
-  NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse,
-} from '../api'
+import type { NoCTFAPIEndpointsCompetitionsEventsCompetitionEventKindProtocol, NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse } from '../api/models'
 import { translate } from './i18n'
 import { competitionChallengePath, competitionTeamsPath } from './app-routes'
 
@@ -17,7 +14,7 @@ export const competitionBroadcastKinds = [
   'AwdpBreakResolved',
   'AwdpFixResolved',
   'AnnouncementPublished',
-] satisfies NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol[]
+] satisfies NoCTFAPIEndpointsCompetitionsEventsCompetitionEventKindProtocol[]
 
 const competitionBroadcastLookbackMs = 30 * 24 * 60 * 60 * 1000
 const competitionBroadcastClockSkewMs = 5 * 60 * 1000
@@ -47,17 +44,17 @@ export function competitionBroadcastQueryWindow(
   }
 }
 
-const competitionBroadcastKindSet: ReadonlySet<NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol>
+const competitionBroadcastKindSet: ReadonlySet<NoCTFAPIEndpointsCompetitionsEventsCompetitionEventKindProtocol>
   = new Set(competitionBroadcastKinds)
 
 export function isCompetitionBroadcastKind(
-  kind: NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol,
+  kind: NoCTFAPIEndpointsCompetitionsEventsCompetitionEventKindProtocol,
 ): boolean {
   return competitionBroadcastKindSet.has(kind)
 }
 
 export function competitionBroadcastIdentity(
-  event: NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse,
+  event: NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse,
 ): string {
   return [
     event.kind,
@@ -68,8 +65,8 @@ export function competitionBroadcastIdentity(
 }
 
 export function deduplicateCompetitionBroadcasts(
-  events: readonly NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse[],
-): NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse[] {
+  events: readonly NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse[],
+): NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse[] {
   const seen = new Set<string>()
   return events.filter((event) => {
     const key = competitionBroadcastIdentity(event)
@@ -80,9 +77,9 @@ export function deduplicateCompetitionBroadcasts(
 }
 
 export function mergeCompetitionBroadcasts(
-  current: readonly NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse[],
-  incoming: readonly NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse[],
-): NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse[] {
+  current: readonly NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse[],
+  incoming: readonly NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse[],
+): NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse[] {
   const currentByIdentity = new Map(current.map(event => [
     competitionBroadcastIdentity(event),
     event,
@@ -92,35 +89,35 @@ export function mergeCompetitionBroadcasts(
 }
 
 export function competitionBroadcastText(
-  event: NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse,
+  event: NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse,
 ): string {
-  const team = event.teamDisplayName ?? translate("ui.aTeam")
-  const challenge = event.challengeTitle ?? translate("ui.aChallenge")
-  if (!event.kind) return translate("ui.competitionStatusUpdated")
+  const team = event.teamDisplayName ?? translate("common.label.team.competitionBroadcast")
+  const challenge = event.challengeTitle ?? translate("common.label.challenge")
+  if (!event.kind) return translate("competitions.label.competitionStatusUpdated")
   const awdpSucceeded = event.gameplayFactState === 'Completed'
     && event.gameplayFactResult === 'Correct'
-  const messages: Partial<Record<NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol, string>> = {
-    FirstBloodAwarded: translate("ui.teamEarnedFirstBloodOn2", { team, challenge }),
-    SecondBloodAwarded: translate("ui.teamEarnedSecondBloodOn2", { team, challenge }),
-    ThirdBloodAwarded: translate("ui.teamEarnedThirdBloodOn2", { team, challenge }),
-    TeamBanned: translate("ui.teamWasBannedForCheating", { team }),
-    TeamBanCorrectionPublished: translate("ui.teamWonItsAppealAndTheBanWasRevoked", { team }),
-    HintPublished: translate("ui.challengeHasANewHint", { challenge }),
-    ChallengeDescriptionUpdated: translate("ui.challengeHasAnUpdatedDescription", { challenge }),
-    ChallengePublished: translate("ui.challengeIsNowOpen", { challenge }),
+  const messages: Partial<Record<NoCTFAPIEndpointsCompetitionsEventsCompetitionEventKindProtocol, string>> = {
+    FirstBloodAwarded: translate("competitions.competitionBroadcast.label.teamEarnedFirstBlood", { team, challenge }),
+    SecondBloodAwarded: translate("competitions.competitionBroadcast.label.teamEarnedSecondBlood", { team, challenge }),
+    ThirdBloodAwarded: translate("competitions.competitionBroadcast.label.teamEarnedThirdBlood", { team, challenge }),
+    TeamBanned: translate("competitions.competitionBroadcast.label.teamWasBannedCheating", { team }),
+    TeamBanCorrectionPublished: translate("competitions.competitionBroadcast.description.teamWonAppealBan", { team }),
+    HintPublished: translate("competitions.competitionBroadcast.label.challengeNewHint", { challenge }),
+    ChallengeDescriptionUpdated: translate("common.label.challengeUpdatedDescription", { challenge }),
+    ChallengePublished: translate("competitions.label.challengeNowOpen", { challenge }),
     AwdpBreakResolved: awdpSucceeded
-      ? translate("ui.teamSuccessfullyAttackedChallenge", { team, challenge })
-      : translate("ui.teamFailedToAttackChallenge", { team, challenge }),
+      ? translate("competitions.label.teamSuccessfullyAttackedChallenge", { team, challenge })
+      : translate("competitions.competitionBroadcast.error.teamAttackChallengeFailed", { team, challenge }),
     AwdpFixResolved: awdpSucceeded
-      ? translate("ui.teamSuccessfullyDefendedChallenge", { team, challenge })
-      : translate("ui.teamFailedToDefendChallenge", { team, challenge }),
-    AnnouncementPublished: translate("ui.aNewCompetitionNoticeWasPublished"),
+      ? translate("competitions.label.teamSuccessfullyDefendedChallenge", { team, challenge })
+      : translate("competitions.competitionBroadcast.error.teamDefendChallengeFailed", { team, challenge }),
+    AnnouncementPublished: translate("competitions.competitionBroadcast.description.newCompetitionNoticeWas"),
   }
-  return messages[event.kind] ?? translate("ui.competitionStatusUpdated")
+  return messages[event.kind] ?? translate("competitions.label.competitionStatusUpdated")
 }
 
 export function competitionBroadcastTargetPath(
-  event: NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse,
+  event: NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse,
 ): string | null {
   if (event.competitionChallengeId) {
     return competitionChallengePath(event.competitionId!, event.competitionChallengeId)

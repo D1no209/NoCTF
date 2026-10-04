@@ -1,4 +1,7 @@
-import { adminUpdateCheatIncidentStatus } from '../api'
+
+import { api } from '../lib/api'
+import type { UiMessage } from '../utils/i18n'
+
 import { computed, ref } from 'vue'
 
 export type CheatIncidentResolutionAction = 'confirm' | 'dismiss' | 'correct'
@@ -17,28 +20,28 @@ export interface CheatIncidentResolutionRequest {
 
 interface CheatIncidentResolutionOptions {
   competitionId: string
-  readError: (error: unknown) => string
+  readError: (error: unknown) => UiMessage
   onSuccess?: (request: CheatIncidentResolutionRequest) => void
   clients?: CheatIncidentResolutionClients
 }
 
-interface CheatIncidentResolutionSdkResult {
-  data?: unknown
-  error?: unknown
-  request?: Request
-  response?: Response
+interface CheatIncidentResolutionInput {
+  path: { competitionId: string; gameplayFactId: string }
+  body: { status: 'Confirmed' | 'Dismissed' | 'Corrected'; reason: string }
 }
 
 interface CheatIncidentResolutionClients {
-  confirm: (options: Parameters<typeof adminUpdateCheatIncidentStatus>[0]) => Promise<CheatIncidentResolutionSdkResult>
-  correct: (options: Parameters<typeof adminUpdateCheatIncidentStatus>[0]) => Promise<CheatIncidentResolutionSdkResult>
-  dismiss: (options: Parameters<typeof adminUpdateCheatIncidentStatus>[0]) => Promise<CheatIncidentResolutionSdkResult>
+  confirm: (input: CheatIncidentResolutionInput) => Promise<unknown>
+  correct: (input: CheatIncidentResolutionInput) => Promise<unknown>
+  dismiss: (input: CheatIncidentResolutionInput) => Promise<unknown>
 }
 
+const updateResolution = (input: CheatIncidentResolutionInput) => api.api.v1.admin.competitions
+  .byCompetitionId(input.path.competitionId).cheatIncidents.byGameplayFactId(input.path.gameplayFactId)
+  .status.put(input.body)
+
 const clients: CheatIncidentResolutionClients = {
-  confirm: async options => adminUpdateCheatIncidentStatus(options),
-  correct: async options => adminUpdateCheatIncidentStatus(options),
-  dismiss: async options => adminUpdateCheatIncidentStatus(options),
+  confirm: updateResolution, correct: updateResolution, dismiss: updateResolution,
 }
 
 export const cheatIncidentResolutionMinimumReasonLength = 8
@@ -62,14 +65,12 @@ async function executeResolution(
     },
   }
 
-  const { error } = request.action === 'confirm'
-    ? await sdk.confirm(options)
+  await (request.action === 'confirm'
+    ? sdk.confirm(options)
     : request.action === 'dismiss'
-      ? await sdk.dismiss(options)
-      : await sdk.correct(options)
+      ? sdk.dismiss(options)
+      : sdk.correct(options))
 
-  if (error)
-    throw error
 }
 
 export function useCheatIncidentResolution(options: CheatIncidentResolutionOptions) {
@@ -79,7 +80,7 @@ export function useCheatIncidentResolution(options: CheatIncidentResolutionOptio
   const action = ref<CheatIncidentResolutionAction | null>(null)
   const target = ref<CheatIncidentResolutionTarget | null>(null)
   const reason = ref('')
-  const error = ref('')
+  const error = ref<UiMessage>('')
 
   const normalizedReason = computed(() => reason.value.trim())
   const remainingCharacters = computed(() => Math.max(

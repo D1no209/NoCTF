@@ -1,10 +1,14 @@
+
+import { api } from '../../../../../../lib/api'
+import { message as describeMessage } from '../../../../../../utils/i18n'
+import type { UiMessage } from '../../../../../../utils/i18n'
 import { challengeTagOptions, uniqueTags, validChallengeTags } from '~/lib/challenge-tags'
 import { proxyRefs } from 'vue'
 
 import { Plus } from '@lucide/vue'
-import { toast } from 'vue-sonner'
-import { adminChallengeBankListTemplates, adminCreateCompetitionChallenge, adminDeleteCompetitionChallenge, adminListCompetitionChallenges, adminPatchCompetitionChallenge, adminRestoreCompetitionChallenge } from '../../../../../../api'
-import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateSummaryResponse, NoCtfapiEndpointsChallengesChallengeSummaryResponse } from '../../../../../../api'
+import { toast } from '../../../../../../utils/message-toast'
+
+import type { NoCTFAPIEndpointsAdministrationChallengeBankChallengeTemplateSummaryResponse, NoCTFAPIEndpointsChallengesChallengeSummaryResponse } from '../../../../../../api/models'
 import { useCompetitionAdmin } from '../../../../../../lib/admin-competition'
 import { competitionChallengeConflictMessage } from '../../../../../../lib/competition-challenge-conflict'
 
@@ -14,11 +18,11 @@ type ChallengeStatusFilter = 'all' | 'published' | 'unpublished' | 'deleted'
 export function useAdminCompetitionsByIdChallengesIndexPage() {
   const { competitionId, competition, canWrite } = useCompetitionAdmin()
 
-  const items = ref<NoCtfapiEndpointsChallengesChallengeSummaryResponse[]>([])
+  const items = ref<NoCTFAPIEndpointsChallengesChallengeSummaryResponse[]>([])
 
   const loading = ref(true)
 
-  const error = ref<string | null>(null)
+  const error = ref<UiMessage | null>(null)
 
   const includeDeleted = ref(false)
 
@@ -79,11 +83,9 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
   async function load() {
     loading.value = true
     error.value = null
-    const { data, error: e } = await adminListCompetitionChallenges({
-      path: { competitionId },
-      query: { includeDeleted: includeDeleted.value },
-    })
-    if (e) error.value = parseApiError(e).message
+    let e: unknown;
+    const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).challenges.get({ queryParameters: { includeDeleted: includeDeleted.value } }).catch(cause => { e = cause; return undefined });
+    if (e) error.value = parseApiError(e).displayMessage
     else items.value = [...(data?.items ?? [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
     loading.value = false
   }
@@ -104,7 +106,7 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
 
   const addOpen = ref(false)
 
-  const templates = ref<NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateSummaryResponse[]>([])
+  const templates = ref<NoCTFAPIEndpointsAdministrationChallengeBankChallengeTemplateSummaryResponse[]>([])
 
   const templatesLoading = ref(false)
 
@@ -120,7 +122,7 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
 
   const adding = ref(false)
 
-  const addError = ref<string | null>(null)
+  const addError = ref<UiMessage | null>(null)
 
   const modeTemplates = computed(() =>
     templates.value.filter(t => t.mode === competition.value?.mode && !t.deletedAt),
@@ -149,7 +151,7 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
   const newTags = ref<string[]>([])
   const tagOptions = computed(() => challengeTagOptions(items.value.filter(item => !item.deletedAt)))
   function updateNewTags(tags: string[]) {
-    if (!validChallengeTags(tags)) { toast.error(translate('challengeTags.invalid')); return }
+    if (!validChallengeTags(tags)) { toast.error(describeMessage('challengeTags.invalid')); return }
     newTags.value = uniqueTags(tags)
   }
 
@@ -163,50 +165,49 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
     newTags.value = []
     newOrder.value = (items.value.filter(i => !i.deletedAt).map(i => i.order ?? 0).reduce((m, o) => Math.max(m, o), 0) || 0) + 1
     templatesLoading.value = true
-    const { data, error: e } = await adminChallengeBankListTemplates({ query: { includeDeleted: false, direction: null, keyword: null, offset: 0, limit: 200, desc: false } })
-    if (e) addError.value = parseApiError(e).message
+    let e: unknown;
+    const data = await api.api.v1.admin.challenges.get({ queryParameters: { includeDeleted: false, direction: undefined, keyword: undefined, offset: 0, limit: 200, desc: false } }).catch(cause => { e = cause; return undefined });
+    if (e) addError.value = parseApiError(e).displayMessage
     else templates.value = data?.items ?? []
     templatesLoading.value = false
   }
 
   async function addChallenge() {
     if (!selectedTemplateId.value) {
-      addError.value = translate("ui.pleaseSelectAQuestionBankTemplate")
+      addError.value = describeMessage("administration.competitionsBy.description.selectQuestionBankTemplate")
       return
     }
     adding.value = true
     addError.value = null
     try {
-      const { error } = await adminCreateCompetitionChallenge({
-        path: { competitionId },
-        body: {
+      let error: unknown;
+      await api.api.v1.admin.competitions.byCompetitionId(competitionId).challenges.post({
           challengeId: selectedTemplateId.value,
           customTitle: newCustomTitle.value.trim() || null,
           order: newOrder.value,
           tags: newTags.value,
-        },
-      })
+        }).catch(cause => { error = cause; return undefined });
       if (error) {
-        addError.value = competitionChallengeConflictMessage(error) ?? parseApiError(error).message
+        addError.value = competitionChallengeConflictMessage(error) ?? parseApiError(error).displayMessage
         return
       }
-      toast.success(translate("ui.questionHasBeenAdded"))
+      toast.success(describeMessage("administration.label.questionAdded"))
       addOpen.value = false
       await load()
     }
     catch (e) {
-      addError.value = competitionChallengeConflictMessage(e) ?? parseApiError(e).message
+      addError.value = competitionChallengeConflictMessage(e) ?? parseApiError(e).displayMessage
     }
     finally {
       adding.value = false
     }
   }
 
-  const deleteTarget = ref<NoCtfapiEndpointsChallengesChallengeSummaryResponse | null>(null)
+  const deleteTarget = ref<NoCTFAPIEndpointsChallengesChallengeSummaryResponse | null>(null)
 
   const deletePending = ref(false)
 
-  const deleteError = ref<string | null>(null)
+  const deleteError = ref<UiMessage | null>(null)
 
   function closeDeleteDialog(open: boolean) {
     if (!open && !deletePending.value) {
@@ -215,7 +216,7 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
     }
   }
 
-  function beginDeleteChallenge(c: NoCtfapiEndpointsChallengesChallengeSummaryResponse) {
+  function beginDeleteChallenge(c: NoCTFAPIEndpointsChallengesChallengeSummaryResponse) {
     deleteTarget.value = c
     deleteError.value = null
   }
@@ -227,17 +228,15 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
     deleteError.value = null
     pendingId.value = target.id
     try {
-      const { error } = await adminDeleteCompetitionChallenge({
-        path: { competitionId, competitionChallengeId: target.id },
-      })
-      if (error) throw error
-      toast.success(translate("ui.questionHasBeenDeleted"))
+
+      await api.api.v1.admin.competitions.byCompetitionId(competitionId).challenges.byCompetitionChallengeId(target.id).delete();
+      toast.success(describeMessage("administration.label.questionDeleted"))
       deleteTarget.value = null
       deleteError.value = null
       await load()
     }
     catch (e) {
-      deleteError.value = parseApiError(e).message
+      deleteError.value = parseApiError(e).displayMessage
       toast.error(deleteError.value)
     }
     finally {
@@ -246,15 +245,12 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
     }
   }
 
-  async function restoreChallenge(c: NoCtfapiEndpointsChallengesChallengeSummaryResponse) {
+  async function restoreChallenge(c: NoCTFAPIEndpointsChallengesChallengeSummaryResponse) {
     if (!c.id) return
     pendingId.value = c.id
     try {
-      const { error } = await adminRestoreCompetitionChallenge({
-        path: { competitionId, competitionChallengeId: c.id },
-      })
-      if (error) throw error
-      toast.success(translate("ui.questionHasBeenRestored"))
+      await api.api.v1.admin.competitions.byCompetitionId(competitionId).challenges.byCompetitionChallengeId(c.id).restore.post();
+      toast.success(describeMessage("administration.label.questionRestored"))
       await load()
     }
     catch (e) {
@@ -266,23 +262,19 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
   }
 
   async function setChallengePublished(
-    challenge: NoCtfapiEndpointsChallengesChallengeSummaryResponse,
+    challenge: NoCTFAPIEndpointsChallengesChallengeSummaryResponse,
     published: boolean,
   ) {
     if (!challenge.id || challenge.deletedAt || pendingId.value !== null) return
     pendingId.value = challenge.id
     try {
-      const { data, error: requestError } = await adminPatchCompetitionChallenge({
-        path: { competitionId, competitionChallengeId: challenge.id },
-        body: {
+      const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).challenges.byCompetitionChallengeId(challenge.id).patch({
           presentation: {
             customTitle: challenge.customTitle ?? null,
             order: challenge.order ?? 0,
             isPublished: published,
           },
-        },
-      })
-      if (requestError) throw requestError
+        });
       const updated = data?.challenge
       if (updated) {
         items.value = items.value.map(item => item.id === updated.id ? updated : item)
@@ -290,13 +282,13 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
       else {
         await load()
       }
-      toast.success(translate(
-        published ? 'ui.challengeWasPublished' : 'ui.challengeWasUnpublished',
+      toast.success(describeMessage(
+        published ? 'common.label.challengeWasPublished' : 'common.label.challengeWasUnpublished',
         { challenge: challenge.title ?? challenge.customTitle ?? '-' },
       ))
     }
     catch (e) {
-      toast.error(competitionChallengeConflictMessage(e) ?? parseApiError(e).message)
+      toast.error(competitionChallengeConflictMessage(e) ?? parseApiError(e).displayMessage)
     }
     finally {
       pendingId.value = null

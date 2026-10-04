@@ -19,12 +19,12 @@ const props = withDefaults(defineProps<{
   disabled?: boolean
 }>(), {
   exposureOptions: () => [
-    { value: UrlExposure.OwnerOnly, label: "ui.onlyVisibleToTheTeamItself" },
-    { value: UrlExposure.Participants, label: "ui.visibleToAllContestants" },
+    { value: UrlExposure.OwnerOnly, label: "runtime.urlBinding.description.visibleTeamItself" },
+    { value: UrlExposure.Participants, label: "runtime.label.visibleContestants" },
   ],
   showServiceName: false,
   serviceNames: () => [],
-  addLabel: translate("ui.addAccessPortal"),
+  addLabel: translate("administration.label.addAccessPortal"),
   allowCustomDisplay: true,
   disabled: false,
 })

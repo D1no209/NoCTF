@@ -1,5 +1,7 @@
 .git/
 .github/
+.crowdin-stage/
+.crowdin-stage.yml
 .vs/
 .vscode/
 .idea/

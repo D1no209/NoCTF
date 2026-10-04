@@ -6,7 +6,7 @@ using System.Text.Json.Nodes;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using FastEndpoints;
-using FastEndpoints.Swagger;
+using FastEndpoints.OpenApi;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -346,7 +346,7 @@ public sealed class ChallengeTemplateValidationHttpTests
                 || type == typeof(CreateChallengeTemplateEndpoint)
                 || type == typeof(CreateChallengeTemplateValidator);
         });
-        builder.Services.SwaggerDocument();
+        builder.Services.OpenApiDocument();
         builder.Services
             .AddAuthentication(options =>
             {

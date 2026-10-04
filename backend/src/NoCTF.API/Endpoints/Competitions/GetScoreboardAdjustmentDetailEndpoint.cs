@@ -56,7 +56,7 @@ public sealed class GetScoreboardAdjustmentDetailEndpoint(
     {
         Get("/competitions/{competitionId}/leaderboard/teams/{teamId}/adjustments");
         AllowAnonymous();
-        Summary(summary => summary.Summary = "Get global scoreboard adjustments with signed cursor pagination.");
+        Summary(summary => { summary.Summary = "Get global scoreboard adjustments with signed cursor pagination."; summary.Description = summary.Summary; });
     }
 
     public override async Task<Results<Ok<ScoreboardAdjustmentDetailResponse>, Accepted<LeaderboardProcessingProtocolResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(
@@ -105,9 +105,9 @@ public sealed class GetScoreboardAdjustmentDetailEndpoint(
             dataAsOf.UtcTicks);
         if (!cursors.TryDecode(request.Cursor, CursorEndpoint, scope, out var position))
         {
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
-                title: "Invalid cursor.");
+                title: ApiMessages.Get(ApiMessageId.InvalidCursor));
         }
 
         var adjustments = await details.ReadAdjustmentsAsync(new(

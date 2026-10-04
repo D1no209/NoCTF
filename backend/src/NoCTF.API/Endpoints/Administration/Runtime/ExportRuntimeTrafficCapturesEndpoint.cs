@@ -12,7 +12,6 @@ public sealed class ExportRuntimeTrafficCapturesRequest
     public IReadOnlyList<Guid> RuntimeInstanceIds { get; set; } = [];
 }
 
-[NJsonSchema.Annotations.JsonSchema(NJsonSchema.JsonObjectType.String, Format = "binary")]
 public sealed class RuntimeTrafficCaptureArchiveResponse;
 
 public sealed class ExportRuntimeTrafficCapturesValidator
@@ -22,7 +21,7 @@ public sealed class ExportRuntimeTrafficCapturesValidator
         RuleFor(request => request.RuntimeInstanceIds)
             .NotEmpty()
             .Must(ids => ids.Count <= 100 && ids.Distinct().Count() == ids.Count)
-            .WithMessage("Select between 1 and 100 distinct Runtime captures.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.ExportRuntimeTrafficCapturesValidationSelectBetweenDistinctRuntime)).WithErrorCode(ApiMessages.Key(ApiMessageId.ExportRuntimeTrafficCapturesValidationSelectBetweenDistinctRuntime));
 }
 
 public sealed class ExportRuntimeTrafficCapturesEndpoint(
@@ -41,7 +40,7 @@ public sealed class ExportRuntimeTrafficCapturesEndpoint(
             .Produces<RuntimeTrafficCaptureArchiveResponse>(
                 StatusCodes.Status200OK,
                 "application/zip"));
-        Summary(summary => summary.Summary = "Exports selected Runtime captures as ZIP.");
+        Summary(summary => { summary.Summary = "Exports selected Runtime captures as ZIP."; summary.Description = summary.Summary; });
     }
 
     public override async Task<Results<PushStreamHttpResult, NotFound,

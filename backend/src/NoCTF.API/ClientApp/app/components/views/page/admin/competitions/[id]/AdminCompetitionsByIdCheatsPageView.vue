@@ -11,29 +11,29 @@ const { adminUserPath, adminTeamPath, adminChallengePath, competitionId, filterS
     <div class="flex flex-wrap items-center gap-3">
       <Select v-model="filterStatus">
         <SelectTrigger class="w-40">
-          <SelectValue :placeholder="$t('ui.statusAll')" />
+          <SelectValue :placeholder="$t('common.label.status.runtimesPageView')" />
         </SelectTrigger>
         <SelectContent>
           <SelectGroup>
-            <SelectItem value="All">{{ $t('ui.all') }}</SelectItem>
-            <SelectItem value="Pending">{{ $t('ui.pending') }}</SelectItem>
-            <SelectItem value="Confirmed">{{ $t('ui.confirmed') }}</SelectItem>
-            <SelectItem value="Dismissed">{{ $t('ui.dismissed') }}</SelectItem>
-            <SelectItem value="Superseded">{{ $t('ui.superseded') }}</SelectItem>
-            <SelectItem value="Corrected">{{ $t('ui.corrected') }}</SelectItem>
+            <SelectItem value="All">{{ $t('administration.label.platformLogs') }}</SelectItem>
+            <SelectItem value="Pending">{{ $t('administration.label.pending') }}</SelectItem>
+            <SelectItem value="Confirmed">{{ $t('administration.label.confirmed') }}</SelectItem>
+            <SelectItem value="Dismissed">{{ $t('common.label.dismissed') }}</SelectItem>
+            <SelectItem value="Superseded">{{ $t('administration.label.superseded') }}</SelectItem>
+            <SelectItem value="Corrected">{{ $t('administration.label.corrected') }}</SelectItem>
           </SelectGroup>
         </SelectContent>
       </Select>
-      <DateTimePicker v-model="filterFrom"  class="w-52" :aria-label="$t('ui.startTime2')" />
-      <span class="text-sm text-muted-foreground">{{ $t('ui.to') }}</span>
-      <DateTimePicker v-model="filterTo"  class="w-52" :aria-label="$t('ui.endTime')" />
-      <Button size="sm" @click="applyFilters">{{ $t('ui.applyFilters') }}</Button>
+      <DateTimePicker v-model="filterFrom"  class="w-52" :aria-label="$t('administration.label.startTime')" />
+      <span class="text-sm text-muted-foreground">{{ $t('administration.label.byId') }}</span>
+      <DateTimePicker v-model="filterTo"  class="w-52" :aria-label="$t('common.label.endTime')" />
+      <Button size="sm" @click="applyFilters">{{ $t('common.label.applyFilters') }}</Button>
       <Badge v-if="pendingCount !== null && pendingCount > 0" variant="destructive">
-        {{ $t('ui.pending2', { count: pendingCount }) }}
+        {{ $t('administration.label.pending.cheatsPageView', { count: pendingCount }) }}
       </Badge>
     </div>
 
-    <p class="text-xs text-muted-foreground"> {{ $t('ui.whenAllTimesAreLeftBlankTheLast31Days') }} </p>
+    <p class="text-xs text-muted-foreground"> {{ $t('administration.competitionsBy.description.timesLeftBlankLast') }} </p>
 
     <Alert v-if="filterError || listError" variant="destructive">
       <AlertDescription>{{ filterError ?? listError?.message }}</AlertDescription>
@@ -42,29 +42,29 @@ const { adminUserPath, adminTeamPath, adminChallengePath, competitionId, filterS
     <Skeleton v-if="loading && !initialized" class="h-48 w-full" />
     <Empty v-else-if="initialized && items.length === 0" class="border border-dashed py-12">
       <EmptyHeader>
-        <EmptyTitle>{{ $t('ui.noCheatingIncidentsYet') }}</EmptyTitle>
+        <EmptyTitle>{{ $t('administration.label.cheatingIncidentsYet') }}</EmptyTitle>
       </EmptyHeader>
     </Empty>
     <template v-else>
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>{{ $t('ui.sourceTeam') }}</TableHead>
-            <TableHead>{{ $t('ui.flagOwnerTeam') }}</TableHead>
-            <TableHead>{{ $t('ui.challenge') }}</TableHead>
-            <TableHead class="w-20">{{ $t('ui.type') }}</TableHead>
-            <TableHead class="w-24">{{ $t('ui.status') }}</TableHead>
-            <TableHead class="w-44">{{ $t('ui.detectionTime') }}</TableHead>
-            <TableHead class="w-40 text-right">{{ $t('ui.actions') }}</TableHead>
+            <TableHead>{{ $t('administration.label.sourceTeam') }}</TableHead>
+            <TableHead>{{ $t('administration.label.flagOwnerTeam') }}</TableHead>
+            <TableHead>{{ $t('common.label.challenge.pageTitle') }}</TableHead>
+            <TableHead class="w-20">{{ $t('common.label.type') }}</TableHead>
+            <TableHead class="w-24">{{ $t('common.label.status') }}</TableHead>
+            <TableHead class="w-44">{{ $t('administration.label.detectionTime') }}</TableHead>
+            <TableHead class="w-40 text-right">{{ $t('common.label.actions') }}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          <TableRow v-for="i in items" :key="i.gameplayFactId">
+          <TableRow v-for="i in items" :key="i.gameplayFactId ?? undefined">
             <TableCell class="font-medium">
               <NuxtLink :to="adminTeamPath(competitionId, i.sourceTeamId)" class="hover:underline">{{ i.sourceTeamName }}</NuxtLink>
-              <Badge v-if="i.sourceTeamIsBanned" variant="destructive" class="ml-1">{{ $t('ui.banned2') }}</Badge>
+              <Badge v-if="i.sourceTeamIsBanned" variant="destructive" class="ml-1">{{ $t('common.label.banned') }}</Badge>
             </TableCell>
-            <TableCell><NuxtLink v-if="i.ownerTeamId" :to="adminTeamPath(competitionId, i.ownerTeamId)" class="hover:underline">{{ i.ownerTeamName }}</NuxtLink><span v-else>{{ i.ownerTeamName ?? $t('ui.multipleTeamsOrUndetermined') }}</span></TableCell>
+            <TableCell><NuxtLink v-if="i.ownerTeamId" :to="adminTeamPath(competitionId, i.ownerTeamId)" class="hover:underline">{{ i.ownerTeamName }}</NuxtLink><span v-else>{{ i.ownerTeamName ?? $t('administration.label.multipleTeamsUndetermined') }}</span></TableCell>
             <TableCell><NuxtLink :to="adminChallengePath(competitionId, i.competitionChallengeId)" class="hover:underline">{{ i.challengeTitle }}</NuxtLink></TableCell>
             <TableCell>{{ enumLabel(GameplayFactKindLabel, i.gameplayFactKind) }}</TableCell>
             <TableCell>
@@ -74,58 +74,58 @@ const { adminUserPath, adminTeamPath, adminChallengePath, competitionId, filterS
             </TableCell>
             <TableCell class="font-mono tabular-nums">{{ adminFormatDateTime(i.detectedAt) }}</TableCell>
             <TableCell class="text-right">
-              <Button variant="ghost" size="sm" @click="openDetail(i.gameplayFactId)">{{ $t('ui.details') }}</Button>
+              <Button variant="ghost" size="sm" @click="openDetail(i.gameplayFactId)">{{ $t('common.label.details') }}</Button>
             </TableCell>
           </TableRow>
         </TableBody>
       </Table>
       <div v-if="hasMore" class="flex justify-center">
         <Button variant="outline" :disabled="loading" @click="loadNextPage">
-          <Spinner v-if="loading" data-icon="inline-start" /> {{ $t('ui.loadMore') }} </Button>
+          <Spinner v-if="loading" data-icon="inline-start" /> {{ $t('common.label.load') }} </Button>
       </div>
     </template>
 
     <Sheet v-model:open="detailOpen">
       <SheetContent data-scroll-surface class="overflow-y-auto">
         <SheetHeader>
-          <SheetTitle>{{ $t('ui.cheatIncidentDetails') }}</SheetTitle>
-          <SheetDescription>{{ $t('ui.eventId', { id: detail?.gameplayFactId ?? '-' }) }}</SheetDescription>
+          <SheetTitle>{{ $t('administration.label.cheatIncidentDetails') }}</SheetTitle>
+          <SheetDescription>{{ $t('administration.label.eventId', { id: detail?.gameplayFactId ?? '-' }) }}</SheetDescription>
         </SheetHeader>
         <Skeleton v-if="detailLoading" class="mx-4 h-48" />
         <div v-else-if="detail" class="flex flex-col gap-3 px-4 pb-4 text-sm">
-          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.sourceTeam') }}</span><NuxtLink v-if="detail.sourceTeamId" :to="adminTeamPath(competitionId, detail.sourceTeamId)" class="hover:underline">{{ detail.sourceTeamName }}</NuxtLink><span v-else>{{ detail.sourceTeamName }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.flagOwner') }}</span><NuxtLink v-if="detail.ownerTeamId" :to="adminTeamPath(competitionId, detail.ownerTeamId)" class="hover:underline">{{ detail.ownerTeamName ?? $t('ui.multipleTeamsOrUndetermined') }}</NuxtLink><span v-else>{{ detail.ownerTeamName ?? $t('ui.multipleTeamsOrUndetermined') }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.challenge') }}</span><NuxtLink v-if="detail.competitionChallengeId" :to="adminChallengePath(competitionId, detail.competitionChallengeId)" class="hover:underline">{{ detail.challengeTitle }}</NuxtLink><span v-else>{{ detail.challengeTitle }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.author') }}</span><NuxtLink v-if="detail.actorUserId" :to="adminUserPath(detail.actorUserId)" class="hover:underline">{{ detail.submittedByUserName }}</NuxtLink><span v-else>{{ detail.submittedByUserName }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.type') }}</span><span>{{ enumLabel(GameplayFactKindLabel, detail.gameplayFactKind) }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.result') }}</span><span>{{ enumLabel(GameplayFactResultLabel, detail.result) }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.status') }}</span><span>{{ enumLabel(CheatIncidentStatusLabel, detail.status) }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.submissionTime') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.submittedAt) }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.detectionTime') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.detectedAt) }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('administration.label.sourceTeam') }}</span><NuxtLink v-if="detail.sourceTeamId" :to="adminTeamPath(competitionId, detail.sourceTeamId)" class="hover:underline">{{ detail.sourceTeamName }}</NuxtLink><span v-else>{{ detail.sourceTeamName }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('administration.label.flagOwner') }}</span><NuxtLink v-if="detail.ownerTeamId" :to="adminTeamPath(competitionId, detail.ownerTeamId)" class="hover:underline">{{ detail.ownerTeamName ?? $t('administration.label.multipleTeamsUndetermined') }}</NuxtLink><span v-else>{{ detail.ownerTeamName ?? $t('administration.label.multipleTeamsUndetermined') }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('common.label.challenge.pageTitle') }}</span><NuxtLink v-if="detail.competitionChallengeId" :to="adminChallengePath(competitionId, detail.competitionChallengeId)" class="hover:underline">{{ detail.challengeTitle }}</NuxtLink><span v-else>{{ detail.challengeTitle }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('administration.label.author') }}</span><NuxtLink v-if="detail.actorUserId" :to="adminUserPath(detail.actorUserId)" class="hover:underline">{{ detail.submittedByUserName }}</NuxtLink><span v-else>{{ detail.submittedByUserName }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('common.label.type') }}</span><span>{{ enumLabel(GameplayFactKindLabel, detail.gameplayFactKind) }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('common.label.result') }}</span><span>{{ enumLabel(GameplayFactResultLabel, detail.result) }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('common.label.status') }}</span><span>{{ enumLabel(CheatIncidentStatusLabel, detail.status) }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('common.label.submissionTime') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.submittedAt) }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('administration.label.detectionTime') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.detectedAt) }}</span></div>
           <template v-if="detail.resolvedByUserName">
-            <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.processor') }}</span><NuxtLink v-if="detail.resolvedByUserId" :to="adminUserPath(detail.resolvedByUserId)" class="hover:underline">{{ detail.resolvedByUserName }}</NuxtLink><span v-else>{{ detail.resolvedByUserName }}</span></div>
-            <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.processingTime') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.resolvedAt) }}</span></div>
-            <div class="flex flex-col gap-1"><span class="text-muted-foreground">{{ $t('ui.reasonsForProcessing') }}</span><span class="whitespace-pre-wrap">{{ detail.resolutionReason }}</span></div>
+            <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('administration.label.processor') }}</span><NuxtLink v-if="detail.resolvedByUserId" :to="adminUserPath(detail.resolvedByUserId)" class="hover:underline">{{ detail.resolvedByUserName }}</NuxtLink><span v-else>{{ detail.resolvedByUserName }}</span></div>
+            <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('administration.label.processingTime') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.resolvedAt) }}</span></div>
+            <div class="flex flex-col gap-1"><span class="text-muted-foreground">{{ $t('administration.label.reasonsProcessing') }}</span><span class="whitespace-pre-wrap">{{ detail.resolutionReason }}</span></div>
           </template>
           <template v-if="detail.sourceTeamIsBanned">
             <Separator />
-            <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('ui.banTime') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.sourceTeamBannedAt) }}</span></div>
-            <div class="flex flex-col gap-1"><span class="text-muted-foreground">{{ $t('ui.banReason') }}</span><span class="whitespace-pre-wrap">{{ detail.sourceTeamBanReason ?? '-' }}</span></div>
+            <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('administration.label.banTime') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.sourceTeamBannedAt) }}</span></div>
+            <div class="flex flex-col gap-1"><span class="text-muted-foreground">{{ $t('administration.label.banReason') }}</span><span class="whitespace-pre-wrap">{{ detail.sourceTeamBanReason ?? '-' }}</span></div>
           </template>
           <Separator />
           <div class="flex flex-col gap-2">
-            <span class="text-muted-foreground">{{ $t('ui.submittedFlagEvidence') }}</span>
+            <span class="text-muted-foreground">{{ $t('administration.label.submittedFlagEvidence') }}</span>
             <Button variant="outline" size="sm" class="w-fit" @click="onClickShowFlag">
-              {{ showFlag ? $t('ui.hide') : $t('ui.showFullFlag') }}
+              {{ showFlag ? $t('administration.label.hide') : $t('administration.label.showFullFlag') }}
             </Button>
             <div v-if="showFlag" class="rounded-md border bg-muted p-3 font-mono text-xs break-all">
               {{ detail.value }}
             </div>
           </div>
           <div v-if="detail.canConfirm || detail.canDismiss || detail.canCorrect" class="flex flex-wrap gap-2 pt-2">
-            <Button v-if="detail.canConfirm" variant="destructive" size="sm" @click="openAction('confirm')"> {{ $t('ui.confirmCheatingBan') }} </Button>
-            <Button v-if="detail.canDismiss" variant="outline" size="sm" @click="openAction('dismiss')"> {{ $t('ui.dismiss') }} </Button>
-            <Button v-if="detail.canCorrect" variant="outline" size="sm" @click="openAction('correct')"> {{ $t('ui.correctionUnblocking') }} </Button>
+            <Button v-if="detail.canConfirm" variant="destructive" size="sm" @click="openAction('confirm')"> {{ $t('administration.label.confirmCheatingBan') }} </Button>
+            <Button v-if="detail.canDismiss" variant="outline" size="sm" @click="openAction('dismiss')"> {{ $t('administration.label.dismiss') }} </Button>
+            <Button v-if="detail.canCorrect" variant="outline" size="sm" @click="openAction('correct')"> {{ $t('administration.label.correctionUnblocking') }} </Button>
           </div>
         </div>
       </SheetContent>
@@ -137,14 +137,14 @@ const { adminUserPath, adminTeamPath, adminChallengePath, competitionId, filterS
           <AlertDialogTitle>{{ resolutionAction ? $t(ActionMeta[resolutionAction].title) : '' }}</AlertDialogTitle>
           <AlertDialogDescription>
             {{ resolutionAction ? $t(ActionMeta[resolutionAction].description) : '' }}
-            {{ $t('ui.affectedTargetTheReasonIsRecordedInCompetitionEventsAnd', { target: resolutionTargetLabel }) }}
+            {{ $t('administration.competitionsBy.description.affectedTargetReasonRecorded', { target: resolutionTargetLabel }) }}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <div class="grid gap-2 px-1 pb-2">
           <Textarea
             v-model="resolutionReason"
-            :placeholder="$t('ui.pleaseEnterAReasonForTheDispositionOfAtLeast')"
-            :aria-label="$t('ui.reasonsForDisposal')"
+            :placeholder="$t('administration.competitionsBy.description.enterReasonDispositionLeast')"
+            :aria-label="$t('administration.label.reasonsDisposal')"
             aria-describedby="cheat-resolution-reason-help"
             :aria-invalid="remainingCharacters > 0"
             :disabled="resolutionPending"
@@ -155,16 +155,16 @@ const { adminUserPath, adminTeamPath, adminChallengePath, competitionId, filterS
             :class="remainingCharacters > 0 ? 'text-destructive' : 'text-muted-foreground'"
           >
             <template v-if="remainingCharacters > 0">
-              {{ $t('ui.theReasonMustBeAtLeast8CharactersMoreRequired', { count: remainingCharacters }) }}
+              {{ $t('administration.competitionsBy.validation.reasonLeastRequired', { count: remainingCharacters }) }}
             </template>
-            <template v-else> {{ $t('ui.theLengthOfTheReasonMeetsTheRequirements') }} </template>
+            <template v-else> {{ $t('administration.competitionsBy.description.lengthReasonMeetsRequirements') }} </template>
           </p>
           <p v-if="resolutionError" role="alert" class="text-destructive text-sm">
             {{ $message(resolutionError) }}
           </p>
         </div>
         <AlertDialogFooter>
-          <AlertDialogCancel :disabled="resolutionPending"> {{ $t('ui.cancel') }} </AlertDialogCancel>
+          <AlertDialogCancel :disabled="resolutionPending"> {{ $t('common.action.cancel') }} </AlertDialogCancel>
           <Button
             type="button"
             :variant="resolutionAction === 'confirm' ? 'destructive' : 'default'"
@@ -172,7 +172,7 @@ const { adminUserPath, adminTeamPath, adminChallengePath, competitionId, filterS
             @click="handleResolutionSubmit"
           >
             <Spinner v-if="resolutionPending" data-icon="inline-start" />
-            {{ resolutionPending ? $t('ui.submitting') : (resolutionAction ? $t(ActionMeta[resolutionAction].title) : $t('ui.confirm')) }}
+            {{ resolutionPending ? $t('administration.label.submitting') : (resolutionAction ? $t(ActionMeta[resolutionAction].title) : $t('common.label.confirm')) }}
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>

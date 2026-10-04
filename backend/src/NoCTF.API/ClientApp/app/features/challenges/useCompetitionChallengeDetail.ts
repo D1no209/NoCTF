@@ -1,9 +1,15 @@
+
+import { ResponseMetadata, nativeResponse } from '../../lib/api'
+
+import { api, RequestPolicyOption, } from '../../lib/api'
+import { message as describeMessage } from '../../utils/i18n'
+import type { UiMessage } from '../../utils/i18n'
 import { markRaw, provide, toRefs } from 'vue'
 
-import { toast } from 'vue-sonner'
+import { toast } from '../../utils/message-toast'
 import { Dice5, FileDown, History } from '@lucide/vue'
-import { downloadChallengeAttachmentEndpoint, downloadRandomChallengeAttachmentEndpoint, getChallengeEndpoint, listChallengeAttachmentsEndpoint, startProgressionChallenge } from '../../api'
-import type { NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol, NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse, NoCtfapiEndpointsChallengesChallengeResponse } from '../../api'
+
+import type { NoCTFAPIEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol, NoCTFAPIEndpointsAdministrationChallengeBankChallengeAttachmentResponse, NoCTFAPIEndpointsChallengesChallengeResponse } from '../../api/models'
 import { downloadSdkFileToDisk } from '../../utils/download'
 import ChallengeHintsComponent from './ChallengeHints.vue'
 import ChallengeSubmissionHistoryComponent from './ChallengeSubmissionHistory.vue'
@@ -17,25 +23,25 @@ import { challengeGameplayFactStatusKey, createChallengeGameplayFactStatusReader
 export function useCompetitionChallengeDetail(props: Readonly<{
   competitionId: string
   competitionChallengeId: string
-  flagDockTarget?: string
+  flagDockTarget?: string | null
 }>) {
   const ctx = inject(competitionContextKey)!
 
   const { isLoggedIn, ready: authReady, user } = useAuth()
 
-  const challenge = ref<NoCtfapiEndpointsChallengesChallengeResponse | null>(null)
+  const challenge = ref<NoCTFAPIEndpointsChallengesChallengeResponse | null>(null)
 
   const loading = ref(true)
 
-  const error = ref<string | null>(null)
+  const error = ref<UiMessage | null>(null)
 
-  const attachments = ref<NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse[]>([])
+  const attachments = ref<NoCTFAPIEndpointsAdministrationChallengeBankChallengeAttachmentResponse[]>([])
 
-  const attachmentDeliveryPolicy = ref<NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol>('All')
+  const attachmentDeliveryPolicy = ref<NoCTFAPIEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol>('All')
 
   const attachmentsLoading = ref(false)
 
-  const attachmentError = ref<string | null>(null)
+  const attachmentError = ref<UiMessage | null>(null)
 
   const downloading = ref(false)
 
@@ -73,38 +79,28 @@ export function useCompetitionChallengeDetail(props: Readonly<{
         && entry.value.challengeId === props.competitionChallengeId
         ? entry.value.revision : undefined
       entry.value = null
-      const started = await startProgressionChallenge({
-        signal: reads.signal,
-        path: {
-          competitionId: props.competitionId,
-          competitionChallengeId: props.competitionChallengeId,
-        },
-        body: { expectedRevision },
-      })
+      let startedError: unknown;
+      const startedResponse = new ResponseMetadata();
+      await api.api.v1.competitions.byCompetitionId(props.competitionId).challenges.byCompetitionChallengeId(props.competitionChallengeId).start.post({ expectedRevision }, { options: [new RequestPolicyOption({ signal: reads.signal, response: startedResponse })] }).catch(cause => { startedError = cause; return undefined });
       if (sequence !== loadSequence) return
-      if (started.error) {
+      if (startedError) {
         loading.value = false
-        if (started.response?.status === 409 || started.response?.status === 404) {
+        if (startedResponse?.status === 409 || startedResponse?.status === 404) {
           await navigateTo({ path: `/competitions/${props.competitionId}/progression`,
             query: { blocked: props.competitionChallengeId } })
           return
         }
-        error.value = parseApiError(started.error, translate('progression.startFailed')).message
+        error.value = parseApiError(startedError, describeMessage('progression.startFailed')).displayMessage
         return
       }
     }
 
-    const { data, error: requestError } = await getChallengeEndpoint({
-      signal: reads.signal,
-      path: {
-        competitionId: props.competitionId,
-        competitionChallengeId: props.competitionChallengeId,
-      },
-    })
+    let requestError: unknown;
+    const data = await api.api.v1.competitions.byCompetitionId(props.competitionId).challenges.byCompetitionChallengeId(props.competitionChallengeId).get({ options: [new RequestPolicyOption({ signal: reads.signal })] }).catch(cause => { requestError = cause; return undefined });
     if (sequence !== loadSequence) return
     loading.value = false
     if (requestError || !data) {
-      error.value = parseApiError(requestError, translate("ui.failedToLoadQuestion")).message
+      error.value = parseApiError(requestError, describeMessage("challenges.error.loadQuestionFailed")).displayMessage
       return
     }
     challenge.value = data
@@ -121,17 +117,12 @@ export function useCompetitionChallengeDetail(props: Readonly<{
     const challengeId = props.competitionChallengeId
     attachmentsLoading.value = true
     attachmentError.value = null
-    const { data, error: requestError } = await listChallengeAttachmentsEndpoint({
-      signal: reads.signal,
-      path: {
-        competitionId: props.competitionId,
-        competitionChallengeId: challengeId,
-      },
-    })
+    let requestError: unknown;
+    const data = await api.api.v1.competitions.byCompetitionId(props.competitionId).challenges.byCompetitionChallengeId(challengeId).attachments.get({ options: [new RequestPolicyOption({ signal: reads.signal })] }).catch(cause => { requestError = cause; return undefined });
     if (reads.signal.aborted || challengeId !== props.competitionChallengeId) return
     attachmentsLoading.value = false
     if (requestError || !data) {
-      attachmentError.value = parseApiError(requestError, translate("ui.failedToLoadChallengeAttachments")).message
+      attachmentError.value = parseApiError(requestError, describeMessage("challenges.competitionChallenge.error.loadChallengeAttachmentsFailed")).displayMessage
       return
     }
     attachmentDeliveryPolicy.value = data.deliveryPolicy ?? 'All'
@@ -160,20 +151,12 @@ export function useCompetitionChallengeDetail(props: Readonly<{
     if (downloading.value) return
     downloading.value = true
     try {
-      await downloadSdkFileToDisk(
-        parseAs => downloadChallengeAttachmentEndpoint({
-          path: {
-            competitionId: props.competitionId,
-            competitionChallengeId: props.competitionChallengeId,
-            attachmentId,
-          },
-          parseAs,
-        }),
+      await downloadSdkFileToDisk(() => nativeResponse(responseOptions => api.api.v1.competitions.byCompetitionId(props.competitionId).challenges.byCompetitionChallengeId(props.competitionChallengeId).attachments.byAttachmentId(attachmentId).get({ options: [...responseOptions] })),
         fileName,
       )
     }
     catch (downloadError) {
-      toast.error(parseApiError(downloadError, translate("ui.attachmentDownloadFailed")).message)
+      toast.error(parseApiError(downloadError, describeMessage("challenges.error.attachmentDownloadFailed")).displayMessage)
     }
     finally {
       downloading.value = false
@@ -184,19 +167,12 @@ export function useCompetitionChallengeDetail(props: Readonly<{
     if (downloading.value) return
     downloading.value = true
     try {
-      await downloadSdkFileToDisk(
-        parseAs => downloadRandomChallengeAttachmentEndpoint({
-          path: {
-            competitionId: props.competitionId,
-            competitionChallengeId: props.competitionChallengeId,
-          },
-          parseAs,
-        }),
+      await downloadSdkFileToDisk(() => nativeResponse(responseOptions => api.api.v1.competitions.byCompetitionId(props.competitionId).challenges.byCompetitionChallengeId(props.competitionChallengeId).attachment.get({ options: [...responseOptions] })),
         'attachment',
       )
     }
     catch (downloadError) {
-      toast.error(parseApiError(downloadError, translate("ui.attachmentDownloadFailed")).message)
+      toast.error(parseApiError(downloadError, describeMessage("challenges.error.attachmentDownloadFailed")).displayMessage)
     }
     finally {
       downloading.value = false

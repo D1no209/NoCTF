@@ -8,7 +8,7 @@ const { hasServices, serviceNames, toggleFlagInjection, model, disabled, onUpdat
 
 <template>
   <FieldSet class="rounded-md border p-4">
-    <FieldLegend class="px-1 text-sm font-medium">{{ $t('ui.flagInjection') }}</FieldLegend>
+    <FieldLegend class="px-1 text-sm font-medium">{{ $t('administration.label.flagInjection') }}</FieldLegend>
     <Field orientation="horizontal">
       <Switch
         id="def-has-flag-injection"
@@ -16,41 +16,41 @@ const { hasServices, serviceNames, toggleFlagInjection, model, disabled, onUpdat
         :disabled="disabled"
         @update:model-value="toggleFlagInjection($event === true)"
       />
-      <FieldLabel for="def-has-flag-injection" class="font-normal">{{ $t('ui.injectNewFlagsIntoTheTeamEnvironmentEachRound') }}</FieldLabel>
+      <FieldLabel for="def-has-flag-injection" class="font-normal">{{ $t('administration.definitionFlag.description.injectNewFlagsTeam') }}</FieldLabel>
     </Field>
     <FieldGroup v-if="model.flagInjection">
       <Field>
-        <FieldLabel>{{ $t('ui.injectCommand') }}</FieldLabel>
+        <FieldLabel>{{ $t('administration.label.injectCommand') }}</FieldLabel>
         <Input
           v-model="model.flagInjection.command"
-          :placeholder="$t('ui.shCEchoFlag')"
+          :placeholder="$t('administration.label.shCEchoFlag')"
           class="font-mono text-sm"
           :disabled="disabled"
         />
-        <FieldDescription>{{ $t('ui.mustContainThePlaceholderWhichWillBeExecutedInThe') }}</FieldDescription>
+        <FieldDescription>{{ $t('administration.definitionFlag.validation.placeholderWhichFormat') }}</FieldDescription>
       </Field>
       <div class="grid gap-4 sm:grid-cols-2">
         <Field>
-          <FieldLabel>{{ $t('ui.timeoutSeconds') }}</FieldLabel>
+          <FieldLabel>{{ $t('administration.label.timeoutSeconds') }}</FieldLabel>
           <NullableNumberInput
             :model-value="model.flagInjection.timeoutSeconds"
             :min="1"
             :max="300"
-            :placeholder="$t('ui.default30')"
+            :placeholder="$t('administration.label.default')"
             :disabled="disabled"
             @update:model-value="onUpdateModelValueTimeoutSeconds"
           />
         </Field>
         <Field v-if="hasServices">
-          <FieldLabel>{{ $t('ui.targetServiceName') }}</FieldLabel>
+          <FieldLabel>{{ $t('administration.label.targetServiceName') }}</FieldLabel>
           <Select v-model="model.flagInjection.serviceName" :disabled="disabled">
           <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent><SelectGroup><SelectItem v-for="name in serviceNames" :key="name" :value="name">{{ name }}</SelectItem></SelectGroup></SelectContent>
+          <SelectContent><SelectGroup><SelectItem v-for="name in serviceNames" :key="name ?? undefined" :value="name">{{ name }}</SelectItem></SelectGroup></SelectContent>
         </Select>
-          <FieldDescription>{{ $t('ui.theComposeOperatingEnvironmentMustSpecifyTheInjectionTargetService') }}</FieldDescription>
+          <FieldDescription>{{ $t('administration.definitionFlag.validation.composeOperatingFormat') }}</FieldDescription>
         </Field>
       </div>
     </FieldGroup>
-    <FieldDescription v-else>{{ $t('ui.whenEnablingTheRuntimeEnvironmentAwdMustConfigureFlagInjection') }}</FieldDescription>
+    <FieldDescription v-else>{{ $t('administration.definitionFlag.validation.enablingRuntimeFormat') }}</FieldDescription>
   </FieldSet>
 </template>

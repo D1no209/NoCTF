@@ -8,14 +8,14 @@ const { Box, ScanLine, ShieldCheck, hexes, event } = toRefs(viewProps.state)
 
 <template>
   <div class="event-fx defense-success" aria-hidden="true">
-    <div class="upload-cube"><Box /><i /><span>{{ $t('ui.patchUpload3') }}</span></div>
-    <div class="scan-disc"><ScanLine /><i /><strong>{{ $t('ui.scan') }}</strong></div>
-    <div class="shield-grid"><i v-for="hex in hexes" :key="hex" :style="{ '--hex': hex }" /></div>
+    <div class="upload-cube"><Box /><i /><span>{{ $t('competitions.label.patchUpload') }}</span></div>
+    <div class="scan-disc"><ScanLine /><i /><strong>{{ $t('competitions.label.scan') }}</strong></div>
+    <div class="shield-grid"><i v-for="hex in hexes" :key="hex ?? undefined" :style="{ '--hex': hex }" /></div>
     <div class="success-shield"><ShieldCheck /><i /></div>
     <div class="defense-result">
       <small>{{ event.teamName }} / {{ event.challengeTitle }}</small>
-      <strong>{{ $t('ui.defenseSuccess') }}</strong>
-      <span>{{ $t('ui.patchVerified') }} {{ $t('ui.pendingRoundSettlement') }}</span>
+      <strong>{{ $t('competitions.label.defenseSuccess') }}</strong>
+      <span>{{ $t('competitions.label.patchVerified') }} {{ $t('common.label.pendingRoundSettlement') }}</span>
     </div>
   </div>
 </template>

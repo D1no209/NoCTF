@@ -16,7 +16,7 @@ export function validChallengeTags(names: readonly string[]): boolean {
     && uniqueTags(names).length <= 20
 }
 
-export function challengeTagOptions(items: readonly { tags?: readonly string[] }[]): string[] {
+export function challengeTagOptions(items: readonly { tags?: readonly string[] | null }[]): string[] {
   return uniqueTags(items.flatMap(item => item.tags ?? []))
     .sort((left, right) => tagKey(left).localeCompare(tagKey(right)))
 }

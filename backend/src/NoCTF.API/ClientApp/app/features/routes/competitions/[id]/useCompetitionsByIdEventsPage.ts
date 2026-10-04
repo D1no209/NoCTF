@@ -1,10 +1,17 @@
+import { dateObject } from '../../../../utils/date-value'
+
+import { ResponseMetadata, RequestPolicyOption } from '../../../../lib/api'
+
+import { api } from '../../../../lib/api'
+import { message as describeMessage } from '../../../../utils/i18n'
+import type { UiMessage } from '../../../../utils/i18n'
 
 
-import { adminGetCompetition, listCompetitionEvents } from '../../../../api'
-import type { NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse, NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol, NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol } from '../../../../api'
+
+import type { NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse, NoCTFAPIEndpointsCompetitionsEventsCompetitionEventKindProtocol, NoCTFAPIEndpointsCompetitionsEventsCompetitionEventLevelProtocol } from '../../../../api/models'
 import { competitionEventHistoryRange } from '../../../../lib/competition-event-history'
 
-type CompetitionEvent = NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse
+type CompetitionEvent = NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse
 
 /** Owns state, effects and commands for CompetitionsByIdEventsPage. */
 export function useCompetitionsByIdEventsPage() {
@@ -20,19 +27,19 @@ export function useCompetitionsByIdEventsPage() {
 
   const historyScopeResolved = ref(false)
 
-  const historyScopeError = ref<string | null>(null)
+  const historyScopeError = ref<UiMessage | null>(null)
 
   const initialKind = typeof route.query.kind === 'string' ? route.query.kind : 'all'
 
   const kind = ref<string>(initialKind)
 
   const kindOptions = [
-    { value: 'all', label: "ui.allUpdates" },
-    { value: 'CompetitionLifecycleChanged', label: "ui.gameStatus" },
-    { value: 'AnnouncementPublished', label: "ui.announcement" }, { value: 'ChallengePublished', label: "ui.topicRelease" }, { value: 'HintPublished', label: "ui.promptRelease" },
-    { value: 'FirstBloodAwarded', label: "ui.firstBlood" }, { value: 'SecondBloodAwarded', label: "ui.secondBlood" }, { value: 'ThirdBloodAwarded', label: "ui.thirdBlood" },
-    { value: 'GameplayFactAdjudicated', label: "ui.submitReview" }, { value: 'TeamRegistered', label: "ui.teamRegistration" }, { value: 'TeamBanned', label: "ui.teamBan" },
-    { value: 'QuestionOpened', label: "ui.consultingCreation" }, { value: 'QuestionReplied', label: "ui.consultationReply" }, { value: 'QuestionStatusChanged', label: "ui.consultationStatus" },
+    { value: 'all', label: "competitions.label.updates" },
+    { value: 'CompetitionLifecycleChanged', label: "common.label.gameStatus" },
+    { value: 'AnnouncementPublished', label: "common.label.announcement" }, { value: 'ChallengePublished', label: "common.label.topicRelease" }, { value: 'HintPublished', label: "common.label.promptRelease" },
+    { value: 'FirstBloodAwarded', label: "common.label.firstBlood" }, { value: 'SecondBloodAwarded', label: "common.label.secondBlood" }, { value: 'ThirdBloodAwarded', label: "common.label.thirdBlood" },
+    { value: 'GameplayFactAdjudicated', label: "common.label.submitReview" }, { value: 'TeamRegistered', label: "common.label.teamRegistration" }, { value: 'TeamBanned', label: "common.label.teamBan" },
+    { value: 'QuestionOpened', label: "common.label.consultingCreation" }, { value: 'QuestionReplied', label: "common.label.consultationReply" }, { value: 'QuestionStatusChanged', label: "common.label.consultationStatus" },
   ]
 
   const { items, loading, error, hasMore, initialized, loadMore, reset } =
@@ -42,33 +49,31 @@ export function useCompetitionsByIdEventsPage() {
         hasStaffHistory.value,
         competition?.startTime,
       )
-      const { data, error: err } = await listCompetitionEvents({
-        path: { competitionId },
-        query: {
-          from: range.from,
-          to: range.to,
-          kind: kind.value === 'all' ? null : kind.value as NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol,
-          cursor,
+      let err: unknown;
+      const data = await api.api.v1.competitions.byCompetitionId(competitionId).events.get({ queryParameters: {
+          from: dateObject(range.from ?? undefined),
+          to: dateObject(range.to ?? undefined),
+          kind: kind.value === 'all' ? undefined : kind.value as NoCTFAPIEndpointsCompetitionsEventsCompetitionEventKindProtocol,
+          cursor: cursor ?? undefined,
           offset: 0,
           limit: 50,
           desc: true,
-        },
-      })
-      if (err || !data) throw err ?? new Error(translate("ui.failedToLoad"))
+        } }).catch(cause => { err = cause; return undefined });
+      if (err || !data) throw err ?? new Error(translate("competitions.error.loadFailed"))
       return { items: data.items, nextCursor: data.nextCursor }
     })
 
   async function resolveHistoryScope() {
     if (!hasStaffHistory.value && canOrganize.value) {
-      const { data, error: requestError, response } = await adminGetCompetition({
-        path: { competitionId },
-      })
+      let requestError: unknown;
+      const response = new ResponseMetadata();
+      const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).get({ options: [new RequestPolicyOption({ response: response })] }).catch(cause => { requestError = cause; return undefined });
       hasStaffHistory.value = data?.competition?.administrationRole != null
       if (requestError && response?.status !== 403 && response?.status !== 404) {
         historyScopeError.value = parseApiError(
           requestError,
-          translate("ui.couldNotConfirmAccessToTheFullEventHistoryShowing"),
-        ).message
+          describeMessage("competitions.competitionsBy.description.couldConfirmAccessFull"),
+        ).displayMessage
       }
     }
     historyScopeResolved.value = true
@@ -94,10 +99,10 @@ export function useCompetitionsByIdEventsPage() {
 
   onUnmounted(() => unwatch?.())
 
-  const levelVariant = (level?: NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol) =>
+  const levelVariant = (level?: NoCTFAPIEndpointsCompetitionsEventsCompetitionEventLevelProtocol | null) =>
     level === 'Error' ? ('destructive' as const) : level === 'Warning' ? ('secondary' as const) : ('outline' as const)
 
-  const levelLabel = (level?: NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol) => (level === 'Error' ? translate("ui.warning") : level === 'Warning' ? translate("ui.note") : translate("ui.information"))
+  const levelLabel = (level?: NoCTFAPIEndpointsCompetitionsEventsCompetitionEventLevelProtocol | null) => (level === 'Error' ? translate("common.label.warning") : level === 'Warning' ? translate("competitions.label.note") : translate("common.label.information"))
 
   // Keep observing parent competition readiness after the initial scope request.
   watch(

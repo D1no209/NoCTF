@@ -1,4 +1,4 @@
-import type { AdminPlatformListActiveRuntimesData } from '../api'
+import type { RuntimesRequestBuilderGetQueryParameters } from '../api/api/v1/admin/platform/runtimes'
 
 export interface PlatformRuntimeFilters {
   search: string
@@ -12,7 +12,7 @@ export function emptyPlatformRuntimeFilters(): PlatformRuntimeFilters {
 }
 
 /** Snapshot only applied filters; editing the form must not change polling or cursor requests. */
-export function platformRuntimeQuery(filters: PlatformRuntimeFilters): Omit<AdminPlatformListActiveRuntimesData['query'], 'cursor' | 'limit'> {
+export function platformRuntimeQuery(filters: PlatformRuntimeFilters): Omit<RuntimesRequestBuilderGetQueryParameters, 'cursor' | 'limit'> {
   return {
     search: filters.search.trim() || undefined,
     scope: filters.scope === 'all' ? undefined : filters.scope,

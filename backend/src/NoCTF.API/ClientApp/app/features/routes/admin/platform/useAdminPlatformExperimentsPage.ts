@@ -1,13 +1,17 @@
+
+import { api } from '../../../../lib/api'
+import { message as describeMessage } from '../../../../utils/i18n'
+import type { UiMessage } from '../../../../utils/i18n'
 import { Beaker, RefreshCw } from '@lucide/vue'
-import { toast } from 'vue-sonner'
-import { adminPlatformGetConfiguration, adminPlatformPatchConfiguration } from '../../../../api'
+import { toast } from '../../../../utils/message-toast'
+
 
 /** Owns state, effects and commands for the platform experiment controls. */
 export function useAdminPlatformExperimentsPage() {
   const { refresh: refreshPlatform } = usePlatform()
   const loading = ref(true)
   const saving = ref(false)
-  const loadError = ref<string | null>(null)
+  const loadError = ref<UiMessage | null>(null)
   const ctfPatchVerificationEnabled = ref(false)
   const savedValue = ref(false)
   const dirty = computed(() => ctfPatchVerificationEnabled.value !== savedValue.value)
@@ -15,10 +19,11 @@ export function useAdminPlatformExperimentsPage() {
   async function load(): Promise<void> {
     loading.value = true
     loadError.value = null
-    const { data, error } = await adminPlatformGetConfiguration()
+    let error: unknown;
+    const data = await api.api.v1.admin.platform.configuration.get().catch(cause => { error = cause; return undefined });
     loading.value = false
     if (error || !data?.experimentalFeatures) {
-      loadError.value = parseApiError(error, translate('ui.failedToLoadPlatformConfiguration')).message
+      loadError.value = parseApiError(error, describeMessage('administration.platform.error.loadPlatformConfigurationFailed')).displayMessage
       return
     }
     const enabled = data.experimentalFeatures.ctfPatchVerificationEnabled === true
@@ -29,23 +34,22 @@ export function useAdminPlatformExperimentsPage() {
   async function save(): Promise<void> {
     if (saving.value || !dirty.value) return
     saving.value = true
-    const { data, error } = await adminPlatformPatchConfiguration({
-      body: {
+    let error: unknown;
+    const data = await api.api.v1.admin.platform.configuration.patch({
         experimentalFeatures: {
           ctfPatchVerificationEnabled: ctfPatchVerificationEnabled.value,
         },
-      },
-    })
+      }).catch(cause => { error = cause; return undefined });
     saving.value = false
     if (error || !data?.experimentalFeatures) {
-      toast.error(parseApiError(error, translate('ui.experimentalFeatureSaveFailed')).message)
+      toast.error(parseApiError(error, describeMessage('administration.error.experimentalFeatureSaveFailed')).displayMessage)
       return
     }
     const enabled = data.experimentalFeatures.ctfPatchVerificationEnabled === true
     ctfPatchVerificationEnabled.value = enabled
     savedValue.value = enabled
     await refreshPlatform()
-    toast.success(translate('ui.experimentalFeaturesSaved'))
+    toast.success(describeMessage('administration.label.experimentalFeaturesSaved'))
   }
 
   onMounted(() => { void load() })

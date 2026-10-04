@@ -1,8 +1,14 @@
+
+import { ResponseMetadata, RequestPolicyOption } from '../../lib/api'
+
+import { api } from '../../lib/api'
+import { message as describeMessage } from '../../utils/i18n'
+import type { UiMessage } from '../../utils/i18n'
 import { markRaw, toRefs } from 'vue'
 
-import { toast } from 'vue-sonner'
-import { createRuntime, extendRuntimeEndpoint, getRuntimeEndpoint, stopRuntimeEndpoint } from '../../api'
-import type { NoCtfapiEndpointsRuntimeRuntimeResponse } from '../../api'
+import { toast } from '../../utils/message-toast'
+
+import type { NoCTFAPIEndpointsRuntimeRuntimeResponse } from '../../api/models'
 import { runnerFailureLabel } from '../shared/runner-capacity'
 import { classifyPlayerRuntimeLookup, normalizePlayerRuntime, shouldPollPlayerRuntime, type PlayerRuntimeLookupOutcome } from '../../utils/player-runtime'
 import { RUNTIME_STOP_POLL_DELAYS_MS, RUNTIME_STOP_POLL_MAX_INTERVAL_MS, RUNTIME_STOP_POLL_TIMEOUT_MS } from '../../lib/runtime-stop-polling'
@@ -10,7 +16,7 @@ import { createRuntimeExtensionRequest, isRuntimeExtensionTooEarly, parseRuntime
 import RuntimeAccessUrlComponent from './RuntimeAccessUrl.vue'
 import { useHumanVerification } from '~/features/security/useHumanVerification'
 
-type Runtime = NoCtfapiEndpointsRuntimeRuntimeResponse
+type Runtime = NoCTFAPIEndpointsRuntimeRuntimeResponse
 
 /** Owns state, effects and commands for RuntimeCard. */
 export function useRuntimeCard(props: Readonly<Omit<{
@@ -18,20 +24,20 @@ export function useRuntimeCard(props: Readonly<Omit<{
     competitionChallengeId: string
     /** full = CTF 全操作;reset-only = AWD 仅重置;readonly = 只显示最终状态 */
     controls?: 'full' | 'reset-only' | 'readonly'
-    dockTarget?: string
+    dockTarget?: string | null
   }, "controls" | "dockTarget"> & Required<Pick<{
     competitionId: string
     competitionChallengeId: string
     /** full = CTF 全操作;reset-only = AWD 仅重置;readonly = 只显示最终状态 */
     controls?: 'full' | 'reset-only' | 'readonly'
-    dockTarget?: string
+    dockTarget?: string | null
   }, "controls" | "dockTarget">>>, emit: { (event: 'changed'): void }) {
   const runtime = ref<Runtime | null>(null)
   const { request: requestHumanVerification } = useHumanVerification()
 
   const loading = ref(true)
 
-  const loadError = ref<string | null>(null)
+  const loadError = ref<UiMessage | null>(null)
 
   const acting = ref(false)
 
@@ -46,9 +52,9 @@ export function useRuntimeCard(props: Readonly<Omit<{
   let hasLoaded = false
 
   async function load(): Promise<PlayerRuntimeLookupOutcome> {
-    const { data, error, response } = await getRuntimeEndpoint({
-      path: { competitionId: props.competitionId, competitionChallengeId: props.competitionChallengeId },
-    })
+    let error: unknown;
+    const response = new ResponseMetadata();
+    const data = await api.api.v1.competitions.byCompetitionId(props.competitionId).challenges.byCompetitionChallengeId(props.competitionChallengeId).runtimes.current.get({ options: [new RequestPolicyOption({ response: response })] }).catch(cause => { error = cause; return undefined });
     const outcome = classifyPlayerRuntimeLookup(response?.status, Boolean(error), Boolean(data))
     if (outcome === 'missing') {
       const hadRuntime = runtime.value !== null
@@ -59,7 +65,7 @@ export function useRuntimeCard(props: Readonly<Omit<{
       return outcome
     }
     if (outcome === 'failed') {
-      loadError.value = parseApiError(error, translate("ui.failedToLoadTheEnvironmentStatus")).message
+      loadError.value = parseApiError(error, describeMessage("runtime.runtimeCard.error.loadEnvironmentStatusFailed")).displayMessage
       return outcome
     }
 
@@ -127,7 +133,7 @@ export function useRuntimeCard(props: Readonly<Omit<{
   }
 
   async function act(
-    action: (humanVerificationHeaders: Record<string, string>) => Promise<{ error?: unknown }>,
+    action: (humanVerificationHeaders: Record<string, string>) => Promise<unknown>,
     failMessage: string,
     onAccepted?: () => void,
   ) {
@@ -136,16 +142,12 @@ export function useRuntimeCard(props: Readonly<Omit<{
     try {
     const verificationHeaders = await requestHumanVerification('runtime')
     if (verificationHeaders === null) return
-    const { error } = await action(verificationHeaders)
-    if (error) {
-      toast.error(parseApiError(error, failMessage).message)
-      return
-    }
+    await action(verificationHeaders)
     commandAttempt.completed()
     onAccepted?.()
-    toast.success(translate("ui.theOperationHasBeenAcceptedAndTheEnvironmentStatusIs"))
+    toast.success(describeMessage("runtime.runtimeCard.description.acceptedEnvironmentStatus"))
     startPolling()
-    } catch (e) { toast.error(parseApiError(e, failMessage).message) }
+    } catch (e) { toast.error(parseApiError(e, failMessage).displayMessage) }
     finally { acting.value = false }
   }
 
@@ -154,29 +156,18 @@ export function useRuntimeCard(props: Readonly<Omit<{
     competitionChallengeId: props.competitionChallengeId,
   }))
 
-  const start = () => act(verificationHeaders => createRuntime({
-    path: path.value,
-    body: { replacesRuntimeId: null },
-    headers: { ...commandAttempt.headers({ ...path.value, action: 'start' }), ...verificationHeaders },
-  }), translate("ui.failedToStartEnvironment"))
+  const start = () => act(verificationHeaders => api.api.v1.competitions.byCompetitionId(path.value.competitionId).challenges.byCompetitionChallengeId(path.value.competitionChallengeId).runtimes.post({ replacesRuntimeId: null }, { headers: { ...commandAttempt.headers({ ...path.value, action: 'start' }), ...verificationHeaders } }), translate("runtime.error.startEnvironmentFailed"))
 
   const stop = () => {
     const current = runtime.value
     if (!current?.id) return
-    return act(verificationHeaders => stopRuntimeEndpoint({
-      path: { ...path.value, runtimeInstanceId: current.id! },
-      headers: { ...commandAttempt.headers({ ...path.value, action: 'stop' }), ...verificationHeaders },
-    }), translate("ui.stopEnvironmentFailed"), () => {
+    return act(verificationHeaders => api.api.v1.competitions.byCompetitionId(path.value.competitionId).challenges.byCompetitionChallengeId(path.value.competitionChallengeId).runtimes.byRuntimeInstanceId(current.id!).delete({ headers: { ...commandAttempt.headers({ ...path.value, action: 'stop' }), ...verificationHeaders } }), translate("runtime.error.stopEnvironmentFailed"), () => {
       if (runtime.value?.id === current.id)
         runtime.value = { ...runtime.value, state: 'Stopping' }
     })
   }
 
-  const reset = () => runtime.value && act(verificationHeaders => createRuntime({
-    path: path.value,
-    body: { replacesRuntimeId: runtime.value!.id! },
-    headers: { ...commandAttempt.headers({ ...path.value, action: 'reset' }), ...verificationHeaders },
-  }), translate("ui.failedToResetEnvironment"))
+  const reset = () => runtime.value && act(verificationHeaders => api.api.v1.competitions.byCompetitionId(path.value.competitionId).challenges.byCompetitionChallengeId(path.value.competitionChallengeId).runtimes.post({ replacesRuntimeId: runtime.value!.id! }, { headers: { ...commandAttempt.headers({ ...path.value, action: 'reset' }), ...verificationHeaders } }), translate("runtime.error.resetEnvironmentFailed"))
 
   const extend = () => {
     const current = runtime.value
@@ -184,12 +175,8 @@ export function useRuntimeCard(props: Readonly<Omit<{
       current?.expiresAt, Date.now(), extendMinutes.value, 720)
     if (current?.state !== 'Running' || !current.id || extension === null) return
     return act(
-      verificationHeaders => extendRuntimeEndpoint({
-        headers: { ...commandAttempt.headers({ ...path.value, action: 'extend', minutes: extension.minutes }), ...verificationHeaders },
-        path: { ...path.value, runtimeInstanceId: current.id! },
-        body: { expiresAt: extension.expiresAt },
-      }),
-      translate("ui.renewalFailed"),
+      verificationHeaders => api.api.v1.competitions.byCompetitionId(path.value.competitionId).challenges.byCompetitionChallengeId(path.value.competitionChallengeId).runtimes.byRuntimeInstanceId(current.id!).patch({ expiresAt: extension.expiresAt }, { headers: { ...commandAttempt.headers({ ...path.value, action: 'extend', minutes: extension.minutes }), ...verificationHeaders } }),
+      translate("runtime.error.renewalFailed"),
     )
   }
 
@@ -208,7 +195,7 @@ export function useRuntimeCard(props: Readonly<Omit<{
   const ttl = computed(() => {
     if (!runtime.value?.expiresAt) return null
     const remaining = new Date(runtime.value.expiresAt).getTime() - now.value
-    return remaining > 0 ? formatDuration(remaining) : translate("ui.expired")
+    return remaining > 0 ? formatDuration(remaining) : translate("runtime.label.expired")
   })
 
   const isRunning = computed(() => runtime.value?.state === 'Running')

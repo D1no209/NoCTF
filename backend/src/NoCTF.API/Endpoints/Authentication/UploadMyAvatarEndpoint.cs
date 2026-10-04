@@ -33,7 +33,12 @@ public enum AvatarUploadFailureCode
     MalformedImage
 }
 
-public sealed record AvatarUploadFailureResponse(AvatarUploadFailureCode Code);
+public sealed record AvatarUploadFailureResponse(AvatarUploadFailureCode Code)
+{
+    public string Detail => ApiMessages.For(Code).Text;
+    public string MessageKey => ApiMessages.For(Code).Key;
+    public IReadOnlyDictionary<string, object?> MessageArguments => ApiMessages.NoArguments;
+}
 
 public sealed class UploadMyAvatarEndpoint(
     ReplaceCurrentUserAvatar replace,
@@ -51,6 +56,7 @@ public sealed class UploadMyAvatarEndpoint(
         Put("/auth/me/avatar");
         AuthSchemes("Bearer");
         AllowFileUploads();
+        Description(builder => builder.Accepts<UploadMyAvatarRequest>("multipart/form-data"));
         MaxRequestBodySize(FileUploadLimits.MaximumRequestBytes(
             uploadLimits.MaximumAvatarBytes));
         Description(builder => builder
@@ -58,7 +64,7 @@ public sealed class UploadMyAvatarEndpoint(
             .WithMetadata(new EnableRateLimitingAttribute("avatar"))
             .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
                 StatusCodes.Status413PayloadTooLarge));
-        Summary(summary => summary.Summary = "Replaces the current user's cropped avatar.");
+        Summary(summary => { summary.Summary = "Replaces the current user's cropped avatar."; summary.Description = summary.Summary; });
     }
 
     public override async Task<Results<Ok<CurrentUserResponse>, NotFound,
@@ -88,10 +94,10 @@ public sealed class UploadMyAvatarEndpoint(
     }
 
     private static ProblemHttpResult UploadTooLarge(long maximumBytes) =>
-        TypedResults.Problem(
+        ApiProblems.Problem(
             statusCode: StatusCodes.Status413PayloadTooLarge,
-            title: "Avatar is too large.",
-            detail: $"Avatar uploads cannot exceed {maximumBytes} bytes.",
+            title: ApiMessages.Get(ApiMessageId.UploadMyAvatarTitleAvatarTooLarge),
+            detail: ApiMessages.Get(ApiMessageId.UploadSizeLimit, new Dictionary<string, object?> { ["maximumBytes"] = maximumBytes }),
             extensions: new Dictionary<string, object?>
             {
                 ["code"] = FileUploadFailureCode.UploadTooLarge.ToString()

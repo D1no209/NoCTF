@@ -27,7 +27,7 @@ describe('generated protocol usage', () => {
       expect(labels).not.toContain(`export const ${name}`)
     }
     expect(gameConfig).toContain(
-      'export type GameModeValue = NoCtfapiEndpointsCompetitionsGameModeProtocol',
+      'export type GameModeValue = NoCTFAPIEndpointsCompetitionsGameModeProtocol',
     )
   })
 
@@ -35,7 +35,7 @@ describe('generated protocol usage', () => {
     const source = await sourceFile(new URL('../app/lib/admin-competition.ts', import.meta.url)).text()
 
     expect(source).toContain(
-      'export type CompetitionAdminRole = NoCtfapiEndpointsCompetitionsCompetitionAdministrationRoleProtocol',
+      'export type CompetitionAdminRole = NoCTFAPIEndpointsCompetitionsCompetitionAdministrationRoleProtocol',
     )
     expect(source).not.toContain("'owner' | 'manager' | 'judge' | 'observer'")
   })
@@ -45,10 +45,10 @@ describe('generated protocol usage', () => {
 
     expect(source).not.toContain('Record<string, string> =')
     expect(source).toContain(
-      'satisfies Record<NoCtfapiEndpointsRuntimeRuntimeStateProtocol, string>',
+      'satisfies Record<NoCTFAPIEndpointsRuntimeRuntimeStateProtocol, string>',
     )
     expect(source).toContain(
-      'satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol, string>',
+      'satisfies Record<NoCTFAPIEndpointsGameplayFactsGameplayFactResultProtocol, string>',
     )
   })
 
@@ -59,11 +59,11 @@ describe('generated protocol usage', () => {
 
     expect(hub).toContain("competitionHubString(payload, 'competitionId')")
     expect(hub).toContain('export interface CompetitionHubClientEvents')
-    expect(hub).toContain('NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse')
+    expect(hub).toContain('NoCTFAPIEndpointsGameplayFactsGameplayFactStatusResponse')
     expect(hub).not.toContain('gameplayFactStateChanged?: (payload: unknown)')
     expect(flagSubmit).toContain("competitionHubString(payload, 'gameplayFactId')")
-    expect(fixSubmit).toContain('NoCtfapiEndpointsGameplayFactsAwdpDefenseTargetRequestFailureCodeProtocol')
-    expect(fixSubmit).toContain('NoCtfapiEndpointsGameplayFactsUploadPatchFailureCodeProtocol')
+    expect(fixSubmit).toContain('NoCTFAPIEndpointsGameplayFactsAwdpDefenseTargetRequestFailureCodeProtocol')
+    expect(fixSubmit).toContain('NoCTFAPIEndpointsGameplayFactsUploadPatchFailureCodeProtocol')
     expect(`${hub}\n${flagSubmit}\n${fixSubmit}`).not.toContain('as { gameplayFactId?: unknown }')
   })
 })

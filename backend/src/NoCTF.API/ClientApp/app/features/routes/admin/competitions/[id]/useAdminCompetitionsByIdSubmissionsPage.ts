@@ -1,14 +1,18 @@
+
+import { api, RequestPolicyOption, nativeResponse } from '../../../../../lib/api'
+import { message as describeMessage } from '../../../../../utils/i18n'
+import type { UiMessage } from '../../../../../utils/i18n'
 import { adminUserPath, adminTeamPath, adminChallengePath } from '~/features/admin/admin-navigation'
 import { proxyRefs } from 'vue'
 
-import { toast } from 'vue-sonner'
+import { toast } from '../../../../../utils/message-toast'
 import { Download } from '@lucide/vue'
 import { downloadSdkFile } from '../../../../../utils/download'
-import { adminAccessCompetitionGameplayFactValue, adminCreateGameplayFactRejudgement, adminGetGameplayFact, adminDownloadGameplayFactPatch, adminListCompetitionChallenges, adminListGameplayFacts, adminPreviewHistoricalAdjudicationDifferences, adminListTeams, adminQueueGameplayFactEvaluation } from '../../../../../api'
-import type { NoCtfapiEndpointsGameplayFactsAdminGameplayFactStatusResponse, NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse, NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol, NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol, NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol, NoCtfapiEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferenceItemResponse, NoCtfapiEndpointsAdministrationGameplayFactsAdjudicationDifferenceKindProtocol } from '../../../../../api'
+
+import type { NoCTFAPIEndpointsGameplayFactsAdminGameplayFactStatusResponse, NoCTFAPIEndpointsGameplayFactsGameplayFactListItemResponse, NoCTFAPIEndpointsGameplayFactsGameplayFactResultProtocol, NoCTFAPIEndpointsGameplayFactsGameplayFactStateProtocol, NoCTFAPIEndpointsGameplayFactsGameplayFactKindProtocol, NoCTFAPIEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferenceItemResponse, NoCTFAPIEndpointsAdministrationGameplayFactsAdjudicationDifferenceKindProtocol } from '../../../../../api/models'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
-import { adminGetGameplayFactAdjudicationEvents } from '../../../../../api'
-import type { NoCtfapiEndpointsAdministrationGameplayFactsAdjudicationEventResponse } from '../../../../../api'
+
+import type { NoCTFAPIEndpointsAdministrationGameplayFactsAdjudicationEventResponse } from '../../../../../api/models'
 import { adjudicationCounts, adjudicationSeverity, adjudicationSeverityLabel, adjudicationClassificationLabel, adjudicationCompletenessLabel, adjudicationEventLabel, adjudicationVariant } from '../../../../admin/adjudication-preview'
 
 interface FilterOption<T extends string> {
@@ -27,20 +31,18 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
 
   const patchDownloading = ref(new Set<string>())
 
-  const patchErrors = ref<Record<string, string>>({})
+  const patchErrors = ref<Record<string, UiMessage>>({})
 
-  async function downloadPatch(id?: string) {
+  async function downloadPatch(id?: string | null) {
     if (!id || !canDownloadPatch.value || patchDownloading.value.has(id)) return
     patchDownloading.value.add(id)
     delete patchErrors.value[id]
     try {
-      await downloadSdkFile(adminDownloadGameplayFactPatch({
-        path: { competitionId, gameplayFactId: id }, parseAs: 'blob',
-      }), `patch-${id}.tar.gz`)
+      await downloadSdkFile(nativeResponse(responseOptions => api.api.v1.admin.competitions.byCompetitionId(competitionId).gameplayFacts.byGameplayFactId(id).patchPath.get({ options: [...responseOptions] })), `patch-${id}.tar.gz`)
     }
     catch (error) {
-      patchErrors.value[id] = parseApiError(error).message
-      toast.error(patchErrors.value[id])
+      patchErrors.value[id] = parseApiError(error).displayMessage
+      toast.error(patchErrors.value[id]!)
     }
     finally {
       patchDownloading.value.delete(id)
@@ -50,24 +52,24 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
   const gameplayFactKindOptions = [
     { value: 'FlagAttempt', label: 'Flag' },
     { value: 'BreakAttempt', label: 'Break' },
-    { value: 'FixAttempt', label: translate('ui.patchVerification') },
-  ] satisfies FilterOption<NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol>[]
+    { value: 'FixAttempt', label: translate('common.label.patchVerification') },
+  ] satisfies FilterOption<NoCTFAPIEndpointsGameplayFactsGameplayFactKindProtocol>[]
 
   const gameplayFactStateOptions = [
-    { value: 'Pending', label: "ui.pending" },
-    { value: 'Queued', label: "ui.queuing" },
-    { value: 'Processing', label: "ui.underEvaluation" },
-    { value: 'Completed', label: "ui.completed" },
-    { value: 'PlatformFailed', label: "ui.platformFailed" },
-  ] satisfies FilterOption<NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol>[]
+    { value: 'Pending', label: "administration.label.pending" },
+    { value: 'Queued', label: "common.label.queuing" },
+    { value: 'Processing', label: "common.label.underEvaluation" },
+    { value: 'Completed', label: "common.label.completed" },
+    { value: 'PlatformFailed', label: "common.error.platformFailed.adminFormat" },
+  ] satisfies FilterOption<NoCTFAPIEndpointsGameplayFactsGameplayFactStateProtocol>[]
 
   const gameplayFactResultOptions = [
-    { value: 'Correct', label: "ui.correct" },
-    { value: 'Wrong', label: "ui.wrong" },
-    { value: 'Duplicate', label: "ui.repeat" },
-    { value: 'AttemptsExhausted', label: "ui.exhausted" },
-    { value: 'Rejected', label: "ui.rejected" },
-  ] satisfies FilterOption<NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol>[]
+    { value: 'Correct', label: "common.label.correct" },
+    { value: 'Wrong', label: "common.label.wrong" },
+    { value: 'Duplicate', label: "common.label.repeat" },
+    { value: 'AttemptsExhausted', label: "common.label.exhausted" },
+    { value: 'Rejected', label: "common.label.rejected" },
+  ] satisfies FilterOption<NoCTFAPIEndpointsGameplayFactsGameplayFactResultProtocol>[]
 
   const challengeOptions = ref<{ id: string; title: string }[]>([])
 
@@ -78,57 +80,57 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
   const challengeTitle = (id?: string | null) => challengeOptions.value.find(c => c.id === id)?.title ?? id ?? '-'
 
   async function loadRefs() {
-    const [challenges, teams] = await Promise.all([
-      adminListCompetitionChallenges({ path: { competitionId }, query: { includeDeleted: false } }),
-      adminListTeams({ path: { competitionId }, query: { keyword: null, offset: 0, limit: 200, desc: false } }),
-    ])
-    challengeOptions.value = (challenges.data?.items ?? [])
+    const settledRequests = await Promise.allSettled([
+      api.api.v1.admin.competitions.byCompetitionId(competitionId).challenges.get({ queryParameters: { includeDeleted: false } }),
+      api.api.v1.admin.competitions.byCompetitionId(competitionId).teams.get({ queryParameters: { keyword: undefined, offset: 0, limit: 200, desc: false } }),
+    ]);
+    const challenges = settledRequests[0].status === 'fulfilled' ? settledRequests[0].value : undefined;
+    const teams = settledRequests[1].status === 'fulfilled' ? settledRequests[1].value : undefined;
+
+    challengeOptions.value = (challenges?.items ?? [])
       .map(c => ({ id: c.id!, title: c.title ?? '' }))
-    teamOptions.value = (teams.data?.items ?? []).map(t => ({ id: t.id!, name: t.name ?? '' }))
+    teamOptions.value = (teams?.items ?? []).map(t => ({ id: t.id!, name: t.name ?? '' }))
   }
 
   const filterChallenge = ref('')
 
   const filterTeam = ref('')
 
-  const filterKind = ref<NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol | ''>('')
+  const filterKind = ref<NoCTFAPIEndpointsGameplayFactsGameplayFactKindProtocol | ''>('')
 
-  const filterState = ref<NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol | ''>('')
+  const filterState = ref<NoCTFAPIEndpointsGameplayFactsGameplayFactStateProtocol | ''>('')
 
-  const filterResult = ref<NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol | ''>('')
+  const filterResult = ref<NoCTFAPIEndpointsGameplayFactsGameplayFactResultProtocol | ''>('')
 
   const filterFlag = ref('')
 
-  const previewItems = ref<NoCtfapiEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferenceItemResponse[]>([])
+  const previewItems = ref<NoCTFAPIEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferenceItemResponse[]>([])
 
   const previewCursor = ref<string | null>(null)
 
   const previewLoading = ref(false)
 
-  const previewError = ref<string | null>(null)
+  const previewError = ref<UiMessage | null>(null)
 
   const previewInitialized = ref(false)
   const previewIncludeInformational = ref(false)
   const previewScanned = ref<number | null>(0)
   const previewCounts = computed(() => adjudicationCounts(previewItems.value))
   const evidenceOpen = ref(false)
-  const evidenceTarget = ref<NoCtfapiEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferenceItemResponse | null>(null)
+  const evidenceTarget = ref<NoCTFAPIEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferenceItemResponse | null>(null)
   let evidenceAbort: AbortController | undefined
   let previewAbort: AbortController | undefined
-  const { items: evidenceRows, nextCursor: evidenceCursor, loading: evidenceLoading, error: evidenceError, loadMore: loadEvidence, reset: resetEvidence } = useCursorPagination<NoCtfapiEndpointsAdministrationGameplayFactsAdjudicationEventResponse>(async cursor => {
+  const { items: evidenceRows, nextCursor: evidenceCursor, loading: evidenceLoading, error: evidenceError, loadMore: loadEvidence, reset: resetEvidence } = useCursorPagination<NoCTFAPIEndpointsAdministrationGameplayFactsAdjudicationEventResponse>(async cursor => {
     const factId = evidenceTarget.value?.gameplayFactId
     if (!factId) return { items: [], nextCursor: null }
     evidenceAbort = new AbortController()
-    const { data, error } = await adminGetGameplayFactAdjudicationEvents({
-      path: { competitionId, gameplayFactId: factId },
-      query: { cursor, limit: 50 },
-      signal: evidenceAbort.signal,
-    })
-    if (error || !data) throw parseApiError(error, translate('adjudication.evidenceFailure'))
+    let error: unknown;
+    const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).gameplayFacts.byGameplayFactId(factId).adjudicationEvents.get({ queryParameters: { cursor: cursor ?? undefined, limit: 50 }, options: [new RequestPolicyOption({ signal: evidenceAbort.signal })] }).catch(cause => { error = cause; return undefined });
+    if (error || !data) throw parseApiError(error, describeMessage('adjudication.evidenceFailure'))
     return { items: data.events ?? [], nextCursor: data.nextCursor }
   })
 
-  function openEvidence(item: NoCtfapiEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferenceItemResponse) {
+  function openEvidence(item: NoCTFAPIEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferenceItemResponse) {
     evidenceAbort?.abort()
     evidenceTarget.value = item
     resetEvidence()
@@ -153,23 +155,23 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
 
   let previewGeneration = 0
 
-  const differenceLabels: Record<NoCtfapiEndpointsAdministrationGameplayFactsAdjudicationDifferenceKindProtocol, string> = {
-    DuplicateWithoutCurrentPredecessor: "ui.theCurrentDuplicateResultHasNoPrecedingFactThatRemains",
-    HistoricalResultChanged: "ui.historicalAdjudicationConflictsWithTheCurrentResultOrChangedOver",
-    MissingAdjudicationRecord: "ui.theCurrentResultHasNoImmutableAdjudicationEvent",
-    TeamEligibilityHistoryRequiresReview: "ui.currentTeamEligibilityCannotProveBloodAwardEligibilityAtThe",
-    MissingBloodAward: "ui.aDeterministicallyExpectedBloodAwardIsMissing",
-    UnexpectedBloodAward: "ui.aRecordedBloodAwardIsNotSupportedByTheCurrent",
-    WrongBloodRank: "ui.theRecordedBloodRankDiffersFromAuthoritativeOrdering",
-    DuplicateBloodAward: "ui.theSameGameplayFactHasDuplicateBloodAwards",
+  const differenceLabels: Record<NoCTFAPIEndpointsAdministrationGameplayFactsAdjudicationDifferenceKindProtocol, string> = {
+    DuplicateWithoutCurrentPredecessor: "common.competitionsBy.description.duplicateResultPrecedingFact",
+    HistoricalResultChanged: "common.competitionsBy.description.historicalAdjudicationConflictsResult",
+    MissingAdjudicationRecord: "common.competitionsBy.description.resultImmutableAdjudicationEvent",
+    TeamEligibilityHistoryRequiresReview: "common.competitionsBy.validation.teamEligibilityFormat",
+    MissingBloodAward: "common.competitionsBy.description.deterministicallyExpectedBloodAward",
+    UnexpectedBloodAward: "common.competitionsBy.validation.recordedBloodFormat",
+    WrongBloodRank: "common.competitionsBy.description.recordedBloodRankDiffers",
+    DuplicateBloodAward: "common.competitionsBy.description.sameGameplayFactDuplicate",
   }
 
   const bloodRankLabel = (rank?: string | null) => rank === 'First'
-    ? translate("ui.firstBlood")
+    ? translate("common.label.firstBlood")
     : rank === 'Second'
-      ? translate("ui.secondBlood")
+      ? translate("common.label.secondBlood")
       : rank === 'Third'
-        ? translate("ui.thirdBlood")
+        ? translate("common.label.thirdBlood")
         : '-'
 
   async function loadPreview(reset = false) {
@@ -187,16 +189,13 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
     previewAbort = new AbortController()
     previewError.value = null
     try {
-      const { data, error } = await adminPreviewHistoricalAdjudicationDifferences({
-        signal: previewAbort.signal,
-        path: { competitionId },
-        query: {
-          competitionChallengeId: filterChallenge.value || null,
-          cursor,
+      let error: unknown;
+      const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).gameplayFacts.adjudicationDifferences.get({ queryParameters: {
+          competitionChallengeId: filterChallenge.value || undefined,
+          cursor: cursor ?? undefined,
           limit: 30,
           includeInformational: previewIncludeInformational.value,
-        },
-      })
+        }, options: [new RequestPolicyOption({ signal: previewAbort.signal })] }).catch(cause => { error = cause; return undefined });
       if (error || !data) throw parseApiError(error)
       if (generation !== previewGeneration) return
       previewItems.value.push(...(data.items ?? []))
@@ -205,7 +204,7 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
     }
     catch (requestError) {
       if (generation !== previewGeneration) return
-      previewError.value = parseApiError(requestError, translate("ui.failedToLoadHistoricalAdjudicationDifferences")).message
+      previewError.value = parseApiError(requestError, describeMessage("administration.competitionsBy.error.loadHistoricalAdjudicationFailed")).displayMessage
     }
     finally {
       if (generation === previewGeneration) {
@@ -216,22 +215,20 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
   }
 
   const { items, loading, error: listError, hasMore, loadMore, reset, initialized } = useCursorPagination<
-    NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse
+    NoCTFAPIEndpointsGameplayFactsGameplayFactListItemResponse
   >(async (cursor) => {
-    const { data, error } = await adminListGameplayFacts({
-      path: { competitionId },
-      query: {
-        competitionChallengeId: filterChallenge.value || null,
-        teamId: filterTeam.value || null,
-        gameplayFactKind: filterKind.value || null,
-        state: filterState.value || null,
-        gameplayFactResult: filterResult.value || null,
-        value: filterFlag.value || null,
+    let error: unknown;
+    const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).gameplayFacts.get({ queryParameters: {
+        competitionChallengeId: filterChallenge.value || undefined,
+        teamId: filterTeam.value || undefined,
+        gameplayFactKind: filterKind.value || undefined,
+        state: filterState.value || undefined,
+        gameplayFactResult: filterResult.value || undefined,
+        value: filterFlag.value || undefined,
         offset: cursor ? Number(cursor) || 0 : 0,
         limit: 30,
         desc: true,
-      },
-    })
+      } }).catch(cause => { error = cause; return undefined });
     if (error || !data) throw parseApiError(error)
     const pageItems = data.items ?? []
     const offset = cursor ? Number(cursor) || 0 : 0
@@ -245,17 +242,17 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
     if (previewInitialized.value) void loadPreview(true)
   }
 
-  const detail = ref<NoCtfapiEndpointsGameplayFactsAdminGameplayFactStatusResponse | null>(null)
+  const detail = ref<NoCTFAPIEndpointsGameplayFactsAdminGameplayFactStatusResponse | null>(null)
 
   const detailOpen = ref(false)
 
   const detailLoading = ref(false)
 
-  const detailError = ref<string | null>(null)
+  const detailError = ref<UiMessage | null>(null)
 
   let detailRequest = 0
 
-  async function openDetail(id?: string) {
+  async function openDetail(id?: string | null) {
     if (!id) return
     const request = ++detailRequest
     detailOpen.value = true
@@ -263,12 +260,13 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
     detailError.value = null
     detail.value = null
     try {
-      const { data, error } = await adminGetGameplayFact({ path: { competitionId, gameplayFactId: id } })
+      let error: unknown;
+      const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).gameplayFacts.byGameplayFactId(id).get().catch(cause => { error = cause; return undefined });
       if (error || !data) throw error
       if (request === detailRequest) detail.value = data
     }
     catch (error) {
-      if (request === detailRequest) detailError.value = parseApiError(error).message
+      if (request === detailRequest) detailError.value = parseApiError(error).displayMessage
     }
     finally {
       if (request === detailRequest) detailLoading.value = false
@@ -279,20 +277,17 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
 
   const actionPending = ref<string | null>(null)
 
-  async function rejudgeOne(gameplayFactId?: string) {
+  async function rejudgeOne(gameplayFactId?: string | null) {
     if (!gameplayFactId) return
     actionPending.value = gameplayFactId
     try {
-      const { error } = await adminCreateGameplayFactRejudgement({
-        path: { competitionId },
-        body: { targetKind: 'GameplayFact', targetId: gameplayFactId },
-      })
-      if (error) throw error
-      toast.success(translate("ui.alreadyJoinedTheReSentencingQueue"))
+
+      await api.api.v1.admin.competitions.byCompetitionId(competitionId).gameplayFactRejudgements.post({ targetKind: 'GameplayFact', targetId: gameplayFactId });
+      toast.success(describeMessage("administration.competitionsBy.description.alreadyJoinedReSentencing"))
       applyFilters()
     }
     catch (e) {
-      toast.error(parseApiError(e).message)
+      toast.error(parseApiError(e).displayMessage)
     }
     finally {
       actionPending.value = null
@@ -305,16 +300,12 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
     if (!batchTarget.value) return
     actionPending.value = 'batch'
     try {
-      const { error } = await adminCreateGameplayFactRejudgement({
-        path: { competitionId },
-        body: { targetKind: 'CompetitionChallenge', targetId: batchTarget.value },
-      })
-      if (error) throw error
-      toast.success(translate("ui.allQuestionsHaveBeenSubmittedAndAddedToTheRe"))
+      await api.api.v1.admin.competitions.byCompetitionId(competitionId).gameplayFactRejudgements.post({ targetKind: 'CompetitionChallenge', targetId: batchTarget.value });
+      toast.success(describeMessage("administration.competitionsBy.description.questionsSubmittedAddedRe"))
       applyFilters()
     }
     catch (e) {
-      toast.error(parseApiError(e).message)
+      toast.error(parseApiError(e).displayMessage)
     }
     finally {
       actionPending.value = null
@@ -325,15 +316,11 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
     if (!batchTarget.value) return
     actionPending.value = 'queue'
     try {
-      const { error } = await adminQueueGameplayFactEvaluation({
-        path: { competitionId },
-        body: { competitionChallengeId: batchTarget.value },
-      })
-      if (error) throw error
-      toast.success(translate("ui.reviewQueueTriggered"))
+      await api.api.v1.admin.competitions.byCompetitionId(competitionId).gameplayFacts.queueEvaluation.post({ competitionChallengeId: batchTarget.value });
+      toast.success(describeMessage("administration.label.reviewQueueTriggered"))
     }
     catch (e) {
-      toast.error(parseApiError(e).message)
+      toast.error(parseApiError(e).displayMessage)
     }
     finally {
       actionPending.value = null
@@ -344,13 +331,13 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
 
   const flagResult = ref<string | null>(null)
 
-  const flagError = ref<string | null>(null)
+  const flagError = ref<UiMessage | null>(null)
 
   const flagPending = ref(false)
 
   let flagRequestSequence = 0
 
-  function openFlagAccess(gameplayFactId?: string) {
+  function openFlagAccess(gameplayFactId?: string | null) {
     if (!gameplayFactId) return
     const requestSequence = ++flagRequestSequence
     flagDialog.value = { gameplayFactId }
@@ -372,16 +359,13 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
     flagPending.value = true
     flagError.value = null
     try {
-      const { data, error } = await adminAccessCompetitionGameplayFactValue({
-        path: { competitionId, gameplayFactId: ctx.gameplayFactId },
-      })
-      if (error) throw error
+      const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).gameplayFacts.byGameplayFactId(ctx.gameplayFactId).flagAccess.post();
       if (requestSequence !== flagRequestSequence || flagDialog.value?.gameplayFactId !== ctx.gameplayFactId) return
-      flagResult.value = data?.value ?? translate("ui.noContent")
+      flagResult.value = data?.value ?? translate("administration.label.content")
     }
     catch (e) {
       if (requestSequence !== flagRequestSequence || flagDialog.value?.gameplayFactId !== ctx.gameplayFactId) return
-      flagError.value = parseApiError(e).message
+      flagError.value = parseApiError(e).displayMessage
       toast.error(flagError.value)
     }
     finally {

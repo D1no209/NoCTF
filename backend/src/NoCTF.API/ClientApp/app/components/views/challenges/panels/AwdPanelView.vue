@@ -13,29 +13,29 @@ const { emit, targets, targetsError, targetsLoaded, FlagSubmit, RuntimeAccessUrl
       :competition-id="competition.id!"
       :competition-challenge-id="challenge.id!"
       controls="reset-only"
-      :dock-target="runtimeDockTarget"
+      :dock-target="runtimeDockTarget ?? undefined"
     />
 
     <section class="py-5" aria-labelledby="awd-targets-title">
-      <h3 id="awd-targets-title" class="mb-4 text-sm font-semibold">{{ $t('ui.attackTarget') }}</h3>
+      <h3 id="awd-targets-title" class="mb-4 text-sm font-semibold">{{ $t('challenges.label.attackTarget') }}</h3>
         <Skeleton v-if="!targetsLoaded" class="h-16 w-full" />
         <Alert v-else-if="targetsError">
           <AlertDescription>{{ $message(targetsError) }}</AlertDescription>
         </Alert>
         <Empty v-else-if="!targets.length" class="border py-8">
           <EmptyHeader>
-            <EmptyTitle>{{ $t('ui.noTargetToAttackYet') }}</EmptyTitle>
+            <EmptyTitle>{{ $t('challenges.awdPanel.label.targetAttackYet') }}</EmptyTitle>
           </EmptyHeader>
         </Empty>
         <Table v-else>
           <TableHeader>
             <TableRow>
-              <TableHead>{{ $t('ui.team') }}</TableHead>
-              <TableHead>{{ $t('ui.targetHost') }}</TableHead>
+              <TableHead>{{ $t('common.label.team') }}</TableHead>
+              <TableHead>{{ $t('challenges.label.targetHost') }}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            <TableRow v-for="target in targets" :key="target.teamId">
+            <TableRow v-for="target in targets" :key="target.teamId ?? undefined">
               <TableCell class="font-medium">{{ target.teamName }}</TableCell>
               <TableCell>
                 <div class="flex flex-col gap-1">
@@ -52,11 +52,11 @@ const { emit, targets, targetsError, targetsLoaded, FlagSubmit, RuntimeAccessUrl
     </section>
 
     <component :is="FlagSubmit"
-      :dock-target="flagDockTarget"
+      :dock-target="flagDockTarget ?? undefined"
       :competition-id="competition.id!"
       :competition-challenge-id="challenge.id!"
       multiple
-      :title="$t('ui.batchSubmitFlag')"
+      :title="$t('challenges.label.batchSubmitFlag')"
       :maximum-attempts="challenge.maximumFlagAttempts"
       :remaining-attempts="challenge.remainingFlagAttempts"
       @submitted="emit('submitted')"

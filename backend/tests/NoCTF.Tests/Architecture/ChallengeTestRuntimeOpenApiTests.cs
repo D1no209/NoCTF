@@ -68,7 +68,7 @@ public sealed class ChallengeTestRuntimeOpenApiTests
     {
         var backend = FindBackendRoot();
         return JsonDocument.Parse(await File.ReadAllTextAsync(
-            Path.Combine(backend, "artifacts", "openapi", "swagger.json")));
+            Path.Combine(backend, "artifacts", "openapi", "v1.json")));
     }
 
     private static string FindBackendRoot()

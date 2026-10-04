@@ -9,26 +9,26 @@ describe('api error localization', () => {
 
   test('explains competition deletion guards without suggesting that pausing is enough', () => {
     setLocale('zh-CN')
-    expect(parseApiError({ status: 409, detail: 'Finish the competition before permanently deleting it. Paused competitions cannot be deleted.' }).message)
+    expect(parseApiError({ messageKey: "api.endpoints.competitionForceDelete.activeCompetition",  status: 409, detail: 'Finish the competition before permanently deleting it. Paused competitions cannot be deleted.' }).message)
       .toBe('请先结束比赛再永久删除，暂停中的比赛不能删除。')
-    expect(parseApiError({ status: 409, detail: 'Notification threads contain cross-scope or unproven references. No data was deleted. Review the conflicting notification IDs before retrying.' }).message)
+    expect(parseApiError({ messageKey: "api.endpoints.competitionForceDelete.notificationScopeConflict",  status: 409, detail: 'Notification threads contain cross-scope or unproven references. No data was deleted. Review the conflicting notification IDs before retrying.' }).message)
       .toBe('通知线程存在跨作用域或归属不明的引用，未删除任何数据。请检查返回的冲突通知 ID 后重试。')
   })
 
   test('localizes known backend problem details in the Chinese locale', () => {
     setLocale('zh-CN')
 
-    expect(parseApiError({
+    expect(parseApiError({ messageKey: "api.competitionEvents.validation.specifyEventRangeStaff",
       status: 400,
       detail: 'Specify no event range for staff history, or a range between zero and 31 days.',
     }).message).toBe('工作人员查看完整历史时请不要设置时间范围；普通查询的时间范围需在 0 到 31 天内。')
 
-    expect(parseApiError({
+    expect(parseApiError({ errorMessages: { To: [{ key: "api.cheatIncidents.validation.incidentQueryRangeBetween" }] },
       status: 400,
       errors: { To: ['The incident query range must be between zero and 31 days.'] },
     }).message).toBe('作弊事件查询时间范围必须在 0 到 31 天内。')
 
-    expect(parseApiError({
+    expect(parseApiError({ messageKey: "api.pagination.invalidCursor",
       status: 400,
       title: 'Invalid cursor.',
     }).message).toBe('游标无效,请刷新后重试')
@@ -37,7 +37,7 @@ describe('api error localization', () => {
   test('prefers concrete validation and operation context over a generic bad-request detail', () => {
     setLocale('zh-CN')
 
-    expect(parseApiError({
+    expect(parseApiError({ errorMessages: { To: [{ key: "api.cheatIncidents.validation.incidentQueryRangeBetween" }] },
       status: 400,
       detail: 'Unexpected payload value.',
       errors: {
@@ -53,14 +53,13 @@ describe('api error localization', () => {
     }).message).toBe('Title must not be empty.')
 
     expect(parseApiError({ status: 400 }, '保存题目失败').message).toBe('保存题目失败')
-    expect(apiPlugin).toContain("status === 400 || status === 422")
-    expect(apiPlugin).toContain('? { status }')
+    expect(parseApiError({ responseStatusCode: 422 }, '保存题目失败').message).toBe('保存题目失败')
   })
 
   test('keeps the same backend details in the English locale', () => {
     setLocale('en')
 
-    expect(parseApiError({
+    expect(parseApiError({ messageKey: "api.platformLogs.validation.platformLogQueryRange",
       status: 400,
       detail: 'The platform log query range must be between zero and 14 days.',
     }).message).toBe('The platform log query range must be between zero and 14 days.')
@@ -95,7 +94,7 @@ describe('api error localization', () => {
       errors: { General: 'The competition has already finished.' },
     }).message).toBe('The competition has already finished.')
 
-    expect(parseApiError({
+    expect(parseApiError({ messageKey: "common.description.runtimeStateChangedWhile",
       status: 409,
       code: 'RuntimeStateConflict',
       detail: 'The runtime state changed while this request was being processed. Refresh the runtime status before retrying.',
@@ -160,7 +159,7 @@ describe('api error localization', () => {
     await ensureLocaleDomains(['runtime'])
     expect(parseApiError({ status: 409, code: 'RuntimeExtensionTooEarly' }).message)
       .toBe('仅在容器到期前最后 10 分钟可续期。')
-    expect(parseApiError({
+    expect(parseApiError({ messageKey: "api.runtime.runtimeMutation.extensionTooEarly",
       status: 409,
       message: 'Runtime renewal is available only during the final ten minutes before expiration.',
     }).message).toBe('仅在容器到期前最后 10 分钟可续期。')

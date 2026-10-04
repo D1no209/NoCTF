@@ -43,9 +43,16 @@ public sealed class CreateCompetitionBadgeEndpoint(
 {
     public override void Configure()
     {
+        Summary(summary =>
+        {
+            summary.Summary = "Creates a badge in the competition catalog without awarding points.";
+            summary.Description = summary.Summary;
+        });
+
         Post("/admin/competitions/{competitionId}/badges");
         AuthSchemes("Bearer");
         AllowFileUploads();
+        Description(builder => builder.Accepts<CreateCompetitionBadgeRequest>("multipart/form-data"));
         MaxRequestBodySize(FileUploadLimits.MaximumRequestBytes(limits.MaximumPosterBytes));
         Description(builder => builder.WithName("AdminCreateCompetitionBadge"));
     }
@@ -81,8 +88,8 @@ internal static class BadgeImageValidation
     public static bool IsSupported(string? contentType) =>
         contentType is "image/png" or "image/jpeg" or "image/webp";
 
-    public static ProblemHttpResult TooLarge(long limit) => TypedResults.Problem(
+    public static ProblemHttpResult TooLarge(long limit) => ApiProblems.Problem(
         statusCode: StatusCodes.Status413PayloadTooLarge,
-        title: "Badge image is too large.",
-        detail: $"Image uploads cannot exceed {limit} bytes.");
+        title: ApiMessages.Get(ApiMessageId.CreateCompetitionBadgeTitleBadgeImageTooLarge),
+        detail: ApiMessages.Get(ApiMessageId.UploadSizeLimit, new Dictionary<string, object?> { ["maximumBytes"] = limit }));
 }

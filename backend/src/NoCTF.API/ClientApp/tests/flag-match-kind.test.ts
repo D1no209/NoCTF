@@ -10,15 +10,15 @@ describe('challenge flag match kind editor', () => {
       new URL('../app/pages/admin/competitions/[id]/challenges/[ccId].vue', import.meta.url),
     ).text()
 
-    expect(templatePage).toContain('NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol')
+    expect(templatePage).toContain('NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol')
     expect(templatePage).toContain('matchKind: flagForm')
     expect(templatePage).toContain('supportsRegularExpression')
     expect(templatePage).toContain("template.value?.mode === 'Ctf'")
     expect(templatePage).toContain('!usesRuntimeFlagInjection.value')
     expect(templatePage).toContain('value="RegularExpression"')
-    expect(templatePage).not.toContain("ui.theRegularExpressionMatchesTheEntireFlagAndIsCase")
+    expect(templatePage).not.toContain("common.description.regularExpressionMatchesEntire")
     expect(templatePage).toContain('usesRuntimeFlagInjection')
-    expect(templatePage).toContain("ui.thisChallengeUsesRuntimeManagedDynamicFlagsThePlatformGenerates")
+    expect(templatePage).toContain("administration.challengesBy.description.challengeUsesRuntimeManaged")
     expect(templatePage).not.toContain('flagForm.teamId')
     expect(templatePage).not.toContain('flagForm.specificationKind')
     expect(templatePage).not.toContain('flagForm.specificationId')
@@ -38,7 +38,7 @@ describe('challenge flag match kind editor', () => {
       new URL('../app/pages/admin/competitions/[id]/challenges/[ccId].vue', import.meta.url),
     ).text()
 
-    expect(templatePage).toContain('NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse')
+    expect(templatePage).toContain('NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagFailureResponse')
     expect(templatePage).toContain('challengeFlagErrorMessage')
     expect(competitionPage).not.toContain('ChallengeFlagFailureResponse')
     expect(competitionPage).not.toContain('challengeFlagErrorMessage')
@@ -74,7 +74,7 @@ describe('attachment delivery editor', () => {
 
     expect(confirmation).toContain('<Button variant="destructive"')
     expect(confirmation).not.toContain('<AlertDialogAction')
-    expect(deletion).toContain('adminChallengeBankDeleteAttachment({')
+    expect(deletion).toMatch(/api\.api\.v1\.admin\.challenges\.byChallengeId\([^)]*\)\.attachments\.byAttachmentId\([^)]*\)\.delete\(/)
     expect(deletion.indexOf('deletingAttachment.value = null'))
       .toBeGreaterThan(deletion.indexOf('if (error)'))
   })
@@ -88,13 +88,13 @@ describe('attachment delivery editor', () => {
       page.indexOf('function randomAttachmentErrorMessage'),
     )
 
-    expect(page).toContain('adminChallengeBankUploadAttachments')
-    expect(page).toContain('NoCtfapiEndpointsAdministrationChallengeBankAttachmentBatchFailureResponse')
+    expect(page).toMatch(/api\.api\.v1\.admin\.challenges\.byChallengeId\([^)]*\)\.attachments\.post\(/)
+    expect(page).toContain('NoCTFAPIEndpointsAdministrationChallengeBankAttachmentBatchFailureResponse')
     expect(page).toContain('multiple class="hidden" @change="selectRandomFiles"')
     expect(page).toContain('file.name')
     expect(page).toContain('attachment.exactFlag')
-    expect(page).toContain("$t('ui.hash')")
-    expect(page).toContain("attachment.sha256?.slice(0, 8) ?? $t('ui.symbol')")
+    expect(page).toContain("$t('administration.label.hash')")
+    expect(page).toContain("attachment.sha256?.slice(0, 8) ?? $t('common.label.symbol')")
     expect(page).toContain(':content="attachment.sha256"')
     expect(page).toContain('id="attachment-delivery-policy"')
     expect(page).toContain('requestAttachmentDeliveryPolicy')
@@ -110,8 +110,8 @@ describe('attachment delivery editor', () => {
     ).text()
 
     expect(page).toContain("attachmentDeliveryPolicy === 'RandomOnePerTeam'")
-    expect(page).toContain('downloadRandomChallengeAttachmentEndpoint')
+    expect(page).toMatch(/api\.api\.v1\.competitions\.byCompetitionId\([^)]*\)\.challenges\.byCompetitionChallengeId\([^)]*\)\.attachment\.get\(/)
     expect(page).toContain('v-for="attachment in attachments"')
-    expect(page).not.toContain("ui.theFirstDownloadAssignsOneRandomAttachmentToThisTeam")
+    expect(page).not.toContain("common.description.firstDownloadAssignsOne")
   })
 })

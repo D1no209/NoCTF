@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { bindViewState } from '~/features/shared/view-state'
-import type { NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol } from '~/api'
+import type { NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol } from '~/api/models'
 
 import { useLifecycleBadge } from './useLifecycleBadge'
 import View from '~/components/views/competitions/LifecycleBadgeView.vue'
 
-const props = defineProps<{ status?: NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol }>()
+const props = defineProps<{ status?: NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol }>()
 const state = bindViewState(useLifecycleBadge(props))
 
 </script>

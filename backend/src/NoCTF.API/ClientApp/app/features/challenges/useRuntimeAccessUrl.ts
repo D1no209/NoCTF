@@ -1,13 +1,14 @@
+import { message as describeMessage } from '../../utils/i18n'
 import { toRefs } from 'vue'
 
 import { Copy } from '@lucide/vue'
-import { toast } from 'vue-sonner'
+import { toast } from '../../utils/message-toast'
 import { isRuntimeUrlClickable } from '../../utils/runtime-url'
-import type { NoCtfapiEndpointsRuntimeRuntimeAccessResponse } from '../../api'
+import type { NoCTFAPIEndpointsRuntimeRuntimeAccessResponse } from '../../api/models'
 
 /** Owns state, effects and commands for RuntimeAccessUrl. */
 export function useRuntimeAccessUrl(props: Readonly<{
-  access: NoCtfapiEndpointsRuntimeRuntimeAccessResponse
+  access: NoCTFAPIEndpointsRuntimeRuntimeAccessResponse
 }>) {
   const entries = computed(() => [
     props.access.directAddress
@@ -29,10 +30,10 @@ export function useRuntimeAccessUrl(props: Readonly<{
   async function copy(address: string): Promise<void> {
     try {
       await navigator.clipboard.writeText(address)
-      toast.success(translate("ui.copiedToClipboard"))
+      toast.success(describeMessage("common.label.copiedClipboard"))
     }
     catch {
-      toast.error(translate("ui.copyFailedPleaseManuallySelectCopy"))
+      toast.error(describeMessage("common.kohPanel.error.copyManuallySelectFailed"))
     }
   }
 

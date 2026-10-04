@@ -1,4 +1,5 @@
-import type { NoCtfapiEndpointsCompetitionsCompetitionResponse as Competition } from '~/api'
+import { dateTimestamp } from '../../utils/date-value'
+import type { NoCTFAPIEndpointsCompetitionsCompetitionResponse as Competition } from '~/api/models'
 
 export type CompetitionGroup = 'running' | 'upcoming' | 'finished' | 'deleted'
 export interface CompetitionSidebarOption { value: string; label: string; competition: Competition }
@@ -15,10 +16,10 @@ export function competitionGroup(competition: Competition, includeManagement = f
 export function resolveCompetitionBrowser(items: Competition[], requestedId: string | null, requestedGroup: string | null, includeManagement = false) {
   const availableGroups = includeManagement ? [...competitionGroups, 'deleted' as const] : competitionGroups
   const groups = {
-    running: items.filter(c => c.id && competitionGroup(c, includeManagement) === 'running').sort((a, b) => (a.endTime ?? '').localeCompare(b.endTime ?? '')),
-    upcoming: items.filter(c => c.id && competitionGroup(c, includeManagement) === 'upcoming').sort((a, b) => (a.startTime ?? '').localeCompare(b.startTime ?? '')),
-    finished: items.filter(c => c.id && competitionGroup(c, includeManagement) === 'finished').sort((a, b) => (b.endTime ?? '').localeCompare(a.endTime ?? '')),
-    deleted: items.filter(c => c.id && competitionGroup(c, includeManagement) === 'deleted').sort((a, b) => (b.deletedAt ?? '').localeCompare(a.deletedAt ?? '')),
+    running: items.filter(c => c.id && competitionGroup(c, includeManagement) === 'running').sort((a, b) => (dateTimestamp(a.endTime) || 0) - (dateTimestamp(b.endTime) || 0)),
+    upcoming: items.filter(c => c.id && competitionGroup(c, includeManagement) === 'upcoming').sort((a, b) => (dateTimestamp(a.startTime) || 0) - (dateTimestamp(b.startTime) || 0)),
+    finished: items.filter(c => c.id && competitionGroup(c, includeManagement) === 'finished').sort((a, b) => (dateTimestamp(b.endTime) || 0) - (dateTimestamp(a.endTime) || 0)),
+    deleted: items.filter(c => c.id && competitionGroup(c, includeManagement) === 'deleted').sort((a, b) => (dateTimestamp(b.deletedAt) || 0) - (dateTimestamp(a.deletedAt) || 0)),
   }
   const requested = items.find(c => c.id === requestedId)
   const group: CompetitionGroup = (requested && competitionGroup(requested, includeManagement))

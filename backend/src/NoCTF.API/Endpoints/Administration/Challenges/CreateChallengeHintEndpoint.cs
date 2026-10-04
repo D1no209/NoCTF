@@ -22,7 +22,7 @@ public sealed class SaveChallengeHintValidator : Validator<SaveChallengeHintRequ
     {
         RuleFor(request => request.Id)
             .Must(id => id is null || id != Guid.Empty)
-            .WithMessage("Id cannot be empty when supplied.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.CreateChallengeHintValidationIdEmptySupplied)).WithErrorCode(ApiMessages.Key(ApiMessageId.CreateChallengeHintValidationIdEmptySupplied));
         RuleFor(request => request.Content).NotEmpty();
         RuleFor(request => request.Cost).GreaterThanOrEqualTo(0);
     }
@@ -62,12 +62,12 @@ public sealed class CreateChallengeHintEndpoint(
         if (result.FailureCode == ChallengeHintFailureCode.HintNotFound)
             return TypedResults.NotFound();
         if (!result.Succeeded)
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: result.FailureCode == ChallengeHintFailureCode.ResourceIdConflict
                     ? StatusCodes.Status409Conflict
                     : StatusCodes.Status400BadRequest,
-                title: "Hint was not created.",
-                detail: result.ErrorMessage,
+                title: ApiMessages.Get(ApiMessageId.CreateChallengeHintTitleHintWasCreated),
+                detail: ApiMessages.For(result.FailureCode),
                 extensions: new Dictionary<string, object?> { ["code"] = result.FailureCode?.ToString() });
         var response = ChallengeHintMapping.ToResponse(result.Value!);
         return TypedResults.Created(

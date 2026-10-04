@@ -31,7 +31,7 @@ public sealed class CreateSharedRuntimeEndpoint(
                 NoCTF.Application.Observability.RuntimeOperationMetricKind.SharedCreate)));
         Description(builder => builder.WithName("AdminCreateSharedRuntime")
             .ProducesProblemFE(StatusCodes.Status409Conflict));
-        Summary(summary => summary.Summary = "Creates or replaces a KoH shared runtime.");
+        Summary(summary => { summary.Summary = "Creates or replaces a KoH shared runtime."; summary.Description = summary.Summary; });
     }
 
     public override async Task<Results<Accepted<RuntimeAcceptedResponse>, NotFound, Conflict<RuntimeConflictResponse>,

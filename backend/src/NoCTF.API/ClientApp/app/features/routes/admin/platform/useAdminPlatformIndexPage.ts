@@ -1,21 +1,25 @@
 
+import { api, multipartBody } from '../../../../lib/api'
+import { message as describeMessage } from '../../../../utils/i18n'
+import type { UiMessage } from '../../../../utils/i18n'
+
 import type { ComponentPublicInstance } from 'vue'
 import { Upload } from '@lucide/vue'
-import { toast } from 'vue-sonner'
-import { adminPlatformGetConfiguration, adminPlatformGetInformation, adminPlatformPatchConfiguration, adminPlatformUploadLogo } from '../../../../api'
-import type { NoCtfapiEndpointsAdministrationPlatformPlatformBrandingResponse, NoCtfapiEndpointsAdministrationPlatformPlatformInformationResponse } from '../../../../api'
+import { toast } from '../../../../utils/message-toast'
+
+import type { NoCTFAPIEndpointsAdministrationPlatformPlatformBrandingResponse, NoCTFAPIEndpointsAdministrationPlatformPlatformInformationResponse } from '../../../../api/models'
 
 /** Owns state, effects and commands for AdminPlatformIndexPage. */
 export function useAdminPlatformIndexPage() {
   const { configuration: globalConfiguration } = usePlatform()
 
-  const information = ref<NoCtfapiEndpointsAdministrationPlatformPlatformInformationResponse | null>(null)
+  const information = ref<NoCTFAPIEndpointsAdministrationPlatformPlatformInformationResponse | null>(null)
 
-  const configuration = ref<NoCtfapiEndpointsAdministrationPlatformPlatformBrandingResponse | null>(null)
+  const configuration = ref<NoCTFAPIEndpointsAdministrationPlatformPlatformBrandingResponse | null>(null)
 
   const loading = ref(true)
 
-  const loadError = ref<string | null>(null)
+  const loadError = ref<UiMessage | null>(null)
 
   const name = ref('')
 
@@ -32,35 +36,39 @@ export function useAdminPlatformIndexPage() {
   async function load(): Promise<void> {
     loading.value = true
     loadError.value = null
-    const [infoResult, configResult] = await Promise.all([
-      adminPlatformGetInformation(),
-      adminPlatformGetConfiguration(),
-    ])
+    const settledRequests = await Promise.allSettled([
+      api.api.v1.admin.platform.information.get(),
+      api.api.v1.admin.platform.configuration.get(),
+    ]);
+    const infoResult = settledRequests[0].status === 'fulfilled' ? settledRequests[0].value : undefined;
+    const infoResultError = settledRequests[0].status === 'rejected' ? settledRequests[0].reason : undefined;
+    const configResult = settledRequests[1].status === 'fulfilled' ? settledRequests[1].value : undefined;
+    const configResultError = settledRequests[1].status === 'rejected' ? settledRequests[1].reason : undefined;
+
     loading.value = false
-    if (infoResult.error || configResult.error) {
-      loadError.value = parseApiError(infoResult.error ?? configResult.error).message
+    if (infoResultError || configResultError) {
+      loadError.value = parseApiError(infoResultError ?? configResultError).displayMessage
       return
     }
-    information.value = infoResult.data ?? null
-    configuration.value = configResult.data?.branding ?? null
-    name.value = configResult.data?.branding?.name ?? ''
-    description.value = configResult.data?.branding?.description ?? ''
+    information.value = infoResult ?? null
+    configuration.value = configResult?.branding ?? null
+    name.value = configResult?.branding?.name ?? ''
+    description.value = configResult?.branding?.description ?? ''
   }
 
   async function save(): Promise<void> {
     if (!configuration.value || !name.value.trim()) return
     saving.value = true
-    const { data, error } = await adminPlatformPatchConfiguration({
-      body: {
+    let error: unknown;
+    const data = await api.api.v1.admin.platform.configuration.patch({
         branding: {
           name: name.value.trim(),
           description: description.value.trim() || null,
         },
-      },
-    })
+      }).catch(cause => { error = cause; return undefined });
     saving.value = false
     if (error) {
-      toast.error(parseApiError(error).message)
+      toast.error(parseApiError(error).displayMessage)
       return
     }
     configuration.value = data?.branding ?? configuration.value
@@ -72,7 +80,7 @@ export function useAdminPlatformIndexPage() {
         logoUrl: data.branding.logoUrl,
       }
     }
-    toast.success(translate("ui.platformConfigurationSaved"))
+    toast.success(describeMessage("administration.label.platformConfigurationSaved"))
   }
 
   async function uploadLogo(event: Event): Promise<void> {
@@ -81,12 +89,11 @@ export function useAdminPlatformIndexPage() {
     input.value = ''
     if (!file || !configuration.value) return
     logoUploading.value = true
-    const { data, error } = await adminPlatformUploadLogo({
-      body: { file },
-    })
+    let error: unknown;
+    const data = await api.api.v1.admin.platform.configuration.logo.put(await multipartBody({ file })).catch(cause => { error = cause; return undefined });
     logoUploading.value = false
     if (error) {
-      toast.error(parseApiError(error).message)
+      toast.error(parseApiError(error).displayMessage)
       return
     }
     if (data) {
@@ -95,7 +102,7 @@ export function useAdminPlatformIndexPage() {
         globalConfiguration.value = { ...globalConfiguration.value, logoUrl: data.logoUrl }
       }
     }
-    toast.success(translate("ui.logoHasBeenUpdated"))
+    toast.success(describeMessage("administration.label.logoUpdated"))
   }
 
   onMounted(() => {

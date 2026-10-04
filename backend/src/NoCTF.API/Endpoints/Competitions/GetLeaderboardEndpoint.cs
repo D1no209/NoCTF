@@ -318,7 +318,7 @@ public sealed class GetLeaderboardEndpoint(
     {
         Get("/competitions/{competitionId}/leaderboard");
         AllowAnonymous();
-        Summary(summary => summary.Summary = "Get the sparse scoreboard snapshot or queue a refresh.");
+        Summary(summary => { summary.Summary = "Get the sparse scoreboard snapshot or queue a refresh."; summary.Description = summary.Summary; });
     }
 
     public override async Task<Results<Ok<ScoreboardSnapshotResponse>, Accepted<LeaderboardProcessingProtocolResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(
@@ -397,9 +397,9 @@ public sealed class GetLeaderboardEndpoint(
         var status = await leaderboard.GetStatusAsync(request.CompetitionId, cancellationToken);
         if (status.LastFailureAt is not null)
         {
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: StatusCodes.Status503ServiceUnavailable,
-                title: "Leaderboard projection is unavailable.",
+                title: ApiMessages.Get(ApiMessageId.GetLeaderboardTitleLeaderboardProjectionUnavailable),
                 extensions: new Dictionary<string, object?>
                 {
                     ["code"] = LeaderboardProblemCode.LeaderboardProjectionFailed

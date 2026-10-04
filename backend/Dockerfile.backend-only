@@ -7,6 +7,8 @@ COPY backend/ ./backend/
 WORKDIR /src/backend
 RUN dotnet publish src/NoCTF.Host/NoCTF.Host.csproj -c Release -o /app/backend /p:BuildSpaOnPublish=false \
     && rm -rf /app/backend/wwwroot
+COPY LICENSE /app/backend/LICENSE
+COPY LICENSES /app/backend/LICENSES
 
 FROM deployed
 WORKDIR /app

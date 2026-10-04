@@ -21,8 +21,8 @@ public sealed class DownloadTeamWriteUpEndpoint(
             NoCTF.Application.Observability.ApiRequestKind.Download)));
         Description(builder => builder
             .WithName("DownloadTeamWriteUp")
-            .Produces<TeamWriteUpBinaryResponse>(StatusCodes.Status200OK, "application/pdf"));
-        Summary(summary => summary.Summary = "Downloads a team's PDF WriteUp for staff review.");
+            .Produces<byte[]>(StatusCodes.Status200OK, "application/pdf"));
+        Summary(summary => { summary.Summary = "Downloads a team's PDF WriteUp for staff review."; summary.Description = summary.Summary; });
     }
 
     public override async Task<Results<FileStreamHttpResult, NotFound, ForbidHttpResult>>

@@ -10,9 +10,9 @@ export const maximumQuestionBodyLength = 4000
 export function validateAppealStatement(value: string): string | null {
   const length = value.trim().length
   if (length < minimumAppealStatementLength)
-    return translate("ui.theAppealStatementMustBeAtLeastCharactersItCurrently", { minimum: minimumAppealStatementLength, length })
+    return translate("common.participantValidation.validation.appealStatementLength.participantFormValidation", { minimum: minimumAppealStatementLength, length })
   if (length > maximumAppealStatementLength)
-    return translate("ui.theAppealStatementCannotExceedCharacters", { maximum: maximumAppealStatementLength })
+    return translate("common.participantValidation.validation.appealStatementLength", { maximum: maximumAppealStatementLength })
   return null
 }
 
@@ -27,19 +27,19 @@ export function validateCompetitionQuestionDraft(
   draft: CompetitionQuestionDraft,
 ): string | null {
   if (draft.requiresChallenge && !draft.challengeId)
-    return translate("ui.forTopicRelatedInquiriesYouMustSelectARelatedTopic")
+    return translate("common.participantValidation.validation.topicRelatedFormat")
 
   const titleLength = draft.title.trim().length
   if (titleLength < minimumQuestionTitleLength)
-    return translate("ui.theTitleMustBeAtLeastCharactersItCurrentlyHas", { minimum: minimumQuestionTitleLength, length: titleLength })
+    return translate("common.participantValidation.validation.titleLeastLength", { minimum: minimumQuestionTitleLength, length: titleLength })
   if (titleLength > maximumQuestionTitleLength)
-    return translate("ui.theTitleCannotExceedCharacters", { maximum: maximumQuestionTitleLength })
+    return translate("common.participantValidation.validation.titleExceedLength", { maximum: maximumQuestionTitleLength })
 
   const bodyLength = draft.body.trim().length
   if (bodyLength < minimumQuestionBodyLength)
-    return translate("ui.theContentMustBeAtLeastCharactersItCurrentlyHas", { minimum: minimumQuestionBodyLength, length: bodyLength })
+    return translate("common.participantValidation.validation.contentLeastLength", { minimum: minimumQuestionBodyLength, length: bodyLength })
   if (bodyLength > maximumQuestionBodyLength)
-    return translate("ui.theContentCannotExceedCharacters", { maximum: maximumQuestionBodyLength })
+    return translate("common.participantValidation.validation.contentExceedLength", { maximum: maximumQuestionBodyLength })
 
   return null
 }

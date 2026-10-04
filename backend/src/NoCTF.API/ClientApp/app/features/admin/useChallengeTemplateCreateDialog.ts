@@ -1,7 +1,11 @@
+
+import { api } from '../../lib/api'
+import type { UiMessage } from '../../utils/i18n'
+import { message as describeMessage } from '../../utils/i18n'
 import { markRaw, proxyRefs, toRefs } from 'vue'
-import { toast } from 'vue-sonner'
-import { adminChallengeBankCreateTemplate } from '../../api'
-import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract, NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol, NoCtfapiEndpointsCompetitionsGameModeProtocol } from '../../api'
+import { toast } from '../../utils/message-toast'
+
+import type { NoCTFAPIEndpointsAdministrationChallengeBankChallengeDefinitionContract, NoCTFAPIEndpointsAdministrationChallengeBankChallengeVisibilityProtocol, NoCTFAPIEndpointsCompetitionsGameModeProtocol } from '../../api/models'
 import { challengeTemplateWriteErrorMessages } from '../../lib/challenge-template-error'
 import { validateChallengeTemplateDraft } from '../../lib/challenge-template-validation'
 import { challengeDirectionOptions, directionLabel } from '../../utils/directions'
@@ -19,14 +23,14 @@ export function useChallengeTemplateCreateDialog(
   emit: Events,
 ) {
   const title = ref('')
-  const mode = ref<NoCtfapiEndpointsCompetitionsGameModeProtocol>('Ctf')
-  const visibility = ref<NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol>('Private')
+  const mode = ref<NoCTFAPIEndpointsCompetitionsGameModeProtocol>('Ctf')
+  const visibility = ref<NoCTFAPIEndpointsAdministrationChallengeBankChallengeVisibilityProtocol>('Private')
   const direction = ref<(typeof challengeDirectionOptions)[number]>('Misc')
   const description = ref('')
-  const definition = ref<NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract>(
+  const definition = ref<NoCTFAPIEndpointsAdministrationChallengeBankChallengeDefinitionContract>(
     defaultDefinition(mode.value),
   )
-  const saveErrors = ref<string[]>([])
+  const saveErrors = ref<UiMessage[]>([])
   const saveAttempted = ref(false)
   const pending = ref(false)
 
@@ -69,35 +73,34 @@ export function useChallengeTemplateCreateDialog(
     })
     if (validationErrors.length > 0) {
       saveErrors.value = validationErrors
-      toast.error(validationErrors[0] ?? translate('ui.unableToSaveTheChallengeTemplate'))
+      toast.error(validationErrors[0] ?? translate('administration.challengesBy.description.unableSaveChallengeTemplate'))
       return
     }
 
     pending.value = true
     try {
-      const { data, error } = await adminChallengeBankCreateTemplate({
-        body: {
+      let error: unknown;
+      const data = await api.api.v1.admin.challenges.post({
           title: title.value.trim(),
           mode: mode.value,
           visibility: visibility.value,
           direction: directionLabel(direction.value),
           description: description.value.trim() || null,
           definition: definition.value,
-        },
-      })
+        }).catch(cause => { error = cause; return undefined });
       if (error || !data?.id) {
         saveErrors.value = challengeTemplateWriteErrorMessages(error)
-        toast.error(saveErrors.value[0] ?? translate('ui.unableToSaveTheChallengeTemplate'))
+        toast.error(saveErrors.value[0] ?? translate('administration.challengesBy.description.unableSaveChallengeTemplate'))
         return
       }
       const templateId = data.id
-      toast.success(translate('ui.templateCreated'))
+      toast.success(describeMessage('administration.label.templateCreated'))
       reset()
       emit('created', templateId)
     }
     catch (error) {
       saveErrors.value = challengeTemplateWriteErrorMessages(error)
-      toast.error(saveErrors.value[0] ?? translate('ui.unableToSaveTheChallengeTemplate'))
+      toast.error(saveErrors.value[0] ?? translate('administration.challengesBy.description.unableSaveChallengeTemplate'))
     }
     finally {
       pending.value = false

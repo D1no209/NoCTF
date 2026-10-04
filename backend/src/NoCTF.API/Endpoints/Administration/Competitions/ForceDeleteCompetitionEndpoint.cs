@@ -38,7 +38,12 @@ public sealed record CompetitionForceDeleteConflictResponse(
     CompetitionForceDeleteConflictCode Code,
     string Detail,
     CompetitionHardDeletePreviewResponse? Preview = null,
-    IReadOnlyList<Guid>? ConflictingNotificationIds = null);
+    IReadOnlyList<Guid>? ConflictingNotificationIds = null)
+{
+    public string Detail { get; init; } = ApiMessages.Localize(Code, Detail, ApiMessages.NoArguments);
+    public string MessageKey => ApiMessages.For(Code).Key;
+    public IReadOnlyDictionary<string, object?> MessageArguments => ApiMessages.NoArguments;
+}
 
 public sealed class ForceDeleteCompetitionEndpoint(
     ForceDeleteCompetition forceDelete,
@@ -91,10 +96,10 @@ public sealed class ForceDeleteCompetitionEndpoint(
                 "Notification threads contain cross-scope or unproven references. No data was deleted. Review the conflicting notification IDs before retrying.",
                 result.Preview is null ? null : CompetitionHardDeleteMapping.ToResponse(result.Preview),
                 result.ConflictingNotificationIds)),
-            CompetitionForceDeleteState.InvalidReason => TypedResults.Problem(
+            CompetitionForceDeleteState.InvalidReason => ApiProblems.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
-                title: "Competition was not force-deleted.",
-                detail: "Reason must contain between 8 and 500 characters."),
+                title: ApiMessages.Get(ApiMessageId.ForceDeleteCompetitionTitleCompetitionWasForceDeleted),
+                detail: ApiMessages.Get(ApiMessageId.ForceDeleteCompetitionDetailReasonContainBetweenCharacters)),
             _ => throw new InvalidOperationException(
                 $"Unsupported force-delete state: {result.State}.")
         };

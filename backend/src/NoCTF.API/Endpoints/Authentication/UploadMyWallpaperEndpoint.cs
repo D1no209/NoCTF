@@ -33,7 +33,12 @@ public enum WallpaperUploadFailureCode
     MalformedImage
 }
 
-public sealed record WallpaperUploadFailureResponse(WallpaperUploadFailureCode Code);
+public sealed record WallpaperUploadFailureResponse(WallpaperUploadFailureCode Code)
+{
+    public string Detail => ApiMessages.For(Code).Text;
+    public string MessageKey => ApiMessages.For(Code).Key;
+    public IReadOnlyDictionary<string, object?> MessageArguments => ApiMessages.NoArguments;
+}
 
 public sealed class UploadMyWallpaperEndpoint(
     ReplaceCurrentUserWallpaper replace,
@@ -52,6 +57,7 @@ public sealed class UploadMyWallpaperEndpoint(
         Put("/auth/me/wallpaper");
         AuthSchemes("Bearer");
         AllowFileUploads();
+        Description(builder => builder.Accepts<UploadMyWallpaperRequest>("multipart/form-data"));
         MaxRequestBodySize(FileUploadLimits.MaximumRequestBytes(
             uploadLimits.MaximumWallpaperBytes));
         Description(builder => builder
@@ -59,7 +65,7 @@ public sealed class UploadMyWallpaperEndpoint(
             .WithMetadata(new EnableRateLimitingAttribute("avatar"))
             .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
                 StatusCodes.Status413PayloadTooLarge));
-        Summary(summary => summary.Summary = "Replaces and enables the current user's wallpaper.");
+        Summary(summary => { summary.Summary = "Replaces and enables the current user's wallpaper."; summary.Description = summary.Summary; });
     }
 
     public override async Task<Results<Ok<CurrentUserResponse>, NotFound,
@@ -92,10 +98,10 @@ public sealed class UploadMyWallpaperEndpoint(
     }
 
     private static ProblemHttpResult UploadTooLarge(long maximumBytes) =>
-        TypedResults.Problem(
+        ApiProblems.Problem(
             statusCode: StatusCodes.Status413PayloadTooLarge,
-            title: "Wallpaper is too large.",
-            detail: $"Wallpaper uploads cannot exceed {maximumBytes} bytes.",
+            title: ApiMessages.Get(ApiMessageId.UploadMyWallpaperTitleWallpaperTooLarge),
+            detail: ApiMessages.Get(ApiMessageId.UploadSizeLimit, new Dictionary<string, object?> { ["maximumBytes"] = maximumBytes }),
             extensions: new Dictionary<string, object?>
             {
                 ["code"] = FileUploadFailureCode.UploadTooLarge.ToString()

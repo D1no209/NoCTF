@@ -1,4 +1,8 @@
-import { authenticationRequestEmailVerification, registerEndpoint } from '../../../api'
+
+import { api } from '../../../lib/api'
+import { message as describeMessage } from '../../../utils/i18n'
+import type { UiMessage } from '../../../utils/i18n'
+
 import { useHumanVerification } from '~/features/security/useHumanVerification'
 import { useAuthThemeArtwork } from './useAuthThemeArtwork'
 
@@ -12,15 +16,15 @@ export function useAuthRegisterPage() {
   const email = ref('')
   const password = ref('')
   const confirmPassword = ref('')
-  const error = ref<string | null>(null)
+  const error = ref<UiMessage | null>(null)
   const pending = ref(false)
   const registered = ref<{
-    requiresEmailVerification?: boolean
-    verificationEmailQueued?: boolean
+    requiresEmailVerification?: boolean | null
+    verificationEmailQueued?: boolean | null
   } | null>(null)
   const resendPending = ref(false)
   const resendDone = ref(false)
-  const resendError = ref<string | null>(null)
+  const resendError = ref<UiMessage | null>(null)
   const loginTarget = computed(() => {
     const candidate = route.query.redirect
     const redirect = typeof candidate === 'string'
@@ -36,24 +40,22 @@ export function useAuthRegisterPage() {
   async function submit() {
     error.value = null
     if (password.value !== confirmPassword.value) {
-      error.value = translate('ui.thePasswordsEnteredTwiceAreInconsistent')
+      error.value = describeMessage('common.authRegister.description.passwordsEnteredTwiceInconsistent')
       return
     }
     pending.value = true
     try {
       const verificationHeaders = await requestHumanVerification('registration')
       if (verificationHeaders === null) return
-      const { data, error: requestError } = await registerEndpoint({
-        headers: verificationHeaders,
-        body: { userName: userName.value, email: email.value, password: password.value },
-      })
+      let requestError: unknown;
+      const data = await api.api.v1.auth.register.post({ userName: userName.value, email: email.value, password: password.value }, { headers: verificationHeaders }).catch(cause => { requestError = cause; return undefined });
       if (requestError) throw parseApiError(requestError)
       password.value = ''
       confirmPassword.value = ''
       registered.value = data ?? {}
     }
     catch (requestError) {
-      error.value = parseApiError(requestError).message
+      error.value = parseApiError(requestError).displayMessage
     }
     finally {
       pending.value = false
@@ -64,14 +66,13 @@ export function useAuthRegisterPage() {
     resendError.value = null
     resendPending.value = true
     try {
-      const { error: requestError } = await authenticationRequestEmailVerification({
-        body: { email: email.value },
-      })
+      let requestError: unknown;
+      await api.api.v1.auth.emailVerification.request.post({ email: email.value }).catch(cause => { requestError = cause; return undefined });
       if (requestError) throw parseApiError(requestError)
       resendDone.value = true
     }
     catch (requestError) {
-      resendError.value = parseApiError(requestError).message
+      resendError.value = parseApiError(requestError).displayMessage
     }
     finally {
       resendPending.value = false

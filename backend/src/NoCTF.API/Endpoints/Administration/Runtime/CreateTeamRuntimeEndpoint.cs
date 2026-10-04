@@ -31,7 +31,7 @@ public sealed class CreateTeamRuntimeEndpoint(
                 NoCTF.Application.Observability.RuntimeOperationMetricKind.TeamCreate)));
         Description(builder => builder.WithName("AdminCreateTeamRuntime")
             .ProducesProblemFE(StatusCodes.Status409Conflict));
-        Summary(summary => summary.Summary = "Creates or replaces a team runtime.");
+        Summary(summary => { summary.Summary = "Creates or replaces a team runtime."; summary.Description = summary.Summary; });
     }
 
     public override async Task<Results<Accepted<RuntimeAcceptedResponse>, NotFound, Conflict<RuntimeConflictResponse>,

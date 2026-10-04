@@ -1,25 +1,29 @@
+
+import { api } from '../../../lib/api'
+import { message as describeMessage } from '../../../utils/i18n'
+import type { UiMessage } from '../../../utils/i18n'
 import { markRaw, toRefs } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import { ShieldCheck } from '@lucide/vue'
-import { getAwdpParticipantStateEndpoint } from '../../../api'
-import type { NoCtfapiEndpointsChallengesChallengeResponse, NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsGameplayFactsAwdpParticipantStateResponse } from '../../../api'
+
+import type { NoCTFAPIEndpointsChallengesChallengeResponse, NoCTFAPIEndpointsCompetitionsCompetitionResponse, NoCTFAPIEndpointsGameplayFactsAwdpParticipantStateResponse } from '../../../api/models'
 import FixSubmitComponent from '../FixSubmit.vue'
 import FlagSubmitComponent from '../FlagSubmit.vue'
 import RuntimeCardComponent from '../RuntimeCard.vue'
 
 /** Owns state, effects and commands for AwdpPanel. */
 export function useAwdpPanel(props: Readonly<{
-  competition: NoCtfapiEndpointsCompetitionsCompetitionResponse
-  challenge: NoCtfapiEndpointsChallengesChallengeResponse
-  flagDockTarget?: string
-  runtimeDockTarget?: string
+  competition: NoCTFAPIEndpointsCompetitionsCompetitionResponse
+  challenge: NoCTFAPIEndpointsChallengesChallengeResponse
+  flagDockTarget?: string | null
+  runtimeDockTarget?: string | null
 }>,
 emit: { (event: "submitted", ...args: []): void; (event: "remainingChanged", ...args: [remaining: number | null]): void }) {
-  const state = ref<NoCtfapiEndpointsGameplayFactsAwdpParticipantStateResponse | null>(null)
+  const state = ref<NoCTFAPIEndpointsGameplayFactsAwdpParticipantStateResponse | null>(null)
 
   const loading = ref(true)
 
-  const stateError = ref<string | null>(null)
+  const stateError = ref<UiMessage | null>(null)
 
   const attackRuntimeCard = ref<{ refreshUntilStopped: () => Promise<void> } | null>(null)
 
@@ -37,23 +41,19 @@ emit: { (event: "submitted", ...args: []): void; (event: "remainingChanged", ...
   const defenseOutcome = computed(() => {
     const defense = state.value?.defense
     if (!defense?.gameplayFactId || !defense.result && !defense.failureCode) return null
-    if (defense.result === 'Correct') return translate("ui.defenseSucceeded")
-    if (defense.failureCode === 'AwdpExploitSucceeded') return translate("ui.defenseFailedExploitSucceeded")
-    if (defense.failureCode === 'AwdpServiceAbnormal') return translate("ui.defenseFailedServiceAbnormal")
-    if (defense.state === 'PlatformFailed') return translate("ui.defenseVerificationFailed")
-    return translate("ui.defenseFailedServiceAbnormal")
+    if (defense.result === 'Correct') return translate("common.label.defenseSucceeded")
+    if (defense.failureCode === 'AwdpExploitSucceeded') return translate("challenges.error.defenseExploitSucceededFailed")
+    if (defense.failureCode === 'AwdpServiceAbnormal') return translate("challenges.error.defenseServiceAbnormalFailed")
+    if (defense.state === 'PlatformFailed') return translate("challenges.error.defenseVerificationFailed")
+    return translate("challenges.error.defenseServiceAbnormalFailed")
   })
 
   async function refreshState(): Promise<boolean> {
-    const { data, error } = await getAwdpParticipantStateEndpoint({
-      path: {
-        competitionId: props.competition.id!,
-        competitionChallengeId: props.challenge.id!,
-      },
-    })
+    let error: unknown;
+    const data = await api.api.v1.competitions.byCompetitionId(props.competition.id!).challenges.byCompetitionChallengeId(props.challenge.id!).awdpState.get().catch(cause => { error = cause; return undefined });
     loading.value = false
     if (error || !data) {
-      stateError.value = parseApiError(error, translate("ui.failedToLoadTheAwdpChallengeState")).message
+      stateError.value = parseApiError(error, describeMessage("challenges.awdpPanel.error.loadAwdpChallengeFailed")).displayMessage
       return false
     }
     stateError.value = null

@@ -55,18 +55,17 @@ public sealed class CompetitionPermissionsOpenApiTests
             ]);
         AssertGuid(permissions, "competitionId");
         AssertGuid(permissions, "ownerId");
-        AssertGuidArray(permissions, "managerIds");
-        AssertGuidArray(permissions, "judgeIds");
-        AssertGuidArray(permissions, "observerIds");
+        AssertGuidArray(root, permissions, "managerIds");
+        AssertGuidArray(root, permissions, "judgeIds");
+        AssertGuidArray(root, permissions, "observerIds");
         var candidates = ResponseSchema(
             root,
             Operation(root, CandidatesPath, "get"),
             "200");
         var candidateItems = ResolveSchema(
             root,
-            candidates.GetProperty("properties")
-                .GetProperty("items")
-                .GetProperty("items"));
+            ResolveSchema(root, candidates.GetProperty("properties")
+                .GetProperty("items")).GetProperty("items"));
         await Assert.That(PropertyNames(candidateItems))
             .IsEquivalentTo(["id", "userName", "kind", "role", "emailVerified"]);
         AssertGuid(candidateItems, "id");
@@ -161,18 +160,18 @@ public sealed class CompetitionPermissionsOpenApiTests
     {
         var property = schema.GetProperty("properties").GetProperty(propertyName);
         if (property.GetProperty("type").GetString() != "string"
-            || property.GetProperty("format").GetString() != "guid")
+            || property.GetProperty("format").GetString() != "uuid")
             throw new InvalidOperationException($"{propertyName} must be a Guid.");
     }
 
-    private static void AssertGuidArray(JsonElement schema, string propertyName)
+    private static void AssertGuidArray(JsonElement root, JsonElement schema, string propertyName)
     {
-        var property = schema.GetProperty("properties").GetProperty(propertyName);
+        var property = ResolveSchema(root, schema.GetProperty("properties").GetProperty(propertyName));
         if (property.GetProperty("type").GetString() != "array")
             throw new InvalidOperationException($"{propertyName} must be an array.");
         var item = property.GetProperty("items");
         if (item.GetProperty("type").GetString() != "string"
-            || item.GetProperty("format").GetString() != "guid")
+            || item.GetProperty("format").GetString() != "uuid")
             throw new InvalidOperationException($"{propertyName} must contain Guid values.");
     }
 
@@ -180,7 +179,7 @@ public sealed class CompetitionPermissionsOpenApiTests
     {
         var backend = FindBackendRoot();
         return JsonDocument.Parse(await File.ReadAllTextAsync(
-            Path.Combine(backend, "artifacts", "openapi", "swagger.json")));
+            Path.Combine(backend, "artifacts", "openapi", "v1.json")));
     }
 
     private static string FindBackendRoot()

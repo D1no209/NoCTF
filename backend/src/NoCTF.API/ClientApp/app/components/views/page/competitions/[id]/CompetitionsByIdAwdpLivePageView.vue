@@ -12,28 +12,28 @@ const { Activity, ChevronLeft, ChevronRight, Clock3, Expand, Minimize, Radio, Re
       <div class="awdp-grid" aria-hidden="true" />
       <header class="awdp-topbar hud-panel">
         <div class="round-block">
-          <span>{{ $t('ui.currentRound') }}</span><strong>{{ currentRound ? `${$t('ui.round')} ${currentRound} ${$t('ui.message3')}` : $t('ui.symbol') }}</strong>
-          <small>{{ $t('ui.settledThroughRound', { round: settledRound }) }}</small>
+          <span>{{ $t('competitions.label.round') }}</span><strong>{{ currentRound ? $t('competitions.awdp.roundLabel', { round: currentRound }) : $t('common.label.symbol') }}</strong>
+          <small>{{ $t('competitions.label.settledThroughRound', { round: settledRound }) }}</small>
         </div>
         <div class="title-block">
-          <span>{{ configuration?.name ?? $t('ui.noctf') }}</span>
-          <h1>{{ competition?.title ?? $t('ui.awdpLiveControlScreen') }}</h1>
-          <small>{{ $t('ui.attackDefensePatchSettlement') }}</small>
+          <span>{{ configuration?.name ?? $t('common.label.noctf') }}</span>
+          <h1>{{ competition?.title ?? $t('competitions.label.awdpLiveControlScreen') }}</h1>
+          <small>{{ $t('competitions.label.attackDefensePatchSettlement') }}</small>
         </div>
         <dl class="top-stats">
-          <div><Users /><dt>{{ $t('ui.team') }}</dt><dd>{{ rankedEntries.length }}</dd></div>
-          <div><Activity /><dt>{{ $t('ui.challenge') }}</dt><dd>{{ board.catalog.value?.items?.length ?? 0 }}</dd></div>
-          <div class="operation-stat attack"><Swords /><dt>{{ $t('ui.attackSuccessAttempts') }}</dt><dd>{{ operationMetrics.attack.success }} / {{ operationMetrics.attack.total }}</dd></div>
-          <div class="operation-stat defense"><ShieldCheck /><dt>{{ $t('ui.defenseSuccessAttempts') }}</dt><dd>{{ operationMetrics.defense.success }} / {{ operationMetrics.defense.total }}</dd></div>
+          <div><Users /><dt>{{ $t('common.label.team') }}</dt><dd>{{ rankedEntries.length }}</dd></div>
+          <div><Activity /><dt>{{ $t('common.label.challenge.pageTitle') }}</dt><dd>{{ board.catalog.value?.items?.length ?? 0 }}</dd></div>
+          <div class="operation-stat attack"><Swords /><dt>{{ $t('competitions.label.attackSuccessAttempts') }}</dt><dd>{{ operationMetrics.attack.success }} / {{ operationMetrics.attack.total }}</dd></div>
+          <div class="operation-stat defense"><ShieldCheck /><dt>{{ $t('competitions.label.defenseSuccessAttempts') }}</dt><dd>{{ operationMetrics.defense.success }} / {{ operationMetrics.defense.total }}</dd></div>
         </dl>
         <div class="clock-block">
-          <Clock3 /><span>{{ $t('ui.roundRemaining') }}</span><strong>{{ remainingText }}</strong>
+          <Clock3 /><span>{{ $t('competitions.label.roundRemaining') }}</span><strong>{{ remainingText }}</strong>
           <div class="screen-actions">
-            <ActionButton :aria-label="$t('ui.refreshControlScreen')" @click="refreshLatest"><RefreshCw :class="refreshing && 'spin'" /></ActionButton>
-            <ActionButton :aria-label="fullscreen ? $t('ui.exitFullscreen') : $t('ui.enterFullscreen')" @click="toggleFullscreen">
+            <ActionButton :aria-label="$t('competitions.label.refreshControlScreen')" @click="refreshLatest"><RefreshCw :class="refreshing && 'spin'" /></ActionButton>
+            <ActionButton :aria-label="fullscreen ? $t('competitions.label.exitFullscreen') : $t('competitions.label.enterFullscreen')" @click="toggleFullscreen">
               <Minimize v-if="fullscreen" /><Expand v-else />
             </ActionButton>
-            <NuxtLink :to="`/competitions/${competitionId}/leaderboard`" :aria-label="$t('ui.exitControlScreen')"><X /></NuxtLink>
+            <NuxtLink :to="`/competitions/${competitionId}/leaderboard`" :aria-label="$t('competitions.label.exitControlScreen')"><X /></NuxtLink>
           </div>
         </div>
       </header>
@@ -41,19 +41,19 @@ const { Activity, ChevronLeft, ChevronRight, Clock3, Expand, Minimize, Radio, Re
       <main class="awdp-main-grid">
         <section class="event-feed hud-panel">
           <header class="hud-heading">
-            <div class="hud-title"><Radio class="hud-title-icon" /><span>{{ $t('ui.teamActivityStream') }}</span></div>
-            <b><i /> {{ $t('ui.live') }}</b>
+            <div class="hud-title"><Radio class="hud-title-icon" /><span>{{ $t('competitions.label.teamActivityStream') }}</span></div>
+            <b><i /> {{ $t('competitions.label.live') }}</b>
           </header>
           <ol v-if="recentFeed.length" class="feed-list">
-            <li v-for="event in recentFeed" :key="event.id" :class="[event.action, event.outcome]">
+            <li v-for="event in recentFeed" :key="event.id ?? undefined" :class="[event.action, event.outcome]">
               <time>{{ eventTime(event.occurredAt) }}</time>
               <span class="feed-symbol">{{ event.action === 'attack' ? '⚔' : '⬡' }}</span>
               <p><strong>{{ event.teamName }}</strong>{{ eventLabel(event) }}<b>{{ event.challengeTitle }}</b></p>
               <em>{{ eventLabel(event) }}</em>
             </li>
           </ol>
-          <div v-else class="panel-empty">{{ $t('ui.awaitingCompetitionActivity') }}</div>
-          <footer>{{ $t('ui.showsTeamAttackAndDefenseOperationsAgainstChallengesOnly') }}</footer>
+          <div v-else class="panel-empty">{{ $t('competitions.label.awaitingCompetitionActivity') }}</div>
+          <footer>{{ $t('competitions.competitionsBy.description.showsTeamAttackDefense') }}</footer>
         </section>
 
         <component :is="AwdpEventStage"
@@ -65,20 +65,20 @@ const { Activity, ChevronLeft, ChevronRight, Clock3, Expand, Minimize, Radio, Re
         <aside class="right-column">
           <section class="ranking-panel hud-panel">
             <header class="hud-heading">
-              <div class="hud-title"><Trophy class="hud-title-icon" /><span>{{ $t('ui.liveLeaderboard') }}</span></div>
-              <b>{{ $t('ui.settled') }}</b>
+              <div class="hud-title"><Trophy class="hud-title-icon" /><span>{{ $t('competitions.label.liveLeaderboard') }}</span></div>
+              <b>{{ $t('common.label.settled') }}</b>
             </header>
-            <div class="rank-head"><span>{{ $t('ui.ranking2') }}</span><span>{{ $t('ui.team') }}</span><span>{{ $t('ui.attackScore') }}</span><span>{{ $t('ui.defenseScore') }}</span><span>{{ $t('ui.totalScore') }}</span></div>
+            <div class="rank-head"><span>{{ $t('common.label.ranking') }}</span><span>{{ $t('common.label.team') }}</span><span>{{ $t('common.label.attackScore') }}</span><span>{{ $t('common.label.defenseScore') }}</span><span>{{ $t('common.label.totalScore') }}</span></div>
             <ol v-if="topEntries.length" class="rank-list">
-              <li v-for="entry in topEntries" :key="entry.teamId" :class="rankTone(entry.rank)">
-                <span class="rank-number">{{ entry.rank ?? $t('ui.symbol') }}</span>
+              <li v-for="entry in topEntries" :key="entry.teamId ?? undefined" :class="rankTone(entry.rank)">
+                <span class="rank-number">{{ entry.rank ?? $t('common.label.symbol') }}</span>
                 <strong>{{ entry.teamName }}<small v-if="entry.rankingState !== 'Eligible'"> · {{ scoreboardRankingStateLabel(entry.rankingState) }}</small></strong>
                 <span>{{ entry.attackScore }}</span><span>{{ entry.defenseScore }}</span><b>{{ entry.totalScore ?? 0 }}</b>
                 <i :class="entry.trend">{{ entry.trend === 'up' ? '↗' : entry.trend === 'down' ? '↘' : '→' }}</i>
               </li>
             </ol>
-            <div v-else class="panel-empty">{{ projectionPending ? $t('ui.buildingTheScoreboardProjection') : $t('ui.noTeamHasScoredYet') }}</div>
-            <footer>{{ $t('ui.onlyCompletedRoundSettlementsAreShown') }} · {{ eventTime(board.snapshot.value?.generatedAt) }}</footer>
+            <div v-else class="panel-empty">{{ projectionPending ? $t('competitions.label.buildingScoreboardProjection') : $t('common.competitionsBy.label.teamScoredYet') }}</div>
+            <footer>{{ $t('competitions.competitionsBy.description.completedRoundSettlementsShown') }} · {{ eventTime(board.snapshot.value?.generatedAt) }}</footer>
           </section>
 
           <section
@@ -89,46 +89,46 @@ const { Activity, ChevronLeft, ChevronRight, Clock3, Expand, Minimize, Radio, Re
             @focusout="onFocusoutTeamPanelFocused(false)"
           >
             <header class="hud-heading">
-              <div class="hud-title"><Activity class="hud-title-icon" /><span>{{ $t('ui.teamChallengeActivity') }}</span></div>
-              <span>{{ teamCarouselPaused ? $t('ui.carouselPaused') : $t('ui.rotatesEvery8Seconds') }}</span>
+              <div class="hud-title"><Activity class="hud-title-icon" /><span>{{ $t('competitions.label.teamChallengeActivity') }}</span></div>
+              <span>{{ teamCarouselPaused ? $t('competitions.label.carouselPaused') : $t('competitions.label.rotatesEverySeconds') }}</span>
             </header>
             <div v-if="selectedTeam" class="team-carousel">
-              <nav class="team-tabs" :aria-label="$t('ui.selectTeam')">
+              <nav class="team-tabs" :aria-label="$t('competitions.label.selectTeam')">
                 <ActionButton
                   class="team-tab-control"
-                  :aria-label="$t('ui.previousPage')"
+                  :aria-label="$t('common.label.previousPage')"
                   :disabled="rankedEntries.length <= 1"
                   @click="selectPreviousTeam"
                 ><ChevronLeft /></ActionButton>
                 <div class="team-tab-list">
                   <ActionButton
                     v-for="(entry, index) in rankedEntries.slice(0, 5)"
-                    :key="entry.teamId"
+                    :key="entry.teamId ?? undefined"
                     :class="selectedTeam?.teamId === entry.teamId && 'active'"
                     @click="onClickSelectedTeamIndex(index)"
                   >{{ entry.teamName }}</ActionButton>
                 </div>
                 <ActionButton
                   class="team-tab-control"
-                  :aria-label="$t('ui.nextPage')"
+                  :aria-label="$t('common.label.nextPage')"
                   :disabled="rankedEntries.length <= 1"
                   @click="selectNextTeam"
                 ><ChevronRight /></ActionButton>
               </nav>
               <div class="team-summary">
                 <strong>{{ selectedTeam.teamName }}</strong>
-                <span>{{ $t('ui.attack') }} {{ selectedTeamMetrics.attack.success }}/{{ selectedTeamMetrics.attack.total }} · {{ $t('ui.defense') }} {{ selectedTeamMetrics.defense.success }}/{{ selectedTeamMetrics.defense.total }}</span>
+                <span>{{ $t('competitions.label.attack') }} {{ selectedTeamMetrics.attack.success }}/{{ selectedTeamMetrics.attack.total }} · {{ $t('competitions.label.defense') }} {{ selectedTeamMetrics.defense.success }}/{{ selectedTeamMetrics.defense.total }}</span>
               </div>
               <ScrollSurface as="div"
-                :key="selectedTeam.teamId"
+                :key="selectedTeam.teamId ?? undefined"
                 class="challenge-strip"
                 role="region"
-                :aria-label="$t('ui.teamChallengeActivity')"
+                :aria-label="$t('competitions.label.teamChallengeActivity')"
                 tabindex="0"
               >
                 <article
                   v-for="challenge in selectedChallengeStates"
-                  :key="challenge.competitionChallengeId"
+                  :key="challenge.competitionChallengeId ?? undefined"
                   :class="isChallengeFocused(challenge.competitionChallengeId) && 'event-focus'"
                 >
                   <div class="challenge-identity">
@@ -136,14 +136,14 @@ const { Activity, ChevronLeft, ChevronRight, Clock3, Expand, Minimize, Radio, Re
                     <div><span>{{ challenge.direction }}</span><Hint :content="challenge.title" ><strong >{{ challenge.title }}</strong></Hint></div>
                   </div>
                   <dl>
-                    <div><dt>{{ $t('ui.attack') }}</dt><dd :class="challenge.attackOutcome">{{ challenge.attackOutcome === 'idle' ? $t('ui.symbol') : challenge.attackOutcome === 'pending' ? $t('ui.running') : challenge.attackOutcome === 'success' ? $t('ui.success') : $t('ui.failed') }}</dd></div>
-                    <div><dt>{{ $t('ui.defense') }}</dt><dd :class="challenge.defenseOutcome">{{ challenge.defenseOutcome === 'idle' ? $t('ui.symbol') : challenge.defenseOutcome === 'pending' ? $t('ui.verifying') : challenge.defenseOutcome === 'success' ? $t('ui.success') : $t('ui.failed') }}</dd></div>
+                    <div><dt>{{ $t('competitions.label.attack') }}</dt><dd :class="challenge.attackOutcome">{{ challenge.attackOutcome === 'idle' ? $t('common.label.symbol') : challenge.attackOutcome === 'pending' ? $t('common.label.running') : challenge.attackOutcome === 'success' ? $t('competitions.label.success') : $t('common.error.failed') }}</dd></div>
+                    <div><dt>{{ $t('competitions.label.defense') }}</dt><dd :class="challenge.defenseOutcome">{{ challenge.defenseOutcome === 'idle' ? $t('common.label.symbol') : challenge.defenseOutcome === 'pending' ? $t('competitions.label.verifying') : challenge.defenseOutcome === 'success' ? $t('competitions.label.success') : $t('common.error.failed') }}</dd></div>
                   </dl>
-                  <footer><span>{{ $t('ui.attackScore') }} {{ challenge.attackScore }}</span><span>{{ $t('ui.defenseScore') }} {{ challenge.defenseScore }}</span></footer>
+                  <footer><span>{{ $t('common.label.attackScore') }} {{ challenge.attackScore }}</span><span>{{ $t('common.label.defenseScore') }} {{ challenge.defenseScore }}</span></footer>
                 </article>
               </ScrollSurface>
             </div>
-            <div v-else class="panel-empty">{{ $t('ui.noTeamData') }}</div>
+            <div v-else class="panel-empty">{{ $t('competitions.label.teamData') }}</div>
           </section>
         </aside>
       </main>
@@ -153,8 +153,8 @@ const { Activity, ChevronLeft, ChevronRight, Clock3, Expand, Minimize, Radio, Re
       <div v-if="loading || error" class="screen-overlay">
         <Radio v-if="loading" class="pulse" />
         <ShieldCheck v-else />
-        <strong>{{ loading ? $t('ui.connectingToLiveCompetitionData') : error }}</strong>
-        <ActionButton v-if="error" @click="refreshLatest">{{ $t('ui.reload') }}</ActionButton>
+        <strong>{{ loading ? $t('competitions.competitionsBy.label.connectingLiveCompetitionData') : error }}</strong>
+        <ActionButton v-if="error" @click="refreshLatest">{{ $t('common.label.reload') }}</ActionButton>
       </div>
     </div>
   </div>

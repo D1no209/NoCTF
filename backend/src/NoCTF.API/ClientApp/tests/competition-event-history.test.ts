@@ -39,8 +39,8 @@ describe('competition event history scope', () => {
       new URL('../app/pages/competitions/[id]/events.vue', import.meta.url),
     ).text()
 
-    expect(source).toContain('adminGetCompetition({')
+    expect(source).toMatch(/api\.api\.v1\.admin\.competitions\.byCompetitionId\([^)]*\)\.get\(/)
     expect(source).toMatch(/competitionEventHistoryRange\(\s*hasStaffHistory\.value,/)
-    expect(source).toContain("$t(hasStaffHistory ? 'ui.fullHistory' : 'ui.last30Days')")
+    expect(source).toContain("$t(hasStaffHistory ? 'common.label.fullHistory' : 'common.label.lastDays')")
   })
 })

@@ -7,8 +7,8 @@ const { Activity, eventText, eventTime, setViewportRef, setGroupRef, setTrackRef
 </script>
 
 <template>
-  <section class="awdp-ticker hud-panel" :aria-label="$t('ui.battleFeed')">
-    <div class="ticker-label"><Activity /><span>{{ $t('ui.battleFeed') }}</span><b>{{ $t('ui.liveFeed2') }}</b></div>
+  <section class="awdp-ticker hud-panel" :aria-label="$t('competitions.label.battleFeed')">
+    <div class="ticker-label"><Activity /><span>{{ $t('competitions.label.battleFeed') }}</span><b>{{ $t('competitions.label.liveFeed.eventTickerView') }}</b></div>
     <div
       :ref="setViewportRef"
       class="ticker-viewport"
@@ -19,7 +19,7 @@ const { Activity, eventText, eventTime, setViewportRef, setGroupRef, setTrackRef
     >
       <div v-if="events.length" :ref="setTrackRef" class="ticker-track">
         <div :ref="setGroupRef" class="ticker-group">
-          <article v-for="event in events" :key="event.id" :class="['ticker-card', event.action, event.outcome]">
+          <article v-for="event in events" :key="event.id ?? undefined" :class="['ticker-card', event.action, event.outcome]">
             <time>{{ eventTime(event.occurredAt) }}</time><span>{{ eventText(event) }}</span>
           </article>
         </div>
@@ -29,7 +29,7 @@ const { Activity, eventText, eventTime, setViewportRef, setGroupRef, setTrackRef
           </article>
         </div>
       </div>
-      <div v-else class="ticker-empty">{{ $t('ui.awaitingCompetitionActivity') }}</div>
+      <div v-else class="ticker-empty">{{ $t('competitions.label.awaitingCompetitionActivity') }}</div>
     </div>
   </section>
 </template>

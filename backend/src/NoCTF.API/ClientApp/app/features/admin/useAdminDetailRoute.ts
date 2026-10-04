@@ -1,8 +1,9 @@
+import { message as describeMessage } from '../../utils/i18n'
+import type { UiMessage } from '../../utils/i18n'
 import { computed, onScopeDispose, shallowRef, ref, watch } from 'vue'
 import { adminRouteId, validAdminId } from './admin-navigation'
 import { createLatestRequestGuard } from '~/lib/latest-request'
 import { parseApiError } from '~/utils/api-error'
-import { translate } from '~/utils/i18n'
 
 /** Route selection owns the sheet; detail reads are independent of list pagination. */
 export function useAdminDetailRoute<T>(parameter: string, base: string, load: (id: string, signal: AbortSignal) => Promise<T>) {
@@ -11,7 +12,7 @@ export function useAdminDetailRoute<T>(parameter: string, base: string, load: (i
   const selectedId = computed(() => adminRouteId(route.params[parameter]))
   const data = shallowRef<T | null>(null)
   const loading = ref(false)
-  const error = ref<string | null>(null)
+  const error = ref<UiMessage | null>(null)
   const requests = createLatestRequestGuard()
   let controller: AbortController | undefined
 
@@ -31,7 +32,7 @@ export function useAdminDetailRoute<T>(parameter: string, base: string, load: (i
     loading.value = false
     if (!id) return
     if (!validAdminId(id)) {
-      error.value = translate('adminNavigation.invalidId')
+      error.value = describeMessage('adminNavigation.invalidId')
       return
     }
     controller = new AbortController()
@@ -41,7 +42,7 @@ export function useAdminDetailRoute<T>(parameter: string, base: string, load: (i
       if (requests.isCurrent(request)) data.value = result
     }
     catch (failure) {
-      if (requests.isCurrent(request)) error.value = parseApiError(failure, translate('adminNavigation.detailFailed')).message
+      if (requests.isCurrent(request)) error.value = parseApiError(failure, describeMessage('adminNavigation.detailFailed')).displayMessage
     }
     finally {
       if (requests.isCurrent(request)) loading.value = false

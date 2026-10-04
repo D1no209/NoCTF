@@ -15,7 +15,7 @@ const { toggleRuntime, DefinitionRuntime, model, mode, disabled } = toRefs(viewP
         :disabled="disabled"
         @update:model-value="toggleRuntime($event === true)"
       />
-      <FieldLabel for="def-has-runtime" class="font-normal">{{ $t('ui.enableRuntimeEnvironment') }}</FieldLabel>
+      <FieldLabel for="def-has-runtime" class="font-normal">{{ $t('runtime.label.enableRuntimeEnvironment') }}</FieldLabel>
     </Field>
     <component :is="DefinitionRuntime"
       v-if="model.runtime"

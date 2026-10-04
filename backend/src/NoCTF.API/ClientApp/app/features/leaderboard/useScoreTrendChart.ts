@@ -50,20 +50,20 @@ export function useScoreTrendChart(props: Readonly<ScoreTrendChartProps>) {
 
   function rememberZoom(...args: unknown[]) {
     const event = (args[0] ?? {}) as {
-    start?: number
-    end?: number
-    startValue?: number
-    endValue?: number
+    start?: number | null
+    end?: number | null
+    startValue?: number | null
+    endValue?: number | null
     batch?: Array<{
-      start?: number
-      end?: number
-      startValue?: number
-      endValue?: number
-      dataZoomId?: string
-      dataZoomIndex?: number
+      start?: number | null
+      end?: number | null
+      startValue?: number | null
+      endValue?: number | null
+      dataZoomId?: string | null
+      dataZoomIndex?: number | null
     }>
-    dataZoomId?: string
-    dataZoomIndex?: number
+    dataZoomId?: string | null
+    dataZoomIndex?: number | null
     }
     if (applyingOption) return
     const change = event.batch?.[0] ?? event
@@ -125,7 +125,7 @@ export function useScoreTrendChart(props: Readonly<ScoreTrendChartProps>) {
     const border = themeColor('--border', el.value ?? undefined)
     const primary = themeColor('--primary', el.value ?? undefined)
     const muted = themeColor('--muted-foreground', el.value ?? undefined)
-    const teamNames = props.series.map(team => team.teamName ?? translate('ui.team'))
+    const teamNames = props.series.map(team => team.teamName ?? translate('common.label.team'))
     if (focusedTeamName && !teamNames.includes(focusedTeamName))
       focusedTeamName = null
     const selectedTeams = Object.fromEntries(teamNames.map(name => [
@@ -154,7 +154,7 @@ export function useScoreTrendChart(props: Readonly<ScoreTrendChartProps>) {
           type: 'line',
           lineStyle: { color: primary, width: 1, type: 'dashed', opacity: 0.7 },
         },
-        valueFormatter: (value: number | string) => `${value} ${translate('ui.pts2')}`,
+        valueFormatter: (value: number | string) => `${value} ${translate('common.label.pts.scoreTrendChart')}`,
       },
       legend: {
         bottom: 36,
@@ -173,9 +173,9 @@ export function useScoreTrendChart(props: Readonly<ScoreTrendChartProps>) {
         iconStyle: { borderColor: foreground },
         emphasis: { iconStyle: { borderColor: primary } },
         feature: {
-          saveAsImage: { title: translate("ui.downloadAsImage") },
-          dataZoom: { title: { zoom: translate("ui.areaZoom"), back: translate("ui.zoomRestore") }, yAxisIndex: 'none' },
-          restore: { title: translate("ui.restore") },
+          saveAsImage: { title: translate("leaderboard.label.downloadImage") },
+          dataZoom: { title: { zoom: translate("leaderboard.label.areaZoom"), back: translate("leaderboard.label.zoomRestore") }, yAxisIndex: 'none' },
+          restore: { title: translate("leaderboard.label.restore") },
         },
       },
       xAxis: {
@@ -188,7 +188,7 @@ export function useScoreTrendChart(props: Readonly<ScoreTrendChartProps>) {
       },
       yAxis: {
         type: 'value',
-        name: translate("ui.score"),
+        name: translate("leaderboard.label.score.scoreTrendChart"),
         nameTextStyle: { color: muted },
         axisLine: { lineStyle: { color: border } },
         axisTick: { lineStyle: { color: border } },
@@ -246,7 +246,7 @@ export function useScoreTrendChart(props: Readonly<ScoreTrendChartProps>) {
           id: team.teamId || team.teamName || `team-${index}`,
           type: 'line' as const,
           colorBy: 'series' as const,
-          name: team.teamName ?? translate("ui.team"),
+          name: team.teamName ?? translate("common.label.team"),
           step: 'end' as const,
           showSymbol: false,
           symbol: 'circle',

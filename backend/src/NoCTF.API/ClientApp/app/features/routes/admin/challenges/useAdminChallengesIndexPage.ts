@@ -1,15 +1,18 @@
+
+import { api } from '../../../../lib/api'
+import type { UiMessage } from '../../../../utils/i18n'
 import { markRaw } from 'vue'
 
 import { Plus } from '@lucide/vue'
-import { adminChallengeBankListTemplates } from '../../../../api'
-import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateSummaryResponse } from '../../../../api'
+
+import type { NoCTFAPIEndpointsAdministrationChallengeBankChallengeTemplateSummaryResponse } from '../../../../api/models'
 import AdminDateTimeComponent from '../../../admin/AdminDateTime.vue'
 import AdminGameModeBadgeComponent from '../../../admin/AdminGameModeBadge.vue'
 import ChallengeTemplateCreateDialogComponent from '../../../admin/ChallengeTemplateCreateDialog.vue'
 import { directionKey, directionLabel } from '../../../../utils/directions'
 import { useOffsetPagination } from '../../../../composables/useOffsetPagination'
 
-type ChallengeTemplate = NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateSummaryResponse
+type ChallengeTemplate = NoCTFAPIEndpointsAdministrationChallengeBankChallengeTemplateSummaryResponse
 
 let lastIncludeDeleted = false
 interface ChallengeLibrarySnapshot {
@@ -46,7 +49,7 @@ export function useAdminChallengesIndexPage() {
     ?? directionCatalogs.get(includeDeleted.value)
     ?? [])])
 
-  const loadError = ref<string | null>(null)
+  const loadError = ref<UiMessage | null>(null)
 
   const search = ref(typeof route.query.q === 'string'
     ? route.query.q
@@ -65,16 +68,15 @@ export function useAdminChallengesIndexPage() {
   const filteredTemplates = computed(() => templates.value)
 
   const pagination = useOffsetPagination<ChallengeTemplate>(async ({ offset, limit, desc }) => {
-    const { data, error } = await adminChallengeBankListTemplates({
-      query: {
+    let error: unknown;
+    const data = await api.api.v1.admin.challenges.get({ queryParameters: {
         includeDeleted: includeDeleted.value,
-        keyword: search.value.trim() || null,
-        direction: directionFilter.value === 'all' ? null : directionFilter.value,
+        keyword: search.value.trim() || undefined,
+        direction: directionFilter.value === 'all' ? undefined : directionFilter.value,
         offset,
         limit,
         desc,
-      },
-    })
+      } }).catch(cause => { error = cause; return undefined });
     if (error || !data) throw error ?? new Error('Failed to load challenge templates.')
     templates.value = data.items ?? []
     const catalog = [...new Set([
@@ -163,8 +165,8 @@ export function useAdminChallengesIndexPage() {
     pagination.reset()
   })
 
-  function visibilityLabel(visibility?: string): string {
-    return visibility === 'Shared' ? translate("ui.share") : translate("ui.private")
+  function visibilityLabel(visibility?: string | null): string {
+    return visibility === 'Shared' ? translate("common.label.share") : translate("administration.label.private")
   }
 
   function setCreateOpen(value: boolean) {

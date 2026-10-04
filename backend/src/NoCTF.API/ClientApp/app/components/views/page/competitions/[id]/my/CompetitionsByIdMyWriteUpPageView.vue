@@ -25,7 +25,7 @@ const { Download, Eye, FileText, maximumWriteUpBytes, competitionId, submissionR
         <Alert v-if="loadError" variant="destructive">
           <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
             <span>{{ $message(loadError) }}</span>
-            <Button variant="outline" size="sm" @click="load">{{ $t('ui.retry') }}</Button>
+            <Button variant="outline" size="sm" @click="load">{{ $t('common.label.retry') }}</Button>
           </AlertDescription>
         </Alert>
         <Skeleton v-else-if="loading" class="h-56 w-full" />
@@ -47,7 +47,7 @@ const { Download, Eye, FileText, maximumWriteUpBytes, competitionId, submissionR
             <Field>
               <FieldLabel for="team-writeup-file">{{ writeUp ? $t('writeUp.replacePdf') : $t('writeUp.selectPdf') }}</FieldLabel>
               <FileUpload
-                :key="uploadInputKey"
+                :key="uploadInputKey ?? undefined"
                 id="team-writeup-file"
                 accept="application/pdf,.pdf"
                 :pending="uploadPending"
@@ -70,11 +70,11 @@ const { Download, Eye, FileText, maximumWriteUpBytes, competitionId, submissionR
               <dl class="grid min-w-0 gap-x-6 gap-y-2 text-sm sm:grid-cols-[auto_minmax(0,1fr)]">
                 <dt class="text-muted-foreground">{{ $t('writeUp.fileName') }}</dt>
                 <dd class="break-all font-medium">{{ writeUp.fileName }}</dd>
-                <dt class="text-muted-foreground">{{ $t('ui.fileSize') }}</dt>
+                <dt class="text-muted-foreground">{{ $t('common.label.fileSize') }}</dt>
                 <dd class="font-mono tabular-nums">{{ formatBytes(writeUp.byteLength ?? 0) }}</dd>
                 <dt class="text-muted-foreground">{{ $t('writeUp.submittedAt') }}</dt>
                 <dd class="font-mono tabular-nums">{{ formatDateTime(writeUp.submittedAt) }}</dd>
-                <dt class="text-muted-foreground">{{ $t('writeUp.sha256') }}</dt>
+                <dt class="text-muted-foreground">{{ $t('writeups.label.sha') }}</dt>
                 <dd class="break-all font-mono text-xs">{{ writeUp.sha256 }}</dd>
               </dl>
               <div class="flex flex-wrap gap-2">
@@ -84,7 +84,7 @@ const { Download, Eye, FileText, maximumWriteUpBytes, competitionId, submissionR
                 </Button>
                 <Button variant="outline" :disabled="downloadPending" @click="download">
                   <Spinner v-if="downloadPending" data-icon="inline-start" />
-                  <Download v-else data-icon="inline-start" />{{ $t('ui.download') }}
+                  <Download v-else data-icon="inline-start" />{{ $t('writeups.label.download') }}
                 </Button>
               </div>
             </div>

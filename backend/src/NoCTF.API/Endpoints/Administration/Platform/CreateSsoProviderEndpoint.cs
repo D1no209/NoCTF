@@ -58,7 +58,7 @@ public class SsoProviderWriteValidator<TRequest> : Validator<TRequest>
             SsoProtocolProtocol.Oidc => request.Oidc is not null && request.Cas is null,
             SsoProtocolProtocol.Cas => request.Cas is not null && request.Oidc is null,
             _ => false
-        }).WithMessage("Exactly one protocol configuration matching the provider protocol is required.");
+        }).WithMessage(_ => ApiMessages.Text(ApiMessageId.CreateSsoProviderValidationExactlyOneProtocolConfiguration)).WithErrorCode(ApiMessages.Key(ApiMessageId.CreateSsoProviderValidationExactlyOneProtocolConfiguration));
     }
 }
 
@@ -101,7 +101,7 @@ public sealed class CreateSsoProviderEndpoint(
         AuthSchemes("Bearer");
         Roles("Administrator");
         Description(builder => builder.WithName("AdminPlatformSsoCreateProvider"));
-        Summary(summary => summary.Summary = "Creates a disabled or ready SSO provider definition.");
+        Summary(summary => { summary.Summary = "Creates a disabled or ready SSO provider definition."; summary.Description = summary.Summary; });
     }
 
     public override async Task<Results<Ok<SsoConfigurationResponse>, ProblemHttpResult>> ExecuteAsync(

@@ -11,10 +11,10 @@ const { BLOOD_REWARD_POLICIES, SCORE_DECAY_MODES, ScoreDecayMode, emitValue, par
     v-if="field.type === 'int' || field.type === 'decimal'"
 
     :model-value="numberText"
-    :min="field.min"
-    :max="field.max"
+    :min="field.min ?? undefined"
+    :max="field.max ?? undefined"
     :step="field.type === 'decimal' ? 'any' : 1"
-    :placeholder="field.placeholder"
+    :placeholder="field.placeholder ?? undefined"
     :disabled="disabled"
     @update:model-value="emitValue(parseNullableNumber($event))"
   />
@@ -50,8 +50,8 @@ const { BLOOD_REWARD_POLICIES, SCORE_DECAY_MODES, ScoreDecayMode, emitValue, par
     </SelectTrigger>
     <SelectContent>
       <SelectGroup>
-        <SelectItem v-for="option in field.options ?? []" :key="String(option.value)" :value="option.value">
-          {{ $t(option.label) }}
+        <SelectItem v-for="option in field.options ?? []" :key="(String(option.value)) ?? undefined" :value="option.value">
+          {{ translate(option.label) }}
         </SelectItem>
       </SelectGroup>
     </SelectContent>
@@ -60,7 +60,7 @@ const { BLOOD_REWARD_POLICIES, SCORE_DECAY_MODES, ScoreDecayMode, emitValue, par
   <div v-else-if="field.type === 'pointsCurve'" class="flex flex-col gap-3">
     <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <div class="flex flex-col gap-1.5">
-        <span class="text-xs text-muted-foreground">{{ $t('ui.decayMode') }}</span>
+        <span class="text-xs text-muted-foreground">{{ $t('administration.label.decayMode') }}</span>
         <Select
           :model-value="curve.decayMode"
           :disabled="disabled"
@@ -71,7 +71,7 @@ const { BLOOD_REWARD_POLICIES, SCORE_DECAY_MODES, ScoreDecayMode, emitValue, par
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
-              <SelectItem v-for="option in SCORE_DECAY_MODES" :key="String(option.value)" :value="option.value">
+              <SelectItem v-for="option in SCORE_DECAY_MODES" :key="(String(option.value)) ?? undefined" :value="option.value">
                 {{ $t(option.label) }}
               </SelectItem>
             </SelectGroup>
@@ -79,7 +79,7 @@ const { BLOOD_REWARD_POLICIES, SCORE_DECAY_MODES, ScoreDecayMode, emitValue, par
         </Select>
       </div>
       <div class="flex flex-col gap-1.5">
-        <span class="text-xs text-muted-foreground">{{ $t('ui.initialScore') }}</span>
+        <span class="text-xs text-muted-foreground">{{ $t('administration.label.initialScore') }}</span>
         <NumberInput
 
           :model-value="curve.initialPoints ?? ''"
@@ -88,7 +88,7 @@ const { BLOOD_REWARD_POLICIES, SCORE_DECAY_MODES, ScoreDecayMode, emitValue, par
         />
       </div>
       <div class="flex flex-col gap-1.5">
-        <span class="text-xs text-muted-foreground">{{ $t('ui.lowestScore') }}</span>
+        <span class="text-xs text-muted-foreground">{{ $t('administration.label.lowestScore') }}</span>
         <NumberInput
 
           :model-value="curve.minimumPoints ?? ''"
@@ -97,7 +97,7 @@ const { BLOOD_REWARD_POLICIES, SCORE_DECAY_MODES, ScoreDecayMode, emitValue, par
         />
       </div>
       <div class="flex flex-col gap-1.5">
-        <span class="text-xs text-muted-foreground">{{ $t('ui.teamsAtMinimumScore') }}</span>
+        <span class="text-xs text-muted-foreground">{{ $t('administration.label.teamsMinimumScore') }}</span>
         <NumberInput
 
           min="2"
@@ -109,13 +109,13 @@ const { BLOOD_REWARD_POLICIES, SCORE_DECAY_MODES, ScoreDecayMode, emitValue, par
       </div>
     </div>
     <div v-if="curve.decayMode === ScoreDecayMode.Custom" class="flex flex-col gap-1.5">
-      <span class="text-xs text-muted-foreground">{{ $t('ui.customDecayFormula') }}</span>
+      <span class="text-xs text-muted-foreground">{{ $t('administration.label.customDecayFormula') }}</span>
       <Textarea
         :model-value="curve.customExpression ?? ''"
         :rows="3"
         class="font-mono"
         :disabled="disabled"
-        :placeholder="$t('ui.variablesInitialpointsMinimumpointsSolvecountEligibleteamcountDecayteamcount')"
+        :placeholder="$t('administration.scoring.curveVariables')"
         @update:model-value="updateCurve({ customExpression: String($event) })"
       />
     </div>
@@ -123,8 +123,8 @@ const { BLOOD_REWARD_POLICIES, SCORE_DECAY_MODES, ScoreDecayMode, emitValue, par
   </div>
 
   <div v-else-if="field.type === 'bloodRewards'" class="flex flex-col gap-2">
-    <p v-if="rewards.length === 0" class="text-sm text-muted-foreground">{{ $t('ui.noBloodListReward') }}</p>
-    <div v-for="(reward, index) in rewards" :key="index" class="flex items-center gap-2">
+    <p v-if="rewards.length === 0" class="text-sm text-muted-foreground">{{ $t('administration.label.bloodListReward') }}</p>
+    <div v-for="(reward, index) in rewards" :key="index ?? undefined" class="flex items-center gap-2">
       <Select
         :model-value="reward.policy"
         :disabled="disabled"
@@ -135,7 +135,7 @@ const { BLOOD_REWARD_POLICIES, SCORE_DECAY_MODES, ScoreDecayMode, emitValue, par
         </SelectTrigger>
         <SelectContent>
           <SelectGroup>
-            <SelectItem v-for="option in BLOOD_REWARD_POLICIES" :key="String(option.value)" :value="option.value">
+            <SelectItem v-for="option in BLOOD_REWARD_POLICIES" :key="(String(option.value)) ?? undefined" :value="option.value">
               {{ $t(option.label) }}
             </SelectItem>
           </SelectGroup>
@@ -149,17 +149,17 @@ const { BLOOD_REWARD_POLICIES, SCORE_DECAY_MODES, ScoreDecayMode, emitValue, par
         :disabled="disabled"
         @update:model-value="updateReward(index, { value: parseNullableNumber($event) })"
       />
-      <Button variant="ghost" size="sm" :disabled="disabled" @click="removeReward(index)"> {{ $t('ui.delete') }} </Button>
+      <Button variant="ghost" size="sm" :disabled="disabled" @click="removeReward(index)"> {{ $t('common.action.delete') }} </Button>
     </div>
     <div>
-      <Button variant="outline" size="sm" :disabled="disabled || rewards.length >= 3" @click="addReward"> {{ $t('ui.addReward') }} </Button>
+      <Button variant="outline" size="sm" :disabled="disabled || rewards.length >= 3" @click="addReward"> {{ $t('administration.label.addReward') }} </Button>
     </div>
   </div>
 
   <div v-else-if="field.type === 'flagTemplate'" class="flex flex-col gap-3">
     <div class="grid gap-3 sm:grid-cols-2">
       <div class="flex flex-col gap-1.5">
-        <span class="text-xs text-muted-foreground">{{ $t('ui.prefixHeader') }}</span>
+        <span class="text-xs text-muted-foreground">{{ $t('administration.label.prefixHeader') }}</span>
         <Input
           :model-value="flagTemplateValue.header"
           :disabled="disabled"
@@ -167,7 +167,7 @@ const { BLOOD_REWARD_POLICIES, SCORE_DECAY_MODES, ScoreDecayMode, emitValue, par
         />
       </div>
       <div class="flex flex-col gap-1.5">
-        <span class="text-xs text-muted-foreground">{{ $t('ui.bodyTemplateBodytemplate') }}</span>
+        <span class="text-xs text-muted-foreground">{{ $t('administration.label.bodyTemplateBodytemplate') }}</span>
         <Input
           :model-value="flagTemplateValue.bodyTemplate"
           class="font-mono"
@@ -182,8 +182,8 @@ const { BLOOD_REWARD_POLICIES, SCORE_DECAY_MODES, ScoreDecayMode, emitValue, par
         :disabled="disabled"
         @update:model-value="updateFlagTemplate({ leetLiteralText: $event === true })"
       />
-      <span class="text-sm text-muted-foreground">{{ $t('ui.leetliteraltextLiteralTextConvertedToLeetStyle') }}</span>
+      <span class="text-sm text-muted-foreground">{{ $t('administration.configField.description.leetliteraltextLiteralTextConverted') }}</span>
     </div>
-    <FieldDescription> {{ $t('ui.availablePlaceholdersGuidTeamidChallengeidCompetitionchallengeidCompetitionidTeamhashNRandom') }} </FieldDescription>
+    <FieldDescription> {{ $t('administration.configField.description.availablePlaceholdersGuidTeamid') }} </FieldDescription>
   </div>
 </template>

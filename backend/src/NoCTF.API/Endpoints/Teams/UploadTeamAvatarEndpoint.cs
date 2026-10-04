@@ -24,7 +24,7 @@ public sealed class UploadTeamAvatarValidator : Validator<UploadTeamAvatarReques
         RuleFor(request => request.File.ContentType)
             .Must(value => ContentTypes.Contains(value, StringComparer.OrdinalIgnoreCase))
             .When(request => request.File is not null)
-            .WithMessage("Avatar must be a JPEG, PNG, or WebP image.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.UploadTeamAvatarValidationAvatarJpegPngWebp)).WithErrorCode(ApiMessages.Key(ApiMessageId.UploadTeamAvatarValidationAvatarJpegPngWebp));
     }
 }
 
@@ -46,13 +46,14 @@ public sealed class UploadTeamAvatarEndpoint(
         Put("/competitions/{competitionId}/teams/{teamId}/avatar");
         AuthSchemes("Bearer");
         AllowFileUploads();
+        Description(builder => builder.Accepts<UploadTeamAvatarRequest>("multipart/form-data"));
         MaxRequestBodySize(FileUploadLimits.MaximumRequestBytes(
             uploadLimits.MaximumAvatarBytes));
         Description(builder => builder
             .WithName("TeamAvatar_Replace")
             .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
                 StatusCodes.Status413PayloadTooLarge));
-        Summary(summary => summary.Summary = "Replaces a team's avatar with an immutable File reference.");
+        Summary(summary => { summary.Summary = "Replaces a team's avatar with an immutable File reference."; summary.Description = summary.Summary; });
     }
 
     public override async Task<Results<Ok<TeamAvatarResponse>, NotFound, ForbidHttpResult,
@@ -60,10 +61,10 @@ public sealed class UploadTeamAvatarEndpoint(
         ExecuteAsync(UploadTeamAvatarRequest request, CancellationToken ct)
     {
         if (request.File.Length > uploadLimits.MaximumAvatarBytes)
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: StatusCodes.Status413PayloadTooLarge,
-                title: "Avatar is too large.",
-                detail: $"Avatar uploads cannot exceed {uploadLimits.MaximumAvatarBytes} bytes.",
+                title: ApiMessages.Get(ApiMessageId.UploadTeamAvatarTitleAvatarTooLarge),
+                detail: ApiMessages.Get(ApiMessageId.UploadSizeLimit, new Dictionary<string, object?> { ["maximumBytes"] = uploadLimits.MaximumAvatarBytes }),
                 extensions: new Dictionary<string, object?>
                 {
                     ["code"] = FileUploadFailureCode.UploadTooLarge.ToString()

@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { bindViewState } from '~/features/shared/view-state'
 
-import type { NoCtfapiEndpointsChallengesChallengeResponse, NoCtfapiEndpointsCompetitionsCompetitionResponse } from '~/api'
+import type { NoCTFAPIEndpointsChallengesChallengeResponse, NoCTFAPIEndpointsCompetitionsCompetitionResponse } from '~/api/models'
 import { useCtfPanel } from './useCtfPanel'
 import View from '~/components/views/challenges/panels/CtfPanelView.vue'
 
 const props = defineProps<{
-  competition: NoCtfapiEndpointsCompetitionsCompetitionResponse
-  challenge: NoCtfapiEndpointsChallengesChallengeResponse
+  competition: NoCTFAPIEndpointsCompetitionsCompetitionResponse
+  challenge: NoCTFAPIEndpointsChallengesChallengeResponse
   flagDockTarget?: string
   runtimeDockTarget?: string
 }>()

@@ -68,6 +68,7 @@ public sealed class CompetitionQuestionRateLimitingHttpTests
     private static async Task<WebApplication> CreateApplicationAsync()
     {
         var builder = WebApplication.CreateBuilder();
+        builder.Configuration["Pagination:SigningKey"] = new string('k', 64);
         builder.WebHost.UseTestServer();
         builder.Services.AddNoCtfApi(
             builder.Configuration,

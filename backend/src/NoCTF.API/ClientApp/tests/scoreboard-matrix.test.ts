@@ -1,9 +1,9 @@
 import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import type {
-  NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse,
-  NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
-} from '../app/api'
+  NoCTFAPIEndpointsCompetitionsScoreboardSchemaResponse,
+  NoCTFAPIEndpointsCompetitionsScoreboardTeamResponse,
+} from '../app/api/models'
 import {
   latestSettledScore,
   scoreboardBloodAward,
@@ -47,7 +47,7 @@ const scoreboardSlotStatus = await sourceFile(
 
 describe('normalized scoreboard matrix', () => {
   test('AWDP clock refresh covers anonymous live viewers but stops at settlement or freeze', () => {
-    const schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse = {
+    const schema: NoCTFAPIEndpointsCompetitionsScoreboardSchemaResponse = {
       mode: 'Awdp', rounds: [{ state: 'Settled' }, { state: 'Running' }],
     }
     expect(needsAwdpRoundRefresh(schema, { dataScope: 'Live' })).toBeTrue()
@@ -61,10 +61,10 @@ describe('normalized scoreboard matrix', () => {
   })
 
   test('loads catalog, schema and snapshot concurrently with stale-response fencing', () => {
-    expect(composable).toContain('await Promise.all([')
-    expect(composable).toContain('getScoreboardChallengeCatalogEndpoint')
-    expect(composable).toContain('getScoreboardSchemaEndpoint')
-    expect(composable).toContain('getLeaderboardEndpoint')
+    expect(composable).toContain('await Promise.allSettled([')
+    expect(composable).toMatch(/api\.api\.v1\.competitions\.byCompetitionId\([^)]*\)\.leaderboard\.challenges\.get\(/)
+    expect(composable).toMatch(/api\.api\.v1\.competitions\.byCompetitionId\([^)]*\)\.leaderboard\.schema\.get\(/)
+    expect(composable).toMatch(/api\.api\.v1\.competitions\.byCompetitionId\([^)]*\)\.leaderboard\.get\(/)
     expect(composable).toContain('const requestGeneration = ++generation')
     expect(composable).toContain('requestGeneration !== generation')
     expect(composable).toContain('candidateSnapshot = incoming')
@@ -98,9 +98,9 @@ describe('normalized scoreboard matrix', () => {
   })
 
   test('keeps accepted state while processing and retries the authoritative snapshot', () => {
-    expect(composable).toContain("snapshotResult?.response?.status === 202")
+    expect(composable).toContain("snapshotResponse.status === 202")
     expect(composable).toContain('scheduleProcessingRetry()')
-    expect(composable).toContain('if (snapshotResult?.data)')
+    expect(composable).toContain('if (snapshotResult)')
     expect(composable).not.toContain('snapshot.value = null')
   })
 
@@ -109,15 +109,15 @@ describe('normalized scoreboard matrix', () => {
     expect(composable).toContain("schema.value?.mode !== 'Awdp' && schema.value?.mode !== 'Awd'")
     expect(composable).toContain("schema.value?.mode === 'Awdp' || schema.value?.mode === 'Awd'")
     expect(composable).toContain("snapshot.value?.dataScope !== 'Frozen'")
-    expect(composable).toContain('query: { endingRound }')
+    expect(composable).toContain('queryParameters: { endingRound: endingRound ?? undefined }')
     expect(composable).toContain('await selectRoundWindow(windowStart - 1)')
     expect(composable).toContain('const nextEnd = Math.min(latestRound, windowEnd + 50)')
     expect(composable).toContain('await selectRoundWindow(nextEnd >= latestRound ? null : nextEnd)')
     expect(composable).toContain('const detailEndingRound = computed')
     expect(leaderboardPage).toContain('endingRound: board.detailEndingRound.value')
-    expect(leaderboardPage).toContain("$t('ui.earlierRounds')")
-    expect(leaderboardPage).toContain("$t('ui.laterRounds')")
-    expect(leaderboardPage).toContain("$t('ui.backToLatestRounds')")
+    expect(leaderboardPage).toContain("$t('leaderboard.label.earlierRounds')")
+    expect(leaderboardPage).toContain("$t('leaderboard.label.laterRounds')")
+    expect(leaderboardPage).toContain("$t('leaderboard.label.backLatestRounds')")
   })
 
   test('pins ranking, team and total score while preserving readable matrix widths', () => {
@@ -162,7 +162,7 @@ describe('normalized scoreboard matrix', () => {
     expect(groups[1]?.competitionChallengeId).toBe(missingChallengeId)
     expect(groups[1]?.challenge).toBeNull()
     expect(groups[1]?.columns.map(column => column.index)).toEqual([1])
-    expect(leaderboardPage).toContain("group.challenge?.title ?? $t('ui.unknownQuestion')")
+    expect(leaderboardPage).toContain("group.challenge?.title ?? $t('common.label.unknownQuestion')")
   })
 
   test('refreshes a missing challenge catalog at most once for each revision', () => {
@@ -210,7 +210,7 @@ describe('normalized scoreboard matrix', () => {
   })
 
   test('reads sparse slots and never predicts a pending round score', () => {
-    const team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse = {
+    const team: NoCTFAPIEndpointsCompetitionsScoreboardTeamResponse = {
       teamId: crypto.randomUUID(),
       teamName: 'Alpha',
       trackKey: 'default',
@@ -258,7 +258,7 @@ describe('normalized scoreboard matrix', () => {
   test('keeps challenge-major column order from the server schema', () => {
     const challengeA = crypto.randomUUID()
     const challengeB = crypto.randomUUID()
-    const schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse = {
+    const schema: NoCTFAPIEndpointsCompetitionsScoreboardSchemaResponse = {
       competitionId: crypto.randomUUID(),
       mode: 'Awdp',
       revision: '1',
@@ -276,7 +276,7 @@ describe('normalized scoreboard matrix', () => {
 
   test('groups displayed challenge columns by direction without changing schema slot indexes', () => {
     const [webA, pwnA, webB, missing, pwnB] = Array.from({ length: 5 }, () => crypto.randomUUID())
-    const schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse = {
+    const schema: NoCTFAPIEndpointsCompetitionsScoreboardSchemaResponse = {
       mode: 'Awdp',
       columns: [
         { index: 0, competitionChallengeId: webA },
@@ -356,7 +356,7 @@ describe('normalized scoreboard matrix', () => {
   test('builds each team radar from authoritative effective challenge scores', () => {
     const challengeA = crypto.randomUUID()
     const challengeB = crypto.randomUUID()
-    const team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse = {
+    const team: NoCTFAPIEndpointsCompetitionsScoreboardTeamResponse = {
       teamId: crypto.randomUUID(),
       teamName: 'Radar team',
       challengeScores: [{ competitionChallengeId: challengeA, attackScore: 240, defenseScore: 160 }],
@@ -413,9 +413,9 @@ describe('normalized scoreboard matrix', () => {
     expect(scoreboardTeamDetailDialog).toContain('scoreboardTeamDirectionScore')
     expect(scoreboardTeamDetailDialog).toContain("radius: '62%'")
     expect(scoreboardTeamDetailDialog).toContain('splitNumber: 3')
-    expect(scoreboardTeamDetailDialog).toContain("name: translate(\"ui.attackScore\")")
-    expect(scoreboardTeamDetailDialog).toContain("name: translate(\"ui.defenseScore\")")
-    expect(scoreboardTeamDetailDialog).toContain("usesCurrentScore.value ? translate(\"ui.currentScore\") : translate(\"ui.settledScore\")")
+    expect(scoreboardTeamDetailDialog).toContain("name: translate(\"common.label.attackScore\")")
+    expect(scoreboardTeamDetailDialog).toContain("name: translate(\"common.label.defenseScore\")")
+    expect(scoreboardTeamDetailDialog).toContain("usesCurrentScore.value ? translate(\"leaderboard.label.score\") : translate(\"leaderboard.label.settledScore\")")
     expect(scoreboardTeamDetailDialog.match(/areaStyle: \{ opacity: 0\.2 \}/g)).toHaveLength(2)
     expect(scoreboardTeamDetailDialog).not.toContain("color: '#ef4444'")
     expect(scoreboardTeamDetailDialog).not.toContain("color: '#0ea5e9'")

@@ -1,3 +1,4 @@
+import { createTestApi, kiotaBindings, testId } from './support/kiota-harness'
 import { describe, expect, test } from 'bun:test'
 import { computed, effectScope, nextTick, onScopeDispose, reactive, ref, toRefs, watch } from 'vue'
 import { challengeTagOptions, matchesAllTags, tagKey, tagsFromQuery, uniqueTags, validChallengeTags } from '../app/lib/challenge-tags'
@@ -7,28 +8,41 @@ const source = await Bun.file(new URL('../app/features/competition/useCompetitio
 const compiled = new Bun.Transpiler({ loader: 'ts' }).transformSync(source)
   .replace(/^import[\s\S]*?from ["'][^"']+["'];?\s*$/gm, '').replace(/export function /g, 'function ')
 const drain = async () => { await nextTick(); await new Promise(resolve => setTimeout(resolve, 0)) }
-const challenge = (id: string, tags: string[], published = true) => ({ id, title: id, direction: 'Web', order: 1, isPublished: published, tags })
+const challenge = (id: string, tags: string[], published = true) => ({ id: testId(id), title: id, direction: 'Web', order: 1, isPublished: published, tags })
 
 function harness(query: Record<string, any> = {}) {
   const route = reactive({ query })
-  const props = reactive({ competitionId: 'competition', selectedChallengeId: 'sql' })
+  const props = reactive({ competitionId: 'competition', selectedChallengeId: testId('sql') })
   let rows = [challenge('sql', ['Web', 'SQL']), challenge('http', ['web', 'HTTP']), challenge('plain', []), challenge('draft', ['Secret'], false)]
   let listener: any
   const ready: string[] = []
-  const deps = {
-    computed, ref, toRefs, watch, challengeTagOptions, matchesAllTags, tagsFromQuery, uniqueTags,
-    ShieldCheck: {}, Swords: {}, Users: {}, directionGlyph: () => 'web',
-    competitionContextKey: {}, inject: () => ({ competition: ref({ mode: 'Ctf' }) }),
-    useAuth: () => ({ isLoggedIn: ref(false) }), useRoute: () => route,
-    useRouter: () => ({ replace: async (next: any) => { route.query = next.query } }),
-    useScoreboardMatrix: () => ({ snapshot: ref(null), catalog: ref(null), schema: ref(null) }),
-    listChallengesEndpoint: async () => ({ data: { items: rows }, response: { status: 200 } }),
-    watchCompetition: (_: string, callbacks: any) => { listener = callbacks; return () => {} },
-    createTrailingRefresh: (callback: any) => callback,
-    onMounted: (callback: () => void) => callback(), onUnmounted: onScopeDispose,
-    translate: (key: string) => key, directionLabel: (value: string) => value,
-    bloodRankLabel: () => '', scoreboardCurrentChallengeScore: () => null,
-  }
+  const deps = { ...kiotaBindings(source), api: createTestApi({ 'GET /api/v1/competitions/{competitionId}/challenges': async () => (Response.json({ items: rows }, { status: 200 })) }),
+computed,
+ref,
+toRefs,
+watch,
+challengeTagOptions,
+matchesAllTags,
+tagsFromQuery,
+uniqueTags,
+ShieldCheck: {},
+Swords: {},
+Users: {},
+directionGlyph: () => 'web',
+competitionContextKey: {},
+inject: () => ({ competition: ref({ mode: 'Ctf' }) }),
+useAuth: () => ({ isLoggedIn: ref(false) }),
+useRoute: () => route,
+useRouter: () => ({ replace: async (next: any) => { route.query = next.query } }),
+useScoreboardMatrix: () => ({ snapshot: ref(null), catalog: ref(null), schema: ref(null) }),
+watchCompetition: (_: string, callbacks: any) => { listener = callbacks; return () => {} },
+createTrailingRefresh: (callback: any) => callback,
+onMounted: (callback: () => void) => callback(),
+onUnmounted: onScopeDispose,
+translate: (key: string) => key,
+directionLabel: (value: string) => value,
+bloodRankLabel: () => '',
+scoreboardCurrentChallengeScore: () => null }
   const factory = new Function('deps', `const { ${Object.keys(deps).join(', ')} } = deps; ${compiled}; return useCompetitionChallengeNavigator;`)(deps)
   const scope = effectScope()
   const state = scope.run(() => factory(props, (event: string, id: string) => { if (event === 'ready') ready.push(id) }))!
@@ -63,7 +77,7 @@ describe('competition challenge tags', () => {
     const app = harness({ tag: [' web ', 'WEB', 'SQL'], retained: 'yes' })
     await drain()
     expect(app.state.selectedTags.value).toEqual(['web', 'SQL'])
-    expect(app.state.listOptions.value.map((item: any) => item.value)).toEqual(['sql'])
+    expect(app.state.listOptions.value.map((item: any) => item.value)).toEqual([testId('sql')])
     expect(app.state.tagOptions.value).toEqual(['HTTP', 'SQL', 'Web'])
     app.state.search.value = 'nothing'
     expect(app.state.listOptions.value).toEqual([])
@@ -72,8 +86,8 @@ describe('competition challenge tags', () => {
     app.state.updateSelectedTags(['HTTP'])
     await drain()
     expect(app.route.query).toEqual({ tag: ['HTTP'], retained: 'yes' })
-    expect(app.ready.at(-1)).toBe('http')
-    app.props.selectedChallengeId = 'http'
+    expect(app.ready.at(-1)).toBe(testId('http'))
+    app.props.selectedChallengeId = testId('http')
     await drain()
     expect(app.state.selectedTags.value).toEqual(['HTTP'])
     app.state.updateSelectedTags([])

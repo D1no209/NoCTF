@@ -18,7 +18,13 @@ public sealed class SaveCompetitionDirectionsRequest
 }
 public sealed record CompetitionDirectionFailureResponse(
     [property: Required, JsonRequired, JsonConverter(typeof(StrictPascalCaseEnumConverter<CompetitionDirectionFailure>))] CompetitionDirectionFailure Code,
-    [property: Required, JsonRequired] string Detail);
+    string Detail)
+{
+    [Required, JsonRequired]
+    public string Detail { get; init; } = ApiMessages.Localize(Code, Detail, ApiMessages.NoArguments);
+    public string MessageKey => ApiMessages.For(Code).Key;
+    public IReadOnlyDictionary<string, object?> MessageArguments => ApiMessages.NoArguments;
+}
 public sealed class SaveCompetitionDirectionsValidator : Validator<SaveCompetitionDirectionsRequest>
 {
     public SaveCompetitionDirectionsValidator()
@@ -55,8 +61,8 @@ public sealed class SaveCompetitionDirectionsEndpoint(ManageCompetitionDirection
             null => TypedResults.Ok(new CompetitionDirectionsResponse(result.Items!.Select(item => new CompetitionDirectionResponse(item.Id, item.Name, item.Icon)).ToArray())),
             CompetitionDirectionFailure.CompetitionNotFound => TypedResults.NotFound(),
             CompetitionDirectionFailure.DirectionInUse or CompetitionDirectionFailure.NameConflict => TypedResults.Conflict(new CompetitionDirectionFailureResponse(result.Failure.Value, Describe(result.Failure.Value))),
-            _ => TypedResults.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Competition directions were not saved.",
-                detail: Describe(result.Failure.Value), extensions: new Dictionary<string, object?> { ["code"] = result.Failure.Value.ToString() })
+            _ => ApiProblems.Problem(statusCode: StatusCodes.Status400BadRequest, title: ApiMessages.Get(ApiMessageId.SaveCompetitionDirectionsTitleCompetitionDirectionsWereSaved),
+                detail: ApiMessages.For(result.Failure), extensions: new Dictionary<string, object?> { ["code"] = result.Failure.Value.ToString() })
         };
     }
     private static string Describe(CompetitionDirectionFailure failure) => failure switch

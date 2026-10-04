@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 import { adjudicationCounts, adjudicationSeverity, adjudicationVariant } from '../app/features/admin/adjudication-preview'
-import type { NoCtfapiEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferenceItemResponse as Item } from '../app/api'
+import type { NoCTFAPIEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferenceItemResponse as Item } from '../app/api/models'
 
 test('deterministic legal history is information rather than an anomaly', () => {
   const information: Item = { differences: [{ kind: 'HistoricalResultChanged', certainty: 'Deterministic', severity: 'Information', classification: 'LegalHistoryChange' }] }
@@ -22,6 +22,6 @@ test('historical analysis is requested explicitly and event pages use the shared
   expect(mount).toBeDefined()
   expect(mount).not.toContain('loadPreview')
   expect(source).toContain('includeInformational: previewIncludeInformational.value')
-  expect(source).toContain('useCursorPagination<NoCtfapiEndpointsAdministrationGameplayFactsAdjudicationEventResponse>')
+  expect(source).toContain('useCursorPagination<NoCTFAPIEndpointsAdministrationGameplayFactsAdjudicationEventResponse>')
   expect(source).toContain('evidenceAbort?.abort()')
 })

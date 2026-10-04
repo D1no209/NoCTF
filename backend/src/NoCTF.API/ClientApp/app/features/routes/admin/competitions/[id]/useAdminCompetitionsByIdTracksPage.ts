@@ -1,12 +1,11 @@
+
+import { api } from '../../../../../lib/api'
+import { message as describeMessage } from '../../../../../utils/i18n'
+import type { UiMessage } from '../../../../../utils/i18n'
 import { Plus, Save, Trash2 } from '@lucide/vue'
-import { toast } from 'vue-sonner'
-import { adminGetCompetition, adminListTeams, adminPatchCompetition } from '../../../../../api'
-import type {
-  NoCtfapiEndpointsAdministrationCompetitionsRemovedTrackReassignmentRequest,
-  NoCtfapiEndpointsAdministrationCompetitionsCompetitionSsoProviderResponse,
-  NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionTrackRequest,
-  NoCtfapiEndpointsTeamsTeamResponse,
-} from '../../../../../api'
+import { toast } from '../../../../../utils/message-toast'
+
+import type { NoCTFAPIEndpointsAdministrationCompetitionsRemovedTrackReassignmentRequest, NoCTFAPIEndpointsAdministrationCompetitionsCompetitionSsoProviderResponse, NoCTFAPIEndpointsAdministrationCompetitionsUpdateCompetitionTrackRequest, NoCTFAPIEndpointsTeamsTeamResponse } from '../../../../../api/models'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
 import {
   competitionTrackErrorMessage,
@@ -14,7 +13,9 @@ import {
   nextCompetitionTrackOrdinal,
 } from '../../../../../lib/competition-track'
 
-type TrackForm = Omit<NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionTrackRequest, 'invitationCode'> & {
+type TrackForm = Omit<NoCTFAPIEndpointsAdministrationCompetitionsUpdateCompetitionTrackRequest, 'invitationCode' | 'key' | 'name'> & {
+  key: string
+  name: string
   clientId: string
   existingKey: string | null
   requiresInvitationCode: boolean
@@ -38,14 +39,14 @@ export function useAdminCompetitionsByIdTracksPage() {
   const enabled = ref(false)
   const canUpdate = ref(false)
   const tracks = ref<TrackForm[]>([])
-  const ssoProviders = ref<NoCtfapiEndpointsAdministrationCompetitionsCompetitionSsoProviderResponse[]>([])
-  const teams = ref<NoCtfapiEndpointsTeamsTeamResponse[]>([])
-  const removedTrackReassignments = ref<NoCtfapiEndpointsAdministrationCompetitionsRemovedTrackReassignmentRequest[]>([])
+  const ssoProviders = ref<NoCTFAPIEndpointsAdministrationCompetitionsCompetitionSsoProviderResponse[]>([])
+  const teams = ref<NoCTFAPIEndpointsTeamsTeamResponse[]>([])
+  const removedTrackReassignments = ref<NoCTFAPIEndpointsAdministrationCompetitionsRemovedTrackReassignmentRequest[]>([])
   const pendingRemoval = ref<PendingTrackRemoval | null>(null)
   const disableConfirmationOpen = ref(false)
   const loading = ref(true)
   const saving = ref(false)
-  const error = ref<string | null>(null)
+  const error = ref<UiMessage | null>(null)
 
   const defaultTrack = computed(() => tracks.value.find(track => track.isDefault) ?? null)
   const removalTargets = computed(() => tracks.value.filter(track =>
@@ -60,28 +61,33 @@ export function useAdminCompetitionsByIdTracksPage() {
 
   async function load() {
     loading.value = true
-    const [competitionResult, teamResult] = await Promise.all([
-      adminGetCompetition({ path: { competitionId } }),
-      adminListTeams({ path: { competitionId }, query: { keyword: null, offset: 0, limit: 200, desc: false } }),
-    ])
+    const settledRequests = await Promise.allSettled([
+      api.api.v1.admin.competitions.byCompetitionId(competitionId).get(),
+      api.api.v1.admin.competitions.byCompetitionId(competitionId).teams.get({ queryParameters: { keyword: undefined, offset: 0, limit: 200, desc: false } }),
+    ]);
+    const competitionResult = settledRequests[0].status === 'fulfilled' ? settledRequests[0].value : undefined;
+    const competitionResultError = settledRequests[0].status === 'rejected' ? settledRequests[0].reason : undefined;
+    const teamResult = settledRequests[1].status === 'fulfilled' ? settledRequests[1].value : undefined;
+    const teamResultError = settledRequests[1].status === 'rejected' ? settledRequests[1].reason : undefined;
+
     loading.value = false
-    if (competitionResult.error || !competitionResult.data) {
+    if (competitionResultError || !competitionResult) {
       error.value = competitionTrackErrorMessage(
-        competitionResult.error,
-        translate('ui.failedToLoadTrackConfiguration'),
+        competitionResultError,
+        translate('administration.competitionsBy.error.loadTrackConfigurationFailed'),
       )
       return
     }
-    if (teamResult.error || !teamResult.data) {
-      error.value = parseApiError(teamResult.error, translate('ui.failedToLoadRegisteredTeams')).message
+    if (teamResultError || !teamResult) {
+      error.value = parseApiError(teamResultError, describeMessage('administration.competitionsBy.error.loadRegisteredTeamsFailed')).displayMessage
       return
     }
 
-    const data = competitionResult.data
+    const data = competitionResult
     mode.value = data.competition?.mode ?? 'Ctf'
     enabled.value = data.tracks?.enabled ?? data.competition?.tracksEnabled ?? false
     canUpdate.value = data.tracks?.canUpdate ?? false
-    teams.value = teamResult.data.items ?? []
+    teams.value = teamResult.items ?? []
     ssoProviders.value = data.ssoProviders ?? []
     removedTrackReassignments.value = []
     pendingRemoval.value = null
@@ -109,12 +115,12 @@ export function useAdminCompetitionsByIdTracksPage() {
   }
 
   function addTrack() {
-    const ordinal = nextCompetitionTrackOrdinal(tracks.value.map(track => track.key))
+    const ordinal = nextCompetitionTrackOrdinal(tracks.value.flatMap(track => track.key ? [track.key] : []))
     tracks.value.push({
       clientId: crypto.randomUUID(),
       existingKey: null,
       key: `track-${ordinal}`,
-      name: translate('ui.newTrack', { ordinal }),
+      name: translate('administration.label.newTrack', { ordinal }),
       isDefault: false,
       isPublicSelectable: true,
       isInternal: false,
@@ -255,9 +261,9 @@ export function useAdminCompetitionsByIdTracksPage() {
 
   async function save() {
     if (saving.value || !canUpdate.value || !canWrite.value) return
-    const duplicateTrackKey = duplicateCompetitionTrackKey(tracks.value.map(track => track.key))
+    const duplicateTrackKey = duplicateCompetitionTrackKey(tracks.value.flatMap(track => track.key ? [track.key] : []))
     if (duplicateTrackKey) {
-      error.value = translate('ui.duplicateTrackKey', { key: duplicateTrackKey })
+      error.value = describeMessage('administration.label.duplicateTrackKey', { key: duplicateTrackKey })
       toast.error(error.value)
       return
     }
@@ -269,15 +275,14 @@ export function useAdminCompetitionsByIdTracksPage() {
     if (invalidInvitationTrack) {
       const trackName = invalidInvitationTrack.name?.trim()
         || invalidInvitationTrack.key?.trim()
-        || translate('ui.unnamedTrack')
-      error.value = translate('ui.trackRequiresAnInvitationCode', { name: trackName })
+        || translate('administration.label.unnamedTrack')
+      error.value = describeMessage('administration.competitionsBy.label.trackRequiresInvitationCode', { name: trackName })
       toast.error(error.value)
       return
     }
     saving.value = true
-    const { data, error: requestError } = await adminPatchCompetition({
-      path: { competitionId },
-      body: {
+    let requestError: unknown;
+    const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).patch({
         tracks: {
           enabled: enabled.value,
           tracks: tracks.value.map(track => ({
@@ -299,15 +304,14 @@ export function useAdminCompetitionsByIdTracksPage() {
           })),
           removedTrackReassignments: enabled.value ? removedTrackReassignments.value : [],
         },
-      },
-    })
+      }).catch(cause => { requestError = cause; return undefined });
     saving.value = false
     if (requestError || !data) {
-      error.value = competitionTrackErrorMessage(requestError, translate('ui.failedToSaveTrackConfiguration'))
+      error.value = competitionTrackErrorMessage(requestError, translate('administration.competitionsBy.error.saveTrackConfigurationFailed'))
       toast.error(error.value)
       return
     }
-    toast.success(translate('ui.trackConfigurationSaved'))
+    toast.success(describeMessage('administration.label.trackConfigurationSaved'))
     await load()
   }
 

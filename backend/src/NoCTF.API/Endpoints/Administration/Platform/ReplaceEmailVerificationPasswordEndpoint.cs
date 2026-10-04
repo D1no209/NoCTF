@@ -50,9 +50,9 @@ public sealed class ReplaceEmailVerificationPasswordEndpoint(
             ct);
         if (result.State == EmailVerificationConfigurationUpdateState.Invalid)
         {
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
-                title: "SMTP password is invalid.",
+                title: ApiMessages.Get(ApiMessageId.ReplaceEmailVerificationPasswordTitleSmtpPasswordInvalid),
                 extensions: new Dictionary<string, object?>
                 {
                     ["code"] = PlatformProblemCode.SmtpPasswordInvalid

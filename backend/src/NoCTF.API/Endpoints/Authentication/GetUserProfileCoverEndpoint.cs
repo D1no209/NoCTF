@@ -19,7 +19,7 @@ public sealed class GetUserProfileCoverEndpoint(GetPublicUserProfileCover getCov
         Get("/users/{userId}/profile-cover");
         AllowAnonymous();
         Description(builder => builder.WithName("UserProfileCover_Get"));
-        Summary(summary => summary.Summary = "Returns a user's public profile cover image.");
+        Summary(summary => { summary.Summary = "Returns a user's public profile cover image."; summary.Description = summary.Summary; });
     }
 
     public override async Task<Results<FileStreamHttpResult, NotFound>> ExecuteAsync(

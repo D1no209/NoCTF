@@ -1,33 +1,37 @@
+import { dateObject } from '../../../../utils/date-value'
+
+import { api, nativeResponse } from '../../../../lib/api'
+import { message as describeMessage } from '../../../../utils/i18n'
 import { markRaw } from 'vue'
 
 import { Download, Radio } from '@lucide/vue'
-import { toast } from 'vue-sonner'
-import { adminPlatformExportLogs, adminPlatformListLogs } from '../../../../api'
+import { toast } from '../../../../utils/message-toast'
+
 import { downloadSdkFile } from '../../../../utils/download'
-import type { NoCtfapiEndpointsAdministrationPlatformPlatformLogResponse, NoCtfapiEndpointsAdministrationPlatformPlatformLogLevelProtocol, NoCtfapiEndpointsAdministrationPlatformPlatformLogServiceProtocol } from '../../../../api'
+import type { NoCTFAPIEndpointsAdministrationPlatformPlatformLogResponse, NoCTFAPIEndpointsAdministrationPlatformPlatformLogLevelProtocol, NoCTFAPIEndpointsAdministrationPlatformPlatformLogServiceProtocol } from '../../../../api/models'
 import AdminDateTimeComponent from '../../../admin/AdminDateTime.vue'
 
-type PlatformLog = NoCtfapiEndpointsAdministrationPlatformPlatformLogResponse
+type PlatformLog = NoCTFAPIEndpointsAdministrationPlatformPlatformLogResponse
 
 /** Owns state, effects and commands for AdminPlatformLogsPage. */
 export function useAdminPlatformLogsPage() {
   const LEVEL_LABELS: Record<string, string> = {
-    Trace: "ui.track", Debug: "ui.debugging", Information: "ui.information", Warning: "ui.warning", Error: "ui.wrong", Critical: "ui.serious",
+    Trace: "administration.label.track", Debug: "administration.label.debugging", Information: "common.label.information", Warning: "common.label.warning", Error: "common.label.wrong", Critical: "administration.label.serious",
   }
 
   const SERVICE_LABELS: Record<string, string> = {
-    Api: "ui.api", Worker: "ui.worker", Runner: "ui.runner", Host: "ui.host3",
+    Api: "administration.label.api", Worker: "administration.label.worker", Runner: "common.label.runner", Host: "administration.label.host.platformLogsPage",
   }
 
   const LEVEL_ORDER = ['Trace', 'Debug', 'Information', 'Warning', 'Error', 'Critical'] as const
 
-  const levelOrdinal = (level?: string | number) => typeof level === 'number' ? level : LEVEL_ORDER.indexOf(level as typeof LEVEL_ORDER[number])
+  const levelOrdinal = (level?: string | number | null) => typeof level === 'number' ? level : LEVEL_ORDER.indexOf(level as typeof LEVEL_ORDER[number])
 
   const LIVE_LIMIT = 200
 
-  const minimumLevel = ref<NoCtfapiEndpointsAdministrationPlatformPlatformLogLevelProtocol>('Warning')
+  const minimumLevel = ref<NoCTFAPIEndpointsAdministrationPlatformPlatformLogLevelProtocol>('Warning')
 
-  const service = ref<'all' | NoCtfapiEndpointsAdministrationPlatformPlatformLogServiceProtocol>('all')
+  const service = ref<'all' | NoCTFAPIEndpointsAdministrationPlatformPlatformLogServiceProtocol>('all')
 
   const search = ref('')
 
@@ -44,19 +48,18 @@ export function useAdminPlatformLogsPage() {
   }
 
   const { items, loading, error: listError, hasMore, initialized, loadMore, reset } = useCursorPagination<PlatformLog>(async (cursor) => {
-    const { data, error } = await adminPlatformListLogs({
-      query: {
+    let error: unknown;
+    const data = await api.api.v1.admin.platform.logs.get({ queryParameters: {
         minimumLevel: minimumLevel.value,
-        service: service.value === 'all'
+        service: (service.value === 'all'
           ? null
-          : service.value as NoCtfapiEndpointsAdministrationPlatformPlatformLogServiceProtocol,
-        from: toIso(from.value),
-        to: toIso(to.value),
-        search: search.value.trim() || null,
-        cursor,
+          : service.value as NoCTFAPIEndpointsAdministrationPlatformPlatformLogServiceProtocol) ?? undefined,
+        from: dateObject(toIso(from.value) ?? undefined),
+        to: dateObject(toIso(to.value) ?? undefined),
+        search: search.value.trim() || undefined,
+        cursor: cursor ?? undefined,
         limit: 50,
-      },
-    })
+      } }).catch(cause => { error = cause; return undefined });
     if (error || !data) throw parseApiError(error)
     return { items: data.items ?? [], nextCursor: data.nextCursor ?? null }
   })
@@ -94,13 +97,13 @@ export function useAdminPlatformLogsPage() {
   const hubStateBadge = computed(() => {
     switch (hubState.value) {
       case 'connected':
-        return { label: translate("ui.liveStreamIsConnected"), variant: 'secondary' as const }
+        return { label: translate("administration.label.liveStreamConnected"), variant: 'secondary' as const }
       case 'connecting':
-        return { label: translate("ui.liveStreamingConnection"), variant: 'outline' as const }
+        return { label: translate("administration.label.liveStreamingConnection"), variant: 'outline' as const }
       case 'reconnecting':
-        return { label: translate("ui.liveStreamReconnecting"), variant: 'outline' as const }
+        return { label: translate("administration.label.liveStreamReconnecting"), variant: 'outline' as const }
       default:
-        return { label: translate("ui.liveStreamDisconnected"), variant: 'destructive' as const }
+        return { label: translate("administration.label.liveStreamDisconnected"), variant: 'destructive' as const }
     }
   })
 
@@ -108,28 +111,25 @@ export function useAdminPlatformLogsPage() {
     const fromIso = toIso(from.value)
     const toIsoValue = toIso(to.value)
     if (!fromIso || !toIsoValue) {
-      toast.error(translate("ui.exportNeedsToSelectTheStartAndEndTime"))
+      toast.error(describeMessage("administration.platformLogs.description.exportSelectStartEnd"))
       return
     }
     exporting.value = true
     try {
       await downloadSdkFile(
-        adminPlatformExportLogs({
-          query: {
+        nativeResponse(responseOptions => api.api.v1.admin.platform.logs.exportEscaped.get({ queryParameters: {
             minimumLevel: minimumLevel.value,
-            service: service.value === 'all' ? null : service.value,
-            from: fromIso,
-            to: toIsoValue,
-            search: search.value.trim() || null,
-          },
-          parseAs: 'blob',
-        }),
+            service: service.value === 'all' ? undefined : service.value,
+            from: dateObject(fromIso ?? undefined),
+            to: dateObject(toIsoValue ?? undefined),
+            search: search.value.trim() || undefined,
+          }, options: [...responseOptions] })),
         'platform-logs.jsonl',
       )
-      toast.success(translate("ui.logExportDownloadHasStarted"))
+      toast.success(describeMessage("administration.platformLogs.label.logExportDownloadStarted"))
     }
     catch (e) {
-      toast.error(parseApiError(e).message)
+      toast.error(parseApiError(e).displayMessage)
     }
     finally {
       exporting.value = false

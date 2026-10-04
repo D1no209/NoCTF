@@ -1,10 +1,10 @@
 import { toRefs } from 'vue'
 
-import type { NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol } from '../../api'
+import type { NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol } from '../../api/models'
 import { competitionStatusLabel } from '../../utils/labels'
 
 /** Owns state, effects and commands for LifecycleBadge. */
-export function useLifecycleBadge(props: Readonly<{ status?: NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol }>) {
+export function useLifecycleBadge(props: Readonly<{ status?: NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol }>) {
   const label = computed(() => competitionStatusLabel(props.status))
 
   const variant = computed(() => {

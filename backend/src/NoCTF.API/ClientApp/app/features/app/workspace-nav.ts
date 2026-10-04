@@ -9,7 +9,7 @@ export interface WorkspaceNavItem {
 }
 
 export interface WorkspaceNavGroup {
-  label?: string
+  label?: string | null
   items: WorkspaceNavItem[]
 }
 

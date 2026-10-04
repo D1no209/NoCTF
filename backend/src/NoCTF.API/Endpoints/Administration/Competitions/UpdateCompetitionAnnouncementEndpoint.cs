@@ -25,9 +25,9 @@ public sealed class UpdateCompetitionAnnouncementValidator : Validator<UpdateCom
 }
 internal static class AnnouncementMutationProblems
 {
-    public static ProblemHttpResult Failure(CompetitionAnnouncementFailure? failure) => TypedResults.Problem(
+    public static ProblemHttpResult Failure(CompetitionAnnouncementFailure? failure) => ApiProblems.Problem(
         statusCode: failure == CompetitionAnnouncementFailure.InvalidContent ? 400 : 409,
-        title: failure == CompetitionAnnouncementFailure.Withdrawn ? "The announcement has been withdrawn." : "The announcement could not be changed.",
+        title: ApiMessages.For(failure),
         extensions: new Dictionary<string, object?> { ["code"] = failure?.ToString() });
 }
 public sealed class UpdateCompetitionAnnouncementEndpoint(ManageCompetitionAnnouncements announcements,

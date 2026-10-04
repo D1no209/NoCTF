@@ -4,7 +4,7 @@ using System.Security.Claims;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using FastEndpoints;
-using FastEndpoints.Swagger;
+using FastEndpoints.OpenApi;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -116,7 +116,7 @@ public sealed class NotificationFeedEndpointTests
                 type == typeof(ReadNotificationFeedEndpoint)
                 || type == typeof(ReadNotificationFeedValidator);
         });
-        builder.Services.SwaggerDocument();
+        builder.Services.OpenApiDocument();
         builder.Services
             .AddAuthentication(options =>
             {

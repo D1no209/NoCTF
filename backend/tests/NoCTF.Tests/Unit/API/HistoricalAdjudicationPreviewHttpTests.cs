@@ -198,6 +198,7 @@ public sealed class HistoricalAdjudicationPreviewHttpTests
         IHistoricalAdjudicationEventStore? eventStore = null)
     {
         var builder = WebApplication.CreateBuilder();
+        builder.Configuration["Pagination:SigningKey"] = new string('k', 64);
         builder.WebHost.UseTestServer();
         builder.Services.AddNoCtfApi(builder.Configuration, includeInfrastructure: false);
         builder.Services.AddSingleton(TimeProvider.System);

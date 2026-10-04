@@ -1,15 +1,14 @@
-import type { MessageKey } from './zh-CN'
-import { messages as CoreMessages } from './catalogs/en/core'
-import { messages as CompetitionsMessages } from './catalogs/en/competitions'
-import { messages as ChallengesMessages } from './catalogs/en/challenges'
-import { messages as LeaderboardMessages } from './catalogs/en/leaderboard'
-import { messages as AdministrationMessages } from './catalogs/en/administration'
-import { messages as AccountMessages } from './catalogs/en/account'
-import { messages as NotificationsMessages } from './catalogs/en/notifications'
-import { messages as RuntimeMessages } from './catalogs/en/runtime'
-import { messages as WriteupsMessages } from './catalogs/en/writeups'
+import CoreMessages from './catalogs/en/core.json'
+import CompetitionsMessages from './catalogs/en/competitions.json'
+import ChallengesMessages from './catalogs/en/challenges.json'
+import LeaderboardMessages from './catalogs/en/leaderboard.json'
+import AdministrationMessages from './catalogs/en/administration.json'
+import AccountMessages from './catalogs/en/account.json'
+import NotificationsMessages from './catalogs/en/notifications.json'
+import RuntimeMessages from './catalogs/en/runtime.json'
+import WriteupsMessages from './catalogs/en/writeups.json'
+import ApiMessages from './catalogs/en/api.json'
 
-/** Canonical build-time catalog used by architecture and parity checks. */
 export const englishMessages = {
   ...CoreMessages,
   ...CompetitionsMessages,
@@ -20,4 +19,6 @@ export const englishMessages = {
   ...NotificationsMessages,
   ...RuntimeMessages,
   ...WriteupsMessages,
-} satisfies Record<MessageKey, string>
+  ...ApiMessages,
+}
+export type MessageKey = keyof typeof englishMessages

@@ -21,9 +21,6 @@ public enum AdminPatchFailureCode
 
 public sealed record AdminPatchMetadataResponse(Guid FileId, string FileName, long ByteLength, DateTimeOffset UploadedAt, string Sha256);
 
-// OpenAPI binary-body marker; ExecuteAsync returns a streamed FileStreamHttpResult, not JSON.
-[NJsonSchema.Annotations.JsonSchema(NJsonSchema.JsonObjectType.String, Format = "binary")]
-public sealed class AdminPatchBinaryResponse;
 
 public sealed class DownloadAdminGameplayFactPatchRequest
 {
@@ -57,7 +54,7 @@ public sealed class DownloadAdminGameplayFactPatchEndpoint(AccessAdminPatch patc
         AuthSchemes("Bearer");
         Options(builder => builder.WithMetadata(new ApiRequestMetricsMetadata(ApiRequestKind.Download)));
         Description(builder => builder.WithName("AdminDownloadGameplayFactPatch")
-            .Produces<AdminPatchBinaryResponse>(StatusCodes.Status200OK, "application/octet-stream")
+            .Produces<byte[]>(StatusCodes.Status200OK, "application/octet-stream")
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict)
@@ -89,7 +86,7 @@ public sealed class DownloadAdminGameplayFactPatchEndpoint(AccessAdminPatch patc
                 AdminPatchFailure.AuditUnavailable => (StatusCodes.Status503ServiceUnavailable, "The Patch download audit could not be saved. No file was returned. Try again later."),
                 _ => throw new InvalidOperationException($"Unknown Patch access failure: {failure}.")
             };
-            return TypedResults.Problem(statusCode: status, title: "Patch download failed.", detail: detail,
+            return ApiProblems.Problem(statusCode: status, title: ApiMessages.Get(ApiMessageId.DownloadAdminGameplayFactPatchTitlePatchDownloadFailed), detail: ApiMessages.For(AdminPatchMapping.ToProtocol(failure)),
                 extensions: new Dictionary<string, object?> { ["code"] = AdminPatchMapping.ToProtocol(failure) });
         }
         return TypedResults.Stream(result.Content!, "application/octet-stream", SafeFileName(result.Metadata!.FileName, factId), enableRangeProcessing: false);

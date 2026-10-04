@@ -1,4 +1,5 @@
-<script setup lang="ts">
+<script setup lang="ts">import type { UiMessage } from '../../../utils/i18n'
+
 import type { PDFDocumentLoadingTask, PDFDocumentProxy, PDFPageProxy, RenderTask } from 'pdfjs-dist'
 import { ChevronLeft, ChevronRight, FileWarning, Maximize2, Minus, Plus } from '@lucide/vue'
 import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
@@ -9,7 +10,7 @@ const props = defineProps<{
   accessibleLabel: string
   emptyLabel: string
   loading?: boolean
-  error?: string | null
+  error?: UiMessage | null
   fill?: boolean
 }>()
 
@@ -251,13 +252,13 @@ onBeforeUnmount(() => {
     <template v-else-if="pdfDocument">
       <div data-slot="pdf-preview-toolbar">
         <div role="group" :aria-label="$t('pdfPreview.pageNavigation')">
-          <Button variant="ghost" size="icon-sm" :disabled="!canGoBack" :aria-label="$t('ui.previousPage')" @click="previousPage">
+          <Button variant="ghost" size="icon-sm" :disabled="!canGoBack" :aria-label="$t('common.label.previousPage')" @click="previousPage">
             <ChevronLeft />
           </Button>
           <span class="min-w-24 text-center font-mono text-xs tabular-nums" aria-live="polite">
             {{ $t('pdfPreview.pageStatus', { page: pageNumber, total: pageCount }) }}
           </span>
-          <Button variant="ghost" size="icon-sm" :disabled="!canGoForward" :aria-label="$t('ui.nextPage')" @click="nextPage">
+          <Button variant="ghost" size="icon-sm" :disabled="!canGoForward" :aria-label="$t('common.label.nextPage')" @click="nextPage">
             <ChevronRight />
           </Button>
         </div>

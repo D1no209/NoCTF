@@ -34,7 +34,7 @@ public sealed class BeginSsoBindingEndpoint(
         Options(options => options.WithMetadata(
             new ProtectedEntryMetadata(ProtectedEntry.SsoAuthentication)));
         Description(builder => builder.WithName("Authentication_SsoBeginBinding"));
-        Summary(summary => summary.Summary = "Starts an external identity binding flow for the authenticated user.");
+        Summary(summary => { summary.Summary = "Starts an external identity binding flow for the authenticated user."; summary.Description = summary.Summary; });
     }
 
     public override async Task<Results<Ok<BeginSsoLoginResponse>, ProblemHttpResult>> ExecuteAsync(

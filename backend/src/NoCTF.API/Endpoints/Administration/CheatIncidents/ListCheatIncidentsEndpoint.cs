@@ -58,7 +58,7 @@ public sealed class ListCheatIncidentsValidator : Validator<ListCheatIncidentsRe
         RuleFor(request => request).Must(request =>
                 request.From <= request.To
                 && request.To - request.From <= TimeSpan.FromDays(31))
-            .WithMessage("The incident query range must be between zero and 31 days.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.ListCheatIncidentsValidationIncidentQueryRangeBetween)).WithErrorCode(ApiMessages.Key(ApiMessageId.ListCheatIncidentsValidationIncidentQueryRangeBetween));
     }
 }
 
@@ -126,9 +126,9 @@ public sealed class ListCheatIncidentsEndpoint(
         var filterKey = FilterKey(competitionId, request);
         if (!cursors.TryDecode(request.Cursor, CursorEndpoint, filterKey, out var position))
         {
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
-                title: "Invalid cursor.");
+                title: ApiMessages.Get(ApiMessageId.InvalidCursor));
         }
         var result = await list.ExecuteAsync(new(
             competitionId,

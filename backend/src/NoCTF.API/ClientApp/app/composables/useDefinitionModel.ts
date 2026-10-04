@@ -1,20 +1,20 @@
 import { ref, toRaw, watch } from 'vue'
 import type { DefinitionModel, GameModeValue } from '../utils/game-config'
-import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract } from '../api'
+import type { NoCTFAPIEndpointsAdministrationChallengeBankChallengeDefinitionContract } from '../api/models'
 import { definitionContractToModel, definitionModelToContract } from '../utils/game-config'
 
 /**
  * OpenAPI 强类型 definition 与编辑器 DefinitionModel 的映射。
  */
 export function useDefinitionModel(
-  modelValue: () => NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract,
+  modelValue: () => NoCTFAPIEndpointsAdministrationChallengeBankChallengeDefinitionContract,
   mode: () => GameModeValue,
-  emit: (definition: NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract) => void,
+  emit: (definition: NoCTFAPIEndpointsAdministrationChallengeBankChallengeDefinitionContract) => void,
 ) {
   const model = ref<DefinitionModel | null>(null)
   const parseFailed = ref(false)
   let syncing = false
-  let lastEmitted: NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract | null = null
+  let lastEmitted: NoCTFAPIEndpointsAdministrationChallengeBankChallengeDefinitionContract | null = null
   let lastEmittedMode: GameModeValue | null = null
 
   watch(

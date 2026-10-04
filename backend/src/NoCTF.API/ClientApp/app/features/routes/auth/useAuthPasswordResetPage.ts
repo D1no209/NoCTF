@@ -1,6 +1,10 @@
 
+import { api } from '../../../lib/api'
+import { message as describeMessage } from '../../../utils/i18n'
+import type { UiMessage } from '../../../utils/i18n'
 
-import { authenticationCompletePasswordReset, authenticationRequestPasswordReset } from '../../../api'
+
+
 
 /** Owns state, effects and commands for AuthPasswordResetPage. */
 export function useAuthPasswordResetPage() {
@@ -20,7 +24,7 @@ export function useAuthPasswordResetPage() {
 
   const completed = ref(false)
 
-  const error = ref<string | null>(null)
+  const error = ref<UiMessage | null>(null)
 
   const pending = ref(false)
 
@@ -28,12 +32,13 @@ export function useAuthPasswordResetPage() {
     error.value = null
     pending.value = true
     try {
-      const { error: apiError } = await authenticationRequestPasswordReset({ body: { email: email.value } })
+      let apiError: unknown;
+      await api.api.v1.auth.passwordReset.request.post({ email: email.value }).catch(cause => { apiError = cause; return undefined });
       if (apiError) throw parseApiError(apiError)
       requested.value = true
     }
     catch (e) {
-      error.value = parseApiError(e).message
+      error.value = parseApiError(e).displayMessage
     }
     finally {
       pending.value = false
@@ -43,19 +48,18 @@ export function useAuthPasswordResetPage() {
   async function completeReset() {
     error.value = null
     if (newPassword.value !== confirmPassword.value) {
-      error.value = translate("ui.thePasswordsEnteredTwiceAreInconsistent")
+      error.value = describeMessage("common.authRegister.description.passwordsEnteredTwiceInconsistent")
       return
     }
     pending.value = true
     try {
-      const { error: apiError } = await authenticationCompletePasswordReset({
-        body: { token: token.value!, newPassword: newPassword.value },
-      })
+      let apiError: unknown;
+      await api.api.v1.auth.passwordReset.complete.post({ token: token.value!, newPassword: newPassword.value }).catch(cause => { apiError = cause; return undefined });
       if (apiError) throw parseApiError(apiError)
       completed.value = true
     }
     catch (e) {
-      error.value = parseApiError(e).message
+      error.value = parseApiError(e).displayMessage
     }
     finally {
       pending.value = false

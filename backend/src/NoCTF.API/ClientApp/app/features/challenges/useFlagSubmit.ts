@@ -1,14 +1,18 @@
+
+import { api, RequestPolicyOption } from '../../lib/api'
+import { message as describeMessage } from '../../utils/i18n'
+import type { UiMessage } from '../../utils/i18n'
 import { inject, toRefs } from 'vue'
 
 import { PartyPopper } from '@lucide/vue'
-import { toast } from 'vue-sonner'
-import { judgeAwdpBreakFlag, submitFlagEndpoint } from '../../api'
-import type { NoCtfapiEndpointsGameplayFactsGameplayFactAdmissionFailureCodeProtocol, NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse } from '../../api'
+import { toast } from '../../utils/message-toast'
+
+import type { NoCTFAPIEndpointsGameplayFactsGameplayFactAdmissionFailureCodeProtocol, NoCTFAPIEndpointsGameplayFactsGameplayFactStatusResponse } from '../../api/models'
 import { useHumanVerification } from '~/features/security/useHumanVerification'
 import { challengeGameplayFactStatusKey, createChallengeGameplayFactStatusReader } from './challenge-gameplay-fact-status'
 
 type TrackedSubmission = Pick<
-  NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse,
+  NoCTFAPIEndpointsGameplayFactsGameplayFactStatusResponse,
   'state' | 'result' | 'failureCode'
 > & {
   id: string
@@ -22,11 +26,11 @@ export function useFlagSubmit(props: Readonly<Omit<{
     competitionChallengeId: string
     /** AWD 批量提交:多行输入,一次提交多个 flag */
     multiple?: boolean
-    title?: string
-    description?: string
+    title?: string | null
+    description?: string | null
     practice?: boolean
     readOnlyJudgement?: boolean
-    dockTarget?: string
+    dockTarget?: string | null
     maximumAttempts?: number | null
     remainingAttempts?: number | null
     initiallySolved?: boolean
@@ -35,11 +39,11 @@ export function useFlagSubmit(props: Readonly<Omit<{
     competitionChallengeId: string
     /** AWD 批量提交:多行输入,一次提交多个 flag */
     multiple?: boolean
-    title?: string
-    description?: string
+    title?: string | null
+    description?: string | null
     practice?: boolean
     readOnlyJudgement?: boolean
-    dockTarget?: string
+    dockTarget?: string | null
     maximumAttempts?: number | null
     remainingAttempts?: number | null
     initiallySolved?: boolean
@@ -64,7 +68,7 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
 
   const celebrating = ref(false)
 
-  const persistentResult = ref<{ correct: boolean | null; message: string } | null>(null)
+  const persistentResult = ref<{ correct: boolean | null; message: UiMessage } | null>(null)
 
   const solved = ref(props.initiallySolved || solvedChallengeKeys.has(challengeKey()))
 
@@ -103,7 +107,7 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
 
   const inputDisabled = computed(() => solved.value || attemptsExhausted.value)
 
-  function showResult(correct: boolean, message: string): void {
+  function showResult(correct: boolean, message: UiMessage): void {
     persistentResult.value = { correct, message }
   }
 
@@ -127,7 +131,7 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
   )
 
   const pollingErrorMessage = computed(() => pollingError.value
-    ? parseApiError(pollingError.value, translate("ui.failedToRefreshSubmissionStatus")).message
+    ? parseApiError(pollingError.value, describeMessage("common.flagSubmit.error.submissionStatusFailed")).displayMessage
     : null)
 
   async function refreshOne(id: string): Promise<void> {
@@ -168,7 +172,7 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
         solvedChallengeKeys.add(challengeKey())
         solved.value = true
         if (props.practice)
-          showResult(true, translate("ui.correctFlagPracticeAttemptsDoNotAwardPoints"))
+          showResult(true, translate("challenges.flagSubmit.description.correctFlagPracticeAttempts"))
         else
           showResult(true, translate('terminal.challengeSolved'))
         celebrateCorrectFlag()
@@ -177,8 +181,8 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
         const result = gameplayFactResultLabel(data.result)
         const reason = data.failureCode ? gameplayFactFailureCodeLabel(data.failureCode) : null
         showResult(false, reason
-          ? translate("ui.submissionJudgingCompleted2", { result, reason })
-          : translate("ui.submissionJudgingCompleted", { result }))
+          ? translate("challenges.label.submissionJudgingCompleted.useFlagSubmit", { result, reason })
+          : translate("challenges.label.submissionJudgingCompleted", { result }))
       }
       emit('evaluated', data.result)
       tracked.value = tracked.value.filter(item => item.id !== id)
@@ -204,58 +208,47 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
     const verificationHeaders = await requestHumanVerification('evaluation')
     if (verificationHeaders === null) return
     if (props.readOnlyJudgement) {
-      const { data, error } = await judgeAwdpBreakFlag({
-        headers: verificationHeaders,
-        path: {
-          competitionId: props.competitionId,
-          competitionChallengeId: props.competitionChallengeId,
-        },
-        body: { flag: lines[0]! },
-        signal: AbortSignal.timeout(30_000),
-      })
+      let error: unknown;
+      const data = await api.api.v1.competitions.byCompetitionId(props.competitionId).challenges.byCompetitionChallengeId(props.competitionChallengeId).awdpBreakFlagJudgement.post({ flag: lines[0]! }, { headers: verificationHeaders, options: [new RequestPolicyOption({ signal: AbortSignal.timeout(30_000) })] }).catch(cause => { error = cause; return undefined });
       if (generation !== requestGeneration) return
       if (error || !data) {
-        const parsed = parseApiError(error, translate("ui.flagCheckFailed"))
+        const parsed = parseApiError(error, describeMessage("challenges.error.flagCheckFailed"))
         const message = parsed.code === 'AchievementNotSucceeded'
-          ? translate("ui.theBreakAchievementHasNotSucceededYet")
+          ? translate("challenges.flagSubmit.description.breakAchievementSucceededYet")
           : parsed.code === 'JudgementUnavailable'
-            ? translate("ui.readOnlyFlagCheckingIsUnavailableForThisChallenge")
+            ? translate("challenges.flagSubmit.error.readFlagCheckingUnavailable")
             : parsed.code === 'FlagInvalid'
-              ? translate("ui.theFlagFormatIsInvalid")
+              ? translate("challenges.flagSubmit.error.flagFormatInvalid")
               : parsed.status === 403
-                ? translate("ui.theCurrentAccountHasNoApprovedTeamEligibleForThis")
-                : parsed.message
+                ? translate("challenges.flagSubmit.description.accountApprovedTeamEligible")
+                : parsed.displayMessage
         persistentResult.value = { correct: null, message }
         return
       }
       if (data.result === 'Correct') {
-        showResult(true, translate("ui.flagIsCorrectThisCheckCreatesNoCompetitionRecords"))
+        showResult(true, translate("challenges.flagSubmit.description.flagCorrectCheckCreates"))
         celebrateCorrectFlag()
       }
       else {
-        showResult(false, translate("ui.incorrectFlag"))
+        showResult(false, translate("challenges.error.flagFailed"))
       }
       return
     }
-    const { data, error } = await submitFlagEndpoint({
-      signal: AbortSignal.timeout(30_000),
-      headers: { ...commandAttempt.headers({ competitionId: props.competitionId, challengeId: props.competitionChallengeId, lines }), ...verificationHeaders },
-      path: { competitionId: props.competitionId, competitionChallengeId: props.competitionChallengeId },
-      body: props.multiple ? { flags: lines } : { flag: lines[0] },
-    })
+    let error: unknown;
+      const data = await api.api.v1.competitions.byCompetitionId(props.competitionId).challenges.byCompetitionChallengeId(props.competitionChallengeId).flagSubmissions.post(props.multiple ? { flags: lines } : { flag: lines[0] }, { headers: { ...commandAttempt.headers({ competitionId: props.competitionId, challengeId: props.competitionChallengeId, lines }), ...verificationHeaders }, options: [new RequestPolicyOption({ signal: AbortSignal.timeout(30_000) })] }).catch(cause => { error = cause; return undefined });
     if (generation !== requestGeneration) return
     if (error || !data) {
-      const parsed = parseApiError(error, translate("ui.submissionFailed"))
-      const code = parsed.code as NoCtfapiEndpointsGameplayFactsGameplayFactAdmissionFailureCodeProtocol | undefined
+      const parsed = parseApiError(error, describeMessage("challenges.error.submissionFailed"))
+      const code = parsed.code as NoCTFAPIEndpointsGameplayFactsGameplayFactAdmissionFailureCodeProtocol | undefined
       if (code === 'AttemptsExhausted') {
         remainingAttempts.value = 0
         emit('remainingChanged', 0)
       }
       persistentResult.value = { correct: null, message: code === 'AchievementAlreadySucceeded'
-        ? translate("ui.breakHasAlreadySucceededUseVerificationModeToCheckWhether")
+        ? translate("challenges.flagSubmit.description.breakAlreadySucceededVerification")
         : code === 'RuntimeNotRunning'
-          ? translate("ui.startTheChallengeEnvironmentAndWaitUntilItIsRunning")
-          : parsed.message }
+          ? translate("challenges.flagSubmit.description.startChallengeEnvironmentWait")
+          : parsed.displayMessage }
       return
     }
     const ids = [
@@ -267,7 +260,7 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
         tracked.value.unshift({ id, state: 'Pending', result: null })
       }
     }
-    if (!ids.length) throw new Error(translate("ui.theJudgingEndpointReturnedNoValidResultPleaseRetry"))
+    if (!ids.length) throw new Error(translate("challenges.flagSubmit.description.judgingEndpointReturnedValid"))
     commandAttempt.completed()
     input.value = ''
     if (remainingAttempts.value !== null) {
@@ -278,7 +271,7 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
     startPolling()
     } catch (error) {
       if (generation === requestGeneration) {
-        persistentResult.value = { correct: null, message: parseApiError(error, translate("ui.flagCheckFailed")).message }
+        persistentResult.value = { correct: null, message: parseApiError(error, describeMessage("challenges.error.flagCheckFailed")).displayMessage }
       }
     } finally {
       if (generation === requestGeneration) submitting.value = false
@@ -305,7 +298,7 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
         const id = competitionHubString(payload, 'gameplayFactId')
         if (id && tracked.value.some((t) => t.id === id)) {
           void refreshOne(id).catch((error) => {
-            toast.error(parseApiError(error, translate("ui.failedToRefreshSubmissionStatus")).message)
+            toast.error(parseApiError(error, describeMessage("common.flagSubmit.error.submissionStatusFailed")).displayMessage)
             startPolling()
           })
         }

@@ -40,7 +40,7 @@ describe('authentication response refresh', () => {
     const competitionHub = await sourceFile(new URL('../app/composables/useCompetitionHub.ts', import.meta.url)).text()
     const platformHub = await sourceFile(new URL('../app/composables/usePlatformLogHub.ts', import.meta.url)).text()
 
-    expect(session).toContain('refreshTokenEndpoint({ client: refreshClient })')
+    expect(session).toContain('refreshClient.api.v1.auth.refresh.post()')
     expect(session).not.toContain("fetch('/api/v1/auth/refresh'")
     expect(competitionHub).toContain('accessTokenFactory: getRealtimeAccessToken')
     expect(platformHub).toContain('accessTokenFactory: getRealtimeAccessToken')
@@ -67,7 +67,7 @@ describe('authentication response refresh', () => {
 
 describe('authentication status errors', () => {
   test('classifies unauthorized responses by attached credentials instead of endpoint paths', () => {
-    expect(statusErrorMessage(401, false)).toBe('用户名或密码错误')
+    expect(statusErrorMessage(401, false)).toBe('登录失败,请检查用户名或密码')
     expect(statusErrorMessage(401, true)).toBe('登录状态已失效,请重新登录')
   })
 })

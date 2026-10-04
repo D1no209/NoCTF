@@ -3,7 +3,7 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using FastEndpoints;
-using FastEndpoints.Swagger;
+using FastEndpoints.OpenApi;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -164,7 +164,7 @@ public sealed class AdminDetailEndpointTests
             options.Filter = type => type == typeof(ListRuntimeFlagsEndpoint) || type == typeof(ListRuntimeFlagsValidator)
                 || type == typeof(GetAdminTeamEndpoint) || type == typeof(GetAdminTeamValidator);
         });
-        builder.Services.SwaggerDocument();
+        builder.Services.OpenApiDocument();
         builder.Services.AddAuthentication("Bearer").AddScheme<AuthenticationSchemeOptions, TestBearer>("Bearer", _ => { });
         builder.Services.AddAuthorization();
         builder.Services.AddSingleton(Substitute.For<IUserContext>());

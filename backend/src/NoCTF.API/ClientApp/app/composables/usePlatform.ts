@@ -1,17 +1,22 @@
-import { platformConfigurationGet } from '../api'
+
+import { api } from '../lib/api'
+import type { UiMessage } from '../utils/i18n'
+import { message as describeMessage } from '../utils/i18n'
+
 
 let platformLoadPromise: Promise<void> | null = null
 
 /** Public branding and deployment capabilities, loaded once for the whole app. */
 export function usePlatform() {
   const configuration = useState<Awaited<ReturnType<typeof load>> | null>('platform:configuration', () => null)
-  const error = useState<string | null>('platform:configuration-error', () => null)
+  const error = useState<UiMessage | null>('platform:configuration-error', () => null)
   const loading = useState('platform:configuration-loading', () => false)
 
   async function load() {
-    const { data, error: requestError } = await platformConfigurationGet()
+    let requestError: unknown;
+    const data = await api.api.v1.platform.configuration.get().catch(cause => { requestError = cause; return undefined });
     if (requestError || !data)
-      throw parseApiError(requestError, translate("ui.failedToLoadPlatformConfiguration"))
+      throw parseApiError(requestError, describeMessage("administration.platform.error.loadPlatformConfigurationFailed"))
     return data ?? null
   }
 
@@ -24,7 +29,7 @@ export function usePlatform() {
       }
       catch (requestError) {
         configuration.value = null
-        error.value = parseApiError(requestError, translate("ui.failedToLoadPlatformConfiguration")).message
+        error.value = parseApiError(requestError, describeMessage("administration.platform.error.loadPlatformConfigurationFailed")).displayMessage
       }
       finally {
         loading.value = false

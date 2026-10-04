@@ -32,7 +32,12 @@ public enum IssuePlatformUserTokenFailureCode
 
 public sealed record IssuePlatformUserTokenFailureResponse(
     IssuePlatformUserTokenFailureCode Code,
-    string Message);
+    string Message)
+{
+    public string Message { get; init; } = ApiMessages.Localize(Code, Message, ApiMessages.NoArguments);
+    public string MessageKey => ApiMessages.For(Code).Key;
+    public IReadOnlyDictionary<string, object?> MessageArguments => ApiMessages.NoArguments;
+}
 
 public sealed record IssuePlatformUserTokenResponse(
     string AccessToken,
@@ -80,9 +85,9 @@ public sealed class IssuePlatformUserTokenEndpoint(
                 new IssuePlatformUserTokenFailureResponse(
                     IssuePlatformUserTokenFailureCode.AccountInactive,
                     "Only active accounts can receive administrator-issued tokens.")),
-            IssuePlatformUserTokenFailure.InvalidLifetime => TypedResults.Problem(
+            IssuePlatformUserTokenFailure.InvalidLifetime => ApiProblems.Problem(
                     statusCode: StatusCodes.Status400BadRequest,
-                    title: "Token was not issued."),
+                    title: ApiMessages.Get(ApiMessageId.IssuePlatformUserTokenTitleTokenWasIssued)),
             _ => TypedResults.Ok(new IssuePlatformUserTokenResponse(
                 result.Token!.Token,
                 result.Token.ExpiresAt,

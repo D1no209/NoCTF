@@ -4,7 +4,7 @@ on:
   pull_request:
     paths:
       - .github/workflows/gitops-contract.yml
-      - backend/artifacts/openapi/swagger.json
+      - backend/artifacts/openapi/v1.json
       - backend/src/NoCTF.API/Endpoints/Administration/ChallengeBank/**
       - backend/src/NoCTF.API/Endpoints/Administration/Challenges/**
       - backend/tests/NoCTF.Tests/Architecture/GitOpsApiOpenApiContractTests.cs
@@ -14,7 +14,7 @@ on:
     branches: [main]
     paths:
       - .github/workflows/gitops-contract.yml
-      - backend/artifacts/openapi/swagger.json
+      - backend/artifacts/openapi/v1.json
       - backend/src/NoCTF.API/Endpoints/Administration/ChallengeBank/**
       - backend/src/NoCTF.API/Endpoints/Administration/Challenges/**
       - backend/tests/NoCTF.Tests/Architecture/GitOpsApiOpenApiContractTests.cs

@@ -1,7 +1,11 @@
+
+import { api } from '../../../../../lib/api'
+import { message as describeMessage } from '../../../../../utils/i18n'
+import type { UiMessage } from '../../../../../utils/i18n'
 import { computed, onMounted, onScopeDispose, ref, watch } from 'vue'
-import { toast } from 'vue-sonner'
-import { adminCreateCompetitionAnnouncement, adminDeleteCompetitionAnnouncement, adminListCompetitionAnnouncements, adminUpdateCompetitionAnnouncement } from '~/api'
-import type { NoCtfapiEndpointsAdministrationCompetitionsAnnouncementAudience, NoCtfapiEndpointsAdministrationCompetitionsManagedAnnouncementResponse } from '~/api'
+import { toast } from '../../../../../utils/message-toast'
+
+import type { NoCTFAPIEndpointsAdministrationCompetitionsAnnouncementAudience, NoCTFAPIEndpointsAdministrationCompetitionsManagedAnnouncementResponse } from '~/api/models'
 import { useCompetitionAdmin } from '~/lib/admin-competition'
 import { useOffsetPagination } from '~/composables/useOffsetPagination'
 import { watchNotifications } from '~/composables/useNotificationHub'
@@ -9,10 +13,9 @@ import { createTrailingRefresh } from '~/lib/latest-page-refresh'
 import { adminUserPath } from '~/features/admin/admin-navigation'
 import { adminFormatDateTime } from '~/utils/admin-format'
 import { parseApiError } from '~/utils/api-error'
-import { translate } from '~/utils/i18n'
 
-type Announcement = NoCtfapiEndpointsAdministrationCompetitionsManagedAnnouncementResponse
-type Audience = NoCtfapiEndpointsAdministrationCompetitionsAnnouncementAudience
+type Announcement = NoCTFAPIEndpointsAdministrationCompetitionsManagedAnnouncementResponse
+type Audience = NoCTFAPIEndpointsAdministrationCompetitionsAnnouncementAudience
 
 export function useAdminCompetitionsByIdAnnouncementsPage() {
   const { competitionId, canJudge } = useCompetitionAdmin()
@@ -22,18 +25,18 @@ export function useAdminCompetitionsByIdAnnouncementsPage() {
   const body = ref('')
   const audience = ref<Audience>('Participants')
   const saving = ref(false)
-  const formError = ref<string | null>(null)
+  const formError = ref<UiMessage | null>(null)
   const deleting = ref(false)
   const deleteTarget = ref<Announcement | null>(null)
-  const deleteError = ref<string | null>(null)
+  const deleteError = ref<UiMessage | null>(null)
   const previewTarget = ref<Announcement | null>(null)
   const valid = computed(() => title.value.trim().length > 0 && title.value.trim().length <= 160
     && body.value.trim().length > 0 && body.value.trim().length <= 16_000)
 
   const pagination = useOffsetPagination<Announcement>(async ({ offset, limit, desc }) => {
-    const { data, error } = await adminListCompetitionAnnouncements({ path: { competitionId },
-      query: { includeWithdrawn: includeWithdrawn.value, offset, limit, desc } })
-    if (error || !data) throw parseApiError(error, translate('announcements.loadFailed'))
+    let error: unknown;
+    const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).announcements.get({ queryParameters: { includeWithdrawn: includeWithdrawn.value, offset, limit, desc } }).catch(cause => { error = cause; return undefined });
+    if (error || !data) throw parseApiError(error, describeMessage('announcements.loadFailed'))
     return { items: data.items ?? [], total: data.total ?? 0 }
   }, { initialDesc: true })
   const refresh = createTrailingRefresh(() => pagination.loadPage())
@@ -62,24 +65,25 @@ export function useAdminCompetitionsByIdAnnouncementsPage() {
   }
   async function save() {
     if (!canJudge.value || saving.value || deleting.value) return
-    if (!valid.value) { formError.value = translate('announcements.invalidContent'); return }
+    if (!valid.value) { formError.value = describeMessage('announcements.invalidContent'); return }
     const id = editingId.value
     saving.value = true
     formError.value = null
     try {
       const content = { title: title.value.trim(), body: body.value.trim() }
-      const result = id
-        ? await adminUpdateCompetitionAnnouncement({ path: { competitionId, announcementId: id }, body: content })
-        : await adminCreateCompetitionAnnouncement({ path: { competitionId }, body: { ...content, audience: audience.value } })
-      if (result.error) throw result.error
-      toast.success(translate(id ? 'announcements.updated' : 'ui.competitionNoticeHasBeenReleased'))
+      let resultError: unknown;
+      await (id
+        ? api.api.v1.admin.competitions.byCompetitionId(competitionId).announcements.byAnnouncementId(id).patch(content)
+        : api.api.v1.admin.competitions.byCompetitionId(competitionId).announcements.post({ ...content, audience: audience.value })).catch(cause => { resultError = cause; return undefined });
+      if (resultError) throw resultError
+      toast.success(describeMessage(id ? 'announcements.updated' : 'administration.competitionsBy.label.competitionNoticeReleased'))
       saving.value = false
       resetEditor()
       if (!id) pagination.reset()
       await pagination.loadPage(id ? pagination.page.value : 1)
     }
     catch (error) {
-      formError.value = parseApiError(error, translate('announcements.saveFailed')).message
+      formError.value = parseApiError(error, describeMessage('announcements.saveFailed')).displayMessage
     }
     finally { saving.value = false }
   }
@@ -97,20 +101,20 @@ export function useAdminCompetitionsByIdAnnouncementsPage() {
     deleting.value = true
     deleteError.value = null
     try {
-      const { error } = await adminDeleteCompetitionAnnouncement({ path: { competitionId, announcementId: target.id } })
-      if (error) throw error
-      toast.success(translate('announcements.deleted'))
+
+      await api.api.v1.admin.competitions.byCompetitionId(competitionId).announcements.byAnnouncementId(target.id).delete();
+      toast.success(describeMessage('announcements.deleted'))
       if (editingId.value === target.id) resetEditor()
       if (previewTarget.value?.id === target.id) previewTarget.value = null
       deleteTarget.value = null
       await pagination.loadPage()
     }
-    catch (error) { deleteError.value = parseApiError(error, translate('announcements.deleteFailed')).message }
+    catch (error) { deleteError.value = parseApiError(error, describeMessage('announcements.deleteFailed')).displayMessage }
     finally { deleting.value = false }
   }
   function preview(item: Announcement) { previewTarget.value = item }
   function setPreviewOpen(open: boolean) { if (!open) previewTarget.value = null }
-  function audienceKey(value?: Audience) { return value === 'Collaborators' ? 'ui.eventStaff' : 'ui.allContestants' }
+  function audienceKey(value?: Audience | null) { return value === 'Collaborators' ? 'common.label.eventStaff' : 'administration.label.contestants' }
   let stopNotifications: (() => void) | undefined
   onMounted(() => {
     void pagination.loadPage(1)

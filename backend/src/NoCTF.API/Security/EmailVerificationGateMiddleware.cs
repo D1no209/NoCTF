@@ -62,10 +62,10 @@ public sealed class EmailVerificationGateMiddleware(RequestDelegate next)
             return;
         }
 
-        await Results.Problem(
+        await ApiProblems.Problem(
             statusCode: StatusCodes.Status403Forbidden,
-            title: "Email verification is required.",
-            detail: "Verify the account email address before using this feature.",
+            title: ApiMessages.Get(ApiMessageId.EmailVerificationGateMiddlewareTitleEmailVerificationRequired),
+            detail: ApiMessages.Get(ApiMessageId.EmailVerificationGateMiddlewareDetailVerifyAccountEmailAddress),
             extensions: new Dictionary<string, object?>
             {
                 ["code"] = EmailVerificationProblemCode.EmailVerificationRequired

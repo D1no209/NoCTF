@@ -9,7 +9,7 @@ test('remaining attempt emphasis changes only the number below five', async () =
   expect(component).toContain(':data-critical="count < 5 || undefined"')
   expect(component).toContain("$t('attempts.remainingPrefix')")
   expect(component).toContain("$t('attempts.remainingSuffix')")
-  expect(component).toContain("$t('ui.submissionsRemaining', { count })")
+  expect(component).toContain("$t('common.label.submissionsRemaining', { count })")
   expect(css).toContain('--critical-attempt: #ff0000;')
   expect(css).toContain("[data-slot='remaining-attempt-count'][data-critical='true']")
 })

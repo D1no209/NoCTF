@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { bindViewState } from '~/features/shared/view-state'
 
-import type { NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse } from '~/api'
+import type { NoCTFAPIEndpointsGameplayFactsGameplayFactStatusResponse } from '~/api/models'
 import { useFlagSubmit } from './useFlagSubmit'
 import View from '~/components/views/challenges/FlagSubmitView.vue'
 
 type TrackedSubmission = Pick<
-  NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse,
+  NoCTFAPIEndpointsGameplayFactsGameplayFactStatusResponse,
   'state' | 'result' | 'failureCode'
 > & {
   id: string
@@ -27,7 +27,7 @@ const props = withDefaults(
     remainingAttempts?: number | null
     initiallySolved?: boolean
   }>(),
-  { multiple: false, title: translate("ui.submitFlag"), description: '', practice: false, readOnlyJudgement: false, dockTarget: '', initiallySolved: false },
+  { multiple: false, title: translate("challenges.label.submitFlag"), description: '', practice: false, readOnlyJudgement: false, dockTarget: '', initiallySolved: false },
 )
 const emit = defineEmits<{
   evaluated: [result: TrackedSubmission['result']]

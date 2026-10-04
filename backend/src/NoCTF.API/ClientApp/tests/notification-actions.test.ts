@@ -21,8 +21,8 @@ describe('notification unread state', () => {
       new URL('../app/features/notifications/NotificationCenter.vue', import.meta.url),
     ).text()
 
-    expect(layout).toContain(":aria-label=\"item.unread ? t('ui.notificationsUnreadMessages') : item.label\"")
-    expect(layout).toContain("<span v-if=\"item.unread\" class=\"sr-only\">{{ t('ui.unreadNotifications') }}</span>")
+    expect(layout).toContain(":aria-label=\"item.unread ? t('common.label.notificationsUnreadMessages') : item.label\"")
+    expect(layout).toContain("<span v-if=\"item.unread\" class=\"sr-only\">{{ t('common.label.unreadNotifications') }}</span>")
     expect(page).toContain("<component :is=\"NotificationCenter\" />")
     expect(center).toContain('markAllRead(items.value[0]?.id)')
     expect(center).toContain("scope: 'Inbox'")
@@ -68,7 +68,7 @@ describe('competition announcement access', () => {
     ).text()
 
     expect(page).toContain('canJudge')
-    expect(page).toContain("adminCreateCompetitionAnnouncement({")
+    expect(page).toMatch(/api\.api\.v1\.admin\.competitions\.byCompetitionId\([^)]*\)\.announcements\.post\(/)
     expect(page).toContain("('Participants')")
     expect(endpoint).toContain('authorizer.CanJudgeAsync(')
   })

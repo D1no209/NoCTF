@@ -7,13 +7,13 @@ const { Compass, isActive, groups } = toRefs(viewProps.state)
 </script>
 
 <template>
-  <Card as="nav" size="sm" class="gap-0 py-0" :aria-label="$t('ui.competitionNavigation')">
+  <Card as="nav" size="sm" class="gap-0 py-0" :aria-label="$t('competitions.label.competitionNavigation')">
     <CardHeader class="flex flex-row items-center gap-2 px-4 py-3">
       <Compass class="size-4 text-primary" aria-hidden="true" />
-      <CardTitle>{{ $t('ui.competitionNavigation') }}</CardTitle>
+      <CardTitle>{{ $t('competitions.label.competitionNavigation') }}</CardTitle>
     </CardHeader>
 
-    <ScrollSurface axis="y" class="min-h-0 flex-1" :aria-label="$t('ui.competitionNavigation')">
+    <ScrollSurface axis="y" class="min-h-0 flex-1" :aria-label="$t('competitions.label.competitionNavigation')">
     <CardContent class="flex flex-col gap-4 px-3 pb-3">
       <section v-for="(group, groupIndex) in groups" :key="group.label ?? groupIndex" class="flex flex-col gap-2">
         <h3 v-if="group.label" class="px-1 text-[0.6875rem] font-medium uppercase tracking-[0.14em] text-muted-foreground">
@@ -22,7 +22,7 @@ const { Compass, isActive, groups } = toRefs(viewProps.state)
         <div class="grid grid-cols-2 gap-2">
           <NuxtLink
             v-for="item in group.items"
-            :key="item.to"
+            :key="item.to ?? undefined"
             :to="item.to"
             class="flex min-h-10 items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition-colors focus-visible:outline-none"
             :class="isActive(item)

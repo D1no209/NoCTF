@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { nextTick, ref, useId, watch } from 'vue'
 import { constraintFeedback } from './validation'
-import { currentLocale, translate } from '~/utils/i18n'
+import { currentLocale, translate } from '../../../utils/i18n'
 
 defineOptions({ inheritAttrs: false })
 const props = withDefaults(defineProps<{ validation?: 'constraints' | 'feature' }>(), { validation: 'constraints' })

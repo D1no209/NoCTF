@@ -1,11 +1,18 @@
+import { dateObject } from '../../utils/date-value'
+
+import { api, multipartBody } from '../../lib/api'
+
+
+import { message as describeMessage } from '../../utils/i18n'
+import type { UiMessage } from '../../utils/i18n'
 import { toRefs } from 'vue'
-import { toast } from 'vue-sonner'
-import { adminCompetitionPosterReplace, adminCreateCompetition } from '../../api'
-import type { NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsCompetitionsGameModeProtocol } from '../../api'
+import { toast } from '../../utils/message-toast'
+
+import type { NoCTFAPIEndpointsCompetitionsCompetitionResponse, NoCTFAPIEndpointsCompetitionsGameModeProtocol } from '../../api/models'
 
 type Events = {
   'update:open': [value: boolean]
-  created: [competition: NoCtfapiEndpointsCompetitionsCompetitionResponse]
+  created: [competition: NoCTFAPIEndpointsCompetitionsCompetitionResponse]
 }
 
 /** Owns the create-competition draft and commands used by the competition browser dialog. */
@@ -16,7 +23,7 @@ export function useCreateCompetitionDialog(
   const { canOrganize } = useAuth()
   const title = ref('')
   const description = ref('')
-  const mode = ref<NoCtfapiEndpointsCompetitionsGameModeProtocol>('Ctf')
+  const mode = ref<NoCTFAPIEndpointsCompetitionsGameModeProtocol>('Ctf')
   const startTime = ref('')
   const endTime = ref('')
   const teamRegistrationAutoApprove = ref(false)
@@ -29,15 +36,15 @@ export function useCreateCompetitionDialog(
   const practiceModeEnabled = ref(false)
   const staffOnly = ref(false)
   const posterFile = ref<File | null>(null)
-  const posterError = ref<string | null>(null)
+  const posterError = ref<UiMessage | null>(null)
   const posterInputKey = ref(0)
-  const createdCompetition = ref<NoCtfapiEndpointsCompetitionsCompetitionResponse | null>(null)
-  const error = ref<string | null>(null)
+  const createdCompetition = ref<NoCTFAPIEndpointsCompetitionsCompetitionResponse | null>(null)
+  const error = ref<UiMessage | null>(null)
   const pending = ref(false)
   let resetBeforeNextOpen = false
 
   const submitLabel = computed(() => {
-    if (!createdCompetition.value) return translate('ui.createContest')
+    if (!createdCompetition.value) return translate('competitions.label.createContest')
     return posterFile.value
       ? translate('createCompetition.retryPosterUpload')
       : translate('createCompetition.finishCreation')
@@ -69,7 +76,7 @@ export function useCreateCompetitionDialog(
     const competition = createdCompetition.value
     if (!competition) return
     createdCompetition.value = null
-    toast.success(translate('ui.contestCreated'))
+    toast.success(describeMessage('common.label.contestCreated'))
     emit('created', competition)
   }
 
@@ -93,7 +100,7 @@ export function useCreateCompetitionDialog(
     posterError.value = null
     if (!file) return
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      posterError.value = translate('ui.posterMustBeAJpegPngOrWebpImage')
+      posterError.value = describeMessage('common.createCompetition.validation.posterJpegFormat')
       return
     }
     posterFile.value = file
@@ -102,10 +109,10 @@ export function useCreateCompetitionDialog(
   function posterUploadError(requestError: unknown): string {
     const parsed = parseApiError(requestError)
     const message = parsed.code === 'UploadTooLarge'
-      ? translate('ui.theUploadedFileIsTooLarge')
+      ? translate('common.error.uploadTooLarge')
       : ['SizeInvalid', 'SourceMetadataMismatch', 'UnsupportedFormat', 'InvalidDimensions', 'PixelLimitExceeded', 'MultipleFrames', 'MalformedImage'].includes(parsed.code ?? '')
-        ? translate('ui.posterMustBeAJpegPngOrWebpImage')
-        : parsed.message
+        ? translate('common.createCompetition.validation.posterJpegFormat')
+        : parsed.displayMessage
     return translate('createCompetition.posterUploadFailed', { message })
   }
 
@@ -116,26 +123,26 @@ export function useCreateCompetitionDialog(
     try {
       if (!createdCompetition.value) {
         if (!title.value.trim()) {
-          error.value = translate('ui.pleaseEnterAContestTitle')
+          error.value = describeMessage('competitions.createCompetition.label.enterContestTitle')
           return
         }
         const start = localInputToIso(startTime.value)
         const end = localInputToIso(endTime.value)
         if (!start || !end) {
-          error.value = translate('ui.pleaseSelectStartAndEndTime')
+          error.value = describeMessage('competitions.createCompetition.description.selectStartEndTime')
           return
         }
         if (new Date(start) >= new Date(end)) {
-          error.value = translate('ui.startTimeMustBeEarlierThanEndTime')
+          error.value = describeMessage('competitions.createCompetition.validation.startTimeFormat')
           return
         }
-        const { data, error: requestError } = await adminCreateCompetition({
-          body: {
+        let requestError: unknown;
+        const data = await api.api.v1.admin.competitions.post({
             title: title.value.trim(),
             description: description.value.trim() || null,
             mode: mode.value,
-            startTime: start,
-            endTime: end,
+            startTime: dateObject(start ?? undefined),
+            endTime: dateObject(end ?? undefined),
             teamRegistrationAutoApprove: teamRegistrationAutoApprove.value,
             allowTeamRegistrationWhileRunning: allowTeamRegistrationWhileRunning.value,
             maxTeamMembers: maxTeamMembers.value,
@@ -145,17 +152,14 @@ export function useCreateCompetitionDialog(
             allowChallengeOwnersToHandleQuestions: allowChallengeOwnersToHandleQuestions.value,
             practiceModeEnabled: mode.value === 'Ctf' && practiceModeEnabled.value,
             accessMode: staffOnly.value ? 'StaffOnly' : 'Public',
-          },
-        })
+          }).catch(cause => { requestError = cause; return undefined });
         if (requestError || !data) throw requestError
         createdCompetition.value = data
       }
 
       if (posterFile.value && createdCompetition.value.id) {
-        const { data: uploadedPoster, error: uploadError } = await adminCompetitionPosterReplace({
-          path: { competitionId: createdCompetition.value.id },
-          body: { file: posterFile.value },
-        })
+        let uploadError: unknown;
+        const uploadedPoster = await api.api.v1.admin.competitions.byCompetitionId(createdCompetition.value.id).poster.put(await multipartBody({ file: posterFile.value })).catch(cause => { uploadError = cause; return undefined });
         if (uploadError || !uploadedPoster?.url) {
           error.value = posterUploadError(uploadError)
           return
@@ -171,7 +175,7 @@ export function useCreateCompetitionDialog(
       setOpen(false)
     }
     catch (requestError) {
-      error.value = parseApiError(requestError).message
+      error.value = parseApiError(requestError).displayMessage
     }
     finally {
       pending.value = false

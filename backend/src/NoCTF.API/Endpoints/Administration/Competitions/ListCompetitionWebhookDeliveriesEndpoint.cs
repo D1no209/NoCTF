@@ -65,6 +65,12 @@ public sealed class ListCompetitionWebhookDeliveriesEndpoint(
 {
     public override void Configure()
     {
+        Summary(summary =>
+        {
+            summary.Summary = "Lists delivery attempts and results for competition webhooks.";
+            summary.Description = summary.Summary;
+        });
+
         Get("/admin/competitions/{competitionId}/webhook-deliveries");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("AdminListCompetitionWebhookDeliveries"));

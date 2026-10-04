@@ -25,7 +25,15 @@ public sealed class StartProgressionChallengeValidator
     }
 }
 
-public sealed record ProgressionStartConflict(string Code, string Detail);
+[System.Text.Json.Serialization.JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<ProgressionStartFailureCode>))]
+public enum ProgressionStartFailureCode { GraphChanged }
+
+public sealed record ProgressionStartConflict(ProgressionStartFailureCode Code, string Detail)
+{
+    public string Detail { get; init; } = ApiMessages.Localize(Code, Detail, ApiMessages.NoArguments);
+    public string MessageKey => ApiMessages.For(Code).Key;
+    public IReadOnlyDictionary<string, object?> MessageArguments => ApiMessages.NoArguments;
+}
 
 public sealed class StartProgressionChallengeEndpoint(
     IProgressionChallengeStarter starter, IUserContext user, TimeProvider clock)
@@ -34,6 +42,12 @@ public sealed class StartProgressionChallengeEndpoint(
 {
     public override void Configure()
     {
+        Summary(summary =>
+        {
+            summary.Summary = "Checks progression access and starts the selected competition challenge.";
+            summary.Description = summary.Summary;
+        });
+
         Post("/competitions/{competitionId}/challenges/{competitionChallengeId}/start");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("StartProgressionChallenge"));
@@ -46,7 +60,7 @@ public sealed class StartProgressionChallengeEndpoint(
         {
             StartProgressionChallengeResult.Started => TypedResults.NoContent(),
             StartProgressionChallengeResult.GraphChanged => TypedResults.Conflict(
-                new ProgressionStartConflict("GraphChanged", "Progression rules changed; reload before starting.")),
+                new ProgressionStartConflict(ProgressionStartFailureCode.GraphChanged, "Progression rules changed; reload before starting.")),
             _ => TypedResults.NotFound()
         };
 }

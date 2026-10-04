@@ -25,7 +25,7 @@ public sealed class UpdateCheatIncidentStatusValidator
             .Must(status => status is CheatIncidentStatusProtocol.Confirmed
                 or CheatIncidentStatusProtocol.Dismissed
                 or CheatIncidentStatusProtocol.Corrected)
-            .WithMessage("Status must be Confirmed, Dismissed or Corrected.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.UpdateCheatIncidentStatusValidationStatusConfirmedDismissedCorrected)).WithErrorCode(ApiMessages.Key(ApiMessageId.UpdateCheatIncidentStatusValidationStatusConfirmedDismissedCorrected));
         RuleFor(request => request.Reason).NotEmpty().MinimumLength(8).MaximumLength(512);
     }
 }
@@ -45,7 +45,7 @@ public sealed class UpdateCheatIncidentStatusEndpoint(
         Description(builder => builder
             .WithName("AdminUpdateCheatIncidentStatus")
             .ProducesProblemFE(StatusCodes.Status409Conflict));
-        Summary(summary => summary.Summary = "Updates a cheat incident status.");
+        Summary(summary => { summary.Summary = "Updates a cheat incident status."; summary.Description = summary.Summary; });
     }
 
     public override async Task<
@@ -100,10 +100,10 @@ internal static class CheatIncidentResolutionHttpResults
             or CheatIncidentResolutionFailure.TeamNotBanned
                 ? StatusCodes.Status409Conflict
                 : StatusCodes.Status400BadRequest;
-        return TypedResults.Problem(
+        return ApiProblems.Problem(
             statusCode: statusCode,
-            title: title,
-            detail: result.Failure.ToString(),
+            title: ApiMessages.For(result.Failure),
+            detail: ApiMessages.For(result.Failure),
             extensions: new Dictionary<string, object?>
             {
                 ["code"] = result.Failure.ToString()

@@ -10,7 +10,7 @@ const { ArrowUpRight, ChevronLeft, ChevronRight, Plus, RefreshCw, loading, error
     <CardHeader class="flex shrink-0 flex-row items-center justify-between gap-3">
       <CardTitle>{{ $t('placements.title') }}</CardTitle>
       <Button type="button" variant="outline" size="sm" :disabled="loading || adding" @click="load">
-        <RefreshCw data-icon="inline-start" />{{ $t('ui.refreshStatus') }}
+        <RefreshCw data-icon="inline-start" />{{ $t('runtime.label.refreshStatus') }}
       </Button>
     </CardHeader>
     <ScrollSurface axis="y" class="min-h-0 flex-1 overflow-y-auto overscroll-contain">
@@ -21,7 +21,7 @@ const { ArrowUpRight, ChevronLeft, ChevronRight, Plus, RefreshCw, loading, error
           <section :aria-label="$t('placements.linked')">
             <div class="mb-3 flex items-center gap-2"><h3 class="text-sm font-semibold">{{ $t('placements.linked') }}</h3><Badge variant="secondary">{{ linked.length }}</Badge></div>
             <div v-if="linkedOptions.length" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              <Button v-for="item in linkedOptions" :key="item.value" as-child variant="ghost" class="h-auto min-w-0 overflow-hidden p-0">
+              <Button v-for="item in linkedOptions" :key="item.value ?? undefined" as-child variant="ghost" class="h-auto min-w-0 overflow-hidden p-0">
                 <NuxtLink :to="item.href" :aria-label="$t('placements.manageChallenge', { competition: item.label })" class="block w-full">
                   <CoverImage :src="item.posterUrl" :alt="item.label" :aspect-ratio="12 / 5" class="w-full">
                     <div class="flex min-h-full items-end justify-between gap-2 p-4">
@@ -42,7 +42,7 @@ const { ArrowUpRight, ChevronLeft, ChevronRight, Plus, RefreshCw, loading, error
                 <Button type="button" variant="ghost" size="icon" :aria-label="$t('placements.previous')" :disabled="adding || targetIndex <= 0" @click="previousTarget"><ChevronLeft aria-hidden="true" /></Button>
                 <section class="min-w-0 overflow-hidden rounded-md" :aria-label="$t('placements.posterPreview')">
                   <MotionSwap :identity="preview?.competition.id ?? ''" :preset="previewMotion">
-                    <CoverImage v-if="preview" :src="previewPosterUrl" :alt="preview.competition.title ?? $t('ui.competitionPoster')" :aspect-ratio="16 / 7">
+                    <CoverImage v-if="preview" :src="previewPosterUrl" :alt="preview.competition.title ?? $t('common.label.competitionPoster')" :aspect-ratio="16 / 7">
                       <div class="flex min-h-full flex-col justify-end gap-2 p-5">
                         <h3 class="text-left text-lg font-semibold">{{ preview.competition.title }}</h3>
                       </div>
@@ -64,7 +64,7 @@ const { ArrowUpRight, ChevronLeft, ChevronRight, Plus, RefreshCw, loading, error
                   <FieldLabel for="placement-competition">{{ $t('placements.chooseCompetition') }}</FieldLabel>
                   <Select :model-value="targetId" :disabled="adding" @update:model-value="selectTarget">
                     <SelectTrigger id="placement-competition" class="w-full"><SelectValue :placeholder="$t('placements.chooseCompetition')" /></SelectTrigger>
-                    <SelectContent><SelectGroup><SelectItem v-for="candidate in candidates" :key="candidate.competition.id" :value="candidate.competition.id">{{ candidate.competition.title }}</SelectItem></SelectGroup></SelectContent>
+                    <SelectContent><SelectGroup><SelectItem v-for="candidate in candidates" :key="candidate.competition.id ?? undefined" :value="candidate.competition.id">{{ candidate.competition.title }}</SelectItem></SelectGroup></SelectContent>
                   </Select>
                 </Field>
                 <span class="pb-2 font-mono text-xs tabular-nums text-muted-foreground">{{ targetIndex + 1 }} / {{ candidates.length }}</span>

@@ -1,7 +1,11 @@
+import { dateObject } from '../../../../../utils/date-value'
+
+import { api, nativeResponse } from '../../../../../lib/api'
+import { message as describeMessage } from '../../../../../utils/i18n'
 
 
-import { toast } from 'vue-sonner'
-import { adminExportCompetitionArchive, adminExportCompetitionEvents } from '../../../../../api'
+import { toast } from '../../../../../utils/message-toast'
+
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
 import { downloadSdkFile } from '../../../../../utils/download'
 import { userFacingErrorMessage } from '../../../../../utils/api-error'
@@ -20,23 +24,19 @@ export function useAdminCompetitionsByIdExportsPage() {
     const from = localInputToIso(eventsFrom.value)
     const to = localInputToIso(eventsTo.value)
     if (!from || !to) {
-      toast.error(translate("ui.pleaseSelectTheExportTimeRange"))
+      toast.error(describeMessage("administration.competitionsBy.description.selectExportTimeRange"))
       return
     }
     exportingEvents.value = true
     try {
       await downloadSdkFile(
-        adminExportCompetitionEvents({
-          path: { competitionId },
-          query: { from, to },
-          parseAs: 'blob',
-        }),
+        nativeResponse(responseOptions => api.api.v1.admin.competitions.byCompetitionId(competitionId).events.exportEscaped.get({ queryParameters: { from: dateObject(from ?? undefined), to: dateObject(to ?? undefined) }, options: [...responseOptions] })),
         `competition-${competitionId}-events.jsonl`,
       )
-      toast.success(translate("ui.eventExportHasStartedDownloading"))
+      toast.success(describeMessage("administration.competitionsBy.label.eventExportStartedDownloading"))
     }
     catch (e) {
-      toast.error(userFacingErrorMessage(e instanceof Error ? e.message : null, translate("ui.exportFailed")))
+      toast.error(userFacingErrorMessage(e instanceof Error ? e.message : null, translate("administration.error.exportFailed")))
     }
     finally {
       exportingEvents.value = false
@@ -53,27 +53,23 @@ export function useAdminCompetitionsByIdExportsPage() {
     if (exportingArchive.value) return
     const reason = exportReason.value.trim()
     if (includeProtectedFlags.value && (reason.length < 8 || reason.length > 512)) {
-      toast.error(translate("ui.enterAnExportReasonOf8512CharactersWhenIncluding"))
+      toast.error(describeMessage("administration.competitionsBy.description.enterExportReasonCharacters"))
       return
     }
     exportingArchive.value = true
     try {
       await downloadSdkFile(
-        adminExportCompetitionArchive({
-          path: { competitionId },
-          body: {
+        nativeResponse(responseOptions => api.api.v1.admin.competitions.byCompetitionId(competitionId).dataExport.post({
             includeProtectedFlags: includeProtectedFlags.value,
             reason: reason || null,
-          },
-          parseAs: 'blob',
-        }),
+          }, { options: [...responseOptions] })),
         `competition-${competitionId}-archive.zip`,
       )
-      toast.success(translate("ui.theCompetitionArchiveDownloadHasStarted"))
+      toast.success(describeMessage("administration.competitionsBy.description.competitionArchiveDownloadStarted"))
       exportReason.value = ''
     }
     catch (e) {
-      toast.error(parseApiError(e).message)
+      toast.error(parseApiError(e).displayMessage)
     }
     finally {
       exportingArchive.value = false

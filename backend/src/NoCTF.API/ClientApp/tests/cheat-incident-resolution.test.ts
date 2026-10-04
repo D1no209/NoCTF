@@ -209,7 +209,7 @@ describe('cheat incident page wiring', () => {
     expect(page).toContain("@click=\"openAction('confirm')\"")
     expect(page).toContain('@click="handleResolutionSubmit"')
     expect(page).not.toMatch(/<AlertDialogAction[\s\S]*?@click="handleResolutionSubmit"/)
-    expect(page).toContain("ui.theReasonMustBeAtLeast8CharactersMoreRequired")
+    expect(page).toContain("administration.competitionsBy.validation.reasonLeastRequired")
     expect(page).toContain('await openDetail(request.gameplayFactId)')
     expect(page).toContain('await refreshLatest()')
     expect(page).toContain('watchCompetition(competitionId')

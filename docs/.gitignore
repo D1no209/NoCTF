@@ -1,0 +1,6 @@
+# Dependencies and VitePress generated output. Keep bun.lock in version control.
+node_modules/
+.vitepress/cache/
+.vitepress/dist/
+.vitepress/.temp/
+*.tsbuildinfo

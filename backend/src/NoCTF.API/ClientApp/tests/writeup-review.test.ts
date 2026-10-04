@@ -13,8 +13,8 @@ test('participant WriteUp flow uses generated PDF upload preview and download op
     '../app/features/routes/competitions/useCompetitionsByIdPage.ts',
   ).text()
 
-  expect(controller).toContain('replaceMyTeamWriteUp')
-  expect(controller).toContain('downloadMyTeamWriteUp')
+  expect(controller).toMatch(/api\.api\.v1\.competitions\.byCompetitionId\([^)]*\)\.teams\.me\.writeup\.put\(/)
+  expect(controller).toMatch(/api\.api\.v1\.competitions\.byCompetitionId\([^)]*\)\.teams\.me\.writeup\.content\.get\(/)
   expect(controller).toContain("!== '%PDF-'")
   expect(view).toContain('accept="application/pdf,.pdf"')
   expect(view).toContain('<PdfPreview')
@@ -35,13 +35,13 @@ test('staff review combines the shared sidebar and built-in PDF renderer with au
     '../app/components/views/page/competitions/CompetitionsByIdPageView.vue',
   ).text()
 
-  expect(controller).toContain('listTeamWriteUps')
-  expect(controller).toContain('issueTeamWriteUpPreview')
+  expect(controller).toMatch(/api\.api\.v1\.competitions\.byCompetitionId\([^)]*\)\.writeups\.get\(/)
+  expect(controller).toMatch(/api\.api\.v1\.competitions\.byCompetitionId\([^)]*\)\.teams\.byTeamId\([^)]*\)\.writeup\.preview\.post\(/)
   expect(controller).toContain('previewUrl.value = data.previewUrl')
   expect(controller).not.toContain('readProtectedDownload')
   expect(controller).not.toContain('URL.createObjectURL')
   expect(controller).not.toContain('URL.revokeObjectURL')
-  expect(controller).toContain('adminCreateManualAdjustment')
+  expect(controller).toMatch(/api\.api\.v1\.admin\.competitions\.byCompetitionId\([^)]*\)\.gameplayFacts\.manualAdjustments\.post\(/)
   expect(controller).toContain('if (await adjustScore(-points)) deduction.value = null')
   expect(controller).toContain('usePolling(observeAdjustment')
   expect(controller).toContain('polling: adjustmentRefreshing')
@@ -96,7 +96,7 @@ test('WriteUp reviewers can start a team consultation and continue in the existi
     '../app/features/routes/competitions/[id]/useCompetitionsByIdWriteUpsPage.ts',
   ).text()
 
-  expect(controller).toContain('createTeamWriteUpConsultation')
+  expect(controller).toMatch(/api\.api\.v1\.competitions\.byCompetitionId\([^)]*\)\.teams\.byTeamId\([^)]*\)\.writeup\.consultations\.post\(/)
   expect(controller).toContain("path: `/competitions/${competitionId}/questions`")
   expect(controller).toContain('query: { question: data.threadRootId }')
 })

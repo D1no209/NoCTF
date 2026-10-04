@@ -69,7 +69,7 @@ public sealed class GetScoreboardSlotDetailEndpoint(
     {
         Get("/competitions/{competitionId}/leaderboard/teams/{teamId}/columns/{columnIndex}");
         AllowAnonymous();
-        Summary(summary => summary.Summary = "Get one sparse scoreboard slot with signed cursor pagination.");
+        Summary(summary => { summary.Summary = "Get one sparse scoreboard slot with signed cursor pagination."; summary.Description = summary.Summary; });
     }
 
     public override async Task<Results<Ok<ScoreboardSlotDetailResponse>, Accepted<LeaderboardProcessingProtocolResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(
@@ -140,9 +140,9 @@ public sealed class GetScoreboardSlotDetailEndpoint(
             dataAsOf.UtcTicks);
         if (!cursors.TryDecode(request.Cursor, CursorEndpoint, scope, out var position))
         {
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
-                title: "Invalid cursor.");
+                title: ApiMessages.Get(ApiMessageId.InvalidCursor));
         }
 
         var round = column.RoundId is Guid roundId

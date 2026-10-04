@@ -51,7 +51,7 @@ public sealed class PatchChallengeTemplateValidator
     {
         RuleFor(request => request)
             .Must(request => request.Content is not null || request.Permissions is not null)
-            .WithMessage("At least one challenge-template section is required.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.PatchChallengeTemplateValidationLeastOneChallengeTemplate)).WithErrorCode(ApiMessages.Key(ApiMessageId.PatchChallengeTemplateValidationLeastOneChallengeTemplate));
         RuleFor(request => request.Content!.Mode).IsInEnum()
             .When(request => request.Content is not null);
         RuleFor(request => request.Content!.Visibility).IsInEnum()
@@ -67,7 +67,7 @@ public sealed class PatchChallengeTemplateValidator
                 ChallengeDefinitionContractMapper.HasValidShape(definition)
                 && definition!.Mode == request.Content!.Mode)
             .When(request => request.Content is not null)
-            .WithMessage("Definition must contain exactly the branch matching the challenge mode.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.CreateChallengeTemplateValidationDefinitionContainExactlyBranch)).WithErrorCode(ApiMessages.Key(ApiMessageId.CreateChallengeTemplateValidationDefinitionContainExactlyBranch));
         RuleFor(request => request.Permissions!.OwnerId).NotEmpty()
             .When(request => request.Permissions is not null);
         RuleFor(request => request.Permissions!.ManagerIds).NotNull()
@@ -144,7 +144,7 @@ public sealed class PatchChallengeTemplateEndpoint(
         Patch("/admin/challenges/{challengeId}");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("AdminChallengeBankPatchTemplate"));
-        Summary(summary => summary.Summary = "Updates selected challenge-template aggregate sections.");
+        Summary(summary => { summary.Summary = "Updates selected challenge-template aggregate sections."; summary.Description = summary.Summary; });
     }
 
     public override async Task<Results<Ok<ChallengeTemplateResponse>, NotFound,
@@ -195,10 +195,10 @@ public sealed class PatchChallengeTemplateEndpoint(
             && target.OwnerId != current.OwnerId
             && !target.ManagerIds.Contains(current.OwnerId))
         {
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: StatusCodes.Status409Conflict,
-                title: "Challenge template permissions are invalid.",
-                detail: "The previous owner must remain in ManagerIds when ownership changes.");
+                title: ApiMessages.Get(ApiMessageId.PatchChallengeTemplateTitleChallengeTemplatePermissionsInvalid),
+                detail: ApiMessages.Get(ApiMessageId.PatchChallengeTemplateDetailPreviousOwnerRemainManagerids));
         }
 
         return await atomicPatch.ExecuteAsync(ApplyAsync, ct);
@@ -297,7 +297,7 @@ public sealed class PatchChallengeTemplateEndpoint(
                 TypedResults.Conflict(ChallengeTemplateWriteResponseMapper.ToConflict(result)),
             ChallengeTemplateWriteState.InvalidRequest
                 or ChallengeTemplateWriteState.InvalidDefinition =>
-                TypedResults.Problem(ApiValidationProblemFactory.Create(
+                ApiProblems.Problem(ApiValidationProblemFactory.Create(
                     [
                         new ValidationFailure(
                             result.State == ChallengeTemplateWriteState.InvalidDefinition
@@ -306,10 +306,10 @@ public sealed class PatchChallengeTemplateEndpoint(
                             result.Detail ?? "Challenge template update is invalid.")
                     ],
                     StatusCodes.Status400BadRequest)),
-            _ => TypedResults.Problem(
+            _ => ApiProblems.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
-                title: "Challenge template was not updated.",
-                detail: result.Detail)
+                title: ApiMessages.Get(ApiMessageId.PatchChallengeTemplateTitleChallengeTemplateWasUpdated),
+                detail: ApiMessages.Get(ApiMessageId.PatchChallengeTemplateTitleChallengeTemplateWasUpdated))
         };
 
     private static ChallengeTemplatePatchSection ResolveSections(

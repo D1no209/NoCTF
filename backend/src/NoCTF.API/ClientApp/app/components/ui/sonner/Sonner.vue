@@ -19,7 +19,7 @@ onBeforeUnmount(() => document.removeEventListener('fullscreenchange', updateTar
 <template>
   <Teleport :to="target">
   <Sonner
-    :container-aria-label="props.containerAriaLabel ?? $t('ui.notifications')"
+    :container-aria-label="props.containerAriaLabel ?? $t('common.label.notifications')"
     :class="cn('toaster group', props.class)"
     :style="{
       '--normal-bg': 'var(--popover)',
@@ -33,7 +33,7 @@ onBeforeUnmount(() => document.removeEventListener('fullscreenchange', updateTar
       '--gray12': 'var(--popover-foreground)',
     }"
     :toast-options="{
-      closeButtonAriaLabel: $t('ui.close'),
+      closeButtonAriaLabel: $t('common.action.close'),
       ...(props.toastOptions ?? { classes: { toast: 'rounded-2xl' } }),
     }"
     v-bind="delegatedProps"

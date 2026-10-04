@@ -1,12 +1,16 @@
+import { dateObject } from '../../../../../utils/date-value'
+
+import { api, RequestPolicyOption } from '../../../../../lib/api'
+import { message as describeMessage } from '../../../../../utils/i18n'
 import { proxyRefs } from 'vue'
 import { useAdminDetailRoute } from '~/features/admin/useAdminDetailRoute'
 import { adminRuntimeTeamPath, adminRuntimeChallengePath } from '~/features/admin/admin-navigation'
 import RuntimeFlagsPanelComponent from '~/features/admin/RuntimeFlagsPanel.vue'
 import { markRaw } from 'vue'
 
-import { toast } from 'vue-sonner'
-import { adminCreateRuntimeForceTermination, adminCreateSharedRuntime, adminCreateTeamRuntime, adminExtendTeamRuntime, adminGetRuntime, adminListCompetitionChallenges, adminListRuntimes, adminListTeams, adminTerminateRuntime } from '../../../../../api'
-import type { NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse, NoCtfapiEndpointsRuntimeRuntimeKindProtocol, NoCtfapiEndpointsRuntimeRuntimeStateProtocol } from '../../../../../api'
+import { toast } from '../../../../../utils/message-toast'
+
+import type { NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeResponse, NoCTFAPIEndpointsRuntimeRuntimeKindProtocol, NoCTFAPIEndpointsRuntimeRuntimeStateProtocol } from '../../../../../api/models'
 import { useOffsetPagination } from '../../../../../composables/useOffsetPagination'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
 import { createTrailingRefresh } from '../../../../../lib/latest-page-refresh'
@@ -27,7 +31,7 @@ export function useAdminCompetitionsByIdRuntimesPage() {
   const teamOptions = ref<{ id: string; name: string }[]>([])
 
   const runtimeTeamLabel = (
-    runtime: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse | null | undefined,
+    runtime: NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeResponse | null | undefined,
   ) => runtime
     ? adminRuntimeTeamLabel(
         runtime,
@@ -37,18 +41,21 @@ export function useAdminCompetitionsByIdRuntimesPage() {
     : '-'
 
   const isPlayerManagedRuntime = (
-    runtime: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse,
+    runtime: NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeResponse,
   ) => runtime.purpose !== 'AwdpTarget'
 
   const challengeTitle = (id?: string | null) => challengeOptions.value.find(c => c.id === id)?.title ?? id ?? '-'
 
   async function loadRefs() {
-    const [challenges, teams] = await Promise.all([
-      adminListCompetitionChallenges({ path: { competitionId }, query: { includeDeleted: false } }),
-      adminListTeams({ path: { competitionId }, query: { keyword: null, offset: 0, limit: 200, desc: false } }),
-    ])
-    challengeOptions.value = (challenges.data?.items ?? []).map(c => ({ id: c.id!, title: c.title ?? '' }))
-    teamOptions.value = (teams.data?.items ?? []).map(t => ({ id: t.id!, name: t.name ?? '' }))
+    const settledRequests = await Promise.allSettled([
+      api.api.v1.admin.competitions.byCompetitionId(competitionId).challenges.get({ queryParameters: { includeDeleted: false } }),
+      api.api.v1.admin.competitions.byCompetitionId(competitionId).teams.get({ queryParameters: { keyword: undefined, offset: 0, limit: 200, desc: false } }),
+    ]);
+    const challenges = settledRequests[0].status === 'fulfilled' ? settledRequests[0].value : undefined;
+    const teams = settledRequests[1].status === 'fulfilled' ? settledRequests[1].value : undefined;
+
+    challengeOptions.value = (challenges?.items ?? []).map(c => ({ id: c.id!, title: c.title ?? '' }))
+    teamOptions.value = (teams?.items ?? []).map(t => ({ id: t.id!, name: t.name ?? '' }))
   }
 
   const filterChallenge = ref('')
@@ -61,20 +68,18 @@ export function useAdminCompetitionsByIdRuntimesPage() {
 
   const appliedFilters = ref({ challengeId: '', teamId: '', state: '', kind: '' })
 
-  const pagination = useOffsetPagination<NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse>(async ({ offset, limit, desc }) => {
+  const pagination = useOffsetPagination<NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeResponse>(async ({ offset, limit, desc }) => {
     const filters = appliedFilters.value
-    const { data, error } = await adminListRuntimes({
-      path: { competitionId },
-      query: {
-        competitionChallengeId: filters.challengeId || null,
-        teamId: filters.teamId || null,
-        state: filters.state === '' ? null : filters.state as NoCtfapiEndpointsRuntimeRuntimeStateProtocol,
-        runtimeKind: filters.kind === '' ? null : filters.kind as NoCtfapiEndpointsRuntimeRuntimeKindProtocol,
+    let error: unknown;
+    const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).runtimes.get({ queryParameters: {
+        competitionChallengeId: filters.challengeId || undefined,
+        teamId: filters.teamId || undefined,
+        state: filters.state === '' ? undefined : filters.state as NoCTFAPIEndpointsRuntimeRuntimeStateProtocol,
+        runtimeKind: filters.kind === '' ? undefined : filters.kind as NoCTFAPIEndpointsRuntimeRuntimeKindProtocol,
         offset,
         limit,
         desc,
-      },
-    })
+      } }).catch(cause => { error = cause; return undefined });
     if (error || !data) throw parseApiError(error)
     return { items: data.items ?? [], total: data.total ?? 0 }
   }, { initialPageSize: 10, initialDesc: true })
@@ -97,15 +102,16 @@ export function useAdminCompetitionsByIdRuntimesPage() {
     return refreshRuntimeList()
   }
 
-  const selection = useAdminDetailRoute<NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse>('runtimeId', `/admin/competitions/${competitionId}/runtimes`, async (runtimeInstanceId, signal) => {
-    const { data, error } = await adminGetRuntime({ path: { runtimeInstanceId }, signal })
+  const selection = useAdminDetailRoute<NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeResponse>('runtimeId', `/admin/competitions/${competitionId}/runtimes`, async (runtimeInstanceId, signal) => {
+    let error: unknown;
+    const data = await api.api.v1.admin.runtimes.byRuntimeInstanceId(runtimeInstanceId).get({ options: [new RequestPolicyOption({ signal: signal })] }).catch(cause => { error = cause; return undefined });
     if (error || !data) throw error ?? new Error(translate('adminNavigation.notFound'))
     if (data.competitionId !== competitionId) throw new Error(translate('adminNavigation.notFound'))
     return data
   })
   const { data: detail, open: detailOpen, loading: detailLoading, error: detailError } = selection
   const RuntimeFlagsPanel = markRaw(RuntimeFlagsPanelComponent)
-  async function openDetail(id?: string) {
+  async function openDetail(id?: string | null) {
     if (id) await selection.select(id)
   }
 
@@ -119,17 +125,17 @@ export function useAdminCompetitionsByIdRuntimesPage() {
 
   const opMessage = ref<string | null>(null)
 
-  function runtimeOperationKey(rt: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse | null): string | null {
+  function runtimeOperationKey(rt: NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeResponse | null): string | null {
     return rt?.id ?? null
   }
 
-  function isRuntimePending(rt: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse | null): boolean {
+  function isRuntimePending(rt: NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeResponse | null): boolean {
     const key = runtimeOperationKey(rt)
     return key !== null && runtimeOperations.pending.has(key)
   }
 
   function isRuntimeOperationPending(
-    rt: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse | null,
+    rt: NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeResponse | null,
     operation: RuntimeOperationKind,
   ): boolean {
     const key = runtimeOperationKey(rt)
@@ -137,7 +143,7 @@ export function useAdminCompetitionsByIdRuntimesPage() {
   }
 
   function beginRuntimeOperation(
-    rt: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse,
+    rt: NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeResponse,
     operation: RuntimeOperationKind,
   ): RuntimeOperationToken | null {
     const key = runtimeOperationKey(rt)
@@ -160,10 +166,8 @@ export function useAdminCompetitionsByIdRuntimesPage() {
     done: (state?: string | null) => boolean,
   ): void {
     void runtimeOperations.poll(token, async (signal) => {
-      const { data, error } = await adminGetRuntime({
-        path: { runtimeInstanceId },
-        signal,
-      })
+      let error: unknown;
+      const data = await api.api.v1.admin.runtimes.byRuntimeInstanceId(runtimeInstanceId).get({ options: [new RequestPolicyOption({ signal: signal })] }).catch(cause => { error = cause; return undefined });
       if (error || !data) return false
 
       if (detailOpen.value && detail.value?.id === data.id)
@@ -172,14 +176,14 @@ export function useAdminCompetitionsByIdRuntimesPage() {
       return done(data.state)
     }).then((result) => {
       if (result === 'exhausted')
-        opMessage.value = translate("ui.theRequestWasAcceptedStatusUpdatesAreTakingLongerThan")
+        opMessage.value = translate("runtime.competitionsBy.description.wasAcceptedStatusUpdates")
     }).finally(() => {
       runtimeOperations.finish(token)
     })
   }
 
   async function runRuntimeOp(
-    rt: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse,
+    rt: NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeResponse,
     op: 'start' | 'reset',
   ) {
     if (!rt.id || !rt.competitionChallengeId) return
@@ -189,13 +193,14 @@ export function useAdminCompetitionsByIdRuntimesPage() {
       const ccPath = { competitionId, competitionChallengeId: rt.competitionChallengeId }
       const teamPath = { ...ccPath, teamId: rt.teamId ?? '' }
       const body = { replacesRuntimeId: op === 'reset' ? rt.id : null }
-      const { data, error } = rt.teamId
-        ? await adminCreateTeamRuntime({ path: teamPath, body })
-        : await adminCreateSharedRuntime({ path: ccPath, body })
+      let error: unknown;
+      const data = await (rt.teamId
+        ? api.api.v1.admin.competitions.byCompetitionId(ccPath.competitionId).teams.byTeamId(teamPath.teamId).challenges.byCompetitionChallengeId(ccPath.competitionChallengeId).runtimes.post(body)
+        : api.api.v1.admin.competitions.byCompetitionId(ccPath.competitionId).challenges.byCompetitionChallengeId(ccPath.competitionChallengeId).runtimes.post(body)).catch(cause => { error = cause; return undefined });
       if (!runtimeOperations.isActive(token)) return
       if (error) throw error
-      const label = op === 'start' ? translate("ui.start") : translate("ui.reset")
-      toast.success(translate("ui.requestAccepted", { action: label }))
+      const label = op === 'start' ? translate("runtime.label.start") : translate("runtime.label.reset")
+      toast.success(describeMessage("runtime.label.accepted", { action: label }))
       void refreshList()
       refreshRuntimeInBackground(token, data?.runtimeInstanceId ?? rt.id, state =>
         op === 'reset' ? state === 'Stopped' : state === 'Running' || state === 'Failed')
@@ -203,15 +208,15 @@ export function useAdminCompetitionsByIdRuntimesPage() {
     catch (e) {
       const shouldNotify = runtimeOperations.isActive(token)
       runtimeOperations.finish(token)
-      if (shouldNotify) toast.error(parseApiError(e).message)
+      if (shouldNotify) toast.error(parseApiError(e).displayMessage)
     }
   }
 
-  const terminateDialog = ref<NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse | null>(null)
+  const terminateDialog = ref<NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeResponse | null>(null)
 
   const terminatePending = computed(() => isRuntimeOperationPending(terminateDialog.value, 'terminate'))
 
-  function canTerminate(rt: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse) {
+  function canTerminate(rt: NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeResponse) {
     return rt.state === 'Queued'
       || rt.state === 'Provisioning'
       || rt.state === 'Running'
@@ -224,13 +229,12 @@ export function useAdminCompetitionsByIdRuntimesPage() {
     const token = beginRuntimeOperation(rt, 'terminate')
     if (!token) return
     try {
-      const { data, error } = await adminTerminateRuntime({
-        path: { runtimeInstanceId: rt.id },
-      })
+      let error: unknown;
+      const data = await api.api.v1.admin.runtimes.byRuntimeInstanceId(rt.id).delete().catch(cause => { error = cause; return undefined });
       if (!runtimeOperations.isActive(token)) return
       if (error) throw error
       markRuntimeStopping(rt.id)
-      toast.success(translate("ui.instanceTerminationOperationHasBeenAccepted"))
+      toast.success(describeMessage("runtime.platformRuntimes.description.instanceTerminationAccepted"))
       terminateDialog.value = null
       void refreshList()
       refreshRuntimeInBackground(token, data?.runtimeInstanceId ?? rt.id, state => state === 'Stopped' || state === 'Failed')
@@ -238,11 +242,11 @@ export function useAdminCompetitionsByIdRuntimesPage() {
     catch (e) {
       const shouldNotify = runtimeOperations.isActive(token)
       runtimeOperations.finish(token)
-      if (shouldNotify) toast.error(parseApiError(e).message)
+      if (shouldNotify) toast.error(parseApiError(e).displayMessage)
     }
   }
 
-  const forceTerminateDialog = ref<NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse | null>(null)
+  const forceTerminateDialog = ref<NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeResponse | null>(null)
 
   const forceTerminateReason = ref('')
 
@@ -250,7 +254,7 @@ export function useAdminCompetitionsByIdRuntimesPage() {
 
   const forceTerminatePending = computed(() => isRuntimeOperationPending(forceTerminateDialog.value, 'force-terminate'))
 
-  function openForceTermination(rt: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse) {
+  function openForceTermination(rt: NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeResponse) {
     forceTerminateReason.value = ''
     forceTerminateConfirmed.value = false
     forceTerminateDialog.value = rt
@@ -263,16 +267,14 @@ export function useAdminCompetitionsByIdRuntimesPage() {
     const token = beginRuntimeOperation(rt, 'force-terminate')
     if (!token) return
     try {
-      const { data, error } = await adminCreateRuntimeForceTermination({
-        path: { runtimeInstanceId: rt.id },
-        body: {
+      let error: unknown;
+      const data = await api.api.v1.admin.runtimes.byRuntimeInstanceId(rt.id).forceTerminations.post({
           reason,
-        },
-      })
+        }).catch(cause => { error = cause; return undefined });
       if (!runtimeOperations.isActive(token)) return
       if (error) throw error
       markRuntimeStopping(rt.id)
-      toast.success(translate("ui.forcedFinalizationHasBeenHandedOverToRunnerForCleanup"))
+      toast.success(describeMessage("runtime.platformRuntimes.description.forcedFinalizationHandedOver"))
       forceTerminateDialog.value = null
       void refreshList()
       refreshRuntimeInBackground(token, data?.runtimeInstanceId ?? rt.id, state => state === 'Stopped')
@@ -280,11 +282,11 @@ export function useAdminCompetitionsByIdRuntimesPage() {
     catch (e) {
       const shouldNotify = runtimeOperations.isActive(token)
       runtimeOperations.finish(token)
-      if (shouldNotify) toast.error(parseApiError(e).message)
+      if (shouldNotify) toast.error(parseApiError(e).displayMessage)
     }
   }
 
-  const extendDialog = ref<NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse | null>(null)
+  const extendDialog = ref<NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeResponse | null>(null)
 
   const extendSeconds = ref(1800)
 
@@ -292,16 +294,16 @@ export function useAdminCompetitionsByIdRuntimesPage() {
 
   let clockTimer: ReturnType<typeof setInterval> | undefined
 
-  function canExtendRuntime(rt: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse): boolean {
+  function canExtendRuntime(rt: NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeResponse): boolean {
     return rt.state === 'Running' && !!rt.teamId && isPlayerManagedRuntime(rt)
       && isRuntimeExtensionWindowOpen(rt.expiresAt, now.value)
   }
 
-  function renewalHint(rt: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse): string | null {
+  function renewalHint(rt: NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeResponse): string | null {
     if (isRuntimeExtensionTooEarly(rt.expiresAt, now.value))
-      return translate('ui.renewalAvailableInFinalTenMinutes')
+      return translate('runtime.extend.tooEarly')
     return !isRuntimeExtensionWindowOpen(rt.expiresAt, now.value)
-      ? translate('ui.expired') : null
+      ? translate('runtime.label.expired') : null
   }
 
   const extendPending = computed(() => isRuntimeOperationPending(extendDialog.value, 'extend'))
@@ -310,32 +312,25 @@ export function useAdminCompetitionsByIdRuntimesPage() {
     const rt = extendDialog.value
     if (!rt?.id || !rt.teamId || !rt.competitionChallengeId) return
     if (!canExtendRuntime(rt)) {
-      toast.error(renewalHint(rt) ?? translate('ui.renewalFailed'))
+      toast.error(renewalHint(rt) ?? translate('runtime.error.renewalFailed'))
       return
     }
     if (!Number.isInteger(extendSeconds.value) || extendSeconds.value < 60) {
-      toast.error(translate('ui.renewalFailed'))
+      toast.error(describeMessage('runtime.error.renewalFailed'))
       return
     }
     const token = beginRuntimeOperation(rt, 'extend')
     if (!token) return
     try {
-      const { error } = await adminExtendTeamRuntime({
-        path: {
-          competitionId,
-          teamId: rt.teamId,
-          competitionChallengeId: rt.competitionChallengeId,
-          runtimeInstanceId: rt.id,
-        },
-        body: {
-          expiresAt: new Date(
+      let error: unknown;
+      await api.api.v1.admin.competitions.byCompetitionId(competitionId).teams.byTeamId(rt.teamId).challenges.byCompetitionChallengeId(rt.competitionChallengeId).runtimes.byRuntimeInstanceId(rt.id).patch({
+          expiresAt: dateObject(new Date(
             new Date(rt.expiresAt!).getTime() + extendSeconds.value * 1000,
-          ).toISOString(),
-        },
-      })
+          ).toISOString() ?? undefined),
+        }).catch(cause => { error = cause; return undefined });
       if (!runtimeOperations.isActive(token)) return
       if (error) throw error
-      toast.success(translate("ui.renewalOperationHasBeenAccepted"))
+      toast.success(describeMessage("runtime.competitionsBy.label.renewalAccepted"))
       extendDialog.value = null
       void refreshList()
       refreshRuntimeInBackground(token, rt.id, () => true)
@@ -343,7 +338,7 @@ export function useAdminCompetitionsByIdRuntimesPage() {
     catch (e) {
       const shouldNotify = runtimeOperations.isActive(token)
       runtimeOperations.finish(token)
-      if (shouldNotify) toast.error(parseApiError(e).message)
+      if (shouldNotify) toast.error(parseApiError(e).displayMessage)
     }
   }
 

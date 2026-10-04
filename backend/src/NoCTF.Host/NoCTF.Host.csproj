@@ -5,6 +5,7 @@
     <NoWarn>$(NoWarn);NU1608</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="FastEndpoints.OpenApi.Kiota" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
   </ItemGroup>
   <ItemGroup Condition="'$(NoCtfGenerateWolverineHandlers)' == 'true'">

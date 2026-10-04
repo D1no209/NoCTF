@@ -1,10 +1,10 @@
 import { sourceFile } from './support/feature-source'
 import { expect, test } from 'bun:test'
 import { scoreboardTeamAchievements } from '../app/utils/scoreboard'
-import type { NoCtfapiEndpointsCompetitionsScoreboardTeamResponse } from '../app/api'
+import type { NoCTFAPIEndpointsCompetitionsScoreboardTeamResponse } from '../app/api/models'
 
 test('only successful challenge metadata selects solved rows, not scores or truncated slots', () => {
-  const team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse = {
+  const team: NoCTFAPIEndpointsCompetitionsScoreboardTeamResponse = {
     totalScore: 9999,
     slots: [],
     achievements: [{ competitionChallengeId: 'solved', kind: 'Solve', displayName: 'Alice', occurredAt: '2026-09-08T01:00:00Z' }],
@@ -15,7 +15,7 @@ test('only successful challenge metadata selects solved rows, not scores or trun
 })
 
 test('AWDP keeps successful attack and defense attribution outside the displayed round window', () => {
-  const team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse = { achievements: [
+  const team: NoCTFAPIEndpointsCompetitionsScoreboardTeamResponse = { achievements: [
     { competitionChallengeId: 'pwn', kind: 'Defense', displayName: 'Bob', occurredAt: '2026-09-08T02:00:00Z' },
     { competitionChallengeId: 'pwn', kind: 'Attack', displayName: 'Alice', occurredAt: '2026-09-08T01:00:00Z' },
   ] }
@@ -29,7 +29,7 @@ test('team detail scrolls within its opaque dialog and presents solver and time 
   expect(source).toContain('<DialogContent class="flex max-h-[calc(100dvh-2rem)]')
   expect(source).toContain('overflow-y-auto overscroll-contain')
   expect(source).toContain('row.achievements.length > 0')
-  expect(source).toContain("$t('ui.solvedBy')")
-  expect(source).toContain("$t('ui.solvedAt')")
+  expect(source).toContain("$t('leaderboard.label.solved')")
+  expect(source).toContain("$t('leaderboard.label.solved.detailDialogView')")
   expect(source).not.toContain('DialogScrollContent')
 })

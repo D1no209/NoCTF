@@ -13,20 +13,20 @@ const { competitionId, teams, loading, error, teamDisplayNames, initialized, pag
     </Alert>
 
     <div v-if="loading" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <Skeleton v-for="i in 6" :key="i" class="h-24 w-full" />
+      <Skeleton v-for="i in 6" :key="i ?? undefined" class="h-24 w-full" />
     </div>
 
     <Empty v-else-if="!error && !teams.length" class="border py-12">
       <EmptyHeader>
-        <EmptyTitle>{{ $t('ui.thereIsNoRegistrationTeamYet') }}</EmptyTitle>
-        <EmptyDescription>{{ $t('ui.beTheFirstTeamToSignUpToCompete') }}</EmptyDescription>
+        <EmptyTitle>{{ $t('competitions.competitionsBy.description.thereRegistrationTeamYet') }}</EmptyTitle>
+        <EmptyDescription>{{ $t('competitions.competitionsBy.description.firstTeamSignCompete') }}</EmptyDescription>
       </EmptyHeader>
     </Empty>
 
     <div v-else-if="teams.length" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <NuxtLink
         v-for="team in teams"
-        :key="team.id"
+        :key="team.id ?? undefined"
         :to="`/competitions/${competitionId}/teams/${team.id}`"
         prefetch-on="interaction"
       >
@@ -46,7 +46,7 @@ const { competitionId, teams, loading, error, teamDisplayNames, initialized, pag
                     {{ teamRegistrationStatusLabel(team.registrationStatus) }}
                   </Badge>
                   <Badge variant="outline">{{ team.trackName ?? team.trackKey }}</Badge>
-                  <span class="text-xs text-muted-foreground">{{ $t('ui.members2', { count: team.memberIds?.length ?? 0 }) }}</span>
+                  <span class="text-xs text-muted-foreground">{{ $t('competitions.label.members', { count: team.memberIds?.length ?? 0 }) }}</span>
                 </div>
               </div>
             </div>

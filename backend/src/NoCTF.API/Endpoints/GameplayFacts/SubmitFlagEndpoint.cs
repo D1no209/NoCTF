@@ -1,5 +1,5 @@
 using FastEndpoints;
-using FastEndpoints.Swagger;
+using FastEndpoints.OpenApi;
 using FluentValidation;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.RateLimiting;
@@ -153,7 +153,12 @@ public enum GameplayFactAdmissionFailureCodeProtocol
 
 public sealed record GameplayFactAdmissionFailureResponse(
     GameplayFactAdmissionFailureCodeProtocol Code,
-    string? Detail);
+    string? Detail)
+{
+    public string Detail { get; init; } = ApiMessages.Localize(Code, Detail, ApiMessages.NoArguments);
+    public string MessageKey => ApiMessages.For(Code).Key;
+    public IReadOnlyDictionary<string, object?> MessageArguments => ApiMessages.NoArguments;
+}
 
 [Mapper(RequiredMappingStrategy = RequiredMappingStrategy.Target)]
 public static partial class GameplayFactMapper
@@ -214,10 +219,10 @@ internal static class GameplayFactProblemDetails
         int status,
         AdmissionFailureCode? code,
         string? detail) =>
-        TypedResults.Problem(
+        ApiProblems.Problem(
             statusCode: status,
-            title: "GameplayFact was not accepted.",
-            detail: detail,
+            title: ApiMessages.Get(ApiMessageId.SubmitFlagTitleGameplayfactWasAccepted),
+            detail: ApiMessages.For(code),
             type: "https://httpstatuses.com/" + status,
             extensions: code is null
                 ? null
@@ -229,6 +234,10 @@ internal static class GameplayFactProblemDetails
 
 public sealed class SubmitFlagRequest
 {
+    /// <summary>One-time verification token; optional when platform policy disables verification. Maximum 4096 characters.</summary>
+    [FromHeader("X-NoCTF-Human-Verification", IsRequired = false, RemoveFromSchema = true)]
+    public string? HumanVerificationToken { get; set; }
+
     public Guid CompetitionId { get; set; }
     public Guid CompetitionChallengeId { get; set; }
     public string? Flag { get; set; }
@@ -241,12 +250,12 @@ public sealed class SubmitFlagRequestValidator : Validator<SubmitFlagRequest>
     {
         RuleFor(request => request)
             .Must(request => request.Flag is not null ^ request.Flags is not null)
-            .WithMessage("Exactly one of flag or flags is required.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.SubmitFlagValidationExactlyOneFlagFlags)).WithErrorCode(ApiMessages.Key(ApiMessageId.SubmitFlagValidationExactlyOneFlagFlags));
         RuleForEach(request => request.Flags)
             .NotNull()
             .SwaggerIgnore();
         RuleFor(request => request.Flags).Must(flags => flags is null || flags.Count <= 128)
-            .WithMessage("每次最多提交 128 个 Flag。");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.SubmitFlagValidationFlag)).WithErrorCode(ApiMessages.Key(ApiMessageId.SubmitFlagValidationFlag));
     }
 }
 
@@ -268,6 +277,10 @@ public sealed class SubmitFlagEndpoint(SubmitFlag submitFlag, IUserContext userC
 {
     public override void Configure()
     {
+        Description(builder => builder
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable));
+
         Post("/competitions/{competitionId}/challenges/{competitionChallengeId}/flag-submissions");
         AuthSchemes("Bearer");
         MaxRequestBodySize(4 * 1024 * 1024);
@@ -280,6 +293,7 @@ public sealed class SubmitFlagEndpoint(SubmitFlag submitFlag, IUserContext userC
             .Produces(StatusCodes.Status429TooManyRequests));
         Summary(summary =>
         {
+            summary.Params["X-NoCTF-Human-Verification"] = "One-time verification token, at most 4096 characters. Required only when the configured platform policy enables verification for this operation.";
             summary.Summary = "Submit one Flag or an ordered AWD Flag collection.";
             summary.Description =
                 "Creates independent immutable attempts, including post-competition CTF practice attempts when enabled. The accepted response is not an evaluation result.";

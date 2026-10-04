@@ -12,7 +12,7 @@ const { ArrowRight, Bell, Mail, selected, selectedId, thread, threadLoading, thr
       <div class="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
         <Bell class="size-4" aria-hidden="true" />
       </div>
-      <h1 class="text-display text-2xl">{{ $t('ui.messageCenter') }}</h1>
+      <h1 class="text-display text-2xl">{{ $t('notifications.label.messageCenter') }}</h1>
     </header>
 
     <div class="notification-center-layout">
@@ -21,15 +21,15 @@ const { ArrowRight, Bell, Mail, selected, selectedId, thread, threadLoading, thr
           :items="notificationOptions"
           :model-value="selectedId"
           :loading="loading && !initialized"
-          :label="$t('ui.notificationList')"
-          :loading-label="$t('ui.notificationList')"
-          :empty-label="$t('ui.noNotificationYet')"
+          :label="$t('notifications.label.notificationList')"
+          :loading-label="$t('notifications.label.notificationList')"
+          :empty-label="$t('notifications.label.notificationYet')"
           controls="notification-center-detail"
           @update:model-value="selectNotification"
         >
           <template #header>
             <header class="pr-10">
-              <h2 class="text-base font-semibold">{{ $t('ui.notificationList') }}</h2>
+              <h2 class="text-base font-semibold">{{ $t('notifications.label.notificationList') }}</h2>
             </header>
           </template>
           <template #feedback>
@@ -51,13 +51,13 @@ const { ArrowRight, Bell, Mail, selected, selectedId, thread, threadLoading, thr
           </template>
           <template #footer>
             <Button v-if="hasMore" variant="outline" class="mr-10 shrink-0" :disabled="loading" @click="loadMore">
-              <Spinner v-if="loading" data-icon="inline-start" /> {{ $t('ui.loadMore') }}
+              <Spinner v-if="loading" data-icon="inline-start" /> {{ $t('common.label.load') }}
             </Button>
           </template>
         </ChoiceSidebar>
       </div>
 
-      <Card id="notification-center-detail" class="notification-detail-card h-full min-h-0 gap-0 py-0" :aria-label="$t('ui.notificationDetails')">
+      <Card id="notification-center-detail" class="notification-detail-card h-full min-h-0 gap-0 py-0" :aria-label="$t('notifications.label.notificationDetails')">
         <MotionSwap :identity="selectedId || ''" preset="film-up">
           <div class="flex h-full min-h-0 flex-col">
             <Alert v-if="routeError" variant="destructive">
@@ -72,24 +72,24 @@ const { ArrowRight, Bell, Mail, selected, selectedId, thread, threadLoading, thr
             <Empty v-else-if="!selected" class="flex-1 py-16">
               <EmptyHeader>
                 <EmptyMedia variant="icon"><Mail /></EmptyMedia>
-                <EmptyTitle>{{ $t('ui.selectAMessageToViewDetails') }}</EmptyTitle>
-                <EmptyDescription>{{ $t('ui.theMessageBodyProcessingEntryAndSubsequentStatusWillBe') }}</EmptyDescription>
+                <EmptyTitle>{{ $t('notifications.notificationCenter.description.selectMessageViewDetails') }}</EmptyTitle>
+                <EmptyDescription>{{ $t('notifications.notificationCenter.description.messageBodyProcessingEntry') }}</EmptyDescription>
               </EmptyHeader>
             </Empty>
 
             <template v-else>
               <header class="flex shrink-0 items-start justify-between gap-4 px-6 py-5">
                 <div class="min-w-0">
-                  <Badge v-if="selected.kind === 'CompetitionAnnouncement'" variant="secondary" class="mb-2">{{ $t('ui.officialAnnouncement') }}</Badge>
+                  <Badge v-if="selected.kind === 'CompetitionAnnouncement'" variant="secondary" class="mb-2">{{ $t('notifications.label.officialAnnouncement') }}</Badge>
                   <h2 class="text-lg font-semibold leading-snug">{{ notificationTitle(selected) }}</h2>
                   <p class="mt-2 font-mono text-xs tabular-nums text-muted-foreground">
-                    {{ $t('ui.publishedBy', { source: sourceLabel(selected), time: formatDateTime(selected.sentAt) }) }}
+                    {{ $t('notifications.label.published', { source: sourceLabel(selected), time: formatDateTime(selected.sentAt) }) }}
                   </p>
                 </div>
-                <Button type="button" variant="ghost" size="sm" class="shrink-0" @click="closeDetail">{{ $t('ui.close') }}</Button>
+                <Button type="button" variant="ghost" size="sm" class="shrink-0" @click="closeDetail">{{ $t('common.action.close') }}</Button>
               </header>
 
-              <ScrollSurface axis="y" class="min-h-0 flex-1" :aria-label="$t('ui.notificationDetails')">
+              <ScrollSurface axis="y" class="min-h-0 flex-1" :aria-label="$t('notifications.label.notificationDetails')">
                 <div class="flex flex-col gap-5 px-6 py-5">
                   <p v-if="notificationBody(selected)" class="max-w-[72ch] text-sm leading-7 whitespace-pre-wrap">
                     {{ notificationBody(selected) }}
@@ -103,15 +103,15 @@ const { ArrowRight, Bell, Mail, selected, selectedId, thread, threadLoading, thr
                   </Button>
 
                   <Separator />
-                  <section :aria-label="$t('ui.followUpRecords')">
-                    <h3 class="mb-3 text-sm font-semibold">{{ $t('ui.followUpRecords') }}</h3>
+                  <section :aria-label="$t('notifications.label.followRecords')">
+                    <h3 class="mb-3 text-sm font-semibold">{{ $t('notifications.label.followRecords') }}</h3>
                     <Skeleton v-if="threadLoading" class="h-28 w-full" />
                     <Alert v-else-if="threadError" variant="destructive">
                       <AlertDescription>{{ $message(threadError) }}</AlertDescription>
                     </Alert>
-                    <p v-else-if="thread.length <= 1" class="text-sm text-muted-foreground">{{ $t('ui.thereHasBeenNoFollowUpReplyOrStatusChange') }}</p>
+                    <p v-else-if="thread.length <= 1" class="text-sm text-muted-foreground">{{ $t('notifications.notificationCenter.description.thereFollowReplyStatus') }}</p>
                     <ol v-else class="flex flex-col gap-4">
-                      <li v-for="entry in thread" :key="entry.id" class="grid grid-cols-[0.5rem_1fr] gap-3">
+                      <li v-for="entry in thread" :key="entry.id ?? undefined" class="grid grid-cols-[0.5rem_1fr] gap-3">
                         <span class="mt-1.5 size-2 rounded-full bg-primary" aria-hidden="true" />
                         <div class="min-w-0">
                           <div class="flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-xs tabular-nums text-muted-foreground">

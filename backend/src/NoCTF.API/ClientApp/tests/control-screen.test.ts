@@ -1,10 +1,10 @@
 import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import type {
-  NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse,
-  NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse,
-  NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse,
-} from '../app/api'
+  NoCTFAPIEndpointsCompetitionsScoreboardChallengeCatalogResponse,
+  NoCTFAPIEndpointsCompetitionsScoreboardSchemaResponse,
+  NoCTFAPIEndpointsCompetitionsScoreboardSnapshotResponse,
+} from '../app/api/models'
 import {
   controlScreenChallenges,
   controlScreenPublicEntries,
@@ -15,7 +15,7 @@ import {
 const competitionId = '00000000-0000-0000-0000-000000000010'
 const webId = '00000000-0000-0000-0000-000000000001'
 const pwnId = '00000000-0000-0000-0000-000000000002'
-const catalog: NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse = {
+const catalog: NoCTFAPIEndpointsCompetitionsScoreboardChallengeCatalogResponse = {
   competitionId,
   revision: 1,
   items: [
@@ -23,7 +23,7 @@ const catalog: NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse =
     { id: pwnId, title: 'pwn-200', direction: 'PWN', category: 'PWN', order: 2, published: true },
   ],
 }
-const schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse = {
+const schema: NoCTFAPIEndpointsCompetitionsScoreboardSchemaResponse = {
   competitionId,
   mode: 'Ctf',
   revision: 1,
@@ -34,7 +34,7 @@ const schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse = {
     { index: 1, competitionChallengeId: pwnId, roundId: null },
   ],
 }
-const snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse = {
+const snapshot: NoCTFAPIEndpointsCompetitionsScoreboardSnapshotResponse = {
   competitionId: 'competition-1',
   version: 1,
   schemaRevision: 1,
@@ -173,10 +173,10 @@ describe('CTF control screen projection', () => {
     expect(page).toContain('const solveFeed = computed(() => allSolves.value.slice(0, 10))')
     expect(page).toContain('for (const solve of allSolves.value)')
     expect(page).toContain('reconcileCelebrations(allSolves.value)')
-    expect(page).toContain("entry.rank ?? $t('ui.symbol')")
+    expect(page).toContain("entry.rank ?? $t('common.label.symbol')")
     expect(page).toContain('scoreboardRankingStateLabel(entry.rankingState)')
     expect(page).not.toContain('rankClass(index + 1)')
-    expect(page).toContain("t('ui.allPublicTracks')")
+    expect(page).toContain("t('competitions.label.publicTracks')")
     expect(page).not.toContain('selectedTrackKey')
     expect(page).toContain("competition.value.mode !== 'Ctf'")
     expect(page).not.toContain('$fetch(')
@@ -184,8 +184,8 @@ describe('CTF control screen projection', () => {
     expect(oldScreenExists).toBe(false)
     expect(shell).not.toContain('/screen')
     expect(shell).toContain("competition.value?.mode === 'Awdp'")
-    expect(shell).toContain("label: translate(\"ui.controlScreen\")")
-    expect(shell).toContain("label: translate(\"ui.3dLiveScreen\")")
+    expect(shell).toContain("label: translate(\"administration.label.controlScreen\")")
+    expect(shell).toContain("label: translate(\"leaderboard.ctf.liveTitle\")")
     expect(scene).toContain('fitLiveCityFrame(this.worldRadius, this.worldHeight,')
     expect(scene).toContain("window.addEventListener('resize', this.resize)")
     expect(scene).toContain("window.removeEventListener('resize', this.resize)")

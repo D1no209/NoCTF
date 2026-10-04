@@ -61,10 +61,10 @@ public sealed class CreateManualAdjustmentEndpoint(
             user.UserId,
             timeProvider.GetUtcNow()), ct);
         if (!result.Succeeded)
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: StatusCodes.Status404NotFound,
-                title: "Manual adjustment was not accepted.",
-                detail: result.ErrorMessage);
+                title: ApiMessages.Get(ApiMessageId.CreateManualAdjustmentTitleManualAdjustmentWasAccepted),
+                detail: ApiMessages.Get(ApiMessageId.CreateManualAdjustmentTitleManualAdjustmentWasAccepted));
         var accepted = result.Value!;
         var statusUrl =
             $"/api/v1/competitions/{competitionId}/gameplay-facts/{accepted.GameplayFactId}";

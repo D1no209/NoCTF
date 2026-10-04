@@ -7,6 +7,6 @@ const emit = defineEmits<{ load: [] }>()
 <template>
   <div v-if="hasMore" class="flex justify-center py-4">
     <Button variant="outline" :disabled="loading" @click="emit('load')">
-      <Spinner v-if="loading" data-icon="inline-start" /> {{ $t('ui.loadMore') }} </Button>
+      <Spinner v-if="loading" data-icon="inline-start" /> {{ $t('common.label.load') }} </Button>
   </div>
 </template>

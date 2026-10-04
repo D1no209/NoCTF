@@ -1,6 +1,6 @@
 import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
-import type { NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse } from '../app/api'
+import type { NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse } from '../app/api/models'
 import {
   competitionBroadcastKinds,
   competitionBroadcastQueryWindow,
@@ -13,9 +13,9 @@ import {
 } from '../app/utils/competition-broadcast'
 
 function event(
-  kind: NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse['kind'],
-  values: Partial<NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse> = {},
-): NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse {
+  kind: NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse['kind'],
+  values: Partial<NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse> = {},
+): NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse {
   return {
     id: 'event-1',
     competitionId: 'competition-1',
@@ -213,7 +213,7 @@ describe('competition broadcast projection', () => {
     expect(panel).not.toContain('<TransitionGroup')
     expect(panel).toContain('v-bind="broadcastMotionAttributes(event)"')
     expect(panel).toContain("motionAttributes('list-enter')")
-    expect(panel).toContain(':key="competitionBroadcastIdentity(event)"')
+    expect(panel).toContain(':key="(competitionBroadcastIdentity(event)) ?? undefined"')
     expect(panel).not.toContain('.broadcast-move')
     expect(panel).toContain('const initialLoad = !initialized.value')
     expect(panel).toContain("now < startAt || status === 'Draft' || status === 'Visible' || status === 'Published'")
@@ -231,16 +231,16 @@ describe('competition administration entry', () => {
       sourceFile(new URL('../app/features/competitions/CompetitionOverview.vue', import.meta.url)).text(),
     ])
 
-    expect(page).toContain('adminListCompetitions({ query: { includeDeleted: true } })')
+    expect(page).toContain('api.api.v1.admin.competitions.get({ queryParameters: { includeDeleted: true } })')
     expect(page).toContain("v-if=\"isAdministrator\"")
     expect(page).toContain('@click="openCreateDialog"')
     expect(page).toContain(':is="CreateCompetitionDialog"')
     expect(page).toContain('@created="handleCompetitionCreated"')
     expect(page).toContain('const { create: _create, ...query } = route.query')
     expect(page).not.toContain('to="/admin/competitions/new"')
-    expect(overview).toContain("$t('ui.manageCompetition')")
-    expect(overview.indexOf("$t('ui.myTeam')")).toBeLessThan(overview.indexOf("$t('ui.manageCompetition')"))
-    expect(page).not.toContain('adminListCheatIncidents')
+    expect(overview).toContain("$t('competitions.label.manageCompetition')")
+    expect(overview.indexOf("$t('competitions.label.myTeam')")).toBeLessThan(overview.indexOf("$t('competitions.label.manageCompetition')"))
+    expect(page).not.toMatch(/api\.api\.v1\.admin\.competitions\.byCompetitionId\([^)]*\)\.cheatIncidents\.get\(/)
     expect(page).not.toContain('probeRole')
   })
 
@@ -252,7 +252,7 @@ describe('competition administration entry', () => {
     expect(dialog).toContain('sm:max-w-3xl')
     expect(dialog).toContain('<FileUpload')
     expect(dialog).toContain('accept="image/jpeg,image/png,image/webp"')
-    expect(dialog).toContain('adminCompetitionPosterReplace({')
+    expect(dialog).toMatch(/api\.api\.v1\.admin\.competitions\.byCompetitionId\([^)]*\)\.poster\.put\(/)
     expect(dialog).toContain('createdCompetition.value = data')
     expect(dialog).toContain('completeCreation()')
     expect(dialog).toContain('<ScrollSurface axis="y"')

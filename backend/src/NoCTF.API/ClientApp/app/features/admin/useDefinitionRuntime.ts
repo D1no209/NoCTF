@@ -14,15 +14,15 @@ export function useDefinitionRuntime(props: Readonly<{
   const showDynamicFlagInjection = computed(() => props.mode === 'Ctf' && !isPatchVerification.value)
   const dynamicFlagInjection = computed(() => props.runtime.flagSource === FlagSource.PerTeam)
   const kindOptions = computed(() => singleServiceOnly.value
-    ? [{ value: 'container', label: translate('ui.runtimeServices') }]
-    : [{ value: 'container', label: translate('ui.runtimeServices') }, { value: 'ova', label: translate('ui.virtualMachine') }])
+    ? [{ value: 'container', label: translate('runtime.label.runtimeServices') }]
+    : [{ value: 'container', label: translate('runtime.label.runtimeServices') }, { value: 'ova', label: translate('runtime.label.virtualMachine') }])
   const exposureOptions = computed(() => props.mode === 'Ctf' || props.mode === 'Awdp'
-    ? [{ value: UrlExposure.OwnerOnly, label: 'ui.onlyVisibleToTheTeamItself' }]
-    : [{ value: UrlExposure.OwnerOnly, label: 'ui.onlyVisibleToTheTeamItself' }, { value: UrlExposure.Participants, label: 'ui.visibleToAllContestants' }])
+    ? [{ value: UrlExposure.OwnerOnly, label: 'runtime.urlBinding.description.visibleTeamItself' }]
+    : [{ value: UrlExposure.OwnerOnly, label: 'runtime.urlBinding.description.visibleTeamItself' }, { value: UrlExposure.Participants, label: 'runtime.label.visibleContestants' }])
   const flagSourceOptions = computed(() => [
-    { value: FlagSource.Static, label: translate('ui.staticFlagTemplatePreset') },
-    { value: FlagSource.PerTeam, label: translate('ui.independentFlagForEachTeam') },
-    { value: FlagSource.AwdRotation, label: translate('ui.alternateByRoundAwd') },
+    { value: FlagSource.Static, label: translate('runtime.label.staticFlagTemplatePreset') },
+    { value: FlagSource.PerTeam, label: translate('runtime.definitionRuntime.label.independentFlagTeam') },
+    { value: FlagSource.AwdRotation, label: translate('runtime.label.alternateRoundAwd') },
   ])
   function synchronizeFlagInjection(): void {
     if (props.runtime.definition.kind !== 'container') return

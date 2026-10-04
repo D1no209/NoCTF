@@ -65,9 +65,9 @@ public sealed class ListCompetitionQuestionsEndpoint(
         var filterKey = FilterKey(competitionId, user.UserId, request);
         if (!cursors.TryDecode(request.Cursor, CursorEndpoint, filterKey, out var position))
         {
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
-                title: "Invalid cursor.");
+                title: ApiMessages.Get(ApiMessageId.InvalidCursor));
         }
         var page = await list.ExecuteAsync(new(
             competitionId,

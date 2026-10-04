@@ -229,7 +229,7 @@ public sealed class DeploymentTopologyTests
         var pipeline = await ReadAsync(
             "backend", "src", "NoCTF.API", "Composition", "PipelineConfiguration.cs");
 
-        await Assert.That(compose).Contains("name: 1panel-network");
+        await Assert.That(compose).Contains("name: noctf-proxy");
         await Assert.That(compose).Contains("aliases: [noctf-web]");
         await Assert.That(compose).DoesNotContain("ports:");
         await Assert.That(compose).DoesNotContain("expose:");
@@ -364,8 +364,9 @@ public sealed class DeploymentTopologyTests
         await Assert.That(ci).Contains("  publish-images:\n");
         await Assert.That(publishJob).IsNotEmpty();
         await Assert.That(ci).DoesNotContain("  verify:\n");
-        await Assert.That(publishJob).DoesNotContain("    needs:");
-        await Assert.That(ci).DoesNotContain("bun test");
+        await Assert.That(publishJob).Contains("    needs: validation");
+        await Assert.That(ci).Contains("uses: ./.github/workflows/repository-checks.yml");
+        await Assert.That(ci).Contains("bun run typecheck && bun run test");
         await Assert.That(ci).DoesNotContain("dotnet test");
         await Assert.That(ci).DoesNotContain("bash deploy/recovery/rehearse.sh");
         await Assert.That(ci).Contains("    branches:\n      - main\n");
@@ -513,16 +514,30 @@ public sealed class DeploymentTopologyTests
         var ci = await ReadAsync(".github", "workflows", "ci.yml");
         var actionReferences = ci.Split('\n')
             .Select(line => line.Trim())
-            .Where(line => line.StartsWith("- uses:", StringComparison.Ordinal))
+            .Where(line => line.StartsWith("- uses:", StringComparison.Ordinal)
+                || line.StartsWith("uses:", StringComparison.Ordinal))
+            .Select(line => line.TrimStart('-', ' '))
             .ToArray();
-        await Assert.That(actionReferences).Count().IsEqualTo(1);
+        await Assert.That(actionReferences).IsNotEmpty();
         await Assert.That(actionReferences.All(line =>
+            line == "uses: ./.github/workflows/repository-checks.yml"
+            ||
             System.Text.RegularExpressions.Regex.IsMatch(
                 line,
-                "^- uses: [a-z0-9-]+/[a-z0-9-]+@[a-f0-9]{40} # v[0-9]+$"))).IsTrue();
+                "^uses: [a-z0-9-]+/[a-z0-9-]+@[a-f0-9]{40} # v[0-9]+$"))).IsTrue();
 
         await Assert.That(actionReferences.Count(line =>
-            line.StartsWith("- uses: actions/checkout@", StringComparison.Ordinal))).IsEqualTo(1);
+            line.StartsWith("uses: actions/checkout@", StringComparison.Ordinal))).IsEqualTo(1);
+
+        var checks = await ReadAsync(".github", "workflows", "repository-checks.yml");
+        var checkActions = checks.Split('\n').Select(line => line.Trim())
+            .Where(line => line.StartsWith("- uses:", StringComparison.Ordinal))
+            .Select(line => line.TrimStart('-', ' ')).ToArray();
+        await Assert.That(checkActions).IsNotEmpty();
+        await Assert.That(checkActions.All(line => System.Text.RegularExpressions.Regex.IsMatch(
+            line, "^uses: [a-z0-9-]+/[a-z0-9-]+@[a-f0-9]{40} # v[0-9]+$"))).IsTrue();
+        await Assert.That(checks).Contains("contents: read");
+        await Assert.That(checks).DoesNotContain("secrets: inherit");
 
         var ciServiceImages = ci.Split('\n')
             .Select(line => line.Trim())

@@ -1,17 +1,19 @@
-import { toast } from 'vue-sonner'
-import {
-  authenticationSsoCompleteBinding,
-  authenticationSsoGetFlow,
-} from '~/api'
-import type { NoCtfapiEndpointsAuthenticationSsoFlowStatusResponse } from '~/api'
+
+import { api } from '../../../lib/api'
+import type { MessageKey } from '~/locales/en'
+import { message as describeMessage } from '../../../utils/i18n'
+import type { UiMessage } from '../../../utils/i18n'
+import { toast } from '../../../utils/message-toast'
+
+import type { NoCTFAPIEndpointsAuthenticationSsoFlowStatusResponse } from '~/api/models'
 
 export function useAuthSsoCompletePage() {
   const route = useRoute()
   const auth = useAuth()
-  const flow = ref<NoCtfapiEndpointsAuthenticationSsoFlowStatusResponse | null>(null)
+  const flow = ref<NoCTFAPIEndpointsAuthenticationSsoFlowStatusResponse | null>(null)
   const loading = ref(true)
   const pending = ref(false)
-  const error = ref<string | null>(null)
+  const error = ref<UiMessage | null>(null)
   const identityNotLinked = ref(false)
   const flowId = computed(() => {
     const value = route.query.flow
@@ -36,15 +38,14 @@ export function useAuthSsoCompletePage() {
 
   async function load(attempt = 0): Promise<void> {
     if (!flowId.value) {
-      error.value = translate('sso.invalidFlow')
+      error.value = describeMessage('sso.invalidFlow')
       loading.value = false
       return
     }
-    const { data, error: requestError } = await authenticationSsoGetFlow({
-      path: { flowId: flowId.value },
-    })
+    let requestError: unknown;
+    const data = await api.api.v1.auth.sso.flows.byFlowId(flowId.value).get().catch(cause => { requestError = cause; return undefined });
     if (requestError || !data) {
-      error.value = parseApiError(requestError, translate('sso.flowExpired')).message
+      error.value = parseApiError(requestError, describeMessage('sso.flowExpired')).displayMessage
       loading.value = false
       return
     }
@@ -55,7 +56,7 @@ export function useAuthSsoCompletePage() {
     }
     loading.value = false
     if (data.state === 'Failed') {
-      error.value = translate(ssoFailureMessage(data.failureCode ?? undefined))
+      error.value = describeMessage(ssoFailureMessage(data.failureCode ?? undefined))
       return
     }
     if (data.state === 'Authenticated' && data.intent === 'Login')
@@ -68,17 +69,17 @@ export function useAuthSsoCompletePage() {
     error.value = null
     try {
       const returnPath = await auth.completeSsoLogin(flowId.value)
-      toast.success(translate('sso.loginSuccessful'))
+      toast.success(describeMessage('sso.loginSuccessful'))
       await navigateTo(returnPath)
     }
     catch (requestError) {
-      const parsed = parseApiError(requestError, translate('sso.loginFailed'))
+      const parsed = parseApiError(requestError, describeMessage('sso.loginFailed'))
       if (parsed.code === 'IdentityNotLinked') {
         identityNotLinked.value = true
         error.value = null
       }
       else {
-        error.value = parsed.message
+        error.value = parsed.displayMessage
       }
     }
     finally {
@@ -90,15 +91,14 @@ export function useAuthSsoCompletePage() {
     if (!flowId.value || pending.value) return
     pending.value = true
     error.value = null
-    const { error: requestError } = await authenticationSsoCompleteBinding({
-      path: { flowId: flowId.value },
-    })
+    let requestError: unknown;
+    await api.api.v1.auth.me.ssoBinding.flows.byFlowId(flowId.value).complete.post().catch(cause => { requestError = cause; return undefined });
     pending.value = false
     if (requestError) {
-      error.value = parseApiError(requestError, translate('sso.bindingFailed')).message
+      error.value = parseApiError(requestError, describeMessage('sso.bindingFailed')).displayMessage
       return
     }
-    toast.success(translate('sso.bindingSuccessful'))
+    toast.success(describeMessage('sso.bindingSuccessful'))
     await navigateTo('/')
   }
 
@@ -117,8 +117,8 @@ export function useAuthSsoCompletePage() {
   }
 }
 
-function ssoFailureMessage(code?: string): string {
-  const messages: Record<string, string> = {
+function ssoFailureMessage(code?: string | null): MessageKey {
+  const messages: Record<string, MessageKey> = {
     SsoDisabled: 'sso.failure.ssoDisabled',
     ProviderUnavailable: 'sso.failure.providerUnavailable',
     ProviderChanged: 'sso.failure.providerChanged',

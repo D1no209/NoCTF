@@ -2,7 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using FastEndpoints;
-using FastEndpoints.Swagger;
+using FastEndpoints.OpenApi;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
@@ -1162,7 +1162,7 @@ public sealed class LeaderboardEndpointTests
                 || type == typeof(GetScoreboardAdjustmentDetailEndpoint)
                 || type == typeof(GetScoreboardAdjustmentDetailValidator);
         });
-        builder.Services.SwaggerDocument();
+        builder.Services.OpenApiDocument();
         builder.Services.AddSingleton(leaderboard);
         builder.Services.AddSingleton(snapshotFactory ?? Substitute.For<ILeaderboardSnapshotFactory>());
         builder.Services.AddSingleton(messages);

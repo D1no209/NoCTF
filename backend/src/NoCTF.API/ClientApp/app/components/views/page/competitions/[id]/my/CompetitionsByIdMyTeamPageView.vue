@@ -17,12 +17,12 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
 
     <Empty v-else-if="!team" class="border py-12">
       <EmptyHeader>
-        <EmptyTitle>{{ $t('ui.youHaveNotJoinedTheTeamForThisCompetitionYet') }}</EmptyTitle>
-        <EmptyDescription>{{ $t('ui.returnToTheOverviewPageToCreateATeamOr') }}</EmptyDescription>
+        <EmptyTitle>{{ $t('competitions.competitionsBy.description.joinedTeamCompetitionYet') }}</EmptyTitle>
+        <EmptyDescription>{{ $t('competitions.competitionsBy.description.returnOverviewPageCreate') }}</EmptyDescription>
       </EmptyHeader>
       <EmptyContent>
         <Button as-child>
-          <NuxtLink :to="`/competitions/${competitionId}`">{{ $t('ui.goToOverview') }}</NuxtLink>
+          <NuxtLink :to="`/competitions/${competitionId}`">{{ $t('competitions.label.goOverview') }}</NuxtLink>
         </Button>
       </EmptyContent>
     </Empty>
@@ -42,39 +42,39 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
               {{ teamRegistrationStatusLabel(team.registrationStatus) }}
             </Badge>
             <Badge variant="outline">{{ team.trackName ?? team.trackKey }}</Badge>
-            <Badge v-if="team.isLocked" variant="outline">{{ $t('ui.locked') }}</Badge>
-            <Badge v-if="team.isBanned" variant="destructive">{{ $t('ui.banned2') }}</Badge>
+            <Badge v-if="team.isLocked" variant="outline">{{ $t('competitions.label.locked') }}</Badge>
+            <Badge v-if="team.isBanned" variant="destructive">{{ $t('common.label.banned') }}</Badge>
           </div>
-          <CardDescription>{{ $t('ui.registeredAt', { time: formatDateTime(team.registeredAt) }) }}</CardDescription>
+          <CardDescription>{{ $t('competitions.label.registered', { time: formatDateTime(team.registeredAt) }) }}</CardDescription>
         </CardHeader>
         <CardContent class="flex flex-col gap-3">
           <Alert v-if="team.registrationStatus === 'Pending'">
-            <AlertDescription>{{ $t('ui.pendingTeamCannotAccessCompetition') }}</AlertDescription>
+            <AlertDescription>{{ $t('competitions.competitionsBy.validation.pendingTeamFormat') }}</AlertDescription>
           </Alert>
         </CardContent>
       <Separator />
 
       <section v-if="team.isBanned" id="ban-appeal" class="scroll-mt-24">
         <CardHeader>
-          <CardTitle class="text-base">{{ $t('ui.banProcessing') }}</CardTitle>
-          <CardDescription>{{ $t('ui.yourTeamIsCurrentlyBannedYouCanSubmitAnAppeal') }}</CardDescription>
+          <CardTitle class="text-base">{{ $t('competitions.label.banProcessing') }}</CardTitle>
+          <CardDescription>{{ $t('competitions.competitionsBy.description.teamCurrentlyBannedSubmit') }}</CardDescription>
         </CardHeader>
         <CardContent class="flex flex-col gap-3">
           <Alert v-if="banCaseError" variant="destructive">
             <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
               <span>{{ $message(banCaseError) }}</span>
-              <Button type="button" size="sm" variant="outline" @click="loadBanCase">{{ $t('ui.reload') }}</Button>
+              <Button type="button" size="sm" variant="outline" @click="loadBanCase">{{ $t('common.label.reload') }}</Button>
             </AlertDescription>
           </Alert>
           <template v-if="banCase">
             <p class="text-sm">
-              {{ $t('ui.message14') }}{{ formatDateTime(banCase.bannedAt) }} {{ $t('ui.message15') }}{{ banCase.source === 'CheatIncident' ? $t('ui.cheatingDetection') : $t('ui.manualProcessing') }}
+              {{ $t('teams.ban.occurredAtPrefix') }}{{ formatDateTime(banCase.bannedAt) }} {{ $t('teams.ban.sourcePrefix') }}{{ banCase.source === 'CheatIncident' ? $t('competitions.label.cheatingDetection') : $t('competitions.label.manualProcessing') }}
             </p>
             <Alert v-if="banCase.appeal">
               <AlertDescription>
-                {{ $t('ui.appealStatus', { status: appealStatusLabel(banCase.appeal.status) }) }}
+                {{ $t('competitions.label.appealStatus', { status: appealStatusLabel(banCase.appeal.status) }) }}
                 <template v-if="banCase.appeal.resolutionReason">
-                  · {{ $t('ui.resolution', { reason: banCase.appeal.resolutionReason }) }}
+                  · {{ $t('competitions.label.resolution', { reason: banCase.appeal.resolutionReason }) }}
                 </template>
               </AlertDescription>
             </Alert>
@@ -82,17 +82,17 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
           <div v-if="!banCaseError && banCase?.canAppeal !== false">
             <Dialog :open="appealOpen" @update:open="setAppealOpen">
               <DialogTrigger as-child>
-                <Button variant="outline">{{ $t('ui.submitABanAppeal') }}</Button>
+                <Button variant="outline">{{ $t('competitions.label.submitBanAppeal') }}</Button>
               </DialogTrigger>
               <DialogContent class="sm:max-w-lg">
                 <DialogHeader>
-                  <DialogTitle>{{ $t('ui.banAppeal') }}</DialogTitle>
-                  <DialogDescription>{{ $t('ui.stateTheReasonsForYourComplaintToTheOrganizerAnd') }}</DialogDescription>
+                  <DialogTitle>{{ $t('common.label.banAppeal') }}</DialogTitle>
+                  <DialogDescription>{{ $t('competitions.competitionsBy.description.stateReasonsComplaintOrganizer') }}</DialogDescription>
                 </DialogHeader>
                 <UiForm @submit.prevent>
                   <FieldGroup>
                     <Field>
-                      <FieldLabel for="appeal-statement">{{ $t('ui.statementOfGrievance') }}</FieldLabel>
+                      <FieldLabel for="appeal-statement">{{ $t('competitions.label.statementGrievance') }}</FieldLabel>
                       <Textarea
                         id="appeal-statement"
                         v-model="appealStatement"
@@ -104,7 +104,7 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
                         @input="onInputAppealError(null)"
                       />
                       <p id="appeal-requirement" class="text-xs text-muted-foreground">
-                        {{ $t('ui.requiresToCharacters', { minimum: minimumAppealStatementLength, maximum: maximumAppealStatementLength }) }}
+                        {{ $t('competitions.label.requiresCharacters', { minimum: minimumAppealStatementLength, maximum: maximumAppealStatementLength }) }}
                       </p>
                       <p v-if="appealError" id="appeal-error" role="alert" class="text-sm text-destructive">
                         {{ $message(appealError) }}
@@ -112,7 +112,7 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
                     </Field>
                     <Field>
                       <Button type="button" class="w-full" :disabled="appealPending" @click="submitAppeal">
-                        <Spinner v-if="appealPending" data-icon="inline-start" /> {{ $t('ui.submitAppeal') }} </Button>
+                        <Spinner v-if="appealPending" data-icon="inline-start" /> {{ $t('competitions.label.submitAppeal') }} </Button>
                     </Field>
                   </FieldGroup>
                 </UiForm>
@@ -123,13 +123,13 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
       </section>
 
       <Alert v-if="team.isBanned" variant="destructive">
-        <AlertDescription>{{ $t('ui.aBannedTeamCannotChangeItsNameMembershipCaptainInvitation') }}</AlertDescription>
+        <AlertDescription>{{ $t('competitions.competitionsBy.validation.bannedTeamFormat') }}</AlertDescription>
       </Alert>
 
       <section>
         <CardHeader>
-          <CardTitle class="text-base">{{ $t('ui.members3', { count: team.memberIds?.length ?? 0 }) }}</CardTitle>
-          <CardDescription v-if="!isCaptain">{{ $t('ui.onlyTheLeaderCanRemoveMembers') }}</CardDescription>
+          <CardTitle class="text-base">{{ $t('common.label.members.teamPageView', { count: team.memberIds?.length ?? 0 }) }}</CardTitle>
+          <CardDescription v-if="!isCaptain">{{ $t('competitions.competitionsBy.description.leaderRemoveMembers') }}</CardDescription>
         </CardHeader>
         <CardContent>
           <component :is="TeamMembers"
@@ -143,14 +143,14 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
 
       <template v-if="team.registrationStatus === 'Approved' && !team.isBanned">
         <Separator />
-        <component :is="TeamRuntimeManager" :key="team.id" :competition-id="competitionId" />
+        <component :is="TeamRuntimeManager" :key="team.id ?? undefined" :competition-id="competitionId" />
       </template>
 
       <template v-if="isCaptain && !team.isBanned">
       <Separator />
       <section>
         <CardHeader>
-          <CardTitle class="text-base">{{ $t('ui.inviteMembers') }}</CardTitle>
+          <CardTitle class="text-base">{{ $t('competitions.label.inviteMembers') }}</CardTitle>
         </CardHeader>
         <CardContent class="flex flex-col gap-3">
           <Skeleton v-if="invitationLoading" class="h-9 w-80 max-w-full" />
@@ -158,19 +158,19 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
             <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
               <span>{{ $message(invitationError) }}</span>
               <Button type="button" size="sm" variant="outline" @click="loadInvitationToken">
-                {{ $t('ui.retry') }}
+                {{ $t('common.label.retry') }}
               </Button>
             </AlertDescription>
           </Alert>
           <div v-else-if="invitationToken" class="flex flex-wrap items-center gap-2">
             <code class="rounded bg-muted px-2 py-1 font-mono text-sm">{{ invitationToken }}</code>
             <Button variant="outline" size="sm" @click="copyToken">
-              <Copy data-icon="inline-start" /> {{ $t('ui.copy') }} </Button>
+              <Copy data-icon="inline-start" /> {{ $t('common.action.copy') }} </Button>
           </div>
           <div>
             <Button variant="outline" :disabled="rotating" @click="rotate">
               <Spinner v-if="rotating" data-icon="inline-start" />
-              <RefreshCw v-else data-icon="inline-start" /> {{ $t('ui.rotateInvitationCode') }} </Button>
+              <RefreshCw v-else data-icon="inline-start" /> {{ $t('competitions.label.rotateInvitationCode') }} </Button>
           </div>
         </CardContent>
       </section>
@@ -180,25 +180,25 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
       <Separator />
       <section>
         <CardHeader>
-          <CardTitle class="text-base">{{ $t('ui.teamManagement') }}</CardTitle>
+          <CardTitle class="text-base">{{ $t('common.label.teamManagement') }}</CardTitle>
         </CardHeader>
         <CardContent class="flex flex-wrap items-center gap-2">
           <template v-if="isCaptain">
             <Dialog v-model:open="renameOpen">
               <DialogTrigger as-child>
-                <Button variant="outline" :disabled="!canEditOrganization" @click="openRename">{{ $t('ui.editTeamInformation') }}</Button>
+                <Button variant="outline" :disabled="!canEditOrganization" @click="openRename">{{ $t('competitions.label.editTeamInformation') }}</Button>
               </DialogTrigger>
               <DialogScrollContent class="max-h-[85vh] sm:max-w-xl">
                 <DialogHeader>
-                  <DialogTitle>{{ $t('ui.editTeamInformation') }}</DialogTitle>
+                  <DialogTitle>{{ $t('competitions.label.editTeamInformation') }}</DialogTitle>
                   <DialogDescription>
-                    {{ $t('ui.teamChangesCreateRegistrationDraft') }}
+                    {{ $t('competitions.competitionsBy.label.teamChangesCreateRegistration') }}
                   </DialogDescription>
                 </DialogHeader>
                 <UiForm validation="feature" @submit.prevent="submitRename">
                   <FieldGroup>
                     <Field>
-                      <FieldLabel for="rename-input">{{ $t('ui.newTeamName') }}</FieldLabel>
+                      <FieldLabel for="rename-input">{{ $t('competitions.label.newTeamName') }}</FieldLabel>
                       <Input id="rename-input" v-model="renameValue" required maxlength="128" />
                     </Field>
                     <Field v-if="tracksEnabled && tracksLoading">
@@ -208,18 +208,18 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
                       <Alert variant="destructive">
                         <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
                           <span>{{ $message(tracksError) }}</span>
-                          <Button type="button" size="sm" variant="outline" @click="loadTracks">{{ $t('ui.retry') }}</Button>
+                          <Button type="button" size="sm" variant="outline" @click="loadTracks">{{ $t('common.label.retry') }}</Button>
                         </AlertDescription>
                       </Alert>
                     </Field>
                     <Field v-else-if="tracksEnabled">
-                      <FieldLabel for="team-edit-track">{{ $t('ui.competitionTrack') }}</FieldLabel>
+                      <FieldLabel for="team-edit-track">{{ $t('competitions.label.competitionTrack') }}</FieldLabel>
                       <Select v-model="renameTrackKey" required>
-                        <SelectTrigger id="team-edit-track"><SelectValue :placeholder="$t('ui.selectATrack')" /></SelectTrigger>
+                        <SelectTrigger id="team-edit-track"><SelectValue :placeholder="$t('common.label.selectTrack')" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem
                             v-for="track in selectableTracks"
-                            :key="track.key"
+                            :key="track.key ?? undefined"
                             :value="track.key!"
                           >
                             <span class="flex items-center gap-2">
@@ -239,7 +239,7 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
                     </Field>
                     <Alert v-if="tracksEnabled && selectedRenameTrack?.meetsSsoRequirement === false">
                       <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
-                        <span>{{ $t('ui.trackRequirementsCheckedOnRegistration') }}</span>
+                        <span>{{ $t('competitions.competitionOverview.label.trackRequirementsCheckedRegistration') }}</span>
                         <Button as-child type="button" size="sm" variant="outline">
                           <NuxtLink :to="{ path: '/', query: { account: 'security' } }">{{ $t('sso.openAccountSecurity') }}</NuxtLink>
                         </Button>
@@ -247,50 +247,50 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
                     </Alert>
                     <Separator />
                     <Field>
-                      <FieldLabel for="team-avatar-file">{{ $t('ui.teamAvatar') }}</FieldLabel>
+                      <FieldLabel for="team-avatar-file">{{ $t('competitions.label.teamAvatar') }}</FieldLabel>
                       <FileUpload
-                        :key="avatarInputKey"
+                        :key="avatarInputKey ?? undefined"
                         id="team-avatar-file"
                         accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
                         :pending="avatarPending"
                         @change="replaceTeamAvatar"
                       />
                       <FieldDescription>
-                        {{ maximumAvatarBytes ? $t('accountPanel.avatarRequirements', { limit: formatBytes(maximumAvatarBytes) }) : $t('ui.avatarMustBeAJpegPngOrWebpImage') }}
+                        {{ maximumAvatarBytes ? $t('accountPanel.avatarRequirements', { limit: formatBytes(maximumAvatarBytes) }) : $t('common.competitionsBy.validation.avatarJpegFormat') }}
                       </FieldDescription>
                       <Button v-if="team.avatarUrl" type="button" variant="outline" :disabled="avatarPending" @click="clearTeamAvatar">
-                        <Spinner v-if="avatarPending" data-icon="inline-start" />{{ $t('ui.clearTeamAvatar') }}
+                        <Spinner v-if="avatarPending" data-icon="inline-start" />{{ $t('competitions.label.clearTeamAvatar') }}
                       </Button>
                     </Field>
                     <Field>
                       <Button type="submit" class="w-full" :disabled="renamePending || !renameValid || Boolean(tracksError)">
-                        <Spinner v-if="renamePending" data-icon="inline-start" /> {{ $t('ui.save') }} </Button>
+                        <Spinner v-if="renamePending" data-icon="inline-start" /> {{ $t('common.action.save') }} </Button>
                     </Field>
                   </FieldGroup>
                 </UiForm>
               </DialogScrollContent>
             </Dialog>
 
-            <FieldDescription v-if="!canEditOrganization">{{ $t('ui.teamChangesClosedForCurrentStage', { status: competition?.status ?? '-' }) }}</FieldDescription>
+            <FieldDescription v-if="!canEditOrganization">{{ $t('competitions.competitionsBy.description.teamChangesClosedStage', { status: competition?.status ?? '-' }) }}</FieldDescription>
 
             <Dialog v-model:open="transferOpen">
               <DialogTrigger as-child>
-                <Button variant="outline" :disabled="!canEditOrganization || !transferableMembers.length">{{ $t('ui.transferCaptain') }}</Button>
+                <Button variant="outline" :disabled="!canEditOrganization || !transferableMembers.length">{{ $t('competitions.label.transferCaptain') }}</Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>{{ $t('ui.transferCaptain') }}</DialogTitle>
-                  <DialogDescription>{{ $t('ui.afterTheTransferYouWillBecomeAnOrdinaryMember') }}</DialogDescription>
+                  <DialogTitle>{{ $t('competitions.label.transferCaptain') }}</DialogTitle>
+                  <DialogDescription>{{ $t('competitions.competitionsBy.description.transferBecomeOrdinaryMember') }}</DialogDescription>
                 </DialogHeader>
                 <UiForm @submit.prevent="submitTransfer">
                   <FieldGroup>
                     <Field>
-                      <FieldLabel>{{ $t('ui.newCaptain') }}</FieldLabel>
+                      <FieldLabel>{{ $t('competitions.label.newCaptain') }}</FieldLabel>
                       <Select v-model="transferTarget">
-                        <SelectTrigger><SelectValue :placeholder="$t('ui.selectMembers')" /></SelectTrigger>
+                        <SelectTrigger><SelectValue :placeholder="$t('competitions.label.selectMembers')" /></SelectTrigger>
                         <SelectContent>
                           <SelectGroup>
-                            <SelectItem v-for="id in transferableMembers" :key="id" :value="id">
+                            <SelectItem v-for="id in transferableMembers" :key="id ?? undefined" :value="id">
                               {{ id }}
                             </SelectItem>
                           </SelectGroup>
@@ -299,28 +299,28 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
                     </Field>
                     <Field>
                       <Button type="submit" class="w-full" :disabled="transferPending || !transferTarget">
-                        <Spinner v-if="transferPending" data-icon="inline-start" /> {{ $t('ui.confirmTransfer') }} </Button>
+                        <Spinner v-if="transferPending" data-icon="inline-start" /> {{ $t('common.label.confirmTransfer') }} </Button>
                     </Field>
                   </FieldGroup>
                 </UiForm>
               </DialogContent>
             </Dialog>
             <p v-if="!transferableMembers.length" class="text-xs text-muted-foreground">
-              {{ $t('ui.thereAreNoOtherTeamMembersToTransferTheCaptain') }}
+              {{ $t('competitions.competitionsBy.description.thereOtherTeamMembers') }}
             </p>
 
             <AlertDialog>
               <AlertDialogTrigger as-child>
-                <Button variant="destructive">{{ $t('ui.disbandTheTeam') }}</Button>
+                <Button variant="destructive">{{ $t('competitions.label.disbandTeam') }}</Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>{{ $t('ui.confirmedToDisbandTheTeam') }}</AlertDialogTitle>
-                  <AlertDialogDescription> {{ $t('ui.afterDisbandmentAllMembersWillBeRemovedTheTeamS') }} </AlertDialogDescription>
+                  <AlertDialogTitle>{{ $t('competitions.competitionsBy.label.confirmedDisbandTeam') }}</AlertDialogTitle>
+                  <AlertDialogDescription> {{ $t('competitions.competitionsBy.description.disbandmentMembersRemovedTeam') }} </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>{{ $t('ui.cancel') }}</AlertDialogCancel>
-                  <AlertDialogAction :disabled="acting" @click="disband">{{ $t('ui.confirmDissolution') }}</AlertDialogAction>
+                  <AlertDialogCancel>{{ $t('common.action.cancel') }}</AlertDialogCancel>
+                  <AlertDialogAction :disabled="acting" @click="disband">{{ $t('competitions.label.confirmDissolution') }}</AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
@@ -328,16 +328,16 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
 
           <AlertDialog v-else>
             <AlertDialogTrigger as-child>
-              <Button variant="destructive" :disabled="!canEditOrganization">{{ $t('ui.exitTheTeam') }}</Button>
+              <Button variant="destructive" :disabled="!canEditOrganization">{{ $t('competitions.label.exitTeam') }}</Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>{{ $t('ui.confirmToLeaveTheTeam') }}</AlertDialogTitle>
-                <AlertDialogDescription>{{ $t('ui.afterExitingYouCanRejoinWithTheInvitationCodeOr') }}</AlertDialogDescription>
+                <AlertDialogTitle>{{ $t('competitions.competitionsBy.label.confirmLeaveTeam') }}</AlertDialogTitle>
+                <AlertDialogDescription>{{ $t('competitions.competitionsBy.description.exitingRejoinInvitationCode') }}</AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>{{ $t('ui.cancel') }}</AlertDialogCancel>
-                <AlertDialogAction :disabled="acting" @click="leave">{{ $t('ui.confirmToExit') }}</AlertDialogAction>
+                <AlertDialogCancel>{{ $t('common.action.cancel') }}</AlertDialogCancel>
+                <AlertDialogAction :disabled="acting" @click="leave">{{ $t('competitions.label.confirmExit') }}</AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>

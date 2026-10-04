@@ -74,7 +74,7 @@ public sealed class GetScoreboardSchemaEndpoint(
     {
         Get("/competitions/{competitionId}/leaderboard/schema");
         AllowAnonymous();
-        Summary(summary => summary.Summary = "Get the low-frequency scoreboard matrix schema.");
+        Summary(summary => { summary.Summary = "Get the low-frequency scoreboard matrix schema."; summary.Description = summary.Summary; });
     }
 
     public override async Task<Results<Ok<ScoreboardSchemaResponse>, Accepted<LeaderboardProcessingProtocolResponse>, NotFound>> ExecuteAsync(

@@ -1,17 +1,18 @@
+import { dateTimestamp } from '../utils/date-value'
 export interface RuntimeExtensionRequest {
   minutes: number
-  expiresAt: string
+  expiresAt: Date
 }
 
 export const RUNTIME_RENEWAL_WINDOW_MS = 10 * 60_000
 
-export function isRuntimeExtensionWindowOpen(currentExpiry: string | null | undefined, now: number): boolean {
-  const expiry = currentExpiry ? Date.parse(currentExpiry) : Number.NaN
+export function isRuntimeExtensionWindowOpen(currentExpiry: Date | string | null | undefined, now: number): boolean {
+  const expiry = currentExpiry ? dateTimestamp(currentExpiry) : Number.NaN
   return Number.isFinite(expiry) && expiry > now && expiry - now <= RUNTIME_RENEWAL_WINDOW_MS
 }
 
-export function isRuntimeExtensionTooEarly(currentExpiry: string | null | undefined, now: number): boolean {
-  const expiry = currentExpiry ? Date.parse(currentExpiry) : Number.NaN
+export function isRuntimeExtensionTooEarly(currentExpiry: Date | string | null | undefined, now: number): boolean {
+  const expiry = currentExpiry ? dateTimestamp(currentExpiry) : Number.NaN
   return Number.isFinite(expiry) && expiry - now > RUNTIME_RENEWAL_WINDOW_MS
 }
 
@@ -26,16 +27,16 @@ export function parseRuntimeExtensionMinutes(value: unknown, maximum: number): n
 }
 
 export function createRuntimeExtensionRequest(
-  currentExpiry: string | null | undefined,
+  currentExpiry: Date | string | null | undefined,
   now: number,
   value: unknown,
   maximum: number,
 ): RuntimeExtensionRequest | null {
   const minutes = parseRuntimeExtensionMinutes(value, maximum)
   if (minutes === null || !isRuntimeExtensionWindowOpen(currentExpiry, now)) return null
-  const expiry = Date.parse(currentExpiry ?? '')
+  const expiry = dateTimestamp(currentExpiry ?? '')
   try {
-    return { minutes, expiresAt: new Date(expiry + minutes * 60_000).toISOString() }
+    return { minutes, expiresAt: new Date(expiry + minutes * 60_000) }
   }
   catch {
     return null

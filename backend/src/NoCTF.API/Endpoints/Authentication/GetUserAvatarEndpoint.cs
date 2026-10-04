@@ -14,7 +14,7 @@ public sealed class GetUserAvatarEndpoint(GetUserAvatar getAvatar)
         Get("/users/{userId}/avatar");
         AllowAnonymous();
         Description(builder => builder.WithName("UserAvatar_Get"));
-        Summary(summary => summary.Summary = "Returns a user's current public avatar.");
+        Summary(summary => { summary.Summary = "Returns a user's current public avatar."; summary.Description = summary.Summary; });
     }
 
     public override async Task<Results<FileStreamHttpResult, NotFound>> ExecuteAsync(

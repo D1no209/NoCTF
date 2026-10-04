@@ -62,11 +62,11 @@ public sealed class SubmitTeamBanAppealEndpoint(
         {
             return TypedResults.NotFound();
         }
-        return TypedResults.Problem(
+        return ApiProblems.Problem(
             statusCode: result.Failure == TeamBanAppealFailure.AppealAlreadySubmitted
                 ? StatusCodes.Status409Conflict
                 : StatusCodes.Status400BadRequest,
-            title: "Team ban appeal was rejected.",
+            title: ApiMessages.Get(ApiMessageId.SubmitTeamBanAppealTitleTeamBanAppealWas),
             extensions: new Dictionary<string, object?>
             {
                 ["code"] = result.Failure?.ToString()

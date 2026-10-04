@@ -1,4 +1,5 @@
 <script setup lang="ts">
+
 import { toRefs } from 'vue'
 import type { CompetitionsByIdPageViewState } from '~/features/routes/competitions/useCompetitionsByIdPage'
 
@@ -22,46 +23,46 @@ const { isOverview, isControlScreen, isWriteUpReview, isProgression, competition
         <span class="sr-only">{{ gameModeLabel(competition.mode) }}</span>
         <div class="relative z-10 flex flex-wrap items-center gap-x-3 gap-y-2">
           <h1 class="text-display text-2xl md:text-3xl">{{ competition.title }}</h1>
-          <component :is="LifecycleBadge" :status="competition.status" />
+          <component :is="LifecycleBadge" :status="competition.status ?? undefined" />
         </div>
         <div v-if="!isProgression" class="relative z-10 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs tabular-nums md:text-sm">
           <span class="text-muted-foreground">
             {{ formatDateTime(competition.startTime) }} ~ {{ formatDateTime(competition.endTime) }}
           </span>
           <component :is="CompetitionCountdown"
-            :start-time="competition.startTime"
-            :end-time="competition.endTime"
+            :start-time="(dateIso(competition.startTime)) ?? undefined"
+            :end-time="(dateIso(competition.endTime)) ?? undefined"
             :status="competition.status"
             class="font-medium text-primary"
           />
         </div>
       </div>
 
-      <div v-if="standingLoading" class="flex shrink-0 gap-2" :aria-label="$t('ui.loadingTeamStanding')">
+      <div v-if="standingLoading" class="flex shrink-0 gap-2" :aria-label="$t('competitions.label.loadingTeamStanding')">
         <Skeleton class="h-12 w-24" />
         <Skeleton class="h-12 w-28" />
       </div>
       <dl v-else-if="myStanding" class="flex shrink-0 divide-x rounded-lg border bg-card/60">
         <div class="min-w-24 px-4 py-2 text-right">
-          <dt class="text-xs text-muted-foreground">{{ $t('ui.teamRank') }}</dt>
+          <dt class="text-xs text-muted-foreground">{{ $t('competitions.label.teamRank') }}</dt>
           <dd class="font-mono text-lg font-semibold tabular-nums">{{ myStanding.rank ? `#${myStanding.rank}` : '-' }}</dd>
         </div>
         <div class="min-w-28 px-4 py-2 text-right">
-          <dt class="text-xs text-muted-foreground">{{ $t('ui.teamPoints') }}</dt>
-          <dd class="font-mono text-lg font-semibold tabular-nums text-primary">{{ myStanding.totalScore ?? 0 }} {{ $t('ui.pts2') }}</dd>
+          <dt class="text-xs text-muted-foreground">{{ $t('competitions.label.teamPoints') }}</dt>
+          <dd class="font-mono text-lg font-semibold tabular-nums text-primary">{{ myStanding.totalScore ?? 0 }} {{ $t('common.label.pts.scoreTrendChart') }}</dd>
         </div>
       </dl>
     </div>
     <Alert v-if="!isWriteUpReview && teamLoadError" variant="destructive">
       <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
         <span>{{ $message(teamLoadError) }}</span>
-        <Button type="button" size="sm" variant="outline" @click="refreshMyTeam">{{ $t('ui.reload') }}</Button>
+        <Button type="button" size="sm" variant="outline" @click="refreshMyTeam">{{ $t('common.label.reload') }}</Button>
       </AlertDescription>
     </Alert>
     <Alert v-else-if="!isWriteUpReview && standingError" variant="destructive">
       <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
         <span>{{ $message(standingError) }}</span>
-        <Button type="button" size="sm" variant="outline" @click="refreshMyStanding">{{ $t('ui.reload') }}</Button>
+        <Button type="button" size="sm" variant="outline" @click="refreshMyStanding">{{ $t('common.label.reload') }}</Button>
       </AlertDescription>
     </Alert>
     <NuxtPage />

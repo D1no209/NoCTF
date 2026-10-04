@@ -1,6 +1,7 @@
+import { currentLocale } from '../utils/i18n'
 import { HubConnectionBuilder, HubConnectionState, HttpTransportType, LogLevel } from '@microsoft/signalr'
 import type { HubConnection } from '@microsoft/signalr'
-import type { NoCtfapiEndpointsAdministrationPlatformPlatformLogResponse } from '../api'
+import type { NoCTFAPIEndpointsAdministrationPlatformPlatformLogResponse } from '../api/models'
 import { getRealtimeAccessToken } from '../lib/session'
 import { startRealtimeWithRetry } from '../lib/realtime-retry'
 
@@ -12,7 +13,7 @@ export type PlatformLogHubState = 'disconnected' | 'connecting' | 'connected' | 
  * Disconnects automatically when the owning scope (page) is disposed.
  */
 export function usePlatformLogHub(
-  onLog: (log: NoCtfapiEndpointsAdministrationPlatformPlatformLogResponse) => void,
+  onLog: (log: NoCTFAPIEndpointsAdministrationPlatformPlatformLogResponse) => void,
 ) {
   const state = ref<PlatformLogHubState>('disconnected')
   let connection: HubConnection | null = null
@@ -22,6 +23,7 @@ export function usePlatformLogHub(
   function createConnection(): HubConnection {
     const hub = new HubConnectionBuilder()
       .withUrl('/hubs/v1/admin/platform-logs', {
+        headers: { 'Accept-Language': currentLocale() },
         accessTokenFactory: getRealtimeAccessToken,
         // 与 useCompetitionHub 相同:dev 下绕过 Vite ws 代理的 WebSocket 崩溃问题。
         ...(import.meta.dev

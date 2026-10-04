@@ -10,6 +10,12 @@ public sealed class LogoutEndpoint(IOptions<RefreshHttpOptions> options)
 {
     public override void Configure()
     {
+        Summary(summary =>
+        {
+            summary.Summary = "Clears the refresh cookie for the current browser.";
+            summary.Description = summary.Summary;
+        });
+
         Post("/auth/logout");
         AllowAnonymous();
     }

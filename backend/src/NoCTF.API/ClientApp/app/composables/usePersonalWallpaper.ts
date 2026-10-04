@@ -1,4 +1,6 @@
-import { authenticationGetMyWallpaper } from '../api'
+
+import { api, binaryResponse } from '../lib/api'
+
 
 export function usePersonalWallpaper() {
   const { user } = useAuth()
@@ -25,7 +27,8 @@ export function usePersonalWallpaper() {
 
     const sequence = ++loadSequence.value
     try {
-      const { data, error } = await authenticationGetMyWallpaper({ parseAs: 'blob' })
+      let error: unknown;
+      const data = await binaryResponse(responseOptions => api.api.v1.auth.me.wallpaper.get({ options: [...responseOptions] }), 'blob').catch(cause => { error = cause; return undefined });
       if (sequence !== loadSequence.value) return
       if (error || !(data instanceof Blob) || !data.type.startsWith('image/') || data.size === 0)
         throw error

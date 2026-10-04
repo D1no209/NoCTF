@@ -1,19 +1,24 @@
+import { dateObject } from '../../../../../utils/date-value'
+
+import { api } from '../../../../../lib/api'
+import { message as describeMessage } from '../../../../../utils/i18n'
+import type { UiMessage } from '../../../../../utils/i18n'
 
 
-import { toast } from 'vue-sonner'
-import { adminGetCompetition, adminPatchCompetition } from '../../../../../api'
-import type { NoCtfapiEndpointsAdministrationCompetitionsCompetitionLeaderboardVisibilityResponse } from '../../../../../api'
+import { toast } from '../../../../../utils/message-toast'
+
+import type { NoCTFAPIEndpointsAdministrationCompetitionsCompetitionLeaderboardVisibilityResponse } from '../../../../../api/models'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
 
 /** Owns state, effects and commands for AdminCompetitionsByIdLeaderboardPage. */
 export function useAdminCompetitionsByIdLeaderboardPage() {
   const { competitionId, canWrite } = useCompetitionAdmin()
 
-  const current = ref<NoCtfapiEndpointsAdministrationCompetitionsCompetitionLeaderboardVisibilityResponse | null>(null)
+  const current = ref<NoCTFAPIEndpointsAdministrationCompetitionsCompetitionLeaderboardVisibilityResponse | null>(null)
 
   const loading = ref(true)
 
-  const error = ref<string | null>(null)
+  const error = ref<UiMessage | null>(null)
 
   const frozenStartAt = ref('')
 
@@ -26,8 +31,9 @@ export function useAdminCompetitionsByIdLeaderboardPage() {
   async function load() {
     loading.value = true
     error.value = null
-    const { data, error: e } = await adminGetCompetition({ path: { competitionId } })
-    if (e) error.value = parseApiError(e).message
+    let e: unknown;
+    const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).get().catch(cause => { e = cause; return undefined });
+    if (e) error.value = parseApiError(e).displayMessage
     else {
       current.value = data?.leaderboardVisibility ?? null
       frozenStartAt.value = isoToLocalInput(data?.leaderboardVisibility?.frozenStartAt)
@@ -40,22 +46,18 @@ export function useAdminCompetitionsByIdLeaderboardPage() {
     if (!current.value) return
     saving.value = true
     try {
-      const { data, error } = await adminPatchCompetition({
-        path: { competitionId },
-        body: {
+      const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).patch({
           leaderboardVisibility: {
-            frozenStartAt: localInputToIso(frozenStartAt.value) ?? null,
-            hiddenStartAt: localInputToIso(hiddenStartAt.value) ?? null,
+            frozenStartAt: dateObject(localInputToIso(frozenStartAt.value) ?? null),
+            hiddenStartAt: dateObject(localInputToIso(hiddenStartAt.value) ?? null),
             reason: reason.value.trim() || null,
           },
-        },
-      })
-      if (error) throw error
+        });
       current.value = data?.leaderboardVisibility ?? current.value
       frozenStartAt.value = isoToLocalInput(current.value?.frozenStartAt)
       hiddenStartAt.value = isoToLocalInput(current.value?.hiddenStartAt)
       reason.value = ''
-      toast.success(translate("ui.scoreboardVisibilityUpdated"))
+      toast.success(describeMessage("leaderboard.label.scoreboardVisibilityUpdated"))
     }
     catch (e) {
       toastWriteError(e)

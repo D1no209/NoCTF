@@ -19,7 +19,7 @@ services:
         condition: service_healthy
     networks:
       cap-internal:
-      1panel-network:
+      proxy:
         aliases:
           - noctf-cap
     volumes:
@@ -93,6 +93,6 @@ networks:
   cap-internal:
     name: noctf-cap-internal
     internal: true
-  1panel-network:
+  proxy:
     external: true
-    name: 1panel-network
+    name: noctf-proxy

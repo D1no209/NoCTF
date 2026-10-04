@@ -1,12 +1,18 @@
+import { dateObject } from '../../utils/date-value'
+import { dateTimestamp } from '../../utils/date-value'
+
+import { api } from '../../lib/api'
+import { message as describeMessage } from '../../utils/i18n'
+import type { UiMessage } from '../../utils/i18n'
 import { toRefs } from 'vue'
 
 import { Megaphone } from '@lucide/vue'
-import { listCompetitionEvents } from '../../api'
-import type { NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse } from '../../api'
+
+import type { NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse } from '../../api/models'
 import { createTrailingRefresh } from '../../lib/latest-page-refresh'
 import { motionAttributes } from '../../motion/presets'
 
-type CompetitionEvent = NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse
+type CompetitionEvent = NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse
 
 /** Owns state, effects and commands for CompetitionBroadcastPanel. */
 export function useCompetitionBroadcastPanel(props: Readonly<Omit<{
@@ -22,7 +28,7 @@ export function useCompetitionBroadcastPanel(props: Readonly<Omit<{
 
   const loading = ref(true)
 
-  const error = ref<string | null>(null)
+  const error = ref<UiMessage | null>(null)
 
   const initialized = ref(false)
 
@@ -61,7 +67,7 @@ export function useCompetitionBroadcastPanel(props: Readonly<Omit<{
     const competition = ctx.competition.value
     if (!competition) return
     const status = competition.status ?? null
-    const startAt = competition.startTime ? Date.parse(competition.startTime) : Number.NaN
+    const startAt = competition.startTime ? dateTimestamp(competition.startTime) : Number.NaN
     const now = Date.now()
     if (!Number.isFinite(startAt) || now < startAt || status === 'Draft' || status === 'Visible' || status === 'Published') {
       items.value = []
@@ -80,20 +86,18 @@ export function useCompetitionBroadcastPanel(props: Readonly<Omit<{
       now,
       latestNotifiedAt,
     )!
-    const { data, error: requestError } = await listCompetitionEvents({
-      path: { competitionId: props.competitionId },
-      query: {
-        from: queryWindow.from,
-        to: queryWindow.to,
+    let requestError: unknown;
+    const data = await api.api.v1.competitions.byCompetitionId(props.competitionId).events.get({ queryParameters: {
+        from: dateObject(queryWindow.from ?? undefined),
+        to: dateObject(queryWindow.to ?? undefined),
         kinds: competitionBroadcastKinds,
         offset: 0,
         limit: 10,
         desc: true,
-      },
-    })
+      } }).catch(cause => { requestError = cause; return undefined });
     if (requestError || !data) {
       if (initialLoad)
-        error.value = parseApiError(requestError, translate("ui.failedToLoadEventReport")).message
+        error.value = parseApiError(requestError, describeMessage("competitions.competitionBroadcast.error.loadEventReportFailed")).displayMessage
       loading.value = false
       return
     }
@@ -121,7 +125,7 @@ export function useCompetitionBroadcastPanel(props: Readonly<Omit<{
     unwatch = watchCompetition(props.competitionId, {
       competitionEventChanged: notification => {
         if (!isCompetitionBroadcastKind(notification.kind)) return
-        const notifiedAt = Date.parse(notification.occurredAt)
+        const notifiedAt = dateTimestamp(notification.occurredAt)
         if (Number.isFinite(notifiedAt)) latestNotifiedAt = Math.max(latestNotifiedAt, notifiedAt)
         void refreshLatest()
       },

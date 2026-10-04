@@ -1,22 +1,23 @@
+import { message as describeMessage } from '../../../utils/i18n'
 import { markRaw, toRefs } from 'vue'
 
-import { toast } from 'vue-sonner'
+import { toast } from '../../../utils/message-toast'
 import { Copy } from '@lucide/vue'
-import type { NoCtfapiEndpointsChallengesChallengeResponse, NoCtfapiEndpointsCompetitionsCompetitionResponse } from '../../../api'
+import type { NoCTFAPIEndpointsChallengesChallengeResponse, NoCTFAPIEndpointsCompetitionsCompetitionResponse } from '../../../api/models'
 import RuntimeAccessUrlComponent from '../RuntimeAccessUrl.vue'
 
 /** Owns state, effects and commands for KohPanel. */
 export function useKohPanel(props: Readonly<{
-  competition: NoCtfapiEndpointsCompetitionsCompetitionResponse
-  challenge: NoCtfapiEndpointsChallengesChallengeResponse
+  competition: NoCTFAPIEndpointsCompetitionsCompetitionResponse
+  challenge: NoCTFAPIEndpointsChallengesChallengeResponse
 }>) {
   async function copyControlFlag(flag: string) {
     try {
       await navigator.clipboard.writeText(flag)
-      toast.success(translate("ui.controlFlagCopied"))
+      toast.success(describeMessage("challenges.label.controlFlagCopied"))
     }
     catch {
-      toast.error(translate("ui.copyFailedPleaseManuallySelectCopy"))
+      toast.error(describeMessage("common.kohPanel.error.copyManuallySelectFailed"))
     }
   }
 

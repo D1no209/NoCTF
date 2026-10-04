@@ -9,13 +9,13 @@ const { Crosshair, ShieldX, bolts, event } = toRefs(viewProps.state)
 <template>
   <div class="event-fx attack-failure" aria-hidden="true">
     <div class="failure-reticle"><i /><i /><Crosshair /></div>
-    <div class="failure-bolts"><i v-for="bolt in bolts" :key="bolt" :style="{ '--bolt': bolt }" /></div>
-    <div class="block-shield"><ShieldX /><strong>{{ $t('ui.blocked') }}</strong></div>
-    <div class="failure-signal"><span v-for="index in 7" :key="index" /></div>
+    <div class="failure-bolts"><i v-for="bolt in bolts" :key="bolt ?? undefined" :style="{ '--bolt': bolt }" /></div>
+    <div class="block-shield"><ShieldX /><strong>{{ $t('competitions.label.blocked') }}</strong></div>
+    <div class="failure-signal"><span v-for="index in 7" :key="index ?? undefined" /></div>
     <div class="failure-result">
       <small>{{ event.teamName }} / {{ event.challengeTitle }}</small>
-      <strong>{{ $t('ui.attackFailed2') }}</strong>
-      <span>{{ $t('ui.noPoints') }}</span>
+      <strong>{{ $t('competitions.error.attackFailed') }}</strong>
+      <span>{{ $t('competitions.label.points') }}</span>
     </div>
   </div>
 </template>

@@ -3,7 +3,7 @@ import type { ElkNode } from 'elkjs/lib/elk-api.js'
 import elkWorkerUrl from 'elkjs/lib/elk-worker.min.js?url'
 
 export type ProgressionLayoutDirection = 'RIGHT' | 'DOWN'
-export interface ProgressionLayoutNode { id: string, kind: 0 | 1, width?: number, height?: number }
+export interface ProgressionLayoutNode { id: string, kind: 0 | 1, width?: number | null, height?: number | null }
 export interface ProgressionLayoutEdge { source: string, target: string }
 export interface ProgressionPosition { id: string, x: number, y: number }
 

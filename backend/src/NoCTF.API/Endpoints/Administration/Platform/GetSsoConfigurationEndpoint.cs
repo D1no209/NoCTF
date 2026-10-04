@@ -103,9 +103,9 @@ internal static class SsoAdministrationMapping
                 or SsoConfigurationMutationState.ProviderLimitReached => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest
         };
-        return TypedResults.Problem(
+        return ApiProblems.Problem(
             statusCode: status,
-            title: "The SSO configuration could not be updated.",
+            title: ApiMessages.Get(ApiMessageId.GetSsoConfigurationTitleSsoConfigurationCouldUpdated),
             extensions: new Dictionary<string, object?>
             {
                 ["code"] = state.ToString()
@@ -122,7 +122,7 @@ public sealed class GetSsoConfigurationEndpoint(ManageSsoProviders management)
         AuthSchemes("Bearer");
         Roles("Administrator");
         Description(builder => builder.WithName("AdminPlatformSsoGetConfiguration"));
-        Summary(summary => summary.Summary = "Returns SSO configuration without provider secrets.");
+        Summary(summary => { summary.Summary = "Returns SSO configuration without provider secrets."; summary.Description = summary.Summary; });
     }
 
     public override async Task<Ok<SsoConfigurationResponse>> ExecuteAsync(CancellationToken ct) =>

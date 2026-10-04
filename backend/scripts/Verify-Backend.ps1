@@ -66,35 +66,18 @@ try {
     Complete-NativeStep 'EF migration drift check'
 
     if (-not $SkipOpenApi) {
-        Write-Host '[RUN] OpenAPI export'
-        dotnet run --project .\src\NoCTF.Host\NoCTF.Host.csproj `
-            --no-launch-profile `
-            -- `
-            --export-openapi
-        Complete-NativeStep 'OpenAPI export'
-
-        Write-Host '[RUN] OpenAPI artifact drift check'
-        git -C (Split-Path -Parent $backendRoot) diff --exit-code -- `
-            backend/artifacts/openapi/swagger.json `
-            backend/src/NoCTF.API/wwwroot/openapi/v1.json
-        Complete-NativeStep 'OpenAPI artifact drift check'
-
-        Write-Host '[RUN] Frontend API client generation'
+        Write-Host '[RUN] OpenAPI and Kiota artifact check'
         Push-Location .\src\NoCTF.API\ClientApp
         try {
             bun install --frozen-lockfile
             Complete-NativeStep 'Frontend dependency install'
-            bun run api:gen
-            Complete-NativeStep 'Frontend API client generation'
+            bun run api:check
+            Complete-NativeStep 'OpenAPI and Kiota artifact check'
         }
         finally {
             Pop-Location
         }
 
-        Write-Host '[RUN] Frontend API client drift check'
-        git -C (Split-Path -Parent $backendRoot) diff --exit-code -- `
-            backend/src/NoCTF.API/ClientApp/app/api
-        Complete-NativeStep 'Frontend API client drift check'
     }
     else {
         Write-Warning '[SKIPPED] OpenAPI export: -SkipOpenApi was specified.'

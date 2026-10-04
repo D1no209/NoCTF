@@ -13,21 +13,21 @@ export function useAdminPlatformPage() {
 
   const navGroups = computed<WorkspaceNavGroup[]>(() => [
     {
-      label: translate("ui.platform"),
+      label: translate("administration.label.platform"),
       items: [
-        { to: '/admin/platform', label: translate("ui.platformInformation"), icon: Info, exact: true },
-        { to: '/admin/platform/users', label: translate("ui.user"), icon: Users },
-        { to: '/admin/platform/email', label: translate("ui.emailAndHumanVerification"), icon: MailCheck },
+        { to: '/admin/platform', label: translate("administration.label.platformInformation"), icon: Info, exact: true },
+        { to: '/admin/platform/users', label: translate("administration.label.user"), icon: Users },
+        { to: '/admin/platform/email', label: translate("administration.label.emailHumanVerification"), icon: MailCheck },
         { to: '/admin/platform/authentication', label: translate('sso.authenticationSettings'), icon: KeyRound },
-        { to: '/admin/platform/experiments', label: translate('ui.experimentalFeatures'), icon: Beaker },
+        { to: '/admin/platform/experiments', label: translate('administration.label.experimentalFeatures'), icon: Beaker },
       ],
     },
     {
-      label: translate("ui.maintenance"),
+      label: translate("administration.label.maintenance"),
       items: [
-        { to: '/admin/platform/runtimes', label: translate("ui.runtimeContainers"), icon: Container },
-        { to: '/admin/platform/logs', label: translate("ui.log"), icon: ScrollText },
-        { to: '/admin/platform/audit', label: translate("ui.audit"), icon: History },
+        { to: '/admin/platform/runtimes', label: translate("common.label.runtimeContainers"), icon: Container },
+        { to: '/admin/platform/logs', label: translate("administration.label.log"), icon: ScrollText },
+        { to: '/admin/platform/audit', label: translate("administration.label.audit"), icon: History },
       ],
     },
   ])

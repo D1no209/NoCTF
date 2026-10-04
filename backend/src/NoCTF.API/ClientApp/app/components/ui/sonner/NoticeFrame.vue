@@ -87,6 +87,6 @@ onBeforeUnmount(() => {
   <div ref="frame" class="notice-frame" :data-tone="destructive ? 'error' : 'info'" :role="destructive ? 'alert' : 'status'">
     <NoticeIcon :tone="destructive ? 'error' : 'info'" />
     <ScrollSurface axis="y" class="notice-message"><slot /></ScrollSurface>
-    <ActionButton class="notice-dismiss" :aria-label="$t('ui.close')" @click="emit('dismiss')"><X class="size-4" /></ActionButton>
+    <ActionButton class="notice-dismiss" :aria-label="$t('common.action.close')" @click="emit('dismiss')"><X class="size-4" /></ActionButton>
   </div>
 </template>

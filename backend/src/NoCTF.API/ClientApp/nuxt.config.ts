@@ -52,6 +52,8 @@ export default defineNuxtConfig({
     strict: true,
     tsConfig: {
       compilerOptions: {
+        // Kiota 1.29 emits some query enum imports without `type`; elide those type-only imports.
+        verbatimModuleSyntax: false,
         noUnusedLocals: true,
         noUnusedParameters: true,
       },

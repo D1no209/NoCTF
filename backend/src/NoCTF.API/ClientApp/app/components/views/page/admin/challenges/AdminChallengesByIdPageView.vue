@@ -1,4 +1,5 @@
 <script setup lang="ts">
+
 import { toRefs } from 'vue'
 import type { AdminChallengesByIdPageViewState } from '~/features/routes/admin/challenges/useAdminChallengesByIdPage'
 
@@ -9,13 +10,13 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
 <template>
   <div data-contained-workspace-page data-slot="challenge-template-workspace" class="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-5">
     <div class="flex items-center gap-2 text-sm text-muted-foreground">
-      <NuxtLink to="/admin/challenges" class="hover:underline">{{ $t('ui.challengeLibrary2') }}</NuxtLink>
+      <NuxtLink to="/admin/challenges" class="hover:underline">{{ $t('common.label.challengeLibrary.useDefaultLayout') }}</NuxtLink>
       <span>/</span>
       <span class="min-w-0 truncate">{{ template?.title ?? challengeId }}</span>
     </div>
 
     <Alert v-if="!canOrganize" variant="destructive">
-      <AlertDescription>{{ $t('ui.organizerOrAdministratorRightsAreRequiredToManageTheQuestion') }}</AlertDescription>
+      <AlertDescription>{{ $t('administration.challengesBy.validation.organizerAdministratorRequired') }}</AlertDescription>
     </Alert>
 
     <template v-else>
@@ -33,28 +34,28 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
           <div class="flex min-w-0 items-center gap-3">
             <h1 class="truncate text-2xl font-semibold">{{ template.title }}</h1>
             <component :is="AdminGameModeBadge" :mode="template.mode" />
-            <Badge v-if="isDeleted" variant="destructive">{{ $t('ui.deleted') }}</Badge>
+            <Badge v-if="isDeleted" variant="destructive">{{ $t('common.label.deleted.competitionSidebarView') }}</Badge>
           </div>
           <div class="flex items-center gap-2">
             <Button v-if="isDeleted" variant="outline" :disabled="restoring" @click="restoreTemplate">
               <Spinner v-if="restoring" data-icon="inline-start" />
-              <RotateCcw v-else data-icon="inline-start" /> {{ $t('ui.recoveryTemplate') }} </Button>
+              <RotateCcw v-else data-icon="inline-start" /> {{ $t('administration.label.recoveryTemplate') }} </Button>
             <AlertDialog v-else>
               <AlertDialogTrigger as-child>
                 <Button variant="destructive">
-                  <Trash2 data-icon="inline-start" /> {{ $t('ui.deleteTemplate') }} </Button>
+                  <Trash2 data-icon="inline-start" /> {{ $t('administration.label.deleteTemplate') }} </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>{{ $t('ui.deleteQuestionTemplate') }}</AlertDialogTitle>
+                  <AlertDialogTitle>{{ $t('administration.label.deleteQuestionTemplate') }}</AlertDialogTitle>
                   <AlertDialogDescription>
-                    {{ $t('ui.softDeleteTemplateItCanBeRestoredLaterAndHistorical', { title: template.title ?? $t('ui.symbol') }) }}
+                    {{ $t('administration.challengesBy.description.softDeleteTemplateRestored', { title: template.title ?? $t('common.label.symbol') }) }}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>{{ $t('ui.cancel') }}</AlertDialogCancel>
+                  <AlertDialogCancel>{{ $t('common.action.cancel') }}</AlertDialogCancel>
                   <AlertDialogAction variant="destructive" :disabled="deleting" @click="removeTemplate">
-                    <Spinner v-if="deleting" data-icon="inline-start" /> {{ $t('ui.confirmDeletion') }} </AlertDialogAction>
+                    <Spinner v-if="deleting" data-icon="inline-start" /> {{ $t('administration.label.confirmDeletion') }} </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
@@ -66,20 +67,20 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
           orientation="vertical"
           class="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-4 lg:grid-cols-[12rem_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)] lg:gap-6"
         >
-          <ScrollSurface as="aside" axis="y" class="min-h-0 overflow-y-auto lg:pr-2" :aria-label="$t('ui.challengeLibrary2')">
+          <ScrollSurface as="aside" axis="y" class="min-h-0 overflow-y-auto lg:pr-2" :aria-label="$t('common.label.challengeLibrary.useDefaultLayout')">
             <TabsList class="grid h-auto w-full grid-cols-2 items-stretch gap-1 bg-transparent p-0 sm:grid-cols-3 lg:flex lg:flex-col">
-              <TabsTrigger value="basic" class="w-full justify-start px-3 py-2">{{ $t('ui.basicInformation') }}</TabsTrigger>
-              <TabsTrigger value="runtime" class="w-full justify-start px-3 py-2">{{ $t('ui.runtimeEnvironment') }}</TabsTrigger>
-              <TabsTrigger value="definition" class="w-full justify-start px-3 py-2">{{ $t('ui.modeDefinition') }}</TabsTrigger>
+              <TabsTrigger value="basic" class="w-full justify-start px-3 py-2">{{ $t('administration.label.basicInformation') }}</TabsTrigger>
+              <TabsTrigger value="runtime" class="w-full justify-start px-3 py-2">{{ $t('common.label.runtimeEnvironment') }}</TabsTrigger>
+              <TabsTrigger value="definition" class="w-full justify-start px-3 py-2">{{ $t('administration.label.modeDefinition') }}</TabsTrigger>
               <TabsTrigger value="attachments" class="w-full justify-start px-3 py-2">
-                {{ $t('ui.accessories') }}
+                {{ $t('common.label.accessories') }}
                 <Badge variant="secondary" class="ml-auto">{{ attachments.length }}</Badge>
               </TabsTrigger>
               <TabsTrigger value="flags" class="w-full justify-start px-3 py-2">
-                {{ $t('ui.flags') }}
+                {{ $t('administration.label.flags') }}
                 <Badge variant="secondary" class="ml-auto">{{ flags.length }}</Badge>
               </TabsTrigger>
-              <TabsTrigger value="permissions" class="w-full justify-start px-3 py-2">{{ $t('ui.permissions') }}</TabsTrigger>
+              <TabsTrigger value="permissions" class="w-full justify-start px-3 py-2">{{ $t('administration.label.permissions') }}</TabsTrigger>
               <TabsTrigger value="placements" class="w-full justify-start px-3 py-2">{{ $t('placements.title') }}</TabsTrigger>
             </TabsList>
           </ScrollSurface>
@@ -93,10 +94,10 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
               <ScrollSurface axis="y" :reset-key="selectedSection" class="min-h-0 flex-1 overflow-y-auto overscroll-contain">
               <CardContent>
                 <Alert v-if="basicSaveErrors.length" variant="destructive" class="mb-4">
-                  <AlertTitle>{{ $t('ui.unableToSaveTheChallengeTemplate') }}</AlertTitle>
+                  <AlertTitle>{{ $t('administration.challengesBy.description.unableSaveChallengeTemplate') }}</AlertTitle>
                   <AlertDescription>
                     <ul class="list-disc pl-5">
-                      <li v-for="message in basicSaveErrors" :key="message">{{ message }}</li>
+                      <li v-for="(message, index) in basicSaveErrors" :key="index ?? undefined">{{ message }}</li>
                     </ul>
                   </AlertDescription>
                 </Alert>
@@ -104,7 +105,7 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
                   <FieldGroup>
                     <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
                     <Field :data-invalid="titleInvalid || undefined">
-                      <FieldLabel for="edit-title">{{ $t('ui.title') }}</FieldLabel>
+                      <FieldLabel for="edit-title">{{ $t('common.label.title') }}</FieldLabel>
                       <Input
                         id="edit-title"
                         v-model="form.title"
@@ -115,21 +116,21 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
                       />
                     </Field>
                     <Field>
-                      <FieldLabel for="edit-visibility">{{ $t('ui.visibility') }}</FieldLabel>
+                      <FieldLabel for="edit-visibility">{{ $t('administration.label.visibility') }}</FieldLabel>
                       <Select v-model="form.visibility" :disabled="isDeleted">
                         <SelectTrigger id="edit-visibility" class="w-full">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectGroup>
-                            <SelectItem value="Private">{{ $t('ui.private') }}</SelectItem>
-                            <SelectItem value="Shared">{{ $t('ui.share') }}</SelectItem>
+                            <SelectItem value="Private">{{ $t('administration.label.private') }}</SelectItem>
+                            <SelectItem value="Shared">{{ $t('common.label.share') }}</SelectItem>
                           </SelectGroup>
                         </SelectContent>
                       </Select>
                     </Field>
                     <Field :data-invalid="directionInvalid || undefined">
-                      <FieldLabel for="edit-direction">{{ $t('ui.category') }}</FieldLabel>
+                      <FieldLabel for="edit-direction">{{ $t('administration.label.category') }}</FieldLabel>
                       <Input
                         id="edit-direction"
                         v-model="form.direction"
@@ -143,19 +144,19 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
                     </div>
                     <div class="grid min-w-0 gap-4 xl:grid-cols-2">
                       <Field>
-                        <FieldLabel for="edit-description">{{ $t('ui.question') }}</FieldLabel>
+                        <FieldLabel for="edit-description">{{ $t('administration.label.question') }}</FieldLabel>
                         <Textarea id="edit-description" v-model="form.description" rows="8" :disabled="isDeleted" />
                       </Field>
-                      <MarkdownPreview :source="form.description" :label="$t('ui.markdownPreview')" :empty-label="$t('ui.noContent')" />
+                      <MarkdownPreview :source="form.description" :label="$t('administration.label.markdownPreview')" :empty-label="$t('administration.label.content')" />
                     </div>
                     <div class="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                      <span>{{ $t('ui.create') }} <component :is="AdminDateTime" :value="template.createdAt" /></span>
-                      <span>{{ $t('ui.update') }} <component :is="AdminDateTime" :value="template.updatedAt" /></span>
-                      <span v-if="template.deletedAt">{{ $t('ui.delete') }} <component :is="AdminDateTime" :value="template.deletedAt" /></span>
+                      <span>{{ $t('common.action.create') }} <component :is="AdminDateTime" :value="dateIso(template.createdAt)" /></span>
+                      <span>{{ $t('administration.label.update') }} <component :is="AdminDateTime" :value="dateIso(template.updatedAt)" /></span>
+                      <span v-if="template.deletedAt">{{ $t('common.action.delete') }} <component :is="AdminDateTime" :value="dateIso(template.deletedAt)" /></span>
                     </div>
                     <Field v-if="!isDeleted" orientation="horizontal">
                       <Button type="submit" :disabled="saving">
-                        <Spinner v-if="saving" data-icon="inline-start" /> {{ $t('ui.saveChanges') }} </Button>
+                        <Spinner v-if="saving" data-icon="inline-start" /> {{ $t('administration.label.saveChanges') }} </Button>
                     </Field>
                   </FieldGroup>
                 </UiForm>
@@ -169,28 +170,28 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
               <CardHeader v-if="!isDeleted" class="shrink-0">
                   <div class="flex flex-wrap items-center justify-between gap-2">
                     <Button type="button" variant="outline" size="sm" @click="resetRuntimeDefinition">
-                      <RotateCcw data-icon="inline-start" /> {{ $t('ui.resetToCurrentModeDefinition') }}
+                      <RotateCcw data-icon="inline-start" /> {{ $t('administration.challengesBy.label.resetModeDefinition') }}
                     </Button>
                     <Button data-testid="runtime-definition-save" type="button" size="sm" :disabled="saving" @click="saveRuntimeDefinition">
-                      <Spinner v-if="saving" data-icon="inline-start" /> {{ $t('ui.saveChanges') }}
+                      <Spinner v-if="saving" data-icon="inline-start" /> {{ $t('administration.label.saveChanges') }}
                     </Button>
                   </div>
               </CardHeader>
               <ScrollSurface axis="y" :reset-key="selectedSection" class="min-h-0 flex-1 overflow-y-auto overscroll-contain">
               <CardContent>
                 <Alert v-if="runtimeSaveErrors.length" variant="destructive" class="mb-4">
-                  <AlertTitle>{{ $t('ui.unableToSaveTheChallengeTemplate') }}</AlertTitle>
+                  <AlertTitle>{{ $t('administration.challengesBy.description.unableSaveChallengeTemplate') }}</AlertTitle>
                   <AlertDescription>
                     <ul class="list-disc pl-5">
-                      <li v-for="message in runtimeSaveErrors" :key="message">{{ message }}</li>
+                      <li v-for="(message, index) in runtimeSaveErrors" :key="index ?? undefined">{{ message }}</li>
                     </ul>
                   </AlertDescription>
                 </Alert>
                 <Alert v-if="runtimeDefinitionParseFailed" variant="destructive">
                   <AlertDescription class="flex flex-col items-start gap-3">
-                    <span>{{ $t('ui.theExistingDefinitionJsonCannotBeParsedAndMayBe2') }}</span>
+                    <span>{{ $t('administration.challengesBy.validation.existingDefinitionFormat') }}</span>
                     <Button v-if="!isDeleted" type="button" variant="outline" size="sm" @click="resetRuntimeDefinition">
-                      <RotateCcw data-icon="inline-start" /> {{ $t('ui.resetToCurrentModeDefinition') }}
+                      <RotateCcw data-icon="inline-start" /> {{ $t('administration.challengesBy.label.resetModeDefinition') }}
                     </Button>
                   </AlertDescription>
                 </Alert>
@@ -212,54 +213,54 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
               <CardHeader v-if="!isDeleted" class="shrink-0">
                   <div class="flex flex-wrap items-center justify-between gap-2">
                     <Button type="button" variant="outline" size="sm" @click="resetModeDefinition">
-                      <RotateCcw data-icon="inline-start" /> {{ $t('ui.resetToCurrentModeDefinition') }}
+                      <RotateCcw data-icon="inline-start" /> {{ $t('administration.challengesBy.label.resetModeDefinition') }}
                     </Button>
                     <Button data-testid="mode-definition-save" type="button" size="sm" :disabled="saving" @click="saveModeDefinition">
-                      <Spinner v-if="saving" data-icon="inline-start" /> {{ $t('ui.saveChanges') }}
+                      <Spinner v-if="saving" data-icon="inline-start" /> {{ $t('administration.label.saveChanges') }}
                     </Button>
                   </div>
               </CardHeader>
               <ScrollSurface axis="y" :reset-key="selectedSection" class="min-h-0 flex-1 overflow-y-auto overscroll-contain">
               <CardContent>
                 <Alert v-if="definitionSaveErrors.length" variant="destructive" class="mb-4">
-                  <AlertTitle>{{ $t('ui.unableToSaveTheChallengeTemplate') }}</AlertTitle>
+                  <AlertTitle>{{ $t('administration.challengesBy.description.unableSaveChallengeTemplate') }}</AlertTitle>
                   <AlertDescription>
                     <ul class="list-disc pl-5">
-                      <li v-for="message in definitionSaveErrors" :key="message">{{ message }}</li>
+                      <li v-for="(message, index) in definitionSaveErrors" :key="index ?? undefined">{{ message }}</li>
                     </ul>
                   </AlertDescription>
                 </Alert>
                 <Alert v-if="definitionParseFailed" variant="destructive">
                   <AlertDescription class="flex flex-col items-start gap-3">
-                    <span>{{ $t('ui.theExistingDefinitionJsonCannotBeParsedAndMayBe3') }}</span>
+                    <span>{{ $t('administration.challengesBy.validation.existingDefinitionFormat.idPageView') }}</span>
                     <Button v-if="!isDeleted" type="button" variant="outline" size="sm" @click="resetModeDefinition">
-                      <RotateCcw data-icon="inline-start" /> {{ $t('ui.resetToCurrentModeDefinition') }}
+                      <RotateCcw data-icon="inline-start" /> {{ $t('administration.challengesBy.label.resetModeDefinition') }}
                     </Button>
                   </AlertDescription>
                 </Alert>
                 <FieldGroup v-else-if="definitionModel">
                   <Alert v-if="hasModeDefinition && runtimeDisabled">
-                    <AlertDescription>{{ $t('ui.theFollowingConfigurationsWillNotTakeEffectWhileTheRuntime') }}</AlertDescription>
+                    <AlertDescription>{{ $t('administration.challengesBy.description.followingConfigurationsTakeEffect') }}</AlertDescription>
                   </Alert>
                   <Field>
-                    <FieldLabel for="edit-mode">{{ $t('ui.gameMode') }}</FieldLabel>
+                    <FieldLabel for="edit-mode">{{ $t('common.label.gameMode') }}</FieldLabel>
                     <Select :model-value="form.mode" :disabled="isDeleted" @update:model-value="changeMode">
                       <SelectTrigger id="edit-mode" class="w-full">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectGroup>
-                          <SelectItem value="Ctf">{{ $t('ui.ctf') }}</SelectItem>
-                          <SelectItem value="Awd">{{ $t('ui.awd') }}</SelectItem>
-                          <SelectItem value="Awdp">{{ $t('ui.awdp') }}</SelectItem>
-                          <SelectItem value="Koh">{{ $t('ui.koh') }}</SelectItem>
+                          <SelectItem value="Ctf">{{ $t('common.label.ctf') }}</SelectItem>
+                          <SelectItem value="Awd">{{ $t('common.label.awd') }}</SelectItem>
+                          <SelectItem value="Awdp">{{ $t('common.label.awdp.createDialogView') }}</SelectItem>
+                          <SelectItem value="Koh">{{ $t('common.label.koh') }}</SelectItem>
                         </SelectGroup>
                       </SelectContent>
                     </Select>
-                    <FieldDescription>{{ $t('ui.theModeCannotBeModifiedWhileThereIsAnOngoing') }}</FieldDescription>
+                    <FieldDescription>{{ $t('administration.challengesBy.validation.modeModifiedFormat') }}</FieldDescription>
                   </Field>
                   <Field v-if="showInteractionKind">
-                    <FieldLabel for="challenge-ctf-interaction-kind">{{ $t('ui.completionMethod') }}</FieldLabel>
+                    <FieldLabel for="challenge-ctf-interaction-kind">{{ $t('administration.label.completionMethod') }}</FieldLabel>
                     <Select
                       :model-value="definitionModel.interactionKind === CtfInteraction.PatchVerification ? 'PatchVerification' : 'FlagSubmission'"
                       :disabled="isDeleted"
@@ -268,12 +269,12 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
                       <SelectTrigger id="challenge-ctf-interaction-kind" class="w-full"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectGroup>
-                          <SelectItem value="FlagSubmission">{{ $t('ui.flagSubmission') }}</SelectItem>
-                          <SelectItem value="PatchVerification">{{ $t('ui.patchVerification') }}</SelectItem>
+                          <SelectItem value="FlagSubmission">{{ $t('administration.label.flagSubmission') }}</SelectItem>
+                          <SelectItem value="PatchVerification">{{ $t('common.label.patchVerification') }}</SelectItem>
                         </SelectGroup>
                       </SelectContent>
                     </Select>
-                    <FieldDescription>{{ $t('ui.ctfCompletionMethodDescription') }}</FieldDescription>
+                    <FieldDescription>{{ $t('administration.label.ctfCompletionMethodDescription') }}</FieldDescription>
                   </Field>
                   <template v-if="form.mode === 'Awd'">
                     <component :is="DefinitionFlagInjectionSection" :model="definitionModel" :disabled="isDeleted" />
@@ -297,10 +298,10 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
                   </template>
                   <Empty v-if="!hasModeDefinition">
                     <EmptyHeader>
-                      <EmptyTitle>{{ $t('ui.thisModeHasNoAdditionalModeDefinition') }}</EmptyTitle>
+                      <EmptyTitle>{{ $t('administration.challengesBy.description.modeAdditionalModeDefinition') }}</EmptyTitle>
                     </EmptyHeader>
                   </Empty>
-                  <FieldDescription v-else> {{ $t('ui.definitionModificationsWillTakeEffectOnInstancesThatAreStarted') }} </FieldDescription>
+                  <FieldDescription v-else> {{ $t('administration.definitionEditor.description.definitionModificationsTakeEffect') }} </FieldDescription>
                 </FieldGroup>
               </CardContent>
               </ScrollSurface>
@@ -312,25 +313,25 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
               <CardHeader class="gap-4">
                 <div class="flex flex-wrap items-center justify-between gap-4">
                   <div>
-                    <CardTitle>{{ $t('ui.attachmentDelivery') }}</CardTitle>
+                    <CardTitle>{{ $t('administration.label.attachmentDelivery') }}</CardTitle>
                     <CardDescription>
                       {{ attachmentDeliveryPolicy === 'RandomOnePerTeam'
-                        ? $t('ui.eachTeamReceivesOneStableRandomAttachmentVariantOnIts')
-                        : $t('ui.participantsCanViewAndDownloadEveryStandardAttachment') }}
+                        ? $t('administration.challengesBy.description.teamReceivesOneStable')
+                        : $t('administration.challengesBy.description.participantsViewDownloadEvery') }}
                     </CardDescription>
                   </div>
                   <Badge variant="outline">
-                    {{ attachmentDeliveryPolicy === 'RandomOnePerTeam' ? $t('ui.oneRandomVariantPerTeam') : $t('ui.allAttachments') }}
+                    {{ attachmentDeliveryPolicy === 'RandomOnePerTeam' ? $t('administration.challengesBy.label.oneRandomVariantTeam') : $t('administration.label.attachments') }}
                   </Badge>
                 </div>
                 <div class="flex flex-wrap items-end justify-between gap-3">
                   <div class="flex items-center gap-2">
                     <Switch id="attachments-include-deleted" v-model="attachmentsIncludeDeleted" />
-                    <Label for="attachments-include-deleted">{{ $t('ui.showDeleted') }}</Label>
+                    <Label for="attachments-include-deleted">{{ $t('administration.label.showDeleted') }}</Label>
                   </div>
                   <div class="flex flex-wrap items-end gap-2">
                     <div class="grid min-w-48 gap-1.5">
-                      <Label for="attachment-delivery-policy">{{ $t('ui.deliveryMode') }}</Label>
+                      <Label for="attachment-delivery-policy">{{ $t('administration.label.deliveryMode') }}</Label>
                       <Select
                         :model-value="attachmentDeliveryPolicy"
                         :disabled="isDeleted || uploading || randomUploading"
@@ -340,8 +341,8 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="All">{{ $t('ui.allAttachments') }}</SelectItem>
-                          <SelectItem value="RandomOnePerTeam">{{ $t('ui.oneRandomVariantPerTeam') }}</SelectItem>
+                          <SelectItem value="All">{{ $t('administration.label.attachments') }}</SelectItem>
+                          <SelectItem value="RandomOnePerTeam">{{ $t('administration.challengesBy.label.oneRandomVariantTeam') }}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -349,18 +350,18 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
                       <FileInput :ref="setUploadInputRef"  multiple class="hidden" @change="uploadAttachment" />
                       <Button :disabled="uploading || isDeleted" @click="uploadInput?.click()">
                         <Spinner v-if="uploading" data-icon="inline-start" />
-                        <Upload v-else data-icon="inline-start" /> {{ $t('ui.uploadStandardAttachments') }}
+                        <Upload v-else data-icon="inline-start" /> {{ $t('administration.label.uploadStandardAttachments') }}
                       </Button>
                       <Button
                         variant="outline"
                         :disabled="isDeleted || attachments.some(item => !item.deletedAt)"
                         @click="onClickRandomBatchOpen(true)"
                       >
-                        {{ $t('ui.createPerTeamRandomAttachments') }}
+                        {{ $t('administration.challengesBy.label.createTeamRandomAttachments') }}
                       </Button>
                     </template>
                     <Button v-else :disabled="isDeleted" @click="onClickRandomBatchOpen(true)">
-                      {{ $t('ui.uploadRandomAttachmentBatch') }}
+                      {{ $t('administration.label.uploadRandomAttachmentBatch') }}
                     </Button>
                   </div>
                 </div>
@@ -368,29 +369,29 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
               <ScrollSurface axis="y" :reset-key="selectedSection" class="min-h-0 flex-1 overflow-y-auto overscroll-contain">
               <CardContent>
                 <div v-if="attachmentsLoading" class="flex flex-col gap-2">
-                  <Skeleton v-for="i in 3" :key="i" class="h-10 w-full" />
+                  <Skeleton v-for="i in 3" :key="i ?? undefined" class="h-10 w-full" />
                 </div>
                 <Empty v-else-if="attachments.length === 0">
                   <EmptyHeader>
-                    <EmptyTitle>{{ $t('ui.noAttachmentsYet') }}</EmptyTitle>
-                    <EmptyDescription>{{ $t('ui.uploadTheAttachmentFilesRequiredForTheQuestion') }}</EmptyDescription>
+                    <EmptyTitle>{{ $t('administration.label.attachmentsYet') }}</EmptyTitle>
+                    <EmptyDescription>{{ $t('administration.challengesBy.validation.uploadAttachmentRequired') }}</EmptyDescription>
                   </EmptyHeader>
                 </Empty>
                 <Table v-else>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>{{ $t('ui.fileName') }}</TableHead>
-                      <TableHead v-if="attachmentDeliveryPolicy === 'RandomOnePerTeam'">{{ $t('ui.exactFlag') }}</TableHead>
-                      <TableHead v-else>{{ $t('ui.type') }}</TableHead>
-                      <TableHead>{{ $t('ui.hash') }}</TableHead>
-                      <TableHead>{{ $t('ui.size') }}</TableHead>
-                      <TableHead>{{ $t('ui.uploadTime') }}</TableHead>
-                      <TableHead>{{ $t('ui.status') }}</TableHead>
-                      <TableHead class="text-right">{{ $t('ui.actions') }}</TableHead>
+                      <TableHead>{{ $t('administration.label.fileName') }}</TableHead>
+                      <TableHead v-if="attachmentDeliveryPolicy === 'RandomOnePerTeam'">{{ $t('administration.label.exactFlag') }}</TableHead>
+                      <TableHead v-else>{{ $t('common.label.type') }}</TableHead>
+                      <TableHead>{{ $t('administration.label.hash') }}</TableHead>
+                      <TableHead>{{ $t('administration.label.size') }}</TableHead>
+                      <TableHead>{{ $t('administration.label.uploadTime') }}</TableHead>
+                      <TableHead>{{ $t('common.label.status') }}</TableHead>
+                      <TableHead class="text-right">{{ $t('common.label.actions') }}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    <TableRow v-for="attachment in attachments" :key="attachment.id">
+                    <TableRow v-for="attachment in attachments" :key="attachment.id ?? undefined">
                       <TableCell class="font-medium">
                         <span class="inline-flex items-center gap-2">
                           <Paperclip class="size-4 text-muted-foreground" />
@@ -398,22 +399,22 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
                         </span>
                       </TableCell>
                       <TableCell v-if="attachmentDeliveryPolicy === 'RandomOnePerTeam'" class="font-mono text-sm">
-                        {{ attachment.exactFlag ?? $t('ui.symbol') }}
+                        {{ attachment.exactFlag ?? $t('common.label.symbol') }}
                       </TableCell>
                       <TableCell v-else class="text-muted-foreground">{{ attachment.contentType }}</TableCell>
                       <Hint :content="attachment.sha256" ><TableCell tabindex="0"
                         class="font-mono text-xs tabular-nums text-muted-foreground"
 
                       >
-                        {{ attachment.sha256?.slice(0, 8) ?? $t('ui.symbol') }}
+                        {{ attachment.sha256?.slice(0, 8) ?? $t('common.label.symbol') }}
                       </TableCell></Hint>
                       <TableCell>{{ formatBytes(attachment.byteLength) }}</TableCell>
                       <TableCell>
-                        <component :is="AdminDateTime" :value="attachment.createdAt" />
+                        <component :is="AdminDateTime" :value="dateIso(attachment.createdAt)" />
                       </TableCell>
                       <TableCell>
-                        <Badge v-if="attachment.deletedAt" variant="destructive">{{ $t('ui.deleted') }}</Badge>
-                        <Badge v-else variant="secondary">{{ $t('ui.normal') }}</Badge>
+                        <Badge v-if="attachment.deletedAt" variant="destructive">{{ $t('common.label.deleted.competitionSidebarView') }}</Badge>
+                        <Badge v-else variant="secondary">{{ $t('administration.label.normal') }}</Badge>
                       </TableCell>
                       <TableCell class="text-right">
                         <div class="flex justify-end gap-2">
@@ -423,10 +424,10 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
                               variant="outline"
                               :disabled="attachmentActionPending"
                               @click="restoreAttachment(attachment)"
-                            > {{ $t('ui.restore2') }} </Button>
+                            > {{ $t('administration.label.restore') }} </Button>
                           </template>
                           <template v-else>
-                            <Button size="sm" variant="destructive" @click="onClickDeletingAttachment(attachment)"> {{ $t('ui.delete') }} </Button>
+                            <Button size="sm" variant="destructive" @click="onClickDeletingAttachment(attachment)"> {{ $t('common.action.delete') }} </Button>
                           </template>
                         </div>
                       </TableCell>
@@ -443,33 +444,33 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
               <CardHeader class="flex flex-row items-center justify-between gap-4">
                 <div class="flex items-center gap-2">
                   <Switch id="flags-include-deleted" v-model="flagsIncludeDeleted" />
-                  <Label for="flags-include-deleted">{{ $t('ui.showDeleted') }}</Label>
+                  <Label for="flags-include-deleted">{{ $t('administration.label.showDeleted') }}</Label>
                 </div>
               </CardHeader>
               <ScrollSurface axis="y" :reset-key="selectedSection" class="min-h-0 flex-1 overflow-y-auto overscroll-contain">
               <CardContent>
                 <section v-if="!usesRuntimeFlagInjection" class="mb-6 flex flex-col gap-4" aria-labelledby="add-static-flag-title">
                   <div>
-                    <h3 id="add-static-flag-title" class="text-sm font-semibold">{{ $t('ui.addFlag2') }}</h3>
+                    <h3 id="add-static-flag-title" class="text-sm font-semibold">{{ $t('administration.label.addFlag') }}</h3>
                   </div>
                   <UiForm validation="feature" @submit.prevent="createFlag">
                     <div class="grid gap-4 lg:grid-cols-[minmax(12rem,16rem)_minmax(0,1fr)_auto] lg:items-end">
                       <Field>
-                        <FieldLabel for="flag-match-kind">{{ $t('ui.matchType') }}</FieldLabel>
+                        <FieldLabel for="flag-match-kind">{{ $t('administration.label.matchType') }}</FieldLabel>
                         <Select v-model="flagForm.matchKind" :disabled="isDeleted || flagCreating">
                           <SelectTrigger id="flag-match-kind" class="w-full"><SelectValue /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="Exact">{{ $t('ui.exactMatch') }}</SelectItem>
-                            <SelectItem v-if="supportsRegularExpression" value="RegularExpression">{{ $t('ui.regularExpression') }}</SelectItem>
+                            <SelectItem value="Exact">{{ $t('administration.label.exactMatch') }}</SelectItem>
+                            <SelectItem v-if="supportsRegularExpression" value="RegularExpression">{{ $t('administration.label.regularExpression') }}</SelectItem>
                           </SelectContent>
                         </Select>
                       </Field>
                       <Field>
-                        <FieldLabel for="flag-value">{{ flagForm.matchKind === 'RegularExpression' ? $t('ui.regularExpression2') : $t('ui.flagContent') }}</FieldLabel>
-                        <Input id="flag-value" v-model="flagForm.flag" required class="font-mono text-sm" :disabled="isDeleted || flagCreating" :placeholder="flagForm.matchKind === 'RegularExpression' ? $t('ui.flag09aF36') : $t('ui.flag3')" />
+                        <FieldLabel for="flag-value">{{ flagForm.matchKind === 'RegularExpression' ? $t('administration.label.regularExpression.idPageView') : $t('administration.label.flagContent') }}</FieldLabel>
+                        <Input id="flag-value" v-model="flagForm.flag" required class="font-mono text-sm" :disabled="isDeleted || flagCreating" :placeholder="flagForm.matchKind === 'RegularExpression' ? $t('administration.label.flagF') : $t('administration.label.flag.idPageView')" />
                       </Field>
                       <Button type="submit" :disabled="isDeleted || flagCreating || !flagForm.flag.trim()">
-                        <Spinner v-if="flagCreating" data-icon="inline-start" />{{ $t('ui.add') }}
+                        <Spinner v-if="flagCreating" data-icon="inline-start" />{{ $t('administration.label.add') }}
                       </Button>
                     </div>
                   </UiForm>
@@ -477,43 +478,43 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
                 <Separator v-if="!usesRuntimeFlagInjection" class="mb-6" />
                 <Alert v-if="usesRuntimeFlagInjection" class="mb-4">
                   <AlertDescription>
-                    {{ $t('ui.thisChallengeUsesRuntimeManagedDynamicFlagsThePlatformGenerates') }}
+                    {{ $t('administration.challengesBy.description.challengeUsesRuntimeManaged') }}
                   </AlertDescription>
                 </Alert>
                 <div v-if="flagsLoading" class="flex flex-col gap-2">
-                  <Skeleton v-for="i in 3" :key="i" class="h-10 w-full" />
+                  <Skeleton v-for="i in 3" :key="i ?? undefined" class="h-10 w-full" />
                 </div>
                 <Empty v-else-if="staticFlags.length === 0 && systemFlags.length === 0">
                   <EmptyHeader>
-                    <EmptyTitle>{{ $t('ui.noFlagYet') }}</EmptyTitle>
-                    <EmptyDescription v-if="!usesRuntimeFlagInjection">{{ $t('ui.addTemplateLevelStaticFlag') }}</EmptyDescription>
-                    <EmptyDescription v-else>{{ $t('ui.aDynamicFlagWillBeGeneratedAutomaticallyWhenATeam') }}</EmptyDescription>
+                    <EmptyTitle>{{ $t('administration.label.flagYet') }}</EmptyTitle>
+                    <EmptyDescription v-if="!usesRuntimeFlagInjection">{{ $t('administration.challengesBy.label.addTemplateLevelStatic') }}</EmptyDescription>
+                    <EmptyDescription v-else>{{ $t('administration.challengesBy.description.dynamicFlagGeneratedAutomatically') }}</EmptyDescription>
                   </EmptyHeader>
                 </Empty>
                 <div v-else class="space-y-6">
                   <section v-if="staticFlags.length > 0" class="space-y-2">
-                    <h3 class="text-sm font-semibold">{{ $t('ui.staticFlags') }}</h3>
+                    <h3 class="text-sm font-semibold">{{ $t('administration.label.staticFlags') }}</h3>
                     <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>{{ $t('ui.flag4') }}</TableHead>
-                      <TableHead>{{ $t('ui.status') }}</TableHead>
-                      <TableHead class="text-right">{{ $t('ui.actions') }}</TableHead>
+                      <TableHead>{{ $t('common.label.flag.flagSubmitView') }}</TableHead>
+                      <TableHead>{{ $t('common.label.status') }}</TableHead>
+                      <TableHead class="text-right">{{ $t('common.label.actions') }}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    <TableRow v-for="flag in staticFlags" :key="flag.id">
+                    <TableRow v-for="flag in staticFlags" :key="flag.id ?? undefined">
                       <Hint :content="flag.flag" ><TableCell tabindex="0" class="max-w-md" >
                         <div class="flex min-w-0 items-center gap-2">
                           <Badge variant="outline">
-                            {{ flag.matchKind === 'RegularExpression' ? $t('ui.regularExpression') : $t('ui.exactMatch') }}
+                            {{ flag.matchKind === 'RegularExpression' ? $t('administration.label.regularExpression') : $t('administration.label.exactMatch') }}
                           </Badge>
                           <span class="truncate font-mono text-sm">{{ flag.flag }}</span>
                         </div>
                       </TableCell></Hint>
                       <TableCell>
-                        <Badge v-if="flag.deletedAt" variant="destructive">{{ $t('ui.deleted') }}</Badge>
-                        <Badge v-else variant="secondary">{{ $t('ui.normal') }}</Badge>
+                        <Badge v-if="flag.deletedAt" variant="destructive">{{ $t('common.label.deleted.competitionSidebarView') }}</Badge>
+                        <Badge v-else variant="secondary">{{ $t('administration.label.normal') }}</Badge>
                       </TableCell>
                       <TableCell class="text-right">
                         <Button
@@ -522,8 +523,8 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
                           variant="outline"
                           :disabled="flagActionPending"
                           @click="restoreFlag(flag)"
-                        > {{ $t('ui.restore2') }} </Button>
-                        <Button v-else size="sm" variant="destructive" @click="onClickDeletingFlag(flag)"> {{ $t('ui.delete') }} </Button>
+                        > {{ $t('administration.label.restore') }} </Button>
+                        <Button v-else size="sm" variant="destructive" @click="onClickDeletingFlag(flag)"> {{ $t('common.action.delete') }} </Button>
                       </TableCell>
                     </TableRow>
                   </TableBody>
@@ -532,34 +533,34 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
 
                   <section v-if="systemFlags.length > 0" class="space-y-2">
                     <div>
-                      <h3 class="text-sm font-semibold">{{ $t('ui.systemGeneratedDynamicFlags') }}</h3>
+                      <h3 class="text-sm font-semibold">{{ $t('administration.label.systemGeneratedDynamicFlags') }}</h3>
                     </div>
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>{{ $t('ui.flag4') }}</TableHead>
-                          <TableHead>{{ $t('ui.team') }}</TableHead>
-                          <TableHead>{{ $t('ui.internalLink') }}</TableHead>
-                          <TableHead>{{ $t('ui.validityPeriod') }}</TableHead>
-                          <TableHead>{{ $t('ui.status') }}</TableHead>
+                          <TableHead>{{ $t('common.label.flag.flagSubmitView') }}</TableHead>
+                          <TableHead>{{ $t('common.label.team') }}</TableHead>
+                          <TableHead>{{ $t('administration.label.internalLink') }}</TableHead>
+                          <TableHead>{{ $t('administration.label.validityPeriod') }}</TableHead>
+                          <TableHead>{{ $t('common.label.status') }}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        <TableRow v-for="flag in systemFlags" :key="flag.id">
+                        <TableRow v-for="flag in systemFlags" :key="flag.id ?? undefined">
                           <Hint :content="flag.flag" ><TableCell tabindex="0" class="max-w-md truncate font-mono text-sm" >{{ flag.flag }}</TableCell></Hint>
-                          <TableCell class="font-mono text-xs">{{ flag.teamId ?? $t('ui.symbol') }}</TableCell>
+                          <TableCell class="font-mono text-xs">{{ flag.teamId ?? $t('common.label.symbol') }}</TableCell>
                           <TableCell class="font-mono text-xs">
-                            {{ flag.specificationKind ?? $t('ui.symbol') }}<span v-if="flag.specificationId"> · {{ flag.specificationId }}</span>
+                            {{ flag.specificationKind ?? $t('common.label.symbol') }}<span v-if="flag.specificationId"> · {{ flag.specificationId }}</span>
                           </TableCell>
                           <TableCell class="text-sm text-muted-foreground">
                             <template v-if="flag.validStart || flag.validUntil">
-                              <component :is="AdminDateTime" :value="flag.validStart" /> {{ $t('ui.to') }} <component :is="AdminDateTime" :value="flag.validUntil" />
+                              <component :is="AdminDateTime" :value="dateIso(flag.validStart)" /> {{ $t('administration.label.byId') }} <component :is="AdminDateTime" :value="dateIso(flag.validUntil)" />
                             </template>
-                            <span v-else>{{ $t('ui.effectiveForALongTime') }}</span>
+                            <span v-else>{{ $t('administration.challengesBy.label.effectiveLongTime') }}</span>
                           </TableCell>
                           <TableCell>
-                            <Badge v-if="flag.deletedAt" variant="destructive">{{ $t('ui.expired3') }}</Badge>
-                            <Badge v-else variant="secondary">{{ $t('ui.injected') }}</Badge>
+                            <Badge v-if="flag.deletedAt" variant="destructive">{{ $t('administration.label.expired') }}</Badge>
+                            <Badge v-else variant="secondary">{{ $t('common.label.injected') }}</Badge>
                           </TableCell>
                         </TableRow>
                       </TableBody>
@@ -575,31 +576,31 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
             <div class="grid h-full min-h-0 gap-4 lg:grid-cols-2">
               <Card>
                 <CardHeader>
-                  <CardTitle>{{ $t('ui.templatePermissions') }}</CardTitle>
-                  <CardDescription>{{ $t('ui.thePersonInChargeHasAllPermissionsTheAdministratorCan') }}</CardDescription>
+                  <CardTitle>{{ $t('administration.label.templatePermissions') }}</CardTitle>
+                  <CardDescription>{{ $t('administration.challengesBy.description.personChargePermissionsAdministrator') }}</CardDescription>
                 </CardHeader>
                 <ScrollSurface axis="y" :reset-key="selectedSection" class="min-h-0 flex-1 overflow-y-auto overscroll-contain">
               <CardContent>
                   <FieldGroup>
                     <Field>
-                      <FieldLabel>{{ $t('ui.responsiblePersonId') }}</FieldLabel>
-                      <Input :model-value="template.ownerId" disabled class="font-mono text-sm" />
+                      <FieldLabel>{{ $t('administration.label.responsiblePersonId') }}</FieldLabel>
+                      <Input :model-value="template.ownerId ?? undefined" disabled class="font-mono text-sm" />
                     </Field>
                     <Field>
-                      <FieldLabel for="managers">{{ $t('ui.administratorIdList') }}</FieldLabel>
+                      <FieldLabel for="managers">{{ $t('administration.label.administratorIdList') }}</FieldLabel>
                       <Textarea
                         id="managers"
                         v-model="managersText"
                         rows="5"
                         class="font-mono text-sm"
-                        :placeholder="$t('ui.oneUserUuidPerLineOrSeparatedByCommas')"
+                        :placeholder="$t('administration.challengesBy.description.oneUserUuidLine')"
                         :disabled="isDeleted"
                       />
-                      <FieldDescription>{{ $t('ui.thePersonInChargeCannotBeIncludedInTheAdministrator') }}</FieldDescription>
+                      <FieldDescription>{{ $t('administration.challengesBy.validation.personChargeFormat') }}</FieldDescription>
                     </Field>
                     <Field v-if="!isDeleted" orientation="horizontal">
                       <Button :disabled="permissionsSaving" @click="savePermissions">
-                        <Spinner v-if="permissionsSaving" data-icon="inline-start" /> {{ $t('ui.savePermissions') }} </Button>
+                        <Spinner v-if="permissionsSaving" data-icon="inline-start" /> {{ $t('administration.label.savePermissions') }} </Button>
                     </Field>
                   </FieldGroup>
                 </CardContent>
@@ -607,24 +608,24 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
               </Card>
               <Card>
                 <CardHeader>
-                  <CardTitle>{{ $t('ui.transferPerson') }}</CardTitle>
-                  <CardDescription>{{ $t('ui.transferTheTemplateOwnerToAnotherOrganizerOrAdministratorEffective') }}</CardDescription>
+                  <CardTitle>{{ $t('administration.label.transferPerson') }}</CardTitle>
+                  <CardDescription>{{ $t('administration.challengesBy.description.transferTemplateOwnerAnother') }}</CardDescription>
                 </CardHeader>
                 <ScrollSurface axis="y" :reset-key="selectedSection" class="min-h-0 flex-1 overflow-y-auto overscroll-contain">
               <CardContent>
                   <FieldGroup>
                     <Field>
-                      <FieldLabel for="new-owner">{{ $t('ui.newPersonInChargeUserId') }}</FieldLabel>
+                      <FieldLabel for="new-owner">{{ $t('administration.challengesBy.description.newPersonChargeUser') }}</FieldLabel>
                       <Input
                         id="new-owner"
                         v-model="newOwnerId"
                         class="font-mono text-sm"
-                        :placeholder="$t('ui.userUuid')"
+                        :placeholder="$t('administration.label.userUuid')"
                         :disabled="isDeleted"
                       />
                     </Field>
                     <Field v-if="!isDeleted" orientation="horizontal">
-                      <Button variant="destructive" :disabled="!newOwnerId.trim()" @click="onClickTransferOpen(true)"> {{ $t('ui.transferPerson') }} </Button>
+                      <Button variant="destructive" :disabled="!newOwnerId.trim()" @click="onClickTransferOpen(true)"> {{ $t('administration.label.transferPerson') }} </Button>
                     </Field>
                   </FieldGroup>
                 </CardContent>
@@ -640,15 +641,15 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
     <AlertDialog :open="!!deletingAttachment" @update:open="onUpdateOpenDeletingAttachment">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>{{ $t('ui.deleteAttachment') }}</AlertDialogTitle>
+          <AlertDialogTitle>{{ $t('administration.label.deleteAttachment') }}</AlertDialogTitle>
           <AlertDialogDescription>
-            {{ $t('ui.softDeleteAttachmentItCanBeRestoredLater', { file: deletingAttachment?.fileName ?? $t('ui.symbol') }) }}
+            {{ $t('administration.challengesBy.description.softDeleteAttachmentRestored', { file: deletingAttachment?.fileName ?? $t('common.label.symbol') }) }}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>{{ $t('ui.cancel') }}</AlertDialogCancel>
+          <AlertDialogCancel>{{ $t('common.action.cancel') }}</AlertDialogCancel>
           <Button variant="destructive" :disabled="attachmentActionPending" @click="confirmDeleteAttachment">
-            <Spinner v-if="attachmentActionPending" data-icon="inline-start" /> {{ $t('ui.confirmDeletion') }} </Button>
+            <Spinner v-if="attachmentActionPending" data-icon="inline-start" /> {{ $t('administration.label.confirmDeletion') }} </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -656,21 +657,21 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
     <Dialog v-model:open="randomBatchOpen">
       <DialogContent class="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{{ $t('ui.perTeamRandomAttachments') }}</DialogTitle>
-          <DialogDescription>{{ $t('ui.eachCompleteOriginalFilenameIsParsedAsAnExactFlag') }}</DialogDescription>
+          <DialogTitle>{{ $t('administration.label.teamRandomAttachments') }}</DialogTitle>
+          <DialogDescription>{{ $t('administration.challengesBy.description.completeOriginalFilenameParsed') }}</DialogDescription>
         </DialogHeader>
         <FieldGroup>
           <Field>
-            <FieldLabel for="random-download-name">{{ $t('ui.participantDownloadFilename') }}</FieldLabel>
-            <Input id="random-download-name" v-model="randomDownloadFileName" :placeholder="$t('ui.challengeZip')" />
+            <FieldLabel for="random-download-name">{{ $t('administration.label.participantDownloadFilename') }}</FieldLabel>
+            <Input id="random-download-name" v-model="randomDownloadFileName" :placeholder="$t('administration.label.challengeZip')" />
           </Field>
           <Field>
-            <FieldLabel>{{ $t('ui.attachmentVariants') }}</FieldLabel>
+            <FieldLabel>{{ $t('administration.label.attachmentVariants') }}</FieldLabel>
             <FileInput :ref="setRandomUploadInputRef"  multiple class="hidden" @change="selectRandomFiles" />
             <Button variant="outline" :disabled="randomUploading" @click="randomUploadInput?.click()">
-              <Upload data-icon="inline-start" /> {{ $t('ui.selectMultipleFiles') }}
+              <Upload data-icon="inline-start" /> {{ $t('administration.label.selectMultipleFiles') }}
             </Button>
-            <FieldDescription>{{ $t('ui.selectedVariantsOriginalFilenamesMustBeUniqueWithinTheBatch', { count: randomFiles.length }) }}</FieldDescription>
+            <FieldDescription>{{ $t('administration.challengesBy.validation.variantsOriginalFormat', { count: randomFiles.length }) }}</FieldDescription>
             <ScrollSurface as="div" v-if="randomFiles.length" class="max-h-56 overflow-auto rounded-md border p-3">
               <div v-for="file in randomFiles" :key="`${file.name}-${file.size}-${file.lastModified}`" class="flex justify-between gap-4 py-1 text-sm">
                 <span class="truncate font-mono">{{ file.name }}</span>
@@ -680,9 +681,9 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
           </Field>
         </FieldGroup>
         <DialogFooter>
-          <Button variant="outline" :disabled="randomUploading" @click="onClickRandomBatchOpen2(false)">{{ $t('ui.cancel') }}</Button>
+          <Button variant="outline" :disabled="randomUploading" @click="onClickRandomBatchOpen2(false)">{{ $t('common.action.cancel') }}</Button>
           <Button :disabled="randomUploading || !randomDownloadFileName.trim() || randomFiles.length === 0" @click="uploadRandomBatch">
-            <Spinner v-if="randomUploading" data-icon="inline-start" /> {{ $t('ui.uploadEntireBatch') }}
+            <Spinner v-if="randomUploading" data-icon="inline-start" /> {{ $t('administration.label.uploadEntireBatch') }}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -691,15 +692,15 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
     <AlertDialog :open="!!deletingFlag" @update:open="onUpdateOpenDeletingFlag">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>{{ $t('ui.deleteFlag') }}</AlertDialogTitle>
+          <AlertDialogTitle>{{ $t('administration.label.deleteFlag') }}</AlertDialogTitle>
           <AlertDialogDescription>
-            {{ $t('ui.softDeleteThisFlagItCanBeRestoredLater', { flag: deletingFlag?.flag ?? $t('ui.symbol') }) }}
+            {{ $t('administration.challengesBy.description.softDeleteFlagRestored', { flag: deletingFlag?.flag ?? $t('common.label.symbol') }) }}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>{{ $t('ui.cancel') }}</AlertDialogCancel>
+          <AlertDialogCancel>{{ $t('common.action.cancel') }}</AlertDialogCancel>
           <Button variant="destructive" :disabled="flagActionPending" @click="confirmDeleteFlag">
-            <Spinner v-if="flagActionPending" data-icon="inline-start" /> {{ $t('ui.confirmDeletion') }} </Button>
+            <Spinner v-if="flagActionPending" data-icon="inline-start" /> {{ $t('administration.label.confirmDeletion') }} </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -707,15 +708,15 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
     <AlertDialog v-model:open="transferOpen">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>{{ $t('ui.transferPerson') }}</AlertDialogTitle>
+          <AlertDialogTitle>{{ $t('administration.label.transferPerson') }}</AlertDialogTitle>
           <AlertDialogDescription>
-            {{ $t('ui.transferOwnershipOfToUserYouWillLoseOwnershipImmediately', { title: template?.title ?? $t('ui.symbol'), user: newOwnerId }) }}
+            {{ $t('administration.challengesBy.description.transferOwnershipUserLose', { title: template?.title ?? $t('common.label.symbol'), user: newOwnerId }) }}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>{{ $t('ui.cancel') }}</AlertDialogCancel>
+          <AlertDialogCancel>{{ $t('common.action.cancel') }}</AlertDialogCancel>
           <AlertDialogAction variant="destructive" :disabled="transferring" @click="transferOwner">
-            <Spinner v-if="transferring" data-icon="inline-start" /> {{ $t('ui.confirmTransfer') }} </AlertDialogAction>
+            <Spinner v-if="transferring" data-icon="inline-start" /> {{ $t('common.label.confirmTransfer') }} </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

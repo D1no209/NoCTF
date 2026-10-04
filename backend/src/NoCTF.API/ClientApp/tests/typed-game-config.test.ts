@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { adminChallengeBankCreateTemplate } from '../app/api'
-import { createClient } from '../app/api/client'
+import { createTestApi } from './support/kiota-harness'
 
 import {
   buildConfigValues,
@@ -88,27 +87,18 @@ describe('typed game configuration contracts', () => {
 
   test('generated create-template SDK sends the branch regardless of property order', async () => {
     const sent: string[] = []
-    const client = createClient({
-      baseUrl: 'https://noctf.test',
-      fetch: async (input) => {
-        sent.push(await new Request(input).text())
-        return new Response(JSON.stringify({ id: '00000000-0000-0000-0000-000000000001' }), {
-          status: 201,
-          headers: { 'Content-Type': 'application/json' },
-        })
-      },
-    })
+    const client = createTestApi({ 'POST /api/v1/admin/challenges': ({ body }) => {
+      sent.push(JSON.stringify(body))
+      return Response.json({ id: '00000000-0000-0000-0000-000000000001' }, { status: 201 })
+    } })
     const model = emptyDefinition('Ctf')
     model.runtime = emptyRuntimeTemplate('Ctf')
-    await adminChallengeBankCreateTemplate({
-      client,
-      body: {
+    await client.api.v1.admin.challenges.post({
         mode: 'Ctf',
         visibility: 'Private',
         title: 'Current template',
         direction: 'Web',
         definition: definitionModelToContract('Ctf', model),
-      },
     })
     expect(sent).toHaveLength(1)
     const payload = JSON.parse(sent[0]!) as { definition: { mode: string, ctf: object, runtime: { kind: string, container: object } } }

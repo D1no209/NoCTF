@@ -2,7 +2,19 @@
 
 默认统一 Host（Api、Worker、Runner）、PostgreSQL、Redis、NATS JetStream、认证 Registry。
 本地文件默认，RustFS 与独立监控通过可选 overlay 启用。平台不发布宿主端口，运维通过已有
-`1panel-network` 反代；题目服务直接由 Docker 分配随机宿主端口，不经过平台反代。
+`noctf-proxy` 独立代理网络反代；题目服务直接由 Docker 分配随机宿主端口，不经过平台反代。
+
+首次安装由运维创建该外部 bridge，并将容器化反向代理接入：
+
+```bash
+docker --context YOUR_CONTEXT network create --driver bridge noctf-proxy
+docker --context YOUR_CONTEXT network inspect noctf-proxy --format '{{json .IPAM.Config}}'
+```
+
+已有同名网络时只检查，不重复创建。使用实际代理 CIDR 填写可信网络，平台、Registry、
+可选 Grafana 与 Cap 共用该入口网络；数据库和题目网络保持各自边界。详细安装见
+[平台手册](../../docs/installation/docker.md)，已有安装网络切换见
+[升级说明](../../docs/operations/upgrade.md)。仓库模板修改不会自动迁移现有线上容器。
 
 ## 配置与启动
 
@@ -47,7 +59,7 @@ docker --context YOUR_CONTEXT compose --env-file .env -f docker-compose.yml -f c
 
 ## 网络、权限及可选服务
 
-- 外部 `1panel-network` 由运维管理。上游 `noctf-web:8080`、`noctf-registry:5000`；
+- 外部 `noctf-proxy` 由运维管理。上游 `noctf-web:8080`、`noctf-registry:5000`；
   Nginx 示例不会自动安装或 reload。TLS、DNS、Registry HTTPS 由运维配置。
 - 代理传递对称可信的 forwarded headers，允许 SignalR/WSRX Upgrade 和流式上传；
   `/api/v1/runtime-proxies/` 默认会话 30 分钟。上传上限仍由 Endpoint 执行。

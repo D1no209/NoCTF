@@ -11,7 +11,7 @@ const props = withDefaults(defineProps<{
   disabled?: boolean
 }>(), {
   placeholder: '',
-  addLabel: translate("ui.addPort"),
+  addLabel: translate("common.label.addPort"),
   min: 1,
   max: 65535,
   disabled: false,
@@ -51,14 +51,14 @@ function add(): void {
           variant="ghost"
           size="icon"
           class="shrink-0"
-          :aria-label="$t('ui.removeItem', { index: index + 1 })"
+          :aria-label="$t('common.label.removeItem', { index: index + 1 })"
           @click="remove(index)"
         >
           <X class="size-4" aria-hidden="true" />
         </Button>
       </div>
       <p v-if="port === null" class="text-xs text-destructive">
-        {{ $t('ui.enterAPortFromToOrUseTheButtonOn', { minimum: min, maximum: max }) }}
+        {{ $t('common.numberList.description.enterPortButton', { minimum: min, maximum: max }) }}
       </p>
     </div>
     <Button
@@ -70,7 +70,7 @@ function add(): void {
       @click="add"
     >
       <Plus data-icon="inline-start" />
-      {{ $t(addLabel) }}
+      {{ translate(addLabel) }}
     </Button>
   </div>
 </template>

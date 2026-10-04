@@ -1,8 +1,16 @@
+import { ProjectionResponseOption } from '../../../lib/api'
+import { createNoCTFAPIEndpointsCompetitionsScoreboardSnapshotResponseFromDiscriminatorValue } from '../../../api/models'
+
+import { ResponseMetadata, RequestPolicyOption } from '../../../lib/api'
+
+import { api } from '../../../lib/api'
+import { message as describeMessage } from '../../../utils/i18n'
+import type { UiMessage } from '../../../utils/i18n'
 import { markRaw } from 'vue'
 
 import { ClipboardCheck, FileText, GitBranch, LayoutDashboard, MessageCircleQuestion, Puzzle, Trophy, UserRound } from '@lucide/vue'
-import { getCompetitionEndpoint, getLeaderboardEndpoint, getMyTeamEndpoint, getPlayerCompetitionProgression } from '../../../api'
-import type { NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsCompetitionsScoreboardTeamResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../api'
+
+import type { NoCTFAPIEndpointsCompetitionsCompetitionResponse, NoCTFAPIEndpointsCompetitionsScoreboardTeamResponse, NoCTFAPIEndpointsTeamsTeamResponse } from '../../../api/models'
 import { competitionWorkspaceNavigationKey } from '../../app/workspace-nav'
 import type { WorkspaceNavGroup } from '../../app/workspace-nav'
 import { createTrailingRefresh } from '../../../lib/latest-page-refresh'
@@ -33,21 +41,21 @@ export function useCompetitionsByIdPage() {
     route.path === `/competitions/${competitionId.value}/progression`,
   )
 
-  const competition = ref<NoCtfapiEndpointsCompetitionsCompetitionResponse | null>(null)
+  const competition = ref<NoCTFAPIEndpointsCompetitionsCompetitionResponse | null>(null)
 
-  const myTeam = ref<NoCtfapiEndpointsTeamsTeamResponse | null>(null)
+  const myTeam = ref<NoCTFAPIEndpointsTeamsTeamResponse | null>(null)
 
-  const myStanding = ref<NoCtfapiEndpointsCompetitionsScoreboardTeamResponse | null>(null)
+  const myStanding = ref<NoCTFAPIEndpointsCompetitionsScoreboardTeamResponse | null>(null)
 
   const standingLoading = ref(false)
 
-  const teamLoadError = ref<string | null>(null)
+  const teamLoadError = ref<UiMessage | null>(null)
 
-  const standingError = ref<string | null>(null)
+  const standingError = ref<UiMessage | null>(null)
 
   const loading = ref(true)
 
-  const error = ref<string | null>(null)
+  const error = ref<UiMessage | null>(null)
 
   const { user } = useAuth()
 
@@ -70,9 +78,7 @@ export function useCompetitionsByIdPage() {
       progressionEnabled.value = false
       return
     }
-    const { data } = await getPlayerCompetitionProgression({
-      path: { competitionId: competitionId.value },
-    })
+    const data = await api.api.v1.competitions.byCompetitionId(competitionId.value).progression.get();
     if (requestId === progressionRequestId)
       progressionEnabled.value = data?.enabled === true
   }
@@ -89,9 +95,9 @@ export function useCompetitionsByIdPage() {
       standingError.value = null
       return
     }
-    const { data, error: teamError, response } = await getMyTeamEndpoint({
-      path: { competitionId: competitionId.value },
-    })
+    let teamError: unknown;
+    const response = new ResponseMetadata();
+    const data = await api.api.v1.competitions.byCompetitionId(competitionId.value).teams.me.get({ options: [new RequestPolicyOption({ response: response })] }).catch(cause => { teamError = cause; return undefined });
     if (response?.status === 404) {
       myTeam.value = null
       teamLoadError.value = null
@@ -99,7 +105,7 @@ export function useCompetitionsByIdPage() {
       return
     }
     if (teamError || !data) {
-      teamLoadError.value = parseApiError(teamError, translate("ui.failedToLoadYourTeam")).message
+      teamLoadError.value = parseApiError(teamError, describeMessage("competitions.competitionsBy.error.loadTeamFailed")).displayMessage
       return
     }
     teamLoadError.value = null
@@ -115,10 +121,9 @@ export function useCompetitionsByIdPage() {
       return
     }
     standingLoading.value = myStanding.value === null
-    const { data, error: requestError, response } = await getLeaderboardEndpoint({
-      path: { competitionId: competitionId.value },
-      query: { endingRound: null },
-    })
+    let requestError: unknown;
+    const response = new ResponseMetadata();
+    const data = await api.api.v1.competitions.byCompetitionId(competitionId.value).leaderboard.get({ queryParameters: { endingRound: undefined } , options: [new RequestPolicyOption({ response: response }), new ProjectionResponseOption(createNoCTFAPIEndpointsCompetitionsScoreboardSnapshotResponseFromDiscriminatorValue)] }).catch(cause => { requestError = cause; return undefined });
     standingLoading.value = false
     if (response?.status === 404) {
       myStanding.value = null
@@ -126,7 +131,7 @@ export function useCompetitionsByIdPage() {
       return
     }
     if (requestError || !data || !('teams' in data)) {
-      standingError.value = parseApiError(requestError, translate("ui.failedToLoadYourTeamRanking")).message
+      standingError.value = parseApiError(requestError, describeMessage("competitions.competitionsBy.error.loadTeamRankingFailed")).displayMessage
       return
     }
     standingError.value = null
@@ -136,12 +141,12 @@ export function useCompetitionsByIdPage() {
   const refreshStandingLatest = createTrailingRefresh(refreshMyStanding)
 
   async function refresh(): Promise<'loaded' | 'not-found' | 'failed'> {
-    const { data, error: err, response } = await getCompetitionEndpoint({
-      path: { competitionId: competitionId.value },
-    })
+    let err: unknown;
+    const response = new ResponseMetadata();
+    const data = await api.api.v1.competitions.byCompetitionId(competitionId.value).get({ options: [new RequestPolicyOption({ response: response })] }).catch(cause => { err = cause; return undefined });
     loading.value = false
     if (err || !data) {
-      error.value = parseApiError(err, translate("ui.loadingCompetitionFailed")).message
+      error.value = parseApiError(err, describeMessage("common.error.loadingCompetitionFailed")).displayMessage
       progressionEnabled.value = false
       return response?.status === 404 ? 'not-found' : 'failed'
     }
@@ -217,21 +222,21 @@ export function useCompetitionsByIdPage() {
     const canReadChallenges = hasCompetitionStaffAccess.value || hasParticipantChallengeAccess.value
     return [
       {
-        label: translate("ui.competitions"),
+        label: translate("common.label.competitions"),
         items: [
-          { to: competitionPath(competitionId.value), label: translate("ui.overview"), icon: LayoutDashboard, exact: true },
-          ...(challengesVisible && canReadChallenges ? [{ to: `${base}/challenges`, label: translate("ui.challenge"), icon: Puzzle }] : []),
+          { to: competitionPath(competitionId.value), label: translate("common.label.overview"), icon: LayoutDashboard, exact: true },
+          ...(challengesVisible && canReadChallenges ? [{ to: `${base}/challenges`, label: translate("common.label.challenge.pageTitle"), icon: Puzzle }] : []),
           ...(competition.value?.mode === 'Ctf' && canReadChallenges && progressionEnabled.value
             ? [{ to: `${base}/progression`, label: translate('progression.title'), icon: GitBranch }]
             : []),
-          { to: `${base}/leaderboard`, label: translate("ui.leaderboard"), icon: Trophy },
-          { to: `${base}/questions`, label: translate("ui.questions"), icon: MessageCircleQuestion },
+          { to: `${base}/leaderboard`, label: translate("common.label.leaderboard"), icon: Trophy },
+          { to: `${base}/questions`, label: translate("common.label.questions"), icon: MessageCircleQuestion },
         ],
       },
       {
-        label: translate("ui.mine"),
+        label: translate("competitions.label.mine"),
         items: [
-          { to: `${base}/my/team`, label: translate("ui.myTeam"), icon: UserRound },
+          { to: `${base}/my/team`, label: translate("competitions.label.myTeam"), icon: UserRound },
           ...(hasParticipantChallengeAccess.value
             ? [{ to: `${base}/my/writeup`, label: translate("writeUp.myWriteUp"), icon: FileText }]
             : []),
@@ -239,7 +244,7 @@ export function useCompetitionsByIdPage() {
       },
       ...(hasCompetitionStaffAccess.value
         ? [{
-            label: translate("ui.management"),
+            label: translate("common.label.management"),
             items: [
               { to: `${base}/writeups`, label: translate("writeUp.review"), icon: ClipboardCheck },
             ],

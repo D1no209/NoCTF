@@ -57,7 +57,7 @@ const { ImagePlus, UserRound, profile, loading, error, isOwnProfile, coverUrl, m
             <p v-if="profile.description" class="mt-2 line-clamp-3 max-w-[70ch] whitespace-pre-line text-sm leading-6">
               {{ profile.description }}
             </p>
-            <p v-else class="mt-2 text-sm text-muted-foreground">{{ $t('ui.thisUserHasNotFilledOutAProfileYet') }}</p>
+            <p v-else class="mt-2 text-sm text-muted-foreground">{{ $t('common.usersBy.description.userFilledOutProfile') }}</p>
           </div>
 
           <div class="grid max-w-3xl grid-cols-3 gap-2 rounded-2xl bg-background/65 p-1.5 sm:gap-3 sm:p-2">
@@ -90,7 +90,7 @@ const { ImagePlus, UserRound, profile, loading, error, isOwnProfile, coverUrl, m
                 <MiniChart :option="modeChartOption" height="100%" />
               </div>
               <ul v-if="modeRows.length" class="grid shrink-0 grid-cols-2 gap-x-3 gap-y-1.5 pb-2 text-xs">
-                <li v-for="mode in modeRows" :key="mode.mode" class="flex min-w-0 items-center gap-1.5">
+                <li v-for="mode in modeRows" :key="mode.mode ?? undefined" class="flex min-w-0 items-center gap-1.5">
                   <span :class="mode.colorClass" class="size-2 shrink-0 rounded-full" aria-hidden="true" />
                   <span class="min-w-0 truncate">{{ mode.label }}</span>
                   <span class="ml-auto font-mono tabular-nums">{{ mode.competitionCount }}</span>
@@ -100,7 +100,7 @@ const { ImagePlus, UserRound, profile, loading, error, isOwnProfile, coverUrl, m
                 <EmptyDescription>{{ $t('profile.noPublicCompetitionData') }}</EmptyDescription>
               </Empty>
               <ul class="sr-only">
-                <li v-for="mode in modes" :key="mode.mode">{{ mode.mode }}: {{ mode.competitionCount ?? 0 }}</li>
+                <li v-for="mode in modes" :key="mode.mode ?? undefined">{{ mode.mode }}: {{ mode.competitionCount ?? 0 }}</li>
               </ul>
             </div>
 
@@ -110,7 +110,7 @@ const { ImagePlus, UserRound, profile, loading, error, isOwnProfile, coverUrl, m
                 <MiniChart :option="directionChartOption" color-token="--primary" height="100%" />
               </div>
               <ul v-else-if="directionRows.length" class="mt-4 flex flex-col gap-2">
-                <li v-for="direction in directionRows" :key="direction.direction"
+                <li v-for="direction in directionRows" :key="direction.direction ?? undefined"
                   class="flex items-center justify-between gap-4 text-sm">
                   <span>{{ direction.label }}</span>
                   <Badge variant="secondary" class="font-mono tabular-nums">{{ direction.successfulChallengeCount }}</Badge>
@@ -120,7 +120,7 @@ const { ImagePlus, UserRound, profile, loading, error, isOwnProfile, coverUrl, m
                 <EmptyDescription>{{ $t('profile.noPublicCompetitionData') }}</EmptyDescription>
               </Empty>
               <ul class="sr-only">
-                <li v-for="direction in directionRows" :key="direction.direction">
+                <li v-for="direction in directionRows" :key="direction.direction ?? undefined">
                   {{ direction.label }}: {{ direction.successfulChallengeCount ?? 0 }}
                 </li>
               </ul>
@@ -131,7 +131,7 @@ const { ImagePlus, UserRound, profile, loading, error, isOwnProfile, coverUrl, m
             <h2 id="profile-recent-competitions-title" class="font-semibold">{{ $t('profile.recentCompetitions') }}</h2>
             <ScrollSurface v-if="recentCompetitions.length" axis="y" class="mt-3 min-h-0 flex-1 pr-2" :aria-label="$t('profile.recentCompetitions')">
               <div class="flex flex-col">
-                <template v-for="(competition, index) in recentCompetitions" :key="competition.competitionId">
+                <template v-for="(competition, index) in recentCompetitions" :key="competition.competitionId ?? undefined">
                   <Separator v-if="index" />
                   <NuxtLink
                     :to="competitionPath(competition.competitionId!)"
@@ -164,12 +164,12 @@ const { ImagePlus, UserRound, profile, loading, error, isOwnProfile, coverUrl, m
                   <Popover v-for="badge in profile.badges" :key="`${badge.competitionId}:${badge.id}`">
                     <PopoverTrigger as-child>
                       <Button type="button" variant="secondary" class="h-auto w-36 shrink-0 flex-col gap-2 p-3 whitespace-normal">
-                        <img :src="badge.imageUrl" alt="" class="size-14 rounded-lg object-contain" />
+                        <img :src="badge.imageUrl ?? undefined" alt="" class="size-14 rounded-lg object-contain" />
                         <span class="line-clamp-2 w-full break-words text-center text-xs font-medium">{{ badge.name }}</span>
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent class="w-72 max-w-[calc(100vw-2rem)]" align="start">
-                      <img :src="badge.imageUrl" alt="" class="mx-auto mb-3 size-20 rounded-xl object-contain" />
+                      <img :src="badge.imageUrl ?? undefined" alt="" class="mx-auto mb-3 size-20 rounded-xl object-contain" />
                       <PopoverHeader>
                         <PopoverTitle>{{ badge.name }}</PopoverTitle>
                         <PopoverDescription>{{ badge.competitionTitle }}</PopoverDescription>

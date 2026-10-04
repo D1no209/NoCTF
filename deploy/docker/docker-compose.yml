@@ -55,7 +55,7 @@ services:
     networks:
       default:
         aliases: [registry, noctf-registry]
-      panel:
+      proxy:
         aliases: [noctf-registry]
 
   noctf:
@@ -104,7 +104,7 @@ services:
     networks:
       default:
         aliases: [noctf]
-      panel:
+      proxy:
         aliases: [noctf-web]
       challenges: {}
       callbacks:
@@ -113,9 +113,9 @@ services:
 networks:
   default:
     name: ${COMPOSE_PROJECT_NAME:-noctf}-network
-  panel:
+  proxy:
     external: true
-    name: 1panel-network
+    name: noctf-proxy
   challenges:
     name: ${COMPOSE_PROJECT_NAME:-noctf}-challenges
     driver: bridge

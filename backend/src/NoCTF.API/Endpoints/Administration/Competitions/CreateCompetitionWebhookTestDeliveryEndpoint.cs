@@ -29,6 +29,12 @@ public sealed class CreateCompetitionWebhookTestDeliveryEndpoint(
 {
     public override void Configure()
     {
+        Summary(summary =>
+        {
+            summary.Summary = "Queues a test delivery for a configured competition webhook.";
+            summary.Description = summary.Summary;
+        });
+
         Post("/admin/competitions/{competitionId}/webhooks/{targetId}/test-deliveries");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("AdminCreateCompetitionWebhookTestDelivery"));

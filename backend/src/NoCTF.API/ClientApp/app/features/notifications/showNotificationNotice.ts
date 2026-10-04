@@ -1,13 +1,13 @@
 import { h, markRaw, shallowReactive } from 'vue'
-import { toast } from 'vue-sonner'
+import { toast } from '../../utils/message-toast'
 
-import type { NoCtfapiEndpointsNotificationsNotificationResponse } from '../../api'
+import type { NoCTFAPIEndpointsNotificationsNotificationResponse } from '../../api/models'
 import NotificationNoticeContentComponent from '../../components/views/layout/NotificationNoticeContent.vue'
 import NoticeToastComponent from '../../components/ui/sonner/NoticeToast.vue'
 import type { NoticePayload } from '../../components/ui/sonner/notice-state'
 
 interface NotificationNoticeOptions {
-  idPrefix?: string
+  idPrefix?: string | null
 }
 
 const displayedNoticeIds = new Set<string>()
@@ -24,7 +24,7 @@ function rememberDisplayedNotice(id: string): boolean {
 }
 
 export function showNotificationNotice(
-  notification: NoCtfapiEndpointsNotificationsNotificationResponse,
+  notification: NoCTFAPIEndpointsNotificationsNotificationResponse,
   options: NotificationNoticeOptions = {},
 ): boolean {
   if (!notification.id) return false

@@ -148,7 +148,7 @@ public sealed class PreviewHistoricalAdjudicationDifferencesEndpoint(
         var includeInternal = user.IsAdministrator || await authorizer.CanReadInternalHistoricalAuditAsync(user.UserId, competitionId, ct);
         var filterKey = FilterKey(competitionId, user.UserId, request.CompetitionChallengeId, request.IncludeInformational == true, includeInternal);
         if (!cursors.TryDecode(request.Cursor, CursorEndpoint, filterKey, out var position))
-            return TypedResults.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Invalid cursor.");
+            return ApiProblems.Problem(statusCode: StatusCodes.Status400BadRequest, title: ApiMessages.Get(ApiMessageId.InvalidCursor));
 
         var page = await preview.ExecuteAsync(
             competitionId,

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { toast } from 'vue-sonner'
+import { toast } from '../../../utils/message-toast'
 import type { NoticePayload } from './notice-state'
 import NoticeFrame from './NoticeFrame.vue'
 defineOptions({ inheritAttrs: false })

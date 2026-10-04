@@ -1,8 +1,9 @@
+import { message as describeMessage } from '../../utils/i18n'
 import { markRaw } from 'vue'
 import type { Ref } from 'vue'
 import { ShieldCheck } from '@lucide/vue'
 import TurnstileWidgetComponent from '@nuxtjs/turnstile/runtime/components/NuxtTurnstile.vue'
-import { toast } from 'vue-sonner'
+import { toast } from '../../utils/message-toast'
 import type { MessageKey } from '~/locales/zh-CN'
 import { createHumanVerificationCoordinator } from '~/lib/human-verification-coordinator'
 import type { HumanVerificationHeaders } from '~/lib/human-verification-coordinator'
@@ -68,7 +69,7 @@ function failChallenge(
 function beginChallengeTimeout(challenge: Ref<ChallengeState | null>, id: number): void {
   clearTimeoutHandle()
   challengeTimeout = setTimeout(() => {
-    failChallenge(challenge, 'ui.humanVerificationTimedOutPleaseRetry', id)
+    failChallenge(challenge, 'common.humanVerification.description.humanVerificationTimedOut', id)
   }, 120_000)
 }
 
@@ -101,13 +102,13 @@ async function solveCapChallenge(
     const solved = await instance.solve()
     if (challenge.value?.id !== id) return
     if (!solved?.success || !solved.token) {
-      reject('ui.humanVerificationFailedPleaseRetry')
+      reject('security.verification.failed')
       return
     }
     complete(solved.token)
   }
   catch {
-    reject('ui.humanVerificationFailedPleaseRetry')
+    reject('security.verification.failed')
   }
 }
 
@@ -123,27 +124,27 @@ export function useHumanVerification() {
     await ensureLoaded()
     const provider = providerConfiguration(configuration.value)
     if (!provider?.provider) {
-      toast.error(translate('ui.humanVerificationConfigurationUnavailable'))
+      toast.error(describeMessage('common.error.humanVerificationConfigurationUnavailable'))
       return null
     }
     if (action === 'runtime' && provider.runtimeRequired === false) return {}
     if (action === 'evaluation' && provider.evaluationRequired === false) return {}
     if (provider.provider === 'None') return {}
     if (requestCoordinator.active || challenge.value) {
-      toast.info(translate('ui.anotherHumanVerificationIsInProgress'))
+      toast.info(describeMessage('common.humanVerification.description.anotherHumanVerificationProgress'))
       return null
     }
 
     const siteKey = provider.siteKey?.trim()
     const apiEndpoint = provider.apiEndpoint?.trim() ?? ''
     if (!siteKey || (provider.provider === 'Cap' && !apiEndpoint)) {
-      toast.error(translate('ui.humanVerificationConfigurationUnavailable'))
+      toast.error(describeMessage('common.error.humanVerificationConfigurationUnavailable'))
       return null
     }
 
     const result = requestCoordinator.begin()
     if (!result) {
-      toast.info(translate('ui.anotherHumanVerificationIsInProgress'))
+      toast.info(describeMessage('common.humanVerification.description.anotherHumanVerificationProgress'))
       return null
     }
     const id = ++nextChallengeId
@@ -244,10 +245,10 @@ export function useHumanVerificationGate() {
     'refresh-timeout': 'manual' as const,
     language: currentLocale(),
     'response-field': false,
-    'error-callback': () => failChallenge(challenge, 'ui.humanVerificationFailedPleaseRetry'),
-    'expired-callback': () => failChallenge(challenge, 'ui.humanVerificationTimedOutPleaseRetry'),
-    'timeout-callback': () => failChallenge(challenge, 'ui.humanVerificationTimedOutPleaseRetry'),
-    'unsupported-callback': () => failChallenge(challenge, 'ui.humanVerificationFailedPleaseRetry'),
+    'error-callback': () => failChallenge(challenge, 'security.verification.failed'),
+    'expired-callback': () => failChallenge(challenge, 'common.humanVerification.description.humanVerificationTimedOut'),
+    'timeout-callback': () => failChallenge(challenge, 'common.humanVerification.description.humanVerificationTimedOut'),
+    'unsupported-callback': () => failChallenge(challenge, 'security.verification.failed'),
   }))
 
   watch(() => route.fullPath, () => {

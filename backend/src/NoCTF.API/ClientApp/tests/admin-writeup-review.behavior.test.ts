@@ -1,3 +1,4 @@
+import { createTestApi, kiotaBindings, testId } from './support/kiota-harness'
 import { describe, expect, test } from 'bun:test'
 import { computed, effectScope, markRaw, nextTick, proxyRefs, reactive, ref, watch } from 'vue'
 import { createTrailingRefresh } from '../app/lib/latest-page-refresh'
@@ -11,6 +12,7 @@ const compile = async (path: string, name: string) => {
     `const { ${Object.keys(deps).join(', ')} } = deps; ${compiled}; return ${name};`)(deps)
 }
 const shellFactory = await compile('../app/features/routes/admin/competitions/useAdminCompetitionsByIdPage.ts', 'useAdminCompetitionsByIdPage')
+const awaitlessReviewSource = await Bun.file(new URL('../app/features/routes/competitions/[id]/useCompetitionsByIdWriteUpsPage.ts', import.meta.url)).text()
 const reviewFactory = await compile('../app/features/routes/competitions/[id]/useCompetitionsByIdWriteUpsPage.ts', 'useCompetitionsByIdWriteUpsPage')
 const drain = async () => { await nextTick(); await new Promise(resolve => setTimeout(resolve, 0)) }
 
@@ -37,11 +39,11 @@ test('management review remains discoverable for finished competitions and uses 
 })
 
 function harness(canJudge: boolean) {
-  const route = reactive({ path: '/admin/competitions/competition/writeups', params: { id: 'competition' }, query: { team: 'team-b', filter: 'retained' } })
+  const route = reactive({ path: '/admin/competitions/competition/writeups', params: { id: 'competition' }, query: { team: testId('team-b'), filter: 'retained' } })
   const review = { scoreboardAvailable: true, canJudge, items: ['team-a', 'team-b'].map(teamId => ({
-    writeUp: { teamId, teamName: teamId, fileId: `file-${teamId}`, fileName: 'writeup.pdf' },
+    writeUp: { teamId: testId(teamId), teamName: teamId, fileId: testId(`file-${teamId}`), fileName: 'writeup.pdf' },
     originalTotalScore: 100, originalRank: 2, adjustedTotalScore: 100, adjustedRank: 2,
-    challengeScores: [{ competitionChallengeId: 'challenge', title: 'Challenge', direction: 'Web', netPoints: 100 }],
+    challengeScores: [{ competitionChallengeId: testId('challenge'), title: 'Challenge', direction: 'Web', netPoints: 100 }],
   })) }
   const reads: string[] = []
   const previews: string[] = []
@@ -49,20 +51,23 @@ function harness(canJudge: boolean) {
   const scope = effectScope()
   let observe!: () => Promise<boolean>
   const polling = ref(false)
-  const deps = {
-    ref, computed, watch, createTrailingRefresh,
-    ...Object.fromEntries('ArrowLeft Download FileSearch MessageCircleQuestion MinusCircle RefreshCw Scale'.split(' ').map(name => [name, {}])),
-    useRoute: () => route,
-    useRouter: () => ({ replace: async (next: { query: typeof route.query }) => { route.query = next.query }, push: async () => {} }),
-    onMounted: () => {}, onUnmounted: () => {},
-    usePolling: (callback: () => Promise<boolean>) => { observe = callback; return { polling, timedOut: ref(false), start: () => { polling.value = true } } },
-    listTeamWriteUps: async ({ path }: { path: { competitionId: string } }) => { reads.push(path.competitionId); return { data: structuredClone(review) } },
-    issueTeamWriteUpPreview: async ({ path }: { path: { teamId: string } }) => { previews.push(path.teamId); return { data: { previewUrl: `/preview/${path.teamId}` } } },
-    adminCreateManualAdjustment: async (request: unknown) => { writes.push(request); return { data: { gameplayFactId: 'adjustment' } } },
-    translate: (key: string) => key,
-    parseApiError: () => ({ message: 'failed' }),
-    toast: { success: () => {}, error: () => {} },
-  }
+  const deps = { ...kiotaBindings(awaitlessReviewSource), api: createTestApi({ 'GET /api/v1/competitions/{competitionId}/writeups': async ({ path }: { path: { competitionId: string } }) => { reads.push(path.competitionId); return structuredClone(review) },
+'POST /api/v1/competitions/{competitionId}/teams/{teamId}/writeup/preview': async ({ path }: { path: { teamId: string } }) => { previews.push(path.teamId); return { previewUrl: `/preview/${path.teamId}` } },
+'POST /api/v1/admin/competitions/{competitionId}/gameplay-facts/manual-adjustments': async (request: unknown) => { writes.push({ path: (request as any).path, body: (request as any).body }); return { gameplayFactId: testId('adjustment') } } }),
+ref,
+computed,
+watch,
+createTrailingRefresh,
+...Object.fromEntries('ArrowLeft Download FileSearch MessageCircleQuestion MinusCircle RefreshCw Scale'.split(' ').map(name => [name, {}])),
+useRoute: () => route,
+useRouter: () => ({ replace: async (next: { query: typeof route.query }) => { route.query = next.query }, push: async () => {} }),
+onMounted: () => {},
+onUnmounted: () => {},
+usePolling: (callback: () => Promise<boolean>) => { observe = callback; return { polling, timedOut: ref(false), start: () => { polling.value = true } } },
+translate: (key: string) => key,
+describeMessage: (key: string) => ({ key }),
+parseApiError: () => ({ displayMessage: 'failed' }),
+toast: { success: () => {}, error: () => {} } }
   const state = scope.run(() => reviewFactory(deps)({ management: true }))!
   return { state, route, review, reads, previews, writes, observe: () => observe(), stop: () => scope.stop() }
 }
@@ -70,25 +75,26 @@ function harness(canJudge: boolean) {
 describe('management WriteUp review', () => {
   test('opens the deep-linked team, retains its admin route and observes authoritative score changes', async () => {
     const app = harness(true)
+    await drain()
     try {
       await app.state.load()
       await drain()
       expect(app.reads).toEqual(['competition'])
       expect(app.state.management).toBeTrue()
-      expect(app.state.selected.value.writeUp.teamId).toBe('team-b')
-      expect(app.state.previewUrl.value).toBe('/preview/team-b')
+      expect(app.state.selected.value.writeUp.teamId).toBe(testId('team-b'))
+      expect(app.state.previewUrl.value).toBe(`/preview/${testId('team-b')}`)
       expect(app.state.canJudge.value).toBeTrue()
-      await app.state.selectTeam('team-a')
+      await app.state.selectTeam(testId('team-a'))
       await drain()
       expect(app.route.path).toBe('/admin/competitions/competition/writeups')
-      expect(app.route.query).toEqual({ team: 'team-a', filter: 'retained' })
-      expect(app.previews).toEqual(['team-b', 'team-a'])
+      expect(app.route.query).toEqual({ team: testId('team-a'), filter: 'retained' })
+      expect(app.previews).toEqual([testId('team-b'), testId('team-a')])
 
       app.state.adjustmentDelta.value = -40
       app.state.submitAdjustment()
       await drain()
       expect(app.writes).toEqual([{ path: { competitionId: 'competition' }, body: {
-        teamId: 'team-a', competitionChallengeId: 'challenge', delta: -40,
+        teamId: testId('team-a'), competitionChallengeId: testId('challenge'), delta: -40,
       } }])
       app.review.items[0]!.challengeScores[0]!.netPoints = 60
       app.review.items[0]!.adjustedTotalScore = 60
@@ -101,10 +107,11 @@ describe('management WriteUp review', () => {
 
   test('management placement does not grant a read-only reviewer scoring or consultation rights', async () => {
     const app = harness(false)
+    await drain()
     try {
       await app.state.load()
       await drain()
-      expect(app.state.previewUrl.value).toBe('/preview/team-b')
+      expect(app.state.previewUrl.value).toBe(`/preview/${testId('team-b')}`)
       expect(app.state.canJudge.value).toBeFalse()
       app.state.adjustmentDelta.value = -40
       app.state.submitAdjustment()

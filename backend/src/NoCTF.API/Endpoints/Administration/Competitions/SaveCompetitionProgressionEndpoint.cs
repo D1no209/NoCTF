@@ -45,7 +45,14 @@ public sealed class SaveCompetitionProgressionValidator
     }
 }
 
-public sealed record ProgressionSaveProblem(string Code, string? Detail);
+public sealed record ProgressionSaveProblem(
+    [property: System.Text.Json.Serialization.JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<CompetitionProgressionSaveFailure>))] CompetitionProgressionSaveFailure Code,
+    string? Detail)
+{
+    public string Detail { get; init; } = ApiMessages.Localize(Code, Detail);
+    public string MessageKey => ApiMessages.For(Code).Key;
+    public IReadOnlyDictionary<string, object?> MessageArguments => ApiMessages.NoArguments;
+}
 
 public sealed class SaveCompetitionProgressionEndpoint(
     SaveCompetitionProgression save,
@@ -58,6 +65,12 @@ public sealed class SaveCompetitionProgressionEndpoint(
 {
     public override void Configure()
     {
+        Summary(summary =>
+        {
+            summary.Summary = "Replaces the competition progression graph and immediately reevaluates challenge access.";
+            summary.Description = summary.Summary;
+        });
+
         Put("/admin/competitions/{competitionId}/progression");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("AdminSaveCompetitionProgression"));
@@ -86,11 +99,11 @@ public sealed class SaveCompetitionProgressionEndpoint(
             null => TypedResults.Ok(ProgressionProtocol.ToContract(result.Progression!)),
             CompetitionProgressionSaveFailure.CompetitionNotFound => TypedResults.NotFound(),
             CompetitionProgressionSaveFailure.ConcurrencyConflict => TypedResults.Conflict(
-                new ProgressionSaveProblem("ConcurrencyConflict", null)),
-            _ => TypedResults.ValidationProblem(new Dictionary<string, string[]>
+                new ProgressionSaveProblem(CompetitionProgressionSaveFailure.ConcurrencyConflict, null)),
+            _ => ApiProblems.ValidationProblem(new Dictionary<string, Enum?>
             {
-                ["graph"] = [result.GraphFailure?.ToString()
-                    ?? result.Failure.Value.ToString()]
+                ["graph"] = result.GraphFailure is { } graphFailure
+                    ? graphFailure : result.Failure
             })
         };
     }

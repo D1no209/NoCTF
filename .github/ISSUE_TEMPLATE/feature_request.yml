@@ -1,0 +1,21 @@
+name: Feature request
+description: Describe a user problem and a proposed improvement.
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: User problem
+      description: Explain who is affected and what they are trying to accomplish.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Proposed behavior
+      description: Include the affected game modes or operator workflows.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

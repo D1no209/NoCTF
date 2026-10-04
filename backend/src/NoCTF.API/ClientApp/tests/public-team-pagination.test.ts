@@ -1,8 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { client } from '../app/api/client.gen'
 import { useCompetitionsByIdTeamsIndexPage } from '../app/features/routes/competitions/[id]/teams/useCompetitionsByIdTeamsIndexPage'
 
-const savedConfig = client.getConfig()
+const savedFetch = globalThis.fetch
 const globals = globalThis as unknown as Record<string, unknown>
 const originalGlobals = new Map(['useRoute', 'onMounted', 'onBeforeUnmount']
   .map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]))
@@ -18,7 +17,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  client.setConfig(savedConfig)
+  globalThis.fetch = savedFetch
   for (const [key, descriptor] of originalGlobals) {
     if (descriptor) Object.defineProperty(globalThis, key, descriptor)
     else delete globals[key]
@@ -32,11 +31,11 @@ describe('public competition team pagination', () => {
       name: index === 0 || index === 15 ? 'Echo' : `Team ${index + 1}`,
     }))
     let requests = 0
-    client.setConfig({ baseUrl: 'http://teams.test', fetch: async (request) => {
+    globalThis.fetch = (async (request) => {
       expect(new URL(request.url).pathname).toBe('/api/v1/competitions/competition-under-test/teams')
       requests++
       return Response.json({ items: teams })
-    } })
+    }) as typeof fetch
     const state = useCompetitionsByIdTeamsIndexPage()
     expect(state.loading.value).toBeTrue()
     await mount!()
@@ -62,7 +61,7 @@ describe('public competition team pagination', () => {
   })
 
   test('completes empty and failed loads without getting stuck in loading', async () => {
-    client.setConfig({ baseUrl: 'http://teams.test', fetch: async () => Response.json({ items: [] }) })
+    globalThis.fetch = async () => Response.json({ items: [] })
     const empty = useCompetitionsByIdTeamsIndexPage()
     await mount!()
     expect(empty.loading.value).toBeFalse()
@@ -70,7 +69,7 @@ describe('public competition team pagination', () => {
     expect(empty.total.value).toBe(0)
     expect(empty.teams.value).toEqual([])
 
-    client.setConfig({ fetch: async () => Response.json({ status: 500, detail: '列表暂时不可用' }, { status: 500 }) })
+    globalThis.fetch = async () => Response.json({ status: 500, detail: '列表暂时不可用' }, { status: 500 })
     const failed = useCompetitionsByIdTeamsIndexPage()
     await mount!()
     expect(failed.loading.value).toBeFalse()
@@ -82,10 +81,10 @@ describe('public competition team pagination', () => {
     let resolve!: (response: Response) => void
     let started!: () => void
     const requestStarted = new Promise<void>((done) => { started = done })
-    client.setConfig({ baseUrl: 'http://teams.test', fetch: () => new Promise<Response>((done) => {
+    globalThis.fetch = (() => new Promise<Response>((done) => {
       resolve = done
       started()
-    }) })
+    })) as typeof fetch
     const state = useCompetitionsByIdTeamsIndexPage()
     const pending = mount!()
     await requestStarted

@@ -11,7 +11,7 @@ const { authArtwork, configuration, loginName, password, error, pending, capVeri
     <div class="mb-8 flex flex-col items-center gap-2 text-center">
       <NuxtLink to="/" class="flex items-baseline gap-1.5 font-mono text-2xl font-semibold tracking-tight">
         <span class="text-primary">&gt;</span>
-        <span>{{ configuration?.name ?? $t('ui.noctf') }}</span>
+        <span>{{ configuration?.name ?? $t('common.label.noctf') }}</span>
         <span class="animate-blink text-primary">_</span>
       </NuxtLink>
       <p v-if="configuration?.description" class="text-sm text-muted-foreground">{{ configuration.description }}</p>
@@ -19,7 +19,7 @@ const { authArtwork, configuration, loginName, password, error, pending, capVeri
     <Card class="auth-card">
       <img v-if="authArtwork" data-slot="auth-character-cutout" :data-corner="authArtwork.corner" :src="authArtwork.src" :width="authArtwork.width" :height="authArtwork.height" decoding="async" alt="" aria-hidden="true">
       <CardHeader class="relative z-10 pt-3">
-        <CardTitle class="text-xl font-semibold">{{ $t('ui.signIn') }}</CardTitle>
+        <CardTitle class="text-xl font-semibold">{{ $t('auth.login.action') }}</CardTitle>
       </CardHeader>
       <CardContent class="relative z-10">
         <UiForm @submit.prevent="submit">
@@ -28,27 +28,27 @@ const { authArtwork, configuration, loginName, password, error, pending, capVeri
               <AlertDescription>{{ $message(error) }}</AlertDescription>
             </Alert>
             <Field>
-              <FieldLabel for="login">{{ $t('ui.usernameOrEmail') }}</FieldLabel>
+              <FieldLabel for="login">{{ $t('common.label.usernameEmail') }}</FieldLabel>
               <Input id="login" v-model="loginName" autocomplete="username" required class="max-w-none" />
             </Field>
             <Field>
-              <FieldLabel for="password">{{ $t('ui.password') }}</FieldLabel>
+              <FieldLabel for="password">{{ $t('common.label.password') }}</FieldLabel>
               <PasswordInput id="password" v-model="password" autocomplete="current-password" required />
               <FieldDescription>
-                <NuxtLink to="/auth/password-reset" class="underline">{{ $t('ui.forgotYourPassword') }}</NuxtLink>
+                <NuxtLink to="/auth/password-reset" class="underline">{{ $t('common.label.forgotPassword') }}</NuxtLink>
               </FieldDescription>
             </Field>
             <Field>
               <CapVerificationStatus
                 v-if="capVerification"
-                :key="capVerification.id"
+                :key="capVerification.id ?? undefined"
                 :state="capVerification.state"
                 :progress="capVerification.progress"
                 :label="capVerification.label"
               />
               <Button type="submit" :disabled="submitDisabled" class="w-full sm:mx-auto sm:w-2/3">
                 <Spinner v-if="pending && !capCanRetry" data-icon="inline-start" />
-                {{ capCanRetry ? $t('ui.retry') : $t('ui.signIn') }}
+                {{ capCanRetry ? $t('common.label.retry') : $t('auth.login.action') }}
               </Button>
             </Field>
           </FieldGroup>
@@ -64,7 +64,7 @@ const { authArtwork, configuration, loginName, password, error, pending, capVeri
             <template v-else>
               <Button
                 v-for="provider in ssoProviders"
-                :key="provider.id"
+                :key="provider.id ?? undefined"
                 type="button"
                 variant="outline"
                 class="w-full"
@@ -88,8 +88,8 @@ const { authArtwork, configuration, loginName, password, error, pending, capVeri
         </template>
       </CardContent>
       <CardFooter class="relative z-10 justify-center text-sm text-muted-foreground">
-        {{ $t('ui.donTHaveAnAccountYet') }}
-        <NuxtLink to="/auth/register" class="ml-1 underline">{{ $t('ui.registerNow') }}</NuxtLink>
+        {{ $t('common.authLogin.description.donTAccountYet') }}
+        <NuxtLink to="/auth/register" class="ml-1 underline">{{ $t('common.label.registerNow') }}</NuxtLink>
       </CardFooter>
     </Card>
   </div>

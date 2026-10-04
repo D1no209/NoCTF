@@ -16,7 +16,7 @@ const {
 <template>
   <div data-progression-page class="flex min-h-0 w-full flex-1 flex-col">
     <Alert v-if="error" variant="destructive">
-      <AlertDescription>{{ error }} <Button size="sm" variant="outline" @click="load">{{ $t('ui.retry') }}</Button></AlertDescription>
+      <AlertDescription>{{ error }} <Button size="sm" variant="outline" @click="load">{{ $t('common.label.retry') }}</Button></AlertDescription>
     </Alert>
     <Skeleton v-if="loading" class="min-h-64 flex-1" />
     <template v-else-if="data">
@@ -58,7 +58,7 @@ const {
                     {{ selectedNode.data?.kind === 1 ? $t('progression.badgeNode') : $t('progression.challengeNode') }}
                   </p>
                 </div>
-                <Button type="button" variant="ghost" size="sm" @click="closeSelectedNode">{{ $t('ui.close') }}</Button>
+                <Button type="button" variant="ghost" size="sm" @click="closeSelectedNode">{{ $t('common.action.close') }}</Button>
               </div>
 
               <div v-if="selectedNode.data?.kind === 1" class="flex flex-col gap-3">
@@ -93,7 +93,7 @@ const {
                     {{ $t('progression.noPrerequisites') }}
                   </p>
                   <ul v-else class="flex flex-col gap-2">
-                    <li v-for="requirement in selectedRequirements" :key="requirement.id"
+                    <li v-for="requirement in selectedRequirements" :key="requirement.id ?? undefined"
                       class="flex flex-wrap items-center justify-between gap-2 text-sm">
                       <span class="min-w-0 break-words">{{ requirement.title }}</span>
                       <Badge :variant="requirement.satisfied ? 'default' : 'secondary'">
@@ -127,12 +127,12 @@ const {
             <SheetDescription>{{ $t('progression.badgeCount', { count: data.badges?.length ?? 0 }) }}</SheetDescription>
           </SheetHeader>
           <div v-if="data.badges?.length" class="flex flex-col gap-2 px-4 pb-6">
-            <div v-for="badge in data.badges" :key="badge.id" class="flex flex-col">
+            <div v-for="badge in data.badges" :key="badge.id ?? undefined" class="flex flex-col">
               <Button type="button" variant="ghost" class="h-auto w-full justify-start gap-3 p-2 text-left whitespace-normal"
                 :aria-expanded="selectedBadgeId === badge.id"
                 :aria-controls="`progression-badge-details-${badge.id}`"
                 @click="toggleBadgeDetails(badge.id!)">
-                <img :src="badge.imageUrl" alt="" class="size-12 shrink-0 rounded-lg object-cover" />
+                <img :src="badge.imageUrl ?? undefined" alt="" class="size-12 shrink-0 rounded-lg object-cover" />
                 <span class="min-w-0 break-words font-medium">{{ badge.name }}</span>
               </Button>
               <div v-show="selectedBadgeId === badge.id" :id="`progression-badge-details-${badge.id}`"

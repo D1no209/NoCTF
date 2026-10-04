@@ -26,7 +26,7 @@ public sealed class ExportPlatformAuditArchiveValidator
                 request.From is null && request.To is null
                 || request.From is not null && request.To is not null
                 && request.From <= request.To)
-            .WithMessage("Specify no audit range, or a complete range with the start before the end.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.ExportPlatformAuditArchiveValidationSpecifyAuditRangeComplete)).WithErrorCode(ApiMessages.Key(ApiMessageId.ExportPlatformAuditArchiveValidationSpecifyAuditRangeComplete));
     }
 }
 

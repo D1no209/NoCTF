@@ -10,11 +10,11 @@ const page = await sourceFile(
 
 describe('challenge template test runtime', () => {
   test('uses generated SDK operations for the full lifecycle', () => {
-    expect(panel).toContain('adminChallengeBankGetTestRuntime')
-    expect(panel).toContain('adminChallengeBankCreateTestRuntime')
-    expect(panel).toContain('adminChallengeBankStopTestRuntime')
+    expect(panel).toMatch(/api\.api\.v1\.admin\.challenges\.byChallengeId\([^)]*\)\.testRuntimes\.current\.get\(/)
+    expect(panel).toMatch(/api\.api\.v1\.admin\.challenges\.byChallengeId\([^)]*\)\.testRuntimes\.post\(/)
+    expect(panel).toMatch(/api\.api\.v1\.admin\.challenges\.byChallengeId\([^)]*\)\.testRuntimes\.byRuntimeInstanceId\([^)]*\)\.delete\(/)
     expect(panel).toContain('replacesRuntimeId')
-    expect(panel).toContain('adminChallengeBankExtendTestRuntime')
+    expect(panel).toMatch(/api\.api\.v1\.admin\.challenges\.byChallengeId\([^)]*\)\.testRuntimes\.byRuntimeInstanceId\([^)]*\)\.patch\(/)
     expect(panel).toContain('evaluateChallengeTestRuntimePolling')
     expect(panel).toContain('const outcome = await load()')
     expect(panel).not.toContain("fetch('/api")
@@ -37,6 +37,6 @@ describe('challenge template test runtime', () => {
     expect(page).toContain("<component :is=\"ChallengeTestRuntimePanel\"")
     expect(page).toContain(':definition-dirty="runtimeDefinitionDirty"')
     expect(panel).toContain(':disabled="busy || definitionDirty"')
-    expect(panel).toContain("ui.stoppingATestInstanceRemovesItsContainerAndNetworkBut")
+    expect(panel).toContain("runtime.challengeTest.description.stoppingTestInstanceRemoves")
   })
 })

@@ -10,6 +10,10 @@ namespace NoCTF.API.Endpoints.Runtime;
 
 public sealed class ExtendRuntimeRequest
 {
+    /// <summary>One-time verification token; optional when platform policy disables verification. Maximum 4096 characters.</summary>
+    [FromHeader("X-NoCTF-Human-Verification", IsRequired = false, RemoveFromSchema = true)]
+    public string? HumanVerificationToken { get; set; }
+
     public DateTimeOffset ExpiresAt { get; set; }
 }
 
@@ -28,6 +32,10 @@ public sealed class ExtendRuntimeEndpoint(
 {
     public override void Configure()
     {
+        Description(builder => builder
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable));
+
         Patch("/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes/{runtimeInstanceId}");
         AuthSchemes("Bearer");
         Options(builder => builder.WithMetadata(new NoCTF.API.Security.ProtectedEntryMetadata(NoCTF.API.Security.ProtectedEntry.RuntimeCommand)));
@@ -40,8 +48,8 @@ public sealed class ExtendRuntimeEndpoint(
                 StatusCodes.Status409Conflict)
             .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
                 StatusCodes.Status503ServiceUnavailable));
-        Summary(summary => summary.Summary =
-            "Extends a running CTF runtime during its final ten minutes.");
+        Summary(summary => {
+            summary.Params["X-NoCTF-Human-Verification"] = "One-time verification token, at most 4096 characters. Required only when the configured platform policy enables verification for this operation."; summary.Summary = "Extends a running CTF runtime during its final ten minutes."; summary.Description = summary.Summary; });
     }
 
     public override async Task<Results<Accepted<RuntimeAcceptedResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(
@@ -66,10 +74,10 @@ public sealed class ExtendRuntimeEndpoint(
         if (result.FailureCode is RuntimeMutationFailureCode.RuntimeStateConflict
             or RuntimeMutationFailureCode.RuntimeExtensionTooEarly
             or RuntimeMutationFailureCode.RuntimeConflict)
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: StatusCodes.Status409Conflict,
-                title: "Runtime extension conflicts with its current state.",
-                detail: result.ErrorMessage,
+                title: ApiMessages.Get(ApiMessageId.ExtendRuntimeTitleRuntimeExtensionConflictsState),
+                detail: ApiMessages.For(result.FailureCode),
                 extensions: new Dictionary<string, object?>
                 {
                     ["code"] = result.FailureCode.Value.ToString()
@@ -83,10 +91,10 @@ public sealed class ExtendRuntimeEndpoint(
                         NoCTF.Application.Observability.RuntimeOperationMetricKind.PlayerExtend,
                         failure);
             }
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: StatusCodes.Status503ServiceUnavailable,
-                title: "Runtime could not be extended.",
-                detail: result.ErrorMessage);
+                title: ApiMessages.Get(ApiMessageId.ExtendRuntimeTitleRuntimeCouldExtended),
+                detail: ApiMessages.For(result.FailureCode));
         }
         var accepted = RuntimeEndpointMapping.ToAccepted(result.Value!);
         return TypedResults.Accepted(accepted.StatusUrl, accepted);

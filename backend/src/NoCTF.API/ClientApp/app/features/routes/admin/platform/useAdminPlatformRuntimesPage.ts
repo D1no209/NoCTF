@@ -1,19 +1,23 @@
+
+import { api, RequestPolicyOption } from '../../../../lib/api'
+import { message as describeMessage } from '../../../../utils/i18n'
+import type { UiMessage } from '../../../../utils/i18n'
 import { markRaw, proxyRefs } from 'vue'
 import { useAdminDetailRoute } from '~/features/admin/useAdminDetailRoute'
 import { adminCompetitionPath, adminRuntimeTeamPath, adminRuntimeChallengePath, adminRuntimePath } from '~/features/admin/admin-navigation'
 import RuntimeFlagsPanelComponent from '~/features/admin/RuntimeFlagsPanel.vue'
 
 import { ExternalLink, RefreshCw } from '@lucide/vue'
-import { toast } from 'vue-sonner'
-import { adminGetRuntime, adminGetCompetition, adminGetCompetitionChallenge, adminChallengeBankGetTemplate, adminCreateRuntimeForceTermination, adminPlatformListActiveRuntimes, adminTerminateRuntime } from '../../../../api'
-import type { NoCtfapiEndpointsAdministrationPlatformPlatformRuntimeResponse, NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse } from '../../../../api'
+import { toast } from '../../../../utils/message-toast'
+
+import type { NoCTFAPIEndpointsAdministrationPlatformPlatformRuntimeResponse, NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeResponse } from '../../../../api/models'
 import { useOffsetPagination } from '../../../../composables/useOffsetPagination'
 import { adminRuntimeTeamLabel } from '../../../../utils/admin-runtime'
 import { emptyPlatformRuntimeFilters, platformRuntimeQuery } from '../../../../utils/platform-runtime-filters'
 import { formatCapacityAmount, runnerFailureLabel } from '../../../shared/runner-capacity'
 import RuntimeAccessUrlComponent from '../../../challenges/RuntimeAccessUrl.vue'
 
-type PlatformRuntime = NoCtfapiEndpointsAdministrationPlatformPlatformRuntimeResponse
+type PlatformRuntime = NoCTFAPIEndpointsAdministrationPlatformPlatformRuntimeResponse
 
 /** Owns state, effects and commands for AdminPlatformRuntimesPage. */
 export function useAdminPlatformRuntimesPage() {
@@ -22,9 +26,8 @@ export function useAdminPlatformRuntimesPage() {
   const appliedQuery = ref(platformRuntimeQuery(filters))
 
   const pagination = useOffsetPagination<PlatformRuntime>(async ({ offset, limit, desc }) => {
-    const { data, error: requestError } = await adminPlatformListActiveRuntimes({
-      query: { ...appliedQuery.value, offset, limit, desc },
-    })
+    let requestError: unknown;
+    const data = await api.api.v1.admin.platform.runtimes.get({ queryParameters: { ...appliedQuery.value, offset, limit, desc } }).catch(cause => { requestError = cause; return undefined });
     if (requestError || !data) throw parseApiError(requestError)
     return { items: data.items ?? [], total: data.total ?? 0 }
   }, { initialPageSize: 50, initialDesc: true })
@@ -36,22 +39,23 @@ export function useAdminPlatformRuntimesPage() {
   }
 
   const selection = useAdminDetailRoute<PlatformRuntime>('runtimeId', '/admin/platform/runtimes', async (runtimeInstanceId, signal) => {
-    const { data, error } = await adminGetRuntime({ path: { runtimeInstanceId }, signal })
+    let error: unknown;
+    const data = await api.api.v1.admin.runtimes.byRuntimeInstanceId(runtimeInstanceId).get({ options: [new RequestPolicyOption({ signal: signal })] }).catch(cause => { error = cause; return undefined });
     if (error || !data) throw error ?? new Error(translate('adminNavigation.notFound'))
     const known = items.value.find(item => item.runtime?.id === runtimeInstanceId)
     if (known) return { ...known, runtime: data }
-    const competition = data.competitionId ? await adminGetCompetition({ path: { competitionId: data.competitionId }, signal }) : null
+    const competition = await (data.competitionId ? api.api.v1.admin.competitions.byCompetitionId(data.competitionId).get({ options: [new RequestPolicyOption({ signal: signal })] }) : null);
     let challengeTitle = data.challengeId ?? data.competitionChallengeId ?? ''
     if (data.competitionId && data.competitionChallengeId) {
-      const challenge = await adminGetCompetitionChallenge({ path: { competitionId: data.competitionId, competitionChallengeId: data.competitionChallengeId }, query: { includeDeleted: true }, signal })
-      challengeTitle = challenge.data?.challenge?.title ?? challengeTitle
+      const challenge = await api.api.v1.admin.competitions.byCompetitionId(data.competitionId).challenges.byCompetitionChallengeId(data.competitionChallengeId).get({ queryParameters: { includeDeleted: true }, options: [new RequestPolicyOption({ signal: signal })] });
+      challengeTitle = challenge?.challenge?.title ?? challengeTitle
     }
     else if (data.challengeId) {
-      const challenge = await adminChallengeBankGetTemplate({ path: { challengeId: data.challengeId }, query: { includeDeleted: true }, signal })
-      challengeTitle = challenge.data?.title ?? challengeTitle
+      const challenge = await api.api.v1.admin.challenges.byChallengeId(data.challengeId).get({ queryParameters: { includeDeleted: true }, options: [new RequestPolicyOption({ signal: signal })] });
+      challengeTitle = challenge?.title ?? challengeTitle
     }
     return { runtime: data, scope: data.purpose === 'TemplateTest' ? 'ChallengeTest' : 'Competition',
-      competitionTitle: competition?.data?.competition?.title ?? data.competitionId, challengeTitle }
+      competitionTitle: competition?.competition?.title ?? data.competitionId, challengeTitle }
   })
   const { data: detailTarget, open: detailOpen, loading: detailLoading, error: detailError } = selection
   const detail = computed(() => {
@@ -76,7 +80,7 @@ export function useAdminPlatformRuntimesPage() {
 
   const terminatePending = ref(false)
 
-  const terminationError = ref<string | null>(null)
+  const terminationError = ref<UiMessage | null>(null)
 
   const forceTerminateTarget = ref<PlatformRuntime | null>(null)
 
@@ -86,11 +90,11 @@ export function useAdminPlatformRuntimesPage() {
 
   const forceTerminatePending = ref(false)
 
-  const forceTerminationError = ref<string | null>(null)
+  const forceTerminationError = ref<UiMessage | null>(null)
 
   let refreshTimer: ReturnType<typeof setInterval> | undefined
 
-  function runtimeOf(item: PlatformRuntime | null): NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse | null {
+  function runtimeOf(item: PlatformRuntime | null): NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeResponse | null {
     return item?.runtime ?? null
   }
 
@@ -99,7 +103,7 @@ export function useAdminPlatformRuntimesPage() {
     return runtime ? adminRuntimeTeamLabel(runtime, translate) : '-'
   }
 
-  function stateBadgeVariant(state?: string): 'default' | 'secondary' | 'outline' | 'destructive' {
+  function stateBadgeVariant(state?: string | null): 'default' | 'secondary' | 'outline' | 'destructive' {
     if (state === 'Running') return 'default'
     if (state === 'Stopping') return 'destructive'
     if (state === 'Queued') return 'outline'
@@ -129,16 +133,14 @@ export function useAdminPlatformRuntimesPage() {
     terminatePending.value = true
     terminationError.value = null
     try {
-      const { error: requestError } = await adminTerminateRuntime({
-        path: { runtimeInstanceId: runtime.id },
-      })
-      if (requestError) throw requestError
-      toast.success(translate("ui.instanceTerminationOperationHasBeenAccepted"))
+
+      await api.api.v1.admin.runtimes.byRuntimeInstanceId(runtime.id).delete();
+      toast.success(describeMessage("runtime.platformRuntimes.description.instanceTerminationAccepted"))
       terminateTarget.value = null
       await refresh()
     }
     catch (requestError) {
-      terminationError.value = parseApiError(requestError).message
+      terminationError.value = parseApiError(requestError).displayMessage
       toast.error(terminationError.value)
     }
     finally {
@@ -158,17 +160,13 @@ export function useAdminPlatformRuntimesPage() {
     forceTerminatePending.value = true
     forceTerminationError.value = null
     try {
-      const { error: requestError } = await adminCreateRuntimeForceTermination({
-        path: { runtimeInstanceId: runtime.id },
-        body: { reason },
-      })
-      if (requestError) throw requestError
-      toast.success(translate("ui.forcedFinalizationHasBeenHandedOverToRunnerForCleanup"))
+      await api.api.v1.admin.runtimes.byRuntimeInstanceId(runtime.id).forceTerminations.post({ reason });
+      toast.success(describeMessage("runtime.platformRuntimes.description.forcedFinalizationHandedOver"))
       forceTerminateTarget.value = null
       await refresh()
     }
     catch (requestError) {
-      forceTerminationError.value = parseApiError(requestError).message
+      forceTerminationError.value = parseApiError(requestError).displayMessage
       toast.error(forceTerminationError.value)
     }
     finally {

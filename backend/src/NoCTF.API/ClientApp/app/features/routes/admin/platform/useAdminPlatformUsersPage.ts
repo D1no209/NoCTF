@@ -1,26 +1,32 @@
+
+import { ResponseMetadata } from '../../../../lib/api'
+
+import { api, RequestPolicyOption } from '../../../../lib/api'
+import { message as describeMessage } from '../../../../utils/i18n'
+import type { UiMessage } from '../../../../utils/i18n'
 import { markRaw } from 'vue'
 import { useAdminDetailRoute } from '~/features/admin/useAdminDetailRoute'
 
 import { Copy, KeyRound, LogIn, Plus, Trash2, Unlink } from '@lucide/vue'
-import { toast } from 'vue-sonner'
-import { adminPlatformCreateBot, adminPlatformDeleteUser, adminPlatformDeleteUserTokens, adminPlatformGetUser, adminPlatformIssueUserToken, adminPlatformListUsers, adminPlatformPatchUser, adminPlatformPreviewUserDeletion, adminPlatformSsoGetConfiguration, adminPlatformUnbindSsoIdentity } from '../../../../api'
-import type { NoCtfapiEndpointsAdministrationPlatformIssuePlatformUserTokenResponse, NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionMode, NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionPreviewResponse, NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse, NoCtfapiEndpointsAdministrationPlatformPlatformManagedUserAccountStatusProtocol, NoCtfapiEndpointsAdministrationPlatformSsoProviderResponse, NoCtfapiEndpointsAuthenticationUserKindProtocol, NoCtfapiEndpointsAuthenticationUserRoleProtocol } from '../../../../api'
+import { toast } from '../../../../utils/message-toast'
+
+import type { NoCTFAPIEndpointsAdministrationPlatformIssuePlatformUserTokenResponse, NoCTFAPIEndpointsAdministrationPlatformPlatformUserDeletionMode, NoCTFAPIEndpointsAdministrationPlatformPlatformUserDeletionPreviewResponse, NoCTFAPIEndpointsAdministrationPlatformPlatformUserResponse, NoCTFAPIEndpointsAdministrationPlatformPlatformManagedUserAccountStatusProtocol, NoCTFAPIEndpointsAdministrationPlatformSsoProviderResponse, NoCTFAPIEndpointsAuthenticationUserKindProtocol, NoCTFAPIEndpointsAuthenticationUserRoleProtocol } from '../../../../api/models'
 import { createLatestRequestGuard } from '../../../../lib/latest-request'
 import PrivateAccountPanelComponent from '../../../account/PrivateAccountPanel.vue'
 import AdminDateTimeComponent from '../../../admin/AdminDateTime.vue'
 import { useOffsetPagination } from '../../../../composables/useOffsetPagination'
 
-type PlatformUser = NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse
+type PlatformUser = NoCTFAPIEndpointsAdministrationPlatformPlatformUserResponse
 
-type DeletionPreview = NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionPreviewResponse
+type DeletionPreview = NoCTFAPIEndpointsAdministrationPlatformPlatformUserDeletionPreviewResponse
 
-type ManagedAccountStatus = NoCtfapiEndpointsAdministrationPlatformPlatformManagedUserAccountStatusProtocol
+type ManagedAccountStatus = NoCTFAPIEndpointsAdministrationPlatformPlatformManagedUserAccountStatusProtocol
 
 type EmailVerificationDraft = 'Verified' | 'Unverified'
 
 type TokenIntent = 'issue' | 'impersonate'
 
-type IssuedToken = NoCtfapiEndpointsAdministrationPlatformIssuePlatformUserTokenResponse
+type IssuedToken = NoCTFAPIEndpointsAdministrationPlatformIssuePlatformUserTokenResponse
 
 /** Owns state, effects and commands for AdminPlatformUsersPage. */
 export function useAdminPlatformUsersPage() {
@@ -29,57 +35,58 @@ export function useAdminPlatformUsersPage() {
 
   const users = ref<PlatformUser[]>([])
 
-  const loadError = ref<string | null>(null)
+  const loadError = ref<UiMessage | null>(null)
 
   const search = ref('')
 
-  const roleFilter = ref<'all' | 'Bot' | NoCtfapiEndpointsAuthenticationUserRoleProtocol>(
+  const roleFilter = ref<'all' | 'Bot' | NoCTFAPIEndpointsAuthenticationUserRoleProtocol>(
     route.query.filter === 'Bot' ? 'Bot' : 'all',
   )
 
-  const ssoProviders = ref<NoCtfapiEndpointsAdministrationPlatformSsoProviderResponse[]>([])
+  const ssoProviders = ref<NoCTFAPIEndpointsAdministrationPlatformSsoProviderResponse[]>([])
 
   const ssoProviderFilter = ref('all')
 
-  const ROLE_LABELS: Record<string, string> = { User: "ui.user", Organizer: "ui.organizer", Administrator: "ui.administrator" }
+  const ROLE_LABELS: Record<string, string> = { User: "administration.label.user", Organizer: "administration.label.organizer", Administrator: "administration.label.administrator" }
 
-  const STATUS_LABELS: Record<string, string> = { Active: "ui.normal", Banned: "ui.banned2", Disabled: "ui.disabled", Anonymized: "ui.anonymous" }
+  const STATUS_LABELS: Record<string, string> = { Active: "administration.label.normal", Banned: "common.label.banned", Disabled: "administration.label.disabled", Anonymized: "common.label.anonymous" }
 
   const MANAGED_ACCOUNT_STATUS_OPTIONS: ReadonlyArray<{ value: ManagedAccountStatus, label: string }> = [
-    { value: 'Active', label: "ui.normal" },
-    { value: 'Banned', label: "ui.banned2" },
-    { value: 'Disabled', label: "ui.disabled" },
+    { value: 'Active', label: "administration.label.normal" },
+    { value: 'Banned', label: "common.label.banned" },
+    { value: 'Disabled', label: "administration.label.disabled" },
   ]
 
   const REFERENCE_LABELS: Record<string, string> = {
-    CompetitionOwner: "ui.competitionLeader",
-    CompetitionCollaborator: "ui.competitionCollaborator",
-    ChallengeOwner: "ui.questionBankTemplatePersonInCharge",
-    ChallengeManager: "ui.questionBankTemplateManager",
-    TeamCaptain: "ui.teamCaptain",
-    TeamMember: "ui.teamMembers",
-    Submission: "ui.submitRecord",
-    PatchUpload: "ui.patchUpload2",
-    Notification: "ui.notifications",
-    GameplayFact: "ui.gameplayFacts",
-    CompetitionLifecycleAudit: "ui.competitionLifeCycleAudit",
-    CompetitionQuestion: "ui.competitionQuestions",
-    CompetitionQuestionEntry: "ui.qAReply",
-    CompetitionEvent: "ui.competitionEvent",
-    UserAccountLifecycleAudit: "ui.accountLifeCycleAudit",
+    CompetitionOwner: "common.label.competitionLeader",
+    CompetitionCollaborator: "common.label.competitionCollaborator",
+    ChallengeOwner: "common.platformUsers.description.questionBankTemplatePerson",
+    ChallengeManager: "common.label.questionBankTemplateManager",
+    TeamCaptain: "common.label.teamCaptain",
+    TeamMember: "common.label.teamMembers",
+    Submission: "common.label.submitRecord",
+    PatchUpload: "common.label.patchUpload.platformUsersPage",
+    Notification: "common.label.notifications",
+    GameplayFact: "common.label.gameplayFacts",
+    CompetitionLifecycleAudit: "common.label.competitionLifeCycleAudit",
+    CompetitionQuestion: "common.label.competitionQuestions",
+    CompetitionQuestionEntry: "common.label.qReply",
+    CompetitionEvent: "administration.label.competitionEvent",
+    UserAccountLifecycleAudit: "account.label.accountLifeCycleAudit",
   }
 
   const pagination = useOffsetPagination<PlatformUser>(async ({ offset, limit, desc }) => {
     const query = {
-      keyword: search.value.trim() || null,
-      kind: roleFilter.value === 'Bot' ? 'Bot' as NoCtfapiEndpointsAuthenticationUserKindProtocol : null,
-      role: roleFilter.value !== 'all' && roleFilter.value !== 'Bot' ? roleFilter.value : null,
-      ssoProviderId: ssoProviderFilter.value === 'all' ? null : ssoProviderFilter.value,
+      keyword: search.value.trim() || undefined,
+      kind: roleFilter.value === 'Bot' ? 'Bot' as NoCTFAPIEndpointsAuthenticationUserKindProtocol : undefined,
+      role: roleFilter.value !== 'all' && roleFilter.value !== 'Bot' ? roleFilter.value : undefined,
+      ssoProviderId: ssoProviderFilter.value === 'all' ? undefined : ssoProviderFilter.value,
       offset,
       limit,
       desc,
     }
-    const { data, error } = await adminPlatformListUsers({ query })
+    let error: unknown;
+    const data = await api.api.v1.admin.platform.users.get({ queryParameters: query }).catch(cause => { error = cause; return undefined });
     if (error || !data) throw error ?? new Error('Failed to load platform users.')
     users.value = data.items ?? []
     return { items: users.value, total: data.total ?? 0 }
@@ -101,7 +108,7 @@ export function useAdminPlatformUsersPage() {
   })
 
   async function loadSsoProviders(): Promise<void> {
-    const { data } = await adminPlatformSsoGetConfiguration()
+    const data = await api.api.v1.admin.platform.sso.get();
     ssoProviders.value = data?.providers ?? []
   }
 
@@ -111,7 +118,7 @@ export function useAdminPlatformUsersPage() {
 
   const botName = ref('')
 
-  const botRole = ref<NoCtfapiEndpointsAuthenticationUserRoleProtocol>('User')
+  const botRole = ref<NoCTFAPIEndpointsAuthenticationUserRoleProtocol>('User')
 
   function openCreateBot(): void {
     botName.value = ''
@@ -127,22 +134,22 @@ export function useAdminPlatformUsersPage() {
   async function createBot(): Promise<void> {
     if (creatingBot.value || !botName.value.trim()) return
     creatingBot.value = true
-    const { error } = await adminPlatformCreateBot({
-      body: { userName: botName.value.trim(), role: botRole.value },
-    })
+    let error: unknown;
+    await api.api.v1.admin.platform.bots.post({ userName: botName.value.trim(), role: botRole.value }).catch(cause => { error = cause; return undefined });
     creatingBot.value = false
     if (error) {
-      toast.error(parseApiError(error).message)
+      toast.error(parseApiError(error).displayMessage)
       return
     }
     createBotOpen.value = false
     roleFilter.value = 'Bot'
-    toast.success(translate("ui.botCreated"))
+    toast.success(describeMessage("administration.label.botCreated"))
     await load()
   }
 
   const selection = useAdminDetailRoute<PlatformUser>('userId', '/admin/platform/users', async (userId, signal) => {
-    const { data, error } = await adminPlatformGetUser({ path: { userId }, signal })
+    let error: unknown;
+    const data = await api.api.v1.admin.platform.users.byUserId(userId).get({ options: [new RequestPolicyOption({ signal: signal })] }).catch(cause => { error = cause; return undefined });
     if (error || !data?.user) throw error ?? new Error(translate('adminNavigation.notFound'))
     return data.user
   })
@@ -215,16 +222,14 @@ export function useAdminPlatformUsersPage() {
     const request = tokenIssueRequests.begin()
     const intent = tokenIntent.value
     tokenIssuing.value = true
-    const { data, error } = await adminPlatformIssueUserToken({
-      path: { userId: target.id },
-      body: {
+    let error: unknown;
+    const data = await api.api.v1.admin.platform.users.byUserId(target.id).tokens.post({
         expiresInSeconds: tokenExpiresInSeconds.value,
-      },
-    })
+      }).catch(cause => { error = cause; return undefined });
     if (!tokenIssueRequests.isCurrent(request) || !tokenOpen.value) return
     tokenIssuing.value = false
     if (error || !data?.accessToken || !data.expiresAt || !data.targetUserId || !data.targetUserName) {
-      toast.error(parseApiError(error).message)
+      toast.error(parseApiError(error).displayMessage)
       return
     }
     if (intent === 'impersonate') {
@@ -233,14 +238,14 @@ export function useAdminPlatformUsersPage() {
       try {
         await startImpersonation({
           accessToken: data.accessToken,
-          expiresAt: data.expiresAt,
+          expiresAt: data.expiresAt.toISOString(),
           targetUserId: data.targetUserId,
           targetUserName: data.targetUserName,
           returnPath: route.fullPath,
         })
       }
       catch (impersonationError) {
-        toast.error(parseApiError(impersonationError).message)
+        toast.error(parseApiError(impersonationError).displayMessage)
       }
       return
     }
@@ -251,10 +256,10 @@ export function useAdminPlatformUsersPage() {
     if (!issuedToken.value?.accessToken) return
     try {
       await navigator.clipboard.writeText(issuedToken.value.accessToken)
-      toast.success(translate("ui.copiedToClipboard"))
+      toast.success(describeMessage("common.label.copiedClipboard"))
     }
     catch {
-      toast.error(translate("ui.copyFailedPleaseManuallySelectCopy"))
+      toast.error(describeMessage("common.kohPanel.error.copyManuallySelectFailed"))
     }
   }
 
@@ -262,15 +267,14 @@ export function useAdminPlatformUsersPage() {
     const target = detail.value
     if (!target?.id || !target.ssoBinding || ssoUnbinding.value) return
     ssoUnbinding.value = true
-    const { error } = await adminPlatformUnbindSsoIdentity({
-      path: { userId: target.id },
-    })
+    let error: unknown;
+    await api.api.v1.admin.platform.users.byUserId(target.id).ssoBinding.delete().catch(cause => { error = cause; return undefined });
     ssoUnbinding.value = false
     if (error) {
-      toast.error(parseApiError(error, translate('sso.adminUnbindFailed')).message)
+      toast.error(parseApiError(error, describeMessage('sso.adminUnbindFailed')).displayMessage)
       return
     }
-    toast.success(translate('sso.adminUnbindSuccessful'))
+    toast.success(describeMessage('sso.adminUnbindSuccessful'))
     if (target.id === currentUser.value?.userId) {
       invalidate()
       detailOpen.value = false
@@ -285,31 +289,30 @@ export function useAdminPlatformUsersPage() {
     if (!detail.value?.id) return
     const targetId = detail.value.id
     roleSaving.value = true
-    const { data, error, response } = await adminPlatformPatchUser({
-      path: { userId: targetId },
-      body: { role: pendingRole.value as 'User' | 'Organizer' | 'Administrator' },
-    })
+    let error: unknown;
+    const response = new ResponseMetadata();
+    const data = await api.api.v1.admin.platform.users.byUserId(targetId).patch({ role: pendingRole.value as 'User' | 'Organizer' | 'Administrator' }, { options: [new RequestPolicyOption({ response: response })] }).catch(cause => { error = cause; return undefined });
     roleSaving.value = false
     if (error) {
       if (response?.status === 409) {
-        toast.error(translate("ui.thisUserIsStillTheOwnerOrAdministratorOfThe"))
+        toast.error(describeMessage("administration.platformUsers.description.userStillOwnerAdministrator"))
       }
       else {
-        toast.error(parseApiError(error).message)
+        toast.error(parseApiError(error).displayMessage)
       }
       return
     }
     if (selection.selectedId.value === targetId) detail.value = data?.user ?? detail.value
-    toast.success(translate("ui.roleUpdated"))
+    toast.success(describeMessage("administration.label.roleUpdated"))
     await load()
   }
 
-  function accountStatusConflictMessage(code: string | undefined): string | null {
+  function accountStatusConflictMessage(code: string | null | undefined): string | null {
     switch (code) {
       case 'LastAdministratorProtected':
-        return translate("ui.theLastActiveAdministratorCannotBeDeactivated")
+        return translate("administration.platformUsers.validation.lastActiveFormat")
       case 'AnonymizedAccountImmutable':
-        return translate("ui.anAnonymizedAccountCannotBeRestored")
+        return translate("administration.platformUsers.validation.anonymizedAccountFormat")
       default:
         return null
     }
@@ -319,14 +322,12 @@ export function useAdminPlatformUsersPage() {
     if (!detail.value?.id || detail.value.accountStatus === 'Anonymized') return
     const targetId = detail.value.id
     accountStatusSaving.value = true
-    const { data, error } = await adminPlatformPatchUser({
-      path: { userId: targetId },
-      body: { accountStatus: pendingAccountStatus.value },
-    })
+    let error: unknown;
+    const data = await api.api.v1.admin.platform.users.byUserId(targetId).patch({ accountStatus: pendingAccountStatus.value }).catch(cause => { error = cause; return undefined });
     accountStatusSaving.value = false
     if (error) {
       const apiError = parseApiError(error)
-      toast.error(accountStatusConflictMessage(apiError.code) ?? apiError.message)
+      toast.error(accountStatusConflictMessage(apiError.code) ?? apiError.displayMessage)
       return
     }
 
@@ -336,24 +337,22 @@ export function useAdminPlatformUsersPage() {
       if (index >= 0) users.value.splice(index, 1, data.user)
     }
     toast.success(pendingAccountStatus.value === 'Active'
-      ? translate("ui.accountActivated")
-      : translate("ui.accountStatusUpdatedTheUserSExistingSessionsHaveBeen"))
+      ? translate("administration.label.accountActivated")
+      : translate("administration.platformUsers.description.accountStatusUpdatedUser"))
   }
 
   async function saveEmailVerification(): Promise<void> {
     if (!detail.value?.id || detail.value.accountStatus === 'Anonymized') return
     const targetId = detail.value.id
     emailVerificationSaving.value = true
-    const { data, error } = await adminPlatformPatchUser({
-      path: { userId: targetId },
-      body: { emailVerified: pendingEmailVerification.value === 'Verified' },
-    })
+    let error: unknown;
+    const data = await api.api.v1.admin.platform.users.byUserId(targetId).patch({ emailVerified: pendingEmailVerification.value === 'Verified' }).catch(cause => { error = cause; return undefined });
     emailVerificationSaving.value = false
     if (error) {
       const apiError = parseApiError(error)
       toast.error(apiError.code === 'AnonymizedAccountImmutable'
-        ? translate("ui.anAnonymizedAccountCannotBeChanged")
-        : apiError.message)
+        ? translate("administration.platformUsers.validation.anonymizedAccountFormat.platformUsersPage")
+        : apiError.displayMessage)
       return
     }
 
@@ -363,20 +362,21 @@ export function useAdminPlatformUsersPage() {
       if (index >= 0) users.value.splice(index, 1, data.user)
     }
     toast.success(pendingEmailVerification.value === 'Verified'
-      ? translate("ui.emailMarkedAsVerifiedByAnAdministrator")
-      : translate("ui.emailVerificationStatusRevoked"))
+      ? translate("administration.platformUsers.description.emailMarkedVerifiedAdministrator")
+      : translate("administration.label.emailVerificationStatusRevoked"))
   }
 
   async function invalidateTokens(): Promise<void> {
     if (invalidating.value || !detail.value?.id) return
     invalidating.value = true
-    const { error } = await adminPlatformDeleteUserTokens({ path: { userId: detail.value.id } })
+    let error: unknown;
+    await api.api.v1.admin.platform.users.byUserId(detail.value.id).tokens.delete().catch(cause => { error = cause; return undefined });
     invalidating.value = false
     if (error) {
-      toast.error(parseApiError(error).message)
+      toast.error(parseApiError(error).displayMessage)
       return
     }
-    toast.success(translate("ui.allTokensForThisUserHaveBeenRevoked"))
+    toast.success(describeMessage("administration.platformUsers.description.tokensUserRevoked"))
   }
 
   const deleteOpen = ref(false)
@@ -385,7 +385,7 @@ export function useAdminPlatformUsersPage() {
 
   const preview = ref<DeletionPreview | null>(null)
 
-  const deletionMode = ref<NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionMode>('Anonymize')
+  const deletionMode = ref<NoCTFAPIEndpointsAdministrationPlatformPlatformUserDeletionMode>('Anonymize')
 
   const deletionReason = ref('')
 
@@ -397,10 +397,11 @@ export function useAdminPlatformUsersPage() {
     previewLoading.value = true
     preview.value = null
     deletionReason.value = ''
-    const { data, error } = await adminPlatformPreviewUserDeletion({ path: { userId: detail.value.id } })
+    let error: unknown;
+    const data = await api.api.v1.admin.platform.users.byUserId(detail.value.id).deletionPreview.get().catch(cause => { error = cause; return undefined });
     previewLoading.value = false
     if (error) {
-      toast.error(parseApiError(error).message)
+      toast.error(parseApiError(error).displayMessage)
       deleteOpen.value = false
       return
     }
@@ -408,35 +409,33 @@ export function useAdminPlatformUsersPage() {
     deletionMode.value = data?.canAnonymize ? 'Anonymize' : 'HardDelete'
   }
 
-  function deletionConflictMessage(error: unknown): string {
+  function deletionConflictMessage(error: unknown): UiMessage {
     const code = parseApiError(error).code
     switch (code) {
       case 'SelfDeletionForbidden':
-        return translate("ui.cannotDeleteOwnAccount")
+        return translate("administration.validation.deleteOwnFormat")
       case 'LastAdministratorProtected':
-        return translate("ui.cannotDeleteLastAdministrator")
+        return translate("administration.validation.deleteLastFormat")
       case 'HardDeleteBlocked':
-        return translate("ui.thisUserHasBusinessReferencesAndCannotBePhysicallyDeleted")
+        return translate("administration.platformUsers.validation.userBusinessFormat")
       case 'AlreadyAnonymized':
-        return translate("ui.thisUserHasBeenAnonymized")
+        return translate("administration.platformUsers.label.userAnonymized")
       default:
-        return parseApiError(error).message
+        return parseApiError(error).displayMessage
     }
   }
 
   async function confirmDelete(): Promise<void> {
     if (!detail.value?.id || !deletionReason.value.trim()) return
     deleting.value = true
-    const { error } = await adminPlatformDeleteUser({
-      path: { userId: detail.value.id },
-      body: { mode: deletionMode.value, reason: deletionReason.value.trim() },
-    })
+    let error: unknown;
+    await api.api.v1.admin.platform.users.byUserId(detail.value.id).delete({ mode: deletionMode.value, reason: deletionReason.value.trim() }).catch(cause => { error = cause; return undefined });
     deleting.value = false
     if (error) {
       toast.error(deletionConflictMessage(error))
       return
     }
-    toast.success(deletionMode.value === 'HardDelete' ? translate("ui.userHasBeenPhysicallyDeleted") : translate("ui.userHasBeenAnonymized"))
+    toast.success(deletionMode.value === 'HardDelete' ? translate("administration.platformUsers.label.userPhysicallyDeleted") : translate("administration.label.userAnonymized"))
     deleteOpen.value = false
     detailOpen.value = false
     await load()

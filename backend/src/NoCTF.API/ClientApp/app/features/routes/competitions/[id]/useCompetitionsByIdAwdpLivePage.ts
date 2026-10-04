@@ -1,10 +1,15 @@
+import { dateObject } from '../../../../utils/date-value'
+
+import { api } from '../../../../lib/api'
+import { message as describeMessage } from '../../../../utils/i18n'
+import type { UiMessage } from '../../../../utils/i18n'
 import { proxyRefs } from 'vue'
 import { markRaw } from 'vue'
 
 import { Activity, ChevronLeft, ChevronRight, Clock3, Expand, Minimize, Radio, RefreshCw, ShieldCheck, Swords, Trophy, Users, X } from '@lucide/vue'
-import { toast } from 'vue-sonner'
-import { getCompetitionEndpoint, listCompetitionEvents } from '../../../../api'
-import type { NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse } from '../../../../api'
+import { toast } from '../../../../utils/message-toast'
+
+import type { NoCTFAPIEndpointsCompetitionsCompetitionResponse, NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse } from '../../../../api/models'
 import { createTrailingRefresh } from '../../../../lib/latest-page-refresh'
 import { awdpControlEventKinds, awdpControlEvents, awdpCurrentRoundEvents, awdpCurrentRoundOperationMetrics, awdpPlaybackEvents, awdpRankedEntries, awdpRoundClock, awdpTeamChallengeStates, calculateAwdpCanvasScale, reconcileAwdpControlEvents } from '../../../../utils/awdp-control-screen'
 import type { AwdpControlEvent, AwdpRankedEntry, AwdpResolvedControlEvent } from '../../../../utils/awdp-control-screen'
@@ -25,7 +30,7 @@ export function useCompetitionsByIdAwdpLivePage() {
 
   const board = useScoreboardMatrix(competitionId, { pollRounds: false })
 
-  const competition = ref<NoCtfapiEndpointsCompetitionsCompetitionResponse | null>(null)
+  const competition = ref<NoCTFAPIEndpointsCompetitionsCompetitionResponse | null>(null)
 
   const events = ref<AwdpControlEvent[]>([])
 
@@ -35,7 +40,7 @@ export function useCompetitionsByIdAwdpLivePage() {
 
   const projectionPending = ref(false)
 
-  const error = ref<string | null>(null)
+  const error = ref<UiMessage | null>(null)
 
   const activeEvent = ref<AwdpResolvedControlEvent | null>(null)
 
@@ -151,7 +156,7 @@ export function useCompetitionsByIdAwdpLivePage() {
   ))
 
   const remainingText = computed(() => {
-    if (competition.value?.status === 'Finished') return t("ui.competitionFinished")
+    if (competition.value?.status === 'Finished') return t("competitions.label.competitionFinished")
     const total = liveRoundClock.value.remainingSeconds
     if (!total) return '—'
     const hours = Math.floor(total / 3600)
@@ -173,12 +178,12 @@ export function useCompetitionsByIdAwdpLivePage() {
   }
 
   function eventLabel(event: AwdpResolvedControlEvent): string {
-    const action = event.action === 'attack' ? t("ui.attack") : t("ui.defense")
-    const outcome = event.outcome === 'success' ? t("ui.success") : t("ui.failed")
+    const action = event.action === 'attack' ? t("competitions.label.attack") : t("competitions.label.defense")
+    const outcome = event.outcome === 'success' ? t("competitions.label.success") : t("common.error.failed")
     return `${action}${outcome}`
   }
 
-  function eventTime(value?: string | null): string {
+  function eventTime(value?: Date | string | null): string {
     if (!value) return '—'
     const date = new Date(value)
     return Number.isNaN(date.getTime()) ? '—' : date.toLocaleTimeString(undefined, { hour12: false })
@@ -216,25 +221,20 @@ export function useCompetitionsByIdAwdpLivePage() {
       && activeEvent.value?.competitionChallengeId === challengeId
   }
 
-  async function loadAllAwdpEvents(from: string, to: string): Promise<{
-    data: NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse[] | null
-    error: unknown
-  }> {
-    const items: NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse[] = []
+  async function loadAllAwdpEvents(from: string, to: string): Promise<NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse[]> {
+    const items: NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse[] = []
     const seenCursors = new Set<string>()
     let cursor: string | null | undefined
     do {
-      const result = await listCompetitionEvents({
-        path: { competitionId },
-        query: { from, to, kinds: [...awdpControlEventKinds], cursor, offset: 0, limit: 200, desc: true },
-      })
-      if (result.error || !result.data) return { data: null, error: result.error }
-      items.push(...(result.data.items ?? []))
-      cursor = result.data.nextCursor
+      let resultError: unknown;
+      const result = await api.api.v1.competitions.byCompetitionId(competitionId).events.get({ queryParameters: { from: dateObject(from ?? undefined), to: dateObject(to ?? undefined), kinds: [...awdpControlEventKinds], cursor: cursor ?? undefined, offset: 0, limit: 200, desc: true } }).catch(cause => { resultError = cause; return undefined });
+      if (resultError || !result) throw resultError ?? new Error('Competition event response is empty.')
+      items.push(...(result.items ?? []))
+      cursor = result.nextCursor
       if (!cursor || seenCursors.has(cursor)) break
       seenCursors.add(cursor)
     } while (cursor)
-    return { data: items, error: null }
+    return items
   }
 
   function enqueueResolvedEvents(newEvents: readonly AwdpControlEvent[]): void {
@@ -244,18 +244,19 @@ export function useCompetitionsByIdAwdpLivePage() {
 
   async function loadData(): Promise<void> {
     refreshing.value = Boolean(competition.value || board.snapshot.value)
-    const competitionResult = await getCompetitionEndpoint({ path: { competitionId } })
-    if (competitionResult.error || !competitionResult.data) {
+    let competitionResultError: unknown;
+    const competitionResult = await api.api.v1.competitions.byCompetitionId(competitionId).get().catch(cause => { competitionResultError = cause; return undefined });
+    if (competitionResultError || !competitionResult) {
       loading.value = false
       refreshing.value = false
-      error.value = parseApiError(competitionResult.error, t("ui.loadingCompetitionFailed")).message
+      error.value = parseApiError(competitionResultError, t("common.error.loadingCompetitionFailed")).displayMessage
       return
     }
-    competition.value = competitionResult.data
+    competition.value = competitionResult
     if (competition.value.mode !== 'Awdp') {
       loading.value = false
       refreshing.value = false
-      error.value = t("ui.theAwdpControlScreenIsOnlyAvailableForAwdpCompetitions")
+      error.value = t("competitions.competitionsBy.description.awdpControlScreenAvailable")
       return
     }
 
@@ -263,18 +264,21 @@ export function useCompetitionsByIdAwdpLivePage() {
     const knownStart = competition.value.startTime ? new Date(competition.value.startTime).getTime() : now
     const from = new Date(Math.max(knownStart, now - 31 * 24 * 60 * 60 * 1000)).toISOString()
     const to = new Date(now).toISOString()
-    const [, eventResult] = await Promise.all([
+    const settledRequests = await Promise.allSettled([
       board.refresh({ catalog: true, schema: true, snapshot: true }),
       loadAllAwdpEvents(from, to),
-    ])
+    ]);
+    const eventResult = settledRequests[1].status === 'fulfilled' ? settledRequests[1].value : undefined;
+    const eventResultError = settledRequests[1].status === 'rejected' ? settledRequests[1].reason : undefined;
+
     loading.value = false
     refreshing.value = false
 
-    if (eventResult.error || !eventResult.data) {
-      error.value = parseApiError(eventResult.error, t("ui.failedToLoadCompetitionActivity")).message
+    if (eventResultError || !eventResult) {
+      error.value = parseApiError(eventResultError, t("competitions.competitionsBy.error.loadCompetitionActivityFailed")).displayMessage
       return
     }
-    const nextEvents = awdpControlEvents(eventResult.data)
+    const nextEvents = awdpControlEvents(eventResult)
     const reconciliation = reconcileAwdpControlEvents(seenEventIds, nextEvents)
     seenEventIds = reconciliation.seenIds
     events.value = nextEvents
@@ -293,7 +297,7 @@ export function useCompetitionsByIdAwdpLivePage() {
     }
     if (board.error.value || !board.snapshot.value) {
       projectionPending.value = false
-      error.value = board.error.value ?? t("ui.failedToLoadScoreboard")
+      error.value = board.error.value ?? t("common.error.loadScoreboardFailed")
       return
     }
     projectionPending.value = false
@@ -322,7 +326,7 @@ export function useCompetitionsByIdAwdpLivePage() {
       else await document.exitFullscreen()
     }
     catch {
-      toast.error(translate("ui.theBrowserDeniedFullscreenAccessCheckSitePermissionsOrUse"))
+      toast.error(describeMessage("competitions.competitionsBy.description.browserDeniedFullscreenAccess"))
     }
   }
 

@@ -9,72 +9,72 @@ const { RuntimeFlagsPanel, adminCompetitionPath, adminRuntimeTeamPath, adminRunt
 <template>
   <div class="flex min-w-0 flex-col gap-4">
     <div class="flex flex-wrap items-center justify-between gap-3">
-      <h2 class="text-lg font-semibold">{{ $t('ui.runtimeContainers') }}</h2>
+      <h2 class="text-lg font-semibold">{{ $t('common.label.runtimeContainers') }}</h2>
       <Button variant="outline" size="sm" :disabled="loading" @click="refresh">
         <Spinner v-if="loading" data-icon="inline-start" />
         <RefreshCw v-else data-icon="inline-start" />
-        {{ $t('ui.refresh') }}
+        {{ $t('common.label.refresh') }}
       </Button>
     </div>
     <Card>
       <CardHeader class="sr-only">
-        <CardTitle>{{ $t('ui.applyFilters') }}</CardTitle>
-        <CardDescription>{{ $t('ui.activeContainersOnlySearchByCompetitionChallengeOrAttributedTeam') }}</CardDescription>
+        <CardTitle>{{ $t('common.label.applyFilters') }}</CardTitle>
+        <CardDescription>{{ $t('runtime.platformRuntimes.description.activeContainersSearchCompetition') }}</CardDescription>
       </CardHeader>
       <CardContent>
         <UiForm @submit.prevent="applyFilters">
           <FieldGroup class="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(12rem,1fr)_repeat(3,minmax(7rem,9rem))_auto] xl:items-end">
             <Field>
-              <FieldLabel for="platform-runtime-search" class="sr-only">{{ $t('ui.searchCompetitionChallengeOrTeam') }}</FieldLabel>
-              <Input id="platform-runtime-search" v-model="filters.search" maxlength="200" :placeholder="$t('ui.searchCompetitionChallengeOrTeam')" />
+              <FieldLabel for="platform-runtime-search" class="sr-only">{{ $t('runtime.platformRuntimes.label.searchCompetitionChallengeTeam') }}</FieldLabel>
+              <Input id="platform-runtime-search" v-model="filters.search" maxlength="200" :placeholder="$t('runtime.platformRuntimes.label.searchCompetitionChallengeTeam')" />
             </Field>
             <Field>
-              <FieldLabel for="platform-runtime-scope" class="sr-only">{{ $t('ui.allSources') }}</FieldLabel>
+              <FieldLabel for="platform-runtime-scope" class="sr-only">{{ $t('runtime.label.sources') }}</FieldLabel>
               <Select v-model="filters.scope">
                 <SelectTrigger id="platform-runtime-scope" class="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent><SelectGroup>
-                  <SelectItem value="all">{{ $t('ui.allSources') }}</SelectItem>
-                  <SelectItem value="Competition">{{ $t('ui.competitionContainers') }}</SelectItem>
-                  <SelectItem value="ChallengeTest">{{ $t('ui.challengeTest') }}</SelectItem>
+                  <SelectItem value="all">{{ $t('runtime.label.sources') }}</SelectItem>
+                  <SelectItem value="Competition">{{ $t('runtime.label.competitionContainers') }}</SelectItem>
+                  <SelectItem value="ChallengeTest">{{ $t('runtime.label.challengeTest') }}</SelectItem>
                 </SelectGroup></SelectContent>
               </Select>
             </Field>
             <Field>
-              <FieldLabel for="platform-runtime-state" class="sr-only">{{ $t('ui.statusAll') }}</FieldLabel>
+              <FieldLabel for="platform-runtime-state" class="sr-only">{{ $t('common.label.status.runtimesPageView') }}</FieldLabel>
               <Select v-model="filters.state">
                 <SelectTrigger id="platform-runtime-state" class="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent><SelectGroup>
-                  <SelectItem value="all">{{ $t('ui.statusAll') }}</SelectItem>
-                  <SelectItem value="Queued">{{ $t('ui.queuing') }}</SelectItem>
-                  <SelectItem value="Provisioning">{{ $t('ui.inPreparation') }}</SelectItem>
-                  <SelectItem value="Running">{{ $t('ui.running2') }}</SelectItem>
-                  <SelectItem value="Stopping">{{ $t('ui.stopping') }}</SelectItem>
+                  <SelectItem value="all">{{ $t('common.label.status.runtimesPageView') }}</SelectItem>
+                  <SelectItem value="Queued">{{ $t('common.label.queuing') }}</SelectItem>
+                  <SelectItem value="Provisioning">{{ $t('runtime.label.preparation') }}</SelectItem>
+                  <SelectItem value="Running">{{ $t('common.label.running.adminFormat') }}</SelectItem>
+                  <SelectItem value="Stopping">{{ $t('common.label.stopping') }}</SelectItem>
                 </SelectGroup></SelectContent>
               </Select>
             </Field>
             <Field>
-              <FieldLabel for="platform-runtime-kind" class="sr-only">{{ $t('ui.typeAll') }}</FieldLabel>
+              <FieldLabel for="platform-runtime-kind" class="sr-only">{{ $t('common.label.type.runtimesPageView') }}</FieldLabel>
               <Select v-model="filters.kind">
                 <SelectTrigger id="platform-runtime-kind" class="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent><SelectGroup>
-                  <SelectItem value="all">{{ $t('ui.typeAll') }}</SelectItem>
-                  <SelectItem value="Container">{{ $t('ui.container') }}</SelectItem>
+                  <SelectItem value="all">{{ $t('common.label.type.runtimesPageView') }}</SelectItem>
+                  <SelectItem value="Container">{{ $t('runtime.label.container') }}</SelectItem>
                 </SelectGroup></SelectContent>
               </Select>
             </Field>
             <Field orientation="horizontal">
               <Button type="submit" size="sm" :disabled="loading">
-                <Spinner v-if="loading" data-icon="inline-start" />{{ $t('ui.applyFilters') }}
+                <Spinner v-if="loading" data-icon="inline-start" />{{ $t('common.label.applyFilters') }}
               </Button>
-              <Button type="button" variant="ghost" size="sm" :disabled="loading" @click="clearFilters">{{ $t('ui.clear') }}</Button>
+              <Button type="button" variant="ghost" size="sm" :disabled="loading" @click="clearFilters">{{ $t('common.label.clear') }}</Button>
             </Field>
           </FieldGroup>
         </UiForm>
       </CardContent>
     </Card>
     <div class="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground" role="status">
-      <span>{{ $t('ui.activeContainersLoaded', { count: items.length }) }}</span>
-      <span>{{ $t('ui.thePageRefreshesAutomaticallyEvery10Seconds') }}</span>
+      <span>{{ $t('runtime.label.activeContainersLoaded', { count: items.length }) }}</span>
+      <span>{{ $t('runtime.platformRuntimes.description.pageRefreshesAutomaticallyEvery') }}</span>
     </div>
 
     <Alert v-if="error" variant="destructive">
@@ -84,8 +84,8 @@ const { RuntimeFlagsPanel, adminCompetitionPath, adminRuntimeTeamPath, adminRunt
     <Skeleton v-if="loading && !initialized" class="h-64 w-full" />
     <Empty v-else-if="initialized && items.length === 0 && !error" class="border border-dashed py-14">
       <EmptyHeader>
-        <EmptyTitle>{{ $t('ui.thereAreNoRuntimeInstancesThatMatchTheCriteria') }}</EmptyTitle>
-        <EmptyDescription>{{ $t('ui.queuedProvisioningRunningAndStoppingContainerOrComposeInstancesAppear') }}</EmptyDescription>
+        <EmptyTitle>{{ $t('runtime.platformRuntimes.description.thereRuntimeInstancesMatch') }}</EmptyTitle>
+        <EmptyDescription>{{ $t('runtime.platformRuntimes.description.queuedProvisioningRunningStopping') }}</EmptyDescription>
       </EmptyHeader>
     </Empty>
 
@@ -93,21 +93,21 @@ const { RuntimeFlagsPanel, adminCompetitionPath, adminRuntimeTeamPath, adminRunt
       <Table class="min-w-[48rem] table-fixed">
         <TableHeader>
           <TableRow>
-            <TableHead class="w-[20%]">{{ $t('ui.team') }}</TableHead>
-            <TableHead class="w-[29%]">{{ $t('ui.competitionChallenge') }}</TableHead>
-            <TableHead class="w-[9%]">{{ $t('ui.type') }}</TableHead>
-            <TableHead class="w-[10%]">{{ $t('ui.status') }}</TableHead>
-            <TableHead class="w-[17%]">{{ $t('ui.expirationTime') }}</TableHead>
-            <TableHead class="w-[15%] text-right">{{ $t('ui.actions') }}</TableHead>
+            <TableHead class="w-[20%]">{{ $t('common.label.team') }}</TableHead>
+            <TableHead class="w-[29%]">{{ $t('runtime.label.competitionChallenge') }}</TableHead>
+            <TableHead class="w-[9%]">{{ $t('common.label.type') }}</TableHead>
+            <TableHead class="w-[10%]">{{ $t('common.label.status') }}</TableHead>
+            <TableHead class="w-[17%]">{{ $t('runtime.label.expirationTime') }}</TableHead>
+            <TableHead class="w-[15%] text-right">{{ $t('common.label.actions') }}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          <TableRow v-for="item in items" :key="item.runtime?.id">
+          <TableRow v-for="item in items" :key="(item.runtime?.id) ?? undefined">
             <TableCell class="whitespace-normal break-words font-medium"><NuxtLink v-if="adminRuntimeTeamPath(item.runtime)" :to="adminRuntimeTeamPath(item.runtime)" class="hover:underline">{{ teamLabel(item) }}</NuxtLink><span v-else>{{ teamLabel(item) }}</span></TableCell>
             <TableCell class="whitespace-normal break-words">
               <div class="grid gap-1">
                 <NuxtLink v-if="adminRuntimeChallengePath(item.runtime)" :to="adminRuntimeChallengePath(item.runtime)" class="hover:underline">{{ item.challengeTitle ?? '-' }}</NuxtLink><span v-else>{{ item.challengeTitle ?? '-' }}</span>
-                <NuxtLink v-if="item.runtime?.competitionId" :to="adminCompetitionPath(item.runtime.competitionId)" class="text-xs text-muted-foreground hover:underline">{{ item.competitionTitle ?? item.runtime.competitionId }}</NuxtLink><span v-else class="text-xs text-muted-foreground">{{ $t('ui.challengeTest') }}</span>
+                <NuxtLink v-if="item.runtime?.competitionId" :to="adminCompetitionPath(item.runtime.competitionId)" class="text-xs text-muted-foreground hover:underline">{{ item.competitionTitle ?? item.runtime.competitionId }}</NuxtLink><span v-else class="text-xs text-muted-foreground">{{ $t('runtime.label.challengeTest') }}</span>
               </div>
             </TableCell>
             <TableCell class="whitespace-normal break-words">
@@ -123,7 +123,7 @@ const { RuntimeFlagsPanel, adminCompetitionPath, adminRuntimeTeamPath, adminRunt
             </TableCell>
             <TableCell class="text-right">
               <div class="flex flex-wrap justify-end gap-1">
-                <Button variant="ghost" size="sm" @click="onClickDetailTarget(item)">{{ $t('ui.details') }}</Button>
+                <Button variant="ghost" size="sm" @click="onClickDetailTarget(item)">{{ $t('common.label.details') }}</Button>
                 <Button
                   v-if="canTerminate(item)"
                   variant="destructive"
@@ -131,7 +131,7 @@ const { RuntimeFlagsPanel, adminCompetitionPath, adminRuntimeTeamPath, adminRunt
                   :disabled="terminatePending || forceTerminatePending"
                   @click="openTermination(item)"
                 >
-                  {{ $t('ui.terminate') }}
+                  {{ $t('runtime.label.terminate') }}
                 </Button>
                 <Button
                   v-if="item.runtime?.canForceTerminate"
@@ -140,7 +140,7 @@ const { RuntimeFlagsPanel, adminCompetitionPath, adminRuntimeTeamPath, adminRunt
                   :disabled="terminatePending || forceTerminatePending"
                   @click="openForceTermination(item)"
                 >
-                  {{ $t('ui.forcedTermination') }}
+                  {{ $t('runtime.label.forcedTermination') }}
                 </Button>
               </div>
             </TableCell>
@@ -161,27 +161,27 @@ const { RuntimeFlagsPanel, adminCompetitionPath, adminRuntimeTeamPath, adminRunt
     <Sheet :open="detailOpen" @update:open="onUpdateOpenDetailTarget">
       <SheetContent data-scroll-surface class="overflow-y-auto">
         <SheetHeader>
-          <SheetTitle>{{ $t('ui.runtimeDetails') }}</SheetTitle>
+          <SheetTitle>{{ $t('runtime.label.runtimeDetails') }}</SheetTitle>
           <SheetDescription class="break-all font-mono text-xs">{{ detail?.runtime?.id }}</SheetDescription>
         </SheetHeader>
         <Skeleton v-if="detailLoading" class="mx-4 h-48" />
         <Alert v-else-if="detailError" variant="destructive"><AlertDescription>{{ $message(detailError) }}</AlertDescription></Alert>
         <div v-else-if="detail" class="flex flex-col gap-4 px-4 pb-4 text-sm">
           <dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-3">
-            <dt class="text-muted-foreground">{{ $t('ui.team') }}</dt><dd class="break-words"><NuxtLink v-if="adminRuntimeTeamPath(detail.runtime)" :to="adminRuntimeTeamPath(detail.runtime)" class="hover:underline">{{ teamLabel(detail) }}</NuxtLink><span v-else>{{ teamLabel(detail) }}</span></dd>
-            <dt class="text-muted-foreground">{{ $t('ui.competitionChallenge') }}</dt>
-            <dd class="break-words"><NuxtLink v-if="adminRuntimeChallengePath(detail.runtime)" :to="adminRuntimeChallengePath(detail.runtime)" class="hover:underline">{{ detail.challengeTitle }}</NuxtLink><p class="mt-1 text-xs text-muted-foreground"><NuxtLink v-if="detail.runtime?.competitionId" :to="adminCompetitionPath(detail.runtime.competitionId)" class="hover:underline">{{ detail.competitionTitle }}</NuxtLink><span v-else>{{ $t('ui.challengeTest') }}</span></p></dd>
-            <dt class="text-muted-foreground">{{ $t('ui.type') }}</dt><dd>{{ enumLabel(RuntimeKindLabel, detail.runtime?.runtimeKind) }}</dd>
-            <dt class="text-muted-foreground">{{ $t('ui.status') }}</dt><dd><Badge :variant="stateBadgeVariant(detail.runtime?.state)">{{ enumLabel(RuntimeStateLabel, detail.runtime?.state) }}</Badge></dd>
-            <dt class="text-muted-foreground">{{ $t('ui.placement') }}</dt><dd class="break-all">{{ enumLabel(RuntimeProviderLabel, detail.runtime?.provider) }}<p class="mt-1 font-mono text-xs">{{ detail.runtime?.runnerId ?? $t('ui.runnerNotAssigned') }}</p></dd>
-            <dt class="text-muted-foreground">{{ $t('ui.creationTime') }}</dt><dd class="font-mono text-xs tabular-nums">{{ adminFormatDateTime(detail.runtime?.createdAt) }}</dd>
-            <dt class="text-muted-foreground">{{ $t('ui.expirationTime') }}</dt><dd class="font-mono text-xs tabular-nums">{{ adminFormatDateTime(detail.runtime?.expiresAt) }}</dd>
+            <dt class="text-muted-foreground">{{ $t('common.label.team') }}</dt><dd class="break-words"><NuxtLink v-if="adminRuntimeTeamPath(detail.runtime)" :to="adminRuntimeTeamPath(detail.runtime)" class="hover:underline">{{ teamLabel(detail) }}</NuxtLink><span v-else>{{ teamLabel(detail) }}</span></dd>
+            <dt class="text-muted-foreground">{{ $t('runtime.label.competitionChallenge') }}</dt>
+            <dd class="break-words"><NuxtLink v-if="adminRuntimeChallengePath(detail.runtime)" :to="adminRuntimeChallengePath(detail.runtime)" class="hover:underline">{{ detail.challengeTitle }}</NuxtLink><p class="mt-1 text-xs text-muted-foreground"><NuxtLink v-if="detail.runtime?.competitionId" :to="adminCompetitionPath(detail.runtime.competitionId)" class="hover:underline">{{ detail.competitionTitle }}</NuxtLink><span v-else>{{ $t('runtime.label.challengeTest') }}</span></p></dd>
+            <dt class="text-muted-foreground">{{ $t('common.label.type') }}</dt><dd>{{ enumLabel(RuntimeKindLabel, detail.runtime?.runtimeKind) }}</dd>
+            <dt class="text-muted-foreground">{{ $t('common.label.status') }}</dt><dd><Badge :variant="stateBadgeVariant(detail.runtime?.state)">{{ enumLabel(RuntimeStateLabel, detail.runtime?.state) }}</Badge></dd>
+            <dt class="text-muted-foreground">{{ $t('runtime.label.placement') }}</dt><dd class="break-all">{{ enumLabel(RuntimeProviderLabel, detail.runtime?.provider) }}<p class="mt-1 font-mono text-xs">{{ detail.runtime?.runnerId ?? $t('runtime.label.runnerAssigned') }}</p></dd>
+            <dt class="text-muted-foreground">{{ $t('common.label.creationTime') }}</dt><dd class="font-mono text-xs tabular-nums">{{ adminFormatDateTime(detail.runtime?.createdAt) }}</dd>
+            <dt class="text-muted-foreground">{{ $t('runtime.label.expirationTime') }}</dt><dd class="font-mono text-xs tabular-nums">{{ adminFormatDateTime(detail.runtime?.expiresAt) }}</dd>
           </dl>
           <FieldDescription v-if="detail.runtime?.waitingReason">{{ runnerFailureLabel(detail.runtime.waitingReason) }}</FieldDescription>
           <template v-if="detail.runtime?.capacity?.length">
             <Separator />
             <FieldDescription>{{ $t('capacity.units') }}</FieldDescription>
-            <dl v-for="allocation in detail.runtime.capacity" :key="allocation.operationId" class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2">
+            <dl v-for="allocation in detail.runtime.capacity" :key="allocation.operationId ?? undefined" class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2">
               <dt>{{ $t('capacity.workload') }}</dt><dd class="break-all font-mono text-xs">{{ allocation.operationId }}</dd>
               <dt>{{ $t('capacity.limit') }}</dt><dd class="font-mono tabular-nums">{{ formatCapacityAmount(allocation.limit) }}</dd>
               <dt>{{ $t('capacity.budget') }}</dt><dd class="font-mono tabular-nums">{{ formatCapacityAmount(allocation.budget) }}</dd>
@@ -189,16 +189,16 @@ const { RuntimeFlagsPanel, adminCompetitionPath, adminRuntimeTeamPath, adminRunt
           </template>
           <template v-if="detail.runtime?.accesses?.length">
             <Separator />
-            <p class="font-medium">{{ $t('ui.accessEntrance') }}</p>
+            <p class="font-medium">{{ $t('runtime.label.accessEntrance') }}</p>
             <component :is="RuntimeAccessUrl" v-for="access in detail.runtime.accesses" :key="`${access.directAddress}:${access.webSocketAddress}`" :access="access" />
           </template>
           <Separator />
-          <component :is="RuntimeFlagsPanel" v-if="detail.runtime?.id" :key="detail.runtime.id" :runtime-id="detail.runtime.id" />
+          <component :is="RuntimeFlagsPanel" v-if="detail.runtime?.id" :key="detail.runtime.id ?? undefined" :runtime-id="detail.runtime.id" />
           <Button v-if="detail.runtime?.competitionId" variant="outline" as-child>
-            <NuxtLink :to="adminRuntimePath(detail.runtime.competitionId, detail.runtime.id)"><ExternalLink data-icon="inline-start" />{{ $t('ui.competitionRuntimes') }}</NuxtLink>
+            <NuxtLink :to="adminRuntimePath(detail.runtime.competitionId, detail.runtime.id)"><ExternalLink data-icon="inline-start" />{{ $t('runtime.label.competitionRuntimes') }}</NuxtLink>
           </Button>
           <Button v-else-if="detail.runtime?.challengeId" variant="outline" as-child>
-            <NuxtLink :to="`/admin/challenges/${detail.runtime.challengeId}`"><ExternalLink data-icon="inline-start" />{{ $t('ui.challengeTemplate') }}</NuxtLink>
+            <NuxtLink :to="`/admin/challenges/${detail.runtime.challengeId}`"><ExternalLink data-icon="inline-start" />{{ $t('runtime.label.challengeTemplate') }}</NuxtLink>
           </Button>
         </div>
       </SheetContent>
@@ -210,9 +210,9 @@ const { RuntimeFlagsPanel, adminCompetitionPath, adminRuntimeTeamPath, adminRunt
     >
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>{{ $t('ui.terminateThisRuntimeInstance') }}</AlertDialogTitle>
+          <AlertDialogTitle>{{ $t('runtime.label.terminateRuntimeInstance') }}</AlertDialogTitle>
           <AlertDialogDescription>
-            {{ $t('ui.immediatelyStopAndCleanTheInstanceForOnTheEnvironment', {
+            {{ $t('runtime.platformRuntimes.description.immediatelyStopCleanInstance', {
               team: terminateTarget ? teamLabel(terminateTarget) : '-',
               challenge: terminateTarget?.challengeTitle ?? '-',
             }) }}
@@ -222,9 +222,9 @@ const { RuntimeFlagsPanel, adminCompetitionPath, adminRuntimeTeamPath, adminRunt
           <AlertDescription>{{ $message(terminationError) }}</AlertDescription>
         </Alert>
         <AlertDialogFooter>
-          <AlertDialogCancel :disabled="terminatePending">{{ $t('ui.cancel') }}</AlertDialogCancel>
+          <AlertDialogCancel :disabled="terminatePending">{{ $t('common.action.cancel') }}</AlertDialogCancel>
           <Button type="button" variant="destructive" :disabled="terminatePending" @click="submitTermination">
-            <Spinner v-if="terminatePending" data-icon="inline-start" /> {{ $t('ui.confirmTermination') }}
+            <Spinner v-if="terminatePending" data-icon="inline-start" /> {{ $t('runtime.label.confirmTermination') }}
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -236,9 +236,9 @@ const { RuntimeFlagsPanel, adminCompetitionPath, adminRuntimeTeamPath, adminRunt
     >
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>{{ $t('ui.forcefullyTerminateAStuckInstance') }}</AlertDialogTitle>
+          <AlertDialogTitle>{{ $t('runtime.platformRuntimes.label.forcefullyTerminateStuckInstance') }}</AlertDialogTitle>
           <AlertDialogDescription>
-            {{ $t('ui.theRunnerWillCleanUpTheActualResourcesBasedOn') }}
+            {{ $t('runtime.platformRuntimes.description.runnerCleanActualResources') }}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <FieldGroup>
@@ -246,32 +246,32 @@ const { RuntimeFlagsPanel, adminCompetitionPath, adminRuntimeTeamPath, adminRunt
             <AlertDescription>{{ $message(forceTerminationError) }}</AlertDescription>
           </Alert>
           <Field>
-            <FieldLabel for="platform-force-termination-reason">{{ $t('ui.reasonForOperation') }}</FieldLabel>
+            <FieldLabel for="platform-force-termination-reason">{{ $t('runtime.label.reason') }}</FieldLabel>
             <Textarea
               id="platform-force-termination-reason"
               v-model="forceTerminateReason"
               :disabled="forceTerminatePending"
               maxlength="512"
-              :placeholder="$t('ui.atLeast8CharactersUsedToIdentifyThisCleanupOperation')"
+              :placeholder="$t('runtime.platformRuntimes.description.leastCharactersIdentifyCleanup')"
             />
-            <FieldDescription>{{ forceTerminateReason.trim().length }}{{ $t('ui.512') }}</FieldDescription>
+            <FieldDescription>{{ forceTerminateReason.trim().length }}{{ $t('runtime.terminate.reasonLimitSuffix') }}</FieldDescription>
           </Field>
           <Field orientation="horizontal">
             <Checkbox id="platform-force-termination-confirm" v-model="forceTerminateConfirmed" :disabled="forceTerminatePending" />
             <FieldLabel for="platform-force-termination-confirm" class="font-normal">
-              {{ $t('ui.iConfirmThisIsAStuckInstanceAndUnderstandThat') }}
+              {{ $t('runtime.platformRuntimes.description.iConfirmStuckInstance') }}
             </FieldLabel>
           </Field>
         </FieldGroup>
         <AlertDialogFooter>
-          <AlertDialogCancel :disabled="forceTerminatePending">{{ $t('ui.cancel') }}</AlertDialogCancel>
+          <AlertDialogCancel :disabled="forceTerminatePending">{{ $t('common.action.cancel') }}</AlertDialogCancel>
           <Button
             type="button"
             variant="destructive"
             :disabled="forceTerminatePending || !forceTerminateConfirmed || forceTerminateReason.trim().length < 8"
             @click="submitForceTermination"
           >
-            <Spinner v-if="forceTerminatePending" data-icon="inline-start" /> {{ $t('ui.confirmForcedTermination') }}
+            <Spinner v-if="forceTerminatePending" data-icon="inline-start" /> {{ $t('runtime.label.confirmForcedTermination') }}
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>

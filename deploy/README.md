@@ -1,5 +1,10 @@
 # NoCTF 部署入口
 
+普通安装使用 GitHub Actions 已编译的完整 Host 镜像。下载同次 CI 运行的
+`noctf-deploy-完整提交SHA` artifact，校验并解压配置包，再在解压目录执行下方命令。
+镜像 digest 见运行摘要或包内 `deployment.json`。安装服务器无需 Git、应用源码或编译工具。
+逐步操作见[镜像与配置包获取](https://github.com/D1no209/NoCTF/blob/HEAD/docs/installation/images.md)。
+
 ```bash
 bash deploy/configure.sh
 ```

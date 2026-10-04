@@ -64,6 +64,9 @@ backend/artifacts/*
 !backend/artifacts/openapi/swagger.json
 !backend/artifacts/webhooks/
 !backend/artifacts/webhooks/competition-events-v1.schema.json
+# Crowdin CI staging contains build-only candidate catalogs.
+.crowdin-stage/
+.crowdin-stage.yml
 
 # Private operational records and local recovery material
 /HANDOFF.md

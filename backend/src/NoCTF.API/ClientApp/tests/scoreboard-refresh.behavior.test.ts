@@ -1,3 +1,4 @@
+import { createTestApi, kiotaBindings } from './support/kiota-harness'
 import { sourceFile } from './support/feature-source'
 import { expect, test } from 'bun:test'
 import { computed, ref } from 'vue'
@@ -22,34 +23,35 @@ function harness() {
   let tick = () => {}
   let handlers: Record<string, (value?: unknown) => void> = {}
   const requests: Array<number | null> = []
-  const deps = {
-    ref, computed, createTrailingRefresh, ...coherence,
-    translate: (value: string) => value,
-    parseApiError: (value: unknown) => ({ message: String(value) }),
-    competitionHubString: (value: Record<string, unknown>, key: string) => value[key],
-    onMounted: (fn: () => void) => { mount = fn },
-    onBeforeUnmount: (fn: () => void) => { dispose = fn },
-    watchCompetition: (_: string, value: typeof handlers) => { handlers = value; return () => { handlers = {} } },
-    setInterval: (fn: () => void) => { tick = fn; return 1 },
-    clearInterval: () => { tick = () => {} },
-    setTimeout: () => 1,
-    clearTimeout: () => {},
-    getScoreboardChallengeCatalogEndpoint: async () => ({ data: { revision: 'catalog', items: [{ id: 'challenge' }] } }),
-    getScoreboardSchemaEndpoint: async () => ({ data: {
+  const deps = { ...kiotaBindings(source), api: createTestApi({ 'GET /api/v1/competitions/{competitionId}/leaderboard/challenges': async () => ({ revision: 'catalog', items: [{ id: 'challenge' }] }),
+'GET /api/v1/competitions/{competitionId}/leaderboard/schema': async () => ({
       mode: 'Awdp', revision: String(revision), challengeCatalogRevision: 'catalog',
       rounds: [{ id: 'round', number: version, state: settled ? 'Settled' : 'Running', endAt: `2026-09-08T00:0${version}:00Z` }],
       columns: [{ index: 0, competitionChallengeId: 'challenge', roundId: 'round' }],
       roundWindowStart: 1, roundWindowEnd: version, latestRound: version,
-    } }),
-    getLeaderboardEndpoint: async (request: { query: { endingRound: number | null } }) => {
+    }),
+'GET /api/v1/competitions/{competitionId}/leaderboard': async (request: { query: { endingRound: number | null } }) => {
       calls++
       requests.push(request.query.endingRound)
-      return processing ? { response: { status: 202 } } : { data: {
+      return processing ? new Response(null, { status: 202 }) : {
         version: String(version), schemaRevision: String(revision), dataScope: 'Live', currentRoundId: 'round',
         teams: [{ teamId: 'team', totalScore: 100, slots: [{ columnIndex: 0, netPoints: 100 }] }],
-      } }
-    },
-  }
+      }
+    } }),
+ref,
+computed,
+createTrailingRefresh,
+...coherence,
+translate: (value: string) => value,
+parseApiError: (value: unknown) => ({ message: String(value) }),
+competitionHubString: (value: Record<string, unknown>, key: string) => value[key],
+onMounted: (fn: () => void) => { mount = fn },
+onBeforeUnmount: (fn: () => void) => { dispose = fn },
+watchCompetition: (_: string, value: typeof handlers) => { handlers = value; return () => { handlers = {} } },
+setInterval: (fn: () => void) => { tick = fn; return 1 },
+clearInterval: () => { tick = () => {} },
+setTimeout: () => 1,
+clearTimeout: () => {} }
   const board = new Function('deps', `const { ${Object.keys(deps).join(', ')} } = deps; ${compiled}; return useScoreboardMatrix('competition');`)(deps)
   return {
     board, mount: () => mount(), dispose: () => dispose(), tick: () => tick(),
@@ -65,9 +67,9 @@ async function drain() { await new Promise(resolve => setTimeout(resolve, 0)) }
 test('duration update notification replaces schema and snapshot together without a page reload', async () => {
   const app = harness()
   app.mount(); await drain()
-  expect(app.board.schema.value.rounds[0].endAt).toBe('2026-09-08T00:01:00Z')
+  expect(app.board.schema.value.rounds[0].endAt.toISOString()).toBe('2026-09-08T00:01:00.000Z')
   app.update(); app.notice(); await drain()
-  expect(app.board.schema.value.rounds[0].endAt).toBe('2026-09-08T00:02:00Z')
+  expect(app.board.schema.value.rounds[0].endAt.toISOString()).toBe('2026-09-08T00:02:00.000Z')
   expect(app.board.snapshot.value.schemaRevision).toBe(app.board.schema.value.revision)
   expect(app.board.schema.value.columns).toHaveLength(1)
   app.dispose()

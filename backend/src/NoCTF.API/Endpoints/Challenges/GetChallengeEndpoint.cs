@@ -213,7 +213,7 @@ public sealed class GetChallengeEndpoint(
     {
         Get("/competitions/{competitionId}/challenges/{competitionChallengeId}");
         AllowAnonymous();
-        Summary(summary => summary.Summary = "Gets a published challenge.");
+        Summary(summary => { summary.Summary = "Gets a published challenge."; summary.Description = summary.Summary; });
     }
 
     public override async Task<Results<Ok<ChallengeResponse>, NotFound>> ExecuteAsync(

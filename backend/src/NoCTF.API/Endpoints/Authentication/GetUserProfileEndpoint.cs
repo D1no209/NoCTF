@@ -54,7 +54,7 @@ public sealed class GetUserProfileEndpoint(
         Get("/users/{userId}");
         AllowAnonymous();
         Description(builder => builder.WithName("UserProfile_Get"));
-        Summary(summary => summary.Summary = "Returns a user's public profile.");
+        Summary(summary => { summary.Summary = "Returns a user's public profile."; summary.Description = summary.Summary; });
     }
 
     public override async Task<Results<Ok<PublicUserProfileResponse>, NotFound>> ExecuteAsync(

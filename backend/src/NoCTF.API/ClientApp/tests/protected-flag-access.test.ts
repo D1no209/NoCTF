@@ -9,7 +9,7 @@ const source = readFileSync(
 describe('protected Flag access', () => {
   test('loads the Flag immediately without collecting a reason', () => {
     expect(source).toContain('void accessFlag(requestSequence)')
-    expect(source).toContain('adminAccessCompetitionGameplayFactValue({')
+    expect(source).toMatch(/api\.api\.v1\.admin\.competitions\.byCompetitionId\([^)]*\)\.gameplayFacts\.byGameplayFactId\([^)]*\)\.flagAccess\.post\(/)
     expect(source).toContain('v-if="canJudge && (s.kind === \'FlagAttempt\' || s.kind === \'BreakAttempt\')"')
     expect(source).toContain('@click="openFlagAccess(s.id)"')
     expect(source).not.toContain('flagReason')
@@ -17,8 +17,8 @@ describe('protected Flag access', () => {
   })
 
   test('explains the role-specific audit behavior and keeps retry feedback', () => {
-    expect(source).toContain("$t('ui.platformAdministratorFlagAccessIsNotWrittenToTheAudit')")
-    expect(source).toContain("$t('ui.competitionStaffFlagAccessIsWrittenToTheAuditLog')")
+    expect(source).toContain("$t('administration.competitionsBy.description.platformAdministratorFlagAccess')")
+    expect(source).toContain("$t('administration.competitionsBy.description.competitionStaffFlagAccess')")
     expect(source).toContain('v-else-if="flagError"')
     expect(source).toContain('@click="accessFlag"')
   })

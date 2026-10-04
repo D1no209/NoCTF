@@ -1,9 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using FastEndpoints;
-using FastEndpoints.Swagger;
+using FastEndpoints.OpenApi;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -14,6 +15,7 @@ using Microsoft.Extensions.Options;
 using NoCTF.API.Composition;
 using NoCTF.API.Endpoints.Administration.Competitions;
 using NoCTF.API.Security;
+using NoCTF.API.Localization;
 using NoCTF.Application.Competitions.Management;
 using NSubstitute;
 
@@ -208,15 +210,17 @@ public sealed class CompetitionHardDeleteEndpointTests
         {
             ConfirmationTitle = "Protected competition", Reason = "Detailed deletion test reason."
         });
-        var body = await response.Content.ReadFromJsonAsync<CompetitionForceDeleteConflictResponse>();
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var body = document.RootElement.Deserialize<CompetitionForceDeleteConflictResponse>(JsonSerializerOptions.Web);
+        var detail = document.RootElement.GetProperty("detail").GetString();
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Conflict);
         if (state == CompetitionForceDeleteState.ActiveCompetition)
-            await Assert.That(body!.Detail).IsEqualTo("Finish the competition before permanently deleting it. Paused competitions cannot be deleted.");
+            await Assert.That(detail).IsEqualTo("Finish the competition before permanently deleting it. Paused competitions cannot be deleted.");
         else
         {
             await Assert.That(body!.Code).IsEqualTo(CompetitionForceDeleteConflictCode.NotificationScopeConflict);
             await Assert.That(body.ConflictingNotificationIds).IsEquivalentTo([notificationId]);
-            await Assert.That(body.Detail).Contains("No data was deleted");
+            await Assert.That(detail).Contains("No data was deleted");
         }
     }
 
@@ -254,6 +258,7 @@ public sealed class CompetitionHardDeleteEndpointTests
         builder.WebHost.UseTestServer();
         builder.Configuration["Authentication:SigningKey"] = SigningKey;
         builder.Services.AddProblemDetails();
+        builder.Services.AddNoCtfLocalization();
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddFastEndpoints(options =>
         {
@@ -263,7 +268,7 @@ public sealed class CompetitionHardDeleteEndpointTests
                 || type == typeof(PreviewCompetitionHardDeleteEndpoint)
                 || type == typeof(ForceDeleteCompetitionEndpoint);
         });
-        builder.Services.SwaggerDocument();
+        builder.Services.OpenApiDocument();
         builder.Services
             .AddAuthentication(options =>
             {
@@ -282,6 +287,7 @@ public sealed class CompetitionHardDeleteEndpointTests
         builder.Services.AddSingleton(new TestIdentityOptions(administrator));
 
         var app = builder.Build();
+        app.UseRequestLocalization();
         app.UseAuthentication();
         app.UseAuthorization();
         app.UseNoCtfEndpoints();

@@ -15,7 +15,7 @@ public sealed class GetCompetitionPosterEndpoint(ManageBusinessImages images)
         Get("/competitions/{competitionId}/poster");
         AllowAnonymous();
         Description(builder => builder.WithName("CompetitionPoster_Get"));
-        Summary(summary => summary.Summary = "Returns a competition's current poster.");
+        Summary(summary => { summary.Summary = "Returns a competition's current poster."; summary.Description = summary.Summary; });
     }
 
     public override async Task<Results<FileStreamHttpResult, NotFound>> ExecuteAsync(

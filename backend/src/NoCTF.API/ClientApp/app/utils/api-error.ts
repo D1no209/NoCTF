@@ -1,148 +1,123 @@
-import { currentLocale, localizeMessage, translate } from './i18n'
+import { message as describeMessage } from './i18n'
+import type { MessageDescriptor, UiMessage } from './i18n'
+import { currentLocale, isMessageKey, localizeMessage, translate } from './i18n'
 
-/**
- * Normalized API error parsed from RFC 9457 problem+json responses.
- * `code` is the stable machine code emitted by the backend (when present).
- */
 export class ApiError extends Error {
   readonly status?: number
-  readonly code?: string
-  /** Field-level validation errors keyed by field name, when provided. */
+  readonly code?: string | null
   readonly fieldErrors?: Record<string, string[]>
+  readonly fieldMessages?: Record<string, UiMessage[]>
+  readonly displayMessage: UiMessage
 
-  constructor(message: string, init?: { status?: number; code?: string; fieldErrors?: Record<string, string[]> }) {
-    super(message)
+  constructor(value: UiMessage, init?: { status?: number; code?: string | null; fieldErrors?: Record<string, string[]>; fieldMessages?: Record<string, UiMessage[]> }) {
+    super(localizeMessage(value))
     this.name = 'ApiError'
+    this.displayMessage = value
     this.status = init?.status
     this.code = init?.code
     this.fieldErrors = init?.fieldErrors
+    this.fieldMessages = init?.fieldMessages
+    Object.defineProperty(this, 'message', { get: () => localizeMessage(this.displayMessage), configurable: true })
   }
 }
 
 interface ProblemDetailsLike {
   status?: number
+  authenticatedRequest?: boolean
+  responseStatusCode?: number
   statusCode?: number
-  title?: string
-  detail?: string
-  message?: string
-  code?: string
+  title?: string | null
+  detail?: string | null
+  message?: string | null
+  code?: string | null
+  messageKey?: string | null
+  messageArguments?: unknown
   errors?: Record<string, string[] | string>
+  errorMessages?: Record<string, Array<{ key: string; arguments?: unknown }>>
 }
 
-function isUntranslatedEnglish(message: string): boolean {
-  return currentLocale() === 'zh-CN'
-    && /[A-Za-z]{3}/.test(message)
-    && !/[\u3400-\u9FFF]/.test(message)
+function descriptor(key: string | null | undefined, arguments_: unknown): MessageDescriptor | undefined {
+  if (!key || !isMessageKey(key)) return undefined
+  const argumentsObject = arguments_ && typeof arguments_ === 'object' && !Array.isArray(arguments_)
+    ? Object.fromEntries(Object.entries(arguments_).filter(([, value]) => value === null || ['string', 'number', 'boolean'].includes(typeof value))) as Record<string, string | number | boolean | null>
+    : {}
+  return describeMessage(key, argumentsObject)
 }
 
-/**
- * Localize backend text without leaking raw English diagnostics into the Chinese UI.
- * Known backend messages keep their explicit translation; unknown diagnostics fall
- * back to the caller's stable user-facing description.
- */
-export function userFacingErrorMessage(
-  message: string | null | undefined,
-  fallback = translate("ui.requestFailedPleaseTryAgainLater"),
-  allowUntranslated = false,
-): string {
-  const source = message?.trim()
-  if (!source) return fallback
-
-  const localized = localizeMessage(source)
-  return !allowUntranslated && isUntranslatedEnglish(localized) ? fallback : localized
+export function userFacingErrorMessage(value: string | null | undefined, fallback: UiMessage = describeMessage('common.error.requestFailed'), allowUntranslated = false): string {
+  const source = value?.trim()
+  if (!source) return localizeMessage(fallback)
+  return !allowUntranslated && currentLocale() === 'zh-CN' && /[A-Za-z]{3}/.test(source) && !/[\u3400-\u9FFF]/.test(source)
+    ? localizeMessage(fallback) : source
 }
 
-function normalizeFieldErrors(
-  errors: ProblemDetailsLike['errors'],
-): Record<string, string[]> | undefined {
-  if (!errors) return undefined
-  return Object.fromEntries(Object.entries(errors).map(([field, messages]) => [
-    field,
-    Array.isArray(messages) ? messages : [messages],
-  ]))
-}
-
-function validationErrorMessage(fieldErrors: Record<string, string[]> | undefined): string | undefined {
-  if (!fieldErrors) return undefined
-  const messages = [...new Set(Object.values(fieldErrors)
-    .flat()
-    .map(message => message.trim())
-    .filter(Boolean))]
-  if (!messages.length) return undefined
-  const localized = messages.map(message => userFacingErrorMessage(message, message, true))
-  return localized
-    .map((message, index) => index === localized.length - 1
-      ? message
-      : message.replace(/[。.!?；;]+$/u, ''))
-    .join(translate('ui.validationErrorSeparator'))
-}
-
-function stableCodeMessage(code: string | undefined): string | null {
+function stableCodeMessage(code: string | null | undefined): MessageDescriptor | null {
   switch (code) {
-    case 'HumanVerificationRequired': return translate('ui.completeHumanVerificationBeforeRetrying')
-    case 'HumanVerificationFailed': return translate('ui.humanVerificationFailedPleaseRetry')
-    case 'HumanVerificationUnavailable': return translate('ui.humanVerificationProviderUnavailablePleaseRetry')
-    case 'HumanVerificationSecretInvalid': return translate('ui.humanVerificationSecretInvalid')
-    case 'CapConfigurationInvalid': return translate('ui.capConfigurationValidationFailed')
-    case 'CapProviderUnavailable': return translate('ui.capProviderUnavailableDuringValidation')
-    case 'CapWorkloadProviderNotCap': return translate('ui.capProviderMustBeSelected')
-    case 'CapWorkloadDifficultyInvalid': return translate('ui.capDifficultyInvalid')
-    case 'CapWorkloadChallengeCountInvalid': return translate('ui.capChallengeCountInvalid')
-    case 'CapWorkloadManagementCredentialMissing': return translate('ui.capManagementCredentialMissing')
-    case 'CapWorkloadManagementCredentialInvalid': return translate('ui.capManagementCredentialInvalid')
-    case 'CapWorkloadSiteKeyNotFound': return translate('ui.capSiteKeyNotFound')
-    case 'CapWorkloadProviderUnavailable': return translate('ui.capWorkloadConfigurationUnavailable')
-    case 'CapWorkloadConfigurationNotApplied': return translate('ui.capWorkloadConfigurationNotApplied')
-    case 'EmailVerificationDisabled': return translate('ui.theTestEmailWillBeSentToTheEmailAddress')
-    case 'WriteUpSubmissionDeadlinePassed': return translate('writeUp.deadlinePassedShort')
-    case 'RuntimeExtensionTooEarly': return translate('ui.renewalAvailableInFinalTenMinutes')
+    case 'HumanVerificationRequired': return describeMessage('security.verification.required')
+    case 'HumanVerificationFailed': return describeMessage('security.verification.failed')
+    case 'HumanVerificationUnavailable': return describeMessage('security.verification.unavailable')
+    case 'HumanVerificationSecretInvalid': return describeMessage('security.verification.invalidSecret')
+    case 'CapConfigurationInvalid': return describeMessage('common.error.capConfigurationValidationFailed')
+    case 'CapProviderUnavailable': return describeMessage('common.error.capProviderValidationUnavailable')
+    case 'CapWorkloadProviderNotCap': return describeMessage('administration.validation.capProviderFormat')
+    case 'CapWorkloadDifficultyInvalid': return describeMessage('administration.error.capDifficultyInvalid')
+    case 'CapWorkloadChallengeCountInvalid': return describeMessage('administration.error.capChallengeCountInvalid')
+    case 'CapWorkloadManagementCredentialMissing': return describeMessage('administration.label.capManagementCredentialMissing')
+    case 'CapWorkloadManagementCredentialInvalid': return describeMessage('administration.error.capManagementCredentialInvalid')
+    case 'CapWorkloadSiteKeyNotFound': return describeMessage('administration.label.capSiteKeyFound')
+    case 'CapWorkloadProviderUnavailable': return describeMessage('administration.error.capWorkloadConfigurationUnavailable')
+    case 'CapWorkloadConfigurationNotApplied': return describeMessage('administration.label.capWorkloadConfigurationApplied')
+    case 'EmailVerificationDisabled': return describeMessage('common.description.testEmailSentEmail')
+    case 'WriteUpSubmissionDeadlinePassed': return describeMessage('writeUp.deadlinePassedShort')
+    case 'RuntimeExtensionTooEarly': return describeMessage('runtime.extend.tooEarly')
     default: return null
   }
 }
 
-/** Convert an SDK error payload into a user-facing ApiError. */
-export function parseApiError(error: unknown, fallback = translate("ui.requestFailedPleaseTryAgainLater")): ApiError {
+/** Field errors retain precedence; protocol descriptors identify messages, never English prose. */
+export function parseApiError(error: unknown, fallback: UiMessage = describeMessage('common.error.requestFailed')): ApiError {
   if (error instanceof ApiError) return error
-  if (error && typeof error === 'object') {
-    const problem = error as ProblemDetailsLike
-    const status = problem.status ?? problem.statusCode
-    const fieldErrors = normalizeFieldErrors(problem.errors)
-    const validationMessage = validationErrorMessage(fieldErrors)
-    const defaultFallback = translate('ui.requestFailedPleaseTryAgainLater')
-    // 字段级校验错误(FluentValidation)优先于泛泛的 detail/title。
-    const statusFallback = status === undefined
-      ? fallback
-      : (status === 400 || status === 422) && fallback !== defaultFallback
-          ? fallback
-          : statusErrorMessage(status)
-    const message = stableCodeMessage(problem.code) ?? userFacingErrorMessage(
-        validationMessage ?? problem.detail ?? problem.message ?? problem.title,
-        statusFallback,
-        status === 409 || status === 422 || Boolean(validationMessage) || (status === 400 && Boolean(problem.code)),
-      )
-    return new ApiError(message, {
-      status,
-      code: problem.code,
-      fieldErrors,
-    })
-  }
-  return new ApiError(fallback)
+  if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError'))
+    return new ApiError(describeMessage('common.error.requestTimeout'), { status: 503, code: 'RequestTimeout' })
+  if (!error || typeof error !== 'object') return new ApiError(fallback)
+  const problem = error as ProblemDetailsLike
+  const status = problem.status ?? problem.responseStatusCode ?? problem.statusCode
+  const fieldErrors = problem.errors ? Object.fromEntries(Object.entries(problem.errors).map(([field, entries]) => [field, Array.isArray(entries) ? entries : [entries]])) : undefined
+  const fields = new Set([...Object.keys(fieldErrors ?? {}), ...Object.keys(problem.errorMessages ?? {})])
+  const fieldMessages = Object.fromEntries([...fields].map((field) => {
+    const descriptions = problem.errorMessages?.[field] ?? []
+    const raw = fieldErrors?.[field] ?? []
+    return [field, Array.from({ length: Math.max(descriptions.length, raw.length) }, (_, index) =>
+      descriptor(descriptions[index]?.key, descriptions[index]?.arguments) ?? raw[index] ?? '')]
+  }))
+  const unique = new Map<string, UiMessage>()
+  for (const value of Object.values(fieldMessages).flat())
+    if (typeof value !== 'string' || value.trim()) unique.set(JSON.stringify(value), value)
+  const validation = [...unique.values()]
+  const statusFallback = status === undefined ? fallback
+    : (status === 400 || status === 422) && localizeMessage(fallback) !== translate('common.error.requestFailed') ? fallback : statusErrorDescriptor(status, problem.authenticatedRequest)
+  const structured = descriptor(problem.messageKey, problem.messageArguments) ?? stableCodeMessage(problem.code)
+  const raw = problem.detail ?? problem.message ?? problem.title
+  const display: UiMessage = validation.length
+    ? { messages: validation, separator: 'common.validation.separator' }
+    : structured ?? (userFacingErrorMessage(raw, statusFallback, status === 409 || status === 422 || (status === 400 && Boolean(problem.code))) === localizeMessage(statusFallback)
+      ? statusFallback : raw?.trim() || statusFallback)
+  return new ApiError(display, { status, code: problem.code, fieldErrors, fieldMessages })
 }
 
-/** 无 problem+json 响应体时,按 HTTP 状态码给出有意义的提示。 */
-export function statusErrorMessage(status: number | undefined, authenticatedRequest = false): string {
+export function statusErrorDescriptor(status: number | undefined, authenticatedRequest = false): MessageDescriptor {
   switch (status) {
-    case 400: return translate("ui.theRequestParametersAreIncorrectPleaseCheckYourInput")
-    case 401:
-      return authenticatedRequest ? translate("ui.loginStatusHasExpiredPleaseLogInAgain") : translate("ui.wrongUsernameOrPassword")
-    case 403: return translate("ui.noPermissionToPerformThisOperation")
-    case 404: return translate("ui.theRequestedResourceDoesNotExist")
-    case 409: return translate("ui.theResourceStateChangedRefreshThePageToLoadThe")
-    case 413: return translate("ui.theUploadedFileIsTooLarge")
-    case 429: return translate("ui.theRequestIsTooFrequentPleaseTryAgainLater")
-    default:
-      if (status !== undefined && status >= 500) return translate("ui.internalServerErrorPleaseTryAgainLater")
-      if (status === undefined) return translate("ui.unableToConnectToTheServerPleaseCheckTheNetwork")
-      return translate("ui.requestFailedPleaseTryAgainLater")
+    case 400: return describeMessage('common.error.invalidRequest')
+    case 401: return describeMessage(authenticatedRequest ? 'auth.session.expired' : 'auth.login.invalidCredentials')
+    case 403: return describeMessage('common.error.forbidden')
+    case 404: return describeMessage('common.error.notFound')
+    case 409: return describeMessage('common.error.stateConflict')
+    case 413: return describeMessage('common.error.uploadTooLarge')
+    case 429: return describeMessage('common.error.rateLimited')
+    default: return describeMessage(status !== undefined && status >= 500 ? 'common.error.serverUnavailable' : status === undefined ? 'common.error.networkUnavailable' : 'common.error.requestFailed')
   }
+}
+
+export function statusErrorMessage(status: number | undefined, authenticatedRequest = false): string {
+  return localizeMessage(statusErrorDescriptor(status, authenticatedRequest))
 }

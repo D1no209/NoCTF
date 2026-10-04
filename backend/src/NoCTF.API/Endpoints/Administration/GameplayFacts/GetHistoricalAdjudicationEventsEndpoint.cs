@@ -62,7 +62,7 @@ public sealed class GetHistoricalAdjudicationEventsEndpoint(ReadHistoricalAdjudi
         var internalTeams = user.IsAdministrator || await authorizer.CanReadInternalHistoricalAuditAsync(user.UserId, competitionId, ct);
         var filter = $"{competitionId:N}|{factId:N}|{user.UserId:N}|{internalTeams}";
         if (!cursors.TryDecode(request.Cursor, CursorEndpoint, filter, out var position))
-            return TypedResults.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Invalid cursor.");
+            return ApiProblems.Problem(statusCode: StatusCodes.Status400BadRequest, title: ApiMessages.Get(ApiMessageId.InvalidCursor));
         var page = await read.ExecuteAsync(competitionId, factId, position?.CreatedAt, position?.Id, request.Limit, internalTeams, ct);
         if (page is null) return TypedResults.NotFound();
         var next = page.NextBeforeOccurredAt is { } at && page.NextBeforeId is { } id

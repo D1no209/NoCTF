@@ -23,7 +23,7 @@ public sealed class SaveChallengeFlagValidator : Validator<SaveChallengeFlagRequ
     {
         RuleFor(request => request.Id)
             .Must(id => id is null || id != Guid.Empty)
-            .WithMessage("Id cannot be empty when supplied.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.CreateChallengeFlagValidationIdEmptySupplied)).WithErrorCode(ApiMessages.Key(ApiMessageId.CreateChallengeFlagValidationIdEmptySupplied));
         RuleFor(request => request.Flag).NotEmpty().MaximumLength(4096);
         RuleFor(request => request.MatchKind).IsInEnum();
     }
@@ -72,7 +72,12 @@ public enum ChallengeFlagFailureCodeProtocol
 
 public sealed record ChallengeFlagFailureResponse(
     ChallengeFlagFailureCodeProtocol Code,
-    string Message);
+    string Message)
+{
+    public string Message { get; init; } = ApiMessages.Localize(Code, Message, ApiMessages.NoArguments);
+    public string MessageKey => ApiMessages.For(Code).Key;
+    public IReadOnlyDictionary<string, object?> MessageArguments => ApiMessages.NoArguments;
+}
 
 internal static class ChallengeFlagFailureMapping
 {

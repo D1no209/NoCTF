@@ -43,9 +43,16 @@ public sealed class UpdateCompetitionBadgeEndpoint(
 {
     public override void Configure()
     {
+        Summary(summary =>
+        {
+            summary.Summary = "Updates the metadata and image of a competition badge.";
+            summary.Description = summary.Summary;
+        });
+
         Put("/admin/competitions/{competitionId}/badges/{badgeId}");
         AuthSchemes("Bearer");
         AllowFileUploads();
+        Description(builder => builder.Accepts<UpdateCompetitionBadgeRequest>("multipart/form-data"));
         MaxRequestBodySize(FileUploadLimits.MaximumRequestBytes(limits.MaximumPosterBytes));
         Description(builder => builder.WithName("AdminUpdateCompetitionBadge"));
     }
@@ -69,10 +76,10 @@ public sealed class UpdateCompetitionBadgeEndpoint(
             CompetitionBadgeFailure.NotFound => TypedResults.NotFound(),
             CompetitionBadgeFailure.ConcurrencyConflict => TypedResults.Conflict(
                 new CompetitionBadgeConflictResponse(
-                    "ConcurrencyConflict", "Badge was updated concurrently.")),
-            _ => TypedResults.ValidationProblem(new Dictionary<string, string[]>
+                    CompetitionBadgeConflictCode.ConcurrencyConflict, "Badge was updated concurrently.")),
+            _ => ApiProblems.ValidationProblem(new Dictionary<string, Enum?>
             {
-                ["badge"] = [result.Failure.Value.ToString()]
+                ["badge"] = result.Failure
             })
         };
     }

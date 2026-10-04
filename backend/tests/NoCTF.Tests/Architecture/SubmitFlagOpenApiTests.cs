@@ -35,9 +35,9 @@ public sealed class SubmitFlagOpenApiTests
         await Assert.That(flag.GetProperty("nullable").GetBoolean()).IsTrue();
 
         var flags = properties.GetProperty("flags");
-        await Assert.That(flags.GetProperty("type").GetString()).IsEqualTo("array");
+        await Assert.That(ResolveNullableSchema(root, flags).GetProperty("type").GetString()).IsEqualTo("array");
         await Assert.That(flags.GetProperty("nullable").GetBoolean()).IsTrue();
-        await Assert.That(flags.GetProperty("items").GetProperty("type").GetString())
+        await Assert.That(ResolveNullableSchema(root, flags).GetProperty("items").GetProperty("type").GetString())
             .IsEqualTo("string");
     }
 
@@ -77,6 +77,9 @@ public sealed class SubmitFlagOpenApiTests
                 .ToArray()
             : [];
 
+    private static JsonElement ResolveNullableSchema(JsonElement root, JsonElement schema)
+        => ResolveSchema(root, schema.TryGetProperty("oneOf", out var choices) ? choices[0] : schema);
+
     private static JsonElement ResolveSchema(JsonElement root, JsonElement schema)
     {
         while (schema.TryGetProperty("$ref", out var reference))
@@ -93,7 +96,7 @@ public sealed class SubmitFlagOpenApiTests
     {
         var backend = FindBackendRoot();
         return JsonDocument.Parse(await File.ReadAllTextAsync(
-            Path.Combine(backend, "artifacts", "openapi", "swagger.json")));
+            Path.Combine(backend, "artifacts", "openapi", "v1.json")));
     }
 
     private static string FindBackendRoot()

@@ -19,7 +19,7 @@ public sealed class CompleteSsoBindingEndpoint(
         Options(options => options.WithMetadata(
             new ProtectedEntryMetadata(ProtectedEntry.SsoAuthentication)));
         Description(builder => builder.WithName("Authentication_SsoCompleteBinding"));
-        Summary(summary => summary.Summary = "Confirms and persists a browser-bound external identity binding.");
+        Summary(summary => { summary.Summary = "Confirms and persists a browser-bound external identity binding."; summary.Description = summary.Summary; });
     }
 
     public override async Task<Results<Ok<MySsoBindingResponse>, ProblemHttpResult>> ExecuteAsync(

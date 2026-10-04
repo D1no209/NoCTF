@@ -1,7 +1,11 @@
+
+import { api } from '../../../lib/api'
+import { message as describeMessage } from '../../../utils/i18n'
+import type { UiMessage } from '../../../utils/i18n'
 import { computed, markRaw, ref, watch } from 'vue'
 import { Plus } from '@lucide/vue'
-import { adminListCompetitions, listCompetitionsEndpoint } from '../../../api'
-import type { NoCtfapiEndpointsCompetitionsCompetitionResponse } from '../../../api'
+
+import type { NoCTFAPIEndpointsCompetitionsCompetitionResponse } from '../../../api/models'
 import { resolveCompetitionBrowser, type CompetitionGroup } from '../../competitions/competition-browser'
 import CompetitionOverviewComponent from '../../competitions/CompetitionOverview.vue'
 import CompetitionSidebarComponent from '../../competitions/CompetitionSidebar.vue'
@@ -14,9 +18,9 @@ export function useCompetitionsIndexPage() {
   if ('competition' in route.query) throw createError({ statusCode: 404, statusMessage: 'Page not found' })
   const router = useRouter()
   const { isAdministrator } = useAuth()
-  const items = ref<NoCtfapiEndpointsCompetitionsCompetitionResponse[]>([])
+  const items = ref<NoCTFAPIEndpointsCompetitionsCompetitionResponse[]>([])
   const loading = ref(true)
-  const error = ref<string | null>(null)
+  const error = ref<UiMessage | null>(null)
   const queryValue = (value: unknown) => typeof value === 'string' ? value : null
   const routeCompetitionId = computed(() => queryValue(route.params.id))
   const requestedCompetitionId = routeCompetitionId
@@ -54,7 +58,7 @@ export function useCompetitionsIndexPage() {
       void router.replace({ query })
     }
   }
-  function handleCompetitionCreated(competition: NoCtfapiEndpointsCompetitionsCompetitionResponse) {
+  function handleCompetitionCreated(competition: NoCTFAPIEndpointsCompetitionsCompetitionResponse) {
     if (!competition.id) {
       void load()
       return
@@ -69,15 +73,16 @@ export function useCompetitionsIndexPage() {
     loading.value = true
     error.value = null
     try {
-      const { data, error: failure } = isAdministrator.value
-        ? await adminListCompetitions({ query: { includeDeleted: true } })
-        : await listCompetitionsEndpoint()
+      let failure: unknown;
+      const data = await (isAdministrator.value
+        ? api.api.v1.admin.competitions.get({ queryParameters: { includeDeleted: true } })
+        : api.api.v1.competitions.get()).catch(cause => { failure = cause; return undefined });
       if (failure || !data) throw failure
       if (generation !== loadGeneration) return
       items.value = data.items ?? []
     } catch (failure) {
       if (generation !== loadGeneration) return
-      error.value = parseApiError(failure, translate('ui.failedToLoadContestList')).message
+      error.value = parseApiError(failure, describeMessage('competitions.competitionsIndex.error.loadContestListFailed')).displayMessage
     } finally {
       if (generation === loadGeneration) loading.value = false
     }

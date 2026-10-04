@@ -1,7 +1,8 @@
-<script setup lang="ts">
+<script setup lang="ts">import type { UiMessage } from '../../utils/i18n'
+
 import { bindViewState } from '~/features/shared/view-state'
 
-import type { NoCtfapiEndpointsCompetitionsGameModeProtocol, NoCtfapiEndpointsCompetitionsScoreboardTeamResponse } from '~/api'
+import type { NoCTFAPIEndpointsCompetitionsGameModeProtocol, NoCTFAPIEndpointsCompetitionsScoreboardTeamResponse } from '~/api/models'
 
 import type { ScoreboardChallengeColumnGroup } from '~/utils/scoreboard'
 import type { TrendSeries } from '~/features/leaderboard/types'
@@ -9,13 +10,13 @@ import { useScoreboardTeamDetailDialog } from './useScoreboardTeamDetailDialog'
 import View from '~/components/views/leaderboard/ScoreboardTeamDetailDialogView.vue'
 
 const props = defineProps<{
-  mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol | null
-  team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse | null
-  teams: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse[]
+  mode?: NoCTFAPIEndpointsCompetitionsGameModeProtocol | null
+  team: NoCTFAPIEndpointsCompetitionsScoreboardTeamResponse | null
+  teams: NoCTFAPIEndpointsCompetitionsScoreboardTeamResponse[]
   columnGroups: ScoreboardChallengeColumnGroup[]
   trendSeries?: TrendSeries[]
   trendLoading?: boolean
-  trendError?: string | null
+  trendError?: UiMessage | null
   trendRangeStart?: string | null
   trendRangeEnd?: string | null
   trendRevision?: string | number | null
