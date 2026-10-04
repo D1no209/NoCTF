@@ -115,3 +115,7 @@ appsettings.*.Local.json
 appsettings.*.local.json
 *.secrets.json
 /backend/src/NoCTF.API/ClientApp/scripts/dev-forward.cjs
+
+# Build-only Crowdin candidate catalogs.
+.crowdin-stage/
+.crowdin-stage.yml

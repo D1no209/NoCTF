@@ -53,6 +53,7 @@ jobs:
           dotnet test tests/NoCTF.Tests/NoCTF.Tests.csproj
           --treenode-filter '/*/*/GitOpsApiOpenApiContractTests/*'
           --minimum-expected-tests 4
+          -p:BuildSpaOnPublish=false
       - name: Validate every typed fixture
         working-directory: noctf/backend
         env:

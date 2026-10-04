@@ -69,7 +69,7 @@ Nuxt 4 SPA(`ssr: false`),Bun 管理依赖,TypeScript strict,Vue 用 `<script set
 - 题目列表的一血、二血、三血标记保持横向图标排列，悬停提示显示排行榜快照中的队伍名；队伍名缺失时才回退到带标签的 Team ID，常驻界面不显示队名或 UUID。
 - 全局组件与原语不显示边框、outline 或 ring 框线；使用背景、投影和光晕表达层次、焦点及错误。统一规则由 main.css 覆盖，保留 SVG 图标笔画。竞赛侧栏状态选择器、下拉面板与列表选中/悬停底色完全透明，文字和图标保持可见。
 
-- API 调用一律走 `app/api` SDK:`const { data, error } = await xxxEndpoint({ path, query, body })`;错误统一 `parseApiError(error)` 取 message,toast 用 vue-sonner 的 `toast()`。空响应体的错误(如登录 401)由 `plugins/api.client.ts` 的 error 拦截器按状态码合成文案,登录页 401 显示「用户名或密码错误」。
+- API 调用一律通过 `api` 的 Kiota request builders，直接取得模型并通过 `try/catch` 处理异常；错误使用 `parseApiError(error)` 解析，通过 `utils/message-toast` 展示本地化反馈。空响应体按 HTTP 状态码生成提示，登录页 401 显示登录失败文案。
 - 模式专属管理配置一律使用 OpenAPI 生成的枚举加互斥 nullable 分支对象请求/响应和结构化编辑器；`mode`/`kind` 与唯一非空分支必须匹配，JSON 属性顺序无关。禁止原始 JSON textarea、schemaVersion upgrader 或自由 JSON 解析。`DefinitionEditor`、`CompetitionModeConfigEditor`、`ChallengeRulesEditor` 只编辑当前分支。长表单内部分组用 `DefinitionSection`；常用组固定展开，高级组默认折叠且数据非空时自动展开。
 - 竞赛管理与平台管理的路由级多分区导航使用 AppWorkspaceNav 组合 ChoiceSidebar / WaveSelectionList，不使用旧 SidebarProvider / SidebarInset；桌面端为网格内 sticky 侧栏，移动端位于内容上方。Tabs 仅用于单页内内容切换。
 - 竞赛管理与平台管理默认共用固定视口的 `data-workspace-scroll-content` 内容区：页面本身不滚动，标题保持固定，子页面由纵向 ScrollSurface 独立滚动，并用 MotionSwap 执行路由内容切换。赛事题目列表及详情、队伍管理、闯关编排页例外，取消工作区固定高度与内部纵向滚动，使用 DefaultLayout 页面主滚动；桌面端左侧导航整列 sticky，不随右侧页面滚动，窄屏仍按正常页面流排列。Vue Flow 画布仍保留自身拖拽与缩放。赛事题目列表先完成搜索/方向/状态筛选，再用 OffsetPagination 对结果分页；队伍管理继续使用服务端分页。竞赛概览、配置、排行榜、导出与权限页把同一任务域的分区合并到一张连续 Card，以 Separator 划分。
