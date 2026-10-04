@@ -155,7 +155,7 @@ public sealed class CompetitionWebhookSenderTests
         var request = ReceiveOnceAsync(listener, status, retryAfter);
         var options = new CompetitionWebhookOptions(
             new Uri("https://noctf.example.test/"),
-            3,
+            15,
             new HashSet<string>(["127.0.0.1"], StringComparer.OrdinalIgnoreCase),
             new HashSet<string>(["127.0.0.1"], StringComparer.OrdinalIgnoreCase));
         var body = Encoding.UTF8.GetBytes("{\"type\":\"com.noctf.webhook.test.v1\"}");

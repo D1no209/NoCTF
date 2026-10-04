@@ -55,6 +55,7 @@ jobs:
           dotnet test tests/NoCTF.Tests/NoCTF.Tests.csproj
           --no-restore
           --treenode-filter '/*/*/*/*[Category!=Integration]'
+          --maximum-parallel-tests 8
           --minimum-expected-tests 1
           -p:BuildSpaOnPublish=false
 

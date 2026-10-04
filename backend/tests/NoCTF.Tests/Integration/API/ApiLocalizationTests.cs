@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Net.Http.Json;
 using System.Text.Json;
+using FluentValidation;
 using FluentValidation.Results;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -17,6 +18,9 @@ using NoCTF.Application.Authentication.Account;
 
 namespace NoCTF.Tests.Integration.API;
 
+// FastEndpoints test hosts change FluentValidation's process-wide property-name resolver.
+// Keep this standalone validator host isolated from their startup/shutdown.
+[NotInParallel]
 public sealed class ApiLocalizationTests
 {
     private static async Task<WebApplication> Server()
@@ -95,16 +99,28 @@ public sealed class ApiLocalizationTests
     [Test]
     public async Task Validation_includes_localized_fields_and_semantic_descriptors()
     {
-        await using var server = await Server();
-        using var client = server.GetTestClient();
-        client.DefaultRequestHeaders.AcceptLanguage.ParseAdd("zh-CN");
-        using var response = await client.GetAsync("/validation");
-        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        var errors = body.GetProperty("errors").GetProperty("UserName");
-        await Assert.That(errors[0].GetString()).Contains("不能为空");
-        var descriptor = body.GetProperty("errorMessages").GetProperty("UserName")[0];
-        await Assert.That(descriptor.GetProperty("key").GetString()).IsEqualTo("api.validation.required");
-        await Assert.That(descriptor.GetProperty("arguments").GetProperty("field").GetString()).IsEqualTo("User Name");
+        var propertyNameResolver = ValidatorOptions.Global.PropertyNameResolver;
+        var displayNameResolver = ValidatorOptions.Global.DisplayNameResolver;
+        try
+        {
+            ValidatorOptions.Global.PropertyNameResolver = (_, member, _) => member?.Name;
+            ValidatorOptions.Global.DisplayNameResolver = (_, _, _) => null;
+            await using var server = await Server();
+            using var client = server.GetTestClient();
+            client.DefaultRequestHeaders.AcceptLanguage.ParseAdd("zh-CN");
+            using var response = await client.GetAsync("/validation");
+            var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+            var errors = body.GetProperty("errors").GetProperty("UserName");
+            await Assert.That(errors[0].GetString()).Contains("不能为空");
+            var descriptor = body.GetProperty("errorMessages").GetProperty("UserName")[0];
+            await Assert.That(descriptor.GetProperty("key").GetString()).IsEqualTo("api.validation.required");
+            await Assert.That(descriptor.GetProperty("arguments").GetProperty("field").GetString()).IsEqualTo("User Name");
+        }
+        finally
+        {
+            ValidatorOptions.Global.PropertyNameResolver = propertyNameResolver;
+            ValidatorOptions.Global.DisplayNameResolver = displayNameResolver;
+        }
     }
 
     [Test]
