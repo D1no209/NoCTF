@@ -8,7 +8,7 @@
 .sisyphus/
 .playwright-mcp/
 .codex/
-TEST/
+/TEST/
 .vs/
 .vscode/
 .idea/
