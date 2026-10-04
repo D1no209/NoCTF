@@ -73,4 +73,4 @@ Runtime 以全新 UUID、状态和 MessageId 幂等处理重复；配置后写�
 
 ## OpenAPI 验收
 
-每个 Endpoint 必须有 Summary、Description、Tag、稳定 OperationId、Accepts/Produces、认证信息、所有 Typed Result 与字段 Description。CI 生成 OpenAPI 并检查 drift；集成测试覆盖序列化、授权、Validation 与每个结果分支。
+每个 Endpoint 必须有 Summary、Description、Tag、稳定 OperationId、Accepts/Produces、认证信息、所有 Typed Result 与字段 Description。提交前在本地生成 OpenAPI 并检查 drift（CI 仅构建）；集成测试覆盖序列化、授权、Validation 与每个结果分支。

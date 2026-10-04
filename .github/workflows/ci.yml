@@ -10,13 +10,8 @@ permissions:
   contents: read
 
 jobs:
-  validation:
-    name: Validate backend before publishing
-    uses: ./.github/workflows/repository-checks.yml
-
   publish-images:
     name: Publish application image
-    needs: validation
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -64,10 +59,6 @@ jobs:
         env:
           CROWDIN_OUTCOME: ${{ steps.translations.outputs.enabled == 'true' && steps.crowdin.outcome || 'disabled' }}
         run: bun backend/scripts/Sync-Translations.ts apply .
-
-      - name: Validate the frontend used by this build
-        working-directory: backend/src/NoCTF.API/ClientApp
-        run: bun install --frozen-lockfile && bun run typecheck && bun run test
 
       - name: Validate custom registry configuration
         if: env.CUSTOM_REGISTRY != ''

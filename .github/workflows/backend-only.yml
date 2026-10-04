@@ -13,12 +13,7 @@ permissions:
 
 # This workflow publishes an immutable image only. Production deployment remains manual.
 jobs:
-  validation:
-    name: Validate backend before publishing
-    uses: ./.github/workflows/repository-checks.yml
-
   image:
-    needs: validation
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:

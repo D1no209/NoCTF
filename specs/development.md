@@ -133,13 +133,13 @@ bun run api:check
 
 FastEndpoints 8.2 使用 Kiota Builder 1.29.1 安全补丁；TypeScript 运行库固定为 preview.102，abstractions 的传递版本也被锁定。preview.103 起更改了基础集合反序列化签名，不能直接升级。FE 8.2 文档规范化仅处理 nullable 引用及被移除的 IFormFile 组件引用；本地化 ProblemDetails 扩展由单独 schema transformer 描述，枚举、绑定和验证仍使用 FE 原生能力。生成代码不手工修补。Nuxt 设置 `verbatimModuleSyntax: false`，由 TypeScript 消除 Kiota 1.29 生成的纯类型枚举导入；配置变化后运行 `bun run postinstall` 刷新 Nuxt 类型配置。
 
-前端测试和 typecheck 在本地开发与提交前执行；涉及前端与翻译的 PR 由
-`localization.yml` 执行 typecheck、architecture audit、测试及静态构建。
-普通 PR 的后端单元、架构与真实 Docker 依赖集成检查由 `repository-checks.yml` 执行，
-不读取镜像发布凭据。镜像发布工作流调用同一后端检查，检查通过后才允许发布；完整镜像
-还验证本次构建实际使用的前端。文档改动由 `docs-pages.yml` 构建并检查链接；PR 不部署 Pages。
-镜像发布时，Docker 构建会在专用阶段执行 `nuxt prepare` 和 `bun run generate`，
-确保 Nuxt 生产静态包能够编译。
+CI 仅执行构建，不运行单元、集成、契约、架构或 SDK 漂移测试。测试、typecheck、
+architecture audit 和 `bun run api:check` 在本地开发与提交前执行。
+普通 PR 由 `repository-build.yml` 构建完整 Host Docker 镜像，不读取发布凭据、不推送镜像。
+主分支和手动发布直接构建并推送镜像；后端专用发布同样不调用测试工作流。
+翻译资源准备仍作为构建输入处理；文档由 `docs-pages.yml` 构建，PR 不部署 Pages。
+Docker 的前端阶段执行 `nuxt prepare` 和 `bun run generate`，后端阶段执行 restore、build、
+Wolverine codegen 和 publish。普通构建不会隐式重新生成 API 客户端。
 
 Docker 使用多阶段构建：`frontend-build` 只是构建阶段，生成的 `.output/public`
 会复制到 API/Host 镜像的 `wwwroot`。生产 Compose 不启动任何 Node/Bun/Nuxt 容器；

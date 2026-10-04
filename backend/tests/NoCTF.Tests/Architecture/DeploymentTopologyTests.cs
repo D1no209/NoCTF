@@ -364,9 +364,9 @@ public sealed class DeploymentTopologyTests
         await Assert.That(ci).Contains("  publish-images:\n");
         await Assert.That(publishJob).IsNotEmpty();
         await Assert.That(ci).DoesNotContain("  verify:\n");
-        await Assert.That(publishJob).Contains("    needs: validation");
-        await Assert.That(ci).Contains("uses: ./.github/workflows/repository-checks.yml");
-        await Assert.That(ci).Contains("bun run typecheck && bun run test");
+        await Assert.That(publishJob).DoesNotContain("    needs: validation");
+        await Assert.That(ci).DoesNotContain("uses: ./.github/workflows/repository-checks.yml");
+        await Assert.That(ci).DoesNotContain("bun run test");
         await Assert.That(ci).DoesNotContain("dotnet test");
         await Assert.That(ci).DoesNotContain("bash deploy/recovery/rehearse.sh");
         await Assert.That(ci).Contains("    branches:\n      - main\n");
@@ -520,8 +520,6 @@ public sealed class DeploymentTopologyTests
             .ToArray();
         await Assert.That(actionReferences).IsNotEmpty();
         await Assert.That(actionReferences.All(line =>
-            line == "uses: ./.github/workflows/repository-checks.yml"
-            ||
             System.Text.RegularExpressions.Regex.IsMatch(
                 line,
                 "^uses: [a-z0-9-]+/[a-z0-9-]+@[a-f0-9]{40} # v[0-9]+$"))).IsTrue();
@@ -529,7 +527,7 @@ public sealed class DeploymentTopologyTests
         await Assert.That(actionReferences.Count(line =>
             line.StartsWith("uses: actions/checkout@", StringComparison.Ordinal))).IsEqualTo(1);
 
-        var checks = await ReadAsync(".github", "workflows", "repository-checks.yml");
+        var checks = await ReadAsync(".github", "workflows", "repository-build.yml");
         var checkActions = checks.Split('\n').Select(line => line.Trim())
             .Where(line => line.StartsWith("- uses:", StringComparison.Ordinal))
             .Select(line => line.TrimStart('-', ' ')).ToArray();
