@@ -67,7 +67,7 @@ describe('authentication response refresh', () => {
 
 describe('authentication status errors', () => {
   test('classifies unauthorized responses by attached credentials instead of endpoint paths', () => {
-    expect(statusErrorMessage(401, false)).toBe('用户名或密码错误')
+    expect(statusErrorMessage(401, false)).toBe('登录失败,请检查用户名或密码')
     expect(statusErrorMessage(401, true)).toBe('登录状态已失效,请重新登录')
   })
 })

@@ -18,9 +18,9 @@ const { Beaker, RefreshCw, loading, saving, loadError, ctfPatchVerificationEnabl
       <CardHeader>
         <CardTitle class="flex items-center gap-2">
           <Beaker class="size-5" />
-          {{ $t('ui.experimentalFeatures') }}
+          {{ $t('administration.label.experimentalFeatures') }}
         </CardTitle>
-        <CardDescription>{{ $t('ui.experimentalFeaturesDescription') }}</CardDescription>
+        <CardDescription>{{ $t('administration.label.experimentalFeaturesDescription') }}</CardDescription>
       </CardHeader>
       <CardContent>
         <UiForm class="flex flex-col gap-6" @submit.prevent="save">
@@ -33,21 +33,21 @@ const { Beaker, RefreshCw, loading, saving, loadError, ctfPatchVerificationEnabl
               />
               <FieldContent>
                 <FieldLabel for="ctf-patch-verification-enabled">
-                  {{ $t('ui.ctfPatchVerification') }}
+                  {{ $t('administration.label.ctfPatchVerification') }}
                 </FieldLabel>
-                <FieldDescription>{{ $t('ui.ctfPatchVerificationDescription') }}</FieldDescription>
+                <FieldDescription>{{ $t('administration.label.ctfPatchVerificationDescription') }}</FieldDescription>
               </FieldContent>
-              <Badge variant="secondary">{{ $t('ui.experimental') }}</Badge>
+              <Badge variant="secondary">{{ $t('administration.label.experimental') }}</Badge>
             </Field>
           </FieldGroup>
           <div class="flex flex-wrap gap-3">
             <Button type="submit" :disabled="saving || !dirty">
               <Spinner v-if="saving" data-icon="inline-start" />
-              {{ $t('ui.saveChanges') }}
+              {{ $t('administration.label.saveChanges') }}
             </Button>
             <Button type="button" variant="outline" :disabled="saving" @click="load">
               <RefreshCw data-icon="inline-start" />
-              {{ $t('ui.reload') }}
+              {{ $t('common.label.reload') }}
             </Button>
           </div>
         </UiForm>

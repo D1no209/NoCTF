@@ -2,7 +2,7 @@
 import { CalendarDays } from '@lucide/vue'
 import { parseDate, type DateValue } from '@internationalized/date'
 import { computed, nextTick, ref, watch } from 'vue'
-import { localeTag, translate } from '~/utils/i18n'
+import { localeTag, translate } from '../../../utils/i18n'
 import { normalizeLocalDateTime, dateTimeWithDate, dateTimeWithTime } from './date-time'
 
 defineOptions({ inheritAttrs: false })
@@ -85,7 +85,7 @@ function clear() { setDraft(''); open.value = false }
         </FieldGroup>
         <div class="mt-3 flex justify-between gap-2">
           <Button variant="ghost" size="sm" @click="clear">{{ $t('dateTime.clear') }}</Button>
-          <Button size="sm" @click="open = false">{{ $t('ui.confirm') }}</Button>
+          <Button size="sm" @click="open = false">{{ $t('common.label.confirm') }}</Button>
         </div>
       </PopoverContent>
     </Popover>

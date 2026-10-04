@@ -40,7 +40,7 @@ const {
     <Alert v-if="competition?.mode !== 'Ctf'"><AlertDescription>{{ $t('progression.ctfOnly') }}</AlertDescription></Alert>
     <Alert v-if="error" variant="destructive">
       <AlertDescription class="flex items-center justify-between gap-3">
-        <span>{{ error }}</span><Button size="sm" variant="outline" @click="load">{{ $t('ui.retry') }}</Button>
+        <span>{{ error }}</span><Button size="sm" variant="outline" @click="load">{{ $t('common.label.retry') }}</Button>
       </AlertDescription>
     </Alert>
     <div v-if="loading" class="h-80 animate-pulse rounded-lg border bg-muted/30" />
@@ -59,10 +59,10 @@ const {
             <div class="mb-3 grid gap-2">
               <Input v-model="challengeSearch" :placeholder="$t('progression.searchChallenges')" :aria-label="$t('progression.searchChallenges')" />
               <Select v-model="challengeDirection">
-                <SelectTrigger class="w-full" :aria-label="$t('ui.category')"><SelectValue /></SelectTrigger>
+                <SelectTrigger class="w-full" :aria-label="$t('administration.label.category')"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    <SelectItem value="all">{{ $t('ui.allDirections') }}</SelectItem>
+                    <SelectItem value="all">{{ $t('administration.label.directions') }}</SelectItem>
                     <SelectItem v-for="direction in challengeDirections" :key="direction.value" :value="direction.value">{{ direction.label }}</SelectItem>
                   </SelectGroup>
                 </SelectContent>
@@ -153,7 +153,7 @@ const {
               <Button size="sm" :variant="batchCondition === 1 ? 'default' : 'outline'" @click="setBatchCondition(1)">{{ $t('progression.incomplete') }}</Button>
             </div>
             <Button :disabled="!batchTargets.size" @click="applyBatch">{{ $t('progression.addConnections', { count: batchTargets.size }) }}</Button>
-            <Button variant="secondary" @click="cancelBatch">{{ $t('ui.cancel') }}</Button>
+            <Button variant="secondary" @click="cancelBatch">{{ $t('common.action.cancel') }}</Button>
           </div>
           <div v-else-if="selectedCount > 1" class="mt-4 flex flex-col gap-3">
             <p class="text-sm font-medium">{{ $t('progression.selectedCount', { count: selectedCount }) }}</p>

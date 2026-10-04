@@ -22,8 +22,8 @@ const { Crosshair, Swords, rays, shards, event } = toRefs(viewProps.state)
     </div>
     <div class="attack-result">
       <small>{{ event.challengeTitle }}</small>
-      <strong>{{ $t('ui.destroyed') }}</strong>
-      <span>{{ $t('ui.attackVerified') }}</span>
+      <strong>{{ $t('competitions.label.destroyed') }}</strong>
+      <span>{{ $t('competitions.label.attackVerified') }}</span>
     </div>
   </div>
 </template>

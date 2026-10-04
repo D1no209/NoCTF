@@ -1,10 +1,12 @@
+import { message as describeMessage } from '../../../../../../utils/i18n'
+import type { UiMessage } from '../../../../../../utils/i18n'
 import { challengeTagOptions, uniqueTags, validChallengeTags } from '~/lib/challenge-tags'
 import { adminTeamPath, adminTemplatePath } from '~/features/admin/admin-navigation'
 import { proxyRefs } from 'vue'
 import { markRaw } from 'vue'
 
 import { Plus } from '@lucide/vue'
-import { toast } from 'vue-sonner'
+import { toast } from '../../../../../../utils/message-toast'
 import { adminListCompetitionChallenges, adminGetCompetitionDirections, adminCreateManualAdjustment, adminCreateCompetitionChallengeHint, adminDeleteCompetitionChallengeHint, adminGetCompetition, adminGetCompetitionChallenge, adminListGameplayFacts, adminListCompetitionChallengeHints, adminListTeams, adminPatchCompetitionChallenge, adminRestoreCompetitionChallengeHint, adminUpdateCompetitionChallengeHint, getLeaderboardEndpoint, getScoreboardSchemaEndpoint } from '../../../../../../api'
 import type { NoCtfapiEndpointsAdministrationChallengesChallengeHintResponse, NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract, NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract, NoCtfapiEndpointsChallengesChallengeResponse, NoCtfapiEndpointsCompetitionsGameModeProtocol, NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse, NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse, NoCtfapiEndpointsGameplayFactsGameplayFactListResponse, NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../../../../api'
 import { useOffsetPagination } from '../../../../../../composables/useOffsetPagination'
@@ -45,15 +47,15 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
 
   const loading = ref(true)
 
-  const loadError = ref<string | null>(null)
+  const loadError = ref<UiMessage | null>(null)
 
   const activeSection = ref('general')
 
   const sectionOptions = computed(() => [
-    { value: 'general', label: translate('ui.basicSettings') },
-    { value: 'config', label: translate('ui.questionConfiguration') },
-    { value: 'hints', label: translate('ui.hint') },
-    { value: 'scoring', label: translate('ui.teamScoring') },
+    { value: 'general', label: translate('administration.label.basicSettings') },
+    { value: 'config', label: translate('administration.label.questionConfiguration') },
+    { value: 'hints', label: translate('administration.label.hint') },
+    { value: 'scoring', label: translate('administration.label.teamScoring') },
   ])
 
   async function loadChallenge() {
@@ -62,21 +64,21 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
       path: { competitionId, competitionChallengeId: ccId },
       query: { includeDeleted: false },
     })
-    if (error) loadError.value = parseApiError(error).message
+    if (error) loadError.value = parseApiError(error).displayMessage
     else challenge.value = data?.challenge ?? null
     loading.value = false
   }
 
   const directions = ref<import('~/api').NoCtfapiEndpointsAdministrationCompetitionsCompetitionDirectionResponse[]>([])
   const directionLoading = ref(true)
-  const directionError = ref<string | null>(null)
+  const directionError = ref<UiMessage | null>(null)
   const editDirectionId = ref('')
   const directionRequest = new AbortController()
   async function loadDirections() {
     const { data, error } = await adminGetCompetitionDirections({ path: { competitionId }, signal: directionRequest.signal })
     if (directionRequest.signal.aborted) return
     directionLoading.value = false
-    directionError.value = error || !data ? parseApiError(error).message : null
+    directionError.value = error || !data ? parseApiError(error).displayMessage : null
     directions.value = data?.items ?? []
   }
   const editCustomTitle = ref('')
@@ -84,7 +86,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
   const tagSuggestions = ref<string[]>([])
   const tagOptions = computed(() => uniqueTags([...tagSuggestions.value, ...(challenge.value?.tags ?? [])]))
   function updateEditTags(tags: string[]) {
-    if (!validChallengeTags(tags)) { toast.error(translate('challengeTags.invalid')); return }
+    if (!validChallengeTags(tags)) { toast.error(describeMessage('challengeTags.invalid')); return }
     editTags.value = uniqueTags(tags)
   }
   async function loadTagSuggestions() {
@@ -92,7 +94,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
       path: { competitionId }, query: { includeDeleted: false }, signal: directionRequest.signal,
     })
     if (directionRequest.signal.aborted) return
-    if (error) toast.error(parseApiError(error).message)
+    if (error) toast.error(parseApiError(error).displayMessage)
     else tagSuggestions.value = challengeTagOptions(data?.items ?? [])
   }
 
@@ -128,7 +130,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
       if (error) throw error
       challenge.value = data?.challenge ?? challenge.value
       void loadTagSuggestions()
-      toast.success(translate("ui.questionSettingsSaved"))
+      toast.success(describeMessage("administration.label.questionSettingsSaved"))
     }
     catch (e) {
       toastWriteError(e)
@@ -179,7 +181,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
       config.value = data
         ? { mode: data.mode, rules: data.rules }
         : config.value
-      toast.success(translate("ui.questionConfigurationHasBeenSaved"))
+      toast.success(describeMessage("administration.competitionsBy.label.questionConfigurationSaved"))
     }
     catch (e) {
       toastWriteError(e)
@@ -193,7 +195,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
 
   const hintsLoading = ref(true)
 
-  const hintsLoadError = ref<string | null>(null)
+  const hintsLoadError = ref<UiMessage | null>(null)
 
   const includeDeletedHints = ref(false)
 
@@ -203,7 +205,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
 
   const hintForm = ref({ content: '', cost: 0, publishedAt: '' })
 
-  const hintError = ref<string | null>(null)
+  const hintError = ref<UiMessage | null>(null)
 
   const savingHint = ref(false)
 
@@ -216,7 +218,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
       query: { includeDeleted: includeDeletedHints.value },
     })
     if (error || !data) {
-      hintsLoadError.value = parseApiError(error).message
+      hintsLoadError.value = parseApiError(error).displayMessage
     }
     else {
       hintsLoadError.value = null
@@ -240,7 +242,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
 
   async function saveHint() {
     if (!hintForm.value.content.trim()) {
-      hintError.value = translate("ui.pleaseEnterThePromptContent")
+      hintError.value = describeMessage("administration.competitionsBy.label.enterPromptContent")
       return
     }
     savingHint.value = true
@@ -256,12 +258,12 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
         ? await adminUpdateCompetitionChallengeHint({ path: { ...path, hintId: editingHint.value.id }, body })
         : await adminCreateCompetitionChallengeHint({ path, body })
       if (error) throw error
-      toast.success(editingHint.value ? translate("ui.tipHasBeenUpdated") : translate("ui.promptAdded"))
+      toast.success(editingHint.value ? translate("administration.label.tipUpdated") : translate("administration.label.promptAdded"))
       hintDialogOpen.value = false
       await loadHints()
     }
     catch (e) {
-      hintError.value = parseApiError(e).message
+      hintError.value = parseApiError(e).displayMessage
     }
     finally {
       savingHint.value = false
@@ -276,11 +278,11 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
         path: { competitionId, competitionChallengeId: ccId, hintId: h.id },
       })
       if (error) throw error
-      toast.success(translate("ui.tipHasBeenDeleted"))
+      toast.success(describeMessage("administration.label.tipDeleted"))
       await loadHints()
     }
     catch (e) {
-      toast.error(parseApiError(e).message)
+      toast.error(parseApiError(e).displayMessage)
     }
     finally {
       pendingHintId.value = null
@@ -295,11 +297,11 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
         path: { competitionId, competitionChallengeId: ccId, hintId: h.id },
       })
       if (error) throw error
-      toast.success(translate("ui.tipHasBeenRestored"))
+      toast.success(describeMessage("administration.label.tipRestored"))
       await loadHints()
     }
     catch (e) {
-      toast.error(parseApiError(e).message)
+      toast.error(parseApiError(e).displayMessage)
     }
     finally {
       pendingHintId.value = null
@@ -313,7 +315,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
       path: { competitionId },
       query: { keyword: scoringSearch.value.trim() || null, offset, limit, desc },
     })
-    if (error || !data) throw error ?? new Error(translate("ui.failedToLoadTeams"))
+    if (error || !data) throw error ?? new Error(translate("administration.error.loadTeamsFailed"))
     return { items: data.items ?? [], total: data.total ?? 0 }
   })
 
@@ -327,7 +329,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
 
   const scoringContextLoading = ref(true)
 
-  const scoringContextError = ref<string | null>(null)
+  const scoringContextError = ref<UiMessage | null>(null)
 
   const scoringLoading = computed(() => scoringContextLoading.value
     || (scoringPagination.loading.value && !scoringPagination.initialized.value))
@@ -351,7 +353,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
         query: { competitionChallengeId: ccId, offset, limit: 200, desc: true },
       })
       if (response.error || !response.data)
-        throw response.error ?? new Error(translate("ui.failedToLoadThisChallengeSAdjudicationRecords"))
+        throw response.error ?? new Error(translate("administration.competitionsBy.error.loadChallengeSFailed"))
       facts.push(...(response.data.items ?? []))
       total = response.data.total ?? facts.length
       offset += response.data.items?.length ?? 0
@@ -381,7 +383,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
     }
     catch (requestError) {
       if (generation === scoringLoadGeneration)
-        scoringContextError.value = parseApiError(requestError, translate("ui.failedToLoadTeamScoringForThisChallenge")).message
+        scoringContextError.value = parseApiError(requestError, describeMessage("administration.competitionsBy.error.loadTeamScoringFailed")).displayMessage
     }
     finally {
       if (generation === scoringLoadGeneration) scoringContextLoading.value = false
@@ -415,23 +417,23 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
       case 'Awdp': {
         const attack = hasSuccessfulFact(facts, 'BreakAttempt')
         const defense = hasSuccessfulFact(facts, 'FixAttempt')
-        if (attack && defense) return { progressLabel: translate("ui.attackAndDefenseSucceeded2"), progressVariant: 'default' }
-        if (attack) return { progressLabel: translate("ui.attackSucceeded"), progressVariant: 'secondary' }
-        if (defense) return { progressLabel: translate("ui.defenseSucceeded"), progressVariant: 'secondary' }
-        return { progressLabel: translate("ui.noSuccessfulOperationYet"), progressVariant: 'outline' }
+        if (attack && defense) return { progressLabel: translate("administration.label.attackDefenseSucceeded"), progressVariant: 'default' }
+        if (attack) return { progressLabel: translate("common.label.attackSucceeded"), progressVariant: 'secondary' }
+        if (defense) return { progressLabel: translate("common.label.defenseSucceeded"), progressVariant: 'secondary' }
+        return { progressLabel: translate("administration.label.successfulYet"), progressVariant: 'outline' }
       }
       case 'Awd':
         return hasSuccessfulFact(facts, 'FlagAttempt')
-          ? { progressLabel: translate("ui.attackSucceeded"), progressVariant: 'default' }
-          : { progressLabel: translate("ui.noSuccessfulAttackYet"), progressVariant: 'outline' }
+          ? { progressLabel: translate("common.label.attackSucceeded"), progressVariant: 'default' }
+          : { progressLabel: translate("administration.label.successfulAttackYet"), progressVariant: 'outline' }
       case 'Koh':
         return hasSuccessfulFact(facts, 'KohControlObservation')
-          ? { progressLabel: translate("ui.controlAcquired2"), progressVariant: 'default' }
-          : { progressLabel: translate("ui.controlNotAcquired2"), progressVariant: 'outline' }
+          ? { progressLabel: translate("administration.label.controlAcquired"), progressVariant: 'default' }
+          : { progressLabel: translate("administration.label.controlAcquired.ccIdPage"), progressVariant: 'outline' }
       default:
         return hasSuccessfulFact(facts, 'FlagAttempt')
-          ? { progressLabel: translate("ui.solved"), progressVariant: 'default' }
-          : { progressLabel: translate("ui.notSolved"), progressVariant: 'outline' }
+          ? { progressLabel: translate("common.label.solved.competitionChallengeNavigator"), progressVariant: 'default' }
+          : { progressLabel: translate("common.label.solved"), progressVariant: 'outline' }
     }
   }
 
@@ -481,7 +483,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
 
   const adjustmentPending = ref(false)
 
-  const adjustmentError = ref<string | null>(null)
+  const adjustmentError = ref<UiMessage | null>(null)
 
   const adjustmentValid = computed(() => Number.isInteger(adjustmentDelta.value) && adjustmentDelta.value !== 0)
 
@@ -506,12 +508,12 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
         body: { teamId, competitionChallengeId: ccId, delta: adjustmentDelta.value },
       })
       if (error) throw error
-      toast.success(translate("ui.challengeScoringCorrected"))
+      toast.success(describeMessage("administration.label.challengeScoringCorrected"))
       adjustmentTarget.value = null
       await loadChallengeTeamScoring()
     }
     catch (requestError) {
-      adjustmentError.value = parseApiError(requestError, translate("ui.failedToCorrectChallengeScoring")).message
+      adjustmentError.value = parseApiError(requestError, describeMessage("administration.competitionsBy.error.correctChallengeScoringFailed")).displayMessage
     }
     finally {
       adjustmentPending.value = false

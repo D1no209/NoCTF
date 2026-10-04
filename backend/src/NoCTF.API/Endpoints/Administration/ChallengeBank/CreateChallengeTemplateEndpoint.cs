@@ -172,8 +172,14 @@ public enum ChallengeTemplateConflictCode
 
 public sealed record ChallengeTemplateConflictResponse(
     [property: Required, JsonRequired] ChallengeTemplateConflictCode Code,
-    [property: Required, JsonRequired] string Detail,
-    [property: Required, JsonRequired] IReadOnlyList<Guid> UserIds);
+    string Detail,
+    [property: Required, JsonRequired] IReadOnlyList<Guid> UserIds)
+{
+    [Required, JsonRequired]
+    public string Detail { get; init; } = ApiMessages.Localize(Code, Detail, ApiMessages.NoArguments);
+    public string MessageKey => ApiMessages.For(Code).Key;
+    public IReadOnlyDictionary<string, object?> MessageArguments => ApiMessages.NoArguments;
+}
 
 internal static class ChallengeTemplateWriteResponseMapper
 {
@@ -230,7 +236,7 @@ public sealed class CreateChallengeTemplateValidator : Validator<CreateChallenge
     {
         RuleFor(request => request.Id)
             .Must(id => id is null || id != Guid.Empty)
-            .WithMessage("Id cannot be empty when supplied.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.CreateChallengeTemplateValidationIdEmptySupplied)).WithErrorCode(ApiMessages.Key(ApiMessageId.CreateChallengeTemplateValidationIdEmptySupplied));
         RuleFor(request => request.Mode).IsInEnum();
         RuleFor(request => request.Visibility).IsInEnum();
         RuleFor(request => request.Title).NotEmpty().MaximumLength(160);
@@ -239,7 +245,7 @@ public sealed class CreateChallengeTemplateValidator : Validator<CreateChallenge
             .Must((request, definition) =>
                 ChallengeDefinitionContractMapper.HasValidShape(definition)
                 && definition!.Mode == request.Mode)
-            .WithMessage("Definition must contain exactly the branch matching the challenge mode.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.CreateChallengeTemplateValidationDefinitionContainExactlyBranch)).WithErrorCode(ApiMessages.Key(ApiMessageId.CreateChallengeTemplateValidationDefinitionContainExactlyBranch));
     }
 }
 
@@ -665,10 +671,10 @@ public sealed class CreateChallengeTemplateEndpoint(
                     ChallengeTemplateMapper.ToResponse(result.Template)),
             ChallengeTemplateWriteState.InvalidRequest
                 or ChallengeTemplateWriteState.InvalidDefinition =>
-                TypedResults.Problem(
+                ApiProblems.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
-                title: "Challenge template was not created.",
-                detail: result.Detail),
+                title: ApiMessages.Get(ApiMessageId.CreateChallengeTemplateTitleChallengeTemplateWasCreated),
+                detail: ApiMessages.Get(ApiMessageId.CreateChallengeTemplateTitleChallengeTemplateWasCreated)),
             ChallengeTemplateWriteState.ResourceIdConflict
                 or ChallengeTemplateWriteState.UserNotFound
                 or ChallengeTemplateWriteState.RoleNotEligible

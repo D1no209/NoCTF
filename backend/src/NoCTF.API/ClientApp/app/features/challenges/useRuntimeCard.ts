@@ -1,6 +1,8 @@
+import { message as describeMessage } from '../../utils/i18n'
+import type { UiMessage } from '../../utils/i18n'
 import { markRaw, toRefs } from 'vue'
 
-import { toast } from 'vue-sonner'
+import { toast } from '../../utils/message-toast'
 import { createRuntime, extendRuntimeEndpoint, getRuntimeEndpoint, stopRuntimeEndpoint } from '../../api'
 import type { NoCtfapiEndpointsRuntimeRuntimeResponse } from '../../api'
 import { runnerFailureLabel } from '../shared/runner-capacity'
@@ -31,7 +33,7 @@ export function useRuntimeCard(props: Readonly<Omit<{
 
   const loading = ref(true)
 
-  const loadError = ref<string | null>(null)
+  const loadError = ref<UiMessage | null>(null)
 
   const acting = ref(false)
 
@@ -59,7 +61,7 @@ export function useRuntimeCard(props: Readonly<Omit<{
       return outcome
     }
     if (outcome === 'failed') {
-      loadError.value = parseApiError(error, translate("ui.failedToLoadTheEnvironmentStatus")).message
+      loadError.value = parseApiError(error, describeMessage("runtime.runtimeCard.error.loadEnvironmentStatusFailed")).displayMessage
       return outcome
     }
 
@@ -138,14 +140,14 @@ export function useRuntimeCard(props: Readonly<Omit<{
     if (verificationHeaders === null) return
     const { error } = await action(verificationHeaders)
     if (error) {
-      toast.error(parseApiError(error, failMessage).message)
+      toast.error(parseApiError(error, failMessage).displayMessage)
       return
     }
     commandAttempt.completed()
     onAccepted?.()
-    toast.success(translate("ui.theOperationHasBeenAcceptedAndTheEnvironmentStatusIs"))
+    toast.success(describeMessage("runtime.runtimeCard.description.acceptedEnvironmentStatus"))
     startPolling()
-    } catch (e) { toast.error(parseApiError(e, failMessage).message) }
+    } catch (e) { toast.error(parseApiError(e, failMessage).displayMessage) }
     finally { acting.value = false }
   }
 
@@ -158,7 +160,7 @@ export function useRuntimeCard(props: Readonly<Omit<{
     path: path.value,
     body: { replacesRuntimeId: null },
     headers: { ...commandAttempt.headers({ ...path.value, action: 'start' }), ...verificationHeaders },
-  }), translate("ui.failedToStartEnvironment"))
+  }), translate("runtime.error.startEnvironmentFailed"))
 
   const stop = () => {
     const current = runtime.value
@@ -166,7 +168,7 @@ export function useRuntimeCard(props: Readonly<Omit<{
     return act(verificationHeaders => stopRuntimeEndpoint({
       path: { ...path.value, runtimeInstanceId: current.id! },
       headers: { ...commandAttempt.headers({ ...path.value, action: 'stop' }), ...verificationHeaders },
-    }), translate("ui.stopEnvironmentFailed"), () => {
+    }), translate("runtime.error.stopEnvironmentFailed"), () => {
       if (runtime.value?.id === current.id)
         runtime.value = { ...runtime.value, state: 'Stopping' }
     })
@@ -176,7 +178,7 @@ export function useRuntimeCard(props: Readonly<Omit<{
     path: path.value,
     body: { replacesRuntimeId: runtime.value!.id! },
     headers: { ...commandAttempt.headers({ ...path.value, action: 'reset' }), ...verificationHeaders },
-  }), translate("ui.failedToResetEnvironment"))
+  }), translate("runtime.error.resetEnvironmentFailed"))
 
   const extend = () => {
     const current = runtime.value
@@ -189,7 +191,7 @@ export function useRuntimeCard(props: Readonly<Omit<{
         path: { ...path.value, runtimeInstanceId: current.id! },
         body: { expiresAt: extension.expiresAt },
       }),
-      translate("ui.renewalFailed"),
+      translate("runtime.error.renewalFailed"),
     )
   }
 
@@ -208,7 +210,7 @@ export function useRuntimeCard(props: Readonly<Omit<{
   const ttl = computed(() => {
     if (!runtime.value?.expiresAt) return null
     const remaining = new Date(runtime.value.expiresAt).getTime() - now.value
-    return remaining > 0 ? formatDuration(remaining) : translate("ui.expired")
+    return remaining > 0 ? formatDuration(remaining) : translate("runtime.label.expired")
   })
 
   const isRunning = computed(() => runtime.value?.state === 'Running')

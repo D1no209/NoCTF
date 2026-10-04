@@ -1,3 +1,4 @@
+import { message as describeMessage } from './i18n'
 import { ApiError, parseApiError } from './api-error'
 import { translate } from './i18n'
 
@@ -60,11 +61,11 @@ async function readSdkDownload(
   if (error || response?.ok === false) {
     throw parseApiError(
       error,
-      translate("ui.downloadFailedHttp", { status: response?.status ?? '-' }),
+      describeMessage("common.error.downloadFailed.download", { status: response?.status ?? '-' }),
     )
   }
   if (!(data instanceof Blob)) {
-    throw new ApiError(translate("ui.theDownloadResponseFormatIsInvalid"))
+    throw new ApiError(translate("common.download.error.downloadResponseFormatInvalid"))
   }
   return {
     blob: data,
@@ -131,11 +132,11 @@ export async function downloadSdkFileToDisk(
   if (error || response?.ok === false) {
     throw parseApiError(
       error,
-      translate("ui.downloadFailedHttp", { status: response?.status ?? '-' }),
+      describeMessage("common.error.downloadFailed.download", { status: response?.status ?? '-' }),
     )
   }
   if (!(data instanceof ReadableStream)) {
-    throw new ApiError(translate("ui.theDownloadResponseFormatIsInvalid"))
+    throw new ApiError(translate("common.download.error.downloadResponseFormatInvalid"))
   }
 
   const writable = await handle.createWritable()

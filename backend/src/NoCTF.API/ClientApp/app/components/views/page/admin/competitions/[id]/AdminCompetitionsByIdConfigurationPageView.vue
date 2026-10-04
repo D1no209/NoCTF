@@ -11,8 +11,8 @@ const { competition, canWrite, title, description, startTime, endTime, teamRegis
     <Card class="gap-0">
       <section id="competition-basic-configuration" class="flex flex-col gap-4 py-4 first:pt-0 last:pb-0">
       <CardHeader>
-        <CardTitle>{{ $t('ui.basicInformation2') }}</CardTitle>
-        <CardDescription>{{ $t('ui.titleTimeAndTeamRestrictionsGameModeCannotBeModified') }}</CardDescription>
+        <CardTitle>{{ $t('administration.label.basicInformation.configurationPageView') }}</CardTitle>
+        <CardDescription>{{ $t('administration.competitionsBy.validation.titleTimeFormat') }}</CardDescription>
       </CardHeader>
       <CardContent>
         <UiForm @submit.prevent="saveMeta">
@@ -21,23 +21,23 @@ const { competition, canWrite, title, description, startTime, endTime, teamRegis
               <AlertDescription>{{ $message(metaError) }}</AlertDescription>
             </Alert>
             <Field>
-              <FieldLabel for="c-title">{{ $t('ui.title') }}</FieldLabel>
+              <FieldLabel for="c-title">{{ $t('common.label.title') }}</FieldLabel>
               <Input id="c-title" v-model="title" :readonly="!canWrite" required />
             </Field>
             <div class="grid min-w-0 gap-4 xl:grid-cols-2">
               <Field>
-                <FieldLabel for="c-desc">{{ $t('ui.description') }}</FieldLabel>
+                <FieldLabel for="c-desc">{{ $t('common.label.description') }}</FieldLabel>
                 <Textarea id="c-desc" v-model="description" rows="8" :readonly="!canWrite" />
               </Field>
-              <MarkdownPreview :source="description" :label="$t('ui.markdownPreview')" :empty-label="$t('ui.noContent')" />
+              <MarkdownPreview :source="description" :label="$t('administration.label.markdownPreview')" :empty-label="$t('administration.label.content')" />
             </div>
             <div class="grid gap-4 sm:grid-cols-2">
               <Field>
-                <FieldLabel for="c-start">{{ $t('ui.startTime') }}</FieldLabel>
+                <FieldLabel for="c-start">{{ $t('common.label.startTime') }}</FieldLabel>
                 <DateTimePicker id="c-start" v-model="startTime"  :readonly="!canWrite" required />
               </Field>
               <Field>
-                <FieldLabel for="c-end">{{ $t('ui.endTime') }}</FieldLabel>
+                <FieldLabel for="c-end">{{ $t('common.label.endTime') }}</FieldLabel>
                 <DateTimePicker id="c-end" v-model="endTime"  :readonly="!canWrite" required />
               </Field>
             </div>
@@ -103,23 +103,23 @@ const { competition, canWrite, title, description, startTime, endTime, teamRegis
             </Field>
             <div class="grid gap-4 sm:grid-cols-2">
               <Field>
-                <FieldLabel for="c-max-members">{{ $t('ui.maximumNumberOfPeoplePerTeam') }}</FieldLabel>
+                <FieldLabel for="c-max-members">{{ $t('common.createCompetition.description.maximumNumberPeopleTeam') }}</FieldLabel>
                 <NumberInput id="c-max-members" v-model.number="maxTeamMembers"  min="1" :readonly="!canWrite" required />
               </Field>
               <Field>
-                <FieldLabel for="c-max-runtime">{{ $t('ui.maximumConcurrentRuntimePerTeam') }}</FieldLabel>
+                <FieldLabel for="c-max-runtime">{{ $t('common.createCompetition.label.maximumConcurrentRuntimeTeam') }}</FieldLabel>
                 <NumberInput id="c-max-runtime" v-model.number="maxConcurrentRuntimeInstancesPerTeam"  min="1" :readonly="!canWrite" required />
               </Field>
             </div>
             <Field orientation="horizontal">
               <Checkbox id="c-auto-approve" v-model="teamRegistrationAutoApprove" :disabled="!canWrite" />
-              <FieldLabel for="c-auto-approve" class="font-normal">{{ $t('ui.teamRegistrationAutomaticallyPasses') }}</FieldLabel>
+              <FieldLabel for="c-auto-approve" class="font-normal">{{ $t('administration.label.teamRegistrationAutomaticallyPasses') }}</FieldLabel>
             </Field>
             <Field v-if="competition?.mode === 'Ctf'" orientation="horizontal">
               <Checkbox id="c-practice-mode" v-model="practiceModeEnabled" :disabled="!canWrite" />
               <div class="grid gap-1.5 leading-none">
-                <FieldLabel for="c-practice-mode" class="font-normal">{{ $t('ui.postCompetitionPracticeMode') }}</FieldLabel>
-                <FieldDescription>{{ $t('ui.afterTheCompetitionFinishesApprovedAndNonBannedTeamsCan') }}</FieldDescription>
+                <FieldLabel for="c-practice-mode" class="font-normal">{{ $t('administration.label.postCompetitionPracticeMode') }}</FieldLabel>
+                <FieldDescription>{{ $t('administration.competitionsBy.description.competitionFinishesApprovedNon') }}</FieldDescription>
               </div>
             </Field>
             <Field orientation="horizontal">
@@ -132,32 +132,32 @@ const { competition, canWrite, title, description, startTime, endTime, teamRegis
             <Field orientation="horizontal">
               <Checkbox id="c-allow-running-registration" v-model="allowTeamRegistrationWhileRunning" :disabled="!canWrite" />
               <div class="grid gap-1.5 leading-none">
-                <FieldLabel for="c-allow-running-registration" class="font-normal">{{ $t('ui.teamCreationIsStillAllowedDuringTheGame') }}</FieldLabel>
-                <FieldDescription>{{ $t('ui.whenClosedTheCompetitionWillStopAcceptingNewTeamsAnd') }}</FieldDescription>
+                <FieldLabel for="c-allow-running-registration" class="font-normal">{{ $t('common.createCompetition.description.teamCreationStillAllowed') }}</FieldLabel>
+                <FieldDescription>{{ $t('common.createCompetition.description.closedCompetitionStopAccepting') }}</FieldDescription>
               </div>
             </Field>
             <div class="grid gap-4 sm:grid-cols-2">
               <Field>
-                <FieldLabel for="c-max-active-questions">{{ $t('ui.activeConsultationLimitPerTeam') }}</FieldLabel>
+                <FieldLabel for="c-max-active-questions">{{ $t('common.createCompetition.label.activeConsultationLimitTeam') }}</FieldLabel>
                 <NumberInput id="c-max-active-questions" v-model.number="maxActiveQuestionsPerTeam"  min="1" :readonly="!canWrite" required />
-                <FieldDescription>{{ $t('ui.pendingAndRespondedInquiriesCountTowardsTheCap') }}</FieldDescription>
+                <FieldDescription>{{ $t('common.createCompetition.description.pendingRespondedInquiriesCount') }}</FieldDescription>
               </Field>
               <Field>
-                <FieldLabel for="c-max-participant-messages">{{ $t('ui.maximumNumberOfContinuousSupplementaryMessages') }}</FieldLabel>
+                <FieldLabel for="c-max-participant-messages">{{ $t('common.createCompetition.description.maximumNumberContinuousSupplementary') }}</FieldLabel>
                 <NumberInput id="c-max-participant-messages" v-model.number="maxParticipantMessagesBeforeHandlerReply"  min="1" :readonly="!canWrite" required />
-                <FieldDescription>{{ $t('ui.initialQuestionsAreIncludedInTheQuotaTheyWillBe') }}</FieldDescription>
+                <FieldDescription>{{ $t('common.createCompetition.description.initialQuestionsIncludedQuota') }}</FieldDescription>
               </Field>
             </div>
             <Field orientation="horizontal">
               <Checkbox id="c-allow-challenge-owner-questions" v-model="allowChallengeOwnersToHandleQuestions" :disabled="!canWrite" />
               <div class="grid gap-1.5 leading-none">
-                <FieldLabel for="c-allow-challenge-owner-questions" class="font-normal">{{ $t('ui.allowQuestionOwnersToHandleRelatedInquiries') }}</FieldLabel>
-                <FieldDescription>{{ $t('ui.onlyForTopicsItOwnsOrCollaboratesOnNoFlag') }}</FieldDescription>
+                <FieldLabel for="c-allow-challenge-owner-questions" class="font-normal">{{ $t('common.createCompetition.description.allowQuestionOwnersHandle') }}</FieldLabel>
+                <FieldDescription>{{ $t('common.createCompetition.description.topicsOwnsCollaboratesFlag') }}</FieldDescription>
               </div>
             </Field>
             <Field v-if="canWrite">
               <Button type="submit" :disabled="savingMeta">
-                <Spinner v-if="savingMeta" data-icon="inline-start" /> {{ $t('ui.saveBasicInformation') }} </Button>
+                <Spinner v-if="savingMeta" data-icon="inline-start" /> {{ $t('administration.label.saveBasicInformation') }} </Button>
             </Field>
           </FieldGroup>
         </UiForm>
@@ -167,9 +167,9 @@ const { competition, canWrite, title, description, startTime, endTime, teamRegis
       <Separator />
       <section id="competition-mode-configuration" class="flex flex-col gap-4 py-4 first:pt-0 last:pb-0">
       <CardHeader>
-        <CardTitle>{{ $t('ui.modeConfiguration') }}</CardTitle>
+        <CardTitle>{{ $t('administration.label.modeConfiguration') }}</CardTitle>
         <CardDescription>
-          {{ $t('ui.modeSpecificSettingsFor', { mode: enumLabel(GameModeLabel, config?.mode) }) }}
+          {{ $t('administration.label.modeSpecificSettings', { mode: enumLabel(GameModeLabel, config?.mode) }) }}
         </CardDescription>
       </CardHeader>
       <CardContent>

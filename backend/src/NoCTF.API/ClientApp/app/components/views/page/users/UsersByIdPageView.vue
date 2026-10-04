@@ -57,7 +57,7 @@ const { ImagePlus, UserRound, profile, loading, error, isOwnProfile, coverUrl, m
             <p v-if="profile.description" class="mt-2 line-clamp-3 max-w-[70ch] whitespace-pre-line text-sm leading-6">
               {{ profile.description }}
             </p>
-            <p v-else class="mt-2 text-sm text-muted-foreground">{{ $t('ui.thisUserHasNotFilledOutAProfileYet') }}</p>
+            <p v-else class="mt-2 text-sm text-muted-foreground">{{ $t('common.usersBy.description.userFilledOutProfile') }}</p>
           </div>
 
           <div class="grid max-w-3xl grid-cols-3 gap-2 rounded-2xl bg-background/65 p-1.5 sm:gap-3 sm:p-2">

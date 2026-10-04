@@ -15,7 +15,7 @@ function harness(fetch: (options: any) => Promise<any>, autoLoad = false) {
   const props = reactive({ runtimeId: 'runtime-a', autoLoad })
   const copied: string[] = []
   const dependencies = { computed, onScopeDispose, ref, watch, useOffsetPagination, adminListRuntimeFlags: fetch,
-    toast: { success: () => {}, error: () => {} }, translate: (key: string) => key, adminFormatDateTime: (value: string) => value,
+    toast: { success: () => {}, error: () => {} }, translate: (key: string) => key, describeMessage: (key: string) => ({ key }), adminFormatDateTime: (value: string) => value,
     parseApiError: (value: unknown) => new ApiError(value instanceof Error ? value.message : 'failed'),
     navigator: { clipboard: { writeText: async (value: string) => { copied.push(value) } } } }
   const factory = new Function('deps', `const { ${Object.keys(dependencies).join(', ')} } = deps; ${compiled}; return useRuntimeFlagsPanel;`)(dependencies)

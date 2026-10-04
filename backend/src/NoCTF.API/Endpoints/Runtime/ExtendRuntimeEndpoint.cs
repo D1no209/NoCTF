@@ -66,10 +66,10 @@ public sealed class ExtendRuntimeEndpoint(
         if (result.FailureCode is RuntimeMutationFailureCode.RuntimeStateConflict
             or RuntimeMutationFailureCode.RuntimeExtensionTooEarly
             or RuntimeMutationFailureCode.RuntimeConflict)
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: StatusCodes.Status409Conflict,
-                title: "Runtime extension conflicts with its current state.",
-                detail: result.ErrorMessage,
+                title: ApiMessages.Get(ApiMessageId.ExtendRuntimeTitleRuntimeExtensionConflictsState),
+                detail: ApiMessages.For(result.FailureCode),
                 extensions: new Dictionary<string, object?>
                 {
                     ["code"] = result.FailureCode.Value.ToString()
@@ -83,10 +83,10 @@ public sealed class ExtendRuntimeEndpoint(
                         NoCTF.Application.Observability.RuntimeOperationMetricKind.PlayerExtend,
                         failure);
             }
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: StatusCodes.Status503ServiceUnavailable,
-                title: "Runtime could not be extended.",
-                detail: result.ErrorMessage);
+                title: ApiMessages.Get(ApiMessageId.ExtendRuntimeTitleRuntimeCouldExtended),
+                detail: ApiMessages.For(result.FailureCode));
         }
         var accepted = RuntimeEndpointMapping.ToAccepted(result.Value!);
         return TypedResults.Accepted(accepted.StatusUrl, accepted);

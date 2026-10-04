@@ -9,39 +9,39 @@ const { job, disabled, onUpdateModelValueJobCommand, onUpdateModelValueJobEnviro
 <template>
   <FieldGroup>
     <Field>
-      <FieldLabel>{{ $t('ui.mirror') }}</FieldLabel>
-      <Input v-model="job.image" :placeholder="$t('ui.registryExampleComCheckerLatest')" class="font-mono text-sm" :disabled="disabled" />
+      <FieldLabel>{{ $t('administration.label.mirror') }}</FieldLabel>
+      <Input v-model="job.image" :placeholder="$t('administration.runnerJob.label.registryExampleComChecker')" class="font-mono text-sm" :disabled="disabled" />
     </Field>
     <Field>
-      <FieldLabel>{{ $t('ui.startCommand') }}</FieldLabel>
+      <FieldLabel>{{ $t('administration.label.startCommand') }}</FieldLabel>
       <StringListEditor
         :model-value="job.command"
-        :placeholder="$t('ui.parametersSuchAsCheck')"
-        :add-label="$t('ui.addParameters')"
+        :placeholder="$t('administration.label.parametersCheck')"
+        :add-label="$t('administration.label.addParameters')"
         :disabled="disabled"
         @update:model-value="onUpdateModelValueJobCommand"
       />
-      <FieldDescription>{{ $t('ui.leaveItBlankToUseTheDefaultEntryOfThe') }}</FieldDescription>
+      <FieldDescription>{{ $t('administration.runnerJob.description.leaveBlankDefaultEntry') }}</FieldDescription>
     </Field>
     <Field>
-      <FieldLabel>{{ $t('ui.environmentVariables') }}</FieldLabel>
+      <FieldLabel>{{ $t('administration.label.environmentVariables') }}</FieldLabel>
       <KeyValueEditor
         :model-value="job.environment"
-        :key-placeholder="$t('ui.variableName')"
-        :value-placeholder="$t('ui.value')"
-        :add-label="$t('ui.addEnvironmentVariables')"
+        :key-placeholder="$t('administration.label.variableName')"
+        :value-placeholder="$t('common.label.valueEditor')"
+        :add-label="$t('administration.label.addEnvironmentVariables')"
         :disabled="disabled"
         @update:model-value="onUpdateModelValueJobEnvironment"
       />
-      <FieldDescription>{{ $t('ui.variableNamesPrefixedWithNoctfAreNotAllowedPlatformReserved') }}</FieldDescription>
+      <FieldDescription>{{ $t('administration.runnerJob.description.variableNamesPrefixedNoctf') }}</FieldDescription>
     </Field>
     <Field>
-      <FieldLabel>{{ $t('ui.timeoutSeconds') }}</FieldLabel>
+      <FieldLabel>{{ $t('administration.label.timeoutSeconds') }}</FieldLabel>
       <NullableNumberInput
         :model-value="job.timeoutSeconds"
         :min="1"
         :max="1800"
-        :placeholder="$t('ui.default60')"
+        :placeholder="$t('administration.label.default.jobEditorView')"
         :disabled="disabled"
         @update:model-value="onUpdateModelValueJobTimeoutSeconds"
       />

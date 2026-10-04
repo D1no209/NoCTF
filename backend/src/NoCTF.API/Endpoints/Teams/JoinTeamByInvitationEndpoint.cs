@@ -30,7 +30,12 @@ public enum TeamMembershipFailureCodeProtocol
 
 public sealed record TeamMembershipFailureResponse(
     TeamMembershipFailureCodeProtocol Code,
-    string Message);
+    string Message)
+{
+    public string Message { get; init; } = ApiMessages.Localize(Code, Message, ApiMessages.NoArguments);
+    public string MessageKey => ApiMessages.For(Code).Key;
+    public IReadOnlyDictionary<string, object?> MessageArguments => ApiMessages.NoArguments;
+}
 
 public sealed class JoinTeamByInvitationRequest
 {

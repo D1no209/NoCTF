@@ -33,7 +33,12 @@ public enum AvatarUploadFailureCode
     MalformedImage
 }
 
-public sealed record AvatarUploadFailureResponse(AvatarUploadFailureCode Code);
+public sealed record AvatarUploadFailureResponse(AvatarUploadFailureCode Code)
+{
+    public string Detail => ApiMessages.For(Code).Text;
+    public string MessageKey => ApiMessages.For(Code).Key;
+    public IReadOnlyDictionary<string, object?> MessageArguments => ApiMessages.NoArguments;
+}
 
 public sealed class UploadMyAvatarEndpoint(
     ReplaceCurrentUserAvatar replace,
@@ -88,10 +93,10 @@ public sealed class UploadMyAvatarEndpoint(
     }
 
     private static ProblemHttpResult UploadTooLarge(long maximumBytes) =>
-        TypedResults.Problem(
+        ApiProblems.Problem(
             statusCode: StatusCodes.Status413PayloadTooLarge,
-            title: "Avatar is too large.",
-            detail: $"Avatar uploads cannot exceed {maximumBytes} bytes.",
+            title: ApiMessages.Get(ApiMessageId.UploadMyAvatarTitleAvatarTooLarge),
+            detail: ApiMessages.Get(ApiMessageId.UploadSizeLimit, new Dictionary<string, object?> { ["maximumBytes"] = maximumBytes }),
             extensions: new Dictionary<string, object?>
             {
                 ["code"] = FileUploadFailureCode.UploadTooLarge.ToString()

@@ -28,7 +28,7 @@ public sealed class DeleteCompetitionEndpoint(DeleteCompetition delete, ICompeti
         if (!await authorizer.CanModerateAsync(user.UserId, id, ct)) return TypedResults.Forbid();
         var result = await delete.ExecuteAsync(id, user.UserId, timeProvider.GetUtcNow(), ct);
         if (result.FailureCode == CompetitionManagementFailureCode.CompetitionNotFound) return TypedResults.NotFound();
-        if (!result.Succeeded) return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict, title: "Competition was not deleted.", detail: result.ErrorMessage);
+        if (!result.Succeeded) return ApiProblems.Problem(statusCode: StatusCodes.Status409Conflict, title: ApiMessages.Get(ApiMessageId.DeleteCompetitionTitleCompetitionWasDeleted), detail: ApiMessages.For(result.FailureCode));
         return TypedResults.NoContent();
     }
 }

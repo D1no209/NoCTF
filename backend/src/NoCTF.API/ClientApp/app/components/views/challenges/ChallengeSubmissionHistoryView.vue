@@ -8,19 +8,19 @@ const { valueDialogOpen, valueSubmission, submittedValue, valueLoading, valueErr
 
 <template>
   <section class="border-t pt-5" aria-labelledby="challenge-submission-history-title">
-    <h3 id="challenge-submission-history-title" class="text-sm font-semibold">{{ $t('ui.challengeSubmissionHistory') }}</h3>
+    <h3 id="challenge-submission-history-title" class="text-sm font-semibold">{{ $t('challenges.label.challengeSubmissionHistory') }}</h3>
 
     <Alert v-if="error" variant="destructive" class="mt-3">
       <AlertDescription>{{ $message(error.message) }}</AlertDescription>
     </Alert>
     <Alert v-else-if="pendingPollingTimedOut" variant="destructive" class="mt-3">
       <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
-        <span>{{ $t('ui.automaticSubmissionStatusUpdatesStoppedRetryManually') }}</span>
-        <Button type="button" size="sm" variant="outline" @click="startPendingPolling">{{ $t('ui.reload') }}</Button>
+        <span>{{ $t('common.challengeSubmission.description.automaticSubmissionStatusUpdates') }}</span>
+        <Button type="button" size="sm" variant="outline" @click="startPendingPolling">{{ $t('common.label.reload') }}</Button>
       </AlertDescription>
     </Alert>
     <Alert v-else-if="pendingPollingErrorMessage" variant="destructive" class="mt-3">
-      <AlertDescription>{{ $t('ui.submissionStatusUpdateFailedAndWillRetryAutomatically', { reason: pendingPollingErrorMessage }) }}</AlertDescription>
+      <AlertDescription>{{ $t('common.flagSubmit.error.submissionStatusUpdateFailed', { reason: pendingPollingErrorMessage }) }}</AlertDescription>
     </Alert>
 
     <div v-if="loading && !initialized" class="mt-3 flex flex-col gap-2">
@@ -28,16 +28,16 @@ const { valueDialogOpen, valueSubmission, submittedValue, valueLoading, valueErr
     </div>
 
     <p v-else-if="initialized && !items.length" class="mt-3 text-sm text-muted-foreground">
-      {{ $t('ui.noSubmissionsForThisChallengeYet') }}
+      {{ $t('challenges.challengeSubmission.description.submissionsChallengeYet') }}
     </p>
 
     <Table v-else class="mt-3">
       <TableHeader>
         <TableRow>
-          <TableHead class="w-36">{{ $t('ui.type') }}</TableHead>
-          <TableHead>{{ $t('ui.result') }}</TableHead>
-          <TableHead class="w-44 text-right">{{ $t('ui.submissionTime') }}</TableHead>
-          <TableHead class="w-28 text-right">{{ $t('ui.actions') }}</TableHead>
+          <TableHead class="w-36">{{ $t('common.label.type') }}</TableHead>
+          <TableHead>{{ $t('common.label.result') }}</TableHead>
+          <TableHead class="w-44 text-right">{{ $t('common.label.submissionTime') }}</TableHead>
+          <TableHead class="w-28 text-right">{{ $t('common.label.actions') }}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -61,7 +61,7 @@ const { valueDialogOpen, valueSubmission, submittedValue, valueLoading, valueErr
               @click="openSubmittedValue(submission)"
             >
               <Spinner v-if="valueLoading && valueSubmission?.id === submission.id" data-icon="inline-start" />
-              {{ $t('ui.viewFlag') }}
+              {{ $t('challenges.label.viewFlag') }}
             </Button>
             <span v-else class="text-muted-foreground">-</span>
           </TableCell>
@@ -70,15 +70,15 @@ const { valueDialogOpen, valueSubmission, submittedValue, valueLoading, valueErr
     </Table>
 
     <Button v-if="hasMore" variant="outline" size="sm" class="mt-3" :disabled="loading" @click="loadNextPage">
-      <Spinner v-if="loading" data-icon="inline-start" />{{ $t('ui.loadMore') }}
+      <Spinner v-if="loading" data-icon="inline-start" />{{ $t('common.label.load') }}
     </Button>
 
     <Dialog :open="valueDialogOpen" @update:open="setValueDialogOpen">
       <DialogContent class="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>{{ $t('ui.submittedFlagValue') }}</DialogTitle>
+          <DialogTitle>{{ $t('challenges.label.submittedFlag') }}</DialogTitle>
           <DialogDescription>
-            {{ $t('ui.onlyTeamMembersCanViewFlagValuesSubmittedByTheir') }}
+            {{ $t('challenges.challengeSubmission.description.teamMembersViewFlag') }}
           </DialogDescription>
         </DialogHeader>
 
@@ -92,10 +92,10 @@ const { valueDialogOpen, valueSubmission, submittedValue, valueLoading, valueErr
           v-else-if="submittedValue"
           class="max-h-64 overflow-auto whitespace-pre-wrap break-all rounded-md border bg-muted/40 p-4 font-mono text-sm select-text"
         >{{ submittedValue }}</ScrollSurface>
-        <p v-else class="text-sm text-muted-foreground">{{ $t('ui.noFlagValueIsAvailable') }}</p>
+        <p v-else class="text-sm text-muted-foreground">{{ $t('challenges.challengeSubmission.label.flagAvailable') }}</p>
 
         <DialogFooter>
-          <Button variant="outline" @click="closeValueDialog">{{ $t('ui.close') }}</Button>
+          <Button variant="outline" @click="closeValueDialog">{{ $t('common.action.close') }}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

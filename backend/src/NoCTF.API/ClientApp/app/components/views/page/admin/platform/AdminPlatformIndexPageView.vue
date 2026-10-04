@@ -16,21 +16,21 @@ const { Upload, information, loading, loadError, name, description, saving, logo
 
     <Card v-else>
       <CardHeader>
-        <CardTitle>{{ $t('ui.platformConfiguration') }}</CardTitle>
-        <CardDescription>{{ $t('ui.platformNameDescriptionAndLogo') }}</CardDescription>
+        <CardTitle>{{ $t('administration.label.platformConfiguration') }}</CardTitle>
+        <CardDescription>{{ $t('administration.platformIndex.label.platformNameDescriptionLogo') }}</CardDescription>
       </CardHeader>
       <CardContent class="flex flex-col gap-6">
         <section class="flex flex-col gap-4" aria-labelledby="platform-runtime-information">
           <div>
-            <h2 id="platform-runtime-information" class="font-semibold">{{ $t('ui.platformInformation') }}</h2>
-            <p class="mt-1 text-xs text-muted-foreground">{{ $t('ui.backendVersionsAndProjectContributors') }}</p>
+            <h2 id="platform-runtime-information" class="font-semibold">{{ $t('administration.label.platformInformation') }}</h2>
+            <p class="mt-1 text-xs text-muted-foreground">{{ $t('administration.platformIndex.label.backendVersionsProjectContributors') }}</p>
           </div>
           <div class="flex items-center gap-2">
-            <span class="text-sm text-muted-foreground">{{ $t('ui.version') }}</span>
+            <span class="text-sm text-muted-foreground">{{ $t('administration.label.version') }}</span>
             <Badge variant="secondary" class="font-mono">{{ information?.version ?? '-' }}</Badge>
           </div>
           <div class="flex flex-col gap-2">
-            <span class="text-sm text-muted-foreground">{{ $t('ui.contributor') }}</span>
+            <span class="text-sm text-muted-foreground">{{ $t('administration.label.contributor') }}</span>
             <div v-if="information?.contributors?.length" class="flex flex-wrap gap-2">
               <Avatar v-for="contributor in information.contributors" :key="contributor.id" class="size-8">
                 <AvatarImage v-if="contributor.avatarUrl" :src="contributor.avatarUrl" :alt="contributor.id ?? ''" />
@@ -44,36 +44,36 @@ const { Upload, information, loading, loadError, name, description, saving, logo
         <Separator />
 
         <section aria-labelledby="platform-identity-configuration">
-          <h2 id="platform-identity-configuration" class="sr-only">{{ $t('ui.platformConfiguration') }}</h2>
+          <h2 id="platform-identity-configuration" class="sr-only">{{ $t('administration.label.platformConfiguration') }}</h2>
           <UiForm @submit.prevent="save">
             <FieldGroup>
               <Field>
-                <FieldLabel for="platform-name">{{ $t('ui.platformName') }}</FieldLabel>
+                <FieldLabel for="platform-name">{{ $t('administration.label.platformName') }}</FieldLabel>
                 <Input id="platform-name" v-model="name" required maxlength="100" />
               </Field>
               <Field>
-                <FieldLabel for="platform-description">{{ $t('ui.platformDescription') }}</FieldLabel>
+                <FieldLabel for="platform-description">{{ $t('administration.label.platformDescription') }}</FieldLabel>
                 <Textarea id="platform-description" v-model="description" rows="3" maxlength="500" />
               </Field>
               <Field>
-                <FieldLabel>{{ $t('ui.logo') }}</FieldLabel>
+                <FieldLabel>{{ $t('administration.label.logo') }}</FieldLabel>
                 <div class="flex items-center gap-4">
                   <img
                     v-if="logoSrc"
                     :src="logoSrc"
-                    :alt="$t('ui.platformLogo')"
+                    :alt="$t('administration.label.platformLogo')"
                     class="size-16 rounded-md border object-contain"
                   >
-                  <span v-else class="text-sm text-muted-foreground">{{ $t('ui.logoNotSetYet') }}</span>
+                  <span v-else class="text-sm text-muted-foreground">{{ $t('administration.label.logoSetYet') }}</span>
                   <FileInput :ref="setLogoInputRef"  accept="image/*" class="hidden" @change="uploadLogo" />
                   <Button type="button" variant="outline" :disabled="logoUploading" @click="logoInput?.click()">
                     <Spinner v-if="logoUploading" data-icon="inline-start" />
-                    <Upload v-else data-icon="inline-start" /> {{ $t('ui.uploadLogo') }} </Button>
+                    <Upload v-else data-icon="inline-start" /> {{ $t('administration.label.uploadLogo') }} </Button>
                 </div>
               </Field>
               <Field orientation="horizontal">
                 <Button type="submit" :disabled="saving || !name.trim()">
-                  <Spinner v-if="saving" data-icon="inline-start" /> {{ $t('ui.saveConfiguration') }} </Button>
+                  <Spinner v-if="saving" data-icon="inline-start" /> {{ $t('administration.label.saveConfiguration') }} </Button>
               </Field>
             </FieldGroup>
           </UiForm>

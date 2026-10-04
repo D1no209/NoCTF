@@ -11,8 +11,8 @@ describe('competition challenge custom title', () => {
 
     expect(page).toContain('v-model="newCustomTitle"')
     expect(page).toContain('customTitle: newCustomTitle.value.trim() || null')
-    expect(page).toContain("$t('ui.leaveBlankToUseTheQuestionBankTemplateTitle')")
-    expect(page).toContain("$t('ui.changesTheDisplayNameForThisCompetitionOnlyAndDoes')")
+    expect(page).toContain("$t('administration.competitionsBy.description.leaveBlankQuestionBank')")
+    expect(page).toContain("$t('administration.competitionsBy.description.changesDisplayNameCompetition')")
   })
 
   test('allows restoring the template fallback from challenge settings', async () => {

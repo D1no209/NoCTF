@@ -13,7 +13,12 @@ public sealed class DeleteRuntimeTrafficCaptureRequest
     public Guid RuntimeInstanceId { get; set; }
 }
 
-public sealed record RuntimeTrafficCaptureConflictResponse(string Detail);
+public sealed record RuntimeTrafficCaptureConflictResponse(string Detail)
+{
+    public string Detail { get; init; } = ApiMessages.Localize(ApiMessageId.RuntimeTrafficCaptureConflict, Detail);
+    public string MessageKey => ApiMessages.Key(ApiMessageId.RuntimeTrafficCaptureConflict);
+    public IReadOnlyDictionary<string, object?> MessageArguments => ApiMessages.NoArguments;
+}
 
 public sealed class DeleteRuntimeTrafficCaptureEndpoint(
     ManageRuntimeTrafficCaptures captures,

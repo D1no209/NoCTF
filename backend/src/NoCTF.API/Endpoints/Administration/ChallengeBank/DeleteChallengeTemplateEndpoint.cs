@@ -36,10 +36,10 @@ public sealed class DeleteChallengeTemplateEndpoint(
         if (result.Succeeded)
             return TypedResults.NoContent();
         return result.FailureCode == ChallengeTemplateDeleteFailureCode.ChallengeInUse
-            ? TypedResults.Problem(
+            ? ApiProblems.Problem(
                 statusCode: StatusCodes.Status409Conflict,
-                title: "Challenge was not deleted.",
-                detail: result.ErrorMessage,
+                title: ApiMessages.Get(ApiMessageId.DeleteChallengeTemplateTitleChallengeWasDeleted),
+                detail: ApiMessages.For(result.FailureCode),
                 extensions: new Dictionary<string, object?> { ["code"] = result.FailureCode?.ToString() })
             : TypedResults.NotFound();
     }

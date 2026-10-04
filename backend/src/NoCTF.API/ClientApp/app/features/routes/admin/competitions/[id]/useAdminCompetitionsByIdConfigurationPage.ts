@@ -1,6 +1,8 @@
+import { message as describeMessage } from '../../../../../utils/i18n'
+import type { UiMessage } from '../../../../../utils/i18n'
 import { markRaw } from 'vue'
 
-import { toast } from 'vue-sonner'
+import { toast } from '../../../../../utils/message-toast'
 import { adminGetCompetition, adminPatchCompetition } from '../../../../../api'
 import type { NoCtfapiEndpointsAdministrationCompetitionsCompetitionConfigurationResponse } from '../../../../../api'
 import type { NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract } from '../../../../../api'
@@ -60,7 +62,7 @@ export function useAdminCompetitionsByIdConfigurationPage() {
 
   const savingMeta = ref(false)
 
-  const metaError = ref<string | null>(null)
+  const metaError = ref<UiMessage | null>(null)
 
   watch(competition, (c) => {
     if (!c) return
@@ -91,26 +93,26 @@ export function useAdminCompetitionsByIdConfigurationPage() {
     const start = localInputToIso(startTime.value)
     const end = localInputToIso(endTime.value)
     if (!title.value.trim() || !start || !end) {
-      metaError.value = translate("ui.pleaseFillInTheTitleAndTimeCompletely")
+      metaError.value = describeMessage("administration.competitionsBy.description.fillTitleTimeCompletely")
       return
     }
     if (!Number.isInteger(writeUpSubmissionDeadlineHours.value)
       || writeUpSubmissionDeadlineHours.value < 0
       || writeUpSubmissionDeadlineHours.value > maximumWriteUpDeadlineHours) {
-      metaError.value = translate('writeUp.invalidDeadlineHours', {
+      metaError.value = describeMessage('writeUp.invalidDeadlineHours', {
         maximum: maximumWriteUpDeadlineHours,
       })
       return
     }
     if (trafficCaptureEnabled.value && runtimeAccessMode.value === 'Direct') {
-      metaError.value = translate('runtime.captureRequiresWsrx')
+      metaError.value = describeMessage('runtime.captureRequiresWsrx')
       return
     }
     if (trafficCaptureLimitMiB.value !== null
       && (!Number.isInteger(trafficCaptureLimitMiB.value)
         || trafficCaptureLimitMiB.value < 1
         || trafficCaptureLimitMiB.value > 4096)) {
-      metaError.value = translate('runtime.captureLimitInvalid')
+      metaError.value = describeMessage('runtime.captureLimitInvalid')
       return
     }
     savingMeta.value = true
@@ -143,7 +145,7 @@ export function useAdminCompetitionsByIdConfigurationPage() {
         },
       })
       if (error) throw error
-      toast.success(translate("ui.basicInformationHasBeenSaved"))
+      toast.success(describeMessage("administration.competitionsBy.label.basicInformationSaved"))
       await refresh()
     }
     catch (e) {
@@ -177,7 +179,7 @@ export function useAdminCompetitionsByIdConfigurationPage() {
       })
       if (error) throw error
       config.value = data?.modeConfiguration ?? config.value
-      toast.success(translate("ui.modeConfigurationSaved"))
+      toast.success(describeMessage("administration.label.modeConfigurationSaved"))
     }
     catch (e) {
       toastWriteError(e)

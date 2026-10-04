@@ -1,3 +1,5 @@
+import { message as describeMessage } from '../../../../../utils/i18n'
+import type { UiMessage } from '../../../../../utils/i18n'
 import { markRaw } from 'vue'
 
 import { getTeamEndpoint } from '../../../../../api'
@@ -16,13 +18,13 @@ export function useCompetitionsByIdTeamsByTeamIdPage() {
 
   const loading = ref(true)
 
-  const error = ref<string | null>(null)
+  const error = ref<UiMessage | null>(null)
 
   onMounted(async () => {
     const { data, error: err } = await getTeamEndpoint({ path: { competitionId, teamId } })
     loading.value = false
     if (err || !data) {
-      error.value = parseApiError(err, translate("ui.failedToLoadTeamInformation")).message
+      error.value = parseApiError(err, describeMessage("competitions.competitionsBy.error.loadTeamInformationFailed")).displayMessage
       return
     }
     team.value = data

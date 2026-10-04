@@ -14,7 +14,7 @@ public sealed class LeaveTeamEndpoint(LeaveTeam leave, IUserContext user)
     {
         var result = await leave.ExecuteAsync(Route<Guid>("competitionId"), user.UserId, ct);
         if (result.FailureCode == TeamMembershipFailure.MembershipNotFound) return TypedResults.NotFound();
-        if (!result.Succeeded) return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict, title: "User could not leave the team.", detail: result.ErrorMessage);
+        if (!result.Succeeded) return ApiProblems.Problem(statusCode: StatusCodes.Status409Conflict, title: ApiMessages.Get(ApiMessageId.LeaveTeamTitleUserCouldLeaveTeam), detail: ApiMessages.For(result.FailureCode));
         return TypedResults.NoContent();
     }
 }

@@ -138,7 +138,7 @@ describe('competition question page wiring', () => {
     ).text()
 
     expect(page).toContain('if (replyPending.value || !reply.value.trim() || !detail.value?.canReply) return')
-    expect(page).toContain("competitionQuestionErrorMessage(error, translate(\"ui.sendingFailed\"))")
+    expect(page).toContain("competitionQuestionErrorMessage(error, translate(\"notifications.error.sendingFailed\"))")
     expect(page).toContain('finally {')
     expect(page).toContain('replyPending.value = false')
     expect(page).toContain('applyDetailQuestion(data)')

@@ -1,3 +1,4 @@
+import { message as describeMessage } from '../../utils/i18n'
 import type { InjectionKey } from 'vue'
 import type { NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse } from '../../api'
 import { getGameplayFactStatusEndpoint } from '../../api'
@@ -17,7 +18,7 @@ async function readStatus(
     signal,
   })
   if (error || !data)
-    throw parseApiError(error, translate('ui.failedToRefreshSubmissionStatus'))
+    throw parseApiError(error, describeMessage('common.flagSubmit.error.submissionStatusFailed'))
   return data
 }
 

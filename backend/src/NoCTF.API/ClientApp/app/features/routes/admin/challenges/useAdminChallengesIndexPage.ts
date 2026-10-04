@@ -1,3 +1,4 @@
+import type { UiMessage } from '../../../../utils/i18n'
 import { markRaw } from 'vue'
 
 import { Plus } from '@lucide/vue'
@@ -46,7 +47,7 @@ export function useAdminChallengesIndexPage() {
     ?? directionCatalogs.get(includeDeleted.value)
     ?? [])])
 
-  const loadError = ref<string | null>(null)
+  const loadError = ref<UiMessage | null>(null)
 
   const search = ref(typeof route.query.q === 'string'
     ? route.query.q
@@ -164,7 +165,7 @@ export function useAdminChallengesIndexPage() {
   })
 
   function visibilityLabel(visibility?: string): string {
-    return visibility === 'Shared' ? translate("ui.share") : translate("ui.private")
+    return visibility === 'Shared' ? translate("common.label.share") : translate("administration.label.private")
   }
 
   function setCreateOpen(value: boolean) {

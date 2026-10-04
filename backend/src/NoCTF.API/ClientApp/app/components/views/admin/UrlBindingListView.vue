@@ -16,7 +16,7 @@ const { Plus, X, displayTemplateOptions, update, remove, add, modelValue, exposu
       <div class="flex items-start gap-2">
         <div class="grid flex-1 gap-2 sm:grid-cols-2">
           <Field>
-            <FieldLabel>{{ allowCustomDisplay ? $t('ui.displayTemplate') : $t('ui.urlTemplate') }}</FieldLabel>
+            <FieldLabel>{{ allowCustomDisplay ? $t('administration.label.displayTemplate') : $t('administration.label.urlTemplate') }}</FieldLabel>
             <Select
               v-if="allowCustomDisplay"
               :model-value="binding.urlTemplate"
@@ -44,14 +44,14 @@ const { Plus, X, displayTemplateOptions, update, remove, add, modelValue, exposu
             <Input
               v-else
               :model-value="binding.urlTemplate"
-              :placeholder="$t('ui.httpHOSTPORT')"
+              :placeholder="$t('administration.label.httpHostport')"
               class="font-mono text-sm"
               :disabled="disabled"
               @update:model-value="update(index, { urlTemplate: String($event ?? '') })"
             />
           </Field>
           <Field>
-            <FieldLabel>{{ $t('ui.exposureRange') }}</FieldLabel>
+            <FieldLabel>{{ $t('administration.label.exposureRange') }}</FieldLabel>
             <Select
               :model-value="String(binding.exposure)"
               :disabled="disabled || exposureOptions.length <= 1"
@@ -63,25 +63,25 @@ const { Plus, X, displayTemplateOptions, update, remove, add, modelValue, exposu
               <SelectContent>
                 <SelectGroup>
                   <SelectItem v-for="option in exposureOptions" :key="option.value" :value="String(option.value)">
-                    {{ $t(option.label) }}
+                    {{ translate(option.label) }}
                   </SelectItem>
                 </SelectGroup>
               </SelectContent>
             </Select>
           </Field>
           <Field>
-            <FieldLabel>{{ $t('ui.containerPort') }}</FieldLabel>
+            <FieldLabel>{{ $t('administration.label.containerPort') }}</FieldLabel>
             <NullableNumberInput
               :model-value="binding.containerPort"
               :min="1"
               :max="65535"
-              :placeholder="$t('ui.containerPort')"
+              :placeholder="$t('administration.label.containerPort')"
               :disabled="disabled"
               @update:model-value="update(index, { containerPort: $event })"
             />
           </Field>
           <Field v-if="showServiceName">
-            <FieldLabel>{{ $t('ui.runtimeServiceName') }}</FieldLabel>
+            <FieldLabel>{{ $t('runtime.label.runtimeServiceName') }}</FieldLabel>
             <Select :model-value="binding.serviceName" :disabled="disabled"
               @update:model-value="update(index, { serviceName: String($event ?? '') })">
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -95,7 +95,7 @@ const { Plus, X, displayTemplateOptions, update, remove, add, modelValue, exposu
           variant="ghost"
           size="icon"
           class="mt-6 shrink-0"
-          :aria-label="$t('ui.removeItem', { index: index + 1 })"
+          :aria-label="$t('common.label.removeItem', { index: index + 1 })"
           @click="remove(index)"
         >
           <X class="size-4" aria-hidden="true" />
@@ -111,10 +111,10 @@ const { Plus, X, displayTemplateOptions, update, remove, add, modelValue, exposu
       @click="add"
     >
       <Plus data-icon="inline-start" />
-      {{ $t(addLabel) }}
+      {{ translate(addLabel) }}
     </Button>
     <p v-if="!allowCustomDisplay" class="text-xs text-muted-foreground">
-      {{ $t('ui.urlTemplatesOnlyAllowAndPlaceholdersIsARandomHost') }}
+      {{ $t('administration.urlBinding.description.urlTemplatesAllowPlaceholders') }}
     </p>
   </div>
 </template>

@@ -1,7 +1,9 @@
+import { message as describeMessage } from '../../../../utils/i18n'
+import type { UiMessage } from '../../../../utils/i18n'
 
 import type { ComponentPublicInstance } from 'vue'
 import { Upload } from '@lucide/vue'
-import { toast } from 'vue-sonner'
+import { toast } from '../../../../utils/message-toast'
 import { adminPlatformGetConfiguration, adminPlatformGetInformation, adminPlatformPatchConfiguration, adminPlatformUploadLogo } from '../../../../api'
 import type { NoCtfapiEndpointsAdministrationPlatformPlatformBrandingResponse, NoCtfapiEndpointsAdministrationPlatformPlatformInformationResponse } from '../../../../api'
 
@@ -15,7 +17,7 @@ export function useAdminPlatformIndexPage() {
 
   const loading = ref(true)
 
-  const loadError = ref<string | null>(null)
+  const loadError = ref<UiMessage | null>(null)
 
   const name = ref('')
 
@@ -38,7 +40,7 @@ export function useAdminPlatformIndexPage() {
     ])
     loading.value = false
     if (infoResult.error || configResult.error) {
-      loadError.value = parseApiError(infoResult.error ?? configResult.error).message
+      loadError.value = parseApiError(infoResult.error ?? configResult.error).displayMessage
       return
     }
     information.value = infoResult.data ?? null
@@ -60,7 +62,7 @@ export function useAdminPlatformIndexPage() {
     })
     saving.value = false
     if (error) {
-      toast.error(parseApiError(error).message)
+      toast.error(parseApiError(error).displayMessage)
       return
     }
     configuration.value = data?.branding ?? configuration.value
@@ -72,7 +74,7 @@ export function useAdminPlatformIndexPage() {
         logoUrl: data.branding.logoUrl,
       }
     }
-    toast.success(translate("ui.platformConfigurationSaved"))
+    toast.success(describeMessage("administration.label.platformConfigurationSaved"))
   }
 
   async function uploadLogo(event: Event): Promise<void> {
@@ -86,7 +88,7 @@ export function useAdminPlatformIndexPage() {
     })
     logoUploading.value = false
     if (error) {
-      toast.error(parseApiError(error).message)
+      toast.error(parseApiError(error).displayMessage)
       return
     }
     if (data) {
@@ -95,7 +97,7 @@ export function useAdminPlatformIndexPage() {
         globalConfiguration.value = { ...globalConfiguration.value, logoUrl: data.logoUrl }
       }
     }
-    toast.success(translate("ui.logoHasBeenUpdated"))
+    toast.success(describeMessage("administration.label.logoUpdated"))
   }
 
   onMounted(() => {

@@ -26,9 +26,9 @@ describe('locale feature catalogs', () => {
 
   test('keeps complete catalogs out of the runtime i18n entry', async () => {
     const runtime = await sourceFile(new URL('../app/utils/i18n.ts', import.meta.url)).text()
-    expect(runtime).not.toContain("from '../locales/en'")
+    expect(runtime).not.toMatch(/^import \{[^}]+\} from '\.\.\/locales\/en'/m)
     expect(runtime).not.toMatch(/^import \{[^}]+\} from '\.\.\/locales\/zh-CN'/m)
-    expect(runtime).toContain("import type { MessageKey } from '../locales/zh-CN'")
+    expect(runtime).toContain("import type { MessageKey } from '../locales/en'")
     expect(runtime).not.toContain('englishMessageSources')
   })
 })

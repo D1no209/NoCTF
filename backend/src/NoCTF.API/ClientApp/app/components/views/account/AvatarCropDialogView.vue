@@ -10,9 +10,9 @@ const { RotateCcw, RotateCw, Scan, profileCover, cropWidth, cropHeight, emit, so
   <Dialog :open="open" @update:open="emit('update:open', $event)">
     <DialogContent :class="profileCover ? 'sm:max-w-[900px]' : 'sm:max-w-[760px]'" :data-profile-cover-crop="profileCover || undefined">
       <DialogHeader>
-        <DialogTitle>{{ profileCover ? $t('profile.cropCover') : $t('ui.cropAvatar') }}</DialogTitle>
+        <DialogTitle>{{ profileCover ? $t('profile.cropCover') : $t('account.label.cropAvatar') }}</DialogTitle>
         <DialogDescription>
-          {{ profileCover ? $t('profile.coverCropDescription') : $t('ui.dragOnThePictureToAdjustThePositionAndScroll') }}
+          {{ profileCover ? $t('profile.coverCropDescription') : $t('account.avatarCrop.description.dragPictureAdjustPosition') }}
         </DialogDescription>
       </DialogHeader>
 
@@ -26,7 +26,7 @@ const { RotateCcw, RotateCw, Scan, profileCover, cropWidth, cropHeight, emit, so
           ]"
           role="group"
           tabindex="0"
-          :aria-label="profileCover ? $t('profile.coverCropPreview') : $t('ui.avatarCropPreview')"
+          :aria-label="profileCover ? $t('profile.coverCropPreview') : $t('account.label.avatarCropPreview')"
           @dragstart.prevent
           @wheel.prevent="handleWheel"
           @pointerdown="startDrag"
@@ -40,7 +40,7 @@ const { RotateCcw, RotateCw, Scan, profileCover, cropWidth, cropHeight, emit, so
             :width="cropWidth"
             :height="cropHeight"
             class="size-full"
-            :aria-label="profileCover ? $t('profile.coverCropCanvas') : $t('ui.avatarCropCanvas')"
+            :aria-label="profileCover ? $t('profile.coverCropCanvas') : $t('account.label.avatarCropCanvas')"
           />
           <div
             v-if="!profileCover"
@@ -49,37 +49,37 @@ const { RotateCcw, RotateCw, Scan, profileCover, cropWidth, cropHeight, emit, so
           <div
             v-if="loadError"
             class="absolute inset-0 grid place-items-center bg-background p-6 text-center text-sm text-destructive"
-          > {{ $t('ui.thisImageCannotBeReadPleaseUseJpegPngOr') }} </div>
+          > {{ $t('account.accountPanel.validation.imageReadFormat') }} </div>
         </div>
 
         <div class="flex min-w-0 flex-col gap-5">
-          <div class="rounded-lg border bg-muted/50 p-3 text-sm leading-6 text-muted-foreground"> {{ $t('ui.theScrollWheelZoomsCenteredOnThePointerPositionThe') }} </div>
+          <div class="rounded-lg border bg-muted/50 p-3 text-sm leading-6 text-muted-foreground"> {{ $t('account.avatarCrop.description.scrollWheelZoomsCentered') }} </div>
           <div class="flex items-center justify-between border-b pb-3 text-sm">
-            <span class="text-muted-foreground">{{ $t('ui.currentZoom') }}</span>
+            <span class="text-muted-foreground">{{ $t('account.label.zoom') }}</span>
             <span class="font-mono font-semibold tabular-nums">{{ zoomPercent }}%</span>
           </div>
           <div class="flex flex-col gap-2">
-            <span class="text-sm font-medium">{{ $t('ui.rotate') }}</span>
+            <span class="text-sm font-medium">{{ $t('account.label.rotate') }}</span>
             <div class="grid grid-cols-2 gap-2">
               <Button variant="outline" type="button" @click="rotate(-90)">
                 <RotateCcw />
-                {{ $t('ui.90') }}
+                {{ $t('account.avatar.rotateCounterclockwise') }}
               </Button>
               <Button variant="outline" type="button" @click="rotate(90)">
                 <RotateCw />
-                {{ $t('ui.902') }}
+                {{ $t('account.avatar.rotateClockwise') }}
               </Button>
             </div>
           </div>
           <Button variant="ghost" type="button" class="self-start" @click="resetCrop">
-            <Scan /> {{ $t('ui.resetCropping') }} </Button>
+            <Scan /> {{ $t('account.label.resetCropping') }} </Button>
         </div>
       </div>
 
       <DialogFooter>
-        <Button variant="outline" :disabled="saving || encoding" @click="emit('update:open', false)"> {{ $t('ui.cancel') }} </Button>
+        <Button variant="outline" :disabled="saving || encoding" @click="emit('update:open', false)"> {{ $t('common.action.cancel') }} </Button>
         <Button :disabled="saving || encoding || !sourceImage || loadError" @click="createCroppedFile">
-          <Spinner v-if="saving || encoding" data-icon="inline-start" /> {{ $t('ui.cropAndUpload') }} </Button>
+          <Spinner v-if="saving || encoding" data-icon="inline-start" /> {{ $t('account.label.cropUpload') }} </Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

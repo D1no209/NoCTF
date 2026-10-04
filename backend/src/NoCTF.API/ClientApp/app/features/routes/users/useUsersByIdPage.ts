@@ -1,7 +1,9 @@
+import { message as describeMessage } from '../../../utils/i18n'
+import type { UiMessage } from '../../../utils/i18n'
 import { markRaw } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import { ImagePlus, UserRound } from '@lucide/vue'
-import { toast } from 'vue-sonner'
+import { toast } from '../../../utils/message-toast'
 import { authenticationUploadMyProfileCover, userProfileGet } from '../../../api'
 import type { NoCtfapiEndpointsAuthenticationPublicUserProfileResponse } from '../../../api'
 import type { echarts } from '../../../utils/echarts'
@@ -19,7 +21,7 @@ export function useUsersByIdPage() {
 
   const profile = ref<NoCtfapiEndpointsAuthenticationPublicUserProfileResponse | null>(null)
   const loading = ref(true)
-  const error = ref<string | null>(null)
+  const error = ref<UiMessage | null>(null)
   let loadSequence = 0
 
   const userId = computed(() => typeof route.params.id === 'string' ? route.params.id : '')
@@ -38,7 +40,7 @@ export function useUsersByIdPage() {
     loading.value = false
     if (requestError || !data) {
       profile.value = null
-      error.value = parseApiError(requestError, translate('ui.userDoesNotExistOrFailedToLoad')).message
+      error.value = parseApiError(requestError, describeMessage('common.usersBy.error.userExistLoadFailed')).displayMessage
       return
     }
     profile.value = data
@@ -68,9 +70,9 @@ export function useUsersByIdPage() {
       month: 'short',
       day: 'numeric',
     })
-    if (!start && !end) return translate('ui.symbol')
+    if (!start && !end) return translate('common.label.symbol')
     if (!end) return formatter.format(new Date(start!))
-    return `${start ? formatter.format(new Date(start)) : translate('ui.symbol')} · ${formatter.format(new Date(end))}`
+    return `${start ? formatter.format(new Date(start)) : translate('common.label.symbol')} · ${formatter.format(new Date(end))}`
   }
 
   const modeChartOption = computed<echarts.EChartsCoreOption>(() => ({
@@ -144,7 +146,7 @@ export function useUsersByIdPage() {
     input.value = ''
     if (!file || coverPending.value) return
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      toast.error(translate('accountPanel.wallpaperFileInvalid'))
+      toast.error(describeMessage('accountPanel.wallpaperFileInvalid'))
       return
     }
     coverSourceFile.value = file
@@ -161,7 +163,7 @@ export function useUsersByIdPage() {
     if (exceedsUploadLimit(file.size, maximumWallpaperBytes.value)) {
       toast.error(maximumWallpaperBytes.value
         ? translate('accountPanel.fileExceedsUploadLimit', { limit: formatBytes(maximumWallpaperBytes.value) })
-        : translate('ui.theUploadedFileIsTooLarge'))
+        : translate('common.error.uploadTooLarge'))
       return
     }
 
@@ -173,10 +175,10 @@ export function useUsersByIdPage() {
       await loadProfile()
       coverEditorOpen.value = false
       coverSourceFile.value = null
-      toast.success(translate('profile.coverUpdated'))
+      toast.success(describeMessage('profile.coverUpdated'))
     }
     catch (uploadError) {
-      toast.error(parseApiError(uploadError).message)
+      toast.error(parseApiError(uploadError).displayMessage)
     }
     finally {
       coverPending.value = false

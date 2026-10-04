@@ -66,9 +66,9 @@ public sealed class ChangeCompetitionQuestionStatusEndpoint(
             CompetitionQuestionFailure.InvalidTransition
                 or CompetitionQuestionFailure.QuestionClosed => TypedResults.Conflict(
                     CompetitionQuestionFailureMapper.ToResponse(result)),
-            CompetitionQuestionFailure.InvalidRequest => TypedResults.Problem(
+            CompetitionQuestionFailure.InvalidRequest => ApiProblems.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
-                title: "Competition question status is invalid.",
+                title: ApiMessages.Get(ApiMessageId.ChangeCompetitionQuestionStatusTitleCompetitionQuestionStatusInvalid),
                 extensions: new Dictionary<string, object?>
                 {
                     ["code"] = CompetitionQuestionFailureMapper.ToCode(result.Failure.Value)

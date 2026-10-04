@@ -1,8 +1,10 @@
+import { message as describeMessage } from '../../utils/i18n'
+import type { UiMessage } from '../../utils/i18n'
 import { proxyRefs } from 'vue'
 import { toRefs } from 'vue'
 
 import { Lightbulb, LockKeyhole } from '@lucide/vue'
-import { toast } from 'vue-sonner'
+import { toast } from '../../utils/message-toast'
 import { getChallengeEndpoint, getGameplayFactStatusEndpoint, unlockChallengeHintEndpoint } from '../../api'
 import type { NoCtfapiEndpointsChallengesParticipantChallengeHintResponse } from '../../api'
 import { affectsChallengeHints, hintUnlockState, readableHintContent } from '../../lib/challenge-hints'
@@ -26,9 +28,9 @@ emit: { (event: "unlocked", ...args: []): void }) {
 
   const refreshing = ref(false)
 
-  const refreshError = ref<string | null>(null)
+  const refreshError = ref<UiMessage | null>(null)
 
-  const unlockError = ref<string | null>(null)
+  const unlockError = ref<UiMessage | null>(null)
 
   const confirmingId = ref<string | null>(null)
 
@@ -52,12 +54,12 @@ emit: { (event: "unlocked", ...args: []): void }) {
         path: { competitionId: props.competitionId, competitionChallengeId: props.competitionChallengeId },
       })
       if (!requestGuard.isCurrent(request)) return
-      if (error || !data) throw parseApiError(error, translate("ui.failedToRefreshHints"))
+      if (error || !data) throw parseApiError(error, describeMessage("challenges.error.hintsFailed"))
       hints.value = data.hints ?? []
       refreshError.value = null
     }
     catch (error) {
-      if (requestGuard.isCurrent(request)) refreshError.value = parseApiError(error, translate("ui.failedToRefreshHints")).message
+      if (requestGuard.isCurrent(request)) refreshError.value = parseApiError(error, describeMessage("challenges.error.hintsFailed")).displayMessage
     }
     finally {
       if (requestGuard.isCurrent(request)) refreshing.value = false
@@ -73,20 +75,20 @@ emit: { (event: "unlocked", ...args: []): void }) {
       path: { competitionId: props.competitionId, gameplayFactId: id },
     })
     if (disposed || id !== pendingFactId.value) return true
-    if (error || !data) throw parseApiError(error, translate("ui.failedToRefreshHintUnlockStatus"))
+    if (error || !data) throw parseApiError(error, describeMessage("challenges.challengeHints.error.hintUnlockStatusFailed"))
     const state = hintUnlockState(data)
     if (state === 'pending') return false
     pendingFactId.value = null
     if (state === 'unlocked') {
       await refreshHints()
       if (disposed) return true
-      toast.success(translate("ui.hintUnlocked"))
+      toast.success(describeMessage("challenges.label.hintUnlocked"))
       emit('unlocked')
     }
     else {
       unlockError.value = data.failureCode
         ? gameplayFactFailureCodeLabel(data.failureCode)
-        : translate("ui.failedToUnlockHint")
+        : translate("challenges.error.unlockHintFailed")
     }
     return true
   }
@@ -102,13 +104,13 @@ emit: { (event: "unlocked", ...args: []): void }) {
         path: { competitionId: props.competitionId, competitionChallengeId: props.competitionChallengeId, hintId: hint.id },
       })
       if (disposed) return
-      if (error || !data?.gameplayFactId) throw parseApiError(error, translate("ui.failedToUnlockHint"))
+      if (error || !data?.gameplayFactId) throw parseApiError(error, describeMessage("challenges.error.unlockHintFailed"))
       confirmingId.value = null
       pendingFactId.value = data.gameplayFactId
       start()
     }
     catch (error) {
-      if (!disposed) unlockError.value = parseApiError(error, translate("ui.failedToUnlockHint")).message
+      if (!disposed) unlockError.value = parseApiError(error, describeMessage("challenges.error.unlockHintFailed")).displayMessage
     }
     finally {
       if (!disposed) submitting.value = false

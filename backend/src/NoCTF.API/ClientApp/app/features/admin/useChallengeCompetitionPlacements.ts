@@ -1,10 +1,11 @@
+import { message as describeMessage } from '../../utils/i18n'
+import type { UiMessage } from '../../utils/i18n'
 import { computed, onBeforeUnmount, onMounted, ref, toRefs, watch } from 'vue'
 import { ArrowUpRight, ChevronLeft, ChevronRight, Plus, RefreshCw } from '@lucide/vue'
-import { toast } from 'vue-sonner'
+import { toast } from '../../utils/message-toast'
 import { adminCreateCompetitionChallenge, adminListCompetitionChallenges, adminListCompetitions, competitionPosterGet } from '../../api'
 import type { NoCtfapiEndpointsCompetitionsGameModeProtocol } from '../../api'
 import type { ContentSwapPreset } from '../../motion/useContentSwap'
-import { translate } from '../../utils/i18n'
 import { parseApiError } from '../../utils/api-error'
 import { competitionChallengeConflictMessage } from '../../lib/competition-challenge-conflict'
 import { availablePlacementCompetitions, placementManagementPath, projectChallengePlacements, writablePlacementCompetitions } from './challenge-competition-placements'
@@ -14,7 +15,7 @@ export function useChallengeCompetitionPlacements(props: Readonly<{ challengeId:
   const { user } = useAuth()
   const items = ref<ChallengeCompetitionPlacement[]>([])
   const loading = ref(true)
-  const error = ref<string | null>(null)
+  const error = ref<UiMessage | null>(null)
   const adding = ref(false)
   const targetId = ref('')
   const protectedPosters = ref<Record<string, string>>({})
@@ -88,10 +89,10 @@ export function useChallengeCompetitionPlacements(props: Readonly<{ challengeId:
       clearProtectedPosters()
       protectedPosters.value = Object.fromEntries([...posterBlobs].map(([id, blob]) => [id, URL.createObjectURL(blob)]))
       items.value = results.sort((a, b) => (a.competition.title ?? '').localeCompare(b.competition.title ?? ''))
-      if (failures.length) error.value = translate('placements.partialFailure', { competitions: failures.join('、') })
+      if (failures.length) error.value = describeMessage('placements.partialFailure', { competitions: failures.join('、') })
       if (!candidates.value.some(item => item.competition.id === targetId.value)) targetId.value = candidates.value[0]?.competition.id ?? ''
     } catch (failure) {
-      if (!signal.aborted && request === generation) error.value = parseApiError(failure, translate('placements.loadFailed')).message
+      if (!signal.aborted && request === generation) error.value = parseApiError(failure, describeMessage('placements.loadFailed')).displayMessage
     } finally {
       if (!signal.aborted && request === generation) loading.value = false
     }
@@ -110,14 +111,14 @@ export function useChallengeCompetitionPlacements(props: Readonly<{ challengeId:
       })
       if (disposed || actorId !== user.value?.userId) return
       if (failure) {
-        error.value = competitionChallengeConflictMessage(failure) ?? parseApiError(failure).message
+        error.value = competitionChallengeConflictMessage(failure) ?? parseApiError(failure).displayMessage
         return
       }
       targetId.value = ''
-      toast.success(translate('placements.added', { competition: target.competition.title ?? '' }))
+      toast.success(describeMessage('placements.added', { competition: target.competition.title ?? '' }))
       await load()
     } catch (failure) {
-      if (!disposed && actorId === user.value?.userId) error.value = parseApiError(failure, translate('placements.addFailed')).message
+      if (!disposed && actorId === user.value?.userId) error.value = parseApiError(failure, describeMessage('placements.addFailed')).displayMessage
     } finally { adding.value = false }
   }
   watch(() => [user.value?.userId, props.challengeId, props.mode], () => {

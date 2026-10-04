@@ -35,10 +35,10 @@ internal static class CapWorkloadConfigurationHttpMapping
         configuration.ExpectedHashAttempts);
 
     public static ProblemHttpResult ToProblem(
-        CapWorkloadConfigurationError error) => TypedResults.Problem(
+        CapWorkloadConfigurationError error) => ApiProblems.Problem(
         statusCode: Status(error),
-        title: "CAP workload configuration is unavailable.",
-        detail: Detail(error),
+        title: ApiMessages.Get(ApiMessageId.GetCapWorkloadConfigurationTitleCapWorkloadConfigurationUnavailable),
+        detail: ApiMessages.For(ToProtocol(error)),
         extensions: new Dictionary<string, object?>
         {
             ["code"] = ToProtocol(error)

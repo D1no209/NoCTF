@@ -118,10 +118,10 @@ describe('safe challenge Markdown', () => {
     const detail = await sourceFile(new URL('../app/features/challenges/CompetitionChallengeDetail.vue', import.meta.url)).text()
     expect(hints).toContain('<MarkdownQuote v-if="readableHintContent(hint) !== null"')
     expect(detail).toContain('<MarkdownContent :source="challenge.description"')
-    expect(hints).not.toContain("$t('ui.free')")
+    expect(hints).not.toContain("$t('common.label.free')")
     expect(hints).toContain('v-if="hint.isUnlocked && (hint.cost ?? 0) > 0"')
     expect(hints).toContain('<Button v-else-if="!hint.isUnlocked"')
-    expect(hints).toContain("$t('ui.unlockHintPoints'")
+    expect(hints).toContain("$t('challenges.label.unlockHintPoints'")
   })
 
   test('competition and challenge editors share a live sanitized preview', async () => {

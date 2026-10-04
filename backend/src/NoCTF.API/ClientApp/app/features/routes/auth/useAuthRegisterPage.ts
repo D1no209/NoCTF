@@ -1,3 +1,5 @@
+import { message as describeMessage } from '../../../utils/i18n'
+import type { UiMessage } from '../../../utils/i18n'
 import { authenticationRequestEmailVerification, registerEndpoint } from '../../../api'
 import { useHumanVerification } from '~/features/security/useHumanVerification'
 import { useAuthThemeArtwork } from './useAuthThemeArtwork'
@@ -12,7 +14,7 @@ export function useAuthRegisterPage() {
   const email = ref('')
   const password = ref('')
   const confirmPassword = ref('')
-  const error = ref<string | null>(null)
+  const error = ref<UiMessage | null>(null)
   const pending = ref(false)
   const registered = ref<{
     requiresEmailVerification?: boolean
@@ -20,7 +22,7 @@ export function useAuthRegisterPage() {
   } | null>(null)
   const resendPending = ref(false)
   const resendDone = ref(false)
-  const resendError = ref<string | null>(null)
+  const resendError = ref<UiMessage | null>(null)
   const loginTarget = computed(() => {
     const candidate = route.query.redirect
     const redirect = typeof candidate === 'string'
@@ -36,7 +38,7 @@ export function useAuthRegisterPage() {
   async function submit() {
     error.value = null
     if (password.value !== confirmPassword.value) {
-      error.value = translate('ui.thePasswordsEnteredTwiceAreInconsistent')
+      error.value = describeMessage('common.authRegister.description.passwordsEnteredTwiceInconsistent')
       return
     }
     pending.value = true
@@ -53,7 +55,7 @@ export function useAuthRegisterPage() {
       registered.value = data ?? {}
     }
     catch (requestError) {
-      error.value = parseApiError(requestError).message
+      error.value = parseApiError(requestError).displayMessage
     }
     finally {
       pending.value = false
@@ -71,7 +73,7 @@ export function useAuthRegisterPage() {
       resendDone.value = true
     }
     catch (requestError) {
-      resendError.value = parseApiError(requestError).message
+      resendError.value = parseApiError(requestError).displayMessage
     }
     finally {
       resendPending.value = false

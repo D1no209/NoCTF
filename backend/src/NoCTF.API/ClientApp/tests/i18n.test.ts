@@ -27,15 +27,15 @@ describe('platform locale', () => {
 
   test('uses source Chinese in the default locale and English resources after switching', () => {
     setLocale('zh-CN')
-    expect(translate('ui.competitionAdmin')).toBe('竞赛管理')
+    expect(translate('navigation.competitionAdmin')).toBe('竞赛管理')
 
     setLocale('en')
-    expect(translate('ui.competitionAdmin')).toBe('Competition Admin')
+    expect(translate('navigation.competitionAdmin')).toBe('Competition Admin')
   })
 
   test('keeps user data intact while interpolating localized text', () => {
     setLocale('en')
-    expect(translate('ui.teamHasBeenBanned2', { team: 'AAA' }))
+    expect(translate('teams.status.bannedWithName', { team: 'AAA' }))
       .toBe('Team “AAA” has been banned')
   })
 
@@ -49,7 +49,7 @@ describe('platform locale', () => {
   test('reactively updates translated consumers in place', () => {
     setLocale('zh-CN')
     const rendered: string[] = []
-    const runner = effect(() => rendered.push(translate('ui.competitionAdmin')))
+    const runner = effect(() => rendered.push(translate('navigation.competitionAdmin')))
 
     setLocale('en')
 
@@ -139,8 +139,8 @@ describe('locale switch placement', () => {
     ).text()
 
     expect(configInput).toContain('{{ $t(option.label) }}')
-    expect(questions).toContain("$t('ui.challenge2'")
-    expect(questions).toContain("$t('ui.challengeQuestion'")
+    expect(questions).toContain("$t('notifications.label.challenge'")
+    expect(questions).toContain("$t('notifications.label.challengeQuestion'")
     expect(questions).not.toContain('`题目 · ${')
     expect(questions).not.toContain('`题目咨询 · ${')
     expect(scoreTrend).toContain('props.title, locale.value')
@@ -151,8 +151,8 @@ describe('locale switch placement', () => {
     const select = await Bun.file(new URL('../app/components/ui/select/Select.vue', import.meta.url)).text()
     const toggle = await Bun.file(new URL('../app/components/ui/switch/Switch.vue', import.meta.url)).text()
 
-    expect(logs).toContain('Warning: "ui.warning"')
-    expect(logs).toContain('Worker: "ui.worker"')
+    expect(logs).toContain('Warning: "common.label.warning"')
+    expect(logs).toContain('Worker: "administration.label.worker"')
     expect(logs).not.toContain('Warning: translate(')
     expect(select).toContain(':key="localeKey"')
     expect(toggle).toContain(':key="localeKey"')

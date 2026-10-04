@@ -59,8 +59,8 @@ function harness(canJudge: boolean) {
     listTeamWriteUps: async ({ path }: { path: { competitionId: string } }) => { reads.push(path.competitionId); return { data: structuredClone(review) } },
     issueTeamWriteUpPreview: async ({ path }: { path: { teamId: string } }) => { previews.push(path.teamId); return { data: { previewUrl: `/preview/${path.teamId}` } } },
     adminCreateManualAdjustment: async (request: unknown) => { writes.push(request); return { data: { gameplayFactId: 'adjustment' } } },
-    translate: (key: string) => key,
-    parseApiError: () => ({ message: 'failed' }),
+    translate: (key: string) => key, describeMessage: (key: string) => ({ key }),
+    parseApiError: () => ({ displayMessage: 'failed' }),
     toast: { success: () => {}, error: () => {} },
   }
   const state = scope.run(() => reviewFactory(deps)({ management: true }))!

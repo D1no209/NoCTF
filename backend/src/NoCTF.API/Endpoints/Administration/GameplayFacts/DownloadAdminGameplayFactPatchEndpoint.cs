@@ -89,7 +89,7 @@ public sealed class DownloadAdminGameplayFactPatchEndpoint(AccessAdminPatch patc
                 AdminPatchFailure.AuditUnavailable => (StatusCodes.Status503ServiceUnavailable, "The Patch download audit could not be saved. No file was returned. Try again later."),
                 _ => throw new InvalidOperationException($"Unknown Patch access failure: {failure}.")
             };
-            return TypedResults.Problem(statusCode: status, title: "Patch download failed.", detail: detail,
+            return ApiProblems.Problem(statusCode: status, title: ApiMessages.Get(ApiMessageId.DownloadAdminGameplayFactPatchTitlePatchDownloadFailed), detail: ApiMessages.For(AdminPatchMapping.ToProtocol(failure)),
                 extensions: new Dictionary<string, object?> { ["code"] = AdminPatchMapping.ToProtocol(failure) });
         }
         return TypedResults.Stream(result.Content!, "application/octet-stream", SafeFileName(result.Metadata!.FileName, factId), enableRangeProcessing: false);

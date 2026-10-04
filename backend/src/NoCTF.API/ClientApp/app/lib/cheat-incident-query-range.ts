@@ -1,3 +1,4 @@
+import type { UiMessage } from '../utils/i18n'
 import { translate } from '../utils/i18n'
 
 const MaximumIncidentQueryRangeMilliseconds = 31 * 24 * 60 * 60 * 1000
@@ -9,7 +10,7 @@ export interface CheatIncidentQueryRange {
 
 export interface CheatIncidentQueryRangeResolution {
   range: CheatIncidentQueryRange | null
-  error: string | null
+  error: UiMessage | null
 }
 
 export function defaultCheatIncidentQueryRange(now = new Date()): CheatIncidentQueryRange {
@@ -34,20 +35,20 @@ export function resolveCheatIncidentQueryRange(
   if (hasFrom !== hasTo) {
     return {
       range: null,
-      error: translate("ui.pleaseFillInBothTheStartAndEndTimesOr"),
+      error: translate("common.cheatIncident.description.fillBothStartEnd"),
     }
   }
 
   const from = new Date(fromValue)
   const to = new Date(toValue)
   if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()))
-    return { range: null, error: translate("ui.pleaseEnterValidStartAndEndTimes") }
+    return { range: null, error: translate("common.cheatIncident.description.enterValidStartEnd") }
 
   if (from > to)
-    return { range: null, error: translate("ui.theStartTimeCannotBeLaterThanTheEndTime") }
+    return { range: null, error: translate("common.cheatIncident.validation.startTimeFormat") }
 
   if (to.getTime() - from.getTime() > MaximumIncidentQueryRangeMilliseconds)
-    return { range: null, error: translate("ui.theQueryTimeRangeCannotExceed31Days") }
+    return { range: null, error: translate("common.cheatIncident.validation.queryTimeLength") }
 
   return {
     range: { from: from.toISOString(), to: to.toISOString() },

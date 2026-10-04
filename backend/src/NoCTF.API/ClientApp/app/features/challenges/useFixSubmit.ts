@@ -1,6 +1,7 @@
+import { message as describeMessage } from '../../utils/i18n'
 import { toRefs } from 'vue'
 
-import { toast } from 'vue-sonner'
+import { toast } from '../../utils/message-toast'
 import { requestAwdpDefenseTargetEndpoint, requestPatchVerificationTargetEndpoint, uploadPatchEndpoint, uploadPatchVerificationEndpoint } from '../../api'
 import type { NoCtfapiEndpointsGameplayFactsAwdpDefenseProgressResponse, NoCtfapiEndpointsGameplayFactsAwdpDefenseTargetRequestFailureCodeProtocol, NoCtfapiEndpointsGameplayFactsPatchVerificationStateResponse, NoCtfapiEndpointsGameplayFactsPatchVerificationTargetFailureCodeProtocol, NoCtfapiEndpointsGameplayFactsPatchVerificationUploadFailureCode, NoCtfapiEndpointsGameplayFactsUploadPatchFailureCodeProtocol } from '../../api'
 import { useHumanVerification } from '~/features/security/useHumanVerification'
@@ -19,44 +20,44 @@ emit: { (event: "changed", ...args: []): void; (event: "accepted", ...args: []):
   const pendingAction = ref<'request' | 'upload' | null>(null)
 
   const requestFailureLabels: Record<NoCtfapiEndpointsGameplayFactsAwdpDefenseTargetRequestFailureCodeProtocol, string> = {
-    DefenseNotAvailable: "ui.thisCompetitionTeamOrChallengeDoesNotCurrentlyAllowA",
-    ActiveDefenseTargetExists: "ui.aOneShotDefenseVerificationEnvironmentAlreadyExistsCompleteIt",
-    DefenseAlreadySucceeded: "ui.fixHasAlreadySucceededFurtherFixAttemptsAreNotAccepted",
-    BreakRequired: "ui.thisChallengeRequiresAValidBreakBeforeDefenseVerificationCan",
-    FixAttemptsExhausted: "ui.thisChallengeSFixAttemptsAreExhausted",
-    InvalidRuntimeConfiguration: "ui.theOneShotDefenseVerificationEnvironmentIsMisconfiguredContactCompetition",
-    DefenseTargetConcurrency: "ui.theDefenseVerificationStateChangedRefreshAndTryAgain",
+    DefenseNotAvailable: "common.fixSubmit.description.competitionTeamChallengeCurrently",
+    ActiveDefenseTargetExists: "common.fixSubmit.description.oneShotDefenseVerification",
+    DefenseAlreadySucceeded: "common.fixSubmit.description.fixAlreadySucceededFurther",
+    BreakRequired: "common.fixSubmit.description.challengeRequiresValidBreak",
+    FixAttemptsExhausted: "common.fixSubmit.description.challengeSFixAttempts",
+    InvalidRuntimeConfiguration: "common.fixSubmit.description.oneShotDefenseVerification.useFixSubmit",
+    DefenseTargetConcurrency: "common.fixSubmit.description.defenseVerificationStateChanged",
   }
 
   const uploadFailureLabels: Record<NoCtfapiEndpointsGameplayFactsUploadPatchFailureCodeProtocol, string> = {
-    ArchiveStreamNotSeekable: "ui.theFixArchiveCannotBeValidatedSelectTheFileAgain",
-    ArchiveInvalid: "ui.theFixArchiveIsInvalidUploadAValidTarGz",
-    DefenseTargetNotReady: "ui.thisOneShotDefenseVerificationEnvironmentHasExpiredOrNo",
-    DefenseAlreadySucceeded: "ui.fixHasAlreadySucceededFurtherFixAttemptsAreNotAccepted",
-    FixAttemptsExhausted: "ui.thisChallengeSFixAttemptsAreExhausted",
-    DefenseTargetConsumed: "ui.thisOneShotDefenseVerificationEnvironmentAlreadyHasAFix",
+    ArchiveStreamNotSeekable: "common.fixSubmit.validation.fixArchiveFormat",
+    ArchiveInvalid: "common.fixSubmit.error.fixArchiveUploadInvalid",
+    DefenseTargetNotReady: "common.fixSubmit.description.oneShotDefenseVerification.verificationEnvironmentExpired",
+    DefenseAlreadySucceeded: "common.fixSubmit.description.fixAlreadySucceededFurther",
+    FixAttemptsExhausted: "common.fixSubmit.description.challengeSFixAttempts",
+    DefenseTargetConsumed: "common.fixSubmit.description.oneShotDefenseVerification.environmentAlreadyFix",
   }
 
   const patchRequestFailureLabels: Record<NoCtfapiEndpointsGameplayFactsPatchVerificationTargetFailureCodeProtocol, string> = {
-    PatchVerificationNotAvailable: 'ui.thisCompetitionTeamOrChallengeDoesNotCurrentlyAllowA',
-    ExperimentalFeatureDisabled: 'ui.patchVerificationIsDisabled',
-    ActiveTargetExists: 'ui.aOneShotDefenseVerificationEnvironmentAlreadyExistsCompleteIt',
-    PatchAlreadyVerified: 'ui.fixHasAlreadySucceededFurtherFixAttemptsAreNotAccepted',
-    PatchAttemptsExhausted: 'ui.thisChallengeSFixAttemptsAreExhausted',
-    RuntimeQuotaExceeded: 'ui.teamRuntimeQuotaReached',
-    InvalidRuntimeConfiguration: 'ui.theOneShotDefenseVerificationEnvironmentIsMisconfiguredContactCompetition',
-    TargetConcurrency: 'ui.theDefenseVerificationStateChangedRefreshAndTryAgain',
+    PatchVerificationNotAvailable: 'common.fixSubmit.description.competitionTeamChallengeCurrently',
+    ExperimentalFeatureDisabled: 'common.label.patchVerificationDisabled',
+    ActiveTargetExists: 'common.fixSubmit.description.oneShotDefenseVerification',
+    PatchAlreadyVerified: 'common.fixSubmit.description.fixAlreadySucceededFurther',
+    PatchAttemptsExhausted: 'common.fixSubmit.description.challengeSFixAttempts',
+    RuntimeQuotaExceeded: 'common.label.teamRuntimeQuotaReached',
+    InvalidRuntimeConfiguration: 'common.fixSubmit.description.oneShotDefenseVerification.useFixSubmit',
+    TargetConcurrency: 'common.fixSubmit.description.defenseVerificationStateChanged',
   }
 
   const patchUploadFailureLabels: Record<NoCtfapiEndpointsGameplayFactsPatchVerificationUploadFailureCode, string> = {
-    ArchiveStreamNotSeekable: 'ui.theFixArchiveCannotBeValidatedSelectTheFileAgain',
-    ArchiveTooLarge: 'ui.patchArchiveTooLarge',
-    ArchiveInvalid: 'ui.theFixArchiveIsInvalidUploadAValidTarGz',
-    TargetNotReady: 'ui.thisOneShotDefenseVerificationEnvironmentHasExpiredOrNo',
-    PatchAlreadyVerified: 'ui.fixHasAlreadySucceededFurtherFixAttemptsAreNotAccepted',
-    AttemptsExhausted: 'ui.thisChallengeSFixAttemptsAreExhausted',
-    TargetConsumed: 'ui.thisOneShotDefenseVerificationEnvironmentAlreadyHasAFix',
-    UploadConflict: 'ui.theDefenseVerificationStateChangedRefreshAndTryAgain',
+    ArchiveStreamNotSeekable: 'common.fixSubmit.validation.fixArchiveFormat',
+    ArchiveTooLarge: 'common.label.patchArchiveTooLarge',
+    ArchiveInvalid: 'common.fixSubmit.error.fixArchiveUploadInvalid',
+    TargetNotReady: 'common.fixSubmit.description.oneShotDefenseVerification.verificationEnvironmentExpired',
+    PatchAlreadyVerified: 'common.fixSubmit.description.fixAlreadySucceededFurther',
+    AttemptsExhausted: 'common.fixSubmit.description.challengeSFixAttempts',
+    TargetConsumed: 'common.fixSubmit.description.oneShotDefenseVerification.environmentAlreadyFix',
+    UploadConflict: 'common.fixSubmit.description.defenseVerificationStateChanged',
   }
 
   const verificationState = computed(() => props.ctfPatchVerification
@@ -140,11 +141,11 @@ emit: { (event: "changed", ...args: []): void; (event: "accepted", ...args: []):
         const label = props.ctfPatchVerification
           ? patchRequestFailureLabels[code as NoCtfapiEndpointsGameplayFactsPatchVerificationTargetFailureCodeProtocol]
           : requestFailureLabels[code as NoCtfapiEndpointsGameplayFactsAwdpDefenseTargetRequestFailureCodeProtocol]
-        toast.error(label ? translate(label) : parseApiError(error, translate("ui.failedToRequestTheDefenseVerificationEnvironment")).message)
+        toast.error(label ? translate(label) : parseApiError(error, describeMessage("challenges.fixSubmit.error.defenseVerificationEnvironmentFailed")).displayMessage)
         return
       }
       targetCommandAttempt.completed()
-      toast.success(translate("ui.aOneShotDefenseVerificationEnvironmentWasRequestedAClean"))
+      toast.success(describeMessage("challenges.fixSubmit.description.oneShotDefenseVerification"))
       emit('changed')
     }
     finally {
@@ -180,12 +181,12 @@ emit: { (event: "changed", ...args: []): void; (event: "accepted", ...args: []):
         const label = props.ctfPatchVerification
           ? patchUploadFailureLabels[code as NoCtfapiEndpointsGameplayFactsPatchVerificationUploadFailureCode]
           : uploadFailureLabels[code as NoCtfapiEndpointsGameplayFactsUploadPatchFailureCodeProtocol]
-        toast.error(label ? translate(label) : parseApiError(error, translate("ui.fixUploadFailed")).message)
+        toast.error(label ? translate(label) : parseApiError(error, describeMessage("challenges.error.fixUploadFailed")).displayMessage)
         return
       }
       patchCommandAttempt.completed()
       file.value = null
-      toast.success(translate("ui.theFixIsLockedOneShotVerificationWillStartAutomatically"))
+      toast.success(describeMessage("challenges.fixSubmit.description.fixLockedOneShot"))
       emit('accepted')
       emit('changed')
     }

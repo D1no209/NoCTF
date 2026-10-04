@@ -20,16 +20,16 @@ const { ShieldAlert, isHome, routePath, wallpaperActive, wallpaperStyle, isLogge
     <header class="pointer-events-none sticky top-0 z-40">
       <div data-slot="topbar-frame" class="mx-auto grid h-20 w-full max-w-[96rem] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 md:px-6">
         <div data-slot="topbar-capsule" data-position="left">
-          <NuxtLink to="/" class="flex min-w-0 items-center gap-2.5 font-mono text-base font-semibold tracking-tight" :aria-label="configuration?.name ?? $t('ui.noctf')">
-            <img v-if="configuration?.logoUrl" :src="configuration.logoUrl" :alt="configuration.name ?? $t('ui.noctf')" loading="eager" fetchpriority="high" decoding="async" class="size-8 shrink-0 rounded-full object-contain">
+          <NuxtLink to="/" class="flex min-w-0 items-center gap-2.5 font-mono text-base font-semibold tracking-tight" :aria-label="configuration?.name ?? $t('common.label.noctf')">
+            <img v-if="configuration?.logoUrl" :src="configuration.logoUrl" :alt="configuration.name ?? $t('common.label.noctf')" loading="eager" fetchpriority="high" decoding="async" class="size-8 shrink-0 rounded-full object-contain">
             <span v-else class="text-primary">&gt;</span>
-            <span data-slot="topbar-brand-name" class="hidden max-w-48 truncate sm:inline">{{ configuration?.name ?? $t('ui.noctf') }}</span>
+            <span data-slot="topbar-brand-name" class="hidden max-w-48 truncate sm:inline">{{ configuration?.name ?? $t('common.label.noctf') }}</span>
             <span v-if="!configuration?.logoUrl" class="animate-blink text-primary">_</span>
           </NuxtLink>
         </div>
 
         <div data-slot="topbar-capsule" data-position="center" class="min-w-0 justify-self-center">
-          <ScrollSurface as="nav" axis="x" class="scrollbar-none flex min-w-0 items-center gap-1 overflow-x-auto overflow-y-hidden" :aria-label="t('ui.mainNavigation')">
+          <ScrollSurface as="nav" axis="x" class="scrollbar-none flex min-w-0 items-center gap-1 overflow-x-auto overflow-y-hidden" :aria-label="t('common.label.mainNavigation')">
             <span
               v-for="item in navItems.filter((i) => i.show)"
               :key="item.to"
@@ -48,14 +48,14 @@ const { ShieldAlert, isHome, routePath, wallpaperActive, wallpaperStyle, isLogge
                 :data-active="isActive(item.to) || undefined"
                 :class="isActive(item.to) ? 'text-foreground font-medium after:absolute after:inset-x-2.5 after:bottom-1 after:h-0.5 after:rounded-full after:bg-primary' : 'text-muted-foreground'"
               >
-                <NuxtLink :to="item.to" :aria-current="isActive(item.to) ? 'page' : undefined" :aria-label="item.unread ? t('ui.notificationsUnreadMessages') : item.label">
+                <NuxtLink :to="item.to" :aria-current="isActive(item.to) ? 'page' : undefined" :aria-label="item.unread ? t('common.label.notificationsUnreadMessages') : item.label">
                   <span data-top-nav-content>
                     <span data-top-nav-icon class="relative">
                       <component :is="item.icon" />
                       <span v-if="item.unread" class="absolute top-1 right-1 size-2.5 rounded-full bg-destructive" aria-hidden="true" />
                     </span>
                     <span data-top-nav-label>{{ item.label }}</span>
-                    <span v-if="item.unread" class="sr-only">{{ t('ui.unreadNotifications') }}</span>
+                    <span v-if="item.unread" class="sr-only">{{ t('common.label.unreadNotifications') }}</span>
                   </span>
                 </NuxtLink>
               </Button>
@@ -69,8 +69,8 @@ const { ShieldAlert, isHome, routePath, wallpaperActive, wallpaperStyle, isLogge
           <component :is="ThemeToggle" />
           <component v-if="isLoggedIn" :is="AccountPanel" />
           <template v-else>
-            <Button variant="ghost" as-child><NuxtLink to="/auth/login">{{ t('ui.signIn') }}</NuxtLink></Button>
-            <Button as-child><NuxtLink to="/auth/register">{{ t('ui.createAccount') }}</NuxtLink></Button>
+            <Button variant="ghost" as-child><NuxtLink to="/auth/login">{{ t('auth.login.action') }}</NuxtLink></Button>
+            <Button as-child><NuxtLink to="/auth/register">{{ t('common.label.createAccount') }}</NuxtLink></Button>
           </template>
         </div>
       </div>
@@ -88,7 +88,7 @@ const { ShieldAlert, isHome, routePath, wallpaperActive, wallpaperStyle, isLogge
           <span class="flex min-w-0 items-center gap-2">
             <component :is="ShieldAlert" class="size-4 shrink-0" aria-hidden="true" />
             <span class="min-w-0">
-              {{ t('ui.impersonatingUserUntil', {
+              {{ t('common.label.impersonatingUserUntil', {
                 user: impersonation.targetUserName,
                 expiresAt: impersonationExpiresAt,
               }) }}
@@ -96,7 +96,7 @@ const { ShieldAlert, isHome, routePath, wallpaperActive, wallpaperStyle, isLogge
           </span>
           <Button type="button" size="sm" variant="outline" :disabled="impersonationEnding" @click="endImpersonation">
             <Spinner v-if="impersonationEnding" data-icon="inline-start" />
-            {{ t('ui.exitImpersonation') }}
+            {{ t('common.label.exitImpersonation') }}
           </Button>
         </CardContent>
       </Card>
@@ -105,7 +105,7 @@ const { ShieldAlert, isHome, routePath, wallpaperActive, wallpaperStyle, isLogge
       <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
         <span>{{ $message(platformError) }}</span>
         <Button type="button" size="sm" variant="outline" :disabled="platformLoading" @click="ensureLoaded">
-          <Spinner v-if="platformLoading" data-icon="inline-start" />{{ t('ui.reload') }}
+          <Spinner v-if="platformLoading" data-icon="inline-start" />{{ t('common.label.reload') }}
         </Button>
       </AlertDescription>
     </Alert>

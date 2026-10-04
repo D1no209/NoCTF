@@ -49,7 +49,7 @@ describe('participant action page wiring', () => {
     expect(page).toContain('class="min-h-44"')
     expect(page).toContain(':disabled="createPending || createSubject === \'Challenge\' && (challengesLoading || Boolean(challengeLoadError))"')
     expect(page).toContain('@click="submitCreate"')
-    expect(page).toContain("ui.relatedQuestionsRequired")
+    expect(page).toContain("notifications.validation.relatedQuestionsRequired")
     expect(page).toContain('<Alert v-else-if="challengeLoadError" variant="destructive">')
     expect(page).toContain('@click="loadChallengeOptions"')
   })
@@ -77,7 +77,7 @@ describe('participant action page wiring', () => {
     expect(verification).toContain('authenticationRequestEmailVerification')
     expect(verification).toContain('v-model="email"')
     expect(verification).toContain("isLoggedIn.value")
-    expect(register).not.toContain("ui.theVerificationEmailHasBeenSentPleaseCheckYourEmail")
+    expect(register).not.toContain("common.description.verificationEmailSentCheck")
   })
 
   test('keeps password visibility toggles out of the sequential form focus order', async () => {
@@ -92,7 +92,7 @@ describe('participant action page wiring', () => {
     ].map(path => sourceFile(new URL(path, import.meta.url)).text()))
 
     expect(component).toContain(":type=\"visible ? 'text' : 'password'\"")
-    expect(component).toContain(":aria-label=\"$t(visible ? 'ui.hidePassword' : 'ui.showPassword')\"")
+    expect(component).toContain(":aria-label=\"$t(visible ? 'common.label.hidePassword' : 'common.label.showPassword')\"")
     expect(component).toContain(':aria-pressed="visible"')
     expect(component).toContain('tabindex="-1"')
     expect(pages.every(page => page.includes('<PasswordInput'))).toBe(true)

@@ -1,5 +1,7 @@
+import { message as describeMessage } from '../../../../../utils/i18n'
+import type { UiMessage } from '../../../../../utils/i18n'
 import type { Connection, Edge, Node } from '@vue-flow/core'
-import { toast } from 'vue-sonner'
+import { toast } from '../../../../../utils/message-toast'
 import {
   adminCreateCompetitionBadge,
   adminDeleteCompetitionBadge,
@@ -55,7 +57,7 @@ export function useAdminCompetitionsByIdProgressionPage() {
   const loading = ref(true)
   const saving = ref(false)
   const badgeSaving = ref(false)
-  const error = ref<string | null>(null)
+  const error = ref<UiMessage | null>(null)
   const newBadgeName = ref('')
   const newBadgeDescription = ref('')
   const newBadgeImage = ref<File | null>(null)
@@ -122,7 +124,7 @@ export function useAdminCompetitionsByIdProgressionPage() {
     ])
     if (!graphResult.data || !badgeResult.data || !challengeResult.data) {
       loading.value = false
-      error.value = translate('progression.loadFailed')
+      error.value = describeMessage('progression.loadFailed')
       return
     }
     badges.value = badgeResult.data.items ?? []
@@ -134,7 +136,7 @@ export function useAdminCompetitionsByIdProgressionPage() {
       || graph.edges?.some(edge => !edge.id || !edge.sourceNodeId || !edge.targetNodeId
         || (edge.condition !== 0 && edge.condition !== 1))) {
       loading.value = false
-      error.value = translate('progression.loadFailed')
+      error.value = describeMessage('progression.loadFailed')
       return
     }
     enabled.value = graph.enabled ?? false
@@ -186,7 +188,7 @@ export function useAdminCompetitionsByIdProgressionPage() {
       layoutRevision.value++
     }
     catch {
-      toast.error(translate('progression.layoutFailed'))
+      toast.error(describeMessage('progression.layoutFailed'))
     }
   }
 
@@ -227,7 +229,7 @@ export function useAdminCompetitionsByIdProgressionPage() {
     const source = connection.source
     const target = connection.target
     if (!canConnectProgression(edges.value, source, target)) {
-      toast.error(translate('progression.invalidConnection'))
+      toast.error(describeMessage('progression.invalidConnection'))
       return
     }
     const edge: GateEdge = {
@@ -303,7 +305,7 @@ export function useAdminCompetitionsByIdProgressionPage() {
     const targets = [...currentBatch.targets].sort()
     const issue = progressionBatchIssue(edges.value, currentBatch.sourceId, targets)
     if (issue) {
-      toast.error(translate(`progression.connectionIssue.${issue}`))
+      toast.error(describeMessage(`progression.connectionIssue.${issue}`))
       return
     }
     const next: GateEdge[] = targets.map(target => ({
@@ -342,12 +344,12 @@ export function useAdminCompetitionsByIdProgressionPage() {
     })
     saving.value = false
     if (!data || saveError) {
-      error.value = parseApiError(saveError, translate('progression.saveFailed')).message
+      error.value = parseApiError(saveError, describeMessage('progression.saveFailed')).displayMessage
       return
     }
     stamp.value = data.concurrencyStamp ?? null
     error.value = null
-    toast.success(translate('progression.saved'))
+    toast.success(describeMessage('progression.saved'))
   }
 
   function onBadgeFileChange(event: Event) {
@@ -379,7 +381,7 @@ export function useAdminCompetitionsByIdProgressionPage() {
     })
     badgeSaving.value = false
     if (!data || updateError) {
-      error.value = parseApiError(updateError, translate('progression.badgeUpdateFailed')).message
+      error.value = parseApiError(updateError, describeMessage('progression.badgeUpdateFailed')).displayMessage
       return
     }
     badges.value = badges.value.map(badge => badge.id === data.id ? data : badge)
@@ -388,7 +390,7 @@ export function useAdminCompetitionsByIdProgressionPage() {
       : node)
     editingBadgeId.value = null
     editBadgeImage.value = null
-    toast.success(translate('progression.badgeUpdated'))
+    toast.success(describeMessage('progression.badgeUpdated'))
   }
 
   async function createBadge() {
@@ -404,7 +406,7 @@ export function useAdminCompetitionsByIdProgressionPage() {
     })
     badgeSaving.value = false
     if (!data || createError) {
-      error.value = parseApiError(createError, translate('progression.badgeCreateFailed')).message
+      error.value = parseApiError(createError, describeMessage('progression.badgeCreateFailed')).displayMessage
       return
     }
     badges.value.push(data)
@@ -412,19 +414,19 @@ export function useAdminCompetitionsByIdProgressionPage() {
     newBadgeDescription.value = ''
     newBadgeImage.value = null
     newBadgeUploadKey.value++
-    toast.success(translate('progression.badgeCreated'))
+    toast.success(describeMessage('progression.badgeCreated'))
   }
 
   async function deleteBadge(badgeId: string) {
     if (!canWrite.value || nodes.value.some(node => node.data?.kind === 1 && node.data.resourceId === badgeId)) {
-      toast.error(translate('progression.badgeInUse'))
+      toast.error(describeMessage('progression.badgeInUse'))
       return
     }
     const { error: deleteError } = await adminDeleteCompetitionBadge({
       path: { competitionId, badgeId },
     })
     if (deleteError) {
-      error.value = parseApiError(deleteError, translate('progression.badgeDeleteFailed')).message
+      error.value = parseApiError(deleteError, describeMessage('progression.badgeDeleteFailed')).displayMessage
       return
     }
     badges.value = badges.value.filter(badge => badge.id !== badgeId)

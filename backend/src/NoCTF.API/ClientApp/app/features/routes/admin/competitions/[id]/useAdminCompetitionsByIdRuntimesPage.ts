@@ -1,10 +1,11 @@
+import { message as describeMessage } from '../../../../../utils/i18n'
 import { proxyRefs } from 'vue'
 import { useAdminDetailRoute } from '~/features/admin/useAdminDetailRoute'
 import { adminRuntimeTeamPath, adminRuntimeChallengePath } from '~/features/admin/admin-navigation'
 import RuntimeFlagsPanelComponent from '~/features/admin/RuntimeFlagsPanel.vue'
 import { markRaw } from 'vue'
 
-import { toast } from 'vue-sonner'
+import { toast } from '../../../../../utils/message-toast'
 import { adminCreateRuntimeForceTermination, adminCreateSharedRuntime, adminCreateTeamRuntime, adminExtendTeamRuntime, adminGetRuntime, adminListCompetitionChallenges, adminListRuntimes, adminListTeams, adminTerminateRuntime } from '../../../../../api'
 import type { NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse, NoCtfapiEndpointsRuntimeRuntimeKindProtocol, NoCtfapiEndpointsRuntimeRuntimeStateProtocol } from '../../../../../api'
 import { useOffsetPagination } from '../../../../../composables/useOffsetPagination'
@@ -172,7 +173,7 @@ export function useAdminCompetitionsByIdRuntimesPage() {
       return done(data.state)
     }).then((result) => {
       if (result === 'exhausted')
-        opMessage.value = translate("ui.theRequestWasAcceptedStatusUpdatesAreTakingLongerThan")
+        opMessage.value = translate("runtime.competitionsBy.description.wasAcceptedStatusUpdates")
     }).finally(() => {
       runtimeOperations.finish(token)
     })
@@ -194,8 +195,8 @@ export function useAdminCompetitionsByIdRuntimesPage() {
         : await adminCreateSharedRuntime({ path: ccPath, body })
       if (!runtimeOperations.isActive(token)) return
       if (error) throw error
-      const label = op === 'start' ? translate("ui.start") : translate("ui.reset")
-      toast.success(translate("ui.requestAccepted", { action: label }))
+      const label = op === 'start' ? translate("runtime.label.start") : translate("runtime.label.reset")
+      toast.success(describeMessage("runtime.label.accepted", { action: label }))
       void refreshList()
       refreshRuntimeInBackground(token, data?.runtimeInstanceId ?? rt.id, state =>
         op === 'reset' ? state === 'Stopped' : state === 'Running' || state === 'Failed')
@@ -203,7 +204,7 @@ export function useAdminCompetitionsByIdRuntimesPage() {
     catch (e) {
       const shouldNotify = runtimeOperations.isActive(token)
       runtimeOperations.finish(token)
-      if (shouldNotify) toast.error(parseApiError(e).message)
+      if (shouldNotify) toast.error(parseApiError(e).displayMessage)
     }
   }
 
@@ -230,7 +231,7 @@ export function useAdminCompetitionsByIdRuntimesPage() {
       if (!runtimeOperations.isActive(token)) return
       if (error) throw error
       markRuntimeStopping(rt.id)
-      toast.success(translate("ui.instanceTerminationOperationHasBeenAccepted"))
+      toast.success(describeMessage("runtime.platformRuntimes.description.instanceTerminationAccepted"))
       terminateDialog.value = null
       void refreshList()
       refreshRuntimeInBackground(token, data?.runtimeInstanceId ?? rt.id, state => state === 'Stopped' || state === 'Failed')
@@ -238,7 +239,7 @@ export function useAdminCompetitionsByIdRuntimesPage() {
     catch (e) {
       const shouldNotify = runtimeOperations.isActive(token)
       runtimeOperations.finish(token)
-      if (shouldNotify) toast.error(parseApiError(e).message)
+      if (shouldNotify) toast.error(parseApiError(e).displayMessage)
     }
   }
 
@@ -272,7 +273,7 @@ export function useAdminCompetitionsByIdRuntimesPage() {
       if (!runtimeOperations.isActive(token)) return
       if (error) throw error
       markRuntimeStopping(rt.id)
-      toast.success(translate("ui.forcedFinalizationHasBeenHandedOverToRunnerForCleanup"))
+      toast.success(describeMessage("runtime.platformRuntimes.description.forcedFinalizationHandedOver"))
       forceTerminateDialog.value = null
       void refreshList()
       refreshRuntimeInBackground(token, data?.runtimeInstanceId ?? rt.id, state => state === 'Stopped')
@@ -280,7 +281,7 @@ export function useAdminCompetitionsByIdRuntimesPage() {
     catch (e) {
       const shouldNotify = runtimeOperations.isActive(token)
       runtimeOperations.finish(token)
-      if (shouldNotify) toast.error(parseApiError(e).message)
+      if (shouldNotify) toast.error(parseApiError(e).displayMessage)
     }
   }
 
@@ -299,9 +300,9 @@ export function useAdminCompetitionsByIdRuntimesPage() {
 
   function renewalHint(rt: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse): string | null {
     if (isRuntimeExtensionTooEarly(rt.expiresAt, now.value))
-      return translate('ui.renewalAvailableInFinalTenMinutes')
+      return translate('runtime.extend.tooEarly')
     return !isRuntimeExtensionWindowOpen(rt.expiresAt, now.value)
-      ? translate('ui.expired') : null
+      ? translate('runtime.label.expired') : null
   }
 
   const extendPending = computed(() => isRuntimeOperationPending(extendDialog.value, 'extend'))
@@ -310,11 +311,11 @@ export function useAdminCompetitionsByIdRuntimesPage() {
     const rt = extendDialog.value
     if (!rt?.id || !rt.teamId || !rt.competitionChallengeId) return
     if (!canExtendRuntime(rt)) {
-      toast.error(renewalHint(rt) ?? translate('ui.renewalFailed'))
+      toast.error(renewalHint(rt) ?? translate('runtime.error.renewalFailed'))
       return
     }
     if (!Number.isInteger(extendSeconds.value) || extendSeconds.value < 60) {
-      toast.error(translate('ui.renewalFailed'))
+      toast.error(describeMessage('runtime.error.renewalFailed'))
       return
     }
     const token = beginRuntimeOperation(rt, 'extend')
@@ -335,7 +336,7 @@ export function useAdminCompetitionsByIdRuntimesPage() {
       })
       if (!runtimeOperations.isActive(token)) return
       if (error) throw error
-      toast.success(translate("ui.renewalOperationHasBeenAccepted"))
+      toast.success(describeMessage("runtime.competitionsBy.label.renewalAccepted"))
       extendDialog.value = null
       void refreshList()
       refreshRuntimeInBackground(token, rt.id, () => true)
@@ -343,7 +344,7 @@ export function useAdminCompetitionsByIdRuntimesPage() {
     catch (e) {
       const shouldNotify = runtimeOperations.isActive(token)
       runtimeOperations.finish(token)
-      if (shouldNotify) toast.error(parseApiError(e).message)
+      if (shouldNotify) toast.error(parseApiError(e).displayMessage)
     }
   }
 

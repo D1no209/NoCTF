@@ -103,12 +103,12 @@ internal static class ChallengeTestRuntimeMutationEndpoint
                 NoCTF.Application.Observability.NoCtfTelemetry
                     .RecordRuntimeMutationFailure(MetricOperation(action), result.Failure.Value);
             }
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: result.Failure == RuntimeMutationFailure.CapacityExceeded
                     ? StatusCodes.Status503ServiceUnavailable
                     : StatusCodes.Status409Conflict,
-                title: "Challenge test Runtime operation was rejected.",
-                detail: result.Failure.ToString());
+                title: ApiMessages.Get(ApiMessageId.CreateChallengeTestRuntimeTitleChallengeTestRuntimeWas),
+                detail: ApiMessages.For(result.Failure));
         }
         var statusUrl = $"/api/v1/admin/challenges/{challengeId}/test-runtimes/current";
         return TypedResults.Accepted(

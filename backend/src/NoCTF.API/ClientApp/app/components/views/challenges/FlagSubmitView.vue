@@ -17,7 +17,7 @@ const { PartyPopper, input, submitting, celebrating, persistentResult, solved, c
         aria-live="polite"
         class="flag-celebration-layer"
       >
-        <span class="sr-only">{{ $t('ui.flagCorrect') }}</span>
+        <span class="sr-only">{{ $t('challenges.label.flagCorrect') }}</span>
         <span aria-hidden="true" class="flag-celebration-burst">
           <span
             v-for="particle in celebrationParticles"
@@ -38,21 +38,21 @@ const { PartyPopper, input, submitting, celebrating, persistentResult, solved, c
     </Transition>
     <h3 id="flag-submit-title" class="sr-only">{{ title }}</h3>
     <p v-if="description" class="text-xs text-muted-foreground">{{ description }}</p>
-    <p v-else-if="practice" class="text-xs text-muted-foreground">{{ $t('ui.practiceModeOnlyChecksWhetherAFlagIsCorrectIt') }}</p>
+    <p v-else-if="practice" class="text-xs text-muted-foreground">{{ $t('challenges.flagSubmit.description.practiceModeChecksWhether') }}</p>
     <div>
       <Alert v-if="persistentResult?.correct === true" class="mb-4" role="status">
         <PartyPopper class="size-5 shrink-0 text-primary" aria-hidden="true" />
-        <AlertTitle>{{ $t('ui.flagCorrect') }}</AlertTitle>
+        <AlertTitle>{{ $t('challenges.label.flagCorrect') }}</AlertTitle>
         <AlertDescription>{{ $message(persistentResult.message) }}</AlertDescription>
       </Alert>
-      <TerminalCommand :id="`flag-input-${competitionChallengeId}`" v-model="input" :label="multiple ? $t('ui.flagListOnePerLine') : $t('ui.flag4')" :multiple="multiple" :pending="submitting" :disabled="inputDisabled" :placeholder="solved ? $t('terminal.challengeSolved') : $t('terminal.flagPlaceholder')" :hint="multiple ? $t('terminal.multipleHint') : $t('terminal.submitHint')" @submit="submit" />
+      <TerminalCommand :id="`flag-input-${competitionChallengeId}`" v-model="input" :label="multiple ? $t('challenges.flagSubmit.label.flagListOneLine') : $t('common.label.flag.flagSubmitView')" :multiple="multiple" :pending="submitting" :disabled="inputDisabled" :placeholder="solved ? $t('terminal.challengeSolved') : $t('terminal.flagPlaceholder')" :hint="multiple ? $t('terminal.multipleHint') : $t('terminal.submitHint')" @submit="submit" />
 
-      <Alert v-if="persistentResult && persistentResult.correct !== true" class="mt-4" variant="destructive" role="status"><AlertTitle>{{ persistentResult.correct === null ? $t('ui.noJudgementReceived') : $t('ui.latestJudgement') }}</AlertTitle><AlertDescription>{{ $message(persistentResult.message) }}</AlertDescription></Alert>
+      <Alert v-if="persistentResult && persistentResult.correct !== true" class="mt-4" variant="destructive" role="status"><AlertTitle>{{ persistentResult.correct === null ? $t('challenges.label.judgementReceived') : $t('challenges.label.latestJudgement') }}</AlertTitle><AlertDescription>{{ $message(persistentResult.message) }}</AlertDescription></Alert>
       <Alert v-if="timedOut" class="mt-4">
-        <AlertDescription>{{ $t('ui.theEvaluationIsTakingLongerThanExpectedContinueTrackingIt') }}</AlertDescription>
+        <AlertDescription>{{ $t('challenges.flagSubmit.description.evaluationTakingLongerExpected') }}</AlertDescription>
       </Alert>
       <Alert v-else-if="pollingErrorMessage" variant="destructive" class="mt-4">
-        <AlertDescription>{{ $t('ui.submissionStatusUpdateFailedAndWillRetryAutomatically', { reason: pollingErrorMessage }) }}</AlertDescription>
+        <AlertDescription>{{ $t('common.flagSubmit.error.submissionStatusUpdateFailed', { reason: pollingErrorMessage }) }}</AlertDescription>
       </Alert>
     </div>
   </section>

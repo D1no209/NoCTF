@@ -20,17 +20,17 @@ describe('historical adjudication difference preview', () => {
     expect(source).toContain('adjudicationClassificationLabel(difference.classification)')
     expect(source).toContain('adjudicationCompletenessLabel(item.evidenceCompleteness)')
     const previewTemplate = source.slice(
-      source.indexOf("$t('ui.historicalAdjudicationDifferencePreview')"),
-      source.indexOf('<Card>', source.indexOf("$t('ui.historicalAdjudicationDifferencePreview')") + 1),
+      source.indexOf("$t('administration.label.historicalAdjudicationDifferencePreview')"),
+      source.indexOf('<Card>', source.indexOf("$t('administration.label.historicalAdjudicationDifferencePreview')") + 1),
     )
     expect(previewTemplate).not.toContain('rejudge')
     expect(previewTemplate).not.toContain('纠正按钮')
   })
 
   test('describes current adjudication evidence accurately', () => {
-    expect(source).toContain("ui.thisPreviewAnalyzesCtfFlagFactsAndAwdpBreakFacts")
+    expect(source).toContain("administration.competitionsBy.description.previewAnalyzesCtfFlag")
     expect(source).not.toContain('CurrentDuplicateShouldBeCorrect')
-    expect(source).toContain('MissingAdjudicationRecord: "ui.theCurrentResultHasNoImmutableAdjudicationEvent"')
-    expect(source).toContain('TeamEligibilityHistoryRequiresReview: "ui.currentTeamEligibilityCannotProveBloodAwardEligibilityAtThe"')
+    expect(source).toContain('MissingAdjudicationRecord: "common.competitionsBy.description.resultImmutableAdjudicationEvent"')
+    expect(source).toContain('TeamEligibilityHistoryRequiresReview: "common.competitionsBy.validation.teamEligibilityFormat"')
   })
 })

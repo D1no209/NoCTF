@@ -1,3 +1,4 @@
+import { languageHeaders } from '../utils/i18n'
 import { refreshTokenEndpoint } from '../api'
 import { createClient } from '../api/client'
 import { accessTokenNeedsRefresh } from './auth-refresh'
@@ -114,7 +115,7 @@ function refreshSessionCore(): Promise<boolean> {
   const expectedRevision = sessionRevision
   const attempt = (async () => {
     try {
-      const refreshClient = createClient({ credentials: 'same-origin', fetch: globalThis.fetch })
+      const refreshClient = createClient({ credentials: 'same-origin', headers: languageHeaders(), fetch: globalThis.fetch })
       const { data, error } = await refreshTokenEndpoint({ client: refreshClient })
       if (sessionRevision !== expectedRevision || impersonationActive) return false
       if (error || !data?.accessToken) {

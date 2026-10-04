@@ -1,10 +1,12 @@
+import { message as describeMessage } from '../../utils/i18n'
+import type { UiMessage } from '../../utils/i18n'
 import { competitionPosterGet } from '../../api'
 
 /** Loads one competition's mutable poster without retaining stale browser responses. */
 export function useCompetitionPoster(competitionId: string) {
   const posterUrl = ref<string | null>(null)
   const posterLoading = ref(true)
-  const posterError = ref<string | null>(null)
+  const posterError = ref<UiMessage | null>(null)
   let generation = 0
 
   function clearPoster(): void {
@@ -44,7 +46,7 @@ export function useCompetitionPoster(competitionId: string) {
     }
     catch (error) {
       if (current === generation)
-        posterError.value = parseApiError(error, translate('ui.failedToLoadCompetitionPoster')).message
+        posterError.value = parseApiError(error, describeMessage('competitions.competitionPoster.error.loadCompetitionPosterFailed')).displayMessage
     }
     finally {
       if (current === generation) posterLoading.value = false

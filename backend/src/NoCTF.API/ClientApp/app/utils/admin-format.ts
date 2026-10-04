@@ -1,4 +1,4 @@
-import { toast } from 'vue-sonner'
+import { toast } from './message-toast'
 import type {
   NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol,
   NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentStatusProtocol,
@@ -26,37 +26,37 @@ export const GameModeLabel = {
 } satisfies Record<NoCtfapiEndpointsCompetitionsGameModeProtocol, string>
 
 export const CompetitionStatusLabel = {
-  Draft: "ui.draft", Visible: "ui.visible", Published: "ui.published", Running: "ui.running", Paused: "ui.suspended", Finished: "ui.finished",
+  Draft: "common.label.draft", Visible: "common.label.visible", Published: "administration.label.published", Running: "common.label.running", Paused: "common.label.suspended", Finished: "common.label.finished",
 } satisfies Record<NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol, string>
 
 export const TeamRegistrationStatusLabel = {
-  Pending: "ui.pendingApproval", Approved: "ui.passed", Rejected: "ui.rejected", Unregistered: "ui.notRegistered",
+  Pending: "common.label.pendingApproval", Approved: "common.label.passed", Rejected: "common.label.rejected", Unregistered: "common.label.registered",
 } satisfies Record<NoCtfapiEndpointsTeamsTeamRegistrationStatusProtocol, string>
 
 export const TeamBanSourceLabel = {
-  ManualModeration: "ui.manualBan", CheatIncident: "ui.cheatIncident",
+  ManualModeration: "common.label.manualBan", CheatIncident: "common.label.cheatIncident",
 } satisfies Record<NoCtfapiEndpointsTeamsTeamBanSourceProtocol, string>
 
 export const TeamBanAppealStatusLabel = {
-  Submitted: "ui.pendingDecision", Upheld: "ui.maintained", Accepted: "ui.accepted",
+  Submitted: "common.label.pendingDecision", Upheld: "common.label.maintained", Accepted: "common.label.accepted",
 } satisfies Record<NoCtfapiEndpointsTeamsTeamBanAppealStatusProtocol, string>
 
 export const GameplayFactKindLabel = {
-  FlagAttempt: 'Flag', BreakAttempt: 'Break', FixAttempt: 'Fix', HintUnlock: "ui.promptToUnlock",
-  ManualAdjustment: "ui.manualAdjustment", AwdServiceTransition: "ui.awdServiceStatus", KohControlObservation: "ui.kohControlObservation",
+  FlagAttempt: 'Flag', BreakAttempt: 'Break', FixAttempt: 'Fix', HintUnlock: "common.label.promptUnlock",
+  ManualAdjustment: "common.label.manualAdjustment", AwdServiceTransition: "common.label.awdServiceStatus", KohControlObservation: "common.label.kohControlObservation",
 } satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol, string>
 
 export const GameplayFactStateLabel = {
-  Pending: "ui.pending", Queued: "ui.queuing", Processing: "ui.underEvaluation", Completed: "ui.completed", PlatformFailed: "ui.platformFailed",
+  Pending: "administration.label.pending", Queued: "common.label.queuing", Processing: "common.label.underEvaluation", Completed: "common.label.completed", PlatformFailed: "common.error.platformFailed.adminFormat",
 } satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol, string>
 
 export const GameplayFactResultLabel = {
-  Correct: "ui.correct", Wrong: "ui.wrong", Duplicate: "ui.repeat", AttemptsExhausted: "ui.exhausted", Rejected: "ui.rejected",
-  Unlocked: "ui.unlocked", Applied: "ui.applied", ServiceUp: "ui.serviceIsNormal", ServiceDown: "ui.serviceException", Controlled: "ui.controlled", Uncontrolled: "ui.uncontrolled",
+  Correct: "common.label.correct", Wrong: "common.label.wrong", Duplicate: "common.label.repeat", AttemptsExhausted: "common.label.exhausted", Rejected: "common.label.rejected",
+  Unlocked: "common.label.unlocked", Applied: "common.label.applied", ServiceUp: "common.label.serviceNormal", ServiceDown: "common.label.serviceException", Controlled: "common.label.controlled", Uncontrolled: "common.label.uncontrolled",
 } satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol, string>
 
 export const RuntimeKindLabel = {
-  Container: "ui.container", OvaVm: "ui.virtualMachine",
+  Container: "runtime.label.container", OvaVm: "runtime.label.virtualMachine",
 } satisfies Record<NoCtfapiEndpointsRuntimeRuntimeKindProtocol, string>
 
 export const RuntimeProviderLabel = {
@@ -64,29 +64,29 @@ export const RuntimeProviderLabel = {
 } satisfies Record<NoCtfapiEndpointsRuntimeRuntimeProviderProtocol, string>
 
 export const RuntimeStateLabel = {
-  Queued: "ui.queuing", Provisioning: "ui.inPreparation", Running: "ui.running2", Stopping: "ui.stopping", Stopped: "ui.stopped", Failed: "ui.failed",
+  Queued: "common.label.queuing", Provisioning: "runtime.label.preparation", Running: "common.label.running.adminFormat", Stopping: "common.label.stopping", Stopped: "common.label.stopped", Failed: "common.error.failed",
 } satisfies Record<NoCtfapiEndpointsRuntimeRuntimeStateProtocol, string>
 
 export const RuntimeFailureCodeLabel = {
-  InvalidConfiguration: "ui.invalidRuntimeConfiguration",
-  RunnerUnavailable: "ui.runnerUnavailable",
-  ProviderUnavailable: "ui.runtimeProviderUnavailable",
-  ProvisionTimeout: "ui.runtimeProvisioningTimedOut",
-  ProviderRejected: "ui.runtimeProviderRejectedTheRequest",
-  CleanupFailed: "ui.resourceCleanupFailed",
-  UrlExpansionFailed: "ui.accessUrlExpansionFailed",
+  InvalidConfiguration: "common.error.runtimeConfigurationInvalid",
+  RunnerUnavailable: "common.error.runnerUnavailable",
+  ProviderUnavailable: "common.error.runtimeProviderUnavailable",
+  ProvisionTimeout: "common.label.runtimeProvisioningTimedOut",
+  ProviderRejected: "common.label.runtimeProviderRejected",
+  CleanupFailed: "common.error.resourceCleanupFailed",
+  UrlExpansionFailed: "common.error.accessUrlExpansionFailed",
 } satisfies Record<NoCtfapiEndpointsRuntimeRuntimeFailureCodeProtocol, string>
 
 export const CheatIncidentStatusLabel = {
-  Pending: "ui.pending", Confirmed: "ui.confirmed", Dismissed: "ui.dismissed", Superseded: "ui.superseded", Corrected: "ui.corrected",
+  Pending: "administration.label.pending", Confirmed: "administration.label.confirmed", Dismissed: "common.label.dismissed", Superseded: "administration.label.superseded", Corrected: "administration.label.corrected",
 } satisfies Record<NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentStatusProtocol, string>
 
 export const LeaderboardVisibilityLabel = {
-  Normal: "ui.normal", Frozen: "ui.freeze", Blackout: "ui.cover2",
+  Normal: "administration.label.normal", Frozen: "common.label.freeze", Blackout: "common.label.cover",
 } satisfies Record<NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol, string>
 
 export const SpecificationKindLabel = {
-  Attachment: "ui.accessories", AwdRound: "ui.awdRounds", RuntimeDefinition: "ui.runtimeDefinition", RuntimeInstance: "ui.runtime2", Hint: "ui.hint",
+  Attachment: "common.label.accessories", AwdRound: "common.label.awdRounds", RuntimeDefinition: "common.label.runtimeDefinition", RuntimeInstance: "common.label.runtime", Hint: "administration.label.hint",
 } satisfies Record<NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol, string>
 
 export function enumLabel<T extends string>(
@@ -122,5 +122,5 @@ export function isoToLocalInput(value: string | null | undefined): string {
 
 /** Show an administrative write failure without inventing transport-level conflict semantics. */
 export function toastWriteError(error: unknown): void {
-  toast.error(parseApiError(error).message)
+  toast.error(parseApiError(error).displayMessage)
 }

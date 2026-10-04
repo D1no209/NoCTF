@@ -1,8 +1,10 @@
+import { message as describeMessage } from '../../../../../../utils/i18n'
+import type { UiMessage } from '../../../../../../utils/i18n'
 import { challengeTagOptions, uniqueTags, validChallengeTags } from '~/lib/challenge-tags'
 import { proxyRefs } from 'vue'
 
 import { Plus } from '@lucide/vue'
-import { toast } from 'vue-sonner'
+import { toast } from '../../../../../../utils/message-toast'
 import { adminChallengeBankListTemplates, adminCreateCompetitionChallenge, adminDeleteCompetitionChallenge, adminListCompetitionChallenges, adminPatchCompetitionChallenge, adminRestoreCompetitionChallenge } from '../../../../../../api'
 import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateSummaryResponse, NoCtfapiEndpointsChallengesChallengeSummaryResponse } from '../../../../../../api'
 import { useCompetitionAdmin } from '../../../../../../lib/admin-competition'
@@ -18,7 +20,7 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
 
   const loading = ref(true)
 
-  const error = ref<string | null>(null)
+  const error = ref<UiMessage | null>(null)
 
   const includeDeleted = ref(false)
 
@@ -83,7 +85,7 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
       path: { competitionId },
       query: { includeDeleted: includeDeleted.value },
     })
-    if (e) error.value = parseApiError(e).message
+    if (e) error.value = parseApiError(e).displayMessage
     else items.value = [...(data?.items ?? [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
     loading.value = false
   }
@@ -120,7 +122,7 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
 
   const adding = ref(false)
 
-  const addError = ref<string | null>(null)
+  const addError = ref<UiMessage | null>(null)
 
   const modeTemplates = computed(() =>
     templates.value.filter(t => t.mode === competition.value?.mode && !t.deletedAt),
@@ -149,7 +151,7 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
   const newTags = ref<string[]>([])
   const tagOptions = computed(() => challengeTagOptions(items.value.filter(item => !item.deletedAt)))
   function updateNewTags(tags: string[]) {
-    if (!validChallengeTags(tags)) { toast.error(translate('challengeTags.invalid')); return }
+    if (!validChallengeTags(tags)) { toast.error(describeMessage('challengeTags.invalid')); return }
     newTags.value = uniqueTags(tags)
   }
 
@@ -164,14 +166,14 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
     newOrder.value = (items.value.filter(i => !i.deletedAt).map(i => i.order ?? 0).reduce((m, o) => Math.max(m, o), 0) || 0) + 1
     templatesLoading.value = true
     const { data, error: e } = await adminChallengeBankListTemplates({ query: { includeDeleted: false, direction: null, keyword: null, offset: 0, limit: 200, desc: false } })
-    if (e) addError.value = parseApiError(e).message
+    if (e) addError.value = parseApiError(e).displayMessage
     else templates.value = data?.items ?? []
     templatesLoading.value = false
   }
 
   async function addChallenge() {
     if (!selectedTemplateId.value) {
-      addError.value = translate("ui.pleaseSelectAQuestionBankTemplate")
+      addError.value = describeMessage("administration.competitionsBy.description.selectQuestionBankTemplate")
       return
     }
     adding.value = true
@@ -187,15 +189,15 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
         },
       })
       if (error) {
-        addError.value = competitionChallengeConflictMessage(error) ?? parseApiError(error).message
+        addError.value = competitionChallengeConflictMessage(error) ?? parseApiError(error).displayMessage
         return
       }
-      toast.success(translate("ui.questionHasBeenAdded"))
+      toast.success(describeMessage("administration.label.questionAdded"))
       addOpen.value = false
       await load()
     }
     catch (e) {
-      addError.value = competitionChallengeConflictMessage(e) ?? parseApiError(e).message
+      addError.value = competitionChallengeConflictMessage(e) ?? parseApiError(e).displayMessage
     }
     finally {
       adding.value = false
@@ -206,7 +208,7 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
 
   const deletePending = ref(false)
 
-  const deleteError = ref<string | null>(null)
+  const deleteError = ref<UiMessage | null>(null)
 
   function closeDeleteDialog(open: boolean) {
     if (!open && !deletePending.value) {
@@ -231,13 +233,13 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
         path: { competitionId, competitionChallengeId: target.id },
       })
       if (error) throw error
-      toast.success(translate("ui.questionHasBeenDeleted"))
+      toast.success(describeMessage("administration.label.questionDeleted"))
       deleteTarget.value = null
       deleteError.value = null
       await load()
     }
     catch (e) {
-      deleteError.value = parseApiError(e).message
+      deleteError.value = parseApiError(e).displayMessage
       toast.error(deleteError.value)
     }
     finally {
@@ -254,7 +256,7 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
         path: { competitionId, competitionChallengeId: c.id },
       })
       if (error) throw error
-      toast.success(translate("ui.questionHasBeenRestored"))
+      toast.success(describeMessage("administration.label.questionRestored"))
       await load()
     }
     catch (e) {
@@ -290,13 +292,13 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
       else {
         await load()
       }
-      toast.success(translate(
-        published ? 'ui.challengeWasPublished' : 'ui.challengeWasUnpublished',
+      toast.success(describeMessage(
+        published ? 'common.label.challengeWasPublished' : 'common.label.challengeWasUnpublished',
         { challenge: challenge.title ?? challenge.customTitle ?? '-' },
       ))
     }
     catch (e) {
-      toast.error(competitionChallengeConflictMessage(e) ?? parseApiError(e).message)
+      toast.error(competitionChallengeConflictMessage(e) ?? parseApiError(e).displayMessage)
     }
     finally {
       pendingId.value = null

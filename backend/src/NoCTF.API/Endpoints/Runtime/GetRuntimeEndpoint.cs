@@ -123,7 +123,12 @@ public sealed record RuntimeAcceptedResponse(
     Guid RuntimeInstanceId,
     string StatusUrl);
 
-public sealed record RuntimeConflictResponse(string Detail);
+public sealed record RuntimeConflictResponse(string Detail)
+{
+    public string Detail { get; init; } = ApiMessages.Localize(ApiMessageId.RuntimeStateConflict, Detail);
+    public string MessageKey => ApiMessages.Key(ApiMessageId.RuntimeStateConflict);
+    public IReadOnlyDictionary<string, object?> MessageArguments => ApiMessages.NoArguments;
+}
 
 public sealed record RuntimeAccessResponse(
     string? DirectAddress,

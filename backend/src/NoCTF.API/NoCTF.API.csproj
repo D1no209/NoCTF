@@ -11,6 +11,10 @@
     <NoWarn>$(NoWarn);NU1608</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Localization/Catalogs/en/api.json" LogicalName="NoCTF.API.Localization.Catalogs.en.api.json" WithCulture="false" />
+    <EmbeddedResource Include="Localization/Catalogs/zh-CN/api.json" LogicalName="NoCTF.API.Localization.Catalogs.zh-CN.api.json" WithCulture="false" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../NoCTF.Application/NoCTF.Application.csproj" />
     <ProjectReference Include="../NoCTF.GameModes/NoCTF.GameModes.csproj" />
     <ProjectReference Include="../NoCTF.Infrastructure/NoCTF.Infrastructure.csproj" />

@@ -13,6 +13,10 @@ export type NoCtfapiEndpointsHealthStatus = 'Ok';
 export type NoCtfapiEndpointsTeamsTeamRegistrationFailureResponse = {
     code?: NoCtfapiEndpointsTeamsTeamRegistrationFailureCodeProtocol;
     message?: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
 };
 
 export type NoCtfapiEndpointsTeamsTeamRegistrationFailureCodeProtocol = 'InvalidTeamName' | 'CompetitionNotFound' | 'RegistrationClosed' | 'UserAlreadyRegistered' | 'TeamNameOrMembershipConflict' | 'TeamNotFound' | 'CompetitionFinished' | 'TeamLocked' | 'TeamBanned' | 'TeamConflict' | 'TeamReviewConflict' | 'CompetitionActive' | 'TrackNotFound' | 'TrackNotPublicSelectable' | 'TrackInvitationRequired' | 'TrackInvitationInvalid' | 'TrackSsoIdentityRequired';
@@ -92,6 +96,10 @@ export type NoCtfapiEndpointsTeamsGetTeamInvitationRequest = {
 export type NoCtfapiEndpointsTeamsTeamMembershipFailureResponse = {
     code?: NoCtfapiEndpointsTeamsTeamMembershipFailureCodeProtocol;
     message?: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
 };
 
 export type NoCtfapiEndpointsTeamsTeamMembershipFailureCodeProtocol = 'CompetitionNotFound' | 'TeamNotFound' | 'TeamForbidden' | 'TeamBanned' | 'MembershipLocked' | 'UserAlreadyRegistered' | 'TeamFull' | 'MembershipConflict' | 'CaptainCannotBeRemoved' | 'MemberNotFound' | 'MembershipNotFound' | 'CaptainMustTransfer' | 'CaptainOnly' | 'TrackSsoIdentityRequired';
@@ -101,6 +109,28 @@ export type MicrosoftAspNetCoreMvcValidationProblemDetails = MicrosoftAspNetCore
         [key: string]: Array<string>;
     };
     [key: string]: unknown;
+} & {
+    /**
+     * Stable semantic message identity. Translate with messageArguments; never infer identity from detail text.
+     */
+    messageKey?: string;
+    /**
+     * Named interpolation arguments.
+     */
+    messageArguments?: {
+        [key: string]: unknown;
+    };
+    /**
+     * Per-field message descriptors, in the same order as errors.
+     */
+    errorMessages?: {
+        [key: string]: Array<{
+            key?: string;
+            arguments?: {
+                [key: string]: unknown;
+            };
+        }>;
+    };
 };
 
 export type MicrosoftAspNetCoreHttpHttpValidationProblemDetails = MicrosoftAspNetCoreMvcProblemDetails & {
@@ -108,6 +138,17 @@ export type MicrosoftAspNetCoreHttpHttpValidationProblemDetails = MicrosoftAspNe
         [key: string]: Array<string>;
     };
     [key: string]: unknown;
+} & {
+    /**
+     * Stable semantic message identity. Translate with messageArguments; never infer identity from detail text.
+     */
+    messageKey?: string;
+    /**
+     * Named interpolation arguments.
+     */
+    messageArguments?: {
+        [key: string]: unknown;
+    };
 };
 
 export type MicrosoftAspNetCoreMvcProblemDetails = {
@@ -116,6 +157,16 @@ export type MicrosoftAspNetCoreMvcProblemDetails = {
     status?: number | null;
     detail?: string | null;
     instance?: string | null;
+    /**
+     * Stable semantic message identity. Translate with messageArguments; never infer identity from detail text.
+     */
+    messageKey?: string;
+    /**
+     * Named interpolation arguments.
+     */
+    messageArguments?: {
+        [key: string]: unknown;
+    };
     [key: string]: unknown;
 };
 
@@ -246,9 +297,13 @@ export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionEntryKindCode
 
 export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureResponse = {
     code?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureCode;
-    detail?: string;
     current?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse | null;
     limit?: number | null;
+    detail?: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
 };
 
 export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureCode = 'InvalidRequest' | 'SpamRejected' | 'CompetitionNotAcceptingQuestions' | 'TeamNotEligible' | 'InvalidChallengeReference' | 'TeamActiveQuestionLimitReached' | 'ParticipantMessageLimitReached' | 'InvalidTransition' | 'QuestionClosed';
@@ -302,6 +357,10 @@ export type NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpChallengeScoreResponse = {
 export type NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpFailureResponse = {
     code?: NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpFailureCode;
     detail?: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
 };
 
 export type NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpFailureCode = 'InvalidPdf' | 'UploadTooLarge' | 'WriteUpSubmissionDeadlinePassed';
@@ -317,6 +376,10 @@ export type NoCtfapiEndpointsRuntimeRuntimeAcceptedResponse = {
 
 export type NoCtfapiEndpointsRuntimeRuntimeConflictResponse = {
     detail?: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
 };
 
 export type NoCtfapiEndpointsRuntimeCreateRuntimeRequest = {
@@ -780,6 +843,10 @@ export type NoCtfapiEndpointsGameplayFactsAwdpBreakFlagJudgementProtocol = 'Corr
 export type NoCtfapiEndpointsGameplayFactsAwdpBreakFlagJudgementConflictResponse = {
     code?: NoCtfapiEndpointsGameplayFactsAwdpBreakFlagJudgementFailureCodeProtocol;
     detail?: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
 };
 
 export type NoCtfapiEndpointsGameplayFactsAwdpBreakFlagJudgementFailureCodeProtocol = 'JudgementUnavailable' | 'TeamNotEligible' | 'AchievementNotSucceeded' | 'FlagInvalid';
@@ -826,6 +893,10 @@ export type NoCtfapiEndpointsGameplayFactsRequestAwdpDefenseTargetResponse = {
 export type NoCtfapiEndpointsGameplayFactsAwdpDefenseTargetConflictResponse = {
     code?: NoCtfapiEndpointsGameplayFactsAwdpDefenseTargetRequestFailureCodeProtocol;
     detail?: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
 };
 
 export type NoCtfapiEndpointsGameplayFactsAwdpDefenseTargetRequestFailureCodeProtocol = 'DefenseNotAvailable' | 'ActiveDefenseTargetExists' | 'DefenseAlreadySucceeded' | 'BreakRequired' | 'FixAttemptsExhausted' | 'InvalidRuntimeConfiguration' | 'DefenseTargetConcurrency';
@@ -839,6 +910,10 @@ export type NoCtfapiEndpointsGameplayFactsRequestPatchVerificationTargetResponse
 export type NoCtfapiEndpointsGameplayFactsPatchVerificationTargetFailureResponse = {
     code?: NoCtfapiEndpointsGameplayFactsPatchVerificationTargetFailureCodeProtocol;
     detail?: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
 };
 
 export type NoCtfapiEndpointsGameplayFactsRequestPatchVerificationTargetRequest = {
@@ -860,7 +935,11 @@ export type NoCtfapiEndpointsGameplayFactsFlagGameplayFactItem = {
 
 export type NoCtfapiEndpointsGameplayFactsGameplayFactAdmissionFailureResponse = {
     code?: NoCtfapiEndpointsGameplayFactsGameplayFactAdmissionFailureCodeProtocol;
-    detail?: string | null;
+    detail?: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
 };
 
 export type NoCtfapiEndpointsGameplayFactsGameplayFactAdmissionFailureCodeProtocol = 'ResourceDeleted' | 'ChallengeUnavailable' | 'TeamForbidden' | 'TeamBanned' | 'GameplayFactKindUnsupported' | 'CompetitionPaused' | 'CompetitionNotPublished' | 'CompetitionNotStarted' | 'CompetitionFinished' | 'CompetitionUnavailable' | 'RuntimeNotRunning' | 'BreakRequired' | 'AchievementAlreadySucceeded' | 'AttemptsExhausted' | 'FlagInvalid' | 'FlagBatchNotSupported' | 'GameplayFactScopeNotFound' | 'GameplayFactConcurrency' | 'PatchUploadNotFound';
@@ -880,6 +959,10 @@ export type NoCtfapiEndpointsGameplayFactsUploadPatchResponse = {
 export type NoCtfapiEndpointsGameplayFactsUploadPatchFailureResponse = {
     code?: NoCtfapiEndpointsGameplayFactsUploadPatchFailureCodeProtocol;
     detail?: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
 };
 
 export type NoCtfapiEndpointsGameplayFactsUploadPatchFailureCodeProtocol = 'ArchiveStreamNotSeekable' | 'ArchiveInvalid' | 'DefenseTargetNotReady' | 'DefenseAlreadySucceeded' | 'FixAttemptsExhausted' | 'DefenseTargetConsumed';
@@ -891,6 +974,10 @@ export type NoCtfapiEndpointsGameplayFactsUploadPatchRequest = {
 export type NoCtfapiEndpointsGameplayFactsPatchVerificationUploadFailureResponse = {
     code?: NoCtfapiEndpointsGameplayFactsPatchVerificationUploadFailureCode;
     detail?: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
 };
 
 export type NoCtfapiEndpointsGameplayFactsPatchVerificationUploadFailureCode = 'ArchiveStreamNotSeekable' | 'ArchiveTooLarge' | 'ArchiveInvalid' | 'TargetNotReady' | 'PatchAlreadyVerified' | 'AttemptsExhausted' | 'TargetConsumed' | 'UploadConflict';
@@ -1485,9 +1572,15 @@ export type NoCtfapiEndpointsChallengesListChallengesRequest = {
 };
 
 export type NoCtfapiEndpointsChallengesProgressionStartConflict = {
-    code?: string;
+    code?: NoCtfapiEndpointsChallengesProgressionStartFailureCode;
     detail?: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
 };
+
+export type NoCtfapiEndpointsChallengesProgressionStartFailureCode = 'GraphChanged';
 
 export type NoCtfapiEndpointsChallengesStartProgressionChallengeRequest = {
     expectedRevision?: number | null;
@@ -1502,6 +1595,10 @@ export type NoCtfapiEndpointsGameplayFactsAcceptedGameplayFactResponse = {
 export type NoCtfapiEndpointsChallengesChallengeHintUnlockConflictResponse = {
     code?: NoCtfapiEndpointsChallengesChallengeHintUnlockFailureCodeProtocol;
     detail?: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
 };
 
 export type NoCtfapiEndpointsChallengesChallengeHintUnlockFailureCodeProtocol = 'InsufficientScore';
@@ -1553,6 +1650,10 @@ export type NoCtfapiEndpointsAuthenticationCasSsoCallbackRequest = {
 export type NoCtfapiEndpointsAuthenticationChangePasswordFailureResponse = {
     code?: NoCtfapiEndpointsAuthenticationChangePasswordFailureCode;
     detail?: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
 };
 
 export type NoCtfapiEndpointsAuthenticationChangePasswordFailureCode = 'CurrentPasswordInvalid';
@@ -1564,6 +1665,11 @@ export type NoCtfapiEndpointsAuthenticationChangePasswordRequest = {
 
 export type NoCtfapiEndpointsAuthenticationCompletePasswordResetFailureResponse = {
     code?: NoCtfapiEndpointsAuthenticationCompletePasswordResetFailureCode;
+    detail?: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
 };
 
 export type NoCtfapiEndpointsAuthenticationCompletePasswordResetFailureCode = 'InvalidOrExpired';
@@ -1738,6 +1844,11 @@ export type NoCtfapiEndpointsAuthenticationOidcSsoCallbackRequest = {
 
 export type NoCtfapiEndpointsAuthenticationCurrentUserProfilePatchFailureResponse = {
     code?: NoCtfapiEndpointsAuthenticationCurrentUserProfilePatchFailureCode;
+    detail?: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
 };
 
 export type NoCtfapiEndpointsAuthenticationCurrentUserProfilePatchFailureCode = 'WallpaperNotUploaded';
@@ -1804,6 +1915,11 @@ export type NoCtfapiEndpointsAuthenticationRequestPasswordResetRequest = {
 
 export type NoCtfapiEndpointsAuthenticationAvatarUploadFailureResponse = {
     code?: NoCtfapiEndpointsAuthenticationAvatarUploadFailureCode;
+    detail?: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
 };
 
 export type NoCtfapiEndpointsAuthenticationAvatarUploadFailureCode = 'SizeInvalid' | 'SourceMetadataMismatch' | 'UnsupportedFormat' | 'InvalidDimensions' | 'PixelLimitExceeded' | 'MultipleFrames' | 'MalformedImage';
@@ -1814,6 +1930,11 @@ export type NoCtfapiEndpointsAuthenticationUploadMyAvatarRequest = {
 
 export type NoCtfapiEndpointsAuthenticationProfileCoverUploadFailureResponse = {
     code?: NoCtfapiEndpointsAuthenticationProfileCoverUploadFailureCode;
+    detail?: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
 };
 
 export type NoCtfapiEndpointsAuthenticationProfileCoverUploadFailureCode = 'SizeInvalid' | 'SourceMetadataMismatch' | 'UnsupportedFormat' | 'InvalidDimensions' | 'PixelLimitExceeded' | 'MultipleFrames' | 'MalformedImage';
@@ -1824,6 +1945,11 @@ export type NoCtfapiEndpointsAuthenticationUploadMyProfileCoverRequest = {
 
 export type NoCtfapiEndpointsAuthenticationWallpaperUploadFailureResponse = {
     code?: NoCtfapiEndpointsAuthenticationWallpaperUploadFailureCode;
+    detail?: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
 };
 
 export type NoCtfapiEndpointsAuthenticationWallpaperUploadFailureCode = 'SizeInvalid' | 'SourceMetadataMismatch' | 'UnsupportedFormat' | 'InvalidDimensions' | 'PixelLimitExceeded' | 'MultipleFrames' | 'MalformedImage';
@@ -1935,6 +2061,10 @@ export type NoCtfapiEndpointsAdministrationRuntimeCreateTeamRuntimeRequest = {
 
 export type NoCtfapiEndpointsAdministrationRuntimeRuntimeTrafficCaptureConflictResponse = {
     detail?: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
 };
 
 export type NoCtfapiEndpointsAdministrationRuntimeDeleteRuntimeTrafficCaptureRequest = {
@@ -2176,8 +2306,12 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionOutcomeCo
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionConflictResponse = {
     code?: NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionConflictCode;
-    detail?: string;
     preview?: NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionPreviewResponse | null;
+    detail?: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionConflictCode = 'HardDeleteBlocked' | 'SelfDeletionForbidden' | 'LastAdministratorProtected' | 'AlreadyAnonymized';
@@ -2303,6 +2437,10 @@ export type NoCtfapiEndpointsAdministrationPlatformIssuePlatformUserTokenRespons
 export type NoCtfapiEndpointsAdministrationPlatformIssuePlatformUserTokenFailureResponse = {
     code?: NoCtfapiEndpointsAdministrationPlatformIssuePlatformUserTokenFailureCode;
     message?: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformIssuePlatformUserTokenFailureCode = 'AccountInactive';
@@ -2672,8 +2810,12 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCreateCompetitionBadgeReq
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictResponse = {
     code?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictCode;
-    detail?: string;
     userIds?: Array<string>;
+    detail?: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictCode = 'RolesOverlap' | 'OwnerIncluded' | 'UserNotFound' | 'RoleNotEligible' | 'EmailNotVerified';
@@ -2720,6 +2862,10 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookDisable
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookFailureResponse = {
     code?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookProblemCode;
     message?: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookProblemCode = 'DuplicateEndpoint' | 'InvalidEndpoint' | 'InvalidName';
@@ -2747,9 +2893,15 @@ export type NoCtfapiEndpointsAdministrationCompetitionsDeleteCompetitionAnnounce
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionBadgeConflictResponse = {
-    code?: string;
+    code?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionBadgeConflictCode;
     detail?: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
 };
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionBadgeConflictCode = 'BadgeInUse' | 'ConcurrencyConflict';
 
 export type NoCtfapiEndpointsAdministrationCompetitionsDeleteCompetitionBadgeRequest = {
     [key: string]: never;
@@ -2761,9 +2913,13 @@ export type NoCtfapiEndpointsAdministrationCompetitionsDeleteCompetitionWebhookR
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionForceDeleteConflictResponse = {
     code?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionForceDeleteConflictCode;
-    detail?: string;
     preview?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeletePreviewResponse | null;
     conflictingNotificationIds?: Array<string> | null;
+    detail?: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionForceDeleteConflictCode = 'ActiveCompetition' | 'ActiveRuntimeResource' | 'ConfirmationMismatch' | 'NotificationScopeConflict';
@@ -2799,6 +2955,10 @@ export type NoCtfapiEndpointsAdministrationCompetitionsMissingFlagGenerationFail
     teamId?: string;
     code?: NoCtfapiEndpointsAdministrationCompetitionsMissingFlagFailureCodeProtocol;
     description?: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsMissingFlagFailureCodeProtocol = 'CompetitionNotFound' | 'GameModeUnsupported' | 'FlagGenerationFailed';
@@ -3080,8 +3240,12 @@ export type NoCtfapiEndpointsAdministrationCompetitionsListCompetitionWebhooksRe
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionTrackFailureResponse = {
     code?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionTrackFailureCodeProtocol;
-    message?: string;
     affectedTeamCount?: number;
+    message?: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionTrackFailureCodeProtocol = 'CompetitionNotFound' | 'InvalidConfiguration' | 'CompetitionFinished' | 'TracksDisabled' | 'TrackReassignmentRequired' | 'InvalidTrackReassignment' | 'TeamNotFound' | 'TrackNotFound' | 'TrackNotPublicSelectable' | 'TrackSsoIdentityRequired' | 'SsoProviderNotFound';
@@ -3171,6 +3335,10 @@ export type NoCtfapiEndpointsAdministrationCompetitionsRotateCompetitionWebhookS
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionDirectionFailureResponse = {
     code: NoCtfApplicationCompetitionsDirectionsCompetitionDirectionFailure;
     detail: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
 };
 
 export type NoCtfApplicationCompetitionsDirectionsCompetitionDirectionFailure = 'CompetitionNotFound' | 'InvalidCatalog' | 'InvalidIcon' | 'DirectionInUse' | 'NameConflict';
@@ -3180,9 +3348,15 @@ export type NoCtfapiEndpointsAdministrationCompetitionsSaveCompetitionDirections
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsProgressionSaveProblem = {
-    code?: string;
-    detail?: string | null;
+    code?: NoCtfApplicationCompetitionsProgressionCompetitionProgressionSaveFailure;
+    detail?: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
 };
+
+export type NoCtfApplicationCompetitionsProgressionCompetitionProgressionSaveFailure = 'CompetitionNotFound' | 'UnsupportedGameMode' | 'ConcurrencyConflict' | 'InvalidGraph' | 'ChallengeNotFound' | 'BadgeNotFound';
 
 export type NoCtfapiEndpointsAdministrationCompetitionsSaveCompetitionProgressionRequest = {
     expectedConcurrencyStamp?: string | null;
@@ -3231,6 +3405,10 @@ export type NoCtfapiEndpointsAdministrationCompetitionsStartGateErrorResponse = 
     code?: NoCtfapiEndpointsAdministrationCompetitionsStartGateFailureCodeProtocol;
     competitionChallengeId?: string | null;
     message?: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsStartGateFailureCodeProtocol = 'CompetitionNotPublished' | 'CompetitionConfigurationInvalid' | 'PublishedChallengeRequired' | 'ApprovedTeamRequired' | 'RuntimeQuotaInsufficient' | 'ChallengeModeMismatch' | 'ChallengeRulesInvalid' | 'RuntimeDefinitionInvalid' | 'TrackConfigurationInvalid' | 'TeamTrackInvalid' | 'ExperimentalFeatureDisabled';
@@ -3314,6 +3492,10 @@ export type NoCtfapiEndpointsAdministrationCheatIncidentsUpdateCheatIncidentStat
 export type NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictResponse = {
     code: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictCode;
     detail: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
 };
 
 export type NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictCode = 'ResourceIdConflict' | 'ChallengeOrderConflict' | 'ChallengeTemplateConflict' | 'LifecycleStateConflict' | 'ChallengeTemplateNotFound' | 'ChallengeTemplateModeMismatch' | 'ExperimentalFeatureDisabled';
@@ -3458,6 +3640,10 @@ export type NoCtfapiEndpointsAdministrationChallengesRestoreChallengeRequest = {
 export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse = {
     code?: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureCodeProtocol;
     message?: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
 };
 
 export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureCodeProtocol = 'InvalidFlag' | 'InvalidRegularExpression' | 'RegularExpressionNotSupported' | 'InvalidSpecification' | 'InvalidValidityWindow' | 'InvalidTemplateFlagScope' | 'ResourceIdConflict' | 'ManualFlagNotSupported' | 'SystemManagedFlag' | 'DeliveryModeConflict';
@@ -3600,8 +3786,12 @@ export type NoCtfapiEndpointsAdministrationChallengeBankKohChallengeDefinitionCo
 
 export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictResponse = {
     code: NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictCode;
-    detail: string;
     userIds: Array<string>;
+    detail: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
 };
 
 export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictCode = 'ResourceIdConflict' | 'ActiveCompetitionModeConflict' | 'ActiveRuntimeDefinitionConflict' | 'OwnerIncludedInManagerSet' | 'UserNotFound' | 'RoleNotEligible' | 'ExperimentalFeatureDisabled' | 'InteractionKindConflict';
@@ -3708,6 +3898,10 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplatePermiss
 export type NoCtfapiEndpointsAdministrationChallengeBankAttachmentBatchFailureResponse = {
     code?: NoCtfapiEndpointsAdministrationChallengeBankAttachmentBatchFailureCodeProtocol;
     message?: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
 };
 
 export type NoCtfapiEndpointsAdministrationChallengeBankAttachmentBatchFailureCodeProtocol = 'UploadTooLarge' | 'InvalidFileName' | 'InvalidVariantFileName' | 'EmptyBatch' | 'DuplicateFlag' | 'DeliveryModeConflict' | 'BatchStorageFailed' | 'BatchPersistenceFailed' | 'ResourceIdConflict';

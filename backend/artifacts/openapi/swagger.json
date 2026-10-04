@@ -1439,6 +1439,16 @@
             "content": {
               "application/problem+json": {
                 "schema": {
+                  "properties": {
+                    "messageKey": {
+                      "type": "string",
+                      "description": "Stable semantic message identity. Translate with messageArguments; never infer identity from detail text."
+                    },
+                    "messageArguments": {
+                      "type": "object",
+                      "description": "Named interpolation arguments."
+                    }
+                  },
                   "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
                 }
               }
@@ -1550,6 +1560,16 @@
             "content": {
               "application/problem+json": {
                 "schema": {
+                  "properties": {
+                    "messageKey": {
+                      "type": "string",
+                      "description": "Stable semantic message identity. Translate with messageArguments; never infer identity from detail text."
+                    },
+                    "messageArguments": {
+                      "type": "object",
+                      "description": "Named interpolation arguments."
+                    }
+                  },
                   "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
                 }
               }
@@ -1656,6 +1676,16 @@
             "content": {
               "application/problem+json": {
                 "schema": {
+                  "properties": {
+                    "messageKey": {
+                      "type": "string",
+                      "description": "Stable semantic message identity. Translate with messageArguments; never infer identity from detail text."
+                    },
+                    "messageArguments": {
+                      "type": "object",
+                      "description": "Named interpolation arguments."
+                    }
+                  },
                   "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
                 }
               }
@@ -2684,6 +2714,16 @@
             "content": {
               "application/problem+json": {
                 "schema": {
+                  "properties": {
+                    "messageKey": {
+                      "type": "string",
+                      "description": "Stable semantic message identity. Translate with messageArguments; never infer identity from detail text."
+                    },
+                    "messageArguments": {
+                      "type": "object",
+                      "description": "Named interpolation arguments."
+                    }
+                  },
                   "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
                 }
               }
@@ -2704,6 +2744,16 @@
             "content": {
               "application/problem+json": {
                 "schema": {
+                  "properties": {
+                    "messageKey": {
+                      "type": "string",
+                      "description": "Stable semantic message identity. Translate with messageArguments; never infer identity from detail text."
+                    },
+                    "messageArguments": {
+                      "type": "object",
+                      "description": "Named interpolation arguments."
+                    }
+                  },
                   "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
                 }
               }
@@ -2887,6 +2937,16 @@
             "content": {
               "application/problem+json": {
                 "schema": {
+                  "properties": {
+                    "messageKey": {
+                      "type": "string",
+                      "description": "Stable semantic message identity. Translate with messageArguments; never infer identity from detail text."
+                    },
+                    "messageArguments": {
+                      "type": "object",
+                      "description": "Named interpolation arguments."
+                    }
+                  },
                   "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
                 }
               }
@@ -2897,6 +2957,16 @@
             "content": {
               "application/problem+json": {
                 "schema": {
+                  "properties": {
+                    "messageKey": {
+                      "type": "string",
+                      "description": "Stable semantic message identity. Translate with messageArguments; never infer identity from detail text."
+                    },
+                    "messageArguments": {
+                      "type": "object",
+                      "description": "Named interpolation arguments."
+                    }
+                  },
                   "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
                 }
               }
@@ -2979,6 +3049,16 @@
             "content": {
               "application/problem+json": {
                 "schema": {
+                  "properties": {
+                    "messageKey": {
+                      "type": "string",
+                      "description": "Stable semantic message identity. Translate with messageArguments; never infer identity from detail text."
+                    },
+                    "messageArguments": {
+                      "type": "object",
+                      "description": "Named interpolation arguments."
+                    }
+                  },
                   "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
                 }
               }
@@ -2989,6 +3069,16 @@
             "content": {
               "application/problem+json": {
                 "schema": {
+                  "properties": {
+                    "messageKey": {
+                      "type": "string",
+                      "description": "Stable semantic message identity. Translate with messageArguments; never infer identity from detail text."
+                    },
+                    "messageArguments": {
+                      "type": "object",
+                      "description": "Named interpolation arguments."
+                    }
+                  },
                   "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
                 }
               }
@@ -3078,6 +3168,16 @@
             "content": {
               "application/problem+json": {
                 "schema": {
+                  "properties": {
+                    "messageKey": {
+                      "type": "string",
+                      "description": "Stable semantic message identity. Translate with messageArguments; never infer identity from detail text."
+                    },
+                    "messageArguments": {
+                      "type": "object",
+                      "description": "Named interpolation arguments."
+                    }
+                  },
                   "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
                 }
               }
@@ -3104,6 +3204,16 @@
             "content": {
               "application/problem+json": {
                 "schema": {
+                  "properties": {
+                    "messageKey": {
+                      "type": "string",
+                      "description": "Stable semantic message identity. Translate with messageArguments; never infer identity from detail text."
+                    },
+                    "messageArguments": {
+                      "type": "object",
+                      "description": "Named interpolation arguments."
+                    }
+                  },
                   "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
                 }
               }
@@ -3228,6 +3338,16 @@
             "content": {
               "application/problem+json": {
                 "schema": {
+                  "properties": {
+                    "messageKey": {
+                      "type": "string",
+                      "description": "Stable semantic message identity. Translate with messageArguments; never infer identity from detail text."
+                    },
+                    "messageArguments": {
+                      "type": "object",
+                      "description": "Named interpolation arguments."
+                    }
+                  },
                   "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
                 }
               }
@@ -3248,6 +3368,16 @@
             "content": {
               "application/problem+json": {
                 "schema": {
+                  "properties": {
+                    "messageKey": {
+                      "type": "string",
+                      "description": "Stable semantic message identity. Translate with messageArguments; never infer identity from detail text."
+                    },
+                    "messageArguments": {
+                      "type": "object",
+                      "description": "Named interpolation arguments."
+                    }
+                  },
                   "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
                 }
               }
@@ -3372,6 +3502,16 @@
             "content": {
               "application/problem+json": {
                 "schema": {
+                  "properties": {
+                    "messageKey": {
+                      "type": "string",
+                      "description": "Stable semantic message identity. Translate with messageArguments; never infer identity from detail text."
+                    },
+                    "messageArguments": {
+                      "type": "object",
+                      "description": "Named interpolation arguments."
+                    }
+                  },
                   "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
                 }
               }
@@ -3392,6 +3532,16 @@
             "content": {
               "application/problem+json": {
                 "schema": {
+                  "properties": {
+                    "messageKey": {
+                      "type": "string",
+                      "description": "Stable semantic message identity. Translate with messageArguments; never infer identity from detail text."
+                    },
+                    "messageArguments": {
+                      "type": "object",
+                      "description": "Named interpolation arguments."
+                    }
+                  },
                   "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
                 }
               }
@@ -6055,6 +6205,16 @@
             "content": {
               "application/problem+json": {
                 "schema": {
+                  "properties": {
+                    "messageKey": {
+                      "type": "string",
+                      "description": "Stable semantic message identity. Translate with messageArguments; never infer identity from detail text."
+                    },
+                    "messageArguments": {
+                      "type": "object",
+                      "description": "Named interpolation arguments."
+                    }
+                  },
                   "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
                 }
               }
@@ -6065,6 +6225,16 @@
             "content": {
               "application/problem+json": {
                 "schema": {
+                  "properties": {
+                    "messageKey": {
+                      "type": "string",
+                      "description": "Stable semantic message identity. Translate with messageArguments; never infer identity from detail text."
+                    },
+                    "messageArguments": {
+                      "type": "object",
+                      "description": "Named interpolation arguments."
+                    }
+                  },
                   "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
                 }
               }
@@ -6257,6 +6427,16 @@
             "content": {
               "application/problem+json": {
                 "schema": {
+                  "properties": {
+                    "messageKey": {
+                      "type": "string",
+                      "description": "Stable semantic message identity. Translate with messageArguments; never infer identity from detail text."
+                    },
+                    "messageArguments": {
+                      "type": "object",
+                      "description": "Named interpolation arguments."
+                    }
+                  },
                   "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
                 }
               }
@@ -6267,6 +6447,16 @@
             "content": {
               "application/problem+json": {
                 "schema": {
+                  "properties": {
+                    "messageKey": {
+                      "type": "string",
+                      "description": "Stable semantic message identity. Translate with messageArguments; never infer identity from detail text."
+                    },
+                    "messageArguments": {
+                      "type": "object",
+                      "description": "Named interpolation arguments."
+                    }
+                  },
                   "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
                 }
               }
@@ -15801,6 +15991,13 @@
           },
           "message": {
             "type": "string"
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
       },
@@ -16077,6 +16274,13 @@
           },
           "message": {
             "type": "string"
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
       },
@@ -16117,6 +16321,34 @@
         ]
       },
       "MicrosoftAspNetCoreMvcValidationProblemDetails": {
+        "properties": {
+          "messageKey": {
+            "type": "string",
+            "description": "Stable semantic message identity. Translate with messageArguments; never infer identity from detail text."
+          },
+          "messageArguments": {
+            "type": "object",
+            "description": "Named interpolation arguments."
+          },
+          "errorMessages": {
+            "type": "object",
+            "description": "Per-field message descriptors, in the same order as errors.",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "arguments": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
         "allOf": [
           {
             "$ref": "#/components/schemas/MicrosoftAspNetCoreHttpHttpValidationProblemDetails"
@@ -16141,6 +16373,16 @@
         ]
       },
       "MicrosoftAspNetCoreHttpHttpValidationProblemDetails": {
+        "properties": {
+          "messageKey": {
+            "type": "string",
+            "description": "Stable semantic message identity. Translate with messageArguments; never infer identity from detail text."
+          },
+          "messageArguments": {
+            "type": "object",
+            "description": "Named interpolation arguments."
+          }
+        },
         "allOf": [
           {
             "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
@@ -16190,6 +16432,14 @@
           "instance": {
             "type": "string",
             "nullable": true
+          },
+          "messageKey": {
+            "type": "string",
+            "description": "Stable semantic message identity. Translate with messageArguments; never infer identity from detail text."
+          },
+          "messageArguments": {
+            "type": "object",
+            "description": "Named interpolation arguments."
           }
         }
       },
@@ -16694,9 +16944,6 @@
           "code": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionFailureCode"
           },
-          "detail": {
-            "type": "string"
-          },
           "current": {
             "nullable": true,
             "oneOf": [
@@ -16709,6 +16956,16 @@
             "type": "integer",
             "format": "int32",
             "nullable": true
+          },
+          "detail": {
+            "type": "string"
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
       },
@@ -16902,6 +17159,13 @@
           },
           "detail": {
             "type": "string"
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
       },
@@ -16952,6 +17216,13 @@
         "properties": {
           "detail": {
             "type": "string"
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
       },
@@ -19229,6 +19500,13 @@
           },
           "detail": {
             "type": "string"
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
       },
@@ -19420,6 +19698,13 @@
           },
           "detail": {
             "type": "string"
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
       },
@@ -19470,6 +19755,13 @@
           },
           "detail": {
             "type": "string"
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
       },
@@ -19531,8 +19823,14 @@
             "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsGameplayFactAdmissionFailureCodeProtocol"
           },
           "detail": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
       },
@@ -19628,6 +19926,13 @@
           },
           "detail": {
             "type": "string"
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
       },
@@ -19674,6 +19979,13 @@
           },
           "detail": {
             "type": "string"
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
       },
@@ -22059,12 +22371,29 @@
         "additionalProperties": false,
         "properties": {
           "code": {
-            "type": "string"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesProgressionStartFailureCode"
           },
           "detail": {
             "type": "string"
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
+      },
+      "NoCTFAPIEndpointsChallengesProgressionStartFailureCode": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "GraphChanged"
+        ],
+        "enum": [
+          "GraphChanged"
+        ]
       },
       "NoCTFAPIEndpointsChallengesStartProgressionChallengeRequest": {
         "type": "object",
@@ -22103,6 +22432,13 @@
           },
           "detail": {
             "type": "string"
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
       },
@@ -22276,6 +22612,13 @@
           },
           "detail": {
             "type": "string"
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
       },
@@ -22317,6 +22660,16 @@
         "properties": {
           "code": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationCompletePasswordResetFailureCode"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
       },
@@ -22873,6 +23226,16 @@
         "properties": {
           "code": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationCurrentUserProfilePatchFailureCode"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
       },
@@ -23109,6 +23472,16 @@
         "properties": {
           "code": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationAvatarUploadFailureCode"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
       },
@@ -23154,6 +23527,16 @@
         "properties": {
           "code": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationProfileCoverUploadFailureCode"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
       },
@@ -23199,6 +23582,16 @@
         "properties": {
           "code": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationWallpaperUploadFailureCode"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
       },
@@ -23564,6 +23957,13 @@
         "properties": {
           "detail": {
             "type": "string"
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
       },
@@ -24505,9 +24905,6 @@
           "code": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformUserDeletionConflictCode"
           },
-          "detail": {
-            "type": "string"
-          },
           "preview": {
             "nullable": true,
             "oneOf": [
@@ -24515,6 +24912,16 @@
                 "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformUserDeletionPreviewResponse"
               }
             ]
+          },
+          "detail": {
+            "type": "string"
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
       },
@@ -24961,6 +25368,13 @@
           },
           "message": {
             "type": "string"
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
       },
@@ -26543,15 +26957,22 @@
           "code": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictCode"
           },
-          "detail": {
-            "type": "string"
-          },
           "userIds": {
             "type": "array",
             "items": {
               "type": "string",
               "format": "guid"
             }
+          },
+          "detail": {
+            "type": "string"
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
       },
@@ -26728,6 +27149,13 @@
           },
           "message": {
             "type": "string"
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
       },
@@ -26813,12 +27241,31 @@
         "additionalProperties": false,
         "properties": {
           "code": {
-            "type": "string"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionBadgeConflictCode"
           },
           "detail": {
             "type": "string"
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionBadgeConflictCode": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "BadgeInUse",
+          "ConcurrencyConflict"
+        ],
+        "enum": [
+          "BadgeInUse",
+          "ConcurrencyConflict"
+        ]
       },
       "NoCTFAPIEndpointsAdministrationCompetitionsDeleteCompetitionBadgeRequest": {
         "type": "object",
@@ -26835,9 +27282,6 @@
           "code": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionForceDeleteConflictCode"
           },
-          "detail": {
-            "type": "string"
-          },
           "preview": {
             "nullable": true,
             "oneOf": [
@@ -26853,6 +27297,16 @@
               "type": "string",
               "format": "guid"
             }
+          },
+          "detail": {
+            "type": "string"
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
       },
@@ -27003,6 +27457,13 @@
           },
           "description": {
             "type": "string"
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
       },
@@ -27978,12 +28439,19 @@
           "code": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionTrackFailureCodeProtocol"
           },
-          "message": {
-            "type": "string"
-          },
           "affectedTeamCount": {
             "type": "integer",
             "format": "int32"
+          },
+          "message": {
+            "type": "string"
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
       },
@@ -28373,6 +28841,13 @@
           "detail": {
             "type": "string",
             "minLength": 1
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
       },
@@ -28415,13 +28890,39 @@
         "additionalProperties": false,
         "properties": {
           "code": {
-            "type": "string"
+            "$ref": "#/components/schemas/NoCTFApplicationCompetitionsProgressionCompetitionProgressionSaveFailure"
           },
           "detail": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
+      },
+      "NoCTFApplicationCompetitionsProgressionCompetitionProgressionSaveFailure": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "CompetitionNotFound",
+          "UnsupportedGameMode",
+          "ConcurrencyConflict",
+          "InvalidGraph",
+          "ChallengeNotFound",
+          "BadgeNotFound"
+        ],
+        "enum": [
+          "CompetitionNotFound",
+          "UnsupportedGameMode",
+          "ConcurrencyConflict",
+          "InvalidGraph",
+          "ChallengeNotFound",
+          "BadgeNotFound"
+        ]
       },
       "NoCTFAPIEndpointsAdministrationCompetitionsSaveCompetitionProgressionRequest": {
         "type": "object",
@@ -28598,6 +29099,13 @@
           },
           "message": {
             "type": "string"
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
       },
@@ -28909,6 +29417,13 @@
           "detail": {
             "type": "string",
             "minLength": 1
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
       },
@@ -29423,6 +29938,13 @@
           },
           "message": {
             "type": "string"
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
       },
@@ -29991,16 +30513,12 @@
         "additionalProperties": false,
         "required": [
           "code",
-          "detail",
-          "userIds"
+          "userIds",
+          "detail"
         ],
         "properties": {
           "code": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeTemplateConflictCode"
-          },
-          "detail": {
-            "type": "string",
-            "minLength": 1
           },
           "userIds": {
             "type": "array",
@@ -30008,6 +30526,17 @@
               "type": "string",
               "format": "guid"
             }
+          },
+          "detail": {
+            "type": "string",
+            "minLength": 1
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
       },
@@ -30385,6 +30914,13 @@
           },
           "message": {
             "type": "string"
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
           }
         }
       },

@@ -1,3 +1,5 @@
+import { message as describeMessage } from '../../../../utils/i18n'
+import type { UiMessage } from '../../../../utils/i18n'
 
 
 import { adminGetCompetition, listCompetitionEvents } from '../../../../api'
@@ -20,19 +22,19 @@ export function useCompetitionsByIdEventsPage() {
 
   const historyScopeResolved = ref(false)
 
-  const historyScopeError = ref<string | null>(null)
+  const historyScopeError = ref<UiMessage | null>(null)
 
   const initialKind = typeof route.query.kind === 'string' ? route.query.kind : 'all'
 
   const kind = ref<string>(initialKind)
 
   const kindOptions = [
-    { value: 'all', label: "ui.allUpdates" },
-    { value: 'CompetitionLifecycleChanged', label: "ui.gameStatus" },
-    { value: 'AnnouncementPublished', label: "ui.announcement" }, { value: 'ChallengePublished', label: "ui.topicRelease" }, { value: 'HintPublished', label: "ui.promptRelease" },
-    { value: 'FirstBloodAwarded', label: "ui.firstBlood" }, { value: 'SecondBloodAwarded', label: "ui.secondBlood" }, { value: 'ThirdBloodAwarded', label: "ui.thirdBlood" },
-    { value: 'GameplayFactAdjudicated', label: "ui.submitReview" }, { value: 'TeamRegistered', label: "ui.teamRegistration" }, { value: 'TeamBanned', label: "ui.teamBan" },
-    { value: 'QuestionOpened', label: "ui.consultingCreation" }, { value: 'QuestionReplied', label: "ui.consultationReply" }, { value: 'QuestionStatusChanged', label: "ui.consultationStatus" },
+    { value: 'all', label: "competitions.label.updates" },
+    { value: 'CompetitionLifecycleChanged', label: "common.label.gameStatus" },
+    { value: 'AnnouncementPublished', label: "common.label.announcement" }, { value: 'ChallengePublished', label: "common.label.topicRelease" }, { value: 'HintPublished', label: "common.label.promptRelease" },
+    { value: 'FirstBloodAwarded', label: "common.label.firstBlood" }, { value: 'SecondBloodAwarded', label: "common.label.secondBlood" }, { value: 'ThirdBloodAwarded', label: "common.label.thirdBlood" },
+    { value: 'GameplayFactAdjudicated', label: "common.label.submitReview" }, { value: 'TeamRegistered', label: "common.label.teamRegistration" }, { value: 'TeamBanned', label: "common.label.teamBan" },
+    { value: 'QuestionOpened', label: "common.label.consultingCreation" }, { value: 'QuestionReplied', label: "common.label.consultationReply" }, { value: 'QuestionStatusChanged', label: "common.label.consultationStatus" },
   ]
 
   const { items, loading, error, hasMore, initialized, loadMore, reset } =
@@ -54,7 +56,7 @@ export function useCompetitionsByIdEventsPage() {
           desc: true,
         },
       })
-      if (err || !data) throw err ?? new Error(translate("ui.failedToLoad"))
+      if (err || !data) throw err ?? new Error(translate("competitions.error.loadFailed"))
       return { items: data.items, nextCursor: data.nextCursor }
     })
 
@@ -67,8 +69,8 @@ export function useCompetitionsByIdEventsPage() {
       if (requestError && response?.status !== 403 && response?.status !== 404) {
         historyScopeError.value = parseApiError(
           requestError,
-          translate("ui.couldNotConfirmAccessToTheFullEventHistoryShowing"),
-        ).message
+          describeMessage("competitions.competitionsBy.description.couldConfirmAccessFull"),
+        ).displayMessage
       }
     }
     historyScopeResolved.value = true
@@ -97,7 +99,7 @@ export function useCompetitionsByIdEventsPage() {
   const levelVariant = (level?: NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol) =>
     level === 'Error' ? ('destructive' as const) : level === 'Warning' ? ('secondary' as const) : ('outline' as const)
 
-  const levelLabel = (level?: NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol) => (level === 'Error' ? translate("ui.warning") : level === 'Warning' ? translate("ui.note") : translate("ui.information"))
+  const levelLabel = (level?: NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol) => (level === 'Error' ? translate("common.label.warning") : level === 'Warning' ? translate("competitions.label.note") : translate("common.label.information"))
 
   // Keep observing parent competition readiness after the initial scope request.
   watch(

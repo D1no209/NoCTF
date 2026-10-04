@@ -16,11 +16,11 @@ export function useDefinitionContainer(props: Readonly<{
   const selectedServiceId = computed(() => `service-${selectedServiceIndex.value}`)
   const topology = computed(() => runtimeTopology(props.definition, props.model.runtime?.urlBindings ?? [],
     props.model.runtime?.controlCheckUrlBinding ?? null, {
-      unnamedService: index => translate('ui.runtimeUnnamedService', { index }),
-      missingImage: translate('ui.runtimeImageNotSet'),
-      missingService: translate('ui.runtimeServiceNotFound'),
-      controlEntry: translate('ui.controlCheckEntry'),
-      noEntries: translate('ui.runtimeNoAccessEntries'),
+      unnamedService: index => translate('runtime.label.runtimeUnnamedService', { index }),
+      missingImage: translate('runtime.label.runtimeImageSet'),
+      missingService: translate('runtime.label.runtimeServiceFound'),
+      controlEntry: translate('runtime.label.controlCheckEntry'),
+      noEntries: translate('runtime.label.runtimeAccessEntries'),
     }))
   const advancedOpen = computed(() => {
     const service = selectedService.value

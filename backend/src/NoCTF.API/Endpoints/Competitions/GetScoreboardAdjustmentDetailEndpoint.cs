@@ -105,9 +105,9 @@ public sealed class GetScoreboardAdjustmentDetailEndpoint(
             dataAsOf.UtcTicks);
         if (!cursors.TryDecode(request.Cursor, CursorEndpoint, scope, out var position))
         {
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
-                title: "Invalid cursor.");
+                title: ApiMessages.Get(ApiMessageId.InvalidCursor));
         }
 
         var adjustments = await details.ReadAdjustmentsAsync(new(

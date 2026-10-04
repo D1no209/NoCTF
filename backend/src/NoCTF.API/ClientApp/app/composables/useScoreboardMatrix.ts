@@ -1,3 +1,5 @@
+import { message as describeMessage } from '../utils/i18n'
+import type { UiMessage } from '../utils/i18n'
 import {
   getLeaderboardEndpoint,
   getScoreboardChallengeCatalogEndpoint,
@@ -58,7 +60,7 @@ export function useScoreboardMatrix(competitionId: string, options: { pollRounds
   const loading = ref(true)
   const refreshing = ref(false)
   const processing = ref(false)
-  const error = ref<string | null>(null)
+  const error = ref<UiMessage | null>(null)
   const requestedEndingRound = ref<number | null>(null)
   let generation = 0
   let stopped = false
@@ -79,7 +81,7 @@ export function useScoreboardMatrix(competitionId: string, options: { pollRounds
   function scheduleCoherenceRetry(): void {
     if (coherenceRetryTimer || stopped) return
     if (coherenceRetryCount >= 3) {
-      error.value = translate("ui.scoreboardDataRevisionsAreNotSynchronizedYetPleaseTryAgain")
+      error.value = describeMessage("leaderboard.scoreboardMatrix.description.scoreboardDataRevisionsSynchronized")
       return
     }
     coherenceRetryCount += 1
@@ -119,10 +121,10 @@ export function useScoreboardMatrix(competitionId: string, options: { pollRounds
 
     const failures = [catalogResult, schemaResult, snapshotResult]
       .filter(result => result?.error)
-      .map(result => parseApiError(result?.error, translate("ui.failedToLoadScoreboard")).message)
+      .map(result => parseApiError(result?.error, describeMessage("common.error.loadScoreboardFailed")).displayMessage)
     let outcome: ScoreboardRefreshOutcome = 'failed'
     if (failures.length) {
-      error.value = failures[0] ?? translate("ui.failedToLoadScoreboard")
+      error.value = failures[0] ?? translate("common.error.loadScoreboardFailed")
     }
     else {
       if (snapshotResult?.response?.status === 202) {

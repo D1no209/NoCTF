@@ -1,3 +1,4 @@
+import { currentLocale } from '../utils/i18n'
 import { HubConnectionBuilder, HubConnectionState, HttpTransportType, LogLevel } from '@microsoft/signalr'
 import type { HubConnection } from '@microsoft/signalr'
 import type { NoCtfapiEndpointsAdministrationPlatformPlatformLogResponse } from '../api'
@@ -22,6 +23,7 @@ export function usePlatformLogHub(
   function createConnection(): HubConnection {
     const hub = new HubConnectionBuilder()
       .withUrl('/hubs/v1/admin/platform-logs', {
+        headers: { 'Accept-Language': currentLocale() },
         accessTokenFactory: getRealtimeAccessToken,
         // 与 useCompetitionHub 相同:dev 下绕过 Vite ws 代理的 WebSocket 崩溃问题。
         ...(import.meta.dev

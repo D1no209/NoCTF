@@ -35,7 +35,7 @@ public sealed class ExportPlatformLogsValidator : Validator<ExportPlatformLogsRe
         RuleFor(request => request).Must(request =>
                 request.From <= request.To
                 && request.To - request.From <= TimeSpan.FromDays(14))
-            .WithMessage("The platform log export range must be between zero and 14 days.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.ExportPlatformLogsValidationPlatformLogExportRange)).WithErrorCode(ApiMessages.Key(ApiMessageId.ExportPlatformLogsValidationPlatformLogExportRange));
     }
 }
 
@@ -83,9 +83,9 @@ public sealed class ExportPlatformLogsEndpoint(ExportPlatformLogs export)
             50_000), ct);
         if (result.State != PlatformLogReadState.Available || result.Export is null)
         {
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: StatusCodes.Status503ServiceUnavailable,
-                title: "Platform logs are unavailable.");
+                title: ApiMessages.Get(ApiMessageId.ExportPlatformLogsTitlePlatformLogsUnavailable));
         }
         return TypedResults.Stream(
             result.Export.Content,

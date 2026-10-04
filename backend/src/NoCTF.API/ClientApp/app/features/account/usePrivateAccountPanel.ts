@@ -1,3 +1,4 @@
+import type { UiMessage } from '../../utils/i18n'
 import { markRaw, toRefs } from 'vue'
 
 import { LockKeyhole } from '@lucide/vue'
@@ -12,13 +13,13 @@ export function usePrivateAccountPanel(props: Readonly<Omit<{ userId: string, co
 
   const loading = ref(false)
 
-  const error = ref<string | null>(null)
+  const error = ref<UiMessage | null>(null)
 
   let revision = 0
 
   const commonSources = computed(() => summarizeAccountSources(data.value?.activities ?? []))
 
-  const kinds: Record<string, string> = { Registered: "ui.registrationSuccessful", LoggedIn: "ui.loginSuccessful", LoginFailed: "ui.signInFailed", FlagSubmitted: "ui.flagSubmission", PatchUploaded: "ui.patchUpload" }
+  const kinds: Record<string, string> = { Registered: "common.label.registrationSuccessful", LoggedIn: "common.label.loginSuccessful", LoginFailed: "auth.login.failed", FlagSubmitted: "administration.label.flagSubmission", PatchUploaded: "common.label.patchUpload" }
 
   async function load() {
     const ticket = ++revision
@@ -33,7 +34,7 @@ export function usePrivateAccountPanel(props: Readonly<Omit<{ userId: string, co
       if (result.error) throw result.error
       data.value = result.data ?? null
     }
-    catch (e) { if (ticket === revision) error.value = parseApiError(e).message }
+    catch (e) { if (ticket === revision) error.value = parseApiError(e).displayMessage }
     finally { if (ticket === revision) loading.value = false }
   }
 

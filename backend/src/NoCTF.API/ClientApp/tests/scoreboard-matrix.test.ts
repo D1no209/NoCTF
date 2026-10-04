@@ -115,9 +115,9 @@ describe('normalized scoreboard matrix', () => {
     expect(composable).toContain('await selectRoundWindow(nextEnd >= latestRound ? null : nextEnd)')
     expect(composable).toContain('const detailEndingRound = computed')
     expect(leaderboardPage).toContain('endingRound: board.detailEndingRound.value')
-    expect(leaderboardPage).toContain("$t('ui.earlierRounds')")
-    expect(leaderboardPage).toContain("$t('ui.laterRounds')")
-    expect(leaderboardPage).toContain("$t('ui.backToLatestRounds')")
+    expect(leaderboardPage).toContain("$t('leaderboard.label.earlierRounds')")
+    expect(leaderboardPage).toContain("$t('leaderboard.label.laterRounds')")
+    expect(leaderboardPage).toContain("$t('leaderboard.label.backLatestRounds')")
   })
 
   test('pins ranking, team and total score while preserving readable matrix widths', () => {
@@ -162,7 +162,7 @@ describe('normalized scoreboard matrix', () => {
     expect(groups[1]?.competitionChallengeId).toBe(missingChallengeId)
     expect(groups[1]?.challenge).toBeNull()
     expect(groups[1]?.columns.map(column => column.index)).toEqual([1])
-    expect(leaderboardPage).toContain("group.challenge?.title ?? $t('ui.unknownQuestion')")
+    expect(leaderboardPage).toContain("group.challenge?.title ?? $t('common.label.unknownQuestion')")
   })
 
   test('refreshes a missing challenge catalog at most once for each revision', () => {
@@ -413,9 +413,9 @@ describe('normalized scoreboard matrix', () => {
     expect(scoreboardTeamDetailDialog).toContain('scoreboardTeamDirectionScore')
     expect(scoreboardTeamDetailDialog).toContain("radius: '62%'")
     expect(scoreboardTeamDetailDialog).toContain('splitNumber: 3')
-    expect(scoreboardTeamDetailDialog).toContain("name: translate(\"ui.attackScore\")")
-    expect(scoreboardTeamDetailDialog).toContain("name: translate(\"ui.defenseScore\")")
-    expect(scoreboardTeamDetailDialog).toContain("usesCurrentScore.value ? translate(\"ui.currentScore\") : translate(\"ui.settledScore\")")
+    expect(scoreboardTeamDetailDialog).toContain("name: translate(\"common.label.attackScore\")")
+    expect(scoreboardTeamDetailDialog).toContain("name: translate(\"common.label.defenseScore\")")
+    expect(scoreboardTeamDetailDialog).toContain("usesCurrentScore.value ? translate(\"leaderboard.label.score\") : translate(\"leaderboard.label.settledScore\")")
     expect(scoreboardTeamDetailDialog.match(/areaStyle: \{ opacity: 0\.2 \}/g)).toHaveLength(2)
     expect(scoreboardTeamDetailDialog).not.toContain("color: '#ef4444'")
     expect(scoreboardTeamDetailDialog).not.toContain("color: '#0ea5e9'")

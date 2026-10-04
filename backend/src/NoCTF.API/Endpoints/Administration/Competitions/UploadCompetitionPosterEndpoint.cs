@@ -25,7 +25,7 @@ public sealed class UploadCompetitionPosterValidator : Validator<UploadCompetiti
         RuleFor(request => request.File.ContentType)
             .Must(value => ContentTypes.Contains(value, StringComparer.OrdinalIgnoreCase))
             .When(request => request.File is not null)
-            .WithMessage("Poster must be a JPEG, PNG, or WebP image.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.UploadCompetitionPosterValidationPosterJpegPngWebp)).WithErrorCode(ApiMessages.Key(ApiMessageId.UploadCompetitionPosterValidationPosterJpegPngWebp));
     }
 }
 
@@ -67,10 +67,10 @@ public sealed class UploadCompetitionPosterEndpoint(
         ExecuteAsync(UploadCompetitionPosterRequest request, CancellationToken ct)
     {
         if (request.File.Length > uploadLimits.MaximumPosterBytes)
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: StatusCodes.Status413PayloadTooLarge,
-                title: "Poster is too large.",
-                detail: $"Poster uploads cannot exceed {uploadLimits.MaximumPosterBytes} bytes.",
+                title: ApiMessages.Get(ApiMessageId.UploadCompetitionPosterTitlePosterTooLarge),
+                detail: ApiMessages.Get(ApiMessageId.UploadSizeLimit, new Dictionary<string, object?> { ["maximumBytes"] = uploadLimits.MaximumPosterBytes }),
                 extensions: new Dictionary<string, object?>
                 {
                     ["code"] = FileUploadFailureCode.UploadTooLarge.ToString()

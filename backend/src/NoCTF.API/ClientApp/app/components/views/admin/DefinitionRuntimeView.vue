@@ -10,7 +10,7 @@ const { bytesToMib, cpuMillicoresToCores, RuntimeAllocation, UrlExposure, hasSer
   <FieldGroup>
     <div class="flex flex-wrap items-end gap-4">
       <Field class="min-w-0 flex-1">
-        <FieldLabel>{{ $t('ui.operatingEnvironmentType') }}</FieldLabel>
+        <FieldLabel>{{ $t('runtime.label.operatingEnvironmentType') }}</FieldLabel>
         <Select
           :model-value="runtime.definition.kind"
           :disabled="disabled || mode === 'Awdp'"
@@ -29,7 +29,7 @@ const { bytesToMib, cpuMillicoresToCores, RuntimeAllocation, UrlExposure, hasSer
         </Select>
       </Field>
       <Badge variant="secondary" class="mb-1 h-8 px-3">
-        {{ runtime.allocation === RuntimeAllocation.Shared ? $t('ui.share') : $t('ui.eachTeamIsIndependent') }}
+        {{ runtime.allocation === RuntimeAllocation.Shared ? $t('common.label.share') : $t('runtime.label.teamIndependent') }}
       </Badge>
     </div>
 
@@ -42,7 +42,7 @@ const { bytesToMib, cpuMillicoresToCores, RuntimeAllocation, UrlExposure, hasSer
       />
       <div>
         <FieldLabel for="ctf-dynamic-flag-injection" class="font-normal">
-          {{ $t('ui.dynamicFlagInjection') }}
+          {{ $t('runtime.label.dynamicFlagInjection') }}
         </FieldLabel>
       </div>
     </Field>
@@ -56,20 +56,20 @@ const { bytesToMib, cpuMillicoresToCores, RuntimeAllocation, UrlExposure, hasSer
       :flag-source="runtime.flagSource"
       :disabled="disabled"
     />
-    <DefinitionSection v-else :title="$t('ui.operatingEnvironmentType')" :collapsible="false">
+    <DefinitionSection v-else :title="$t('runtime.label.operatingEnvironmentType')" :collapsible="false">
       <Field>
-        <FieldLabel>{{ $t('ui.ovaSourceUrl') }}</FieldLabel>
+        <FieldLabel>{{ $t('administration.label.ovaSourceUrl') }}</FieldLabel>
         <Input v-model="runtime.definition.sourceUrl" :disabled="disabled" />
       </Field>
       <Field>
-        <FieldLabel>{{ $t('ui.sha256') }}</FieldLabel>
+        <FieldLabel>{{ $t('administration.label.sha') }}</FieldLabel>
         <Input v-model="runtime.definition.sha256" :disabled="disabled" />
       </Field>
     </DefinitionSection>
 
-    <DefinitionSection :title="$t('ui.accessEntrance')" :collapsible="false" accent-title>
+    <DefinitionSection :title="$t('runtime.label.accessEntrance')" :collapsible="false" accent-title>
       <Field v-if="mode !== 'Ctf' && mode !== 'Awdp'">
-        <FieldLabel>{{ $t('ui.flagSource') }}</FieldLabel>
+        <FieldLabel>{{ $t('runtime.label.flagSource') }}</FieldLabel>
         <Select
           :model-value="String(runtime.flagSource)"
           :disabled="disabled"
@@ -94,70 +94,70 @@ const { bytesToMib, cpuMillicoresToCores, RuntimeAllocation, UrlExposure, hasSer
         />
       </Field>
       <Field v-if="mode === 'Koh'">
-        <FieldLabel>{{ $t('ui.controlCheckEntry') }}</FieldLabel>
+        <FieldLabel>{{ $t('runtime.label.controlCheckEntry') }}</FieldLabel>
         <component :is="UrlBindingList"
           v-model="controlBindingList"
-          :exposure-options="[{ value: UrlExposure.Participants, label: $t('ui.platformCheckUsage') }]"
+          :exposure-options="[{ value: UrlExposure.Participants, label: $t('runtime.label.platformCheckUsage') }]"
           :show-service-name="hasServices"
           :service-names="serviceNames"
-          :add-label="$t('ui.setUpControlCheckEntry')"
+          :add-label="$t('runtime.definitionRuntime.label.setControlCheckEntry')"
           :allow-custom-display="false"
           :disabled="disabled"
         />
       </Field>
     </DefinitionSection>
 
-    <DefinitionSection :title="$t('ui.resourcesLifecycle')"  accent-title>
+    <DefinitionSection :title="$t('runtime.label.resourcesLifecycle')"  accent-title>
       <div class="grid gap-4 sm:grid-cols-3">
         <Field v-if="runtime.definition.kind === 'ova'">
-          <FieldLabel>{{ $t('ui.memoryMib') }}</FieldLabel>
+          <FieldLabel>{{ $t('common.label.memoryMib') }}</FieldLabel>
           <NullableNumberInput
             :model-value="bytesToMib(runtime.limits.memoryBytes)"
             :min="1"
-            :placeholder="$t('ui.256')"
+            :placeholder="$t('runtime.resources.memoryPlaceholder')"
             :disabled="disabled"
             @update:model-value="onUpdateModelValueRuntimeLimitsMemoryBytes"
           />
         </Field>
         <Field v-if="runtime.definition.kind === 'ova'">
-          <FieldLabel>{{ $t('ui.cpuCore') }}</FieldLabel>
+          <FieldLabel>{{ $t('common.label.cpuCore') }}</FieldLabel>
           <NullableNumberInput
             :model-value="cpuMillicoresToCores(runtime.limits.cpuMillicores)"
             :min="0"
             step="0.1"
-            :placeholder="$t('ui.05')"
+            :placeholder="$t('runtime.resources.cpuPlaceholder')"
             :disabled="disabled"
             @update:model-value="onUpdateModelValueRuntimeLimitsCpuMillicores"
           />
         </Field>
         <Field v-if="runtime.definition.kind === 'ova'">
-          <FieldLabel>{{ $t('ui.maximumNumberOfProcesses') }}</FieldLabel>
+          <FieldLabel>{{ $t('common.label.maximumNumberProcesses') }}</FieldLabel>
           <NullableNumberInput
             :model-value="runtime.limits.pidsLimit"
             :min="1"
-            :placeholder="$t('ui.128')"
+            :placeholder="$t('runtime.resources.pidPlaceholder')"
             :disabled="disabled"
             @update:model-value="onUpdateModelValueRuntimeLimitsPidsLimit"
           />
         </Field>
         <Field>
-          <FieldLabel>{{ $t('ui.instanceSurvivalTimeSeconds') }}</FieldLabel>
+          <FieldLabel>{{ $t('runtime.label.instanceSurvivalTimeSeconds') }}</FieldLabel>
           <NullableNumberInput
             :model-value="runtime.ttlSeconds"
             :min="1"
             :max="604800"
-            :placeholder="$t('ui.3600')"
+            :placeholder="$t('runtime.defaults.lifetimeSeconds')"
             :disabled="disabled"
             @update:model-value="onUpdateModelValueRuntimeTtlSeconds"
           />
         </Field>
         <Field>
-          <FieldLabel>{{ $t('ui.operationTimeoutSeconds') }}</FieldLabel>
+          <FieldLabel>{{ $t('runtime.label.timeoutSeconds') }}</FieldLabel>
           <NullableNumberInput
             :model-value="runtime.operationTimeoutSeconds"
             :min="1"
             :max="300"
-            :placeholder="$t('ui.60')"
+            :placeholder="$t('runtime.defaults.checkerTimeoutSeconds')"
             :disabled="disabled"
             @update:model-value="onUpdateModelValueRuntimeOperationTimeoutSeconds"
           />

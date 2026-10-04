@@ -127,11 +127,11 @@ export function useAuth() {
   }): Promise<void> {
     const administrator = user.value
     if (!administrator?.userId || administrator.role !== 'Administrator')
-      throw new Error(translate("ui.administratorSessionRequired"))
+      throw new Error(translate("common.validation.administratorSessionRequired"))
     if (impersonation.value)
-      throw new Error(translate("ui.identitySwitchAlreadyActive"))
+      throw new Error(translate("common.label.identitySwitchAlreadyActive"))
     if (!beginImpersonationAccessToken(input.accessToken, input.expiresAt))
-      throw new Error(translate("ui.administratorSessionRequired"))
+      throw new Error(translate("common.validation.administratorSessionRequired"))
     impersonation.value = {
       administratorUserId: administrator.userId,
       administratorUserName: administrator.userName ?? administrator.userId,
@@ -143,7 +143,7 @@ export function useAuth() {
     await fetchMe()
     if (user.value?.userId !== input.targetUserId) {
       await endImpersonation()
-      throw new Error(translate("ui.impersonatedIdentityCouldNotBeVerified"))
+      throw new Error(translate("common.auth.description.impersonatedIdentityCouldVerified"))
     }
     await navigateTo('/')
   }

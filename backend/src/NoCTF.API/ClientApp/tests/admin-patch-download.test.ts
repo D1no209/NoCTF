@@ -18,9 +18,9 @@ test('Patch downloads retain UTF-8 attachment names and original bytes', async (
 test('Patch download failures retain clear Chinese diagnostics', () => {
   expect(adminPatchFailureMessage('PatchNotFound')).toBe('该提交没有 Patch 包。')
   expect(adminPatchFailureMessage('FileNotFound')).toBe('Patch 包文件已不存在。')
-  expect(parseApiError({ status: 403, detail: "Only this competition's owner, managers, judges, or a platform administrator may download Patch archives." }).message)
+  expect(parseApiError({ messageKey: "common.patch.description.competitionSOwnerManagers",  status: 403, detail: "Only this competition's owner, managers, judges, or a platform administrator may download Patch archives." }).message)
     .toBe('只有本场比赛负责人、Manager、Judge 或平台管理员可以下载 Patch。')
-  expect(parseApiError({ status: 503, detail: 'The Patch download audit could not be saved. No file was returned. Try again later.' }).message)
+  expect(parseApiError({ messageKey: "common.patch.description.patchDownloadAuditCould",  status: 503, detail: 'The Patch download audit could not be saved. No file was returned. Try again later.' }).message)
     .toBe('Patch 下载审计保存失败，未下发文件，请稍后重试。')
 })
 

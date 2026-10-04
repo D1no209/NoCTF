@@ -16,20 +16,20 @@ const { canWrite, current, loading, error, frozenStartAt, hiddenStartAt, reason,
       <Card class="gap-0">
         <section id="competition-leaderboard-status" class="flex flex-col gap-4 py-4 first:pt-0 last:pb-0">
         <CardHeader>
-          <CardTitle>{{ $t('ui.currentStatus') }}</CardTitle>
+          <CardTitle>{{ $t('leaderboard.label.status') }}</CardTitle>
         </CardHeader>
         <CardContent class="flex flex-col gap-2 text-sm">
           <div class="flex items-center gap-2">
-            <span class="text-muted-foreground">{{ $t('ui.actualEffective') }}</span>
+            <span class="text-muted-foreground">{{ $t('leaderboard.label.actualEffective') }}</span>
             <Badge>{{ enumLabel(LeaderboardVisibilityLabel, current.effectiveVisibility) }}</Badge>
           </div>
           <div class="flex items-center gap-2">
-            <span class="text-muted-foreground">{{ $t('ui.freezeStartsAt') }}</span>
-            <span class="font-mono tabular-nums">{{ current.frozenStartAt ? adminFormatDateTime(current.frozenStartAt) : $t('ui.notSet') }}</span>
+            <span class="text-muted-foreground">{{ $t('leaderboard.label.freezeStarts') }}</span>
+            <span class="font-mono tabular-nums">{{ current.frozenStartAt ? adminFormatDateTime(current.frozenStartAt) : $t('leaderboard.label.set') }}</span>
           </div>
           <div class="flex items-center gap-2">
-            <span class="text-muted-foreground">{{ $t('ui.blackoutStartsAt') }}</span>
-            <span class="font-mono tabular-nums">{{ current.hiddenStartAt ? adminFormatDateTime(current.hiddenStartAt) : $t('ui.notSet') }}</span>
+            <span class="text-muted-foreground">{{ $t('leaderboard.label.blackoutStarts') }}</span>
+            <span class="font-mono tabular-nums">{{ current.hiddenStartAt ? adminFormatDateTime(current.hiddenStartAt) : $t('leaderboard.label.set') }}</span>
           </div>
         </CardContent>
         </section>
@@ -37,27 +37,27 @@ const { canWrite, current, loading, error, frozenStartAt, hiddenStartAt, reason,
         <Separator />
         <section id="competition-leaderboard-visibility" class="flex flex-col gap-4 py-4 first:pt-0 last:pb-0">
         <CardHeader>
-          <CardTitle>{{ $t('ui.modifyVisibility') }}</CardTitle>
-          <CardDescription>{{ $t('ui.freezeRetainsASnapshotOfTheLastStandingsMaskCompletely') }}</CardDescription>
+          <CardTitle>{{ $t('leaderboard.label.modifyVisibility') }}</CardTitle>
+          <CardDescription>{{ $t('leaderboard.competitionsBy.description.freezeRetainsSnapshotLast') }}</CardDescription>
         </CardHeader>
         <CardContent>
           <UiForm @submit.prevent="save">
             <FieldGroup>
               <Field>
-                <FieldLabel for="frozen-start">{{ $t('ui.freezeStartTimeOptional') }}</FieldLabel>
+                <FieldLabel for="frozen-start">{{ $t('leaderboard.label.freezeStartTimeOptional') }}</FieldLabel>
                 <DateTimePicker id="frozen-start" v-model="frozenStartAt"  class="max-w-sm" :readonly="!canWrite" />
               </Field>
               <Field>
-                <FieldLabel for="hidden-start">{{ $t('ui.blackoutStartTimeOptional') }}</FieldLabel>
+                <FieldLabel for="hidden-start">{{ $t('leaderboard.label.blackoutStartTimeOptional') }}</FieldLabel>
                 <DateTimePicker id="hidden-start" v-model="hiddenStartAt"  class="max-w-sm" :readonly="!canWrite" />
               </Field>
               <Field>
-                <FieldLabel for="vis-reason">{{ $t('ui.reasonOptionalRecordedInAudit') }}</FieldLabel>
-                <Input id="vis-reason" v-model="reason" class="max-w-sm" :readonly="!canWrite" :placeholder="$t('ui.exampleFreezeTheLast30MinutesOfTheGame')" />
+                <FieldLabel for="vis-reason">{{ $t('leaderboard.competitionsBy.label.reasonOptionalRecordedAudit') }}</FieldLabel>
+                <Input id="vis-reason" v-model="reason" class="max-w-sm" :readonly="!canWrite" :placeholder="$t('leaderboard.competitionsBy.description.exampleFreezeLastMinutes')" />
               </Field>
               <Field v-if="canWrite">
                 <Button type="submit" :disabled="saving" class="w-fit">
-                  <Spinner v-if="saving" data-icon="inline-start" /> {{ $t('ui.save') }} </Button>
+                  <Spinner v-if="saving" data-icon="inline-start" /> {{ $t('common.action.save') }} </Button>
               </Field>
             </FieldGroup>
           </UiForm>

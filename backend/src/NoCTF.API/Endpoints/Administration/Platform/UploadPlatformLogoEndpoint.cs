@@ -29,7 +29,7 @@ public sealed class UploadPlatformLogoValidator : Validator<UploadPlatformLogoRe
                 contentType,
                 StringComparer.OrdinalIgnoreCase))
             .When(request => request.File is not null)
-            .WithMessage("Logo must be a JPEG, PNG, or WebP image.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.UploadPlatformLogoValidationLogoJpegPngWebp)).WithErrorCode(ApiMessages.Key(ApiMessageId.UploadPlatformLogoValidationLogoJpegPngWebp));
     }
 }
 
@@ -68,10 +68,10 @@ public sealed class UploadPlatformLogoEndpoint(
         CancellationToken ct)
     {
         if (request.File.Length > uploadLimits.MaximumLogoBytes)
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: StatusCodes.Status413PayloadTooLarge,
-                title: "Logo is too large.",
-                detail: $"Logo uploads cannot exceed {uploadLimits.MaximumLogoBytes} bytes.",
+                title: ApiMessages.Get(ApiMessageId.UploadPlatformLogoTitleLogoTooLarge),
+                detail: ApiMessages.Get(ApiMessageId.UploadSizeLimit, new Dictionary<string, object?> { ["maximumBytes"] = uploadLimits.MaximumLogoBytes }),
                 extensions: new Dictionary<string, object?>
                 {
                     ["code"] = FileUploadFailureCode.UploadTooLarge.ToString()
@@ -92,12 +92,12 @@ public sealed class UploadPlatformLogoEndpoint(
                     result.Configuration!,
                     links,
                     HttpContext)),
-            PlatformLogoUpdateState.InvalidSize => TypedResults.Problem(
+            PlatformLogoUpdateState.InvalidSize => ApiProblems.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
-                title: "Logo size is invalid."),
-            PlatformLogoUpdateState.InvalidFormat => TypedResults.Problem(
+                title: ApiMessages.Get(ApiMessageId.UploadPlatformLogoTitleLogoSizeInvalid)),
+            PlatformLogoUpdateState.InvalidFormat => ApiProblems.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
-                title: "Logo format is invalid."),
+                title: ApiMessages.Get(ApiMessageId.UploadPlatformLogoTitleLogoFormatInvalid)),
             _ => throw new InvalidOperationException(
                 $"Unsupported platform logo update state: {result.State}.")
         };

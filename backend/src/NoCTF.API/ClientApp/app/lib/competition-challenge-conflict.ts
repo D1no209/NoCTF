@@ -27,11 +27,11 @@ export function competitionChallengeConflictMessage(error: unknown): string | un
 
   switch (code) {
     case 'ChallengeTemplateConflict':
-      return translate("ui.thisChallengeIsAlreadyInTheCompetitionEditTheExisting")
+      return translate("challenges.competitionChallenge.description.challengeAlreadyCompetitionEdit")
     case 'ChallengeOrderConflict':
-      return translate("ui.thisOrderIsAlreadyUsedByAnotherChallengeChooseA")
+      return translate("challenges.competitionChallenge.description.orderAlreadyAnotherChallenge")
     case 'ResourceIdConflict':
-      return translate("ui.theChallengeResourceIdentifierConflictsWithAnExistingResourceAdd")
+      return translate("challenges.competitionChallenge.description.challengeResourceIdentifierConflicts")
     default:
       return undefined
   }

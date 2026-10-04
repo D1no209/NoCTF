@@ -9,11 +9,11 @@ const { fields, overridden, parseFailed, updateField, setOverride, displayedValu
 <template>
   <div class="flex flex-col gap-3">
     <div class="flex items-center gap-2 text-xs text-muted-foreground">
-      <span v-if="dirty">{{ $t('ui.thereAreUnsavedChanges') }}</span>
+      <span v-if="dirty">{{ $t('administration.label.thereUnsavedChanges') }}</span>
     </div>
     <Skeleton v-if="loading" class="h-64 w-full" />
     <Alert v-else-if="parseFailed" variant="destructive">
-      <AlertDescription>{{ $t('ui.typedConfigurationUnavailable') }}</AlertDescription>
+      <AlertDescription>{{ $t('administration.error.typedConfigurationUnavailable') }}</AlertDescription>
     </Alert>
     <template v-else>
       <FieldGroup>
@@ -26,8 +26,8 @@ const { fields, overridden, parseFailed, updateField, setOverride, displayedValu
               :disabled="readonly"
               @update:model-value="setOverride(field, $event === true)"
             />
-            <span class="text-xs text-muted-foreground">{{ $t('ui.cover') }}</span>
-            <span v-if="!(overridden[field.key] ?? false)" class="text-xs text-muted-foreground">{{ $t('ui.inheritContestDefaults') }}</span>
+            <span class="text-xs text-muted-foreground">{{ $t('administration.label.cover') }}</span>
+            <span v-if="!(overridden[field.key] ?? false)" class="text-xs text-muted-foreground">{{ $t('administration.label.inheritContestDefaults') }}</span>
           </div>
           <component :is="ConfigFieldInput"
             :field="field"
@@ -40,7 +40,7 @@ const { fields, overridden, parseFailed, updateField, setOverride, displayedValu
       </FieldGroup>
       <div v-if="!readonly">
         <Button :disabled="saving || !dirty" @click="save">
-          <Spinner v-if="saving" data-icon="inline-start" /> {{ $t('ui.saveConfiguration') }} </Button>
+          <Spinner v-if="saving" data-icon="inline-start" /> {{ $t('administration.label.saveConfiguration') }} </Button>
       </div>
     </template>
   </div>

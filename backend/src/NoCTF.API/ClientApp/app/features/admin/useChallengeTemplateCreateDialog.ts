@@ -1,5 +1,7 @@
+import type { UiMessage } from '../../utils/i18n'
+import { message as describeMessage } from '../../utils/i18n'
 import { markRaw, proxyRefs, toRefs } from 'vue'
-import { toast } from 'vue-sonner'
+import { toast } from '../../utils/message-toast'
 import { adminChallengeBankCreateTemplate } from '../../api'
 import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract, NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol, NoCtfapiEndpointsCompetitionsGameModeProtocol } from '../../api'
 import { challengeTemplateWriteErrorMessages } from '../../lib/challenge-template-error'
@@ -26,7 +28,7 @@ export function useChallengeTemplateCreateDialog(
   const definition = ref<NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract>(
     defaultDefinition(mode.value),
   )
-  const saveErrors = ref<string[]>([])
+  const saveErrors = ref<UiMessage[]>([])
   const saveAttempted = ref(false)
   const pending = ref(false)
 
@@ -69,7 +71,7 @@ export function useChallengeTemplateCreateDialog(
     })
     if (validationErrors.length > 0) {
       saveErrors.value = validationErrors
-      toast.error(validationErrors[0] ?? translate('ui.unableToSaveTheChallengeTemplate'))
+      toast.error(validationErrors[0] ?? translate('administration.challengesBy.description.unableSaveChallengeTemplate'))
       return
     }
 
@@ -87,17 +89,17 @@ export function useChallengeTemplateCreateDialog(
       })
       if (error || !data?.id) {
         saveErrors.value = challengeTemplateWriteErrorMessages(error)
-        toast.error(saveErrors.value[0] ?? translate('ui.unableToSaveTheChallengeTemplate'))
+        toast.error(saveErrors.value[0] ?? translate('administration.challengesBy.description.unableSaveChallengeTemplate'))
         return
       }
       const templateId = data.id
-      toast.success(translate('ui.templateCreated'))
+      toast.success(describeMessage('administration.label.templateCreated'))
       reset()
       emit('created', templateId)
     }
     catch (error) {
       saveErrors.value = challengeTemplateWriteErrorMessages(error)
-      toast.error(saveErrors.value[0] ?? translate('ui.unableToSaveTheChallengeTemplate'))
+      toast.error(saveErrors.value[0] ?? translate('administration.challengesBy.description.unableSaveChallengeTemplate'))
     }
     finally {
       pending.value = false

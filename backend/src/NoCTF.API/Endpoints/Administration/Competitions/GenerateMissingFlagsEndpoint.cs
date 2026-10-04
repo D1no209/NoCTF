@@ -20,7 +20,12 @@ public sealed record MissingFlagGenerationFailureResponse(
     Guid CompetitionChallengeId,
     Guid TeamId,
     MissingFlagFailureCodeProtocol Code,
-    string Description);
+    string Description)
+{
+    public string Description { get; init; } = ApiMessages.Localize(Code, Description);
+    public string MessageKey => ApiMessages.For(Code).Key;
+    public IReadOnlyDictionary<string, object?> MessageArguments => ApiMessages.NoArguments;
+}
 
 public sealed record GenerateMissingFlagsResponse(
     IReadOnlyList<MissingFlagGenerationFailureResponse> Failures);

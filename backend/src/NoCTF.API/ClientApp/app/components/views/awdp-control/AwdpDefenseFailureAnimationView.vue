@@ -8,14 +8,14 @@ const { Box, ScanLine, ShieldAlert, cracks, event } = toRefs(viewProps.state)
 
 <template>
   <div class="event-fx defense-failure" aria-hidden="true">
-    <div class="upload-cube"><Box /><span>{{ $t('ui.patchUpload3') }}</span></div>
-    <div class="scan-warning"><ScanLine /><i /><strong>{{ $t('ui.scan') }}</strong></div>
-    <div class="warning-mark"><ShieldAlert /><b>!</b><span>{{ $t('ui.validationError') }}</span></div>
+    <div class="upload-cube"><Box /><span>{{ $t('competitions.label.patchUpload') }}</span></div>
+    <div class="scan-warning"><ScanLine /><i /><strong>{{ $t('competitions.label.scan') }}</strong></div>
+    <div class="warning-mark"><ShieldAlert /><b>!</b><span>{{ $t('competitions.error.validationFailed') }}</span></div>
     <div class="cracked-shield"><i v-for="crack in cracks" :key="crack" :style="{ '--crack': crack }" /></div>
     <div class="defense-result">
       <small>{{ event.teamName }} / {{ event.challengeTitle }}</small>
-      <strong>{{ $t('ui.defenseFailed2') }}</strong>
-      <span>{{ $t('ui.patchRejected') }} {{ $t('ui.noPoints') }}</span>
+      <strong>{{ $t('competitions.error.defenseFailed') }}</strong>
+      <span>{{ $t('competitions.label.patchRejected') }} {{ $t('competitions.label.points') }}</span>
     </div>
   </div>
 </template>

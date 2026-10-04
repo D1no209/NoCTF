@@ -1,10 +1,12 @@
+import { message as describeMessage } from '../../../../../utils/i18n'
+import type { UiMessage } from '../../../../../utils/i18n'
 import { proxyRefs } from 'vue'
 import { createLatestRequestGuard } from '~/lib/latest-request'
 import { useAdminDetailRoute } from '~/features/admin/useAdminDetailRoute'
 import { adminUserPath } from '~/features/admin/admin-navigation'
 import { markRaw } from 'vue'
 
-import { toast } from 'vue-sonner'
+import { toast } from '../../../../../utils/message-toast'
 import { adminGetTeam, adminCreateManualAdjustment, adminCorrectTeamBan, adminGetCompetition, adminGetTeamInvitation, adminListCompetitionChallenges, adminListTeamBanAppeals, adminListTeams, adminResolveTeamBanAppeal, patchCompetitionTeam, userProfileGet } from '../../../../../api'
 import type { NoCtfapiEndpointsAdministrationTeamsAdminTeamBanCaseResponse, NoCtfapiEndpointsAuthenticationPublicUserProfileResponse, NoCtfapiEndpointsChallengesChallengeSummaryResponse, NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../../../api'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
@@ -24,7 +26,7 @@ export function useAdminCompetitionsByIdTeamsPage() {
 
   const loading = ref(true)
 
-  const error = ref<string | null>(null)
+  const error = ref<UiMessage | null>(null)
 
   const pendingId = ref<string | null>(null)
 
@@ -33,10 +35,10 @@ export function useAdminCompetitionsByIdTeamsPage() {
   const tracksEnabled = ref(false)
 
   const registrationStatusOptions = [
-    { value: 'Unregistered', label: "ui.notRegistered" },
-    { value: 'Pending', label: "ui.pendingApproval" },
-    { value: 'Approved', label: "ui.passed" },
-    { value: 'Rejected', label: "ui.rejected" },
+    { value: 'Unregistered', label: "common.label.registered" },
+    { value: 'Pending', label: "common.label.pendingApproval" },
+    { value: 'Approved', label: "common.label.passed" },
+    { value: 'Rejected', label: "common.label.rejected" },
   ] as const
 
   const selection = useAdminDetailRoute<NoCtfapiEndpointsTeamsTeamResponse>('teamId', `/admin/competitions/${competitionId}/teams`, async (teamId, signal) => {
@@ -54,7 +56,7 @@ export function useAdminCompetitionsByIdTeamsPage() {
 
   const teamInvitationLoading = ref(false)
 
-  const teamInvitationError = ref<string | null>(null)
+  const teamInvitationError = ref<UiMessage | null>(null)
 
   const expandedMemberId = ref<string | null>(null)
   const memberRequests = createLatestRequestGuard()
@@ -81,8 +83,8 @@ export function useAdminCompetitionsByIdTeamsPage() {
       if (requestError || !data?.invitationToken) {
         teamInvitationError.value = parseApiError(
           requestError,
-          translate('ui.failedToLoadInvitationCode'),
-        ).message
+          describeMessage('competitions.competitionsBy.error.loadInvitationCodeFailed'),
+        ).displayMessage
         return
       }
       teamInvitationToken.value = data.invitationToken
@@ -91,8 +93,8 @@ export function useAdminCompetitionsByIdTeamsPage() {
       if (invitationRequests.isCurrent(request) && selectedTeam.value?.id === team.id) {
         teamInvitationError.value = parseApiError(
           requestError,
-          translate('ui.failedToLoadInvitationCode'),
-        ).message
+          describeMessage('competitions.competitionsBy.error.loadInvitationCodeFailed'),
+        ).displayMessage
       }
     }
     finally {
@@ -104,10 +106,10 @@ export function useAdminCompetitionsByIdTeamsPage() {
     if (!teamInvitationToken.value) return
     try {
       await navigator.clipboard.writeText(teamInvitationToken.value)
-      toast.success(translate('ui.invitationCodeHasBeenCopied'))
+      toast.success(describeMessage('competitions.competitionsBy.label.invitationCodeCopied'))
     }
     catch {
-      toast.error(translate('ui.copyFailedPleaseManuallySelectCopy'))
+      toast.error(describeMessage('common.kohPanel.error.copyManuallySelectFailed'))
     }
   }
 
@@ -142,7 +144,7 @@ export function useAdminCompetitionsByIdTeamsPage() {
 
   const scoreAdjustmentPending = ref(false)
 
-  const scoreAdjustmentError = ref<string | null>(null)
+  const scoreAdjustmentError = ref<UiMessage | null>(null)
 
   const scoreAdjustmentValid = computed(() =>
     Boolean(scoreAdjustmentTeam.value?.id)
@@ -172,7 +174,7 @@ export function useAdminCompetitionsByIdTeamsPage() {
     }
     catch (requestError) {
       if (scoreAdjustmentTeam.value?.id === team.id)
-        scoreAdjustmentError.value = parseApiError(requestError, translate("ui.failedToLoadTheChallengeList")).message
+        scoreAdjustmentError.value = parseApiError(requestError, describeMessage("administration.competitionsBy.error.loadChallengeListFailed")).displayMessage
     }
     finally {
       if (scoreAdjustmentTeam.value?.id === team.id) scoreAdjustmentLoading.value = false
@@ -198,11 +200,11 @@ export function useAdminCompetitionsByIdTeamsPage() {
         },
       })
       if (requestError) throw requestError
-      toast.success(translate("ui.scoreAdjustmentRecorded"))
+      toast.success(describeMessage("administration.label.scoreAdjustmentRecorded"))
       scoreAdjustmentTeam.value = null
     }
     catch (requestError) {
-      scoreAdjustmentError.value = parseApiError(requestError, translate("ui.failedToRecordTheScoreAdjustment")).message
+      scoreAdjustmentError.value = parseApiError(requestError, describeMessage("administration.competitionsBy.error.recordScoreAdjustmentFailed")).displayMessage
     }
     finally {
       scoreAdjustmentPending.value = false
@@ -265,11 +267,11 @@ export function useAdminCompetitionsByIdTeamsPage() {
         body: { administration: { trackKey, registrationStatus: team.registrationStatus } },
       })
       if (requestError) throw requestError
-      toast.success(translate("ui.teamTrackUpdated"))
+      toast.success(describeMessage("administration.label.teamTrackUpdated"))
       await load()
     }
     catch (requestError) {
-      toast.error(competitionTrackErrorMessage(requestError, translate("ui.failedToUpdateTeamTrack")))
+      toast.error(competitionTrackErrorMessage(requestError, translate("administration.competitionsBy.error.updateTeamTrackFailed")))
     }
     finally {
       pendingId.value = null
@@ -298,11 +300,11 @@ export function useAdminCompetitionsByIdTeamsPage() {
         },
       })
       if (error) throw error
-      toast.success(translate("ui.operationCompleted"))
+      toast.success(describeMessage("administration.label.completed"))
       await load()
     }
     catch (e) {
-      toast.error(parseApiError(e).message)
+      toast.error(parseApiError(e).displayMessage)
     }
     finally {
       pendingId.value = null
@@ -355,12 +357,12 @@ export function useAdminCompetitionsByIdTeamsPage() {
           })
         : await adminCorrectTeamBan({ path, body: { reason: banReason.value.trim() } })
       if (error) throw error
-      toast.success(ctx.mode === 'ban' ? translate("ui.teamHasBeenBanned") : translate("ui.theBanHasBeenCorrected"))
+      toast.success(ctx.mode === 'ban' ? translate("administration.label.teamBanned") : translate("administration.competitionsBy.label.banCorrected"))
       banDialog.value = null
       await load()
     }
     catch (e) {
-      toast.error(parseApiError(e).message)
+      toast.error(parseApiError(e).displayMessage)
     }
     finally {
       banPending.value = false
@@ -371,7 +373,7 @@ export function useAdminCompetitionsByIdTeamsPage() {
 
   const appealsLoading = ref(true)
 
-  const appealsError = ref<string | null>(null)
+  const appealsError = ref<UiMessage | null>(null)
 
   const appealDialog = ref<{ banCase: NoCtfapiEndpointsAdministrationTeamsAdminTeamBanCaseResponse; mode: 'accept' | 'uphold' } | null>(null)
 
@@ -383,7 +385,7 @@ export function useAdminCompetitionsByIdTeamsPage() {
     appealsLoading.value = true
     const { data, error } = await adminListTeamBanAppeals({ path: { competitionId } })
     if (error || !data) {
-      appealsError.value = parseApiError(error).message
+      appealsError.value = parseApiError(error).displayMessage
     }
     else {
       appealsError.value = null
@@ -416,12 +418,12 @@ export function useAdminCompetitionsByIdTeamsPage() {
         },
       })
       if (error) throw error
-      toast.success(ctx.mode === 'accept' ? translate("ui.appealAcceptedTeamUnblocked") : translate("ui.theAppealHasBeenDismissedAndTheBanIsMaintained"))
+      toast.success(ctx.mode === 'accept' ? translate("administration.label.appealAcceptedTeamUnblocked") : translate("administration.competitionsBy.description.appealDismissedBanMaintained"))
       appealDialog.value = null
       await Promise.all([load(), loadAppeals()])
     }
     catch (e) {
-      toast.error(parseApiError(e).message)
+      toast.error(parseApiError(e).displayMessage)
     }
     finally {
       appealPending.value = false

@@ -19,6 +19,6 @@ const props = defineProps<{
     <slot>
       <MoreHorizontalIcon />
     </slot>
-    <span class="sr-only">{{ $t('ui.more') }}</span>
+    <span class="sr-only">{{ $t('common.label.breadcrumbEllipsis') }}</span>
   </span>
 </template>

@@ -38,7 +38,12 @@ public enum UploadPatchFailureCodeProtocol
 
 public sealed record UploadPatchFailureResponse(
     UploadPatchFailureCodeProtocol Code,
-    string Detail);
+    string Detail)
+{
+    public string Detail { get; init; } = ApiMessages.Localize(Code, Detail, ApiMessages.NoArguments);
+    public string MessageKey => ApiMessages.For(Code).Key;
+    public IReadOnlyDictionary<string, object?> MessageArguments => ApiMessages.NoArguments;
+}
 
 public sealed class UploadPatchValidator : Validator<UploadPatchRequest>
 {
@@ -149,14 +154,12 @@ public sealed class UploadPatchEndpoint(
                     UploadPatchFailureCodeProtocol.ArchiveInvalid,
                     result.ErrorMessage!));
             }
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: result.FailureCode == PatchUploadFailureCode.ArchiveTooLarge
                     ? StatusCodes.Status413PayloadTooLarge
                     : StatusCodes.Status422UnprocessableEntity,
-                title: result.FailureCode == PatchUploadFailureCode.ArchiveTooLarge
-                    ? "Patch archive is too large."
-                    : "Patch archive was rejected.",
-                detail: result.ErrorMessage,
+                title: ApiMessages.For(result.FailureCode),
+                detail: ApiMessages.For(result.FailureCode),
                 extensions: new Dictionary<string, object?>
                 {
                     ["code"] = result.FailureCode?.ToString()

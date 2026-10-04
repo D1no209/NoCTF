@@ -48,7 +48,7 @@ describe('competition practice entry', () => {
     const submit = await sourceFile(new URL('../app/features/challenges/FlagSubmit.vue', import.meta.url)).text()
     const detail = await sourceFile(new URL('../app/features/challenges/CompetitionChallengeDetail.vue', import.meta.url)).text()
     expect(overview).toContain('canEnterCompetition(competition.value, myTeam.value)')
-    expect(overview).toContain("practiceOpen ? $t('ui.enterPractice') : $t('ui.enterTheCompetition')")
+    expect(overview).toContain("practiceOpen ? $t('competitions.label.enterPractice') : $t('competitions.label.enterCompetition')")
     expect(panel).toContain('isCtfPracticeOpen(props.competition)')
     expect(panel).toContain(':practice="practiceOpen"')
     expect(submit).toContain('await submitFlagEndpoint({')

@@ -1,3 +1,5 @@
+import { message as describeMessage } from '../../utils/i18n'
+import type { UiMessage } from '../../utils/i18n'
 import { toRefs } from 'vue'
 
 import { Megaphone } from '@lucide/vue'
@@ -22,7 +24,7 @@ export function useCompetitionBroadcastPanel(props: Readonly<Omit<{
 
   const loading = ref(true)
 
-  const error = ref<string | null>(null)
+  const error = ref<UiMessage | null>(null)
 
   const initialized = ref(false)
 
@@ -93,7 +95,7 @@ export function useCompetitionBroadcastPanel(props: Readonly<Omit<{
     })
     if (requestError || !data) {
       if (initialLoad)
-        error.value = parseApiError(requestError, translate("ui.failedToLoadEventReport")).message
+        error.value = parseApiError(requestError, describeMessage("competitions.competitionBroadcast.error.loadEventReportFailed")).displayMessage
       loading.value = false
       return
     }

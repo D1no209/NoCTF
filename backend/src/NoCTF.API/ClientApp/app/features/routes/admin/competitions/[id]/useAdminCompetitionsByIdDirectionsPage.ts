@@ -1,5 +1,7 @@
+import { message as describeMessage } from '../../../../../utils/i18n'
+import type { UiMessage } from '../../../../../utils/i18n'
 import { Plus, Trash2, RefreshCw } from '@lucide/vue'
-import { toast } from 'vue-sonner'
+import { toast } from '../../../../../utils/message-toast'
 import { adminGetCompetitionDirections, adminSaveCompetitionDirections, adminListCompetitionChallenges } from '~/api'
 import type { NoCtfapiEndpointsAdministrationCompetitionsCompetitionDirectionResponse as Direction } from '~/api'
 import { useCompetitionAdmin } from '~/lib/admin-competition'
@@ -16,7 +18,7 @@ export function useAdminCompetitionsByIdDirectionsPage() {
   const items = ref<Direction[]>([])
   const loading = ref(true)
   const saving = ref(false)
-  const error = ref<string | null>(null)
+  const error = ref<UiMessage | null>(null)
   const used = ref(new Set<string>())
   let generation = 0
   let request: AbortController | undefined
@@ -34,7 +36,7 @@ export function useAdminCompetitionsByIdDirectionsPage() {
     if (version !== generation) return
     loading.value = false
     if (catalog.error || !catalog.data || challenges.error) {
-      error.value = parseApiError(catalog.error ?? challenges.error).message
+      error.value = parseApiError(catalog.error ?? challenges.error).displayMessage
       return
     }
     items.value = catalog.data.items ?? []
@@ -56,13 +58,13 @@ export function useAdminCompetitionsByIdDirectionsPage() {
       if (version !== generation) return
       if (result.error || !result.data) {
         const code = result.error && typeof result.error === 'object' && 'code' in result.error ? result.error.code : null
-        error.value = code ? translate(`directionSettings.errors.${code}`) : parseApiError(result.error).message
+        error.value = code ? translate(`directionSettings.errors.${code}`) : parseApiError(result.error).displayMessage
         return
       }
       items.value = result.data.items ?? []
-      toast.success(translate('directionSettings.saved'))
+      toast.success(describeMessage('directionSettings.saved'))
     }
-    catch (failure) { if (version === generation) error.value = parseApiError(failure).message }
+    catch (failure) { if (version === generation) error.value = parseApiError(failure).displayMessage }
     finally { if (version === generation) saving.value = false }
   }
   function canRemove(item: Direction) { return items.value.length > 1 && !used.value.has(item.id ?? '') }

@@ -1,8 +1,8 @@
-import type { translate, localizeMessage } from '../utils/i18n'
+import type { t, localizeMessage } from '../utils/i18n'
 
 declare module 'vue' {
   interface ComponentCustomProperties {
-    $t: typeof translate
+    $t: typeof t
     $message: typeof localizeMessage
   }
 }

@@ -58,7 +58,7 @@ public class SsoProviderWriteValidator<TRequest> : Validator<TRequest>
             SsoProtocolProtocol.Oidc => request.Oidc is not null && request.Cas is null,
             SsoProtocolProtocol.Cas => request.Cas is not null && request.Oidc is null,
             _ => false
-        }).WithMessage("Exactly one protocol configuration matching the provider protocol is required.");
+        }).WithMessage(_ => ApiMessages.Text(ApiMessageId.CreateSsoProviderValidationExactlyOneProtocolConfiguration)).WithErrorCode(ApiMessages.Key(ApiMessageId.CreateSsoProviderValidationExactlyOneProtocolConfiguration));
     }
 }
 

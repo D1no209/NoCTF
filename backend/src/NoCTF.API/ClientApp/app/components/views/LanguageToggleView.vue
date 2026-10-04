@@ -11,7 +11,7 @@ const { Languages, isEnglish, switchLocale, t } = toRefs(viewProps.state)
     variant="ghost"
     size="icon"
     class="rounded-full"
-    :aria-label="isEnglish ? t('ui.switchToChinese') : t('ui.switchToEnglish')"
+    :aria-label="isEnglish ? t('common.label.switchChinese') : t('common.label.switchEnglish')"
     @click="switchLocale"
   >
     <Languages class="size-4" />

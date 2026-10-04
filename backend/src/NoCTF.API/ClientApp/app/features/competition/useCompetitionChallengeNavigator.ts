@@ -1,3 +1,5 @@
+import { message as describeMessage } from '../../utils/i18n'
+import type { UiMessage } from '../../utils/i18n'
 import { challengeTagOptions, matchesAllTags, tagsFromQuery, uniqueTags } from '../../lib/challenge-tags'
 import { toRefs } from 'vue'
 
@@ -76,7 +78,7 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
 
   const loading = ref(true)
 
-  const error = ref<string | null>(null)
+  const error = ref<UiMessage | null>(null)
 
   const dataScope = ref<NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol>('Live')
 
@@ -124,7 +126,7 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
     loading.value = false
     if (requestError || !data) {
       if (response?.status === 404) items.value = []
-      error.value = parseApiError(requestError, translate("ui.failedToLoadQuestion")).message
+      error.value = parseApiError(requestError, describeMessage("challenges.error.loadQuestionFailed")).displayMessage
       if (!initialized) emit('ready', null)
       return
     }
@@ -228,9 +230,9 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
 
   function awdpProgressLabel(progress: ChallengeProgress | null): string | null {
     if (!progress) return null
-    if (progress.attackSucceeded && progress.defenseSucceeded) return translate("ui.attackAndDefenseSucceeded")
-    if (progress.attackSucceeded) return translate("ui.attackSucceeded")
-    if (progress.defenseSucceeded) return translate("ui.defenseSucceeded")
+    if (progress.attackSucceeded && progress.defenseSucceeded) return translate("common.label.attackDefenseSucceeded")
+    if (progress.attackSucceeded) return translate("common.label.attackSucceeded")
+    if (progress.defenseSucceeded) return translate("common.label.defenseSucceeded")
     return null
   }
 
@@ -243,7 +245,7 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
     if (!progress) return null
     if (isAwdp.value) return awdpProgressLabel(progress)
     if (!progress.solvedByMyTeam) return null
-    return progress.bloodRank ? bloodRankLabel(progress.bloodRank) : translate("ui.solved")
+    return progress.bloodRank ? bloodRankLabel(progress.bloodRank) : translate("common.label.solved.competitionChallengeNavigator")
   }
 
   function currentScore(challengeId?: string): number | null {
@@ -259,13 +261,13 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
   }
 
   function bloodTeamName(blood: ChallengeBloodMark): string {
-    return blood.teamName ?? `${translate('ui.teamId')}: ${blood.teamId}`
+    return blood.teamName ?? `${translate('common.label.teamId')}: ${blood.teamId}`
   }
 
   const groups = computed(() => {
     const grouped = new Map<string, Challenge[]>()
     for (const item of items.value) {
-      const direction = (item.directionId ? item.direction : directionLabel(item.direction)) || translate("ui.uncategorized")
+      const direction = (item.directionId ? item.direction : directionLabel(item.direction)) || translate("common.label.uncategorized")
       const challenges = grouped.get(direction) ?? []
       challenges.push(item)
       grouped.set(direction, challenges)
@@ -294,7 +296,7 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
   const emptyLabel = computed(() => normalizedSearch.value || selectedTags.value.length || (hideSolved.value && hidesLockedChallenges.value)
     ? translate('challengeNavigator.noMatches')
     : hidesLockedChallenges.value ? translate('challengeNavigator.noUnlockedChallenges')
-      : hideSolved.value ? translate('ui.noUnsolvedChallenges') : translate('ui.thereAreNoPublishedTopicsYet'))
+      : hideSolved.value ? translate('challenges.label.unsolvedChallenges') : translate('challenges.competitionChallenge.description.therePublishedTopicsYet'))
 
   const groupOptions = computed(() => visibleGroups.value.map(group => ({
     value: group.direction,

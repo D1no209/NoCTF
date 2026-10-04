@@ -9,7 +9,7 @@ import {
   useForwardPropsEmits,
 } from 'reka-ui'
 import { cn } from '~/lib/utils'
-import { currentLocale } from '~/utils/i18n'
+import { currentLocale } from '../../../utils/i18n'
 
 const props = withDefaults(defineProps<SwitchRootProps & {
   class?: HTMLAttributes['class']

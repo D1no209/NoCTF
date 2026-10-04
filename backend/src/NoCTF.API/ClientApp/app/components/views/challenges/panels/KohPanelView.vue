@@ -9,7 +9,7 @@ const { Copy, copyControlFlag, RuntimeAccessUrl, challenge } = toRefs(viewProps.
 <template>
   <div class="grid gap-6 md:grid-cols-2 md:gap-0 md:divide-x">
     <section class="flex flex-col gap-4 md:pr-6" aria-labelledby="koh-hill-title">
-        <h3 id="koh-hill-title" class="text-sm font-semibold">{{ $t('ui.hillEntrance') }}</h3>
+        <h3 id="koh-hill-title" class="text-sm font-semibold">{{ $t('challenges.label.hillEntrance') }}</h3>
         <div v-if="challenge.accesses?.length" class="flex flex-col gap-1">
           <component :is="RuntimeAccessUrl"
             v-for="access in challenge.accesses"
@@ -17,20 +17,20 @@ const { Copy, copyControlFlag, RuntimeAccessUrl, challenge } = toRefs(viewProps.
             :access="access"
           />
         </div>
-        <p v-else class="text-sm text-muted-foreground">{{ $t('ui.theEntranceToTheMountainIsNotYetOpenPlease') }}</p>
+        <p v-else class="text-sm text-muted-foreground">{{ $t('challenges.kohPanel.description.entranceMountainYetOpen') }}</p>
     </section>
 
     <section class="flex flex-col gap-4 border-t pt-6 md:border-t-0 md:pl-6 md:pt-0" aria-labelledby="koh-control-title">
         <header>
-          <h3 id="koh-control-title" class="text-sm font-semibold">{{ $t('ui.teamControlFlag') }}</h3>
-          <p class="mt-1 text-sm text-muted-foreground">{{ $t('ui.itIsOnlyVisibleToThisTeamItIsUsed') }}</p>
+          <h3 id="koh-control-title" class="text-sm font-semibold">{{ $t('challenges.label.teamControlFlag') }}</h3>
+          <p class="mt-1 text-sm text-muted-foreground">{{ $t('challenges.kohPanel.description.visibleTeam') }}</p>
         </header>
         <div v-if="challenge.controlFlag" class="flex flex-wrap items-center gap-2">
           <code class="rounded bg-muted px-2 py-1 font-mono text-sm">{{ challenge.controlFlag }}</code>
           <Button variant="outline" size="sm" @click="copyControlFlag(challenge.controlFlag!)">
-            <Copy data-icon="inline-start" /> {{ $t('ui.copy') }} </Button>
+            <Copy data-icon="inline-start" /> {{ $t('common.action.copy') }} </Button>
         </div>
-        <p v-else class="text-sm text-muted-foreground"> {{ $t('ui.afterLoggingInAndPassingTheRegistrationReviewYourTeam') }} </p>
+        <p v-else class="text-sm text-muted-foreground"> {{ $t('challenges.kohPanel.description.loggingPassingRegistrationReview') }} </p>
     </section>
   </div>
 </template>

@@ -5,41 +5,27 @@ export function startGateErrorMessage(
   error: Pick<NoCtfapiEndpointsAdministrationCompetitionsStartGateErrorResponse, 'code' | 'message'>,
 ): string {
   const message = error.message ?? ''
-  const isSchemaVersionFailure = /schema\s*version/i.test(message)
-    && /unsupported|supported versions/i.test(message)
-
-  if (isSchemaVersionFailure) {
-    switch (error.code) {
-      case 'CompetitionConfigurationInvalid':
-        return translate("ui.theCompetitionModeConfigurationIsOutdatedSaveTheCompetitionConfiguration")
-      case 'RuntimeDefinitionInvalid':
-        return translate("ui.theChallengeRuntimeDefinitionIsOutdatedOpenTheChallengeTemplate")
-      case 'ChallengeRulesInvalid':
-        return translate("ui.theChallengeRulesAreOutdatedSaveTheChallengeRulesAgain")
-    }
-  }
-
   switch (error.code) {
     case 'CompetitionNotPublished':
-      return translate("ui.theCompetitionMustBePublishedBeforeStartValidationIsAvailable")
+      return translate("common.startGate.validation.competitionPublishedFormat")
     case 'CompetitionConfigurationInvalid':
-      return translate("ui.theCompetitionModeConfigurationIsInvalidCheckTheCompetitionSettings")
+      return translate("common.startGate.error.competitionModeConfigurationInvalid")
     case 'PublishedChallengeRequired':
-      return translate("ui.publishAtLeastOneChallenge")
+      return translate("common.startGate.label.publishLeastOneChallenge")
     case 'ApprovedTeamRequired':
-      return translate("ui.atLeastOneApprovedTeamIsRequired")
+      return translate("common.startGate.validation.leastOneRequired")
     case 'RuntimeQuotaInsufficient':
-      return translate("ui.thePerTeamRuntimeLimitIsTooLowForAll")
+      return translate("common.startGate.description.teamRuntimeLimitToo")
     case 'ChallengeModeMismatch':
-      return translate("ui.theChallengeModeDoesNotMatchTheCompetitionMode")
+      return translate("common.startGate.description.challengeModeMatchCompetition")
     case 'ChallengeRulesInvalid':
-      return translate("ui.theChallengeRulesAreInvalidCheckTheCompetitionChallengeSettings")
+      return translate("common.startGate.error.challengeRulesCheckInvalid")
     case 'RuntimeDefinitionInvalid':
-      return translate("ui.theChallengeRuntimeDefinitionIsInvalidCheckTheChallengeTemplate")
+      return translate("common.startGate.error.challengeRuntimeDefinitionInvalid")
     case 'TrackConfigurationInvalid':
-      return translate("ui.theTrackConfigurationIsInvalidCheckTheTrackSettings")
+      return translate("common.startGate.error.trackConfigurationCheckInvalid")
     case 'TeamTrackInvalid':
-      return translate("ui.aTeamReferencesATrackThatNoLongerExistsReassign")
+      return translate("common.startGate.description.teamReferencesTrackLonger")
     default:
       return localizeMessage(message)
   }

@@ -1,3 +1,5 @@
+import { message as describeMessage } from '../../utils/i18n'
+import type { UiMessage } from '../../utils/i18n'
 
 
 import { ArrowRight, Bell, Mail } from '@lucide/vue'
@@ -23,9 +25,9 @@ export function useNotificationCenter() {
 
   const threadLoading = ref(false)
 
-  const threadError = ref<string | null>(null)
+  const threadError = ref<UiMessage | null>(null)
 
-  const routeError = ref<string | null>(null)
+  const routeError = ref<UiMessage | null>(null)
 
   const threadRequests = createLatestRequestGuard()
 
@@ -39,7 +41,7 @@ export function useNotificationCenter() {
           desc: true,
         },
       })
-      if (requestError || !data) throw requestError ?? new Error(translate("ui.failedToLoadNotification"))
+      if (requestError || !data) throw requestError ?? new Error(translate("notifications.error.loadNotificationFailed"))
       const pageItems = data.items ?? []
       const offset = cursor ? Number(cursor) || 0 : 0
       const nextOffset = offset + pageItems.length
@@ -59,31 +61,31 @@ export function useNotificationCenter() {
 
   function sourceLabel(notification: Notification): string {
     if (notification.sourceDisplayName) return notification.sourceDisplayName
-    return notification.sourceType === 0 ? translate("ui.eventSystem") : translate("ui.eventStaff")
+    return notification.sourceType === 0 ? translate("notifications.label.eventSystem") : translate("common.label.eventStaff")
   }
 
   function audienceLabel(notification: Notification): string {
     return ({
-      0: translate("ui.onlyYou"),
-      1: translate("ui.eventWorkingGroup"),
-      2: translate("ui.eventAnnouncement"),
-      3: translate("ui.ourTeam"),
-      4: translate("ui.platformAdministrator"),
-    } as Record<number, string>)[notification.targetType ?? -1] ?? translate("ui.targetedMessages")
+      0: translate("notifications.label.notificationCenter"),
+      1: translate("notifications.label.eventWorkingGroup"),
+      2: translate("common.label.eventAnnouncement"),
+      3: translate("notifications.label.ourTeam"),
+      4: translate("notifications.label.platformAdministrator"),
+    } as Record<number, string>)[notification.targetType ?? -1] ?? translate("notifications.label.targetedMessages")
   }
 
   function categoryLabel(notification: Notification): string {
     if (notification.kind === 'QuestionOpened' || notification.kind === 'QuestionStatusChanged' || notification.kind === 'Message')
-      return translate("ui.questions")
+      return translate("common.label.questions")
     if (notification.kind === 'TeamBanned' || notification.kind === 'TeamBanCorrected' || notification.kind === 'TeamBanAppealSubmitted' || notification.kind === 'TeamRegistrationChanged')
-      return translate("ui.team")
-    if (notification.kind === 'GameplayFactAdjudicated') return translate("ui.review")
-    if (notification.kind === 'RuntimeStateChanged') return translate("ui.environment")
+      return translate("common.label.team")
+    if (notification.kind === 'GameplayFactAdjudicated') return translate("notifications.label.review")
+    if (notification.kind === 'RuntimeStateChanged') return translate("notifications.label.environment")
     if (notification.kind === 'CheatIncidentDetected' || notification.kind === 'ManagementFailure' || notification.kind === 'StartGateFailed')
-      return translate("ui.management")
-    if (notification.kind === 'UserAccountLifecycleChanged') return translate("ui.accountNumber")
-    if (notification.kind === 'CompetitionForceDeleted') return translate("ui.management")
-    return translate("ui.news")
+      return translate("common.label.management")
+    if (notification.kind === 'UserAccountLifecycleChanged') return translate("notifications.label.accountNumber")
+    if (notification.kind === 'CompetitionForceDeleted') return translate("common.label.management")
+    return translate("common.label.news")
   }
 
   function threadText(notification: Notification): string {
@@ -93,9 +95,9 @@ export function useNotificationCenter() {
       ? notification.content as Record<string, unknown>
       : {}
     if (notification.kind === 'QuestionStatusChanged') {
-      const from = typeof payload.from === 'string' ? payload.from : translate("ui.unknown")
-      const to = typeof payload.to === 'string' ? payload.to : translate("ui.unknown")
-      return translate("ui.questionStatus", { from, to })
+      const from = typeof payload.from === 'string' ? payload.from : translate("common.label.unknown")
+      const to = typeof payload.to === 'string' ? payload.to : translate("common.label.unknown")
+      return translate("notifications.label.questionStatus", { from, to })
     }
     return notificationText(notification)
   }
@@ -122,12 +124,12 @@ export function useNotificationCenter() {
         path: { notificationId: rootId },
       })
       if (!threadRequests.isCurrent(request)) return
-      if (requestError || !data) throw requestError ?? new Error(translate("ui.failedToLoadNotificationDetails"))
+      if (requestError || !data) throw requestError ?? new Error(translate("notifications.notificationCenter.error.loadNotificationDetailsFailed"))
       thread.value = data.items ?? []
     }
     catch (requestError) {
       if (threadRequests.isCurrent(request))
-        threadError.value = parseApiError(requestError, translate("ui.failedToLoadNotificationDetails")).message
+        threadError.value = parseApiError(requestError, describeMessage("notifications.notificationCenter.error.loadNotificationDetailsFailed")).displayMessage
     }
     finally {
       if (threadRequests.isCurrent(request))
@@ -174,15 +176,15 @@ export function useNotificationCenter() {
         path: { notificationId: selectedId },
       })
       if (!threadRequests.isCurrent(request)) return
-      if (requestError || !data) throw requestError ?? new Error(translate("ui.failedToLoadNotificationDetails"))
+      if (requestError || !data) throw requestError ?? new Error(translate("notifications.notificationCenter.error.loadNotificationDetailsFailed"))
       const routedNotification = data.items?.find(item => item.id === selectedId)
-      if (!routedNotification) throw new Error(translate("ui.theNotificationDoesNotExistOrYouAreNotAllowed"))
+      if (!routedNotification) throw new Error(translate("notifications.notificationCenter.description.notificationExistAllowed"))
       selected.value = routedNotification
       thread.value = data.items ?? []
     }
     catch (requestError) {
       if (threadRequests.isCurrent(request))
-        routeError.value = parseApiError(requestError, translate("ui.failedToLoadNotificationDetails")).message
+        routeError.value = parseApiError(requestError, describeMessage("notifications.notificationCenter.error.loadNotificationDetailsFailed")).displayMessage
     }
     finally {
       if (threadRequests.isCurrent(request))
@@ -230,13 +232,13 @@ export function useNotificationCenter() {
     }
     catch (failure) {
       if (!threadRequests.isCurrent(request) || selected.value?.id !== current.id) return
-      const parsed = parseApiError(failure, translate('ui.failedToLoadNotificationDetails'))
+      const parsed = parseApiError(failure, describeMessage('notifications.notificationCenter.error.loadNotificationDetailsFailed'))
       if (parsed.status === 403 || parsed.status === 404) {
         selected.value = null
         thread.value = []
-        routeError.value = parsed.message
+        routeError.value = parsed.displayMessage
       }
-      else threadError.value = parsed.message
+      else threadError.value = parsed.displayMessage
     }
   }
 

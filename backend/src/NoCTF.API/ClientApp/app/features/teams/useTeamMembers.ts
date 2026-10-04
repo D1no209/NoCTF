@@ -1,6 +1,8 @@
+import { message as describeMessage } from '../../utils/i18n'
+import type { UiMessage } from '../../utils/i18n'
 import { toRefs } from 'vue'
 
-import { toast } from 'vue-sonner'
+import { toast } from '../../utils/message-toast'
 import { Crown, UserMinus } from '@lucide/vue'
 import { patchCompetitionTeam, userProfileGet } from '../../api'
 import type { NoCtfapiEndpointsAuthenticationPublicUserProfileResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../api'
@@ -17,7 +19,7 @@ emit: { (event: "changed", ...args: []): void }) {
 
   const loaded = ref(false)
 
-  const loadError = ref<string | null>(null)
+  const loadError = ref<UiMessage | null>(null)
 
   const removing = ref<string | null>(null)
 
@@ -38,7 +40,7 @@ emit: { (event: "changed", ...args: []): void }) {
     )
     const failures = entries.filter(entry => entry.error || !entry.data).length
     if (failures > 0) {
-      loadError.value = translate("ui.profilesForTeamMembersCouldNotBeLoadedUserIdentifiers", {
+      loadError.value = describeMessage("competitions.teamMembers.description.profilesTeamMembersCould", {
         count: failures,
       })
     }
@@ -60,10 +62,10 @@ emit: { (event: "changed", ...args: []): void }) {
     })
     removing.value = null
     if (error) {
-      toast.error(parseApiError(error, translate("ui.failedToRemoveMember")).message)
+      toast.error(parseApiError(error, describeMessage("competitions.error.removeMemberFailed")).displayMessage)
       return
     }
-    toast.success(translate("ui.memberRemoved"))
+    toast.success(describeMessage("competitions.label.memberRemoved"))
     emit('changed')
   }
 

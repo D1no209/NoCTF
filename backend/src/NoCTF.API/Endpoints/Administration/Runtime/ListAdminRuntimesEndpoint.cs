@@ -150,7 +150,7 @@ public sealed class ListAdminRuntimesEndpoint(
             request.ExpiresBefore?.ToString("O", CultureInfo.InvariantCulture),
             request.HostPort);
         if (!cursors.TryDecode(request.Cursor, CursorEndpoint, filterKey, out var position))
-            return TypedResults.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Invalid cursor.");
+            return ApiProblems.Problem(statusCode: StatusCodes.Status400BadRequest, title: ApiMessages.Get(ApiMessageId.InvalidCursor));
         var filter = new AdminRuntimeFilter(
                 competitionId, request.CompetitionChallengeId, request.TeamId,
                 request.RuntimeKind is null ? null : RuntimeProtocolMapper.ToDomain(request.RuntimeKind.Value),

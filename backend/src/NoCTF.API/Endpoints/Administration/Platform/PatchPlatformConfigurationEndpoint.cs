@@ -114,7 +114,7 @@ public sealed class PatchPlatformConfigurationValidator
             || request.HumanVerification is not null
             || request.EmailVerification is not null
             || request.ExperimentalFeatures is not null)
-            .WithMessage("At least one platform configuration section is required.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.PatchPlatformConfigurationValidationLeastOnePlatformConfiguration)).WithErrorCode(ApiMessages.Key(ApiMessageId.PatchPlatformConfigurationValidationLeastOnePlatformConfiguration));
         RuleFor(request => request.Branding!.Name).NotEmpty()
             .MaximumLength(PlatformConfigurationRules.MaximumNameLength)
             .When(request => request.Branding is not null);
@@ -405,10 +405,10 @@ public sealed class PatchPlatformConfigurationEndpoint(
         | (request.ExperimentalFeatures is null ? PlatformConfigurationPatchSection.None
             : PlatformConfigurationPatchSection.ExperimentalFeatures);
 
-    private static ProblemHttpResult Invalid(string detail) => TypedResults.Problem(
+    private static ProblemHttpResult Invalid(string detail) => ApiProblems.Problem(
         statusCode: StatusCodes.Status400BadRequest,
-        title: "Platform configuration is invalid.",
-        detail: detail);
+        title: ApiMessages.Get(ApiMessageId.PatchPlatformConfigurationTitlePlatformConfigurationInvalid),
+        detail: ApiMessages.Get(ApiMessageId.PatchPlatformConfigurationTitlePlatformConfigurationInvalid));
 
     private static ProblemHttpResult HumanVerificationInvalid(
         IReadOnlyList<HumanVerificationConfigurationError> errors)
@@ -420,14 +420,12 @@ public sealed class PatchPlatformConfigurationEndpoint(
             : errors.Contains(HumanVerificationConfigurationError.CapConfigurationInvalid)
                 ? PlatformProblemCode.CapConfigurationInvalid
                 : (PlatformProblemCode?)null;
-        return TypedResults.Problem(
+        return ApiProblems.Problem(
             statusCode: unavailable
                 ? StatusCodes.Status503ServiceUnavailable
                 : StatusCodes.Status400BadRequest,
-            title: unavailable
-                ? "Cap is unavailable."
-                : "Platform configuration is invalid.",
-            detail: string.Join(" ", errors),
+            title: ApiMessages.For(code),
+            detail: ApiMessages.For(code),
             extensions: code is null
                 ? null
                 : new Dictionary<string, object?> { ["code"] = code.Value });

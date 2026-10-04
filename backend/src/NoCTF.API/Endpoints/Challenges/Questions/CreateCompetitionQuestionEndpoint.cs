@@ -52,7 +52,12 @@ public sealed record CompetitionQuestionFailureResponse(
     CompetitionQuestionFailureCode Code,
     string Detail,
     CompetitionQuestionResponse? Current,
-    int? Limit);
+    int? Limit)
+{
+    public string Detail { get; init; } = ApiMessages.Localize(Code, Detail, new Dictionary<string, object?> { ["limit"] = Limit ?? 0 });
+    public string MessageKey => ApiMessages.For(Code).Key;
+    public IReadOnlyDictionary<string, object?> MessageArguments => new Dictionary<string, object?> { ["limit"] = Limit ?? 0 };
+}
 
 internal static class CompetitionQuestionFailureMapper
 {
@@ -176,9 +181,9 @@ public sealed class CreateCompetitionQuestionEndpoint(
             CompetitionQuestionFailure.InvalidChallengeReference => TypedResults.UnprocessableEntity(
                 CompetitionQuestionFailureMapper.ToResponse(result)),
             CompetitionQuestionFailure.InvalidRequest
-                or CompetitionQuestionFailure.SpamRejected => TypedResults.Problem(
+                or CompetitionQuestionFailure.SpamRejected => ApiProblems.Problem(
                     statusCode: StatusCodes.Status400BadRequest,
-                    title: "Competition question was rejected.",
+                    title: ApiMessages.Get(ApiMessageId.CreateCompetitionQuestionTitleCompetitionQuestionWasRejected),
                     extensions: new Dictionary<string, object?>
                     {
                         ["code"] = CompetitionQuestionFailureMapper.ToCode(result.Failure.Value)

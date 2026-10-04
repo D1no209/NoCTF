@@ -1,7 +1,9 @@
+import { message as describeMessage } from '../../../../../utils/i18n'
+import type { UiMessage } from '../../../../../utils/i18n'
 import { markRaw } from 'vue'
 import { useNow } from '@vueuse/core'
 import { Download, Eye, FileText } from '@lucide/vue'
-import { toast } from 'vue-sonner'
+import { toast } from '../../../../../utils/message-toast'
 
 import { downloadMyTeamWriteUp, getMyTeamWriteUp, replaceMyTeamWriteUp } from '../../../../../api'
 import type { NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpResponse } from '../../../../../api'
@@ -33,12 +35,12 @@ export function useCompetitionsByIdMyWriteUpPage() {
   const selectedFile = ref<File | null>(null)
   const uploadInputKey = ref(0)
   const loading = ref(true)
-  const loadError = ref<string | null>(null)
-  const uploadError = ref<string | null>(null)
+  const loadError = ref<UiMessage | null>(null)
+  const uploadError = ref<UiMessage | null>(null)
   const uploadPending = ref(false)
   const previewUrl = ref<string | null>(null)
   const previewLoading = ref(false)
-  const previewError = ref<string | null>(null)
+  const previewError = ref<UiMessage | null>(null)
   const downloadPending = ref(false)
   let selectionRequest = 0
   let previewRequest = 0
@@ -60,7 +62,7 @@ export function useCompetitionsByIdMyWriteUpPage() {
       return
     }
     if (error || !data) {
-      loadError.value = parseApiError(error, translate('writeUp.loadFailed')).message
+      loadError.value = parseApiError(error, describeMessage('writeUp.loadFailed')).displayMessage
       return
     }
     writeUp.value = data
@@ -73,19 +75,19 @@ export function useCompetitionsByIdMyWriteUpPage() {
     uploadError.value = null
     if (!file) return
     if (!file.name.toLowerCase().endsWith('.pdf') || file.type !== 'application/pdf') {
-      uploadError.value = translate('writeUp.pdfOnly')
+      uploadError.value = describeMessage('writeUp.pdfOnly')
       selectedFile.value = null
       return
     }
     if (file.size > maximumWriteUpBytes) {
-      uploadError.value = translate('writeUp.tooLarge', { size: formatBytes(maximumWriteUpBytes) })
+      uploadError.value = describeMessage('writeUp.tooLarge', { size: formatBytes(maximumWriteUpBytes) })
       selectedFile.value = null
       return
     }
     const header = new Uint8Array(await file.slice(0, 5).arrayBuffer())
     if (request !== selectionRequest) return
     if (new TextDecoder('ascii').decode(header) !== '%PDF-') {
-      uploadError.value = translate('writeUp.invalidPdf')
+      uploadError.value = describeMessage('writeUp.invalidPdf')
       selectedFile.value = null
     }
   }
@@ -106,10 +108,10 @@ export function useCompetitionsByIdMyWriteUpPage() {
       uploadInputKey.value++
       previewRequest++
       releasePreview()
-      toast.success(translate('writeUp.uploaded'))
+      toast.success(describeMessage('writeUp.uploaded'))
     }
     catch (error) {
-      uploadError.value = parseApiError(error, translate('writeUp.uploadFailed')).message
+      uploadError.value = parseApiError(error, describeMessage('writeUp.uploadFailed')).displayMessage
       toast.error(uploadError.value)
     }
     finally {
@@ -136,7 +138,7 @@ export function useCompetitionsByIdMyWriteUpPage() {
     }
     catch (error) {
       if (request === previewRequest)
-        previewError.value = parseApiError(error, translate('writeUp.previewFailed')).message
+        previewError.value = parseApiError(error, describeMessage('writeUp.previewFailed')).displayMessage
     }
     finally {
       if (request === previewRequest) previewLoading.value = false
@@ -156,7 +158,7 @@ export function useCompetitionsByIdMyWriteUpPage() {
       )
     }
     catch (error) {
-      toast.error(parseApiError(error, translate('writeUp.downloadFailed')).message)
+      toast.error(parseApiError(error, describeMessage('writeUp.downloadFailed')).displayMessage)
     }
     finally {
       downloadPending.value = false

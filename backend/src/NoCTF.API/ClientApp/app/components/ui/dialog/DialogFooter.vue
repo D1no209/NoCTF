@@ -20,7 +20,7 @@ const props = withDefaults(defineProps<{
     <slot />
     <DialogClose v-if="showCloseButton" as-child>
       <Button variant="outline">
-        {{ $t('ui.close2') }}
+        {{ $t('common.label.close') }}
       </Button>
     </DialogClose>
   </div>

@@ -41,8 +41,8 @@ public sealed class RequestAdmissionMiddleware(RequestDelegate next)
         if (entry is ProtectedEntry.PatchUpload or ProtectedEntry.RuntimeCommand or ProtectedEntry.ManualAdjustment or ProtectedEntry.FlagSubmission
             && (!Guid.TryParse(context.Request.Headers["Idempotency-Key"], out var key) || key == Guid.Empty))
         {
-            await TypedResults.Problem(statusCode: 400, title: "缺少有效请求标识",
-                detail: "请提供 UUID 格式的 Idempotency-Key；重试同一次操作时复用该值。",
+            await ApiProblems.Problem(statusCode: 400, title: ApiMessages.Get(ApiMessageId.RequestAdmissionMiddlewareTitleRequestAdmissionMiddleware),
+                detail: ApiMessages.Get(ApiMessageId.RequestAdmissionMiddlewareDetailUuidIdempotencyKey),
                 extensions: new Dictionary<string, object?> { ["code"] = "IdempotencyKeyRequired" }).ExecuteAsync(context);
             return;
         }
@@ -100,8 +100,8 @@ public sealed class RequestAdmissionMiddleware(RequestDelegate next)
                 || !Guid.TryParse(context.Request.RouteValues["runtimeInstanceId"]?.ToString(), out var targetId)
                 || !await patchScope.CanAccessTargetAsync(competitionId, challengeId, targetId, actorId, originalToken))
             {
-                await TypedResults.Problem(statusCode: 403, title: "无权上传此防御环境的 Patch",
-                    detail: "请确认目标属于当前比赛和你的已审核队伍。").ExecuteAsync(context);
+                await ApiProblems.Problem(statusCode: 403, title: ApiMessages.Get(ApiMessageId.RequestAdmissionMiddlewareTitlePatch),
+                    detail: ApiMessages.Get(ApiMessageId.RequestAdmissionMiddlewareDetailRequestAdmissionMiddleware)).ExecuteAsync(context);
                 return;
             }
             }
@@ -120,10 +120,9 @@ public sealed class RequestAdmissionMiddleware(RequestDelegate next)
     internal static Task WriteFailure(HttpContext context, AdmissionRejectedException failure)
     {
         context.Response.Headers.RetryAfter = failure.RetryAfterSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        return TypedResults.Problem(statusCode: failure.Failure == AdmissionFailure.DependencyUnavailable ? 503 : 429,
-            title: failure.Failure == AdmissionFailure.DependencyUnavailable ? "请求准入服务暂不可用" : "请求过于频繁或服务繁忙",
-            detail: failure.Failure switch { AdmissionFailure.DependencyUnavailable => "请求未能继续执行，请稍后使用相同请求标识重试。",
-                AdmissionFailure.CapacityBusy => "当前处理任务已满，请稍后重试。", _ => "账号或当前网络的请求频率超限，请按 Retry-After 提示重试。" },
+        return ApiProblems.Problem(statusCode: failure.Failure == AdmissionFailure.DependencyUnavailable ? 503 : 429,
+            title: ApiMessages.For(failure.Failure),
+            detail: ApiMessages.For(failure.Failure),
             extensions: new Dictionary<string, object?> { ["code"] = failure.Failure.ToString() }).ExecuteAsync(context);
     }
 }

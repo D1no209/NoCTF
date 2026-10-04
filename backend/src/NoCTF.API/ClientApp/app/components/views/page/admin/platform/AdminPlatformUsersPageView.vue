@@ -11,16 +11,16 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
     <div class="flex flex-wrap items-center gap-3">
       <Input v-model="search" class="w-full sm:max-w-sm" :placeholder="$t('sso.adminUserSearchPlaceholder')" :aria-label="$t('sso.adminUserSearchPlaceholder')" />
       <Select v-model="roleFilter">
-        <SelectTrigger class="w-full sm:w-44" :aria-label="$t('ui.role')">
+        <SelectTrigger class="w-full sm:w-44" :aria-label="$t('administration.label.role')">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
           <SelectGroup>
-            <SelectItem value="all">{{ $t('ui.allRoles') }}</SelectItem>
-            <SelectItem value="User">{{ $t('ui.user') }}</SelectItem>
-            <SelectItem value="Organizer">{{ $t('ui.organizer') }}</SelectItem>
-            <SelectItem value="Administrator">{{ $t('ui.administrator') }}</SelectItem>
-            <SelectItem value="Bot">{{ $t('ui.bot') }}</SelectItem>
+            <SelectItem value="all">{{ $t('administration.label.roles') }}</SelectItem>
+            <SelectItem value="User">{{ $t('administration.label.user') }}</SelectItem>
+            <SelectItem value="Organizer">{{ $t('administration.label.organizer') }}</SelectItem>
+            <SelectItem value="Administrator">{{ $t('administration.label.administrator') }}</SelectItem>
+            <SelectItem value="Bot">{{ $t('administration.label.bot') }}</SelectItem>
           </SelectGroup>
         </SelectContent>
       </Select>
@@ -38,9 +38,9 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
         </SelectContent>
       </Select>
       <Button type="button" @click="openCreateBot">
-        <Plus data-icon="inline-start" /> {{ $t('ui.createBot') }}
+        <Plus data-icon="inline-start" /> {{ $t('administration.label.createBot') }}
       </Button>
-      <p class="text-sm text-muted-foreground sm:ml-auto">{{ $t('ui.showingUsers', { count: filteredUsers.length }) }}</p>
+      <p class="text-sm text-muted-foreground sm:ml-auto">{{ $t('administration.label.showingUsers', { count: filteredUsers.length }) }}</p>
     </div>
 
     <Alert v-if="loadError" variant="destructive">
@@ -53,21 +53,21 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
 
     <Empty v-else-if="filteredUsers.length === 0" class="border border-dashed py-12">
       <EmptyHeader>
-        <EmptyTitle>{{ $t('ui.noMatchingUser') }}</EmptyTitle>
-        <EmptyDescription>{{ $t('ui.adjustYourSearchOrFilters') }}</EmptyDescription>
+        <EmptyTitle>{{ $t('administration.label.matchingUser') }}</EmptyTitle>
+        <EmptyDescription>{{ $t('administration.platformUsers.label.adjustSearchFilters') }}</EmptyDescription>
       </EmptyHeader>
     </Empty>
 
     <Table v-else class="min-w-[1040px] [&_th]:px-4 [&_th]:py-3 [&_td]:px-4 [&_td]:py-4">
       <TableHeader class="bg-muted/30">
         <TableRow>
-          <TableHead class="w-[26%]">{{ $t('ui.username') }}</TableHead>
-          <TableHead class="w-[28%]">{{ $t('ui.email') }}</TableHead>
-          <TableHead>{{ $t('ui.type') }}</TableHead>
-          <TableHead>{{ $t('ui.role') }}</TableHead>
-          <TableHead>{{ $t('ui.status') }}</TableHead>
+          <TableHead class="w-[26%]">{{ $t('common.label.username') }}</TableHead>
+          <TableHead class="w-[28%]">{{ $t('common.label.email') }}</TableHead>
+          <TableHead>{{ $t('common.label.type') }}</TableHead>
+          <TableHead>{{ $t('administration.label.role') }}</TableHead>
+          <TableHead>{{ $t('common.label.status') }}</TableHead>
           <TableHead>{{ $t('sso.externalIdentity') }}</TableHead>
-          <TableHead>{{ $t('ui.registrationTime') }}</TableHead>
+          <TableHead>{{ $t('administration.label.registrationTime') }}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -77,29 +77,29 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
           class="cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
           role="button"
           tabindex="0"
-          :aria-label="$t('ui.viewDetailsForUser', { name: user.userName ?? '' })"
+          :aria-label="$t('administration.label.viewDetailsUser', { name: user.userName ?? '' })"
           @click="openDetail(user)"
           @keydown.enter="openDetail(user)"
           @keydown.space.prevent="openDetail(user)"
         >
           <TableCell class="max-w-sm whitespace-normal break-words font-medium">
             {{ user.userName }}
-            <Badge v-if="user.id === currentUser?.userId" variant="outline" class="ml-2">{{ $t('ui.me') }}</Badge>
+            <Badge v-if="user.id === currentUser?.userId" variant="outline" class="ml-2">{{ $t('administration.label.me') }}</Badge>
           </TableCell>
-          <TableCell class="max-w-sm whitespace-normal break-all text-muted-foreground">{{ user.email || $t('ui.symbol') }}</TableCell>
+          <TableCell class="max-w-sm whitespace-normal break-all text-muted-foreground">{{ user.email || $t('common.label.symbol') }}</TableCell>
           <TableCell>
             <Badge :variant="user.kind === 'Bot' ? 'secondary' : 'outline'">
-              {{ user.kind === 'Bot' ? $t('ui.bot') : $t('ui.user') }}
+              {{ user.kind === 'Bot' ? $t('administration.label.bot') : $t('administration.label.user') }}
             </Badge>
           </TableCell>
           <TableCell>
             <Badge :variant="user.role === 'Administrator' ? 'default' : 'secondary'">
-              {{ ROLE_LABELS[String(user.role)] ? $t(ROLE_LABELS[String(user.role)]!) : user.role }}
+              {{ ROLE_LABELS[String(user.role)] ? translate(ROLE_LABELS[String(user.role)]!) : user.role }}
             </Badge>
           </TableCell>
           <TableCell>
             <Badge :variant="user.accountStatus === 'Active' ? 'outline' : 'destructive'">
-              {{ STATUS_LABELS[String(user.accountStatus)] ? $t(STATUS_LABELS[String(user.accountStatus)]!) : user.accountStatus }}
+              {{ STATUS_LABELS[String(user.accountStatus)] ? translate(STATUS_LABELS[String(user.accountStatus)]!) : user.accountStatus }}
             </Badge>
           </TableCell>
           <TableCell class="max-w-64 whitespace-normal">
@@ -130,26 +130,26 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
     <Dialog :open="createBotOpen" @update:open="setCreateBotOpen">
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{{ $t('ui.createBot') }}</DialogTitle>
-          <DialogDescription>{{ $t('ui.botIsASpecialServiceAccountForWhichAccessTokens') }}</DialogDescription>
+          <DialogTitle>{{ $t('administration.label.createBot') }}</DialogTitle>
+          <DialogDescription>{{ $t('administration.platformUsers.description.botSpecialServiceAccount') }}</DialogDescription>
         </DialogHeader>
         <UiForm validation="feature" class="flex flex-col gap-4" @submit.prevent="createBot">
           <FieldGroup>
             <Field>
-              <FieldLabel for="bot-name">{{ $t('ui.name') }}</FieldLabel>
-              <Input id="bot-name" v-model="botName" required maxlength="50" :placeholder="$t('ui.forExampleScoreboardSync')" />
+              <FieldLabel for="bot-name">{{ $t('administration.label.name') }}</FieldLabel>
+              <Input id="bot-name" v-model="botName" required maxlength="50" :placeholder="$t('administration.label.exampleScoreboardSync')" />
             </Field>
             <Field>
-              <FieldLabel for="bot-role">{{ $t('ui.role') }}</FieldLabel>
+              <FieldLabel for="bot-role">{{ $t('administration.label.role') }}</FieldLabel>
               <Select v-model="botRole">
                 <SelectTrigger id="bot-role" class="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    <SelectItem value="User">{{ $t('ui.user') }}</SelectItem>
-                    <SelectItem value="Organizer">{{ $t('ui.organizer') }}</SelectItem>
-                    <SelectItem value="Administrator">{{ $t('ui.administrator') }}</SelectItem>
+                    <SelectItem value="User">{{ $t('administration.label.user') }}</SelectItem>
+                    <SelectItem value="Organizer">{{ $t('administration.label.organizer') }}</SelectItem>
+                    <SelectItem value="Administrator">{{ $t('administration.label.administrator') }}</SelectItem>
                   </SelectGroup>
                 </SelectContent>
               </Select>
@@ -157,10 +157,10 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
           </FieldGroup>
           <DialogFooter>
             <Button type="button" variant="outline" :disabled="creatingBot" @click="setCreateBotOpen(false)">
-              {{ $t('ui.cancel') }}
+              {{ $t('common.action.cancel') }}
             </Button>
             <Button type="submit" :disabled="creatingBot || !botName.trim()">
-              <Spinner v-if="creatingBot" data-icon="inline-start" /> {{ $t('ui.create') }}
+              <Spinner v-if="creatingBot" data-icon="inline-start" /> {{ $t('common.action.create') }}
             </Button>
           </DialogFooter>
         </UiForm>
@@ -170,8 +170,8 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
     <Sheet v-model:open="detailOpen">
       <SheetContent class="gap-0 overflow-hidden data-[side=right]:w-full data-[side=right]:sm:max-w-2xl">
         <SheetHeader class="shrink-0 border-b px-6 py-5 pr-14">
-          <SheetTitle>{{ $t('ui.userDetails') }}</SheetTitle>
-          <SheetDescription>{{ detail?.userName ?? $t('ui.loading') }}</SheetDescription>
+          <SheetTitle>{{ $t('administration.label.userDetails') }}</SheetTitle>
+          <SheetDescription>{{ detail?.userName ?? $t('common.label.loading') }}</SheetDescription>
         </SheetHeader>
         <div v-if="detailLoading" class="flex flex-col gap-3 p-6">
           <Skeleton v-for="i in 5" :key="i" class="h-8 w-full" />
@@ -179,27 +179,27 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
         <Alert v-else-if="detailError" variant="destructive" class="m-6"><AlertDescription>{{ $message(detailError) }}</AlertDescription></Alert>
         <ScrollSurface as="div" v-else-if="detail" :key="detail.id" class="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-6">
           <section class="flex flex-col gap-4" aria-labelledby="user-account-overview">
-            <h3 id="user-account-overview" class="font-semibold">{{ $t('ui.accountInformation') }}</h3>
+            <h3 id="user-account-overview" class="font-semibold">{{ $t('administration.label.accountInformation') }}</h3>
             <dl class="grid grid-cols-[6rem_minmax(0,1fr)] gap-x-5 gap-y-2.5 text-sm sm:grid-cols-[7rem_minmax(0,1fr)]">
-              <dt class="text-muted-foreground">{{ $t('ui.userId') }}</dt>
+              <dt class="text-muted-foreground">{{ $t('administration.label.userId') }}</dt>
               <dd class="select-all break-all font-mono">{{ detail.id }}</dd>
-              <dt class="text-muted-foreground">{{ $t('ui.username') }}</dt>
+              <dt class="text-muted-foreground">{{ $t('common.label.username') }}</dt>
               <dd class="break-words font-medium">{{ detail.userName }}</dd>
-              <dt class="text-muted-foreground">{{ $t('ui.email') }}</dt>
+              <dt class="text-muted-foreground">{{ $t('common.label.email') }}</dt>
               <dd class="break-all">
-                {{ detail.email || $t('ui.symbol') }}
-                <Badge v-if="detail.emailVerified" variant="secondary" class="ml-1">{{ $t('ui.verified') }}</Badge>
-                <Badge v-else variant="outline" class="ml-1">{{ $t('ui.notVerified') }}</Badge>
+                {{ detail.email || $t('common.label.symbol') }}
+                <Badge v-if="detail.emailVerified" variant="secondary" class="ml-1">{{ $t('common.label.verified.accountPanelView') }}</Badge>
+                <Badge v-else variant="outline" class="ml-1">{{ $t('common.label.verified') }}</Badge>
               </dd>
-              <dt class="text-muted-foreground">{{ $t('ui.type') }}</dt>
-              <dd>{{ detail.kind === 'Bot' ? $t('ui.bot') : $t('ui.user') }}</dd>
-              <dt class="text-muted-foreground">{{ $t('ui.status') }}</dt>
-              <dd>{{ STATUS_LABELS[String(detail.accountStatus)] ? $t(STATUS_LABELS[String(detail.accountStatus)]!) : detail.accountStatus }}</dd>
-              <dt class="text-muted-foreground">{{ $t('ui.tokenVersion') }}</dt>
+              <dt class="text-muted-foreground">{{ $t('common.label.type') }}</dt>
+              <dd>{{ detail.kind === 'Bot' ? $t('administration.label.bot') : $t('administration.label.user') }}</dd>
+              <dt class="text-muted-foreground">{{ $t('common.label.status') }}</dt>
+              <dd>{{ STATUS_LABELS[String(detail.accountStatus)] ? translate(STATUS_LABELS[String(detail.accountStatus)]!) : detail.accountStatus }}</dd>
+              <dt class="text-muted-foreground">{{ $t('administration.label.tokenVersion') }}</dt>
               <dd class="font-mono tabular-nums">{{ detail.tokenVersion ?? 0 }}</dd>
-              <dt class="text-muted-foreground">{{ $t('ui.registrationTime') }}</dt>
+              <dt class="text-muted-foreground">{{ $t('administration.label.registrationTime') }}</dt>
               <dd><component :is="AdminDateTime" :value="detail.createdAt" /></dd>
-              <dt class="text-muted-foreground">{{ $t('ui.updateTime') }}</dt>
+              <dt class="text-muted-foreground">{{ $t('administration.label.updateTime') }}</dt>
               <dd><component :is="AdminDateTime" :value="detail.updatedAt" /></dd>
             </dl>
           </section>
@@ -233,7 +233,7 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
                     <AlertDialogDescription>{{ $t('sso.adminUnbindDescription') }}</AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>{{ $t('ui.cancel') }}</AlertDialogCancel>
+                    <AlertDialogCancel>{{ $t('common.action.cancel') }}</AlertDialogCancel>
                     <AlertDialogAction @click="unbindManagedSsoIdentity">{{ $t('sso.adminUnbind') }}</AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
@@ -247,10 +247,10 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
           <Separator />
 
           <section class="flex flex-col gap-4" aria-labelledby="user-account-management">
-            <h3 id="user-account-management" class="font-semibold">{{ $t('ui.rolesAndAccountManagement') }}</h3>
+            <h3 id="user-account-management" class="font-semibold">{{ $t('administration.label.rolesAccountManagement') }}</h3>
             <FieldGroup>
               <Field>
-                <FieldLabel for="user-role">{{ $t('ui.platformRole') }}</FieldLabel>
+                <FieldLabel for="user-role">{{ $t('administration.label.platformRole') }}</FieldLabel>
                 <div class="flex items-center gap-2">
                   <Select v-model="pendingRole" :disabled="detail.id === currentUser?.userId">
                     <SelectTrigger id="user-role" class="w-full">
@@ -258,9 +258,9 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
-                        <SelectItem value="User">{{ $t('ui.user') }}</SelectItem>
-                        <SelectItem value="Organizer">{{ $t('ui.organizer') }}</SelectItem>
-                        <SelectItem value="Administrator">{{ $t('ui.administrator') }}</SelectItem>
+                        <SelectItem value="User">{{ $t('administration.label.user') }}</SelectItem>
+                        <SelectItem value="Organizer">{{ $t('administration.label.organizer') }}</SelectItem>
+                        <SelectItem value="Administrator">{{ $t('administration.label.administrator') }}</SelectItem>
                       </SelectGroup>
                     </SelectContent>
                   </Select>
@@ -268,12 +268,12 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
                     :disabled="roleSaving || pendingRole === String(detail.role ?? 'User') || detail.id === currentUser?.userId"
                     @click="saveRole"
                   >
-                    <Spinner v-if="roleSaving" data-icon="inline-start" /> {{ $t('ui.save') }} </Button>
+                    <Spinner v-if="roleSaving" data-icon="inline-start" /> {{ $t('common.action.save') }} </Button>
                 </div>
-                <FieldDescription v-if="detail.id === currentUser?.userId">{{ $t('ui.youCannotModifyYourRole') }}</FieldDescription>
+                <FieldDescription v-if="detail.id === currentUser?.userId">{{ $t('administration.platformUsers.validation.modifyRoleFormat') }}</FieldDescription>
               </Field>
               <Field>
-                <FieldLabel for="user-account-status">{{ $t('ui.accountStatus') }}</FieldLabel>
+                <FieldLabel for="user-account-status">{{ $t('administration.label.accountStatus') }}</FieldLabel>
                 <div class="flex items-center gap-2">
                   <Select
                     v-model="pendingAccountStatus"
@@ -289,7 +289,7 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
                           :key="option.value"
                           :value="option.value"
                         >
-                          {{ $t(option.label) }}
+                          {{ translate(option.label) }}
                         </SelectItem>
                       </SelectGroup>
                     </SelectContent>
@@ -302,21 +302,21 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
                     @click="saveAccountStatus"
                   >
                     <Spinner v-if="accountStatusSaving" data-icon="inline-start" />
-                    {{ $t('ui.save') }}
+                    {{ $t('common.action.save') }}
                   </Button>
                 </div>
                 <FieldDescription v-if="detail.id === currentUser?.userId">
-                  {{ $t('ui.youCannotChangeYourOwnAccountStatus') }}
+                  {{ $t('administration.platformUsers.validation.changeOwnFormat') }}
                 </FieldDescription>
                 <FieldDescription v-else-if="detail.accountStatus === 'Anonymized'">
-                  {{ $t('ui.anAnonymizedAccountCannotBeChanged') }}
+                  {{ $t('administration.platformUsers.validation.anonymizedAccountFormat.platformUsersPage') }}
                 </FieldDescription>
                 <FieldDescription v-else>
-                  {{ $t('ui.changingTheAccountStatusRevokesTheUserSExistingAccess') }}
+                  {{ $t('administration.platformUsers.description.changingAccountStatusRevokes') }}
                 </FieldDescription>
               </Field>
               <Field>
-                <FieldLabel for="user-email-verification">{{ $t('ui.emailActivationStatus') }}</FieldLabel>
+                <FieldLabel for="user-email-verification">{{ $t('administration.label.emailActivationStatus') }}</FieldLabel>
                 <div class="flex items-center gap-2">
                   <Select
                     v-model="pendingEmailVerification"
@@ -327,8 +327,8 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
-                        <SelectItem value="Verified">{{ $t('ui.activated') }}</SelectItem>
-                        <SelectItem value="Unverified">{{ $t('ui.notActivated') }}</SelectItem>
+                        <SelectItem value="Verified">{{ $t('administration.label.activated') }}</SelectItem>
+                        <SelectItem value="Unverified">{{ $t('administration.label.activated.usersPageView') }}</SelectItem>
                       </SelectGroup>
                     </SelectContent>
                   </Select>
@@ -339,14 +339,14 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
                     @click="saveEmailVerification"
                   >
                     <Spinner v-if="emailVerificationSaving" data-icon="inline-start" />
-                    {{ $t('ui.save') }}
+                    {{ $t('common.action.save') }}
                   </Button>
                 </div>
                 <FieldDescription v-if="detail.accountStatus === 'Anonymized'">
-                  {{ $t('ui.anAnonymizedAccountCannotBeChanged') }}
+                  {{ $t('administration.platformUsers.validation.anonymizedAccountFormat.platformUsersPage') }}
                 </FieldDescription>
                 <FieldDescription v-else>
-                  {{ $t('ui.changingEmailActivationStatusInvalidatesTheUserSExistingAccess') }}
+                  {{ $t('administration.platformUsers.description.changingEmailActivationStatus') }}
                 </FieldDescription>
               </Field>
             </FieldGroup>
@@ -356,7 +356,7 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
 
           <section class="flex flex-col gap-4" aria-labelledby="user-issued-access">
             <div class="flex flex-wrap items-center justify-between gap-3">
-              <h3 id="user-issued-access" class="font-semibold">{{ $t('ui.administratorIssuedAccess') }}</h3>
+              <h3 id="user-issued-access" class="font-semibold">{{ $t('administration.label.administratorIssuedAccess') }}</h3>
               <div class="flex flex-wrap gap-2">
                 <Button
                   type="button"
@@ -365,7 +365,7 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
                   :disabled="detail.accountStatus !== 'Active'"
                   @click="openToken(detail, 'issue')"
                 >
-                  <KeyRound data-icon="inline-start" />{{ $t('ui.issueJwt') }}
+                  <KeyRound data-icon="inline-start" />{{ $t('administration.label.issueJwt') }}
                 </Button>
                 <Button
                   type="button"
@@ -373,42 +373,42 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
                   :disabled="detail.accountStatus !== 'Active' || identitySwitchActive"
                   @click="openToken(detail, 'impersonate')"
                 >
-                  <LogIn data-icon="inline-start" />{{ $t('ui.signInAsThisUser') }}
+                  <LogIn data-icon="inline-start" />{{ $t('administration.platformUsers.label.signUser') }}
                 </Button>
               </div>
             </div>
             <p v-if="detail.accountStatus !== 'Active'" class="text-sm text-muted-foreground">
-              {{ $t('ui.onlyActiveAccountsCanReceiveAdministratorIssuedTokens') }}
+              {{ $t('administration.platformUsers.description.activeAccountsReceiveAdministrator') }}
             </p>
-            <FieldDescription>{{ $t('ui.issuedTokensAreStatelessAndCanOnlyBeRevokedTogether') }}</FieldDescription>
+            <FieldDescription>{{ $t('administration.platformUsers.description.issuedTokensStatelessRevoked') }}</FieldDescription>
           </section>
 
           <Separator />
 
           <div class="flex flex-col gap-3">
-            <h3 class="text-sm font-medium">{{ $t('ui.dangerousOperation') }}</h3>
+            <h3 class="text-sm font-medium">{{ $t('administration.label.dangerous') }}</h3>
             <div class="flex flex-wrap gap-2">
               <AlertDialog>
                 <AlertDialogTrigger as-child>
                   <Button variant="outline">
-                    <KeyRound data-icon="inline-start" /> {{ $t('ui.revokeAllTokens') }} </Button>
+                    <KeyRound data-icon="inline-start" /> {{ $t('administration.label.revokeTokens') }} </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>{{ $t('ui.revokeToken') }}</AlertDialogTitle>
+                    <AlertDialogTitle>{{ $t('administration.label.revokeToken') }}</AlertDialogTitle>
                     <AlertDialogDescription>
-                      {{ $t('ui.revokeAllAccessAndRefreshTokensForTheUserMust', { user: detail.userName ?? '-' }) }}
+                      {{ $t('administration.platformUsers.validation.revokeAccessFormat', { user: detail.userName ?? '-' }) }}
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>{{ $t('ui.cancel') }}</AlertDialogCancel>
+                    <AlertDialogCancel>{{ $t('common.action.cancel') }}</AlertDialogCancel>
                     <AlertDialogAction :disabled="invalidating" @click="invalidateTokens">
-                      <Spinner v-if="invalidating" data-icon="inline-start" /> {{ $t('ui.confirmRevocation') }} </AlertDialogAction>
+                      <Spinner v-if="invalidating" data-icon="inline-start" /> {{ $t('administration.label.confirmRevocation') }} </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
               <Button variant="destructive" @click="startDelete">
-                <Trash2 data-icon="inline-start" /> {{ $t('ui.deleteUser') }} </Button>
+                <Trash2 data-icon="inline-start" /> {{ $t('administration.label.deleteUser') }} </Button>
             </div>
           </div>
         </ScrollSurface>
@@ -419,52 +419,52 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            {{ tokenIntent === 'impersonate' ? $t('ui.signInAsThisUser') : $t('ui.issueAccessToken') }}
+            {{ tokenIntent === 'impersonate' ? $t('administration.platformUsers.label.signUser') : $t('administration.label.issueAccessToken') }}
           </DialogTitle>
           <DialogDescription>
             {{ tokenIntent === 'impersonate'
-              ? $t('ui.impersonationTokenDescription', { user: detail?.userName ?? '-' })
-              : $t('ui.issueUserAccessTokenFor', { user: detail?.userName ?? '-' }) }}
+              ? $t('administration.label.impersonationTokenDescription', { user: detail?.userName ?? '-' })
+              : $t('administration.platformUsers.label.issueUserAccessToken', { user: detail?.userName ?? '-' }) }}
           </DialogDescription>
         </DialogHeader>
         <template v-if="!issuedToken">
           <UiForm validation="feature" class="flex flex-col gap-4" @submit.prevent="issueToken">
             <FieldGroup>
               <Field>
-                <FieldLabel for="user-token-ttl">{{ $t('ui.validityPeriodSeconds') }}</FieldLabel>
+                <FieldLabel for="user-token-ttl">{{ $t('administration.label.validityPeriodSeconds') }}</FieldLabel>
                 <NumberInput id="user-token-ttl" v-model.number="tokenExpiresInSeconds" min="60" max="31536000" step="60" required />
-                <FieldDescription>{{ $t('ui.tokenLifetimeRange') }}</FieldDescription>
+                <FieldDescription>{{ $t('administration.label.tokenLifetimeRange') }}</FieldDescription>
               </Field>
             </FieldGroup>
             <DialogFooter>
-              <Button type="button" variant="outline" @click="setTokenOpen(false)">{{ $t('ui.cancel') }}</Button>
+              <Button type="button" variant="outline" @click="setTokenOpen(false)">{{ $t('common.action.cancel') }}</Button>
               <Button type="submit" :disabled="tokenIssuing || tokenExpiresInSeconds < 60 || tokenExpiresInSeconds > 31536000">
                 <Spinner v-if="tokenIssuing" data-icon="inline-start" />
-                {{ tokenIntent === 'impersonate' ? $t('ui.issueAndSignIn') : $t('ui.issue') }}
+                {{ tokenIntent === 'impersonate' ? $t('administration.label.issueSign') : $t('administration.label.issue') }}
               </Button>
             </DialogFooter>
           </UiForm>
         </template>
         <template v-else>
           <Alert>
-            <AlertDescription>{{ $t('ui.theTokenIsOnlyDisplayedOncePleaseCopyAndSave') }}</AlertDescription>
+            <AlertDescription>{{ $t('administration.platformUsers.description.tokenDisplayedOnceCopy') }}</AlertDescription>
           </Alert>
           <FieldGroup>
             <Field>
-              <FieldLabel for="issued-user-token">{{ $t('ui.accessToken') }}</FieldLabel>
+              <FieldLabel for="issued-user-token">{{ $t('administration.label.accessToken') }}</FieldLabel>
               <div class="flex items-center gap-2">
                 <Input id="issued-user-token" :model-value="issuedToken.accessToken" readonly class="font-mono text-xs" />
-                <Button type="button" size="icon" variant="outline" :aria-label="$t('ui.copyToken')" @click="copyIssuedToken">
+                <Button type="button" size="icon" variant="outline" :aria-label="$t('administration.label.copyToken')" @click="copyIssuedToken">
                   <Copy />
                 </Button>
               </div>
               <FieldDescription>
-                {{ $t('ui.expirationDate') }} <component :is="AdminDateTime" :value="issuedToken.expiresAt" />
+                {{ $t('administration.label.expirationDate') }} <component :is="AdminDateTime" :value="issuedToken.expiresAt" />
               </FieldDescription>
             </Field>
           </FieldGroup>
           <DialogFooter>
-            <Button type="button" @click="setTokenOpen(false)">{{ $t('ui.iHaveSavedClose') }}</Button>
+            <Button type="button" @click="setTokenOpen(false)">{{ $t('administration.label.iSavedClose') }}</Button>
           </DialogFooter>
         </template>
       </DialogContent>
@@ -473,8 +473,8 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
     <AlertDialog v-model:open="deleteOpen">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>{{ $t('ui.deleteUser2', { user: detail?.userName ?? '-' }) }}</AlertDialogTitle>
-          <AlertDialogDescription> {{ $t('ui.deletionIsIrreversiblePleaseConfirmTheScopeOfImpactFirst') }} </AlertDialogDescription>
+          <AlertDialogTitle>{{ $t('administration.label.deleteUser.usersPageView', { user: detail?.userName ?? '-' }) }}</AlertDialogTitle>
+          <AlertDialogDescription> {{ $t('administration.platformUsers.description.deletionIrreversibleConfirmScope') }} </AlertDialogDescription>
         </AlertDialogHeader>
         <div v-if="previewLoading" class="flex flex-col gap-2">
           <Skeleton v-for="i in 3" :key="i" class="h-8 w-full" />
@@ -482,48 +482,48 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
         <div v-else-if="preview" class="flex flex-col gap-4">
           <Alert v-if="preview.selfDeletionForbidden || preview.lastAdministratorProtected" variant="destructive">
             <AlertDescription>
-              {{ preview.selfDeletionForbidden ? $t('ui.youCannotDeleteYourOwnAccount') : $t('ui.theLastAdministratorCannotBeDeleted') }}
+              {{ preview.selfDeletionForbidden ? $t('administration.platformUsers.validation.deleteOwnFormat') : $t('administration.platformUsers.validation.lastAdministratorFormat') }}
             </AlertDescription>
           </Alert>
           <div v-if="preview.references?.length" class="flex flex-col gap-2">
-            <p class="text-sm text-muted-foreground">{{ $t('ui.thisUserHasTheFollowingBusinessReferences') }}</p>
+            <p class="text-sm text-muted-foreground">{{ $t('administration.platformUsers.description.userFollowingBusinessReferences') }}</p>
             <div class="flex flex-wrap gap-2">
               <Badge v-for="reference in preview.references" :key="reference.code" variant="secondary">
-                {{ REFERENCE_LABELS[reference.code ?? ''] ? $t(REFERENCE_LABELS[reference.code ?? '']!) : reference.code }} × {{ reference.count }}
+                {{ REFERENCE_LABELS[reference.code ?? ''] ? translate(REFERENCE_LABELS[reference.code ?? '']!) : reference.code }} × {{ reference.count }}
               </Badge>
             </div>
           </div>
-          <p v-else class="text-sm text-muted-foreground">{{ $t('ui.thisUserHasNoBusinessReferences') }}</p>
+          <p v-else class="text-sm text-muted-foreground">{{ $t('administration.platformUsers.description.userBusinessReferences') }}</p>
           <FieldGroup>
             <Field>
-              <FieldLabel for="deletion-mode">{{ $t('ui.deleteMethod') }}</FieldLabel>
+              <FieldLabel for="deletion-mode">{{ $t('administration.label.deleteMethod') }}</FieldLabel>
               <Select v-model="deletionMode">
                 <SelectTrigger id="deletion-mode" class="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    <SelectItem v-if="preview.canAnonymize" value="Anonymize">{{ $t('ui.anonymizeKeepDataRemoveIdentity') }}</SelectItem>
-                    <SelectItem v-if="preview.canHardDelete" value="HardDelete">{{ $t('ui.physicalDeletionCompleteErasure') }}</SelectItem>
+                    <SelectItem v-if="preview.canAnonymize" value="Anonymize">{{ $t('administration.platformUsers.label.anonymizeKeepDataRemove') }}</SelectItem>
+                    <SelectItem v-if="preview.canHardDelete" value="HardDelete">{{ $t('administration.label.physicalDeletionCompleteErasure') }}</SelectItem>
                   </SelectGroup>
                 </SelectContent>
               </Select>
             </Field>
             <Field>
-              <FieldLabel for="deletion-reason">{{ $t('ui.reasonForDeletion') }}</FieldLabel>
-              <Input id="deletion-reason" v-model="deletionReason" required :placeholder="$t('ui.willBeLoggedToTheAuditLog')" />
+              <FieldLabel for="deletion-reason">{{ $t('administration.label.reasonDeletion') }}</FieldLabel>
+              <Input id="deletion-reason" v-model="deletionReason" required :placeholder="$t('administration.platformUsers.description.loggedAuditLog')" />
             </Field>
           </FieldGroup>
         </div>
         <AlertDialogFooter>
-          <AlertDialogCancel>{{ $t('ui.cancel') }}</AlertDialogCancel>
+          <AlertDialogCancel>{{ $t('common.action.cancel') }}</AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
             :disabled="deleting || !preview || !deletionReason.trim()
               || preview.selfDeletionForbidden || preview.lastAdministratorProtected"
             @click="confirmDelete"
           >
-            <Spinner v-if="deleting" data-icon="inline-start" /> {{ $t('ui.confirmDeletion') }} </AlertDialogAction>
+            <Spinner v-if="deleting" data-icon="inline-start" /> {{ $t('administration.label.confirmDeletion') }} </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

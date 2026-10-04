@@ -27,9 +27,9 @@ public sealed class UploadChallengeAttachmentsValidator
         RuleFor(request => request.DeliveryPolicy).NotNull().IsInEnum();
         RuleFor(request => request.AttachmentIds)
             .Must((request, ids) => ids is null || ids.Count == 0 || ids.Count == request.Files.Count)
-            .WithMessage("AttachmentIds must be empty or contain one ID for every file.")
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.UploadChallengeAttachmentsValidationAttachmentidsEmptyContainOne)).WithErrorCode(ApiMessages.Key(ApiMessageId.UploadChallengeAttachmentsValidationAttachmentidsEmptyContainOne))
             .Must(ids => ids is null || ids.Distinct().Count() == ids.Count)
-            .WithMessage("AttachmentIds cannot contain duplicates.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.UploadChallengeAttachmentsValidationAttachmentidsContainDuplicates)).WithErrorCode(ApiMessages.Key(ApiMessageId.UploadChallengeAttachmentsValidationAttachmentidsContainDuplicates));
         RuleForEach(request => request.AttachmentIds!).NotEmpty()
             .When(request => request.AttachmentIds is not null);
         RuleFor(request => request.Files).NotEmpty().Must(files => files.Count <= 128);
@@ -55,7 +55,12 @@ public enum AttachmentBatchFailureCodeProtocol
 
 public sealed record AttachmentBatchFailureResponse(
     AttachmentBatchFailureCodeProtocol Code,
-    string Message);
+    string Message)
+{
+    public string Message { get; init; } = ApiMessages.Localize(Code, Message, ApiMessages.NoArguments);
+    public string MessageKey => ApiMessages.For(Code).Key;
+    public IReadOnlyDictionary<string, object?> MessageArguments => ApiMessages.NoArguments;
+}
 
 public sealed class UploadChallengeAttachmentsEndpoint(
     ManageChallengeAttachments attachments,

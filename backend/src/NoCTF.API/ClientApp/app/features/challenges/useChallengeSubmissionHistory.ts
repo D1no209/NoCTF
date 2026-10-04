@@ -1,3 +1,5 @@
+import { message as describeMessage } from '../../utils/i18n'
+import type { UiMessage } from '../../utils/i18n'
 import { inject, toRefs } from 'vue'
 
 import { getGameplayFactValueEndpoint, listGameplayFactsEndpoint } from '../../api'
@@ -26,7 +28,7 @@ export function useChallengeSubmissionHistory(props: Readonly<Omit<{
 
   const valueLoading = ref(false)
 
-  const valueError = ref<string | null>(null)
+  const valueError = ref<UiMessage | null>(null)
 
   let valueRequestGeneration = 0
 
@@ -42,7 +44,7 @@ export function useChallengeSubmissionHistory(props: Readonly<Omit<{
         },
       })
       if (response?.status === 404) return { items: [], nextCursor: null }
-      if (requestError || !data) throw requestError ?? new Error(translate("ui.failedToLoadSubmissionHistory"))
+      if (requestError || !data) throw requestError ?? new Error(translate("challenges.challengeSubmission.error.loadSubmissionHistoryFailed"))
       const pageItems = data.items ?? []
       const offset = cursor ? Number(cursor) || 0 : 0
       const nextOffset = offset + pageItems.length
@@ -94,7 +96,7 @@ export function useChallengeSubmissionHistory(props: Readonly<Omit<{
   )
 
   const pendingPollingErrorMessage = computed(() => pendingPollingError.value
-    ? parseApiError(pendingPollingError.value, translate("ui.failedToRefreshSubmissionStatus")).message
+    ? parseApiError(pendingPollingError.value, describeMessage("common.flagSubmit.error.submissionStatusFailed")).displayMessage
     : null)
 
   watch(
@@ -180,7 +182,7 @@ export function useChallengeSubmissionHistory(props: Readonly<Omit<{
     if (generation !== valueRequestGeneration) return
     valueLoading.value = false
     if (requestError || !data) {
-      valueError.value = parseApiError(requestError, translate("ui.failedToLoadTheSubmittedFlagValue")).message
+      valueError.value = parseApiError(requestError, describeMessage("challenges.challengeSubmission.error.loadSubmittedFlagFailed")).displayMessage
       return
     }
     submittedValue.value = data.value ?? null

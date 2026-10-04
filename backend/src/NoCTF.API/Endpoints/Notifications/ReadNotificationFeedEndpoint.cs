@@ -63,9 +63,9 @@ public sealed class ReadNotificationFeedEndpoint(
                 cursorScope,
                 out var decoded))
         {
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
-                title: "Invalid cursor.",
+                title: ApiMessages.Get(ApiMessageId.InvalidCursor),
                 extensions: new Dictionary<string, object?>
                 {
                     ["code"] = NotificationFailureCode.CursorInvalid

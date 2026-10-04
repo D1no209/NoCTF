@@ -8,7 +8,7 @@ const props = withDefaults(defineProps<{
   disabled?: boolean
 }>(), {
   placeholder: '',
-  addLabel: translate("ui.addAnItem"),
+  addLabel: translate("common.label.addItem"),
   disabled: false,
 })
 
@@ -45,7 +45,7 @@ function add(): void {
         variant="ghost"
         size="icon"
         class="shrink-0"
-        :aria-label="$t('ui.removeItem', { index: index + 1 })"
+        :aria-label="$t('common.label.removeItem', { index: index + 1 })"
         @click="remove(index)"
       >
         <X class="size-4" aria-hidden="true" />
@@ -60,7 +60,7 @@ function add(): void {
       @click="add"
     >
       <Plus data-icon="inline-start" />
-      {{ $t(addLabel) }}
+      {{ translate(addLabel) }}
     </Button>
   </div>
 </template>

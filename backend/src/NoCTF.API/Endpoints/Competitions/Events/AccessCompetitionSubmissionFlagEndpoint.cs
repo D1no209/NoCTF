@@ -50,9 +50,9 @@ public sealed class AccessCompetitionGameplayFactValueEndpoint(
         if (result.State != CompetitionEventReadState.Available
             || result.View is null)
         {
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
-                title: "Invalid Flag access request.");
+                title: ApiMessages.Get(ApiMessageId.AccessCompetitionSubmissionFlagTitleInvalidFlagAccess));
         }
         return TypedResults.Ok(new AccessCompetitionGameplayFactValueResponse(
             result.View.GameplayFactId,

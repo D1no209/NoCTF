@@ -81,8 +81,8 @@ internal static class BadgeImageValidation
     public static bool IsSupported(string? contentType) =>
         contentType is "image/png" or "image/jpeg" or "image/webp";
 
-    public static ProblemHttpResult TooLarge(long limit) => TypedResults.Problem(
+    public static ProblemHttpResult TooLarge(long limit) => ApiProblems.Problem(
         statusCode: StatusCodes.Status413PayloadTooLarge,
-        title: "Badge image is too large.",
-        detail: $"Image uploads cannot exceed {limit} bytes.");
+        title: ApiMessages.Get(ApiMessageId.CreateCompetitionBadgeTitleBadgeImageTooLarge),
+        detail: ApiMessages.Get(ApiMessageId.UploadSizeLimit, new Dictionary<string, object?> { ["maximumBytes"] = limit }));
 }

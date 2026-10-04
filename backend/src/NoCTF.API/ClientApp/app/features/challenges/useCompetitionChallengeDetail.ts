@@ -1,6 +1,8 @@
+import { message as describeMessage } from '../../utils/i18n'
+import type { UiMessage } from '../../utils/i18n'
 import { markRaw, provide, toRefs } from 'vue'
 
-import { toast } from 'vue-sonner'
+import { toast } from '../../utils/message-toast'
 import { Dice5, FileDown, History } from '@lucide/vue'
 import { downloadChallengeAttachmentEndpoint, downloadRandomChallengeAttachmentEndpoint, getChallengeEndpoint, listChallengeAttachmentsEndpoint, startProgressionChallenge } from '../../api'
 import type { NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol, NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse, NoCtfapiEndpointsChallengesChallengeResponse } from '../../api'
@@ -27,7 +29,7 @@ export function useCompetitionChallengeDetail(props: Readonly<{
 
   const loading = ref(true)
 
-  const error = ref<string | null>(null)
+  const error = ref<UiMessage | null>(null)
 
   const attachments = ref<NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse[]>([])
 
@@ -35,7 +37,7 @@ export function useCompetitionChallengeDetail(props: Readonly<{
 
   const attachmentsLoading = ref(false)
 
-  const attachmentError = ref<string | null>(null)
+  const attachmentError = ref<UiMessage | null>(null)
 
   const downloading = ref(false)
 
@@ -89,7 +91,7 @@ export function useCompetitionChallengeDetail(props: Readonly<{
             query: { blocked: props.competitionChallengeId } })
           return
         }
-        error.value = parseApiError(started.error, translate('progression.startFailed')).message
+        error.value = parseApiError(started.error, describeMessage('progression.startFailed')).displayMessage
         return
       }
     }
@@ -104,7 +106,7 @@ export function useCompetitionChallengeDetail(props: Readonly<{
     if (sequence !== loadSequence) return
     loading.value = false
     if (requestError || !data) {
-      error.value = parseApiError(requestError, translate("ui.failedToLoadQuestion")).message
+      error.value = parseApiError(requestError, describeMessage("challenges.error.loadQuestionFailed")).displayMessage
       return
     }
     challenge.value = data
@@ -131,7 +133,7 @@ export function useCompetitionChallengeDetail(props: Readonly<{
     if (reads.signal.aborted || challengeId !== props.competitionChallengeId) return
     attachmentsLoading.value = false
     if (requestError || !data) {
-      attachmentError.value = parseApiError(requestError, translate("ui.failedToLoadChallengeAttachments")).message
+      attachmentError.value = parseApiError(requestError, describeMessage("challenges.competitionChallenge.error.loadChallengeAttachmentsFailed")).displayMessage
       return
     }
     attachmentDeliveryPolicy.value = data.deliveryPolicy ?? 'All'
@@ -173,7 +175,7 @@ export function useCompetitionChallengeDetail(props: Readonly<{
       )
     }
     catch (downloadError) {
-      toast.error(parseApiError(downloadError, translate("ui.attachmentDownloadFailed")).message)
+      toast.error(parseApiError(downloadError, describeMessage("challenges.error.attachmentDownloadFailed")).displayMessage)
     }
     finally {
       downloading.value = false
@@ -196,7 +198,7 @@ export function useCompetitionChallengeDetail(props: Readonly<{
       )
     }
     catch (downloadError) {
-      toast.error(parseApiError(downloadError, translate("ui.attachmentDownloadFailed")).message)
+      toast.error(parseApiError(downloadError, describeMessage("challenges.error.attachmentDownloadFailed")).displayMessage)
     }
     finally {
       downloading.value = false

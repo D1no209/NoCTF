@@ -9,7 +9,7 @@ const { adminUserPath, X, canManagePermissions, permissions, candidates, loading
 <template>
   <div class="flex flex-col gap-6">
     <Alert v-if="!canManagePermissions">
-      <AlertDescription>{{ $t('ui.onlyTheCompetitionLeaderOrPlatformAdministratorCanManagePermissions') }}</AlertDescription>
+      <AlertDescription>{{ $t('administration.competitionsBy.description.competitionLeaderPlatformAdministrator') }}</AlertDescription>
     </Alert>
     <Alert v-if="error" variant="destructive">
       <AlertDescription>{{ $message(error) }}</AlertDescription>
@@ -20,14 +20,14 @@ const { adminUserPath, X, canManagePermissions, permissions, candidates, loading
       <Card class="gap-0">
         <section id="competition-collaboration-permissions" class="flex flex-col gap-4 py-4 first:pt-0 last:pb-0">
         <CardHeader>
-          <CardTitle>{{ $t('ui.collaborationPermissions') }}</CardTitle>
+          <CardTitle>{{ $t('administration.label.collaborationPermissions') }}</CardTitle>
           <CardDescription>
-            <span>{{ $t('ui.competitionLeader') }}: </span><NuxtLink v-if="permissions.ownerId" :to="adminUserPath(permissions.ownerId)" class="hover:underline">{{ candidateName(permissions.ownerId) }}</NuxtLink>
+            <span>{{ $t('common.label.competitionLeader') }}: </span><NuxtLink v-if="permissions.ownerId" :to="adminUserPath(permissions.ownerId)" class="hover:underline">{{ candidateName(permissions.ownerId) }}</NuxtLink>
           </CardDescription>
         </CardHeader>
         <CardContent class="flex flex-col gap-6">
           <div v-for="r in roles" :key="r.key" class="flex flex-col gap-2">
-            <h3 class="text-sm font-medium">{{ $t(r.label) }}</h3>
+            <h3 class="text-sm font-medium">{{ translate(r.label) }}</h3>
             <div class="flex flex-wrap items-center gap-2">
               <Badge v-for="id in r.list.value" :key="id" variant="secondary" class="gap-1">
                 <NuxtLink :to="adminUserPath(id)" class="hover:underline">{{ candidateName(id) }}</NuxtLink>
@@ -35,21 +35,21 @@ const { adminUserPath, X, canManagePermissions, permissions, candidates, loading
                   v-if="canManagePermissions"
                   type="button"
                   class="inline-flex"
-                  :aria-label="$t('ui.remove2', { user: candidateName(id) })"
+                  :aria-label="$t('administration.label.remove', { user: candidateName(id) })"
                   @click="remove(r.key, id)"
                 >
                   <X class="size-3" />
                 </ActionButton>
               </Badge>
-              <span v-if="r.list.value.length === 0" class="text-sm text-muted-foreground">{{ $t('ui.none2') }}</span>
+              <span v-if="r.list.value.length === 0" class="text-sm text-muted-foreground">{{ $t('administration.label.none') }}</span>
             </div>
           </div>
 
           <template v-if="canManagePermissions">
             <Separator />
             <Field>
-              <FieldLabel for="candidate-search">{{ $t('ui.addCollaborationMembersSearchCandidateUsers') }}</FieldLabel>
-              <Input id="candidate-search" v-model="search" :placeholder="$t('ui.searchByUsername')" />
+              <FieldLabel for="candidate-search">{{ $t('administration.competitionsBy.description.addCollaborationMembersSearch') }}</FieldLabel>
+              <Input id="candidate-search" v-model="search" :placeholder="$t('administration.label.searchUsername')" />
             </Field>
             <div class="flex flex-col gap-1">
               <div
@@ -59,22 +59,22 @@ const { adminUserPath, X, canManagePermissions, permissions, candidates, loading
               >
                 <span>
                   <NuxtLink :to="adminUserPath(c.id)" class="hover:underline">{{ c.userName }}</NuxtLink>
-                  <span v-if="!c.emailVerified" class="text-muted-foreground">{{ $t('ui.emailNotVerified') }}</span>
+                  <span v-if="!c.emailVerified" class="text-muted-foreground">{{ $t('administration.label.emailVerified') }}</span>
                 </span>
                 <div class="flex items-center gap-1">
                   <template v-if="!assigned(c.id)">
-                    <Button variant="ghost" size="sm" @click="add('manager', c.id)">{{ $t('ui.setAsAdministrator') }}</Button>
-                    <Button variant="ghost" size="sm" @click="add('judge', c.id)">{{ $t('ui.setAsReferee') }}</Button>
-                    <Button variant="ghost" size="sm" @click="add('observer', c.id)">{{ $t('ui.setAsObserver') }}</Button>
+                    <Button variant="ghost" size="sm" @click="add('manager', c.id)">{{ $t('administration.label.setAdministrator') }}</Button>
+                    <Button variant="ghost" size="sm" @click="add('judge', c.id)">{{ $t('administration.label.setReferee') }}</Button>
+                    <Button variant="ghost" size="sm" @click="add('observer', c.id)">{{ $t('administration.label.setObserver') }}</Button>
                   </template>
-                  <Badge v-else variant="outline">{{ $t('ui.assigned') }}</Badge>
+                  <Badge v-else variant="outline">{{ $t('administration.label.assigned') }}</Badge>
                 </div>
               </div>
-              <p v-if="filteredCandidates.length === 0" class="text-sm text-muted-foreground">{{ $t('ui.noMatchingCandidateUsers') }}</p>
+              <p v-if="filteredCandidates.length === 0" class="text-sm text-muted-foreground">{{ $t('administration.label.matchingCandidateUsers') }}</p>
             </div>
             <div>
               <Button :disabled="saving" @click="save">
-                <Spinner v-if="saving" data-icon="inline-start" /> {{ $t('ui.savePermissionChanges') }} </Button>
+                <Spinner v-if="saving" data-icon="inline-start" /> {{ $t('administration.label.savePermissionChanges') }} </Button>
             </div>
           </template>
         </CardContent>
@@ -84,13 +84,13 @@ const { adminUserPath, X, canManagePermissions, permissions, candidates, loading
         <Separator />
         <section id="competition-ownership-transfer" class="flex flex-col gap-4 py-4 first:pt-0 last:pb-0">
         <CardHeader>
-          <CardTitle class="text-destructive">{{ $t('ui.transferOwnership') }}</CardTitle>
-          <CardDescription>{{ $t('ui.transferTheIdentityOfTheCompetitionLeaderToAnotherUser') }}</CardDescription>
+          <CardTitle class="text-destructive">{{ $t('administration.label.transferOwnership') }}</CardTitle>
+          <CardDescription>{{ $t('administration.competitionsBy.description.transferIdentityCompetitionLeader') }}</CardDescription>
         </CardHeader>
         <CardContent class="flex flex-wrap items-center gap-2">
           <Select v-model="transferTarget">
             <SelectTrigger class="w-64">
-              <SelectValue :placeholder="$t('ui.chooseANewPersonInCharge')" />
+              <SelectValue :placeholder="$t('administration.competitionsBy.description.chooseNewPersonCharge')" />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
@@ -100,7 +100,7 @@ const { adminUserPath, X, canManagePermissions, permissions, candidates, loading
               </SelectGroup>
             </SelectContent>
           </Select>
-          <Button variant="destructive" :disabled="!transferTarget" @click="onClickTransferConfirm(true)"> {{ $t('ui.transferOwnership') }} </Button>
+          <Button variant="destructive" :disabled="!transferTarget" @click="onClickTransferConfirm(true)"> {{ $t('administration.label.transferOwnership') }} </Button>
         </CardContent>
         </section>
         </template>
@@ -110,15 +110,15 @@ const { adminUserPath, X, canManagePermissions, permissions, candidates, loading
     <AlertDialog v-model:open="transferConfirm">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>{{ $t('ui.transferOwnership') }}</AlertDialogTitle>
+          <AlertDialogTitle>{{ $t('administration.label.transferOwnership') }}</AlertDialogTitle>
           <AlertDialogDescription>
-            {{ $t('ui.transferCompetitionOwnershipToThisTakesEffectImmediately', { user: candidateName(transferTarget) }) }}
+            {{ $t('administration.competitionsBy.description.transferCompetitionOwnershipTakes', { user: candidateName(transferTarget) }) }}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>{{ $t('ui.cancel') }}</AlertDialogCancel>
+          <AlertDialogCancel>{{ $t('common.action.cancel') }}</AlertDialogCancel>
           <AlertDialogAction variant="destructive" :disabled="transferring" @click="transfer">
-            <Spinner v-if="transferring" data-icon="inline-start" /> {{ $t('ui.confirmTransfer') }} </AlertDialogAction>
+            <Spinner v-if="transferring" data-icon="inline-start" /> {{ $t('common.label.confirmTransfer') }} </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

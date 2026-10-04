@@ -1,3 +1,5 @@
+import type { UiMessage } from '../../../utils/i18n'
+import { message as describeMessage } from '../../../utils/i18n'
 
 
 import { authenticationRequestEmailVerification, resendEmailVerificationEndpoint, verifyEmailEndpoint } from '../../../api'
@@ -12,7 +14,7 @@ export function useAuthVerifyEmailPage() {
 
   const state = ref<'idle' | 'verifying' | 'success' | 'failed'>('idle')
 
-  const message = ref<string | null>(null)
+  const message = ref<UiMessage | null>(null)
 
   const resendPending = ref(false)
 
@@ -28,7 +30,7 @@ export function useAuthVerifyEmailPage() {
     const { error } = await verifyEmailEndpoint({ body: { token: token.value } })
     if (error) {
       state.value = 'failed'
-      message.value = parseApiError(error, translate("ui.verificationLinkIsInvalidOrExpired")).message
+      message.value = parseApiError(error, describeMessage("common.authVerify.error.verificationLinkExpiredInvalid")).displayMessage
     }
     else {
       state.value = 'success'
@@ -43,13 +45,13 @@ export function useAuthVerifyEmailPage() {
         ? await resendEmailVerificationEndpoint()
         : await authenticationRequestEmailVerification({ body: { email: email.value } })
       if (error) {
-        message.value = parseApiError(error).message
+        message.value = parseApiError(error).displayMessage
         return
       }
       resendDone.value = true
     }
     catch (error) {
-      message.value = parseApiError(error).message
+      message.value = parseApiError(error).displayMessage
     }
     finally {
       resendPending.value = false

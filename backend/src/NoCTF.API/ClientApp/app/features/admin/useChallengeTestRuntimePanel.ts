@@ -1,7 +1,9 @@
+import { message as describeMessage } from '../../utils/i18n'
+import type { UiMessage } from '../../utils/i18n'
 import { markRaw, toRefs } from 'vue'
 
 import { Check, Clipboard, FlaskConical, RefreshCw } from '@lucide/vue'
-import { toast } from 'vue-sonner'
+import { toast } from '../../utils/message-toast'
 import { adminChallengeBankCreateTestRuntime, adminChallengeBankExtendTestRuntime, adminChallengeBankGetTestRuntime, adminChallengeBankStopTestRuntime } from '../../api'
 import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeTestRuntimeAcceptedResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeTestRuntimeResponse, NoCtfapiEndpointsAdministrationChallengeBankRuntimeTestFlagStateProtocol } from '../../api'
 import type { ChallengeTestRuntimeLoadOutcome, ChallengeTestRuntimeMutationKind, PendingChallengeTestRuntimeMutation } from '../../utils/challenge-test-runtime-polling'
@@ -20,7 +22,7 @@ export function useChallengeTestRuntimePanel(props: Readonly<{
 
   const loading = ref(true)
 
-  const loadError = ref<string | null>(null)
+  const loadError = ref<UiMessage | null>(null)
 
   const acting = ref(false)
 
@@ -47,7 +49,7 @@ export function useChallengeTestRuntimePanel(props: Readonly<{
         return 'missing'
       }
       if (error || !data) {
-        loadError.value = parseApiError(error, translate("ui.failedToLoadTheChallengeTestContainer")).message
+        loadError.value = parseApiError(error, describeMessage("runtime.challengeTest.error.loadChallengeTestFailed")).displayMessage
         return 'failed'
       }
       runtime.value = data
@@ -55,7 +57,7 @@ export function useChallengeTestRuntimePanel(props: Readonly<{
       return 'available'
     }
     catch (error) {
-      loadError.value = parseApiError(error, translate("ui.failedToLoadTheChallengeTestContainer")).message
+      loadError.value = parseApiError(error, describeMessage("runtime.challengeTest.error.loadChallengeTestFailed")).displayMessage
       return 'failed'
     }
   }
@@ -121,13 +123,13 @@ export function useChallengeTestRuntimePanel(props: Readonly<{
         previousRuntimeInstanceId,
         previousExpiresAt,
       }
-      toast.success(translate("ui.theOperationWasAcceptedTestContainerStatusIsUpdating"))
+      toast.success(describeMessage("runtime.challengeTest.description.wasAcceptedTestContainer"))
       const outcome = await load()
       if (shouldContinuePolling(outcome))
         startPolling()
     }
     catch (error) {
-      toast.error(parseApiError(error, failureMessage).message)
+      toast.error(parseApiError(error, failureMessage).displayMessage)
     }
     finally {
       acting.value = false
@@ -142,7 +144,7 @@ export function useChallengeTestRuntimePanel(props: Readonly<{
       path: path.value,
       body: { replacesRuntimeId: null },
     }),
-    translate("ui.failedToStartTheChallengeTestContainer"),
+    translate("runtime.challengeTest.error.startChallengeTestFailed"),
   )
 
   const stop = () => act(
@@ -150,7 +152,7 @@ export function useChallengeTestRuntimePanel(props: Readonly<{
     () => adminChallengeBankStopTestRuntime({
       path: { ...path.value, runtimeInstanceId: runtime.value!.id! },
     }),
-    translate("ui.failedToStopTheChallengeTestContainer"),
+    translate("runtime.challengeTest.error.stopChallengeTestFailed"),
   )
 
   const reset = () => act(
@@ -159,7 +161,7 @@ export function useChallengeTestRuntimePanel(props: Readonly<{
       path: path.value,
       body: { replacesRuntimeId: runtime.value!.id! },
     }),
-    translate("ui.failedToResetTheChallengeTestContainer"),
+    translate("runtime.challengeTest.error.resetChallengeTestFailed"),
   )
 
   const extend = () => {
@@ -173,7 +175,7 @@ export function useChallengeTestRuntimePanel(props: Readonly<{
         path: { ...path.value, runtimeInstanceId: current.id! },
         body: { expiresAt: extension.expiresAt },
       }),
-      translate("ui.failedToExtendTheChallengeTestContainer"),
+      translate("runtime.challengeTest.error.extendChallengeTestFailed"),
     )
   }
 
@@ -186,7 +188,7 @@ export function useChallengeTestRuntimePanel(props: Readonly<{
       copiedTimer = setTimeout(() => { copied.value = false }, 1800)
     }
     catch {
-      toast.error(translate("ui.couldNotCopyTheTestFlagSelectAndCopyIt"))
+      toast.error(describeMessage("runtime.challengeTest.description.couldCopyTestFlag"))
     }
   }
 
@@ -213,7 +215,7 @@ export function useChallengeTestRuntimePanel(props: Readonly<{
   const ttl = computed(() => {
     if (!runtime.value?.expiresAt) return null
     const remaining = new Date(runtime.value.expiresAt).getTime() - now.value
-    return remaining > 0 ? formatDuration(remaining) : translate("ui.expired")
+    return remaining > 0 ? formatDuration(remaining) : translate("runtime.label.expired")
   })
 
   const canExtend = computed(() => {
@@ -244,11 +246,11 @@ export function useChallengeTestRuntimePanel(props: Readonly<{
 
   function flagStateLabel(state?: NoCtfapiEndpointsAdministrationChallengeBankRuntimeTestFlagStateProtocol): string {
     switch (state) {
-      case 'Pending': return translate("ui.injecting")
-      case 'Succeeded': return translate("ui.injected")
-      case 'Failed': return translate("ui.injectionFailed")
-      case 'Canceled': return translate("ui.canceled")
-      default: return translate("ui.notRequired")
+      case 'Pending': return translate("runtime.label.injecting")
+      case 'Succeeded': return translate("common.label.injected")
+      case 'Failed': return translate("runtime.error.injectionFailed")
+      case 'Canceled': return translate("runtime.label.canceled")
+      default: return translate("runtime.validation.required")
     }
   }
 

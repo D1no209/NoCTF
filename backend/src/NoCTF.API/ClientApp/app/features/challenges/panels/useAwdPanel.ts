@@ -1,3 +1,5 @@
+import { message as describeMessage } from '../../../utils/i18n'
+import type { UiMessage } from '../../../utils/i18n'
 import { markRaw, toRefs } from 'vue'
 
 import { listRuntimeTargetsEndpoint } from '../../../api'
@@ -16,7 +18,7 @@ export function useAwdPanel(props: Readonly<{
 emit: { (event: "submitted", ...args: []): void; (event: "remainingChanged", ...args: [remaining: number | null]): void }) {
   const targets = ref<NoCtfapiEndpointsRuntimeRuntimeTargetResponse[]>([])
 
-  const targetsError = ref<string | null>(null)
+  const targetsError = ref<UiMessage | null>(null)
 
   const targetsLoaded = ref(false)
 
@@ -26,7 +28,7 @@ emit: { (event: "submitted", ...args: []): void; (event: "remainingChanged", ...
     })
     targetsLoaded.value = true
     if (error || !data) {
-      targetsError.value = parseApiError(error, translate("ui.failedToLoadAttackTarget")).message
+      targetsError.value = parseApiError(error, describeMessage("challenges.awdPanel.error.loadAttackTargetFailed")).displayMessage
       return
     }
     targets.value = data.items ?? []

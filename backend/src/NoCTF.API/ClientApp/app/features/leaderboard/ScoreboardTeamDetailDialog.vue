@@ -1,4 +1,5 @@
-<script setup lang="ts">
+<script setup lang="ts">import type { UiMessage } from '../../utils/i18n'
+
 import { bindViewState } from '~/features/shared/view-state'
 
 import type { NoCtfapiEndpointsCompetitionsGameModeProtocol, NoCtfapiEndpointsCompetitionsScoreboardTeamResponse } from '~/api'
@@ -15,7 +16,7 @@ const props = defineProps<{
   columnGroups: ScoreboardChallengeColumnGroup[]
   trendSeries?: TrendSeries[]
   trendLoading?: boolean
-  trendError?: string | null
+  trendError?: UiMessage | null
   trendRangeStart?: string | null
   trendRangeEnd?: string | null
   trendRevision?: string | number | null

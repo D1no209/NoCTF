@@ -2,14 +2,14 @@ import type { NoCtfapiEndpointsAdministrationGameplayFactsAdminPatchFailureCode 
 import { translate } from './i18n'
 
 const messages: Record<NoCtfapiEndpointsAdministrationGameplayFactsAdminPatchFailureCode, string> = {
-  Forbidden: "ui.onlyThisCompetitionSOwnerManagersJudgesOrAPlatform",
-  SubmissionNotFound: "ui.theSubmissionDoesNotExistInThisCompetition",
-  NotFixSubmission: "ui.onlyFixSubmissionsHaveADownloadablePatchArchive",
-  PatchNotFound: "ui.thisSubmissionHasNoPatchArchive",
-  InvalidAssociation: "ui.thePatchArchiveAssociationDoesNotMatchTheSubmissionS",
-  FileNotFound: "ui.thePatchArchiveFileNoLongerExists",
-  StorageUnavailable: "ui.patchArchiveStorageIsTemporarilyUnavailableTryAgainLater",
-  AuditUnavailable: "ui.thePatchDownloadAuditCouldNotBeSavedNoFile",
+  Forbidden: "common.patch.description.competitionSOwnerManagers",
+  SubmissionNotFound: "common.patch.description.submissionExistCompetition",
+  NotFixSubmission: "common.patch.description.fixSubmissionsDownloadablePatch",
+  PatchNotFound: "common.patch.description.submissionPatchArchive",
+  InvalidAssociation: "common.patch.description.patchArchiveAssociationMatch",
+  FileNotFound: "common.patch.description.patchArchiveFileLonger",
+  StorageUnavailable: "common.patch.error.patchArchiveStorageUnavailable",
+  AuditUnavailable: "common.patch.description.patchDownloadAuditCould",
 }
 
 export function adminPatchFailureMessage(code: NoCtfapiEndpointsAdministrationGameplayFactsAdminPatchFailureCode): string {

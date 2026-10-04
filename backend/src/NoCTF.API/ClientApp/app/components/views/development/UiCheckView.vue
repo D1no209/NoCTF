@@ -10,8 +10,8 @@ const { isDark, toggleTheme, isEnglish, switchLocale, name, amount, when, select
     <header class="ui-preview-toolbar flex flex-wrap items-center justify-between gap-4">
       <div><h1 class="text-2xl font-semibold">{{ $t('preview.title') }}</h1><p class="mt-2 text-sm text-muted-foreground">{{ $t('preview.description') }}</p></div>
       <div class="flex gap-2">
-        <Button id="probe-theme" variant="outline" @click="toggleTheme">{{ isDark ? $t('ui.switchToLightTheme') : $t('ui.switchToDarkTheme') }}</Button>
-        <Button id="probe-locale" variant="outline" @click="switchLocale">{{ isEnglish ? $t('ui.switchToChinese') : $t('ui.switchToEnglish') }}</Button>
+        <Button id="probe-theme" variant="outline" @click="toggleTheme">{{ isDark ? $t('common.label.switchLightTheme') : $t('common.label.switchDarkTheme') }}</Button>
+        <Button id="probe-locale" variant="outline" @click="switchLocale">{{ isEnglish ? $t('common.label.switchChinese') : $t('common.label.switchEnglish') }}</Button>
       </div>
     </header>
     <Card id="probe-card">

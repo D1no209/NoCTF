@@ -1,8 +1,10 @@
+import { message as describeMessage } from '../../utils/i18n'
+import type { UiMessage } from '../../utils/i18n'
 import { markRaw } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import { Image as ImageIcon, LockKeyhole, LogOut, ShieldCheck, UserRound } from '@lucide/vue'
 import { useMediaQuery } from '@vueuse/core'
-import { toast } from 'vue-sonner'
+import { toast } from '../../utils/message-toast'
 import {
   authenticationGetMyProfile,
   authenticationPatchMyProfile,
@@ -34,7 +36,7 @@ export function useAccountPanel() {
     platformConfiguration.value?.imageUploadLimits?.maximumWallpaperBytes ?? null)
   const avatarRequirements = computed(() => maximumAvatarBytes.value
     ? translate('accountPanel.avatarRequirements', { limit: formatBytes(maximumAvatarBytes.value) })
-    : translate('ui.pleaseSelectAJpegPngOrWebpImageNoLarger'))
+    : translate('account.accountPanel.description.selectJpegPngWebp'))
   const wallpaperRequirements = computed(() => maximumWallpaperBytes.value
     ? translate('accountPanel.wallpaperRequirements', { limit: formatBytes(maximumWallpaperBytes.value) })
     : translate('accountPanel.wallpaperRequirementsFallback'))
@@ -46,10 +48,10 @@ export function useAccountPanel() {
   function uploadTooLarge(maximumBytes: number | null): string {
     return maximumBytes
       ? translate('accountPanel.fileExceedsUploadLimit', { limit: formatBytes(maximumBytes) })
-      : translate('ui.theUploadedFileIsTooLarge')
+      : translate('common.error.uploadTooLarge')
   }
 
-  function imageUploadError(error: unknown, maximumBytes: number | null): string {
+  function imageUploadError(error: unknown, maximumBytes: number | null): UiMessage {
     const parsed = parseApiError(error)
     if (parsed.code === 'UploadTooLarge')
       return uploadTooLarge(maximumBytes)
@@ -60,9 +62,9 @@ export function useAccountPanel() {
       || parsed.code === 'PixelLimitExceeded'
       || parsed.code === 'MultipleFrames'
       || parsed.code === 'MalformedImage') {
-      return translate('ui.thisImageCannotBeReadPleaseUseJpegPngOr')
+      return translate('account.accountPanel.validation.imageReadFormat')
     }
-    return parsed.message
+    return parsed.displayMessage
   }
 
   function setOpen(value: boolean) {
@@ -81,7 +83,7 @@ export function useAccountPanel() {
   const description = ref('')
   const savedDescription = ref(description.value)
   const profilePending = ref(false)
-  const profileError = ref<string | null>(null)
+  const profileError = ref<UiMessage | null>(null)
   const profileSuccess = ref(false)
   const profileDirty = computed(() => description.value !== savedDescription.value)
 
@@ -98,10 +100,10 @@ export function useAccountPanel() {
       if (error || !data) throw error
       savedDescription.value = draft
       profileSuccess.value = true
-      toast.success(translate('ui.dataSaved'))
+      toast.success(describeMessage('account.label.dataSaved'))
     }
     catch (error) {
-      profileError.value = parseApiError(error).message
+      profileError.value = parseApiError(error).displayMessage
     }
     finally {
       profilePending.value = false
@@ -119,7 +121,7 @@ export function useAccountPanel() {
     input.value = ''
     if (!file) return
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      toast.error(translate('ui.pleaseSelectAJpegPngOrWebpImageNoLarger'))
+      toast.error(describeMessage('account.accountPanel.description.selectJpegPngWebp'))
       return
     }
     avatarSourceFile.value = file
@@ -144,7 +146,7 @@ export function useAccountPanel() {
       await fetchMe()
       avatarEditorOpen.value = false
       avatarSourceFile.value = null
-      toast.success(translate('ui.avatarHasBeenUpdated'))
+      toast.success(describeMessage('account.label.avatarUpdated'))
     }
     catch (error) {
       toast.error(imageUploadError(error, maximumAvatarBytes.value))
@@ -168,7 +170,7 @@ export function useAccountPanel() {
     input.value = ''
     if (!file) return
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      toast.error(translate('accountPanel.wallpaperFileInvalid'))
+      toast.error(describeMessage('accountPanel.wallpaperFileInvalid'))
       return
     }
     if (exceedsUploadLimit(file.size, maximumWallpaperBytes.value)) {
@@ -182,7 +184,7 @@ export function useAccountPanel() {
       if (error || !data) throw error
       user.value = data
       await refreshWallpaper(true)
-      toast.success(translate('accountPanel.wallpaperUpdated'))
+      toast.success(describeMessage('accountPanel.wallpaperUpdated'))
     }
     catch (error) {
       toast.error(imageUploadError(error, maximumWallpaperBytes.value))
@@ -205,12 +207,12 @@ export function useAccountPanel() {
         if (user.value)
           user.value = { ...user.value, wallpaperEnabled: nextEnabled }
       })
-      toast.success(translate(enabled
+      toast.success(describeMessage(enabled
         ? 'accountPanel.wallpaperEnabled'
         : 'accountPanel.wallpaperDisabled'))
     }
     catch (error) {
-      toast.error(parseApiError(error).message)
+      toast.error(parseApiError(error).displayMessage)
     }
     finally {
       wallpaperPending.value = false
@@ -223,7 +225,7 @@ export function useAccountPanel() {
   const identityLoading = ref(false)
   const identityLoaded = ref(false)
   const identityPending = ref(false)
-  const identityError = ref<string | null>(null)
+  const identityError = ref<UiMessage | null>(null)
   const identitySuccess = ref(false)
   const identityFieldErrors = ref<Record<string, string[]>>({})
   const identityDirty = computed(() => fullName.value !== savedIdentity.value.fullName || studentNumber.value !== savedIdentity.value.studentNumber)
@@ -246,7 +248,7 @@ export function useAccountPanel() {
       identityLoaded.value = true
     }
     catch (error) {
-      identityError.value = parseApiError(error).message
+      identityError.value = parseApiError(error).displayMessage
     }
     finally {
       identityLoading.value = false
@@ -269,11 +271,11 @@ export function useAccountPanel() {
       studentNumber.value = draft.studentNumber
       savedIdentity.value = draft
       identitySuccess.value = true
-      toast.success(translate('ui.dataSaved'))
+      toast.success(describeMessage('account.label.dataSaved'))
     }
     catch (error) {
       const parsed = parseApiError(error)
-      identityError.value = parsed.message
+      identityError.value = parsed.displayMessage
       identityFieldErrors.value = parsed.fieldErrors ?? {}
     }
     finally {
@@ -282,7 +284,7 @@ export function useAccountPanel() {
   }
 
   const emailPending = ref(false)
-  const emailMessage = ref<string | null>(null)
+  const emailMessage = ref<UiMessage | null>(null)
   const emailError = ref(false)
 
   async function resendEmail() {
@@ -292,11 +294,11 @@ export function useAccountPanel() {
     try {
       const { error } = await resendEmailVerificationEndpoint()
       if (error) throw error
-      emailMessage.value = translate('ui.verificationEmailRequestedPleaseCheckYourInbox')
+      emailMessage.value = translate('account.accountPanel.description.verificationEmailRequestedCheck')
     }
     catch (error) {
       emailError.value = true
-      emailMessage.value = parseApiError(error).message
+      emailMessage.value = parseApiError(error).displayMessage
     }
     finally {
       emailPending.value = false
@@ -307,7 +309,7 @@ export function useAccountPanel() {
   const ssoLoading = ref(false)
   const ssoLoaded = ref(false)
   const ssoPending = ref(false)
-  const ssoError = ref<string | null>(null)
+  const ssoError = ref<UiMessage | null>(null)
   const ssoProviderId = ref('')
 
   async function loadSsoBinding() {
@@ -316,7 +318,7 @@ export function useAccountPanel() {
     const { data, error } = await authenticationSsoGetMyBinding()
     ssoLoading.value = false
     if (error || !data) {
-      ssoError.value = parseApiError(error, translate('sso.bindingUnavailable')).message
+      ssoError.value = parseApiError(error, describeMessage('sso.bindingUnavailable')).displayMessage
       return
     }
     ssoConfiguration.value = data
@@ -336,7 +338,7 @@ export function useAccountPanel() {
       window.location.assign(data.authorizationUrl)
     }
     catch (error) {
-      ssoError.value = parseApiError(error, translate('sso.bindingStartFailed')).message
+      ssoError.value = parseApiError(error, describeMessage('sso.bindingStartFailed')).displayMessage
       ssoPending.value = false
     }
   }
@@ -348,11 +350,11 @@ export function useAccountPanel() {
     const { error } = await authenticationSsoUnbindIdentity()
     ssoPending.value = false
     if (error) {
-      ssoError.value = parseApiError(error, translate('sso.unbindingFailed')).message
+      ssoError.value = parseApiError(error, describeMessage('sso.unbindingFailed')).displayMessage
       return
     }
     invalidate()
-    toast.success(translate('sso.unbindingSuccessful'))
+    toast.success(describeMessage('sso.unbindingSuccessful'))
     open.value = false
     await navigateTo('/auth/login')
   }
@@ -380,12 +382,12 @@ export function useAccountPanel() {
   const newPassword = ref('')
   const confirmNewPassword = ref('')
   const passwordPending = ref(false)
-  const passwordError = ref<string | null>(null)
+  const passwordError = ref<UiMessage | null>(null)
 
   async function changePassword() {
     passwordError.value = null
     if (newPassword.value !== confirmNewPassword.value) {
-      passwordError.value = translate('ui.theNewPasswordsEnteredTwiceAreInconsistent')
+      passwordError.value = describeMessage('account.accountPanel.description.newPasswordsEnteredTwice')
       return
     }
     passwordPending.value = true
@@ -394,14 +396,14 @@ export function useAccountPanel() {
         body: { currentPassword: currentPassword.value, newPassword: newPassword.value },
       })
       if (error) throw error
-      toast.success(translate('ui.thePasswordHasBeenChangedPleaseLogInAgain'))
+      toast.success(describeMessage('account.accountPanel.description.passwordChangedLogAgain'))
       currentPassword.value = ''
       newPassword.value = ''
       confirmNewPassword.value = ''
       await logoutAll()
     }
     catch (error) {
-      passwordError.value = parseApiError(error).message
+      passwordError.value = parseApiError(error).displayMessage
     }
     finally {
       passwordPending.value = false

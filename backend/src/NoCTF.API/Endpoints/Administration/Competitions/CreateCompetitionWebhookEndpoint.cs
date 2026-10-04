@@ -24,7 +24,7 @@ public sealed class CreateCompetitionWebhookValidator
         RuleFor(request => request.Name).NotEmpty().MaximumLength(100);
         RuleFor(request => request.EndpointUrl).NotEmpty().MaximumLength(2048)
             .Must(CompetitionWebhookEndpointValidation.IsValid)
-            .WithMessage("EndpointUrl must be an absolute HTTP or HTTPS URL without credentials or a fragment.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.CreateCompetitionWebhookValidationEndpointurlAbsoluteHttpHttps)).WithErrorCode(ApiMessages.Key(ApiMessageId.CreateCompetitionWebhookValidationEndpointurlAbsoluteHttpHttps));
     }
 }
 
@@ -34,7 +34,12 @@ public sealed record CompetitionWebhookCreatedResponse(
 
 public sealed record CompetitionWebhookFailureResponse(
     CompetitionWebhookProblemCode Code,
-    string Message);
+    string Message)
+{
+    public string Message { get; init; } = ApiMessages.Localize(Code, Message, ApiMessages.NoArguments);
+    public string MessageKey => ApiMessages.For(Code).Key;
+    public IReadOnlyDictionary<string, object?> MessageArguments => ApiMessages.NoArguments;
+}
 
 public sealed class CreateCompetitionWebhookEndpoint(
     CreateCompetitionWebhookTarget create,
@@ -95,9 +100,9 @@ internal static class CompetitionWebhookEndpointValidation
         && string.IsNullOrEmpty(uri.Fragment);
 
     public static ProblemHttpResult Failure(CompetitionWebhookMutationFailure? failure) =>
-        TypedResults.Problem(
+        ApiProblems.Problem(
             statusCode: StatusCodes.Status400BadRequest,
-            title: "Invalid webhook target.",
+            title: ApiMessages.Get(ApiMessageId.CreateCompetitionWebhookTitleInvalidWebhookTarget),
             extensions: new Dictionary<string, object?>
             {
                 ["code"] = failure is CompetitionWebhookMutationFailure value

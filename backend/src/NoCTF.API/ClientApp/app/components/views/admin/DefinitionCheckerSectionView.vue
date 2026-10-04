@@ -8,7 +8,7 @@ const { hasServices, serviceNames, toggleChecker, toggleCheckerJob, RunnerJobEdi
 
 <template>
   <FieldSet v-if="mode === 'Awd'" class="rounded-md border p-4">
-    <FieldLegend class="px-1 text-sm font-medium">{{ $t('ui.checkerServiceHealthCheck') }}</FieldLegend>
+    <FieldLegend class="px-1 text-sm font-medium">{{ $t('administration.label.checkerServiceHealthCheck') }}</FieldLegend>
     <Field orientation="horizontal">
       <Switch
         id="def-has-checker"
@@ -16,23 +16,23 @@ const { hasServices, serviceNames, toggleChecker, toggleCheckerJob, RunnerJobEdi
         :disabled="disabled"
         @update:model-value="toggleChecker($event === true)"
       />
-      <FieldLabel for="def-has-checker" class="font-normal">{{ $t('ui.enablePeriodicServiceChecks') }}</FieldLabel>
+      <FieldLabel for="def-has-checker" class="font-normal">{{ $t('administration.label.enablePeriodicServiceChecks') }}</FieldLabel>
     </Field>
     <template v-if="model.checker">
       <component :is="RunnerJobEditor" :job="model.checker.job" :disabled="disabled" />
       <Field v-if="hasServices">
-        <FieldLabel>{{ $t('ui.targetServiceName') }}</FieldLabel>
+        <FieldLabel>{{ $t('administration.label.targetServiceName') }}</FieldLabel>
         <Select v-model="model.checker.targetServiceName" :disabled="disabled">
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent><SelectGroup><SelectItem v-for="name in serviceNames" :key="name" :value="name">{{ name }}</SelectItem></SelectGroup></SelectContent>
         </Select>
-        <FieldDescription>{{ $t('ui.runtimeServiceTarget') }}</FieldDescription>
+        <FieldDescription>{{ $t('runtime.label.runtimeServiceTarget') }}</FieldDescription>
       </Field>
     </template>
   </FieldSet>
 
   <FieldSet v-else-if="mode === 'Awdp' || mode === 'Ctf'" class="rounded-md border p-4">
-    <FieldLegend class="px-1 text-sm font-medium">{{ $t('ui.oneShotFixVerificationChecker') }}</FieldLegend>
+    <FieldLegend class="px-1 text-sm font-medium">{{ $t('administration.definitionChecker.label.oneShotFixVerification') }}</FieldLegend>
     <Field orientation="horizontal">
       <Switch
         id="def-has-checker-job"
@@ -40,7 +40,7 @@ const { hasServices, serviceNames, toggleChecker, toggleCheckerJob, RunnerJobEdi
         :disabled="disabled"
         @update:model-value="toggleCheckerJob($event === true)"
       />
-      <FieldLabel for="def-has-checker-job" class="font-normal">{{ $t('ui.enableTheOneShotFixVerificationChecker') }}</FieldLabel>
+      <FieldLabel for="def-has-checker-job" class="font-normal">{{ $t('administration.definitionChecker.description.enableOneShotFix.checkerSectionView') }}</FieldLabel>
     </Field>
     <template v-if="model.checkerJob">
       <component :is="RunnerJobEditor" :job="model.checkerJob" :disabled="disabled" />
@@ -51,15 +51,15 @@ const { hasServices, serviceNames, toggleChecker, toggleCheckerJob, RunnerJobEdi
           :disabled="disabled"
         />
         <div class="grid gap-1">
-          <FieldLabel for="def-checker-fix-input" class="font-normal">{{ $t('ui.provideTheFixPackageToTheChecker') }}</FieldLabel>
+          <FieldLabel for="def-checker-fix-input" class="font-normal">{{ $t('administration.definitionChecker.description.fixPackageChecker') }}</FieldLabel>
           <FieldDescription>
-            {{ $t('ui.beforeItStartsTheCheckerReceivesThePlatformValidatedFix') }}
+            {{ $t('administration.definitionChecker.description.startsCheckerReceivesPlatform') }}
           </FieldDescription>
         </div>
       </Field>
     </template>
     <FieldDescription v-else>
-      {{ $t('ui.enableTheOneShotFixCheckerBeforeProvidingItWith') }}
+      {{ $t('administration.definitionChecker.description.enableOneShotFix') }}
     </FieldDescription>
   </FieldSet>
 </template>

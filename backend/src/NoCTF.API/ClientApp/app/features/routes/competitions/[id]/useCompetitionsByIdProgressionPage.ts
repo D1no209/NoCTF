@@ -1,3 +1,5 @@
+import { message as describeMessage } from '../../../../utils/i18n'
+import type { UiMessage } from '../../../../utils/i18n'
 import type { Edge, Node } from '@vue-flow/core'
 import { getPlayerCompetitionProgression } from '../../../../api'
 import type { NoCtfapiEndpointsCompetitionsPlayerProgressionContract } from '../../../../api'
@@ -22,7 +24,7 @@ export function useCompetitionsByIdProgressionPage() {
   const competitionId = route.params.id as string
   const data = ref<NoCtfapiEndpointsCompetitionsPlayerProgressionContract | null>(null)
   const loading = ref(true)
-  const error = ref<string | null>(null)
+  const error = ref<UiMessage | null>(null)
   const nodes = shallowRef<ReadNode[]>([])
   const edges = shallowRef<ReadEdge[]>([])
   const direction = ref<ProgressionLayoutDirection>('RIGHT')
@@ -74,7 +76,7 @@ export function useCompetitionsByIdProgressionPage() {
     if (generation !== loadGeneration) return
     if (!result.data || result.error) {
       loading.value = false
-      error.value = parseApiError(result.error, translate('progression.loadFailed')).message
+      error.value = parseApiError(result.error, describeMessage('progression.loadFailed')).displayMessage
       return
     }
     if (result.data.nodes?.some(node => !node.id || !node.resourceId
@@ -83,7 +85,7 @@ export function useCompetitionsByIdProgressionPage() {
       || result.data.edges?.some(edge => !edge.id || !edge.sourceNodeId || !edge.targetNodeId
         || (edge.condition !== 0 && edge.condition !== 1))) {
       loading.value = false
-      error.value = translate('progression.loadFailed')
+      error.value = describeMessage('progression.loadFailed')
       return
     }
     data.value = result.data
@@ -134,7 +136,7 @@ export function useCompetitionsByIdProgressionPage() {
         initialFocusNodeId.value = selectedNodeId.value ?? currentProgressNodeId.value
       }
       catch {
-        error.value = translate('progression.layoutFailed')
+        error.value = describeMessage('progression.layoutFailed')
       }
     }
     loading.value = false

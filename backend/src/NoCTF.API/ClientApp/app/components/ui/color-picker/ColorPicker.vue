@@ -42,7 +42,7 @@ function start(event: PointerEvent) { if (event.button !== 0) return; (event.cur
       <span data-slot="color-cursor" :style="{ left: `${hsv.s}%`, top: `${100 - hsv.v}%` }" />
     </div>
     <div v-for="axis in axes" :key="axis.key" class="flex flex-col gap-2">
-      <div class="flex justify-between text-xs"><Label :id="`${id}-${axis.key}`">{{ $t(axis.label) }}</Label><span class="tabular-nums">{{ Math.round(axis.value) }}</span></div>
+      <div class="flex justify-between text-xs"><Label :id="`${id}-${axis.key}`">{{ translate(axis.label) }}</Label><span class="tabular-nums">{{ Math.round(axis.value) }}</span></div>
       <SliderRoot data-slot="color-slider" :model-value="[axis.value]" :min="0" :max="axis.max" :step="1" @update:model-value="changeAxis(axis.key, $event)">
         <SliderTrack data-slot="color-slider-track"><SliderRange data-slot="color-slider-range" /></SliderTrack>
         <SliderThumb data-slot="color-slider-thumb" :aria-labelledby="`${id}-${axis.key}`" />

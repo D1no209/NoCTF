@@ -29,20 +29,20 @@ const { Dice5, FileDown, History, ctx, isLoggedIn, user, challenge, loading, err
           class="relative z-10 font-sans text-lg font-bold italic tabular-nums text-primary"
         />
         <Dialog v-if="isLoggedIn" v-model:open="historyOpen">
-          <Hint :content="$t('ui.challengeSubmissionHistory')">
+          <Hint :content="$t('challenges.label.challengeSubmissionHistory')">
             <DialogTrigger as-child>
-              <Button variant="ghost" size="icon-sm" class="relative z-10" :aria-label="$t('ui.challengeSubmissionHistory')"><History /></Button>
+              <Button variant="ghost" size="icon-sm" class="relative z-10" :aria-label="$t('challenges.label.challengeSubmissionHistory')"><History /></Button>
             </DialogTrigger>
           </Hint>
           <DialogContent class="sm:max-w-3xl">
-            <DialogHeader class="sr-only"><DialogTitle>{{ $t('ui.challengeSubmissionHistory') }}</DialogTitle><DialogDescription>{{ $t('ui.onlyTeamMembersCanViewFlagValuesSubmittedByTheir') }}</DialogDescription></DialogHeader>
-            <ScrollSurface axis="y" class="max-h-[65dvh]" :aria-label="$t('ui.challengeSubmissionHistory')">
+            <DialogHeader class="sr-only"><DialogTitle>{{ $t('challenges.label.challengeSubmissionHistory') }}</DialogTitle><DialogDescription>{{ $t('challenges.challengeSubmission.description.teamMembersViewFlag') }}</DialogDescription></DialogHeader>
+            <ScrollSurface axis="y" class="max-h-[65dvh]" :aria-label="$t('challenges.label.challengeSubmissionHistory')">
               <component :is="ChallengeSubmissionHistory" v-if="historyOpen" :key="challenge.id" :competition-id="competitionId" :competition-challenge-id="competitionChallengeId" :refresh-key="historyRefreshKey" />
             </ScrollSurface>
           </DialogContent>
         </Dialog>
         <span class="sr-only">{{ challenge.direction || '' }}</span>
-        <Badge v-if="mode === 'Awdp'" variant="secondary">{{ $t('ui.scoresSettleByRound') }}</Badge>
+        <Badge v-if="mode === 'Awdp'" variant="secondary">{{ $t('challenges.label.scoresSettleRound') }}</Badge>
         <div v-if="challenge.tags?.length" class="relative z-10 flex basis-full flex-wrap gap-1.5" :aria-label="$t('challengeTags.label')">
           <Badge v-for="tag in challenge.tags" :key="tag" variant="secondary" class="max-w-full break-words whitespace-normal">{{ tag }}</Badge>
         </div>
@@ -61,7 +61,7 @@ const { Dice5, FileDown, History, ctx, isLoggedIn, user, challenge, loading, err
         aria-labelledby="challenge-attachments-title"
       >
         <div class="flex items-center justify-between gap-3">
-            <h3 id="challenge-attachments-title" class="text-sm font-semibold">{{ $t('ui.accessories') }}</h3>
+            <h3 id="challenge-attachments-title" class="text-sm font-semibold">{{ $t('common.label.accessories') }}</h3>
             <Button
               v-if="!attachmentsLoading && !attachmentError && attachmentDeliveryPolicy === 'RandomOnePerTeam'"
               variant="outline"
@@ -69,14 +69,14 @@ const { Dice5, FileDown, History, ctx, isLoggedIn, user, challenge, loading, err
               :disabled="downloading"
               @click="downloadRandom"
             >
-              <Dice5 data-icon="inline-start" /> {{ $t('ui.downloadAttachment') }}
+              <Dice5 data-icon="inline-start" /> {{ $t('challenges.label.downloadAttachment') }}
             </Button>
         </div>
           <Skeleton v-if="attachmentsLoading" class="mt-3 h-12 w-full" />
           <Alert v-else-if="attachmentError" variant="destructive" class="mt-3">
             <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
               <span>{{ $message(attachmentError) }}</span>
-              <Button type="button" size="sm" variant="outline" @click="loadAttachments">{{ $t('ui.reload') }}</Button>
+              <Button type="button" size="sm" variant="outline" @click="loadAttachments">{{ $t('common.label.reload') }}</Button>
             </AlertDescription>
           </Alert>
           <ul v-else-if="attachmentDeliveryPolicy !== 'RandomOnePerTeam'" class="mt-3 flex flex-wrap gap-2">

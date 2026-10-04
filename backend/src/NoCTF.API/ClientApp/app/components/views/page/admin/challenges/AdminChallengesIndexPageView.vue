@@ -9,29 +9,29 @@ const { Plus, canOrganize, templates, filteredTemplates, search, directionFilter
 <template>
   <div class="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8">
     <div class="flex items-center justify-between gap-4">
-      <h1 class="text-2xl font-semibold">{{ $t('ui.challengeLibrary2') }}</h1>
+      <h1 class="text-2xl font-semibold">{{ $t('common.label.challengeLibrary.useDefaultLayout') }}</h1>
       <Button v-if="canOrganize" @click="setCreateOpen(true)">
-          <Plus data-icon="inline-start" /> {{ $t('ui.createNewTemplate') }}
+          <Plus data-icon="inline-start" /> {{ $t('administration.label.createNewTemplate') }}
       </Button>
     </div>
 
     <Alert v-if="!canOrganize" variant="destructive">
-      <AlertDescription>{{ $t('ui.organizerOrAdministratorRightsAreRequiredToManageTheQuestion') }}</AlertDescription>
+      <AlertDescription>{{ $t('administration.challengesBy.validation.organizerAdministratorRequired') }}</AlertDescription>
     </Alert>
 
     <template v-else>
       <div class="flex flex-wrap items-end gap-4">
         <Field class="w-full sm:w-72">
-          <FieldLabel>{{ $t('ui.searchQuestionBankTemplates') }}</FieldLabel>
-          <Input v-model="search" :placeholder="$t('ui.searchQuestionBankTemplates')" />
+          <FieldLabel>{{ $t('administration.label.searchQuestionBankTemplates') }}</FieldLabel>
+          <Input v-model="search" :placeholder="$t('administration.label.searchQuestionBankTemplates')" />
         </Field>
         <Field class="w-full sm:w-56">
-          <FieldLabel>{{ $t('ui.category') }}</FieldLabel>
+          <FieldLabel>{{ $t('administration.label.category') }}</FieldLabel>
           <Select v-model="directionFilter">
             <SelectTrigger class="w-full"><SelectValue /></SelectTrigger>
             <SelectContent position="popper">
               <SelectGroup>
-                <SelectItem value="all">{{ $t('ui.allDirections') }}</SelectItem>
+                <SelectItem value="all">{{ $t('administration.label.directions') }}</SelectItem>
                 <SelectItem v-for="option in directionOptions" :key="option.value" :value="option.value!">
                   {{ option.label }}
                 </SelectItem>
@@ -41,7 +41,7 @@ const { Plus, canOrganize, templates, filteredTemplates, search, directionFilter
         </Field>
         <div class="flex h-10 items-center gap-2">
           <Switch id="include-deleted" v-model="includeDeleted" />
-          <Label for="include-deleted">{{ $t('ui.showDeletedTemplates') }}</Label>
+          <Label for="include-deleted">{{ $t('administration.label.showDeletedTemplates') }}</Label>
         </div>
       </div>
 
@@ -57,8 +57,8 @@ const { Plus, canOrganize, templates, filteredTemplates, search, directionFilter
 
       <Empty v-else-if="filteredTemplates.length === 0 && !loadError">
         <EmptyHeader>
-          <EmptyTitle>{{ $t('ui.noQuestionTemplateYet') }}</EmptyTitle>
-          <EmptyDescription>{{ $t('ui.clickNewTemplateInTheUpperRightCornerToCreate') }}</EmptyDescription>
+          <EmptyTitle>{{ $t('administration.label.questionTemplateYet') }}</EmptyTitle>
+          <EmptyDescription>{{ $t('administration.challengesIndex.description.clickNewTemplateUpper') }}</EmptyDescription>
         </EmptyHeader>
       </Empty>
 
@@ -66,13 +66,13 @@ const { Plus, canOrganize, templates, filteredTemplates, search, directionFilter
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>{{ $t('ui.title') }}</TableHead>
-              <TableHead>{{ $t('ui.mode') }}</TableHead>
-              <TableHead>{{ $t('ui.category') }}</TableHead>
-              <TableHead>{{ $t('ui.visibility') }}</TableHead>
-              <TableHead>{{ $t('ui.quoted') }}</TableHead>
-              <TableHead>{{ $t('ui.updateTime') }}</TableHead>
-              <TableHead>{{ $t('ui.status') }}</TableHead>
+              <TableHead>{{ $t('common.label.title') }}</TableHead>
+              <TableHead>{{ $t('administration.label.mode') }}</TableHead>
+              <TableHead>{{ $t('administration.label.category') }}</TableHead>
+              <TableHead>{{ $t('administration.label.visibility') }}</TableHead>
+              <TableHead>{{ $t('administration.label.quoted') }}</TableHead>
+              <TableHead>{{ $t('administration.label.updateTime') }}</TableHead>
+              <TableHead>{{ $t('common.label.status') }}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -85,7 +85,7 @@ const { Plus, canOrganize, templates, filteredTemplates, search, directionFilter
               <TableCell>
                 <component :is="AdminGameModeBadge" :mode="template.mode" />
                 <Badge v-if="template.interactionKind === 'PatchVerification'" variant="secondary" class="ml-2">
-                  {{ $t('ui.patchVerification') }}
+                  {{ $t('common.label.patchVerification') }}
                 </Badge>
               </TableCell>
               <TableCell>{{ directionLabel(template.direction) }}</TableCell>
@@ -97,8 +97,8 @@ const { Plus, canOrganize, templates, filteredTemplates, search, directionFilter
                 <component :is="AdminDateTime" :value="template.updatedAt" />
               </TableCell>
               <TableCell>
-                <Badge v-if="template.deletedAt" variant="destructive">{{ $t('ui.deleted') }}</Badge>
-                <Badge v-else variant="secondary">{{ $t('ui.normal') }}</Badge>
+                <Badge v-if="template.deletedAt" variant="destructive">{{ $t('common.label.deleted.competitionSidebarView') }}</Badge>
+                <Badge v-else variant="secondary">{{ $t('administration.label.normal') }}</Badge>
               </TableCell>
             </TableRow>
           </TableBody>

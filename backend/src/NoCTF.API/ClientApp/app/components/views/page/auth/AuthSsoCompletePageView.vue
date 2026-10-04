@@ -54,12 +54,12 @@ const { flow, loading, pending, error, identityNotLinked, bindingLoginTarget, bi
         </template>
         <div v-else class="flex flex-col gap-3">
           <Button v-if="flow?.intent === 'Login'" :disabled="pending" @click="completeLogin">{{ $t('sso.retryCompletion') }}</Button>
-          <Button as-child variant="outline"><NuxtLink to="/auth/login">{{ $t('ui.backToLogin') }}</NuxtLink></Button>
+          <Button as-child variant="outline"><NuxtLink to="/auth/login">{{ $t('account.label.backLogin') }}</NuxtLink></Button>
         </div>
       </CardContent>
       <CardFooter v-if="error && !identityNotLinked" class="justify-center gap-3 text-sm">
-        <NuxtLink to="/auth/login" class="underline">{{ $t('ui.signIn') }}</NuxtLink>
-        <NuxtLink to="/auth/register" class="underline">{{ $t('ui.registerNow') }}</NuxtLink>
+        <NuxtLink to="/auth/login" class="underline">{{ $t('auth.login.action') }}</NuxtLink>
+        <NuxtLink to="/auth/register" class="underline">{{ $t('common.label.registerNow') }}</NuxtLink>
       </CardFooter>
     </Card>
   </div>

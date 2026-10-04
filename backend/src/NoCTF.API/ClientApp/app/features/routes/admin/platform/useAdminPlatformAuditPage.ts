@@ -1,8 +1,9 @@
+import { message as describeMessage } from '../../../../utils/i18n'
 import { adminUserPath, adminTeamPath, adminAuditSubjectPath } from '~/features/admin/admin-navigation'
 import { markRaw } from 'vue'
 
 import { Download } from '@lucide/vue'
-import { toast } from 'vue-sonner'
+import { toast } from '../../../../utils/message-toast'
 import { adminExportPlatformAuditArchive, adminPlatformListAuditLogs } from '../../../../api'
 import type { NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse, NoCtfapiEndpointsAdministrationPlatformPlatformAuditKindProtocol } from '../../../../api'
 import { downloadSdkFile } from '../../../../utils/download'
@@ -14,7 +15,7 @@ type AuditLog = NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse
 /** Owns state, effects and commands for AdminPlatformAuditPage. */
 export function useAdminPlatformAuditPage() {
   const KIND_LABELS: Record<string, string> = {
-    CompetitionLifecycle: "ui.competitionLifeCycle", UserAccountLifecycle: "ui.accountLifeCycle", PlatformAdministration: "ui.platformAdmin", CompetitionAdministration: "ui.competitionAdmin", CompetitionLeaderboardVisibility: "ui.listVisibility", CompetitionEvent: "ui.competitionEvent",
+    CompetitionLifecycle: "administration.label.competitionLifeCycle", UserAccountLifecycle: "administration.label.accountLifeCycle", PlatformAdministration: "common.label.platformAdmin", CompetitionAdministration: "navigation.competitionAdmin", CompetitionLeaderboardVisibility: "administration.label.listVisibility", CompetitionEvent: "administration.label.competitionEvent",
   }
 
   const kind = ref('all')
@@ -77,10 +78,10 @@ export function useAdminPlatformAuditPage() {
         }),
         'platform-audit-archive.zip',
       )
-      toast.success(translate("ui.theAuditArchiveDownloadHasStarted"))
+      toast.success(describeMessage("administration.platformAudit.description.auditArchiveDownloadStarted"))
     }
     catch (e) {
-      toast.error(parseApiError(e).message)
+      toast.error(parseApiError(e).displayMessage)
     }
     finally {
       exportingArchive.value = false

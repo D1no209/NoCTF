@@ -98,9 +98,9 @@ public sealed class CreateTeamWriteUpConsultationEndpoint(
                 TypedResults.UnprocessableEntity(
                     CompetitionQuestionFailureMapper.ToResponse(result)),
             CompetitionQuestionFailure.InvalidRequest
-                or CompetitionQuestionFailure.SpamRejected => TypedResults.Problem(
+                or CompetitionQuestionFailure.SpamRejected => ApiProblems.Problem(
                     statusCode: StatusCodes.Status400BadRequest,
-                    title: "WriteUp consultation was rejected.",
+                    title: ApiMessages.Get(ApiMessageId.CreateTeamWriteUpConsultationTitleWriteupConsultationWasRejected),
                     extensions: new Dictionary<string, object?>
                     {
                         ["code"] = CompetitionQuestionFailureMapper.ToCode(result.Failure.Value)

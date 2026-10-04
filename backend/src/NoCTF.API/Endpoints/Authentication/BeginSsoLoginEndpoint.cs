@@ -30,7 +30,7 @@ public sealed record BeginSsoLoginResponse(
 internal static class SsoEndpointProblems
 {
     internal static ProblemHttpResult Create(SsoFailureCode code) =>
-        TypedResults.Problem(
+        ApiProblems.Problem(
             statusCode: code switch
             {
                 SsoFailureCode.ProviderNotFound => StatusCodes.Status404NotFound,
@@ -45,7 +45,7 @@ internal static class SsoEndpointProblems
                 SsoFailureCode.ReauthenticationRequired => StatusCodes.Status401Unauthorized,
                 _ => StatusCodes.Status400BadRequest
             },
-            title: "The SSO operation could not be completed.",
+            title: ApiMessages.Get(ApiMessageId.BeginSsoLoginTitleSsoCouldCompleted),
             extensions: new Dictionary<string, object?>
             {
                 ["code"] = code.ToString()

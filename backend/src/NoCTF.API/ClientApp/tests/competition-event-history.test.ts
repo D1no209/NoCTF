@@ -41,6 +41,6 @@ describe('competition event history scope', () => {
 
     expect(source).toContain('adminGetCompetition({')
     expect(source).toMatch(/competitionEventHistoryRange\(\s*hasStaffHistory\.value,/)
-    expect(source).toContain("$t(hasStaffHistory ? 'ui.fullHistory' : 'ui.last30Days')")
+    expect(source).toContain("$t(hasStaffHistory ? 'common.label.fullHistory' : 'common.label.lastDays')")
   })
 })

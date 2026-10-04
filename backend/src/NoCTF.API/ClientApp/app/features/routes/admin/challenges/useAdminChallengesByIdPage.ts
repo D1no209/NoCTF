@@ -1,8 +1,10 @@
+import { message as describeMessage } from '../../../../utils/i18n'
+import type { UiMessage } from '../../../../utils/i18n'
 import { proxyRefs } from 'vue'
 import { markRaw } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import { Paperclip, RotateCcw, Trash2, Upload } from '@lucide/vue'
-import { toast } from 'vue-sonner'
+import { toast } from '../../../../utils/message-toast'
 import { adminChallengeBankCreateFlag, adminChallengeBankDeleteAttachment, adminChallengeBankDeleteFlag, adminChallengeBankDeleteTemplate, adminChallengeBankGetTemplate, adminChallengeBankListAttachments, adminChallengeBankListFlags, adminChallengeBankPatchTemplate, adminChallengeBankRestoreAttachment, adminChallengeBankRestoreFlag, adminChallengeBankRestoreTemplate, adminChallengeBankUploadAttachments } from '../../../../api'
 import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract, NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol, NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateContentPatchRequest, NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol, NoCtfapiEndpointsCompetitionsGameModeProtocol, NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol, NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse, NoCtfapiEndpointsAdministrationChallengeBankAttachmentBatchFailureResponse } from '../../../../api'
 import { challengeTemplateWriteErrorMessages } from '../../../../lib/challenge-template-error'
@@ -40,7 +42,7 @@ export function useAdminChallengesByIdPage() {
 
   const loading = ref(true)
 
-  const loadError = ref<string | null>(null)
+  const loadError = ref<UiMessage | null>(null)
 
   const form = reactive({
     title: '',
@@ -57,11 +59,11 @@ export function useAdminChallengesByIdPage() {
 
   const saving = computed(() => savingSection.value !== null)
 
-  const basicSaveErrors = ref<string[]>([])
+  const basicSaveErrors = ref<UiMessage[]>([])
 
-  const runtimeSaveErrors = ref<string[]>([])
+  const runtimeSaveErrors = ref<UiMessage[]>([])
 
-  const definitionSaveErrors = ref<string[]>([])
+  const definitionSaveErrors = ref<UiMessage[]>([])
 
   const basicSaveAttempted = ref(false)
 
@@ -152,12 +154,12 @@ export function useAdminChallengesByIdPage() {
     if (!mode) return
     runtimeDefinitionModel.value = definitionContractToModel(defaultDefinition(mode), mode)
     runtimeDefinitionParseFailed.value = false
-    toast.info(translate("ui.loadedTheCurrentModeSDefaultChallengeDefinitionSaveYour"))
+    toast.info(describeMessage("administration.challengesBy.description.loadedModeSDefault"))
   }
 
   function resetModeDefinition(): void {
     form.definition = defaultDefinition(form.mode)
-    toast.info(translate("ui.loadedTheCurrentModeSDefaultChallengeDefinitionSaveYour"))
+    toast.info(describeMessage("administration.challengesBy.description.loadedModeSDefault"))
   }
 
   function syncBasicForm(value: Template): void {
@@ -204,7 +206,7 @@ export function useAdminChallengesByIdPage() {
   async function updateContent(
     section: SaveSection,
     content: NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateContentPatchRequest,
-    errors: { value: string[] },
+    errors: { value: UiMessage[] },
   ): Promise<Template | null> {
     if (savingSection.value !== null) return null
     savingSection.value = section
@@ -215,19 +217,19 @@ export function useAdminChallengesByIdPage() {
     savingSection.value = null
     if (error || !data) {
       errors.value = challengeTemplateWriteErrorMessages(error)
-      toast.error(errors.value[0] ?? translate("ui.unableToSaveTheChallengeTemplate"))
+      toast.error(errors.value[0] ?? translate("administration.challengesBy.description.unableSaveChallengeTemplate"))
       return null
     }
     template.value = data
     errors.value = []
-    toast.success(translate("ui.saved"))
+    toast.success(describeMessage("common.label.saved"))
     return data
   }
 
   function validateDefinitionForSave(
     mode: NoCtfapiEndpointsCompetitionsGameModeProtocol,
     definition: DefinitionModel,
-    errors: { value: string[] },
+    errors: { value: UiMessage[] },
   ): NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract | null {
     const value = template.value
     const validationErrors = validateChallengeTemplateDraft({
@@ -238,7 +240,7 @@ export function useAdminChallengesByIdPage() {
     })
     if (validationErrors.length > 0) {
       errors.value = validationErrors
-      toast.error(validationErrors[0] ?? translate("ui.unableToSaveTheChallengeTemplate"))
+      toast.error(validationErrors[0] ?? translate("administration.challengesBy.description.unableSaveChallengeTemplate"))
       return null
     }
     return definitionModelToContract(mode, definition)
@@ -253,7 +255,7 @@ export function useAdminChallengesByIdPage() {
     })
     loading.value = false
     if (error || !data) {
-      loadError.value = parseApiError(error, translate("ui.theTemplateDoesNotExistOrFailedToLoad")).message
+      loadError.value = parseApiError(error, describeMessage("administration.challengesBy.error.templateExistLoadFailed")).displayMessage
       return
     }
     template.value = data
@@ -266,20 +268,20 @@ export function useAdminChallengesByIdPage() {
     basicSaveErrors.value = []
     const value = template.value
     if (!value) {
-      basicSaveErrors.value = [translate("ui.theTemplateHasNotFinishedLoadingAndCannotBeSaved")]
-      toast.error(basicSaveErrors.value[0] ?? translate("ui.unableToSaveTheChallengeTemplate"))
+      basicSaveErrors.value = [translate("administration.challengesBy.validation.templateFinishedFormat")]
+      toast.error(basicSaveErrors.value[0] ?? translate("administration.challengesBy.description.unableSaveChallengeTemplate"))
       return
     }
     const validationErrors: string[] = []
-    if (!form.title.trim()) validationErrors.push(translate("ui.titleIsRequired"))
+    if (!form.title.trim()) validationErrors.push(translate("challenges.validation.titleRequired"))
     else if (form.title.trim().length > 160)
-      validationErrors.push(translate("ui.titleCannotExceed160Characters"))
-    if (!form.direction.trim()) validationErrors.push(translate("ui.directionIsRequired"))
+      validationErrors.push(translate("challenges.validation.titleLength"))
+    if (!form.direction.trim()) validationErrors.push(translate("challenges.validation.directionRequired"))
     else if (form.direction.trim().length > 96)
-      validationErrors.push(translate("ui.directionCannotExceed96Characters"))
+      validationErrors.push(translate("challenges.validation.directionLength"))
     if (validationErrors.length > 0) {
       basicSaveErrors.value = validationErrors
-      toast.error(validationErrors[0] ?? translate("ui.unableToSaveTheChallengeTemplate"))
+      toast.error(validationErrors[0] ?? translate("administration.challengesBy.description.unableSaveChallengeTemplate"))
       return
     }
     const updated = await updateContent('basic', contentFromTemplate(value, {
@@ -295,8 +297,8 @@ export function useAdminChallengesByIdPage() {
     runtimeSaveErrors.value = []
     const value = template.value
     if (!value) {
-      runtimeSaveErrors.value = [translate("ui.theTemplateHasNotFinishedLoadingAndCannotBeSaved")]
-      toast.error(runtimeSaveErrors.value[0] ?? translate("ui.unableToSaveTheChallengeTemplate"))
+      runtimeSaveErrors.value = [translate("administration.challengesBy.validation.templateFinishedFormat")]
+      toast.error(runtimeSaveErrors.value[0] ?? translate("administration.challengesBy.description.unableSaveChallengeTemplate"))
       return
     }
     const mode = value.mode ?? 'Ctf'
@@ -321,8 +323,8 @@ export function useAdminChallengesByIdPage() {
     definitionSaveErrors.value = []
     const value = template.value
     if (!value) {
-      definitionSaveErrors.value = [translate("ui.theTemplateHasNotFinishedLoadingAndCannotBeSaved")]
-      toast.error(definitionSaveErrors.value[0] ?? translate("ui.unableToSaveTheChallengeTemplate"))
+      definitionSaveErrors.value = [translate("administration.challengesBy.validation.templateFinishedFormat")]
+      toast.error(definitionSaveErrors.value[0] ?? translate("administration.challengesBy.description.unableSaveChallengeTemplate"))
       return
     }
     const previousMode = value.mode ?? 'Ctf'
@@ -360,10 +362,10 @@ export function useAdminChallengesByIdPage() {
     const { error } = await adminChallengeBankDeleteTemplate({ path: { challengeId } })
     deleting.value = false
     if (error) {
-      toast.error(parseApiError(error).message)
+      toast.error(parseApiError(error).displayMessage)
       return
     }
-    toast.success(translate("ui.templateDeleted"))
+    toast.success(describeMessage("administration.label.templateDeleted"))
     await navigateTo('/admin/challenges')
   }
 
@@ -372,10 +374,10 @@ export function useAdminChallengesByIdPage() {
     const { error } = await adminChallengeBankRestoreTemplate({ path: { challengeId } })
     restoring.value = false
     if (error) {
-      toast.error(parseApiError(error).message)
+      toast.error(parseApiError(error).displayMessage)
       return
     }
-    toast.success(translate("ui.templateRestored"))
+    toast.success(describeMessage("administration.label.templateRestored"))
     await loadTemplate()
   }
 
@@ -412,7 +414,7 @@ export function useAdminChallengesByIdPage() {
       randomBatchOpen.value = true
       return
     }
-    toast.info(translate("ui.deleteAllActiveRandomAttachmentVariantsFirstTheDeliveryMode"))
+    toast.info(describeMessage("administration.challengesBy.description.deleteActiveRandomAttachment"))
   }
 
   async function loadAttachments(): Promise<void> {
@@ -423,7 +425,7 @@ export function useAdminChallengesByIdPage() {
     })
     attachmentsLoading.value = false
     if (error) {
-      toast.error(parseApiError(error).message)
+      toast.error(parseApiError(error).displayMessage)
       return
     }
     attachmentDeliveryPolicy.value = data?.deliveryPolicy ?? 'All'
@@ -446,11 +448,11 @@ export function useAdminChallengesByIdPage() {
     })
     uploading.value = false
     if (failed) {
-      toast.error(parseApiError(failed).message)
+      toast.error(parseApiError(failed).displayMessage)
       await loadAttachments()
       return
     }
-    toast.success(translate("ui.uploadedAttachments", { count: files.length }))
+    toast.success(describeMessage("administration.label.uploadedAttachments", { count: files.length }))
     await loadAttachments()
   }
 
@@ -476,39 +478,39 @@ export function useAdminChallengesByIdPage() {
       toast.error(randomAttachmentErrorMessage(error))
       return
     }
-    toast.success(translate("ui.createdRandomAttachmentVariants", { count: randomFiles.value.length }))
+    toast.success(describeMessage("administration.label.createdRandomAttachmentVariants", { count: randomFiles.value.length }))
     randomFiles.value = []
     randomBatchOpen.value = false
     await Promise.all([loadAttachments(), loadFlags()])
   }
 
-  function randomAttachmentErrorMessage(error: unknown): string {
+  function randomAttachmentErrorMessage(error: unknown): UiMessage {
     const failure = error as NoCtfapiEndpointsAdministrationChallengeBankAttachmentBatchFailureResponse
     switch (failure.code) {
-      case 'UploadTooLarge': return translate("ui.anAttachmentVariantExceedsTheUploadSizeLimit")
-      case 'InvalidFileName': return translate("ui.theSharedDownloadFilenameIsInvalid")
-      case 'InvalidVariantFileName': return translate("ui.anOriginalFilenameIsNotAValidExactFlag")
-      case 'EmptyBatch': return translate("ui.selectAtLeastOneAttachmentVariant")
-      case 'DuplicateFlag': return translate("ui.attachmentVariantFlagsMustBeUnique")
-      case 'DeliveryModeConflict': return translate("ui.standardAttachmentsOrStaticFlagsCannotBeMixedWithPer")
-      case 'BatchStorageFailed': return translate("ui.attachmentStorageFailedTheEntireBatchWasRolledBack")
-      case 'BatchPersistenceFailed': return translate("ui.theAttachmentBatchCouldNotBeSavedTheEntireBatch")
-      case 'ResourceIdConflict': return translate("ui.theAttachmentResourceIdentifierConflictsUploadTheBatchAgain")
-      default: return parseApiError(error).message
+      case 'UploadTooLarge': return translate("administration.challengesBy.description.attachmentVariantExceedsUpload")
+      case 'InvalidFileName': return translate("administration.challengesBy.error.sharedDownloadFilenameInvalid")
+      case 'InvalidVariantFileName': return translate("administration.challengesBy.description.originalFilenameValidExact")
+      case 'EmptyBatch': return translate("administration.challengesBy.description.selectLeastOneAttachment")
+      case 'DuplicateFlag': return translate("administration.challengesBy.validation.attachmentVariantFormat")
+      case 'DeliveryModeConflict': return translate("administration.challengesBy.validation.standardAttachmentsFormat")
+      case 'BatchStorageFailed': return translate("administration.challengesBy.error.attachmentStorageEntireFailed")
+      case 'BatchPersistenceFailed': return translate("administration.challengesBy.description.attachmentBatchCouldSaved")
+      case 'ResourceIdConflict': return translate("administration.challengesBy.description.attachmentResourceIdentifierConflicts")
+      default: return parseApiError(error).displayMessage
     }
   }
 
-  function challengeFlagErrorMessage(error: unknown): string {
+  function challengeFlagErrorMessage(error: unknown): UiMessage {
     const failure = error as NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse
     switch (failure.code) {
-      case 'InvalidFlag': return translate("ui.theFlagValueIsInvalid")
-      case 'InvalidRegularExpression': return translate("ui.theFlagRegularExpressionIsInvalid")
-      case 'RegularExpressionNotSupported': return translate("ui.thisChallengeDoesNotSupportRegularExpressionFlags")
-      case 'ManualFlagNotSupported': return translate("ui.dynamicRuntimeFlagsAreGeneratedAndInjectedByThePlatform")
-      case 'SystemManagedFlag': return translate("ui.systemGeneratedDynamicFlagsAreReadOnlyAndCannotBe")
-      case 'DeliveryModeConflict': return translate("ui.standardAttachmentsOrStaticFlagsCannotBeMixedWithPer")
-      case 'ResourceIdConflict': return translate("ui.theFlagResourceIdentifierConflictsAddItAgain")
-      default: return parseApiError(error).message
+      case 'InvalidFlag': return translate("administration.challengesBy.error.flagInvalid")
+      case 'InvalidRegularExpression': return translate("administration.challengesBy.error.flagRegularExpressionInvalid")
+      case 'RegularExpressionNotSupported': return translate("administration.challengesBy.description.challengeSupportRegularExpression")
+      case 'ManualFlagNotSupported': return translate("administration.challengesBy.description.dynamicRuntimeFlagsGenerated")
+      case 'SystemManagedFlag': return translate("administration.challengesBy.validation.systemGeneratedFormat")
+      case 'DeliveryModeConflict': return translate("administration.challengesBy.validation.standardAttachmentsFormat")
+      case 'ResourceIdConflict': return translate("administration.challengesBy.description.flagResourceIdentifierConflicts")
+      default: return parseApiError(error).displayMessage
     }
   }
 
@@ -521,11 +523,11 @@ export function useAdminChallengesByIdPage() {
     })
     attachmentActionPending.value = false
     if (error) {
-      toast.error(parseApiError(error).message)
+      toast.error(parseApiError(error).displayMessage)
       return
     }
     deletingAttachment.value = null
-    toast.success(translate("ui.attachmentDeleted"))
+    toast.success(describeMessage("administration.label.attachmentDeleted"))
     await Promise.all([loadAttachments(), loadFlags()])
   }
 
@@ -537,10 +539,10 @@ export function useAdminChallengesByIdPage() {
     })
     attachmentActionPending.value = false
     if (error) {
-      toast.error(parseApiError(error).message)
+      toast.error(parseApiError(error).displayMessage)
       return
     }
-    toast.success(translate("ui.attachmentRestored"))
+    toast.success(describeMessage("administration.label.attachmentRestored"))
     await Promise.all([loadAttachments(), loadFlags()])
   }
 
@@ -587,7 +589,7 @@ export function useAdminChallengesByIdPage() {
     })
     flagsLoading.value = false
     if (error) {
-      toast.error(parseApiError(error).message)
+      toast.error(parseApiError(error).displayMessage)
       return
     }
     flags.value = data?.items ?? []
@@ -602,7 +604,7 @@ export function useAdminChallengesByIdPage() {
 
   async function createFlag(): Promise<void> {
     if (!flagForm.flag.trim()) {
-      toast.error(translate("ui.pleaseFillInTheFlagContent"))
+      toast.error(describeMessage("administration.challengesBy.description.fillFlagContent"))
       return
     }
     flagCreating.value = true
@@ -620,7 +622,7 @@ export function useAdminChallengesByIdPage() {
     }
     flagForm.flag = ''
     flagForm.matchKind = 'Exact'
-    toast.success(translate("ui.flagAdded"))
+    toast.success(describeMessage("administration.label.flagAdded"))
     await loadFlags()
   }
 
@@ -637,7 +639,7 @@ export function useAdminChallengesByIdPage() {
       return
     }
     deletingFlag.value = null
-    toast.success(translate("ui.flagHasBeenDeleted"))
+    toast.success(describeMessage("administration.label.flagDeleted"))
     await loadFlags()
   }
 
@@ -652,7 +654,7 @@ export function useAdminChallengesByIdPage() {
       toast.error(challengeFlagErrorMessage(error))
       return
     }
-    toast.success(translate("ui.flagHasBeenRestored"))
+    toast.success(describeMessage("administration.label.flagRestored"))
     await loadFlags()
   }
 
@@ -674,19 +676,19 @@ export function useAdminChallengesByIdPage() {
     return [...new Set(text.split(/[\s,;]+/).map(id => id.trim()).filter(Boolean))]
   }
 
-  function conflictMessage(error: unknown): string {
+  function conflictMessage(error: unknown): UiMessage {
     const code = parseApiError(error).code
     switch (code) {
       case 'OwnerIncludedInManagerSet':
-        return translate("ui.thePersonInChargeCannotAppearInTheAdministratorCollection")
+        return translate("administration.challengesBy.validation.personChargeFormat.byIdPage")
       case 'UserNotFound':
-        return translate("ui.someUsersDoNotExistPleaseCheckTheUserId")
+        return translate("administration.challengesBy.description.someUsersExistCheck")
       case 'RoleNotEligible':
-        return translate("ui.someUserRolesDoNotMeetTheRequirementsNeedTo")
+        return translate("administration.challengesBy.description.someUserRolesMeet")
       case 'ActiveCompetitionModeConflict':
-        return translate("ui.thereIsAnOngoingCompetitionReferenceAndTheModeCannot")
+        return translate("administration.challengesBy.validation.thereOngoingFormat")
       default:
-        return parseApiError(error).message
+        return parseApiError(error).displayMessage
     }
   }
 
@@ -708,7 +710,7 @@ export function useAdminChallengesByIdPage() {
       return
     }
     if (data) template.value = data
-    toast.success(translate("ui.permissionsUpdated"))
+    toast.success(describeMessage("administration.label.permissionsUpdated"))
   }
 
   async function transferOwner(): Promise<void> {
@@ -736,7 +738,7 @@ export function useAdminChallengesByIdPage() {
       template.value = data
       syncPermissions(data)
     }
-    toast.success(translate("ui.thePersonInChargeHasBeenTransferred"))
+    toast.success(describeMessage("administration.challengesBy.description.personChargeTransferred"))
   }
 
   onMounted(() => {

@@ -25,11 +25,11 @@ public sealed class UploadMyTeamWriteUpValidator : Validator<UploadMyTeamWriteUp
         RuleFor(request => request.File.FileName)
             .Must(TeamWriteUpRules.HasValidFileName)
             .When(request => request.File is not null)
-            .WithMessage("WriteUp file names must use the .pdf extension.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.UploadMyTeamWriteUpValidationWriteupFileNamesUse)).WithErrorCode(ApiMessages.Key(ApiMessageId.UploadMyTeamWriteUpValidationWriteupFileNamesUse));
         RuleFor(request => request.File.ContentType)
             .Must(TeamWriteUpRules.HasValidContentType)
             .When(request => request.File is not null)
-            .WithMessage("WriteUp files must declare application/pdf.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.UploadMyTeamWriteUpValidationWriteupFilesDeclareApplication)).WithErrorCode(ApiMessages.Key(ApiMessageId.UploadMyTeamWriteUpValidationWriteupFilesDeclareApplication));
     }
 }
 
@@ -43,7 +43,12 @@ public enum TeamWriteUpFailureCode
 
 public sealed record TeamWriteUpFailureResponse(
     TeamWriteUpFailureCode Code,
-    string Detail);
+    string Detail)
+{
+    public string Detail { get; init; } = ApiMessages.Localize(Code, Detail, ApiMessages.NoArguments);
+    public string MessageKey => ApiMessages.For(Code).Key;
+    public IReadOnlyDictionary<string, object?> MessageArguments => ApiMessages.NoArguments;
+}
 
 public sealed class UploadMyTeamWriteUpEndpoint(
     ManageTeamWriteUps writeUps,
@@ -83,10 +88,10 @@ public sealed class UploadMyTeamWriteUpEndpoint(
     {
         if (request.File.Length > TeamWriteUpRules.MaximumFileBytes)
         {
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: StatusCodes.Status413PayloadTooLarge,
-                title: "WriteUp is too large.",
-                detail: $"WriteUp PDFs cannot exceed {TeamWriteUpRules.MaximumFileBytes} bytes.",
+                title: ApiMessages.Get(ApiMessageId.UploadMyTeamWriteUpTitleWriteupTooLarge),
+                detail: ApiMessages.Get(ApiMessageId.UploadSizeLimit, new Dictionary<string, object?> { ["maximumBytes"] = TeamWriteUpRules.MaximumFileBytes }),
                 extensions: new Dictionary<string, object?>
                 {
                     ["code"] = TeamWriteUpFailureCode.UploadTooLarge

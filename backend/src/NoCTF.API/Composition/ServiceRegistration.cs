@@ -48,6 +48,7 @@ public static class ServiceRegistration
         IReadOnlyCollection<System.Reflection.Assembly>? endpointAssemblies = null)
     {
         services.TryAddSingleton(TimeProvider.System);
+        services.AddNoCtfLocalization();
         var allowDevelopmentHumanVerification = development
             || configuration.GetValue<bool>("OpenApi:Exporting");
         services.AddOptions<HumanVerificationOptions>()
@@ -90,7 +91,14 @@ public static class ServiceRegistration
         if (uploadLimitErrors.Count > 0)
             throw new InvalidOperationException(string.Join(" ", uploadLimitErrors));
         services.AddSingleton(uploadLimits);
-        services.AddProblemDetails();
+        services.AddProblemDetails(options => options.CustomizeProblemDetails = context =>
+        {
+            if (context.ProblemDetails.Extensions.ContainsKey("messageKey")
+                || context.ProblemDetails.Extensions.ContainsKey("errorMessages")) return;
+            context.ProblemDetails.Title = ApiMessages.Text(ApiMessageId.RequestFailed);
+            context.ProblemDetails.Extensions["messageKey"] = ApiMessages.Key(ApiMessageId.RequestFailed);
+            context.ProblemDetails.Extensions["messageArguments"] = ApiMessages.NoArguments;
+        });
         services.AddExceptionHandler<NoCTF.API.Security.RequestSafetyExceptionHandler>();
         services.AddNoCtfStaticAssetDelivery();
         services.AddHttpContextAccessor();
@@ -107,6 +115,7 @@ public static class ServiceRegistration
             options.DocumentSettings = settings =>
             {
                 settings.SchemaSettings.ResolveExternalXmlDocumentation = false;
+                settings.SchemaSettings.SchemaProcessors.Add(new LocalizedProblemSchemaProcessor());
                 settings.OperationProcessors.Add(
                     new HumanVerificationOperationProcessor());
                 settings.DocumentProcessors.Add(
@@ -239,7 +248,7 @@ public static class ServiceRegistration
                 NoCtfTelemetry.RecordRateLimitRejection(route);
                 context.HttpContext.Response.Headers.RetryAfter = context.Lease.TryGetMetadata(System.Threading.RateLimiting.MetadataName.RetryAfter, out var retry)
                     ? Math.Max(1, (int)Math.Ceiling(retry.TotalSeconds)).ToString(System.Globalization.CultureInfo.InvariantCulture) : "60";
-                await TypedResults.Problem(statusCode: 429, title: "请求过于频繁", detail: "请求频率超限，请按 Retry-After 提示重试。",
+                await ApiProblems.Problem(statusCode: 429, title: ApiMessages.Get(ApiMessageId.ServiceRegistrationTitleServiceRegistration), detail: ApiMessages.Get(ApiMessageId.ServiceRegistrationDetailRetry),
                     extensions: new Dictionary<string, object?> { ["code"] = "RateLimited" }).ExecuteAsync(context.HttpContext);
             };
             options.AddPolicy("submission", context =>

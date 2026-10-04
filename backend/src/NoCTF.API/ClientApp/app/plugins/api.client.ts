@@ -1,4 +1,5 @@
 import { client } from '../api/client.gen'
+import { currentLocale } from '../utils/i18n'
 import { shouldRefreshSession } from '../lib/auth-refresh'
 import {
   getAccessToken,
@@ -18,6 +19,7 @@ import { prepareCommandRequest, observeCommandResponse } from '../utils/command-
  */
 export default defineNuxtPlugin(() => {
   client.interceptors.request.use(async (request, options) => {
+    request.headers.set('Accept-Language', currentLocale())
     const token = getAccessToken()
     if (token) {
       request.headers.set('Authorization', `Bearer ${token}`)
@@ -41,6 +43,7 @@ export default defineNuxtPlugin(() => {
     }
     const headers = new Headers(request.headers)
     headers.set('Authorization', `Bearer ${getAccessToken()}`)
+    headers.set('Accept-Language', currentLocale())
     const body = (options.serializedBody as BodyInit | undefined) ?? (options.body as BodyInit | undefined)
     const retried = await fetch(
       new Request(request.url, {
@@ -57,7 +60,7 @@ export default defineNuxtPlugin(() => {
   client.interceptors.error.use((error, response, request) => {
     observeCommandResponse(request, response?.status, true)
     if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError'))
-      return { status: 503, code: 'RequestTimeout', detail: translate("ui.theRequestTimedOutAndItsOutcomeIsNotYet") }
+      return { status: 503, code: 'RequestTimeout', detail: translate("common.error.requestTimeout") }
     const status = response?.ok === false ? response.status : undefined
     // 保留真实的 problem+json 及强类型失败响应体。很多业务冲突只携带
     // code/message；丢弃它们会把明确原因退化成笼统的 HTTP 状态提示。

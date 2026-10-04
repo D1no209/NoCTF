@@ -1,3 +1,4 @@
+import { currentLocale } from '../utils/i18n'
 import * as signalR from '@microsoft/signalr'
 import { getAccessToken, getRealtimeAccessToken } from '../lib/session'
 import { startRealtimeWithRetry } from '../lib/realtime-retry'
@@ -24,6 +25,7 @@ function ensureConnection(): signalR.HubConnection {
   if (connection) return connection
   const hub = new signalR.HubConnectionBuilder()
     .withUrl('/hubs/v1/notifications', {
+      headers: { 'Accept-Language': currentLocale() },
       accessTokenFactory: getRealtimeAccessToken,
       ...(import.meta.dev
         ? { transport: signalR.HttpTransportType.ServerSentEvents | signalR.HttpTransportType.LongPolling }

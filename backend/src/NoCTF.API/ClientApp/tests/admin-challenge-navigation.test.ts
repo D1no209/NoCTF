@@ -112,7 +112,7 @@ describe('challenge template list navigation', () => {
     expect(index).toContain("const directionFilter = ref(typeof route.query.direction === 'string'")
     expect(index).toContain('const filteredTemplates = computed(')
     expect(index).toContain('v-model="directionFilter"')
-    expect(index).toContain("$t('ui.allDirections')")
+    expect(index).toContain("$t('administration.label.directions')")
     expect(index).toContain('v-for="template in filteredTemplates"')
     expect(index).toContain('interface ChallengeLibrarySnapshot')
     expect(index).toContain("const directionFilter = ref(typeof route.query.direction === 'string'")

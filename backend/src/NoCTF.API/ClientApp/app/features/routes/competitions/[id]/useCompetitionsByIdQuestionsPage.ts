@@ -1,7 +1,9 @@
+import { message as describeMessage } from '../../../../utils/i18n'
+import type { UiMessage } from '../../../../utils/i18n'
 import { proxyRefs } from 'vue'
 import { markRaw } from 'vue'
 
-import { toast } from 'vue-sonner'
+import { toast } from '../../../../utils/message-toast'
 import { addCompetitionQuestionMessage, changeCompetitionQuestionStatus, createCompetitionQuestion, getCompetitionQuestion, listChallengesEndpoint, listCompetitionQuestions } from '../../../../api'
 import type { NoCtfapiEndpointsChallengesChallengeSummaryResponse, NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode, NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionSubjectCode, NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse } from '../../../../api'
 import { createLatestRequestGuard } from '../../../../lib/latest-request'
@@ -24,7 +26,7 @@ export function useCompetitionsByIdQuestionsPage() {
 
   const { markRead, unreadCount } = useCompetitionQuestionReadState(competitionId)
 
-  const refreshError = ref<string | null>(null)
+  const refreshError = ref<UiMessage | null>(null)
 
   async function fetchQuestionPage(cursor: string | null) {
     const { data, error } = await listCompetitionQuestions({
@@ -32,7 +34,7 @@ export function useCompetitionsByIdQuestionsPage() {
       query: { cursor, limit: 50 },
     })
     if (error || !data)
-      throw parseApiError(error, translate("ui.failedToLoadConsultationList"))
+      throw parseApiError(error, describeMessage("notifications.competitionsBy.error.loadConsultationListFailed"))
     return { items: data.items ?? [], nextCursor: data.nextCursor ?? null }
   }
 
@@ -66,7 +68,7 @@ export function useCompetitionsByIdQuestionsPage() {
       paginationError.value = null
     }
     catch (error) {
-      refreshError.value = parseApiError(error, translate("ui.failedToLoadConsultationList")).message
+      refreshError.value = parseApiError(error, describeMessage("notifications.competitionsBy.error.loadConsultationListFailed")).displayMessage
     }
   })
 
@@ -86,13 +88,13 @@ export function useCompetitionsByIdQuestionsPage() {
 
   const createPending = ref(false)
 
-  const createError = ref<string | null>(null)
+  const createError = ref<UiMessage | null>(null)
 
   const challenges = ref<NoCtfapiEndpointsChallengesChallengeSummaryResponse[]>([])
 
   const challengesLoading = ref(false)
 
-  const challengeLoadError = ref<string | null>(null)
+  const challengeLoadError = ref<UiMessage | null>(null)
 
   async function loadChallengeOptions(): Promise<void> {
     if (challengesLoading.value) return
@@ -101,7 +103,7 @@ export function useCompetitionsByIdQuestionsPage() {
     const { data, error } = await listChallengesEndpoint({ path: { competitionId } })
     challengesLoading.value = false
     if (error || !data) {
-      challengeLoadError.value = parseApiError(error, translate("ui.failedToLoadAvailableChallenges")).message
+      challengeLoadError.value = parseApiError(error, describeMessage("notifications.competitionsBy.error.loadAvailableChallengesFailed")).displayMessage
       return
     }
     challenges.value = (data?.items ?? []).filter((c) => c.isPublished)
@@ -137,11 +139,11 @@ export function useCompetitionsByIdQuestionsPage() {
         },
       })
       if (error || !data) {
-        createError.value = competitionQuestionErrorMessage(error, translate("ui.failedToSubmitConsultation"))
+        createError.value = competitionQuestionErrorMessage(error, translate("notifications.error.submitConsultationFailed"))
         toast.error(createError.value)
         return
       }
-      toast.success(translate("ui.inquiryHasBeenSubmitted"))
+      toast.success(describeMessage("notifications.label.inquirySubmitted"))
       createOpen.value = false
       createTitle.value = ''
       createBody.value = ''
@@ -150,7 +152,7 @@ export function useCompetitionsByIdQuestionsPage() {
       await select(data.threadRootId!)
     }
     catch (error) {
-      createError.value = competitionQuestionErrorMessage(error, translate("ui.failedToSubmitConsultation"))
+      createError.value = competitionQuestionErrorMessage(error, translate("notifications.error.submitConsultationFailed"))
       toast.error(createError.value)
     }
     finally {
@@ -196,14 +198,14 @@ export function useCompetitionsByIdQuestionsPage() {
       const { data, error } = await getCompetitionQuestion({ path: { competitionId, threadRootId: id } })
       if (!detailRequests.isCurrent(request) || selectedId.value !== id) return
       if (error || !data) {
-        toast.error(parseApiError(error, translate("ui.failedToLoadConsultationDetails")).message)
+        toast.error(parseApiError(error, describeMessage("notifications.competitionsBy.error.loadConsultationDetailsFailed")).displayMessage)
         return
       }
       applyDetailQuestion(data)
     }
     catch (error) {
       if (detailRequests.isCurrent(request))
-        toast.error(parseApiError(error, translate("ui.failedToLoadConsultationDetails")).message)
+        toast.error(parseApiError(error, describeMessage("notifications.competitionsBy.error.loadConsultationDetailsFailed")).displayMessage)
     }
     finally {
       if (detailRequests.isCurrent(request))
@@ -262,7 +264,7 @@ export function useCompetitionsByIdQuestionsPage() {
 
   const replyPending = ref(false)
 
-  const replyError = ref<string | null>(null)
+  const replyError = ref<UiMessage | null>(null)
 
   async function submitReply() {
     if (replyPending.value || !reply.value.trim() || !detail.value?.canReply) return
@@ -276,7 +278,7 @@ export function useCompetitionsByIdQuestionsPage() {
         body: { body: submittedReply.trim() },
       })
       if (error || !data) {
-        replyError.value = competitionQuestionErrorMessage(error, translate("ui.sendingFailed"))
+        replyError.value = competitionQuestionErrorMessage(error, translate("notifications.error.sendingFailed"))
         toast.error(replyError.value)
         return
       }
@@ -284,10 +286,10 @@ export function useCompetitionsByIdQuestionsPage() {
         applyDetailQuestion(data)
         if (reply.value === submittedReply) reply.value = ''
       } else upsertQuestion(data)
-      toast.success(translate("ui.messageSent"))
+      toast.success(describeMessage("notifications.label.messageSent"))
     }
     catch (error) {
-      replyError.value = competitionQuestionErrorMessage(error, translate("ui.sendingFailed"))
+      replyError.value = competitionQuestionErrorMessage(error, translate("notifications.error.sendingFailed"))
       toast.error(replyError.value)
     }
     finally {
@@ -308,15 +310,15 @@ export function useCompetitionsByIdQuestionsPage() {
         body: { status },
       })
       if (error || !data) {
-        toast.error(competitionQuestionErrorMessage(error, translate("ui.statusUpdateFailed")))
+        toast.error(competitionQuestionErrorMessage(error, translate("notifications.error.statusUpdateFailed")))
         return
       }
       if (selectedId.value === questionId) applyDetailQuestion(data)
       else upsertQuestion(data)
-      toast.success(status === 'Resolved' ? translate("ui.advisoryMarkedAsResolved") : translate("ui.inquiryIsClosed"))
+      toast.success(status === 'Resolved' ? translate("notifications.label.advisoryMarkedResolved") : translate("notifications.label.inquiryClosed"))
     }
     catch (error) {
-      toast.error(competitionQuestionErrorMessage(error, translate("ui.statusUpdateFailed")))
+      toast.error(competitionQuestionErrorMessage(error, translate("notifications.error.statusUpdateFailed")))
     }
     finally {
       statusPending.value = false
@@ -331,10 +333,10 @@ export function useCompetitionsByIdQuestionsPage() {
         : ('outline' as const)
 
   const statusLabel = (status?: string) =>
-    ({ Pending: translate("ui.awaitingReply"), Replied: translate("ui.replied"), Resolved: translate("ui.resolved"), Closed: translate("ui.closed") })[status ?? ''] ?? status
+    ({ Pending: translate("notifications.label.awaitingReply"), Replied: translate("notifications.label.replied"), Resolved: translate("notifications.label.resolved"), Closed: translate("notifications.label.closed") })[status ?? ''] ?? status
 
   const roleLabel = (role?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode) =>
-    role ? translate(competitionQuestionRoleLabel[role]) : translate("ui.unknownRole")
+    role ? translate(competitionQuestionRoleLabel[role]) : translate("notifications.label.unknownRole")
 
   const isHandlerRole = (role?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode) =>
     isCompetitionQuestionHandlerRole(role)

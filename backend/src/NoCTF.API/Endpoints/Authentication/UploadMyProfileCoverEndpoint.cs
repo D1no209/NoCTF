@@ -33,7 +33,12 @@ public enum ProfileCoverUploadFailureCode
     MalformedImage
 }
 
-public sealed record ProfileCoverUploadFailureResponse(ProfileCoverUploadFailureCode Code);
+public sealed record ProfileCoverUploadFailureResponse(ProfileCoverUploadFailureCode Code)
+{
+    public string Detail => ApiMessages.For(Code).Text;
+    public string MessageKey => ApiMessages.For(Code).Key;
+    public IReadOnlyDictionary<string, object?> MessageArguments => ApiMessages.NoArguments;
+}
 
 public sealed class UploadMyProfileCoverEndpoint(
     ReplaceCurrentUserProfileCover replace,
@@ -92,10 +97,10 @@ public sealed class UploadMyProfileCoverEndpoint(
     }
 
     private static ProblemHttpResult UploadTooLarge(long maximumBytes) =>
-        TypedResults.Problem(
+        ApiProblems.Problem(
             statusCode: StatusCodes.Status413PayloadTooLarge,
-            title: "Profile cover is too large.",
-            detail: $"Profile cover uploads cannot exceed {maximumBytes} bytes.",
+            title: ApiMessages.Get(ApiMessageId.UploadMyProfileCoverTitleProfileCoverTooLarge),
+            detail: ApiMessages.Get(ApiMessageId.UploadSizeLimit, new Dictionary<string, object?> { ["maximumBytes"] = maximumBytes }),
             extensions: new Dictionary<string, object?>
             {
                 ["code"] = FileUploadFailureCode.UploadTooLarge.ToString()

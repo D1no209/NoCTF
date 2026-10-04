@@ -1,9 +1,11 @@
 FROM docker.m.daocloud.io/oven/bun:1.3.14@sha256:e10577f0db68676a7024391c6e5cb4b879ebd17188ab750cf10024a6d700e5c4 AS frontend-build
-WORKDIR /src/ClientApp
+WORKDIR /src/backend/src/NoCTF.API/ClientApp
 COPY backend/src/NoCTF.API/ClientApp/package.json backend/src/NoCTF.API/ClientApp/bun.lock ./
-RUN bun install --frozen-lockfile
+RUN bun install --frozen-lockfile --ignore-scripts
 COPY backend/src/NoCTF.API/ClientApp/ ./
-RUN bunx nuxt prepare
+COPY backend/src/NoCTF.API/Localization/Catalogs/ /src/backend/src/NoCTF.API/Localization/Catalogs/
+COPY backend/scripts/Validate-Translations.ts /src/backend/scripts/Validate-Translations.ts
+RUN bun run postinstall
 RUN bun --bun run generate
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0.302@sha256:72dd743782f2ae7e5476fd64f6a460045e3998dc862218b80e6944cba79a01b0 AS build
@@ -42,7 +44,7 @@ HEALTHCHECK --interval=10s --timeout=3s --start-period=120s --retries=12 CMD ["/
 FROM runtime AS host
 WORKDIR /app
 COPY --from=build /app/host .
-COPY --from=frontend-build /src/ClientApp/.output/public ./wwwroot
+COPY --from=frontend-build /src/backend/src/NoCTF.API/ClientApp/.output/public ./wwwroot
 RUN mkdir -p /app/uploads && chown -R 1654:1654 /app/uploads
 # The combined Host includes Runner and accesses the mounted Docker socket.
 USER 0

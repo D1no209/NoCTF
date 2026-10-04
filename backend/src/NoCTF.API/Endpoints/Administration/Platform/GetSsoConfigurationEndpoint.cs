@@ -103,9 +103,9 @@ internal static class SsoAdministrationMapping
                 or SsoConfigurationMutationState.ProviderLimitReached => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest
         };
-        return TypedResults.Problem(
+        return ApiProblems.Problem(
             statusCode: status,
-            title: "The SSO configuration could not be updated.",
+            title: ApiMessages.Get(ApiMessageId.GetSsoConfigurationTitleSsoConfigurationCouldUpdated),
             extensions: new Dictionary<string, object?>
             {
                 ["code"] = state.ToString()

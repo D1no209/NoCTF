@@ -27,7 +27,12 @@ public enum StartGateFailureCodeProtocol
 public sealed record StartGateErrorResponse(
     StartGateFailureCodeProtocol Code,
     Guid? CompetitionChallengeId,
-    string Message);
+    string Message)
+{
+    public string Message { get; init; } = ApiMessages.Localize(Code, Message);
+    public string MessageKey => ApiMessages.For(Code).Key;
+    public IReadOnlyDictionary<string, object?> MessageArguments => ApiMessages.NoArguments;
+}
 
 public sealed record StartValidationResponse(IReadOnlyList<StartGateErrorResponse> Errors);
 

@@ -1,7 +1,9 @@
+import { message as describeMessage } from '../../../../../utils/i18n'
+import type { UiMessage } from '../../../../../utils/i18n'
 import { adminUserPath, adminTeamPath, adminChallengePath } from '~/features/admin/admin-navigation'
 import { proxyRefs } from 'vue'
 
-import { toast } from 'vue-sonner'
+import { toast } from '../../../../../utils/message-toast'
 import { Download } from '@lucide/vue'
 import { downloadSdkFile } from '../../../../../utils/download'
 import { adminAccessCompetitionGameplayFactValue, adminCreateGameplayFactRejudgement, adminGetGameplayFact, adminDownloadGameplayFactPatch, adminListCompetitionChallenges, adminListGameplayFacts, adminPreviewHistoricalAdjudicationDifferences, adminListTeams, adminQueueGameplayFactEvaluation } from '../../../../../api'
@@ -27,7 +29,7 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
 
   const patchDownloading = ref(new Set<string>())
 
-  const patchErrors = ref<Record<string, string>>({})
+  const patchErrors = ref<Record<string, UiMessage>>({})
 
   async function downloadPatch(id?: string) {
     if (!id || !canDownloadPatch.value || patchDownloading.value.has(id)) return
@@ -39,8 +41,8 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
       }), `patch-${id}.tar.gz`)
     }
     catch (error) {
-      patchErrors.value[id] = parseApiError(error).message
-      toast.error(patchErrors.value[id])
+      patchErrors.value[id] = parseApiError(error).displayMessage
+      toast.error(patchErrors.value[id]!)
     }
     finally {
       patchDownloading.value.delete(id)
@@ -50,23 +52,23 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
   const gameplayFactKindOptions = [
     { value: 'FlagAttempt', label: 'Flag' },
     { value: 'BreakAttempt', label: 'Break' },
-    { value: 'FixAttempt', label: translate('ui.patchVerification') },
+    { value: 'FixAttempt', label: translate('common.label.patchVerification') },
   ] satisfies FilterOption<NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol>[]
 
   const gameplayFactStateOptions = [
-    { value: 'Pending', label: "ui.pending" },
-    { value: 'Queued', label: "ui.queuing" },
-    { value: 'Processing', label: "ui.underEvaluation" },
-    { value: 'Completed', label: "ui.completed" },
-    { value: 'PlatformFailed', label: "ui.platformFailed" },
+    { value: 'Pending', label: "administration.label.pending" },
+    { value: 'Queued', label: "common.label.queuing" },
+    { value: 'Processing', label: "common.label.underEvaluation" },
+    { value: 'Completed', label: "common.label.completed" },
+    { value: 'PlatformFailed', label: "common.error.platformFailed.adminFormat" },
   ] satisfies FilterOption<NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol>[]
 
   const gameplayFactResultOptions = [
-    { value: 'Correct', label: "ui.correct" },
-    { value: 'Wrong', label: "ui.wrong" },
-    { value: 'Duplicate', label: "ui.repeat" },
-    { value: 'AttemptsExhausted', label: "ui.exhausted" },
-    { value: 'Rejected', label: "ui.rejected" },
+    { value: 'Correct', label: "common.label.correct" },
+    { value: 'Wrong', label: "common.label.wrong" },
+    { value: 'Duplicate', label: "common.label.repeat" },
+    { value: 'AttemptsExhausted', label: "common.label.exhausted" },
+    { value: 'Rejected', label: "common.label.rejected" },
   ] satisfies FilterOption<NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol>[]
 
   const challengeOptions = ref<{ id: string; title: string }[]>([])
@@ -105,7 +107,7 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
 
   const previewLoading = ref(false)
 
-  const previewError = ref<string | null>(null)
+  const previewError = ref<UiMessage | null>(null)
 
   const previewInitialized = ref(false)
   const previewIncludeInformational = ref(false)
@@ -124,7 +126,7 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
       query: { cursor, limit: 50 },
       signal: evidenceAbort.signal,
     })
-    if (error || !data) throw parseApiError(error, translate('adjudication.evidenceFailure'))
+    if (error || !data) throw parseApiError(error, describeMessage('adjudication.evidenceFailure'))
     return { items: data.events ?? [], nextCursor: data.nextCursor }
   })
 
@@ -154,22 +156,22 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
   let previewGeneration = 0
 
   const differenceLabels: Record<NoCtfapiEndpointsAdministrationGameplayFactsAdjudicationDifferenceKindProtocol, string> = {
-    DuplicateWithoutCurrentPredecessor: "ui.theCurrentDuplicateResultHasNoPrecedingFactThatRemains",
-    HistoricalResultChanged: "ui.historicalAdjudicationConflictsWithTheCurrentResultOrChangedOver",
-    MissingAdjudicationRecord: "ui.theCurrentResultHasNoImmutableAdjudicationEvent",
-    TeamEligibilityHistoryRequiresReview: "ui.currentTeamEligibilityCannotProveBloodAwardEligibilityAtThe",
-    MissingBloodAward: "ui.aDeterministicallyExpectedBloodAwardIsMissing",
-    UnexpectedBloodAward: "ui.aRecordedBloodAwardIsNotSupportedByTheCurrent",
-    WrongBloodRank: "ui.theRecordedBloodRankDiffersFromAuthoritativeOrdering",
-    DuplicateBloodAward: "ui.theSameGameplayFactHasDuplicateBloodAwards",
+    DuplicateWithoutCurrentPredecessor: "common.competitionsBy.description.duplicateResultPrecedingFact",
+    HistoricalResultChanged: "common.competitionsBy.description.historicalAdjudicationConflictsResult",
+    MissingAdjudicationRecord: "common.competitionsBy.description.resultImmutableAdjudicationEvent",
+    TeamEligibilityHistoryRequiresReview: "common.competitionsBy.validation.teamEligibilityFormat",
+    MissingBloodAward: "common.competitionsBy.description.deterministicallyExpectedBloodAward",
+    UnexpectedBloodAward: "common.competitionsBy.validation.recordedBloodFormat",
+    WrongBloodRank: "common.competitionsBy.description.recordedBloodRankDiffers",
+    DuplicateBloodAward: "common.competitionsBy.description.sameGameplayFactDuplicate",
   }
 
   const bloodRankLabel = (rank?: string | null) => rank === 'First'
-    ? translate("ui.firstBlood")
+    ? translate("common.label.firstBlood")
     : rank === 'Second'
-      ? translate("ui.secondBlood")
+      ? translate("common.label.secondBlood")
       : rank === 'Third'
-        ? translate("ui.thirdBlood")
+        ? translate("common.label.thirdBlood")
         : '-'
 
   async function loadPreview(reset = false) {
@@ -205,7 +207,7 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
     }
     catch (requestError) {
       if (generation !== previewGeneration) return
-      previewError.value = parseApiError(requestError, translate("ui.failedToLoadHistoricalAdjudicationDifferences")).message
+      previewError.value = parseApiError(requestError, describeMessage("administration.competitionsBy.error.loadHistoricalAdjudicationFailed")).displayMessage
     }
     finally {
       if (generation === previewGeneration) {
@@ -251,7 +253,7 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
 
   const detailLoading = ref(false)
 
-  const detailError = ref<string | null>(null)
+  const detailError = ref<UiMessage | null>(null)
 
   let detailRequest = 0
 
@@ -268,7 +270,7 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
       if (request === detailRequest) detail.value = data
     }
     catch (error) {
-      if (request === detailRequest) detailError.value = parseApiError(error).message
+      if (request === detailRequest) detailError.value = parseApiError(error).displayMessage
     }
     finally {
       if (request === detailRequest) detailLoading.value = false
@@ -288,11 +290,11 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
         body: { targetKind: 'GameplayFact', targetId: gameplayFactId },
       })
       if (error) throw error
-      toast.success(translate("ui.alreadyJoinedTheReSentencingQueue"))
+      toast.success(describeMessage("administration.competitionsBy.description.alreadyJoinedReSentencing"))
       applyFilters()
     }
     catch (e) {
-      toast.error(parseApiError(e).message)
+      toast.error(parseApiError(e).displayMessage)
     }
     finally {
       actionPending.value = null
@@ -310,11 +312,11 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
         body: { targetKind: 'CompetitionChallenge', targetId: batchTarget.value },
       })
       if (error) throw error
-      toast.success(translate("ui.allQuestionsHaveBeenSubmittedAndAddedToTheRe"))
+      toast.success(describeMessage("administration.competitionsBy.description.questionsSubmittedAddedRe"))
       applyFilters()
     }
     catch (e) {
-      toast.error(parseApiError(e).message)
+      toast.error(parseApiError(e).displayMessage)
     }
     finally {
       actionPending.value = null
@@ -330,10 +332,10 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
         body: { competitionChallengeId: batchTarget.value },
       })
       if (error) throw error
-      toast.success(translate("ui.reviewQueueTriggered"))
+      toast.success(describeMessage("administration.label.reviewQueueTriggered"))
     }
     catch (e) {
-      toast.error(parseApiError(e).message)
+      toast.error(parseApiError(e).displayMessage)
     }
     finally {
       actionPending.value = null
@@ -344,7 +346,7 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
 
   const flagResult = ref<string | null>(null)
 
-  const flagError = ref<string | null>(null)
+  const flagError = ref<UiMessage | null>(null)
 
   const flagPending = ref(false)
 
@@ -377,11 +379,11 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
       })
       if (error) throw error
       if (requestSequence !== flagRequestSequence || flagDialog.value?.gameplayFactId !== ctx.gameplayFactId) return
-      flagResult.value = data?.value ?? translate("ui.noContent")
+      flagResult.value = data?.value ?? translate("administration.label.content")
     }
     catch (e) {
       if (requestSequence !== flagRequestSequence || flagDialog.value?.gameplayFactId !== ctx.gameplayFactId) return
-      flagError.value = parseApiError(e).message
+      flagError.value = parseApiError(e).displayMessage
       toast.error(flagError.value)
     }
     finally {

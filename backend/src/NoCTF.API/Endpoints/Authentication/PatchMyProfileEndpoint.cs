@@ -53,7 +53,7 @@ public sealed class PatchMyProfileValidator : Validator<PatchMyProfileRequest>
             .Must(request => request.Profile is not null
                 || request.SchoolIdentity is not null
                 || request.Appearance is not null)
-            .WithMessage("At least one profile section is required.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.PatchMyProfileValidationLeastOneProfileSection)).WithErrorCode(ApiMessages.Key(ApiMessageId.PatchMyProfileValidationLeastOneProfileSection));
         RuleFor(request => request.Profile!.Description)
             .MaximumLength(UserProfileRules.MaximumDescriptionLength)
             .When(request => request.Profile is not null);
@@ -75,7 +75,12 @@ public enum CurrentUserProfilePatchFailureCode
 }
 
 public sealed record CurrentUserProfilePatchFailureResponse(
-    CurrentUserProfilePatchFailureCode Code);
+    CurrentUserProfilePatchFailureCode Code)
+{
+    public string Detail => ApiMessages.For(Code).Text;
+    public string MessageKey => ApiMessages.For(Code).Key;
+    public IReadOnlyDictionary<string, object?> MessageArguments => ApiMessages.NoArguments;
+}
 
 [Mapper(
     AutoUserMappings = false,
@@ -239,10 +244,10 @@ public sealed class PatchMyProfileEndpoint(
         }
         if (!result.Succeeded)
         {
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
-                title: "Profile was not updated.",
-                detail: result.ErrorMessage);
+                title: ApiMessages.Get(ApiMessageId.PatchMyProfileTitleProfileWasUpdated),
+                detail: ApiMessages.For(result.FailureCode));
         }
 
         return TypedResults.Ok(CurrentUserProfileMapping.ToResponse(

@@ -14,49 +14,49 @@ const { Clock3, Expand, Minimize, Radio, RefreshCw, ShieldCheck, Trophy, Users, 
     <header class="live-screen-header">
       <div class="live-screen-title min-w-0">
         <div class="flex items-center gap-3">
-          <span class="live-screen-wordmark">{{ configuration?.name ?? $t('ui.noctf') }}</span>
+          <span class="live-screen-wordmark">{{ configuration?.name ?? $t('common.label.noctf') }}</span>
           <span class="live-screen-divider" aria-hidden="true" />
-          <h1 class="truncate text-xl font-semibold tracking-tight lg:text-2xl">{{ competition?.title ?? t('ui.3dLiveScreen') }}</h1>
+          <h1 class="truncate text-xl font-semibold tracking-tight lg:text-2xl">{{ competition?.title ?? t('leaderboard.ctf.liveTitle') }}</h1>
         </div>
         <p class="mt-1 font-mono text-[0.625rem] uppercase tracking-[0.24em] text-slate-400 lg:text-xs">
-          {{ t('ui.live3dCityView') }} · {{ t('ui.allPublicTracks') }}
+          {{ t('competitions.label.liveDCityView') }} · {{ t('competitions.label.publicTracks') }}
         </p>
       </div>
 
       <dl class="live-screen-metrics">
         <div>
-          <dt>{{ t('ui.breached') }}</dt>
+          <dt>{{ t('competitions.label.breached') }}</dt>
           <dd>{{ solvedChallengeCount }}<span>/{{ challenges.length }}</span></dd>
         </div>
         <div>
-          <dt>{{ t('ui.captures') }}</dt>
+          <dt>{{ t('competitions.label.captures') }}</dt>
           <dd>{{ totalSolveCount }}</dd>
         </div>
         <div>
-          <dt>{{ t('ui.teams') }}</dt>
+          <dt>{{ t('common.label.teams') }}</dt>
           <dd>{{ entries.length }}</dd>
         </div>
       </dl>
 
       <div class="live-screen-controls flex items-center gap-3">
         <div class="hidden text-right sm:block">
-          <p class="text-[0.625rem] uppercase tracking-[0.2em] text-slate-500">{{ t('ui.endsIn2') }}</p>
+          <p class="text-[0.625rem] uppercase tracking-[0.2em] text-slate-500">{{ t('competitions.label.ends.livePageView') }}</p>
           <p class="live-screen-countdown font-mono text-lg font-semibold tabular-nums lg:text-2xl">{{ remainingText }}</p>
         </div>
         <div class="hidden h-9 w-px bg-white/10 lg:block" />
         <div class="hidden text-right lg:block">
-          <p class="text-[0.625rem] uppercase tracking-[0.2em] text-slate-500">{{ t('ui.elapsed') }}</p>
+          <p class="text-[0.625rem] uppercase tracking-[0.2em] text-slate-500">{{ t('competitions.label.elapsed') }}</p>
           <p class="font-mono text-sm tabular-nums text-slate-300">{{ elapsedText }}</p>
         </div>
-        <Button variant="ghost" size="icon" class="text-slate-400 hover:bg-white/5 hover:text-white" :aria-label="t('ui.refreshControlScreen')" @click="refreshLatest">
+        <Button variant="ghost" size="icon" class="text-slate-400 hover:bg-white/5 hover:text-white" :aria-label="t('competitions.label.refreshControlScreen')" @click="refreshLatest">
           <RefreshCw :class="['size-4', refreshing && 'animate-spin']" />
         </Button>
-        <Button variant="ghost" size="icon" class="text-slate-400 hover:bg-white/5 hover:text-white" :aria-label="fullscreen ? t('ui.exitFullscreen') : t('ui.enterFullscreen')" @click="toggleFullscreen">
+        <Button variant="ghost" size="icon" class="text-slate-400 hover:bg-white/5 hover:text-white" :aria-label="fullscreen ? t('competitions.label.exitFullscreen') : t('competitions.label.enterFullscreen')" @click="toggleFullscreen">
           <Minimize v-if="fullscreen" class="size-4" />
           <Expand v-else class="size-4" />
         </Button>
         <Button variant="ghost" size="icon" as-child class="text-slate-400 hover:bg-white/5 hover:text-white">
-          <NuxtLink :to="`/competitions/${competitionId}/leaderboard`" :aria-label="t('ui.exit3dLiveScreen')">
+          <NuxtLink :to="`/competitions/${competitionId}/leaderboard`" :aria-label="t('competitions.label.exitDLiveScreen')">
             <X class="size-4" />
           </NuxtLink>
         </Button>
@@ -67,42 +67,42 @@ const { Clock3, Expand, Minimize, Radio, RefreshCw, ShieldCheck, Trophy, Users, 
       <section
         :ref="setArenaRefRef"
         :class="['live-arena', featuredSolve && 'live-arena-focusing']"
-        :aria-label="t('ui.liveChallengeStatus')"
+        :aria-label="t('competitions.label.liveChallengeStatus')"
       >
         <div class="live-arena-scanlines" aria-hidden="true" />
         <div class="live-arena-vignette" aria-hidden="true" />
 
         <div v-if="loading" class="live-overlay">
           <Radio class="live-overlay-icon size-9 animate-pulse" />
-          <p class="font-mono text-sm uppercase tracking-[0.22em] text-slate-400">{{ t('ui.connectingToLiveCompetitionData') }}</p>
+          <p class="font-mono text-sm uppercase tracking-[0.22em] text-slate-400">{{ t('competitions.competitionsBy.label.connectingLiveCompetitionData') }}</p>
         </div>
 
         <div v-else-if="error" class="live-overlay">
           <ShieldCheck class="size-9 text-destructive" />
           <p class="max-w-lg text-center text-sm text-slate-300">{{ $message(error) }}</p>
           <Button variant="outline" class="border-white/15 bg-transparent text-white hover:bg-white/5" @click="refreshLatest">
-            {{ t('ui.reload') }}
+            {{ t('common.label.reload') }}
           </Button>
         </div>
 
         <div v-else-if="projectionPending && !board.snapshot.value" class="live-overlay">
           <Radio class="live-overlay-icon size-9 animate-pulse" />
-          <p class="font-mono text-sm uppercase tracking-[0.22em] text-slate-400">{{ t('ui.buildingTheScoreboardProjection') }}</p>
+          <p class="font-mono text-sm uppercase tracking-[0.22em] text-slate-400">{{ t('competitions.label.buildingScoreboardProjection') }}</p>
         </div>
 
         <div v-else-if="board.snapshot.value?.dataScope === 'Hidden'" class="live-overlay">
           <ShieldCheck class="live-overlay-icon size-9" />
-          <p class="text-xl font-semibold">{{ t('ui.theRankingsAreNotPublicYet') }}</p>
-          <p class="text-sm text-slate-400">{{ t('ui.theOrganizerCurrentlyHidesRankingData') }}</p>
+          <p class="text-xl font-semibold">{{ t('common.competitionsBy.description.rankingsPublicYet') }}</p>
+          <p class="text-sm text-slate-400">{{ t('common.competitionsBy.description.organizerCurrentlyHidesRanking') }}</p>
         </div>
 
         <div class="live-arena-heading" aria-hidden="true">
           <div class="flex items-center gap-2">
             <span class="live-arena-pulse" />
-            <span>{{ t('ui.liveChallengeStatus') }}</span>
+            <span>{{ t('competitions.label.liveChallengeStatus') }}</span>
           </div>
           <div v-if="board.snapshot.value?.dataScope === 'Frozen'" class="live-frozen">
-            {{ t('ui.frozenSnapshot') }} · {{ formatDateTime(dataAsOf) }}
+            {{ t('competitions.label.frozenSnapshot') }} · {{ formatDateTime(dataAsOf) }}
           </div>
           <div v-else class="font-mono text-[0.625rem] text-slate-500">{{ formatDateTime(dataAsOf) }}</div>
         </div>
@@ -129,13 +129,13 @@ const { Clock3, Expand, Minimize, Radio, RefreshCw, ShieldCheck, Trophy, Users, 
               <div class="live-celebration-eyebrow">
                 <span>{{ bloodLabel(featuredSolve.bloodRank) }}</span>
                 <i />
-                <span>{{ t('ui.solveConfirmed') }}</span>
+                <span>{{ t('competitions.label.solveConfirmed') }}</span>
               </div>
               <strong>{{ featuredSolve.teamName }}</strong>
-              <p>{{ t('ui.solved3') }} <b>{{ featuredSolve.challengeTitle }}</b></p>
+              <p>{{ t('competitions.label.solved.livePageView') }} <b>{{ featuredSolve.challengeTitle }}</b></p>
               <div class="live-celebration-score">
                 <span>+{{ featuredSolve.score }}</span>
-                <small>{{ $t('ui.pts5') }}</small>
+                <small>{{ $t('competitions.label.pts') }}</small>
               </div>
               <div class="live-celebration-progress" aria-hidden="true"><i /></div>
             </div>
@@ -148,8 +148,8 @@ const { Clock3, Expand, Minimize, Radio, RefreshCw, ShieldCheck, Trophy, Users, 
       <aside class="live-rail">
         <section class="live-panel min-h-0 flex-1">
           <header class="live-panel-heading">
-            <div class="flex items-center gap-2"><Trophy class="size-4 text-primary" />{{ t('ui.leaderboard2') }}</div>
-            <span>{{ t('ui.combined') }}</span>
+            <div class="flex items-center gap-2"><Trophy class="size-4 text-primary" />{{ t('common.label.leaderboard.leaderboardPageView') }}</div>
+            <span>{{ t('competitions.label.combined') }}</span>
           </header>
           <div v-if="rankedEntries.length" class="live-rank-viewport">
             <div
@@ -158,7 +158,7 @@ const { Clock3, Expand, Minimize, Radio, RefreshCw, ShieldCheck, Trophy, Users, 
             >
               <ol class="live-ranking">
                 <li v-for="entry in rankedEntries" :key="entry.teamId" :class="rankClass(entry.rank ?? undefined)">
-                  <span class="live-rank">{{ entry.rank ?? $t('ui.symbol') }}</span>
+                  <span class="live-rank">{{ entry.rank ?? $t('common.label.symbol') }}</span>
                   <span class="min-w-0 flex-1 truncate font-semibold">{{ entry.teamName }}<small v-if="entry.rankingState !== 'Eligible'"> · {{ scoreboardRankingStateLabel(entry.rankingState) }}</small></span>
                   <span class="font-mono text-[0.625rem] text-slate-500">{{ scoreboardTeamSolveCount(entry) }}</span>
                   <strong class="font-mono tabular-nums">{{ entry.totalScore ?? 0 }}</strong>
@@ -166,7 +166,7 @@ const { Clock3, Expand, Minimize, Radio, RefreshCw, ShieldCheck, Trophy, Users, 
               </ol>
               <ol v-if="marqueeEnabled" class="live-ranking" aria-hidden="true">
                 <li v-for="entry in rankedEntries" :key="`clone-${entry.teamId}`" :class="rankClass(entry.rank ?? undefined)">
-                  <span class="live-rank">{{ entry.rank ?? $t('ui.symbol') }}</span>
+                  <span class="live-rank">{{ entry.rank ?? $t('common.label.symbol') }}</span>
                   <span class="min-w-0 flex-1 truncate font-semibold">{{ entry.teamName }}<small v-if="entry.rankingState !== 'Eligible'"> · {{ scoreboardRankingStateLabel(entry.rankingState) }}</small></span>
                   <span class="font-mono text-[0.625rem] text-slate-500">{{ scoreboardTeamSolveCount(entry) }}</span>
                   <strong class="font-mono tabular-nums">{{ entry.totalScore ?? 0 }}</strong>
@@ -174,30 +174,30 @@ const { Clock3, Expand, Minimize, Radio, RefreshCw, ShieldCheck, Trophy, Users, 
               </ol>
             </div>
           </div>
-          <div v-else class="live-empty h-full">{{ t('ui.noTeamHasScoredYet') }}</div>
+          <div v-else class="live-empty h-full">{{ t('common.competitionsBy.label.teamScoredYet') }}</div>
         </section>
 
         <section class="live-panel min-h-0 flex-1">
           <header class="live-panel-heading">
-            <div class="flex items-center gap-2"><Radio class="size-4 text-primary" />{{ t('ui.liveFeed') }}</div>
-            <span>{{ $t('ui.live') }}</span>
+            <div class="flex items-center gap-2"><Radio class="size-4 text-primary" />{{ t('competitions.label.liveFeed') }}</div>
+            <span>{{ $t('competitions.label.live') }}</span>
           </header>
           <ScrollSurface as="ol" v-if="solveFeed.length" class="live-feed">
             <li v-for="solve in solveFeed" :key="solve.key">
               <time :datetime="solve.solvedAt">{{ new Date(solve.solvedAt).toLocaleTimeString(localeTag(), { hour12: false }) }}</time>
               <span :class="bloodClass(solve.bloodRank)">{{ bloodLabel(solve.bloodRank) }}</span>
-              <p><strong>{{ solve.teamName }}</strong> {{ t('ui.solved3') }} <b>{{ solve.challengeTitle }}</b> <em>+{{ solve.score }}</em></p>
+              <p><strong>{{ solve.teamName }}</strong> {{ t('competitions.label.solved.livePageView') }} <b>{{ solve.challengeTitle }}</b> <em>+{{ solve.score }}</em></p>
             </li>
           </ScrollSurface>
-          <div v-else class="live-empty h-full">{{ t('ui.waitingForTheFirstSolve') }}</div>
+          <div v-else class="live-empty h-full">{{ t('competitions.competitionsBy.label.waitingFirstSolve') }}</div>
         </section>
       </aside>
     </main>
 
     <footer class="live-screen-footer">
-      <span class="flex items-center gap-2"><Radio class="size-3 text-primary" />{{ t('ui.dataRefreshesAutomatically') }}</span>
+      <span class="flex items-center gap-2"><Radio class="size-3 text-primary" />{{ t('competitions.label.dataRefreshesAutomatically') }}</span>
       <span class="hidden items-center gap-2 sm:flex"><Clock3 class="size-3" />{{ formatDateTime(dataAsOf) }}</span>
-      <span class="ml-auto flex items-center gap-2"><Users class="size-3" />{{ entries.length }} {{ t('ui.teams4') }}</span>
+      <span class="ml-auto flex items-center gap-2"><Users class="size-3" />{{ entries.length }} {{ t('competitions.label.teams.livePageView') }}</span>
     </footer>
   </div>
 </template>

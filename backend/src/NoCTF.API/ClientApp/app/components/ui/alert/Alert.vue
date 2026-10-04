@@ -2,7 +2,7 @@
 import type { HTMLAttributes } from 'vue'
 import type { AlertVariants } from '~/components/ui/alert'
 import { markRaw, nextTick, onBeforeUnmount, onMounted, onUpdated, ref, shallowReactive, useId, useSlots, watch } from 'vue'
-import { toast } from 'vue-sonner'
+import { toast } from '../../../utils/message-toast'
 import NoticeToast from '../sonner/NoticeToast.vue'
 import type { NoticePayload } from '../sonner/notice-state'
 

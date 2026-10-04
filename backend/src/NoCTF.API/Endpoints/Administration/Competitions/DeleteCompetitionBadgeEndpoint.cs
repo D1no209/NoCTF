@@ -12,7 +12,15 @@ public sealed class DeleteCompetitionBadgeRequest
     public Guid BadgeId { get; set; }
 }
 
-public sealed record CompetitionBadgeConflictResponse(string Code, string Detail);
+[System.Text.Json.Serialization.JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<CompetitionBadgeConflictCode>))]
+public enum CompetitionBadgeConflictCode { BadgeInUse, ConcurrencyConflict }
+
+public sealed record CompetitionBadgeConflictResponse(CompetitionBadgeConflictCode Code, string Detail)
+{
+    public string Detail { get; init; } = ApiMessages.Localize(Code, Detail, ApiMessages.NoArguments);
+    public string MessageKey => ApiMessages.For(Code).Key;
+    public IReadOnlyDictionary<string, object?> MessageArguments => ApiMessages.NoArguments;
+}
 
 public sealed class DeleteCompetitionBadgeEndpoint(
     ManageCompetitionBadges badges,
@@ -41,7 +49,7 @@ public sealed class DeleteCompetitionBadgeEndpoint(
             null => TypedResults.NoContent(),
             CompetitionBadgeFailure.NotFound => TypedResults.NotFound(),
             _ => TypedResults.Conflict(new CompetitionBadgeConflictResponse(
-                "BadgeInUse", "Badge is referenced by the progression graph."))
+                CompetitionBadgeConflictCode.BadgeInUse, "Badge is referenced by the progression graph."))
         };
     }
 }

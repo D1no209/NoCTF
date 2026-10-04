@@ -9,7 +9,7 @@ describe('home authentication actions', () => {
 
     expect(page).toContain('const { isLoggedIn, user } = useAuth()')
     expect(page).toContain('<Button v-if="!isLoggedIn" size="lg" variant="outline" as-child>')
-    expect(page).toContain("<NuxtLink to=\"/auth/register\">{{ $t('ui.registerNow') }}</NuxtLink>")
+    expect(page).toContain("<NuxtLink to=\"/auth/register\">{{ $t('common.label.registerNow') }}</NuxtLink>")
     expect(page).toContain('<NuxtLink to="/competitions">')
   })
 })

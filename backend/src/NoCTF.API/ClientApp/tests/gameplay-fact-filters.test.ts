@@ -9,7 +9,7 @@ describe('administrator gameplay fact filters', () => {
 
     expect(page).toContain("{ value: 'FlagAttempt', label: 'Flag' }")
     expect(page).toContain("{ value: 'BreakAttempt', label: 'Break' }")
-    expect(page).toContain("{ value: 'FixAttempt', label: translate('ui.patchVerification') }")
+    expect(page).toContain("{ value: 'FixAttempt', label: translate('common.label.patchVerification') }")
     expect(page).toContain('gameplayFactKind: filterKind.value || null')
     expect(page).toContain('state: filterState.value || null')
     expect(page).toContain('gameplayFactResult: filterResult.value || null')

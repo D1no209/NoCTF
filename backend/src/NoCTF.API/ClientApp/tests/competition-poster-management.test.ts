@@ -31,7 +31,7 @@ test('competition administration previews replaces and removes the current poste
   expect(controller).toContain('await refreshPoster()')
   expect(view).toContain(':src="posterUrl"')
   expect(view).toContain('@change="selectPoster"')
-  expect(view).toContain("$t('ui.removeCompetitionPoster')")
+  expect(view).toContain("$t('administration.label.removeCompetitionPoster')")
   expect(createController).toContain('posterUrl: uploadedPoster.url')
   expect(mock).toContain("request.method === 'DELETE'")
 })

@@ -24,12 +24,12 @@ public sealed class CreateChallengeValidator : Validator<CreateChallengeRequest>
     {
         RuleFor(request => request.Id)
             .Must(id => id is null || id != Guid.Empty)
-            .WithMessage("Id cannot be empty when supplied.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.CreateChallengeValidationIdEmptySupplied)).WithErrorCode(ApiMessages.Key(ApiMessageId.CreateChallengeValidationIdEmptySupplied));
         RuleFor(request => request.ChallengeId).NotEmpty();
         RuleFor(request => request.CustomTitle).MaximumLength(160);
         RuleFor(request => request.Order).GreaterThanOrEqualTo(0);
         RuleFor(request => request.Tags).Must(tags => NoCTF.Domain.Challenges.CompetitionChallengeTags.TryNormalize(tags, out _))
-            .WithMessage("Use at most 20 nonblank tags, each up to 40 characters.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.CreateChallengeValidationUseMostNonblankTags)).WithErrorCode(ApiMessages.Key(ApiMessageId.CreateChallengeValidationUseMostNonblankTags));
     }
 }
 
@@ -103,10 +103,10 @@ public sealed class CreateChallengeEndpoint(
                 or ChallengeMutationFailure.InvalidTags
                 or ChallengeMutationFailure.InvalidOrder
                 or ChallengeMutationFailure.TemplateModeMismatch =>
-                TypedResults.Problem(
+                ApiProblems.Problem(
                     statusCode: StatusCodes.Status400BadRequest,
-                    title: "Challenge was not created.",
-                    detail: "Competition challenge values are invalid."),
+                    title: ApiMessages.Get(ApiMessageId.CreateChallengeTitleChallengeWasCreated),
+                    detail: ApiMessages.Get(ApiMessageId.CreateChallengeDetailCompetitionChallengeValuesInvalid)),
             _ => throw new InvalidOperationException(
                 $"Unsupported competition challenge create failure: {result.Failure}.")
         };

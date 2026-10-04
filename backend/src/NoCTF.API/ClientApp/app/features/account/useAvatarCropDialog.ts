@@ -228,7 +228,7 @@ emit: { (event: "update:open", ...args: [value: boolean]): void; (event: "save",
       if (!blob)
         throw new Error(translate(profileCover.value
           ? 'profile.unableToEncodeCover'
-          : 'ui.unableToEncodeCroppedAvatar'))
+          : 'account.avatarCrop.label.unableEncodeCroppedAvatar'))
 
       const fileBase = profileCover.value ? 'profile-cover' : 'avatar'
       emit('save', new File([blob], `${fileBase}.${webp ? 'webp' : 'png'}`, { type: blob.type }))
@@ -236,7 +236,7 @@ emit: { (event: "update:open", ...args: [value: boolean]): void; (event: "save",
     catch (error) {
       emit('error', error instanceof Error ? error : new Error(translate(profileCover.value
         ? 'profile.coverCroppingFailed'
-        : 'ui.avatarCroppingFailed')))
+        : 'account.error.avatarCroppingFailed')))
     }
     finally {
       encoding.value = false

@@ -94,29 +94,29 @@ export function mergeCompetitionBroadcasts(
 export function competitionBroadcastText(
   event: NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse,
 ): string {
-  const team = event.teamDisplayName ?? translate("ui.aTeam")
-  const challenge = event.challengeTitle ?? translate("ui.aChallenge")
-  if (!event.kind) return translate("ui.competitionStatusUpdated")
+  const team = event.teamDisplayName ?? translate("common.label.team.competitionBroadcast")
+  const challenge = event.challengeTitle ?? translate("common.label.challenge")
+  if (!event.kind) return translate("competitions.label.competitionStatusUpdated")
   const awdpSucceeded = event.gameplayFactState === 'Completed'
     && event.gameplayFactResult === 'Correct'
   const messages: Partial<Record<NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol, string>> = {
-    FirstBloodAwarded: translate("ui.teamEarnedFirstBloodOn2", { team, challenge }),
-    SecondBloodAwarded: translate("ui.teamEarnedSecondBloodOn2", { team, challenge }),
-    ThirdBloodAwarded: translate("ui.teamEarnedThirdBloodOn2", { team, challenge }),
-    TeamBanned: translate("ui.teamWasBannedForCheating", { team }),
-    TeamBanCorrectionPublished: translate("ui.teamWonItsAppealAndTheBanWasRevoked", { team }),
-    HintPublished: translate("ui.challengeHasANewHint", { challenge }),
-    ChallengeDescriptionUpdated: translate("ui.challengeHasAnUpdatedDescription", { challenge }),
-    ChallengePublished: translate("ui.challengeIsNowOpen", { challenge }),
+    FirstBloodAwarded: translate("competitions.competitionBroadcast.label.teamEarnedFirstBlood", { team, challenge }),
+    SecondBloodAwarded: translate("competitions.competitionBroadcast.label.teamEarnedSecondBlood", { team, challenge }),
+    ThirdBloodAwarded: translate("competitions.competitionBroadcast.label.teamEarnedThirdBlood", { team, challenge }),
+    TeamBanned: translate("competitions.competitionBroadcast.label.teamWasBannedCheating", { team }),
+    TeamBanCorrectionPublished: translate("competitions.competitionBroadcast.description.teamWonAppealBan", { team }),
+    HintPublished: translate("competitions.competitionBroadcast.label.challengeNewHint", { challenge }),
+    ChallengeDescriptionUpdated: translate("common.label.challengeUpdatedDescription", { challenge }),
+    ChallengePublished: translate("competitions.label.challengeNowOpen", { challenge }),
     AwdpBreakResolved: awdpSucceeded
-      ? translate("ui.teamSuccessfullyAttackedChallenge", { team, challenge })
-      : translate("ui.teamFailedToAttackChallenge", { team, challenge }),
+      ? translate("competitions.label.teamSuccessfullyAttackedChallenge", { team, challenge })
+      : translate("competitions.competitionBroadcast.error.teamAttackChallengeFailed", { team, challenge }),
     AwdpFixResolved: awdpSucceeded
-      ? translate("ui.teamSuccessfullyDefendedChallenge", { team, challenge })
-      : translate("ui.teamFailedToDefendChallenge", { team, challenge }),
-    AnnouncementPublished: translate("ui.aNewCompetitionNoticeWasPublished"),
+      ? translate("competitions.label.teamSuccessfullyDefendedChallenge", { team, challenge })
+      : translate("competitions.competitionBroadcast.error.teamDefendChallengeFailed", { team, challenge }),
+    AnnouncementPublished: translate("competitions.competitionBroadcast.description.newCompetitionNoticeWas"),
   }
-  return messages[event.kind] ?? translate("ui.competitionStatusUpdated")
+  return messages[event.kind] ?? translate("competitions.label.competitionStatusUpdated")
 }
 
 export function competitionBroadcastTargetPath(

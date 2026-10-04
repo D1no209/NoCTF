@@ -9,12 +9,12 @@ const { Plus, isAdministrator, loading, error, load, counts, group, selected, se
 <template>
   <div data-contained-workspace-page class="competition-browser-page mx-auto flex w-full flex-col gap-6 py-8">
     <header class="flex items-center justify-between gap-4">
-      <h1 class="text-display text-2xl">{{ $t('ui.competitions') }}</h1>
+      <h1 class="text-display text-2xl">{{ $t('common.label.competitions') }}</h1>
       <Button v-if="isAdministrator" @click="openCreateDialog">
-        <Plus data-icon="inline-start" />{{ $t('ui.newCompetition') }}
+        <Plus data-icon="inline-start" />{{ $t('competitions.label.newCompetition') }}
       </Button>
     </header>
-    <Alert v-if="error" variant="destructive"><AlertDescription>{{ $message(error) }}<Button variant="outline" size="sm" @click="load">{{ $t('ui.retry') }}</Button></AlertDescription></Alert>
+    <Alert v-if="error" variant="destructive"><AlertDescription>{{ $message(error) }}<Button variant="outline" size="sm" @click="load">{{ $t('common.label.retry') }}</Button></AlertDescription></Alert>
     <div class="competition-browser-layout">
       <div class="min-w-0">
         <component :is="CompetitionSidebar" v-model:group="group" :loading="loading" :options="options" :selected-id="selectedId" :counts="counts" :show-deleted="isAdministrator && counts.deleted > 0" @select="selectCompetition" />

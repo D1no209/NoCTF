@@ -88,12 +88,12 @@ internal static class TeamBanAppealHttpResults
         {
             return TypedResults.NotFound();
         }
-        return TypedResults.Problem(
+        return ApiProblems.Problem(
             statusCode: result.Failure is TeamBanAppealFailure.AppealAlreadyResolved
                 or TeamBanAppealFailure.BanNoLongerCurrent
                 ? StatusCodes.Status409Conflict
                 : StatusCodes.Status400BadRequest,
-            title: title,
+            title: ApiMessages.For(result.Failure),
             extensions: new Dictionary<string, object?>
             {
                 ["code"] = result.Failure?.ToString()

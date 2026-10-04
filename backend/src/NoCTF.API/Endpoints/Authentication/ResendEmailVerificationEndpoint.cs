@@ -29,10 +29,10 @@ public sealed class ResendEmailVerificationEndpoint(
         var result = await resend.ExecuteAsync(user.UserId, timeProvider.GetUtcNow(), ct);
         return result.Succeeded
             ? TypedResults.NoContent()
-            : TypedResults.Problem(
+            : ApiProblems.Problem(
                 statusCode: StatusCodes.Status409Conflict,
-                title: "Verification message was not queued.",
-                detail: result.ErrorMessage,
+                title: ApiMessages.Get(ApiMessageId.ResendEmailVerificationTitleVerificationMessageWasQueued),
+                detail: ApiMessages.For(result.FailureCode),
                 extensions: new Dictionary<string, object?>
                 {
                     ["code"] = result.FailureCode

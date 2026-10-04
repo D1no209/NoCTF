@@ -18,7 +18,12 @@ public enum ChallengeHintUnlockFailureCodeProtocol
 
 public sealed record ChallengeHintUnlockConflictResponse(
     ChallengeHintUnlockFailureCodeProtocol Code,
-    string Detail);
+    string Detail)
+{
+    public string Detail { get; init; } = ApiMessages.Localize(Code, Detail, ApiMessages.NoArguments);
+    public string MessageKey => ApiMessages.For(Code).Key;
+    public IReadOnlyDictionary<string, object?> MessageArguments => ApiMessages.NoArguments;
+}
 
 public sealed class UnlockChallengeHintEndpoint(
     UnlockChallengeHint unlock,

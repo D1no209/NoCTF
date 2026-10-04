@@ -30,7 +30,12 @@ public sealed record RequestAwdpDefenseTargetResponse(
 
 public sealed record AwdpDefenseTargetConflictResponse(
     AwdpDefenseTargetRequestFailureCodeProtocol Code,
-    string Detail);
+    string Detail)
+{
+    public string Detail { get; init; } = ApiMessages.Localize(Code, Detail, ApiMessages.NoArguments);
+    public string MessageKey => ApiMessages.For(Code).Key;
+    public IReadOnlyDictionary<string, object?> MessageArguments => ApiMessages.NoArguments;
+}
 
 [Mapper]
 internal static partial class AwdpDefenseTargetRequestMapping

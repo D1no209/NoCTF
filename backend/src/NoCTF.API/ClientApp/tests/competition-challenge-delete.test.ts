@@ -11,7 +11,7 @@ describe('competition challenge deletion', () => {
     expect(page).toContain('adminPatchCompetitionChallenge({')
     expect(page).toContain('isPublished: published')
     expect(page).toContain('@update:model-value="setChallengePublished(c, $event)"')
-    expect(page).toContain("published ? 'ui.challengeWasPublished' : 'ui.challengeWasUnpublished'")
+    expect(page).toContain("published ? 'common.label.challengeWasPublished' : 'common.label.challengeWasUnpublished'")
   })
 
   test('can search templates and hide templates already added to the competition', async () => {
@@ -45,7 +45,7 @@ describe('competition challenge deletion', () => {
     expect(page).toContain('v-model="directionFilter"')
     expect(page).toContain('v-model="statusFilter"')
     expect(page).toContain('v-for="c in pageItems"')
-    expect(page).toContain("$t('ui.noMatchingCompetitionChallenges')")
+    expect(page).toContain("$t('administration.label.matchingCompetitionChallenges')")
   })
 
   test('paginates matching rows and resets the page when filters change', async () => {
@@ -77,7 +77,7 @@ describe('competition challenge deletion', () => {
     expect(deleteSection).toContain('const target = deleteTarget.value')
     expect(deleteSection).toContain('if (!target?.id || deletePending.value) return')
     expect(deleteSection).toContain('deletePending.value = true')
-    expect(deleteSection).toContain('deleteError.value = parseApiError(e).message')
+    expect(deleteSection).toContain('deleteError.value = parseApiError(e).displayMessage')
     expect(deleteSection).toContain('<Alert v-if="deleteError" variant="destructive">')
     expect(deleteSection).toContain(':disabled="deletePending"')
     expect(deleteSection).toContain('@click="removeChallenge"')
@@ -94,7 +94,7 @@ describe('competition challenge deletion', () => {
     expect(deleteHandler).toContain('adminDeleteCompetitionChallenge')
     expect(deleteHandler).toContain('path: { competitionId, competitionChallengeId: target.id }')
     expect(deleteHandler).not.toContain('query:')
-    expect(deleteHandler).toContain("toast.success(translate(\"ui.questionHasBeenDeleted\"))")
+    expect(deleteHandler).toContain("toast.success(describeMessage(\"administration.label.questionDeleted\"))")
     expect(deleteHandler).toContain('deleteTarget.value = null')
   })
 })

@@ -397,9 +397,9 @@ public sealed class GetLeaderboardEndpoint(
         var status = await leaderboard.GetStatusAsync(request.CompetitionId, cancellationToken);
         if (status.LastFailureAt is not null)
         {
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: StatusCodes.Status503ServiceUnavailable,
-                title: "Leaderboard projection is unavailable.",
+                title: ApiMessages.Get(ApiMessageId.GetLeaderboardTitleLeaderboardProjectionUnavailable),
                 extensions: new Dictionary<string, object?>
                 {
                     ["code"] = LeaderboardProblemCode.LeaderboardProjectionFailed

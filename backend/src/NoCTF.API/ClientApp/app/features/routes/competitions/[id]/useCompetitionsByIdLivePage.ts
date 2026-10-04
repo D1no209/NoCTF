@@ -1,7 +1,9 @@
+import { message as describeMessage } from '../../../../utils/i18n'
+import type { UiMessage } from '../../../../utils/i18n'
 
 import type { ComponentPublicInstance } from 'vue'
 import { Clock3, Expand, Minimize, Radio, RefreshCw, ShieldCheck, Trophy, Users, X } from '@lucide/vue'
-import { toast } from 'vue-sonner'
+import { toast } from '../../../../utils/message-toast'
 import { getCompetitionEndpoint } from '../../../../api'
 import type { NoCtfapiEndpointsCompetitionsCompetitionResponse } from '../../../../api'
 import { controlScreenChallenges, controlScreenPublicEntries, controlScreenSolveFeed, reconcileControlScreenSolves } from '../../../../utils/control-screen'
@@ -30,7 +32,7 @@ export function useCompetitionsByIdLivePage() {
 
   const projectionPending = ref(false)
 
-  const error = ref<string | null>(null)
+  const error = ref<UiMessage | null>(null)
 
   const featuredSolve = ref<ControlScreenSolve | null>(null)
 
@@ -94,7 +96,7 @@ export function useCompetitionsByIdLivePage() {
 
   const remainingText = computed(() => {
     const end = competition.value?.endTime ? new Date(competition.value.endTime).getTime() : null
-    if (!end || competition.value?.status === 'Finished' || end <= clock.value) return t("ui.competitionFinished")
+    if (!end || competition.value?.status === 'Finished' || end <= clock.value) return t("competitions.label.competitionFinished")
     const total = Math.max(0, Math.floor((end - clock.value) / 1000))
     const days = Math.floor(total / 86400)
     const hours = Math.floor(total % 86400 / 3600)
@@ -116,10 +118,10 @@ export function useCompetitionsByIdLivePage() {
   })
 
   function bloodLabel(rank: ControlScreenBloodRank | null): string {
-    if (rank === 'First') return t("ui.firstBlood")
-    if (rank === 'Second') return t("ui.secondBlood")
-    if (rank === 'Third') return t("ui.thirdBlood")
-    return t("ui.solved2")
+    if (rank === 'First') return t("common.label.firstBlood")
+    if (rank === 'Second') return t("common.label.secondBlood")
+    if (rank === 'Third') return t("common.label.thirdBlood")
+    return t("competitions.label.solved")
   }
 
   function bloodClass(rank: ControlScreenBloodRank | null): string {
@@ -161,7 +163,7 @@ export function useCompetitionsByIdLivePage() {
     title: challenge.title,
     score: challenge.currentScore,
     solveCount: challenge.solveCount,
-    solvesText: `${challenge.solveCount} ${t("ui.solve")}`,
+    solvesText: `${challenge.solveCount} ${t("competitions.label.solve")}`,
     solved: challenge.solveCount > 0,
     bloods: bloodsByChallenge.value.get(challengeKey(challenge.competitionChallengeId)) ?? [],
   })))
@@ -222,13 +224,13 @@ export function useCompetitionsByIdLivePage() {
     refreshing.value = false
 
     if (competitionResult.error || !competitionResult.data) {
-      error.value = parseApiError(competitionResult.error, t("ui.loadingCompetitionFailed")).message
+      error.value = parseApiError(competitionResult.error, t("common.error.loadingCompetitionFailed")).displayMessage
       return
     }
     competition.value = competitionResult.data
     if (competition.value.mode !== 'Ctf') {
       projectionPending.value = false
-      error.value = t("ui.the3dLiveScreenCurrentlySupportsCtfCompetitionsOnly")
+      error.value = t("competitions.competitionsBy.description.dLiveScreenCurrently")
       return
     }
     await board.refresh({ catalog: true, schema: true, snapshot: true })
@@ -245,7 +247,7 @@ export function useCompetitionsByIdLivePage() {
     }
     if (board.error.value || !board.snapshot.value) {
       projectionPending.value = false
-      error.value = board.error.value ?? t("ui.failedToLoadScoreboard")
+      error.value = board.error.value ?? t("common.error.loadScoreboardFailed")
       return
     }
     projectionPending.value = false
@@ -262,7 +264,7 @@ export function useCompetitionsByIdLivePage() {
       else await document.exitFullscreen()
     }
     catch {
-      toast.error(translate("ui.theBrowserDeniedFullscreenAccessCheckSitePermissionsOrUse"))
+      toast.error(describeMessage("competitions.competitionsBy.description.browserDeniedFullscreenAccess"))
     }
   }
 

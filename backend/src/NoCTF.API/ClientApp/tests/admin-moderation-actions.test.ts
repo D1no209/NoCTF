@@ -18,10 +18,10 @@ describe('administrator destructive action wiring', () => {
 
     expect(page).not.toContain('adminUnbanTeam')
     expect(page).not.toContain('openUnban')
-    expect(page).not.toContain("$t('ui.unban')")
+    expect(page).not.toContain("$t('common.label.unban')")
     expect(page).toContain("@click.stop=\"openBan(t, 'correct')\"")
     expect(page).toContain("mode === 'correct' ? length >= 8")
-    expect(page).toContain("ui.atLeast8CharactersCurrently512")
+    expect(page).toContain("administration.label.leastCharactersCurrently")
   })
 
   test('keeps manual ban announcements opt-in and sends the generated request field', async () => {
@@ -31,7 +31,7 @@ describe('administrator destructive action wiring', () => {
     expect(page).toContain('banAnnouncePublicly.value = false')
     expect(page).toContain('announcePublicly: banAnnouncePublicly.value')
     expect(page).toContain('id="ban-announce-publicly"')
-    expect(page).toContain("ui.releaseOfEventDisciplineAnnouncementAfterBan")
+    expect(page).toContain("administration.competitionsBy.description.releaseEventDisciplineAnnouncement")
   })
 
   test('lets judges ban teams and resolve appeals without exposing manager-only reversal and registration actions', async () => {

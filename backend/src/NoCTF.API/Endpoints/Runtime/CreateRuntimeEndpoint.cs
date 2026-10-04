@@ -111,10 +111,10 @@ internal static class PlayerRuntimeMutation
                 NoCTF.Application.Observability.NoCtfTelemetry
                     .RecordRuntimeMutationFailure(MetricOperation(action), failure);
             }
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: StatusCodes.Status503ServiceUnavailable,
-                title: "Runtime operation could not be queued.",
-                detail: result.ErrorMessage,
+                title: ApiMessages.Get(ApiMessageId.CreateRuntimeTitleRuntimeCouldQueued),
+                detail: ApiMessages.For(result.FailureCode),
                 extensions: new Dictionary<string, object?>
                 {
                     ["code"] = result.FailureCode?.ToString()

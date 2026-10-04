@@ -1,3 +1,5 @@
+import { message as describeMessage } from '../../../utils/i18n'
+import type { UiMessage } from '../../../utils/i18n'
 
 
 import { authenticationCompletePasswordReset, authenticationRequestPasswordReset } from '../../../api'
@@ -20,7 +22,7 @@ export function useAuthPasswordResetPage() {
 
   const completed = ref(false)
 
-  const error = ref<string | null>(null)
+  const error = ref<UiMessage | null>(null)
 
   const pending = ref(false)
 
@@ -33,7 +35,7 @@ export function useAuthPasswordResetPage() {
       requested.value = true
     }
     catch (e) {
-      error.value = parseApiError(e).message
+      error.value = parseApiError(e).displayMessage
     }
     finally {
       pending.value = false
@@ -43,7 +45,7 @@ export function useAuthPasswordResetPage() {
   async function completeReset() {
     error.value = null
     if (newPassword.value !== confirmPassword.value) {
-      error.value = translate("ui.thePasswordsEnteredTwiceAreInconsistent")
+      error.value = describeMessage("common.authRegister.description.passwordsEnteredTwiceInconsistent")
       return
     }
     pending.value = true
@@ -55,7 +57,7 @@ export function useAuthPasswordResetPage() {
       completed.value = true
     }
     catch (e) {
-      error.value = parseApiError(e).message
+      error.value = parseApiError(e).displayMessage
     }
     finally {
       pending.value = false

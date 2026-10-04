@@ -17,8 +17,8 @@ describe('protected Flag access', () => {
   })
 
   test('explains the role-specific audit behavior and keeps retry feedback', () => {
-    expect(source).toContain("$t('ui.platformAdministratorFlagAccessIsNotWrittenToTheAudit')")
-    expect(source).toContain("$t('ui.competitionStaffFlagAccessIsWrittenToTheAuditLog')")
+    expect(source).toContain("$t('administration.competitionsBy.description.platformAdministratorFlagAccess')")
+    expect(source).toContain("$t('administration.competitionsBy.description.competitionStaffFlagAccess')")
     expect(source).toContain('v-else-if="flagError"')
     expect(source).toContain('@click="accessFlag"')
   })

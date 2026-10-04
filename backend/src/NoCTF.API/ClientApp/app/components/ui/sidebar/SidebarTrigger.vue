@@ -23,6 +23,6 @@ const { toggleSidebar } = useSidebar()
     @click="toggleSidebar"
   >
     <PanelLeftIcon class="cn-rtl-flip" />
-    <span class="sr-only">{{ $t('ui.toggleSidebar') }}</span>
+    <span class="sr-only">{{ $t('common.label.toggleSidebar') }}</span>
   </Button>
 </template>

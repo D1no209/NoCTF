@@ -1,3 +1,4 @@
+import type { UiMessage } from '../../utils/i18n'
 import { defineAsyncComponent } from 'vue'
 import { markRaw, toRefs } from 'vue'
 import type { Ref } from 'vue'
@@ -16,7 +17,7 @@ export function useScoreboardTeamDetailDialog(props: Readonly<{
   columnGroups: ScoreboardChallengeColumnGroup[]
   trendSeries?: TrendSeries[]
   trendLoading?: boolean
-  trendError?: string | null
+  trendError?: UiMessage | null
   trendRangeStart?: string | null
   trendRangeEnd?: string | null
   trendRevision?: string | number | null
@@ -28,7 +29,7 @@ open: Ref<boolean>) {
   const usesCurrentScore = computed(() => props.mode === 'Ctf' || props.mode === 'Koh')
 
   const scoreLabel = computed(() => translate(
-    usesCurrentScore.value ? translate("ui.currentScore") : translate("ui.settledScore"),
+    usesCurrentScore.value ? translate("leaderboard.label.score") : translate("leaderboard.label.settledScore"),
   ))
 
   const memberContributionSlices = computed(() => scoreboardMemberContributionSlices(props.team))
@@ -81,7 +82,7 @@ open: Ref<boolean>) {
       : { attack: 0, defense: 0 }
     return {
       group,
-      title: group.challenge?.title ?? translate("ui.unknownQuestion"),
+      title: group.challenge?.title ?? translate("common.label.unknownQuestion"),
       score: props.team ? scoreboardTeamChallengeScore(props.team, group, props.mode) : 0,
       attackScore: split.attack,
       defenseScore: split.defense,
@@ -111,7 +112,7 @@ open: Ref<boolean>) {
     const data = isAwdp.value
       ? [
           {
-            name: translate("ui.attackScore"),
+            name: translate("common.label.attackScore"),
             value: selectedScores.map(score => score.attack),
             lineStyle: { width: 3 },
             areaStyle: { opacity: 0.2 },
@@ -119,7 +120,7 @@ open: Ref<boolean>) {
             symbolSize: 6,
           },
           {
-            name: translate("ui.defenseScore"),
+            name: translate("common.label.defenseScore"),
             value: selectedScores.map(score => score.defense),
             lineStyle: { width: 3 },
             areaStyle: { opacity: 0.2 },
@@ -155,10 +156,10 @@ open: Ref<boolean>) {
 
   function flagLabel(succeeded: boolean): string {
     if (props.mode === 'Awd' || props.mode === 'Awdp')
-      return succeeded ? translate("ui.attackSucceeded") : translate("ui.noSuccessfulAttack")
+      return succeeded ? translate("common.label.attackSucceeded") : translate("leaderboard.label.successfulAttack")
     if (props.mode === 'Koh')
-      return succeeded ? translate("ui.controlAcquired") : translate("ui.controlNotAcquired")
-    return succeeded ? translate("ui.solved") : translate("ui.notSolved")
+      return succeeded ? translate("leaderboard.label.controlAcquired") : translate("leaderboard.label.controlAcquired.scoreboardSlotStatus")
+    return succeeded ? translate("common.label.solved.competitionChallengeNavigator") : translate("common.label.solved")
   }
 
   const LazyScoreTrendChart = markRaw(defineAsyncComponent(() => import('./ScoreTrendChart.vue')))

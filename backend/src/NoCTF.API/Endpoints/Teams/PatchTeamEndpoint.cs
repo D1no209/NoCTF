@@ -75,7 +75,7 @@ public sealed class PatchTeamValidator : Validator<PatchTeamRequest>
             || request.Registration is not null
             || request.Administration is not null
             || request.Ban is not null)
-            .WithMessage("At least one team section is required.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.PatchTeamValidationLeastOneTeamSection)).WithErrorCode(ApiMessages.Key(ApiMessageId.PatchTeamValidationLeastOneTeamSection));
         RuleFor(request => request.Profile!.Name).NotEmpty().MaximumLength(128)
             .When(request => request.Profile is not null);
         RuleFor(request => request.Profile!.TrackKey).MaximumLength(64)
@@ -98,7 +98,7 @@ public sealed class PatchTeamValidator : Validator<PatchTeamRequest>
         RuleFor(request => request.Registration!.Status)
             .Equal(TeamRegistrationStatusProtocol.Pending)
             .When(request => request.Registration is not null)
-            .WithMessage("Captain registration updates use Pending to submit the current team draft.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.PatchTeamValidationCaptainRegistrationUpdatesUse)).WithErrorCode(ApiMessages.Key(ApiMessageId.PatchTeamValidationCaptainRegistrationUpdatesUse));
         RuleFor(request => request.Registration!.TrackInvitationCode).MaximumLength(128)
             .When(request => request.Registration?.TrackInvitationCode is not null);
         RuleFor(request => request.Ban!.Reason).NotEmpty().MaximumLength(512)
@@ -519,10 +519,10 @@ public sealed class PatchTeamEndpoint(
                 ProblemHttpResult>>.Rollback(failure);
     }
 
-    private static ProblemHttpResult Conflict(string detail, string? code = null) => TypedResults.Problem(
+    private static ProblemHttpResult Conflict(string detail, string? code = null) => ApiProblems.Problem(
         statusCode: StatusCodes.Status409Conflict,
-        title: "Team was not updated.",
-        detail: detail,
+        title: ApiMessages.Get(ApiMessageId.PatchTeamTitleTeamWasUpdated),
+        detail: ApiMessages.Get(ApiMessageId.PatchTeamTitleTeamWasUpdated),
         extensions: code is null
             ? null
             : new Dictionary<string, object?> { ["code"] = code });

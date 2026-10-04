@@ -85,16 +85,14 @@ public sealed class RegisterEndpoint(RegisterUser register, TimeProvider timePro
             new(request.UserName, request.Email, request.Password, timeProvider.GetUtcNow()),
             ct);
         if (!result.Succeeded)
-            return TypedResults.Conflict(new MvcProblemDetails
-            {
-                Status = StatusCodes.Status409Conflict,
-                Title = "Account registration conflict.",
-                Detail = result.ErrorMessage,
-                Extensions =
+            return TypedResults.Conflict(ApiProblems.Create(
+                StatusCodes.Status409Conflict,
+                title: ApiMessages.For(result.FailureCode),
+                detail: ApiMessages.For(result.FailureCode),
+                extensions: new Dictionary<string, object?>
                 {
                     ["code"] = RegisterProtocolMapper.ToProtocol(result.FailureCode!.Value)
-                }
-            });
+                }));
 
         var registration = result.Value!;
         var profile = registration.Profile;

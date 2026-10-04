@@ -1,3 +1,5 @@
+import { message as describeMessage } from '../../utils/i18n'
+import type { UiMessage } from '../../utils/i18n'
 import { ArrowRight } from '@lucide/vue'
 import { listCompetitionsEndpoint } from '../../api'
 import type { NoCtfapiEndpointsCompetitionsCompetitionResponse } from '../../api'
@@ -13,7 +15,7 @@ export function useIndexPage() {
 
   const competitionsLoading = ref(true)
 
-  const competitionsError = ref<string | null>(null)
+  const competitionsError = ref<UiMessage | null>(null)
 
   async function loadCompetitions(): Promise<void> {
     competitionsLoading.value = true
@@ -21,7 +23,7 @@ export function useIndexPage() {
     const { data, error } = await listCompetitionsEndpoint()
     competitionsLoading.value = false
     if (error || !data) {
-      competitionsError.value = parseApiError(error, translate("ui.failedToLoadRecentCompetitions")).message
+      competitionsError.value = parseApiError(error, describeMessage("common.index.error.loadRecentCompetitionsFailed")).displayMessage
       return
     }
     items.value = data?.items ?? []
@@ -45,9 +47,9 @@ export function useIndexPage() {
   const unknownTerminalCommand = ref('')
 
   const statusRows = computed(() => [
-    { label: translate('ui.modes'), value: translate('ui.ctfAwdAwdpKoh') },
-    { label: translate('ui.live2'), value: competitionsLoading.value ? translate('ui.loading') : competitionsError.value ? '—' : translate('ui.running4', { count: liveCount.value }) },
-    { label: translate('ui.upcoming3'), value: competitionsLoading.value ? translate('ui.loading') : competitionsError.value ? '—' : translate('ui.upcoming2', { count: upcomingCount.value }) },
+    { label: translate('common.label.modes'), value: translate('common.label.ctfAwdAwdpKoh') },
+    { label: translate('common.label.live'), value: competitionsLoading.value ? translate('common.label.loading') : competitionsError.value ? '—' : translate('common.label.running.useIndexPage', { count: liveCount.value }) },
+    { label: translate('common.label.upcoming.useIndexPage'), value: competitionsLoading.value ? translate('common.label.loading') : competitionsError.value ? '—' : translate('common.label.upcoming', { count: upcomingCount.value }) },
   ])
 
   const terminalOutput = computed(() => {
@@ -55,7 +57,7 @@ export function useIndexPage() {
       return homeTerminalCommands.map(command => ({ value: command }))
     }
     if (terminalCommand.value === 'ls') {
-      if (competitionsLoading.value) return [{ value: translate('ui.loading') }]
+      if (competitionsLoading.value) return [{ value: translate('common.label.loading') }]
       if (competitionsError.value) return [{ value: '—' }]
       if (!items.value.length) return [{ value: translate('terminal.noCompetitions') }]
       return items.value.map((competition, index) => ({

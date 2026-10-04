@@ -1,5 +1,7 @@
+import { message as describeMessage } from '../../../../utils/i18n'
+import type { UiMessage } from '../../../../utils/i18n'
 import { ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, RefreshCw, Scale } from '@lucide/vue'
-import { toast } from 'vue-sonner'
+import { toast } from '../../../../utils/message-toast'
 
 import { adminCreateManualAdjustment, createTeamWriteUpConsultation, downloadTeamWriteUp, issueTeamWriteUpPreview, listTeamWriteUps } from '../../../../api'
 import type { NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpChallengeScoreResponse, NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpReviewItemResponse, NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpReviewResponse } from '../../../../api'
@@ -18,7 +20,7 @@ export function useCompetitionsByIdWriteUpsPage(options: { management?: boolean 
 
   const review = ref<NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpReviewResponse | null>(null)
   const loading = ref(true)
-  const loadError = ref<string | null>(null)
+  const loadError = ref<UiMessage | null>(null)
   const selectedTeamId = ref(typeof route.query.team === 'string' ? route.query.team : '')
   const selected = computed<ReviewItem | null>(() =>
     review.value?.items?.find(item => item.writeUp?.teamId === selectedTeamId.value) ?? null,
@@ -32,7 +34,7 @@ export function useCompetitionsByIdWriteUpsPage(options: { management?: boolean 
 
   const previewUrl = ref<string | null>(null)
   const previewLoading = ref(false)
-  const previewError = ref<string | null>(null)
+  const previewError = ref<UiMessage | null>(null)
   const previewFileId = ref<string | null>(null)
   const downloadPending = ref(false)
   let previewRequest = 0
@@ -48,7 +50,7 @@ export function useCompetitionsByIdWriteUpsPage(options: { management?: boolean 
     const { data, error } = await listTeamWriteUps({ path: { competitionId } })
     loading.value = false
     if (error || !data) {
-      loadError.value = parseApiError(error, translate('writeUp.reviewLoadFailed')).message
+      loadError.value = parseApiError(error, describeMessage('writeUp.reviewLoadFailed')).displayMessage
       return
     }
     review.value = data
@@ -83,7 +85,7 @@ export function useCompetitionsByIdWriteUpsPage(options: { management?: boolean 
     }
     catch (error) {
       if (request === previewRequest)
-        previewError.value = parseApiError(error, translate('writeUp.previewFailed')).message
+        previewError.value = parseApiError(error, describeMessage('writeUp.previewFailed')).displayMessage
     }
     finally {
       if (request === previewRequest) previewLoading.value = false
@@ -104,7 +106,7 @@ export function useCompetitionsByIdWriteUpsPage(options: { management?: boolean 
       )
     }
     catch (error) {
-      toast.error(parseApiError(error, translate('writeUp.downloadFailed')).message)
+      toast.error(parseApiError(error, describeMessage('writeUp.downloadFailed')).displayMessage)
     }
     finally {
       downloadPending.value = false
@@ -115,7 +117,7 @@ export function useCompetitionsByIdWriteUpsPage(options: { management?: boolean 
   const selectedChallengeId = ref('')
   const adjustmentDelta = ref(0)
   const adjustmentRequestPending = ref(false)
-  const adjustmentError = ref<string | null>(null)
+  const adjustmentError = ref<UiMessage | null>(null)
   const pendingAdjustment = ref<{
     teamId: string
     competitionChallengeId: string
@@ -132,7 +134,7 @@ export function useCompetitionsByIdWriteUpsPage(options: { management?: boolean 
       candidate.competitionChallengeId === expectation.competitionChallengeId)
     if (score?.netPoints !== expectation.expectedNetPoints) return false
     pendingAdjustment.value = null
-    toast.success(translate('writeUp.adjustmentApplied'))
+    toast.success(describeMessage('writeUp.adjustmentApplied'))
     return true
   }
 
@@ -153,7 +155,7 @@ export function useCompetitionsByIdWriteUpsPage(options: { management?: boolean 
   watch(adjustmentRefreshTimedOut, timedOut => {
     if (!timedOut) return
     pendingAdjustment.value = null
-    adjustmentError.value = translate('writeUp.adjustmentRefreshTimedOut')
+    adjustmentError.value = describeMessage('writeUp.adjustmentRefreshTimedOut')
     toast.error(adjustmentError.value)
   })
 
@@ -172,13 +174,13 @@ export function useCompetitionsByIdWriteUpsPage(options: { management?: boolean 
       || delta === 0 || adjustmentBusy.value)
       return false
     if (!Number.isInteger(delta) || delta < -2147483648 || delta > 2147483647) {
-      adjustmentError.value = translate('writeUp.invalidAdjustment')
+      adjustmentError.value = describeMessage('writeUp.invalidAdjustment')
       return false
     }
     const score = selected.value?.challengeScores?.find(candidate =>
       candidate.competitionChallengeId === selectedChallengeId.value)
     if (score?.netPoints === null || score?.netPoints === undefined) {
-      adjustmentError.value = translate('writeUp.invalidAdjustment')
+      adjustmentError.value = describeMessage('writeUp.invalidAdjustment')
       return false
     }
     adjustmentRequestPending.value = true
@@ -200,11 +202,11 @@ export function useCompetitionsByIdWriteUpsPage(options: { management?: boolean 
         expectedNetPoints: score.netPoints + delta,
       }
       startAdjustmentRefresh()
-      toast.success(translate('writeUp.adjustmentAccepted'))
+      toast.success(describeMessage('writeUp.adjustmentAccepted'))
       return true
     }
     catch (error) {
-      adjustmentError.value = parseApiError(error, translate('writeUp.adjustmentFailed')).message
+      adjustmentError.value = parseApiError(error, describeMessage('writeUp.adjustmentFailed')).displayMessage
       toast.error(adjustmentError.value)
       return false
     }
@@ -250,7 +252,7 @@ export function useCompetitionsByIdWriteUpsPage(options: { management?: boolean 
   const consultationTitle = ref('')
   const consultationBody = ref('')
   const consultationPending = ref(false)
-  const consultationError = ref<string | null>(null)
+  const consultationError = ref<UiMessage | null>(null)
 
   function openConsultation() {
     const item = selected.value
@@ -287,14 +289,14 @@ export function useCompetitionsByIdWriteUpsPage(options: { management?: boolean 
       })
       if (error || !data?.threadRootId) throw error
       consultationOpen.value = false
-      toast.success(translate('writeUp.consultationCreated'))
+      toast.success(describeMessage('writeUp.consultationCreated'))
       await router.push({
         path: `/competitions/${competitionId}/questions`,
         query: { question: data.threadRootId },
       })
     }
     catch (error) {
-      consultationError.value = parseApiError(error, translate('writeUp.consultationFailed')).message
+      consultationError.value = parseApiError(error, describeMessage('writeUp.consultationFailed')).displayMessage
       toast.error(consultationError.value)
     }
     finally {

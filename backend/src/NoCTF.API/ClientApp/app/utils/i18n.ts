@@ -1,4 +1,4 @@
-import type { MessageKey } from '../locales/zh-CN'
+import type { MessageKey } from '../locales/en'
 import { shallowRef } from 'vue'
 
 export const supportedLocales = ['zh-CN', 'en'] as const
@@ -14,46 +14,53 @@ export const localeDomains = [
   'notifications',
   'runtime',
   'writeups',
+  'api',
 ] as const
 export type LocaleDomain = typeof localeDomains[number]
 
 type LocaleCatalog = Partial<Record<MessageKey, string>>
-interface LocaleChunk {
-  messages: LocaleCatalog
-  englishSources?: Readonly<Record<string, MessageKey>>
-}
+export type MessageArguments = Record<string, string | number | boolean | null | MessageDescriptor | MessageGroup>
+export interface MessageDescriptor { key: MessageKey; arguments?: MessageArguments }
+export interface MessageGroup { messages: UiMessage[]; separator: MessageKey }
+export type UiMessage = string | MessageDescriptor | MessageGroup
+
 
 const localeStorageKey = 'noctf-locale'
 const activeLocale = shallowRef<AppLocale>('zh-CN')
 const catalogRevision = shallowRef(0)
 const catalogs: Record<AppLocale, LocaleCatalog> = { 'zh-CN': {}, en: {} }
-const sourceKeys = new Map<string, MessageKey>()
 const loadedDomains: Record<AppLocale, Set<LocaleDomain>> = { 'zh-CN': new Set(), en: new Set() }
 const pendingDomains = new Map<string, Promise<void>>()
-const activeDomains = new Set<LocaleDomain>(['core'])
+const activeDomains = new Set<LocaleDomain>(['core', 'api'])
 
-const catalogLoaders: Record<AppLocale, Record<LocaleDomain, () => Promise<LocaleChunk>>> = {
+export function mergeLocaleCatalog(english: LocaleCatalog, translated: LocaleCatalog): LocaleCatalog {
+  return { ...english, ...Object.fromEntries(Object.entries(translated).filter(([, value]) => value?.trim())) }
+}
+
+const catalogLoaders: Record<AppLocale, Record<LocaleDomain, () => Promise<LocaleCatalog>>> = {
   'zh-CN': {
-    core: () => import('../locales/catalogs/zh-CN/core'),
-    competitions: () => import('../locales/catalogs/zh-CN/competitions'),
-    challenges: () => import('../locales/catalogs/zh-CN/challenges'),
-    leaderboard: () => import('../locales/catalogs/zh-CN/leaderboard'),
-    administration: () => import('../locales/catalogs/zh-CN/administration'),
-    account: () => import('../locales/catalogs/zh-CN/account'),
-    notifications: () => import('../locales/catalogs/zh-CN/notifications'),
-    runtime: () => import('../locales/catalogs/zh-CN/runtime'),
-    writeups: () => import('../locales/catalogs/zh-CN/writeups'),
+    core: () => import('../locales/catalogs/zh-CN/core.json').then(chunk => chunk.default),
+    competitions: () => import('../locales/catalogs/zh-CN/competitions.json').then(chunk => chunk.default),
+    challenges: () => import('../locales/catalogs/zh-CN/challenges.json').then(chunk => chunk.default),
+    leaderboard: () => import('../locales/catalogs/zh-CN/leaderboard.json').then(chunk => chunk.default),
+    administration: () => import('../locales/catalogs/zh-CN/administration.json').then(chunk => chunk.default),
+    account: () => import('../locales/catalogs/zh-CN/account.json').then(chunk => chunk.default),
+    notifications: () => import('../locales/catalogs/zh-CN/notifications.json').then(chunk => chunk.default),
+    runtime: () => import('../locales/catalogs/zh-CN/runtime.json').then(chunk => chunk.default),
+    writeups: () => import('../locales/catalogs/zh-CN/writeups.json').then(chunk => chunk.default),
+    api: () => import('../locales/catalogs/zh-CN/api.json').then(chunk => chunk.default),
   },
-  en: {
-    core: () => import('../locales/catalogs/en/core'),
-    competitions: () => import('../locales/catalogs/en/competitions'),
-    challenges: () => import('../locales/catalogs/en/challenges'),
-    leaderboard: () => import('../locales/catalogs/en/leaderboard'),
-    administration: () => import('../locales/catalogs/en/administration'),
-    account: () => import('../locales/catalogs/en/account'),
-    notifications: () => import('../locales/catalogs/en/notifications'),
-    runtime: () => import('../locales/catalogs/en/runtime'),
-    writeups: () => import('../locales/catalogs/en/writeups'),
+  'en': {
+    core: () => import('../locales/catalogs/en/core.json').then(chunk => chunk.default),
+    competitions: () => import('../locales/catalogs/en/competitions.json').then(chunk => chunk.default),
+    challenges: () => import('../locales/catalogs/en/challenges.json').then(chunk => chunk.default),
+    leaderboard: () => import('../locales/catalogs/en/leaderboard.json').then(chunk => chunk.default),
+    administration: () => import('../locales/catalogs/en/administration.json').then(chunk => chunk.default),
+    account: () => import('../locales/catalogs/en/account.json').then(chunk => chunk.default),
+    notifications: () => import('../locales/catalogs/en/notifications.json').then(chunk => chunk.default),
+    runtime: () => import('../locales/catalogs/en/runtime.json').then(chunk => chunk.default),
+    writeups: () => import('../locales/catalogs/en/writeups.json').then(chunk => chunk.default),
+    api: () => import('../locales/catalogs/en/api.json').then(chunk => chunk.default),
   },
 }
 
@@ -87,12 +94,9 @@ async function loadLocaleDomain(locale: AppLocale, domain: LocaleDomain): Promis
   if (existing)
     return existing
 
-  const pending = catalogLoaders[locale][domain]().then((chunk) => {
-    Object.assign(catalogs[locale], chunk.messages)
-    if (chunk.englishSources) {
-      for (const [message, key] of Object.entries(chunk.englishSources))
-        sourceKeys.set(message.trim(), key)
-    }
+  const pending = Promise.all([catalogLoaders.en[domain](), catalogLoaders[locale][domain]()]).then(([english, translated]) => {
+    Object.assign(catalogs.en, english)
+    Object.assign(catalogs[locale], mergeLocaleCatalog(english, translated))
     loadedDomains[locale].add(domain)
     catalogRevision.value++
   }).finally(() => pendingDomains.delete(cacheKey))
@@ -104,7 +108,7 @@ async function loadLocaleDomain(locale: AppLocale, domain: LocaleDomain): Promis
 /** Loads the core catalog before Nuxt mounts, preventing a mixed-language first frame. */
 export async function initializeLocale(): Promise<AppLocale> {
   const locale = detectLocale()
-  await loadLocaleDomain(locale, 'core')
+  await Promise.all(['core', 'api'].map(domain => loadLocaleDomain(locale, domain as LocaleDomain)))
   activeLocale.value = locale
   if (import.meta.client)
     document.documentElement.lang = locale
@@ -145,20 +149,40 @@ export function localeTag(): string {
   return activeLocale.value === 'en' ? 'en-US' : 'zh-CN'
 }
 
-export function translate(source: string, values: Record<string, string | number> = {}): string {
+/** Open protocol labels may pass through unchanged; UI-owned text uses t/$t. */
+export function translate(source: string, values: MessageArguments = {}): string {
   void catalogRevision.value
   const messages = catalogs[activeLocale.value]
   const template = Object.hasOwn(messages, source) ? messages[source as MessageKey]! : source
   return template.replace(/\{(\w+)\}/g, (match, key: string) =>
-    values[key] === undefined ? match : String(values[key]))
+    values[key] === undefined ? match : typeof values[key] === 'object' ? localizeMessage(values[key]) : String(values[key]))
 }
 
 /** UI-owned messages use a stable, type-checked catalog key. */
-export function t(key: MessageKey, values: Record<string, string | number> = {}): string {
+export function t(key: MessageKey, values: MessageArguments = {}): string {
   return translate(key, values)
 }
 
-export function localizeMessage(message: string | null | undefined): string {
-  if (!message) return ''
-  return translate(sourceKeys.get(message.trim()) ?? message)
+/** Descriptions remain structured so stored feedback reacts to locale changes. */
+export function message(key: MessageKey, arguments_: MessageArguments = {}): MessageDescriptor {
+  return { key, arguments: arguments_ }
+}
+
+export function isMessageKey(value: string): value is MessageKey {
+  return Object.hasOwn(catalogs.en, value)
+}
+
+export function localizeMessage(value: UiMessage | null | undefined): string {
+  if (!value) return ''
+  if (typeof value === 'string') return value
+  if ('messages' in value) return value.messages.map(localizeMessage)
+    .map((text, index) => index === value.messages.length - 1 ? text : text.replace(/[。.!?；;]+$/u, ''))
+    .join(translate(value.separator))
+  return translate(value.key, value.arguments)
+}
+
+export function languageHeaders(headers?: HeadersInit): Headers {
+  const result = new Headers(headers)
+  result.set('Accept-Language', currentLocale())
+  return result
 }

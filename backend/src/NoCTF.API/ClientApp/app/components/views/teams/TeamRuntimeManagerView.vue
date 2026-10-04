@@ -11,14 +11,14 @@ const { RefreshCw, RuntimeCard, competitionId, items, loading, error, initialize
     <CardHeader class="flex flex-row items-center justify-between gap-3">
       <CardTitle id="team-runtimes-title" class="text-base">{{ $t('runtime.teamInstancesTitle') }}</CardTitle>
       <Button type="button" size="sm" variant="outline" :disabled="loading" @click="refresh">
-        <RefreshCw data-icon="inline-start" />{{ $t('ui.refresh') }}
+        <RefreshCw data-icon="inline-start" />{{ $t('common.label.refresh') }}
       </Button>
     </CardHeader>
     <CardContent class="flex flex-col gap-4">
       <Alert v-if="error" variant="destructive">
         <AlertDescription class="flex flex-wrap items-center justify-between gap-2">
           <span>{{ $message(error.message) }}</span>
-          <Button type="button" size="sm" variant="outline" @click="refresh">{{ $t('ui.retry') }}</Button>
+          <Button type="button" size="sm" variant="outline" @click="refresh">{{ $t('common.label.retry') }}</Button>
         </AlertDescription>
       </Alert>
       <Skeleton v-if="loading && !initialized" class="h-44 w-full" />

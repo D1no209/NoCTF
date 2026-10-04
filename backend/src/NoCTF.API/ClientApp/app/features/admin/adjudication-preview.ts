@@ -21,8 +21,8 @@ const completenessKeys = {
 } satisfies Record<Completeness, MessageKey>
 const eventKeys: Partial<Record<EventKind, MessageKey>> = {
   GameplayFactReceived: 'adjudication.received', GameplayFactAdjudicated: 'adjudication.adjudicated',
-  ScoringRecorded: 'adjudication.resultRecorded', FirstBloodAwarded: 'ui.firstBlood',
-  SecondBloodAwarded: 'ui.secondBlood', ThirdBloodAwarded: 'ui.thirdBlood',
+  ScoringRecorded: 'adjudication.resultRecorded', FirstBloodAwarded: 'common.label.firstBlood',
+  SecondBloodAwarded: 'common.label.secondBlood', ThirdBloodAwarded: 'common.label.thirdBlood',
   TrackConfigurationUpdated: 'adjudication.trackChanged', TeamTrackChanged: 'adjudication.teamTrackChanged',
   TeamBanned: 'adjudication.teamBanned', TeamUnbanned: 'adjudication.teamUnbanned',
   TeamDeleted: 'adjudication.teamDeleted', TeamRegistrationChanged: 'adjudication.registrationChanged',

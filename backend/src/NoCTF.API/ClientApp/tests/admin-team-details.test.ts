@@ -10,7 +10,7 @@ describe('admin competition team details', () => {
 
     expect(source).toContain('userProfileGet')
     expect(source).toContain('@click="openTeamDetail(t)"')
-    expect(source).toContain("$t('ui.teamDetails')")
+    expect(source).toContain("$t('common.label.teamDetails')")
     expect(source).toContain('member.userId === selectedTeam.captainId')
     expect(source).toContain(':show-activities="false"')
     expect(source).toContain('<Accordion')
@@ -19,7 +19,7 @@ describe('admin competition team details', () => {
     expect(source).toContain('v-if="expandedMemberId === member.userId')
     expect(source).toContain('@update:model-value="setExpandedMember"')
     expect(source).toContain('adminGetTeamInvitation')
-    expect(source).toContain('v-if="canWrite" class="text-muted-foreground">{{ $t(\'ui.invitationCode\') }}')
+    expect(source).toContain('v-if="canWrite" class="text-muted-foreground">{{ $t(\'competitions.label.invitationCode\') }}')
     expect(source).toContain(':model-value="teamInvitationToken" readonly')
     expect(source).toContain('@click="copyTeamInvitation"')
     expect(source).toContain('if (!canWrite.value || !team?.id) return')
@@ -38,7 +38,7 @@ describe('admin competition team details', () => {
     expect(source).toContain('if (!teamId || !scoreAdjustmentValid.value || scoreAdjustmentPending.value) return')
     expect(source).toContain('competitionChallengeId: scoreAdjustmentChallengeId.value')
     expect(source).toContain('delta: scoreAdjustmentDelta.value')
-    expect(source).toContain("scoreAdjustmentError.value = parseApiError(requestError, translate(\"ui.failedToRecordTheScoreAdjustment\")).message")
+    expect(source).toContain("scoreAdjustmentError.value = parseApiError(requestError, describeMessage(\"administration.competitionsBy.error.recordScoreAdjustmentFailed\")).displayMessage")
 
     const catchStart = source.indexOf('catch (requestError)', source.indexOf('async function submitScoreAdjustment'))
     const finallyStart = source.indexOf('finally', catchStart)

@@ -22,7 +22,7 @@ function harness(writable = true) {
     useCompetitionAdmin: () => ({ competitionId:'competition', canJudge: ref(writable) }), useOffsetPagination,
     adminListCompetitionAnnouncements: query, adminCreateCompetitionAnnouncement: mutate('create'),
     adminUpdateCompetitionAnnouncement: mutate('edit'), adminDeleteCompetitionAnnouncement: mutate('delete'),
-    watchNotifications: () => () => {}, createTrailingRefresh, translate: (key: string) => key,
+    watchNotifications: () => () => {}, createTrailingRefresh, translate: (key: string) => key, describeMessage: (key: string) => ({ key }),
     parseApiError: (value: unknown) => value instanceof ApiError ? value : new ApiError('failed'),
     adminUserPath: () => '', adminFormatDateTime: () => '', toast:{success:()=>{}}, document:{getElementById:()=>null} }
   const factory = new Function('deps', `const { ${Object.keys(deps).join(', ')} } = deps; ${compiled}; return useAdminCompetitionsByIdAnnouncementsPage;`)(deps)

@@ -10,7 +10,7 @@ const { ArrowUpRight, ChevronLeft, ChevronRight, Plus, RefreshCw, loading, error
     <CardHeader class="flex shrink-0 flex-row items-center justify-between gap-3">
       <CardTitle>{{ $t('placements.title') }}</CardTitle>
       <Button type="button" variant="outline" size="sm" :disabled="loading || adding" @click="load">
-        <RefreshCw data-icon="inline-start" />{{ $t('ui.refreshStatus') }}
+        <RefreshCw data-icon="inline-start" />{{ $t('runtime.label.refreshStatus') }}
       </Button>
     </CardHeader>
     <ScrollSurface axis="y" class="min-h-0 flex-1 overflow-y-auto overscroll-contain">
@@ -42,7 +42,7 @@ const { ArrowUpRight, ChevronLeft, ChevronRight, Plus, RefreshCw, loading, error
                 <Button type="button" variant="ghost" size="icon" :aria-label="$t('placements.previous')" :disabled="adding || targetIndex <= 0" @click="previousTarget"><ChevronLeft aria-hidden="true" /></Button>
                 <section class="min-w-0 overflow-hidden rounded-md" :aria-label="$t('placements.posterPreview')">
                   <MotionSwap :identity="preview?.competition.id ?? ''" :preset="previewMotion">
-                    <CoverImage v-if="preview" :src="previewPosterUrl" :alt="preview.competition.title ?? $t('ui.competitionPoster')" :aspect-ratio="16 / 7">
+                    <CoverImage v-if="preview" :src="previewPosterUrl" :alt="preview.competition.title ?? $t('common.label.competitionPoster')" :aspect-ratio="16 / 7">
                       <div class="flex min-h-full flex-col justify-end gap-2 p-5">
                         <h3 class="text-left text-lg font-semibold">{{ preview.competition.title }}</h3>
                       </div>

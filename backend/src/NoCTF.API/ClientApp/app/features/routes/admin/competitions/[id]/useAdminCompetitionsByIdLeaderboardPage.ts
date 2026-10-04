@@ -1,6 +1,8 @@
+import { message as describeMessage } from '../../../../../utils/i18n'
+import type { UiMessage } from '../../../../../utils/i18n'
 
 
-import { toast } from 'vue-sonner'
+import { toast } from '../../../../../utils/message-toast'
 import { adminGetCompetition, adminPatchCompetition } from '../../../../../api'
 import type { NoCtfapiEndpointsAdministrationCompetitionsCompetitionLeaderboardVisibilityResponse } from '../../../../../api'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
@@ -13,7 +15,7 @@ export function useAdminCompetitionsByIdLeaderboardPage() {
 
   const loading = ref(true)
 
-  const error = ref<string | null>(null)
+  const error = ref<UiMessage | null>(null)
 
   const frozenStartAt = ref('')
 
@@ -27,7 +29,7 @@ export function useAdminCompetitionsByIdLeaderboardPage() {
     loading.value = true
     error.value = null
     const { data, error: e } = await adminGetCompetition({ path: { competitionId } })
-    if (e) error.value = parseApiError(e).message
+    if (e) error.value = parseApiError(e).displayMessage
     else {
       current.value = data?.leaderboardVisibility ?? null
       frozenStartAt.value = isoToLocalInput(data?.leaderboardVisibility?.frozenStartAt)
@@ -55,7 +57,7 @@ export function useAdminCompetitionsByIdLeaderboardPage() {
       frozenStartAt.value = isoToLocalInput(current.value?.frozenStartAt)
       hiddenStartAt.value = isoToLocalInput(current.value?.hiddenStartAt)
       reason.value = ''
-      toast.success(translate("ui.scoreboardVisibilityUpdated"))
+      toast.success(describeMessage("leaderboard.label.scoreboardVisibilityUpdated"))
     }
     catch (e) {
       toastWriteError(e)

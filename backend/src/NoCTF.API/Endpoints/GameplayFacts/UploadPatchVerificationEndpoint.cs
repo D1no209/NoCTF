@@ -44,7 +44,12 @@ public enum PatchVerificationUploadFailureCode
 
 public sealed record PatchVerificationUploadFailureResponse(
     PatchVerificationUploadFailureCode Code,
-    string Detail);
+    string Detail)
+{
+    public string Detail { get; init; } = ApiMessages.Localize(Code, Detail, ApiMessages.NoArguments);
+    public string MessageKey => ApiMessages.For(Code).Key;
+    public IReadOnlyDictionary<string, object?> MessageArguments => ApiMessages.NoArguments;
+}
 
 public sealed class UploadPatchVerificationEndpoint(
     CreatePatchUpload upload,
@@ -137,18 +142,18 @@ public sealed class UploadPatchVerificationEndpoint(
             PatchUploadFailureCode.ArchiveInvalid => TypedResults.UnprocessableEntity(
                 new PatchVerificationUploadFailureResponse(
                     PatchVerificationUploadFailureCode.ArchiveInvalid, detail)),
-            PatchUploadFailureCode.ArchiveTooLarge => TypedResults.Problem(
+            PatchUploadFailureCode.ArchiveTooLarge => ApiProblems.Problem(
                 statusCode: StatusCodes.Status413PayloadTooLarge,
-                title: "Patch archive is too large.",
-                detail: detail,
+                title: ApiMessages.Get(ApiMessageId.UploadPatchVerificationTitlePatchArchiveTooLarge),
+                detail: ApiMessages.For(code),
                 extensions: new Dictionary<string, object?>
                 {
                     ["code"] = PatchVerificationUploadFailureCode.ArchiveTooLarge.ToString()
                 }),
-            _ => TypedResults.Problem(
+            _ => ApiProblems.Problem(
                 statusCode: StatusCodes.Status422UnprocessableEntity,
-                title: "Patch archive was rejected.",
-                detail: detail,
+                title: ApiMessages.Get(ApiMessageId.UploadPatchVerificationTitlePatchArchiveWasRejected),
+                detail: ApiMessages.For(code),
                 extensions: new Dictionary<string, object?> { ["code"] = code.ToString() })
         };
 }

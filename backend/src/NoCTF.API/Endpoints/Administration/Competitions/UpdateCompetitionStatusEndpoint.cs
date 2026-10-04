@@ -23,7 +23,7 @@ public sealed class UpdateCompetitionStatusValidator
             .NotNull()
             .IsInEnum()
             .Must(status => status != CompetitionStatusProtocol.Draft)
-            .WithMessage("Draft cannot be used as a lifecycle transition target.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.UpdateCompetitionStatusValidationDraftUsedLifecycleTransition)).WithErrorCode(ApiMessages.Key(ApiMessageId.UpdateCompetitionStatusValidationDraftUsedLifecycleTransition));
 }
 
 public sealed class UpdateCompetitionStatusEndpoint(
@@ -76,10 +76,10 @@ public sealed class UpdateCompetitionStatusEndpoint(
             return TypedResults.NotFound();
         return result.Succeeded
             ? TypedResults.NoContent()
-            : TypedResults.Problem(
+            : ApiProblems.Problem(
                 statusCode: StatusCodes.Status409Conflict,
-                title: "Competition status cannot be updated.",
-                detail: result.ErrorMessage,
+                title: ApiMessages.Get(ApiMessageId.UpdateCompetitionStatusTitleCompetitionStatusUpdated),
+                detail: ApiMessages.For(result.FailureCode),
                 extensions: new Dictionary<string, object?>
                 {
                     ["code"] = result.FailureCode?.ToString()

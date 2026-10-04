@@ -36,7 +36,7 @@ const { Plus, RotateCw, FlaskConical, configuration, loading, loadError, globalF
               </Field>
             </FieldGroup>
             <Button type="submit" class="self-start" :disabled="globalSaving">
-              <Spinner v-if="globalSaving" data-icon="inline-start" />{{ $t('ui.saveConfiguration') }}
+              <Spinner v-if="globalSaving" data-icon="inline-start" />{{ $t('administration.label.saveConfiguration') }}
             </Button>
           </UiForm>
         </CardContent>
@@ -69,7 +69,7 @@ const { Plus, RotateCw, FlaskConical, configuration, loading, loadError, globalF
               <div class="flex flex-wrap items-center gap-2">
                 <p class="font-semibold">{{ provider.name }}</p>
                 <Badge variant="outline">{{ provider.protocol }}</Badge>
-                <Badge :variant="provider.enabled ? 'secondary' : 'outline'">{{ provider.enabled ? $t('sso.enabled') : $t('ui.disabled') }}</Badge>
+                <Badge :variant="provider.enabled ? 'secondary' : 'outline'">{{ provider.enabled ? $t('sso.enabled') : $t('administration.label.disabled') }}</Badge>
               </div>
               <p class="mt-1 truncate text-xs text-muted-foreground">{{ provider.oidc?.issuer || provider.cas?.identityNamespace }}</p>
               <p class="mt-1 break-all font-mono text-xs text-muted-foreground">{{ $t('sso.providerId') }}: {{ provider.id }}</p>
@@ -80,13 +80,13 @@ const { Plus, RotateCw, FlaskConical, configuration, loading, loadError, globalF
               </Button>
               <Button variant="outline" size="sm" :disabled="Boolean(testingId)" @click="testAuthentication(provider)">{{ $t('sso.testAuthentication') }}</Button>
               <Button v-if="provider.protocol === 'Oidc'" variant="outline" size="sm" @click="openSecret(provider)"><RotateCw data-icon="inline-start" />{{ $t('sso.replaceSecret') }}</Button>
-              <Button variant="ghost" size="sm" @click="openEditProvider(provider)">{{ $t('ui.edit') }}</Button>
+              <Button variant="ghost" size="sm" @click="openEditProvider(provider)">{{ $t('administration.label.edit') }}</Button>
             </div>
           </div>
         </CardContent>
       </Card>
     </template>
-    <Button v-else variant="outline" class="self-start" @click="load">{{ $t('ui.retry') }}</Button>
+    <Button v-else variant="outline" class="self-start" @click="load">{{ $t('common.label.retry') }}</Button>
 
     <Dialog v-model:open="providerOpen">
       <DialogContent class="sm:max-w-2xl">
@@ -97,7 +97,7 @@ const { Plus, RotateCw, FlaskConical, configuration, loading, loadError, globalF
         <ScrollSurface axis="y" class="max-h-[68vh] pr-3">
         <UiForm class="flex flex-col gap-5" @submit.prevent="saveProvider">
           <FieldGroup>
-            <Field><FieldLabel for="sso-provider-name">{{ $t('ui.name') }}</FieldLabel><Input id="sso-provider-name" v-model="providerForm.name" required maxlength="100" /></Field>
+            <Field><FieldLabel for="sso-provider-name">{{ $t('administration.label.name') }}</FieldLabel><Input id="sso-provider-name" v-model="providerForm.name" required maxlength="100" /></Field>
             <Field>
               <FieldLabel for="sso-provider-icon-url">{{ $t('sso.iconUrl') }}</FieldLabel>
               <Input id="sso-provider-icon-url" v-model="providerForm.iconUrl" type="url" maxlength="2048" :placeholder="$t('sso.iconUrlPlaceholder')" />
@@ -107,7 +107,7 @@ const { Plus, RotateCw, FlaskConical, configuration, loading, loadError, globalF
               <FieldLabel for="sso-provider-protocol">{{ $t('sso.protocol') }}</FieldLabel>
               <Select v-model="providerForm.protocol" :disabled="providerSaving || Boolean(providerForm.id)">
                 <SelectTrigger id="sso-provider-protocol"><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="Oidc">{{ $t('sso.oidc') }}</SelectItem><SelectItem value="Cas">{{ $t('sso.cas3') }}</SelectItem></SelectContent>
+                <SelectContent><SelectItem value="Oidc">{{ $t('sso.oidc') }}</SelectItem><SelectItem value="Cas">{{ $t('account.label.cas') }}</SelectItem></SelectContent>
               </Select>
             </Field>
             <div class="grid gap-4 sm:grid-cols-3">
@@ -134,7 +134,7 @@ const { Plus, RotateCw, FlaskConical, configuration, loading, loadError, globalF
             </template>
           </FieldGroup>
           <Alert v-if="providerError" variant="destructive"><AlertDescription>{{ $message(providerError) }}</AlertDescription></Alert>
-          <DialogFooter><Button type="submit" :disabled="providerSaving"><Spinner v-if="providerSaving" data-icon="inline-start" />{{ $t('ui.save') }}</Button></DialogFooter>
+          <DialogFooter><Button type="submit" :disabled="providerSaving"><Spinner v-if="providerSaving" data-icon="inline-start" />{{ $t('common.action.save') }}</Button></DialogFooter>
         </UiForm>
         </ScrollSurface>
       </DialogContent>

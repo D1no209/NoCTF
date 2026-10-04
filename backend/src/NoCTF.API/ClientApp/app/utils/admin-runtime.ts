@@ -16,17 +16,17 @@ export function adminRuntimeTeamLabel(
 
   if (runtime.purpose === 'AwdpTarget') {
     return sourceTeamName
-      ? t("ui.oneTimeFixVerificationTarget2", { team: sourceTeamName })
-      : t("ui.oneTimeFixVerificationTarget")
+      ? t("runtime.runtime.label.oneTimeFixVerification.adminRuntime", { team: sourceTeamName })
+      : t("runtime.runtime.label.oneTimeFixVerification")
   }
   if (runtime.purpose === 'TemplateTest')
-    return t("ui.challengeTest")
+    return t("runtime.label.challengeTest")
 
   if (sourceTeamName)
     return sourceTeamName
   if (sourceTeamId)
     return sourceTeamId
   if (runtime.purpose === 'AwdpAttack')
-    return t("ui.awdpAttackRuntimeWithoutABoundTeam")
-  return t("ui.share")
+    return t("runtime.runtime.description.awdpAttackRuntimeBound")
+  return t("common.label.share")
 }

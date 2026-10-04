@@ -44,8 +44,8 @@ public sealed class GetTeamInvitationEndpoint(GetTeamInvitation get, IUserContex
             return TypedResults.Forbid();
         return result.Succeeded
             ? TypedResults.Ok(new GetTeamInvitationResponse(result.Value!))
-            : TypedResults.Problem(
+            : ApiProblems.Problem(
                 statusCode: StatusCodes.Status409Conflict,
-                detail: result.ErrorMessage);
+                detail: ApiMessages.For(result.FailureCode));
     }
 }

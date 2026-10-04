@@ -36,7 +36,7 @@ public sealed class PatchPlatformUserValidator : Validator<PatchPlatformUserRequ
             .Must(request => request.Role is not null
                 || request.AccountStatus is not null
                 || request.EmailVerified is not null)
-            .WithMessage("At least one platform-user field is required.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.PatchPlatformUserValidationLeastOnePlatformUser)).WithErrorCode(ApiMessages.Key(ApiMessageId.PatchPlatformUserValidationLeastOnePlatformUser));
         RuleFor(request => request.Role).IsInEnum();
         RuleFor(request => request.AccountStatus).IsInEnum();
     }
@@ -137,8 +137,8 @@ public sealed class PatchPlatformUserEndpoint(
                 privateDetails.Identity.StudentNumber)));
     }
 
-    private static ProblemHttpResult Failure(string code) => TypedResults.Problem(
+    private static ProblemHttpResult Failure(string code) => ApiProblems.Problem(
         statusCode: StatusCodes.Status409Conflict,
-        title: "Platform user was not updated.",
+        title: ApiMessages.Get(ApiMessageId.PatchPlatformUserTitlePlatformUserWasUpdated),
         extensions: new Dictionary<string, object?> { ["code"] = code });
 }

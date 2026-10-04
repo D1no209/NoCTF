@@ -119,10 +119,10 @@ public sealed class HumanVerificationMiddleware(RequestDelegate next)
         HumanVerificationProblemCode code,
         string title,
         string detail) =>
-        TypedResults.Problem(
+        ApiProblems.Problem(
             statusCode: status,
-            title: title,
-            detail: detail,
+            title: ApiMessages.For(code),
+            detail: ApiMessages.For(code),
             extensions: new Dictionary<string, object?>
             {
                 ["code"] = code

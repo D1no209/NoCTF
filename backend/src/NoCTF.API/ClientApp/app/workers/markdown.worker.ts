@@ -1,3 +1,4 @@
+import type { UiMessage } from '../utils/i18n'
 import { renderMarkdownAsync } from '../lib/markdown'
 
 interface MarkdownWorkerRequest {
@@ -8,7 +9,7 @@ interface MarkdownWorkerRequest {
 interface MarkdownWorkerResponse {
   id: number
   html?: string
-  error?: string
+  error?: UiMessage
 }
 
 self.addEventListener('message', async (event: MessageEvent<MarkdownWorkerRequest>) => {

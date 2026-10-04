@@ -1,3 +1,5 @@
+import { message as describeMessage } from '../../../../utils/i18n'
+import type { UiMessage } from '../../../../utils/i18n'
 import { defineAsyncComponent } from 'vue'
 import { markRaw } from 'vue'
 
@@ -142,7 +144,7 @@ export function useCompetitionsByIdLeaderboardPage() {
 
   const trendsLoading = ref(false)
 
-  const trendsError = ref<string | null>(null)
+  const trendsError = ref<UiMessage | null>(null)
 
   let trendsGeneration = 0
 
@@ -190,7 +192,7 @@ export function useCompetitionsByIdLeaderboardPage() {
       const result = await getLeaderboardTrendsEndpoint({ path: { competitionId } })
       if (requestGeneration !== trendsGeneration) return
       if (result.error) {
-        trendsError.value = parseApiError(result.error, translate("ui.failedToLoadScoreTrends")).message
+        trendsError.value = parseApiError(result.error, describeMessage("leaderboard.competitionsBy.error.loadScoreTrendsFailed")).displayMessage
         return
       }
       if (result.response?.status === 202) {
@@ -207,7 +209,7 @@ export function useCompetitionsByIdLeaderboardPage() {
     }
     catch (error) {
       if (requestGeneration === trendsGeneration)
-        trendsError.value = parseApiError(error, translate("ui.failedToLoadScoreTrends")).message
+        trendsError.value = parseApiError(error, describeMessage("leaderboard.competitionsBy.error.loadScoreTrendsFailed")).displayMessage
     }
     finally {
       if (requestGeneration === trendsGeneration)
@@ -248,20 +250,20 @@ export function useCompetitionsByIdLeaderboardPage() {
   const roundWindowLabel = computed(() => {
     const start = board.schema.value?.roundWindowStart
     const end = board.schema.value?.roundWindowEnd
-    if (!start || !end) return translate("ui.noSettledRoundsYet")
-    return translate("ui.rounds", { start, end })
+    if (!start || !end) return translate("leaderboard.label.settledRoundsYet")
+    return translate("leaderboard.label.rounds", { start, end })
   })
 
   function roundLabel(column: NoCtfapiEndpointsCompetitionsScoreboardColumnResponse): string {
-    if (!column.roundId) return translate("ui.total2")
+    if (!column.roundId) return translate("leaderboard.label.total")
     const round = board.roundsById.value.get(column.roundId)
-    return round?.number ? translate("ui.round2", { round: round.number }) : translate("ui.round3")
+    return round?.number ? translate("leaderboard.label.round", { round: round.number }) : translate("leaderboard.label.round.idLeaderboardPage")
   }
 
   function slotTitle(slot: NoCtfapiEndpointsCompetitionsScoreboardSlotResponse | NoCtfapiEndpointsCompetitionsScoreboardSlotDetailResponse): string {
-    if (slot.scoreState === 'Pending') return translate("ui.pendingRoundSettlement")
-    if (slot.scoreState === 'Provisional') return translate("ui.settling")
-    return translate("ui.settled")
+    if (slot.scoreState === 'Pending') return translate("common.label.pendingRoundSettlement")
+    if (slot.scoreState === 'Provisional') return translate("leaderboard.label.settling")
+    return translate("common.label.settled")
   }
 
   function ctfScore(slot: NoCtfapiEndpointsCompetitionsScoreboardSlotResponse | null): number | null {
@@ -273,13 +275,13 @@ export function useCompetitionsByIdLeaderboardPage() {
     const snapshot = board.snapshot.value
     if (!snapshot) return
     const header = [
-      translate("ui.ranking"),
-      translate("ui.team"),
-      ...(tracksEnabled.value && selectedAllTracks.value ? [translate("ui.tracks")] : []),
-      translate("ui.totalScore"),
+      translate("leaderboard.label.ranking"),
+      translate("common.label.team"),
+      ...(tracksEnabled.value && selectedAllTracks.value ? [translate("common.label.tracks")] : []),
+      translate("common.label.totalScore"),
       ...flatColumns.value.map((column) => {
         const challenge = board.challengesById.value.get(column.competitionChallengeId ?? '')
-        return `${challenge?.title ?? translate("ui.unknownQuestion")} · ${roundLabel(column)}`
+        return `${challenge?.title ?? translate("common.label.unknownQuestion")} · ${roundLabel(column)}`
       }),
     ]
     const rows = teams.value.map(team => [
@@ -298,7 +300,7 @@ export function useCompetitionsByIdLeaderboardPage() {
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `${ctx.competition.value?.title ?? 'scoreboard'}-${translate("ui.leaderboard")}.csv`
+    anchor.download = `${ctx.competition.value?.title ?? 'scoreboard'}-${translate("common.label.leaderboard")}.csv`
     anchor.click()
     URL.revokeObjectURL(url)
   }
@@ -319,7 +321,7 @@ export function useCompetitionsByIdLeaderboardPage() {
 
   const detailLoadingMore = ref(false)
 
-  const detailError = ref<string | null>(null)
+  const detailError = ref<UiMessage | null>(null)
 
   const detail = ref<NoCtfapiEndpointsCompetitionsScoreboardSlotDetailResponse | null>(null)
 
@@ -347,11 +349,11 @@ export function useCompetitionsByIdLeaderboardPage() {
       })
       if (requestGeneration !== detailGeneration) return
       if (result.error) {
-        detailError.value = parseApiError(result.error, translate("ui.failedToLoadScoreboardDetails")).message
+        detailError.value = parseApiError(result.error, describeMessage("leaderboard.competitionsBy.error.loadScoreboardDetailsFailed")).displayMessage
         return
       }
       if (result.response?.status === 202) {
-        detailError.value = translate("ui.scoreboardDataIsBeingProjectedPleaseWait")
+        detailError.value = describeMessage("common.competitionChallenge.description.scoreboardDataProjectedWait")
         return
       }
       if (!result.data) return
@@ -371,7 +373,7 @@ export function useCompetitionsByIdLeaderboardPage() {
     }
     catch (error) {
       if (requestGeneration === detailGeneration)
-        detailError.value = parseApiError(error, translate("ui.failedToLoadScoreboardDetails")).message
+        detailError.value = parseApiError(error, describeMessage("leaderboard.competitionsBy.error.loadScoreboardDetailsFailed")).displayMessage
     }
     finally {
       if (requestGeneration === detailGeneration) {
@@ -419,8 +421,8 @@ export function useCompetitionsByIdLeaderboardPage() {
   }
 
   function entryActor(entry: NoCtfapiEndpointsCompetitionsScoreboardEntryResponse): string {
-    if (entry.actorIndex === null || entry.actorIndex === undefined) return translate("ui.system")
-    return (entry.id ? detailActorNames.value.get(entry.id) : null) ?? translate("ui.unknownUser")
+    if (entry.actorIndex === null || entry.actorIndex === undefined) return translate("common.label.system")
+    return (entry.id ? detailActorNames.value.get(entry.id) : null) ?? translate("common.label.unknownUser")
   }
 
   const adjustmentOpen = ref(false)
@@ -429,7 +431,7 @@ export function useCompetitionsByIdLeaderboardPage() {
 
   const adjustmentLoadingMore = ref(false)
 
-  const adjustmentError = ref<string | null>(null)
+  const adjustmentError = ref<UiMessage | null>(null)
 
   const adjustmentDetail = ref<NoCtfapiEndpointsCompetitionsScoreboardAdjustmentDetailResponse | null>(null)
 
@@ -454,11 +456,11 @@ export function useCompetitionsByIdLeaderboardPage() {
       })
       if (requestGeneration !== adjustmentGeneration) return
       if (result.error) {
-        adjustmentError.value = parseApiError(result.error, translate("ui.failedToLoadGlobalAdjustmentDetails")).message
+        adjustmentError.value = parseApiError(result.error, describeMessage("leaderboard.competitionsBy.error.loadGlobalAdjustmentFailed")).displayMessage
         return
       }
       if (result.response?.status === 202) {
-        adjustmentError.value = translate("ui.scoreboardDataIsBeingProjectedPleaseWait")
+        adjustmentError.value = describeMessage("common.competitionChallenge.description.scoreboardDataProjectedWait")
         return
       }
       if (!result.data) return
@@ -478,7 +480,7 @@ export function useCompetitionsByIdLeaderboardPage() {
     }
     catch (error) {
       if (requestGeneration === adjustmentGeneration)
-        adjustmentError.value = parseApiError(error, translate("ui.failedToLoadGlobalAdjustmentDetails")).message
+        adjustmentError.value = parseApiError(error, describeMessage("leaderboard.competitionsBy.error.loadGlobalAdjustmentFailed")).displayMessage
     }
     finally {
       if (requestGeneration === adjustmentGeneration) {
@@ -502,14 +504,14 @@ export function useCompetitionsByIdLeaderboardPage() {
   watch(adjustmentOpen, (open) => { if (!open) adjustmentGeneration += 1 })
 
   function adjustmentActor(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustmentResponse): string {
-    if (entry.actorIndex === null || entry.actorIndex === undefined) return translate("ui.system")
-    return (entry.id ? adjustmentActorNames.value.get(entry.id) : null) ?? translate("ui.unknownUser")
+    if (entry.actorIndex === null || entry.actorIndex === undefined) return translate("common.label.system")
+    return (entry.id ? adjustmentActorNames.value.get(entry.id) : null) ?? translate("common.label.unknownUser")
   }
 
   function adjustmentKind(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustmentResponse): string {
-    if (entry.kind === 'CompetitionPenalty') return translate("ui.competitionPenalty")
-    if (entry.kind === 'BanRecalculation') return translate("ui.banRecalculation")
-    return translate("ui.manualAdjustment")
+    if (entry.kind === 'CompetitionPenalty') return translate("leaderboard.label.competitionPenalty")
+    if (entry.kind === 'BanRecalculation') return translate("leaderboard.label.banRecalculation")
+    return translate("common.label.manualAdjustment")
   }
 
   const ScoreboardSlotStatus = markRaw(ScoreboardSlotStatusComponent)

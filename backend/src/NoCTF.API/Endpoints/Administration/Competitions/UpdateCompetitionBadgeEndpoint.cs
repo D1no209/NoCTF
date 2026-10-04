@@ -69,10 +69,10 @@ public sealed class UpdateCompetitionBadgeEndpoint(
             CompetitionBadgeFailure.NotFound => TypedResults.NotFound(),
             CompetitionBadgeFailure.ConcurrencyConflict => TypedResults.Conflict(
                 new CompetitionBadgeConflictResponse(
-                    "ConcurrencyConflict", "Badge was updated concurrently.")),
-            _ => TypedResults.ValidationProblem(new Dictionary<string, string[]>
+                    CompetitionBadgeConflictCode.ConcurrencyConflict, "Badge was updated concurrently.")),
+            _ => ApiProblems.ValidationProblem(new Dictionary<string, Enum?>
             {
-                ["badge"] = [result.Failure.Value.ToString()]
+                ["badge"] = result.Failure
             })
         };
     }

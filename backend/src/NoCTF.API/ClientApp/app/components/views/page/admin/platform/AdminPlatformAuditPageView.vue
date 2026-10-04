@@ -11,44 +11,44 @@ const { adminUserPath, adminTeamPath, adminAuditSubjectPath, Download, platformA
     <div class="flex flex-col gap-4">
       <div class="flex flex-wrap items-end gap-4">
         <Field>
-          <FieldLabel for="audit-kind">{{ $t('ui.type') }}</FieldLabel>
+          <FieldLabel for="audit-kind">{{ $t('common.label.type') }}</FieldLabel>
           <Select v-model="kind">
             <SelectTrigger id="audit-kind" class="w-40">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem value="all">{{ $t('ui.allTypes') }}</SelectItem>
-                <SelectItem value="CompetitionLifecycle">{{ $t('ui.competitionLifeCycle') }}</SelectItem>
-                <SelectItem value="UserAccountLifecycle">{{ $t('ui.accountLifeCycle') }}</SelectItem>
-                <SelectItem value="PlatformAdministration">{{ $t('ui.platformAdmin') }}</SelectItem>
-                <SelectItem value="CompetitionAdministration">{{ $t('ui.competitionAdmin') }}</SelectItem>
-                <SelectItem value="CompetitionLeaderboardVisibility">{{ $t('ui.listVisibility') }}</SelectItem>
-                <SelectItem value="CompetitionEvent">{{ $t('ui.competitionEvent') }}</SelectItem>
+                <SelectItem value="all">{{ $t('administration.label.types') }}</SelectItem>
+                <SelectItem value="CompetitionLifecycle">{{ $t('administration.label.competitionLifeCycle') }}</SelectItem>
+                <SelectItem value="UserAccountLifecycle">{{ $t('administration.label.accountLifeCycle') }}</SelectItem>
+                <SelectItem value="PlatformAdministration">{{ $t('common.label.platformAdmin') }}</SelectItem>
+                <SelectItem value="CompetitionAdministration">{{ $t('navigation.competitionAdmin') }}</SelectItem>
+                <SelectItem value="CompetitionLeaderboardVisibility">{{ $t('administration.label.listVisibility') }}</SelectItem>
+                <SelectItem value="CompetitionEvent">{{ $t('administration.label.competitionEvent') }}</SelectItem>
               </SelectGroup>
             </SelectContent>
           </Select>
         </Field>
         <Field>
-          <FieldLabel for="audit-actor">{{ $t('ui.operatorId') }}</FieldLabel>
-          <Input id="audit-actor" v-model="actorId" class="w-64 font-mono text-sm" :placeholder="$t('ui.optional')" />
+          <FieldLabel for="audit-actor">{{ $t('administration.label.operatorId') }}</FieldLabel>
+          <Input id="audit-actor" v-model="actorId" class="w-64 font-mono text-sm" :placeholder="$t('common.label.optional')" />
         </Field>
         <Field>
-          <FieldLabel for="audit-competition">{{ $t('ui.contestId') }}</FieldLabel>
-          <Input id="audit-competition" v-model="competitionId" class="w-64 font-mono text-sm" :placeholder="$t('ui.optional')" />
+          <FieldLabel for="audit-competition">{{ $t('administration.label.contestId') }}</FieldLabel>
+          <Input id="audit-competition" v-model="competitionId" class="w-64 font-mono text-sm" :placeholder="$t('common.label.optional')" />
         </Field>
         <Field>
-          <FieldLabel for="audit-from">{{ $t('ui.startTime2') }}</FieldLabel>
+          <FieldLabel for="audit-from">{{ $t('administration.label.startTime') }}</FieldLabel>
           <DateTimePicker id="audit-from" v-model="from"  />
         </Field>
         <Field>
-          <FieldLabel for="audit-to">{{ $t('ui.endTime') }}</FieldLabel>
+          <FieldLabel for="audit-to">{{ $t('common.label.endTime') }}</FieldLabel>
           <DateTimePicker id="audit-to" v-model="to"  />
         </Field>
-        <Button @click="applyFilters">{{ $t('ui.query') }}</Button>
+        <Button @click="applyFilters">{{ $t('administration.label.query') }}</Button>
         <Button variant="outline" :disabled="exportingArchive" @click="exportArchive">
           <Spinner v-if="exportingArchive" data-icon="inline-start" />
-          <Download v-else data-icon="inline-start" />{{ $t('ui.downloadAuditArchive') }}
+          <Download v-else data-icon="inline-start" />{{ $t('administration.label.downloadAuditArchive') }}
         </Button>
       </div>
 
@@ -64,8 +64,8 @@ const { adminUserPath, adminTeamPath, adminAuditSubjectPath, Download, platformA
 
       <Empty v-else-if="!listError && initialized && items.length === 0" class="border border-dashed py-12">
         <EmptyHeader>
-          <EmptyTitle>{{ $t('ui.noMatchingAuditRecord') }}</EmptyTitle>
-          <EmptyDescription>{{ $t('ui.adjustTheTypeTimeRangeOrFilters') }}</EmptyDescription>
+          <EmptyTitle>{{ $t('administration.label.matchingAuditRecord') }}</EmptyTitle>
+          <EmptyDescription>{{ $t('administration.platformAudit.description.adjustTypeTimeRange') }}</EmptyDescription>
         </EmptyHeader>
       </Empty>
 
@@ -73,11 +73,11 @@ const { adminUserPath, adminTeamPath, adminAuditSubjectPath, Download, platformA
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead class="w-44">{{ $t('ui.time') }}</TableHead>
-              <TableHead class="w-32">{{ $t('ui.type') }}</TableHead>
-              <TableHead>{{ $t('ui.subject') }}</TableHead>
-              <TableHead>{{ $t('ui.actions') }}</TableHead>
-              <TableHead class="w-32">{{ $t('ui.operator') }}</TableHead>
+              <TableHead class="w-44">{{ $t('administration.label.time') }}</TableHead>
+              <TableHead class="w-32">{{ $t('common.label.type') }}</TableHead>
+              <TableHead>{{ $t('administration.label.subject') }}</TableHead>
+              <TableHead>{{ $t('common.label.actions') }}</TableHead>
+              <TableHead class="w-32">{{ $t('administration.label.operator') }}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -86,8 +86,8 @@ const { adminUserPath, adminTeamPath, adminAuditSubjectPath, Download, platformA
                 <component :is="AdminDateTime" :value="log.occurredAt" />
               </TableCell>
               <TableCell>
-                <Badge variant="secondary">{{ KIND_LABELS[String(log.kind)] ? $t(KIND_LABELS[String(log.kind)]!) : log.kind }}</Badge>
-                <Badge v-if="log.automatic" variant="outline" class="ml-1">{{ $t('ui.automatic') }}</Badge>
+                <Badge variant="secondary">{{ KIND_LABELS[String(log.kind)] ? translate(KIND_LABELS[String(log.kind)]!) : log.kind }}</Badge>
+                <Badge v-if="log.automatic" variant="outline" class="ml-1">{{ $t('administration.label.automatic') }}</Badge>
               </TableCell>
               <TableCell class="max-w-56">
                 <Hint :content="log.subjectId" ><NuxtLink v-if="adminAuditSubjectPath(log)" :to="adminAuditSubjectPath(log)" class="block truncate hover:underline">{{ log.subjectDisplayName ?? log.subjectId }}</NuxtLink><div v-else tabindex="0" class="truncate">{{ log.subjectDisplayName ?? log.subjectId }}</div></Hint>
@@ -95,18 +95,18 @@ const { adminUserPath, adminTeamPath, adminAuditSubjectPath, Download, platformA
               <TableCell class="max-w-md">
                 <Hint :content="platformAuditActionText(log)" ><div tabindex="0" class="font-medium" >{{ platformAuditActionText(log) }}</div></Hint>
                 <div v-if="log.fileId" class="mt-1 flex flex-col gap-1 break-all font-mono text-xs text-muted-foreground">
-                  <span>{{ $t('ui.fileId') }}: {{ log.fileId }}</span>
-                  <span>{{ $t('ui.submissionId2') }}: {{ log.gameplayFactId }}</span>
-                  <span>{{ $t('ui.teamId') }}: <NuxtLink v-if="adminTeamPath(log.competitionId, log.teamId)" :to="adminTeamPath(log.competitionId, log.teamId)" class="hover:underline">{{ log.teamId }}</NuxtLink><span v-else>{{ log.teamId }}</span></span>
+                  <span>{{ $t('administration.label.fileId') }}: {{ log.fileId }}</span>
+                  <span>{{ $t('common.label.submissionId') }}: {{ log.gameplayFactId }}</span>
+                  <span>{{ $t('common.label.teamId') }}: <NuxtLink v-if="adminTeamPath(log.competitionId, log.teamId)" :to="adminTeamPath(log.competitionId, log.teamId)" class="hover:underline">{{ log.teamId }}</NuxtLink><span v-else>{{ log.teamId }}</span></span>
                 </div>
                 <div v-if="log.jwtId || log.tokenExpiresAt || log.tokenVersion !== null && log.tokenVersion !== undefined" class="mt-1 flex flex-col gap-1 break-all font-mono text-xs text-muted-foreground">
-                  <span v-if="log.jwtId">{{ $t('ui.jwtId') }}: {{ log.jwtId }}</span>
-                  <span v-if="log.tokenExpiresAt">{{ $t('ui.expiresAt') }} <component :is="AdminDateTime" :value="log.tokenExpiresAt" /></span>
-                  <span v-if="log.tokenVersion !== null && log.tokenVersion !== undefined">{{ $t('ui.tokenVersion') }}: {{ log.tokenVersion }}</span>
+                  <span v-if="log.jwtId">{{ $t('administration.label.jwtId') }}: {{ log.jwtId }}</span>
+                  <span v-if="log.tokenExpiresAt">{{ $t('administration.label.expires') }} <component :is="AdminDateTime" :value="log.tokenExpiresAt" /></span>
+                  <span v-if="log.tokenVersion !== null && log.tokenVersion !== undefined">{{ $t('administration.label.tokenVersion') }}: {{ log.tokenVersion }}</span>
                 </div>
               </TableCell>
               <Hint :content="log.actorId ?? ''" ><TableCell tabindex="0" class="max-w-32 truncate font-mono text-xs text-muted-foreground" >
-                <NuxtLink v-if="log.actorId" :to="adminUserPath(log.actorId)" class="hover:underline">{{ log.actorId }}</NuxtLink><span v-else>{{ $t('ui.system') }}</span>
+                <NuxtLink v-if="log.actorId" :to="adminUserPath(log.actorId)" class="hover:underline">{{ log.actorId }}</NuxtLink><span v-else>{{ $t('common.label.system') }}</span>
               </TableCell></Hint>
             </TableRow>
           </TableBody>

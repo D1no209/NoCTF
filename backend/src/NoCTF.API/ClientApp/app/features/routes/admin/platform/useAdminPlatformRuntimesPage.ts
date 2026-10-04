@@ -1,10 +1,12 @@
+import { message as describeMessage } from '../../../../utils/i18n'
+import type { UiMessage } from '../../../../utils/i18n'
 import { markRaw, proxyRefs } from 'vue'
 import { useAdminDetailRoute } from '~/features/admin/useAdminDetailRoute'
 import { adminCompetitionPath, adminRuntimeTeamPath, adminRuntimeChallengePath, adminRuntimePath } from '~/features/admin/admin-navigation'
 import RuntimeFlagsPanelComponent from '~/features/admin/RuntimeFlagsPanel.vue'
 
 import { ExternalLink, RefreshCw } from '@lucide/vue'
-import { toast } from 'vue-sonner'
+import { toast } from '../../../../utils/message-toast'
 import { adminGetRuntime, adminGetCompetition, adminGetCompetitionChallenge, adminChallengeBankGetTemplate, adminCreateRuntimeForceTermination, adminPlatformListActiveRuntimes, adminTerminateRuntime } from '../../../../api'
 import type { NoCtfapiEndpointsAdministrationPlatformPlatformRuntimeResponse, NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse } from '../../../../api'
 import { useOffsetPagination } from '../../../../composables/useOffsetPagination'
@@ -76,7 +78,7 @@ export function useAdminPlatformRuntimesPage() {
 
   const terminatePending = ref(false)
 
-  const terminationError = ref<string | null>(null)
+  const terminationError = ref<UiMessage | null>(null)
 
   const forceTerminateTarget = ref<PlatformRuntime | null>(null)
 
@@ -86,7 +88,7 @@ export function useAdminPlatformRuntimesPage() {
 
   const forceTerminatePending = ref(false)
 
-  const forceTerminationError = ref<string | null>(null)
+  const forceTerminationError = ref<UiMessage | null>(null)
 
   let refreshTimer: ReturnType<typeof setInterval> | undefined
 
@@ -133,12 +135,12 @@ export function useAdminPlatformRuntimesPage() {
         path: { runtimeInstanceId: runtime.id },
       })
       if (requestError) throw requestError
-      toast.success(translate("ui.instanceTerminationOperationHasBeenAccepted"))
+      toast.success(describeMessage("runtime.platformRuntimes.description.instanceTerminationAccepted"))
       terminateTarget.value = null
       await refresh()
     }
     catch (requestError) {
-      terminationError.value = parseApiError(requestError).message
+      terminationError.value = parseApiError(requestError).displayMessage
       toast.error(terminationError.value)
     }
     finally {
@@ -163,12 +165,12 @@ export function useAdminPlatformRuntimesPage() {
         body: { reason },
       })
       if (requestError) throw requestError
-      toast.success(translate("ui.forcedFinalizationHasBeenHandedOverToRunnerForCleanup"))
+      toast.success(describeMessage("runtime.platformRuntimes.description.forcedFinalizationHandedOver"))
       forceTerminateTarget.value = null
       await refresh()
     }
     catch (requestError) {
-      forceTerminationError.value = parseApiError(requestError).message
+      forceTerminationError.value = parseApiError(requestError).displayMessage
       toast.error(forceTerminationError.value)
     }
     finally {

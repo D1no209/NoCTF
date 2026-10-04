@@ -63,15 +63,15 @@ emit: { (event: "submitted", ...args: []): void; (event: "remainingChanged", ...
 
   const patchOutcome = computed(() => {
     if (patchVerification.value.verificationState === 'PlatformFailed')
-      return { message: translate('ui.patchVerificationPlatformError'), variant: 'destructive' as const }
+      return { message: translate('common.error.patchVerificationPlatformFailed'), variant: 'destructive' as const }
     if (patchVerification.value.verificationResult === 'Correct')
-      return { message: translate('ui.patchVerificationSucceeded'), variant: 'default' as const }
+      return { message: translate('challenges.label.patchVerificationSucceeded'), variant: 'default' as const }
     if (patchVerification.value.verificationResult !== 'Wrong') return null
     const key = patchVerification.value.verificationFailureCode === 'PatchStillExploitable'
-      ? 'ui.patchStillExploitable'
+      ? 'common.label.patchStillExploitable'
       : patchVerification.value.verificationFailureCode === 'PatchServiceAbnormal'
-        ? 'ui.patchServiceAbnormal'
-        : 'ui.patchExecutionFailed'
+        ? 'common.label.patchServiceAbnormal'
+        : 'common.error.patchExecutionFailed'
     return { message: translate(key), variant: 'destructive' as const }
   })
 

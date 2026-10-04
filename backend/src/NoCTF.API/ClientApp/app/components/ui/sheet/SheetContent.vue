@@ -52,9 +52,9 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
         data-slot="sheet-close"
         as-child
       >
-        <Button variant="ghost" class="absolute top-3 right-3" size="icon-sm" :aria-label="$t('ui.close')">
+        <Button variant="ghost" class="absolute top-3 right-3" size="icon-sm" :aria-label="$t('common.action.close')">
           <XIcon aria-hidden="true" />
-          <span class="sr-only">{{ $t('ui.close') }}</span>
+          <span class="sr-only">{{ $t('common.action.close') }}</span>
         </Button>
       </DialogClose>
     </DialogContent>

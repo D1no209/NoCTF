@@ -8,12 +8,12 @@ const { model, parseFailed, DefinitionCheckerSection, DefinitionFlagInjectionSec
 
 <template>
   <Alert v-if="parseFailed" variant="destructive">
-    <AlertDescription> {{ $t('ui.theExistingDefinitionJsonCannotBeParsedAndMayBe') }} </AlertDescription>
+    <AlertDescription> {{ $t('administration.definitionEditor.validation.existingDefinitionFormat') }} </AlertDescription>
   </Alert>
 
   <FieldGroup v-else-if="model">
     <Field v-if="showInteractionKind">
-      <FieldLabel for="ctf-interaction-kind">{{ $t('ui.completionMethod') }}</FieldLabel>
+      <FieldLabel for="ctf-interaction-kind">{{ $t('administration.label.completionMethod') }}</FieldLabel>
       <Select
         :model-value="model.interactionKind === CtfInteraction.PatchVerification ? 'PatchVerification' : 'FlagSubmission'"
         :disabled="disabled"
@@ -24,12 +24,12 @@ const { model, parseFailed, DefinitionCheckerSection, DefinitionFlagInjectionSec
         </SelectTrigger>
         <SelectContent>
           <SelectGroup>
-            <SelectItem value="FlagSubmission">{{ $t('ui.flagSubmission') }}</SelectItem>
-            <SelectItem value="PatchVerification">{{ $t('ui.patchVerification') }}</SelectItem>
+            <SelectItem value="FlagSubmission">{{ $t('administration.label.flagSubmission') }}</SelectItem>
+            <SelectItem value="PatchVerification">{{ $t('common.label.patchVerification') }}</SelectItem>
           </SelectGroup>
         </SelectContent>
       </Select>
-      <FieldDescription>{{ $t('ui.ctfCompletionMethodDescription') }}</FieldDescription>
+      <FieldDescription>{{ $t('administration.label.ctfCompletionMethodDescription') }}</FieldDescription>
     </Field>
 
     <component :is="DefinitionRuntimeSection" :model="model" :mode="mode" :disabled="disabled" />
@@ -44,6 +44,6 @@ const { model, parseFailed, DefinitionCheckerSection, DefinitionFlagInjectionSec
       <component :is="DefinitionCheckerSection" :model="model" :mode="mode" :disabled="disabled" />
     </template>
 
-    <FieldDescription> {{ $t('ui.definitionModificationsWillTakeEffectOnInstancesThatAreStarted') }} </FieldDescription>
+    <FieldDescription> {{ $t('administration.definitionEditor.description.definitionModificationsTakeEffect') }} </FieldDescription>
   </FieldGroup>
 </template>

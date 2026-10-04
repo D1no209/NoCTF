@@ -18,8 +18,8 @@ async function harness(initial: string, load: (id: string, signal: AbortSignal) 
   const route = reactive({ params: router.currentRoute.value.params, query: router.currentRoute.value.query, hash: router.currentRoute.value.hash })
   const scope = effectScope()
   const dependencies = { computed, ref, shallowRef, watch, onScopeDispose, adminRouteId, validAdminId, createLatestRequestGuard,
-    useRoute: () => route, useRouter: () => router, translate: (key: string) => key,
-    parseApiError: (value: unknown) => ({ message: value instanceof Error ? value.message : 'failed' }) }
+    useRoute: () => route, useRouter: () => router, translate: (key: string) => key, describeMessage: (key: string) => ({ key }),
+    parseApiError: (value: unknown) => ({ displayMessage: value instanceof Error ? value.message : 'failed' }) }
   const factory = new Function('deps', `const { ${Object.keys(dependencies).join(', ')} } = deps; ${compiled}; return useAdminDetailRoute;`)(dependencies)
   const state = scope.run(() => {
     watch(router.currentRoute, (value) => { Object.assign(route, { params: value.params, query: value.query, hash: value.hash }) }, { flush: 'sync' })
@@ -75,7 +75,7 @@ describe('admin detail path selection', () => {
     let calls = 0
     const app = await harness(`${base}/invalid`, async () => { calls++; throw new Error('Forbidden') })
     expect(calls).toBe(0)
-    expect(app.state.error.value).toBe('adminNavigation.invalidId')
+    expect(app.state.error.value).toEqual({ key: 'adminNavigation.invalidId' })
     expect(app.state.open.value).toBe(true)
     await app.state.select(first)
     await drain()

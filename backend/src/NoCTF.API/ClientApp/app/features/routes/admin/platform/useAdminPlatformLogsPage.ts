@@ -1,7 +1,8 @@
+import { message as describeMessage } from '../../../../utils/i18n'
 import { markRaw } from 'vue'
 
 import { Download, Radio } from '@lucide/vue'
-import { toast } from 'vue-sonner'
+import { toast } from '../../../../utils/message-toast'
 import { adminPlatformExportLogs, adminPlatformListLogs } from '../../../../api'
 import { downloadSdkFile } from '../../../../utils/download'
 import type { NoCtfapiEndpointsAdministrationPlatformPlatformLogResponse, NoCtfapiEndpointsAdministrationPlatformPlatformLogLevelProtocol, NoCtfapiEndpointsAdministrationPlatformPlatformLogServiceProtocol } from '../../../../api'
@@ -12,11 +13,11 @@ type PlatformLog = NoCtfapiEndpointsAdministrationPlatformPlatformLogResponse
 /** Owns state, effects and commands for AdminPlatformLogsPage. */
 export function useAdminPlatformLogsPage() {
   const LEVEL_LABELS: Record<string, string> = {
-    Trace: "ui.track", Debug: "ui.debugging", Information: "ui.information", Warning: "ui.warning", Error: "ui.wrong", Critical: "ui.serious",
+    Trace: "administration.label.track", Debug: "administration.label.debugging", Information: "common.label.information", Warning: "common.label.warning", Error: "common.label.wrong", Critical: "administration.label.serious",
   }
 
   const SERVICE_LABELS: Record<string, string> = {
-    Api: "ui.api", Worker: "ui.worker", Runner: "ui.runner", Host: "ui.host3",
+    Api: "administration.label.api", Worker: "administration.label.worker", Runner: "common.label.runner", Host: "administration.label.host.platformLogsPage",
   }
 
   const LEVEL_ORDER = ['Trace', 'Debug', 'Information', 'Warning', 'Error', 'Critical'] as const
@@ -94,13 +95,13 @@ export function useAdminPlatformLogsPage() {
   const hubStateBadge = computed(() => {
     switch (hubState.value) {
       case 'connected':
-        return { label: translate("ui.liveStreamIsConnected"), variant: 'secondary' as const }
+        return { label: translate("administration.label.liveStreamConnected"), variant: 'secondary' as const }
       case 'connecting':
-        return { label: translate("ui.liveStreamingConnection"), variant: 'outline' as const }
+        return { label: translate("administration.label.liveStreamingConnection"), variant: 'outline' as const }
       case 'reconnecting':
-        return { label: translate("ui.liveStreamReconnecting"), variant: 'outline' as const }
+        return { label: translate("administration.label.liveStreamReconnecting"), variant: 'outline' as const }
       default:
-        return { label: translate("ui.liveStreamDisconnected"), variant: 'destructive' as const }
+        return { label: translate("administration.label.liveStreamDisconnected"), variant: 'destructive' as const }
     }
   })
 
@@ -108,7 +109,7 @@ export function useAdminPlatformLogsPage() {
     const fromIso = toIso(from.value)
     const toIsoValue = toIso(to.value)
     if (!fromIso || !toIsoValue) {
-      toast.error(translate("ui.exportNeedsToSelectTheStartAndEndTime"))
+      toast.error(describeMessage("administration.platformLogs.description.exportSelectStartEnd"))
       return
     }
     exporting.value = true
@@ -126,10 +127,10 @@ export function useAdminPlatformLogsPage() {
         }),
         'platform-logs.jsonl',
       )
-      toast.success(translate("ui.logExportDownloadHasStarted"))
+      toast.success(describeMessage("administration.platformLogs.label.logExportDownloadStarted"))
     }
     catch (e) {
-      toast.error(parseApiError(e).message)
+      toast.error(parseApiError(e).displayMessage)
     }
     finally {
       exporting.value = false

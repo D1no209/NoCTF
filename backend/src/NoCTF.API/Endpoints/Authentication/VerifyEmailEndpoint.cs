@@ -45,9 +45,9 @@ public sealed class VerifyEmailEndpoint(
         var result = await verify.ExecuteAsync(request.Token, timeProvider.GetUtcNow(), ct);
         return result.Succeeded
             ? TypedResults.NoContent()
-            : TypedResults.Problem(
+            : ApiProblems.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
-                title: "Email verification failed.",
-                detail: result.ErrorMessage);
+                title: ApiMessages.Get(ApiMessageId.VerifyEmailTitleEmailVerificationFailed),
+                detail: ApiMessages.For(result.FailureCode));
     }
 }

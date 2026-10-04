@@ -67,9 +67,9 @@ public sealed class ListCompetitionAnnouncementsEndpoint(
                 cursorScope,
                 out var position))
         {
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
-                title: "Invalid cursor.");
+                title: ApiMessages.Get(ApiMessageId.InvalidCursor));
         }
 
         var result = await list.ExecuteAsync(

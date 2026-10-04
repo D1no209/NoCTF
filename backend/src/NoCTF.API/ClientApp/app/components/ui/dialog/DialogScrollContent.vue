@@ -60,7 +60,7 @@ function preventScrollbarDismiss(event: PointerDownOutsideEvent) {
           class="absolute top-4 right-4 p-0.5 transition-colors rounded-md hover:bg-secondary"
         >
           <XIcon class="w-4 h-4" />
-          <span class="sr-only">{{ $t('ui.close2') }}</span>
+          <span class="sr-only">{{ $t('common.label.close') }}</span>
         </DialogClose>
       </Card>
     </DialogOverlay>

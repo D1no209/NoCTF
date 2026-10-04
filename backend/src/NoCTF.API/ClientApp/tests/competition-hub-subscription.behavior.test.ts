@@ -27,6 +27,7 @@ function harness() {
   const deps = {
     signalR: { HubConnectionBuilder: Builder, HubConnectionState: { Connected: 'Connected', Disconnected: 'Disconnected' }, HttpTransportType: { ServerSentEvents: 1, LongPolling: 2 }, LogLevel: { Warning: 1 } },
     getAccessToken: () => 'test-token', getRealtimeAccessToken: async () => 'test-token',
+    currentLocale: () => 'zh-CN',
     startRealtimeWithRetry: async (start: () => Promise<void>) => { await start(); return true },
     setInterval: () => 1, clearInterval: () => {},
   }

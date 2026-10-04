@@ -97,7 +97,12 @@ public enum CompetitionTrackFailureCodeProtocol
 public sealed record CompetitionTrackFailureResponse(
     CompetitionTrackFailureCodeProtocol Code,
     string Message,
-    int AffectedTeamCount);
+    int AffectedTeamCount)
+{
+    public string Message { get; init; } = ApiMessages.Localize(Code, Message, ApiMessages.NoArguments);
+    public string MessageKey => ApiMessages.For(Code).Key;
+    public IReadOnlyDictionary<string, object?> MessageArguments => ApiMessages.NoArguments;
+}
 
 [Mapper]
 internal static partial class CompetitionTrackFailureProtocolMapper
@@ -151,7 +156,7 @@ public sealed class PatchCompetitionValidator : Validator<PatchCompetitionReques
             || request.Tracks is not null
             || request.Permissions is not null
             || request.LeaderboardVisibility is not null)
-            .WithMessage("At least one competition section is required.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.PatchCompetitionValidationLeastOneCompetitionSection)).WithErrorCode(ApiMessages.Key(ApiMessageId.PatchCompetitionValidationLeastOneCompetitionSection));
         RuleFor(request => request.Metadata!.Title).NotEmpty().MaximumLength(160)
             .When(request => request.Metadata is not null);
         RuleFor(request => request.Metadata!.MaxTeamMembers).GreaterThan(0)
@@ -180,13 +185,13 @@ public sealed class PatchCompetitionValidator : Validator<PatchCompetitionReques
                 || !metadata.TrafficCaptureEnabled
                 || metadata.RuntimeAccessMode is RuntimeAccessModeProtocol.DirectAndWsrx
                     or RuntimeAccessModeProtocol.WsrxOnly)
-            .WithMessage("Traffic capture requires a WSRX-enabled Runtime access mode.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.PatchCompetitionValidationTrafficCaptureRequiresWsrx)).WithErrorCode(ApiMessages.Key(ApiMessageId.PatchCompetitionValidationTrafficCaptureRequiresWsrx));
         RuleFor(request => request.ModeConfiguration!.Configuration).NotNull()
             .When(request => request.ModeConfiguration is not null);
         RuleFor(request => request.ModeConfiguration!.Configuration)
             .Must(CompetitionModeConfigurationContractMapper.HasValidShape)
             .When(request => request.ModeConfiguration is not null)
-            .WithMessage("Configuration must contain exactly the branch matching its mode.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.PatchCompetitionValidationConfigurationContainExactlyBranch)).WithErrorCode(ApiMessages.Key(ApiMessageId.PatchCompetitionValidationConfigurationContainExactlyBranch));
         RuleFor(request => request.Tracks!.Tracks).NotNull()
             .Must(tracks => tracks.Count is >= 1 and <= 32)
             .When(request => request.Tracks is not null);
@@ -214,7 +219,7 @@ public sealed class PatchCompetitionValidator : Validator<PatchCompetitionReques
                     .Concat(permissions.ObserverIds).Distinct().Count()
                     == permissions.ManagerIds.Count + permissions.JudgeIds.Count
                     + permissions.ObserverIds.Count)
-            .WithMessage("Competition permission assignments must be mutually exclusive.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.PatchCompetitionValidationCompetitionPermissionAssignmentsMutually)).WithErrorCode(ApiMessages.Key(ApiMessageId.PatchCompetitionValidationCompetitionPermissionAssignmentsMutually));
         RuleFor(request => request.LeaderboardVisibility!.Reason).MaximumLength(500)
             .When(request => request.LeaderboardVisibility is not null);
     }
@@ -783,10 +788,10 @@ public sealed class PatchCompetitionEndpoint(
         | (request.LeaderboardVisibility is null ? CompetitionPatchSection.None
             : CompetitionPatchSection.LeaderboardVisibility);
 
-    private static ProblemHttpResult Failure(string detail) => TypedResults.Problem(
+    private static ProblemHttpResult Failure(string detail) => ApiProblems.Problem(
         statusCode: StatusCodes.Status409Conflict,
-        title: "Competition was not updated.",
-        detail: detail);
+        title: ApiMessages.Get(ApiMessageId.PatchCompetitionTitleCompetitionWasUpdated),
+        detail: ApiMessages.Get(ApiMessageId.PatchCompetitionTitleCompetitionWasUpdated));
 
     private static Conflict<CompetitionTrackFailureResponse> TrackFailure(
         UpdateCompetitionTracksResult result) =>

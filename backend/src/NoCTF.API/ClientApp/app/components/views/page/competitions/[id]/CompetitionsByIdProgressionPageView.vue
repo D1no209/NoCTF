@@ -16,7 +16,7 @@ const {
 <template>
   <div data-progression-page class="flex min-h-0 w-full flex-1 flex-col">
     <Alert v-if="error" variant="destructive">
-      <AlertDescription>{{ error }} <Button size="sm" variant="outline" @click="load">{{ $t('ui.retry') }}</Button></AlertDescription>
+      <AlertDescription>{{ error }} <Button size="sm" variant="outline" @click="load">{{ $t('common.label.retry') }}</Button></AlertDescription>
     </Alert>
     <Skeleton v-if="loading" class="min-h-64 flex-1" />
     <template v-else-if="data">
@@ -58,7 +58,7 @@ const {
                     {{ selectedNode.data?.kind === 1 ? $t('progression.badgeNode') : $t('progression.challengeNode') }}
                   </p>
                 </div>
-                <Button type="button" variant="ghost" size="sm" @click="closeSelectedNode">{{ $t('ui.close') }}</Button>
+                <Button type="button" variant="ghost" size="sm" @click="closeSelectedNode">{{ $t('common.action.close') }}</Button>
               </div>
 
               <div v-if="selectedNode.data?.kind === 1" class="flex flex-col gap-3">

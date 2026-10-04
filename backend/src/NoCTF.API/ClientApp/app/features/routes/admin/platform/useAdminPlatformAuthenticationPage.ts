@@ -1,5 +1,7 @@
+import { message as describeMessage } from '../../../../utils/i18n'
+import type { UiMessage } from '../../../../utils/i18n'
 import { FlaskConical, Plus, RotateCw } from '@lucide/vue'
-import { toast } from 'vue-sonner'
+import { toast } from '../../../../utils/message-toast'
 import {
   adminPlatformSsoBeginAuthenticationTest,
   adminPlatformSsoCreateProvider,
@@ -22,12 +24,12 @@ type Provider = NoCtfapiEndpointsAdministrationPlatformSsoProviderResponse
 export function useAdminPlatformAuthenticationPage() {
   const configuration = ref<Configuration | null>(null)
   const loading = ref(true)
-  const loadError = ref<string | null>(null)
+  const loadError = ref<UiMessage | null>(null)
   const globalSaving = ref(false)
   const globalForm = reactive({ enabled: false, publicBaseUrl: '' })
   const providerOpen = ref(false)
   const providerSaving = ref(false)
-  const providerError = ref<string | null>(null)
+  const providerError = ref<UiMessage | null>(null)
   const providerForm = reactive({
     id: '',
     name: '',
@@ -67,7 +69,7 @@ export function useAdminPlatformAuthenticationPage() {
     const { data, error } = await adminPlatformSsoGetConfiguration()
     loading.value = false
     if (error || !data) {
-      loadError.value = parseApiError(error, translate('sso.configurationUnavailable')).message
+      loadError.value = parseApiError(error, describeMessage('sso.configurationUnavailable')).displayMessage
       return
     }
     sync(data)
@@ -84,11 +86,11 @@ export function useAdminPlatformAuthenticationPage() {
     })
     globalSaving.value = false
     if (error || !data) {
-      toast.error(parseApiError(error, translate('sso.configurationSaveFailed')).message)
+      toast.error(parseApiError(error, describeMessage('sso.configurationSaveFailed')).displayMessage)
       return
     }
     sync(data)
-    toast.success(translate('sso.configurationSaved'))
+    toast.success(describeMessage('sso.configurationSaved'))
   }
 
   function resetProviderForm() {
@@ -183,12 +185,12 @@ export function useAdminPlatformAuthenticationPage() {
       : await adminPlatformSsoCreateProvider({ body: providerRequest() })
     providerSaving.value = false
     if (response.error || !response.data) {
-      providerError.value = parseApiError(response.error, translate('sso.providerSaveFailed')).message
+      providerError.value = parseApiError(response.error, describeMessage('sso.providerSaveFailed')).displayMessage
       return
     }
     sync(response.data)
     providerOpen.value = false
-    toast.success(translate('sso.providerSaved'))
+    toast.success(describeMessage('sso.providerSaved'))
   }
 
   function openSecret(provider: Provider) {
@@ -207,13 +209,13 @@ export function useAdminPlatformAuthenticationPage() {
     })
     secretSaving.value = false
     if (error || !data) {
-      toast.error(parseApiError(error, translate('sso.secretReplaceFailed')).message)
+      toast.error(parseApiError(error, describeMessage('sso.secretReplaceFailed')).displayMessage)
       return
     }
     sync(data)
     secret.value = ''
     secretOpen.value = false
-    toast.success(translate('sso.secretReplaced'))
+    toast.success(describeMessage('sso.secretReplaced'))
   }
 
   async function testConnection(provider: Provider) {
@@ -224,10 +226,10 @@ export function useAdminPlatformAuthenticationPage() {
     })
     testingId.value = null
     if (error || !data?.succeeded) {
-      toast.error(data?.failureCode ?? parseApiError(error, translate('sso.connectionTestFailed')).message)
+      toast.error(data?.failureCode ?? parseApiError(error, describeMessage('sso.connectionTestFailed')).displayMessage)
       return
     }
-    toast.success(translate('sso.connectionTestSuccessful'))
+    toast.success(describeMessage('sso.connectionTestSuccessful'))
   }
 
   async function testAuthentication(provider: Provider) {
@@ -238,7 +240,7 @@ export function useAdminPlatformAuthenticationPage() {
     })
     if (error || !data?.authorizationUrl) {
       testingId.value = null
-      toast.error(parseApiError(error, translate('sso.authenticationTestFailed')).message)
+      toast.error(parseApiError(error, describeMessage('sso.authenticationTestFailed')).displayMessage)
       return
     }
     window.location.assign(data.authorizationUrl)

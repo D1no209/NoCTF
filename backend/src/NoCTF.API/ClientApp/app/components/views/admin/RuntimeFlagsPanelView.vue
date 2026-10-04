@@ -11,7 +11,7 @@ const { queried, includeHistory, rows, load, toggle, copy, adminFormatDateTime, 
     <div class="flex flex-wrap items-center justify-between gap-2">
       <h3 class="text-sm font-semibold">{{ $t('runtimeFlags.title') }}</h3>
       <Button type="button" variant="outline" size="sm" :disabled="loading" @click="load">
-        <Spinner v-if="loading" data-icon="inline-start" />{{ queried ? $t('ui.refresh') : $t('runtimeFlags.query') }}
+        <Spinner v-if="loading" data-icon="inline-start" />{{ queried ? $t('common.label.refresh') : $t('runtimeFlags.query') }}
       </Button>
     </div>
     <Field orientation="horizontal">
@@ -26,18 +26,18 @@ const { queried, includeHistory, rows, load, toggle, copy, adminFormatDateTime, 
     <template v-else-if="queried">
       <div v-for="row in rows" :key="row.flag?.id" class="flex flex-col gap-2 py-2">
         <div class="flex flex-wrap items-center gap-2">
-          <Badge variant="secondary">{{ $t(row.sourceKey) }}</Badge>
-          <Badge :variant="row.state === 'Active' ? 'default' : 'outline'">{{ $t(row.stateKey) }}</Badge>
-          <Badge variant="outline">{{ $t(row.matchKey) }}</Badge>
+          <Badge variant="secondary">{{ translate(row.sourceKey) }}</Badge>
+          <Badge :variant="row.state === 'Active' ? 'default' : 'outline'">{{ translate(row.stateKey) }}</Badge>
+          <Badge variant="outline">{{ translate(row.matchKey) }}</Badge>
           <span v-if="row.round !== null" class="text-xs">{{ $t('runtimeFlags.round', { round: row.round }) }}</span>
         </div>
         <ScrollSurface as="code" axis="x" class="font-mono text-xs">{{ row.revealed ? row.flag?.flag : '••••••••' }}</ScrollSurface>
         <div class="flex flex-wrap items-center gap-2">
-          <Button type="button" variant="ghost" size="sm" @click="toggle(row)">{{ row.revealed ? $t('ui.hide') : $t('ui.showFullFlag') }}</Button>
-          <Button type="button" variant="ghost" size="sm" @click="copy(row)">{{ $t('ui.copy') }}</Button>
+          <Button type="button" variant="ghost" size="sm" @click="toggle(row)">{{ row.revealed ? $t('administration.label.hide') : $t('administration.label.showFullFlag') }}</Button>
+          <Button type="button" variant="ghost" size="sm" @click="copy(row)">{{ $t('common.action.copy') }}</Button>
         </div>
         <dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs">
-          <dt class="text-muted-foreground">{{ $t('ui.creationTime') }}</dt><dd>{{ adminFormatDateTime(row.flag?.createdAt) }}</dd>
+          <dt class="text-muted-foreground">{{ $t('common.label.creationTime') }}</dt><dd>{{ adminFormatDateTime(row.flag?.createdAt) }}</dd>
           <dt class="text-muted-foreground">{{ $t('runtimeFlags.validFrom') }}</dt><dd>{{ adminFormatDateTime(row.flag?.validStart) }}</dd>
           <dt class="text-muted-foreground">{{ $t('runtimeFlags.validUntil') }}</dt><dd>{{ adminFormatDateTime(row.flag?.validUntil) }}</dd>
           <template v-if="row.flag?.deletedAt"><dt class="text-muted-foreground">{{ $t('runtimeFlags.deletedAt') }}</dt><dd>{{ adminFormatDateTime(row.flag.deletedAt) }}</dd></template>

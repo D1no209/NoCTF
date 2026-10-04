@@ -31,7 +31,12 @@ public enum PatchVerificationTargetFailureCodeProtocol
 
 public sealed record PatchVerificationTargetFailureResponse(
     PatchVerificationTargetFailureCodeProtocol Code,
-    string Detail);
+    string Detail)
+{
+    public string Detail { get; init; } = ApiMessages.Localize(Code, Detail, ApiMessages.NoArguments);
+    public string MessageKey => ApiMessages.For(Code).Key;
+    public IReadOnlyDictionary<string, object?> MessageArguments => ApiMessages.NoArguments;
+}
 
 internal static class PatchVerificationTargetProtocolMapping
 {

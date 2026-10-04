@@ -37,6 +37,6 @@ describe('challenge template test runtime', () => {
     expect(page).toContain("<component :is=\"ChallengeTestRuntimePanel\"")
     expect(page).toContain(':definition-dirty="runtimeDefinitionDirty"')
     expect(panel).toContain(':disabled="busy || definitionDirty"')
-    expect(panel).toContain("ui.stoppingATestInstanceRemovesItsContainerAndNetworkBut")
+    expect(panel).toContain("runtime.challengeTest.description.stoppingTestInstanceRemoves")
   })
 })

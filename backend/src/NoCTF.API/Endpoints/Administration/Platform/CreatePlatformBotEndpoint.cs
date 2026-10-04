@@ -61,17 +61,17 @@ public sealed class CreatePlatformBotEndpoint(ManagePlatform platform, TimeProvi
             timeProvider.GetUtcNow(),
             ct);
         if (result.State == CreateBotState.UserNameConflict)
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: StatusCodes.Status409Conflict,
-                title: "Bot was not created.",
-                detail: "The requested user name is already in use.");
+                title: ApiMessages.Get(ApiMessageId.CreatePlatformBotTitleBotWasCreated),
+                detail: ApiMessages.Get(ApiMessageId.CreatePlatformBotDetailRequestedUserNameAlready));
         if (result.State is CreateBotState.InvalidUserName or CreateBotState.InvalidRole)
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
-                title: "Bot was not created.",
+                title: ApiMessages.Get(ApiMessageId.CreatePlatformBotTitleBotWasCreated),
                 detail: result.State == CreateBotState.InvalidRole
-                    ? "Bot role must be a defined platform role."
-                    : "Bot UserName must contain 3..64 ASCII letters, digits, '_' or '-'.");
+                    ? ApiMessages.Get(ApiMessageId.BotRoleInvalid)
+                    : ApiMessages.Get(ApiMessageId.BotUserNameInvalid));
 
         var response = PlatformUserMapping.ToResponse(result.User!);
         return TypedResults.Created($"/api/v1/admin/platform/users/{response.Id}", response);

@@ -1,6 +1,7 @@
+import { message as describeMessage } from '../../../../../utils/i18n'
 import { adminTeamPath, adminChallengePath, adminRuntimePath } from '~/features/admin/admin-navigation'
 import { Download, RefreshCw, Trash2 } from '@lucide/vue'
-import { toast } from 'vue-sonner'
+import { toast } from '../../../../../utils/message-toast'
 import {
   adminDeleteRuntimeTrafficCapture,
   adminDownloadRuntimeTrafficCapture,
@@ -106,7 +107,7 @@ export function useAdminCompetitionsByIdTrafficCapturesPage() {
       }), `runtime-${item.runtimeInstanceId}.pcapng`)
     }
     catch (error) {
-      toast.error(parseApiError(error).message)
+      toast.error(parseApiError(error).displayMessage)
     }
   }
 
@@ -121,7 +122,7 @@ export function useAdminCompetitionsByIdTrafficCapturesPage() {
       }), 'runtime-traffic.zip')
     }
     catch (error) {
-      toast.error(parseApiError(error).message)
+      toast.error(parseApiError(error).displayMessage)
     }
     finally {
       exporting.value = false
@@ -137,13 +138,13 @@ export function useAdminCompetitionsByIdTrafficCapturesPage() {
         path: { competitionId, runtimeInstanceId: runtimeId },
       })
       if (error) throw error
-      toast.success(translate('runtime.captureDeleted'))
+      toast.success(describeMessage('runtime.captureDeleted'))
       deleteTarget.value = null
       selectedRuntimeIds.value = selectedRuntimeIds.value.filter(id => id !== runtimeId)
       await pagination.loadPage(pagination.page.value)
     }
     catch (error) {
-      toast.error(parseApiError(error).message)
+      toast.error(parseApiError(error).displayMessage)
     }
     finally {
       deleting.value = false

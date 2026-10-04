@@ -24,7 +24,7 @@ const { workspaceNavGroups, selectChallenge, handleReady, CompetitionBroadcastPa
 
     <main id="challenge-workspace-detail" class="min-h-0 min-w-0">
       <slot v-if="showChallengeNavigator || !contentScroll" />
-      <ScrollSurface v-else axis="y" class="h-full" :aria-label="$t('ui.competitions')">
+      <ScrollSurface v-else axis="y" class="h-full" :aria-label="$t('common.label.competitions')">
         <div class="px-1 py-4 md:px-3 md:py-5">
           <slot />
         </div>

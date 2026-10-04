@@ -22,7 +22,7 @@ public sealed class ExportRuntimeTrafficCapturesValidator
         RuleFor(request => request.RuntimeInstanceIds)
             .NotEmpty()
             .Must(ids => ids.Count <= 100 && ids.Distinct().Count() == ids.Count)
-            .WithMessage("Select between 1 and 100 distinct Runtime captures.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.ExportRuntimeTrafficCapturesValidationSelectBetweenDistinctRuntime)).WithErrorCode(ApiMessages.Key(ApiMessageId.ExportRuntimeTrafficCapturesValidationSelectBetweenDistinctRuntime));
 }
 
 public sealed class ExportRuntimeTrafficCapturesEndpoint(

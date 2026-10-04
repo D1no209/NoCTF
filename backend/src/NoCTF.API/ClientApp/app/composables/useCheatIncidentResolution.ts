@@ -1,3 +1,4 @@
+import type { UiMessage } from '../utils/i18n'
 import { adminUpdateCheatIncidentStatus } from '../api'
 import { computed, ref } from 'vue'
 
@@ -17,7 +18,7 @@ export interface CheatIncidentResolutionRequest {
 
 interface CheatIncidentResolutionOptions {
   competitionId: string
-  readError: (error: unknown) => string
+  readError: (error: unknown) => UiMessage
   onSuccess?: (request: CheatIncidentResolutionRequest) => void
   clients?: CheatIncidentResolutionClients
 }
@@ -79,7 +80,7 @@ export function useCheatIncidentResolution(options: CheatIncidentResolutionOptio
   const action = ref<CheatIncidentResolutionAction | null>(null)
   const target = ref<CheatIncidentResolutionTarget | null>(null)
   const reason = ref('')
-  const error = ref('')
+  const error = ref<UiMessage>('')
 
   const normalizedReason = computed(() => reason.value.trim())
   const remainingCharacters = computed(() => Math.max(

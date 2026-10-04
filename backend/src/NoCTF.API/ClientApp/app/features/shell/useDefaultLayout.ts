@@ -83,10 +83,10 @@ export function useDefaultLayout() {
   }
 
   const navItems = computed(() => [
-    { to: '/competitions', label: t("ui.competitions"), icon: Flag, show: true, unread: false },
-    { to: '/admin/challenges', label: t("ui.challengeLibrary2"), icon: Database, show: canOrganize.value, unread: false },
-    { to: '/admin/platform', label: t("ui.platformAdmin"), icon: markRaw(PlatformGearIconComponent), show: isLoggedIn.value && isAdministrator.value, unread: false },
-    { to: '/notifications', label: t("ui.notifications"), icon: Bell, show: isLoggedIn.value, unread: hasUnread.value },
+    { to: '/competitions', label: t("common.label.competitions"), icon: Flag, show: true, unread: false },
+    { to: '/admin/challenges', label: t("common.label.challengeLibrary.useDefaultLayout"), icon: Database, show: canOrganize.value, unread: false },
+    { to: '/admin/platform', label: t("common.label.platformAdmin"), icon: markRaw(PlatformGearIconComponent), show: isLoggedIn.value && isAdministrator.value, unread: false },
+    { to: '/notifications', label: t("common.label.notifications"), icon: Bell, show: isLoggedIn.value, unread: hasUnread.value },
   ])
 
   function isActive(to: string) {

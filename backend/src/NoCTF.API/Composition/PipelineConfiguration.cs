@@ -5,6 +5,7 @@ public static class PipelineConfiguration
     public static WebApplication UseNoCtfPipeline(this WebApplication app)
     {
         app.UseForwardedHeaders();
+        app.UseRequestLocalization();
         app.UseWebSockets();
         app.UseNoCtfStaticAssetDelivery();
         app.UseExceptionHandler();

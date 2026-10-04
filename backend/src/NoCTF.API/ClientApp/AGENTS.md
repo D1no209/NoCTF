@@ -22,7 +22,7 @@ Nuxt 4 SPA(`ssr: false`),Bun 管理依赖,TypeScript strict,Vue 用 `<script set
 - `utils/`:`api-error.ts`(ApiError/parseApiError/statusErrorMessage,problem+json 解析与空响应体的状态码兜底文案)、`labels.ts`(枚举中文标签)、`admin-format.ts`、`download.ts`(带 Bearer 的 blob 下载)。模式配置必须使用生成 SDK 的强类型结构，禁止自建 JSON schema 兼容器。
 - `middleware/`:`auth` / `guest` / `platform-admin`,经 `definePageMeta` 使用。
 - `pages/`、`layouts/`、`app.vue`:仅路由/布局元数据与功能入口组合，不持有业务代码或私有原语。路由仍为公开区、选手区、认证、竞赛管理、题库与平台管理；账户功能由顶栏 `features/account/AccountPanel` 承载，不建立独立账户设置页。
-- `locales/zh-CN.ts`、`locales/en.ts`:使用同一组稳定资源 key，中英文 key 与插值参数必须一致。修改文案不修改 key。页面、组件、默认属性、占位符、无障碍名称、通知与错误文案不得硬编码中文或英文；用户内容、协议值、URL 和代码示例数据按其真实语义处理，不翻译用户内容。
+- `locales/catalogs/<locale>/*.json`:按功能拆分的语义化资源，英文为源语言；`locales/en.ts` 定义 `MessageKey`，`zh-CN.ts` 合并英文回退。修改文案不修改 key，不用原文、整句转写、`ui.*` 或数字后缀 key。非空译文的插值参数必须与英文一致。页面、组件、默认属性、占位符、无障碍名称、通知与错误文案不得硬编码中文或英文；用户内容、协议值、URL 和代码示例数据按其真实语义处理，不翻译用户内容。`api.json` 由 API 的 `Localization/Catalogs` 生成，不手改；`bun run locales:prepare` 更新生成资源。
 
 ## 约定
 
@@ -82,7 +82,7 @@ Nuxt 4 SPA(`ssr: false`),Bun 管理依赖,TypeScript strict,Vue 用 `<script set
 - 主题默认深色,切换走 `useTheme()`(vueuse `vueuse-color-scheme` 持久化,nuxt.config head 脚本防首帧闪烁);浅色品牌蓝、深色 #39FF14 token 与两套配色在 `assets/css/main.css`,背景刻意带蓝色调、不做纯白。
 - 排版约定:标题用 `text-display` 工具类(main.css 定义,字重+字距),全局 h1-h3 已带 `tracking-tight`;终端光标闪烁用 `animate-blink`(如品牌 wordmark `> name _`,见 layouts/default.vue);数据用 `font-mono`（字体同样映射为微软雅黑）+ `tabular-nums`。
 - 页面、分区与列表标题只显示标题和必要业务状态；不在标题下重复解释页面用途、内容范围或键盘操作。会影响决策的权限、风险、表单约束、错误与空状态反馈继续保留。
-- 新 UI 文案在两个 locale 文件同时添加资源；静态文案用稳定 key 调用 `$t` / `t` / `translate`。配置标签保存 key，渲染时翻译，禁止在模块加载时固定当前语言。已解析的错误/反馈用 `$message` 渲染，已知中英文反馈随语言切换，未知服务端文本和用户内容原样保留。不得恢复中文原文作 key。
+- 新 UI 文案在英文功能 JSON 添加完整资源，在中文资源添加对应翻译（缺失或空译文回退英文）；静态文案用稳定 key 调用 `$t` / `t`。配置标签保存 key，渲染时翻译，禁止在模块加载时固定当前语言。已解析的错误/反馈保存 `message(key, arguments)` / `ApiError.displayMessage`，用 `$message` 渲染；通知用 `utils/message-toast`。不得根据原文匹配错误或恢复中文原文作 key。具体错误、字段校验和操作级 fallback 保持原有优先级。
 - 题目方向(Web/Pwn/Crypto 等)的图标与颜色一律走 `utils/directions.ts` 映射表(`directionIcon`/`directionTextClass`/`directionBadgeClass`),禁止局部硬编码方向色;分数、排名、时间等数据用 `font-mono`(JetBrains Mono)+ `tabular-nums`。
 - 项目自绘的静态 SVG 资源统一放在 `app/assets/svg/` 下，方向图标放在 `directions/`、装饰图样放在 `decorations/`；Vue/TypeScript 只通过资源 URL 引用，不内联 path 数据。数据驱动的动态图表不作为静态资源处理。
 - 题目列表详细态使用共享 IconWatermark 显示方向 SVG 水印，收缩态隐藏水印，方向文字只作为辅助技术文本；分组标题继续显示小图标和方向名称。Mock 为每个支持方向提供一题和一个可下载附件，数据与下载内容仅放在 mock/。

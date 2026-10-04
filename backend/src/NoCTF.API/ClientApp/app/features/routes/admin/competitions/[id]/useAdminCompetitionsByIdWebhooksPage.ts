@@ -1,5 +1,6 @@
+import { message as describeMessage } from '../../../../../utils/i18n'
 import { Copy, Plus, RotateCw, Send, Trash2, Webhook } from '@lucide/vue'
-import { toast } from 'vue-sonner'
+import { toast } from '../../../../../utils/message-toast'
 import {
   adminCreateCompetitionWebhook,
   adminCreateCompetitionWebhookTestDelivery,
@@ -137,7 +138,7 @@ export function useAdminCompetitionsByIdWebhooksPage() {
     const name = form.name.trim()
     const endpointUrl = form.endpointUrl.trim()
     if (!name || !endpointUrl) {
-      toast.error(translate('webhook.completeRequiredFields'))
+      toast.error(describeMessage('webhook.completeRequiredFields'))
       return
     }
     saving.value = true
@@ -152,7 +153,7 @@ export function useAdminCompetitionsByIdWebhooksPage() {
         })
     saving.value = false
     if (result.error || !result.data) {
-      toast.error(parseApiError(result.error, translate('webhook.saveFailed')).message)
+      toast.error(parseApiError(result.error, describeMessage('webhook.saveFailed')).displayMessage)
       return
     }
     if ('signingSecret' in result.data && result.data.signingSecret) {
@@ -160,7 +161,7 @@ export function useAdminCompetitionsByIdWebhooksPage() {
       secretOpen.value = true
     }
     formOpen.value = false
-    toast.success(translate('webhook.saved'))
+    toast.success(describeMessage('webhook.saved'))
     await reloadFirstPage()
   }
 
@@ -176,7 +177,7 @@ export function useAdminCompetitionsByIdWebhooksPage() {
     })
     pendingId.value = null
     if (requestError) {
-      toast.error(parseApiError(requestError, translate('webhook.saveFailed')).message)
+      toast.error(parseApiError(requestError, describeMessage('webhook.saveFailed')).displayMessage)
       return
     }
     toast.success(enabled ? translate('webhook.enabled') : translate('webhook.disabled'))
@@ -199,19 +200,19 @@ export function useAdminCompetitionsByIdWebhooksPage() {
     })
     pendingId.value = null
     if (requestError || !data?.signingSecret) {
-      toast.error(parseApiError(requestError, translate('webhook.rotateFailed')).message)
+      toast.error(parseApiError(requestError, describeMessage('webhook.rotateFailed')).displayMessage)
       return
     }
     signingSecret.value = data.signingSecret
     secretOpen.value = true
-    toast.success(translate('webhook.rotated'))
+    toast.success(describeMessage('webhook.rotated'))
     await reloadFirstPage()
   }
 
   async function copySecret() {
     if (!signingSecret.value) return
     await navigator.clipboard.writeText(signingSecret.value)
-    toast.success(translate('webhook.secretCopied'))
+    toast.success(describeMessage('webhook.secretCopied'))
   }
 
   async function remove() {
@@ -223,11 +224,11 @@ export function useAdminCompetitionsByIdWebhooksPage() {
     })
     pendingId.value = null
     if (requestError) {
-      toast.error(parseApiError(requestError, translate('webhook.deleteFailed')).message)
+      toast.error(parseApiError(requestError, describeMessage('webhook.deleteFailed')).displayMessage)
       return
     }
     deletingTarget.value = null
-    toast.success(translate('webhook.deleted'))
+    toast.success(describeMessage('webhook.deleted'))
     await reloadFirstPage()
   }
 
@@ -239,7 +240,7 @@ export function useAdminCompetitionsByIdWebhooksPage() {
     })
     if (requestError || !data?.deliveryId) {
       testStates[target.id] = 'Failed'
-      toast.error(parseApiError(requestError, translate('webhook.testFailed')).message)
+      toast.error(parseApiError(requestError, describeMessage('webhook.testFailed')).displayMessage)
       return
     }
     for (let attempt = 0; attempt < 20; attempt++) {
@@ -258,7 +259,7 @@ export function useAdminCompetitionsByIdWebhooksPage() {
       }
     }
     testStates[target.id] = 'Failed'
-    toast.error(translate('webhook.testTimedOut'))
+    toast.error(describeMessage('webhook.testTimedOut'))
   }
 
   onMounted(() => {

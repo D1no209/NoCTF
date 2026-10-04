@@ -1,3 +1,5 @@
+import { message as describeMessage } from '../../../utils/i18n'
+import type { UiMessage } from '../../../utils/i18n'
 import { computed, markRaw, ref, watch } from 'vue'
 import { Plus } from '@lucide/vue'
 import { adminListCompetitions, listCompetitionsEndpoint } from '../../../api'
@@ -16,7 +18,7 @@ export function useCompetitionsIndexPage() {
   const { isAdministrator } = useAuth()
   const items = ref<NoCtfapiEndpointsCompetitionsCompetitionResponse[]>([])
   const loading = ref(true)
-  const error = ref<string | null>(null)
+  const error = ref<UiMessage | null>(null)
   const queryValue = (value: unknown) => typeof value === 'string' ? value : null
   const routeCompetitionId = computed(() => queryValue(route.params.id))
   const requestedCompetitionId = routeCompetitionId
@@ -77,7 +79,7 @@ export function useCompetitionsIndexPage() {
       items.value = data.items ?? []
     } catch (failure) {
       if (generation !== loadGeneration) return
-      error.value = parseApiError(failure, translate('ui.failedToLoadContestList')).message
+      error.value = parseApiError(failure, describeMessage('competitions.competitionsIndex.error.loadContestListFailed')).displayMessage
     } finally {
       if (generation === loadGeneration) loading.value = false
     }

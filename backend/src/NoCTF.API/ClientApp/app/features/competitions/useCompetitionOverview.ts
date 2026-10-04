@@ -1,7 +1,9 @@
+import { message as describeMessage } from '../../utils/i18n'
+import type { UiMessage } from '../../utils/i18n'
 import { markRaw } from 'vue'
 
 import { canEnterCompetition, canRegisterForCompetition, isCtfPracticeOpen } from '../../lib/competition-participation'
-import { toast } from 'vue-sonner'
+import { toast } from '../../utils/message-toast'
 import { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn, Settings, ShieldCheck, Trophy, UserPlus, Users } from '@lucide/vue'
 import { adminGetCompetition, getCompetitionEndpoint, createTeamEndpoint, getMyTeamEndpoint, joinTeamByInvitationEndpoint, listCompetitionTeamsEndpoint, listCompetitionTracks, patchCompetitionTeam } from '../../api'
 import type { NoCtfapiEndpointsAdministrationCompetitionsAdminCompetitionResponse, NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../api'
@@ -18,7 +20,7 @@ export function useCompetitionOverview(
   const { user, isLoggedIn, isAdministrator } = useAuth()
   const competition = ref(props.competition)
   const managementOnly = computed(() => isAdministrator.value && (competition.value.status === 'Draft' || Boolean(competition.value.deletedAt)))
-  const detailError = ref<string | null>(null)
+  const detailError = ref<UiMessage | null>(null)
   const reads = new AbortController()
   onUnmounted(() => reads.abort())
   const protectedPoster = useCompetitionPoster(competitionId)
@@ -38,14 +40,14 @@ export function useCompetitionOverview(
         ? await adminGetCompetition({ path: { competitionId }, signal: reads.signal })
         : await getCompetitionEndpoint({ path: { competitionId }, signal: reads.signal })
       if (reads.signal.aborted) return
-      if (error || !data) detailError.value = parseApiError(error).message
+      if (error || !data) detailError.value = parseApiError(error).displayMessage
       else {
         competition.value = managementOnly.value
           ? (data as NoCtfapiEndpointsAdministrationCompetitionsAdminCompetitionResponse).competition!
           : data as NoCtfapiEndpointsCompetitionsCompetitionResponse
       }
     } catch (error) {
-      if (!reads.signal.aborted) detailError.value = parseApiError(error).message
+      if (!reads.signal.aborted) detailError.value = parseApiError(error).displayMessage
     }
   }
   onMounted(refreshCompetition)
@@ -73,7 +75,7 @@ export function useCompetitionOverview(
 
   const teamLoaded = ref(false)
 
-  const teamLoadError = ref<string | null>(null)
+  const teamLoadError = ref<UiMessage | null>(null)
 
   async function loadMyTeam() {
     teamLoaded.value = false
@@ -96,13 +98,13 @@ export function useCompetitionOverview(
       }
       if (error || !data) {
         myTeam.value = null
-        teamLoadError.value = parseApiError(error, translate("ui.failedToLoadYourRegistrationStatusPleaseTryAgain")).message
+        teamLoadError.value = parseApiError(error, describeMessage("competitions.competitionOverview.error.loadRegistrationStatusFailed")).displayMessage
         return
       }
       myTeam.value = data
     } catch (error: unknown) {
       myTeam.value = null
-      teamLoadError.value = parseApiError(error, translate("ui.failedToLoadYourRegistrationStatusPleaseTryAgain")).message
+      teamLoadError.value = parseApiError(error, describeMessage("competitions.competitionOverview.error.loadRegistrationStatusFailed")).displayMessage
     } finally {
       teamLoaded.value = true
     }
@@ -118,7 +120,7 @@ export function useCompetitionOverview(
 
   const tracksLoaded = ref(false)
 
-  const trackLoadError = ref<string | null>(null)
+  const trackLoadError = ref<UiMessage | null>(null)
 
   async function loadRegistrationOptions() {
     tracksLoaded.value = false
@@ -145,8 +147,8 @@ export function useCompetitionOverview(
         selectableTracks.value = []
         trackLoadError.value = parseApiError(
           trackResult?.error,
-          translate("ui.failedToLoadCompetitionTracksPleaseTryAgain"),
-        ).message
+          describeMessage("competitions.competitionOverview.error.loadCompetitionTracksFailed"),
+        ).displayMessage
       } else {
         selectableTracks.value = (trackResult.data.items ?? []).filter(track => track.isPublicSelectable)
         if (selectableTracks.value.some(track =>
@@ -159,8 +161,8 @@ export function useCompetitionOverview(
       selectableTracks.value = []
       trackLoadError.value = parseApiError(
         error,
-        translate("ui.failedToLoadCompetitionTracksPleaseTryAgain"),
-      ).message
+        describeMessage("competitions.competitionOverview.error.loadCompetitionTracksFailed"),
+      ).displayMessage
     } finally {
       tracksLoaded.value = true
     }
@@ -187,8 +189,8 @@ export function useCompetitionOverview(
     if (!c) return null
     const end = new Date(c.endTime ?? '').getTime()
     if (Number.isNaN(end)) return null
-    if (now.value < end) return { label: translate("ui.fromTheEnd"), ms: end - now.value }
-    return { label: translate("ui.finished"), ms: 0 }
+    if (now.value < end) return { label: translate("competitions.label.end"), ms: end - now.value }
+    return { label: translate("common.label.finished"), ms: 0 }
   })
 
   const practiceOpen = computed(() => isCtfPracticeOpen(competition.value))
@@ -207,7 +209,7 @@ export function useCompetitionOverview(
 
   const createPending = ref(false)
 
-  const createValidationError = ref<string | null>(null)
+  const createValidationError = ref<UiMessage | null>(null)
 
   const selectedCreateTrack = computed(() => selectableTracks.value.find(
     track => track.key === createTrackKey.value,
@@ -223,11 +225,11 @@ export function useCompetitionOverview(
   async function submitCreate() {
     createValidationError.value = null
     if (!createName.value.trim()) {
-      createValidationError.value = translate("ui.enterATeamName")
+      createValidationError.value = describeMessage("competitions.label.enterTeamName")
       return
     }
     if (tracksEnabled.value && !createTrackKey.value) {
-      createValidationError.value = translate("ui.selectACompetitionTrack")
+      createValidationError.value = describeMessage("competitions.label.selectCompetitionTrack")
       return
     }
     createPending.value = true
@@ -247,11 +249,11 @@ export function useCompetitionOverview(
       if (error || !data) {
         createValidationError.value = teamRegistrationErrorMessage(
           error,
-          translate("ui.teamCreationFailed"),
+          translate("competitions.error.teamCreationFailed"),
         )
         return
       }
-      toast.success(translate("ui.teamCreatedAsUnregistered"))
+      toast.success(describeMessage("competitions.label.teamCreatedUnregistered"))
       createOpen.value = false
       createName.value = ''
       createTrackKey.value = ''
@@ -259,7 +261,7 @@ export function useCompetitionOverview(
     } catch (error: unknown) {
       createValidationError.value = teamRegistrationErrorMessage(
         error,
-        translate("ui.teamCreationFailed"),
+        translate("competitions.error.teamCreationFailed"),
       )
     } finally {
       createPending.value = false
@@ -272,7 +274,7 @@ export function useCompetitionOverview(
 
   const joinPending = ref(false)
 
-  const joinValidationError = ref<string | null>(null)
+  const joinValidationError = ref<UiMessage | null>(null)
 
   watch(joinToken, () => { joinValidationError.value = null })
 
@@ -283,7 +285,7 @@ export function useCompetitionOverview(
     joinValidationError.value = null
     const invitationToken = joinToken.value.trim()
     if (invitationToken.length !== 32) {
-      joinValidationError.value = translate("ui.theInvitationCodeMustBe32Characters")
+      joinValidationError.value = describeMessage("competitions.competitionOverview.validation.invitationCodeLength")
       return
     }
     joinPending.value = true
@@ -295,18 +297,18 @@ export function useCompetitionOverview(
       if (error) {
         joinValidationError.value = teamMembershipErrorMessage(
           error,
-          translate("ui.failedToJoinTheTeamPleaseTryAgain"),
+          translate("competitions.competitionOverview.error.joinTeamFailed"),
         )
         return
       }
-      toast.success(translate("ui.alreadyJoinedTheTeam"))
+      toast.success(describeMessage("competitions.label.alreadyJoinedTeam"))
       joinOpen.value = false
       joinToken.value = ''
       await loadMyTeam()
     } catch (error: unknown) {
       joinValidationError.value = teamMembershipErrorMessage(
         error,
-        translate("ui.failedToJoinTheTeamPleaseTryAgain"),
+        translate("competitions.competitionOverview.error.joinTeamFailed"),
       )
     } finally {
       joinPending.value = false
@@ -331,7 +333,7 @@ export function useCompetitionOverview(
 
   const registrationPending = ref(false)
 
-  const registrationError = ref<string | null>(null)
+  const registrationError = ref<UiMessage | null>(null)
 
   const registrationTrack = computed(() => selectableTracks.value.find(
     track => track.key === myTeam.value?.trackKey,
@@ -384,20 +386,20 @@ export function useCompetitionOverview(
       if (error || !data) {
         registrationError.value = teamRegistrationErrorMessage(
           error,
-          translate('ui.failedToResubmitRegistration'),
+          translate('competitions.error.resubmitRegistrationFailed'),
         )
         return
       }
       myTeam.value = data
       registrationOpen.value = false
       toast.success(data.registrationStatus === 'Approved'
-        ? translate('ui.registrationSubmittedAndApproved')
-        : translate('ui.registrationHasBeenResubmittedAndIsAwaitingReview'))
+        ? translate('competitions.label.registrationSubmittedApproved')
+        : translate('competitions.competitionOverview.description.registrationResubmittedAwaitingReview'))
     }
     catch (error: unknown) {
       registrationError.value = teamRegistrationErrorMessage(
         error,
-        translate('ui.failedToResubmitRegistration'),
+        translate('competitions.error.resubmitRegistrationFailed'),
       )
     }
     finally {

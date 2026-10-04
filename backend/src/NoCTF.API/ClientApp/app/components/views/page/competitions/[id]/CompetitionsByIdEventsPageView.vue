@@ -12,21 +12,21 @@ const { hasStaffHistory, historyScopeError, kind, kindOptions, items, loading, e
       <div class="flex items-center gap-2">
         <Select v-model="kind">
           <SelectTrigger class="w-40">
-            <SelectValue :placeholder="$t('ui.allUpdates')" />
+            <SelectValue :placeholder="$t('competitions.label.updates')" />
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
               <SelectItem v-for="option in kindOptions" :key="option.value" :value="option.value">
-                {{ $t(option.label) }}
+                {{ translate(option.label) }}
               </SelectItem>
             </SelectGroup>
           </SelectContent>
         </Select>
         <Badge variant="outline">
-          {{ $t(hasStaffHistory ? 'ui.fullHistory' : 'ui.last30Days') }}
+          {{ $t(hasStaffHistory ? 'common.label.fullHistory' : 'common.label.lastDays') }}
         </Badge>
       </div>
-      <Button variant="outline" size="sm" @click="reload">{{ $t('ui.refresh') }}</Button>
+      <Button variant="outline" size="sm" @click="reload">{{ $t('common.label.refresh') }}</Button>
     </div>
 
     <Alert v-if="error" variant="destructive">
@@ -43,8 +43,8 @@ const { hasStaffHistory, historyScopeError, kind, kindOptions, items, loading, e
 
     <Empty v-else-if="initialized && !items.length" class="border py-12">
       <EmptyHeader>
-        <EmptyTitle>{{ $t('ui.noNewsYet') }}</EmptyTitle>
-        <EmptyDescription>{{ $t('ui.announcementsTopicReleasesBloodListsAndOtherUpdatesWillAppear') }}</EmptyDescription>
+        <EmptyTitle>{{ $t('competitions.label.newsYet') }}</EmptyTitle>
+        <EmptyDescription>{{ $t('competitions.competitionsBy.description.announcementsTopicReleasesBlood') }}</EmptyDescription>
       </EmptyHeader>
     </Empty>
 
@@ -66,7 +66,7 @@ const { hasStaffHistory, historyScopeError, kind, kindOptions, items, loading, e
 
     <div v-if="hasMore" class="flex justify-center">
       <Button variant="outline" :disabled="loading" @click="loadMore">
-        <Spinner v-if="loading" data-icon="inline-start" /> {{ $t('ui.loadMore') }} </Button>
+        <Spinner v-if="loading" data-icon="inline-start" /> {{ $t('common.label.load') }} </Button>
     </div>
   </div>
 </template>

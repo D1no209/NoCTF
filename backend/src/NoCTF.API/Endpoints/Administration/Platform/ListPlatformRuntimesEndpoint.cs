@@ -28,10 +28,10 @@ public sealed class ListPlatformRuntimesValidator : Validator<ListPlatformRuntim
         RuleFor(request => request.State).Must(value => value is null
             or RuntimeStateProtocol.Queued or RuntimeStateProtocol.Provisioning
             or RuntimeStateProtocol.Running or RuntimeStateProtocol.Stopping)
-            .WithMessage("State must be Queued, Provisioning, Running or Stopping.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.ListPlatformRuntimesValidationStateQueuedProvisioningRunning)).WithErrorCode(ApiMessages.Key(ApiMessageId.ListPlatformRuntimesValidationStateQueuedProvisioningRunning));
         RuleFor(request => request.RuntimeKind).Must(value => value is null
             or RuntimeKindProtocol.Container)
-            .WithMessage("RuntimeKind must be Container.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.ListPlatformRuntimesValidationRuntimekindContainer)).WithErrorCode(ApiMessages.Key(ApiMessageId.ListPlatformRuntimesValidationRuntimekindContainer));
     }
 }
 

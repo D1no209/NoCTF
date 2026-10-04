@@ -153,7 +153,12 @@ public enum GameplayFactAdmissionFailureCodeProtocol
 
 public sealed record GameplayFactAdmissionFailureResponse(
     GameplayFactAdmissionFailureCodeProtocol Code,
-    string? Detail);
+    string? Detail)
+{
+    public string Detail { get; init; } = ApiMessages.Localize(Code, Detail, ApiMessages.NoArguments);
+    public string MessageKey => ApiMessages.For(Code).Key;
+    public IReadOnlyDictionary<string, object?> MessageArguments => ApiMessages.NoArguments;
+}
 
 [Mapper(RequiredMappingStrategy = RequiredMappingStrategy.Target)]
 public static partial class GameplayFactMapper
@@ -214,10 +219,10 @@ internal static class GameplayFactProblemDetails
         int status,
         AdmissionFailureCode? code,
         string? detail) =>
-        TypedResults.Problem(
+        ApiProblems.Problem(
             statusCode: status,
-            title: "GameplayFact was not accepted.",
-            detail: detail,
+            title: ApiMessages.Get(ApiMessageId.SubmitFlagTitleGameplayfactWasAccepted),
+            detail: ApiMessages.For(code),
             type: "https://httpstatuses.com/" + status,
             extensions: code is null
                 ? null
@@ -241,12 +246,12 @@ public sealed class SubmitFlagRequestValidator : Validator<SubmitFlagRequest>
     {
         RuleFor(request => request)
             .Must(request => request.Flag is not null ^ request.Flags is not null)
-            .WithMessage("Exactly one of flag or flags is required.");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.SubmitFlagValidationExactlyOneFlagFlags)).WithErrorCode(ApiMessages.Key(ApiMessageId.SubmitFlagValidationExactlyOneFlagFlags));
         RuleForEach(request => request.Flags)
             .NotNull()
             .SwaggerIgnore();
         RuleFor(request => request.Flags).Must(flags => flags is null || flags.Count <= 128)
-            .WithMessage("每次最多提交 128 个 Flag。");
+            .WithMessage(_ => ApiMessages.Text(ApiMessageId.SubmitFlagValidationFlag)).WithErrorCode(ApiMessages.Key(ApiMessageId.SubmitFlagValidationFlag));
     }
 }
 

@@ -1,8 +1,10 @@
+import { message as describeMessage } from '../../../../utils/i18n'
+import type { UiMessage } from '../../../../utils/i18n'
 import { proxyRefs } from 'vue'
 import { markRaw } from 'vue'
 
 import { Activity, ChevronLeft, ChevronRight, Clock3, Expand, Minimize, Radio, RefreshCw, ShieldCheck, Swords, Trophy, Users, X } from '@lucide/vue'
-import { toast } from 'vue-sonner'
+import { toast } from '../../../../utils/message-toast'
 import { getCompetitionEndpoint, listCompetitionEvents } from '../../../../api'
 import type { NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse } from '../../../../api'
 import { createTrailingRefresh } from '../../../../lib/latest-page-refresh'
@@ -35,7 +37,7 @@ export function useCompetitionsByIdAwdpLivePage() {
 
   const projectionPending = ref(false)
 
-  const error = ref<string | null>(null)
+  const error = ref<UiMessage | null>(null)
 
   const activeEvent = ref<AwdpResolvedControlEvent | null>(null)
 
@@ -151,7 +153,7 @@ export function useCompetitionsByIdAwdpLivePage() {
   ))
 
   const remainingText = computed(() => {
-    if (competition.value?.status === 'Finished') return t("ui.competitionFinished")
+    if (competition.value?.status === 'Finished') return t("competitions.label.competitionFinished")
     const total = liveRoundClock.value.remainingSeconds
     if (!total) return '—'
     const hours = Math.floor(total / 3600)
@@ -173,8 +175,8 @@ export function useCompetitionsByIdAwdpLivePage() {
   }
 
   function eventLabel(event: AwdpResolvedControlEvent): string {
-    const action = event.action === 'attack' ? t("ui.attack") : t("ui.defense")
-    const outcome = event.outcome === 'success' ? t("ui.success") : t("ui.failed")
+    const action = event.action === 'attack' ? t("competitions.label.attack") : t("competitions.label.defense")
+    const outcome = event.outcome === 'success' ? t("competitions.label.success") : t("common.error.failed")
     return `${action}${outcome}`
   }
 
@@ -248,14 +250,14 @@ export function useCompetitionsByIdAwdpLivePage() {
     if (competitionResult.error || !competitionResult.data) {
       loading.value = false
       refreshing.value = false
-      error.value = parseApiError(competitionResult.error, t("ui.loadingCompetitionFailed")).message
+      error.value = parseApiError(competitionResult.error, t("common.error.loadingCompetitionFailed")).displayMessage
       return
     }
     competition.value = competitionResult.data
     if (competition.value.mode !== 'Awdp') {
       loading.value = false
       refreshing.value = false
-      error.value = t("ui.theAwdpControlScreenIsOnlyAvailableForAwdpCompetitions")
+      error.value = t("competitions.competitionsBy.description.awdpControlScreenAvailable")
       return
     }
 
@@ -271,7 +273,7 @@ export function useCompetitionsByIdAwdpLivePage() {
     refreshing.value = false
 
     if (eventResult.error || !eventResult.data) {
-      error.value = parseApiError(eventResult.error, t("ui.failedToLoadCompetitionActivity")).message
+      error.value = parseApiError(eventResult.error, t("competitions.competitionsBy.error.loadCompetitionActivityFailed")).displayMessage
       return
     }
     const nextEvents = awdpControlEvents(eventResult.data)
@@ -293,7 +295,7 @@ export function useCompetitionsByIdAwdpLivePage() {
     }
     if (board.error.value || !board.snapshot.value) {
       projectionPending.value = false
-      error.value = board.error.value ?? t("ui.failedToLoadScoreboard")
+      error.value = board.error.value ?? t("common.error.loadScoreboardFailed")
       return
     }
     projectionPending.value = false
@@ -322,7 +324,7 @@ export function useCompetitionsByIdAwdpLivePage() {
       else await document.exitFullscreen()
     }
     catch {
-      toast.error(translate("ui.theBrowserDeniedFullscreenAccessCheckSitePermissionsOrUse"))
+      toast.error(describeMessage("competitions.competitionsBy.description.browserDeniedFullscreenAccess"))
     }
   }
 

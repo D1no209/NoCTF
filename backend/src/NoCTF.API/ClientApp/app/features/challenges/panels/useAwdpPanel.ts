@@ -1,3 +1,5 @@
+import { message as describeMessage } from '../../../utils/i18n'
+import type { UiMessage } from '../../../utils/i18n'
 import { markRaw, toRefs } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import { ShieldCheck } from '@lucide/vue'
@@ -19,7 +21,7 @@ emit: { (event: "submitted", ...args: []): void; (event: "remainingChanged", ...
 
   const loading = ref(true)
 
-  const stateError = ref<string | null>(null)
+  const stateError = ref<UiMessage | null>(null)
 
   const attackRuntimeCard = ref<{ refreshUntilStopped: () => Promise<void> } | null>(null)
 
@@ -37,11 +39,11 @@ emit: { (event: "submitted", ...args: []): void; (event: "remainingChanged", ...
   const defenseOutcome = computed(() => {
     const defense = state.value?.defense
     if (!defense?.gameplayFactId || !defense.result && !defense.failureCode) return null
-    if (defense.result === 'Correct') return translate("ui.defenseSucceeded")
-    if (defense.failureCode === 'AwdpExploitSucceeded') return translate("ui.defenseFailedExploitSucceeded")
-    if (defense.failureCode === 'AwdpServiceAbnormal') return translate("ui.defenseFailedServiceAbnormal")
-    if (defense.state === 'PlatformFailed') return translate("ui.defenseVerificationFailed")
-    return translate("ui.defenseFailedServiceAbnormal")
+    if (defense.result === 'Correct') return translate("common.label.defenseSucceeded")
+    if (defense.failureCode === 'AwdpExploitSucceeded') return translate("challenges.error.defenseExploitSucceededFailed")
+    if (defense.failureCode === 'AwdpServiceAbnormal') return translate("challenges.error.defenseServiceAbnormalFailed")
+    if (defense.state === 'PlatformFailed') return translate("challenges.error.defenseVerificationFailed")
+    return translate("challenges.error.defenseServiceAbnormalFailed")
   })
 
   async function refreshState(): Promise<boolean> {
@@ -53,7 +55,7 @@ emit: { (event: "submitted", ...args: []): void; (event: "remainingChanged", ...
     })
     loading.value = false
     if (error || !data) {
-      stateError.value = parseApiError(error, translate("ui.failedToLoadTheAwdpChallengeState")).message
+      stateError.value = parseApiError(error, describeMessage("challenges.awdpPanel.error.loadAwdpChallengeFailed")).displayMessage
       return false
     }
     stateError.value = null

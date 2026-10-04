@@ -3,16 +3,17 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "nuxt dev --host 127.0.0.1 --port 3000",
-    "start": "nuxt dev --host 127.0.0.1 --port 3000",
+    "dev": "bun run locales:prepare && nuxt dev --host 127.0.0.1 --port 3000",
+    "start": "bun run locales:prepare && nuxt dev --host 127.0.0.1 --port 3000",
     "build": "bun run audit:architecture && nuxt build",
     "generate": "bun run audit:architecture && nuxt generate",
     "preview": "nuxt preview",
-    "test": "bun test",
-    "audit:architecture": "bun scripts/check-architecture.ts",
-    "postinstall": "nuxt prepare",
+    "test": "bun run locales:prepare && bun test",
+    "audit:architecture": "bun run locales:prepare && bun scripts/check-architecture.ts",
+    "postinstall": "bun run locales:prepare && nuxt prepare",
     "api:gen": "openapi-ts",
-    "typecheck": "nuxi typecheck"
+    "typecheck": "bun run locales:prepare && nuxi typecheck",
+    "locales:prepare": "bun scripts/prepare-locales.ts"
   },
   "dependencies": {
     "@cap.js/widget": "0.1.57",

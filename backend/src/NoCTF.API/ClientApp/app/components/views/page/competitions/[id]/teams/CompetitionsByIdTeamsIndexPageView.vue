@@ -18,8 +18,8 @@ const { competitionId, teams, loading, error, teamDisplayNames, initialized, pag
 
     <Empty v-else-if="!error && !teams.length" class="border py-12">
       <EmptyHeader>
-        <EmptyTitle>{{ $t('ui.thereIsNoRegistrationTeamYet') }}</EmptyTitle>
-        <EmptyDescription>{{ $t('ui.beTheFirstTeamToSignUpToCompete') }}</EmptyDescription>
+        <EmptyTitle>{{ $t('competitions.competitionsBy.description.thereRegistrationTeamYet') }}</EmptyTitle>
+        <EmptyDescription>{{ $t('competitions.competitionsBy.description.firstTeamSignCompete') }}</EmptyDescription>
       </EmptyHeader>
     </Empty>
 
@@ -46,7 +46,7 @@ const { competitionId, teams, loading, error, teamDisplayNames, initialized, pag
                     {{ teamRegistrationStatusLabel(team.registrationStatus) }}
                   </Badge>
                   <Badge variant="outline">{{ team.trackName ?? team.trackKey }}</Badge>
-                  <span class="text-xs text-muted-foreground">{{ $t('ui.members2', { count: team.memberIds?.length ?? 0 }) }}</span>
+                  <span class="text-xs text-muted-foreground">{{ $t('competitions.label.members', { count: team.memberIds?.length ?? 0 }) }}</span>
                 </div>
               </div>
             </div>

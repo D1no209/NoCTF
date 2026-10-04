@@ -128,8 +128,8 @@ export function useAwdpEventTicker(props: Readonly<{ events: readonly AwdpResolv
   })
 
   function eventText(event: AwdpResolvedControlEvent): string {
-    const action = event.action === 'attack' ? t("ui.attack") : t("ui.defense")
-    const outcome = event.outcome === 'success' ? t("ui.success") : t("ui.failed")
+    const action = event.action === 'attack' ? t("competitions.label.attack") : t("competitions.label.defense")
+    const outcome = event.outcome === 'success' ? t("competitions.label.success") : t("common.error.failed")
     return `${event.teamName} · ${event.challengeTitle} · ${action}${outcome}`
   }
 

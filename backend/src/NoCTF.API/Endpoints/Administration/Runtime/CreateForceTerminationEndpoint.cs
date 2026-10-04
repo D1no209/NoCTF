@@ -53,9 +53,9 @@ public sealed class CreateForceTerminationEndpoint(
         if (result.Failure == RuntimeMutationFailure.NotFound)
             return TypedResults.NotFound();
         if (result.Failure == RuntimeMutationFailure.InvalidReason)
-            return TypedResults.Problem(
+            return ApiProblems.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
-                title: "Force-termination reason is invalid.");
+                title: ApiMessages.Get(ApiMessageId.CreateForceTerminationTitleForceTerminationReasonInvalid));
         if (result.Runtime is null)
             return TypedResults.Conflict(new RuntimeConflictResponse(
                 "The Runtime is not an eligible long-running Provisioning or Stopping instance."));

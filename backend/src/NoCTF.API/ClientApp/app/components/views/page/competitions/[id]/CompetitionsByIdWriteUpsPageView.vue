@@ -23,13 +23,13 @@ const { ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, Ref
           <header class="flex flex-col gap-2 pr-10">
             <div class="flex items-center gap-2">
               <Button v-if="!management" variant="ghost" size="icon-sm" as-child>
-                <NuxtLink :to="competitionPath(competitionId)" :aria-label="$t('ui.backToCompetition')">
+                <NuxtLink :to="competitionPath(competitionId)" :aria-label="$t('common.label.backCompetition')">
                   <ArrowLeft />
                 </NuxtLink>
               </Button>
               <FileSearch class="size-5 shrink-0 text-primary" />
               <h2 class="min-w-0 flex-1 truncate text-sm font-semibold">{{ $t('writeUp.review') }}</h2>
-              <Button variant="ghost" size="icon-sm" :disabled="loading" :aria-label="$t('ui.refresh')" @click="load">
+              <Button variant="ghost" size="icon-sm" :disabled="loading" :aria-label="$t('common.label.refresh')" @click="load">
                 <Spinner v-if="loading" />
                 <RefreshCw v-else />
               </Button>
@@ -57,7 +57,7 @@ const { ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, Ref
         <CardContent class="flex min-h-0 flex-1 flex-col">
           <Empty class="h-full min-h-0">
             <EmptyHeader><EmptyTitle>{{ $message(loadError) }}</EmptyTitle></EmptyHeader>
-            <EmptyContent><Button variant="outline" size="sm" @click="load">{{ $t('ui.retry') }}</Button></EmptyContent>
+            <EmptyContent><Button variant="outline" size="sm" @click="load">{{ $t('common.label.retry') }}</Button></EmptyContent>
           </Empty>
         </CardContent>
       </Card>
@@ -97,12 +97,12 @@ const { ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, Ref
                 </div>
                 <div>
                   <dt class="text-[0.6875rem] text-muted-foreground">{{ $t('writeUp.originalScore') }}</dt>
-                  <dd class="font-mono text-lg font-semibold tabular-nums">{{ selected.originalTotalScore ?? '-' }} <span class="text-xs">{{ $t('ui.pts2') }}</span></dd>
+                  <dd class="font-mono text-lg font-semibold tabular-nums">{{ selected.originalTotalScore ?? '-' }} <span class="text-xs">{{ $t('common.label.pts.scoreTrendChart') }}</span></dd>
                 </div>
               </dl>
               <Button variant="outline" size="sm" :disabled="downloadPending" @click="download">
                 <Spinner v-if="downloadPending" data-icon="inline-start" />
-                <Download v-else data-icon="inline-start" />{{ $t('ui.download') }}
+                <Download v-else data-icon="inline-start" />{{ $t('writeups.label.download') }}
               </Button>
             </div>
           </CardHeader>
@@ -135,7 +135,7 @@ const { ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, Ref
                 </div>
                 <div>
                   <dt class="text-[0.6875rem] text-muted-foreground">{{ $t('writeUp.adjustedScore') }}</dt>
-                  <dd class="font-mono text-xl font-bold tabular-nums text-primary">{{ selected.adjustedTotalScore ?? '-' }} <span class="text-xs">{{ $t('ui.pts2') }}</span></dd>
+                  <dd class="font-mono text-xl font-bold tabular-nums text-primary">{{ selected.adjustedTotalScore ?? '-' }} <span class="text-xs">{{ $t('common.label.pts.scoreTrendChart') }}</span></dd>
                 </div>
               </dl>
             </div>
@@ -224,7 +224,7 @@ const { ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, Ref
           <AlertDescription>{{ $message(adjustmentError) }}</AlertDescription>
         </Alert>
         <AlertDialogFooter>
-          <AlertDialogCancel :disabled="adjustmentPending">{{ $t('ui.cancel') }}</AlertDialogCancel>
+          <AlertDialogCancel :disabled="adjustmentPending">{{ $t('common.action.cancel') }}</AlertDialogCancel>
           <Button :disabled="adjustmentPending" @click="confirmDeduction">
             <Spinner v-if="adjustmentPending" data-icon="inline-start" />
             {{ $t('writeUp.deductToZero') }}
@@ -258,18 +258,18 @@ const { ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, Ref
               </Select>
             </Field>
             <Field>
-              <FieldLabel for="writeup-consultation-title">{{ $t('ui.title') }}</FieldLabel>
+              <FieldLabel for="writeup-consultation-title">{{ $t('common.label.title') }}</FieldLabel>
               <Input id="writeup-consultation-title" v-model="consultationTitle" maxlength="160" required @input="clearConsultationError" />
             </Field>
             <Field>
-              <FieldLabel for="writeup-consultation-body">{{ $t('ui.content') }}</FieldLabel>
+              <FieldLabel for="writeup-consultation-body">{{ $t('common.label.content') }}</FieldLabel>
               <Textarea id="writeup-consultation-body" v-model="consultationBody" rows="7" maxlength="4000" required @input="clearConsultationError" />
               <FieldError v-if="consultationError">{{ $message(consultationError) }}</FieldError>
             </Field>
           </FieldGroup>
         </UiForm>
         <DialogFooter>
-          <Button variant="outline" :disabled="consultationPending" @click="setConsultationOpen(false)">{{ $t('ui.cancel') }}</Button>
+          <Button variant="outline" :disabled="consultationPending" @click="setConsultationOpen(false)">{{ $t('common.action.cancel') }}</Button>
           <Button :disabled="consultationPending || !consultationTitle.trim() || !consultationBody.trim()" @click="submitConsultation">
             <Spinner v-if="consultationPending" data-icon="inline-start" />{{ $t('writeUp.startConsultation') }}
           </Button>

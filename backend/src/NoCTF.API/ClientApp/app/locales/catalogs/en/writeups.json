@@ -1,6 +1,5 @@
-/** Runtime locale chunk. Keep keys stable across languages. */
-export const messages = {
-  "ui.download": "Download",
+{
+  "writeups.label.download": "Download",
   "writeUp.previewEmpty": "Select a WriteUp to preview it",
   "writeUp.participantDescription": "Submit the team's current PDF WriteUp. Any team member may update it, up to {size}.",
   "writeUp.submitted": "Submitted",
@@ -57,7 +56,7 @@ export const messages = {
   "writeUp.consultationFailed": "Failed to create the consultation",
   "writeUp.startConsultation": "Create and open consultation",
   "writeUp.teamWriteUpFiles": "Team WriteUp files",
-  "writeUp.sha256": "SHA-256 checksum",
+  "writeups.label.sha": "SHA-256 checksum",
   "writeUp.points": "{score} pts",
   "writeUp.reviewMetadata": "Submitted by {user} at {time}",
   "writeUp.originalRank": "Original rank",
@@ -68,4 +67,4 @@ export const messages = {
   "writeUp.notRequiredForCompetition": "This competition does not require a WriteUp, but the team may still submit one voluntarily.",
   "writeUp.deadlinePassed": "WriteUp submission closed at {deadline}. Teams that did not submit cannot submit late; existing WriteUps remain available to preview and download.",
   "writeUp.deadlineOpen": "WriteUp submission closes at {deadline}. The team may submit or replace its PDF until then."
-} as const
+}

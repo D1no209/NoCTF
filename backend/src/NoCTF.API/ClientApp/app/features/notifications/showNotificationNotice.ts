@@ -1,5 +1,5 @@
 import { h, markRaw, shallowReactive } from 'vue'
-import { toast } from 'vue-sonner'
+import { toast } from '../../utils/message-toast'
 
 import type { NoCtfapiEndpointsNotificationsNotificationResponse } from '../../api'
 import NotificationNoticeContentComponent from '../../components/views/layout/NotificationNoticeContent.vue'

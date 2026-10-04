@@ -31,7 +31,7 @@ function updateValue(value: string | number) {
       <InputGroupButton
         size="icon-xs"
         tabindex="-1"
-        :aria-label="$t(visible ? 'ui.hidePassword' : 'ui.showPassword')"
+        :aria-label="$t(visible ? 'common.label.hidePassword' : 'common.label.showPassword')"
         :aria-pressed="visible"
         @click="visible = !visible"
       >

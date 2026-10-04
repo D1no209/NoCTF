@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { localeTag } from '~/utils/i18n'
+import { localeTag } from '../../../utils/i18n'
 
 defineOptions({ inheritAttrs: false })
 const props = withDefaults(defineProps<{

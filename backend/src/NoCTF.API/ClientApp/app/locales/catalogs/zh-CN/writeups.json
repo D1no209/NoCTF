@@ -1,6 +1,5 @@
-/** Runtime locale chunk. Keep keys stable across languages. */
-export const messages = {
-  "ui.download": "下载",
+{
+  "writeups.label.download": "下载",
   "writeUp.previewEmpty": "选择一份题解以在线查看",
   "writeUp.participantDescription": "提交队伍当前的 PDF 题解，队伍成员均可更新，文件上限 {size}。",
   "writeUp.submitted": "已提交",
@@ -57,7 +56,7 @@ export const messages = {
   "writeUp.consultationFailed": "创建咨询失败",
   "writeUp.startConsultation": "创建并进入咨询",
   "writeUp.teamWriteUpFiles": "队伍题解文件",
-  "writeUp.sha256": "SHA-256 校验值",
+  "writeups.label.sha": "SHA-256 校验值",
   "writeUp.points": "{score} pts",
   "writeUp.reviewMetadata": "由 {user} 提交于 {time}",
   "writeUp.originalRank": "原始排名",
@@ -68,11 +67,4 @@ export const messages = {
   "writeUp.notRequiredForCompetition": "本竞赛未强制要求提交题解，队伍仍可自愿提交。",
   "writeUp.deadlinePassed": "题解提交已于 {deadline} 截止，未提交的队伍无法补交；已有题解仍可查看和下载。",
   "writeUp.deadlineOpen": "题解提交截止时间：{deadline}。截止前可提交或替换。"
-} as const
-export const englishSources = {
-  "Download": "ui.download",
-  "Submitted": "writeUp.submitted",
-  "Preview": "writeUp.preview",
-  "Challenge": "writeUp.challenge",
-  "Closed": "writeUp.submissionClosed"
-} as const
+}

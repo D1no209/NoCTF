@@ -74,7 +74,7 @@ const {
             </CardHeader>
             <CardContent class="flex flex-wrap items-center gap-2">
               <Button v-if="mayManage" variant="secondary" size="sm" @click="editTarget(target)">
-                {{ $t('ui.edit') }}
+                {{ $t('administration.label.edit') }}
               </Button>
               <Button
                 v-if="mayManage"
@@ -104,7 +104,7 @@ const {
                 @click="requestDelete(target)"
               >
                 <component :is="Trash2" data-icon="inline-start" />
-                {{ $t('ui.delete') }}
+                {{ $t('common.action.delete') }}
               </Button>
               <Badge v-if="testStates[target.id!] === 'Succeeded'" variant="outline">{{ $t('webhook.testSucceeded') }}</Badge>
               <Badge v-else-if="testStates[target.id!] === 'Failed'" variant="destructive">{{ $t('webhook.testFailed') }}</Badge>
@@ -207,10 +207,10 @@ const {
           </Field>
         </FieldGroup>
         <DialogFooter>
-          <Button variant="secondary" :disabled="saving" @click="setFormOpen(false)">{{ $t('ui.cancel') }}</Button>
+          <Button variant="secondary" :disabled="saving" @click="setFormOpen(false)">{{ $t('common.action.cancel') }}</Button>
           <Button :disabled="saving" @click="save">
             <Spinner v-if="saving" data-icon="inline-start" />
-            {{ $t('ui.save') }}
+            {{ $t('common.action.save') }}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -238,10 +238,10 @@ const {
           <AlertDialogDescription>{{ $t('webhook.deleteDescription', { name: deletingTarget?.name ?? '' }) }}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>{{ $t('ui.cancel') }}</AlertDialogCancel>
+          <AlertDialogCancel>{{ $t('common.action.cancel') }}</AlertDialogCancel>
           <AlertDialogAction :disabled="Boolean(pendingId)" @click="remove">
             <Spinner v-if="pendingId" data-icon="inline-start" />
-            {{ $t('ui.delete') }}
+            {{ $t('common.action.delete') }}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

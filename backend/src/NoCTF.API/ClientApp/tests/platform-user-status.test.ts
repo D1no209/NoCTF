@@ -14,7 +14,7 @@ describe('platform user account status management', () => {
     expect(source).toContain('<SelectItem value="Bot">')
     expect(source).toContain('adminPlatformCreateBot({')
     expect(source).toContain('roleFilter.value = \'Bot\'')
-    expect(source).toContain("$t('ui.createBot')")
+    expect(source).toContain("$t('administration.label.createBot')")
     expect(source).toContain('validation="feature"')
     expect(platform).not.toContain("to: '/admin/platform/bots'")
   })
@@ -33,7 +33,7 @@ describe('platform user account status management', () => {
 
     expect(source).toContain('adminPlatformPatchUser')
     expect(source).toContain("body: { accountStatus: pendingAccountStatus.value }")
-    expect(source).toContain('accountStatusConflictMessage(apiError.code) ?? apiError.message')
+    expect(source).toContain('accountStatusConflictMessage(apiError.code) ?? apiError.displayMessage')
     const handler = source.slice(
       source.indexOf('async function saveAccountStatus'),
       source.indexOf('async function invalidateTokens'),
@@ -55,9 +55,9 @@ describe('platform user account status management', () => {
     const source = await sourceFile(pageUrl).text()
 
     expect(source).toContain("case 'LastAdministratorProtected':")
-    expect(source).toContain("translate(\"ui.theLastActiveAdministratorCannotBeDeactivated\")")
+    expect(source).toContain("translate(\"administration.platformUsers.validation.lastActiveFormat\")")
     expect(source).toContain("case 'AnonymizedAccountImmutable':")
-    expect(source).toContain("translate(\"ui.anAnonymizedAccountCannotBeRestored\")")
+    expect(source).toContain("translate(\"administration.platformUsers.validation.anonymizedAccountFormat\")")
   })
 
   test('manages email activation independently through the generated SDK', async () => {
@@ -66,9 +66,9 @@ describe('platform user account status management', () => {
     expect(source).toContain('adminPlatformPatchUser')
     expect(source).toContain("body: { emailVerified: pendingEmailVerification.value === 'Verified' }")
     expect(source).toContain("(pendingEmailVerification === 'Verified') === detail.emailVerified")
-    expect(source).toContain("$t('ui.emailActivationStatus')")
-    expect(source).toContain("$t('ui.activated')")
-    expect(source).toContain("$t('ui.notActivated')")
+    expect(source).toContain("$t('administration.label.emailActivationStatus')")
+    expect(source).toContain("$t('administration.label.activated')")
+    expect(source).toContain("$t('administration.label.activated.usersPageView')")
     const handler = source.slice(
       source.indexOf('async function saveEmailVerification'),
       source.indexOf('async function invalidateTokens'),
@@ -84,7 +84,7 @@ describe('platform user account status management', () => {
     expect(source).toContain('adminPlatformUnbindSsoIdentity')
     expect(source).toContain('user.ssoBinding.subject')
     expect(source).toContain('detail.ssoBinding.boundAt')
-    expect(source).toContain("translate('sso.adminUnbindSuccessful')")
+    expect(source).toContain("describeMessage('sso.adminUnbindSuccessful')")
     expect(source).toContain("await navigateTo('/auth/login')")
   })
 })

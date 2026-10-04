@@ -1,7 +1,9 @@
+import { message as describeMessage } from '../../../../../utils/i18n'
+import type { UiMessage } from '../../../../../utils/i18n'
 import { proxyRefs } from 'vue'
 import { markRaw } from 'vue'
 
-import { toast } from 'vue-sonner'
+import { toast } from '../../../../../utils/message-toast'
 import { Copy, RefreshCw } from '@lucide/vue'
 import { deleteTeamEndpoint, getMyTeamBanCase, getMyTeamEndpoint, getTeamInvitationEndpoint, leaveTeamEndpoint, listCompetitionTracks, patchCompetitionTeam, rotateTeamInvitationEndpoint, submitTeamBanAppeal, teamAvatarClear, teamAvatarReplace } from '../../../../../api'
 import type { NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse, NoCtfapiEndpointsTeamsMyTeamBanCaseResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../../../api'
@@ -35,7 +37,7 @@ export function useCompetitionsByIdMyTeamPage() {
 
   const tracksLoading = ref(false)
 
-  const tracksError = ref<string | null>(null)
+  const tracksError = ref<UiMessage | null>(null)
 
   async function loadTracks(): Promise<void> {
     selectableTracks.value = []
@@ -50,8 +52,8 @@ export function useCompetitionsByIdMyTeamPage() {
     catch (error) {
       tracksError.value = parseApiError(
         error,
-        translate('ui.failedToLoadCompetitionTracksPleaseTryAgain'),
-      ).message
+        describeMessage('competitions.competitionOverview.error.loadCompetitionTracksFailed'),
+      ).displayMessage
     }
     finally {
       tracksLoading.value = false
@@ -62,13 +64,13 @@ export function useCompetitionsByIdMyTeamPage() {
 
   const loading = ref(true)
 
-  const loadError = ref<string | null>(null)
+  const loadError = ref<UiMessage | null>(null)
 
   const invitationToken = ref<string | null>(null)
 
   const invitationLoading = ref(false)
 
-  const invitationError = ref<string | null>(null)
+  const invitationError = ref<UiMessage | null>(null)
 
   async function loadInvitationToken() {
     if (!team.value || team.value.captainId !== user.value?.userId || team.value.isBanned) {
@@ -83,7 +85,7 @@ export function useCompetitionsByIdMyTeamPage() {
     })
     invitationLoading.value = false
     if (error || !data?.invitationToken) {
-      invitationError.value = parseApiError(error, translate("ui.failedToLoadInvitationCode")).message
+      invitationError.value = parseApiError(error, describeMessage("competitions.competitionsBy.error.loadInvitationCodeFailed")).displayMessage
       return
     }
     invitationToken.value = data.invitationToken
@@ -95,7 +97,7 @@ export function useCompetitionsByIdMyTeamPage() {
     loading.value = false
     if (error || !data) {
       team.value = null
-      if (error && response?.status !== 404) loadError.value = parseApiError(error).message
+      if (error && response?.status !== 404) loadError.value = parseApiError(error).displayMessage
       return
     }
     team.value = data
@@ -145,21 +147,21 @@ export function useCompetitionsByIdMyTeamPage() {
     })
     rotating.value = false
     if (error || !data?.invitationToken) {
-      toast.error(parseApiError(error, translate("ui.failedToRotateInvitationCode")).message)
+      toast.error(parseApiError(error, describeMessage("competitions.competitionsBy.error.rotateInvitationCodeFailed")).displayMessage)
       return
     }
     invitationToken.value = data.invitationToken
-    toast.success(translate("ui.theInvitationCodeHasBeenRotatedAndTheOldInvitation"))
+    toast.success(describeMessage("competitions.competitionsBy.description.invitationCodeRotatedOld"))
   }
 
   async function copyToken() {
     if (!invitationToken.value) return
     try {
       await navigator.clipboard.writeText(invitationToken.value)
-      toast.success(translate("ui.invitationCodeHasBeenCopied"))
+      toast.success(describeMessage("competitions.competitionsBy.label.invitationCodeCopied"))
     }
     catch {
-      toast.error(translate("ui.copyFailedPleaseManuallySelectCopy"))
+      toast.error(describeMessage("common.kohPanel.error.copyManuallySelectFailed"))
     }
   }
 
@@ -196,8 +198,8 @@ export function useCompetitionsByIdMyTeamPage() {
 
   function showOrganizationChangeSuccess(updatedTeam: NoCtfapiEndpointsTeamsTeamResponse): void {
     toast.success(updatedTeam.registrationStatus === 'Unregistered'
-      ? translate('ui.teamDraftSavedSubmitRegistration')
-      : translate('ui.teamChangesSavedAndApproved'))
+      ? translate('competitions.competitionsBy.label.teamDraftSavedSubmit')
+      : translate('competitions.competitionsBy.label.teamChangesSavedApproved'))
   }
 
   async function submitRename() {
@@ -213,7 +215,7 @@ export function useCompetitionsByIdMyTeamPage() {
     })
     renamePending.value = false
     if (error || !data) {
-      toast.error(teamRegistrationErrorMessage(error, translate("ui.failedToModifyTeamName")))
+      toast.error(teamRegistrationErrorMessage(error, translate("competitions.competitionsBy.error.modifyTeamNameFailed")))
       return
     }
     team.value = data
@@ -235,11 +237,11 @@ export function useCompetitionsByIdMyTeamPage() {
     avatarInputKey.value += 1
     if (!team.value || !file || avatarPending.value || !canEditOrganization.value) return
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      toast.error(translate('ui.avatarMustBeAJpegPngOrWebpImage'))
+      toast.error(describeMessage('common.competitionsBy.validation.avatarJpegFormat'))
       return
     }
     if (exceedsUploadLimit(file.size, maximumAvatarBytes.value)) {
-      toast.error(translate('ui.theUploadedFileIsTooLarge'))
+      toast.error(describeMessage('common.error.uploadTooLarge'))
       return
     }
     avatarPending.value = true
@@ -253,7 +255,7 @@ export function useCompetitionsByIdMyTeamPage() {
       if (team.value) showOrganizationChangeSuccess(team.value)
     }
     catch (error) {
-      toast.error(teamRegistrationErrorMessage(error, translate('ui.failedToUpdateTeamAvatar')))
+      toast.error(teamRegistrationErrorMessage(error, translate('competitions.competitionsBy.error.updateTeamAvatarFailed')))
     }
     finally {
       avatarPending.value = false
@@ -272,7 +274,7 @@ export function useCompetitionsByIdMyTeamPage() {
       if (team.value) showOrganizationChangeSuccess(team.value)
     }
     catch (error) {
-      toast.error(teamRegistrationErrorMessage(error, translate('ui.failedToClearTeamAvatar')))
+      toast.error(teamRegistrationErrorMessage(error, translate('competitions.competitionsBy.error.clearTeamAvatarFailed')))
     }
     finally {
       avatarPending.value = false
@@ -303,14 +305,14 @@ export function useCompetitionsByIdMyTeamPage() {
     })
     transferPending.value = false
     if (error) {
-      toast.error(parseApiError(error, translate("ui.transferOfCaptainFailed")).message)
+      toast.error(parseApiError(error, describeMessage("competitions.error.transferCaptainFailed")).displayMessage)
       return
     }
     transferOpen.value = false
     if (data) team.value = data
     toast.success(data?.registrationStatus === 'Unregistered'
-      ? translate('ui.captainTransferredRegistrationRequired')
-      : translate("ui.captainHasBeenTransferred"))
+      ? translate('competitions.validation.captainTransferredRequired')
+      : translate("competitions.label.captainTransferred"))
     if (!data) await load()
   }
 
@@ -324,10 +326,10 @@ export function useCompetitionsByIdMyTeamPage() {
     })
     acting.value = false
     if (error) {
-      toast.error(parseApiError(error, translate("ui.failedToDisbandTheTeam")).message)
+      toast.error(parseApiError(error, describeMessage("competitions.competitionsBy.error.disbandTeamFailed")).displayMessage)
       return
     }
-    toast.success(translate("ui.theTeamHasBeenDisbanded"))
+    toast.success(describeMessage("competitions.competitionsBy.label.teamDisbanded"))
     team.value = null
   }
 
@@ -336,10 +338,10 @@ export function useCompetitionsByIdMyTeamPage() {
     const { error } = await leaveTeamEndpoint({ path: { competitionId } })
     acting.value = false
     if (error) {
-      toast.error(parseApiError(error, translate("ui.failedToQuitTheTeam")).message)
+      toast.error(parseApiError(error, describeMessage("competitions.competitionsBy.error.quitTeamFailed")).displayMessage)
       return
     }
-    toast.success(translate("ui.hasLeftTheTeam"))
+    toast.success(describeMessage("competitions.label.leftTeam"))
     team.value = null
   }
 
@@ -351,15 +353,15 @@ export function useCompetitionsByIdMyTeamPage() {
 
   const appealPending = ref(false)
 
-  const appealError = ref<string | null>(null)
+  const appealError = ref<UiMessage | null>(null)
 
-  const banCaseError = ref<string | null>(null)
+  const banCaseError = ref<UiMessage | null>(null)
 
   async function loadBanCase() {
     banCaseError.value = null
     const { data, error } = await getMyTeamBanCase({ path: { competitionId } })
     if (error || !data) {
-      banCaseError.value = parseApiError(error, translate("ui.failedToLoadTheBanAndAppealStatus")).message
+      banCaseError.value = parseApiError(error, describeMessage("competitions.competitionsBy.error.loadBanAppealFailed")).displayMessage
       return
     }
     banCase.value = data
@@ -373,7 +375,7 @@ export function useCompetitionsByIdMyTeamPage() {
   )
 
   const appealStatusLabel = (status?: string) =>
-    ({ Submitted: translate("ui.appealing"), Upheld: translate("ui.dismissed"), Accepted: translate("ui.passed") } as Record<string, string>)[String(status)] ?? translate("ui.unknown")
+    ({ Submitted: translate("competitions.label.appealing"), Upheld: translate("common.label.dismissed"), Accepted: translate("common.label.passed") } as Record<string, string>)[String(status)] ?? translate("common.label.unknown")
 
   async function submitAppeal() {
     if (appealPending.value) return
@@ -387,18 +389,18 @@ export function useCompetitionsByIdMyTeamPage() {
         body: { statement: appealStatement.value.trim() },
       })
       if (error) {
-        appealError.value = parseApiError(error, translate("ui.failedToSubmitAppeal")).message
+        appealError.value = parseApiError(error, describeMessage("competitions.error.submitAppealFailed")).displayMessage
         toast.error(appealError.value)
         return
       }
-      toast.success(translate("ui.appealSubmitted"))
+      toast.success(describeMessage("competitions.label.appealSubmitted"))
       appealOpen.value = false
       appealStatement.value = ''
       appealError.value = null
       await loadBanCase()
     }
     catch (error) {
-      appealError.value = parseApiError(error, translate("ui.failedToSubmitAppeal")).message
+      appealError.value = parseApiError(error, describeMessage("competitions.error.submitAppealFailed")).displayMessage
       toast.error(appealError.value)
     }
     finally {
