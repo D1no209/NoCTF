@@ -12,7 +12,7 @@
         "@microsoft/kiota-http-fetchlibrary": "1.0.0-preview.102",
         "@microsoft/kiota-serialization-form": "1.0.0-preview.102",
         "@microsoft/kiota-serialization-json": "1.0.0-preview.102",
-        "@microsoft/kiota-serialization-multipart": "1.0.0-preview.102",
+        "@microsoft/kiota-serialization-multipart": "1.0.0-preview.109",
         "@microsoft/kiota-serialization-text": "1.0.0-preview.102",
         "@microsoft/signalr": "^10.0.11",
         "@nuxt/scripts": "1.3.9",
@@ -266,7 +266,7 @@
 
     "@microsoft/kiota-serialization-json": ["@microsoft/kiota-serialization-json@1.0.0-preview.102", "", { "dependencies": { "@microsoft/kiota-abstractions": "^1.0.0-preview.102", "tslib": "^2.6.2" } }, "sha512-YpIt5pXNX13ND736oJFf0wBYPAafCv+CAE17Fa1HcS1drCdXx8ELPQ5GxGDbQG7J5LIMDgUtBOUmf5R/FrMQ6A=="],
 
-    "@microsoft/kiota-serialization-multipart": ["@microsoft/kiota-serialization-multipart@1.0.0-preview.102", "", { "dependencies": { "@microsoft/kiota-abstractions": "^1.0.0-preview.102", "tslib": "^2.6.2" } }, "sha512-tjwt0m+8+OqZizZU6gBARTcA8suPYS0onD9IUbhKsvRrAJpBIyp07hnyOTXBgE+gurGGbeT3TTl9AUK2ic6DiA=="],
+    "@microsoft/kiota-serialization-multipart": ["@microsoft/kiota-serialization-multipart@1.0.0-preview.109", "", { "dependencies": { "@microsoft/kiota-abstractions": "^1.0.0-preview.109", "tslib": "^2.6.2" } }, "sha512-Q2gQjSjMnwHuXMQcHpIKe8FUIje1mR4Iv5fnUL9VABBcZoCG3P2bHhW5YGOdvfX8GSSpuFpOfIfiAIyWYpqBAw=="],
 
     "@microsoft/kiota-serialization-text": ["@microsoft/kiota-serialization-text@1.0.0-preview.102", "", { "dependencies": { "@microsoft/kiota-abstractions": "^1.0.0-preview.102", "tslib": "^2.6.2" } }, "sha512-ZCihyrXKYGfTz/frqNQvwKsD+EgjhjfclB5/XDrSGNXduisL/f1MbyvjsgmrZnLmtCwX8/v+Mc3vlz716KWYbg=="],
 
