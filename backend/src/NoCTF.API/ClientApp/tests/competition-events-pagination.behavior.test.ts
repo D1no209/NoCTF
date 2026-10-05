@@ -1,9 +1,10 @@
 import { describe, expect, test } from 'bun:test'
-import { effectScope, nextTick, ref, watch } from 'vue'
+import { computed, effectScope, nextTick, ref, watch } from 'vue'
 import { useOffsetPagination } from '../app/composables/useOffsetPagination'
 import { competitionEventHistoryRange } from '../app/lib/competition-event-history'
 import { createTrailingRefresh } from '../app/lib/latest-page-refresh'
 import { competitionChallengesPath } from '../app/utils/app-routes'
+import { adminCompetitionPath } from '../app/features/admin/admin-navigation'
 import { parseApiError } from '../app/utils/api-error'
 
 const source = await Bun.file(new URL('../app/features/routes/competitions/[id]/useCompetitionsByIdEventsPage.ts', import.meta.url)).text()
@@ -33,7 +34,7 @@ async function harness(options: Options = {}) {
   let unsubscribed = false
   const scope = effectScope()
   const state = scope.run(() => factory({
-    ref, watch, useOffsetPagination, competitionEventHistoryRange, createTrailingRefresh, competitionChallengesPath, parseApiError,
+    ref, computed, watch, useOffsetPagination, competitionEventHistoryRange, createTrailingRefresh, competitionChallengesPath, adminCompetitionPath, parseApiError,
     ArrowLeft: {}, competitionContextKey: {}, inject: () => ({ competition }),
     useRoute: () => ({ params: { id: 'competition' }, query: { kind: options.initialKind } }),
     useAuth: () => ({ isAdministrator: ref(options.administrator ?? true), canOrganize: ref(options.organizer ?? false) }),
@@ -84,7 +85,8 @@ describe('competition event pagination and navigation', () => {
     const app = await harness()
     try {
       const { state } = app
-      expect(state.competitionReturnPath).toBe('/competitions/competition/challenges')
+      expect(state.competitionReturnPath.value).toBe('/admin/competitions/competition')
+      expect(state.competitionReturnLabel.value).toBe('competitions.label.backToAdministration')
       expect(state.pageLimit.value).toBe(10)
       expect(state.pageCount.value).toBe(3)
       expect(state.total.value).toBe(23)
@@ -161,6 +163,8 @@ describe('competition event pagination and navigation', () => {
     try {
       expect(staff.scopeRequests()).toBe(1)
       expect(staff.state.hasStaffHistory.value).toBeTrue()
+      expect(staff.state.competitionReturnPath.value).toBe('/competitions/competition/challenges')
+      expect(staff.state.competitionReturnLabel.value).toBe('common.label.backCompetition')
       expect(staff.requests[0]?.from).toBeUndefined()
       expect(staff.requests[0]?.to).toBeUndefined()
     }
@@ -169,6 +173,8 @@ describe('competition event pagination and navigation', () => {
     try {
       expect(participant.scopeRequests()).toBe(0)
       expect(participant.state.hasStaffHistory.value).toBeFalse()
+      expect(participant.state.competitionReturnPath.value).toBe('/competitions/competition/challenges')
+      expect(participant.state.competitionReturnLabel.value).toBe('common.label.backCompetition')
       const initial = participant.requests[0]!
       expect(Date.parse(initial.to!) - Date.parse(initial.from!)).toBe(30 * 24 * 60 * 60 * 1000)
       const serverTime = new Date(Date.now() + 60_000).toISOString()

@@ -2,6 +2,7 @@ import { message as describeMessage } from '../../../../utils/i18n'
 import type { UiMessage } from '../../../../utils/i18n'
 import { ArrowLeft } from '@lucide/vue'
 import { competitionChallengesPath } from '../../../../utils/app-routes'
+import { adminCompetitionPath } from '../../../admin/admin-navigation'
 import { useOffsetPagination } from '../../../../composables/useOffsetPagination'
 import { createTrailingRefresh } from '../../../../lib/latest-page-refresh'
 import { adminGetCompetition, listCompetitionEvents } from '../../../../api'
@@ -16,11 +17,16 @@ export function useCompetitionsByIdEventsPage() {
 
   const competitionId = route.params.id as string
 
-  const competitionReturnPath = competitionChallengesPath(competitionId)
-
   const ctx = inject(competitionContextKey)!
 
   const { canOrganize, isAdministrator } = useAuth()
+
+  const competitionReturnPath = computed(() => isAdministrator.value
+    ? adminCompetitionPath(competitionId)
+    : competitionChallengesPath(competitionId))
+  const competitionReturnLabel = computed(() => isAdministrator.value
+    ? 'competitions.label.backToAdministration' as const
+    : 'common.label.backCompetition' as const)
 
   const hasStaffHistory = ref(isAdministrator.value)
 
@@ -133,6 +139,7 @@ export function useCompetitionsByIdEventsPage() {
       initialize,
       ArrowLeft,
       competitionReturnPath,
+      competitionReturnLabel,
       hasStaffHistory,
       historyScopeError,
       kind,

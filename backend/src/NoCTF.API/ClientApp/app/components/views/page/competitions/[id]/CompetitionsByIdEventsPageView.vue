@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { CompetitionsByIdEventsPageViewState } from '~/features/routes/competitions/[id]/useCompetitionsByIdEventsPage'
 
 const viewProps = defineProps<{ state: CompetitionsByIdEventsPageViewState }>()
-const { ArrowLeft, competitionReturnPath, hasStaffHistory, historyScopeError, kind, kindOptions, items, loading, error, initialized, page, pageCount, total, pageLimit, loadPage, setPageSize, reload, levelVariant, levelLabel } = toRefs(viewProps.state)
+const { ArrowLeft, competitionReturnPath, competitionReturnLabel, hasStaffHistory, historyScopeError, kind, kindOptions, items, loading, error, initialized, page, pageCount, total, pageLimit, loadPage, setPageSize, reload, levelVariant, levelLabel } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -11,7 +11,7 @@ const { ArrowLeft, competitionReturnPath, hasStaffHistory, historyScopeError, ki
     <div>
       <Button variant="ghost" size="sm" as-child>
         <NuxtLink :to="competitionReturnPath">
-          <ArrowLeft data-icon="inline-start" />{{ $t('common.label.backCompetition') }}
+          <ArrowLeft data-icon="inline-start" />{{ $t(competitionReturnLabel) }}
         </NuxtLink>
       </Button>
     </div>

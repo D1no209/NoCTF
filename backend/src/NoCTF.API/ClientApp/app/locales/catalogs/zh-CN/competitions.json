@@ -1,4 +1,5 @@
 {
+  "competitions.label.backToAdministration": "返回管理后台",
   "progression.title": "闯关与勋章",
   "progression.description": "从赛事题目和勋章目录导入节点，再用连线定义前驱条件。",
   "progression.ctfOnly": "闯关图目前只支持 CTF 比赛。",
