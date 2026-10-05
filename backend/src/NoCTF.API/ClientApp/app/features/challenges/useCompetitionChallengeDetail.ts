@@ -1,15 +1,11 @@
-
-import { ResponseMetadata, nativeResponse } from '../../lib/api'
-
-import { api, RequestPolicyOption, } from '../../lib/api'
 import { message as describeMessage } from '../../utils/i18n'
 import type { UiMessage } from '../../utils/i18n'
 import { markRaw, provide, toRefs } from 'vue'
 
 import { toast } from '../../utils/message-toast'
 import { Dice5, FileDown, History } from '@lucide/vue'
-
-import type { NoCTFAPIEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol, NoCTFAPIEndpointsAdministrationChallengeBankChallengeAttachmentResponse, NoCTFAPIEndpointsChallengesChallengeResponse } from '../../api/models'
+import { downloadChallengeAttachmentEndpoint, downloadRandomChallengeAttachmentEndpoint, getChallengeEndpoint, listChallengeAttachmentsEndpoint, startProgressionChallenge } from '../../api'
+import type { NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol, NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse, NoCtfapiEndpointsChallengesChallengeResponse } from '../../api'
 import { downloadSdkFileToDisk } from '../../utils/download'
 import ChallengeHintsComponent from './ChallengeHints.vue'
 import ChallengeSubmissionHistoryComponent from './ChallengeSubmissionHistory.vue'
@@ -23,21 +19,21 @@ import { challengeGameplayFactStatusKey, createChallengeGameplayFactStatusReader
 export function useCompetitionChallengeDetail(props: Readonly<{
   competitionId: string
   competitionChallengeId: string
-  flagDockTarget?: string | null
+  flagDockTarget?: string
 }>) {
   const ctx = inject(competitionContextKey)!
 
   const { isLoggedIn, ready: authReady, user } = useAuth()
 
-  const challenge = ref<NoCTFAPIEndpointsChallengesChallengeResponse | null>(null)
+  const challenge = ref<NoCtfapiEndpointsChallengesChallengeResponse | null>(null)
 
   const loading = ref(true)
 
   const error = ref<UiMessage | null>(null)
 
-  const attachments = ref<NoCTFAPIEndpointsAdministrationChallengeBankChallengeAttachmentResponse[]>([])
+  const attachments = ref<NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse[]>([])
 
-  const attachmentDeliveryPolicy = ref<NoCTFAPIEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol>('All')
+  const attachmentDeliveryPolicy = ref<NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol>('All')
 
   const attachmentsLoading = ref(false)
 
@@ -79,24 +75,34 @@ export function useCompetitionChallengeDetail(props: Readonly<{
         && entry.value.challengeId === props.competitionChallengeId
         ? entry.value.revision : undefined
       entry.value = null
-      let startedError: unknown;
-      const startedResponse = new ResponseMetadata();
-      await api.api.v1.competitions.byCompetitionId(props.competitionId).challenges.byCompetitionChallengeId(props.competitionChallengeId).start.post({ expectedRevision }, { options: [new RequestPolicyOption({ signal: reads.signal, response: startedResponse })] }).catch(cause => { startedError = cause; return undefined });
+      const started = await startProgressionChallenge({
+        signal: reads.signal,
+        path: {
+          competitionId: props.competitionId,
+          competitionChallengeId: props.competitionChallengeId,
+        },
+        body: { expectedRevision },
+      })
       if (sequence !== loadSequence) return
-      if (startedError) {
+      if (started.error) {
         loading.value = false
-        if (startedResponse?.status === 409 || startedResponse?.status === 404) {
+        if (started.response?.status === 409 || started.response?.status === 404) {
           await navigateTo({ path: `/competitions/${props.competitionId}/progression`,
             query: { blocked: props.competitionChallengeId } })
           return
         }
-        error.value = parseApiError(startedError, describeMessage('progression.startFailed')).displayMessage
+        error.value = parseApiError(started.error, describeMessage('progression.startFailed')).displayMessage
         return
       }
     }
 
-    let requestError: unknown;
-    const data = await api.api.v1.competitions.byCompetitionId(props.competitionId).challenges.byCompetitionChallengeId(props.competitionChallengeId).get({ options: [new RequestPolicyOption({ signal: reads.signal })] }).catch(cause => { requestError = cause; return undefined });
+    const { data, error: requestError } = await getChallengeEndpoint({
+      signal: reads.signal,
+      path: {
+        competitionId: props.competitionId,
+        competitionChallengeId: props.competitionChallengeId,
+      },
+    })
     if (sequence !== loadSequence) return
     loading.value = false
     if (requestError || !data) {
@@ -117,8 +123,13 @@ export function useCompetitionChallengeDetail(props: Readonly<{
     const challengeId = props.competitionChallengeId
     attachmentsLoading.value = true
     attachmentError.value = null
-    let requestError: unknown;
-    const data = await api.api.v1.competitions.byCompetitionId(props.competitionId).challenges.byCompetitionChallengeId(challengeId).attachments.get({ options: [new RequestPolicyOption({ signal: reads.signal })] }).catch(cause => { requestError = cause; return undefined });
+    const { data, error: requestError } = await listChallengeAttachmentsEndpoint({
+      signal: reads.signal,
+      path: {
+        competitionId: props.competitionId,
+        competitionChallengeId: challengeId,
+      },
+    })
     if (reads.signal.aborted || challengeId !== props.competitionChallengeId) return
     attachmentsLoading.value = false
     if (requestError || !data) {
@@ -151,7 +162,15 @@ export function useCompetitionChallengeDetail(props: Readonly<{
     if (downloading.value) return
     downloading.value = true
     try {
-      await downloadSdkFileToDisk(() => nativeResponse(responseOptions => api.api.v1.competitions.byCompetitionId(props.competitionId).challenges.byCompetitionChallengeId(props.competitionChallengeId).attachments.byAttachmentId(attachmentId).get({ options: [...responseOptions] })),
+      await downloadSdkFileToDisk(
+        parseAs => downloadChallengeAttachmentEndpoint({
+          path: {
+            competitionId: props.competitionId,
+            competitionChallengeId: props.competitionChallengeId,
+            attachmentId,
+          },
+          parseAs,
+        }),
         fileName,
       )
     }
@@ -167,7 +186,14 @@ export function useCompetitionChallengeDetail(props: Readonly<{
     if (downloading.value) return
     downloading.value = true
     try {
-      await downloadSdkFileToDisk(() => nativeResponse(responseOptions => api.api.v1.competitions.byCompetitionId(props.competitionId).challenges.byCompetitionChallengeId(props.competitionChallengeId).attachment.get({ options: [...responseOptions] })),
+      await downloadSdkFileToDisk(
+        parseAs => downloadRandomChallengeAttachmentEndpoint({
+          path: {
+            competitionId: props.competitionId,
+            competitionChallengeId: props.competitionChallengeId,
+          },
+          parseAs,
+        }),
         'attachment',
       )
     }

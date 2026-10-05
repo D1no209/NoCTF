@@ -1,20 +1,18 @@
-
-import { api } from '../../../lib/api'
 import { markRaw, toRefs } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import { isCtfPracticeOpen } from '../../../lib/competition-participation'
-
-import type { NoCTFAPIEndpointsChallengesChallengeResponse, NoCTFAPIEndpointsCompetitionsCompetitionResponse, NoCTFAPIEndpointsGameplayFactsPatchVerificationStateResponse } from '../../../api/models'
+import { getPatchVerificationEndpoint } from '../../../api'
+import type { NoCtfapiEndpointsChallengesChallengeResponse, NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsGameplayFactsPatchVerificationStateResponse } from '../../../api'
 import FlagSubmitComponent from '../FlagSubmit.vue'
 import FixSubmitComponent from '../FixSubmit.vue'
 import RuntimeCardComponent from '../RuntimeCard.vue'
 
 /** Owns state, effects and commands for CtfPanel. */
 export function useCtfPanel(props: Readonly<{
-  competition: NoCTFAPIEndpointsCompetitionsCompetitionResponse
-  challenge: NoCTFAPIEndpointsChallengesChallengeResponse
-  flagDockTarget?: string | null
-  runtimeDockTarget?: string | null
+  competition: NoCtfapiEndpointsCompetitionsCompetitionResponse
+  challenge: NoCtfapiEndpointsChallengesChallengeResponse
+  flagDockTarget?: string
+  runtimeDockTarget?: string
 }>,
 emit: { (event: "submitted", ...args: []): void; (event: "remainingChanged", ...args: [remaining: number | null]): void }) {
   const practiceOpen = computed(() => isCtfPracticeOpen(props.competition))
@@ -25,7 +23,7 @@ emit: { (event: "submitted", ...args: []): void; (event: "remainingChanged", ...
     ? props.challenge.patchVerificationAvailable === true
     : props.competition.status === 'Running' || practiceOpen.value)
 
-  const patchVerification = ref<NoCTFAPIEndpointsGameplayFactsPatchVerificationStateResponse>({
+  const patchVerification = ref<NoCtfapiEndpointsGameplayFactsPatchVerificationStateResponse>({
     patchVerificationAvailable: props.challenge.patchVerificationAvailable,
     maximumAttempts: props.challenge.maximumPatchAttempts ?? undefined,
     acceptedAttempts: props.challenge.acceptedPatchAttempts ?? undefined,
@@ -39,8 +37,12 @@ emit: { (event: "submitted", ...args: []): void; (event: "remainingChanged", ...
 
   async function refreshPatchVerification(): Promise<boolean> {
     if (!isPatchVerification.value || !props.competition.id || !props.challenge.id) return true
-    let error: unknown;
-    const data = await api.api.v1.competitions.byCompetitionId(props.competition.id).challenges.byCompetitionChallengeId(props.challenge.id).patchVerification.get().catch(cause => { error = cause; return undefined });
+    const { data, error } = await getPatchVerificationEndpoint({
+      path: {
+        competitionId: props.competition.id,
+        competitionChallengeId: props.challenge.id,
+      },
+    })
     if (error || !data) throw parseApiError(error)
     patchVerification.value = data
     emit('remainingChanged', data.remainingAttempts ?? null)

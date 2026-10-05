@@ -47,7 +47,7 @@ const { Download, Eye, FileText, maximumWriteUpBytes, competitionId, submissionR
             <Field>
               <FieldLabel for="team-writeup-file">{{ writeUp ? $t('writeUp.replacePdf') : $t('writeUp.selectPdf') }}</FieldLabel>
               <FileUpload
-                :key="uploadInputKey ?? undefined"
+                :key="uploadInputKey"
                 id="team-writeup-file"
                 accept="application/pdf,.pdf"
                 :pending="uploadPending"

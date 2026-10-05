@@ -19,7 +19,7 @@ const { Activity, eventText, eventTime, setViewportRef, setGroupRef, setTrackRef
     >
       <div v-if="events.length" :ref="setTrackRef" class="ticker-track">
         <div :ref="setGroupRef" class="ticker-group">
-          <article v-for="event in events" :key="event.id ?? undefined" :class="['ticker-card', event.action, event.outcome]">
+          <article v-for="event in events" :key="event.id" :class="['ticker-card', event.action, event.outcome]">
             <time>{{ eventTime(event.occurredAt) }}</time><span>{{ eventText(event) }}</span>
           </article>
         </div>

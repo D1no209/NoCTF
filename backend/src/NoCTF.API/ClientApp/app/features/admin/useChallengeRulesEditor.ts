@@ -1,5 +1,5 @@
 import { markRaw, toRefs } from 'vue'
-import type { NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeRulesContract, NoCTFAPIEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract } from '../../api/models'
+import type { NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract, NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract } from '../../api'
 
 import type { ConfigFieldDef, ConfigValues, GameModeValue } from '../../utils/game-config'
 import { buildConfigValues, challengeRuleFields, readConfigValues } from '../../utils/game-config'
@@ -8,22 +8,22 @@ import ConfigFieldInputComponent from './ConfigFieldInput.vue'
 /** Owns state, effects and commands for ChallengeRulesEditor. */
 export function useChallengeRulesEditor(props: Readonly<Omit<{
   mode: GameModeValue
-  rules?: NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeRulesContract | null
-  inheritedConfiguration?: NoCTFAPIEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract | null
+  rules?: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract | null
+  inheritedConfiguration?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract | null
   readonly?: boolean
   loading?: boolean
   saving?: boolean
   hiddenKeys?: string[]
 }, "rules" | "inheritedConfiguration" | "readonly" | "loading" | "saving" | "hiddenKeys"> & Required<Pick<{
   mode: GameModeValue
-  rules?: NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeRulesContract | null
-  inheritedConfiguration?: NoCTFAPIEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract | null
+  rules?: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract | null
+  inheritedConfiguration?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract | null
   readonly?: boolean
   loading?: boolean
   saving?: boolean
   hiddenKeys?: string[]
 }, "rules" | "inheritedConfiguration" | "readonly" | "loading" | "saving" | "hiddenKeys">>>,
-emit: { (event: "save", ...args: [rules: NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeRulesContract]): void }) {
+emit: { (event: "save", ...args: [rules: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract]): void }) {
   const fields = computed(() => challengeRuleFields(props.mode)
     .filter(field => !props.hiddenKeys.includes(field.key)))
 
@@ -104,7 +104,7 @@ emit: { (event: "save", ...args: [rules: NoCTFAPIEndpointsAdministrationChalleng
     buildConfigValues(props.mode, fields.value, values.value, {
       rules: true,
       overridden: overridden.value,
-    }) as NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeRulesContract,
+    }) as NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract,
   )
 
   const dirty = computed(() => {

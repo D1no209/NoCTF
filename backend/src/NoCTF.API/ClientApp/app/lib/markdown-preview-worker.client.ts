@@ -2,8 +2,8 @@ import { renderMarkdownAsync } from './markdown'
 
 interface WorkerResponse {
   id: number
-  html?: string | null
-  error?: string | null
+  html?: string
+  error?: string
 }
 
 let markdownWorker: Worker | undefined

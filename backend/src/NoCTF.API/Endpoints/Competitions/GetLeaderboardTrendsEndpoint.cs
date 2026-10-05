@@ -47,7 +47,7 @@ public sealed class GetLeaderboardTrendsEndpoint(
     {
         Get("/competitions/{competitionId}/leaderboard/trends");
         AllowAnonymous();
-        Summary(summary => { summary.Summary = "Get CTF team score trends from the authoritative scoreboard projection."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Get CTF team score trends from the authoritative scoreboard projection.");
     }
 
     public override async Task<Results<Ok<ScoreboardTrendsResponse>, Accepted<LeaderboardProcessingProtocolResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(

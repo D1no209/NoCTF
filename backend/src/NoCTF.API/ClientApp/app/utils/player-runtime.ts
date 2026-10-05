@@ -1,7 +1,6 @@
-import { dateTimestamp } from './date-value'
-import type { NoCTFAPIEndpointsRuntimeRuntimeResponse } from '../api/models'
+import type { NoCtfapiEndpointsRuntimeRuntimeResponse } from '../api'
 
-type PlayerRuntime = NoCTFAPIEndpointsRuntimeRuntimeResponse
+type PlayerRuntime = NoCtfapiEndpointsRuntimeRuntimeResponse
 type RuntimeStateValue = NonNullable<PlayerRuntime['state']>
 
 export type PlayerRuntimeLookupOutcome = 'available' | 'missing' | 'failed'
@@ -17,7 +16,7 @@ export function normalizePlayerRuntime(runtime: PlayerRuntime | null): PlayerRun
 }
 
 export function classifyPlayerRuntimeLookup(
-  status: number | null | undefined,
+  status: number | undefined,
   hasError: boolean,
   hasData: boolean,
 ): PlayerRuntimeLookupOutcome {
@@ -31,6 +30,6 @@ export function shouldPollPlayerRuntime(runtime: PlayerRuntime | null, now: numb
   if (TRANSITIONAL_STATES.has(runtime.state)) return true
   if (runtime.state !== 'Running' || !runtime.expiresAt) return false
 
-  const expiresAt = dateTimestamp(runtime.expiresAt)
+  const expiresAt = Date.parse(runtime.expiresAt)
   return Number.isFinite(expiresAt) && expiresAt <= now
 }

@@ -8,7 +8,7 @@ describe('competition challenge deletion', () => {
     ).text()
 
     expect(page).toContain('async function setChallengePublished(')
-    expect(page).toMatch(/api\.api\.v1\.admin\.competitions\.byCompetitionId\([^)]*\)\.challenges\.byCompetitionChallengeId\([^)]*\)\.patch\(/)
+    expect(page).toContain('adminPatchCompetitionChallenge({')
     expect(page).toContain('isPublished: published')
     expect(page).toContain('@update:model-value="setChallengePublished(c, $event)"')
     expect(page).toContain("published ? 'common.label.challengeWasPublished' : 'common.label.challengeWasUnpublished'")
@@ -72,7 +72,7 @@ describe('competition challenge deletion', () => {
 
     expect(deleteSection).toContain('function closeDeleteDialog(open: boolean)')
     expect(deleteSection).toContain('if (!open && !deletePending.value)')
-    expect(deleteSection).toContain('function beginDeleteChallenge(c: NoCTFAPIEndpointsChallengesChallengeSummaryResponse)')
+    expect(deleteSection).toContain('function beginDeleteChallenge(c: NoCtfapiEndpointsChallengesChallengeSummaryResponse)')
     expect(deleteSection).toContain('@click="beginDeleteChallenge(c)"')
     expect(deleteSection).toContain('const target = deleteTarget.value')
     expect(deleteSection).toContain('if (!target?.id || deletePending.value) return')
@@ -91,8 +91,8 @@ describe('competition challenge deletion', () => {
 
     const deleteHandler = page.slice(page.indexOf('async function removeChallenge()'), page.indexOf('async function restoreChallenge'))
 
-    expect(deleteHandler).toMatch(/api\.api\.v1\.admin\.competitions\.byCompetitionId\([^)]*\)\.challenges\.byCompetitionChallengeId\([^)]*\)\.delete\(/)
-    expect(deleteHandler).toContain('.byCompetitionId(competitionId).challenges.byCompetitionChallengeId(target.id)')
+    expect(deleteHandler).toContain('adminDeleteCompetitionChallenge')
+    expect(deleteHandler).toContain('path: { competitionId, competitionChallengeId: target.id }')
     expect(deleteHandler).not.toContain('query:')
     expect(deleteHandler).toContain("toast.success(describeMessage(\"administration.label.questionDeleted\"))")
     expect(deleteHandler).toContain('deleteTarget.value = null')

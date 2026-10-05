@@ -1,21 +1,21 @@
-import type { NoCTFAPIEndpointsChallengesChallengeSummaryResponse, NoCTFAPIEndpointsCompetitionsCompetitionResponse, NoCTFAPIEndpointsCompetitionsGameModeProtocol } from '../../api/models'
+import type { NoCtfapiEndpointsChallengesChallengeSummaryResponse, NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsCompetitionsGameModeProtocol } from '../../api'
 import { adminCompetitionPath } from '../../utils/app-routes'
 
-export type ManagedPlacementCompetition = NoCTFAPIEndpointsCompetitionsCompetitionResponse & { id: string }
+export type ManagedPlacementCompetition = NoCtfapiEndpointsCompetitionsCompetitionResponse & { id: string }
 export interface ChallengeCompetitionPlacement {
   competition: ManagedPlacementCompetition
-  instances: NoCTFAPIEndpointsChallengesChallengeSummaryResponse[]
+  instances: NoCtfapiEndpointsChallengesChallengeSummaryResponse[]
   nextOrder: number
 }
 
-export function writablePlacementCompetitions(items: NoCTFAPIEndpointsCompetitionsCompetitionResponse[]): ManagedPlacementCompetition[] {
+export function writablePlacementCompetitions(items: NoCtfapiEndpointsCompetitionsCompetitionResponse[]): ManagedPlacementCompetition[] {
   return items.filter((item): item is ManagedPlacementCompetition => !!item.id && !item.deletedAt
     && (item.administrationRole === 'Owner' || item.administrationRole === 'Manager'))
 }
 
 export function projectChallengePlacements(
   competition: ManagedPlacementCompetition,
-  challenges: NoCTFAPIEndpointsChallengesChallengeSummaryResponse[],
+  challenges: NoCtfapiEndpointsChallengesChallengeSummaryResponse[],
   challengeId: string,
 ): ChallengeCompetitionPlacement {
   const active = challenges.filter(challenge => !challenge.deletedAt)
@@ -26,7 +26,7 @@ export function projectChallengePlacements(
   }
 }
 
-export function availablePlacementCompetitions(items: ChallengeCompetitionPlacement[], mode: NoCTFAPIEndpointsCompetitionsGameModeProtocol) {
+export function availablePlacementCompetitions(items: ChallengeCompetitionPlacement[], mode: NoCtfapiEndpointsCompetitionsGameModeProtocol) {
   return items.filter(item => item.competition.mode === mode && item.instances.length === 0)
 }
 

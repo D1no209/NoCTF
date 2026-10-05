@@ -1,13 +1,13 @@
 import { toRefs } from 'vue'
 
 import { Flag, Shield, ShieldCheck, ShieldX } from '@lucide/vue'
-import type { NoCTFAPIEndpointsCompetitionsGameModeProtocol, NoCTFAPIEndpointsCompetitionsScoreboardSlotResponse } from '../../api/models'
+import type { NoCtfapiEndpointsCompetitionsGameModeProtocol, NoCtfapiEndpointsCompetitionsScoreboardSlotResponse } from '../../api'
 import { scoreboardSlotSignals } from '../../utils/scoreboard'
 
 /** Owns state, effects and commands for ScoreboardSlotStatus. */
 export function useScoreboardSlotStatus(props: Readonly<{
-  mode?: NoCTFAPIEndpointsCompetitionsGameModeProtocol | null
-  slot: NoCTFAPIEndpointsCompetitionsScoreboardSlotResponse
+  mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol | null
+  slot: NoCtfapiEndpointsCompetitionsScoreboardSlotResponse
 }>) {
   const signals = computed(() => scoreboardSlotSignals(props.slot, props.mode))
 

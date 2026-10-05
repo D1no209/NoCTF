@@ -30,7 +30,7 @@ public sealed class ReplaceSsoProviderSecretEndpoint(
         AuthSchemes("Bearer");
         Roles("Administrator");
         Description(builder => builder.WithName("AdminPlatformSsoReplaceProviderSecret"));
-        Summary(summary => { summary.Summary = "Replaces an OIDC client secret without returning it."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Replaces an OIDC client secret without returning it.");
     }
 
     public override async Task<Results<Ok<SsoConfigurationResponse>, ProblemHttpResult>> ExecuteAsync(

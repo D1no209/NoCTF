@@ -54,7 +54,7 @@ const { Plus, RotateCw, FlaskConical, configuration, loading, loadError, globalF
           <Empty v-if="!configuration.providers?.length">
             <EmptyHeader><EmptyTitle>{{ $t('sso.noProviders') }}</EmptyTitle></EmptyHeader>
           </Empty>
-          <div v-for="provider in configuration.providers" v-else :key="provider.id ?? undefined" class="flex flex-col gap-4 rounded-xl border p-4 sm:flex-row sm:items-center">
+          <div v-for="provider in configuration.providers" v-else :key="provider.id" class="flex flex-col gap-4 rounded-xl border p-4 sm:flex-row sm:items-center">
             <img
               v-if="provider.iconUrl"
               :src="provider.iconUrl"

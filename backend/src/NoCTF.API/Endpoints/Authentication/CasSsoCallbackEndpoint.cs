@@ -27,7 +27,7 @@ public sealed class CasSsoCallbackEndpoint(
         Options(options => options.WithMetadata(
             new ProtectedEntryMetadata(ProtectedEntry.SsoCallback)));
         Description(builder => builder.WithName("Authentication_SsoCasCallback"));
-        Summary(summary => { summary.Summary = "Consumes a CAS service ticket once."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Consumes a CAS service ticket once.");
     }
 
     public override async Task<Results<RedirectHttpResult, ProblemHttpResult>> ExecuteAsync(

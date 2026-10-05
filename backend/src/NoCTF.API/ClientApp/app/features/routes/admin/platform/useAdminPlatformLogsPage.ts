@@ -1,17 +1,14 @@
-import { dateObject } from '../../../../utils/date-value'
-
-import { api, nativeResponse } from '../../../../lib/api'
 import { message as describeMessage } from '../../../../utils/i18n'
 import { markRaw } from 'vue'
 
 import { Download, Radio } from '@lucide/vue'
 import { toast } from '../../../../utils/message-toast'
-
+import { adminPlatformExportLogs, adminPlatformListLogs } from '../../../../api'
 import { downloadSdkFile } from '../../../../utils/download'
-import type { NoCTFAPIEndpointsAdministrationPlatformPlatformLogResponse, NoCTFAPIEndpointsAdministrationPlatformPlatformLogLevelProtocol, NoCTFAPIEndpointsAdministrationPlatformPlatformLogServiceProtocol } from '../../../../api/models'
+import type { NoCtfapiEndpointsAdministrationPlatformPlatformLogResponse, NoCtfapiEndpointsAdministrationPlatformPlatformLogLevelProtocol, NoCtfapiEndpointsAdministrationPlatformPlatformLogServiceProtocol } from '../../../../api'
 import AdminDateTimeComponent from '../../../admin/AdminDateTime.vue'
 
-type PlatformLog = NoCTFAPIEndpointsAdministrationPlatformPlatformLogResponse
+type PlatformLog = NoCtfapiEndpointsAdministrationPlatformPlatformLogResponse
 
 /** Owns state, effects and commands for AdminPlatformLogsPage. */
 export function useAdminPlatformLogsPage() {
@@ -25,13 +22,13 @@ export function useAdminPlatformLogsPage() {
 
   const LEVEL_ORDER = ['Trace', 'Debug', 'Information', 'Warning', 'Error', 'Critical'] as const
 
-  const levelOrdinal = (level?: string | number | null) => typeof level === 'number' ? level : LEVEL_ORDER.indexOf(level as typeof LEVEL_ORDER[number])
+  const levelOrdinal = (level?: string | number) => typeof level === 'number' ? level : LEVEL_ORDER.indexOf(level as typeof LEVEL_ORDER[number])
 
   const LIVE_LIMIT = 200
 
-  const minimumLevel = ref<NoCTFAPIEndpointsAdministrationPlatformPlatformLogLevelProtocol>('Warning')
+  const minimumLevel = ref<NoCtfapiEndpointsAdministrationPlatformPlatformLogLevelProtocol>('Warning')
 
-  const service = ref<'all' | NoCTFAPIEndpointsAdministrationPlatformPlatformLogServiceProtocol>('all')
+  const service = ref<'all' | NoCtfapiEndpointsAdministrationPlatformPlatformLogServiceProtocol>('all')
 
   const search = ref('')
 
@@ -48,18 +45,19 @@ export function useAdminPlatformLogsPage() {
   }
 
   const { items, loading, error: listError, hasMore, initialized, loadMore, reset } = useCursorPagination<PlatformLog>(async (cursor) => {
-    let error: unknown;
-    const data = await api.api.v1.admin.platform.logs.get({ queryParameters: {
+    const { data, error } = await adminPlatformListLogs({
+      query: {
         minimumLevel: minimumLevel.value,
-        service: (service.value === 'all'
+        service: service.value === 'all'
           ? null
-          : service.value as NoCTFAPIEndpointsAdministrationPlatformPlatformLogServiceProtocol) ?? undefined,
-        from: dateObject(toIso(from.value) ?? undefined),
-        to: dateObject(toIso(to.value) ?? undefined),
-        search: search.value.trim() || undefined,
-        cursor: cursor ?? undefined,
+          : service.value as NoCtfapiEndpointsAdministrationPlatformPlatformLogServiceProtocol,
+        from: toIso(from.value),
+        to: toIso(to.value),
+        search: search.value.trim() || null,
+        cursor,
         limit: 50,
-      } }).catch(cause => { error = cause; return undefined });
+      },
+    })
     if (error || !data) throw parseApiError(error)
     return { items: data.items ?? [], nextCursor: data.nextCursor ?? null }
   })
@@ -117,13 +115,16 @@ export function useAdminPlatformLogsPage() {
     exporting.value = true
     try {
       await downloadSdkFile(
-        nativeResponse(responseOptions => api.api.v1.admin.platform.logs.exportEscaped.get({ queryParameters: {
+        adminPlatformExportLogs({
+          query: {
             minimumLevel: minimumLevel.value,
-            service: service.value === 'all' ? undefined : service.value,
-            from: dateObject(fromIso ?? undefined),
-            to: dateObject(toIsoValue ?? undefined),
-            search: search.value.trim() || undefined,
-          }, options: [...responseOptions] })),
+            service: service.value === 'all' ? null : service.value,
+            from: fromIso,
+            to: toIsoValue,
+            search: search.value.trim() || null,
+          },
+          parseAs: 'blob',
+        }),
         'platform-logs.jsonl',
       )
       toast.success(describeMessage("administration.platformLogs.label.logExportDownloadStarted"))

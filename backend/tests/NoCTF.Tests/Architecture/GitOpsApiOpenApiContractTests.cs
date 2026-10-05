@@ -86,10 +86,10 @@ public sealed class GitOpsApiOpenApiContractTests
         await Assert.That(RequiredPropertyNames(request))
             .IsEquivalentTo(["deliveryPolicy", "files"]);
         var attachmentIds = request.GetProperty("properties").GetProperty("attachmentIds");
-        await Assert.That(ResolveNullableSchema(root, attachmentIds).GetProperty("type").GetString()).IsEqualTo("array");
+        await Assert.That(attachmentIds.GetProperty("type").GetString()).IsEqualTo("array");
         await Assert.That(attachmentIds.GetProperty("nullable").GetBoolean()).IsTrue();
-        await Assert.That(ResolveNullableSchema(root, attachmentIds).GetProperty("items").GetProperty("format").GetString())
-            .IsEqualTo("uuid");
+        await Assert.That(attachmentIds.GetProperty("items").GetProperty("format").GetString())
+            .IsEqualTo("guid");
     }
 
     [Test]
@@ -159,9 +159,6 @@ public sealed class GitOpsApiOpenApiContractTests
         return ResolveSchema(root, schema);
     }
 
-    private static JsonElement ResolveNullableSchema(JsonElement root, JsonElement schema)
-        => ResolveSchema(root, schema.TryGetProperty("oneOf", out var choices) ? choices[0] : schema);
-
     private static JsonElement ResolveSchema(JsonElement root, JsonElement schema)
     {
         while (true)
@@ -199,7 +196,7 @@ public sealed class GitOpsApiOpenApiContractTests
     {
         var backend = FindBackendRoot();
         return JsonDocument.Parse(await File.ReadAllTextAsync(
-            Path.Combine(backend, "artifacts", "openapi", "v1.json")));
+            Path.Combine(backend, "artifacts", "openapi", "swagger.json")));
     }
 
     private static string FindBackendRoot()

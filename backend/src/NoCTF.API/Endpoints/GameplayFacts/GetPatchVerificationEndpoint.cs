@@ -38,7 +38,7 @@ public sealed class GetPatchVerificationEndpoint(
     {
         Get("/competitions/{competitionId}/challenges/{competitionChallengeId}/patch-verification");
         AuthSchemes("Bearer");
-        Summary(summary => { summary.Summary = "Gets the participant PatchVerification state."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Gets the participant PatchVerification state.");
     }
 
     public override async Task<Results<Ok<PatchVerificationStateResponse>, NotFound>> ExecuteAsync(

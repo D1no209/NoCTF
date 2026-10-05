@@ -1,8 +1,8 @@
-import type { NoCTFAPIEndpointsAdministrationCompetitionsStartGateErrorResponse } from '../api/models'
+import type { NoCtfapiEndpointsAdministrationCompetitionsStartGateErrorResponse } from '../api'
 import { localizeMessage, translate } from '../utils/i18n'
 
 export function startGateErrorMessage(
-  error: Pick<NoCTFAPIEndpointsAdministrationCompetitionsStartGateErrorResponse, 'code' | 'message'>,
+  error: Pick<NoCtfapiEndpointsAdministrationCompetitionsStartGateErrorResponse, 'code' | 'message'>,
 ): string {
   const message = error.message ?? ''
   switch (error.code) {

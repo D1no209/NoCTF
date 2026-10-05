@@ -1,21 +1,17 @@
-
-import { api, RequestPolicyOption, binaryResponse } from '../../lib/api'
-
-
 import { message as describeMessage } from '../../utils/i18n'
 import type { UiMessage } from '../../utils/i18n'
 import { computed, onBeforeUnmount, onMounted, ref, toRefs, watch } from 'vue'
 import { ArrowUpRight, ChevronLeft, ChevronRight, Plus, RefreshCw } from '@lucide/vue'
 import { toast } from '../../utils/message-toast'
-
-import type { NoCTFAPIEndpointsCompetitionsGameModeProtocol } from '../../api/models'
+import { adminCreateCompetitionChallenge, adminListCompetitionChallenges, adminListCompetitions, competitionPosterGet } from '../../api'
+import type { NoCtfapiEndpointsCompetitionsGameModeProtocol } from '../../api'
 import type { ContentSwapPreset } from '../../motion/useContentSwap'
 import { parseApiError } from '../../utils/api-error'
 import { competitionChallengeConflictMessage } from '../../lib/competition-challenge-conflict'
 import { availablePlacementCompetitions, placementManagementPath, projectChallengePlacements, writablePlacementCompetitions } from './challenge-competition-placements'
 import type { ChallengeCompetitionPlacement } from './challenge-competition-placements'
 
-export function useChallengeCompetitionPlacements(props: Readonly<{ challengeId: string; mode: NoCTFAPIEndpointsCompetitionsGameModeProtocol; disabled: boolean }>) {
+export function useChallengeCompetitionPlacements(props: Readonly<{ challengeId: string; mode: NoCtfapiEndpointsCompetitionsGameModeProtocol; disabled: boolean }>) {
   const { user } = useAuth()
   const items = ref<ChallengeCompetitionPlacement[]>([])
   const loading = ref(true)
@@ -64,8 +60,7 @@ export function useChallengeCompetitionPlacements(props: Readonly<{ challengeId:
     loading.value = true
     error.value = null
     try {
-      let failure: unknown;
-      const data = await api.api.v1.admin.competitions.get({ queryParameters: { includeDeleted: false }, options: [new RequestPolicyOption({ signal: signal })] }).catch(cause => { failure = cause; return undefined });
+      const { data, error: failure } = await adminListCompetitions({ query: { includeDeleted: false }, signal })
       if (signal.aborted) return
       if (failure || !data) throw failure
       const competitions = writablePlacementCompetitions(data.items ?? []).filter(item => item.mode === props.mode)
@@ -76,14 +71,15 @@ export function useChallengeCompetitionPlacements(props: Readonly<{ challengeId:
       await Promise.all(Array.from({ length: Math.min(4, competitions.length) }, async () => {
         while (cursor < competitions.length && !signal.aborted) {
           const competition = competitions[cursor++]!
-          let failure: unknown;
-          const data = await api.api.v1.admin.competitions.byCompetitionId(competition.id).challenges.get({ queryParameters: { includeDeleted: false }, options: [new RequestPolicyOption({ signal: signal })] }).catch(cause => { failure = cause; return undefined });
+          const { data, error: failure } = await adminListCompetitionChallenges({
+            path: { competitionId: competition.id }, query: { includeDeleted: false }, signal,
+          })
           if (signal.aborted) return
           if (failure || !data) failures.push(competition.title ?? '')
           else {
             results.push(projectChallengePlacements(competition, data.items ?? [], props.challengeId))
             if (competition.accessMode === 'StaffOnly' && competition.posterUrl) {
-              const image = await binaryResponse(responseOptions => api.api.v1.competitions.byCompetitionId(competition.id).poster.get({ options: [new RequestPolicyOption({ signal: signal, cache: 'no-store' }), ...responseOptions] }), 'blob').catch(() => undefined);
+              const { data: image } = await competitionPosterGet({ path: { competitionId: competition.id }, parseAs: 'blob', cache: 'no-store', signal })
               if (image instanceof Blob && image.type.startsWith('image/') && image.size > 0) posterBlobs.set(competition.id, image)
             }
           }
@@ -109,8 +105,10 @@ export function useChallengeCompetitionPlacements(props: Readonly<{ challengeId:
     adding.value = true
     error.value = null
     try {
-      let failure: unknown;
-      await api.api.v1.admin.competitions.byCompetitionId(target.competition.id).challenges.post({ challengeId: props.challengeId, customTitle: null, order: target.nextOrder }).catch(cause => { failure = cause; return undefined });
+      const { error: failure } = await adminCreateCompetitionChallenge({
+        path: { competitionId: target.competition.id },
+        body: { challengeId: props.challengeId, customTitle: null, order: target.nextOrder },
+      })
       if (disposed || actorId !== user.value?.userId) return
       if (failure) {
         error.value = competitionChallengeConflictMessage(failure) ?? parseApiError(failure).displayMessage

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-
 import { toRefs } from 'vue'
 import type { PrivateAccountPanelViewState } from '~/features/account/usePrivateAccountPanel'
 
@@ -23,7 +22,7 @@ const { LockKeyhole, data, loading, error, commonSources, kinds, load, AdminDate
             <dt class="text-muted-foreground">{{ $t('sso.identityProvider') }}</dt><dd class="break-all">{{ data.ssoBinding.providerName || data.ssoBinding.providerId }}</dd>
             <dt class="text-muted-foreground">{{ $t('sso.protocol') }}</dt><dd>{{ data.ssoBinding.protocol }}</dd>
             <dt class="text-muted-foreground">{{ $t('sso.subject') }}</dt><dd class="break-all font-mono text-xs">{{ data.ssoBinding.subject }}</dd>
-            <dt class="text-muted-foreground">{{ $t('sso.boundAt') }}</dt><dd><component :is="AdminDateTime" :value="dateIso(data.ssoBinding.boundAt)" /></dd>
+            <dt class="text-muted-foreground">{{ $t('sso.boundAt') }}</dt><dd><component :is="AdminDateTime" :value="data.ssoBinding.boundAt" /></dd>
           </dl>
         </div>
         <p v-else class="text-sm text-muted-foreground">{{ $t('sso.notBound') }}</p>
@@ -34,9 +33,9 @@ const { LockKeyhole, data, loading, error, commonSources, kinds, load, AdminDate
         <p class="text-xs text-muted-foreground">{{ $t('account.privateAccount.description.topKnownIpsRecent', { days: data.retentionDays ?? 30 }) }}</p>
         <p v-if="!commonSources.length" class="text-sm text-muted-foreground">{{ $t('account.privateAccount.label.knownSourceIpAddresses') }}</p>
         <ul v-else class="flex min-w-0 flex-col gap-2">
-          <li v-for="source in commonSources" :key="source.address ?? undefined" class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm">
+          <li v-for="source in commonSources" :key="source.address" class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm">
             <span class="min-w-0 break-all font-mono tabular-nums">{{ source.address }}</span>
-            <span class="text-xs text-muted-foreground">{{ $t('account.label.seenTimes', { count: source.count }) }}<span v-if="source.lastSeen"> · {{ $t('account.label.lastSeen') }} <component :is="AdminDateTime" :value="dateIso(source.lastSeen)" /></span></span>
+            <span class="text-xs text-muted-foreground">{{ $t('account.label.seenTimes', { count: source.count }) }}<span v-if="source.lastSeen"> · {{ $t('account.label.lastSeen') }} <component :is="AdminDateTime" :value="source.lastSeen" /></span></span>
           </li>
         </ul>
       </section>
@@ -55,7 +54,7 @@ const { LockKeyhole, data, loading, error, commonSources, kinds, load, AdminDate
         <p v-if="competitionId" class="text-xs text-muted-foreground">{{ $t('account.privateAccount.description.submissionsCompetitionIncludedNever') }}</p>
         <Empty v-if="!data.activities?.length"><EmptyDescription>{{ $t('account.label.retainedActivity') }}</EmptyDescription></Empty>
         <ol v-else class="flex flex-col divide-y">
-          <li v-for="item in data.activities" :key="item.id ?? undefined" class="flex min-w-0 flex-col gap-1 py-3 text-sm">
+          <li v-for="item in data.activities" :key="item.id" class="flex min-w-0 flex-col gap-1 py-3 text-sm">
             <div class="flex flex-wrap justify-between gap-2"><span>{{ translate(kinds[item.kind ?? ''] ?? item.kind ?? '') }}</span><time class="font-mono text-xs text-muted-foreground">{{ formatDateTime(item.occurredAt) }}</time></div>
             <span class="break-all font-mono">{{ item.ipAddress || $t('account.label.unknownSource') }}</span>
             <span v-if="item.gameplayFactId" class="break-all font-mono text-xs text-muted-foreground">{{ $t('common.label.submissionId') }}: {{ item.gameplayFactId }}</span>

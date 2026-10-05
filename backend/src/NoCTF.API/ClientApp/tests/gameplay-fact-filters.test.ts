@@ -10,10 +10,10 @@ describe('administrator gameplay fact filters', () => {
     expect(page).toContain("{ value: 'FlagAttempt', label: 'Flag' }")
     expect(page).toContain("{ value: 'BreakAttempt', label: 'Break' }")
     expect(page).toContain("{ value: 'FixAttempt', label: translate('common.label.patchVerification') }")
-    expect(page).toContain('gameplayFactKind: filterKind.value || undefined')
-    expect(page).toContain('state: filterState.value || undefined')
-    expect(page).toContain('gameplayFactResult: filterResult.value || undefined')
-    expect(page).not.toContain('filterKind.value as NoCTFAPIEndpointsGameplayFactsGameplayFactKindProtocol')
+    expect(page).toContain('gameplayFactKind: filterKind.value || null')
+    expect(page).toContain('state: filterState.value || null')
+    expect(page).toContain('gameplayFactResult: filterResult.value || null')
+    expect(page).not.toContain('filterKind.value as NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol')
     const resultOptions = page.slice(
       page.indexOf('const gameplayFactResultOptions'),
       page.indexOf('] satisfies', page.indexOf('const gameplayFactResultOptions')),

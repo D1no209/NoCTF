@@ -1,16 +1,5 @@
 const ACCESS_TOKEN_REFRESH_SKEW_SECONDS = 30
 
-/** Used only to prevent replay across an identity switch; the server validates the JWT. */
-export function accessTokenSubject(token: string): string | undefined {
-  try {
-    const payload = token.split('.')[1]
-    if (!payload) return undefined
-    const claims = JSON.parse(atob(payload.replaceAll('-', '+').replaceAll('_', '/'))) as { sub?: unknown }
-    return typeof claims.sub === 'string' ? claims.sub : undefined
-  }
-  catch { return undefined }
-}
-
 function jwtExpiry(token: string): number | null {
   const payload = token.split('.')[1]
   if (!payload) return null

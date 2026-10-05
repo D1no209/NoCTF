@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import type { NoCTFAPIEndpointsCompetitionsCompetitionResponse } from '~/api/models'
+import type { NoCtfapiEndpointsCompetitionsCompetitionResponse } from '~/api'
 import { bindViewState } from '~/features/shared/view-state'
 import { useCompetitionOverview } from './useCompetitionOverview'
 import View from '~/components/views/competitions/CompetitionOverviewView.vue'
 
-const props = defineProps<{ competition: NoCTFAPIEndpointsCompetitionsCompetitionResponse }>()
+const props = defineProps<{ competition: NoCtfapiEndpointsCompetitionsCompetitionResponse }>()
 const emit = defineEmits<{ audienceChanged: [] }>()
 const state = bindViewState(useCompetitionOverview(props, emit))
 </script>

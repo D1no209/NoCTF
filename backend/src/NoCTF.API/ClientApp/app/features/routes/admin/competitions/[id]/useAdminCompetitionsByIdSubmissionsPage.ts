@@ -1,5 +1,3 @@
-
-import { api, RequestPolicyOption, nativeResponse } from '../../../../../lib/api'
 import { message as describeMessage } from '../../../../../utils/i18n'
 import type { UiMessage } from '../../../../../utils/i18n'
 import { adminUserPath, adminTeamPath, adminChallengePath } from '~/features/admin/admin-navigation'
@@ -8,11 +6,11 @@ import { proxyRefs } from 'vue'
 import { toast } from '../../../../../utils/message-toast'
 import { Download } from '@lucide/vue'
 import { downloadSdkFile } from '../../../../../utils/download'
-
-import type { NoCTFAPIEndpointsGameplayFactsAdminGameplayFactStatusResponse, NoCTFAPIEndpointsGameplayFactsGameplayFactListItemResponse, NoCTFAPIEndpointsGameplayFactsGameplayFactResultProtocol, NoCTFAPIEndpointsGameplayFactsGameplayFactStateProtocol, NoCTFAPIEndpointsGameplayFactsGameplayFactKindProtocol, NoCTFAPIEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferenceItemResponse, NoCTFAPIEndpointsAdministrationGameplayFactsAdjudicationDifferenceKindProtocol } from '../../../../../api/models'
+import { adminAccessCompetitionGameplayFactValue, adminCreateGameplayFactRejudgement, adminGetGameplayFact, adminDownloadGameplayFactPatch, adminListCompetitionChallenges, adminListGameplayFacts, adminPreviewHistoricalAdjudicationDifferences, adminListTeams, adminQueueGameplayFactEvaluation } from '../../../../../api'
+import type { NoCtfapiEndpointsGameplayFactsAdminGameplayFactStatusResponse, NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse, NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol, NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol, NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol, NoCtfapiEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferenceItemResponse, NoCtfapiEndpointsAdministrationGameplayFactsAdjudicationDifferenceKindProtocol } from '../../../../../api'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
-
-import type { NoCTFAPIEndpointsAdministrationGameplayFactsAdjudicationEventResponse } from '../../../../../api/models'
+import { adminGetGameplayFactAdjudicationEvents } from '../../../../../api'
+import type { NoCtfapiEndpointsAdministrationGameplayFactsAdjudicationEventResponse } from '../../../../../api'
 import { adjudicationCounts, adjudicationSeverity, adjudicationSeverityLabel, adjudicationClassificationLabel, adjudicationCompletenessLabel, adjudicationEventLabel, adjudicationVariant } from '../../../../admin/adjudication-preview'
 
 interface FilterOption<T extends string> {
@@ -33,12 +31,14 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
 
   const patchErrors = ref<Record<string, UiMessage>>({})
 
-  async function downloadPatch(id?: string | null) {
+  async function downloadPatch(id?: string) {
     if (!id || !canDownloadPatch.value || patchDownloading.value.has(id)) return
     patchDownloading.value.add(id)
     delete patchErrors.value[id]
     try {
-      await downloadSdkFile(nativeResponse(responseOptions => api.api.v1.admin.competitions.byCompetitionId(competitionId).gameplayFacts.byGameplayFactId(id).patchPath.get({ options: [...responseOptions] })), `patch-${id}.tar.gz`)
+      await downloadSdkFile(adminDownloadGameplayFactPatch({
+        path: { competitionId, gameplayFactId: id }, parseAs: 'blob',
+      }), `patch-${id}.tar.gz`)
     }
     catch (error) {
       patchErrors.value[id] = parseApiError(error).displayMessage
@@ -53,7 +53,7 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
     { value: 'FlagAttempt', label: 'Flag' },
     { value: 'BreakAttempt', label: 'Break' },
     { value: 'FixAttempt', label: translate('common.label.patchVerification') },
-  ] satisfies FilterOption<NoCTFAPIEndpointsGameplayFactsGameplayFactKindProtocol>[]
+  ] satisfies FilterOption<NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol>[]
 
   const gameplayFactStateOptions = [
     { value: 'Pending', label: "administration.label.pending" },
@@ -61,7 +61,7 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
     { value: 'Processing', label: "common.label.underEvaluation" },
     { value: 'Completed', label: "common.label.completed" },
     { value: 'PlatformFailed', label: "common.error.platformFailed.adminFormat" },
-  ] satisfies FilterOption<NoCTFAPIEndpointsGameplayFactsGameplayFactStateProtocol>[]
+  ] satisfies FilterOption<NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol>[]
 
   const gameplayFactResultOptions = [
     { value: 'Correct', label: "common.label.correct" },
@@ -69,7 +69,7 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
     { value: 'Duplicate', label: "common.label.repeat" },
     { value: 'AttemptsExhausted', label: "common.label.exhausted" },
     { value: 'Rejected', label: "common.label.rejected" },
-  ] satisfies FilterOption<NoCTFAPIEndpointsGameplayFactsGameplayFactResultProtocol>[]
+  ] satisfies FilterOption<NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol>[]
 
   const challengeOptions = ref<{ id: string; title: string }[]>([])
 
@@ -80,31 +80,28 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
   const challengeTitle = (id?: string | null) => challengeOptions.value.find(c => c.id === id)?.title ?? id ?? '-'
 
   async function loadRefs() {
-    const settledRequests = await Promise.allSettled([
-      api.api.v1.admin.competitions.byCompetitionId(competitionId).challenges.get({ queryParameters: { includeDeleted: false } }),
-      api.api.v1.admin.competitions.byCompetitionId(competitionId).teams.get({ queryParameters: { keyword: undefined, offset: 0, limit: 200, desc: false } }),
-    ]);
-    const challenges = settledRequests[0].status === 'fulfilled' ? settledRequests[0].value : undefined;
-    const teams = settledRequests[1].status === 'fulfilled' ? settledRequests[1].value : undefined;
-
-    challengeOptions.value = (challenges?.items ?? [])
+    const [challenges, teams] = await Promise.all([
+      adminListCompetitionChallenges({ path: { competitionId }, query: { includeDeleted: false } }),
+      adminListTeams({ path: { competitionId }, query: { keyword: null, offset: 0, limit: 200, desc: false } }),
+    ])
+    challengeOptions.value = (challenges.data?.items ?? [])
       .map(c => ({ id: c.id!, title: c.title ?? '' }))
-    teamOptions.value = (teams?.items ?? []).map(t => ({ id: t.id!, name: t.name ?? '' }))
+    teamOptions.value = (teams.data?.items ?? []).map(t => ({ id: t.id!, name: t.name ?? '' }))
   }
 
   const filterChallenge = ref('')
 
   const filterTeam = ref('')
 
-  const filterKind = ref<NoCTFAPIEndpointsGameplayFactsGameplayFactKindProtocol | ''>('')
+  const filterKind = ref<NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol | ''>('')
 
-  const filterState = ref<NoCTFAPIEndpointsGameplayFactsGameplayFactStateProtocol | ''>('')
+  const filterState = ref<NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol | ''>('')
 
-  const filterResult = ref<NoCTFAPIEndpointsGameplayFactsGameplayFactResultProtocol | ''>('')
+  const filterResult = ref<NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol | ''>('')
 
   const filterFlag = ref('')
 
-  const previewItems = ref<NoCTFAPIEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferenceItemResponse[]>([])
+  const previewItems = ref<NoCtfapiEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferenceItemResponse[]>([])
 
   const previewCursor = ref<string | null>(null)
 
@@ -117,20 +114,23 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
   const previewScanned = ref<number | null>(0)
   const previewCounts = computed(() => adjudicationCounts(previewItems.value))
   const evidenceOpen = ref(false)
-  const evidenceTarget = ref<NoCTFAPIEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferenceItemResponse | null>(null)
+  const evidenceTarget = ref<NoCtfapiEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferenceItemResponse | null>(null)
   let evidenceAbort: AbortController | undefined
   let previewAbort: AbortController | undefined
-  const { items: evidenceRows, nextCursor: evidenceCursor, loading: evidenceLoading, error: evidenceError, loadMore: loadEvidence, reset: resetEvidence } = useCursorPagination<NoCTFAPIEndpointsAdministrationGameplayFactsAdjudicationEventResponse>(async cursor => {
+  const { items: evidenceRows, nextCursor: evidenceCursor, loading: evidenceLoading, error: evidenceError, loadMore: loadEvidence, reset: resetEvidence } = useCursorPagination<NoCtfapiEndpointsAdministrationGameplayFactsAdjudicationEventResponse>(async cursor => {
     const factId = evidenceTarget.value?.gameplayFactId
     if (!factId) return { items: [], nextCursor: null }
     evidenceAbort = new AbortController()
-    let error: unknown;
-    const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).gameplayFacts.byGameplayFactId(factId).adjudicationEvents.get({ queryParameters: { cursor: cursor ?? undefined, limit: 50 }, options: [new RequestPolicyOption({ signal: evidenceAbort.signal })] }).catch(cause => { error = cause; return undefined });
+    const { data, error } = await adminGetGameplayFactAdjudicationEvents({
+      path: { competitionId, gameplayFactId: factId },
+      query: { cursor, limit: 50 },
+      signal: evidenceAbort.signal,
+    })
     if (error || !data) throw parseApiError(error, describeMessage('adjudication.evidenceFailure'))
     return { items: data.events ?? [], nextCursor: data.nextCursor }
   })
 
-  function openEvidence(item: NoCTFAPIEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferenceItemResponse) {
+  function openEvidence(item: NoCtfapiEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferenceItemResponse) {
     evidenceAbort?.abort()
     evidenceTarget.value = item
     resetEvidence()
@@ -155,7 +155,7 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
 
   let previewGeneration = 0
 
-  const differenceLabels: Record<NoCTFAPIEndpointsAdministrationGameplayFactsAdjudicationDifferenceKindProtocol, string> = {
+  const differenceLabels: Record<NoCtfapiEndpointsAdministrationGameplayFactsAdjudicationDifferenceKindProtocol, string> = {
     DuplicateWithoutCurrentPredecessor: "common.competitionsBy.description.duplicateResultPrecedingFact",
     HistoricalResultChanged: "common.competitionsBy.description.historicalAdjudicationConflictsResult",
     MissingAdjudicationRecord: "common.competitionsBy.description.resultImmutableAdjudicationEvent",
@@ -189,13 +189,16 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
     previewAbort = new AbortController()
     previewError.value = null
     try {
-      let error: unknown;
-      const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).gameplayFacts.adjudicationDifferences.get({ queryParameters: {
-          competitionChallengeId: filterChallenge.value || undefined,
-          cursor: cursor ?? undefined,
+      const { data, error } = await adminPreviewHistoricalAdjudicationDifferences({
+        signal: previewAbort.signal,
+        path: { competitionId },
+        query: {
+          competitionChallengeId: filterChallenge.value || null,
+          cursor,
           limit: 30,
           includeInformational: previewIncludeInformational.value,
-        }, options: [new RequestPolicyOption({ signal: previewAbort.signal })] }).catch(cause => { error = cause; return undefined });
+        },
+      })
       if (error || !data) throw parseApiError(error)
       if (generation !== previewGeneration) return
       previewItems.value.push(...(data.items ?? []))
@@ -215,20 +218,22 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
   }
 
   const { items, loading, error: listError, hasMore, loadMore, reset, initialized } = useCursorPagination<
-    NoCTFAPIEndpointsGameplayFactsGameplayFactListItemResponse
+    NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse
   >(async (cursor) => {
-    let error: unknown;
-    const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).gameplayFacts.get({ queryParameters: {
-        competitionChallengeId: filterChallenge.value || undefined,
-        teamId: filterTeam.value || undefined,
-        gameplayFactKind: filterKind.value || undefined,
-        state: filterState.value || undefined,
-        gameplayFactResult: filterResult.value || undefined,
-        value: filterFlag.value || undefined,
+    const { data, error } = await adminListGameplayFacts({
+      path: { competitionId },
+      query: {
+        competitionChallengeId: filterChallenge.value || null,
+        teamId: filterTeam.value || null,
+        gameplayFactKind: filterKind.value || null,
+        state: filterState.value || null,
+        gameplayFactResult: filterResult.value || null,
+        value: filterFlag.value || null,
         offset: cursor ? Number(cursor) || 0 : 0,
         limit: 30,
         desc: true,
-      } }).catch(cause => { error = cause; return undefined });
+      },
+    })
     if (error || !data) throw parseApiError(error)
     const pageItems = data.items ?? []
     const offset = cursor ? Number(cursor) || 0 : 0
@@ -242,7 +247,7 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
     if (previewInitialized.value) void loadPreview(true)
   }
 
-  const detail = ref<NoCTFAPIEndpointsGameplayFactsAdminGameplayFactStatusResponse | null>(null)
+  const detail = ref<NoCtfapiEndpointsGameplayFactsAdminGameplayFactStatusResponse | null>(null)
 
   const detailOpen = ref(false)
 
@@ -252,7 +257,7 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
 
   let detailRequest = 0
 
-  async function openDetail(id?: string | null) {
+  async function openDetail(id?: string) {
     if (!id) return
     const request = ++detailRequest
     detailOpen.value = true
@@ -260,8 +265,7 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
     detailError.value = null
     detail.value = null
     try {
-      let error: unknown;
-      const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).gameplayFacts.byGameplayFactId(id).get().catch(cause => { error = cause; return undefined });
+      const { data, error } = await adminGetGameplayFact({ path: { competitionId, gameplayFactId: id } })
       if (error || !data) throw error
       if (request === detailRequest) detail.value = data
     }
@@ -277,12 +281,15 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
 
   const actionPending = ref<string | null>(null)
 
-  async function rejudgeOne(gameplayFactId?: string | null) {
+  async function rejudgeOne(gameplayFactId?: string) {
     if (!gameplayFactId) return
     actionPending.value = gameplayFactId
     try {
-
-      await api.api.v1.admin.competitions.byCompetitionId(competitionId).gameplayFactRejudgements.post({ targetKind: 'GameplayFact', targetId: gameplayFactId });
+      const { error } = await adminCreateGameplayFactRejudgement({
+        path: { competitionId },
+        body: { targetKind: 'GameplayFact', targetId: gameplayFactId },
+      })
+      if (error) throw error
       toast.success(describeMessage("administration.competitionsBy.description.alreadyJoinedReSentencing"))
       applyFilters()
     }
@@ -300,7 +307,11 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
     if (!batchTarget.value) return
     actionPending.value = 'batch'
     try {
-      await api.api.v1.admin.competitions.byCompetitionId(competitionId).gameplayFactRejudgements.post({ targetKind: 'CompetitionChallenge', targetId: batchTarget.value });
+      const { error } = await adminCreateGameplayFactRejudgement({
+        path: { competitionId },
+        body: { targetKind: 'CompetitionChallenge', targetId: batchTarget.value },
+      })
+      if (error) throw error
       toast.success(describeMessage("administration.competitionsBy.description.questionsSubmittedAddedRe"))
       applyFilters()
     }
@@ -316,7 +327,11 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
     if (!batchTarget.value) return
     actionPending.value = 'queue'
     try {
-      await api.api.v1.admin.competitions.byCompetitionId(competitionId).gameplayFacts.queueEvaluation.post({ competitionChallengeId: batchTarget.value });
+      const { error } = await adminQueueGameplayFactEvaluation({
+        path: { competitionId },
+        body: { competitionChallengeId: batchTarget.value },
+      })
+      if (error) throw error
       toast.success(describeMessage("administration.label.reviewQueueTriggered"))
     }
     catch (e) {
@@ -337,7 +352,7 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
 
   let flagRequestSequence = 0
 
-  function openFlagAccess(gameplayFactId?: string | null) {
+  function openFlagAccess(gameplayFactId?: string) {
     if (!gameplayFactId) return
     const requestSequence = ++flagRequestSequence
     flagDialog.value = { gameplayFactId }
@@ -359,7 +374,10 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
     flagPending.value = true
     flagError.value = null
     try {
-      const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).gameplayFacts.byGameplayFactId(ctx.gameplayFactId).flagAccess.post();
+      const { data, error } = await adminAccessCompetitionGameplayFactValue({
+        path: { competitionId, gameplayFactId: ctx.gameplayFactId },
+      })
+      if (error) throw error
       if (requestSequence !== flagRequestSequence || flagDialog.value?.gameplayFactId !== ctx.gameplayFactId) return
       flagResult.value = data?.value ?? translate("administration.label.content")
     }

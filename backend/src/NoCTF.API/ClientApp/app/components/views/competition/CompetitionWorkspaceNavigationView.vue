@@ -22,7 +22,7 @@ const { Compass, isActive, groups } = toRefs(viewProps.state)
         <div class="grid grid-cols-2 gap-2">
           <NuxtLink
             v-for="item in group.items"
-            :key="item.to ?? undefined"
+            :key="item.to"
             :to="item.to"
             class="flex min-h-10 items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition-colors focus-visible:outline-none"
             :class="isActive(item)

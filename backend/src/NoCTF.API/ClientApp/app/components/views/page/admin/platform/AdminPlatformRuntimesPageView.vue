@@ -102,7 +102,7 @@ const { RuntimeFlagsPanel, adminCompetitionPath, adminRuntimeTeamPath, adminRunt
           </TableRow>
         </TableHeader>
         <TableBody>
-          <TableRow v-for="item in items" :key="(item.runtime?.id) ?? undefined">
+          <TableRow v-for="item in items" :key="item.runtime?.id">
             <TableCell class="whitespace-normal break-words font-medium"><NuxtLink v-if="adminRuntimeTeamPath(item.runtime)" :to="adminRuntimeTeamPath(item.runtime)" class="hover:underline">{{ teamLabel(item) }}</NuxtLink><span v-else>{{ teamLabel(item) }}</span></TableCell>
             <TableCell class="whitespace-normal break-words">
               <div class="grid gap-1">
@@ -181,7 +181,7 @@ const { RuntimeFlagsPanel, adminCompetitionPath, adminRuntimeTeamPath, adminRunt
           <template v-if="detail.runtime?.capacity?.length">
             <Separator />
             <FieldDescription>{{ $t('capacity.units') }}</FieldDescription>
-            <dl v-for="allocation in detail.runtime.capacity" :key="allocation.operationId ?? undefined" class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2">
+            <dl v-for="allocation in detail.runtime.capacity" :key="allocation.operationId" class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2">
               <dt>{{ $t('capacity.workload') }}</dt><dd class="break-all font-mono text-xs">{{ allocation.operationId }}</dd>
               <dt>{{ $t('capacity.limit') }}</dt><dd class="font-mono tabular-nums">{{ formatCapacityAmount(allocation.limit) }}</dd>
               <dt>{{ $t('capacity.budget') }}</dt><dd class="font-mono tabular-nums">{{ formatCapacityAmount(allocation.budget) }}</dd>
@@ -193,7 +193,7 @@ const { RuntimeFlagsPanel, adminCompetitionPath, adminRuntimeTeamPath, adminRunt
             <component :is="RuntimeAccessUrl" v-for="access in detail.runtime.accesses" :key="`${access.directAddress}:${access.webSocketAddress}`" :access="access" />
           </template>
           <Separator />
-          <component :is="RuntimeFlagsPanel" v-if="detail.runtime?.id" :key="detail.runtime.id ?? undefined" :runtime-id="detail.runtime.id" />
+          <component :is="RuntimeFlagsPanel" v-if="detail.runtime?.id" :key="detail.runtime.id" :runtime-id="detail.runtime.id" />
           <Button v-if="detail.runtime?.competitionId" variant="outline" as-child>
             <NuxtLink :to="adminRuntimePath(detail.runtime.competitionId, detail.runtime.id)"><ExternalLink data-icon="inline-start" />{{ $t('runtime.label.competitionRuntimes') }}</NuxtLink>
           </Button>

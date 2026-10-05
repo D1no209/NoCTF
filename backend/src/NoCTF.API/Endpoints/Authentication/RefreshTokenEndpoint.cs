@@ -19,12 +19,6 @@ public sealed class RefreshTokenEndpoint(RefreshAccessToken refresh, IOptions<Re
 {
     public override void Configure()
     {
-        Summary(summary =>
-        {
-            summary.Summary = "Exchanges a valid refresh cookie for a new access token.";
-            summary.Description = summary.Summary;
-        });
-
         Post("/auth/refresh");
         AllowAnonymous();
     }

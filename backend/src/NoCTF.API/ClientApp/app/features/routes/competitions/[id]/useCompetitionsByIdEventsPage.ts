@@ -1,17 +1,12 @@
-import { dateObject } from '../../../../utils/date-value'
-
-import { ResponseMetadata, RequestPolicyOption } from '../../../../lib/api'
-
-import { api } from '../../../../lib/api'
 import { message as describeMessage } from '../../../../utils/i18n'
 import type { UiMessage } from '../../../../utils/i18n'
 
 
-
-import type { NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse, NoCTFAPIEndpointsCompetitionsEventsCompetitionEventKindProtocol, NoCTFAPIEndpointsCompetitionsEventsCompetitionEventLevelProtocol } from '../../../../api/models'
+import { adminGetCompetition, listCompetitionEvents } from '../../../../api'
+import type { NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse, NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol, NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol } from '../../../../api'
 import { competitionEventHistoryRange } from '../../../../lib/competition-event-history'
 
-type CompetitionEvent = NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse
+type CompetitionEvent = NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse
 
 /** Owns state, effects and commands for CompetitionsByIdEventsPage. */
 export function useCompetitionsByIdEventsPage() {
@@ -49,25 +44,27 @@ export function useCompetitionsByIdEventsPage() {
         hasStaffHistory.value,
         competition?.startTime,
       )
-      let err: unknown;
-      const data = await api.api.v1.competitions.byCompetitionId(competitionId).events.get({ queryParameters: {
-          from: dateObject(range.from ?? undefined),
-          to: dateObject(range.to ?? undefined),
-          kind: kind.value === 'all' ? undefined : kind.value as NoCTFAPIEndpointsCompetitionsEventsCompetitionEventKindProtocol,
-          cursor: cursor ?? undefined,
+      const { data, error: err } = await listCompetitionEvents({
+        path: { competitionId },
+        query: {
+          from: range.from,
+          to: range.to,
+          kind: kind.value === 'all' ? null : kind.value as NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol,
+          cursor,
           offset: 0,
           limit: 50,
           desc: true,
-        } }).catch(cause => { err = cause; return undefined });
+        },
+      })
       if (err || !data) throw err ?? new Error(translate("competitions.error.loadFailed"))
       return { items: data.items, nextCursor: data.nextCursor }
     })
 
   async function resolveHistoryScope() {
     if (!hasStaffHistory.value && canOrganize.value) {
-      let requestError: unknown;
-      const response = new ResponseMetadata();
-      const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).get({ options: [new RequestPolicyOption({ response: response })] }).catch(cause => { requestError = cause; return undefined });
+      const { data, error: requestError, response } = await adminGetCompetition({
+        path: { competitionId },
+      })
       hasStaffHistory.value = data?.competition?.administrationRole != null
       if (requestError && response?.status !== 403 && response?.status !== 404) {
         historyScopeError.value = parseApiError(
@@ -99,10 +96,10 @@ export function useCompetitionsByIdEventsPage() {
 
   onUnmounted(() => unwatch?.())
 
-  const levelVariant = (level?: NoCTFAPIEndpointsCompetitionsEventsCompetitionEventLevelProtocol | null) =>
+  const levelVariant = (level?: NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol) =>
     level === 'Error' ? ('destructive' as const) : level === 'Warning' ? ('secondary' as const) : ('outline' as const)
 
-  const levelLabel = (level?: NoCTFAPIEndpointsCompetitionsEventsCompetitionEventLevelProtocol | null) => (level === 'Error' ? translate("common.label.warning") : level === 'Warning' ? translate("competitions.label.note") : translate("common.label.information"))
+  const levelLabel = (level?: NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol) => (level === 'Error' ? translate("common.label.warning") : level === 'Warning' ? translate("competitions.label.note") : translate("common.label.information"))
 
   // Keep observing parent competition readiness after the initial scope request.
   watch(

@@ -23,7 +23,7 @@ public sealed class TerminateRuntimeEndpoint(
             new NoCTF.Hosting.Observability.RuntimeOperationMetricsMetadata(
                 NoCTF.Application.Observability.RuntimeOperationMetricKind.Terminate)));
         Description(builder => builder.WithName("AdminTerminateRuntime"));
-        Summary(summary => { summary.Summary = "Terminates an authorized Runtime instance."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Terminates an authorized Runtime instance.");
     }
 
     public override async Task<Results<Accepted<RuntimeAcceptedResponse>, NotFound,

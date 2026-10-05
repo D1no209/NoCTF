@@ -4,11 +4,11 @@ import { toRefs } from 'vue'
 import { Copy } from '@lucide/vue'
 import { toast } from '../../utils/message-toast'
 import { isRuntimeUrlClickable } from '../../utils/runtime-url'
-import type { NoCTFAPIEndpointsRuntimeRuntimeAccessResponse } from '../../api/models'
+import type { NoCtfapiEndpointsRuntimeRuntimeAccessResponse } from '../../api'
 
 /** Owns state, effects and commands for RuntimeAccessUrl. */
 export function useRuntimeAccessUrl(props: Readonly<{
-  access: NoCTFAPIEndpointsRuntimeRuntimeAccessResponse
+  access: NoCtfapiEndpointsRuntimeRuntimeAccessResponse
 }>) {
   const entries = computed(() => [
     props.access.directAddress

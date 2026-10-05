@@ -10,7 +10,7 @@ describe('challenge flag match kind editor', () => {
       new URL('../app/pages/admin/competitions/[id]/challenges/[ccId].vue', import.meta.url),
     ).text()
 
-    expect(templatePage).toContain('NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol')
+    expect(templatePage).toContain('NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol')
     expect(templatePage).toContain('matchKind: flagForm')
     expect(templatePage).toContain('supportsRegularExpression')
     expect(templatePage).toContain("template.value?.mode === 'Ctf'")
@@ -38,7 +38,7 @@ describe('challenge flag match kind editor', () => {
       new URL('../app/pages/admin/competitions/[id]/challenges/[ccId].vue', import.meta.url),
     ).text()
 
-    expect(templatePage).toContain('NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagFailureResponse')
+    expect(templatePage).toContain('NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse')
     expect(templatePage).toContain('challengeFlagErrorMessage')
     expect(competitionPage).not.toContain('ChallengeFlagFailureResponse')
     expect(competitionPage).not.toContain('challengeFlagErrorMessage')
@@ -74,7 +74,7 @@ describe('attachment delivery editor', () => {
 
     expect(confirmation).toContain('<Button variant="destructive"')
     expect(confirmation).not.toContain('<AlertDialogAction')
-    expect(deletion).toMatch(/api\.api\.v1\.admin\.challenges\.byChallengeId\([^)]*\)\.attachments\.byAttachmentId\([^)]*\)\.delete\(/)
+    expect(deletion).toContain('adminChallengeBankDeleteAttachment({')
     expect(deletion.indexOf('deletingAttachment.value = null'))
       .toBeGreaterThan(deletion.indexOf('if (error)'))
   })
@@ -88,8 +88,8 @@ describe('attachment delivery editor', () => {
       page.indexOf('function randomAttachmentErrorMessage'),
     )
 
-    expect(page).toMatch(/api\.api\.v1\.admin\.challenges\.byChallengeId\([^)]*\)\.attachments\.post\(/)
-    expect(page).toContain('NoCTFAPIEndpointsAdministrationChallengeBankAttachmentBatchFailureResponse')
+    expect(page).toContain('adminChallengeBankUploadAttachments')
+    expect(page).toContain('NoCtfapiEndpointsAdministrationChallengeBankAttachmentBatchFailureResponse')
     expect(page).toContain('multiple class="hidden" @change="selectRandomFiles"')
     expect(page).toContain('file.name')
     expect(page).toContain('attachment.exactFlag')
@@ -110,7 +110,7 @@ describe('attachment delivery editor', () => {
     ).text()
 
     expect(page).toContain("attachmentDeliveryPolicy === 'RandomOnePerTeam'")
-    expect(page).toMatch(/api\.api\.v1\.competitions\.byCompetitionId\([^)]*\)\.challenges\.byCompetitionChallengeId\([^)]*\)\.attachment\.get\(/)
+    expect(page).toContain('downloadRandomChallengeAttachmentEndpoint')
     expect(page).toContain('v-for="attachment in attachments"')
     expect(page).not.toContain("common.description.firstDownloadAssignsOne")
   })

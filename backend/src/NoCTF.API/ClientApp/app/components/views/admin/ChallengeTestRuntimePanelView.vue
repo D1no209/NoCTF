@@ -120,7 +120,7 @@ const { Check, Clipboard, FlaskConical, RefreshCw, runtime, loading, loadError, 
           <FieldDescription v-if="renewalTooEarly">{{ $t('runtime.extend.tooEarly') }}</FieldDescription>
         </div>
       </div>
-      <component :is="RuntimeFlagsPanel" v-if="runtime?.id" :key="runtime.id ?? undefined" :runtime-id="runtime.id" />
+      <component :is="RuntimeFlagsPanel" v-if="runtime?.id" :key="runtime.id" :runtime-id="runtime.id" />
     </template>
   </section>
 </template>

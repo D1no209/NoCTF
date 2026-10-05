@@ -108,7 +108,7 @@ const { Clock3, Expand, Minimize, Radio, RefreshCw, ShieldCheck, Trophy, Users, 
         </div>
 
         <Transition name="live-celebration" mode="out-in">
-          <div v-if="featuredSolve" :key="featuredSolve.key ?? undefined" class="live-celebration" aria-live="assertive">
+          <div v-if="featuredSolve" :key="featuredSolve.key" class="live-celebration" aria-live="assertive">
             <div class="live-celebration-flash" aria-hidden="true" />
             <div class="live-celebration-impact" aria-hidden="true">
               <i class="live-impact-ring live-impact-ring-one" />
@@ -116,7 +116,7 @@ const { Clock3, Expand, Minimize, Radio, RefreshCw, ShieldCheck, Trophy, Users, 
               <i class="live-impact-ring live-impact-ring-three" />
               <span
                 v-for="particle in celebrationParticles"
-                :key="particle.id ?? undefined"
+                :key="particle.id"
                 class="live-celebration-particle"
                 :style="{
                   '--particle-angle': particle.angle,
@@ -157,7 +157,7 @@ const { Clock3, Expand, Minimize, Radio, RefreshCw, ShieldCheck, Trophy, Users, 
               :style="marqueeEnabled ? { animationDuration: `${marqueeDuration}s` } : undefined"
             >
               <ol class="live-ranking">
-                <li v-for="entry in rankedEntries" :key="entry.teamId ?? undefined" :class="rankClass(entry.rank ?? undefined)">
+                <li v-for="entry in rankedEntries" :key="entry.teamId" :class="rankClass(entry.rank ?? undefined)">
                   <span class="live-rank">{{ entry.rank ?? $t('common.label.symbol') }}</span>
                   <span class="min-w-0 flex-1 truncate font-semibold">{{ entry.teamName }}<small v-if="entry.rankingState !== 'Eligible'"> · {{ scoreboardRankingStateLabel(entry.rankingState) }}</small></span>
                   <span class="font-mono text-[0.625rem] text-slate-500">{{ scoreboardTeamSolveCount(entry) }}</span>
@@ -183,8 +183,8 @@ const { Clock3, Expand, Minimize, Radio, RefreshCw, ShieldCheck, Trophy, Users, 
             <span>{{ $t('competitions.label.live') }}</span>
           </header>
           <ScrollSurface as="ol" v-if="solveFeed.length" class="live-feed">
-            <li v-for="solve in solveFeed" :key="solve.key ?? undefined">
-              <time :datetime="dateIso(solve.solvedAt)">{{ new Date(solve.solvedAt).toLocaleTimeString(localeTag(), { hour12: false }) }}</time>
+            <li v-for="solve in solveFeed" :key="solve.key">
+              <time :datetime="solve.solvedAt">{{ new Date(solve.solvedAt).toLocaleTimeString(localeTag(), { hour12: false }) }}</time>
               <span :class="bloodClass(solve.bloodRank)">{{ bloodLabel(solve.bloodRank) }}</span>
               <p><strong>{{ solve.teamName }}</strong> {{ t('competitions.label.solved.livePageView') }} <b>{{ solve.challengeTitle }}</b> <em>+{{ solve.score }}</em></p>
             </li>

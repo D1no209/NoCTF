@@ -7,7 +7,7 @@ describe('competition runtime administration pagination', () => {
     const controller = await Bun.file(new URL('../app/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdRuntimesPage.ts', import.meta.url)).text().then(source => source.replace(/\r\n/g, '\n'))
     const view = await Bun.file(new URL('../app/components/views/page/admin/competitions/[id]/AdminCompetitionsByIdRuntimesPageView.vue', import.meta.url)).text().then(source => source.replace(/\r\n/g, '\n'))
 
-    expect(controller).toContain('useOffsetPagination<NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeResponse>')
+    expect(controller).toContain('useOffsetPagination<NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse>')
     expect(controller).toContain('offset,\n        limit,\n        desc,')
     expect(controller).toContain('return { items: data.items ?? [], total: data.total ?? 0 }')
     expect(controller).toContain('initialPageSize: 10')

@@ -20,7 +20,7 @@ public sealed class BeginSsoAuthenticationTestEndpoint(
             new NoCTF.API.Security.ProtectedEntryMetadata(
                 NoCTF.API.Security.ProtectedEntry.SsoAuthentication)));
         Description(builder => builder.WithName("AdminPlatformSsoBeginAuthenticationTest"));
-        Summary(summary => { summary.Summary = "Starts a browser authentication test without creating a binding or platform session."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Starts a browser authentication test without creating a binding or platform session.");
     }
 
     public override async Task<Results<Ok<NoCTF.API.Endpoints.Authentication.BeginSsoLoginResponse>,

@@ -9,27 +9,36 @@ describe('protected downloads', () => {
 
     const result = await readProtectedDownload(async () => {
       calls++
-      return new Response(blob, {
+      return {
+        data: blob,
+        response: new Response(null, {
           status: 200,
           headers: {
             'content-disposition': "attachment; filename*=UTF-8''report%20data.zip",
           },
-        })
+        }),
+      }
     }, 'fallback.zip')
 
     expect(calls).toBe(1)
-    expect(await result.blob.text()).toBe(await blob.text())
+    expect(result.blob).toBe(blob)
     expect(result.fileName).toBe('report data.zip')
   })
 
   test('keeps the fallback name when content disposition is absent', async () => {
-    const result = await readProtectedDownload(async () => new Response('payload', { status: 200 }), 'fallback.bin')
+    const result = await readProtectedDownload(async () => ({
+      data: new Blob(['payload']),
+      response: new Response(null, { status: 200 }),
+    }), 'fallback.bin')
 
     expect(result.fileName).toBe('fallback.bin')
   })
 
   test('preserves generated client problem metadata while localizing its message', async () => {
-    expect(readProtectedDownload(async () => Response.json({ detail: 'download forbidden' }, { status: 403 }))).rejects.toMatchObject({
+    expect(readProtectedDownload(async () => ({
+      error: { status: 403, detail: 'download forbidden' },
+      response: new Response(null, { status: 403 }),
+    }))).rejects.toMatchObject({
       name: 'ApiError',
       status: 403,
       message: '没有权限执行此操作',
@@ -40,6 +49,7 @@ describe('protected downloads', () => {
     const original = Object.getOwnPropertyDescriptor(globalThis, 'showSaveFilePicker')
     const chunks: Uint8Array[] = []
     let suggestedName = ''
+    let parseMode = ''
     Object.defineProperty(globalThis, 'showSaveFilePicker', {
       configurable: true,
       value: async (options: { suggestedName: string }) => {
@@ -53,9 +63,16 @@ describe('protected downloads', () => {
     })
 
     try {
-      const outcome = await downloadSdkFileToDisk(() => Promise.resolve(new Response(new Blob(['payload']).stream())), 'report.zip')
+      const outcome = await downloadSdkFileToDisk((parseAs) => {
+        parseMode = parseAs
+        return Promise.resolve({
+          data: new Blob(['payload']).stream(),
+          response: new Response(null, { status: 200 }),
+        })
+      }, 'report.zip')
 
       expect(outcome).toBe('downloaded')
+      expect(parseMode).toBe('stream')
       expect(suggestedName).toBe('report.zip')
       expect(chunks.map(chunk => new TextDecoder().decode(chunk)).join('')).toBe('payload')
     }
@@ -76,7 +93,7 @@ describe('protected downloads', () => {
     try {
       const outcome = await downloadSdkFileToDisk(() => {
         requests++
-        return Promise.resolve(new Response('unused'))
+        return Promise.resolve({})
       }, 'report.zip')
 
       expect(outcome).toBe('canceled')
@@ -100,11 +117,11 @@ describe('protected downloads', () => {
 
     expect(source).not.toContain('downloadProtectedFile(`/api/')
     expect(source).not.toContain('getAccessToken')
-    expect(source).toMatch(/api\.api\.v1\.competitions\.byCompetitionId\([^)]*\)\.challenges\.byCompetitionChallengeId\([^)]*\)\.attachments\.byAttachmentId\([^)]*\)\.get\(/)
-    expect(source).toMatch(/api\.api\.v1\.competitions\.byCompetitionId\([^)]*\)\.challenges\.byCompetitionChallengeId\([^)]*\)\.attachment\.get\(/)
-    expect(source).toMatch(/api\.api\.v1\.admin\.platform\.logs\.exportEscaped\.get\(/)
-    expect(source).toMatch(/api\.api\.v1\.admin\.competitions\.byCompetitionId\([^)]*\)\.dataExport\.post\(/)
-    expect(source).toMatch(/api\.api\.v1\.admin\.platform\.auditLogs\.dataExport\.post\(/)
-    expect(source).toMatch(/api\.api\.v1\.admin\.competitions\.byCompetitionId\([^)]*\)\.events\.exportEscaped\.get\(/)
+    expect(source).toContain('downloadChallengeAttachmentEndpoint')
+    expect(source).toContain('downloadRandomChallengeAttachmentEndpoint')
+    expect(source).toContain('adminPlatformExportLogs')
+    expect(source).toContain('adminExportCompetitionArchive')
+    expect(source).toContain('adminExportPlatformAuditArchive')
+    expect(source).toContain('adminExportCompetitionEvents')
   })
 })

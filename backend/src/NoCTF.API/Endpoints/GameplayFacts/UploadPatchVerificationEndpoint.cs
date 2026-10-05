@@ -13,10 +13,6 @@ namespace NoCTF.API.Endpoints.GameplayFacts;
 
 public sealed class UploadPatchVerificationRequest
 {
-    /// <summary>One-time verification token; optional when platform policy disables verification. Maximum 4096 characters.</summary>
-    [FromHeader("X-NoCTF-Human-Verification", IsRequired = false, RemoveFromSchema = true)]
-    public string? HumanVerificationToken { get; set; }
-
     public Guid CompetitionId { get; set; }
     public Guid CompetitionChallengeId { get; set; }
     public Guid RuntimeInstanceId { get; set; }
@@ -67,24 +63,18 @@ public sealed class UploadPatchVerificationEndpoint(
 {
     public override void Configure()
     {
-        Description(builder => builder
-            .ProducesProblem(StatusCodes.Status403Forbidden)
-            .ProducesProblem(StatusCodes.Status503ServiceUnavailable));
-
         Post("/competitions/{competitionId}/challenges/{competitionChallengeId}/patch-verification-targets/{runtimeInstanceId}/patch");
         AuthSchemes("Bearer");
         Options(builder => builder.WithMetadata(new ProtectedEntryMetadata(ProtectedEntry.PatchUpload)));
         Options(builder => builder.WithMetadata(
             new HumanVerificationMetadata(HumanVerificationAction.Evaluation)));
         AllowFileUploads();
-        Description(builder => builder.Accepts<UploadPatchVerificationRequest>("multipart/form-data"));
         MaxRequestBodySize(FileUploadLimits.MaximumRequestBytes(
             PatchUploadRules.HardMaximumArchiveBytes));
         Description(builder => builder.ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
             StatusCodes.Status413PayloadTooLarge));
         Summary(summary =>
         {
-            summary.Params["X-NoCTF-Human-Verification"] = "One-time verification token, at most 4096 characters. Required only when the configured platform policy enables verification for this operation.";
             summary.Summary = "Uploads one Patch archive to a CTF PatchVerification target.";
             summary.Description = "The archive is validated before a FixAttempt fact is created.";
         });

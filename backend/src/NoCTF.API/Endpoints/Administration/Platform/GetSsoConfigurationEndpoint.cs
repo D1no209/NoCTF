@@ -122,7 +122,7 @@ public sealed class GetSsoConfigurationEndpoint(ManageSsoProviders management)
         AuthSchemes("Bearer");
         Roles("Administrator");
         Description(builder => builder.WithName("AdminPlatformSsoGetConfiguration"));
-        Summary(summary => { summary.Summary = "Returns SSO configuration without provider secrets."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Returns SSO configuration without provider secrets.");
     }
 
     public override async Task<Ok<SsoConfigurationResponse>> ExecuteAsync(CancellationToken ct) =>

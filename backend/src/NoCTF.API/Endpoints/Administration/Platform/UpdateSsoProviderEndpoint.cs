@@ -24,7 +24,7 @@ public sealed class UpdateSsoProviderEndpoint(
         AuthSchemes("Bearer");
         Roles("Administrator");
         Description(builder => builder.WithName("AdminPlatformSsoUpdateProvider"));
-        Summary(summary => { summary.Summary = "Updates a provider without exposing or replacing its secret."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Updates a provider without exposing or replacing its secret.");
     }
 
     public override async Task<Results<Ok<SsoConfigurationResponse>, ProblemHttpResult>> ExecuteAsync(

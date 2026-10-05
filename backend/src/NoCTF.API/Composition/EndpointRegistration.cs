@@ -1,6 +1,5 @@
 using FastEndpoints;
-using FastEndpoints.OpenApi;
-using Scalar.AspNetCore;
+using FastEndpoints.Swagger;
 using FluentValidation.Results;
 using Microsoft.AspNetCore.Mvc;
 
@@ -22,8 +21,8 @@ public static class EndpointRegistration
                     statusCode,
                     context.Request.Path);
         });
-        app.MapOpenApi();
-        app.MapScalarApiReference(options => options.AddDocuments("v1"));
+        app.UseSwaggerGen(settings =>
+            settings.PostProcess = (document, _) => document.Servers.Clear());
         return app;
     }
 }

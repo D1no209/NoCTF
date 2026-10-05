@@ -42,11 +42,11 @@ const { ShieldCheck, emit, state, loading, stateError, defenseOutcome, statePoll
           :competition-id="competition.id!"
           :competition-challenge-id="challenge.id!"
           :controls="state?.breakActivation ? 'readonly' : 'full'"
-          :dock-target="runtimeDockTarget ?? undefined"
+          :dock-target="runtimeDockTarget"
         />
 
         <component :is="FlagSubmit"
-          :dock-target="flagDockTarget ?? undefined"
+          :dock-target="flagDockTarget"
           :competition-id="competition.id!"
           :competition-challenge-id="challenge.id!"
           :title="state?.breakActivation ? $t('challenges.label.checkFlag') : $t('challenges.label.submitFlag')"
@@ -98,7 +98,7 @@ const { ShieldCheck, emit, state, loading, stateError, defenseOutcome, statePoll
           class="border-t pt-5"
           :competition-id="competition.id!"
           :competition-challenge-id="challenge.id!"
-          :defense="(state?.defense) ?? undefined"
+          :defense="state?.defense"
           @changed="refreshAndPoll"
           @accepted="handleFixAccepted"
         />

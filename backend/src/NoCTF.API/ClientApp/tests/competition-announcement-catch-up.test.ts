@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import type { NoCTFAPIEndpointsNotificationsNotificationResponse } from '../app/api/models'
+import type { NoCtfapiEndpointsNotificationsNotificationResponse } from '../app/api'
 import {
   mergeSeenCompetitionAnnouncementIds,
   missedCompetitionAnnouncements,
@@ -10,8 +10,8 @@ import { sourceFile } from './support/feature-source'
 
 function notification(
   id: string,
-  kind: NoCTFAPIEndpointsNotificationsNotificationResponse['kind'] = 'CompetitionAnnouncement',
-): NoCTFAPIEndpointsNotificationsNotificationResponse {
+  kind: NoCtfapiEndpointsNotificationsNotificationResponse['kind'] = 'CompetitionAnnouncement',
+): NoCtfapiEndpointsNotificationsNotificationResponse {
   return { id, kind }
 }
 

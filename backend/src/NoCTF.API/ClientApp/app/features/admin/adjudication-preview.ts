@@ -1,4 +1,10 @@
-import type { NoCTFAPIEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferenceItemResponse as PreviewItem, NoCTFAPIEndpointsAdministrationGameplayFactsAdjudicationFindingSeverityProtocol as Severity, NoCTFAPIEndpointsAdministrationGameplayFactsAdjudicationFindingClassificationProtocol as Classification, NoCTFAPIEndpointsAdministrationGameplayFactsAdjudicationEvidenceCompletenessProtocol as Completeness, NoCTFAPIEndpointsCompetitionsEventsCompetitionEventKindProtocol as EventKind } from '../../api/models'
+import type {
+  NoCtfapiEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferenceItemResponse as PreviewItem,
+  NoCtfapiEndpointsAdministrationGameplayFactsAdjudicationFindingSeverityProtocol as Severity,
+  NoCtfapiEndpointsAdministrationGameplayFactsAdjudicationFindingClassificationProtocol as Classification,
+  NoCtfapiEndpointsAdministrationGameplayFactsAdjudicationEvidenceCompletenessProtocol as Completeness,
+  NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol as EventKind,
+} from '../../api'
 import type { MessageKey } from '../../locales/zh-CN'
 import { translate } from '../../utils/i18n'
 
@@ -34,9 +40,9 @@ export function adjudicationCounts(items: PreviewItem[]): Record<Severity, numbe
 }
 
 export function adjudicationSeverityLabel(value?: Severity): string { return translate(severityKeys[value ?? 'Warning']) }
-export function adjudicationClassificationLabel(value?: Classification | null): string { return translate(classifications[value ?? 'InsufficientEvidence']) }
-export function adjudicationCompletenessLabel(value?: Completeness | null): string { return translate(completenessKeys[value ?? 'MissingFields']) }
-export function adjudicationEventLabel(value?: EventKind | null): string { return translate(value ? eventKeys[value] ?? 'adjudication.event' : 'adjudication.event') }
+export function adjudicationClassificationLabel(value?: Classification): string { return translate(classifications[value ?? 'InsufficientEvidence']) }
+export function adjudicationCompletenessLabel(value?: Completeness): string { return translate(completenessKeys[value ?? 'MissingFields']) }
+export function adjudicationEventLabel(value?: EventKind): string { return translate(value ? eventKeys[value] ?? 'adjudication.event' : 'adjudication.event') }
 export function adjudicationVariant(value?: Severity): 'destructive' | 'outline' | 'secondary' {
   return value === 'Error' ? 'destructive' : value === 'Information' ? 'secondary' : 'outline'
 }

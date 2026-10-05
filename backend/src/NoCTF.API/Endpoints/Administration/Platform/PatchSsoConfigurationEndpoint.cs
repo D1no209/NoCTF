@@ -33,7 +33,7 @@ public sealed class PatchSsoConfigurationEndpoint(
         AuthSchemes("Bearer");
         Roles("Administrator");
         Description(builder => builder.WithName("AdminPlatformSsoPatchConfiguration"));
-        Summary(summary => { summary.Summary = "Updates the global SSO switch and public base URL."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Updates the global SSO switch and public base URL.");
     }
 
     public override async Task<Results<Ok<SsoConfigurationResponse>, ProblemHttpResult>> ExecuteAsync(

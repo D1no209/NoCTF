@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 
 export type Data = Record<string, any>
-export const spec = JSON.parse(readFileSync(new URL('../../../../artifacts/openapi/v1.json', import.meta.url), 'utf8')) as Data
+export const spec = JSON.parse(readFileSync(new URL('../../wwwroot/openapi/v1.json', import.meta.url), 'utf8')) as Data
 export const now = () => new Date().toISOString()
 export const date = (hours: number) => new Date(Date.now() + hours * 3_600_000).toISOString()
 export const id = (group: number, index = 1) => `${group.toString(16).padStart(8, '0')}-0000-4000-8000-${index.toString(16).padStart(12, '0')}`
@@ -29,7 +29,7 @@ export function sample(schema: Data = {}, depth = 0): any {
 }
 
 export function model(suffix: string, values: Data = {}): Data {
-  const names = Object.keys(spec.components.schemas).filter(name => name.startsWith('NoCTF') && name.endsWith(suffix))
+  const names = Object.keys(spec.components.schemas).filter(name => name.endsWith(suffix))
   if (names.length !== 1) throw new Error(`Ambiguous mock schema: ${suffix}: ${names.join(', ')}`)
   return { ...sample(spec.components.schemas[names[0]]), ...values }
 }

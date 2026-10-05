@@ -39,12 +39,6 @@ public sealed class GetPlayerProgressionEndpoint(
 {
     public override void Configure()
     {
-        Summary(summary =>
-        {
-            summary.Summary = "Returns current challenge locks and badge achievements for the participant.";
-            summary.Description = summary.Summary;
-        });
-
         Get("/competitions/{competitionId}/progression");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("GetPlayerCompetitionProgression"));

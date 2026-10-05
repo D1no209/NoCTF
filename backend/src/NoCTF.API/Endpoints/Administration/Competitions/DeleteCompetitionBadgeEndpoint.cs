@@ -32,12 +32,6 @@ public sealed class DeleteCompetitionBadgeEndpoint(
 {
     public override void Configure()
     {
-        Summary(summary =>
-        {
-            summary.Summary = "Removes a badge from the competition catalog when permitted.";
-            summary.Description = summary.Summary;
-        });
-
         Delete("/admin/competitions/{competitionId}/badges/{badgeId}");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("AdminDeleteCompetitionBadge"));

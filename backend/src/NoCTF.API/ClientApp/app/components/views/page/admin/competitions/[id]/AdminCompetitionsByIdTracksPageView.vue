@@ -74,7 +74,7 @@ const { Plus, Save, Trash2, canWrite, mode, enabled, canUpdate, tracks, ssoProvi
           </TableRow>
         </TableHeader>
         <TableBody>
-          <TableRow v-for="(track, index) in tracks" :key="track.clientId ?? undefined">
+          <TableRow v-for="(track, index) in tracks" :key="track.clientId">
             <TableCell>
               <Input v-model="track.key" :disabled="!canWrite || !canUpdate || track.existingKey !== null" maxlength="64" class="font-mono" />
             </TableCell>
@@ -82,13 +82,13 @@ const { Plus, Save, Trash2, canWrite, mode, enabled, canUpdate, tracks, ssoProvi
               <Input v-model="track.name" :disabled="!canWrite || !canUpdate" maxlength="80" />
             </TableCell>
             <TableCell><Checkbox :model-value="track.isDefault" :disabled="!canWrite || !canUpdate" @update:model-value="updateDefault(index, $event)" /></TableCell>
-            <TableCell><Checkbox :model-value="track.isPublicSelectable" :disabled="(!canWrite || !canUpdate || track.isInternal) ?? undefined" @update:model-value="updatePublicSelectable(track, $event)" /></TableCell>
+            <TableCell><Checkbox :model-value="track.isPublicSelectable" :disabled="!canWrite || !canUpdate || track.isInternal" @update:model-value="updatePublicSelectable(track, $event)" /></TableCell>
             <TableCell><Checkbox :model-value="track.isInternal" :disabled="!canWrite || !canUpdate" @update:model-value="updateInternal(track, $event)" /></TableCell>
-            <TableCell><Checkbox v-model="track.earnsScore" :disabled="(!canWrite || !canUpdate || track.isInternal) ?? undefined" /></TableCell>
+            <TableCell><Checkbox v-model="track.earnsScore" :disabled="!canWrite || !canUpdate || track.isInternal" /></TableCell>
             <TableCell><Checkbox v-model="track.earnsBlood" :disabled="!canWrite || !canUpdate || track.isInternal || mode !== 'Ctf'" /></TableCell>
             <TableCell><Checkbox v-model="track.affectsDynamicChallengeScore" :disabled="!canWrite || !canUpdate || track.isInternal || mode !== 'Ctf'" /></TableCell>
-            <TableCell><Checkbox v-model="track.visibleOnLeaderboard" :disabled="(!canWrite || !canUpdate || track.isInternal) ?? undefined" /></TableCell>
-            <TableCell><Checkbox v-model="track.affectsCompetitiveResults" :disabled="(!canWrite || !canUpdate || track.isInternal) ?? undefined" /></TableCell>
+            <TableCell><Checkbox v-model="track.visibleOnLeaderboard" :disabled="!canWrite || !canUpdate || track.isInternal" /></TableCell>
+            <TableCell><Checkbox v-model="track.affectsCompetitiveResults" :disabled="!canWrite || !canUpdate || track.isInternal" /></TableCell>
             <TableCell>
               <div class="flex min-w-64 flex-col gap-2">
                 <div class="flex items-center gap-2">
@@ -123,7 +123,7 @@ const { Plus, Save, Trash2, canWrite, mode, enabled, canUpdate, tracks, ssoProvi
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">{{ $t('administration.label.restriction') }}</SelectItem>
-                  <SelectItem v-for="provider in ssoProviders" :key="provider.id ?? undefined" :value="provider.id!">
+                  <SelectItem v-for="provider in ssoProviders" :key="provider.id" :value="provider.id!">
                     <span class="flex items-center gap-2">
                       <img v-if="provider.iconUrl" :src="provider.iconUrl" class="size-4 object-contain" alt="" aria-hidden="true" referrerpolicy="no-referrer">
                       <span>{{ provider.name }}</span>
@@ -161,7 +161,7 @@ const { Plus, Save, Trash2, canWrite, mode, enabled, canUpdate, tracks, ssoProvi
           <Select v-model="pendingRemoval.toTrackKey">
             <SelectTrigger id="track-removal-target"><SelectValue :placeholder="$t('common.label.selectTrack')" /></SelectTrigger>
             <SelectContent>
-              <SelectItem v-for="track in removalTargets" :key="track.clientId ?? undefined" :value="track.key">
+              <SelectItem v-for="track in removalTargets" :key="track.clientId" :value="track.key">
                 {{ track.name }}
               </SelectItem>
             </SelectContent>

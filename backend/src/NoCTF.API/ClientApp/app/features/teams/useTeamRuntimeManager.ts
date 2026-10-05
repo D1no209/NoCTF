@@ -1,21 +1,21 @@
-
-import { api } from '../../lib/api'
 import { markRaw, toRefs } from 'vue'
 
 import { RefreshCw } from '@lucide/vue'
-
-import type { NoCTFAPIEndpointsRuntimeTeamRuntimeListItemResponse } from '../../api/models'
+import { listMyTeamRuntimes } from '../../api'
+import type { NoCtfapiEndpointsRuntimeTeamRuntimeListItemResponse } from '../../api'
 import { useOffsetPagination } from '../../composables/useOffsetPagination'
 import { createTrailingRefresh } from '../../lib/latest-page-refresh'
 import { competitionChallengePath } from '../../utils/app-routes'
 import RuntimeCardComponent from '../challenges/RuntimeCard.vue'
 
-type TeamRuntime = NoCTFAPIEndpointsRuntimeTeamRuntimeListItemResponse
+type TeamRuntime = NoCtfapiEndpointsRuntimeTeamRuntimeListItemResponse
 
 export function useTeamRuntimeManager(props: Readonly<{ competitionId: string }>) {
   const pagination = useOffsetPagination<TeamRuntime>(async ({ offset, limit, desc }) => {
-    let error: unknown;
-    const data = await api.api.v1.competitions.byCompetitionId(props.competitionId).teams.me.runtimes.get({ queryParameters: { offset, limit, desc } }).catch(cause => { error = cause; return undefined });
+    const { data, error } = await listMyTeamRuntimes({
+      path: { competitionId: props.competitionId },
+      query: { offset, limit, desc },
+    })
     if (error || !data) throw error
     return { items: data.items ?? [], total: data.total ?? 0 }
   }, { initialPageSize: 10, initialDesc: true })

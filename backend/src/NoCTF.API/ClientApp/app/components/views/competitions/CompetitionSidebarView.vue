@@ -25,7 +25,7 @@ const { EyeOff, loading, options, selectedId, group, counts, showDeleted, setGro
           <span class="sr-only">{{ gameModeLabel(item.competition.mode) }}</span>
           <span class="relative z-10 flex flex-wrap items-center gap-2">
             <Badge v-if="item.competition.deletedAt" variant="destructive">{{ $t('common.label.deleted.competitionSidebarView') }}</Badge>
-            <component :is="LifecycleBadge" v-else :status="item.competition.status ?? undefined" />
+            <component :is="LifecycleBadge" v-else :status="item.competition.status" />
             <Badge v-if="item.competition.accessMode === 'StaffOnly'" variant="secondary">
               <EyeOff class="size-3" />{{ $t('competitionAccess.badge') }}
             </Badge>

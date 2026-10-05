@@ -9,13 +9,7 @@ namespace NoCTF.API.Endpoints.Teams;
 public sealed class LeaveTeamEndpoint(LeaveTeam leave, IUserContext user)
     : EndpointWithoutRequest<Results<NoContent, NotFound, ProblemHttpResult>>
 {
-    public override void Configure() {
-        Summary(summary =>
-        {
-            summary.Summary = "Removes the current user from their competition team when permitted.";
-            summary.Description = summary.Summary;
-        });
- Delete("/competitions/{competitionId}/teams/me/membership"); AuthSchemes("Bearer"); }
+    public override void Configure() { Delete("/competitions/{competitionId}/teams/me/membership"); AuthSchemes("Bearer"); }
     public override async Task<Results<NoContent, NotFound, ProblemHttpResult>> ExecuteAsync(CancellationToken ct)
     {
         var result = await leave.ExecuteAsync(Route<Guid>("competitionId"), user.UserId, ct);

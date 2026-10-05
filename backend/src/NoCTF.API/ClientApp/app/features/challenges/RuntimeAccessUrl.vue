@@ -3,9 +3,9 @@ import { bindViewState } from '~/features/shared/view-state'
 
 import { useRuntimeAccessUrl } from './useRuntimeAccessUrl'
 import View from '~/components/views/challenges/RuntimeAccessUrlView.vue'
-import type { NoCTFAPIEndpointsRuntimeRuntimeAccessResponse } from '~/api/models'
+import type { NoCtfapiEndpointsRuntimeRuntimeAccessResponse } from '~/api'
 
-const props = defineProps<{ access: NoCTFAPIEndpointsRuntimeRuntimeAccessResponse }>()
+const props = defineProps<{ access: NoCtfapiEndpointsRuntimeRuntimeAccessResponse }>()
 const state = bindViewState(useRuntimeAccessUrl(props))
 
 </script>

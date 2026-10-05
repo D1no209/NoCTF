@@ -1,9 +1,9 @@
 import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import type {
-  NoCTFAPIEndpointsCompetitionsScoreboardSchemaResponse,
-  NoCTFAPIEndpointsCompetitionsScoreboardTeamResponse,
-} from '../app/api/models'
+  NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
+} from '../app/api'
 import {
   latestSettledScore,
   scoreboardBloodAward,
@@ -47,7 +47,7 @@ const scoreboardSlotStatus = await sourceFile(
 
 describe('normalized scoreboard matrix', () => {
   test('AWDP clock refresh covers anonymous live viewers but stops at settlement or freeze', () => {
-    const schema: NoCTFAPIEndpointsCompetitionsScoreboardSchemaResponse = {
+    const schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse = {
       mode: 'Awdp', rounds: [{ state: 'Settled' }, { state: 'Running' }],
     }
     expect(needsAwdpRoundRefresh(schema, { dataScope: 'Live' })).toBeTrue()
@@ -61,10 +61,10 @@ describe('normalized scoreboard matrix', () => {
   })
 
   test('loads catalog, schema and snapshot concurrently with stale-response fencing', () => {
-    expect(composable).toContain('await Promise.allSettled([')
-    expect(composable).toMatch(/api\.api\.v1\.competitions\.byCompetitionId\([^)]*\)\.leaderboard\.challenges\.get\(/)
-    expect(composable).toMatch(/api\.api\.v1\.competitions\.byCompetitionId\([^)]*\)\.leaderboard\.schema\.get\(/)
-    expect(composable).toMatch(/api\.api\.v1\.competitions\.byCompetitionId\([^)]*\)\.leaderboard\.get\(/)
+    expect(composable).toContain('await Promise.all([')
+    expect(composable).toContain('getScoreboardChallengeCatalogEndpoint')
+    expect(composable).toContain('getScoreboardSchemaEndpoint')
+    expect(composable).toContain('getLeaderboardEndpoint')
     expect(composable).toContain('const requestGeneration = ++generation')
     expect(composable).toContain('requestGeneration !== generation')
     expect(composable).toContain('candidateSnapshot = incoming')
@@ -98,9 +98,9 @@ describe('normalized scoreboard matrix', () => {
   })
 
   test('keeps accepted state while processing and retries the authoritative snapshot', () => {
-    expect(composable).toContain("snapshotResponse.status === 202")
+    expect(composable).toContain("snapshotResult?.response?.status === 202")
     expect(composable).toContain('scheduleProcessingRetry()')
-    expect(composable).toContain('if (snapshotResult)')
+    expect(composable).toContain('if (snapshotResult?.data)')
     expect(composable).not.toContain('snapshot.value = null')
   })
 
@@ -109,7 +109,7 @@ describe('normalized scoreboard matrix', () => {
     expect(composable).toContain("schema.value?.mode !== 'Awdp' && schema.value?.mode !== 'Awd'")
     expect(composable).toContain("schema.value?.mode === 'Awdp' || schema.value?.mode === 'Awd'")
     expect(composable).toContain("snapshot.value?.dataScope !== 'Frozen'")
-    expect(composable).toContain('queryParameters: { endingRound: endingRound ?? undefined }')
+    expect(composable).toContain('query: { endingRound }')
     expect(composable).toContain('await selectRoundWindow(windowStart - 1)')
     expect(composable).toContain('const nextEnd = Math.min(latestRound, windowEnd + 50)')
     expect(composable).toContain('await selectRoundWindow(nextEnd >= latestRound ? null : nextEnd)')
@@ -210,7 +210,7 @@ describe('normalized scoreboard matrix', () => {
   })
 
   test('reads sparse slots and never predicts a pending round score', () => {
-    const team: NoCTFAPIEndpointsCompetitionsScoreboardTeamResponse = {
+    const team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse = {
       teamId: crypto.randomUUID(),
       teamName: 'Alpha',
       trackKey: 'default',
@@ -258,7 +258,7 @@ describe('normalized scoreboard matrix', () => {
   test('keeps challenge-major column order from the server schema', () => {
     const challengeA = crypto.randomUUID()
     const challengeB = crypto.randomUUID()
-    const schema: NoCTFAPIEndpointsCompetitionsScoreboardSchemaResponse = {
+    const schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse = {
       competitionId: crypto.randomUUID(),
       mode: 'Awdp',
       revision: '1',
@@ -276,7 +276,7 @@ describe('normalized scoreboard matrix', () => {
 
   test('groups displayed challenge columns by direction without changing schema slot indexes', () => {
     const [webA, pwnA, webB, missing, pwnB] = Array.from({ length: 5 }, () => crypto.randomUUID())
-    const schema: NoCTFAPIEndpointsCompetitionsScoreboardSchemaResponse = {
+    const schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse = {
       mode: 'Awdp',
       columns: [
         { index: 0, competitionChallengeId: webA },
@@ -356,7 +356,7 @@ describe('normalized scoreboard matrix', () => {
   test('builds each team radar from authoritative effective challenge scores', () => {
     const challengeA = crypto.randomUUID()
     const challengeB = crypto.randomUUID()
-    const team: NoCTFAPIEndpointsCompetitionsScoreboardTeamResponse = {
+    const team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse = {
       teamId: crypto.randomUUID(),
       teamName: 'Radar team',
       challengeScores: [{ competitionChallengeId: challengeA, attackScore: 240, defenseScore: 160 }],

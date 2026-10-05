@@ -12,13 +12,7 @@ namespace NoCTF.API.Endpoints.GameplayFacts;
 
 public sealed class RequestPatchVerificationTargetRequest
 {
-    /// <summary>One-time verification token; optional when platform policy disables verification. Maximum 4096 characters.</summary>
-    [FromHeader("X-NoCTF-Human-Verification", IsRequired = false, RemoveFromSchema = true)]
-    public string? HumanVerificationToken { get; set; }
-
-    [RouteParam]
     public Guid CompetitionId { get; set; }
-    [RouteParam]
     public Guid CompetitionChallengeId { get; set; }
 }
 
@@ -76,11 +70,6 @@ public sealed class RequestPatchVerificationTargetEndpoint(
 {
     public override void Configure()
     {
-
-        Description(builder => builder
-            .ProducesProblem(StatusCodes.Status403Forbidden)
-            .ProducesProblem(StatusCodes.Status503ServiceUnavailable));
-
         Post("/competitions/{competitionId}/challenges/{competitionChallengeId}/patch-verification-targets");
         AuthSchemes("Bearer");
         Options(builder => builder.WithMetadata(new ProtectedEntryMetadata(ProtectedEntry.RuntimeCommand)));
@@ -89,7 +78,6 @@ public sealed class RequestPatchVerificationTargetEndpoint(
             new HumanVerificationMetadata(HumanVerificationAction.Evaluation)));
         Summary(summary =>
         {
-            summary.Params["X-NoCTF-Human-Verification"] = "One-time verification token, at most 4096 characters. Required only when the configured platform policy enables verification for this operation.";
             summary.Summary = "Requests a clean one-shot CTF PatchVerification target.";
             summary.Description = "Creates one isolated target for one team and challenge.";
         });

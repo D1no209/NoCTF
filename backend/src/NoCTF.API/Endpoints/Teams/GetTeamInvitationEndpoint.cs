@@ -20,12 +20,6 @@ public sealed class GetTeamInvitationEndpoint(GetTeamInvitation get, IUserContex
 {
     public override void Configure()
     {
-        Summary(summary =>
-        {
-            summary.Summary = "Returns the current team invitation token to an authorized captain.";
-            summary.Description = summary.Summary;
-        });
-
         Get("/competitions/{competitionId}/teams/{teamId}/invitation-token");
         AuthSchemes("Bearer");
     }

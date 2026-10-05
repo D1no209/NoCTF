@@ -43,16 +43,9 @@ public sealed class UpdateCompetitionBadgeEndpoint(
 {
     public override void Configure()
     {
-        Summary(summary =>
-        {
-            summary.Summary = "Updates the metadata and image of a competition badge.";
-            summary.Description = summary.Summary;
-        });
-
         Put("/admin/competitions/{competitionId}/badges/{badgeId}");
         AuthSchemes("Bearer");
         AllowFileUploads();
-        Description(builder => builder.Accepts<UpdateCompetitionBadgeRequest>("multipart/form-data"));
         MaxRequestBodySize(FileUploadLimits.MaximumRequestBytes(limits.MaximumPosterBytes));
         Description(builder => builder.WithName("AdminUpdateCompetitionBadge"));
     }

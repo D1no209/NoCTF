@@ -7,7 +7,7 @@ const { competition, role, loading, error, RoleLabel, navGroups, activePath, isP
 </script>
 
 <template>
-  <component :is="AppWorkspaceNav" v-if="competition" :groups="navGroups" :title="competition.title ?? undefined">
+  <component :is="AppWorkspaceNav" v-if="competition" :groups="navGroups" :title="competition.title">
     <div :data-workspace-scroll-content="usesPageScroll ? undefined : ''" data-competition-management-workspace
       class="mx-auto flex w-full flex-col gap-6 px-4 pt-8 md:px-6"
       :class="[isProgressionPage || isWriteUpReview ? 'max-w-none' : 'max-w-6xl', usesPageScroll ? 'pb-8' : 'h-full min-h-0']">

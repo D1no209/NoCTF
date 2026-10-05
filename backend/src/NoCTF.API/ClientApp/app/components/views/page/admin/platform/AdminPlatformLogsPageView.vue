@@ -1,5 +1,4 @@
 <script setup lang="ts">
-
 import { toRefs } from 'vue'
 import type { AdminPlatformLogsPageViewState } from '~/features/routes/admin/platform/useAdminPlatformLogsPage'
 
@@ -78,7 +77,7 @@ const { Download, Radio, LEVEL_LABELS, SERVICE_LABELS, levelOrdinal, minimumLeve
 
     <Card v-if="loading && items.length === 0">
       <CardContent class="flex flex-col gap-3 pt-6">
-        <Skeleton v-for="i in 8" :key="i ?? undefined" class="h-8 w-full" />
+        <Skeleton v-for="i in 8" :key="i" class="h-8 w-full" />
       </CardContent>
     </Card>
 
@@ -101,9 +100,9 @@ const { Download, Radio, LEVEL_LABELS, SERVICE_LABELS, levelOrdinal, minimumLeve
           </TableRow>
         </TableHeader>
         <TableBody>
-          <TableRow v-for="log in items" :key="log.cursor ?? undefined">
+          <TableRow v-for="log in items" :key="log.cursor">
             <TableCell class="text-sm">
-              <component :is="AdminDateTime" :value="dateIso(log.timestamp)" />
+              <component :is="AdminDateTime" :value="log.timestamp" />
             </TableCell>
             <TableCell>
               <Badge :variant="levelOrdinal(log.level) >= 4 ? 'destructive' : log.level === 'Warning' ? 'secondary' : 'outline'">

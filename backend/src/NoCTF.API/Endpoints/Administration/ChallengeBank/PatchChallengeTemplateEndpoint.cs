@@ -144,7 +144,7 @@ public sealed class PatchChallengeTemplateEndpoint(
         Patch("/admin/challenges/{challengeId}");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("AdminChallengeBankPatchTemplate"));
-        Summary(summary => { summary.Summary = "Updates selected challenge-template aggregate sections."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Updates selected challenge-template aggregate sections.");
     }
 
     public override async Task<Results<Ok<ChallengeTemplateResponse>, NotFound,

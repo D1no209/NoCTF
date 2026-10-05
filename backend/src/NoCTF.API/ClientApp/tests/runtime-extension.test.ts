@@ -9,7 +9,7 @@ describe('runtime extension request', () => {
   test('adds the requested minutes to the existing expiry in the final ten minutes', () => {
     expect(createRuntimeExtensionRequest(expiresAt, now, 30, 720)).toEqual({
       minutes: 30,
-      expiresAt: new Date(now + 39 * 60_000),
+      expiresAt: new Date(now + 39 * 60_000).toISOString(),
     })
   })
 
@@ -20,7 +20,7 @@ describe('runtime extension request', () => {
     expect(isRuntimeExtensionWindowOpen(tooEarly, now)).toBe(false)
     expect(createRuntimeExtensionRequest(tooEarly, now, 30, 720)).toBeNull()
     expect(isRuntimeExtensionWindowOpen(boundary, now)).toBe(true)
-    expect(createRuntimeExtensionRequest(boundary, now, 30, 720)?.expiresAt.toISOString())
+    expect(createRuntimeExtensionRequest(boundary, now, 30, 720)?.expiresAt)
       .toBe(new Date(now + 40 * 60_000).toISOString())
     expect(isRuntimeExtensionWindowOpen(new Date(now).toISOString(), now)).toBe(false)
   })

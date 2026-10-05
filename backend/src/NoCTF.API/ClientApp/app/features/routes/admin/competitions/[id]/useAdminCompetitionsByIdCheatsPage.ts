@@ -1,14 +1,11 @@
-import { dateObject } from '../../../../../utils/date-value'
-
-import { api } from '../../../../../lib/api'
 import { message as describeMessage } from '../../../../../utils/i18n'
 import type { UiMessage } from '../../../../../utils/i18n'
 import { adminUserPath, adminTeamPath, adminChallengePath } from '~/features/admin/admin-navigation'
 import { proxyRefs } from 'vue'
 
 import { toast } from '../../../../../utils/message-toast'
-
-import type { NoCTFAPIEndpointsAdministrationCheatIncidentsCheatIncidentDetailResponse, NoCTFAPIEndpointsAdministrationCheatIncidentsCheatIncidentListItemResponse, NoCTFAPIEndpointsAdministrationCheatIncidentsCheatIncidentStatusProtocol } from '../../../../../api/models'
+import { adminGetCheatIncident, adminListCheatIncidents } from '../../../../../api'
+import type { NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentDetailResponse, NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentListItemResponse, NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentStatusProtocol } from '../../../../../api'
 import type { CheatIncidentResolutionRequest } from '../../../../../composables/useCheatIncidentResolution'
 import { useCheatIncidentResolution } from '../../../../../composables/useCheatIncidentResolution'
 import { watchCompetition } from '../../../../../composables/useCompetitionHub'
@@ -17,7 +14,7 @@ import { defaultCheatIncidentQueryRange, resolveCheatIncidentQueryRange } from '
 import { createLatestPageRefresh } from '../../../../../lib/latest-page-refresh'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
 
-type CheatIncidentStatus = NoCTFAPIEndpointsAdministrationCheatIncidentsCheatIncidentStatusProtocol
+type CheatIncidentStatus = NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentStatusProtocol
 
 type CheatIncidentStatusFilter = 'All' | CheatIncidentStatus
 
@@ -42,15 +39,19 @@ export function useAdminCompetitionsByIdCheatsPage() {
   const pendingCount = ref<number | null>(null)
 
   const { items, loading, error: listError, hasMore, loadMore, reset, initialized } = useCursorPagination<
-    NoCTFAPIEndpointsAdministrationCheatIncidentsCheatIncidentListItemResponse
+    NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentListItemResponse
   >(async (cursor) => {
-    const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).cheatIncidents.get({ queryParameters: {
-        status: appliedStatus.value === 'All' ? undefined : appliedStatus.value,
-        from: dateObject(appliedRange.value.from ?? undefined),
-        to: dateObject(appliedRange.value.to ?? undefined),
-        cursor: cursor ?? undefined,
+    const { data, error } = await adminListCheatIncidents({
+      path: { competitionId },
+      query: {
+        status: appliedStatus.value === 'All' ? null : appliedStatus.value,
+        from: appliedRange.value.from,
+        to: appliedRange.value.to,
+        cursor,
         limit: 30,
-      } });
+      },
+    })
+    if (error) throw error
     pendingCount.value = data?.pendingCount ?? null
     return data ?? {}
   })
@@ -70,7 +71,7 @@ export function useAdminCompetitionsByIdCheatsPage() {
     void refreshLatest()
   }
 
-  const detail = ref<NoCTFAPIEndpointsAdministrationCheatIncidentsCheatIncidentDetailResponse | null>(null)
+  const detail = ref<NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentDetailResponse | null>(null)
 
   const detailOpen = ref(false)
 
@@ -86,15 +87,14 @@ export function useAdminCompetitionsByIdCheatsPage() {
     detailLoading.value = false
   })
 
-  async function openDetail(gameplayFactId?: string | null) {
+  async function openDetail(gameplayFactId?: string) {
     if (!gameplayFactId) return
     const request = detailRequests.begin()
     detailOpen.value = true
     detailLoading.value = true
     detail.value = null
     showFlag.value = false
-    let error: unknown;
-    const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).cheatIncidents.byGameplayFactId(gameplayFactId).get().catch(cause => { error = cause; return undefined });
+    const { data, error } = await adminGetCheatIncident({ path: { competitionId, gameplayFactId } })
     if (!detailRequests.isCurrent(request)) return
     if (error) toast.error(parseApiError(error).displayMessage)
     else detail.value = data ?? null

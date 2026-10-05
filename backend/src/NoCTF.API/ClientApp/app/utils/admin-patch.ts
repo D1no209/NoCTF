@@ -1,7 +1,7 @@
-import type { NoCTFAPIEndpointsAdministrationGameplayFactsAdminPatchFailureCode } from '../api/models'
+import type { NoCtfapiEndpointsAdministrationGameplayFactsAdminPatchFailureCode } from '../api'
 import { translate } from './i18n'
 
-const messages: Record<NoCTFAPIEndpointsAdministrationGameplayFactsAdminPatchFailureCode, string> = {
+const messages: Record<NoCtfapiEndpointsAdministrationGameplayFactsAdminPatchFailureCode, string> = {
   Forbidden: "common.patch.description.competitionSOwnerManagers",
   SubmissionNotFound: "common.patch.description.submissionExistCompetition",
   NotFixSubmission: "common.patch.description.fixSubmissionsDownloadablePatch",
@@ -12,6 +12,6 @@ const messages: Record<NoCTFAPIEndpointsAdministrationGameplayFactsAdminPatchFai
   AuditUnavailable: "common.patch.description.patchDownloadAuditCould",
 }
 
-export function adminPatchFailureMessage(code: NoCTFAPIEndpointsAdministrationGameplayFactsAdminPatchFailureCode): string {
+export function adminPatchFailureMessage(code: NoCtfapiEndpointsAdministrationGameplayFactsAdminPatchFailureCode): string {
   return translate(messages[code])
 }

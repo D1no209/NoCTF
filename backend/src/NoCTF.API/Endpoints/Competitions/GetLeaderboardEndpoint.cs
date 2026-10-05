@@ -318,7 +318,7 @@ public sealed class GetLeaderboardEndpoint(
     {
         Get("/competitions/{competitionId}/leaderboard");
         AllowAnonymous();
-        Summary(summary => { summary.Summary = "Get the sparse scoreboard snapshot or queue a refresh."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Get the sparse scoreboard snapshot or queue a refresh.");
     }
 
     public override async Task<Results<Ok<ScoreboardSnapshotResponse>, Accepted<LeaderboardProcessingProtocolResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(

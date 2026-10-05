@@ -1,9 +1,11 @@
-
-import { api } from '../lib/api'
-
-
-
-import type { NoCTFAPIEndpointsAuthenticationCurrentUserResponse } from '../api/models'
+import {
+  getMeEndpoint,
+  loginEndpoint,
+  logoutAllEndpoint,
+  logoutEndpoint,
+  authenticationSsoCompleteLogin,
+} from '../api'
+import type { NoCtfapiEndpointsAuthenticationCurrentUserResponse } from '../api'
 import {
   beginImpersonationAccessToken,
   clearImpersonationAccessToken,
@@ -13,7 +15,7 @@ import {
   setAccessToken,
 } from '../lib/session'
 
-export type CurrentUser = NoCTFAPIEndpointsAuthenticationCurrentUserResponse
+export type CurrentUser = NoCtfapiEndpointsAuthenticationCurrentUserResponse
 
 export type ImpersonationSession = {
   administratorUserId: string
@@ -47,8 +49,7 @@ export function useAuth() {
   }
 
   async function fetchMe(): Promise<void> {
-    let error: unknown;
-    const data = await api.api.v1.auth.me.get().catch(cause => { error = cause; return undefined });
+    const { data, error } = await getMeEndpoint()
     if (error || !data) {
       user.value = null
       setAccessToken(null)
@@ -74,8 +75,10 @@ export function useAuth() {
     password: string,
     humanVerificationHeaders: Record<string, string>,
   ): Promise<void> {
-    let error: unknown;
-    const data = await api.api.v1.auth.login.post({ login, password }, { headers: humanVerificationHeaders }).catch(cause => { error = cause; return undefined });
+    const { data, error } = await loginEndpoint({
+      headers: humanVerificationHeaders,
+      body: { login, password },
+    })
     if (error || !data?.accessToken) {
       throw parseApiError(error)
     }
@@ -88,7 +91,7 @@ export function useAuth() {
       await endImpersonation()
       return
     }
-    await api.api.v1.auth.logout.post().catch(() => undefined)
+    await logoutEndpoint().catch(() => undefined)
     invalidate()
     await navigateTo('/')
   }
@@ -99,14 +102,15 @@ export function useAuth() {
       await endImpersonation()
       return
     }
-    await api.api.v1.auth.logoutAll.post().catch(() => undefined)
+    await logoutAllEndpoint().catch(() => undefined)
     invalidate()
     await navigateTo('/auth/login')
   }
 
   async function completeSsoLogin(flowId: string): Promise<string> {
-    let error: unknown;
-    const data = await api.api.v1.auth.sso.flows.byFlowId(flowId).completeLogin.post().catch(cause => { error = cause; return undefined });
+    const { data, error } = await authenticationSsoCompleteLogin({
+      path: { flowId },
+    })
     if (error || !data?.accessToken)
       throw parseApiError(error)
     setAccessToken(data.accessToken)

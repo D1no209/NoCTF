@@ -11,10 +11,10 @@ const { BLOOD_REWARD_POLICIES, SCORE_DECAY_MODES, ScoreDecayMode, emitValue, par
     v-if="field.type === 'int' || field.type === 'decimal'"
 
     :model-value="numberText"
-    :min="field.min ?? undefined"
-    :max="field.max ?? undefined"
+    :min="field.min"
+    :max="field.max"
     :step="field.type === 'decimal' ? 'any' : 1"
-    :placeholder="field.placeholder ?? undefined"
+    :placeholder="field.placeholder"
     :disabled="disabled"
     @update:model-value="emitValue(parseNullableNumber($event))"
   />
@@ -50,7 +50,7 @@ const { BLOOD_REWARD_POLICIES, SCORE_DECAY_MODES, ScoreDecayMode, emitValue, par
     </SelectTrigger>
     <SelectContent>
       <SelectGroup>
-        <SelectItem v-for="option in field.options ?? []" :key="(String(option.value)) ?? undefined" :value="option.value">
+        <SelectItem v-for="option in field.options ?? []" :key="String(option.value)" :value="option.value">
           {{ translate(option.label) }}
         </SelectItem>
       </SelectGroup>
@@ -71,7 +71,7 @@ const { BLOOD_REWARD_POLICIES, SCORE_DECAY_MODES, ScoreDecayMode, emitValue, par
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
-              <SelectItem v-for="option in SCORE_DECAY_MODES" :key="(String(option.value)) ?? undefined" :value="option.value">
+              <SelectItem v-for="option in SCORE_DECAY_MODES" :key="String(option.value)" :value="option.value">
                 {{ $t(option.label) }}
               </SelectItem>
             </SelectGroup>
@@ -124,7 +124,7 @@ const { BLOOD_REWARD_POLICIES, SCORE_DECAY_MODES, ScoreDecayMode, emitValue, par
 
   <div v-else-if="field.type === 'bloodRewards'" class="flex flex-col gap-2">
     <p v-if="rewards.length === 0" class="text-sm text-muted-foreground">{{ $t('administration.label.bloodListReward') }}</p>
-    <div v-for="(reward, index) in rewards" :key="index ?? undefined" class="flex items-center gap-2">
+    <div v-for="(reward, index) in rewards" :key="index" class="flex items-center gap-2">
       <Select
         :model-value="reward.policy"
         :disabled="disabled"
@@ -135,7 +135,7 @@ const { BLOOD_REWARD_POLICIES, SCORE_DECAY_MODES, ScoreDecayMode, emitValue, par
         </SelectTrigger>
         <SelectContent>
           <SelectGroup>
-            <SelectItem v-for="option in BLOOD_REWARD_POLICIES" :key="(String(option.value)) ?? undefined" :value="option.value">
+            <SelectItem v-for="option in BLOOD_REWARD_POLICIES" :key="String(option.value)" :value="option.value">
               {{ $t(option.label) }}
             </SelectItem>
           </SelectGroup>

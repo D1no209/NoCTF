@@ -1,5 +1,4 @@
 <script setup lang="ts">
-
 import { toRefs } from 'vue'
 import type { AccountPanelViewState } from '~/features/account/useAccountPanel'
 
@@ -230,7 +229,7 @@ const { UserRound, LockKeyhole, ShieldCheck, ImageIcon, LogOut, user, wideAccoun
                       <div class="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                         <Badge variant="outline">{{ ssoConfiguration.binding.protocol }}</Badge>
                         <span>{{ $t('sso.boundAt') }}</span>
-                        <component :is="AdminDateTime" :value="dateIso(ssoConfiguration.binding.boundAt)" />
+                        <component :is="AdminDateTime" :value="ssoConfiguration.binding.boundAt" />
                       </div>
                     </div>
                   </div>
@@ -244,7 +243,7 @@ const { UserRound, LockKeyhole, ShieldCheck, ImageIcon, LogOut, user, wideAccoun
                     <Select v-model="ssoProviderId" :disabled="ssoPending">
                       <SelectTrigger id="account-panel-sso-provider"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem v-for="provider in ssoConfiguration.providers" :key="provider.id ?? undefined" :value="provider.id!">
+                        <SelectItem v-for="provider in ssoConfiguration.providers" :key="provider.id" :value="provider.id!">
                           <span class="flex items-center gap-2">
                             <img v-if="provider.iconUrl" :src="provider.iconUrl" class="size-4 object-contain" alt="" aria-hidden="true" decoding="async" referrerpolicy="no-referrer">
                             <span>{{ provider.name }}</span>

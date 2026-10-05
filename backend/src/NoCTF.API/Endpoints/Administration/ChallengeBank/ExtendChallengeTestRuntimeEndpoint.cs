@@ -42,7 +42,8 @@ public sealed class ExtendChallengeTestRuntimeEndpoint(
         Description(builder => builder.WithName("AdminChallengeBankExtendTestRuntime")
             .ProducesProblemFE(StatusCodes.Status409Conflict)
             .ProducesProblemFE(StatusCodes.Status503ServiceUnavailable));
-        Summary(summary => { summary.Summary = "Extends a challenge-template test Runtime during its final ten minutes."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary =
+            "Extends a challenge-template test Runtime during its final ten minutes.");
     }
 
     public override async Task<

@@ -32,7 +32,7 @@ const { Upload, information, loading, loadError, name, description, saving, logo
           <div class="flex flex-col gap-2">
             <span class="text-sm text-muted-foreground">{{ $t('administration.label.contributor') }}</span>
             <div v-if="information?.contributors?.length" class="flex flex-wrap gap-2">
-              <Avatar v-for="contributor in information.contributors" :key="contributor.id ?? undefined" class="size-8">
+              <Avatar v-for="contributor in information.contributors" :key="contributor.id" class="size-8">
                 <AvatarImage v-if="contributor.avatarUrl" :src="contributor.avatarUrl" :alt="contributor.id ?? ''" />
                 <AvatarFallback>{{ contributor.id?.slice(0, 2) ?? '?' }}</AvatarFallback>
               </Avatar>

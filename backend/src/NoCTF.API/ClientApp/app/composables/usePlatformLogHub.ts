@@ -1,7 +1,7 @@
 import { currentLocale } from '../utils/i18n'
 import { HubConnectionBuilder, HubConnectionState, HttpTransportType, LogLevel } from '@microsoft/signalr'
 import type { HubConnection } from '@microsoft/signalr'
-import type { NoCTFAPIEndpointsAdministrationPlatformPlatformLogResponse } from '../api/models'
+import type { NoCtfapiEndpointsAdministrationPlatformPlatformLogResponse } from '../api'
 import { getRealtimeAccessToken } from '../lib/session'
 import { startRealtimeWithRetry } from '../lib/realtime-retry'
 
@@ -13,7 +13,7 @@ export type PlatformLogHubState = 'disconnected' | 'connecting' | 'connected' | 
  * Disconnects automatically when the owning scope (page) is disposed.
  */
 export function usePlatformLogHub(
-  onLog: (log: NoCTFAPIEndpointsAdministrationPlatformPlatformLogResponse) => void,
+  onLog: (log: NoCtfapiEndpointsAdministrationPlatformPlatformLogResponse) => void,
 ) {
   const state = ref<PlatformLogHubState>('disconnected')
   let connection: HubConnection | null = null

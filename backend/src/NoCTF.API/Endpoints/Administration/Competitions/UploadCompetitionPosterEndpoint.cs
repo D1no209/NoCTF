@@ -49,7 +49,6 @@ public sealed class UploadCompetitionPosterEndpoint(
         Put("/admin/competitions/{competitionId}/poster");
         AuthSchemes("Bearer");
         AllowFileUploads();
-        Description(builder => builder.Accepts<UploadCompetitionPosterRequest>("multipart/form-data"));
         MaxRequestBodySize(FileUploadLimits.MaximumRequestBytes(
             uploadLimits.MaximumPosterBytes));
         Description(builder => builder

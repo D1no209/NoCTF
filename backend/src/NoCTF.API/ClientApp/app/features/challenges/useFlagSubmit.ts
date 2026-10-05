@@ -1,18 +1,16 @@
-
-import { api, RequestPolicyOption } from '../../lib/api'
 import { message as describeMessage } from '../../utils/i18n'
 import type { UiMessage } from '../../utils/i18n'
 import { inject, toRefs } from 'vue'
 
 import { PartyPopper } from '@lucide/vue'
 import { toast } from '../../utils/message-toast'
-
-import type { NoCTFAPIEndpointsGameplayFactsGameplayFactAdmissionFailureCodeProtocol, NoCTFAPIEndpointsGameplayFactsGameplayFactStatusResponse } from '../../api/models'
+import { judgeAwdpBreakFlag, submitFlagEndpoint } from '../../api'
+import type { NoCtfapiEndpointsGameplayFactsGameplayFactAdmissionFailureCodeProtocol, NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse } from '../../api'
 import { useHumanVerification } from '~/features/security/useHumanVerification'
 import { challengeGameplayFactStatusKey, createChallengeGameplayFactStatusReader } from './challenge-gameplay-fact-status'
 
 type TrackedSubmission = Pick<
-  NoCTFAPIEndpointsGameplayFactsGameplayFactStatusResponse,
+  NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse,
   'state' | 'result' | 'failureCode'
 > & {
   id: string
@@ -26,11 +24,11 @@ export function useFlagSubmit(props: Readonly<Omit<{
     competitionChallengeId: string
     /** AWD 批量提交:多行输入,一次提交多个 flag */
     multiple?: boolean
-    title?: string | null
-    description?: string | null
+    title?: string
+    description?: string
     practice?: boolean
     readOnlyJudgement?: boolean
-    dockTarget?: string | null
+    dockTarget?: string
     maximumAttempts?: number | null
     remainingAttempts?: number | null
     initiallySolved?: boolean
@@ -39,11 +37,11 @@ export function useFlagSubmit(props: Readonly<Omit<{
     competitionChallengeId: string
     /** AWD 批量提交:多行输入,一次提交多个 flag */
     multiple?: boolean
-    title?: string | null
-    description?: string | null
+    title?: string
+    description?: string
     practice?: boolean
     readOnlyJudgement?: boolean
-    dockTarget?: string | null
+    dockTarget?: string
     maximumAttempts?: number | null
     remainingAttempts?: number | null
     initiallySolved?: boolean
@@ -208,8 +206,15 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
     const verificationHeaders = await requestHumanVerification('evaluation')
     if (verificationHeaders === null) return
     if (props.readOnlyJudgement) {
-      let error: unknown;
-      const data = await api.api.v1.competitions.byCompetitionId(props.competitionId).challenges.byCompetitionChallengeId(props.competitionChallengeId).awdpBreakFlagJudgement.post({ flag: lines[0]! }, { headers: verificationHeaders, options: [new RequestPolicyOption({ signal: AbortSignal.timeout(30_000) })] }).catch(cause => { error = cause; return undefined });
+      const { data, error } = await judgeAwdpBreakFlag({
+        headers: verificationHeaders,
+        path: {
+          competitionId: props.competitionId,
+          competitionChallengeId: props.competitionChallengeId,
+        },
+        body: { flag: lines[0]! },
+        signal: AbortSignal.timeout(30_000),
+      })
       if (generation !== requestGeneration) return
       if (error || !data) {
         const parsed = parseApiError(error, describeMessage("challenges.error.flagCheckFailed"))
@@ -234,12 +239,16 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
       }
       return
     }
-    let error: unknown;
-      const data = await api.api.v1.competitions.byCompetitionId(props.competitionId).challenges.byCompetitionChallengeId(props.competitionChallengeId).flagSubmissions.post(props.multiple ? { flags: lines } : { flag: lines[0] }, { headers: { ...commandAttempt.headers({ competitionId: props.competitionId, challengeId: props.competitionChallengeId, lines }), ...verificationHeaders }, options: [new RequestPolicyOption({ signal: AbortSignal.timeout(30_000) })] }).catch(cause => { error = cause; return undefined });
+    const { data, error } = await submitFlagEndpoint({
+      signal: AbortSignal.timeout(30_000),
+      headers: { ...commandAttempt.headers({ competitionId: props.competitionId, challengeId: props.competitionChallengeId, lines }), ...verificationHeaders },
+      path: { competitionId: props.competitionId, competitionChallengeId: props.competitionChallengeId },
+      body: props.multiple ? { flags: lines } : { flag: lines[0] },
+    })
     if (generation !== requestGeneration) return
     if (error || !data) {
       const parsed = parseApiError(error, describeMessage("challenges.error.submissionFailed"))
-      const code = parsed.code as NoCTFAPIEndpointsGameplayFactsGameplayFactAdmissionFailureCodeProtocol | undefined
+      const code = parsed.code as NoCtfapiEndpointsGameplayFactsGameplayFactAdmissionFailureCodeProtocol | undefined
       if (code === 'AttemptsExhausted') {
         remainingAttempts.value = 0
         emit('remainingChanged', 0)

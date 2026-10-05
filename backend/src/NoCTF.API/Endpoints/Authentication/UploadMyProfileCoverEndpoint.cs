@@ -57,7 +57,6 @@ public sealed class UploadMyProfileCoverEndpoint(
         Put("/auth/me/profile-cover");
         AuthSchemes("Bearer");
         AllowFileUploads();
-        Description(builder => builder.Accepts<UploadMyProfileCoverRequest>("multipart/form-data"));
         MaxRequestBodySize(FileUploadLimits.MaximumRequestBytes(
             uploadLimits.MaximumWallpaperBytes));
         Description(builder => builder
@@ -65,7 +64,7 @@ public sealed class UploadMyProfileCoverEndpoint(
             .WithMetadata(new EnableRateLimitingAttribute("avatar"))
             .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
                 StatusCodes.Status413PayloadTooLarge));
-        Summary(summary => { summary.Summary = "Replaces the current user's public profile cover image."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Replaces the current user's public profile cover image.");
     }
 
     public override async Task<Results<Ok<CurrentUserResponse>, NotFound,

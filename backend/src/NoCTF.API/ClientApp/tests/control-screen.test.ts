@@ -1,10 +1,10 @@
 import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import type {
-  NoCTFAPIEndpointsCompetitionsScoreboardChallengeCatalogResponse,
-  NoCTFAPIEndpointsCompetitionsScoreboardSchemaResponse,
-  NoCTFAPIEndpointsCompetitionsScoreboardSnapshotResponse,
-} from '../app/api/models'
+  NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse,
+} from '../app/api'
 import {
   controlScreenChallenges,
   controlScreenPublicEntries,
@@ -15,7 +15,7 @@ import {
 const competitionId = '00000000-0000-0000-0000-000000000010'
 const webId = '00000000-0000-0000-0000-000000000001'
 const pwnId = '00000000-0000-0000-0000-000000000002'
-const catalog: NoCTFAPIEndpointsCompetitionsScoreboardChallengeCatalogResponse = {
+const catalog: NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse = {
   competitionId,
   revision: 1,
   items: [
@@ -23,7 +23,7 @@ const catalog: NoCTFAPIEndpointsCompetitionsScoreboardChallengeCatalogResponse =
     { id: pwnId, title: 'pwn-200', direction: 'PWN', category: 'PWN', order: 2, published: true },
   ],
 }
-const schema: NoCTFAPIEndpointsCompetitionsScoreboardSchemaResponse = {
+const schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse = {
   competitionId,
   mode: 'Ctf',
   revision: 1,
@@ -34,7 +34,7 @@ const schema: NoCTFAPIEndpointsCompetitionsScoreboardSchemaResponse = {
     { index: 1, competitionChallengeId: pwnId, roundId: null },
   ],
 }
-const snapshot: NoCTFAPIEndpointsCompetitionsScoreboardSnapshotResponse = {
+const snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse = {
   competitionId: 'competition-1',
   version: 1,
   schemaRevision: 1,

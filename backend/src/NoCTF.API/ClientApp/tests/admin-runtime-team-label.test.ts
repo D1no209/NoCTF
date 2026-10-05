@@ -1,13 +1,13 @@
 import { describe, expect, test } from 'bun:test'
-import type { NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeResponse } from '../app/api/models'
+import type { NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse } from '../app/api'
 import { adminRuntimeTeamLabel } from '../app/utils/admin-runtime'
 
 import { translate as t } from '../app/utils/i18n'
 
 function runtime(
-  purpose: NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeResponse['purpose'],
-  overrides: Partial<NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeResponse> = {},
-): NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeResponse {
+  purpose: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse['purpose'],
+  overrides: Partial<NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse> = {},
+): NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse {
   return { purpose, ...overrides }
 }
 

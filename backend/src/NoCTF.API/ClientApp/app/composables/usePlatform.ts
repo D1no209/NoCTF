@@ -1,8 +1,6 @@
-
-import { api } from '../lib/api'
 import type { UiMessage } from '../utils/i18n'
 import { message as describeMessage } from '../utils/i18n'
-
+import { platformConfigurationGet } from '../api'
 
 let platformLoadPromise: Promise<void> | null = null
 
@@ -13,8 +11,7 @@ export function usePlatform() {
   const loading = useState('platform:configuration-loading', () => false)
 
   async function load() {
-    let requestError: unknown;
-    const data = await api.api.v1.platform.configuration.get().catch(cause => { requestError = cause; return undefined });
+    const { data, error: requestError } = await platformConfigurationGet()
     if (requestError || !data)
       throw parseApiError(requestError, describeMessage("administration.platform.error.loadPlatformConfigurationFailed"))
     return data ?? null

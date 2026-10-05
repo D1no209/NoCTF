@@ -1,5 +1,6 @@
-import { dateTimestamp } from '../utils/date-value'
-import { createApiClient } from './api'
+import { languageHeaders } from '../utils/i18n'
+import { refreshTokenEndpoint } from '../api'
+import { createClient } from '../api/client'
 import { accessTokenNeedsRefresh } from './auth-refresh'
 
 /**
@@ -33,13 +34,13 @@ export function isImpersonatingSession(): boolean {
   return impersonationActive
 }
 
-export function beginImpersonationAccessToken(token: string, expiresAt: Date | string): boolean {
+export function beginImpersonationAccessToken(token: string, expiresAt: string): boolean {
   if (impersonationActive || !accessToken) return false
   if (impersonationTimer) clearTimeout(impersonationTimer)
   administratorAccessToken = accessToken
   impersonationActive = true
   setAccessToken(token)
-  impersonationExpiresAt = dateTimestamp(expiresAt)
+  impersonationExpiresAt = Date.parse(expiresAt)
   scheduleImpersonationExpiry()
   return true
 }
@@ -114,10 +115,10 @@ function refreshSessionCore(): Promise<boolean> {
   const expectedRevision = sessionRevision
   const attempt = (async () => {
     try {
-      const refreshClient = createApiClient(false)
-      const data = await refreshClient.api.v1.auth.refresh.post()
+      const refreshClient = createClient({ credentials: 'same-origin', headers: languageHeaders(), fetch: globalThis.fetch })
+      const { data, error } = await refreshTokenEndpoint({ client: refreshClient })
       if (sessionRevision !== expectedRevision || impersonationActive) return false
-      if (!data?.accessToken) {
+      if (error || !data?.accessToken) {
         invalidateSession()
         return false
       }

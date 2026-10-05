@@ -7,7 +7,10 @@ import { readProtectedDownload } from '../app/utils/download'
 test('Patch downloads retain UTF-8 attachment names and original bytes', async () => {
   const bytes = new Uint8Array([0, 1, 255, 13, 10])
   const name = '原始 Patch.tar.gz'
-  const result = await readProtectedDownload(() => Promise.resolve(new Response(bytes, { headers: { 'content-disposition': `attachment; filename="__ Patch.tar.gz"; filename*=UTF-8''${encodeURIComponent(name)}` } })))
+  const result = await readProtectedDownload(() => Promise.resolve({
+    data: new Blob([bytes]),
+    response: new Response(null, { headers: { 'content-disposition': `attachment; filename="__ Patch.tar.gz"; filename*=UTF-8''${encodeURIComponent(name)}` } }),
+  }))
   expect(result.fileName).toBe(name)
   expect(new Uint8Array(await result.blob.arrayBuffer())).toEqual(bytes)
 })
@@ -25,8 +28,8 @@ test('existing submissions page uses staff-gated SDK download without preview or
   const source = await sourceFile(new URL('../app/pages/admin/competitions/[id]/submissions.vue', import.meta.url)).text()
   expect(source).toContain("canDownloadPatch && s.kind === 'FixAttempt'")
   expect(source).toContain("role.value === 'Owner' || role.value === 'Manager' || role.value === 'Judge'")
-  expect(source).toContain('downloadSdkFile(nativeResponse(')
-  expect(source).toContain('.patchPath.get(')
+  expect(source).toContain('downloadSdkFile(adminDownloadGameplayFactPatch({')
+  expect(source).toContain("parseAs: 'blob'")
   expect(source).toContain('patchDownloading.value.delete(id)')
   expect(source).toContain('detail.patch.fileName')
   expect(source).toContain('detail.patch.sha256')

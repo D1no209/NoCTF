@@ -64,7 +64,6 @@ public sealed class UploadMyTeamWriteUpEndpoint(
         Put("/competitions/{competitionId}/teams/me/writeup");
         AuthSchemes("Bearer");
         AllowFileUploads();
-        Description(builder => builder.Accepts<UploadMyTeamWriteUpRequest>("multipart/form-data"));
         MaxRequestBodySize(FileUploadLimits.MaximumRequestBytes(
             TeamWriteUpRules.MaximumFileBytes));
         Options(builder => builder.WithMetadata(new ApiRequestMetricsMetadata(

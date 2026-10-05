@@ -16,7 +16,7 @@ const { RuntimeFlagsPanel, adminRuntimeTeamPath, adminRuntimeChallengePath, deta
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
-              <SelectItem v-for="c in challengeOptions" :key="c.id ?? undefined" :value="c.id">{{ c.title }}</SelectItem>
+              <SelectItem v-for="c in challengeOptions" :key="c.id" :value="c.id">{{ c.title }}</SelectItem>
             </SelectGroup>
           </SelectContent>
         </Select>
@@ -26,7 +26,7 @@ const { RuntimeFlagsPanel, adminRuntimeTeamPath, adminRuntimeChallengePath, deta
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
-              <SelectItem v-for="t in teamOptions" :key="t.id ?? undefined" :value="t.id">{{ t.name }}</SelectItem>
+              <SelectItem v-for="t in teamOptions" :key="t.id" :value="t.id">{{ t.name }}</SelectItem>
             </SelectGroup>
           </SelectContent>
         </Select>
@@ -88,7 +88,7 @@ const { RuntimeFlagsPanel, adminRuntimeTeamPath, adminRuntimeChallengePath, deta
           </TableRow>
         </TableHeader>
         <TableBody>
-          <TableRow v-for="rt in items" :key="rt.id ?? undefined">
+          <TableRow v-for="rt in items" :key="rt.id">
             <TableCell class="font-medium"><NuxtLink v-if="adminRuntimeTeamPath(rt)" :to="adminRuntimeTeamPath(rt)" class="hover:underline">{{ runtimeTeamLabel(rt) }}</NuxtLink><span v-else>{{ runtimeTeamLabel(rt) }}</span></TableCell>
             <TableCell><NuxtLink v-if="adminRuntimeChallengePath(rt)" :to="adminRuntimeChallengePath(rt)" class="hover:underline">{{ challengeTitle(rt.competitionChallengeId) }}</NuxtLink><span v-else>{{ challengeTitle(rt.competitionChallengeId) }}</span></TableCell>
             <TableCell>{{ enumLabel(RuntimeKindLabel, rt.runtimeKind) }}</TableCell>
@@ -161,7 +161,7 @@ const { RuntimeFlagsPanel, adminRuntimeTeamPath, adminRuntimeChallengePath, deta
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('runtime.label.runningTime') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.runningAt) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('runtime.label.expirationTime') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.expiresAt) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('runtime.label.stopTime') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.stoppedAt) }}</span></div>
-          <component :is="RuntimeFlagsPanel" v-if="detail.id" :key="detail.id ?? undefined" :runtime-id="detail.id" />
+          <component :is="RuntimeFlagsPanel" v-if="detail.id" :key="detail.id" :runtime-id="detail.id" />
           <template v-if="detail.accesses?.length">
             <Separator />
             <p class="text-muted-foreground">{{ $t('runtime.label.accessAddress') }}</p>
@@ -170,7 +170,7 @@ const { RuntimeFlagsPanel, adminRuntimeTeamPath, adminRuntimeChallengePath, deta
           <template v-if="detail.publishedPorts?.length">
             <Separator />
             <p class="text-muted-foreground">{{ $t('runtime.label.portMapping') }}</p>
-            <div v-for="(p, i) in detail.publishedPorts" :key="i ?? undefined" class="font-mono text-xs">
+            <div v-for="(p, i) in detail.publishedPorts" :key="i" class="font-mono text-xs">
               {{ $t('runtime.label.host', { service: p.serviceName ?? $t('runtime.label.service'), containerPort: p.containerPort ?? '-', hostPort: p.hostPort ?? '-' }) }}
             </div>
           </template>

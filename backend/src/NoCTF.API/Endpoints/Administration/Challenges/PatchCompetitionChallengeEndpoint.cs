@@ -172,7 +172,7 @@ public sealed class PatchCompetitionChallengeEndpoint(
         Patch("/admin/competitions/{competitionId}/challenges/{competitionChallengeId}");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("AdminPatchCompetitionChallenge"));
-        Summary(summary => { summary.Summary = "Updates selected competition-challenge sections."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Updates selected competition-challenge sections.");
     }
 
     public override async Task<Results<Ok<AdminCompetitionChallengeResponse>, NotFound,

@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { bindViewState } from '~/features/shared/view-state'
 
-import type { NoCTFAPIEndpointsChallengesParticipantChallengeHintResponse } from '~/api/models'
+import type { NoCtfapiEndpointsChallengesParticipantChallengeHintResponse } from '~/api'
 
 import { useChallengeHints } from './useChallengeHints'
 import View from '~/components/views/challenges/ChallengeHintsView.vue'
 
-type Hint = NoCTFAPIEndpointsChallengesParticipantChallengeHintResponse
+type Hint = NoCtfapiEndpointsChallengesParticipantChallengeHintResponse
 
 const props = defineProps<{
   competitionId: string

@@ -65,12 +65,6 @@ public sealed class SaveCompetitionProgressionEndpoint(
 {
     public override void Configure()
     {
-        Summary(summary =>
-        {
-            summary.Summary = "Replaces the competition progression graph and immediately reevaluates challenge access.";
-            summary.Description = summary.Summary;
-        });
-
         Put("/admin/competitions/{competitionId}/progression");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("AdminSaveCompetitionProgression"));

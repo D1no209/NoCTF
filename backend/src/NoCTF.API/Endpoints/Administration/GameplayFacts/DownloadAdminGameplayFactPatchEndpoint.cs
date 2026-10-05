@@ -21,6 +21,9 @@ public enum AdminPatchFailureCode
 
 public sealed record AdminPatchMetadataResponse(Guid FileId, string FileName, long ByteLength, DateTimeOffset UploadedAt, string Sha256);
 
+// OpenAPI binary-body marker; ExecuteAsync returns a streamed FileStreamHttpResult, not JSON.
+[NJsonSchema.Annotations.JsonSchema(NJsonSchema.JsonObjectType.String, Format = "binary")]
+public sealed class AdminPatchBinaryResponse;
 
 public sealed class DownloadAdminGameplayFactPatchRequest
 {
@@ -54,7 +57,7 @@ public sealed class DownloadAdminGameplayFactPatchEndpoint(AccessAdminPatch patc
         AuthSchemes("Bearer");
         Options(builder => builder.WithMetadata(new ApiRequestMetricsMetadata(ApiRequestKind.Download)));
         Description(builder => builder.WithName("AdminDownloadGameplayFactPatch")
-            .Produces<byte[]>(StatusCodes.Status200OK, "application/octet-stream")
+            .Produces<AdminPatchBinaryResponse>(StatusCodes.Status200OK, "application/octet-stream")
             .ProducesProblem(StatusCodes.Status403Forbidden)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict)

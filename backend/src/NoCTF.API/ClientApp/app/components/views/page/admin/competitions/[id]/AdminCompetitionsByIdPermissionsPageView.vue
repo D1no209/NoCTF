@@ -26,10 +26,10 @@ const { adminUserPath, X, canManagePermissions, permissions, candidates, loading
           </CardDescription>
         </CardHeader>
         <CardContent class="flex flex-col gap-6">
-          <div v-for="r in roles" :key="r.key ?? undefined" class="flex flex-col gap-2">
+          <div v-for="r in roles" :key="r.key" class="flex flex-col gap-2">
             <h3 class="text-sm font-medium">{{ translate(r.label) }}</h3>
             <div class="flex flex-wrap items-center gap-2">
-              <Badge v-for="id in r.list.value" :key="id ?? undefined" variant="secondary" class="gap-1">
+              <Badge v-for="id in r.list.value" :key="id" variant="secondary" class="gap-1">
                 <NuxtLink :to="adminUserPath(id)" class="hover:underline">{{ candidateName(id) }}</NuxtLink>
                 <ActionButton
                   v-if="canManagePermissions"
@@ -54,7 +54,7 @@ const { adminUserPath, X, canManagePermissions, permissions, candidates, loading
             <div class="flex flex-col gap-1">
               <div
                 v-for="c in filteredCandidates"
-                :key="c.id ?? undefined"
+                :key="c.id"
                 class="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
               >
                 <span>
@@ -94,7 +94,7 @@ const { adminUserPath, X, canManagePermissions, permissions, candidates, loading
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem v-for="c in candidates.filter(c => c.id && c.id !== permissions?.ownerId)" :key="c.id ?? undefined" :value="c.id!">
+                <SelectItem v-for="c in candidates.filter(c => c.id && c.id !== permissions?.ownerId)" :key="c.id" :value="c.id!">
                   {{ c.userName }}
                 </SelectItem>
               </SelectGroup>

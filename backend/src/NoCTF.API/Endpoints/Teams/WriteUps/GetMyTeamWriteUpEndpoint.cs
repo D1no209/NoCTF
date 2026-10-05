@@ -68,7 +68,7 @@ public sealed class GetMyTeamWriteUpEndpoint(
         Get("/competitions/{competitionId}/teams/me/writeup");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("GetMyTeamWriteUp"));
-        Summary(summary => { summary.Summary = "Gets the current team's submitted WriteUp metadata."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Gets the current team's submitted WriteUp metadata.");
     }
 
     public override async Task<Results<Ok<TeamWriteUpResponse>, NotFound>> ExecuteAsync(

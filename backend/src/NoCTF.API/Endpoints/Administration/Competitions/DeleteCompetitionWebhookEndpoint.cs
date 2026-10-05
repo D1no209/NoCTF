@@ -21,12 +21,6 @@ public sealed class DeleteCompetitionWebhookEndpoint(
 {
     public override void Configure()
     {
-        Summary(summary =>
-        {
-            summary.Summary = "Deletes a competition webhook and prevents future deliveries.";
-            summary.Description = summary.Summary;
-        });
-
         Delete("/admin/competitions/{competitionId}/webhooks/{targetId}");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("AdminDeleteCompetitionWebhook"));

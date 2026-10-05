@@ -24,7 +24,7 @@ const { valueDialogOpen, valueSubmission, submittedValue, valueLoading, valueErr
     </Alert>
 
     <div v-if="loading && !initialized" class="mt-3 flex flex-col gap-2">
-      <Skeleton v-for="index in 3" :key="index ?? undefined" class="h-11 w-full" />
+      <Skeleton v-for="index in 3" :key="index" class="h-11 w-full" />
     </div>
 
     <p v-else-if="initialized && !items.length" class="mt-3 text-sm text-muted-foreground">
@@ -41,7 +41,7 @@ const { valueDialogOpen, valueSubmission, submittedValue, valueLoading, valueErr
         </TableRow>
       </TableHeader>
       <TableBody>
-        <TableRow v-for="submission in items" :key="submission.id ?? undefined">
+        <TableRow v-for="submission in items" :key="submission.id">
           <TableCell><Badge variant="outline">{{ gameplayFactKindLabel(submission.kind) }}</Badge></TableCell>
           <TableCell>
             <Badge :variant="resultVariant(submission)" class="gap-1">

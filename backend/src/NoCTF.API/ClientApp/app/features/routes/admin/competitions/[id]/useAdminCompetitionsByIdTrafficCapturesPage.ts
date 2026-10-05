@@ -1,17 +1,22 @@
-
-import { api, nativeResponse } from '../../../../../lib/api'
 import { message as describeMessage } from '../../../../../utils/i18n'
 import { adminTeamPath, adminChallengePath, adminRuntimePath } from '~/features/admin/admin-navigation'
 import { Download, RefreshCw, Trash2 } from '@lucide/vue'
 import { toast } from '../../../../../utils/message-toast'
-
-import type { NoCTFAPIEndpointsAdministrationRuntimeRuntimeTrafficCaptureResponse } from '../../../../../api/models'
+import {
+  adminDeleteRuntimeTrafficCapture,
+  adminDownloadRuntimeTrafficCapture,
+  adminExportRuntimeTrafficCaptures,
+  adminListCompetitionChallenges,
+  adminListRuntimeTrafficCaptures,
+  adminListTeams,
+} from '../../../../../api'
+import type { NoCtfapiEndpointsAdministrationRuntimeRuntimeTrafficCaptureResponse } from '../../../../../api'
 import { useOffsetPagination } from '../../../../../composables/useOffsetPagination'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
 import { downloadSdkFile } from '../../../../../utils/download'
 import { formatBytes } from '../../../../../utils/labels'
 
-type Capture = NoCTFAPIEndpointsAdministrationRuntimeRuntimeTrafficCaptureResponse
+type Capture = NoCtfapiEndpointsAdministrationRuntimeRuntimeTrafficCaptureResponse
 
 /** Owns state, effects and commands for the competition traffic-capture monitor. */
 export function useAdminCompetitionsByIdTrafficCapturesPage() {
@@ -28,35 +33,34 @@ export function useAdminCompetitionsByIdTrafficCapturesPage() {
   const deleting = ref(false)
 
   const pagination = useOffsetPagination<Capture>(async ({ offset, limit }) => {
-    let error: unknown;
-    const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).trafficCaptures.get({ queryParameters: {
-        competitionChallengeId: filterChallenge.value === 'all' ? undefined : filterChallenge.value,
-        teamId: filterTeam.value === 'all' ? undefined : filterTeam.value,
-        runtimeInstanceId: filterRuntime.value || undefined,
-        truncated: (filterTruncated.value === 'all'
+    const { data, error } = await adminListRuntimeTrafficCaptures({
+      path: { competitionId },
+      query: {
+        competitionChallengeId: filterChallenge.value === 'all' ? null : filterChallenge.value,
+        teamId: filterTeam.value === 'all' ? null : filterTeam.value,
+        runtimeInstanceId: filterRuntime.value || null,
+        truncated: filterTruncated.value === 'all'
           ? null
-          : filterTruncated.value === 'truncated') ?? undefined,
+          : filterTruncated.value === 'truncated',
         offset,
         limit,
         desc: true,
-      } }).catch(cause => { error = cause; return undefined });
+      },
+    })
     if (error || !data) throw parseApiError(error)
     return { items: data.items ?? [], total: data.total ?? 0 }
   }, { initialPageSize: 50, initialDesc: true })
 
   async function loadReferences() {
-    const settledRequests = await Promise.allSettled([
-      api.api.v1.admin.competitions.byCompetitionId(competitionId).challenges.get({ queryParameters: { includeDeleted: false } }),
-      api.api.v1.admin.competitions.byCompetitionId(competitionId).teams.get({ queryParameters: { keyword: undefined, offset: 0, limit: 200, desc: false } }),
-    ]);
-    const challenges = settledRequests[0].status === 'fulfilled' ? settledRequests[0].value : undefined;
-    const teams = settledRequests[1].status === 'fulfilled' ? settledRequests[1].value : undefined;
-
-    challengeOptions.value = (challenges?.items ?? []).map(item => ({
+    const [challenges, teams] = await Promise.all([
+      adminListCompetitionChallenges({ path: { competitionId }, query: { includeDeleted: false } }),
+      adminListTeams({ path: { competitionId }, query: { keyword: null, offset: 0, limit: 200, desc: false } }),
+    ])
+    challengeOptions.value = (challenges.data?.items ?? []).map(item => ({
       id: item.id!,
       title: item.title ?? item.id!,
     }))
-    teamOptions.value = (teams?.items ?? []).map(item => ({
+    teamOptions.value = (teams.data?.items ?? []).map(item => ({
       id: item.id!,
       name: item.name ?? item.id!,
     }))
@@ -74,7 +78,7 @@ export function useAdminCompetitionsByIdTrafficCapturesPage() {
       : selectedRuntimeIds.value.filter(id => id !== runtimeId)
   }
 
-  function isSelected(runtimeId?: string | null): boolean {
+  function isSelected(runtimeId?: string): boolean {
     return !!runtimeId && selectedRuntimeIds.value.includes(runtimeId)
   }
 
@@ -92,10 +96,15 @@ export function useAdminCompetitionsByIdTrafficCapturesPage() {
   }
 
   async function downloadCapture(item: Capture) {
-    const runtimeInstanceId = item.runtimeInstanceId
-    if (!runtimeInstanceId) return
+    if (!item.runtimeInstanceId) return
     try {
-      await downloadSdkFile(nativeResponse(responseOptions => api.api.v1.admin.competitions.byCompetitionId(competitionId).trafficCaptures.byRuntimeInstanceId(runtimeInstanceId).file.get({ options: [...responseOptions] })), `runtime-${item.runtimeInstanceId}.pcapng`)
+      await downloadSdkFile(adminDownloadRuntimeTrafficCapture({
+        path: {
+          competitionId,
+          runtimeInstanceId: item.runtimeInstanceId,
+        },
+        parseAs: 'blob',
+      }), `runtime-${item.runtimeInstanceId}.pcapng`)
     }
     catch (error) {
       toast.error(parseApiError(error).displayMessage)
@@ -106,7 +115,11 @@ export function useAdminCompetitionsByIdTrafficCapturesPage() {
     if (selectedRuntimeIds.value.length === 0 || exporting.value) return
     exporting.value = true
     try {
-      await downloadSdkFile(nativeResponse(responseOptions => api.api.v1.admin.competitions.byCompetitionId(competitionId).trafficCaptures.exportEscaped.post({ runtimeInstanceIds: selectedRuntimeIds.value }, { options: [...responseOptions] })), 'runtime-traffic.zip')
+      await downloadSdkFile(adminExportRuntimeTrafficCaptures({
+        path: { competitionId },
+        body: { runtimeInstanceIds: selectedRuntimeIds.value },
+        parseAs: 'blob',
+      }), 'runtime-traffic.zip')
     }
     catch (error) {
       toast.error(parseApiError(error).displayMessage)
@@ -121,8 +134,10 @@ export function useAdminCompetitionsByIdTrafficCapturesPage() {
     if (!runtimeId || deleting.value) return
     deleting.value = true
     try {
-
-      await api.api.v1.admin.competitions.byCompetitionId(competitionId).trafficCaptures.byRuntimeInstanceId(runtimeId).delete();
+      const { error } = await adminDeleteRuntimeTrafficCapture({
+        path: { competitionId, runtimeInstanceId: runtimeId },
+      })
+      if (error) throw error
       toast.success(describeMessage('runtime.captureDeleted'))
       deleteTarget.value = null
       selectedRuntimeIds.value = selectedRuntimeIds.value.filter(id => id !== runtimeId)

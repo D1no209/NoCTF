@@ -1,12 +1,12 @@
 import { toRefs } from 'vue'
 
-import type { NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol } from '../../api/models'
+import type { NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol } from '../../api'
 
 /** Owns state, effects and commands for CompetitionCountdown. */
 export function useCompetitionCountdown(props: Readonly<{
-  startTime?: string | null
-  endTime?: string | null
-  status?: NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol | null
+  startTime?: string
+  endTime?: string
+  status?: NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol
 }>) {
   const now = ref(Date.now())
 

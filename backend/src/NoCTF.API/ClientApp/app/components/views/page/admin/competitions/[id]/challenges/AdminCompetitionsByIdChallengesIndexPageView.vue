@@ -25,7 +25,7 @@ const { Plus, competitionId, competition, canWrite, items, loading, error, inclu
             <SelectContent position="popper">
               <SelectGroup>
                 <SelectItem value="all">{{ $t('administration.label.directions') }}</SelectItem>
-                <SelectItem v-for="option in directionOptions" :key="option.value ?? undefined" :value="option.value">
+                <SelectItem v-for="option in directionOptions" :key="option.value" :value="option.value">
                   {{ option.label }}
                 </SelectItem>
               </SelectGroup>
@@ -89,7 +89,7 @@ const { Plus, competitionId, competition, canWrite, items, loading, error, inclu
         </TableRow>
       </TableHeader>
       <TableBody>
-        <TableRow v-for="c in pageItems" :key="c.id ?? undefined" :class="{ 'opacity-60': c.deletedAt }">
+        <TableRow v-for="c in pageItems" :key="c.id" :class="{ 'opacity-60': c.deletedAt }">
           <TableCell class="font-mono tabular-nums">{{ c.order }}</TableCell>
           <TableCell>
             <NuxtLink
@@ -196,7 +196,7 @@ const { Plus, competitionId, competition, canWrite, items, loading, error, inclu
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    <SelectItem v-for="t in visibleModeTemplates" :key="t.id ?? undefined" :value="t.id!">
+                    <SelectItem v-for="t in visibleModeTemplates" :key="t.id" :value="t.id!">
                       {{ t.title }}({{ directionLabel(t.direction) }})
                     </SelectItem>
                   </SelectGroup>

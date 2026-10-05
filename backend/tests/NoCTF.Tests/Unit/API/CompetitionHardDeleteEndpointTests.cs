@@ -4,7 +4,7 @@ using System.Text.Json;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using FastEndpoints;
-using FastEndpoints.OpenApi;
+using FastEndpoints.Swagger;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -268,7 +268,7 @@ public sealed class CompetitionHardDeleteEndpointTests
                 || type == typeof(PreviewCompetitionHardDeleteEndpoint)
                 || type == typeof(ForceDeleteCompetitionEndpoint);
         });
-        builder.Services.OpenApiDocument();
+        builder.Services.SwaggerDocument();
         builder.Services
             .AddAuthentication(options =>
             {

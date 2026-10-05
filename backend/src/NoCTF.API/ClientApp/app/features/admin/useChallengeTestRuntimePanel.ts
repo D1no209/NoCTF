@@ -1,21 +1,17 @@
-
-import { ResponseMetadata, RequestPolicyOption } from '../../lib/api'
-
-import { api } from '../../lib/api'
 import { message as describeMessage } from '../../utils/i18n'
 import type { UiMessage } from '../../utils/i18n'
 import { markRaw, toRefs } from 'vue'
 
 import { Check, Clipboard, FlaskConical, RefreshCw } from '@lucide/vue'
 import { toast } from '../../utils/message-toast'
-
-import type { NoCTFAPIEndpointsAdministrationChallengeBankChallengeTestRuntimeAcceptedResponse, NoCTFAPIEndpointsAdministrationChallengeBankChallengeTestRuntimeResponse, NoCTFAPIEndpointsAdministrationChallengeBankRuntimeTestFlagStateProtocol } from '../../api/models'
+import { adminChallengeBankCreateTestRuntime, adminChallengeBankExtendTestRuntime, adminChallengeBankGetTestRuntime, adminChallengeBankStopTestRuntime } from '../../api'
+import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeTestRuntimeAcceptedResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeTestRuntimeResponse, NoCtfapiEndpointsAdministrationChallengeBankRuntimeTestFlagStateProtocol } from '../../api'
 import type { ChallengeTestRuntimeLoadOutcome, ChallengeTestRuntimeMutationKind, PendingChallengeTestRuntimeMutation } from '../../utils/challenge-test-runtime-polling'
 import RuntimeFlagsPanelComponent from './RuntimeFlagsPanel.vue'
 import RuntimeAccessUrlComponent from '../challenges/RuntimeAccessUrl.vue'
 import { createRuntimeExtensionRequest, isRuntimeExtensionTooEarly, parseRuntimeExtensionMinutes } from '../../lib/runtime-extension'
 
-type TestRuntime = NoCTFAPIEndpointsAdministrationChallengeBankChallengeTestRuntimeResponse
+type TestRuntime = NoCtfapiEndpointsAdministrationChallengeBankChallengeTestRuntimeResponse
 
 /** Owns state, effects and commands for ChallengeTestRuntimePanel. */
 export function useChallengeTestRuntimePanel(props: Readonly<{
@@ -44,9 +40,9 @@ export function useChallengeTestRuntimePanel(props: Readonly<{
 
   async function load(): Promise<ChallengeTestRuntimeLoadOutcome> {
     try {
-      let error: unknown;
-      const response = new ResponseMetadata();
-      const data = await api.api.v1.admin.challenges.byChallengeId(props.challengeId).testRuntimes.current.get({ options: [new RequestPolicyOption({ response: response })] }).catch(cause => { error = cause; return undefined });
+      const { data, error, response } = await adminChallengeBankGetTestRuntime({
+        path: { challengeId: props.challengeId },
+      })
       if (response?.status === 404) {
         runtime.value = null
         loadError.value = null
@@ -108,7 +104,10 @@ export function useChallengeTestRuntimePanel(props: Readonly<{
 
   async function act(
     kind: ChallengeTestRuntimeMutationKind,
-    action: () => Promise<NoCTFAPIEndpointsAdministrationChallengeBankChallengeTestRuntimeAcceptedResponse | undefined>,
+    action: () => Promise<{
+      data?: NoCtfapiEndpointsAdministrationChallengeBankChallengeTestRuntimeAcceptedResponse
+      error?: unknown
+    }>,
     failureMessage: string,
   ): Promise<void> {
     if (acting.value) return
@@ -116,7 +115,8 @@ export function useChallengeTestRuntimePanel(props: Readonly<{
     try {
       const previousRuntimeInstanceId = runtime.value?.id
       const previousExpiresAt = runtime.value?.expiresAt
-      const data = await action()
+      const { data, error } = await action()
+      if (error) throw error
       pendingMutation.value = {
         kind,
         runtimeInstanceId: data?.runtimeInstanceId,
@@ -140,19 +140,27 @@ export function useChallengeTestRuntimePanel(props: Readonly<{
 
   const start = () => act(
     'start',
-    () => api.api.v1.admin.challenges.byChallengeId(path.value.challengeId).testRuntimes.post({ replacesRuntimeId: null }),
+    () => adminChallengeBankCreateTestRuntime({
+      path: path.value,
+      body: { replacesRuntimeId: null },
+    }),
     translate("runtime.challengeTest.error.startChallengeTestFailed"),
   )
 
   const stop = () => act(
     'stop',
-    () => api.api.v1.admin.challenges.byChallengeId(path.value.challengeId).testRuntimes.byRuntimeInstanceId(runtime.value!.id!).delete(),
+    () => adminChallengeBankStopTestRuntime({
+      path: { ...path.value, runtimeInstanceId: runtime.value!.id! },
+    }),
     translate("runtime.challengeTest.error.stopChallengeTestFailed"),
   )
 
   const reset = () => act(
     'reset',
-    () => api.api.v1.admin.challenges.byChallengeId(path.value.challengeId).testRuntimes.post({ replacesRuntimeId: runtime.value!.id! }),
+    () => adminChallengeBankCreateTestRuntime({
+      path: path.value,
+      body: { replacesRuntimeId: runtime.value!.id! },
+    }),
     translate("runtime.challengeTest.error.resetChallengeTestFailed"),
   )
 
@@ -163,7 +171,10 @@ export function useChallengeTestRuntimePanel(props: Readonly<{
     if (current?.state !== 'Running' || !current.id || extension === null) return
     return act(
       'extend',
-      () => api.api.v1.admin.challenges.byChallengeId(path.value.challengeId).testRuntimes.byRuntimeInstanceId(current.id!).patch({ expiresAt: extension.expiresAt }),
+      () => adminChallengeBankExtendTestRuntime({
+        path: { ...path.value, runtimeInstanceId: current.id! },
+        body: { expiresAt: extension.expiresAt },
+      }),
       translate("runtime.challengeTest.error.extendChallengeTestFailed"),
     )
   }
@@ -233,7 +244,7 @@ export function useChallengeTestRuntimePanel(props: Readonly<{
       ? 'default' as const
       : 'secondary' as const)
 
-  function flagStateLabel(state?: NoCTFAPIEndpointsAdministrationChallengeBankRuntimeTestFlagStateProtocol | null): string {
+  function flagStateLabel(state?: NoCtfapiEndpointsAdministrationChallengeBankRuntimeTestFlagStateProtocol): string {
     switch (state) {
       case 'Pending': return translate("runtime.label.injecting")
       case 'Succeeded': return translate("common.label.injected")

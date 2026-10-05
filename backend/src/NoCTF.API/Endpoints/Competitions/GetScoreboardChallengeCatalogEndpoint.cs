@@ -37,7 +37,7 @@ public sealed class GetScoreboardChallengeCatalogEndpoint(
     {
         Get("/competitions/{competitionId}/leaderboard/challenges");
         AllowAnonymous();
-        Summary(summary => { summary.Summary = "Get the low-frequency scoreboard challenge catalog."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Get the low-frequency scoreboard challenge catalog.");
     }
 
     public override async Task<Results<Ok<ScoreboardChallengeCatalogResponse>, Accepted<LeaderboardProcessingProtocolResponse>, NotFound>> ExecuteAsync(

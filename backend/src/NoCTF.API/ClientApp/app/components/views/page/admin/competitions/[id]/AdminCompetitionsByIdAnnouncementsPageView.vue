@@ -54,7 +54,7 @@ const { canJudge, includeWithdrawn, editingId, title, body, audience, saving, fo
         <Table v-else-if="items.length">
           <TableHeader><TableRow><TableHead>{{ $t('common.label.title') }}</TableHead><TableHead>{{ $t('administration.label.notificationObject') }}</TableHead><TableHead>{{ $t('announcements.author') }}</TableHead><TableHead>{{ $t('announcements.publishedAt') }}</TableHead><TableHead>{{ $t('common.label.status') }}</TableHead><TableHead class="text-right">{{ $t('common.label.actions') }}</TableHead></TableRow></TableHeader>
           <TableBody>
-            <TableRow v-for="item in items" :key="item.id ?? undefined">
+            <TableRow v-for="item in items" :key="item.id">
               <TableCell class="max-w-64 whitespace-normal break-words font-medium">{{ item.title }}</TableCell>
               <TableCell>{{ $t(audienceKey(item.audience)) }}</TableCell>
               <TableCell><NuxtLink v-if="item.authorId" :to="adminUserPath(item.authorId)" class="hover:underline">{{ item.authorName ?? item.authorId }}</NuxtLink><span v-else>{{ $t('common.label.system') }}</span></TableCell>

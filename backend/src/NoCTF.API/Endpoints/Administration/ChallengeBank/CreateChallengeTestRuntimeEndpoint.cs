@@ -37,7 +37,7 @@ public sealed class CreateChallengeTestRuntimeEndpoint(
         Description(builder => builder.WithName("AdminChallengeBankCreateTestRuntime")
             .ProducesProblemFE(StatusCodes.Status409Conflict)
             .ProducesProblemFE(StatusCodes.Status503ServiceUnavailable));
-        Summary(summary => { summary.Summary = "Creates or replaces a challenge-template test Runtime."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Creates or replaces a challenge-template test Runtime.");
     }
 
     public override async Task<Results<Accepted<ChallengeTestRuntimeAcceptedResponse>, NotFound,

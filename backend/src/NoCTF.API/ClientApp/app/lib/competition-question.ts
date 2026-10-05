@@ -1,14 +1,19 @@
-import { dateTimestamp } from '../utils/date-value'
 import type { UiMessage } from '../utils/i18n'
-import type { NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionAccessCode, NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionFailureCode, NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionFailureResponse, NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode, NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionResponse } from '../api/models'
+import type {
+  NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionAccessCode,
+  NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureCode,
+  NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureResponse,
+  NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode,
+  NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse,
+} from '../api'
 import { parseApiError } from '../utils/api-error'
 import { translate } from '../utils/i18n'
 
-type FailureCode = NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionFailureCode
-type FailurePayload = NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionFailureResponse
-type ParticipantRole = NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode
-type QuestionAccess = NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionAccessCode
-type CompetitionQuestion = NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionResponse
+type FailureCode = NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureCode
+type FailurePayload = NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureResponse
+type ParticipantRole = NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode
+type QuestionAccess = NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionAccessCode
+type CompetitionQuestion = NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse
 
 const staticFailureMessages = {
   InvalidRequest: "common.competitionQuestion.error.questionContentCheckInvalid",
@@ -30,7 +35,7 @@ export const competitionQuestionRoleLabel = {
   PlatformAdministrator: "notifications.label.platformAdministrator",
 } satisfies Record<ParticipantRole, string>
 
-export function isCompetitionQuestionHandlerRole(role?: ParticipantRole | null): boolean {
+export function isCompetitionQuestionHandlerRole(role?: ParticipantRole): boolean {
   return role !== undefined && role !== 'Asker' && role !== 'Participant'
 }
 
@@ -53,10 +58,10 @@ export function competitionQuestionErrorMessage(
 }
 
 export function competitionQuestionUnreadCount(
-  updatedAt: Date | string | null | undefined,
-  seenUpdatedAt: string | null | undefined,
-  lastActorRole: ParticipantRole | null | undefined,
-  access: QuestionAccess | null | undefined,
+  updatedAt: string | undefined,
+  seenUpdatedAt: string | undefined,
+  lastActorRole: ParticipantRole | undefined,
+  access: QuestionAccess | undefined,
 ): number {
   if (seenUpdatedAt !== undefined)
     return questionTime(updatedAt) > questionTime(seenUpdatedAt) ? 1 : 0
@@ -105,8 +110,8 @@ function questionTimestamp(question: CompetitionQuestion): number {
   return questionTime(question.updatedAt)
 }
 
-function questionTime(value: Date | string | null | undefined): number {
-  const timestamp = dateTimestamp(value ?? '')
+function questionTime(value: string | undefined): number {
+  const timestamp = Date.parse(value ?? '')
   return Number.isFinite(timestamp) ? timestamp : 0
 }
 

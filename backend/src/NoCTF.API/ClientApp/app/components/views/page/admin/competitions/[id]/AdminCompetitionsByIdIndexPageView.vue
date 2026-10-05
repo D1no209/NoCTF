@@ -40,7 +40,7 @@ const { startGateErrorMessage, competitionId, competition, canWrite, canManagePe
                 {{ posterUrl ? $t('administration.label.replaceCompetitionPoster') : $t('administration.label.uploadCompetitionPoster') }}
               </FieldLabel>
               <FileUpload
-                :key="posterInputKey ?? undefined"
+                :key="posterInputKey"
                 id="competition-poster-upload"
                 accept="image/jpeg,image/png,image/webp"
                 :disabled="posterPending"
@@ -71,7 +71,7 @@ const { startGateErrorMessage, competitionId, competition, canWrite, canManagePe
       </CardHeader>
       <CardContent class="flex flex-col gap-6">
         <div class="flex flex-wrap items-center gap-2">
-          <template v-for="(step, i) in steps" :key="step.value ?? undefined">
+          <template v-for="(step, i) in steps" :key="step.value">
             <Badge :variant="status === step.value || (step.value === 'Running' && status === 'Paused') ? 'default' : 'outline'">
               {{ step.value === 'Running' && status === 'Paused' ? $t('common.label.suspended') : translate(step.label) }}
             </Badge>
@@ -88,7 +88,7 @@ const { startGateErrorMessage, competitionId, competition, canWrite, canManagePe
             <Spinner v-if="validating" data-icon="inline-start" /> {{ $t('administration.label.checkStart') }} </Button>
           <Button
             v-for="a in actions.filter(a => a.visible)"
-            :key="a.key ?? undefined"
+            :key="a.key"
             size="sm"
             :variant="a.destructive ? 'destructive' : 'default'"
             :disabled="pendingAction !== null"
@@ -101,7 +101,7 @@ const { startGateErrorMessage, competitionId, competition, canWrite, canManagePe
         <p v-else class="text-sm text-muted-foreground">{{ $t('administration.competitionsBy.validation.roleReadFormat') }}</p>
 
         <div v-if="validationErrors && validationErrors.length > 0" class="flex flex-col gap-2">
-          <Alert v-for="(ve, i) in validationErrors" :key="i ?? undefined" variant="destructive">
+          <Alert v-for="(ve, i) in validationErrors" :key="i" variant="destructive">
             <AlertDescription>
               {{ startGateErrorMessage(ve) }}
               <NuxtLink
@@ -128,7 +128,7 @@ const { startGateErrorMessage, competitionId, competition, canWrite, canManagePe
             <Spinner v-if="generating" data-icon="inline-start" /> {{ $t('administration.label.generateMissingFlag') }} </Button>
         </div>
         <div v-if="generateFailures && generateFailures.length > 0" class="flex flex-col gap-2">
-          <Alert v-for="(f, i) in generateFailures" :key="i ?? undefined" variant="destructive">
+          <Alert v-for="(f, i) in generateFailures" :key="i" variant="destructive">
             <AlertDescription>
               {{ $t('administration.label.challengeTeam', { challenge: f.competitionChallengeId ?? '-', team: f.teamId ?? '-', description: f.description ?? f.code ?? '-' }) }}
             </AlertDescription>
@@ -195,7 +195,7 @@ const { startGateErrorMessage, competitionId, competition, canWrite, canManagePe
               {{ $t('administration.competitionsBy.validation.competitionEventsFormat') }}
             </span>
             <span class="flex flex-wrap gap-2">
-              <Badge v-for="reference in hardDeletePreview.references" :key="reference.code ?? undefined" variant="outline">
+              <Badge v-for="reference in hardDeletePreview.references" :key="reference.code" variant="outline">
                 {{ hardDeleteReferenceLabel(reference.code) }} · {{ reference.count ?? 0 }}
               </Badge>
             </span>

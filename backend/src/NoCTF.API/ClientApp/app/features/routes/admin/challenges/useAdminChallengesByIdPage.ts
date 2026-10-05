@@ -1,5 +1,3 @@
-
-import { api, multipartBody } from '../../../../lib/api'
 import { message as describeMessage } from '../../../../utils/i18n'
 import type { UiMessage } from '../../../../utils/i18n'
 import { proxyRefs } from 'vue'
@@ -7,8 +5,8 @@ import { markRaw } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import { Paperclip, RotateCcw, Trash2, Upload } from '@lucide/vue'
 import { toast } from '../../../../utils/message-toast'
-
-import type { NoCTFAPIEndpointsAdministrationChallengeBankChallengeAttachmentResponse, NoCTFAPIEndpointsAdministrationChallengeBankChallengeDefinitionContract, NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagResponse, NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol, NoCTFAPIEndpointsAdministrationChallengeBankChallengeTemplateContentPatchRequest, NoCTFAPIEndpointsAdministrationChallengeBankChallengeTemplateResponse, NoCTFAPIEndpointsAdministrationChallengeBankChallengeVisibilityProtocol, NoCTFAPIEndpointsCompetitionsGameModeProtocol, NoCTFAPIEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol, NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagFailureResponse, NoCTFAPIEndpointsAdministrationChallengeBankAttachmentBatchFailureResponse } from '../../../../api/models'
+import { adminChallengeBankCreateFlag, adminChallengeBankDeleteAttachment, adminChallengeBankDeleteFlag, adminChallengeBankDeleteTemplate, adminChallengeBankGetTemplate, adminChallengeBankListAttachments, adminChallengeBankListFlags, adminChallengeBankPatchTemplate, adminChallengeBankRestoreAttachment, adminChallengeBankRestoreFlag, adminChallengeBankRestoreTemplate, adminChallengeBankUploadAttachments } from '../../../../api'
+import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract, NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol, NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateContentPatchRequest, NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse, NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol, NoCtfapiEndpointsCompetitionsGameModeProtocol, NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol, NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse, NoCtfapiEndpointsAdministrationChallengeBankAttachmentBatchFailureResponse } from '../../../../api'
 import { challengeTemplateWriteErrorMessages } from '../../../../lib/challenge-template-error'
 import { validateChallengeTemplateDraft } from '../../../../lib/challenge-template-validation'
 import type { DefinitionModel } from '../../../../utils/game-config'
@@ -24,11 +22,11 @@ import DefinitionPatchSectionComponent from '../../../admin/DefinitionPatchSecti
 import DefinitionRuntimeSectionComponent from '../../../admin/DefinitionRuntimeSection.vue'
 import { challengeRuntimeDefinitionsEqual, mergeChallengeModeDefinition, mergeChallengeRuntimeDefinition } from '../../../admin/challenge-definition-sections'
 
-type Template = NoCTFAPIEndpointsAdministrationChallengeBankChallengeTemplateResponse
+type Template = NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse
 
-type Attachment = NoCTFAPIEndpointsAdministrationChallengeBankChallengeAttachmentResponse
+type Attachment = NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse
 
-type Flag = NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagResponse
+type Flag = NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse
 
 /** Owns state, effects and commands for AdminChallengesByIdPage. */
 export function useAdminChallengesByIdPage() {
@@ -48,11 +46,11 @@ export function useAdminChallengesByIdPage() {
 
   const form = reactive({
     title: '',
-    mode: 'Ctf' as NoCTFAPIEndpointsCompetitionsGameModeProtocol,
-    visibility: 'Private' as NoCTFAPIEndpointsAdministrationChallengeBankChallengeVisibilityProtocol,
+    mode: 'Ctf' as NoCtfapiEndpointsCompetitionsGameModeProtocol,
+    visibility: 'Private' as NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol,
     direction: '',
     description: '',
-    definition: defaultDefinition('Ctf') as NoCTFAPIEndpointsAdministrationChallengeBankChallengeDefinitionContract,
+    definition: defaultDefinition('Ctf') as NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract,
   })
 
   type SaveSection = 'basic' | 'runtime' | 'definition'
@@ -192,8 +190,8 @@ export function useAdminChallengesByIdPage() {
 
   function contentFromTemplate(
     value: Template,
-    overrides: Partial<NoCTFAPIEndpointsAdministrationChallengeBankChallengeTemplateContentPatchRequest> = {},
-  ): NoCTFAPIEndpointsAdministrationChallengeBankChallengeTemplateContentPatchRequest {
+    overrides: Partial<NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateContentPatchRequest> = {},
+  ): NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateContentPatchRequest {
     return {
       mode: value.mode ?? 'Ctf',
       visibility: value.visibility ?? 'Private',
@@ -207,13 +205,15 @@ export function useAdminChallengesByIdPage() {
 
   async function updateContent(
     section: SaveSection,
-    content: NoCTFAPIEndpointsAdministrationChallengeBankChallengeTemplateContentPatchRequest,
+    content: NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateContentPatchRequest,
     errors: { value: UiMessage[] },
   ): Promise<Template | null> {
     if (savingSection.value !== null) return null
     savingSection.value = section
-    let error: unknown;
-    const data = await api.api.v1.admin.challenges.byChallengeId(challengeId).patch({ content }).catch(cause => { error = cause; return undefined });
+    const { data, error } = await adminChallengeBankPatchTemplate({
+      path: { challengeId },
+      body: { content },
+    })
     savingSection.value = null
     if (error || !data) {
       errors.value = challengeTemplateWriteErrorMessages(error)
@@ -227,10 +227,10 @@ export function useAdminChallengesByIdPage() {
   }
 
   function validateDefinitionForSave(
-    mode: NoCTFAPIEndpointsCompetitionsGameModeProtocol,
+    mode: NoCtfapiEndpointsCompetitionsGameModeProtocol,
     definition: DefinitionModel,
     errors: { value: UiMessage[] },
-  ): NoCTFAPIEndpointsAdministrationChallengeBankChallengeDefinitionContract | null {
+  ): NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract | null {
     const value = template.value
     const validationErrors = validateChallengeTemplateDraft({
       mode,
@@ -249,8 +249,10 @@ export function useAdminChallengesByIdPage() {
   async function loadTemplate(): Promise<void> {
     loading.value = true
     loadError.value = null
-    let error: unknown;
-    const data = await api.api.v1.admin.challenges.byChallengeId(challengeId).get({ queryParameters: { includeDeleted: true } }).catch(cause => { error = cause; return undefined });
+    const { data, error } = await adminChallengeBankGetTemplate({
+      path: { challengeId },
+      query: { includeDeleted: true },
+    })
     loading.value = false
     if (error || !data) {
       loadError.value = parseApiError(error, describeMessage("administration.challengesBy.error.templateExistLoadFailed")).displayMessage
@@ -357,8 +359,7 @@ export function useAdminChallengesByIdPage() {
 
   async function removeTemplate(): Promise<void> {
     deleting.value = true
-    let error: unknown;
-    await api.api.v1.admin.challenges.byChallengeId(challengeId).delete().catch(cause => { error = cause; return undefined });
+    const { error } = await adminChallengeBankDeleteTemplate({ path: { challengeId } })
     deleting.value = false
     if (error) {
       toast.error(parseApiError(error).displayMessage)
@@ -370,8 +371,7 @@ export function useAdminChallengesByIdPage() {
 
   async function restoreTemplate(): Promise<void> {
     restoring.value = true
-    let error: unknown;
-    await api.api.v1.admin.challenges.byChallengeId(challengeId).restore.post().catch(cause => { error = cause; return undefined });
+    const { error } = await adminChallengeBankRestoreTemplate({ path: { challengeId } })
     restoring.value = false
     if (error) {
       toast.error(parseApiError(error).displayMessage)
@@ -387,7 +387,7 @@ export function useAdminChallengesByIdPage() {
 
   const attachmentsIncludeDeleted = ref(false)
 
-  const attachmentDeliveryPolicy = ref<NoCTFAPIEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol>('All')
+  const attachmentDeliveryPolicy = ref<NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol>('All')
 
   const uploading = ref(false)
 
@@ -419,8 +419,10 @@ export function useAdminChallengesByIdPage() {
 
   async function loadAttachments(): Promise<void> {
     attachmentsLoading.value = true
-    let error: unknown;
-    const data = await api.api.v1.admin.challenges.byChallengeId(challengeId).attachments.get({ queryParameters: { includeDeleted: attachmentsIncludeDeleted.value } }).catch(cause => { error = cause; return undefined });
+    const { data, error } = await adminChallengeBankListAttachments({
+      path: { challengeId },
+      query: { includeDeleted: attachmentsIncludeDeleted.value },
+    })
     attachmentsLoading.value = false
     if (error) {
       toast.error(parseApiError(error).displayMessage)
@@ -440,8 +442,10 @@ export function useAdminChallengesByIdPage() {
     input.value = ''
     if (files.length === 0) return
     uploading.value = true
-    let failed: unknown;
-    await api.api.v1.admin.challenges.byChallengeId(challengeId).attachments.post(await multipartBody({ deliveryPolicy: 'All', files })).catch(cause => { failed = cause; return undefined });
+    const { error: failed } = await adminChallengeBankUploadAttachments({
+      path: { challengeId },
+      body: { deliveryPolicy: 'All', files },
+    })
     uploading.value = false
     if (failed) {
       toast.error(parseApiError(failed).displayMessage)
@@ -461,12 +465,14 @@ export function useAdminChallengesByIdPage() {
   async function uploadRandomBatch(): Promise<void> {
     if (!randomDownloadFileName.value.trim() || randomFiles.value.length === 0) return
     randomUploading.value = true
-    let error: unknown;
-    await api.api.v1.admin.challenges.byChallengeId(challengeId).attachments.post(await multipartBody({
+    const { error } = await adminChallengeBankUploadAttachments({
+      path: { challengeId },
+      body: {
         deliveryPolicy: 'RandomOnePerTeam',
         downloadFileName: randomDownloadFileName.value,
         files: randomFiles.value,
-      })).catch(cause => { error = cause; return undefined });
+      },
+    })
     randomUploading.value = false
     if (error) {
       toast.error(randomAttachmentErrorMessage(error))
@@ -479,7 +485,7 @@ export function useAdminChallengesByIdPage() {
   }
 
   function randomAttachmentErrorMessage(error: unknown): UiMessage {
-    const failure = error as NoCTFAPIEndpointsAdministrationChallengeBankAttachmentBatchFailureResponse
+    const failure = error as NoCtfapiEndpointsAdministrationChallengeBankAttachmentBatchFailureResponse
     switch (failure.code) {
       case 'UploadTooLarge': return translate("administration.challengesBy.description.attachmentVariantExceedsUpload")
       case 'InvalidFileName': return translate("administration.challengesBy.error.sharedDownloadFilenameInvalid")
@@ -495,7 +501,7 @@ export function useAdminChallengesByIdPage() {
   }
 
   function challengeFlagErrorMessage(error: unknown): UiMessage {
-    const failure = error as NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagFailureResponse
+    const failure = error as NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse
     switch (failure.code) {
       case 'InvalidFlag': return translate("administration.challengesBy.error.flagInvalid")
       case 'InvalidRegularExpression': return translate("administration.challengesBy.error.flagRegularExpressionInvalid")
@@ -512,8 +518,9 @@ export function useAdminChallengesByIdPage() {
     const attachment = deletingAttachment.value
     if (!attachment?.id) return
     attachmentActionPending.value = true
-    let error: unknown;
-    await api.api.v1.admin.challenges.byChallengeId(challengeId).attachments.byAttachmentId(attachment.id).delete().catch(cause => { error = cause; return undefined });
+    const { error } = await adminChallengeBankDeleteAttachment({
+      path: { challengeId, attachmentId: attachment.id },
+    })
     attachmentActionPending.value = false
     if (error) {
       toast.error(parseApiError(error).displayMessage)
@@ -527,8 +534,9 @@ export function useAdminChallengesByIdPage() {
   async function restoreAttachment(attachment: Attachment): Promise<void> {
     if (!attachment.id) return
     attachmentActionPending.value = true
-    let error: unknown;
-    await api.api.v1.admin.challenges.byChallengeId(challengeId).attachments.byAttachmentId(attachment.id).restore.post().catch(cause => { error = cause; return undefined });
+    const { error } = await adminChallengeBankRestoreAttachment({
+      path: { challengeId, attachmentId: attachment.id },
+    })
     attachmentActionPending.value = false
     if (error) {
       toast.error(parseApiError(error).displayMessage)
@@ -538,7 +546,7 @@ export function useAdminChallengesByIdPage() {
     await Promise.all([loadAttachments(), loadFlags()])
   }
 
-  function formatBytes(value?: number | null): string {
+  function formatBytes(value?: number): string {
     if (value === undefined || value === null) return '—'
     if (value < 1024) return `${value} B`
     if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`
@@ -562,7 +570,7 @@ export function useAdminChallengesByIdPage() {
 
   const flagForm = reactive({
     flag: '',
-    matchKind: 'Exact' as NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol,
+    matchKind: 'Exact' as NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol,
   })
 
   const deletingFlag = ref<Flag | null>(null)
@@ -575,8 +583,10 @@ export function useAdminChallengesByIdPage() {
 
   async function loadFlags(): Promise<void> {
     flagsLoading.value = true
-    let error: unknown;
-    const data = await api.api.v1.admin.challenges.byChallengeId(challengeId).flags.get({ queryParameters: { includeDeleted: flagsIncludeDeleted.value } }).catch(cause => { error = cause; return undefined });
+    const { data, error } = await adminChallengeBankListFlags({
+      path: { challengeId },
+      query: { includeDeleted: flagsIncludeDeleted.value },
+    })
     flagsLoading.value = false
     if (error) {
       toast.error(parseApiError(error).displayMessage)
@@ -598,11 +608,13 @@ export function useAdminChallengesByIdPage() {
       return
     }
     flagCreating.value = true
-    let error: unknown;
-    await api.api.v1.admin.challenges.byChallengeId(challengeId).flags.post({
+    const { error } = await adminChallengeBankCreateFlag({
+      path: { challengeId },
+      body: {
         flag: flagForm.flag,
         matchKind: flagForm.matchKind,
-      }).catch(cause => { error = cause; return undefined });
+      },
+    })
     flagCreating.value = false
     if (error) {
       toast.error(challengeFlagErrorMessage(error))
@@ -618,8 +630,9 @@ export function useAdminChallengesByIdPage() {
     const flag = deletingFlag.value
     if (!flag?.id) return
     flagActionPending.value = true
-    let error: unknown;
-    await api.api.v1.admin.challenges.byChallengeId(challengeId).flags.byFlagId(flag.id).delete().catch(cause => { error = cause; return undefined });
+    const { error } = await adminChallengeBankDeleteFlag({
+      path: { challengeId, flagId: flag.id },
+    })
     flagActionPending.value = false
     if (error) {
       toast.error(challengeFlagErrorMessage(error))
@@ -633,8 +646,9 @@ export function useAdminChallengesByIdPage() {
   async function restoreFlag(flag: Flag): Promise<void> {
     if (!flag.id) return
     flagActionPending.value = true
-    let error: unknown;
-    await api.api.v1.admin.challenges.byChallengeId(challengeId).flags.byFlagId(flag.id).restore.post().catch(cause => { error = cause; return undefined });
+    const { error } = await adminChallengeBankRestoreFlag({
+      path: { challengeId, flagId: flag.id },
+    })
     flagActionPending.value = false
     if (error) {
       toast.error(challengeFlagErrorMessage(error))
@@ -681,13 +695,15 @@ export function useAdminChallengesByIdPage() {
   async function savePermissions(): Promise<void> {
     if (!template.value) return
     permissionsSaving.value = true
-    let error: unknown;
-    const data = await api.api.v1.admin.challenges.byChallengeId(challengeId).patch({
+    const { data, error } = await adminChallengeBankPatchTemplate({
+      path: { challengeId },
+      body: {
         permissions: {
           ownerId: template.value.ownerId!,
           managerIds: parseUserIds(managersText.value),
         },
-      }).catch(cause => { error = cause; return undefined });
+      },
+    })
     permissionsSaving.value = false
     if (error) {
       toast.error(conflictMessage(error))
@@ -702,13 +718,15 @@ export function useAdminChallengesByIdPage() {
     transferring.value = true
     const managerIds = new Set(parseUserIds(managersText.value))
     managerIds.add(template.value.ownerId!)
-    let error: unknown;
-    const data = await api.api.v1.admin.challenges.byChallengeId(challengeId).patch({
+    const { data, error } = await adminChallengeBankPatchTemplate({
+      path: { challengeId },
+      body: {
         permissions: {
           ownerId: newOwnerId.value.trim(),
           managerIds: [...managerIds],
         },
-      }).catch(cause => { error = cause; return undefined });
+      },
+    })
     transferring.value = false
     if (error) {
       toast.error(conflictMessage(error))

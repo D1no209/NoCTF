@@ -12,6 +12,8 @@ public sealed class DownloadRuntimeTrafficCaptureRequest
     public Guid RuntimeInstanceId { get; set; }
 }
 
+[NJsonSchema.Annotations.JsonSchema(NJsonSchema.JsonObjectType.String, Format = "binary")]
+public sealed class RuntimeTrafficCaptureBinaryResponse;
 
 public sealed class DownloadRuntimeTrafficCaptureEndpoint(
     ManageRuntimeTrafficCaptures captures,
@@ -26,10 +28,10 @@ public sealed class DownloadRuntimeTrafficCaptureEndpoint(
         AuthSchemes("Bearer");
         Description(builder => builder
             .WithName("AdminDownloadRuntimeTrafficCapture")
-            .Produces<byte[]>(
+            .Produces<RuntimeTrafficCaptureBinaryResponse>(
                 StatusCodes.Status200OK,
                 "application/vnd.tcpdump.pcap"));
-        Summary(summary => { summary.Summary = "Downloads one Runtime PCAPNG capture."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Downloads one Runtime PCAPNG capture.");
     }
 
     public override async Task<Results<FileStreamHttpResult, NotFound,

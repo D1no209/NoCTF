@@ -1,5 +1,4 @@
 <script setup lang="ts">
-
 import { toRefs } from 'vue'
 import type { CompetitionBroadcastPanelViewState } from '~/features/competition/useCompetitionBroadcastPanel'
 
@@ -24,7 +23,7 @@ const { Megaphone, items, loading, error, broadcastMotionAttributes, refreshLate
     </CardHeader>
 
     <CardContent v-if="loading" class="flex flex-col gap-3 px-4 pb-4">
-      <Skeleton v-for="index in 4" :key="index ?? undefined" class="h-12 w-full" />
+      <Skeleton v-for="index in 4" :key="index" class="h-12 w-full" />
     </CardContent>
     <CardContent v-else-if="error" class="px-4 pb-4">
       <p class="text-xs leading-5 text-destructive">{{ $message(error) }}</p>
@@ -41,7 +40,7 @@ const { Megaphone, items, loading, error, broadcastMotionAttributes, refreshLate
     >
       <li
         v-for="event in items"
-        :key="(competitionBroadcastIdentity(event)) ?? undefined"
+        :key="competitionBroadcastIdentity(event)"
         v-bind="broadcastMotionAttributes(event)"
       >
         <NuxtLink
@@ -52,13 +51,13 @@ const { Megaphone, items, loading, error, broadcastMotionAttributes, refreshLate
           <p class="text-xs leading-5 text-foreground group-hover:text-primary">
             {{ competitionBroadcastText(event) }}
           </p>
-          <time class="mt-1 block font-mono text-[0.6875rem] text-muted-foreground" :datetime="(dateIso(event.occurredAt)) ?? undefined">
+          <time class="mt-1 block font-mono text-[0.6875rem] text-muted-foreground" :datetime="event.occurredAt">
             {{ formatDateTime(event.occurredAt) }}
           </time>
         </NuxtLink>
         <div v-else class="px-4 py-3">
           <p class="text-xs leading-5 text-foreground">{{ competitionBroadcastText(event) }}</p>
-          <time class="mt-1 block font-mono text-[0.6875rem] text-muted-foreground" :datetime="(dateIso(event.occurredAt)) ?? undefined">
+          <time class="mt-1 block font-mono text-[0.6875rem] text-muted-foreground" :datetime="event.occurredAt">
             {{ formatDateTime(event.occurredAt) }}
           </time>
         </div>

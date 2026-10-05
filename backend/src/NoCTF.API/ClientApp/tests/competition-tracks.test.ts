@@ -1,10 +1,10 @@
 import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import type {
-  NoCTFAPIEndpointsAdministrationCompetitionsCompetitionTrackFailureCodeProtocol,
-  NoCTFAPIEndpointsTeamsTeamMembershipFailureCodeProtocol,
-  NoCTFAPIEndpointsTeamsTeamRegistrationFailureCodeProtocol,
-} from '../app/api/models'
+  NoCtfapiEndpointsAdministrationCompetitionsCompetitionTrackFailureCodeProtocol,
+  NoCtfapiEndpointsTeamsTeamMembershipFailureCodeProtocol,
+  NoCtfapiEndpointsTeamsTeamRegistrationFailureCodeProtocol,
+} from '../app/api'
 import {
   competitionTrackErrorMessage,
   duplicateCompetitionTrackKey,
@@ -26,7 +26,7 @@ describe('competition track error presentation', () => {
     'TrackNotPublicSelectable',
     'TrackSsoIdentityRequired',
     'SsoProviderNotFound',
-  ] satisfies NoCTFAPIEndpointsAdministrationCompetitionsCompetitionTrackFailureCodeProtocol[]
+  ] satisfies NoCtfapiEndpointsAdministrationCompetitionsCompetitionTrackFailureCodeProtocol[]
 
   const registrationCodes = [
     'InvalidTeamName',
@@ -45,7 +45,7 @@ describe('competition track error presentation', () => {
     'TrackInvitationRequired',
     'TrackInvitationInvalid',
     'TrackSsoIdentityRequired',
-  ] satisfies NoCTFAPIEndpointsTeamsTeamRegistrationFailureCodeProtocol[]
+  ] satisfies NoCtfapiEndpointsTeamsTeamRegistrationFailureCodeProtocol[]
 
   const membershipCodes = [
     'CompetitionNotFound',
@@ -62,7 +62,7 @@ describe('competition track error presentation', () => {
     'CaptainMustTransfer',
     'CaptainOnly',
     'TrackSsoIdentityRequired',
-  ] satisfies NoCTFAPIEndpointsTeamsTeamMembershipFailureCodeProtocol[]
+  ] satisfies NoCtfapiEndpointsTeamsTeamMembershipFailureCodeProtocol[]
 
   test('maps every generated track failure code', () => {
     for (const code of trackCodes)
@@ -97,9 +97,9 @@ describe('competition track pages', () => {
     const trackView = await sourceFile(new URL('../app/components/views/page/admin/competitions/[id]/AdminCompetitionsByIdTracksPageView.vue', import.meta.url)).text()
     const teams = await sourceFile(new URL('../app/pages/admin/competitions/[id]/teams.vue', import.meta.url)).text()
 
-    expect(admin).toMatch(/api\.api\.v1\.admin\.competitions\.byCompetitionId\([^)]*\)\.get\(/)
-    expect(admin).toMatch(/api\.api\.v1\.admin\.competitions\.byCompetitionId\([^)]*\)\.teams\.get\(/)
-    expect(admin).toMatch(/api\.api\.v1\.admin\.competitions\.byCompetitionId\([^)]*\)\.patch\(/)
+    expect(admin).toContain('adminGetCompetition')
+    expect(admin).toContain('adminListTeams')
+    expect(admin).toContain('adminPatchCompetition')
     expect(admin).toContain('if (saving.value || !canUpdate.value || !canWrite.value) return')
     expect(admin).toContain('enabled: enabled.value')
     expect(admin).toContain('removedTrackReassignments: enabled.value ? removedTrackReassignments.value : []')
@@ -116,9 +116,9 @@ describe('competition track pages', () => {
     expect(admin).toContain('nextCompetitionTrackOrdinal')
     expect(admin).toContain('duplicateCompetitionTrackKey')
     expect(admin).toContain('clientId: crypto.randomUUID()')
-    expect(admin).toContain(':key="track.clientId ?? undefined"')
+    expect(admin).toContain(':key="track.clientId"')
     expect(admin).toContain('<Switch')
-    expect(admin).not.toContain(':key="`${track.key}-${index}` ?? undefined"')
+    expect(admin).not.toContain(':key="`${track.key}-${index}`"')
     expect(admin).toContain("administration.competitionsBy.label.trackRequiresInvitationCode")
     expect(admin).toContain('track.invitationCode.trim() || null')
     expect(admin).toContain('requiredSsoProviderId: track.requiredSsoProviderId ?? null')
@@ -134,9 +134,9 @@ describe('competition track pages', () => {
     )
     expect(trackView).toContain('sso.trackGateNoProviders')
     expect(trackView).toContain('sso.trackGateConfigurationHint')
-    expect(teams).toMatch(/api\.api\.v1\.competitions\.byCompetitionId\([^)]*\)\.teams\.byTeamId\([^)]*\)\.patch\(/)
+    expect(teams).toContain('patchCompetitionTeam')
     expect(teams).toContain('tracksEnabled')
-    expect(teams).toContain('{ administration: { trackKey, registrationStatus: team.registrationStatus } }')
+    expect(teams).toContain('body: { administration: { trackKey, registrationStatus: team.registrationStatus } }')
     expect(teams).not.toContain('tracksFrozen.value || team.trackKey === trackKey')
   })
 
@@ -144,7 +144,7 @@ describe('competition track pages', () => {
     const overview = await sourceFile(new URL('../app/features/competitions/CompetitionOverview.vue', import.meta.url)).text()
     const leaderboard = await sourceFile(new URL('../app/pages/competitions/[id]/leaderboard.vue', import.meta.url)).text()
 
-    expect(overview).toMatch(/api\.api\.v1\.competitions\.byCompetitionId\([^)]*\)\.tracks\.get\(/)
+    expect(overview).toContain('listCompetitionTracks')
     expect(overview).toContain('tracksEnabled.value && !createTrackKey.value')
     expect(overview).toContain('...(tracksEnabled.value')
     expect(overview).toContain('v-if="tracksEnabled && !tracksLoaded"')
@@ -196,7 +196,7 @@ describe('competition track pages', () => {
     const navigator = await sourceFile(new URL('../app/features/competition/CompetitionChallengeNavigator.vue', import.meta.url)).text()
     const adminTeams = await sourceFile(new URL('../app/pages/admin/competitions/[id]/teams.vue', import.meta.url)).text()
 
-    expect(myTeam).toMatch(/api\.api\.v1\.competitions\.byCompetitionId\([^)]*\)\.tracks\.get\(/)
+    expect(myTeam).toContain('listCompetitionTracks')
     expect(myTeam).toContain('trackKey: tracksEnabled.value ? renameTrackKey.value : null')
     expect(myTeam).toContain('trackInvitationCode: null')
     expect(overview).toContain('trackInvitationCode: registrationTrack.value?.requiresInvitationCode')
@@ -209,8 +209,8 @@ describe('competition track pages', () => {
     expect(overview.indexOf("$t('competitions.label.submitRegistration')")).toBeLessThan(overview.indexOf("$t('competitions.label.myTeam')"))
     expect(myTeam).not.toContain('@click="openRegistration"')
     expect(myTeam).not.toContain('<Dialog :open="registrationOpen"')
-    expect(myTeam).toMatch(/api\.api\.v1\.competitions\.byCompetitionId\([^)]*\)\.teams\.byTeamId\([^)]*\)\.avatar\.put\(/)
-    expect(myTeam).toMatch(/api\.api\.v1\.competitions\.byCompetitionId\([^)]*\)\.teams\.byTeamId\([^)]*\)\.avatar\.delete\(/)
+    expect(myTeam).toContain('teamAvatarReplace')
+    expect(myTeam).toContain('teamAvatarClear')
     expect(myTeam).toContain("team.registrationStatus === 'Pending'")
     expect(myTeam).toContain("updatedTeam.registrationStatus === 'Unregistered'")
     expect(myTeam).toContain("event.kind === 'TeamRegistrationChanged'")

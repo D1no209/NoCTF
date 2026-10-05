@@ -148,7 +148,7 @@ const { ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, Ref
               <div class="flex flex-col gap-2 pr-2">
                 <div
                   v-for="score in selected?.challengeScores ?? []"
-                  :key="score.competitionChallengeId ?? undefined"
+                  :key="score.competitionChallengeId"
                   class="flex items-center justify-between gap-2 rounded-lg bg-background/35 px-3 py-2"
                 >
                   <ActionButton
@@ -183,7 +183,7 @@ const { ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, Ref
                       <SelectGroup>
                         <SelectItem
                           v-for="score in selected.challengeScores ?? []"
-                          :key="score.competitionChallengeId ?? undefined"
+                          :key="score.competitionChallengeId"
                           :value="score.competitionChallengeId ?? ''"
                         >{{ score.title }}</SelectItem>
                       </SelectGroup>
@@ -250,7 +250,7 @@ const { ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, Ref
                     <SelectItem value="none">{{ $t('writeUp.wholeWriteUp') }}</SelectItem>
                     <SelectItem
                       v-for="score in selected?.challengeScores ?? []"
-                      :key="score.competitionChallengeId ?? undefined"
+                      :key="score.competitionChallengeId"
                       :value="score.competitionChallengeId ?? ''"
                     >{{ score.title }}</SelectItem>
                   </SelectGroup>

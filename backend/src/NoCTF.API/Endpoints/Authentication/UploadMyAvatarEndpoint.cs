@@ -56,7 +56,6 @@ public sealed class UploadMyAvatarEndpoint(
         Put("/auth/me/avatar");
         AuthSchemes("Bearer");
         AllowFileUploads();
-        Description(builder => builder.Accepts<UploadMyAvatarRequest>("multipart/form-data"));
         MaxRequestBodySize(FileUploadLimits.MaximumRequestBytes(
             uploadLimits.MaximumAvatarBytes));
         Description(builder => builder
@@ -64,7 +63,7 @@ public sealed class UploadMyAvatarEndpoint(
             .WithMetadata(new EnableRateLimitingAttribute("avatar"))
             .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
                 StatusCodes.Status413PayloadTooLarge));
-        Summary(summary => { summary.Summary = "Replaces the current user's cropped avatar."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Replaces the current user's cropped avatar.");
     }
 
     public override async Task<Results<Ok<CurrentUserResponse>, NotFound,

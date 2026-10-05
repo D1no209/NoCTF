@@ -101,7 +101,7 @@ public sealed class CreateSsoProviderEndpoint(
         AuthSchemes("Bearer");
         Roles("Administrator");
         Description(builder => builder.WithName("AdminPlatformSsoCreateProvider"));
-        Summary(summary => { summary.Summary = "Creates a disabled or ready SSO provider definition."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Creates a disabled or ready SSO provider definition.");
     }
 
     public override async Task<Results<Ok<SsoConfigurationResponse>, ProblemHttpResult>> ExecuteAsync(

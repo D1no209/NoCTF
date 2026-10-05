@@ -1,8 +1,6 @@
-
-import { ResponseMetadata, api, RequestPolicyOption, binaryResponse } from '../../lib/api'
 import { message as describeMessage } from '../../utils/i18n'
 import type { UiMessage } from '../../utils/i18n'
-
+import { competitionPosterGet } from '../../api'
 
 /** Loads one competition's mutable poster without retaining stale browser responses. */
 export function useCompetitionPoster(competitionId: string) {
@@ -29,9 +27,11 @@ export function useCompetitionPoster(competitionId: string) {
     posterLoading.value = true
     posterError.value = null
     try {
-      let error: unknown;
-      const response = new ResponseMetadata();
-      const data = await binaryResponse(responseOptions => api.api.v1.competitions.byCompetitionId(competitionId).poster.get({ options: [new RequestPolicyOption({ response: response, cache: 'no-store' }), ...responseOptions] }), 'blob').catch(cause => { error = cause; return undefined });
+      const { data, error, response } = await competitionPosterGet({
+        path: { competitionId },
+        parseAs: 'blob',
+        cache: 'no-store',
+      })
       if (current !== generation) return
       if (response?.status === 404) {
         clearPoster()

@@ -17,13 +17,7 @@ public sealed class ListCompetitionsEndpoint(
     TimeProvider timeProvider)
     : EndpointWithoutRequest<Ok<CompetitionListResponse>>
 {
-    public override void Configure() {
-        Summary(summary =>
-        {
-            summary.Summary = "Lists competitions visible to the caller using cursor pagination.";
-            summary.Description = summary.Summary;
-        });
- Get("/competitions"); AllowAnonymous(); }
+    public override void Configure() { Get("/competitions"); AllowAnonymous(); }
 
     public override async Task<Ok<CompetitionListResponse>> ExecuteAsync(CancellationToken ct)
     {

@@ -46,14 +46,13 @@ public sealed class UploadTeamAvatarEndpoint(
         Put("/competitions/{competitionId}/teams/{teamId}/avatar");
         AuthSchemes("Bearer");
         AllowFileUploads();
-        Description(builder => builder.Accepts<UploadTeamAvatarRequest>("multipart/form-data"));
         MaxRequestBodySize(FileUploadLimits.MaximumRequestBytes(
             uploadLimits.MaximumAvatarBytes));
         Description(builder => builder
             .WithName("TeamAvatar_Replace")
             .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
                 StatusCodes.Status413PayloadTooLarge));
-        Summary(summary => { summary.Summary = "Replaces a team's avatar with an immutable File reference."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Replaces a team's avatar with an immutable File reference.");
     }
 
     public override async Task<Results<Ok<TeamAvatarResponse>, NotFound, ForbidHttpResult,

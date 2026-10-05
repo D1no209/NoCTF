@@ -27,10 +27,6 @@ internal static partial class RegisterProtocolMapper
 
 public sealed class RegisterRequest
 {
-    /// <summary>One-time verification token; optional when platform policy disables verification. Maximum 4096 characters.</summary>
-    [FromHeader("X-NoCTF-Human-Verification", IsRequired = false, RemoveFromSchema = true)]
-    public string? HumanVerificationToken { get; set; }
-
     private string userName = string.Empty;
 
     public string UserName
@@ -68,10 +64,6 @@ public sealed class RegisterEndpoint(RegisterUser register, TimeProvider timePro
 {
     public override void Configure()
     {
-        Description(builder => builder
-            .ProducesProblem(StatusCodes.Status403Forbidden)
-            .ProducesProblem(StatusCodes.Status503ServiceUnavailable));
-
         Post("/auth/register");
         AllowAnonymous();
         Options(builder => builder.WithMetadata(new NoCTF.API.Security.ProtectedEntryMetadata(NoCTF.API.Security.ProtectedEntry.Registration)));
@@ -79,7 +71,6 @@ public sealed class RegisterEndpoint(RegisterUser register, TimeProvider timePro
         MaxRequestBodySize(16 * 1024);
         Summary(summary =>
         {
-            summary.Params["X-NoCTF-Human-Verification"] = "One-time verification token, at most 4096 characters. Required only when the configured platform policy enables verification for this operation.";
             summary.Summary = "Register a user account";
             summary.Description = "Creates a local account with an Identity V3 password hash.";
         });

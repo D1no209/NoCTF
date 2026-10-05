@@ -1,5 +1,4 @@
 <script setup lang="ts">
-
 import { toRefs } from 'vue'
 import type { AdminPlatformUsersPageViewState } from '~/features/routes/admin/platform/useAdminPlatformUsersPage'
 
@@ -32,7 +31,7 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
         <SelectContent>
           <SelectGroup>
             <SelectItem value="all">{{ $t('sso.allIdentityProviders') }}</SelectItem>
-            <SelectItem v-for="provider in ssoProviders" :key="provider.id ?? undefined" :value="provider.id!">
+            <SelectItem v-for="provider in ssoProviders" :key="provider.id" :value="provider.id!">
               {{ provider.name }}
             </SelectItem>
           </SelectGroup>
@@ -49,7 +48,7 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
     </Alert>
 
     <div v-if="loading" class="flex flex-col gap-3">
-      <Skeleton v-for="i in 6" :key="i ?? undefined" class="h-14 w-full" />
+      <Skeleton v-for="i in 6" :key="i" class="h-14 w-full" />
     </div>
 
     <Empty v-else-if="filteredUsers.length === 0" class="border border-dashed py-12">
@@ -74,7 +73,7 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
       <TableBody>
         <TableRow
           v-for="user in filteredUsers"
-          :key="user.id ?? undefined"
+          :key="user.id"
           class="cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
           role="button"
           tabindex="0"
@@ -111,7 +110,7 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
             <span v-else class="text-muted-foreground">{{ $t('sso.notBound') }}</span>
           </TableCell>
           <TableCell>
-            <component :is="AdminDateTime" :value="dateIso(user.createdAt)" />
+            <component :is="AdminDateTime" :value="user.createdAt" />
           </TableCell>
         </TableRow>
       </TableBody>
@@ -175,10 +174,10 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
           <SheetDescription>{{ detail?.userName ?? $t('common.label.loading') }}</SheetDescription>
         </SheetHeader>
         <div v-if="detailLoading" class="flex flex-col gap-3 p-6">
-          <Skeleton v-for="i in 5" :key="i ?? undefined" class="h-8 w-full" />
+          <Skeleton v-for="i in 5" :key="i" class="h-8 w-full" />
         </div>
         <Alert v-else-if="detailError" variant="destructive" class="m-6"><AlertDescription>{{ $message(detailError) }}</AlertDescription></Alert>
-        <ScrollSurface as="div" v-else-if="detail" :key="detail.id ?? undefined" class="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-6">
+        <ScrollSurface as="div" v-else-if="detail" :key="detail.id" class="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-6">
           <section class="flex flex-col gap-4" aria-labelledby="user-account-overview">
             <h3 id="user-account-overview" class="font-semibold">{{ $t('administration.label.accountInformation') }}</h3>
             <dl class="grid grid-cols-[6rem_minmax(0,1fr)] gap-x-5 gap-y-2.5 text-sm sm:grid-cols-[7rem_minmax(0,1fr)]">
@@ -199,9 +198,9 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
               <dt class="text-muted-foreground">{{ $t('administration.label.tokenVersion') }}</dt>
               <dd class="font-mono tabular-nums">{{ detail.tokenVersion ?? 0 }}</dd>
               <dt class="text-muted-foreground">{{ $t('administration.label.registrationTime') }}</dt>
-              <dd><component :is="AdminDateTime" :value="dateIso(detail.createdAt)" /></dd>
+              <dd><component :is="AdminDateTime" :value="detail.createdAt" /></dd>
               <dt class="text-muted-foreground">{{ $t('administration.label.updateTime') }}</dt>
-              <dd><component :is="AdminDateTime" :value="dateIso(detail.updatedAt)" /></dd>
+              <dd><component :is="AdminDateTime" :value="detail.updatedAt" /></dd>
             </dl>
           </section>
 
@@ -218,7 +217,7 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
                 <dt class="text-muted-foreground">{{ $t('sso.subject') }}</dt>
                 <dd class="select-all break-all font-mono text-xs">{{ detail.ssoBinding.subject }}</dd>
                 <dt class="text-muted-foreground">{{ $t('sso.boundAt') }}</dt>
-                <dd><component :is="AdminDateTime" :value="dateIso(detail.ssoBinding.boundAt)" /></dd>
+                <dd><component :is="AdminDateTime" :value="detail.ssoBinding.boundAt" /></dd>
               </dl>
               <AlertDialog>
                 <AlertDialogTrigger as-child>
@@ -243,7 +242,7 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
             <p v-else class="text-sm text-muted-foreground">{{ $t('sso.notBound') }}</p>
           </section>
 
-          <component :is="PrivateAccountPanel" v-if="detail.id" :key="detail.id ?? undefined" :user-id="detail.id" :show-activities="false" />
+          <component :is="PrivateAccountPanel" v-if="detail.id" :key="detail.id" :user-id="detail.id" :show-activities="false" />
 
           <Separator />
 
@@ -287,7 +286,7 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
                       <SelectGroup>
                         <SelectItem
                           v-for="option in MANAGED_ACCOUNT_STATUS_OPTIONS"
-                          :key="option.value ?? undefined"
+                          :key="option.value"
                           :value="option.value"
                         >
                           {{ translate(option.label) }}
@@ -454,13 +453,13 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
             <Field>
               <FieldLabel for="issued-user-token">{{ $t('administration.label.accessToken') }}</FieldLabel>
               <div class="flex items-center gap-2">
-                <Input id="issued-user-token" :model-value="issuedToken.accessToken ?? undefined" readonly class="font-mono text-xs" />
+                <Input id="issued-user-token" :model-value="issuedToken.accessToken" readonly class="font-mono text-xs" />
                 <Button type="button" size="icon" variant="outline" :aria-label="$t('administration.label.copyToken')" @click="copyIssuedToken">
                   <Copy />
                 </Button>
               </div>
               <FieldDescription>
-                {{ $t('administration.label.expirationDate') }} <component :is="AdminDateTime" :value="dateIso(issuedToken.expiresAt)" />
+                {{ $t('administration.label.expirationDate') }} <component :is="AdminDateTime" :value="issuedToken.expiresAt" />
               </FieldDescription>
             </Field>
           </FieldGroup>
@@ -478,7 +477,7 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
           <AlertDialogDescription> {{ $t('administration.platformUsers.description.deletionIrreversibleConfirmScope') }} </AlertDialogDescription>
         </AlertDialogHeader>
         <div v-if="previewLoading" class="flex flex-col gap-2">
-          <Skeleton v-for="i in 3" :key="i ?? undefined" class="h-8 w-full" />
+          <Skeleton v-for="i in 3" :key="i" class="h-8 w-full" />
         </div>
         <div v-else-if="preview" class="flex flex-col gap-4">
           <Alert v-if="preview.selfDeletionForbidden || preview.lastAdministratorProtected" variant="destructive">
@@ -489,7 +488,7 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
           <div v-if="preview.references?.length" class="flex flex-col gap-2">
             <p class="text-sm text-muted-foreground">{{ $t('administration.platformUsers.description.userFollowingBusinessReferences') }}</p>
             <div class="flex flex-wrap gap-2">
-              <Badge v-for="reference in preview.references" :key="reference.code ?? undefined" variant="secondary">
+              <Badge v-for="reference in preview.references" :key="reference.code" variant="secondary">
                 {{ REFERENCE_LABELS[reference.code ?? ''] ? translate(REFERENCE_LABELS[reference.code ?? '']!) : reference.code }} × {{ reference.count }}
               </Badge>
             </div>

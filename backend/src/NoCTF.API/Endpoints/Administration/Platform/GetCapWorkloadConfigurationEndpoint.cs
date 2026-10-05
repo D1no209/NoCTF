@@ -112,7 +112,8 @@ public sealed class GetCapWorkloadConfigurationEndpoint(
         Roles("Administrator");
         Description(builder => builder.WithName(
             "AdminPlatformGetCapWorkloadConfiguration"));
-        Summary(summary => { summary.Summary = "Returns the active CAP site's proof-of-work configuration."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary =
+            "Returns the active CAP site's proof-of-work configuration.");
     }
 
     public override async Task<

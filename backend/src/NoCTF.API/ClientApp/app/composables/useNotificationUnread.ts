@@ -1,8 +1,5 @@
-import { dateTimestamp } from '../utils/date-value'
-
-import { api } from '../lib/api'
-
-import type { NoCTFAPIEndpointsNotificationsNotificationResponse } from '../api/models'
+import { listNotificationsEndpoint } from '../api'
+import type { NoCtfapiEndpointsNotificationsNotificationResponse } from '../api'
 import { safeLocalStorage } from '../lib/safe-storage'
 import { ref } from 'vue'
 
@@ -15,16 +12,16 @@ export function isNotificationUnread(
   return latestId !== null && latestId !== lastReadId
 }
 
-export function newNotificationNotices<T extends { id?: string | null; sentAt?: Date | string | null }>(
+export function newNotificationNotices<T extends { id?: string | null; sentAt?: string }>(
   newestFirst: readonly T[],
   previousId: string | null,
   maximum = 3,
-  previousSentAt?: Date | string | null,
+  previousSentAt?: string | null,
 ): T[] {
   const previousIndex = newestFirst.findIndex(item => item.id === previousId)
   const candidates = previousIndex < 0 && previousSentAt
-    ? newestFirst.filter(item => item.sentAt && (dateTimestamp(item.sentAt) > dateTimestamp(previousSentAt)
-      || dateTimestamp(item.sentAt) === dateTimestamp(previousSentAt) && (item.id ?? '') > (previousId ?? '')))
+    ? newestFirst.filter(item => item.sentAt && (Date.parse(item.sentAt) > Date.parse(previousSentAt)
+      || Date.parse(item.sentAt) === Date.parse(previousSentAt) && (item.id ?? '') > (previousId ?? '')))
     : previousIndex < 0 ? newestFirst : newestFirst.slice(0, previousIndex)
   return candidates
     .slice(0, maximum)
@@ -39,7 +36,7 @@ export function useNotificationUnread() {
     return user.value?.userId ? `noctf:notifications:last-read:${user.value.userId}` : null
   }
 
-  async function refreshUnread(): Promise<NoCTFAPIEndpointsNotificationsNotificationResponse[] | undefined> {
+  async function refreshUnread(): Promise<NoCtfapiEndpointsNotificationsNotificationResponse[] | undefined> {
     const key = storageKey()
     if (!key) {
       latestNotificationId.value = null
@@ -47,8 +44,9 @@ export function useNotificationUnread() {
       return []
     }
 
-    let error: unknown;
-    const data = await api.api.v1.notifications.get({ queryParameters: { scope: 'Inbox', offset: 0, limit: 20, desc: true } }).catch(cause => { error = cause; return undefined });
+    const { data, error } = await listNotificationsEndpoint({
+      query: { scope: 'Inbox', offset: 0, limit: 20, desc: true },
+    })
     if (error) return undefined
 
     const items = data?.items ?? []

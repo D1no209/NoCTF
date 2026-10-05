@@ -1,13 +1,11 @@
-
-import { api } from '../../../../lib/api'
 import { message as describeMessage } from '../../../../utils/i18n'
 import type { UiMessage } from '../../../../utils/i18n'
 import { adminWorkspacePath } from '~/features/admin/admin-navigation'
 import { markRaw } from 'vue'
 
 import { Activity, ClipboardCheck, Container, Download, FileCheck, GitBranch, KeyRound, LayoutDashboard, Mail, Network, Orbit, Puzzle, Settings, ShieldAlert, Trophy, Users, Webhook } from '@lucide/vue'
-
-import type { NoCTFAPIEndpointsCompetitionsCompetitionResponse } from '../../../../api/models'
+import { adminGetCompetition } from '../../../../api'
+import type { NoCtfapiEndpointsCompetitionsCompetitionResponse } from '../../../../api'
 import type { WorkspaceNavGroup } from '../../../app/workspace-nav'
 import { CompetitionAdminKey } from '../../../../lib/admin-competition'
 import type { CompetitionAdminRole } from '../../../../lib/admin-competition'
@@ -38,7 +36,7 @@ export function useAdminCompetitionsByIdPage() {
 
   const { user, isAdministrator } = useAuth()
 
-  const competition = ref<NoCTFAPIEndpointsCompetitionsCompetitionResponse | null>(null)
+  const competition = ref<NoCtfapiEndpointsCompetitionsCompetitionResponse | null>(null)
 
   const role = ref<CompetitionAdminRole>('Observer')
 
@@ -60,8 +58,7 @@ export function useAdminCompetitionsByIdPage() {
   }
 
   async function refresh() {
-    let e: unknown;
-    const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).get().catch(cause => { e = cause; return undefined });
+    const { data, error: e } = await adminGetCompetition({ path: { competitionId } })
     if (e || !data) {
       error.value = parseApiError(e, describeMessage("common.error.loadingCompetitionFailed")).displayMessage
       return

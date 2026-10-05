@@ -45,7 +45,7 @@ const { hasServices, serviceNames, toggleFlagInjection, model, disabled, onUpdat
           <FieldLabel>{{ $t('administration.label.targetServiceName') }}</FieldLabel>
           <Select v-model="model.flagInjection.serviceName" :disabled="disabled">
           <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent><SelectGroup><SelectItem v-for="name in serviceNames" :key="name ?? undefined" :value="name">{{ name }}</SelectItem></SelectGroup></SelectContent>
+          <SelectContent><SelectGroup><SelectItem v-for="name in serviceNames" :key="name" :value="name">{{ name }}</SelectItem></SelectGroup></SelectContent>
         </Select>
           <FieldDescription>{{ $t('administration.definitionFlag.validation.composeOperatingFormat') }}</FieldDescription>
         </Field>

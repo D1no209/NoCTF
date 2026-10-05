@@ -1,19 +1,16 @@
-import { dateObject } from '../../../../utils/date-value'
-
-import { api, nativeResponse } from '../../../../lib/api'
 import { message as describeMessage } from '../../../../utils/i18n'
 import { adminUserPath, adminTeamPath, adminAuditSubjectPath } from '~/features/admin/admin-navigation'
 import { markRaw } from 'vue'
 
 import { Download } from '@lucide/vue'
 import { toast } from '../../../../utils/message-toast'
-
-import type { NoCTFAPIEndpointsAdministrationPlatformPlatformAuditLogResponse, NoCTFAPIEndpointsAdministrationPlatformPlatformAuditKindProtocol } from '../../../../api/models'
+import { adminExportPlatformAuditArchive, adminPlatformListAuditLogs } from '../../../../api'
+import type { NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse, NoCtfapiEndpointsAdministrationPlatformPlatformAuditKindProtocol } from '../../../../api'
 import { downloadSdkFile } from '../../../../utils/download'
 import { platformAuditActionText } from '../../../../utils/platform-audit'
 import AdminDateTimeComponent from '../../../admin/AdminDateTime.vue'
 
-type AuditLog = NoCTFAPIEndpointsAdministrationPlatformPlatformAuditLogResponse
+type AuditLog = NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse
 
 /** Owns state, effects and commands for AdminPlatformAuditPage. */
 export function useAdminPlatformAuditPage() {
@@ -38,18 +35,19 @@ export function useAdminPlatformAuditPage() {
   }
 
   const { items, loading, error: listError, hasMore, initialized, loadMore, reset } = useCursorPagination<AuditLog>(async (cursor) => {
-    let error: unknown;
-    const data = await api.api.v1.admin.platform.auditLogs.get({ queryParameters: {
-        kind: (kind.value === 'all'
+    const { data, error } = await adminPlatformListAuditLogs({
+      query: {
+        kind: kind.value === 'all'
           ? null
-          : kind.value as NoCTFAPIEndpointsAdministrationPlatformPlatformAuditKindProtocol) ?? undefined,
-        from: dateObject(toIso(from.value) ?? undefined),
-        to: dateObject(toIso(to.value) ?? undefined),
-        actorId: actorId.value.trim() || undefined,
-        competitionId: competitionId.value.trim() || undefined,
-        cursor: cursor ?? undefined,
+          : kind.value as NoCtfapiEndpointsAdministrationPlatformPlatformAuditKindProtocol,
+        from: toIso(from.value),
+        to: toIso(to.value),
+        actorId: actorId.value.trim() || null,
+        competitionId: competitionId.value.trim() || null,
+        cursor,
         limit: 50,
-      } }).catch(cause => { error = cause; return undefined });
+      },
+    })
     if (error || !data) throw parseApiError(error)
     return { items: data.items ?? [], nextCursor: data.nextCursor ?? null }
   })
@@ -66,15 +64,18 @@ export function useAdminPlatformAuditPage() {
     exportingArchive.value = true
     try {
       await downloadSdkFile(
-        nativeResponse(responseOptions => api.api.v1.admin.platform.auditLogs.dataExport.post({
+        adminExportPlatformAuditArchive({
+          body: {
             kind: kind.value === 'all'
               ? null
-              : kind.value as NoCTFAPIEndpointsAdministrationPlatformPlatformAuditKindProtocol,
+              : kind.value as NoCtfapiEndpointsAdministrationPlatformPlatformAuditKindProtocol,
             actorId: actorId.value.trim() || null,
             competitionId: competitionId.value.trim() || null,
-            from: dateObject(toIso(from.value)),
-            to: dateObject(toIso(to.value)),
-          }, { options: [...responseOptions] })),
+            from: toIso(from.value),
+            to: toIso(to.value),
+          },
+          parseAs: 'blob',
+        }),
         'platform-audit-archive.zip',
       )
       toast.success(describeMessage("administration.platformAudit.description.auditArchiveDownloadStarted"))

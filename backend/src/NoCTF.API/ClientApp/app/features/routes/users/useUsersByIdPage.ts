@@ -1,13 +1,11 @@
-
-import { api, multipartBody } from '../../../lib/api'
 import { message as describeMessage } from '../../../utils/i18n'
 import type { UiMessage } from '../../../utils/i18n'
 import { markRaw } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import { ImagePlus, UserRound } from '@lucide/vue'
 import { toast } from '../../../utils/message-toast'
-
-import type { NoCTFAPIEndpointsAuthenticationPublicUserProfileResponse } from '../../../api/models'
+import { authenticationUploadMyProfileCover, userProfileGet } from '../../../api'
+import type { NoCtfapiEndpointsAuthenticationPublicUserProfileResponse } from '../../../api'
 import type { echarts } from '../../../utils/echarts'
 import { buildProfileDirectionRows } from '../../../lib/profile-directions'
 import { competitionStatusLabel, gameModeLabel } from '../../../utils/labels'
@@ -21,7 +19,7 @@ export function useUsersByIdPage() {
   const { locale } = useLocale()
   const { configuration } = usePlatform()
 
-  const profile = ref<NoCTFAPIEndpointsAuthenticationPublicUserProfileResponse | null>(null)
+  const profile = ref<NoCtfapiEndpointsAuthenticationPublicUserProfileResponse | null>(null)
   const loading = ref(true)
   const error = ref<UiMessage | null>(null)
   let loadSequence = 0
@@ -37,8 +35,7 @@ export function useUsersByIdPage() {
     const sequence = ++loadSequence
     loading.value = true
     error.value = null
-    let requestError: unknown;
-    const data = await api.api.v1.users.byUserId(requestedUserId).get().catch(cause => { requestError = cause; return undefined });
+    const { data, error: requestError } = await userProfileGet({ path: { userId: requestedUserId } })
     if (sequence !== loadSequence) return
     loading.value = false
     if (requestError || !data) {
@@ -67,7 +64,7 @@ export function useUsersByIdPage() {
     dateRange: formatDateRange(item.startAt, item.endAt),
   })))
 
-  function formatDateRange(start?: Date | string | null, end?: Date | string | null): string {
+  function formatDateRange(start?: string, end?: string): string {
     const formatter = new Intl.DateTimeFormat(locale.value, {
       year: 'numeric',
       month: 'short',
@@ -172,7 +169,8 @@ export function useUsersByIdPage() {
 
     coverPending.value = true
     try {
-      await api.api.v1.auth.me.profileCover.put(await multipartBody({ file }));
+      const { error: uploadError } = await authenticationUploadMyProfileCover({ body: { file } })
+      if (uploadError) throw uploadError
       await fetchMe()
       await loadProfile()
       coverEditorOpen.value = false

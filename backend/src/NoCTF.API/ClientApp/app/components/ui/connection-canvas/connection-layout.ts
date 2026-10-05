@@ -1,7 +1,7 @@
 export interface ConnectionNode {
   id: string
   label: string
-  detail?: string | null
+  detail?: string
   column: 0 | 1
   selectable?: boolean
   invalid?: boolean

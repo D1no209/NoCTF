@@ -50,20 +50,20 @@ export function useScoreTrendChart(props: Readonly<ScoreTrendChartProps>) {
 
   function rememberZoom(...args: unknown[]) {
     const event = (args[0] ?? {}) as {
-    start?: number | null
-    end?: number | null
-    startValue?: number | null
-    endValue?: number | null
+    start?: number
+    end?: number
+    startValue?: number
+    endValue?: number
     batch?: Array<{
-      start?: number | null
-      end?: number | null
-      startValue?: number | null
-      endValue?: number | null
-      dataZoomId?: string | null
-      dataZoomIndex?: number | null
+      start?: number
+      end?: number
+      startValue?: number
+      endValue?: number
+      dataZoomId?: string
+      dataZoomIndex?: number
     }>
-    dataZoomId?: string | null
-    dataZoomIndex?: number | null
+    dataZoomId?: string
+    dataZoomIndex?: number
     }
     if (applyingOption) return
     const change = event.batch?.[0] ?? event

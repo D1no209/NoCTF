@@ -1,11 +1,11 @@
 import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import type {
-  NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse,
-  NoCTFAPIEndpointsCompetitionsScoreboardChallengeCatalogResponse,
-  NoCTFAPIEndpointsCompetitionsScoreboardSchemaResponse,
-  NoCTFAPIEndpointsCompetitionsScoreboardSnapshotResponse,
-} from '../app/api/models'
+  NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse,
+} from '../app/api'
 import {
   awdpControlEvents,
   awdpCurrentRoundEvents,
@@ -26,10 +26,10 @@ const challengeId = '00000000-0000-0000-0000-000000000002'
 const teamId = '00000000-0000-0000-0000-000000000003'
 
 test('settled final round never shows a running countdown even with an older snapshot', () => {
-  const snapshot: NoCTFAPIEndpointsCompetitionsScoreboardSnapshotResponse = {
+  const snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse = {
     currentRoundId: 'final', generatedAt: '2026-09-08T00:00:00Z',
   }
-  const schema: NoCTFAPIEndpointsCompetitionsScoreboardSchemaResponse = {
+  const schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse = {
     rounds: [{ id: 'final', number: 2, state: 'Settled', endAt: '2026-09-08T00:01:00Z' }],
   }
   expect(awdpRoundClock(snapshot, schema, Date.parse('2026-09-08T00:00:10Z'), false))
@@ -37,9 +37,9 @@ test('settled final round never shows a running countdown even with an older sna
 })
 
 function event(
-  kind: NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse['kind'],
-  values: Partial<NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse> = {},
-): NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse {
+  kind: NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse['kind'],
+  values: Partial<NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse> = {},
+): NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse {
   return {
     id: crypto.randomUUID(),
     competitionId,
@@ -55,12 +55,12 @@ function event(
 }
 
 const roundId = '00000000-0000-0000-0000-000000000005'
-const catalog: NoCTFAPIEndpointsCompetitionsScoreboardChallengeCatalogResponse = {
+const catalog: NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse = {
   competitionId,
   revision: 1,
   items: [{ id: challengeId, title: 'Pwn-02', direction: 'PWN', category: 'PWN', order: 1, published: true }],
 }
-const schema: NoCTFAPIEndpointsCompetitionsScoreboardSchemaResponse = {
+const schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse = {
   competitionId,
   mode: 'Awdp',
   revision: 1,
@@ -75,7 +75,7 @@ const schema: NoCTFAPIEndpointsCompetitionsScoreboardSchemaResponse = {
   }],
   columns: [{ index: 0, competitionChallengeId: challengeId, roundId }],
 }
-const snapshot: NoCTFAPIEndpointsCompetitionsScoreboardSnapshotResponse = {
+const snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse = {
   competitionId,
   version: 1,
   schemaRevision: 1,
@@ -213,7 +213,7 @@ describe('AWDP control screen data adapter', () => {
 
   test('preserves null ranks for banned or disqualified teams instead of inventing public places', () => {
     const ineligibleTeamId = '00000000-0000-0000-0000-000000000006'
-    const ineligibleSnapshot: NoCTFAPIEndpointsCompetitionsScoreboardSnapshotResponse = {
+    const ineligibleSnapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse = {
       ...snapshot,
       teams: [
         ...(snapshot.teams ?? []),
@@ -261,7 +261,7 @@ describe('AWDP control screen data adapter', () => {
 
   test('reads current-round operation metrics from the authoritative matrix', () => {
     const previousRoundId = '00000000-0000-0000-0000-000000000006'
-    const twoRoundSchema: NoCTFAPIEndpointsCompetitionsScoreboardSchemaResponse = {
+    const twoRoundSchema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse = {
       ...schema,
       rounds: [
         {
@@ -279,7 +279,7 @@ describe('AWDP control screen data adapter', () => {
         ...schema.columns!,
       ],
     }
-    const currentSnapshot: NoCTFAPIEndpointsCompetitionsScoreboardSnapshotResponse = {
+    const currentSnapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse = {
       ...snapshot,
       teams: [{
         ...snapshot.teams![0]!,
@@ -360,7 +360,7 @@ describe('AWDP control screen data adapter', () => {
   })
 
   test('advances the displayed round clock from the generated leaderboard snapshot', () => {
-    const timedSchema: NoCTFAPIEndpointsCompetitionsScoreboardSchemaResponse = {
+    const timedSchema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse = {
       ...schema,
       rounds: [{
         id: roundId,
@@ -404,7 +404,7 @@ describe('AWDP control screen implementation contract', () => {
     expect(page).toContain('grid-auto-rows: minmax(150px, max-content)')
     expect(page).toContain('repeat(auto-fit, minmax(min(100%, 160px), 1fr))')
     expect(page).toContain('overflow-y: auto')
-    expect(page).toContain(':key="selectedTeam.teamId ?? undefined"')
+    expect(page).toContain(':key="selectedTeam.teamId"')
     expect(page).toContain('tabindex="0"')
     expect(page).toContain('@mouseenter="onMouseenterTeamPanelHovered(true)"')
     expect(page).toContain('@focusin="onFocusinTeamPanelFocused(true)"')
@@ -434,7 +434,7 @@ describe('AWDP control screen implementation contract', () => {
     expect(page).toContain('definePageMeta({ layout: false })')
     expect(page).toContain('useScoreboardMatrix(competitionId, { pollRounds: false })')
     expect(page).toContain('board.refresh({ catalog: true, schema: true, snapshot: true })')
-    expect(page).toMatch(/api\.api\.v1\.competitions\.byCompetitionId\([^)]*\)\.events\.get\(/)
+    expect(page).toContain('listCompetitionEvents({')
     expect(page).toContain('competitionEventChanged: () => void refreshLatest()')
     expect(page).toContain('playbackQueue')
     expect(stage).toContain("import AwdpAttackSuccessAnimationComponent from './AwdpAttackSuccessAnimation.vue'")

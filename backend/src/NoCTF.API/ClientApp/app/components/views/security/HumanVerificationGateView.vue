@@ -30,7 +30,7 @@ const { ShieldCheck, TurnstileWidget, open, provider, challengeId, siteKey, prog
           <p class="text-sm text-muted-foreground">{{ $t('common.label.preparingHumanVerification') }}</p>
           <component
             :is="TurnstileWidget"
-            :key="challengeId ?? undefined"
+            :key="challengeId"
             v-model="turnstileToken"
             :site-key="siteKey"
             :options="turnstileOptions"

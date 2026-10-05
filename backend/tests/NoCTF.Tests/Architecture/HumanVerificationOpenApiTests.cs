@@ -77,7 +77,7 @@ public sealed class HumanVerificationOpenApiTests
 
     private static string OpenApiPath() => Path.Combine(
         BackendRoot(),
-        "artifacts", "openapi", "v1.json");
+        "src", "NoCTF.API", "wwwroot", "openapi", "v1.json");
 
     private static string BackendRoot() => Path.GetFullPath(Path.Combine(
         AppContext.BaseDirectory,

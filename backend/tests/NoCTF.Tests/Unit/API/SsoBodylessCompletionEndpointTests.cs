@@ -2,7 +2,7 @@ using System.Net;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using FastEndpoints;
-using FastEndpoints.OpenApi;
+using FastEndpoints.Swagger;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -67,7 +67,7 @@ public sealed class SsoBodylessCompletionEndpointTests
             options.Filter = type => type == typeof(CompleteSsoBindingEndpoint)
                 || type == typeof(CompleteSsoLoginEndpoint);
         });
-        builder.Services.OpenApiDocument();
+        builder.Services.SwaggerDocument();
         builder.Services.AddAuthentication()
             .AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>(
                 "Bearer", _ => { })

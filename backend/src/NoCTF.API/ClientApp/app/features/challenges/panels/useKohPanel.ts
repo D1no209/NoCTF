@@ -3,13 +3,13 @@ import { markRaw, toRefs } from 'vue'
 
 import { toast } from '../../../utils/message-toast'
 import { Copy } from '@lucide/vue'
-import type { NoCTFAPIEndpointsChallengesChallengeResponse, NoCTFAPIEndpointsCompetitionsCompetitionResponse } from '../../../api/models'
+import type { NoCtfapiEndpointsChallengesChallengeResponse, NoCtfapiEndpointsCompetitionsCompetitionResponse } from '../../../api'
 import RuntimeAccessUrlComponent from '../RuntimeAccessUrl.vue'
 
 /** Owns state, effects and commands for KohPanel. */
 export function useKohPanel(props: Readonly<{
-  competition: NoCTFAPIEndpointsCompetitionsCompetitionResponse
-  challenge: NoCTFAPIEndpointsChallengesChallengeResponse
+  competition: NoCtfapiEndpointsCompetitionsCompetitionResponse
+  challenge: NoCtfapiEndpointsChallengesChallengeResponse
 }>) {
   async function copyControlFlag(flag: string) {
     try {

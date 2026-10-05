@@ -1,5 +1,4 @@
 <script setup lang="ts">
-
 import { toRefs } from 'vue'
 import type { CompetitionsByIdPageViewState } from '~/features/routes/competitions/useCompetitionsByIdPage'
 
@@ -23,15 +22,15 @@ const { isOverview, isControlScreen, isWriteUpReview, isProgression, competition
         <span class="sr-only">{{ gameModeLabel(competition.mode) }}</span>
         <div class="relative z-10 flex flex-wrap items-center gap-x-3 gap-y-2">
           <h1 class="text-display text-2xl md:text-3xl">{{ competition.title }}</h1>
-          <component :is="LifecycleBadge" :status="competition.status ?? undefined" />
+          <component :is="LifecycleBadge" :status="competition.status" />
         </div>
         <div v-if="!isProgression" class="relative z-10 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs tabular-nums md:text-sm">
           <span class="text-muted-foreground">
             {{ formatDateTime(competition.startTime) }} ~ {{ formatDateTime(competition.endTime) }}
           </span>
           <component :is="CompetitionCountdown"
-            :start-time="(dateIso(competition.startTime)) ?? undefined"
-            :end-time="(dateIso(competition.endTime)) ?? undefined"
+            :start-time="competition.startTime"
+            :end-time="competition.endTime"
             :status="competition.status"
             class="font-medium text-primary"
           />

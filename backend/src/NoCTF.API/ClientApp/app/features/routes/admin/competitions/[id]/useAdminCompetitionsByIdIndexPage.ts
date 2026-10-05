@@ -1,14 +1,10 @@
-
-import { api, multipartBody } from '../../../../../lib/api'
-
-
 import { message as describeMessage } from '../../../../../utils/i18n'
 import type { UiMessage } from '../../../../../utils/i18n'
 import { proxyRefs } from 'vue'
 
 import { toast } from '../../../../../utils/message-toast'
-
-import type { NoCTFAPIEndpointsAdministrationCompetitionsCompetitionHardDeletePreviewResponse, NoCTFAPIEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode, NoCTFAPIEndpointsAdministrationCompetitionsStartGateErrorResponse } from '../../../../../api/models'
+import { adminCompetitionPosterClear, adminCompetitionPosterReplace, adminDeleteCompetition, adminForceDeleteCompetition, adminGenerateMissingFlags, adminHardDeleteCompetition, adminPreviewCompetitionHardDelete, adminRestoreCompetition, adminUpdateCompetitionStatus, adminValidateCompetitionStart } from '../../../../../api'
+import type { NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeletePreviewResponse, NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode, NoCtfapiEndpointsAdministrationCompetitionsStartGateErrorResponse } from '../../../../../api'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
 import { startGateErrorMessage } from '../../../../../lib/start-gate-error'
 import { useCompetitionPoster } from '../../../../competitions/useCompetitionPoster'
@@ -19,7 +15,7 @@ interface LifecycleAction {
   visible: boolean
   destructive?: boolean
   confirm?: { title: string; description: string }
-  run: () => Promise<unknown>
+  run: () => Promise<{ error?: unknown }>
 }
 
 /** Owns state, effects and commands for AdminCompetitionsByIdIndexPage. */
@@ -73,7 +69,11 @@ export function useAdminCompetitionsByIdIndexPage() {
 
     posterPending.value = true
     try {
-      await api.api.v1.admin.competitions.byCompetitionId(competitionId).poster.put(await multipartBody({ file }));
+      const { error } = await adminCompetitionPosterReplace({
+        path: { competitionId },
+        body: { file },
+      })
+      if (error) throw error
       await refreshPoster()
       await loadHardDeletePreview()
       toast.success(describeMessage('administration.label.competitionPosterUpdated'))
@@ -91,7 +91,8 @@ export function useAdminCompetitionsByIdIndexPage() {
     if (posterPending.value || !canWrite.value || isDeleted.value) return
     posterPending.value = true
     try {
-      await api.api.v1.admin.competitions.byCompetitionId(competitionId).poster.delete();
+      const { error } = await adminCompetitionPosterClear({ path: { competitionId } })
+      if (error) throw error
       clearPoster()
       posterRemoveOpen.value = false
       posterInputKey.value += 1
@@ -121,7 +122,7 @@ export function useAdminCompetitionsByIdIndexPage() {
   ]
 
   const updateStatus = (target: 'Visible' | 'Published' | 'Running' | 'Paused' | 'Finished') =>
-    api.api.v1.admin.competitions.byCompetitionId(competitionId).status.put({ status: target })
+    adminUpdateCompetitionStatus({ path: { competitionId }, body: { status: target } })
 
   const actions = computed<LifecycleAction[]>(() => [
     {
@@ -171,7 +172,8 @@ export function useAdminCompetitionsByIdIndexPage() {
     pendingAction.value = action.key
     actionError.value = null
     try {
-      await action.run()
+      const { error } = await action.run()
+      if (error) throw error
       toast.success(describeMessage("administration.label.succeeded", { action: action.label }))
       await refresh()
     }
@@ -194,13 +196,14 @@ export function useAdminCompetitionsByIdIndexPage() {
 
   const validating = ref(false)
 
-  const validationErrors = ref<NoCTFAPIEndpointsAdministrationCompetitionsStartGateErrorResponse[] | null>(null)
+  const validationErrors = ref<NoCtfapiEndpointsAdministrationCompetitionsStartGateErrorResponse[] | null>(null)
 
   async function validateStart() {
     validating.value = true
     validationErrors.value = null
     try {
-      const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).startValidation.get();
+      const { data, error } = await adminValidateCompetitionStart({ path: { competitionId } })
+      if (error) throw error
       validationErrors.value = data?.errors ?? []
       if (validationErrors.value.length === 0) toast.success(describeMessage("administration.label.preStartCheckPassed"))
     }
@@ -214,13 +217,14 @@ export function useAdminCompetitionsByIdIndexPage() {
 
   const generating = ref(false)
 
-  const generateFailures = ref<{ competitionChallengeId?: string | null; teamId?: string | null; code?: string | null; description?: string | null }[]>([])
+  const generateFailures = ref<{ competitionChallengeId?: string; teamId?: string; code?: string; description?: string }[]>([])
 
   async function generateMissingFlags() {
     generating.value = true
       generateFailures.value = []
     try {
-      const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).flags.generateMissing.post();
+      const { data, error } = await adminGenerateMissingFlags({ path: { competitionId } })
+      if (error) throw error
       generateFailures.value = data?.failures ?? []
       if (generateFailures.value.length === 0) toast.success(describeMessage("administration.label.missingFlagGenerated"))
       else toast.warning(describeMessage("administration.label.generationCompletedFailures", { count: generateFailures.value.length }))
@@ -253,7 +257,7 @@ export function useAdminCompetitionsByIdIndexPage() {
 
   const forceDeleteConflictingIds = ref<string[]>([])
 
-  const hardDeletePreview = ref<NoCTFAPIEndpointsAdministrationCompetitionsCompetitionHardDeletePreviewResponse | null>(null)
+  const hardDeletePreview = ref<NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeletePreviewResponse | null>(null)
 
   const hardDeletePreviewLoading = ref(false)
 
@@ -261,7 +265,7 @@ export function useAdminCompetitionsByIdIndexPage() {
 
   let hardDeletePreviewRequest = 0
 
-  const hardDeleteReferenceLabels: Record<NoCTFAPIEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode, string> = {
+  const hardDeleteReferenceLabels: Record<NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode, string> = {
     HistoricalEvent: "common.label.permanentCompetitionEvents",
     Team: "common.label.team",
     CompetitionChallenge: "common.label.competitionChallenges",
@@ -278,11 +282,11 @@ export function useAdminCompetitionsByIdIndexPage() {
     BadgeGrant: 'progression.referenceBadgeGrant',
   }
 
-  function hardDeleteReferenceLabel(code?: NoCTFAPIEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode | null) {
+  function hardDeleteReferenceLabel(code?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode) {
     return code ? translate(hardDeleteReferenceLabels[code]) : translate("administration.label.unknownReference")
   }
 
-  function isHardDeletePreview(value: unknown): value is NoCTFAPIEndpointsAdministrationCompetitionsCompetitionHardDeletePreviewResponse {
+  function isHardDeletePreview(value: unknown): value is NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeletePreviewResponse {
     return !!value && typeof value === 'object' && 'canHardDelete' in value && 'references' in value
   }
 
@@ -297,7 +301,8 @@ export function useAdminCompetitionsByIdIndexPage() {
     hardDeletePreviewLoading.value = true
     hardDeletePreviewError.value = null
     try {
-      const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).hardDeletePreview.get();
+      const { data, error } = await adminPreviewCompetitionHardDelete({ path: { competitionId } })
+      if (error) throw error
       if (request === hardDeletePreviewRequest) hardDeletePreview.value = data ?? null
     }
     catch (error) {
@@ -319,7 +324,8 @@ export function useAdminCompetitionsByIdIndexPage() {
   async function softDelete() {
     deleting.value = true
     try {
-      await api.api.v1.admin.competitions.byCompetitionId(competitionId).delete();
+      const { error } = await adminDeleteCompetition({ path: { competitionId } })
+      if (error) throw error
       toast.success(describeMessage("administration.label.contestDeleted"))
       await refresh()
       await loadHardDeletePreview()
@@ -336,7 +342,8 @@ export function useAdminCompetitionsByIdIndexPage() {
   async function restore() {
     restoring.value = true
     try {
-      await api.api.v1.admin.competitions.byCompetitionId(competitionId).restore.post();
+      const { error } = await adminRestoreCompetition({ path: { competitionId } })
+      if (error) throw error
       toast.success(describeMessage("administration.label.competitionResumed"))
       await refresh()
       await loadHardDeletePreview()
@@ -352,7 +359,8 @@ export function useAdminCompetitionsByIdIndexPage() {
   async function hardDelete() {
     hardDeleting.value = true
     try {
-      await api.api.v1.admin.competitions.byCompetitionId(competitionId).hardDelete.delete();
+      const { error } = await adminHardDeleteCompetition({ path: { competitionId } })
+      if (error) throw error
       toast.success(describeMessage("administration.competitionsBy.label.contestCompletelyDeleted"))
       await navigateTo('/competitions')
     }
@@ -390,11 +398,13 @@ export function useAdminCompetitionsByIdIndexPage() {
     forceDeleteError.value = null
     forceDeleteConflictingIds.value = []
     try {
-      let error: unknown;
-      await api.api.v1.admin.competitions.byCompetitionId(competitionId).forceDelete.post({
+      const { error } = await adminForceDeleteCompetition({
+        path: { competitionId },
+        body: {
           confirmationTitle: forceDeleteTitle.value,
           reason: forceDeleteReason.value.trim(),
-        }).catch(cause => { error = cause; return undefined });
+        },
+      })
       if (error) {
         if (typeof error === 'object' && 'conflictingNotificationIds' in error
           && Array.isArray(error.conflictingNotificationIds)) {

@@ -2,7 +2,7 @@
 
 import { bindViewState } from '~/features/shared/view-state'
 
-import type { NoCTFAPIEndpointsCompetitionsGameModeProtocol, NoCTFAPIEndpointsCompetitionsScoreboardTeamResponse } from '~/api/models'
+import type { NoCtfapiEndpointsCompetitionsGameModeProtocol, NoCtfapiEndpointsCompetitionsScoreboardTeamResponse } from '~/api'
 
 import type { ScoreboardChallengeColumnGroup } from '~/utils/scoreboard'
 import type { TrendSeries } from '~/features/leaderboard/types'
@@ -10,9 +10,9 @@ import { useScoreboardTeamDetailDialog } from './useScoreboardTeamDetailDialog'
 import View from '~/components/views/leaderboard/ScoreboardTeamDetailDialogView.vue'
 
 const props = defineProps<{
-  mode?: NoCTFAPIEndpointsCompetitionsGameModeProtocol | null
-  team: NoCTFAPIEndpointsCompetitionsScoreboardTeamResponse | null
-  teams: NoCTFAPIEndpointsCompetitionsScoreboardTeamResponse[]
+  mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol | null
+  team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse | null
+  teams: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse[]
   columnGroups: ScoreboardChallengeColumnGroup[]
   trendSeries?: TrendSeries[]
   trendLoading?: boolean

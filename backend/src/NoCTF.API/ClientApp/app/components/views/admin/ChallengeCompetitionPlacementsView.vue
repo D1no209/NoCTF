@@ -21,7 +21,7 @@ const { ArrowUpRight, ChevronLeft, ChevronRight, Plus, RefreshCw, loading, error
           <section :aria-label="$t('placements.linked')">
             <div class="mb-3 flex items-center gap-2"><h3 class="text-sm font-semibold">{{ $t('placements.linked') }}</h3><Badge variant="secondary">{{ linked.length }}</Badge></div>
             <div v-if="linkedOptions.length" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              <Button v-for="item in linkedOptions" :key="item.value ?? undefined" as-child variant="ghost" class="h-auto min-w-0 overflow-hidden p-0">
+              <Button v-for="item in linkedOptions" :key="item.value" as-child variant="ghost" class="h-auto min-w-0 overflow-hidden p-0">
                 <NuxtLink :to="item.href" :aria-label="$t('placements.manageChallenge', { competition: item.label })" class="block w-full">
                   <CoverImage :src="item.posterUrl" :alt="item.label" :aspect-ratio="12 / 5" class="w-full">
                     <div class="flex min-h-full items-end justify-between gap-2 p-4">
@@ -64,7 +64,7 @@ const { ArrowUpRight, ChevronLeft, ChevronRight, Plus, RefreshCw, loading, error
                   <FieldLabel for="placement-competition">{{ $t('placements.chooseCompetition') }}</FieldLabel>
                   <Select :model-value="targetId" :disabled="adding" @update:model-value="selectTarget">
                     <SelectTrigger id="placement-competition" class="w-full"><SelectValue :placeholder="$t('placements.chooseCompetition')" /></SelectTrigger>
-                    <SelectContent><SelectGroup><SelectItem v-for="candidate in candidates" :key="candidate.competition.id ?? undefined" :value="candidate.competition.id">{{ candidate.competition.title }}</SelectItem></SelectGroup></SelectContent>
+                    <SelectContent><SelectGroup><SelectItem v-for="candidate in candidates" :key="candidate.competition.id" :value="candidate.competition.id">{{ candidate.competition.title }}</SelectItem></SelectGroup></SelectContent>
                   </Select>
                 </Field>
                 <span class="pb-2 font-mono text-xs tabular-nums text-muted-foreground">{{ targetIndex + 1 }} / {{ candidates.length }}</span>

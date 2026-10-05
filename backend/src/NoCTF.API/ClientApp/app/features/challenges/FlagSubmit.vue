@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { bindViewState } from '~/features/shared/view-state'
 
-import type { NoCTFAPIEndpointsGameplayFactsGameplayFactStatusResponse } from '~/api/models'
+import type { NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse } from '~/api'
 import { useFlagSubmit } from './useFlagSubmit'
 import View from '~/components/views/challenges/FlagSubmitView.vue'
 
 type TrackedSubmission = Pick<
-  NoCTFAPIEndpointsGameplayFactsGameplayFactStatusResponse,
+  NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse,
   'state' | 'result' | 'failureCode'
 > & {
   id: string

@@ -28,7 +28,7 @@ public sealed class StopChallengeTestRuntimeEndpoint(
         Description(builder => builder.WithName("AdminChallengeBankStopTestRuntime")
             .ProducesProblemFE(StatusCodes.Status409Conflict)
             .ProducesProblemFE(StatusCodes.Status503ServiceUnavailable));
-        Summary(summary => { summary.Summary = "Stops the current challenge-template test Runtime."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Stops the current challenge-template test Runtime.");
     }
 
     public override async Task<

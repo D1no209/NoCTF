@@ -4,7 +4,7 @@ import { describe, expect, test } from 'bun:test'
 describe('frontend audit closeout', () => {
   test('platform logs default to Warning', async () => {
     const page = await sourceFile(new URL('../app/pages/admin/platform/logs.vue', import.meta.url)).text()
-    expect(page).toContain("ref<NoCTFAPIEndpointsAdministrationPlatformPlatformLogLevelProtocol>('Warning')")
+    expect(page).toContain("ref<NoCtfapiEndpointsAdministrationPlatformPlatformLogLevelProtocol>('Warning')")
   })
 
   test('definition editor delete buttons expose localized accessible names', async () => {

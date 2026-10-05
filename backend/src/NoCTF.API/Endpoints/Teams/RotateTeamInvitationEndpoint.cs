@@ -10,13 +10,7 @@ public sealed record RotateTeamInvitationResponse(string InvitationToken);
 public sealed class RotateTeamInvitationEndpoint(RotateTeamInvitation rotate, IUserContext user)
     : EndpointWithoutRequest<Results<Ok<RotateTeamInvitationResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>>
 {
-    public override void Configure() {
-        Summary(summary =>
-        {
-            summary.Summary = "Replaces the team invitation token and immediately invalidates the previous token.";
-            summary.Description = summary.Summary;
-        });
- Post("/competitions/{competitionId}/teams/{teamId}/invitation-token/rotate"); AuthSchemes("Bearer"); }
+    public override void Configure() { Post("/competitions/{competitionId}/teams/{teamId}/invitation-token/rotate"); AuthSchemes("Bearer"); }
     public override async Task<Results<Ok<RotateTeamInvitationResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>> ExecuteAsync(CancellationToken ct)
     {
         var result = await rotate.ExecuteAsync(

@@ -32,7 +32,7 @@ public sealed class GetMySsoBindingEndpoint(GetSsoBinding getBinding, IUserConte
         Get("/auth/me/sso-binding");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("Authentication_SsoGetMyBinding"));
-        Summary(summary => { summary.Summary = "Returns the current user's external identity binding and bindable providers."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Returns the current user's external identity binding and bindable providers.");
     }
 
     public override async Task<Ok<MySsoBindingConfigurationResponse>> ExecuteAsync(CancellationToken ct)

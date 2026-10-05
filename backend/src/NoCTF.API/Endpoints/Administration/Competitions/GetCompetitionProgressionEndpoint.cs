@@ -38,12 +38,6 @@ public sealed class GetCompetitionProgressionEndpoint(
 {
     public override void Configure()
     {
-        Summary(summary =>
-        {
-            summary.Summary = "Returns the saved competition progression graph for administration.";
-            summary.Description = summary.Summary;
-        });
-
         Get("/admin/competitions/{competitionId}/progression");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("AdminGetCompetitionProgression"));

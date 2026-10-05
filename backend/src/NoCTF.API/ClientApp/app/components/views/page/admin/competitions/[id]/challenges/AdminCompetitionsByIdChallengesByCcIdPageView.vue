@@ -62,7 +62,7 @@ const { adminTeamPath, adminTemplatePath, Plus, competitionId, competition, canW
                     <FieldLabel for="cc-direction">{{ $t('directionSettings.title') }}</FieldLabel>
                     <Select v-model="editDirectionId" :disabled="!canWrite || directionLoading || savingEdit || !!directionError">
                       <SelectTrigger id="cc-direction"><SelectValue :placeholder="$t('directionSettings.choose')" /></SelectTrigger>
-                      <SelectContent><SelectGroup><SelectItem v-for="direction in directions" :key="direction.id ?? undefined" :value="direction.id || ''"><span class="inline-flex items-center gap-2"><LucideIcon :name="direction.icon || 'flag'" class="size-4" />{{ direction.name }}</span></SelectItem></SelectGroup></SelectContent>
+                      <SelectContent><SelectGroup><SelectItem v-for="direction in directions" :key="direction.id" :value="direction.id || ''"><span class="inline-flex items-center gap-2"><LucideIcon :name="direction.icon || 'flag'" class="size-4" />{{ direction.name }}</span></SelectItem></SelectGroup></SelectContent>
                     </Select>
                     <Alert v-if="directionError" variant="destructive"><AlertDescription>{{ $message(directionError) }}<Button type="button" variant="ghost" size="sm" @click="loadDirections">{{ $t('common.label.refresh') }}</Button></AlertDescription></Alert>
                   </Field>
@@ -139,7 +139,7 @@ const { adminTeamPath, adminTemplatePath, Plus, competitionId, competition, canW
                 </TableRow>
               </TableHeader>
               <TableBody>
-                <TableRow v-for="h in hints" :key="h.id ?? undefined" :class="{ 'opacity-60': h.deletedAt }">
+                <TableRow v-for="h in hints" :key="h.id" :class="{ 'opacity-60': h.deletedAt }">
                   <TableCell class="max-w-96 truncate">{{ h.content }}</TableCell>
                   <TableCell class="font-mono tabular-nums">{{ h.cost }}</TableCell>
                   <TableCell class="font-mono text-xs tabular-nums">{{ h.publishedAt ? adminFormatDateTime(h.publishedAt) : $t('administration.label.unpublished') }}</TableCell>
@@ -199,7 +199,7 @@ const { adminTeamPath, adminTemplatePath, Plus, competitionId, competition, canW
                 </TableRow>
               </TableHeader>
               <TableBody>
-                <TableRow v-for="row in scoringRows" :key="row.team.id ?? undefined">
+                <TableRow v-for="row in scoringRows" :key="row.team.id">
                   <TableCell>
                     <div class="flex items-center gap-2">
                       <NuxtLink :to="adminTeamPath(competitionId, row.team.id)" class="font-medium hover:underline">{{ teamDisplayName(row.team, scoringDisplayNames) }}</NuxtLink>

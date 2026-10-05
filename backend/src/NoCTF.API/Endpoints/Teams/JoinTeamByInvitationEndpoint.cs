@@ -60,13 +60,7 @@ internal static partial class TeamMembershipMapper
 public sealed class JoinTeamByInvitationEndpoint(JoinTeamByInvitation join, IUserContext user, TimeProvider timeProvider)
     : Endpoint<JoinTeamByInvitationRequest, Results<NoContent, Conflict<TeamMembershipFailureResponse>>>
 {
-    public override void Configure() {
-        Summary(summary =>
-        {
-            summary.Summary = "Joins the team identified by its current invitation token.";
-            summary.Description = summary.Summary;
-        });
- Post("/competitions/{competitionId}/teams/join"); AuthSchemes("Bearer"); }
+    public override void Configure() { Post("/competitions/{competitionId}/teams/join"); AuthSchemes("Bearer"); }
     public override async Task<Results<NoContent, Conflict<TeamMembershipFailureResponse>>> ExecuteAsync(
         JoinTeamByInvitationRequest request,
         CancellationToken ct)

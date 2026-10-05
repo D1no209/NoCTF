@@ -21,7 +21,7 @@ const { bytesToMib, cpuMillicoresToCores, RuntimeAllocation, UrlExposure, hasSer
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
-              <SelectItem v-for="option in kindOptions" :key="option.value ?? undefined" :value="option.value">
+              <SelectItem v-for="option in kindOptions" :key="option.value" :value="option.value">
                 {{ option.label }}
               </SelectItem>
             </SelectGroup>
@@ -78,7 +78,7 @@ const { bytesToMib, cpuMillicoresToCores, RuntimeAllocation, UrlExposure, hasSer
           <SelectTrigger class="w-full sm:max-w-xs"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectGroup>
-              <SelectItem v-for="option in flagSourceOptions" :key="option.value ?? undefined" :value="String(option.value)">{{ option.label }}</SelectItem>
+              <SelectItem v-for="option in flagSourceOptions" :key="option.value" :value="String(option.value)">{{ option.label }}</SelectItem>
             </SelectGroup>
           </SelectContent>
         </Select>

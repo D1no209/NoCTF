@@ -1,10 +1,11 @@
 using JasperFx;
 using JasperFx.CodeGeneration;
 using Microsoft.AspNetCore.Http.Features;
-using FastEndpoints.OpenApi.Kiota;
-using Kiota.Builder;
+using Microsoft.AspNetCore.Mvc.ApiExplorer;
+using NSwag.AspNetCore;
 using NoCTF.API.Composition;
 using NoCTF.API.Endpoints;
+using NoCTF.API.OpenApi;
 using NoCTF.API.Security;
 using NoCTF.API.SignalR.Hubs;
 using NoCTF.Hosting;
@@ -19,6 +20,8 @@ using NoCTF.Worker;
 using Wolverine;
 
 var builder = WebApplication.CreateBuilder(args);
+var exportOpenApi = args.Contains("--export-openapi", StringComparer.OrdinalIgnoreCase)
+    || args.Contains("--export-swagger-docs", StringComparer.OrdinalIgnoreCase);
 var generateHandlers = args.Contains("codegen", StringComparer.OrdinalIgnoreCase);
 var apiConfigurationRoot = Path.GetFullPath(Path.Combine(
     builder.Environment.ContentRootPath,
@@ -40,33 +43,18 @@ if (Directory.Exists(apiConfigurationRoot))
         .AddEnvironmentVariables()
         .AddCommandLine(args);
 }
-var generationMode = !builder.IsNotGenerationMode();
-if (builder.IsApiClientGenerationMode() && builder.IsOpenApiJsonExportMode())
-    throw new ArgumentException("Generate clients and export OpenAPI in separate processes.");
-if (generationMode && (generateHandlers
-    || args.Contains("--initialize-storage-only", StringComparer.OrdinalIgnoreCase)
-    || args.Contains("--migrate-only", StringComparer.OrdinalIgnoreCase)))
-    throw new ArgumentException("API generation cannot be combined with storage initialization, migrations, or handler generation.");
 if (args.Contains("--initialize-storage-only", StringComparer.OrdinalIgnoreCase))
 {
     using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(2));
     await NoCTF.Hosting.Storage.StorageInitialization.InitializeAsync(builder.Configuration, timeout.Token);
     return;
 }
-if (generationMode)
-{
-    builder.WebHost.UseUrls("http://127.0.0.1:0");
-    builder.Configuration["Authentication:SigningKey"] = Convert.ToBase64String(
-        System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
-    builder.Configuration["RunnerScoring:SigningKey"] = Convert.ToBase64String(
-        System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
-}
 var migrateOnly = args.Contains("--migrate-only", StringComparer.OrdinalIgnoreCase);
-var roles = migrateOnly || generationMode
+var roles = migrateOnly || exportOpenApi
     ? HostRoles.Only(HostRole.Api)
     : HostRoles.FromConfiguration(builder.Configuration);
 var development = builder.Environment.IsDevelopment();
-builder.Configuration["OpenApi:Generating"] = generationMode.ToString();
+builder.Configuration["OpenApi:Exporting"] = exportOpenApi.ToString();
 builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = null);
 builder.Services.Configure<FormOptions>(options =>
     options.MultipartBodyLengthLimit = long.MaxValue);
@@ -79,7 +67,7 @@ if (roles.Has(HostRole.Api))
     builder.Services.AddNoCtfApi(
         builder.Configuration,
         includeInfrastructure: true,
-        development || generationMode,
+        development || exportOpenApi,
         endpointAssemblies: [typeof(HealthEndpoint).Assembly]);
     builder.Services.AddNoCtfAuthentication(builder.Configuration);
 }
@@ -103,14 +91,14 @@ if (roles.Has(HostRole.Runner))
 builder.UseWolverine(options =>
 {
     options.ServiceLocationPolicy = JasperFx.CodeGeneration.Model.ServiceLocationPolicy.NotAllowed;
-    if (!development && !generationMode && !generateHandlers)
+    if (!development && !exportOpenApi && !generateHandlers)
         options.CodeGeneration.TypeLoadMode = TypeLoadMode.Static;
-    options.ConfigureNoCtfApiMessaging((development || generationMode) && roles.Has(HostRole.Api));
+    options.ConfigureNoCtfApiMessaging((development || exportOpenApi) && roles.Has(HostRole.Api));
     if (roles.Has(HostRole.Worker))
         options.ConfigureNoCtfWorkerMessaging(builder.Configuration, durable: !development);
     if (roles.Has(HostRole.Runner))
         options.ConfigureNoCtfRunnerMessaging(builder.Configuration, durable: !development);
-    if (development || generationMode)
+    if (development || exportOpenApi)
     {
         options.StubAllExternalTransports();
     }
@@ -126,8 +114,8 @@ builder.Services.AddNoCtfDatabaseStartup(builder.Configuration);
 builder.Services.AddNoCtfRoleHealthChecks(
     builder.Configuration,
     roles,
-    development || generationMode);
-if (!generationMode)
+    development || exportOpenApi);
+if (!exportOpenApi)
     builder.Services.AddNoCtfObservability(
         builder.Configuration,
         $"noctf-host-{string.Join('-', roles.Values).ToLowerInvariant()}");
@@ -143,9 +131,9 @@ if (migrateOnly)
     await DatabaseStartup.InitializeAsync(app.Services, app.Configuration, app.Lifetime.ApplicationStopping);
     return;
 }
-if (!generationMode)
+if (!exportOpenApi)
     app.UseNoCtfObservability();
-if (!generationMode && (development || app.Configuration.GetValue("Database:AutoMigrate", false)))
+if (!exportOpenApi && (development || app.Configuration.GetValue("Database:AutoMigrate", false)))
     await DatabaseStartup.InitializeAsync(app.Services, app.Configuration, app.Lifetime.ApplicationStopping);
 if (roles.Has(HostRole.Api))
 {
@@ -157,20 +145,14 @@ if (roles.Has(HostRole.Api))
 }
 
 app.MapNoCtfHealthChecks();
-if (generationMode)
+if (exportOpenApi)
 {
-    var backendRoot = Path.GetFullPath(Path.Combine(apiConfigurationRoot, "..", ".."));
-    await app.ExportOpenApiJsonAndExitAsync("v1", Path.Combine(backendRoot, "artifacts", "openapi"));
-    await app.GenerateApiClientsAndExitAsync(config =>
-    {
-        config.OpenApiDocumentName = "v1";
-        config.Language = GenerationLanguage.TypeScript;
-        config.ClientClassName = "NoCtfClient";
-        config.ClientNamespaceName = "NoCTF";
-        config.OutputPath = Path.Combine(apiConfigurationRoot, "ClientApp", "app", "api");
-        config.CleanOutput = true;
-        config.CreateZipArchive = false;
-    });
+    var registration = app.Services
+        .GetRequiredService<IEnumerable<OpenApiDocumentRegistration>>()
+        .Single(item => item.DocumentName == "v1");
+    var descriptions = app.Services
+        .GetRequiredService<IApiDescriptionGroupCollectionProvider>();
+    await OpenApiExporter.ExportAsync(app, registration, descriptions);
     return;
 }
 app.Run();

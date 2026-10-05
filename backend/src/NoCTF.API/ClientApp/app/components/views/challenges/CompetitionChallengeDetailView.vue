@@ -37,18 +37,18 @@ const { Dice5, FileDown, History, ctx, isLoggedIn, user, challenge, loading, err
           <DialogContent class="sm:max-w-3xl">
             <DialogHeader class="sr-only"><DialogTitle>{{ $t('challenges.label.challengeSubmissionHistory') }}</DialogTitle><DialogDescription>{{ $t('challenges.challengeSubmission.description.teamMembersViewFlag') }}</DialogDescription></DialogHeader>
             <ScrollSurface axis="y" class="max-h-[65dvh]" :aria-label="$t('challenges.label.challengeSubmissionHistory')">
-              <component :is="ChallengeSubmissionHistory" v-if="historyOpen" :key="challenge.id ?? undefined" :competition-id="competitionId" :competition-challenge-id="competitionChallengeId" :refresh-key="historyRefreshKey" />
+              <component :is="ChallengeSubmissionHistory" v-if="historyOpen" :key="challenge.id" :competition-id="competitionId" :competition-challenge-id="competitionChallengeId" :refresh-key="historyRefreshKey" />
             </ScrollSurface>
           </DialogContent>
         </Dialog>
         <span class="sr-only">{{ challenge.direction || '' }}</span>
         <Badge v-if="mode === 'Awdp'" variant="secondary">{{ $t('challenges.label.scoresSettleRound') }}</Badge>
         <div v-if="challenge.tags?.length" class="relative z-10 flex basis-full flex-wrap gap-1.5" :aria-label="$t('challengeTags.label')">
-          <Badge v-for="tag in challenge.tags" :key="tag ?? undefined" variant="secondary" class="max-w-full break-words whitespace-normal">{{ tag }}</Badge>
+          <Badge v-for="tag in challenge.tags" :key="tag" variant="secondary" class="max-w-full break-words whitespace-normal">{{ tag }}</Badge>
         </div>
       </header>
 
-      <section v-if="challenge.description" class="border-b py-5" :aria-label="challenge.title ?? undefined">
+      <section v-if="challenge.description" class="border-b py-5" :aria-label="challenge.title">
         <MarkdownContent :source="challenge.description" class="text-foreground/90" />
       </section>
 
@@ -82,7 +82,7 @@ const { Dice5, FileDown, History, ctx, isLoggedIn, user, challenge, loading, err
           <ul v-else-if="attachmentDeliveryPolicy !== 'RandomOnePerTeam'" class="mt-3 flex flex-wrap gap-2">
             <li
               v-for="attachment in attachments"
-              :key="attachment.id ?? undefined"
+              :key="attachment.id"
               class="min-w-0"
             >
               <Button
@@ -110,37 +110,37 @@ const { Dice5, FileDown, History, ctx, isLoggedIn, user, challenge, loading, err
       <div v-if="ctx.competition.value" class="pt-5">
         <component :is="CtfPanel"
           v-if="mode === 'Ctf'"
-          :key="challenge.id ?? undefined"
+          :key="challenge.id"
           :competition="ctx.competition.value"
           :challenge="challenge"
-          :flag-dock-target="flagDockTarget ?? undefined"
+          :flag-dock-target="flagDockTarget"
           runtime-dock-target="#challenge-runtime-dock"
           @submitted="refreshSubmissionHistory"
           @remaining-changed="updateRemainingAttempts"
         />
         <component :is="AwdPanel"
           v-else-if="mode === 'Awd'"
-          :key="challenge.id ?? undefined"
+          :key="challenge.id"
           :competition="ctx.competition.value"
           :challenge="challenge"
-          :flag-dock-target="flagDockTarget ?? undefined"
+          :flag-dock-target="flagDockTarget"
           runtime-dock-target="#challenge-runtime-dock"
           @submitted="refreshSubmissionHistory"
           @remaining-changed="updateRemainingAttempts"
         />
         <component :is="AwdpPanel"
           v-else-if="mode === 'Awdp'"
-          :key="challenge.id ?? undefined"
+          :key="challenge.id"
           :competition="ctx.competition.value"
           :challenge="challenge"
-          :flag-dock-target="flagDockTarget ?? undefined"
+          :flag-dock-target="flagDockTarget"
           runtime-dock-target="#challenge-runtime-dock"
           @submitted="refreshSubmissionHistory"
           @remaining-changed="updateRemainingAttempts"
         />
         <component :is="KohPanel"
           v-else-if="mode === 'Koh'"
-          :key="challenge.id ?? undefined"
+          :key="challenge.id"
           :competition="ctx.competition.value"
           :challenge="challenge"
         />

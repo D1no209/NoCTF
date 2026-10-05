@@ -1,11 +1,15 @@
-import type { NoCTFAPIEndpointsCompetitionsScoreboardChallengeCatalogResponse, NoCTFAPIEndpointsCompetitionsScoreboardSchemaResponse, NoCTFAPIEndpointsCompetitionsScoreboardSnapshotResponse } from '../api/models'
+import type {
+  NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse,
+} from '../api'
 
 export type ScoreboardRefreshOutcome = 'accepted' | 'retrying' | 'failed' | 'superseded'
 
 /** Anonymous viewers have no Hub; clock-driven settlement must still reach them. */
 export function needsAwdpRoundRefresh(
-  schema: NoCTFAPIEndpointsCompetitionsScoreboardSchemaResponse | null,
-  snapshot: NoCTFAPIEndpointsCompetitionsScoreboardSnapshotResponse | null,
+  schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse | null,
+  snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse | null,
 ): boolean {
   return schema?.mode === 'Awdp' && snapshot?.dataScope === 'Live'
     && (schema.rounds ?? []).some(round => round.state === 'Running')
@@ -50,9 +54,9 @@ export function shouldRestoreRequestedRoundWindow(outcome: ScoreboardRefreshOutc
 }
 
 export function isCoherentScoreboardBundle(
-  catalog: NoCTFAPIEndpointsCompetitionsScoreboardChallengeCatalogResponse | null,
-  schema: NoCTFAPIEndpointsCompetitionsScoreboardSchemaResponse | null,
-  snapshot: NoCTFAPIEndpointsCompetitionsScoreboardSnapshotResponse | null,
+  catalog: NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse | null,
+  schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse | null,
+  snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse | null,
 ): boolean {
   if (!catalog || !schema || !snapshot) return false
   return schema.challengeCatalogRevision === catalog.revision

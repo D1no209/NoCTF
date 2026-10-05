@@ -314,7 +314,7 @@ public sealed class PatchTeamEndpoint(
         Patch("/competitions/{competitionId}/teams/{teamId}");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("PatchCompetitionTeam"));
-        Summary(summary => { summary.Summary = "Updates authorized sections of a competition team."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Updates authorized sections of a competition team.");
     }
 
     public override async Task<Results<Ok<TeamResponse>, NotFound, ForbidHttpResult,

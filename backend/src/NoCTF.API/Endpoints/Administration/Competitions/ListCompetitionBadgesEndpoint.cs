@@ -27,12 +27,6 @@ public sealed class ListCompetitionBadgesEndpoint(
 {
     public override void Configure()
     {
-        Summary(summary =>
-        {
-            summary.Summary = "Lists the competition badge catalog independently of its progression graph.";
-            summary.Description = summary.Summary;
-        });
-
         Get("/admin/competitions/{competitionId}/badges");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("AdminListCompetitionBadges"));

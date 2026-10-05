@@ -3,7 +3,7 @@ import { defineAsyncComponent } from 'vue'
 import { markRaw, toRefs } from 'vue'
 import type { Ref } from 'vue'
 import { ChartSpline, Flag, ShieldCheck, Target, Trophy } from '@lucide/vue'
-import type { NoCTFAPIEndpointsCompetitionsGameModeProtocol, NoCTFAPIEndpointsCompetitionsScoreboardTeamResponse } from '../../api/models'
+import type { NoCtfapiEndpointsCompetitionsGameModeProtocol, NoCtfapiEndpointsCompetitionsScoreboardTeamResponse } from '../../api'
 import type { echarts } from '../../utils/echarts'
 import { scoreboardDirectionGroups, scoreboardMemberContributionSlices, scoreboardRankingStateLabel, scoreboardTeamChallengeScore, scoreboardTeamChallengeSignals, scoreboardTeamAchievements, scoreboardTeamDirectionScore } from '../../utils/scoreboard'
 import type { ScoreboardChallengeColumnGroup } from '../../utils/scoreboard'
@@ -11,9 +11,9 @@ import type { TrendSeries } from './types'
 
 /** Owns state, effects and commands for ScoreboardTeamDetailDialog. */
 export function useScoreboardTeamDetailDialog(props: Readonly<{
-  mode?: NoCTFAPIEndpointsCompetitionsGameModeProtocol | null
-  team: NoCTFAPIEndpointsCompetitionsScoreboardTeamResponse | null
-  teams: NoCTFAPIEndpointsCompetitionsScoreboardTeamResponse[]
+  mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol | null
+  team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse | null
+  teams: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse[]
   columnGroups: ScoreboardChallengeColumnGroup[]
   trendSeries?: TrendSeries[]
   trendLoading?: boolean
@@ -67,7 +67,7 @@ open: Ref<boolean>) {
   }))
 
   function challengeSplitScore(
-    team: NoCTFAPIEndpointsCompetitionsScoreboardTeamResponse,
+    team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
     competitionChallengeId: string,
   ): { attack: number; defense: number } {
     const score = (team.challengeScores ?? []).find(

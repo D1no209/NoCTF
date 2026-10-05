@@ -1,4 +1,3 @@
-import { dateTimestamp } from '../utils/date-value'
 export interface ProgressionConnection {
   source: string
   target: string
@@ -13,7 +12,7 @@ export interface ProgressionFocusCandidate {
   active: boolean
   complete: boolean
   visited: boolean
-  firstOpenedAt?: Date | string | null
+  firstOpenedAt?: string | null
   x: number
   y: number
 }
@@ -22,8 +21,8 @@ export function chooseProgressionFocus(nodes: readonly ProgressionFocusCandidate
   const challenges = nodes.filter(node => node.kind === 0)
   const available = challenges.filter(node => node.active && !node.complete)
   const visited = available.filter(node => node.visited)
-    .sort((a, b) => (dateTimestamp(b.firstOpenedAt ?? '') || 0)
-      - (dateTimestamp(a.firstOpenedAt ?? '') || 0) || a.id.localeCompare(b.id))
+    .sort((a, b) => (Date.parse(b.firstOpenedAt ?? '') || 0)
+      - (Date.parse(a.firstOpenedAt ?? '') || 0) || a.id.localeCompare(b.id))
   return visited[0]?.id ?? [...available].sort((a, b) =>
     a.x - b.x || a.y - b.y || a.id.localeCompare(b.id))[0]?.id
     ?? [...challenges].sort((a, b) => a.id.localeCompare(b.id))[0]?.id

@@ -17,7 +17,7 @@ const { fields, overridden, parseFailed, updateField, setOverride, displayedValu
     </Alert>
     <template v-else>
       <FieldGroup>
-        <Field v-for="field in fields" :key="field.key ?? undefined">
+        <Field v-for="field in fields" :key="field.key">
           <div class="flex items-center gap-2">
             <FieldLabel>{{ field.label }}</FieldLabel>
             <Switch

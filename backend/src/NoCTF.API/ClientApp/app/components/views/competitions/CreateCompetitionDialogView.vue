@@ -116,7 +116,7 @@ const { open, canOrganize, title, description, mode, startTime, endTime, teamReg
           <Field>
             <FieldLabel for="create-competition-poster">{{ $t('common.label.competitionPoster') }}</FieldLabel>
             <FileUpload
-              :key="posterInputKey ?? undefined"
+              :key="posterInputKey"
               id="create-competition-poster"
               accept="image/jpeg,image/png,image/webp"
               :disabled="pending"

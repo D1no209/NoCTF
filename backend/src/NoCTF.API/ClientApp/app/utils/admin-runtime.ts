@@ -1,4 +1,4 @@
-import type { NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeResponse } from '../api/models'
+import type { NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse } from '../api'
 
 type Translate = (
   source: string,
@@ -6,7 +6,7 @@ type Translate = (
 ) => string
 
 export function adminRuntimeTeamLabel(
-  runtime: NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeResponse,
+  runtime: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse,
   t: Translate,
   lookupTeamName: (teamId: string) => string | undefined = () => undefined,
 ): string {

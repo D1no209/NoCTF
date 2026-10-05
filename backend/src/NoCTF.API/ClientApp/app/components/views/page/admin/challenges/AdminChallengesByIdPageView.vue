@@ -1,5 +1,4 @@
 <script setup lang="ts">
-
 import { toRefs } from 'vue'
 import type { AdminChallengesByIdPageViewState } from '~/features/routes/admin/challenges/useAdminChallengesByIdPage'
 
@@ -97,7 +96,7 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
                   <AlertTitle>{{ $t('administration.challengesBy.description.unableSaveChallengeTemplate') }}</AlertTitle>
                   <AlertDescription>
                     <ul class="list-disc pl-5">
-                      <li v-for="(message, index) in basicSaveErrors" :key="index ?? undefined">{{ message }}</li>
+                      <li v-for="(message, index) in basicSaveErrors" :key="index">{{ message }}</li>
                     </ul>
                   </AlertDescription>
                 </Alert>
@@ -150,9 +149,9 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
                       <MarkdownPreview :source="form.description" :label="$t('administration.label.markdownPreview')" :empty-label="$t('administration.label.content')" />
                     </div>
                     <div class="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                      <span>{{ $t('common.action.create') }} <component :is="AdminDateTime" :value="dateIso(template.createdAt)" /></span>
-                      <span>{{ $t('administration.label.update') }} <component :is="AdminDateTime" :value="dateIso(template.updatedAt)" /></span>
-                      <span v-if="template.deletedAt">{{ $t('common.action.delete') }} <component :is="AdminDateTime" :value="dateIso(template.deletedAt)" /></span>
+                      <span>{{ $t('common.action.create') }} <component :is="AdminDateTime" :value="template.createdAt" /></span>
+                      <span>{{ $t('administration.label.update') }} <component :is="AdminDateTime" :value="template.updatedAt" /></span>
+                      <span v-if="template.deletedAt">{{ $t('common.action.delete') }} <component :is="AdminDateTime" :value="template.deletedAt" /></span>
                     </div>
                     <Field v-if="!isDeleted" orientation="horizontal">
                       <Button type="submit" :disabled="saving">
@@ -183,7 +182,7 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
                   <AlertTitle>{{ $t('administration.challengesBy.description.unableSaveChallengeTemplate') }}</AlertTitle>
                   <AlertDescription>
                     <ul class="list-disc pl-5">
-                      <li v-for="(message, index) in runtimeSaveErrors" :key="index ?? undefined">{{ message }}</li>
+                      <li v-for="(message, index) in runtimeSaveErrors" :key="index">{{ message }}</li>
                     </ul>
                   </AlertDescription>
                 </Alert>
@@ -226,7 +225,7 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
                   <AlertTitle>{{ $t('administration.challengesBy.description.unableSaveChallengeTemplate') }}</AlertTitle>
                   <AlertDescription>
                     <ul class="list-disc pl-5">
-                      <li v-for="(message, index) in definitionSaveErrors" :key="index ?? undefined">{{ message }}</li>
+                      <li v-for="(message, index) in definitionSaveErrors" :key="index">{{ message }}</li>
                     </ul>
                   </AlertDescription>
                 </Alert>
@@ -369,7 +368,7 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
               <ScrollSurface axis="y" :reset-key="selectedSection" class="min-h-0 flex-1 overflow-y-auto overscroll-contain">
               <CardContent>
                 <div v-if="attachmentsLoading" class="flex flex-col gap-2">
-                  <Skeleton v-for="i in 3" :key="i ?? undefined" class="h-10 w-full" />
+                  <Skeleton v-for="i in 3" :key="i" class="h-10 w-full" />
                 </div>
                 <Empty v-else-if="attachments.length === 0">
                   <EmptyHeader>
@@ -391,7 +390,7 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    <TableRow v-for="attachment in attachments" :key="attachment.id ?? undefined">
+                    <TableRow v-for="attachment in attachments" :key="attachment.id">
                       <TableCell class="font-medium">
                         <span class="inline-flex items-center gap-2">
                           <Paperclip class="size-4 text-muted-foreground" />
@@ -410,7 +409,7 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
                       </TableCell></Hint>
                       <TableCell>{{ formatBytes(attachment.byteLength) }}</TableCell>
                       <TableCell>
-                        <component :is="AdminDateTime" :value="dateIso(attachment.createdAt)" />
+                        <component :is="AdminDateTime" :value="attachment.createdAt" />
                       </TableCell>
                       <TableCell>
                         <Badge v-if="attachment.deletedAt" variant="destructive">{{ $t('common.label.deleted.competitionSidebarView') }}</Badge>
@@ -482,7 +481,7 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
                   </AlertDescription>
                 </Alert>
                 <div v-if="flagsLoading" class="flex flex-col gap-2">
-                  <Skeleton v-for="i in 3" :key="i ?? undefined" class="h-10 w-full" />
+                  <Skeleton v-for="i in 3" :key="i" class="h-10 w-full" />
                 </div>
                 <Empty v-else-if="staticFlags.length === 0 && systemFlags.length === 0">
                   <EmptyHeader>
@@ -503,7 +502,7 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    <TableRow v-for="flag in staticFlags" :key="flag.id ?? undefined">
+                    <TableRow v-for="flag in staticFlags" :key="flag.id">
                       <Hint :content="flag.flag" ><TableCell tabindex="0" class="max-w-md" >
                         <div class="flex min-w-0 items-center gap-2">
                           <Badge variant="outline">
@@ -546,7 +545,7 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        <TableRow v-for="flag in systemFlags" :key="flag.id ?? undefined">
+                        <TableRow v-for="flag in systemFlags" :key="flag.id">
                           <Hint :content="flag.flag" ><TableCell tabindex="0" class="max-w-md truncate font-mono text-sm" >{{ flag.flag }}</TableCell></Hint>
                           <TableCell class="font-mono text-xs">{{ flag.teamId ?? $t('common.label.symbol') }}</TableCell>
                           <TableCell class="font-mono text-xs">
@@ -554,7 +553,7 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
                           </TableCell>
                           <TableCell class="text-sm text-muted-foreground">
                             <template v-if="flag.validStart || flag.validUntil">
-                              <component :is="AdminDateTime" :value="dateIso(flag.validStart)" /> {{ $t('administration.label.byId') }} <component :is="AdminDateTime" :value="dateIso(flag.validUntil)" />
+                              <component :is="AdminDateTime" :value="flag.validStart" /> {{ $t('administration.label.byId') }} <component :is="AdminDateTime" :value="flag.validUntil" />
                             </template>
                             <span v-else>{{ $t('administration.challengesBy.label.effectiveLongTime') }}</span>
                           </TableCell>
@@ -584,7 +583,7 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
                   <FieldGroup>
                     <Field>
                       <FieldLabel>{{ $t('administration.label.responsiblePersonId') }}</FieldLabel>
-                      <Input :model-value="template.ownerId ?? undefined" disabled class="font-mono text-sm" />
+                      <Input :model-value="template.ownerId" disabled class="font-mono text-sm" />
                     </Field>
                     <Field>
                       <FieldLabel for="managers">{{ $t('administration.label.administratorIdList') }}</FieldLabel>

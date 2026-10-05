@@ -6,34 +6,15 @@ using NoCTF.Application.Admission;
 
 namespace NoCTF.API.Endpoints.Runtime;
 
-public sealed class StopRuntimeRequest
-{
-    /// <summary>One-time verification token; optional when platform policy disables verification. Maximum 4096 characters.</summary>
-    [FromHeader("X-NoCTF-Human-Verification", IsRequired = false, RemoveFromSchema = true)]
-    public string? HumanVerificationToken { get; set; }
-
-    [RouteParam]
-    public Guid CompetitionId { get; set; }
-    [RouteParam]
-    public Guid CompetitionChallengeId { get; set; }
-    [RouteParam]
-    public Guid RuntimeInstanceId { get; set; }
-}
-
 public sealed class StopRuntimeEndpoint(
     MutatePlayerRuntime mutate,
     GetPlayerRuntime get,
     IUserContext user,
     TimeProvider timeProvider)
-    : Endpoint<StopRuntimeRequest, Results<Accepted<RuntimeAcceptedResponse>, NotFound, Conflict<RuntimeConflictResponse>, ProblemHttpResult>>
+    : EndpointWithoutRequest<Results<Accepted<RuntimeAcceptedResponse>, NotFound, Conflict<RuntimeConflictResponse>, ProblemHttpResult>>
 {
     public override void Configure()
     {
-
-        Description(builder => builder
-            .ProducesProblem(StatusCodes.Status403Forbidden)
-            .ProducesProblem(StatusCodes.Status503ServiceUnavailable));
-
         Delete("/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes/{runtimeInstanceId}");
         AuthSchemes("Bearer");
         Options(builder => builder.WithMetadata(new NoCTF.API.Security.ProtectedEntryMetadata(NoCTF.API.Security.ProtectedEntry.RuntimeCommand)));
@@ -46,17 +27,16 @@ public sealed class StopRuntimeEndpoint(
                 StatusCodes.Status409Conflict)
             .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
                 StatusCodes.Status503ServiceUnavailable));
-        Summary(summary => {
-            summary.Params["X-NoCTF-Human-Verification"] = "One-time verification token, at most 4096 characters. Required only when the configured platform policy enables verification for this operation."; summary.Summary = "Queues a team runtime stop."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Queues a team runtime stop.");
     }
 
     public override async Task<Results<Accepted<RuntimeAcceptedResponse>, NotFound, Conflict<RuntimeConflictResponse>, ProblemHttpResult>> ExecuteAsync(
-        StopRuntimeRequest request, CancellationToken ct)
+        CancellationToken ct)
     {
-        var competitionId = request.CompetitionId;
-        var competitionChallengeId = request.CompetitionChallengeId;
+        var competitionId = Route<Guid>("competitionId");
+        var competitionChallengeId = Route<Guid>("competitionChallengeId");
         var current = await get.ExecuteAsync(competitionId, competitionChallengeId, user.UserId, ct);
-        if (current?.Id != request.RuntimeInstanceId)
+        if (current?.Id != Route<Guid>("runtimeInstanceId"))
             return TypedResults.NotFound();
         return await PlayerRuntimeMutation.ExecuteAsync(
             mutate, user, competitionId, competitionChallengeId,

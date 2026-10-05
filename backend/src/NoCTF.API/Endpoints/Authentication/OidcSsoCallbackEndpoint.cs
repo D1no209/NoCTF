@@ -28,7 +28,7 @@ public sealed class OidcSsoCallbackEndpoint(
         Options(options => options.WithMetadata(
             new ProtectedEntryMetadata(ProtectedEntry.SsoCallback)));
         Description(builder => builder.WithName("Authentication_SsoOidcCallback"));
-        Summary(summary => { summary.Summary = "Consumes an OIDC authorization response once."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Consumes an OIDC authorization response once.");
     }
 
     public override async Task<Results<RedirectHttpResult, ProblemHttpResult>> ExecuteAsync(

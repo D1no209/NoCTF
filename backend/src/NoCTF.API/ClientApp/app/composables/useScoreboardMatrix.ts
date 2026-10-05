@@ -1,12 +1,15 @@
-import { ProjectionResponseOption } from '../lib/api'
-import { createNoCTFAPIEndpointsCompetitionsScoreboardChallengeCatalogResponseFromDiscriminatorValue, createNoCTFAPIEndpointsCompetitionsScoreboardSchemaResponseFromDiscriminatorValue, createNoCTFAPIEndpointsCompetitionsScoreboardSnapshotResponseFromDiscriminatorValue } from '../api/models'
-import { ResponseMetadata, RequestPolicyOption } from '../lib/api'
-
-import { api } from '../lib/api'
 import { message as describeMessage } from '../utils/i18n'
 import type { UiMessage } from '../utils/i18n'
-
-import type { NoCTFAPIEndpointsCompetitionsScoreboardChallengeCatalogResponse, NoCTFAPIEndpointsCompetitionsScoreboardSchemaResponse, NoCTFAPIEndpointsCompetitionsScoreboardSnapshotResponse } from '../api/models'
+import {
+  getLeaderboardEndpoint,
+  getScoreboardChallengeCatalogEndpoint,
+  getScoreboardSchemaEndpoint,
+} from '../api'
+import type {
+  NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse,
+} from '../api'
 import type { ScoreboardUpdatedNotification } from './useCompetitionHub'
 import { createTrailingRefresh } from '../lib/latest-page-refresh'
 import {
@@ -51,9 +54,9 @@ function scoreboardUpdatedPayload(payload: ScoreboardUpdatedNotification): Score
  * generation- and version-fenced, so an older response cannot replace newer page state.
  */
 export function useScoreboardMatrix(competitionId: string, options: { pollRounds?: boolean } = {}) {
-  const catalog = ref<NoCTFAPIEndpointsCompetitionsScoreboardChallengeCatalogResponse | null>(null)
-  const schema = ref<NoCTFAPIEndpointsCompetitionsScoreboardSchemaResponse | null>(null)
-  const snapshot = ref<NoCTFAPIEndpointsCompetitionsScoreboardSnapshotResponse | null>(null)
+  const catalog = ref<NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse | null>(null)
+  const schema = ref<NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse | null>(null)
+  const snapshot = ref<NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse | null>(null)
   const loading = ref(true)
   const refreshing = ref(false)
   const processing = ref(false)
@@ -97,44 +100,45 @@ export function useScoreboardMatrix(competitionId: string, options: { pollRounds
     const wantCatalog = options.catalog ?? false
     const wantSchema = options.schema ?? false
     const wantSnapshot = options.snapshot ?? true
-    const snapshotResponse = new ResponseMetadata()
-    const settledRequests = await Promise.allSettled([
+    const [catalogResult, schemaResult, snapshotResult] = await Promise.all([
       wantCatalog
-        ? api.api.v1.competitions.byCompetitionId(competitionId).leaderboard.challenges.get({ options: [new ProjectionResponseOption(createNoCTFAPIEndpointsCompetitionsScoreboardChallengeCatalogResponseFromDiscriminatorValue)] })
+        ? getScoreboardChallengeCatalogEndpoint({ path: { competitionId } })
         : Promise.resolve(null),
       wantSchema
-        ? api.api.v1.competitions.byCompetitionId(competitionId).leaderboard.schema.get({ queryParameters: { endingRound: endingRound ?? undefined }, options: [new ProjectionResponseOption(createNoCTFAPIEndpointsCompetitionsScoreboardSchemaResponseFromDiscriminatorValue)] })
+        ? getScoreboardSchemaEndpoint({
+            path: { competitionId },
+            query: { endingRound },
+          })
         : Promise.resolve(null),
       wantSnapshot
-        ? api.api.v1.competitions.byCompetitionId(competitionId).leaderboard.get({ queryParameters: { endingRound: endingRound ?? undefined }, options: [new RequestPolicyOption({ response: snapshotResponse }), new ProjectionResponseOption(createNoCTFAPIEndpointsCompetitionsScoreboardSnapshotResponseFromDiscriminatorValue)] })
+        ? getLeaderboardEndpoint({
+            path: { competitionId },
+            query: { endingRound },
+          })
         : Promise.resolve(null),
-    ]);
-    const catalogResult = settledRequests[0].status === 'fulfilled' ? settledRequests[0].value : undefined;
-    const schemaResult = settledRequests[1].status === 'fulfilled' ? settledRequests[1].value : undefined;
-    const snapshotResult = settledRequests[2].status === 'fulfilled' ? settledRequests[2].value : undefined;
-
+    ])
     if (stopped || requestGeneration !== generation) return 'superseded'
 
-    const failures = settledRequests
-      .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
-      .map(result => parseApiError(result.reason, describeMessage("common.error.loadScoreboardFailed")).displayMessage)
+    const failures = [catalogResult, schemaResult, snapshotResult]
+      .filter(result => result?.error)
+      .map(result => parseApiError(result?.error, describeMessage("common.error.loadScoreboardFailed")).displayMessage)
     let outcome: ScoreboardRefreshOutcome = 'failed'
     if (failures.length) {
       error.value = failures[0] ?? translate("common.error.loadScoreboardFailed")
     }
     else {
-      if (snapshotResponse.status === 202) {
+      if (snapshotResult?.response?.status === 202) {
         processing.value = true
         error.value = null
         scheduleProcessingRetry()
         outcome = 'retrying'
       }
       else {
-        const candidateCatalog = catalogResult ?? catalog.value
-        const candidateSchema = schemaResult ?? schema.value
+        const candidateCatalog = catalogResult?.data ?? catalog.value
+        const candidateSchema = schemaResult?.data ?? schema.value
         let candidateSnapshot = snapshot.value
-        if (snapshotResult) {
-          const incoming = snapshotResult as NoCTFAPIEndpointsCompetitionsScoreboardSnapshotResponse
+        if (snapshotResult?.data) {
+          const incoming = snapshotResult.data as NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse
           candidateSnapshot = incoming
         }
         const sameDataScope = candidateSnapshot?.dataScope === snapshot.value?.dataScope
@@ -250,12 +254,12 @@ export function useScoreboardMatrix(competitionId: string, options: { pollRounds
   ))
   const columnsByIndex = computed(() => new Map(
     (schema.value?.columns ?? [])
-      .filter(column => column.index != null)
+      .filter(column => column.index !== undefined)
       .map(column => [column.index!, column]),
   ))
   const actorsByIndex = computed(() => new Map(
     (snapshot.value?.actors ?? [])
-      .filter(actor => actor.index != null)
+      .filter(actor => actor.index !== undefined)
       .map(actor => [actor.index!, actor]),
   ))
   const viewingLatestRounds = computed(() => {

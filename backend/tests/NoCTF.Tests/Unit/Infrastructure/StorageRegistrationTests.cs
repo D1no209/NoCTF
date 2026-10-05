@@ -75,7 +75,7 @@ public sealed class StorageRegistrationTests
     {
         var configurationValues = new Dictionary<string, string?>(values)
         {
-            ["OpenApi:Generating"] = "true"
+            ["OpenApi:Exporting"] = "true"
         };
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(configurationValues)

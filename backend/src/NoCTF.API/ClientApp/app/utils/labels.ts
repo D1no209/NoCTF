@@ -1,7 +1,21 @@
 import type { UiMessage } from './i18n'
 import type { InjectionKey, Ref } from 'vue'
 import { localeTag, translate } from './i18n'
-import type { NoCTFAPIEndpointsCompetitionsCompetitionResponse, NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse, NoCTFAPIEndpointsNotificationsNotificationResponse, NoCTFAPIEndpointsCompetitionsGameModeProtocol, NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol, NoCTFAPIEndpointsTeamsTeamRegistrationStatusProtocol, NoCTFAPIEndpointsRuntimeRuntimeStateProtocol, NoCTFAPIEndpointsGameplayFactsGameplayFactKindProtocol, NoCTFAPIEndpointsGameplayFactsGameplayFactStateProtocol, NoCTFAPIEndpointsGameplayFactsGameplayFactResultProtocol, NoCTFAPIEndpointsGameplayFactsGameplayFactFailureCodeProtocol, NoCTFAPIEndpointsCompetitionsEventsCompetitionEventKindProtocol, NoCTFAPIEndpointsNotificationsNotificationKindProtocol } from '../api/models'
+import type {
+  NoCtfapiEndpointsCompetitionsCompetitionResponse,
+  NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse,
+  NoCtfapiEndpointsNotificationsNotificationResponse,
+  NoCtfapiEndpointsCompetitionsGameModeProtocol,
+  NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol,
+  NoCtfapiEndpointsTeamsTeamRegistrationStatusProtocol,
+  NoCtfapiEndpointsRuntimeRuntimeStateProtocol,
+  NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol,
+  NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol,
+  NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol,
+  NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol,
+  NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol,
+  NoCtfapiEndpointsNotificationsNotificationKindProtocol,
+} from '../api'
 import {
   adminCompetitionCheatsPath,
   adminCompetitionTeamsPath,
@@ -13,7 +27,7 @@ import {
 
 /** 竞赛上下文:由 pages/competitions/[id].vue provide,子路由 inject。 */
 export interface CompetitionContext {
-  competition: Ref<NoCTFAPIEndpointsCompetitionsCompetitionResponse | null>
+  competition: Ref<NoCtfapiEndpointsCompetitionsCompetitionResponse | null>
   loading: Ref<boolean>
   error: Ref<UiMessage | null>
   refresh: () => Promise<void>
@@ -21,49 +35,49 @@ export interface CompetitionContext {
 
 export const competitionContextKey: InjectionKey<CompetitionContext> = Symbol('competition-context')
 
-export function gameModeLabel(mode?: NoCTFAPIEndpointsCompetitionsGameModeProtocol | null): string {
+export function gameModeLabel(mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol): string {
   if (!mode) return translate("common.label.unknown")
-  const labels = { Ctf: 'CTF', Awd: 'AWD', Awdp: 'AWDP', Koh: 'KoH' } satisfies Record<NoCTFAPIEndpointsCompetitionsGameModeProtocol, string>
+  const labels = { Ctf: 'CTF', Awd: 'AWD', Awdp: 'AWDP', Koh: 'KoH' } satisfies Record<NoCtfapiEndpointsCompetitionsGameModeProtocol, string>
   return labels[mode]
 }
 
-export function competitionStatusLabel(status?: NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol | null): string {
+export function competitionStatusLabel(status?: NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol): string {
   if (!status) return translate("common.label.unknown")
-  const labels = { Draft: translate("common.label.draft"), Visible: translate("common.label.comingSoon"), Published: translate("common.label.aboutStart"), Running: translate("common.label.running"), Paused: translate("common.label.suspended"), Finished: translate("common.label.finished") } satisfies Record<NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol, string>
+  const labels = { Draft: translate("common.label.draft"), Visible: translate("common.label.comingSoon"), Published: translate("common.label.aboutStart"), Running: translate("common.label.running"), Paused: translate("common.label.suspended"), Finished: translate("common.label.finished") } satisfies Record<NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol, string>
   return labels[status]
 }
 
-export function teamRegistrationStatusLabel(status?: NoCTFAPIEndpointsTeamsTeamRegistrationStatusProtocol | null): string {
+export function teamRegistrationStatusLabel(status?: NoCtfapiEndpointsTeamsTeamRegistrationStatusProtocol): string {
   if (!status) return translate("common.label.unknown")
-  const labels = { Pending: translate("common.label.pendingReview"), Approved: translate("common.label.passed"), Rejected: translate("common.label.rejected"), Unregistered: translate("common.label.registered") } satisfies Record<NoCTFAPIEndpointsTeamsTeamRegistrationStatusProtocol, string>
+  const labels = { Pending: translate("common.label.pendingReview"), Approved: translate("common.label.passed"), Rejected: translate("common.label.rejected"), Unregistered: translate("common.label.registered") } satisfies Record<NoCtfapiEndpointsTeamsTeamRegistrationStatusProtocol, string>
   return labels[status]
 }
 
-export function runtimeStateLabel(state?: NoCTFAPIEndpointsRuntimeRuntimeStateProtocol | null): string {
+export function runtimeStateLabel(state?: NoCtfapiEndpointsRuntimeRuntimeStateProtocol): string {
   if (!state) return translate("common.label.unknown")
-  const labels = { Queued: translate("common.label.queuing"), Provisioning: translate("common.label.deploying"), Running: translate("common.label.running.adminFormat"), Stopping: translate("common.label.stopping"), Stopped: translate("common.label.stopped"), Failed: translate("common.error.failed") } satisfies Record<NoCTFAPIEndpointsRuntimeRuntimeStateProtocol, string>
+  const labels = { Queued: translate("common.label.queuing"), Provisioning: translate("common.label.deploying"), Running: translate("common.label.running.adminFormat"), Stopping: translate("common.label.stopping"), Stopped: translate("common.label.stopped"), Failed: translate("common.error.failed") } satisfies Record<NoCtfapiEndpointsRuntimeRuntimeStateProtocol, string>
   return labels[state]
 }
 
-export function gameplayFactKindLabel(kind?: NoCTFAPIEndpointsGameplayFactsGameplayFactKindProtocol | null): string {
+export function gameplayFactKindLabel(kind?: NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol): string {
   if (!kind) return translate("common.label.gameplayFacts")
-  const labels = { FlagAttempt: 'Flag', BreakAttempt: 'Break', FixAttempt: translate('common.label.patchVerification'), HintUnlock: translate("common.label.promptUnlock"), ManualAdjustment: translate("common.label.manualAdjustment"), AwdServiceTransition: translate("common.label.awdServiceStatus"), KohControlObservation: translate("common.label.kohControlObservation") } satisfies Record<NoCTFAPIEndpointsGameplayFactsGameplayFactKindProtocol, string>
+  const labels = { FlagAttempt: 'Flag', BreakAttempt: 'Break', FixAttempt: translate('common.label.patchVerification'), HintUnlock: translate("common.label.promptUnlock"), ManualAdjustment: translate("common.label.manualAdjustment"), AwdServiceTransition: translate("common.label.awdServiceStatus"), KohControlObservation: translate("common.label.kohControlObservation") } satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol, string>
   return labels[kind]
 }
 
-export function gameplayFactStateLabel(state?: NoCTFAPIEndpointsGameplayFactsGameplayFactStateProtocol | null): string {
+export function gameplayFactStateLabel(state?: NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol): string {
   if (!state) return translate("common.label.unknown")
-  const labels = { Pending: translate("common.label.awaitingEvaluation"), Queued: translate("common.label.queuing"), Processing: translate("common.label.underEvaluation"), Completed: translate("common.label.completed"), PlatformFailed: translate("common.error.platformFailed") } satisfies Record<NoCTFAPIEndpointsGameplayFactsGameplayFactStateProtocol, string>
+  const labels = { Pending: translate("common.label.awaitingEvaluation"), Queued: translate("common.label.queuing"), Processing: translate("common.label.underEvaluation"), Completed: translate("common.label.completed"), PlatformFailed: translate("common.error.platformFailed") } satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol, string>
   return labels[state]
 }
 
-export function gameplayFactResultLabel(result?: NoCTFAPIEndpointsGameplayFactsGameplayFactResultProtocol | null): string {
+export function gameplayFactResultLabel(result?: NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol | null): string {
   if (result === null || result === undefined) return translate("common.label.underEvaluation")
-  const labels = { Correct: translate("common.label.correct"), Wrong: translate("common.label.wrong"), Duplicate: translate("common.label.repeat"), AttemptsExhausted: translate("common.label.exhausted"), Rejected: translate("common.label.rejected"), Unlocked: translate("common.label.unlocked"), Applied: translate("common.label.applied"), ServiceUp: translate("common.label.serviceNormal"), ServiceDown: translate("common.label.serviceException"), Controlled: translate("common.label.controlled"), Uncontrolled: translate("common.label.uncontrolled") } satisfies Record<NoCTFAPIEndpointsGameplayFactsGameplayFactResultProtocol, string>
+  const labels = { Correct: translate("common.label.correct"), Wrong: translate("common.label.wrong"), Duplicate: translate("common.label.repeat"), AttemptsExhausted: translate("common.label.exhausted"), Rejected: translate("common.label.rejected"), Unlocked: translate("common.label.unlocked"), Applied: translate("common.label.applied"), ServiceUp: translate("common.label.serviceNormal"), ServiceDown: translate("common.label.serviceException"), Controlled: translate("common.label.controlled"), Uncontrolled: translate("common.label.uncontrolled") } satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol, string>
   return labels[result]
 }
 
-export function gameplayFactFailureCodeLabel(code?: NoCTFAPIEndpointsGameplayFactsGameplayFactFailureCodeProtocol | null): string {
+export function gameplayFactFailureCodeLabel(code?: NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol | null): string {
   if (!code) return '—'
   const labels = {
     FlagNotSupported: translate("common.description.modeSupportFlagSubmissions"),
@@ -102,16 +116,16 @@ export function gameplayFactFailureCodeLabel(code?: NoCTFAPIEndpointsGameplayFac
     PatchExecutionFailed: translate("common.error.patchExecutionFailed"),
     PatchServiceAbnormal: translate("common.label.serviceException"),
     PatchVerificationPlatformFailed: translate("common.error.patchVerificationPlatformFailed"),
-  } satisfies Record<NoCTFAPIEndpointsGameplayFactsGameplayFactFailureCodeProtocol, string>
+  } satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol, string>
   return labels[code]
 }
 
 /** 评测是否仍在进行中(需要继续轮询)。 */
-export function isGameplayFactPending(state?: NoCTFAPIEndpointsGameplayFactsGameplayFactStateProtocol | null): boolean {
+export function isGameplayFactPending(state?: NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol): boolean {
   return state === 'Pending' || state === 'Queued' || state === 'Processing'
 }
 
-export function formatDateTime(value?: string | Date | null): string {
+export function formatDateTime(value?: string | null): string {
   if (!value) return '—'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
@@ -143,7 +157,7 @@ export function formatDuration(ms: number): string {
 
 /** 竞赛动态文案(NoCTF.Domain.Competitions.Events.CompetitionEventKind)。 */
 export function competitionEventText(
-  event: NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse,
+  event: NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse,
 ): string {
   const actor = event.actorDisplayName ?? translate("common.label.system")
   const team = event.teamDisplayName ?? translate("common.label.team.competitionBroadcast")
@@ -166,7 +180,7 @@ export function competitionEventText(
       ? translate('common.label.teamPassedPatchVerification', { team, challenge })
       : translate('common.error.teamPatchVerificationFailed', { team, challenge })
   }
-  const templates: Partial<Record<NoCTFAPIEndpointsCompetitionsEventsCompetitionEventKindProtocol, string>> = {
+  const templates: Partial<Record<NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol, string>> = {
     GameplayFactPatchDownloaded: translate("common.description.downloadedPatchArchiveTeam", { actor, team }),
     CompetitionAudienceChanged: translate("competitionAccess.changed"),
     TeamWriteUpSubmitted: translate("writeUp.submittedEvent"),
@@ -186,7 +200,7 @@ export function competitionEventText(
 }
 
 function notificationContent(
-  notification: NoCTFAPIEndpointsNotificationsNotificationResponse,
+  notification: NoCtfapiEndpointsNotificationsNotificationResponse,
 ): Record<string, unknown> {
   return notification.content && typeof notification.content === 'object'
     ? notification.content as Record<string, unknown>
@@ -194,14 +208,14 @@ function notificationContent(
 }
 
 export function notificationCompetitionId(
-  notification: NoCTFAPIEndpointsNotificationsNotificationResponse,
+  notification: NoCtfapiEndpointsNotificationsNotificationResponse,
 ): string | null {
   const content = notificationContent(notification)
   return typeof content.competitionId === 'string' ? content.competitionId : null
 }
 
 function notificationContentId(
-  notification: NoCTFAPIEndpointsNotificationsNotificationResponse,
+  notification: NoCtfapiEndpointsNotificationsNotificationResponse,
   key: string,
 ): string | null {
   const value = notificationContent(notification)[key]
@@ -209,7 +223,7 @@ function notificationContentId(
 }
 
 export function notificationThreadRootId(
-  notification: NoCTFAPIEndpointsNotificationsNotificationResponse,
+  notification: NoCtfapiEndpointsNotificationsNotificationResponse,
 ): string | null {
   return notification.threadRootId
     ?? notificationContentId(notification, 'threadRootId')
@@ -229,14 +243,14 @@ interface NotificationTargetContext {
 type NotificationTargetResolver = (context: NotificationTargetContext) => string
 
 function notificationDetailPath(
-  notification: NoCTFAPIEndpointsNotificationsNotificationResponse,
+  notification: NoCtfapiEndpointsNotificationsNotificationResponse,
 ): string {
   return notification.id ? `/notifications?notification=${notification.id}` : '/notifications'
 }
 
 function competitionEventTarget(
   context: NotificationTargetContext,
-  kind: NoCTFAPIEndpointsCompetitionsEventsCompetitionEventKindProtocol,
+  kind: NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol,
 ): string {
   return context.competitionId
     ? `${competitionEventsPath(context.competitionId)}?kind=${kind}`
@@ -290,10 +304,10 @@ const notificationTargetResolvers = {
   PlatformAuditExported: context => context.detailPath,
   UserAccountLifecycleChanged: context => context.detailPath,
   CompetitionForceDeleted: context => context.detailPath,
-} satisfies Record<NoCTFAPIEndpointsNotificationsNotificationKindProtocol, NotificationTargetResolver>
+} satisfies Record<NoCtfapiEndpointsNotificationsNotificationKindProtocol, NotificationTargetResolver>
 
 export function notificationTargetPath(
-  notification: NoCTFAPIEndpointsNotificationsNotificationResponse,
+  notification: NoCtfapiEndpointsNotificationsNotificationResponse,
 ): string {
   const isQuestionActivity = notification.kind === 'QuestionOpened'
     || notification.kind === 'Message'
@@ -318,7 +332,7 @@ export function notificationTargetPath(
 }
 
 export function notificationTitle(
-  notification: NoCTFAPIEndpointsNotificationsNotificationResponse,
+  notification: NoCtfapiEndpointsNotificationsNotificationResponse,
 ): string {
   const payload = notificationContent(notification)
   if (notification.kind === 'CompetitionAnnouncement')
@@ -329,7 +343,7 @@ export function notificationTitle(
 }
 
 export function notificationBody(
-  notification: NoCTFAPIEndpointsNotificationsNotificationResponse,
+  notification: NoCtfapiEndpointsNotificationsNotificationResponse,
 ): string | null {
   const payload = notificationContent(notification)
   if (notification.kind === 'UserAccountLifecycleChanged') {
@@ -357,7 +371,7 @@ export function notificationBody(
 }
 
 export function notificationActionLabel(
-  notification: NoCTFAPIEndpointsNotificationsNotificationResponse,
+  notification: NoCtfapiEndpointsNotificationsNotificationResponse,
 ): string {
   const labels = {
     Message: "common.label.viewConsultation",
@@ -380,13 +394,13 @@ export function notificationActionLabel(
     PlatformAuditExported: "common.label.viewNotificationDetails",
     UserAccountLifecycleChanged: "common.label.viewNotificationDetails",
     CompetitionForceDeleted: "common.label.viewNotificationDetails",
-  } satisfies Record<NoCTFAPIEndpointsNotificationsNotificationKindProtocol, string>
+  } satisfies Record<NoCtfapiEndpointsNotificationsNotificationKindProtocol, string>
   return translate(notification.kind ? labels[notification.kind] : "common.label.viewNotificationDetails")
 }
 
 /** 通知文案(NoCTF.Domain.Notifications.NotificationKind),content 为松散 JSON。 */
 export function notificationText(
-  notification: NoCTFAPIEndpointsNotificationsNotificationResponse,
+  notification: NoCtfapiEndpointsNotificationsNotificationResponse,
 ): string {
   const payload = notificationContent(notification)
   const title = typeof payload.competitionTitle === 'string' ? `「${payload.competitionTitle}」` : ''
@@ -397,7 +411,7 @@ export function notificationText(
   const announcement = announcementBody
     ? `${announcementTitle}：${announcementBody}`
     : announcementTitle
-  const templates: Partial<Record<NoCTFAPIEndpointsNotificationsNotificationKindProtocol, string>> = {
+  const templates: Partial<Record<NoCtfapiEndpointsNotificationsNotificationKindProtocol, string>> = {
     CompetitionLifecycleChanged: translate("common.label.competitionSLifecycleChanged", { title }), TeamRegistrationChanged: translate("common.description.teamSRegistrationStatus", { team }), GameplayFactAdjudicated: translate("common.description.submissionJudged", { challenge }),
     RuntimeStateChanged: translate("common.description.runtimeEnvironmentChanged", { challenge }), StartGateFailed: translate("common.error.competitionStartChecksFailed", { title }), ManagementFailure: translate("common.error.competitionEncounteredManagementFailed", { title }),
     BloodAwarded: translate("common.description.congratulationsEarnedBloodRank", { challenge }), ChallengePublished: translate("common.label.competitionPublishedNewChallenge", { title, challenge }), HintPublished: translate("common.label.newHint", { challenge }),

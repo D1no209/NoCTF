@@ -9,13 +9,7 @@ public sealed class GetTeamRequest { public Guid CompetitionId { get; set; } pub
 
 public sealed class GetTeamEndpoint(GetTeam get, LinkGenerator links) : Endpoint<GetTeamRequest, Results<Ok<TeamResponse>, NotFound>>
 {
-    public override void Configure() {
-        Summary(summary =>
-        {
-            summary.Summary = "Returns the public details of a competition team.";
-            summary.Description = summary.Summary;
-        });
- Get("/competitions/{competitionId}/teams/{teamId}"); AllowAnonymous(); }
+    public override void Configure() { Get("/competitions/{competitionId}/teams/{teamId}"); AllowAnonymous(); }
     public override async Task<Results<Ok<TeamResponse>, NotFound>> ExecuteAsync(GetTeamRequest request, CancellationToken ct)
     {
         var team = await get.ExecuteAsync(

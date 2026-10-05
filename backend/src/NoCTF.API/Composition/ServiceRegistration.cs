@@ -1,5 +1,5 @@
 using FastEndpoints;
-using FastEndpoints.OpenApi;
+using FastEndpoints.Swagger;
 using System.IO.Compression;
 using System.Security.Claims;
 using System.Threading.RateLimiting;
@@ -31,7 +31,7 @@ using NoCTF.API.SignalR.Hubs;
 using NoCTF.API.Endpoints.Authentication;
 using NoCTF.API.Endpoints.Teams.WriteUps;
 using NoCTF.API.Pagination;
-using Microsoft.OpenApi;
+using NSwag;
 
 namespace NoCTF.API.Composition;
 
@@ -50,7 +50,7 @@ public static class ServiceRegistration
         services.TryAddSingleton(TimeProvider.System);
         services.AddNoCtfLocalization();
         var allowDevelopmentHumanVerification = development
-            || configuration.GetValue<bool>("OpenApi:Generating");
+            || configuration.GetValue<bool>("OpenApi:Exporting");
         services.AddOptions<HumanVerificationOptions>()
             .Bind(configuration.GetSection(HumanVerificationOptions.SectionName))
             .Validate(options => options.IsValid(allowDevelopmentHumanVerification),
@@ -109,32 +109,34 @@ public static class ServiceRegistration
             services.AddFastEndpoints();
         else
             services.AddFastEndpoints(options => options.Assemblies = endpointAssemblies);
-        services.OpenApiDocument(options =>
+        services.SwaggerDocument(options =>
         {
-            options.DocumentName = "v1";
-            options.Title = "NoCTF API";
-            options.Version = "v1";
             options.EnableJWTBearerAuth = false;
-            options.ConfigureOpenApi = settings =>
+            options.DocumentSettings = settings =>
             {
-                settings.OpenApiVersion = OpenApiSpecVersion.OpenApi3_0;
-                settings.AddSchemaTransformer<LocalizedProblemSchemaTransformer>();
-                settings.AddDocumentTransformer<OpenApiReferenceDocumentTransformer>();
+                settings.SchemaSettings.ResolveExternalXmlDocumentation = false;
+                settings.SchemaSettings.SchemaProcessors.Add(new LocalizedProblemSchemaProcessor());
+                settings.OperationProcessors.Add(
+                    new HumanVerificationOperationProcessor());
+                settings.DocumentProcessors.Add(
+                    new AwdpFixResultOutcomeDocumentProcessor());
+                settings.DocumentProcessors.Add(
+                    new EndpointMetadataDocumentProcessor());
+                settings.AddAuth("Bearer", new OpenApiSecurityScheme
+                {
+                    Type = OpenApiSecuritySchemeType.Http,
+                    Scheme = "bearer",
+                    BearerFormat = "JWT",
+                    Description = "Short-lived NoCTF user access token."
+                }, []);
+                settings.AddAuth("RunnerScoringBearer", new OpenApiSecurityScheme
+                {
+                    Type = OpenApiSecuritySchemeType.Http,
+                    Scheme = "bearer",
+                    BearerFormat = "JWT",
+                    Description = "Short-lived Runner token restricted to scoring.write."
+                }, []);
             };
-            options.AddAuth(AuthenticationRegistration.AccessScheme, new OpenApiSecurityScheme
-            {
-                Type = SecuritySchemeType.Http,
-                Scheme = "bearer",
-                BearerFormat = "JWT",
-                Description = "Short-lived NoCTF user access token."
-            });
-            options.AddAuth(AuthenticationRegistration.InternalScheme, new OpenApiSecurityScheme
-            {
-                Type = SecuritySchemeType.Http,
-                Scheme = "bearer",
-                BearerFormat = "JWT",
-                Description = "Short-lived internal token restricted to its resource and operation."
-            });
         });
         if (includeInfrastructure)
         {
@@ -159,19 +161,19 @@ public static class ServiceRegistration
         }
         else
         {
-            services.AddScoped<IGameplayFactIntakeStore, OpenApiGameplayFactStore>();
-            services.AddScoped<IPatchUploadStore, OpenApiPatchUploadStore>();
+            services.AddScoped<IGameplayFactIntakeStore, SwaggerGameplayFactStore>();
+            services.AddScoped<IPatchUploadStore, SwaggerPatchUploadStore>();
             services.AddScoped<CreatePatchUpload>();
-            services.AddScoped<IAwdpDefenseTargetStore, OpenApiAwdpDefenseTargetStore>();
+            services.AddScoped<IAwdpDefenseTargetStore, SwaggerAwdpDefenseTargetStore>();
             services.AddScoped<RequestAwdpDefenseTarget>();
-            services.AddScoped<IFixArchiveReader, OpenApiFixArchiveReader>();
-            services.AddScoped<IGameplayFactStatusReader, OpenApiStatusReader>();
-            services.AddScoped<IUserAuthenticationStore, OpenApiAuthenticationStore>();
-            services.AddScoped<ICurrentUserProfilePatchStore, OpenApiAuthenticationStore>();
-            services.AddScoped<IAccessTokenVersionReader, OpenApiAccessTokenVersionReader>();
-            services.AddSingleton<IAccessTokenIssuer, OpenApiTokenIssuer>();
+            services.AddScoped<IFixArchiveReader, SwaggerFixArchiveReader>();
+            services.AddScoped<IGameplayFactStatusReader, SwaggerStatusReader>();
+            services.AddScoped<IUserAuthenticationStore, SwaggerAuthenticationStore>();
+            services.AddScoped<ICurrentUserProfilePatchStore, SwaggerAuthenticationStore>();
+            services.AddScoped<IAccessTokenVersionReader, SwaggerAccessTokenVersionReader>();
+            services.AddSingleton<IAccessTokenIssuer, SwaggerTokenIssuer>();
             services.AddScoped<SubmitFlag>();
-            services.AddSingleton<IGameplayFactAdmissionModePolicy, OpenApiGameplayFactAdmissionModePolicy>();
+            services.AddSingleton<IGameplayFactAdmissionModePolicy, SwaggerGameplayFactAdmissionModePolicy>();
             services.AddScoped<LoginUser>();
             services.AddScoped<RefreshAccessToken>();
             services.AddScoped<GetCurrentUser>();
@@ -187,20 +189,20 @@ public static class ServiceRegistration
             services.AddScoped<ChangePassword>();
             services.AddScoped<LogoutAll>();
             services.AddScoped<ModerateTeam>();
-            services.AddScoped<ITeamModerationStore, OpenApiModerationStore>();
-            services.AddScoped<ICompetitionModerationAuthorizer, OpenApiModerationAuthorizer>();
-            services.AddSingleton<IBackendMessagePublisher, OpenApiBackendMessagePublisher>();
-            services.AddScoped<ILeaderboardCache, OpenApiLeaderboardCache>();
+            services.AddScoped<ITeamModerationStore, SwaggerModerationStore>();
+            services.AddScoped<ICompetitionModerationAuthorizer, SwaggerModerationAuthorizer>();
+            services.AddSingleton<IBackendMessagePublisher, SwaggerBackendMessagePublisher>();
+            services.AddScoped<ILeaderboardCache, SwaggerLeaderboardCache>();
             services.AddSingleton<FluentStorage.Storage.IStore>(
                 _ => FluentStorage.StorageFactory.InMemory());
-            services.AddScoped<IManagedFileUploadRegistry, OpenApiManagedFileUploadRegistry>();
+            services.AddScoped<IManagedFileUploadRegistry, SwaggerManagedFileUploadRegistry>();
             services.AddScoped<ManagedFileUploads>();
-            services.AddSingleton<IAvatarImageProcessor, OpenApiAvatarImageProcessor>();
-            services.AddSingleton<IWallpaperImageProcessor, OpenApiWallpaperImageProcessor>();
-            services.AddScoped<IPasswordResetStore, OpenApiPasswordResetStore>();
+            services.AddSingleton<IAvatarImageProcessor, SwaggerAvatarImageProcessor>();
+            services.AddSingleton<IWallpaperImageProcessor, SwaggerWallpaperImageProcessor>();
+            services.AddScoped<IPasswordResetStore, SwaggerPasswordResetStore>();
             services.AddScoped<RequestPasswordReset>();
             services.AddScoped<CompletePasswordReset>();
-            services.AddScoped<IEmailVerificationStore, OpenApiEmailVerificationStore>();
+            services.AddScoped<IEmailVerificationStore, SwaggerEmailVerificationStore>();
             services.AddScoped<RequestEmailVerification>();
             services.AddScoped<ResendEmailVerification>();
             services.AddScoped<VerifyEmail>();
@@ -228,7 +230,7 @@ public static class ServiceRegistration
         services.AddScoped<ICompetitionLifecycleNotificationPublisher, SignalRCompetitionLifecyclePublisher>();
         if (includeInfrastructure
             && !development
-            && !configuration.GetValue<bool>("OpenApi:Generating"))
+            && !configuration.GetValue<bool>("OpenApi:Exporting"))
         {
             services.AddHostedService<NoCTF.API.SignalR.Publishing.NatsGameplayFactStateRelay>();
             services.AddHostedService<NoCTF.API.SignalR.Publishing.NatsLeaderboardRefreshRelay>();

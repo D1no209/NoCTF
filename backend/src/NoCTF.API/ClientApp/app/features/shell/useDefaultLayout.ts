@@ -52,7 +52,7 @@ export function useDefaultLayout() {
   let unwatchNotifications: (() => void) | undefined
   let notificationBaselineReady = false
   let lastNotificationId: string | null = null
-  let lastNotificationSentAt: Date | string | null = null
+  let lastNotificationSentAt: string | null = null
 
   async function refreshNotifications(showNotice: boolean): Promise<void> {
     const notifications = await refreshUnread()

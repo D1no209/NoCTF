@@ -70,13 +70,12 @@ Development 会 stub 外部 Wolverine transports。验证 NATS 持久投递、�
 
 ## 5. 生成前后端契约
 
-修改 API 后在前端目录直接生成 Kiota SDK，并独立导出文档用于契约审查：
+修改 API 后从仓库根导出 OpenAPI，再生成前端 SDK：
 
 ```powershell
+dotnet run --project backend/src/NoCTF.Host/NoCTF.Host.csproj -- --export-openapi
 Push-Location backend/src/NoCTF.API/ClientApp
 bun run api:gen
-bun run api:export
-bun run api:check
 Pop-Location
 ```
 

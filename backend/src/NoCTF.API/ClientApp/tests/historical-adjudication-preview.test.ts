@@ -8,9 +8,9 @@ const source = readFileSync(
 
 describe('historical adjudication difference preview', () => {
   test('uses the generated read-only SDK with bounded cursor pagination', () => {
-    expect(source).toMatch(/api\.api\.v1\.admin\.competitions\.byCompetitionId\([^)]*\)\.gameplayFacts\.adjudicationDifferences\.get\(/)
+    expect(source).toContain('adminPreviewHistoricalAdjudicationDifferences')
     expect(source).toContain('const cursor = previewCursor.value')
-    expect(source).toContain('cursor: cursor ?? undefined,')
+    expect(source).toContain('cursor,')
     expect(source).toContain('limit: 30')
     expect(source).toContain("previewCursor.value = data.nextCursor ?? null")
   })

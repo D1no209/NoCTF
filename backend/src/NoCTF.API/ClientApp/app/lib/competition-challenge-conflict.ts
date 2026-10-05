@@ -1,7 +1,10 @@
-import type { NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeConflictCode, NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeConflictResponse } from '../api/models'
+import type {
+  NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictCode,
+  NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictResponse,
+} from '../api'
 import { translate } from '../utils/i18n'
 
-function readConflictCode(error: unknown): NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeConflictCode | undefined {
+function readConflictCode(error: unknown): NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictCode | undefined {
   if (!error || typeof error !== 'object' || !('code' in error))
     return undefined
 
@@ -18,8 +21,8 @@ function readConflictCode(error: unknown): NoCTFAPIEndpointsAdministrationChalle
   }
 }
 
-export function competitionChallengeConflictMessage(error: unknown): string | null | undefined {
-  const code: NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeConflictResponse['code'] | undefined
+export function competitionChallengeConflictMessage(error: unknown): string | undefined {
+  const code: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictResponse['code'] | undefined
     = readConflictCode(error)
 
   switch (code) {

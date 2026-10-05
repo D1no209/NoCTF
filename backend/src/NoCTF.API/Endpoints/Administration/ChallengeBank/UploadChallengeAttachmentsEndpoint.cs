@@ -80,7 +80,6 @@ public sealed class UploadChallengeAttachmentsEndpoint(
         Post("/admin/challenges/{challengeId}/attachments");
         AuthSchemes("Bearer");
         AllowFileUploads();
-        Description(builder => builder.Accepts<UploadChallengeAttachmentsRequest>("multipart/form-data"));
         Description(builder => builder.WithName("AdminChallengeBankUploadAttachments"));
         Summary(summary =>
         {

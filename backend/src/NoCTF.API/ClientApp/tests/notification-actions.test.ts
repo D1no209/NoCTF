@@ -68,7 +68,7 @@ describe('competition announcement access', () => {
     ).text()
 
     expect(page).toContain('canJudge')
-    expect(page).toMatch(/api\.api\.v1\.admin\.competitions\.byCompetitionId\([^)]*\)\.announcements\.post\(/)
+    expect(page).toContain("adminCreateCompetitionAnnouncement({")
     expect(page).toContain("('Participants')")
     expect(endpoint).toContain('authorizer.CanJudgeAsync(')
   })

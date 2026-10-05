@@ -59,8 +59,8 @@ describe('leaderboard progressive display', () => {
     expect(page).toContain("<component :is=\"ScoreboardSlotStatus\"")
     expect(page).toContain("slot?.scoreState === 'Settled'")
     expect(page).toContain("slot?.scoreState === 'Settled' ? slot.netPoints ?? 0 : ''")
-    expect(page).toMatch(/api\.api\.v1\.competitions\.byCompetitionId\([^)]*\)\.leaderboard\.teams\.byTeamId\([^)]*\)\.columns\.byColumnIndex\([^)]*\)\.get\(/)
-    expect(page).toMatch(/api\.api\.v1\.competitions\.byCompetitionId\([^)]*\)\.leaderboard\.teams\.byTeamId\([^)]*\)\.adjustments\.get\(/)
+    expect(page).toContain('getScoreboardSlotDetailEndpoint')
+    expect(page).toContain('getScoreboardAdjustmentDetailEndpoint')
     expect(page).toContain('(team.globalAdjustmentCount ?? 0) > 0')
     expect(page).toContain("leaderboard.competitionsBy.description.completeAdjustmentHistoryComes")
     expect(page).toContain("leaderboard.competitionsBy.description.scoresStatesComeAuthoritative")
@@ -72,7 +72,7 @@ describe('leaderboard progressive display', () => {
   })
 
   test('keeps the overall CTF trend above the matrix and moves the team trend into team detail', () => {
-    expect(page).toMatch(/api\.api\.v1\.competitions\.byCompetitionId\([^)]*\)\.leaderboard\.trends\.get\(/)
+    expect(page).toContain('getLeaderboardTrendsEndpoint')
     expect(page).toContain("const visibleTrendSeries = computed<TrendSeries[]>")
     expect(page).toContain("teams.value")
     expect(page).not.toContain("$t('common.label.overallScoreTrend')")

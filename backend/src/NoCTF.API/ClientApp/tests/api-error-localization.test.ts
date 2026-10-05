@@ -53,7 +53,8 @@ describe('api error localization', () => {
     }).message).toBe('Title must not be empty.')
 
     expect(parseApiError({ status: 400 }, '保存题目失败').message).toBe('保存题目失败')
-    expect(parseApiError({ responseStatusCode: 422 }, '保存题目失败').message).toBe('保存题目失败')
+    expect(apiPlugin).toContain("status === 400 || status === 422")
+    expect(apiPlugin).toContain('? { status }')
   })
 
   test('keeps the same backend details in the English locale', () => {

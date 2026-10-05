@@ -1,11 +1,9 @@
-
-import { api, RequestPolicyOption } from '../../../../../lib/api'
 import { message as describeMessage } from '../../../../../utils/i18n'
 import type { UiMessage } from '../../../../../utils/i18n'
 import { Plus, Trash2, RefreshCw } from '@lucide/vue'
 import { toast } from '../../../../../utils/message-toast'
-
-import type { NoCTFAPIEndpointsAdministrationCompetitionsCompetitionDirectionResponse as Direction } from '~/api/models'
+import { adminGetCompetitionDirections, adminSaveCompetitionDirections, adminListCompetitionChallenges } from '~/api'
+import type { NoCtfapiEndpointsAdministrationCompetitionsCompetitionDirectionResponse as Direction } from '~/api'
 import { useCompetitionAdmin } from '~/lib/admin-competition'
 import { isLucideIconName, normalizeLucideIconName } from '~/lib/lucide-icon-name'
 
@@ -17,7 +15,7 @@ export function validateCompetitionDirections(items: ReadonlyArray<Direction>): 
 
 export function useAdminCompetitionsByIdDirectionsPage() {
   const { competitionId, canWrite } = useCompetitionAdmin()
-  const items = ref<Array<Direction & { name: string; icon: string }>>([])
+  const items = ref<Direction[]>([])
   const loading = ref(true)
   const saving = ref(false)
   const error = ref<UiMessage | null>(null)
@@ -31,23 +29,18 @@ export function useAdminCompetitionsByIdDirectionsPage() {
     request = new AbortController()
     loading.value = true
     error.value = null
-    const settledRequests = await Promise.allSettled([
-      api.api.v1.admin.competitions.byCompetitionId(competitionId).directions.get({ options: [new RequestPolicyOption({ signal: request.signal })] }),
-      api.api.v1.admin.competitions.byCompetitionId(competitionId).challenges.get({ queryParameters: { includeDeleted: true }, options: [new RequestPolicyOption({ signal: request.signal })] }),
-    ]);
-    const catalog = settledRequests[0].status === 'fulfilled' ? settledRequests[0].value : undefined;
-    const catalogError = settledRequests[0].status === 'rejected' ? settledRequests[0].reason : undefined;
-    const challenges = settledRequests[1].status === 'fulfilled' ? settledRequests[1].value : undefined;
-    const challengesError = settledRequests[1].status === 'rejected' ? settledRequests[1].reason : undefined;
-
+    const [catalog, challenges] = await Promise.all([
+      adminGetCompetitionDirections({ path: { competitionId }, signal: request.signal }),
+      adminListCompetitionChallenges({ path: { competitionId }, query: { includeDeleted: true }, signal: request.signal }),
+    ])
     if (version !== generation) return
     loading.value = false
-    if (catalogError || !catalog || challengesError) {
-      error.value = parseApiError(catalogError ?? challengesError).displayMessage
+    if (catalog.error || !catalog.data || challenges.error) {
+      error.value = parseApiError(catalog.error ?? challenges.error).displayMessage
       return
     }
-    items.value = (catalog.items ?? []).map(item => ({ ...item, name: item.name ?? '', icon: item.icon ?? '' }))
-    used.value = new Set((challenges?.items ?? []).flatMap(item => item.directionId ? [item.directionId] : []))
+    items.value = catalog.data.items ?? []
+    used.value = new Set((challenges.data?.items ?? []).flatMap(item => item.directionId ? [item.directionId] : []))
   }
   function add() { items.value.push({ id: crypto.randomUUID(), name: '', icon: 'flag' }) }
   function remove(item: Direction) {
@@ -60,15 +53,15 @@ export function useAdminCompetitionsByIdDirectionsPage() {
     error.value = null
     const version = generation
     try {
-      let resultError: unknown;
-      const result = await api.api.v1.admin.competitions.byCompetitionId(competitionId).directions.put({ items: items.value.map(item => ({ ...item, name: item.name?.trim(), icon: normalizeLucideIconName(item.icon ?? '') })) }).catch(cause => { resultError = cause; return undefined });
+      const result = await adminSaveCompetitionDirections({ path: { competitionId },
+        body: { items: items.value.map(item => ({ ...item, name: item.name?.trim(), icon: normalizeLucideIconName(item.icon ?? '') })) } })
       if (version !== generation) return
-      if (resultError || !result) {
-        const code = resultError && typeof resultError === 'object' && 'code' in resultError ? resultError.code : null
-        error.value = code ? translate(`directionSettings.errors.${code}`) : parseApiError(resultError).displayMessage
+      if (result.error || !result.data) {
+        const code = result.error && typeof result.error === 'object' && 'code' in result.error ? result.error.code : null
+        error.value = code ? translate(`directionSettings.errors.${code}`) : parseApiError(result.error).displayMessage
         return
       }
-      items.value = (result.items ?? []).map(item => ({ ...item, name: item.name ?? '', icon: item.icon ?? '' }))
+      items.value = result.data.items ?? []
       toast.success(describeMessage('directionSettings.saved'))
     }
     catch (failure) { if (version === generation) error.value = parseApiError(failure).displayMessage }

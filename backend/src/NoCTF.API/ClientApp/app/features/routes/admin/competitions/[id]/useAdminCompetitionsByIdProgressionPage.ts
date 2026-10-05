@@ -1,11 +1,20 @@
-
-import { api, multipartBody } from '../../../../../lib/api'
 import { message as describeMessage } from '../../../../../utils/i18n'
 import type { UiMessage } from '../../../../../utils/i18n'
 import type { Connection, Edge, Node } from '@vue-flow/core'
 import { toast } from '../../../../../utils/message-toast'
-
-import type { NoCTFAPIEndpointsAdministrationCompetitionsCompetitionBadgeContract, NoCTFAPIEndpointsChallengesChallengeSummaryResponse } from '../../../../../api/models'
+import {
+  adminCreateCompetitionBadge,
+  adminDeleteCompetitionBadge,
+  adminGetCompetitionProgression,
+  adminListCompetitionBadges,
+  adminListCompetitionChallenges,
+  adminSaveCompetitionProgression,
+  adminUpdateCompetitionBadge,
+} from '../../../../../api'
+import type {
+  NoCtfapiEndpointsAdministrationCompetitionsCompetitionBadgeContract,
+  NoCtfapiEndpointsChallengesChallengeSummaryResponse,
+} from '../../../../../api'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
 import {
   applyProgressionSelectionChanges,
@@ -23,7 +32,7 @@ import { directionKey } from '../../../../../utils/directions'
 import ProgressionCanvasComponent from '~/components/ui/progression/ProgressionCanvas.vue'
 import { markRaw } from 'vue'
 
-type CanvasData = { kind: 0 | 1, resourceId: string, title: string, requiresPrerequisites: boolean, imageUrl?: string | null }
+type CanvasData = { kind: 0 | 1, resourceId: string, title: string, requiresPrerequisites: boolean, imageUrl?: string }
 type GateData = { condition: 0 | 1 }
 type CanvasNode = Node<CanvasData>
 type GateEdge = Edge<GateData>
@@ -41,8 +50,8 @@ export function useAdminCompetitionsByIdProgressionPage() {
   const batch = shallowRef<{ sourceId: string, condition: 0 | 1, targets: Set<string> } | null>(null)
   const layoutRevision = ref(0)
   let layoutGeneration = 0
-  const badges = ref<NoCTFAPIEndpointsAdministrationCompetitionsCompetitionBadgeContract[]>([])
-  const challenges = ref<NoCTFAPIEndpointsChallengesChallengeSummaryResponse[]>([])
+  const badges = ref<NoCtfapiEndpointsAdministrationCompetitionsCompetitionBadgeContract[]>([])
+  const challenges = ref<NoCtfapiEndpointsChallengesChallengeSummaryResponse[]>([])
   const challengeSearch = ref('')
   const challengeDirection = ref('all')
   const loading = ref(true)
@@ -108,23 +117,19 @@ export function useAdminCompetitionsByIdProgressionPage() {
     cancelBatch()
     const currentLayout = ++layoutGeneration
     loading.value = true
-    const settledRequests = await Promise.allSettled([
-      api.api.v1.admin.competitions.byCompetitionId(competitionId).progression.get(),
-      api.api.v1.admin.competitions.byCompetitionId(competitionId).badges.get(),
-      api.api.v1.admin.competitions.byCompetitionId(competitionId).challenges.get({ queryParameters: { includeDeleted: false } }),
-    ]);
-    const graphResult = settledRequests[0].status === 'fulfilled' ? settledRequests[0].value : undefined;
-    const badgeResult = settledRequests[1].status === 'fulfilled' ? settledRequests[1].value : undefined;
-    const challengeResult = settledRequests[2].status === 'fulfilled' ? settledRequests[2].value : undefined;
-
-    if (!graphResult || !badgeResult || !challengeResult) {
+    const [graphResult, badgeResult, challengeResult] = await Promise.all([
+      adminGetCompetitionProgression({ path: { competitionId } }),
+      adminListCompetitionBadges({ path: { competitionId } }),
+      adminListCompetitionChallenges({ path: { competitionId }, query: { includeDeleted: false } }),
+    ])
+    if (!graphResult.data || !badgeResult.data || !challengeResult.data) {
       loading.value = false
       error.value = describeMessage('progression.loadFailed')
       return
     }
-    badges.value = badgeResult.items ?? []
-    challenges.value = challengeResult.items ?? []
-    const graph = graphResult
+    badges.value = badgeResult.data.items ?? []
+    challenges.value = challengeResult.data.items ?? []
+    const graph = graphResult.data
     if (graph.nodes?.some(node => !node.id || (node.kind !== 0 && node.kind !== 1)
       || typeof node.requiresPrerequisites !== 'boolean'
       || !(node.kind === 0 ? node.challenge?.competitionChallengeId : node.badge?.competitionBadgeId))
@@ -171,7 +176,7 @@ export function useAdminCompetitionsByIdProgressionPage() {
     loading.value = false
   }
 
-  async function arrange(expectedGeneration?: number | null) {
+  async function arrange(expectedGeneration?: number) {
     if (batch.value || !nodes.value.length) return
     const generation = expectedGeneration ?? ++layoutGeneration
     try {
@@ -196,7 +201,7 @@ export function useAdminCompetitionsByIdProgressionPage() {
     }
   }
 
-  function addChallenge(challenge: NoCTFAPIEndpointsChallengesChallengeSummaryResponse) {
+  function addChallenge(challenge: NoCtfapiEndpointsChallengesChallengeSummaryResponse) {
     if (batch.value || !challenge.id || nodes.value.some(node => node.data?.kind === 0 && node.data.resourceId === challenge.id))
       return
     layoutGeneration++
@@ -208,7 +213,7 @@ export function useAdminCompetitionsByIdProgressionPage() {
     }]
   }
 
-  function addBadge(badge: NoCTFAPIEndpointsAdministrationCompetitionsCompetitionBadgeContract) {
+  function addBadge(badge: NoCtfapiEndpointsAdministrationCompetitionsCompetitionBadgeContract) {
     if (batch.value || !badge.id) return
     layoutGeneration++
     nodes.value = [...nodes.value, {
@@ -320,8 +325,9 @@ export function useAdminCompetitionsByIdProgressionPage() {
   async function save() {
     if (!canWrite.value || saving.value || batch.value) return
     saving.value = true
-    let saveError: unknown;
-    const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).progression.put({
+    const { data, error: saveError } = await adminSaveCompetitionProgression({
+      path: { competitionId },
+      body: {
         expectedConcurrencyStamp: stamp.value,
         enabled: enabled.value, showPlayerMap: showPlayerMap.value,
         nodes: nodes.value.map(node => ({
@@ -334,7 +340,8 @@ export function useAdminCompetitionsByIdProgressionPage() {
           id: edge.id, sourceNodeId: edge.source,
           targetNodeId: edge.target, condition: edge.data?.condition ?? 0,
         })),
-      }).catch(cause => { saveError = cause; return undefined });
+      },
+    })
     saving.value = false
     if (!data || saveError) {
       error.value = parseApiError(saveError, describeMessage('progression.saveFailed')).displayMessage
@@ -353,7 +360,7 @@ export function useAdminCompetitionsByIdProgressionPage() {
     editBadgeImage.value = (event.target as HTMLInputElement).files?.[0] ?? null
   }
 
-  function beginEditBadge(badge: NoCTFAPIEndpointsAdministrationCompetitionsCompetitionBadgeContract) {
+  function beginEditBadge(badge: NoCtfapiEndpointsAdministrationCompetitionsCompetitionBadgeContract) {
     editingBadgeId.value = badge.id ?? null
     editBadgeName.value = badge.name ?? ''
     editBadgeDescription.value = badge.description ?? ''
@@ -364,12 +371,14 @@ export function useAdminCompetitionsByIdProgressionPage() {
   async function updateBadge() {
     if (!canWrite.value || !editingBadgeId.value || !editBadgeName.value.trim()) return
     badgeSaving.value = true
-    let updateError: unknown;
-    const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).badges.byBadgeId(editingBadgeId.value).put(await multipartBody({
+    const { data, error: updateError } = await adminUpdateCompetitionBadge({
+      path: { competitionId, badgeId: editingBadgeId.value },
+      body: {
         name: editBadgeName.value.trim(),
         description: editBadgeDescription.value.trim() || null,
         image: editBadgeImage.value,
-      })).catch(cause => { updateError = cause; return undefined });
+      },
+    })
     badgeSaving.value = false
     if (!data || updateError) {
       error.value = parseApiError(updateError, describeMessage('progression.badgeUpdateFailed')).displayMessage
@@ -387,12 +396,14 @@ export function useAdminCompetitionsByIdProgressionPage() {
   async function createBadge() {
     if (!canWrite.value || !newBadgeName.value.trim() || !newBadgeImage.value) return
     badgeSaving.value = true
-    let createError: unknown;
-    const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).badges.post(await multipartBody({
+    const { data, error: createError } = await adminCreateCompetitionBadge({
+      path: { competitionId },
+      body: {
         name: newBadgeName.value.trim(),
         description: newBadgeDescription.value.trim() || null,
         image: newBadgeImage.value,
-      })).catch(cause => { createError = cause; return undefined });
+      },
+    })
     badgeSaving.value = false
     if (!data || createError) {
       error.value = parseApiError(createError, describeMessage('progression.badgeCreateFailed')).displayMessage
@@ -411,8 +422,9 @@ export function useAdminCompetitionsByIdProgressionPage() {
       toast.error(describeMessage('progression.badgeInUse'))
       return
     }
-    let deleteError: unknown;
-    await api.api.v1.admin.competitions.byCompetitionId(competitionId).badges.byBadgeId(badgeId).delete().catch(cause => { deleteError = cause; return undefined });
+    const { error: deleteError } = await adminDeleteCompetitionBadge({
+      path: { competitionId, badgeId },
+    })
     if (deleteError) {
       error.value = parseApiError(deleteError, describeMessage('progression.badgeDeleteFailed')).displayMessage
       return

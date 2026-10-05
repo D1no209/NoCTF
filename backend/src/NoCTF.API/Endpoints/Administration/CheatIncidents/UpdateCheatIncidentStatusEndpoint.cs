@@ -45,7 +45,7 @@ public sealed class UpdateCheatIncidentStatusEndpoint(
         Description(builder => builder
             .WithName("AdminUpdateCheatIncidentStatus")
             .ProducesProblemFE(StatusCodes.Status409Conflict));
-        Summary(summary => { summary.Summary = "Updates a cheat incident status."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Updates a cheat incident status.");
     }
 
     public override async Task<

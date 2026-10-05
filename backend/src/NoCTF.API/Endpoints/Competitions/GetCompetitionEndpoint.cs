@@ -206,13 +206,7 @@ public sealed class GetCompetitionEndpoint(
     TimeProvider timeProvider)
     : Endpoint<GetCompetitionRequest, Results<Ok<CompetitionResponse>, NotFound>>
 {
-    public override void Configure() {
-        Summary(summary =>
-        {
-            summary.Summary = "Returns competition details visible to the current caller.";
-            summary.Description = summary.Summary;
-        });
- Get("/competitions/{competitionId}"); AllowAnonymous(); }
+    public override void Configure() { Get("/competitions/{competitionId}"); AllowAnonymous(); }
 
     public override async Task<Results<Ok<CompetitionResponse>, NotFound>> ExecuteAsync(GetCompetitionRequest request, CancellationToken ct)
     {

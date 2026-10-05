@@ -13,12 +13,7 @@
     <PackageVersion Include="EFCore.NamingConventions" Version="10.0.1" />
     <PackageVersion Include="FastEndpoints" Version="8.2.0" />
     <PackageVersion Include="FastEndpoints.Security" Version="8.2.0" />
-    <PackageVersion Include="FastEndpoints.OpenApi" Version="8.2.0" />
-    <PackageVersion Include="FastEndpoints.OpenApi.Kiota" Version="8.2.0" />
-    <PackageVersion Include="Microsoft.OpenApi.Kiota.Builder" Version="1.29.1" />
-    <PackageVersion Include="Microsoft.Kiota.Abstractions" Version="1.22.0" />
-    <PackageVersion Include="Microsoft.OpenApi" Version="2.12.0" />
-    <PackageVersion Include="Scalar.AspNetCore" Version="2.16.5" />
+    <PackageVersion Include="FastEndpoints.Swagger" Version="8.2.0" />
     <PackageVersion Include="KubernetesClient" Version="19.0.2" />
     <PackageVersion Include="CliWrap" Version="3.10.5" />
     <PackageVersion Include="MailKit" Version="4.17.0" />

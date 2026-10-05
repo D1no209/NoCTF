@@ -1,7 +1,7 @@
-import type { NoCTFAPIEndpointsCompetitionsCompetitionResponse, NoCTFAPIEndpointsTeamsTeamResponse } from '../api/models'
+import type { NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../api'
 
-type Competition = Pick<NoCTFAPIEndpointsCompetitionsCompetitionResponse, 'mode' | 'status' | 'practiceModeEnabled' | 'allowTeamRegistrationWhileRunning'>
-type Team = Pick<NoCTFAPIEndpointsTeamsTeamResponse, 'registrationStatus' | 'isBanned'>
+type Competition = Pick<NoCtfapiEndpointsCompetitionsCompetitionResponse, 'mode' | 'status' | 'practiceModeEnabled' | 'allowTeamRegistrationWhileRunning'>
+type Team = Pick<NoCtfapiEndpointsTeamsTeamResponse, 'registrationStatus' | 'isBanned'>
 
 export function isCtfPracticeOpen(competition: Competition | null | undefined): boolean {
   return competition?.mode === 'Ctf'

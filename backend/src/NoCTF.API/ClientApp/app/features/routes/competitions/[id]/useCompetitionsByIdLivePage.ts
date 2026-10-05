@@ -1,13 +1,11 @@
-
-import { api } from '../../../../lib/api'
 import { message as describeMessage } from '../../../../utils/i18n'
 import type { UiMessage } from '../../../../utils/i18n'
 
 import type { ComponentPublicInstance } from 'vue'
 import { Clock3, Expand, Minimize, Radio, RefreshCw, ShieldCheck, Trophy, Users, X } from '@lucide/vue'
 import { toast } from '../../../../utils/message-toast'
-
-import type { NoCTFAPIEndpointsCompetitionsCompetitionResponse } from '../../../../api/models'
+import { getCompetitionEndpoint } from '../../../../api'
+import type { NoCtfapiEndpointsCompetitionsCompetitionResponse } from '../../../../api'
 import { controlScreenChallenges, controlScreenPublicEntries, controlScreenSolveFeed, reconcileControlScreenSolves } from '../../../../utils/control-screen'
 import type { ControlScreenBloodRank, ControlScreenSolve } from '../../../../utils/control-screen'
 import { createTrailingRefresh } from '../../../../lib/latest-page-refresh'
@@ -26,7 +24,7 @@ export function useCompetitionsByIdLivePage() {
 
   const board = useScoreboardMatrix(competitionId)
 
-  const competition = ref<NoCTFAPIEndpointsCompetitionsCompetitionResponse | null>(null)
+  const competition = ref<NoCtfapiEndpointsCompetitionsCompetitionResponse | null>(null)
 
   const loading = ref(true)
 
@@ -133,7 +131,7 @@ export function useCompetitionsByIdLivePage() {
     return 'live-blood-solve'
   }
 
-  function rankClass(rank?: number | null): string {
+  function rankClass(rank?: number): string {
     if (rank === 1) return 'live-rank-first'
     if (rank === 2) return 'live-rank-second'
     if (rank === 3) return 'live-rank-third'
@@ -221,16 +219,15 @@ export function useCompetitionsByIdLivePage() {
 
   async function loadData(): Promise<void> {
     refreshing.value = Boolean(competition.value || board.snapshot.value)
-    let competitionResultError: unknown;
-    const competitionResult = await api.api.v1.competitions.byCompetitionId(competitionId).get().catch(cause => { competitionResultError = cause; return undefined });
+    const competitionResult = await getCompetitionEndpoint({ path: { competitionId } })
     loading.value = false
     refreshing.value = false
 
-    if (competitionResultError || !competitionResult) {
-      error.value = parseApiError(competitionResultError, t("common.error.loadingCompetitionFailed")).displayMessage
+    if (competitionResult.error || !competitionResult.data) {
+      error.value = parseApiError(competitionResult.error, t("common.error.loadingCompetitionFailed")).displayMessage
       return
     }
-    competition.value = competitionResult
+    competition.value = competitionResult.data
     if (competition.value.mode !== 'Ctf') {
       projectionPending.value = false
       error.value = t("competitions.competitionsBy.description.dLiveScreenCurrently")

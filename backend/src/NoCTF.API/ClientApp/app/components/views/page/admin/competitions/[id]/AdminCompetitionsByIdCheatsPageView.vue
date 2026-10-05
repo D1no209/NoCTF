@@ -59,7 +59,7 @@ const { adminUserPath, adminTeamPath, adminChallengePath, competitionId, filterS
           </TableRow>
         </TableHeader>
         <TableBody>
-          <TableRow v-for="i in items" :key="i.gameplayFactId ?? undefined">
+          <TableRow v-for="i in items" :key="i.gameplayFactId">
             <TableCell class="font-medium">
               <NuxtLink :to="adminTeamPath(competitionId, i.sourceTeamId)" class="hover:underline">{{ i.sourceTeamName }}</NuxtLink>
               <Badge v-if="i.sourceTeamIsBanned" variant="destructive" class="ml-1">{{ $t('common.label.banned') }}</Badge>

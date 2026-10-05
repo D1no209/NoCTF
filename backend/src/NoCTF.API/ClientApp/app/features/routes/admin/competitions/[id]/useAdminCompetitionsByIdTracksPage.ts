@@ -1,11 +1,14 @@
-
-import { api } from '../../../../../lib/api'
 import { message as describeMessage } from '../../../../../utils/i18n'
 import type { UiMessage } from '../../../../../utils/i18n'
 import { Plus, Save, Trash2 } from '@lucide/vue'
 import { toast } from '../../../../../utils/message-toast'
-
-import type { NoCTFAPIEndpointsAdministrationCompetitionsRemovedTrackReassignmentRequest, NoCTFAPIEndpointsAdministrationCompetitionsCompetitionSsoProviderResponse, NoCTFAPIEndpointsAdministrationCompetitionsUpdateCompetitionTrackRequest, NoCTFAPIEndpointsTeamsTeamResponse } from '../../../../../api/models'
+import { adminGetCompetition, adminListTeams, adminPatchCompetition } from '../../../../../api'
+import type {
+  NoCtfapiEndpointsAdministrationCompetitionsRemovedTrackReassignmentRequest,
+  NoCtfapiEndpointsAdministrationCompetitionsCompetitionSsoProviderResponse,
+  NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionTrackRequest,
+  NoCtfapiEndpointsTeamsTeamResponse,
+} from '../../../../../api'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
 import {
   competitionTrackErrorMessage,
@@ -13,9 +16,7 @@ import {
   nextCompetitionTrackOrdinal,
 } from '../../../../../lib/competition-track'
 
-type TrackForm = Omit<NoCTFAPIEndpointsAdministrationCompetitionsUpdateCompetitionTrackRequest, 'invitationCode' | 'key' | 'name'> & {
-  key: string
-  name: string
+type TrackForm = Omit<NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionTrackRequest, 'invitationCode'> & {
   clientId: string
   existingKey: string | null
   requiresInvitationCode: boolean
@@ -39,9 +40,9 @@ export function useAdminCompetitionsByIdTracksPage() {
   const enabled = ref(false)
   const canUpdate = ref(false)
   const tracks = ref<TrackForm[]>([])
-  const ssoProviders = ref<NoCTFAPIEndpointsAdministrationCompetitionsCompetitionSsoProviderResponse[]>([])
-  const teams = ref<NoCTFAPIEndpointsTeamsTeamResponse[]>([])
-  const removedTrackReassignments = ref<NoCTFAPIEndpointsAdministrationCompetitionsRemovedTrackReassignmentRequest[]>([])
+  const ssoProviders = ref<NoCtfapiEndpointsAdministrationCompetitionsCompetitionSsoProviderResponse[]>([])
+  const teams = ref<NoCtfapiEndpointsTeamsTeamResponse[]>([])
+  const removedTrackReassignments = ref<NoCtfapiEndpointsAdministrationCompetitionsRemovedTrackReassignmentRequest[]>([])
   const pendingRemoval = ref<PendingTrackRemoval | null>(null)
   const disableConfirmationOpen = ref(false)
   const loading = ref(true)
@@ -61,33 +62,28 @@ export function useAdminCompetitionsByIdTracksPage() {
 
   async function load() {
     loading.value = true
-    const settledRequests = await Promise.allSettled([
-      api.api.v1.admin.competitions.byCompetitionId(competitionId).get(),
-      api.api.v1.admin.competitions.byCompetitionId(competitionId).teams.get({ queryParameters: { keyword: undefined, offset: 0, limit: 200, desc: false } }),
-    ]);
-    const competitionResult = settledRequests[0].status === 'fulfilled' ? settledRequests[0].value : undefined;
-    const competitionResultError = settledRequests[0].status === 'rejected' ? settledRequests[0].reason : undefined;
-    const teamResult = settledRequests[1].status === 'fulfilled' ? settledRequests[1].value : undefined;
-    const teamResultError = settledRequests[1].status === 'rejected' ? settledRequests[1].reason : undefined;
-
+    const [competitionResult, teamResult] = await Promise.all([
+      adminGetCompetition({ path: { competitionId } }),
+      adminListTeams({ path: { competitionId }, query: { keyword: null, offset: 0, limit: 200, desc: false } }),
+    ])
     loading.value = false
-    if (competitionResultError || !competitionResult) {
+    if (competitionResult.error || !competitionResult.data) {
       error.value = competitionTrackErrorMessage(
-        competitionResultError,
+        competitionResult.error,
         translate('administration.competitionsBy.error.loadTrackConfigurationFailed'),
       )
       return
     }
-    if (teamResultError || !teamResult) {
-      error.value = parseApiError(teamResultError, describeMessage('administration.competitionsBy.error.loadRegisteredTeamsFailed')).displayMessage
+    if (teamResult.error || !teamResult.data) {
+      error.value = parseApiError(teamResult.error, describeMessage('administration.competitionsBy.error.loadRegisteredTeamsFailed')).displayMessage
       return
     }
 
-    const data = competitionResult
+    const data = competitionResult.data
     mode.value = data.competition?.mode ?? 'Ctf'
     enabled.value = data.tracks?.enabled ?? data.competition?.tracksEnabled ?? false
     canUpdate.value = data.tracks?.canUpdate ?? false
-    teams.value = teamResult.items ?? []
+    teams.value = teamResult.data.items ?? []
     ssoProviders.value = data.ssoProviders ?? []
     removedTrackReassignments.value = []
     pendingRemoval.value = null
@@ -115,7 +111,7 @@ export function useAdminCompetitionsByIdTracksPage() {
   }
 
   function addTrack() {
-    const ordinal = nextCompetitionTrackOrdinal(tracks.value.flatMap(track => track.key ? [track.key] : []))
+    const ordinal = nextCompetitionTrackOrdinal(tracks.value.map(track => track.key))
     tracks.value.push({
       clientId: crypto.randomUUID(),
       existingKey: null,
@@ -261,7 +257,7 @@ export function useAdminCompetitionsByIdTracksPage() {
 
   async function save() {
     if (saving.value || !canUpdate.value || !canWrite.value) return
-    const duplicateTrackKey = duplicateCompetitionTrackKey(tracks.value.flatMap(track => track.key ? [track.key] : []))
+    const duplicateTrackKey = duplicateCompetitionTrackKey(tracks.value.map(track => track.key))
     if (duplicateTrackKey) {
       error.value = describeMessage('administration.label.duplicateTrackKey', { key: duplicateTrackKey })
       toast.error(error.value)
@@ -281,8 +277,9 @@ export function useAdminCompetitionsByIdTracksPage() {
       return
     }
     saving.value = true
-    let requestError: unknown;
-    const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).patch({
+    const { data, error: requestError } = await adminPatchCompetition({
+      path: { competitionId },
+      body: {
         tracks: {
           enabled: enabled.value,
           tracks: tracks.value.map(track => ({
@@ -304,7 +301,8 @@ export function useAdminCompetitionsByIdTracksPage() {
           })),
           removedTrackReassignments: enabled.value ? removedTrackReassignments.value : [],
         },
-      }).catch(cause => { requestError = cause; return undefined });
+      },
+    })
     saving.value = false
     if (requestError || !data) {
       error.value = competitionTrackErrorMessage(requestError, translate('administration.competitionsBy.error.saveTrackConfigurationFailed'))

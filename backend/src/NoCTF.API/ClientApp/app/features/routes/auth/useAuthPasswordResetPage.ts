@@ -1,10 +1,8 @@
-
-import { api } from '../../../lib/api'
 import { message as describeMessage } from '../../../utils/i18n'
 import type { UiMessage } from '../../../utils/i18n'
 
 
-
+import { authenticationCompletePasswordReset, authenticationRequestPasswordReset } from '../../../api'
 
 /** Owns state, effects and commands for AuthPasswordResetPage. */
 export function useAuthPasswordResetPage() {
@@ -32,8 +30,7 @@ export function useAuthPasswordResetPage() {
     error.value = null
     pending.value = true
     try {
-      let apiError: unknown;
-      await api.api.v1.auth.passwordReset.request.post({ email: email.value }).catch(cause => { apiError = cause; return undefined });
+      const { error: apiError } = await authenticationRequestPasswordReset({ body: { email: email.value } })
       if (apiError) throw parseApiError(apiError)
       requested.value = true
     }
@@ -53,8 +50,9 @@ export function useAuthPasswordResetPage() {
     }
     pending.value = true
     try {
-      let apiError: unknown;
-      await api.api.v1.auth.passwordReset.complete.post({ token: token.value!, newPassword: newPassword.value }).catch(cause => { apiError = cause; return undefined });
+      const { error: apiError } = await authenticationCompletePasswordReset({
+        body: { token: token.value!, newPassword: newPassword.value },
+      })
       if (apiError) throw parseApiError(apiError)
       completed.value = true
     }

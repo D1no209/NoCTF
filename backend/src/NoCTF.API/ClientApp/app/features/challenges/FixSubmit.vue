@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { bindViewState } from '~/features/shared/view-state'
 
-import type { NoCTFAPIEndpointsGameplayFactsAwdpDefenseProgressResponse, NoCTFAPIEndpointsGameplayFactsPatchVerificationStateResponse } from '~/api/models'
+import type { NoCtfapiEndpointsGameplayFactsAwdpDefenseProgressResponse, NoCtfapiEndpointsGameplayFactsPatchVerificationStateResponse } from '~/api'
 import { useFixSubmit } from './useFixSubmit'
 import View from '~/components/views/challenges/FixSubmitView.vue'
 
 const props = defineProps<{
   competitionId: string
   competitionChallengeId: string
-  defense?: NoCTFAPIEndpointsGameplayFactsAwdpDefenseProgressResponse | NoCTFAPIEndpointsGameplayFactsPatchVerificationStateResponse
+  defense?: NoCtfapiEndpointsGameplayFactsAwdpDefenseProgressResponse | NoCtfapiEndpointsGameplayFactsPatchVerificationStateResponse
   ctfPatchVerification?: boolean
 }>()
 const emit = defineEmits<{ changed: [], accepted: [] }>()

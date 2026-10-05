@@ -1,7 +1,3 @@
-
-import { ResponseMetadata } from '../../lib/api'
-
-import { api, RequestPolicyOption } from '../../lib/api'
 import { message as describeMessage } from '../../utils/i18n'
 import type { UiMessage } from '../../utils/i18n'
 import { markRaw } from 'vue'
@@ -9,15 +5,15 @@ import { markRaw } from 'vue'
 import { canEnterCompetition, canRegisterForCompetition, isCtfPracticeOpen } from '../../lib/competition-participation'
 import { toast } from '../../utils/message-toast'
 import { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn, Settings, ShieldCheck, Trophy, UserPlus, Users } from '@lucide/vue'
-
-import type { NoCTFAPIEndpointsAdministrationCompetitionsAdminCompetitionResponse, NoCTFAPIEndpointsCompetitionsCompetitionResponse, NoCTFAPIEndpointsCompetitionsTracksCompetitionTrackResponse, NoCTFAPIEndpointsTeamsTeamResponse } from '../../api/models'
+import { adminGetCompetition, getCompetitionEndpoint, createTeamEndpoint, getMyTeamEndpoint, joinTeamByInvitationEndpoint, listCompetitionTeamsEndpoint, listCompetitionTracks, patchCompetitionTeam } from '../../api'
+import type { NoCtfapiEndpointsAdministrationCompetitionsAdminCompetitionResponse, NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../api'
 import { teamMembershipErrorMessage, teamRegistrationErrorMessage } from '../../lib/competition-track'
 import LifecycleBadgeComponent from './LifecycleBadge.vue'
 import { useCompetitionPoster } from './useCompetitionPoster'
 
 /** Owns state, effects and commands for CompetitionOverview. */
 export function useCompetitionOverview(
-  props: Readonly<{ competition: NoCTFAPIEndpointsCompetitionsCompetitionResponse }>,
+  props: Readonly<{ competition: NoCtfapiEndpointsCompetitionsCompetitionResponse }>,
   emit: (event: 'audienceChanged') => void,
 ) {
   const competitionId = props.competition.id!
@@ -40,16 +36,15 @@ export function useCompetitionOverview(
   async function refreshCompetition() {
     detailError.value = null
     try {
-      let error: unknown;
-      const data = await (managementOnly.value
-        ? api.api.v1.admin.competitions.byCompetitionId(competitionId).get({ options: [new RequestPolicyOption({ signal: reads.signal })] })
-        : api.api.v1.competitions.byCompetitionId(competitionId).get({ options: [new RequestPolicyOption({ signal: reads.signal })] })).catch(cause => { error = cause; return undefined });
+      const { data, error } = managementOnly.value
+        ? await adminGetCompetition({ path: { competitionId }, signal: reads.signal })
+        : await getCompetitionEndpoint({ path: { competitionId }, signal: reads.signal })
       if (reads.signal.aborted) return
       if (error || !data) detailError.value = parseApiError(error).displayMessage
       else {
         competition.value = managementOnly.value
-          ? (data as NoCTFAPIEndpointsAdministrationCompetitionsAdminCompetitionResponse).competition!
-          : data as NoCTFAPIEndpointsCompetitionsCompetitionResponse
+          ? (data as NoCtfapiEndpointsAdministrationCompetitionsAdminCompetitionResponse).competition!
+          : data as NoCtfapiEndpointsCompetitionsCompetitionResponse
       }
     } catch (error) {
       if (!reads.signal.aborted) detailError.value = parseApiError(error).displayMessage
@@ -76,7 +71,7 @@ export function useCompetitionOverview(
   })
   onUnmounted(() => unwatch?.())
 
-  const myTeam = ref<NoCTFAPIEndpointsTeamsTeamResponse | null>(null)
+  const myTeam = ref<NoCtfapiEndpointsTeamsTeamResponse | null>(null)
 
   const teamLoaded = ref(false)
 
@@ -96,9 +91,7 @@ export function useCompetitionOverview(
       return
     }
     try {
-      let error: unknown;
-      const response = new ResponseMetadata();
-      const data = await api.api.v1.competitions.byCompetitionId(competitionId).teams.me.get({ options: [new RequestPolicyOption({ signal: reads.signal, response: response })] }).catch(cause => { error = cause; return undefined });
+      const { data, error, response } = await getMyTeamEndpoint({ path: { competitionId }, signal: reads.signal })
       if (response?.status === 404) {
         myTeam.value = null
         return
@@ -123,7 +116,7 @@ export function useCompetitionOverview(
 
   const approvedTeamCount = ref<number | null>(null)
 
-  const selectableTracks = ref<NoCTFAPIEndpointsCompetitionsTracksCompetitionTrackResponse[]>([])
+  const selectableTracks = ref<NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse[]>([])
 
   const tracksLoaded = ref(false)
 
@@ -139,30 +132,25 @@ export function useCompetitionOverview(
       return
     }
     try {
-      const settledRequests = await Promise.allSettled([
-        api.api.v1.competitions.byCompetitionId(competitionId).teams.get({ options: [new RequestPolicyOption({ signal: reads.signal })] }),
+      const [teams, trackResult] = await Promise.all([
+        listCompetitionTeamsEndpoint({ path: { competitionId }, signal: reads.signal }),
         tracksEnabled.value
-          ? api.api.v1.competitions.byCompetitionId(competitionId).tracks.get({ options: [new RequestPolicyOption({ signal: reads.signal })] })
+          ? listCompetitionTracks({ path: { competitionId }, signal: reads.signal })
           : Promise.resolve(null),
-      ]);
-      const teams = settledRequests[0].status === 'fulfilled' ? settledRequests[0].value : undefined;
-      const teamsError = settledRequests[0].status === 'rejected' ? settledRequests[0].reason : undefined;
-      const trackResult = settledRequests[1].status === 'fulfilled' ? settledRequests[1].value : undefined;
-      const trackResultError = settledRequests[1].status === 'rejected' ? settledRequests[1].reason : undefined;
-
-      if (!teamsError && teams) approvedTeamCount.value = (teams.items ?? []).filter(
+      ])
+      if (!teams.error && teams.data) approvedTeamCount.value = (teams.data.items ?? []).filter(
         (team) => team.registrationStatus === 'Approved',
       ).length
       if (!tracksEnabled.value) {
         selectableTracks.value = []
-      } else if (trackResultError || !trackResult) {
+      } else if (trackResult?.error || !trackResult?.data) {
         selectableTracks.value = []
         trackLoadError.value = parseApiError(
-          trackResultError,
+          trackResult?.error,
           describeMessage("competitions.competitionOverview.error.loadCompetitionTracksFailed"),
         ).displayMessage
       } else {
-        selectableTracks.value = (trackResult.items ?? []).filter(track => track.isPublicSelectable)
+        selectableTracks.value = (trackResult.data.items ?? []).filter(track => track.isPublicSelectable)
         if (selectableTracks.value.some(track =>
             track.key === createTrackKey.value
             && track.meetsSsoRequirement === false)) {
@@ -246,8 +234,9 @@ export function useCompetitionOverview(
     }
     createPending.value = true
     try {
-      let error: unknown;
-      const data = await api.api.v1.competitions.byCompetitionId(competitionId).teams.post({
+      const { data, error } = await createTeamEndpoint({
+        path: { competitionId },
+        body: {
           name: createName.value.trim(),
           ...(tracksEnabled.value
             ? {
@@ -255,7 +244,8 @@ export function useCompetitionOverview(
                 trackInvitationCode: null,
               }
             : {}),
-        }).catch(cause => { error = cause; return undefined });
+        },
+      })
       if (error || !data) {
         createValidationError.value = teamRegistrationErrorMessage(
           error,
@@ -300,8 +290,10 @@ export function useCompetitionOverview(
     }
     joinPending.value = true
     try {
-      let error: unknown;
-      await api.api.v1.competitions.byCompetitionId(competitionId).teams.join.post({ invitationToken }).catch(cause => { error = cause; return undefined });
+      const { error } = await joinTeamByInvitationEndpoint({
+        path: { competitionId },
+        body: { invitationToken },
+      })
       if (error) {
         joinValidationError.value = teamMembershipErrorMessage(
           error,
@@ -382,13 +374,15 @@ export function useCompetitionOverview(
     registrationPending.value = true
     registrationError.value = null
     try {
-      let error: unknown;
-      const data = await api.api.v1.competitions.byCompetitionId(competitionId).teams.byTeamId(myTeam.value.id!).patch({ registration: {
+      const { data, error } = await patchCompetitionTeam({
+        path: { competitionId, teamId: myTeam.value.id! },
+        body: { registration: {
           status: 'Pending',
           trackInvitationCode: registrationTrack.value?.requiresInvitationCode
             ? registrationInvitationCode.value.trim()
             : null,
-        } }).catch(cause => { error = cause; return undefined });
+        } },
+      })
       if (error || !data) {
         registrationError.value = teamRegistrationErrorMessage(
           error,

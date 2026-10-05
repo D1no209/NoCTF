@@ -43,16 +43,9 @@ public sealed class CreateCompetitionBadgeEndpoint(
 {
     public override void Configure()
     {
-        Summary(summary =>
-        {
-            summary.Summary = "Creates a badge in the competition catalog without awarding points.";
-            summary.Description = summary.Summary;
-        });
-
         Post("/admin/competitions/{competitionId}/badges");
         AuthSchemes("Bearer");
         AllowFileUploads();
-        Description(builder => builder.Accepts<CreateCompetitionBadgeRequest>("multipart/form-data"));
         MaxRequestBodySize(FileUploadLimits.MaximumRequestBytes(limits.MaximumPosterBytes));
         Description(builder => builder.WithName("AdminCreateCompetitionBadge"));
     }

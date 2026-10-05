@@ -1,4 +1,4 @@
-import type { NoCTFAPIEndpointsAdministrationPlatformPlatformAuditLogResponse, NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeResponse } from '~/api/models'
+import type { NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse, NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse } from '~/api'
 
 const segment = (id: string) => encodeURIComponent(id)
 export const adminUserPath = (id?: string | null) => id ? `/admin/platform/users/${segment(id)}` : undefined
@@ -10,12 +10,12 @@ export const adminChallengePath = (competitionId?: string | null, challengeId?: 
   ? `/admin/competitions/${segment(competitionId)}/challenges/${segment(challengeId)}` : undefined
 export const adminRuntimePath = (competitionId?: string | null, runtimeId?: string | null) => runtimeId
   ? competitionId ? `/admin/competitions/${segment(competitionId)}/runtimes/${segment(runtimeId)}` : `/admin/platform/runtimes/${segment(runtimeId)}` : undefined
-export const adminRuntimeTeamPath = (runtime?: NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeResponse | null) =>
+export const adminRuntimeTeamPath = (runtime?: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse | null) =>
   runtime?.purpose === 'TemplateTest' ? undefined : adminTeamPath(runtime?.competitionId, runtime?.sourceTeamId ?? runtime?.teamId)
-export const adminRuntimeChallengePath = (runtime?: NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeResponse | null) =>
+export const adminRuntimeChallengePath = (runtime?: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse | null) =>
   runtime?.challengeId ? adminTemplatePath(runtime.challengeId) : adminChallengePath(runtime?.competitionId, runtime?.competitionChallengeId)
 
-export function adminAuditSubjectPath(log: NoCTFAPIEndpointsAdministrationPlatformPlatformAuditLogResponse): string | null | undefined {
+export function adminAuditSubjectPath(log: NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse): string | undefined {
   switch (log.kind) {
     case 'UserAccountLifecycle': return adminUserPath(log.subjectId)
     case 'CompetitionLifecycle':

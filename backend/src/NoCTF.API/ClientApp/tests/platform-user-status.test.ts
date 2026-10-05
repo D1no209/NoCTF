@@ -10,9 +10,9 @@ describe('platform user account status management', () => {
       new URL('../app/pages/admin/platform.vue', import.meta.url),
     ).text()
     expect(source).toContain("kind: roleFilter.value === 'Bot' ? 'Bot'")
-    expect(source).toContain('keyword: search.value.trim() || undefined')
+    expect(source).toContain('keyword: search.value.trim() || null')
     expect(source).toContain('<SelectItem value="Bot">')
-    expect(source).toMatch(/api\.api\.v1\.admin\.platform\.bots\.post\(/)
+    expect(source).toContain('adminPlatformCreateBot({')
     expect(source).toContain('roleFilter.value = \'Bot\'')
     expect(source).toContain("$t('administration.label.createBot')")
     expect(source).toContain('validation="feature"')
@@ -31,8 +31,8 @@ describe('platform user account status management', () => {
   test('uses the generated status endpoint and keeps the sheet open on failure', async () => {
     const source = await sourceFile(pageUrl).text()
 
-    expect(source).toMatch(/api\.api\.v1\.admin\.platform\.users\.byUserId\([^)]*\)\.patch\(/)
-    expect(source).toContain("{ accountStatus: pendingAccountStatus.value }")
+    expect(source).toContain('adminPlatformPatchUser')
+    expect(source).toContain("body: { accountStatus: pendingAccountStatus.value }")
     expect(source).toContain('accountStatusConflictMessage(apiError.code) ?? apiError.displayMessage')
     const handler = source.slice(
       source.indexOf('async function saveAccountStatus'),
@@ -63,8 +63,8 @@ describe('platform user account status management', () => {
   test('manages email activation independently through the generated SDK', async () => {
     const source = await sourceFile(pageUrl).text()
 
-    expect(source).toMatch(/api\.api\.v1\.admin\.platform\.users\.byUserId\([^)]*\)\.patch\(/)
-    expect(source).toContain("{ emailVerified: pendingEmailVerification.value === 'Verified' }")
+    expect(source).toContain('adminPlatformPatchUser')
+    expect(source).toContain("body: { emailVerified: pendingEmailVerification.value === 'Verified' }")
     expect(source).toContain("(pendingEmailVerification === 'Verified') === detail.emailVerified")
     expect(source).toContain("$t('administration.label.emailActivationStatus')")
     expect(source).toContain("$t('administration.label.activated')")
@@ -80,8 +80,8 @@ describe('platform user account status management', () => {
     const source = await sourceFile(pageUrl).text()
 
     expect(source).toContain('ssoProviderId: ssoProviderFilter.value')
-    expect(source).toMatch(/api\.api\.v1\.admin\.platform\.sso\.get\(/)
-    expect(source).toMatch(/api\.api\.v1\.admin\.platform\.users\.byUserId\([^)]*\)\.ssoBinding\.delete\(/)
+    expect(source).toContain('adminPlatformSsoGetConfiguration')
+    expect(source).toContain('adminPlatformUnbindSsoIdentity')
     expect(source).toContain('user.ssoBinding.subject')
     expect(source).toContain('detail.ssoBinding.boundAt')
     expect(source).toContain("describeMessage('sso.adminUnbindSuccessful')")

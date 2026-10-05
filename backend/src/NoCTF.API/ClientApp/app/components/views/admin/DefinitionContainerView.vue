@@ -23,7 +23,7 @@ const { definition, disabled, singleServiceOnly, showFlagEnvironmentVariable, se
       :target-label="$t('runtime.label.accessEntrance')"
       @select="selectService"
     />
-    <FieldSet v-if="selectedService" :key="selectedServiceIndex ?? undefined">
+    <FieldSet v-if="selectedService" :key="selectedServiceIndex">
       <FieldLegend class="flex w-full items-center justify-between gap-2 text-sm">
         <span class="truncate font-mono font-semibold">{{ selectedService.name || $t('runtime.label.runtimeServices') }}</span>
         <Button v-if="!disabled && definition.services.length > 1" type="button" variant="ghost" size="sm" :aria-label="$t('common.label.removeItem', { index: selectedServiceIndex + 1 })" :disabled="!canRemove(selectedServiceIndex)" @click="removeService(selectedServiceIndex)">{{ $t('common.action.delete') }}</Button>

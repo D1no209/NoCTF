@@ -20,7 +20,7 @@ public sealed class UnbindSsoIdentityEndpoint(
         Options(options => options.WithMetadata(
             new ProtectedEntryMetadata(ProtectedEntry.Authentication)));
         Description(builder => builder.WithName("Authentication_SsoUnbindIdentity"));
-        Summary(summary => { summary.Summary = "Removes the authenticated user's external identity binding and revokes current sessions."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Removes the authenticated user's external identity binding and revokes current sessions.");
     }
 
     public override async Task<Results<NoContent, ProblemHttpResult>> ExecuteAsync(

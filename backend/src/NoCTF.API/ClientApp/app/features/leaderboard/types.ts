@@ -3,51 +3,51 @@ import { translate } from '../../utils/i18n'
 /** 排行榜页面内部使用的结构化类型(对应后端 LeaderboardProtocolResponse 的 camelCase JSON)。 */
 
 export interface TrendPoint {
-  at?: Date | string | null
-  score?: number | null
+  at?: string
+  score?: number
 }
 
 export interface SolveRecordItem {
-  competitionChallengeId?: string | null
-  at?: Date | string | null
-  points?: number | null
-  solveOrdinal?: number | null
+  competitionChallengeId?: string
+  at?: string
+  points?: number
+  solveOrdinal?: number
   submitterName?: string | null
 }
 
 export interface TrendSeries {
-  teamId?: string | null
-  teamName?: string | null
+  teamId?: string
+  teamName?: string
   points?: TrendPoint[]
   solves?: SolveRecordItem[]
 }
 
 export interface ChallengeInfo {
-  competitionChallengeId?: string | null
-  title?: string | null
-  direction?: string | null
+  competitionChallengeId?: string
+  title?: string
+  direction?: string
 }
 
 export interface LeaderboardCell {
-  competitionChallengeId?: string | null
-  score?: number | null
-  attackScore?: number | null
-  defenseScore?: number | null
+  competitionChallengeId?: string
+  score?: number
+  attackScore?: number
+  defenseScore?: number
   solvedAt?: string | null
   solverName?: string | null
   bloodRank?: string | null
 }
 
 export interface MatrixEntry {
-  rank?: number | null
-  teamId?: string | null
-  teamName?: string | null
-  trackKey?: string | null
-  score?: number | null
-  attackScore?: number | null
-  defenseScore?: number | null
-  penaltyScore?: number | null
-  solveCount?: number | null
+  rank?: number
+  teamId?: string
+  teamName?: string
+  trackKey?: string
+  score?: number
+  attackScore?: number
+  defenseScore?: number
+  penaltyScore?: number
+  solveCount?: number
   lastScoreAt?: string | null
   cells?: LeaderboardCell[]
 }
@@ -74,7 +74,7 @@ export const medalRankClass: Record<number, string> = {
 }
 
 /** 血榜名次 → Medal 图标着色;非前三名返回 undefined(调用方自行兜底)。 */
-export function medalBloodRankClass(bloodRank?: string | null): string | null | undefined {
+export function medalBloodRankClass(bloodRank?: string | null): string | undefined {
   const normalized = bloodRank?.replace(/Blood$/, '')
   const index = normalized
     ? bloodRankOrder.indexOf(normalized as (typeof bloodRankOrder)[number])

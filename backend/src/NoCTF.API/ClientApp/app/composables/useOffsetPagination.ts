@@ -16,7 +16,7 @@ export interface OffsetPageRequest {
 }
 
 export interface OffsetPaginationOptions {
-  initialPageSize?: number | null
+  initialPageSize?: number
   initialDesc?: boolean
 }
 

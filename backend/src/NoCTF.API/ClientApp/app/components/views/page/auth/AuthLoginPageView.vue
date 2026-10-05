@@ -41,7 +41,7 @@ const { authArtwork, configuration, loginName, password, error, pending, capVeri
             <Field>
               <CapVerificationStatus
                 v-if="capVerification"
-                :key="capVerification.id ?? undefined"
+                :key="capVerification.id"
                 :state="capVerification.state"
                 :progress="capVerification.progress"
                 :label="capVerification.label"
@@ -64,7 +64,7 @@ const { authArtwork, configuration, loginName, password, error, pending, capVeri
             <template v-else>
               <Button
                 v-for="provider in ssoProviders"
-                :key="provider.id ?? undefined"
+                :key="provider.id"
                 type="button"
                 variant="outline"
                 class="w-full"

@@ -23,7 +23,7 @@ const { isDark, toggleTheme, isEnglish, switchLocale, name, amount, when, select
           <Field class="col-span-6 min-w-0 @xl/field-group:col-span-3"><FieldLabel for="probe-date">{{ $t('dateTime.open') }}</FieldLabel><DateTimePicker id="probe-date" v-model="when" required /></Field>
           <Field class="col-span-6 min-w-0 @xl/field-group:col-span-3"><FieldLabel for="probe-select">{{ $t('preview.choice') }}</FieldLabel>
             <Select v-model="selection"><SelectTrigger id="probe-select"><SelectValue :placeholder="$t('preview.choice')" /></SelectTrigger>
-              <SelectContent position="popper"><SelectGroup><SelectItem v-for="i in 50" :key="i ?? undefined" :value="String(i)">{{ $t('preview.option', { index: i }) }}</SelectItem></SelectGroup></SelectContent>
+              <SelectContent position="popper"><SelectGroup><SelectItem v-for="i in 50" :key="i" :value="String(i)">{{ $t('preview.option', { index: i }) }}</SelectItem></SelectGroup></SelectContent>
             </Select>
           </Field>
           <Field class="col-span-6 min-w-0"><FieldLabel for="probe-upload">{{ $t('upload.choose') }}</FieldLabel><FileUpload id="probe-upload" multiple @change="fileChanged" /><FieldDescription v-if="fileCount">{{ $t('preview.files', { count: fileCount }) }}</FieldDescription></Field>
@@ -33,7 +33,7 @@ const { isDark, toggleTheme, isEnglish, switchLocale, name, amount, when, select
       </CardContent>
     </Card>
     <section class="flex flex-col gap-3"><h2 class="text-lg font-semibold">{{ $t('preview.scroll') }}</h2>
-      <ScrollSurface id="probe-scroll" axis="y" class="h-48 border p-4" :aria-label="$t('preview.scroll')"><p v-for="i in 60" :key="i ?? undefined">{{ $t('preview.option', { index: i }) }}</p></ScrollSurface>
+      <ScrollSurface id="probe-scroll" axis="y" class="h-48 border p-4" :aria-label="$t('preview.scroll')"><p v-for="i in 60" :key="i">{{ $t('preview.option', { index: i }) }}</p></ScrollSurface>
     </section>
     <div class="flex flex-wrap items-center gap-4"><Hint :content="$t('preview.tooltip')"><Button id="probe-hint" variant="outline">{{ $t('preview.tooltip') }}</Button></Hint><MarkdownContent :source="$t('preview.markdown')" /></div>
     <Dialog v-model:open="dialogOpen"><DialogTrigger as-child><Button id="probe-dialog" variant="outline">{{ $t('preview.dialog') }}</Button></DialogTrigger><DialogContent>

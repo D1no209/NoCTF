@@ -33,7 +33,7 @@ const { adminUserPath, teamDetailOpen, teamLoading, teamDetailError, competition
           </TableRow>
         </TableHeader>
         <TableBody>
-          <TableRow v-for="t in teams" :key="t.id ?? undefined">
+          <TableRow v-for="t in teams" :key="t.id">
             <TableCell>
               <ActionButton
                 type="button"
@@ -52,7 +52,7 @@ const { adminUserPath, teamDetailOpen, teamLoading, teamDetailError, competition
               >
                 <SelectTrigger class="min-w-32"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem v-for="track in tracks" :key="track.key ?? undefined" :value="track.key!">
+                  <SelectItem v-for="track in tracks" :key="track.key" :value="track.key!">
                     {{ track.name }}<template v-if="track.isInternal"> · {{ $t('administration.label.internal') }}</template>
                   </SelectItem>
                 </SelectContent>
@@ -72,7 +72,7 @@ const { adminUserPath, teamDetailOpen, teamLoading, teamDetailError, competition
                 <DropdownMenuContent align="start">
                   <DropdownMenuItem
                     v-for="option in registrationStatusOptions"
-                    :key="option.value ?? undefined"
+                    :key="option.value"
                     :disabled="pendingId === t.id || option.value === t.registrationStatus"
                     @select="setRegistrationStatusValue(t, option.value)"
                   >
@@ -167,7 +167,7 @@ const { adminUserPath, teamDetailOpen, teamLoading, teamDetailError, competition
               class="rounded-md bg-muted/20"
               @update:model-value="setExpandedMember"
             >
-              <AccordionItem v-for="member in teamMembers" :key="member.userId ?? undefined" :value="member.userId!" class="px-3">
+              <AccordionItem v-for="member in teamMembers" :key="member.userId" :value="member.userId!" class="px-3">
                 <div class="flex flex-wrap items-center gap-3 py-3">
                   <Avatar class="size-9">
                     <AvatarImage v-if="member.avatarUrl" :src="member.avatarUrl" :alt="member.userName ?? ''" />
@@ -220,7 +220,7 @@ const { adminUserPath, teamDetailOpen, teamLoading, teamDetailError, competition
                 <SelectValue :placeholder="$t('administration.label.selectChallenge')" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem v-for="challenge in scoreAdjustmentChallenges" :key="challenge.id ?? undefined" :value="challenge.id!">
+                <SelectItem v-for="challenge in scoreAdjustmentChallenges" :key="challenge.id" :value="challenge.id!">
                   {{ challenge.title }} · {{ challenge.direction || '' }}
                 </SelectItem>
               </SelectContent>
@@ -259,7 +259,7 @@ const { adminUserPath, teamDetailOpen, teamLoading, teamDetailError, competition
         </EmptyHeader>
       </Empty>
       <div v-else-if="appeals.length > 0" class="flex flex-col gap-3">
-        <Card v-for="a in appeals" :id="`appeal-${a.appeal?.id ?? a.banEventId}`" :key="a.banEventId ?? undefined" class="scroll-mt-24">
+        <Card v-for="a in appeals" :id="`appeal-${a.appeal?.id ?? a.banEventId}`" :key="a.banEventId" class="scroll-mt-24">
           <CardHeader>
             <div class="flex items-center justify-between gap-2">
               <CardTitle class="text-base">{{ teamDisplayName(a, teamDisplayNames) }}</CardTitle>

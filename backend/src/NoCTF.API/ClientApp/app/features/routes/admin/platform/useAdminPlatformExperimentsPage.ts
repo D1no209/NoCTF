@@ -1,10 +1,8 @@
-
-import { api } from '../../../../lib/api'
 import { message as describeMessage } from '../../../../utils/i18n'
 import type { UiMessage } from '../../../../utils/i18n'
 import { Beaker, RefreshCw } from '@lucide/vue'
 import { toast } from '../../../../utils/message-toast'
-
+import { adminPlatformGetConfiguration, adminPlatformPatchConfiguration } from '../../../../api'
 
 /** Owns state, effects and commands for the platform experiment controls. */
 export function useAdminPlatformExperimentsPage() {
@@ -19,8 +17,7 @@ export function useAdminPlatformExperimentsPage() {
   async function load(): Promise<void> {
     loading.value = true
     loadError.value = null
-    let error: unknown;
-    const data = await api.api.v1.admin.platform.configuration.get().catch(cause => { error = cause; return undefined });
+    const { data, error } = await adminPlatformGetConfiguration()
     loading.value = false
     if (error || !data?.experimentalFeatures) {
       loadError.value = parseApiError(error, describeMessage('administration.platform.error.loadPlatformConfigurationFailed')).displayMessage
@@ -34,12 +31,13 @@ export function useAdminPlatformExperimentsPage() {
   async function save(): Promise<void> {
     if (saving.value || !dirty.value) return
     saving.value = true
-    let error: unknown;
-    const data = await api.api.v1.admin.platform.configuration.patch({
+    const { data, error } = await adminPlatformPatchConfiguration({
+      body: {
         experimentalFeatures: {
           ctfPatchVerificationEnabled: ctfPatchVerificationEnabled.value,
         },
-      }).catch(cause => { error = cause; return undefined });
+      },
+    })
     saving.value = false
     if (error || !data?.experimentalFeatures) {
       toast.error(parseApiError(error, describeMessage('administration.error.experimentalFeatureSaveFailed')).displayMessage)

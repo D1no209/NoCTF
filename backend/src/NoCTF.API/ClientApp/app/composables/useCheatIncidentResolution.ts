@@ -1,7 +1,5 @@
-
-import { api } from '../lib/api'
 import type { UiMessage } from '../utils/i18n'
-
+import { adminUpdateCheatIncidentStatus } from '../api'
 import { computed, ref } from 'vue'
 
 export type CheatIncidentResolutionAction = 'confirm' | 'dismiss' | 'correct'
@@ -25,23 +23,23 @@ interface CheatIncidentResolutionOptions {
   clients?: CheatIncidentResolutionClients
 }
 
-interface CheatIncidentResolutionInput {
-  path: { competitionId: string; gameplayFactId: string }
-  body: { status: 'Confirmed' | 'Dismissed' | 'Corrected'; reason: string }
+interface CheatIncidentResolutionSdkResult {
+  data?: unknown
+  error?: unknown
+  request?: Request
+  response?: Response
 }
 
 interface CheatIncidentResolutionClients {
-  confirm: (input: CheatIncidentResolutionInput) => Promise<unknown>
-  correct: (input: CheatIncidentResolutionInput) => Promise<unknown>
-  dismiss: (input: CheatIncidentResolutionInput) => Promise<unknown>
+  confirm: (options: Parameters<typeof adminUpdateCheatIncidentStatus>[0]) => Promise<CheatIncidentResolutionSdkResult>
+  correct: (options: Parameters<typeof adminUpdateCheatIncidentStatus>[0]) => Promise<CheatIncidentResolutionSdkResult>
+  dismiss: (options: Parameters<typeof adminUpdateCheatIncidentStatus>[0]) => Promise<CheatIncidentResolutionSdkResult>
 }
 
-const updateResolution = (input: CheatIncidentResolutionInput) => api.api.v1.admin.competitions
-  .byCompetitionId(input.path.competitionId).cheatIncidents.byGameplayFactId(input.path.gameplayFactId)
-  .status.put(input.body)
-
 const clients: CheatIncidentResolutionClients = {
-  confirm: updateResolution, correct: updateResolution, dismiss: updateResolution,
+  confirm: async options => adminUpdateCheatIncidentStatus(options),
+  correct: async options => adminUpdateCheatIncidentStatus(options),
+  dismiss: async options => adminUpdateCheatIncidentStatus(options),
 }
 
 export const cheatIncidentResolutionMinimumReasonLength = 8
@@ -65,12 +63,14 @@ async function executeResolution(
     },
   }
 
-  await (request.action === 'confirm'
-    ? sdk.confirm(options)
+  const { error } = request.action === 'confirm'
+    ? await sdk.confirm(options)
     : request.action === 'dismiss'
-      ? sdk.dismiss(options)
-      : sdk.correct(options))
+      ? await sdk.dismiss(options)
+      : await sdk.correct(options)
 
+  if (error)
+    throw error
 }
 
 export function useCheatIncidentResolution(options: CheatIncidentResolutionOptions) {

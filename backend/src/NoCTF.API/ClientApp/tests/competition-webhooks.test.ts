@@ -12,13 +12,13 @@ const view = readFileSync(new URL(
 
 describe('competition webhook administration', () => {
   test('uses generated APIs for pagination, mutation, rotation and asynchronous tests', () => {
-    expect(feature).toMatch(/api\.api\.v1\.admin\.competitions\.byCompetitionId\([^)]*\)\.webhooks\.get\(/)
-    expect(feature).toMatch(/api\.api\.v1\.admin\.competitions\.byCompetitionId\([^)]*\)\.webhooks\.post\(/)
-    expect(feature).toMatch(/api\.api\.v1\.admin\.competitions\.byCompetitionId\([^)]*\)\.webhooks\.byTargetId\([^)]*\)\.put\(/)
-    expect(feature).toMatch(/api\.api\.v1\.admin\.competitions\.byCompetitionId\([^)]*\)\.webhooks\.byTargetId\([^)]*\)\.delete\(/)
-    expect(feature).toMatch(/api\.api\.v1\.admin\.competitions\.byCompetitionId\([^)]*\)\.webhooks\.byTargetId\([^)]*\)\.rotateSecret\.post\(/)
-    expect(feature).toMatch(/api\.api\.v1\.admin\.competitions\.byCompetitionId\([^)]*\)\.webhooks\.byTargetId\([^)]*\)\.testDeliveries\.post\(/)
-    expect(feature).toMatch(/api\.api\.v1\.admin\.competitions\.byCompetitionId\([^)]*\)\.webhooks\.byTargetId\([^)]*\)\.testDeliveries\.byDeliveryId\([^)]*\)\.get\(/)
+    expect(feature).toContain('adminListCompetitionWebhooks')
+    expect(feature).toContain('adminCreateCompetitionWebhook')
+    expect(feature).toContain('adminUpdateCompetitionWebhook')
+    expect(feature).toContain('adminDeleteCompetitionWebhook')
+    expect(feature).toContain('adminRotateCompetitionWebhookSecret')
+    expect(feature).toContain('adminCreateCompetitionWebhookTestDelivery')
+    expect(feature).toContain('adminGetCompetitionWebhookTestDelivery')
     expect(feature).toContain('useOffsetPagination')
     expect(view).toContain('<OffsetPagination')
   })
@@ -30,7 +30,7 @@ describe('competition webhook administration', () => {
   })
 
   test('shows paged delivery diagnostics without rendering protected payloads or secrets', () => {
-    expect(feature).toMatch(/api\.api\.v1\.admin\.competitions\.byCompetitionId\([^)]*\)\.webhookDeliveries\.get\(/)
+    expect(feature).toContain('adminListCompetitionWebhookDeliveries')
     expect(view).toContain("$t('webhook.diagnosticsTitle')")
     expect(view).toContain('delivery.queueAgeSeconds')
     expect(view).toContain('delivery.projectionWaitSeconds')

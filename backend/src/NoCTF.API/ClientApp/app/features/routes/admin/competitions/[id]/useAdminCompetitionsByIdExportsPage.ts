@@ -1,11 +1,8 @@
-import { dateObject } from '../../../../../utils/date-value'
-
-import { api, nativeResponse } from '../../../../../lib/api'
 import { message as describeMessage } from '../../../../../utils/i18n'
 
 
 import { toast } from '../../../../../utils/message-toast'
-
+import { adminExportCompetitionArchive, adminExportCompetitionEvents } from '../../../../../api'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
 import { downloadSdkFile } from '../../../../../utils/download'
 import { userFacingErrorMessage } from '../../../../../utils/api-error'
@@ -30,7 +27,11 @@ export function useAdminCompetitionsByIdExportsPage() {
     exportingEvents.value = true
     try {
       await downloadSdkFile(
-        nativeResponse(responseOptions => api.api.v1.admin.competitions.byCompetitionId(competitionId).events.exportEscaped.get({ queryParameters: { from: dateObject(from ?? undefined), to: dateObject(to ?? undefined) }, options: [...responseOptions] })),
+        adminExportCompetitionEvents({
+          path: { competitionId },
+          query: { from, to },
+          parseAs: 'blob',
+        }),
         `competition-${competitionId}-events.jsonl`,
       )
       toast.success(describeMessage("administration.competitionsBy.label.eventExportStartedDownloading"))
@@ -59,10 +60,14 @@ export function useAdminCompetitionsByIdExportsPage() {
     exportingArchive.value = true
     try {
       await downloadSdkFile(
-        nativeResponse(responseOptions => api.api.v1.admin.competitions.byCompetitionId(competitionId).dataExport.post({
+        adminExportCompetitionArchive({
+          path: { competitionId },
+          body: {
             includeProtectedFlags: includeProtectedFlags.value,
             reason: reason || null,
-          }, { options: [...responseOptions] })),
+          },
+          parseAs: 'blob',
+        }),
         `competition-${competitionId}-archive.zip`,
       )
       toast.success(describeMessage("administration.competitionsBy.description.competitionArchiveDownloadStarted"))

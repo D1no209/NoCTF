@@ -1,7 +1,7 @@
 import { markRaw, toRefs } from 'vue'
 
 import { RotateCcw } from '@lucide/vue'
-import type { NoCTFAPIEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract } from '../../api/models'
+import type { NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract } from '../../api'
 import type { ConfigValues, GameModeValue } from '../../utils/game-config'
 import { buildConfigValues, competitionConfigFields, fieldDefaultValue, readConfigValues } from '../../utils/game-config'
 import ConfigFieldInputComponent from './ConfigFieldInput.vue'
@@ -9,18 +9,18 @@ import ConfigFieldInputComponent from './ConfigFieldInput.vue'
 /** Owns state, effects and commands for CompetitionModeConfigEditor. */
 export function useCompetitionModeConfigEditor(props: Readonly<Omit<{
   mode: GameModeValue
-  configuration?: NoCTFAPIEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract | null
+  configuration?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract | null
   readonly?: boolean
   loading?: boolean
   saving?: boolean
 }, "configuration" | "readonly" | "loading" | "saving"> & Required<Pick<{
   mode: GameModeValue
-  configuration?: NoCTFAPIEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract | null
+  configuration?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract | null
   readonly?: boolean
   loading?: boolean
   saving?: boolean
 }, "configuration" | "readonly" | "loading" | "saving">>>,
-emit: { (event: "save", ...args: [configuration: NoCTFAPIEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract]): void }) {
+emit: { (event: "save", ...args: [configuration: NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract]): void }) {
   const fields = computed(() => competitionConfigFields(props.mode))
 
   const values = ref<ConfigValues>({})
@@ -80,7 +80,7 @@ emit: { (event: "save", ...args: [configuration: NoCTFAPIEndpointsAdministration
     fields.value,
     values.value,
     { rules: false },
-  ) as NoCTFAPIEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract)
+  ) as NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract)
 
   const dirty = computed(() => {
     if (parseFailed.value) return false

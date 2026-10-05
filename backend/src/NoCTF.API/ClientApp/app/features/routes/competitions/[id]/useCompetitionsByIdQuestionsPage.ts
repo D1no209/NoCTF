@@ -1,20 +1,18 @@
-
-import { api } from '../../../../lib/api'
 import { message as describeMessage } from '../../../../utils/i18n'
 import type { UiMessage } from '../../../../utils/i18n'
 import { proxyRefs } from 'vue'
 import { markRaw } from 'vue'
 
 import { toast } from '../../../../utils/message-toast'
-
-import type { NoCTFAPIEndpointsChallengesChallengeSummaryResponse, NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode, NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionSubjectCode, NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionResponse } from '../../../../api/models'
+import { addCompetitionQuestionMessage, changeCompetitionQuestionStatus, createCompetitionQuestion, getCompetitionQuestion, listChallengesEndpoint, listCompetitionQuestions } from '../../../../api'
+import type { NoCtfapiEndpointsChallengesChallengeSummaryResponse, NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode, NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionSubjectCode, NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse } from '../../../../api'
 import { createLatestRequestGuard } from '../../../../lib/latest-request'
 import { competitionQuestionErrorMessage, competitionQuestionRoleLabel, isCompetitionQuestionHandlerRole, mergeCompetitionQuestions } from '../../../../lib/competition-question'
 import { createTrailingRefresh } from '../../../../lib/latest-page-refresh'
 import { maximumQuestionBodyLength, maximumQuestionTitleLength, minimumQuestionBodyLength, minimumQuestionTitleLength, validateCompetitionQuestionDraft } from '../../../../lib/participant-form-validation'
 import CompetitionParticipantWorkspaceComponent from '../../../competition/CompetitionParticipantWorkspace.vue'
 
-type Question = NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionResponse
+type Question = NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse
 
 /** Owns state, effects and commands for CompetitionsByIdQuestionsPage. */
 export function useCompetitionsByIdQuestionsPage() {
@@ -31,8 +29,10 @@ export function useCompetitionsByIdQuestionsPage() {
   const refreshError = ref<UiMessage | null>(null)
 
   async function fetchQuestionPage(cursor: string | null) {
-    let error: unknown;
-    const data = await api.api.v1.competitions.byCompetitionId(competitionId).questions.get({ queryParameters: { cursor: cursor ?? undefined, limit: 50 } }).catch(cause => { error = cause; return undefined });
+    const { data, error } = await listCompetitionQuestions({
+      path: { competitionId },
+      query: { cursor, limit: 50 },
+    })
     if (error || !data)
       throw parseApiError(error, describeMessage("notifications.competitionsBy.error.loadConsultationListFailed"))
     return { items: data.items ?? [], nextCursor: data.nextCursor ?? null }
@@ -78,7 +78,7 @@ export function useCompetitionsByIdQuestionsPage() {
 
   const createOpen = ref(false)
 
-  const createSubject = ref<NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionSubjectCode>('Challenge')
+  const createSubject = ref<NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionSubjectCode>('Challenge')
 
   const createChallengeId = ref<string>('none')
 
@@ -90,7 +90,7 @@ export function useCompetitionsByIdQuestionsPage() {
 
   const createError = ref<UiMessage | null>(null)
 
-  const challenges = ref<NoCTFAPIEndpointsChallengesChallengeSummaryResponse[]>([])
+  const challenges = ref<NoCtfapiEndpointsChallengesChallengeSummaryResponse[]>([])
 
   const challengesLoading = ref(false)
 
@@ -100,8 +100,7 @@ export function useCompetitionsByIdQuestionsPage() {
     if (challengesLoading.value) return
     challengesLoading.value = true
     challengeLoadError.value = null
-    let error: unknown;
-    const data = await api.api.v1.competitions.byCompetitionId(competitionId).challenges.get().catch(cause => { error = cause; return undefined });
+    const { data, error } = await listChallengesEndpoint({ path: { competitionId } })
     challengesLoading.value = false
     if (error || !data) {
       challengeLoadError.value = parseApiError(error, describeMessage("notifications.competitionsBy.error.loadAvailableChallengesFailed")).displayMessage
@@ -127,8 +126,9 @@ export function useCompetitionsByIdQuestionsPage() {
 
     createPending.value = true
     try {
-      let error: unknown;
-      const data = await api.api.v1.competitions.byCompetitionId(competitionId).questions.post({
+      const { data, error } = await createCompetitionQuestion({
+        path: { competitionId },
+        body: {
           subject: createSubject.value,
           competitionChallengeId:
             createSubject.value === 'Challenge' && createChallengeId.value !== 'none'
@@ -136,7 +136,8 @@ export function useCompetitionsByIdQuestionsPage() {
               : null,
           title: createTitle.value.trim(),
           body: createBody.value.trim(),
-        }).catch(cause => { error = cause; return undefined });
+        },
+      })
       if (error || !data) {
         createError.value = competitionQuestionErrorMessage(error, translate("notifications.error.submitConsultationFailed"))
         toast.error(createError.value)
@@ -194,8 +195,7 @@ export function useCompetitionsByIdQuestionsPage() {
       void router.replace({ query: { ...route.query, question: id } })
     }
     try {
-      let error: unknown;
-      const data = await api.api.v1.competitions.byCompetitionId(competitionId).questions.byThreadRootId(id).get().catch(cause => { error = cause; return undefined });
+      const { data, error } = await getCompetitionQuestion({ path: { competitionId, threadRootId: id } })
       if (!detailRequests.isCurrent(request) || selectedId.value !== id) return
       if (error || !data) {
         toast.error(parseApiError(error, describeMessage("notifications.competitionsBy.error.loadConsultationDetailsFailed")).displayMessage)
@@ -224,8 +224,7 @@ export function useCompetitionsByIdQuestionsPage() {
     if (!questionId) return
 
     try {
-      let error: unknown;
-      const data = await api.api.v1.competitions.byCompetitionId(competitionId).questions.byThreadRootId(questionId).get().catch(cause => { error = cause; return undefined });
+      const { data, error } = await getCompetitionQuestion({ path: { competitionId, threadRootId: questionId } })
       if (error || !data || selectedId.value !== questionId) return
       applyDetailQuestion(data, document.visibilityState === 'visible')
     }
@@ -274,8 +273,10 @@ export function useCompetitionsByIdQuestionsPage() {
     replyError.value = null
     replyPending.value = true
     try {
-      let error: unknown;
-      const data = await api.api.v1.competitions.byCompetitionId(competitionId).questions.byThreadRootId(questionId).messages.post({ body: submittedReply.trim() }).catch(cause => { error = cause; return undefined });
+      const { data, error } = await addCompetitionQuestionMessage({
+        path: { competitionId, threadRootId: questionId },
+        body: { body: submittedReply.trim() },
+      })
       if (error || !data) {
         replyError.value = competitionQuestionErrorMessage(error, translate("notifications.error.sendingFailed"))
         toast.error(replyError.value)
@@ -304,8 +305,10 @@ export function useCompetitionsByIdQuestionsPage() {
     if (status === 'Resolved' ? !detail.value.canResolve : !detail.value.canClose) return
     statusPending.value = true
     try {
-      let error: unknown;
-      const data = await api.api.v1.competitions.byCompetitionId(competitionId).questions.byThreadRootId(questionId).status.put({ status }).catch(cause => { error = cause; return undefined });
+      const { data, error } = await changeCompetitionQuestionStatus({
+        path: { competitionId, threadRootId: questionId },
+        body: { status },
+      })
       if (error || !data) {
         toast.error(competitionQuestionErrorMessage(error, translate("notifications.error.statusUpdateFailed")))
         return
@@ -322,20 +325,20 @@ export function useCompetitionsByIdQuestionsPage() {
     }
   }
 
-  const statusVariant = (status?: string | null) =>
+  const statusVariant = (status?: string) =>
     status === 'Pending'
       ? ('secondary' as const)
       : status === 'Replied'
         ? ('default' as const)
         : ('outline' as const)
 
-  const statusLabel = (status?: string | null) =>
+  const statusLabel = (status?: string) =>
     ({ Pending: translate("notifications.label.awaitingReply"), Replied: translate("notifications.label.replied"), Resolved: translate("notifications.label.resolved"), Closed: translate("notifications.label.closed") })[status ?? ''] ?? status
 
-  const roleLabel = (role?: NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode | null) =>
+  const roleLabel = (role?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode) =>
     role ? translate(competitionQuestionRoleLabel[role]) : translate("notifications.label.unknownRole")
 
-  const isHandlerRole = (role?: NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode | null) =>
+  const isHandlerRole = (role?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode) =>
     isCompetitionQuestionHandlerRole(role)
 
   const participantLimitReached = computed(() =>

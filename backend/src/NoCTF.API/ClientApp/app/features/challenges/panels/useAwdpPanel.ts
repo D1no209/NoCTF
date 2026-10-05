@@ -1,25 +1,23 @@
-
-import { api } from '../../../lib/api'
 import { message as describeMessage } from '../../../utils/i18n'
 import type { UiMessage } from '../../../utils/i18n'
 import { markRaw, toRefs } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import { ShieldCheck } from '@lucide/vue'
-
-import type { NoCTFAPIEndpointsChallengesChallengeResponse, NoCTFAPIEndpointsCompetitionsCompetitionResponse, NoCTFAPIEndpointsGameplayFactsAwdpParticipantStateResponse } from '../../../api/models'
+import { getAwdpParticipantStateEndpoint } from '../../../api'
+import type { NoCtfapiEndpointsChallengesChallengeResponse, NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsGameplayFactsAwdpParticipantStateResponse } from '../../../api'
 import FixSubmitComponent from '../FixSubmit.vue'
 import FlagSubmitComponent from '../FlagSubmit.vue'
 import RuntimeCardComponent from '../RuntimeCard.vue'
 
 /** Owns state, effects and commands for AwdpPanel. */
 export function useAwdpPanel(props: Readonly<{
-  competition: NoCTFAPIEndpointsCompetitionsCompetitionResponse
-  challenge: NoCTFAPIEndpointsChallengesChallengeResponse
-  flagDockTarget?: string | null
-  runtimeDockTarget?: string | null
+  competition: NoCtfapiEndpointsCompetitionsCompetitionResponse
+  challenge: NoCtfapiEndpointsChallengesChallengeResponse
+  flagDockTarget?: string
+  runtimeDockTarget?: string
 }>,
 emit: { (event: "submitted", ...args: []): void; (event: "remainingChanged", ...args: [remaining: number | null]): void }) {
-  const state = ref<NoCTFAPIEndpointsGameplayFactsAwdpParticipantStateResponse | null>(null)
+  const state = ref<NoCtfapiEndpointsGameplayFactsAwdpParticipantStateResponse | null>(null)
 
   const loading = ref(true)
 
@@ -49,8 +47,12 @@ emit: { (event: "submitted", ...args: []): void; (event: "remainingChanged", ...
   })
 
   async function refreshState(): Promise<boolean> {
-    let error: unknown;
-    const data = await api.api.v1.competitions.byCompetitionId(props.competition.id!).challenges.byCompetitionChallengeId(props.challenge.id!).awdpState.get().catch(cause => { error = cause; return undefined });
+    const { data, error } = await getAwdpParticipantStateEndpoint({
+      path: {
+        competitionId: props.competition.id!,
+        competitionChallengeId: props.challenge.id!,
+      },
+    })
     loading.value = false
     if (error || !data) {
       stateError.value = parseApiError(error, describeMessage("challenges.awdpPanel.error.loadAwdpChallengeFailed")).displayMessage

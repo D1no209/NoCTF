@@ -18,7 +18,7 @@ const { Activity, Crosshair, RadioTower, Shield, animationComponent, event, queu
 
     <div class="stage-viewport" aria-live="assertive">
       <Transition name="stage-swap" mode="out-in">
-        <div v-if="event && animationComponent" :key="event.id ?? undefined" class="stage-event">
+        <div v-if="event && animationComponent" :key="event.id" class="stage-event">
           <div class="stage-event-copy">
             <span>{{ event.action === 'attack' ? $t('competitions.label.attackVerification') : $t('common.label.defenseVerification') }}</span>
             <strong>

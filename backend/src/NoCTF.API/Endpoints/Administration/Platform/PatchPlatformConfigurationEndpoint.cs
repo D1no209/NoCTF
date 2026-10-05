@@ -260,7 +260,7 @@ public sealed class PatchPlatformConfigurationEndpoint(
         AuthSchemes("Bearer");
         Roles("Administrator");
         Description(builder => builder.WithName("AdminPlatformPatchConfiguration"));
-        Summary(summary => { summary.Summary = "Updates selected platform configuration sections."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Updates selected platform configuration sections.");
     }
 
     public override async Task<Results<Ok<AdminPlatformConfigurationResponse>, ProblemHttpResult>> ExecuteAsync(

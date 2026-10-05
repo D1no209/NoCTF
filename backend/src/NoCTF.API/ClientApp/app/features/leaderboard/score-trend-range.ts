@@ -3,7 +3,7 @@ import type { TrendSeries } from './types'
 const MINIMUM_RANGE_MS = 60_000
 const EDGE_PADDING_RATIO = 0.015
 
-function timestamp(value?: Date | string | null): number | null {
+function timestamp(value?: string | null): number | null {
   if (!value) return null
   const parsed = new Date(value).getTime()
   return Number.isFinite(parsed) ? parsed : null

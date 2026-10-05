@@ -18,12 +18,6 @@ public sealed class GetGameplayFactStatusEndpoint(
 {
     public override void Configure()
     {
-        Summary(summary =>
-        {
-            summary.Summary = "Returns the current processing state and result of a gameplay fact.";
-            summary.Description = summary.Summary;
-        });
-
         Get("/competitions/{competitionId}/gameplay-facts/{gameplayFactId}");
         AuthSchemes("Bearer");
     }

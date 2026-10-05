@@ -24,7 +24,7 @@ const { hasServices, serviceNames, toggleChecker, toggleCheckerJob, RunnerJobEdi
         <FieldLabel>{{ $t('administration.label.targetServiceName') }}</FieldLabel>
         <Select v-model="model.checker.targetServiceName" :disabled="disabled">
           <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent><SelectGroup><SelectItem v-for="name in serviceNames" :key="name ?? undefined" :value="name">{{ name }}</SelectItem></SelectGroup></SelectContent>
+          <SelectContent><SelectGroup><SelectItem v-for="name in serviceNames" :key="name" :value="name">{{ name }}</SelectItem></SelectGroup></SelectContent>
         </Select>
         <FieldDescription>{{ $t('runtime.label.runtimeServiceTarget') }}</FieldDescription>
       </Field>

@@ -34,7 +34,7 @@ public sealed class DeleteRuntimeTrafficCaptureEndpoint(
         Delete("/admin/competitions/{competitionId}/traffic-captures/{runtimeInstanceId}");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("AdminDeleteRuntimeTrafficCapture"));
-        Summary(summary => { summary.Summary = "Deletes one terminal Runtime capture."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Deletes one terminal Runtime capture.");
     }
 
     public override async Task<Results<NoContent, NotFound, ForbidHttpResult,

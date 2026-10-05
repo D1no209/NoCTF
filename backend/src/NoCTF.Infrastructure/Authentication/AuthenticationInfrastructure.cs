@@ -23,7 +23,7 @@ internal static class AuthenticationInfrastructure
         IConfiguration configuration,
         bool development = false)
     {
-        var exporting = configuration.GetValue<bool>("OpenApi:Generating");
+        var exporting = configuration.GetValue<bool>("OpenApi:Exporting");
         var allowDevelopmentProtection = development || exporting;
         services.AddOptions<AuthenticationTokenOptions>()
             .Bind(configuration.GetSection(AuthenticationTokenOptions.SectionName))

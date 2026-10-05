@@ -22,7 +22,7 @@ const { RotateCcw, fields, values, parseFailed, updateField, resetToCurrentDefau
     </Alert>
     <template v-else>
       <FieldGroup>
-        <Field v-for="field in fields" :key="field.key ?? undefined">
+        <Field v-for="field in fields" :key="field.key">
           <FieldLabel>{{ field.label }}</FieldLabel>
           <component :is="ConfigFieldInput"
             :field="field"

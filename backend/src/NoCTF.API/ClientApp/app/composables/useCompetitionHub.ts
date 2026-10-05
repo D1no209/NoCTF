@@ -1,6 +1,11 @@
 import { currentLocale } from '../utils/i18n'
 import * as signalR from '@microsoft/signalr'
-import type { NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol, NoCTFAPIEndpointsCompetitionsEventsCompetitionEventKindProtocol, NoCTFAPIEndpointsCompetitionsEventsCompetitionEventLevelProtocol, NoCTFAPIEndpointsGameplayFactsGameplayFactStatusResponse } from '../api/models'
+import type {
+  NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol,
+  NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol,
+  NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol,
+  NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse,
+} from '../api'
 import { getAccessToken, getRealtimeAccessToken } from '../lib/session'
 import { startRealtimeWithRetry } from '../lib/realtime-retry'
 
@@ -20,21 +25,21 @@ export interface ScoreboardUpdatedNotification {
 
 export interface CompetitionLifecycleChangedNotification {
   competitionId: string
-  from: NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol
-  to: NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol
+  from: NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol
+  to: NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol
   occurredAt: string
 }
 
 export interface CompetitionEventChangedNotification {
   competitionId: string
   eventId: string
-  kind: NoCTFAPIEndpointsCompetitionsEventsCompetitionEventKindProtocol
-  level: NoCTFAPIEndpointsCompetitionsEventsCompetitionEventLevelProtocol
+  kind: NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol
+  level: NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol
   occurredAt: string
 }
 
 export type GameplayFactStateChangedNotification = Required<
-  NoCTFAPIEndpointsGameplayFactsGameplayFactStatusResponse
+  NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse
 >
 
 export interface CompetitionHubClientEvents {

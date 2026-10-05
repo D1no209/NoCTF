@@ -101,7 +101,7 @@ const { ChartSpline, Flag, ShieldCheck, Target, Trophy, scoreboardRankingStateLa
                 <TableHead class="whitespace-nowrap text-right">{{ scoreLabel }}</TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                <template v-for="row in rows" :key="row.group.competitionChallengeId ?? undefined">
+                <template v-for="row in rows" :key="row.group.competitionChallengeId">
                   <TableRow v-for="(achievement, index) in row.achievements.length ? row.achievements : [null]" :key="achievement?.kind ?? 'status'">
                     <TableCell v-if="index === 0" :rowspan="Math.max(1, row.achievements.length)" class="max-w-64 whitespace-normal break-words font-medium">{{ row.title }}</TableCell>
                     <TableCell class="whitespace-nowrap">

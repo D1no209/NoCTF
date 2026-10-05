@@ -87,7 +87,7 @@ describe('participant competition workspace layout', () => {
 
     expect(parent).toContain('if (!user.value)')
     expect(parent).not.toContain('if (!user.value || hasCompetitionStaffAccess.value)')
-    expect(parent).toMatch(/api\.api\.v1\.competitions\.byCompetitionId\([^)]*\)\.leaderboard\.get\(/)
+    expect(parent).toContain('getLeaderboardEndpoint({')
     expect(parent).toContain("myTeam.value?.registrationStatus !== 'Approved'")
     expect(parent).toContain('myStanding.value = data.teams?.find(team => team.teamId === myTeam.value?.id) ?? null')
     expect(parent).toContain('scoreboardUpdated: () => {')

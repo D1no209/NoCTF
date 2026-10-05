@@ -1,12 +1,10 @@
-
-import { api, RequestPolicyOption } from '../../lib/api'
 import { message as describeMessage } from '../../utils/i18n'
 import type { InjectionKey } from 'vue'
-import type { NoCTFAPIEndpointsGameplayFactsGameplayFactStatusResponse } from '../../api/models'
-
+import type { NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse } from '../../api'
+import { getGameplayFactStatusEndpoint } from '../../api'
 import { parseApiError } from '../../utils/api-error'
 
-type StatusReader = (competitionId: string, gameplayFactId: string) => Promise<NoCTFAPIEndpointsGameplayFactsGameplayFactStatusResponse>
+type StatusReader = (competitionId: string, gameplayFactId: string) => Promise<NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse>
 
 export const challengeGameplayFactStatusKey: InjectionKey<StatusReader> = Symbol('challengeGameplayFactStatus')
 
@@ -14,9 +12,11 @@ async function readStatus(
   competitionId: string,
   gameplayFactId: string,
   signal?: AbortSignal,
-): Promise<NoCTFAPIEndpointsGameplayFactsGameplayFactStatusResponse> {
-  let error: unknown;
-  const data = await api.api.v1.competitions.byCompetitionId(competitionId).gameplayFacts.byGameplayFactId(gameplayFactId).get({ options: [new RequestPolicyOption({ signal: signal })] }).catch(cause => { error = cause; return undefined });
+): Promise<NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse> {
+  const { data, error } = await getGameplayFactStatusEndpoint({
+    path: { competitionId, gameplayFactId },
+    signal,
+  })
   if (error || !data)
     throw parseApiError(error, describeMessage('common.flagSubmit.error.submissionStatusFailed'))
   return data
@@ -26,7 +26,7 @@ export function createChallengeGameplayFactStatusReader(
   signal?: AbortSignal,
   fetchStatus: typeof readStatus = readStatus,
 ): StatusReader {
-  const pending = new Map<string, Promise<NoCTFAPIEndpointsGameplayFactsGameplayFactStatusResponse>>()
+  const pending = new Map<string, Promise<NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse>>()
 
   return (competitionId, gameplayFactId) => {
     const key = `${competitionId.toLowerCase()}:${gameplayFactId.replaceAll('-', '').toLowerCase()}`

@@ -54,7 +54,7 @@ const {
           </EmptyHeader>
         </Empty>
         <div v-else class="flex flex-col gap-3">
-          <Card v-for="target in targets" :key="target.id ?? undefined" class="gap-4 bg-card/45">
+          <Card v-for="target in targets" :key="target.id" class="gap-4 bg-card/45">
             <CardHeader class="flex-row items-start justify-between gap-4">
               <div class="min-w-0">
                 <CardTitle class="truncate text-base">{{ target.name }}</CardTitle>

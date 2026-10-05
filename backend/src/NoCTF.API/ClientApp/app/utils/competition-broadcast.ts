@@ -1,4 +1,7 @@
-import type { NoCTFAPIEndpointsCompetitionsEventsCompetitionEventKindProtocol, NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse } from '../api/models'
+import type {
+  NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol,
+  NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse,
+} from '../api'
 import { translate } from './i18n'
 import { competitionChallengePath, competitionTeamsPath } from './app-routes'
 
@@ -14,7 +17,7 @@ export const competitionBroadcastKinds = [
   'AwdpBreakResolved',
   'AwdpFixResolved',
   'AnnouncementPublished',
-] satisfies NoCTFAPIEndpointsCompetitionsEventsCompetitionEventKindProtocol[]
+] satisfies NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol[]
 
 const competitionBroadcastLookbackMs = 30 * 24 * 60 * 60 * 1000
 const competitionBroadcastClockSkewMs = 5 * 60 * 1000
@@ -44,17 +47,17 @@ export function competitionBroadcastQueryWindow(
   }
 }
 
-const competitionBroadcastKindSet: ReadonlySet<NoCTFAPIEndpointsCompetitionsEventsCompetitionEventKindProtocol>
+const competitionBroadcastKindSet: ReadonlySet<NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol>
   = new Set(competitionBroadcastKinds)
 
 export function isCompetitionBroadcastKind(
-  kind: NoCTFAPIEndpointsCompetitionsEventsCompetitionEventKindProtocol,
+  kind: NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol,
 ): boolean {
   return competitionBroadcastKindSet.has(kind)
 }
 
 export function competitionBroadcastIdentity(
-  event: NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse,
+  event: NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse,
 ): string {
   return [
     event.kind,
@@ -65,8 +68,8 @@ export function competitionBroadcastIdentity(
 }
 
 export function deduplicateCompetitionBroadcasts(
-  events: readonly NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse[],
-): NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse[] {
+  events: readonly NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse[],
+): NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse[] {
   const seen = new Set<string>()
   return events.filter((event) => {
     const key = competitionBroadcastIdentity(event)
@@ -77,9 +80,9 @@ export function deduplicateCompetitionBroadcasts(
 }
 
 export function mergeCompetitionBroadcasts(
-  current: readonly NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse[],
-  incoming: readonly NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse[],
-): NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse[] {
+  current: readonly NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse[],
+  incoming: readonly NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse[],
+): NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse[] {
   const currentByIdentity = new Map(current.map(event => [
     competitionBroadcastIdentity(event),
     event,
@@ -89,14 +92,14 @@ export function mergeCompetitionBroadcasts(
 }
 
 export function competitionBroadcastText(
-  event: NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse,
+  event: NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse,
 ): string {
   const team = event.teamDisplayName ?? translate("common.label.team.competitionBroadcast")
   const challenge = event.challengeTitle ?? translate("common.label.challenge")
   if (!event.kind) return translate("competitions.label.competitionStatusUpdated")
   const awdpSucceeded = event.gameplayFactState === 'Completed'
     && event.gameplayFactResult === 'Correct'
-  const messages: Partial<Record<NoCTFAPIEndpointsCompetitionsEventsCompetitionEventKindProtocol, string>> = {
+  const messages: Partial<Record<NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol, string>> = {
     FirstBloodAwarded: translate("competitions.competitionBroadcast.label.teamEarnedFirstBlood", { team, challenge }),
     SecondBloodAwarded: translate("competitions.competitionBroadcast.label.teamEarnedSecondBlood", { team, challenge }),
     ThirdBloodAwarded: translate("competitions.competitionBroadcast.label.teamEarnedThirdBlood", { team, challenge }),
@@ -117,7 +120,7 @@ export function competitionBroadcastText(
 }
 
 export function competitionBroadcastTargetPath(
-  event: NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse,
+  event: NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse,
 ): string | null {
   if (event.competitionChallengeId) {
     return competitionChallengePath(event.competitionId!, event.competitionChallengeId)

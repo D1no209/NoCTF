@@ -42,12 +42,6 @@ public sealed class StartProgressionChallengeEndpoint(
 {
     public override void Configure()
     {
-        Summary(summary =>
-        {
-            summary.Summary = "Checks progression access and starts the selected competition challenge.";
-            summary.Description = summary.Summary;
-        });
-
         Post("/competitions/{competitionId}/challenges/{competitionChallengeId}/start");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("StartProgressionChallenge"));

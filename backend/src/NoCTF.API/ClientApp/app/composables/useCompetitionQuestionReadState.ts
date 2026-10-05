@@ -1,8 +1,8 @@
-import type { NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionResponse } from '../api/models'
+import type { NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse } from '../api'
 import { competitionQuestionUnreadCount } from '../lib/competition-question'
 import { safeLocalStorage } from '../lib/safe-storage'
 
-type Question = NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionResponse
+type Question = NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse
 
 export function useCompetitionQuestionReadState(competitionId: string) {
   const { user } = useAuth()
@@ -42,7 +42,7 @@ export function useCompetitionQuestionReadState(competitionId: string) {
     if (!question.threadRootId) return
     seenUpdatedAt.value = {
       ...seenUpdatedAt.value,
-      [question.threadRootId]: question.updatedAt?.toISOString() ?? new Date().toISOString(),
+      [question.threadRootId]: question.updatedAt ?? new Date().toISOString(),
     }
     const key = storageKey()
     if (key)

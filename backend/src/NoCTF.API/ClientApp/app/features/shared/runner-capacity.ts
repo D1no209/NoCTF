@@ -1,4 +1,7 @@
-import type { NoCTFAPIEndpointsRuntimeRunnerAdmissionFailureProtocol, NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeResourceAmountResponse } from '../../api/models'
+import type {
+  NoCtfapiEndpointsRuntimeRunnerAdmissionFailureProtocol,
+  NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResourceAmountResponse,
+} from '../../api'
 import type { MessageKey } from '../../locales/zh-CN'
 import { translate } from '../../utils/i18n'
 
@@ -13,14 +16,14 @@ const failures = {
   StartupConcurrencyLimited: 'capacity.startupConcurrencyLimited',
   ProviderUnavailable: 'capacity.providerUnavailable',
   RequestExceedsNodeCapacity: 'capacity.requestExceedsNodeCapacity',
-} satisfies Record<NoCTFAPIEndpointsRuntimeRunnerAdmissionFailureProtocol, MessageKey>
+} satisfies Record<NoCtfapiEndpointsRuntimeRunnerAdmissionFailureProtocol, MessageKey>
 
-export function runnerFailureLabel(value?: NoCTFAPIEndpointsRuntimeRunnerAdmissionFailureProtocol | null): string {
+export function runnerFailureLabel(value?: NoCtfapiEndpointsRuntimeRunnerAdmissionFailureProtocol | null): string {
   return value ? translate(failures[value]) : ''
 }
 
 export function formatCapacityAmount(
-  value?: NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeResourceAmountResponse | null,
+  value?: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResourceAmountResponse | null,
 ): string {
   if (value?.cpuMillicores == null || value.memoryBytes == null) return '—'
   return `${(value.cpuMillicores / 1000).toFixed(3)} / ${(value.memoryBytes / 1_048_576).toFixed(0)} / ${value.pidsLimit ?? '—'}`

@@ -16,7 +16,7 @@ public sealed class CompetitionEventRegistrationTests
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["OpenApi:Generating"] = "true",
+                ["OpenApi:Exporting"] = "true",
                 ["ConnectionStrings:Redis"] = "localhost:6379"
             })
             .Build();

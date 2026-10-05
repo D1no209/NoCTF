@@ -14,7 +14,7 @@ public sealed class GetTeamAvatarEndpoint(ManageBusinessImages images)
         Get("/competitions/{competitionId}/teams/{teamId}/avatar");
         AllowAnonymous();
         Description(builder => builder.WithName("TeamAvatar_Get"));
-        Summary(summary => { summary.Summary = "Returns a team's current avatar."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Returns a team's current avatar.");
     }
 
     public override async Task<Results<FileStreamHttpResult, NotFound>> ExecuteAsync(

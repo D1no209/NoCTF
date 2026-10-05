@@ -49,7 +49,6 @@ public sealed class UploadPlatformLogoEndpoint(
         AuthSchemes("Bearer");
         Roles("Administrator");
         AllowFileUploads();
-        Description(builder => builder.Accepts<UploadPlatformLogoRequest>("multipart/form-data"));
         MaxRequestBodySize(FileUploadLimits.MaximumRequestBytes(
             uploadLimits.MaximumLogoBytes));
         Description(builder => builder

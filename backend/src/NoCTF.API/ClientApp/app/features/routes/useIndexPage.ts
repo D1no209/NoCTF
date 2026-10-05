@@ -1,10 +1,8 @@
-
-import { api } from '../../lib/api'
 import { message as describeMessage } from '../../utils/i18n'
 import type { UiMessage } from '../../utils/i18n'
 import { ArrowRight } from '@lucide/vue'
-
-import type { NoCTFAPIEndpointsCompetitionsCompetitionResponse } from '../../api/models'
+import { listCompetitionsEndpoint } from '../../api'
+import type { NoCtfapiEndpointsCompetitionsCompetitionResponse } from '../../api'
 import { executeHomeTerminalInput, homeTerminalCommands, homeTerminalIdentity, type HomeTerminalCommand } from './home-terminal'
 
 /** Owns state, effects and commands for IndexPage. */
@@ -13,7 +11,7 @@ export function useIndexPage() {
 
   const { isLoggedIn, user } = useAuth()
 
-  const items = ref<NoCTFAPIEndpointsCompetitionsCompetitionResponse[]>([])
+  const items = ref<NoCtfapiEndpointsCompetitionsCompetitionResponse[]>([])
 
   const competitionsLoading = ref(true)
 
@@ -22,8 +20,7 @@ export function useIndexPage() {
   async function loadCompetitions(): Promise<void> {
     competitionsLoading.value = true
     competitionsError.value = null
-    let error: unknown;
-    const data = await api.api.v1.competitions.get().catch(cause => { error = cause; return undefined });
+    const { data, error } = await listCompetitionsEndpoint()
     competitionsLoading.value = false
     if (error || !data) {
       competitionsError.value = parseApiError(error, describeMessage("common.index.error.loadRecentCompetitionsFailed")).displayMessage

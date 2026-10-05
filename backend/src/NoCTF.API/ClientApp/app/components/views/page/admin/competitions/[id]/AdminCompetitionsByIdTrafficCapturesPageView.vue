@@ -30,14 +30,14 @@ const { adminTeamPath, adminChallengePath, adminRuntimePath, competitionId, Down
           <SelectTrigger :aria-label="$t('common.label.challenge.pageTitle')"><SelectValue :placeholder="$t('common.label.challenge.pageTitle')" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{{ $t('runtime.allChallenges') }}</SelectItem>
-            <SelectItem v-for="option in challengeOptions" :key="option.id ?? undefined" :value="option.id">{{ option.title }}</SelectItem>
+            <SelectItem v-for="option in challengeOptions" :key="option.id" :value="option.id">{{ option.title }}</SelectItem>
           </SelectContent>
         </Select>
         <Select v-model="filterTeam">
           <SelectTrigger :aria-label="$t('common.label.team')"><SelectValue :placeholder="$t('common.label.team')" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{{ $t('runtime.allTeams') }}</SelectItem>
-            <SelectItem v-for="option in teamOptions" :key="option.id ?? undefined" :value="option.id">{{ option.name }}</SelectItem>
+            <SelectItem v-for="option in teamOptions" :key="option.id" :value="option.id">{{ option.name }}</SelectItem>
           </SelectContent>
         </Select>
         <Input v-model="filterRuntime" :placeholder="$t('runtime.runtimeId')" />
@@ -71,7 +71,7 @@ const { adminTeamPath, adminChallengePath, adminRuntimePath, competitionId, Down
           </TableRow>
         </TableHeader>
         <TableBody>
-          <TableRow v-for="item in items" :key="item.runtimeInstanceId ?? undefined">
+          <TableRow v-for="item in items" :key="item.runtimeInstanceId">
             <TableCell>
               <Checkbox :model-value="isSelected(item.runtimeInstanceId)" @update:model-value="onToggleSelected(item, $event)" />
             </TableCell>

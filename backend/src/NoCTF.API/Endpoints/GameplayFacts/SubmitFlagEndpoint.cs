@@ -1,5 +1,5 @@
 using FastEndpoints;
-using FastEndpoints.OpenApi;
+using FastEndpoints.Swagger;
 using FluentValidation;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.RateLimiting;
@@ -234,10 +234,6 @@ internal static class GameplayFactProblemDetails
 
 public sealed class SubmitFlagRequest
 {
-    /// <summary>One-time verification token; optional when platform policy disables verification. Maximum 4096 characters.</summary>
-    [FromHeader("X-NoCTF-Human-Verification", IsRequired = false, RemoveFromSchema = true)]
-    public string? HumanVerificationToken { get; set; }
-
     public Guid CompetitionId { get; set; }
     public Guid CompetitionChallengeId { get; set; }
     public string? Flag { get; set; }
@@ -277,10 +273,6 @@ public sealed class SubmitFlagEndpoint(SubmitFlag submitFlag, IUserContext userC
 {
     public override void Configure()
     {
-        Description(builder => builder
-            .ProducesProblem(StatusCodes.Status403Forbidden)
-            .ProducesProblem(StatusCodes.Status503ServiceUnavailable));
-
         Post("/competitions/{competitionId}/challenges/{competitionChallengeId}/flag-submissions");
         AuthSchemes("Bearer");
         MaxRequestBodySize(4 * 1024 * 1024);
@@ -293,7 +285,6 @@ public sealed class SubmitFlagEndpoint(SubmitFlag submitFlag, IUserContext userC
             .Produces(StatusCodes.Status429TooManyRequests));
         Summary(summary =>
         {
-            summary.Params["X-NoCTF-Human-Verification"] = "One-time verification token, at most 4096 characters. Required only when the configured platform policy enables verification for this operation.";
             summary.Summary = "Submit one Flag or an ordered AWD Flag collection.";
             summary.Description =
                 "Creates independent immutable attempts, including post-competition CTF practice attempts when enabled. The accepted response is not an evaluation result.";

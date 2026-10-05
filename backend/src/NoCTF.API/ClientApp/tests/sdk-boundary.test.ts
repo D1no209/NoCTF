@@ -19,7 +19,7 @@ describe('generated SDK boundary', () => {
   test('keeps REST endpoint paths inside generated files', async () => {
     for (const file of productSources(appRoot)) {
       const source = await sourceFile(file).text()
-      expect(source, relative(appRoot, file)).not.toMatch(/['"` ]\/api\/(?:v1|internal)\//)
+      expect(source, relative(appRoot, file)).not.toMatch(/\/api\/(?:v1|internal)\//)
     }
   })
 
@@ -31,6 +31,6 @@ describe('generated SDK boundary', () => {
       expect(source, relative(appRoot, file)).not.toContain('$fetch(')
     }
 
-    expect(rawFetchFiles).toEqual(['lib/api.ts'])
+    expect(rawFetchFiles).toEqual(['plugins/api.client.ts'])
   })
 })

@@ -18,7 +18,7 @@ const { Crown, UserMinus, profiles, loaded, loadError, removing, loadProfiles, r
     <Skeleton v-if="!loaded" class="h-12 w-full" />
     <li
       v-for="memberId in team.memberIds ?? []"
-      :key="memberId ?? undefined"
+      :key="memberId"
       class="flex items-center gap-3 rounded-md border px-3 py-2"
     >
       <Avatar class="size-8">

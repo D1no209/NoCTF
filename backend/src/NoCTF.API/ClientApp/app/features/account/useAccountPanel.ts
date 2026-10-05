@@ -1,7 +1,3 @@
-
-import { api, multipartBody } from '../../lib/api'
-
-
 import { message as describeMessage } from '../../utils/i18n'
 import type { UiMessage } from '../../utils/i18n'
 import { markRaw } from 'vue'
@@ -9,8 +5,18 @@ import type { ComponentPublicInstance } from 'vue'
 import { Image as ImageIcon, LockKeyhole, LogOut, ShieldCheck, UserRound } from '@lucide/vue'
 import { useMediaQuery } from '@vueuse/core'
 import { toast } from '../../utils/message-toast'
-
-import type { NoCTFAPIEndpointsAuthenticationMySsoBindingConfigurationResponse } from '../../api/models'
+import {
+  authenticationGetMyProfile,
+  authenticationPatchMyProfile,
+  authenticationUploadMyAvatar,
+  authenticationUploadMyWallpaper,
+  changePasswordEndpoint,
+  resendEmailVerificationEndpoint,
+  authenticationSsoBeginBinding,
+  authenticationSsoGetMyBinding,
+  authenticationSsoUnbindIdentity,
+} from '../../api'
+import type { NoCtfapiEndpointsAuthenticationMySsoBindingConfigurationResponse } from '../../api'
 import AvatarCropDialogComponent from './AvatarCropDialog.vue'
 import AdminDateTimeComponent from '../admin/AdminDateTime.vue'
 import { exceedsUploadLimit } from './upload-limits'
@@ -88,8 +94,9 @@ export function useAccountPanel() {
     profileSuccess.value = false
     const draft = description.value
     try {
-      let error: unknown;
-      const data = await api.api.v1.auth.me.profile.patch({ profile: { description: draft || null } }).catch(cause => { error = cause; return undefined });
+      const { data, error } = await authenticationPatchMyProfile({
+        body: { profile: { description: draft || null } },
+      })
       if (error || !data) throw error
       savedDescription.value = draft
       profileSuccess.value = true
@@ -134,8 +141,8 @@ export function useAccountPanel() {
     }
     avatarPending.value = true
     try {
-
-      await api.api.v1.auth.me.avatar.put(await multipartBody({ file }));
+      const { error } = await authenticationUploadMyAvatar({ body: { file } })
+      if (error) throw error
       await fetchMe()
       avatarEditorOpen.value = false
       avatarSourceFile.value = null
@@ -173,8 +180,7 @@ export function useAccountPanel() {
 
     wallpaperPending.value = true
     try {
-      let error: unknown;
-      const data = await api.api.v1.auth.me.wallpaper.put(await multipartBody({ file })).catch(cause => { error = cause; return undefined });
+      const { data, error } = await authenticationUploadMyWallpaper({ body: { file } })
       if (error || !data) throw error
       user.value = data
       await refreshWallpaper(true)
@@ -192,8 +198,9 @@ export function useAccountPanel() {
     if (wallpaperPending.value || enabled === Boolean(user.value?.wallpaperEnabled)) return
     wallpaperPending.value = true
     try {
-      let error: unknown;
-      const data = await api.api.v1.auth.me.profile.patch({ appearance: { wallpaperEnabled: enabled } }).catch(cause => { error = cause; return undefined });
+      const { data, error } = await authenticationPatchMyProfile({
+        body: { appearance: { wallpaperEnabled: enabled } },
+      })
       if (error || !data) throw error
       const nextEnabled = data.appearance?.wallpaperEnabled ?? enabled
       await runDownRevealTransition('wallpaper', () => {
@@ -231,8 +238,7 @@ export function useAccountPanel() {
     identityLoading.value = true
     identityError.value = null
     try {
-      let error: unknown;
-      const data = await api.api.v1.auth.me.profile.get().catch(cause => { error = cause; return undefined });
+      const { data, error } = await authenticationGetMyProfile()
       if (error || !data) throw error
       description.value = data.description ?? ''
       savedDescription.value = description.value
@@ -257,8 +263,10 @@ export function useAccountPanel() {
     identityFieldErrors.value = {}
     const draft = { fullName: fullName.value.trim(), studentNumber: studentNumber.value.trim() }
     try {
-
-      await api.api.v1.auth.me.profile.patch({ schoolIdentity: draft });
+      const { error } = await authenticationPatchMyProfile({
+        body: { schoolIdentity: draft },
+      })
+      if (error) throw error
       fullName.value = draft.fullName
       studentNumber.value = draft.studentNumber
       savedIdentity.value = draft
@@ -284,7 +292,8 @@ export function useAccountPanel() {
     emailMessage.value = null
     emailError.value = false
     try {
-      await api.api.v1.auth.emailVerification.resend.post();
+      const { error } = await resendEmailVerificationEndpoint()
+      if (error) throw error
       emailMessage.value = translate('account.accountPanel.description.verificationEmailRequestedCheck')
     }
     catch (error) {
@@ -296,7 +305,7 @@ export function useAccountPanel() {
     }
   }
 
-  const ssoConfiguration = ref<NoCTFAPIEndpointsAuthenticationMySsoBindingConfigurationResponse | null>(null)
+  const ssoConfiguration = ref<NoCtfapiEndpointsAuthenticationMySsoBindingConfigurationResponse | null>(null)
   const ssoLoading = ref(false)
   const ssoLoaded = ref(false)
   const ssoPending = ref(false)
@@ -306,8 +315,7 @@ export function useAccountPanel() {
   async function loadSsoBinding() {
     ssoLoading.value = true
     ssoError.value = null
-    let error: unknown;
-    const data = await api.api.v1.auth.me.ssoBinding.get().catch(cause => { error = cause; return undefined });
+    const { data, error } = await authenticationSsoGetMyBinding()
     ssoLoading.value = false
     if (error || !data) {
       ssoError.value = parseApiError(error, describeMessage('sso.bindingUnavailable')).displayMessage
@@ -323,8 +331,9 @@ export function useAccountPanel() {
     ssoPending.value = true
     ssoError.value = null
     try {
-      let error: unknown;
-      const data = await api.api.v1.auth.me.ssoBinding.flows.post({ providerId: ssoProviderId.value }).catch(cause => { error = cause; return undefined });
+      const { data, error } = await authenticationSsoBeginBinding({
+        body: { providerId: ssoProviderId.value },
+      })
       if (error || !data?.authorizationUrl) throw error
       window.location.assign(data.authorizationUrl)
     }
@@ -338,8 +347,7 @@ export function useAccountPanel() {
     if (ssoPending.value) return
     ssoPending.value = true
     ssoError.value = null
-    let error: unknown;
-    await api.api.v1.auth.me.ssoBinding.delete().catch(cause => { error = cause; return undefined });
+    const { error } = await authenticationSsoUnbindIdentity()
     ssoPending.value = false
     if (error) {
       ssoError.value = parseApiError(error, describeMessage('sso.unbindingFailed')).displayMessage
@@ -384,8 +392,10 @@ export function useAccountPanel() {
     }
     passwordPending.value = true
     try {
-
-      await api.api.v1.auth.password.put({ currentPassword: currentPassword.value, newPassword: newPassword.value });
+      const { error } = await changePasswordEndpoint({
+        body: { currentPassword: currentPassword.value, newPassword: newPassword.value },
+      })
+      if (error) throw error
       toast.success(describeMessage('account.accountPanel.description.passwordChangedLogAgain'))
       currentPassword.value = ''
       newPassword.value = ''

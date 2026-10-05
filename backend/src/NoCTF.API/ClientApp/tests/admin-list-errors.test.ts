@@ -44,7 +44,7 @@ describe('admin list error presentation', () => {
   test('competition archives download directly and preserve the form on failure', async () => {
     const source = await pageSource('admin/competitions/[id]/exports.vue')
 
-    expect(source).toMatch(/api\.api\.v1\.admin\.competitions\.byCompetitionId\([^)]*\)\.dataExport\.post\(/)
+    expect(source).toContain('adminExportCompetitionArchive({')
     expect(source).toContain('if (exportingArchive.value) return')
     expect(source).toContain('exportReason.value = \'\'')
     expect(source).toContain('toast.error(parseApiError(e).displayMessage)')
@@ -65,7 +65,7 @@ describe('admin list error presentation', () => {
   test('platform audit archives download directly without an asynchronous task list', async () => {
     const source = await pageSource('admin/platform/audit.vue')
 
-    expect(source).toMatch(/api\.api\.v1\.admin\.platform\.auditLogs\.dataExport\.post\(/)
+    expect(source).toContain('adminExportPlatformAuditArchive({')
     expect(source).toContain('if (exportingArchive.value) return')
     expect(source).toContain('toast.error(parseApiError(e).displayMessage)')
     expect(source).not.toContain('exports_.value')

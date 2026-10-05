@@ -10,7 +10,7 @@ const { Box, ScanLine, ShieldCheck, hexes, event } = toRefs(viewProps.state)
   <div class="event-fx defense-success" aria-hidden="true">
     <div class="upload-cube"><Box /><i /><span>{{ $t('competitions.label.patchUpload') }}</span></div>
     <div class="scan-disc"><ScanLine /><i /><strong>{{ $t('competitions.label.scan') }}</strong></div>
-    <div class="shield-grid"><i v-for="hex in hexes" :key="hex ?? undefined" :style="{ '--hex': hex }" /></div>
+    <div class="shield-grid"><i v-for="hex in hexes" :key="hex" :style="{ '--hex': hex }" /></div>
     <div class="success-shield"><ShieldCheck /><i /></div>
     <div class="defense-result">
       <small>{{ event.teamName }} / {{ event.challengeTitle }}</small>

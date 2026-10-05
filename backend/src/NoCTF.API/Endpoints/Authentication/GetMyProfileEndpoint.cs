@@ -54,7 +54,7 @@ public sealed class GetMyProfileEndpoint(
         Get("/auth/me/profile");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("Authentication_GetMyProfile"));
-        Summary(summary => { summary.Summary = "Gets the current user's editable profile."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Gets the current user's editable profile.");
     }
 
     public override async Task<Results<Ok<CurrentUserProfileResponse>, NotFound>> ExecuteAsync(

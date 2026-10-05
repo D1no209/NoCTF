@@ -2,7 +2,7 @@ using System.Net;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using FastEndpoints;
-using FastEndpoints.OpenApi;
+using FastEndpoints.Swagger;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -63,7 +63,7 @@ public sealed class AdminSsoUnbindEndpointTests
             options.Filter = type => type == typeof(global::NoCTF.API.Endpoints
                 .Administration.Platform.AdminUnbindSsoIdentityEndpoint);
         });
-        builder.Services.OpenApiDocument();
+        builder.Services.SwaggerDocument();
         builder.Services.AddAuthentication("Bearer")
             .AddScheme<AuthenticationSchemeOptions, TestBearer>("Bearer", _ => { });
         builder.Services.AddAuthorization();

@@ -11,7 +11,7 @@ const { Box, ScanLine, ShieldAlert, cracks, event } = toRefs(viewProps.state)
     <div class="upload-cube"><Box /><span>{{ $t('competitions.label.patchUpload') }}</span></div>
     <div class="scan-warning"><ScanLine /><i /><strong>{{ $t('competitions.label.scan') }}</strong></div>
     <div class="warning-mark"><ShieldAlert /><b>!</b><span>{{ $t('competitions.error.validationFailed') }}</span></div>
-    <div class="cracked-shield"><i v-for="crack in cracks" :key="crack ?? undefined" :style="{ '--crack': crack }" /></div>
+    <div class="cracked-shield"><i v-for="crack in cracks" :key="crack" :style="{ '--crack': crack }" /></div>
     <div class="defense-result">
       <small>{{ event.teamName }} / {{ event.challengeTitle }}</small>
       <strong>{{ $t('competitions.error.defenseFailed') }}</strong>

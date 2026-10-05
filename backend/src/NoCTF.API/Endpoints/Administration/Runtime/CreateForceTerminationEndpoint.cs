@@ -36,7 +36,7 @@ public sealed class CreateForceTerminationEndpoint(
             new NoCTF.Hosting.Observability.RuntimeOperationMetricsMetadata(
                 NoCTF.Application.Observability.RuntimeOperationMetricKind.ForceTerminate)));
         Description(builder => builder.WithName("AdminCreateRuntimeForceTermination"));
-        Summary(summary => { summary.Summary = "Creates a force-termination request for a stuck Runtime."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Creates a force-termination request for a stuck Runtime.");
     }
 
     public override async Task<Results<Accepted<RuntimeAcceptedResponse>, NotFound,

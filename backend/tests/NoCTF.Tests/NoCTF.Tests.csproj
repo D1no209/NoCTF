@@ -37,10 +37,4 @@
     <ProjectReference Include="../../src/NoCTF.Runtime.Kubernetes/NoCTF.Runtime.Kubernetes.csproj" />
     <ProjectReference Include="../../src/NoCTF.Runner/NoCTF.Runner.csproj" />
   </ItemGroup>
-  <Target Name="ExcludeKiotaThreadingAnalyzers" BeforeTargets="CoreCompile">
-    <!-- Kiota bundles tooling analyzers; TUnit's existing test conventions are independent. -->
-    <ItemGroup>
-      <Analyzer Remove="@(Analyzer)" Condition="$([System.String]::Copy('%(Analyzer.Filename)').StartsWith('Microsoft.VisualStudio.Threading.Analyzers'))" />
-    </ItemGroup>
-  </Target>
 </Project>

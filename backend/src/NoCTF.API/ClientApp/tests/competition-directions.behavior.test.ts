@@ -1,4 +1,3 @@
-import { createTestApi, kiotaBindings, testId } from './support/kiota-harness'
 import { describe, expect, test } from 'bun:test'
 import { computed, effectScope, nextTick, onScopeDispose, ref } from 'vue'
 import { isLucideIconName, normalizeLucideIconName } from '../app/lib/lucide-icon-name'
@@ -12,28 +11,19 @@ const drain = async () => { await nextTick(); await new Promise(resolve => setTi
 function harness(writable = true) {
   const saved: any[] = []
   const requests: Array<{ options: any; resolve: (value: any) => void }> = []
-  const deps = { ...kiotaBindings(source), api: createTestApi({ 'GET /api/v1/admin/competitions/{competitionId}/directions': (options: any) => new Promise(resolve => requests.push({ options, resolve })),
-'GET /api/v1/admin/competitions/{competitionId}/challenges': async () => ({ items: [{ directionId: testId('web') }] }),
-'PUT /api/v1/admin/competitions/{competitionId}/directions': async (options: any) => { saved.push(options); return { items: options.body.items } } }),
-Plus: {},
-Trash2: {},
-RefreshCw: {},
-computed,
-ref,
-onMounted: (callback: () => void) => callback(),
-onBeforeUnmount: onScopeDispose,
-useCompetitionAdmin: () => ({ competitionId: 'competition', canWrite: ref(writable) }),
-isLucideIconName,
-normalizeLucideIconName,
-translate: (key: string) => key,
-parseApiError: () => new ApiError('failed'),
-toast: { success: () => {} } }
+  const deps = { Plus: {}, Trash2: {}, RefreshCw: {}, computed, ref, onMounted: (callback: () => void) => callback(), onBeforeUnmount: onScopeDispose,
+    useCompetitionAdmin: () => ({ competitionId: 'competition', canWrite: ref(writable) }),
+    adminGetCompetitionDirections: (options: any) => new Promise(resolve => requests.push({ options, resolve })),
+    adminListCompetitionChallenges: async () => ({ data: { items: [{ directionId: 'web' }] } }),
+    adminSaveCompetitionDirections: async (options: any) => { saved.push(options); return { data: { items: options.body.items } } },
+    isLucideIconName, normalizeLucideIconName, translate: (key: string) => key,
+    parseApiError: () => new ApiError('failed'), toast: { success: () => {} } }
   const factory = new Function('deps', `const { ${Object.keys(deps).join(', ')} } = deps; ${compiled}; return useAdminCompetitionsByIdDirectionsPage;`)(deps)
   const scope = effectScope()
   const state = scope.run(() => factory())!
   return { state, saved, requests, stop: () => scope.stop() }
 }
-const row = (id = 'web', name = 'Web', icon = 'globe') => ({ id: testId(id), name, icon })
+const row = (id = 'web', name = 'Web', icon = 'globe') => ({ id, name, icon })
 describe('competition direction catalog', () => {
   test('validates real Lucide suffixes and keeps client and API catalogs aligned', async () => {
     expect(normalizeLucideIconName(' lucide:key-round ')).toBe('key-round')
@@ -44,8 +34,7 @@ describe('competition direction catalog', () => {
   })
   test('guards used directions and saves custom spelling with a normalized icon suffix', async () => {
     const app = harness()
-    await drain()
-    app.requests[0]!.resolve({ items: [row(), row('unused', 'Misc', 'puzzle')] })
+    app.requests[0]!.resolve({ data: { items: [row(), row('unused', 'Misc', 'puzzle')] } })
     await drain()
     app.state.remove(app.state.items.value[0])
     expect(app.state.items.value).toHaveLength(2)
@@ -61,15 +50,13 @@ describe('competition direction catalog', () => {
   })
   test('refresh and unmount invalidate earlier requests', async () => {
     const app = harness()
-    await drain()
     const second = app.state.load()
-    await drain()
     expect(app.requests[0]!.options.signal.aborted).toBe(true)
-    app.requests[1]!.resolve({ items: [row('new')] })
+    app.requests[1]!.resolve({ data: { items: [row('new')] } })
     await second
-    app.requests[0]!.resolve({ items: [row('old')] })
+    app.requests[0]!.resolve({ data: { items: [row('old')] } })
     await drain()
-    expect(app.state.items.value[0].id).toBe(testId('new'))
+    expect(app.state.items.value[0].id).toBe('new')
     app.stop()
     expect(app.requests[1]!.options.signal.aborted).toBe(true)
   })

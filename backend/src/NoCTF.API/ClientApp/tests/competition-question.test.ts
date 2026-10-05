@@ -2,10 +2,10 @@ import { translate } from '../app/utils/i18n'
 import { sourceFile } from './support/feature-source'
 import { describe, expect, test } from 'bun:test'
 import type {
-  NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionFailureCode,
-  NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionFailureResponse,
-  NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionResponse,
-} from '../app/api/models'
+  NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureCode,
+  NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureResponse,
+  NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse,
+} from '../app/api'
 import {
   competitionQuestionErrorMessage,
   competitionQuestionRoleLabel,
@@ -14,7 +14,7 @@ import {
 } from '../app/lib/competition-question'
 import { useCursorPagination } from '../app/composables/useCursorPagination'
 
-type Question = NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionResponse
+type Question = NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse
 
 const expectedFailureText = {
   InvalidRequest: '咨询内容或请求参数无效',
@@ -26,13 +26,13 @@ const expectedFailureText = {
   ParticipantMessageLimitReached: '工作人员回复前最多连续发送 4 条消息',
   InvalidTransition: '当前咨询状态不允许执行此操作',
   QuestionClosed: '该咨询已关闭',
-} satisfies Record<NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionFailureCode, string>
+} satisfies Record<NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureCode, string>
 
 describe('competition question errors', () => {
   for (const [code, expected] of Object.entries(expectedFailureText)) {
     test(`shows a Chinese explanation for ${code}`, () => {
-      const payload: NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionFailureResponse = {
-        code: code as NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionFailureCode,
+      const payload: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureResponse = {
+        code: code as NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureCode,
         limit: code === 'TeamActiveQuestionLimitReached'
           ? 7
           : code === 'ParticipantMessageLimitReached'
@@ -152,7 +152,7 @@ describe('competition question page wiring', () => {
     ).text()
 
     expect(page).toContain('useCursorPagination<Question>(fetchQuestionPage)')
-    expect(page).toContain('queryParameters: { cursor: cursor ?? undefined, limit: 50 }')
+    expect(page).toContain('query: { cursor, limit: 50 }')
     expect(page).toContain('nextCursor: data.nextCursor ?? null')
     expect(page).toContain('mergeCompetitionQuestions(questions.value, page.items ?? [])')
     expect(page).toContain('const refreshList = createTrailingRefresh(async () =>')

@@ -143,7 +143,7 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
 
       <template v-if="team.registrationStatus === 'Approved' && !team.isBanned">
         <Separator />
-        <component :is="TeamRuntimeManager" :key="team.id ?? undefined" :competition-id="competitionId" />
+        <component :is="TeamRuntimeManager" :key="team.id" :competition-id="competitionId" />
       </template>
 
       <template v-if="isCaptain && !team.isBanned">
@@ -219,7 +219,7 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
                         <SelectContent>
                           <SelectItem
                             v-for="track in selectableTracks"
-                            :key="track.key ?? undefined"
+                            :key="track.key"
                             :value="track.key!"
                           >
                             <span class="flex items-center gap-2">
@@ -249,7 +249,7 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
                     <Field>
                       <FieldLabel for="team-avatar-file">{{ $t('competitions.label.teamAvatar') }}</FieldLabel>
                       <FileUpload
-                        :key="avatarInputKey ?? undefined"
+                        :key="avatarInputKey"
                         id="team-avatar-file"
                         accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
                         :pending="avatarPending"
@@ -290,7 +290,7 @@ const { Copy, RefreshCw, maximumAppealStatementLength, minimumAppealStatementLen
                         <SelectTrigger><SelectValue :placeholder="$t('competitions.label.selectMembers')" /></SelectTrigger>
                         <SelectContent>
                           <SelectGroup>
-                            <SelectItem v-for="id in transferableMembers" :key="id ?? undefined" :value="id">
+                            <SelectItem v-for="id in transferableMembers" :key="id" :value="id">
                               {{ id }}
                             </SelectItem>
                           </SelectGroup>

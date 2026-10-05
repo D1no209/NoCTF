@@ -1,4 +1,4 @@
-import type { NoCTFAPIEndpointsCompetitionsGameModeProtocol } from '../api/models'
+import type { NoCtfapiEndpointsCompetitionsGameModeProtocol } from '../api'
 import type { DefinitionModel, RunnerJobModel } from '../utils/game-config'
 import {
   CtfInteraction,
@@ -110,7 +110,7 @@ function validatePatchSettings(issues: string[], model: DefinitionModel): void {
 }
 
 export interface ChallengeTemplateDraft {
-  mode: NoCTFAPIEndpointsCompetitionsGameModeProtocol
+  mode: NoCtfapiEndpointsCompetitionsGameModeProtocol
   title: string
   direction: string
   definition: DefinitionModel

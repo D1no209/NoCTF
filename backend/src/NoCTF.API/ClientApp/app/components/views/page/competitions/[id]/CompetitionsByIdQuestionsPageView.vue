@@ -49,7 +49,7 @@ const { maximumQuestionBodyLength, maximumQuestionTitleLength, minimumQuestionBo
                     <SelectContent>
                       <SelectGroup>
                         <SelectItem value="none">{{ $t('notifications.competitionsBy.label.relatedTopic') }}</SelectItem>
-                        <SelectItem v-for="c in challenges" :key="c.id ?? undefined" :value="c.id!">
+                        <SelectItem v-for="c in challenges" :key="c.id" :value="c.id!">
                           {{ c.title }}
                         </SelectItem>
                       </SelectGroup>
@@ -110,7 +110,7 @@ const { maximumQuestionBodyLength, maximumQuestionTitleLength, minimumQuestionBo
         </EmptyHeader>
       </Empty>
       <ul v-else-if="questions.length" class="flex flex-col gap-2">
-        <li v-for="q in questions" :key="q.threadRootId ?? undefined">
+        <li v-for="q in questions" :key="q.threadRootId">
           <ActionButton
             type="button"
             class="w-full rounded-md border px-3 py-2 text-left transition-colors hover:border-primary/50"
@@ -155,7 +155,7 @@ const { maximumQuestionBodyLength, maximumQuestionTitleLength, minimumQuestionBo
         <EmptyHeader><EmptyTitle>{{ $t('notifications.competitionsBy.description.selectConsultationLeftView') }}</EmptyTitle></EmptyHeader>
       </Empty>
       <Skeleton v-else-if="detailLoading" class="h-full w-full" />
-      <ConversationPanel v-else-if="detail" :key="detail.threadRootId ?? undefined" :identity="detail.threadRootId ?? undefined" :item-count="detail.entries?.length" :history-label="$t('notifications.label.consultationQa')">
+      <ConversationPanel v-else-if="detail" :key="detail.threadRootId" :identity="detail.threadRootId" :item-count="detail.entries?.length" :history-label="$t('notifications.label.consultationQa')">
         <template #header>
           <div class="flex items-center justify-between gap-2">
             <h2 class="text-base font-semibold">{{ detail.title }}</h2>
@@ -167,7 +167,7 @@ const { maximumQuestionBodyLength, maximumQuestionTitleLength, minimumQuestionBo
           </p>
         </template>
         <template #history>
-          <template v-for="entry in detail.entries ?? []" :key="entry.id ?? undefined">
+          <template v-for="entry in detail.entries ?? []" :key="entry.id">
             <MessageBubble v-if="entry.kind === 'Message'" :own="isOwnMessage(entry.actorUserId)">
               <template #meta>
                 <Badge :variant="isHandlerRole(entry.actorRole) ? 'default' : 'secondary'">{{ roleLabel(entry.actorRole) }}</Badge>

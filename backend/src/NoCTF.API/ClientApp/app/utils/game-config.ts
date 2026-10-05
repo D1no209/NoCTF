@@ -1,9 +1,17 @@
-import type { NoCTFAPIEndpointsAdministrationChallengeBankChallengeDefinitionContract, NoCTFAPIEndpointsAdministrationChallengeBankChallengeRuntimeContract, NoCTFAPIEndpointsAdministrationCompetitionsBloodRewardPolicyProtocol, NoCTFAPIEndpointsAdministrationCompetitionsEvaluationDispatchModeProtocol, NoCTFAPIEndpointsAdministrationCompetitionsScoreDecayModeProtocol, NoCTFAPIEndpointsAdministrationCompetitionsCtfScoreSettlementModeProtocol, NoCTFAPIEndpointsCompetitionsGameModeProtocol } from '../api/models'
+import type {
+  NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract,
+  NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeContract,
+  NoCtfapiEndpointsAdministrationCompetitionsBloodRewardPolicyProtocol,
+  NoCtfapiEndpointsAdministrationCompetitionsEvaluationDispatchModeProtocol,
+  NoCtfapiEndpointsAdministrationCompetitionsScoreDecayModeProtocol,
+  NoCtfapiEndpointsAdministrationCompetitionsCtfScoreSettlementModeProtocol,
+  NoCtfapiEndpointsCompetitionsGameModeProtocol,
+} from '../api'
 import { translate } from './i18n'
 
 /** Strongly typed editor models for the OpenAPI game-mode contracts. */
 
-export type GameModeValue = NoCTFAPIEndpointsCompetitionsGameModeProtocol
+export type GameModeValue = NoCtfapiEndpointsCompetitionsGameModeProtocol
 
 // ---------- Editor enums ----------
 
@@ -30,13 +38,13 @@ export const CtfInteraction = { FlagSubmission: 0, PatchVerification: 1 } as con
 
 const scoreDecayProtocols = [
   'Fixed', 'Linear', 'Quadratic', 'Exponential', 'Logarithmic', 'Custom',
-] as const satisfies readonly NoCTFAPIEndpointsAdministrationCompetitionsScoreDecayModeProtocol[]
+] as const satisfies readonly NoCtfapiEndpointsAdministrationCompetitionsScoreDecayModeProtocol[]
 const bloodRewardProtocols = [
   'FixedPoints', 'InitialPointsPercentage', 'SolveTimePointsPercentage', 'CurrentPointsPercentage',
-] as const satisfies readonly NoCTFAPIEndpointsAdministrationCompetitionsBloodRewardPolicyProtocol[]
+] as const satisfies readonly NoCtfapiEndpointsAdministrationCompetitionsBloodRewardPolicyProtocol[]
 const evaluationDispatchProtocols = [
   'Automatic', 'Manual',
-] as const satisfies readonly NoCTFAPIEndpointsAdministrationCompetitionsEvaluationDispatchModeProtocol[]
+] as const satisfies readonly NoCtfapiEndpointsAdministrationCompetitionsEvaluationDispatchModeProtocol[]
 
 function protocolIndex(value: unknown, names: readonly string[], fallback: number): number {
   const index = names.indexOf(value as string)
@@ -51,7 +59,7 @@ export const ATTACK_REWARD_MODES = [
 export const CTF_SCORE_SETTLEMENT_MODES = [
   { value: 'DynamicRecalculation', label: 'common.label.ctfDynamicRecalculation' },
   { value: 'AtSolve', label: 'common.label.ctfSolve' },
-] as const satisfies readonly { value: NoCTFAPIEndpointsAdministrationCompetitionsCtfScoreSettlementModeProtocol, label: string }[]
+] as const satisfies readonly { value: NoCtfapiEndpointsAdministrationCompetitionsCtfScoreSettlementModeProtocol, label: string }[]
 
 export const BLOOD_REWARD_POLICIES = [
   { value: BloodRewardPolicy.FixedPoints, label: "common.label.fixedPoints" },
@@ -319,24 +327,23 @@ function protocolFlagSource(value: unknown): number {
 }
 
 function definitionContractRuntime(
-  runtime: NoCTFAPIEndpointsAdministrationChallengeBankChallengeRuntimeContract,
+  runtime: NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeContract,
 ): RuntimeTemplateModel {
   const value = runtime as Record<string, unknown>
   let definition: RuntimeDefinitionModel
   if (runtime.kind === 'Ova') {
     if (!runtime.ova || runtime.container) throw new Error('Invalid Ova Runtime contract.')
-    definition = { kind: 'ova', sourceUrl: runtime.ova.sourceUrl ?? '', sha256: runtime.ova.sha256 ?? '' }
+    definition = { kind: 'ova', sourceUrl: runtime.ova.sourceUrl, sha256: runtime.ova.sha256 }
   }
   else if (runtime.kind === 'Container') {
-    if (!runtime.container?.services?.length || runtime.ova) throw new Error('Invalid Container Runtime contract.')
+    if (!runtime.container || runtime.ova) throw new Error('Invalid Container Runtime contract.')
     definition = {
       kind: 'container',
-      services: runtime.container.services.map(service => {
-        return ({
-        name: service.name ?? '', image: service.image ?? '', cpuCores: service.cpuCores ?? 0.5, memoryMiB: service.memoryMiB ?? 512,
-        command: [...(service.command ?? [])], arguments: [...(service.arguments ?? [])], environment: Object.fromEntries(Object.entries(service.environment?.additionalData ?? {}).filter((entry): entry is [string, string] => typeof entry[1] === 'string')),
+      services: runtime.container.services.map(service => ({
+        name: service.name, image: service.image, cpuCores: service.cpuCores ?? 0.5, memoryMiB: service.memoryMiB ?? 512,
+        command: [...(service.command ?? [])], arguments: [...(service.arguments ?? [])], environment: { ...(service.environment ?? {}) },
         flagEnvironmentVariableName: service.flagEnvironmentVariableName ?? '', internalPorts: [...(service.internalPorts ?? [])],
-      }) }),
+      })),
     }
   }
   else throw new Error('Unknown Runtime kind.')
@@ -361,7 +368,7 @@ function definitionContractRuntime(
 }
 
 export function definitionContractToModel(
-  contract: NoCTFAPIEndpointsAdministrationChallengeBankChallengeDefinitionContract,
+  contract: NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract,
   mode: GameModeValue,
 ): DefinitionModel {
   if (contract.mode !== mode) throw new Error('Challenge definition mode does not match the editor.')
@@ -379,7 +386,7 @@ export function definitionContractToModel(
     const job = {
       image: asString(checker.image),
       command: asStringArray(checker.command),
-      environment: asStringMap(asObject(checker.environment)?.additionalData),
+      environment: asStringMap(checker.environment),
       timeoutSeconds: asNumber(checker.timeoutSeconds),
     }
     if (mode === 'Awd') {
@@ -462,10 +469,10 @@ export interface ConfigFieldDef {
   key: string
   label: string
   type: ConfigFieldType
-  description?: string | null
-  placeholder?: string | null
-  min?: number | null
-  max?: number | null
+  description?: string
+  placeholder?: string
+  min?: number
+  max?: number
   options?: readonly ConfigFieldOption[]
   /** 缺省值(竞赛配置缺失字段时回填)。 */
   defaultValue?: unknown
@@ -693,7 +700,7 @@ function readFieldValue(field: ConfigFieldDef, raw: unknown): unknown {
 
 function runtimeModelToContract(
   runtime: RuntimeTemplateModel,
-): NoCTFAPIEndpointsAdministrationChallengeBankChallengeRuntimeContract {
+): NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeContract {
   const common = {
     allocation: runtime.allocation === RuntimeAllocation.Shared ? 'Shared' as const : 'PerTeam' as const,
     limits: runtime.definition.kind === 'ova' ? {
@@ -746,8 +753,8 @@ function runtimeModelToContract(
     ...common,
     container: {
       services: runtime.definition.services.map(service => ({
-        name: service.name ?? '', image: service.image ?? '', cpuCores: service.cpuCores ?? 0, memoryMiB: service.memoryMiB ?? 0,
-        command: service.command, arguments: service.arguments, environment: { additionalData: service.environment },
+        name: service.name, image: service.image, cpuCores: service.cpuCores ?? 0, memoryMiB: service.memoryMiB ?? 0,
+        command: service.command, arguments: service.arguments, environment: service.environment,
         flagEnvironmentVariableName: service.flagEnvironmentVariableName || null,
         internalPorts: service.internalPorts.filter((port): port is number => port !== null),
       })),
@@ -760,7 +767,7 @@ function runnerJobContract(job: RunnerJobModel, targetServiceName: string | null
   return {
     image: job.image,
     command: job.command,
-    environment: { additionalData: job.environment },
+    environment: job.environment,
     timeoutSeconds: job.timeoutSeconds ?? 60,
     targetServiceName,
   }
@@ -769,7 +776,7 @@ function runnerJobContract(job: RunnerJobModel, targetServiceName: string | null
 export function definitionModelToContract(
   mode: GameModeValue,
   model: DefinitionModel,
-): NoCTFAPIEndpointsAdministrationChallengeBankChallengeDefinitionContract {
+): NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract {
   const common = {
     flagTemplate: model.flagTemplate ? {
       header: model.flagTemplate.header,
@@ -817,7 +824,7 @@ export function definitionModelToContract(
   }
 }
 
-export function defaultDefinition(mode: GameModeValue): NoCTFAPIEndpointsAdministrationChallengeBankChallengeDefinitionContract {
+export function defaultDefinition(mode: GameModeValue): NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract {
   return definitionModelToContract(mode, emptyDefinition(mode))
 }
 

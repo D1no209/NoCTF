@@ -1,5 +1,12 @@
 import type { UiMessage } from '../utils/i18n'
-import type { NoCTFAPIEndpointsAdministrationCompetitionsCompetitionTrackFailureCodeProtocol, NoCTFAPIEndpointsAdministrationCompetitionsCompetitionTrackFailureResponse, NoCTFAPIEndpointsTeamsTeamRegistrationFailureCodeProtocol, NoCTFAPIEndpointsTeamsTeamRegistrationFailureResponse, NoCTFAPIEndpointsTeamsTeamMembershipFailureCodeProtocol, NoCTFAPIEndpointsTeamsTeamMembershipFailureResponse } from '../api/models'
+import type {
+  NoCtfapiEndpointsAdministrationCompetitionsCompetitionTrackFailureCodeProtocol,
+  NoCtfapiEndpointsAdministrationCompetitionsCompetitionTrackFailureResponse,
+  NoCtfapiEndpointsTeamsTeamRegistrationFailureCodeProtocol,
+  NoCtfapiEndpointsTeamsTeamRegistrationFailureResponse,
+  NoCtfapiEndpointsTeamsTeamMembershipFailureCodeProtocol,
+  NoCtfapiEndpointsTeamsTeamMembershipFailureResponse,
+} from '../api'
 import { parseApiError } from '../utils/api-error'
 import { translate } from '../utils/i18n'
 
@@ -15,7 +22,7 @@ const trackMessages = {
   TrackNotPublicSelectable: "common.competitionTrack.validation.participantsSelectFormat",
   TrackSsoIdentityRequired: "sso.trackIdentityRequired",
   SsoProviderNotFound: "sso.trackProviderNotFound",
-} satisfies Record<NoCTFAPIEndpointsAdministrationCompetitionsCompetitionTrackFailureCodeProtocol, string>
+} satisfies Record<NoCtfapiEndpointsAdministrationCompetitionsCompetitionTrackFailureCodeProtocol, string>
 
 const registrationMessages = {
   InvalidTeamName: "common.competitionTrack.error.teamNameInvalid",
@@ -35,7 +42,7 @@ const registrationMessages = {
   TrackInvitationRequired: "teams.track.invitationRequired",
   TrackInvitationInvalid: "teams.track.invitationInvalid",
   TrackSsoIdentityRequired: "sso.trackIdentityRequired",
-} satisfies Record<NoCTFAPIEndpointsTeamsTeamRegistrationFailureCodeProtocol, string>
+} satisfies Record<NoCtfapiEndpointsTeamsTeamRegistrationFailureCodeProtocol, string>
 
 const membershipMessages = {
   CompetitionNotFound: "common.label.competitionFound",
@@ -52,7 +59,7 @@ const membershipMessages = {
   CaptainMustTransfer: "common.competitionTrack.validation.captainTransferFormat",
   CaptainOnly: "common.competitionTrack.description.captainPerform",
   TrackSsoIdentityRequired: "sso.trackIdentityRequired",
-} satisfies Record<NoCTFAPIEndpointsTeamsTeamMembershipFailureCodeProtocol, string>
+} satisfies Record<NoCtfapiEndpointsTeamsTeamMembershipFailureCodeProtocol, string>
 
 export function nextCompetitionTrackOrdinal(trackKeys: readonly string[]): number {
   const normalizedKeys = new Set(trackKeys.map(key => key.trim().toLowerCase()))
@@ -77,7 +84,7 @@ export function duplicateCompetitionTrackKey(trackKeys: readonly string[]): stri
 }
 
 export function competitionTrackErrorMessage(error: unknown, fallback: string): UiMessage {
-  const payload = error as Partial<NoCTFAPIEndpointsAdministrationCompetitionsCompetitionTrackFailureResponse> | null
+  const payload = error as Partial<NoCtfapiEndpointsAdministrationCompetitionsCompetitionTrackFailureResponse> | null
   if (payload?.code === 'TrackReassignmentRequired' && payload.affectedTeamCount)
     return translate('competitions.competitionTrack.validation.trackReassignmentRequired', { count: payload.affectedTeamCount })
   return payload?.code
@@ -86,11 +93,11 @@ export function competitionTrackErrorMessage(error: unknown, fallback: string): 
 }
 
 export function teamRegistrationErrorMessage(error: unknown, fallback: string): UiMessage {
-  const payload = error as Partial<NoCTFAPIEndpointsTeamsTeamRegistrationFailureResponse> | null
+  const payload = error as Partial<NoCtfapiEndpointsTeamsTeamRegistrationFailureResponse> | null
   return payload?.code ? translate(registrationMessages[payload.code]) : parseApiError(error, fallback).displayMessage
 }
 
 export function teamMembershipErrorMessage(error: unknown, fallback: string): UiMessage {
-  const payload = error as Partial<NoCTFAPIEndpointsTeamsTeamMembershipFailureResponse> | null
+  const payload = error as Partial<NoCtfapiEndpointsTeamsTeamMembershipFailureResponse> | null
   return payload?.code ? translate(membershipMessages[payload.code]) : parseApiError(error, fallback).displayMessage
 }

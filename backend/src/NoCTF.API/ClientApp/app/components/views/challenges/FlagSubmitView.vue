@@ -21,7 +21,7 @@ const { PartyPopper, input, submitting, celebrating, persistentResult, solved, c
         <span aria-hidden="true" class="flag-celebration-burst">
           <span
             v-for="particle in celebrationParticles"
-            :key="particle.id ?? undefined"
+            :key="particle.id"
             class="flag-celebration-particle"
             :class="particle.tone"
             :style="{

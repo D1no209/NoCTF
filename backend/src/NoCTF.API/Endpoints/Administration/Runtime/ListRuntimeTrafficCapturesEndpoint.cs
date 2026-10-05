@@ -53,7 +53,7 @@ public sealed class ListRuntimeTrafficCapturesEndpoint(
         Get("/admin/competitions/{competitionId}/traffic-captures");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("AdminListRuntimeTrafficCaptures"));
-        Summary(summary => { summary.Summary = "Lists Runtime traffic captures."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Lists Runtime traffic captures.");
     }
 
     public override async Task<Results<Ok<RuntimeTrafficCaptureListResponse>,

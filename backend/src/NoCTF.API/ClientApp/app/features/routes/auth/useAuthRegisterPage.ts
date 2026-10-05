@@ -1,8 +1,6 @@
-
-import { api } from '../../../lib/api'
 import { message as describeMessage } from '../../../utils/i18n'
 import type { UiMessage } from '../../../utils/i18n'
-
+import { authenticationRequestEmailVerification, registerEndpoint } from '../../../api'
 import { useHumanVerification } from '~/features/security/useHumanVerification'
 import { useAuthThemeArtwork } from './useAuthThemeArtwork'
 
@@ -19,8 +17,8 @@ export function useAuthRegisterPage() {
   const error = ref<UiMessage | null>(null)
   const pending = ref(false)
   const registered = ref<{
-    requiresEmailVerification?: boolean | null
-    verificationEmailQueued?: boolean | null
+    requiresEmailVerification?: boolean
+    verificationEmailQueued?: boolean
   } | null>(null)
   const resendPending = ref(false)
   const resendDone = ref(false)
@@ -47,8 +45,10 @@ export function useAuthRegisterPage() {
     try {
       const verificationHeaders = await requestHumanVerification('registration')
       if (verificationHeaders === null) return
-      let requestError: unknown;
-      const data = await api.api.v1.auth.register.post({ userName: userName.value, email: email.value, password: password.value }, { headers: verificationHeaders }).catch(cause => { requestError = cause; return undefined });
+      const { data, error: requestError } = await registerEndpoint({
+        headers: verificationHeaders,
+        body: { userName: userName.value, email: email.value, password: password.value },
+      })
       if (requestError) throw parseApiError(requestError)
       password.value = ''
       confirmPassword.value = ''
@@ -66,8 +66,9 @@ export function useAuthRegisterPage() {
     resendError.value = null
     resendPending.value = true
     try {
-      let requestError: unknown;
-      await api.api.v1.auth.emailVerification.request.post({ email: email.value }).catch(cause => { requestError = cause; return undefined });
+      const { error: requestError } = await authenticationRequestEmailVerification({
+        body: { email: email.value },
+      })
       if (requestError) throw parseApiError(requestError)
       resendDone.value = true
     }

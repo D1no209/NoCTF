@@ -56,7 +56,7 @@ public sealed class GetScoreboardAdjustmentDetailEndpoint(
     {
         Get("/competitions/{competitionId}/leaderboard/teams/{teamId}/adjustments");
         AllowAnonymous();
-        Summary(summary => { summary.Summary = "Get global scoreboard adjustments with signed cursor pagination."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Get global scoreboard adjustments with signed cursor pagination.");
     }
 
     public override async Task<Results<Ok<ScoreboardAdjustmentDetailResponse>, Accepted<LeaderboardProcessingProtocolResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(

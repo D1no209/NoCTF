@@ -57,9 +57,9 @@ describe('cheat incident filter wiring', () => {
 
     expect(page).toContain("const filterStatus = ref<CheatIncidentStatusFilter>('All')")
     expect(page).toContain("<SelectItem value=\"All\">{{ $t('administration.label.platformLogs') }}</SelectItem>")
-    expect(page).toContain("status: appliedStatus.value === 'All' ? undefined : appliedStatus.value")
-    expect(page).toContain('from: dateObject(appliedRange.value.from')
-    expect(page).toContain('to: dateObject(appliedRange.value.to')
+    expect(page).toContain("status: appliedStatus.value === 'All' ? null : appliedStatus.value")
+    expect(page).toContain('from: appliedRange.value.from')
+    expect(page).toContain('to: appliedRange.value.to')
     expect(page).not.toContain("'1970-01-01T00:00:00Z'")
     expect(page).not.toContain("'2999-12-31T23:59:59Z'")
   })

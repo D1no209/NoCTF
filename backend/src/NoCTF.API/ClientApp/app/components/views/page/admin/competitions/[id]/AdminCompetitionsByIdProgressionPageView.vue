@@ -63,13 +63,13 @@ const {
                 <SelectContent>
                   <SelectGroup>
                     <SelectItem value="all">{{ $t('administration.label.directions') }}</SelectItem>
-                    <SelectItem v-for="direction in challengeDirections" :key="direction.value ?? undefined" :value="direction.value">{{ direction.label }}</SelectItem>
+                    <SelectItem v-for="direction in challengeDirections" :key="direction.value" :value="direction.value">{{ direction.label }}</SelectItem>
                   </SelectGroup>
                 </SelectContent>
               </Select>
             </div>
             <ScrollSurface axis="y" class="max-h-[26rem]" :aria-label="$t('progression.challengeCatalog')">
-              <Button v-for="challenge in filteredChallenges" :key="challenge.id ?? undefined"
+              <Button v-for="challenge in filteredChallenges" :key="challenge.id"
                 type="button" variant="ghost" :disabled="!canWrite || !!batch"
                 class="flex w-full items-center justify-between gap-2 px-2 text-left text-sm"
                 @click="addChallenge(challenge)">
@@ -84,8 +84,8 @@ const {
             <h3 class="font-semibold">{{ $t('progression.badgeCatalog') }}</h3>
             <p class="mb-3 text-xs text-muted-foreground">{{ $t('progression.badgeImportHint') }}</p>
             <ScrollSurface axis="y" class="max-h-56" :aria-label="$t('progression.badgeCatalog')">
-              <div v-for="badge in badges" :key="badge.id ?? undefined" class="flex items-center gap-2 rounded border p-2">
-                <img :src="badge.imageUrl ?? undefined" :alt="badge.name ?? undefined" class="size-9 rounded object-cover" />
+              <div v-for="badge in badges" :key="badge.id" class="flex items-center gap-2 rounded border p-2">
+                <img :src="badge.imageUrl" :alt="badge.name" class="size-9 rounded object-cover" />
                 <span class="min-w-0 flex-1 truncate text-sm">{{ badge.name }}</span>
                 <Button type="button" size="icon-sm" variant="ghost" :disabled="!canWrite || !!batch" :aria-label="$t('progression.importBadge')" @click="addBadge(badge)">+</Button>
                 <Button type="button" size="icon-sm" variant="ghost" :disabled="!canWrite" :aria-label="$t('progression.editBadge')" @click="beginEditBadge(badge)">✎</Button>
@@ -103,7 +103,7 @@ const {
               </Field>
               <Field>
                 <FieldLabel for="edit-badge-image">{{ $t('progression.badgeImage') }}</FieldLabel>
-                <FileUpload :key="editBadgeUploadKey ?? undefined" id="edit-badge-image" accept="image/png,image/jpeg,image/webp"
+                <FileUpload :key="editBadgeUploadKey" id="edit-badge-image" accept="image/png,image/jpeg,image/webp"
                   :pending="badgeSaving" @change="onEditBadgeFileChange($event)" />
               </Field>
               <Button size="sm" :disabled="badgeSaving || !editBadgeName.trim()" @click="updateBadge">{{ $t('progression.updateBadge') }}</Button>
@@ -119,7 +119,7 @@ const {
               </Field>
               <Field>
                 <FieldLabel for="new-badge-image">{{ $t('progression.badgeImage') }}</FieldLabel>
-                <FileUpload :key="newBadgeUploadKey ?? undefined" id="new-badge-image" accept="image/png,image/jpeg,image/webp"
+                <FileUpload :key="newBadgeUploadKey" id="new-badge-image" accept="image/png,image/jpeg,image/webp"
                   :pending="badgeSaving" @change="onBadgeFileChange($event)" />
               </Field>
               <Button size="sm" class="w-full" :disabled="badgeSaving || !newBadgeName.trim() || !newBadgeImage" @click="createBadge">

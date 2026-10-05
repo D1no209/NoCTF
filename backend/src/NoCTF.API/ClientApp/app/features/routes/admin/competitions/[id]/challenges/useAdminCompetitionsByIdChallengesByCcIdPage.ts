@@ -1,8 +1,3 @@
-import { ProjectionResponseOption } from '../../../../../../lib/api'
-import { createNoCTFAPIEndpointsCompetitionsScoreboardSnapshotResponseFromDiscriminatorValue, createNoCTFAPIEndpointsCompetitionsScoreboardSchemaResponseFromDiscriminatorValue } from '../../../../../../api/models'
-import { dateObject } from '~/utils/date-value'
-
-import { api, RequestPolicyOption } from '../../../../../../lib/api'
 import { message as describeMessage } from '../../../../../../utils/i18n'
 import type { UiMessage } from '../../../../../../utils/i18n'
 import { challengeTagOptions, uniqueTags, validChallengeTags } from '~/lib/challenge-tags'
@@ -12,15 +7,15 @@ import { markRaw } from 'vue'
 
 import { Plus } from '@lucide/vue'
 import { toast } from '../../../../../../utils/message-toast'
-
-import type { NoCTFAPIEndpointsAdministrationChallengesChallengeHintResponse, NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeRulesContract, NoCTFAPIEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract, NoCTFAPIEndpointsChallengesChallengeResponse, NoCTFAPIEndpointsCompetitionsGameModeProtocol, NoCTFAPIEndpointsCompetitionsScoreboardSchemaResponse, NoCTFAPIEndpointsCompetitionsScoreboardSnapshotResponse, NoCTFAPIEndpointsGameplayFactsGameplayFactListItemResponse, NoCTFAPIEndpointsTeamsTeamResponse } from '../../../../../../api/models'
+import { adminListCompetitionChallenges, adminGetCompetitionDirections, adminCreateManualAdjustment, adminCreateCompetitionChallengeHint, adminDeleteCompetitionChallengeHint, adminGetCompetition, adminGetCompetitionChallenge, adminListGameplayFacts, adminListCompetitionChallengeHints, adminListTeams, adminPatchCompetitionChallenge, adminRestoreCompetitionChallengeHint, adminUpdateCompetitionChallengeHint, getLeaderboardEndpoint, getScoreboardSchemaEndpoint } from '../../../../../../api'
+import type { NoCtfapiEndpointsAdministrationChallengesChallengeHintResponse, NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract, NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract, NoCtfapiEndpointsChallengesChallengeResponse, NoCtfapiEndpointsCompetitionsGameModeProtocol, NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse, NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse, NoCtfapiEndpointsGameplayFactsGameplayFactListResponse, NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../../../../api'
 import { useOffsetPagination } from '../../../../../../composables/useOffsetPagination'
 import { useCompetitionAdmin } from '../../../../../../lib/admin-competition'
 
 import ChallengeRulesEditorComponent from '../../../../../admin/ChallengeRulesEditor.vue'
 
 interface ChallengeTeamScoringRow {
-  team: NoCTFAPIEndpointsTeamsTeamResponse
+  team: NoCtfapiEndpointsTeamsTeamResponse
   score: number
   adjustment: number
   progressLabel: string
@@ -28,8 +23,8 @@ interface ChallengeTeamScoringRow {
 }
 
 interface ChallengeConfiguration {
-  mode?: NoCTFAPIEndpointsCompetitionsGameModeProtocol | null
-  rules?: NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeRulesContract | null
+  mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol
+  rules?: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract
 }
 
 /** Owns state, effects and commands for AdminCompetitionsByIdChallengesByCcIdPage. */
@@ -40,7 +35,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
 
   const { competitionId, competition, canWrite, canJudge } = useCompetitionAdmin()
 
-  const challenge = ref<NoCTFAPIEndpointsChallengesChallengeResponse | null>(null)
+  const challenge = ref<NoCtfapiEndpointsChallengesChallengeResponse | null>(null)
 
   const hiddenRuleKeys = computed(() => {
     if (challenge.value?.interactionKind === 'PatchVerification')
@@ -65,21 +60,22 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
 
   async function loadChallenge() {
     loading.value = true
-    let error: unknown;
-    const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).challenges.byCompetitionChallengeId(ccId).get({ queryParameters: { includeDeleted: false } }).catch(cause => { error = cause; return undefined });
+    const { data, error } = await adminGetCompetitionChallenge({
+      path: { competitionId, competitionChallengeId: ccId },
+      query: { includeDeleted: false },
+    })
     if (error) loadError.value = parseApiError(error).displayMessage
     else challenge.value = data?.challenge ?? null
     loading.value = false
   }
 
-  const directions = ref<import('~/api/models').NoCTFAPIEndpointsAdministrationCompetitionsCompetitionDirectionResponse[]>([])
+  const directions = ref<import('~/api').NoCtfapiEndpointsAdministrationCompetitionsCompetitionDirectionResponse[]>([])
   const directionLoading = ref(true)
   const directionError = ref<UiMessage | null>(null)
   const editDirectionId = ref('')
   const directionRequest = new AbortController()
   async function loadDirections() {
-    let error: unknown;
-    const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).directions.get({ options: [new RequestPolicyOption({ signal: directionRequest.signal })] }).catch(cause => { error = cause; return undefined });
+    const { data, error } = await adminGetCompetitionDirections({ path: { competitionId }, signal: directionRequest.signal })
     if (directionRequest.signal.aborted) return
     directionLoading.value = false
     directionError.value = error || !data ? parseApiError(error).displayMessage : null
@@ -94,8 +90,9 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
     editTags.value = uniqueTags(tags)
   }
   async function loadTagSuggestions() {
-    let error: unknown;
-    const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).challenges.get({ queryParameters: { includeDeleted: false }, options: [new RequestPolicyOption({ signal: directionRequest.signal })] }).catch(cause => { error = cause; return undefined });
+    const { data, error } = await adminListCompetitionChallenges({
+      path: { competitionId }, query: { includeDeleted: false }, signal: directionRequest.signal,
+    })
     if (directionRequest.signal.aborted) return
     if (error) toast.error(parseApiError(error).displayMessage)
     else tagSuggestions.value = challengeTagOptions(data?.items ?? [])
@@ -120,14 +117,17 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
     if (!challenge.value) return
     savingEdit.value = true
     try {
-
-      const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).challenges.byCompetitionChallengeId(ccId).patch({ presentation: {
+      const { data, error } = await adminPatchCompetitionChallenge({
+        path: { competitionId, competitionChallengeId: ccId },
+        body: { presentation: {
           customTitle: editCustomTitle.value.trim() || null,
           order: editOrder.value,
           isPublished: editPublished.value,
           directionId: editDirectionId.value || undefined,
           tags: editTags.value,
-        } });
+        } },
+      })
+      if (error) throw error
       challenge.value = data?.challenge ?? challenge.value
       void loadTagSuggestions()
       toast.success(describeMessage("administration.label.questionSettingsSaved"))
@@ -146,36 +146,38 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
 
   const savingConfig = ref(false)
 
-  const inheritedConfiguration = ref<NoCTFAPIEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract | null>(null)
+  const inheritedConfiguration = ref<NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract | null>(null)
 
   async function loadConfig() {
     configLoading.value = true
-    const settledRequests = await Promise.allSettled([
-      api.api.v1.admin.competitions.byCompetitionId(competitionId).challenges.byCompetitionChallengeId(ccId).get({ queryParameters: { includeDeleted: false } }),
-      api.api.v1.admin.competitions.byCompetitionId(competitionId).get(),
-    ]);
-    const challengeResult = settledRequests[0].status === 'fulfilled' ? settledRequests[0].value : undefined;
-    const challengeResultError = settledRequests[0].status === 'rejected' ? settledRequests[0].reason : undefined;
-    const competitionResult = settledRequests[1].status === 'fulfilled' ? settledRequests[1].value : undefined;
-    const competitionResultError = settledRequests[1].status === 'rejected' ? settledRequests[1].reason : undefined;
-
-    if (!challengeResultError && challengeResult) {
+    const [challengeResult, competitionResult] = await Promise.all([
+      adminGetCompetitionChallenge({
+        path: { competitionId, competitionChallengeId: ccId },
+        query: { includeDeleted: false },
+      }),
+      adminGetCompetition({ path: { competitionId } }),
+    ])
+    if (!challengeResult.error && challengeResult.data) {
       config.value = {
-        mode: challengeResult.mode,
-        rules: challengeResult.rules,
+        mode: challengeResult.data.mode,
+        rules: challengeResult.data.rules,
       }
     }
-    if (!competitionResultError && competitionResult) {
-      inheritedConfiguration.value = competitionResult.modeConfiguration?.configuration ?? null
+    if (!competitionResult.error && competitionResult.data) {
+      inheritedConfiguration.value = competitionResult.data.modeConfiguration?.configuration ?? null
     }
     configLoading.value = false
   }
 
-  async function saveConfig(rules: NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeRulesContract) {
+  async function saveConfig(rules: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract) {
     if (!config.value) return
     savingConfig.value = true
     try {
-      const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).challenges.byCompetitionChallengeId(ccId).patch({ rules: { configuration: rules } });
+      const { data, error } = await adminPatchCompetitionChallenge({
+        path: { competitionId, competitionChallengeId: ccId },
+        body: { rules: { configuration: rules } },
+      })
+      if (error) throw error
       config.value = data
         ? { mode: data.mode, rules: data.rules }
         : config.value
@@ -189,7 +191,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
     }
   }
 
-  const hints = ref<NoCTFAPIEndpointsAdministrationChallengesChallengeHintResponse[]>([])
+  const hints = ref<NoCtfapiEndpointsAdministrationChallengesChallengeHintResponse[]>([])
 
   const hintsLoading = ref(true)
 
@@ -199,7 +201,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
 
   const hintDialogOpen = ref(false)
 
-  const editingHint = ref<NoCTFAPIEndpointsAdministrationChallengesChallengeHintResponse | null>(null)
+  const editingHint = ref<NoCtfapiEndpointsAdministrationChallengesChallengeHintResponse | null>(null)
 
   const hintForm = ref({ content: '', cost: 0, publishedAt: '' })
 
@@ -211,8 +213,10 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
 
   async function loadHints() {
     hintsLoading.value = true
-    let error: unknown;
-    const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).challenges.byCompetitionChallengeId(ccId).hints.get({ queryParameters: { includeDeleted: includeDeletedHints.value } }).catch(cause => { error = cause; return undefined });
+    const { data, error } = await adminListCompetitionChallengeHints({
+      path: { competitionId, competitionChallengeId: ccId },
+      query: { includeDeleted: includeDeletedHints.value },
+    })
     if (error || !data) {
       hintsLoadError.value = parseApiError(error).displayMessage
     }
@@ -225,7 +229,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
 
   watch(includeDeletedHints, loadHints)
 
-  function openHintDialog(hint?: NoCTFAPIEndpointsAdministrationChallengesChallengeHintResponse | null) {
+  function openHintDialog(hint?: NoCtfapiEndpointsAdministrationChallengesChallengeHintResponse) {
     editingHint.value = hint ?? null
     hintError.value = null
     hintForm.value = {
@@ -246,14 +250,14 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
     const body = {
       content: hintForm.value.content,
       cost: hintForm.value.cost,
-      publishedAt: dateObject(localInputToIso(hintForm.value.publishedAt) ?? null),
+      publishedAt: localInputToIso(hintForm.value.publishedAt) ?? null,
     }
     try {
       const path = { competitionId, competitionChallengeId: ccId }
-
-      await (editingHint.value?.id
-        ? api.api.v1.admin.competitions.byCompetitionId(path.competitionId).challenges.byCompetitionChallengeId(path.competitionChallengeId).hints.byHintId(editingHint.value.id).put(body)
-        : api.api.v1.admin.competitions.byCompetitionId(path.competitionId).challenges.byCompetitionChallengeId(path.competitionChallengeId).hints.post(body));
+      const { error } = editingHint.value?.id
+        ? await adminUpdateCompetitionChallengeHint({ path: { ...path, hintId: editingHint.value.id }, body })
+        : await adminCreateCompetitionChallengeHint({ path, body })
+      if (error) throw error
       toast.success(editingHint.value ? translate("administration.label.tipUpdated") : translate("administration.label.promptAdded"))
       hintDialogOpen.value = false
       await loadHints()
@@ -266,11 +270,14 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
     }
   }
 
-  async function deleteHint(h: NoCTFAPIEndpointsAdministrationChallengesChallengeHintResponse) {
+  async function deleteHint(h: NoCtfapiEndpointsAdministrationChallengesChallengeHintResponse) {
     if (!h.id) return
     pendingHintId.value = h.id
     try {
-      await api.api.v1.admin.competitions.byCompetitionId(competitionId).challenges.byCompetitionChallengeId(ccId).hints.byHintId(h.id).delete();
+      const { error } = await adminDeleteCompetitionChallengeHint({
+        path: { competitionId, competitionChallengeId: ccId, hintId: h.id },
+      })
+      if (error) throw error
       toast.success(describeMessage("administration.label.tipDeleted"))
       await loadHints()
     }
@@ -282,11 +289,14 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
     }
   }
 
-  async function restoreHint(h: NoCTFAPIEndpointsAdministrationChallengesChallengeHintResponse) {
+  async function restoreHint(h: NoCtfapiEndpointsAdministrationChallengesChallengeHintResponse) {
     if (!h.id) return
     pendingHintId.value = h.id
     try {
-      await api.api.v1.admin.competitions.byCompetitionId(competitionId).challenges.byCompetitionChallengeId(ccId).hints.byHintId(h.id).restore.post();
+      const { error } = await adminRestoreCompetitionChallengeHint({
+        path: { competitionId, competitionChallengeId: ccId, hintId: h.id },
+      })
+      if (error) throw error
       toast.success(describeMessage("administration.label.tipRestored"))
       await loadHints()
     }
@@ -300,20 +310,22 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
 
   const scoringSearch = ref('')
 
-  const scoringPagination = useOffsetPagination<NoCTFAPIEndpointsTeamsTeamResponse>(async ({ offset, limit, desc }) => {
-    let error: unknown;
-    const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).teams.get({ queryParameters: { keyword: scoringSearch.value.trim() || undefined, offset, limit, desc } }).catch(cause => { error = cause; return undefined });
+  const scoringPagination = useOffsetPagination<NoCtfapiEndpointsTeamsTeamResponse>(async ({ offset, limit, desc }) => {
+    const { data, error } = await adminListTeams({
+      path: { competitionId },
+      query: { keyword: scoringSearch.value.trim() || null, offset, limit, desc },
+    })
     if (error || !data) throw error ?? new Error(translate("administration.error.loadTeamsFailed"))
     return { items: data.items ?? [], total: data.total ?? 0 }
   })
 
   const scoringTeams = scoringPagination.items
 
-  const scoringFacts = ref<NoCTFAPIEndpointsGameplayFactsGameplayFactListItemResponse[]>([])
+  const scoringFacts = ref<NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse[]>([])
 
-  const scoringSnapshot = ref<NoCTFAPIEndpointsCompetitionsScoreboardSnapshotResponse | null>(null)
+  const scoringSnapshot = ref<NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse | null>(null)
 
-  const scoringSchema = ref<NoCTFAPIEndpointsCompetitionsScoreboardSchemaResponse | null>(null)
+  const scoringSchema = ref<NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse | null>(null)
 
   const scoringContextLoading = ref(true)
 
@@ -328,18 +340,23 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
 
   let scoringLoadGeneration = 0
 
-  async function loadAllChallengeFacts(): Promise<NoCTFAPIEndpointsGameplayFactsGameplayFactListItemResponse[]> {
-    const facts: NoCTFAPIEndpointsGameplayFactsGameplayFactListItemResponse[] = []
+  async function loadAllChallengeFacts(): Promise<NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse[]> {
+    const facts: NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse[] = []
     let offset = 0
     let total = 0
     do {
-      let responseError: unknown;
-      const response = await api.api.v1.admin.competitions.byCompetitionId(competitionId).gameplayFacts.get({ queryParameters: { competitionChallengeId: ccId, offset, limit: 200, desc: true } }).catch(cause => { responseError = cause; return undefined });
-      if (responseError || !response)
-        throw responseError ?? new Error(translate("administration.competitionsBy.error.loadChallengeSFailed"))
-      facts.push(...(response.items ?? []))
-      total = response.total ?? facts.length
-      offset += response.items?.length ?? 0
+      const response: {
+        data?: NoCtfapiEndpointsGameplayFactsGameplayFactListResponse
+        error?: unknown
+      } = await adminListGameplayFacts({
+        path: { competitionId },
+        query: { competitionChallengeId: ccId, offset, limit: 200, desc: true },
+      })
+      if (response.error || !response.data)
+        throw response.error ?? new Error(translate("administration.competitionsBy.error.loadChallengeSFailed"))
+      facts.push(...(response.data.items ?? []))
+      total = response.data.total ?? facts.length
+      offset += response.data.items?.length ?? 0
     } while (offset < total && offset > 0)
     return facts
   }
@@ -349,25 +366,19 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
     scoringContextLoading.value = true
     scoringContextError.value = null
     try {
-      const settledRequests = await Promise.allSettled([
+      const [, facts, leaderboardResult, schemaResult] = await Promise.all([
         scoringPagination.loadPage(scoringPagination.page.value),
         loadAllChallengeFacts(),
-        api.api.v1.competitions.byCompetitionId(competitionId).leaderboard.get({ options: [new ProjectionResponseOption(createNoCTFAPIEndpointsCompetitionsScoreboardSnapshotResponseFromDiscriminatorValue)] }),
-        api.api.v1.competitions.byCompetitionId(competitionId).leaderboard.schema.get({ options: [new ProjectionResponseOption(createNoCTFAPIEndpointsCompetitionsScoreboardSchemaResponseFromDiscriminatorValue)] }),
-      ]);
-      const facts = settledRequests[1].status === 'fulfilled' ? settledRequests[1].value : undefined;
-      const leaderboardResult = settledRequests[2].status === 'fulfilled' ? settledRequests[2].value : undefined;
-      const schemaResult = settledRequests[3].status === 'fulfilled' ? settledRequests[3].value : undefined;
-
+        getLeaderboardEndpoint({ path: { competitionId } }),
+        getScoreboardSchemaEndpoint({ path: { competitionId } }),
+      ])
       if (generation !== scoringLoadGeneration) return
-      const failed = settledRequests.find((result): result is PromiseRejectedResult => result.status === 'rejected')
-      if (failed) throw failed.reason
-      scoringFacts.value = facts ?? []
-      scoringSnapshot.value = leaderboardResult && 'teams' in leaderboardResult
-        ? leaderboardResult
+      scoringFacts.value = facts
+      scoringSnapshot.value = leaderboardResult.data && 'teams' in leaderboardResult.data
+        ? leaderboardResult.data
         : null
-      scoringSchema.value = schemaResult && 'columns' in schemaResult
-        ? schemaResult
+      scoringSchema.value = schemaResult.data && 'columns' in schemaResult.data
+        ? schemaResult.data
         : null
     }
     catch (requestError) {
@@ -388,19 +399,19 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
 
   watch(scoringSearch, reloadScoringTeamsFromFirstPage)
 
-  function teamFacts(teamId?: string | null): NoCTFAPIEndpointsGameplayFactsGameplayFactListItemResponse[] {
+  function teamFacts(teamId?: string): NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse[] {
     return teamId ? scoringFacts.value.filter(fact => fact.teamId === teamId) : []
   }
 
   function hasSuccessfulFact(
-    facts: NoCTFAPIEndpointsGameplayFactsGameplayFactListItemResponse[],
-    kind: NoCTFAPIEndpointsGameplayFactsGameplayFactListItemResponse['kind'],
+    facts: NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse[],
+    kind: NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse['kind'],
   ): boolean {
     return facts.some(fact => fact.kind === kind
       && (fact.result === 'Correct' || fact.result === 'Controlled'))
   }
 
-  function progressForTeam(teamId?: string | null): Pick<ChallengeTeamScoringRow, 'progressLabel' | 'progressVariant'> {
+  function progressForTeam(teamId?: string): Pick<ChallengeTeamScoringRow, 'progressLabel' | 'progressVariant'> {
     const facts = teamFacts(teamId)
     switch (competition.value?.mode) {
       case 'Awdp': {
@@ -426,13 +437,13 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
     }
   }
 
-  function manualAdjustmentForTeam(teamId?: string | null): number {
+  function manualAdjustmentForTeam(teamId?: string): number {
     return teamFacts(teamId)
       .filter(fact => fact.kind === 'ManualAdjustment' && fact.result === 'Applied')
       .reduce((total, fact) => total + (Number.parseInt(fact.value ?? '0', 10) || 0), 0)
   }
 
-  function projectedChallengeScore(teamId?: string | null): number {
+  function projectedChallengeScore(teamId?: string): number {
     if (!teamId) return 0
     const snapshotTeam = scoringSnapshot.value?.teams?.find(team => team.teamId === teamId)
     if (!snapshotTeam) return manualAdjustmentForTeam(teamId)
@@ -446,7 +457,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
       .map(column => column.index)
       .filter((index): index is number => index !== undefined) ?? [])
     const slotScore = snapshotTeam.slots
-      ?.filter(slot => slot.columnIndex != null && indexes.has(slot.columnIndex))
+      ?.filter(slot => slot.columnIndex !== undefined && indexes.has(slot.columnIndex))
       .reduce((total, slot) => total + (slot.netPoints ?? 0), 0) ?? 0
     return slotScore + adjustment
   }
@@ -492,8 +503,11 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
     adjustmentPending.value = true
     adjustmentError.value = null
     try {
-
-      await api.api.v1.admin.competitions.byCompetitionId(competitionId).gameplayFacts.manualAdjustments.post({ teamId, competitionChallengeId: ccId, delta: adjustmentDelta.value });
+      const { error } = await adminCreateManualAdjustment({
+        path: { competitionId },
+        body: { teamId, competitionChallengeId: ccId, delta: adjustmentDelta.value },
+      })
+      if (error) throw error
       toast.success(describeMessage("administration.label.challengeScoringCorrected"))
       adjustmentTarget.value = null
       await loadChallengeTeamScoring()

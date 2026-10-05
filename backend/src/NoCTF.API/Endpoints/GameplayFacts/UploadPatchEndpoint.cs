@@ -13,10 +13,6 @@ namespace NoCTF.API.Endpoints.GameplayFacts;
 
 public sealed class UploadPatchRequest
 {
-    /// <summary>One-time verification token; optional when platform policy disables verification. Maximum 4096 characters.</summary>
-    [FromHeader("X-NoCTF-Human-Verification", IsRequired = false, RemoveFromSchema = true)]
-    public string? HumanVerificationToken { get; set; }
-
     public Guid CompetitionId { get; set; }
     public Guid CompetitionChallengeId { get; set; }
     public Guid RuntimeInstanceId { get; set; }
@@ -69,10 +65,6 @@ public sealed class UploadPatchEndpoint(
 {
     public override void Configure()
     {
-        Description(builder => builder
-            .ProducesProblem(StatusCodes.Status403Forbidden)
-            .ProducesProblem(StatusCodes.Status503ServiceUnavailable));
-
         Options(builder => builder.WithMetadata(new NoCTF.Hosting.Observability.ApiRequestMetricsMetadata(
             NoCTF.Application.Observability.ApiRequestKind.Upload)));
         Post("/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets/{runtimeInstanceId}/fix");
@@ -81,7 +73,6 @@ public sealed class UploadPatchEndpoint(
         Options(builder => builder.WithMetadata(
             new HumanVerificationMetadata(HumanVerificationAction.Evaluation)));
         AllowFileUploads();
-        Description(builder => builder.Accepts<UploadPatchRequest>("multipart/form-data"));
         MaxRequestBodySize(FileUploadLimits.MaximumRequestBytes(
             PatchUploadRules.HardMaximumArchiveBytes));
         Description(builder => builder
@@ -89,7 +80,6 @@ public sealed class UploadPatchEndpoint(
                 StatusCodes.Status413PayloadTooLarge));
         Summary(summary =>
         {
-            summary.Params["X-NoCTF-Human-Verification"] = "One-time verification token, at most 4096 characters. Required only when the configured platform policy enables verification for this operation.";
             summary.Summary = "Upload the only Fix archive accepted by an AWDP defense target.";
             summary.Description =
                 "Atomically binds one archive and one Fix attempt to the clean disposable target. Verification starts immediately when the target is running, or automatically after provisioning completes.";

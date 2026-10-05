@@ -13,7 +13,7 @@ describe('authentication pages and dialog surfaces', () => {
     expect(loginRoute).toContain("middleware: 'guest'")
     expect(registerRoute).toContain("middleware: 'guest'")
     expect(login).toContain('@submit.prevent="submit"')
-    expect(register).toMatch(/api\.api\.v1\.auth\.emailVerification\.request\.post\(/)
+    expect(register).toContain('authenticationRequestEmailVerification')
     expect(login).toContain('max-w-xl')
     expect(register).toContain('max-w-xl')
     expect(login).toContain('<Card class="auth-card">')

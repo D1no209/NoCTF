@@ -1,5 +1,4 @@
 <script setup lang="ts">
-
 import { toRefs } from 'vue'
 import type { AdminChallengesIndexPageViewState } from '~/features/routes/admin/challenges/useAdminChallengesIndexPage'
 
@@ -33,7 +32,7 @@ const { Plus, canOrganize, templates, filteredTemplates, search, directionFilter
             <SelectContent position="popper">
               <SelectGroup>
                 <SelectItem value="all">{{ $t('administration.label.directions') }}</SelectItem>
-                <SelectItem v-for="option in directionOptions" :key="option.value ?? undefined" :value="option.value!">
+                <SelectItem v-for="option in directionOptions" :key="option.value" :value="option.value!">
                   {{ option.label }}
                 </SelectItem>
               </SelectGroup>
@@ -52,7 +51,7 @@ const { Plus, canOrganize, templates, filteredTemplates, search, directionFilter
 
       <Card v-if="loading && templates.length === 0">
         <CardContent class="flex flex-col gap-3 pt-6">
-          <Skeleton v-for="i in 5" :key="i ?? undefined" class="h-10 w-full" />
+          <Skeleton v-for="i in 5" :key="i" class="h-10 w-full" />
         </CardContent>
       </Card>
 
@@ -77,7 +76,7 @@ const { Plus, canOrganize, templates, filteredTemplates, search, directionFilter
             </TableRow>
           </TableHeader>
           <TableBody>
-            <TableRow v-for="template in filteredTemplates" :key="template.id ?? undefined">
+            <TableRow v-for="template in filteredTemplates" :key="template.id">
               <TableCell>
                 <NuxtLink :to="`/admin/challenges/${template.id}`" prefetch-on="interaction" class="font-medium hover:underline">
                   {{ template.title }}
@@ -95,7 +94,7 @@ const { Plus, canOrganize, templates, filteredTemplates, search, directionFilter
               </TableCell>
               <TableCell>{{ template.activeCompetitionReferenceCount ?? 0 }}</TableCell>
               <TableCell>
-                <component :is="AdminDateTime" :value="dateIso(template.updatedAt)" />
+                <component :is="AdminDateTime" :value="template.updatedAt" />
               </TableCell>
               <TableCell>
                 <Badge v-if="template.deletedAt" variant="destructive">{{ $t('common.label.deleted.competitionSidebarView') }}</Badge>

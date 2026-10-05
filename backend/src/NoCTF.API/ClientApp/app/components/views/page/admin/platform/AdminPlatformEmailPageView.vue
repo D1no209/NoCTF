@@ -1,5 +1,4 @@
 <script setup lang="ts">
-
 import { toRefs } from 'vue'
 import type { AdminPlatformEmailPageViewState } from '~/features/routes/admin/platform/useAdminPlatformEmailPage'
 
@@ -230,7 +229,7 @@ const { KeyRound, RefreshCw, Send, ShieldCheck, configuration, humanVerification
             <CardTitle>{{ $t('administration.label.emailVerificationConfiguration') }}</CardTitle>
             <CardDescription>
               {{ $t('administration.platformEmail.description.registrationVerificationPasswordReset') }}
-              <component :is="AdminDateTime" :value="dateIso(configuration.updatedAt)" />
+              <component :is="AdminDateTime" :value="configuration.updatedAt" />
             </CardDescription>
           </div>
           <div class="flex items-center gap-2">

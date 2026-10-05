@@ -13,7 +13,7 @@ const { emit, targets, targetsError, targetsLoaded, FlagSubmit, RuntimeAccessUrl
       :competition-id="competition.id!"
       :competition-challenge-id="challenge.id!"
       controls="reset-only"
-      :dock-target="runtimeDockTarget ?? undefined"
+      :dock-target="runtimeDockTarget"
     />
 
     <section class="py-5" aria-labelledby="awd-targets-title">
@@ -35,7 +35,7 @@ const { emit, targets, targetsError, targetsLoaded, FlagSubmit, RuntimeAccessUrl
             </TableRow>
           </TableHeader>
           <TableBody>
-            <TableRow v-for="target in targets" :key="target.teamId ?? undefined">
+            <TableRow v-for="target in targets" :key="target.teamId">
               <TableCell class="font-medium">{{ target.teamName }}</TableCell>
               <TableCell>
                 <div class="flex flex-col gap-1">
@@ -52,7 +52,7 @@ const { emit, targets, targetsError, targetsLoaded, FlagSubmit, RuntimeAccessUrl
     </section>
 
     <component :is="FlagSubmit"
-      :dock-target="flagDockTarget ?? undefined"
+      :dock-target="flagDockTarget"
       :competition-id="competition.id!"
       :competition-challenge-id="challenge.id!"
       multiple

@@ -45,7 +45,7 @@ const { Activity, ChevronLeft, ChevronRight, Clock3, Expand, Minimize, Radio, Re
             <b><i /> {{ $t('competitions.label.live') }}</b>
           </header>
           <ol v-if="recentFeed.length" class="feed-list">
-            <li v-for="event in recentFeed" :key="event.id ?? undefined" :class="[event.action, event.outcome]">
+            <li v-for="event in recentFeed" :key="event.id" :class="[event.action, event.outcome]">
               <time>{{ eventTime(event.occurredAt) }}</time>
               <span class="feed-symbol">{{ event.action === 'attack' ? '⚔' : '⬡' }}</span>
               <p><strong>{{ event.teamName }}</strong>{{ eventLabel(event) }}<b>{{ event.challengeTitle }}</b></p>
@@ -70,7 +70,7 @@ const { Activity, ChevronLeft, ChevronRight, Clock3, Expand, Minimize, Radio, Re
             </header>
             <div class="rank-head"><span>{{ $t('common.label.ranking') }}</span><span>{{ $t('common.label.team') }}</span><span>{{ $t('common.label.attackScore') }}</span><span>{{ $t('common.label.defenseScore') }}</span><span>{{ $t('common.label.totalScore') }}</span></div>
             <ol v-if="topEntries.length" class="rank-list">
-              <li v-for="entry in topEntries" :key="entry.teamId ?? undefined" :class="rankTone(entry.rank)">
+              <li v-for="entry in topEntries" :key="entry.teamId" :class="rankTone(entry.rank)">
                 <span class="rank-number">{{ entry.rank ?? $t('common.label.symbol') }}</span>
                 <strong>{{ entry.teamName }}<small v-if="entry.rankingState !== 'Eligible'"> · {{ scoreboardRankingStateLabel(entry.rankingState) }}</small></strong>
                 <span>{{ entry.attackScore }}</span><span>{{ entry.defenseScore }}</span><b>{{ entry.totalScore ?? 0 }}</b>
@@ -103,7 +103,7 @@ const { Activity, ChevronLeft, ChevronRight, Clock3, Expand, Minimize, Radio, Re
                 <div class="team-tab-list">
                   <ActionButton
                     v-for="(entry, index) in rankedEntries.slice(0, 5)"
-                    :key="entry.teamId ?? undefined"
+                    :key="entry.teamId"
                     :class="selectedTeam?.teamId === entry.teamId && 'active'"
                     @click="onClickSelectedTeamIndex(index)"
                   >{{ entry.teamName }}</ActionButton>
@@ -120,7 +120,7 @@ const { Activity, ChevronLeft, ChevronRight, Clock3, Expand, Minimize, Radio, Re
                 <span>{{ $t('competitions.label.attack') }} {{ selectedTeamMetrics.attack.success }}/{{ selectedTeamMetrics.attack.total }} · {{ $t('competitions.label.defense') }} {{ selectedTeamMetrics.defense.success }}/{{ selectedTeamMetrics.defense.total }}</span>
               </div>
               <ScrollSurface as="div"
-                :key="selectedTeam.teamId ?? undefined"
+                :key="selectedTeam.teamId"
                 class="challenge-strip"
                 role="region"
                 :aria-label="$t('competitions.label.teamChallengeActivity')"
@@ -128,7 +128,7 @@ const { Activity, ChevronLeft, ChevronRight, Clock3, Expand, Minimize, Radio, Re
               >
                 <article
                   v-for="challenge in selectedChallengeStates"
-                  :key="challenge.competitionChallengeId ?? undefined"
+                  :key="challenge.competitionChallengeId"
                   :class="isChallengeFocused(challenge.competitionChallengeId) && 'event-focus'"
                 >
                   <div class="challenge-identity">

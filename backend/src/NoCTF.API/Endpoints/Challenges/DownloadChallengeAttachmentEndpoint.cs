@@ -16,7 +16,7 @@ public sealed class DownloadChallengeAttachmentEndpoint(
             NoCTF.Application.Observability.ApiRequestKind.Download)));
         Get("/competitions/{competitionId}/challenges/{competitionChallengeId}/attachments/{attachmentId}");
         AuthSchemes("Bearer");
-        Summary(summary => { summary.Summary = "Downloads one All-policy challenge attachment."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Downloads one All-policy challenge attachment.");
     }
 
     public override async Task<Results<FileStreamHttpResult, NotFound>> ExecuteAsync(CancellationToken ct)

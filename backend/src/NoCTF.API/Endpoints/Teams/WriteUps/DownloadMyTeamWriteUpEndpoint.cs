@@ -6,6 +6,8 @@ using NoCTF.Hosting.Observability;
 
 namespace NoCTF.API.Endpoints.Teams.WriteUps;
 
+[NJsonSchema.Annotations.JsonSchema(NJsonSchema.JsonObjectType.String, Format = "binary")]
+public sealed class TeamWriteUpBinaryResponse;
 
 public sealed class DownloadMyTeamWriteUpEndpoint(
     ManageTeamWriteUps writeUps,
@@ -20,8 +22,8 @@ public sealed class DownloadMyTeamWriteUpEndpoint(
             NoCTF.Application.Observability.ApiRequestKind.Download)));
         Description(builder => builder
             .WithName("DownloadMyTeamWriteUp")
-            .Produces<byte[]>(StatusCodes.Status200OK, "application/pdf"));
-        Summary(summary => { summary.Summary = "Downloads the current team's PDF WriteUp."; summary.Description = summary.Summary; });
+            .Produces<TeamWriteUpBinaryResponse>(StatusCodes.Status200OK, "application/pdf"));
+        Summary(summary => summary.Summary = "Downloads the current team's PDF WriteUp.");
     }
 
     public override async Task<Results<FileStreamHttpResult, NotFound>> ExecuteAsync(

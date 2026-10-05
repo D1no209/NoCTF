@@ -55,7 +55,7 @@ public sealed class LeaderboardOpenApiTests
             .IsEqualTo("string");
         var team = ResolveSchema(
             root,
-            ResolveSchema(root, responseProperties.GetProperty("teams")).GetProperty("items"));
+            responseProperties.GetProperty("teams").GetProperty("items"));
         await Assert.That(PropertyNames(team)).IsEquivalentTo([
             "teamId",
             "teamName",
@@ -75,7 +75,7 @@ public sealed class LeaderboardOpenApiTests
         ]);
         var challengeScore = ResolveSchema(
             root,
-            ResolveSchema(root, team.GetProperty("properties").GetProperty("challengeScores")).GetProperty("items"));
+            team.GetProperty("properties").GetProperty("challengeScores").GetProperty("items"));
         await Assert.That(PropertyNames(challengeScore)).IsEquivalentTo([
             "competitionChallengeId",
             "attackScore",
@@ -83,7 +83,7 @@ public sealed class LeaderboardOpenApiTests
         ]);
         var memberContribution = ResolveSchema(
             root,
-            ResolveSchema(root, team.GetProperty("properties").GetProperty("memberContributions")).GetProperty("items"));
+            team.GetProperty("properties").GetProperty("memberContributions").GetProperty("items"));
         await Assert.That(PropertyNames(memberContribution)).IsEquivalentTo([
             "userId",
             "displayName",
@@ -91,7 +91,7 @@ public sealed class LeaderboardOpenApiTests
         ]);
         var slot = ResolveSchema(
             root,
-            ResolveSchema(root, team.GetProperty("properties").GetProperty("slots")).GetProperty("items"));
+            team.GetProperty("properties").GetProperty("slots").GetProperty("items"));
         await Assert.That(PropertyNames(slot)).IsEquivalentTo([
             "columnIndex",
             "scoreState",
@@ -110,7 +110,7 @@ public sealed class LeaderboardOpenApiTests
         await Assert.That(scoreState.GetProperty("enum").EnumerateArray()
                 .Select(value => value.GetString()!))
             .IsEquivalentTo(["Pending", "Provisional", "Settled"]);
-        await Assert.That(scoreState.GetProperty("enum").EnumerateArray()
+        await Assert.That(scoreState.GetProperty("x-enumNames").EnumerateArray()
                 .Select(value => value.GetString()!))
             .IsEquivalentTo(["Pending", "Provisional", "Settled"]);
         foreach (var propertyName in new[] { "offenseState", "defenseState" })
@@ -121,7 +121,7 @@ public sealed class LeaderboardOpenApiTests
             await Assert.That(operationState.GetProperty("enum").EnumerateArray()
                     .Select(value => value.GetString()!))
                 .IsEquivalentTo(["None", "Failed", "Succeeded"]);
-            await Assert.That(operationState.GetProperty("enum").EnumerateArray()
+            await Assert.That(operationState.GetProperty("x-enumNames").EnumerateArray()
                     .Select(value => value.GetString()!))
                 .IsEquivalentTo(["None", "Failed", "Succeeded"]);
         }
@@ -258,7 +258,7 @@ public sealed class LeaderboardOpenApiTests
             .IsTrue();
         var challenge = ResolveSchema(
             root,
-            ResolveSchema(root, listProperties.GetProperty("items")).GetProperty("items"));
+            listProperties.GetProperty("items").GetProperty("items"));
         var challengeProperties = challenge.GetProperty("properties");
         await Assert.That(challengeProperties.TryGetProperty("baseScore", out _)).IsFalse();
         await Assert.That(challengeProperties.TryGetProperty("title", out _)).IsTrue();
@@ -286,7 +286,7 @@ public sealed class LeaderboardOpenApiTests
             .ToArray();
 
     private static string[] EnumNames(JsonElement schema) =>
-        schema.GetProperty("enum")
+        schema.GetProperty("x-enumNames")
             .EnumerateArray()
             .Select(value => value.GetString()!)
             .ToArray();
@@ -307,7 +307,7 @@ public sealed class LeaderboardOpenApiTests
     {
         var backend = FindBackendRoot();
         return JsonDocument.Parse(await File.ReadAllTextAsync(
-            Path.Combine(backend, "artifacts", "openapi", "v1.json")));
+            Path.Combine(backend, "artifacts", "openapi", "swagger.json")));
     }
 
     private static string FindBackendRoot()

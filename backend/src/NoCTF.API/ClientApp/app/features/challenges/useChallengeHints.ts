@@ -1,5 +1,3 @@
-
-import { api } from '../../lib/api'
 import { message as describeMessage } from '../../utils/i18n'
 import type { UiMessage } from '../../utils/i18n'
 import { proxyRefs } from 'vue'
@@ -7,13 +5,13 @@ import { toRefs } from 'vue'
 
 import { Lightbulb, LockKeyhole } from '@lucide/vue'
 import { toast } from '../../utils/message-toast'
-
-import type { NoCTFAPIEndpointsChallengesParticipantChallengeHintResponse } from '../../api/models'
+import { getChallengeEndpoint, getGameplayFactStatusEndpoint, unlockChallengeHintEndpoint } from '../../api'
+import type { NoCtfapiEndpointsChallengesParticipantChallengeHintResponse } from '../../api'
 import { affectsChallengeHints, hintUnlockState, readableHintContent } from '../../lib/challenge-hints'
 import { createLatestRequestGuard } from '../../lib/latest-request'
 import { createTrailingRefresh } from '../../lib/latest-page-refresh'
 
-type Hint = NoCTFAPIEndpointsChallengesParticipantChallengeHintResponse
+type Hint = NoCtfapiEndpointsChallengesParticipantChallengeHintResponse
 
 /** Owns state, effects and commands for ChallengeHints. */
 export function useChallengeHints(props: Readonly<{
@@ -52,8 +50,9 @@ emit: { (event: "unlocked", ...args: []): void }) {
     const request = requestGuard.begin()
     refreshing.value = true
     try {
-      let error: unknown;
-      const data = await api.api.v1.competitions.byCompetitionId(props.competitionId).challenges.byCompetitionChallengeId(props.competitionChallengeId).get().catch(cause => { error = cause; return undefined });
+      const { data, error } = await getChallengeEndpoint({
+        path: { competitionId: props.competitionId, competitionChallengeId: props.competitionChallengeId },
+      })
       if (!requestGuard.isCurrent(request)) return
       if (error || !data) throw parseApiError(error, describeMessage("challenges.error.hintsFailed"))
       hints.value = data.hints ?? []
@@ -72,8 +71,9 @@ emit: { (event: "unlocked", ...args: []): void }) {
   async function checkUnlock(): Promise<boolean> {
     const id = pendingFactId.value
     if (!id) return true
-    let error: unknown;
-    const data = await api.api.v1.competitions.byCompetitionId(props.competitionId).gameplayFacts.byGameplayFactId(id).get().catch(cause => { error = cause; return undefined });
+    const { data, error } = await getGameplayFactStatusEndpoint({
+      path: { competitionId: props.competitionId, gameplayFactId: id },
+    })
     if (disposed || id !== pendingFactId.value) return true
     if (error || !data) throw parseApiError(error, describeMessage("challenges.challengeHints.error.hintUnlockStatusFailed"))
     const state = hintUnlockState(data)
@@ -100,8 +100,9 @@ emit: { (event: "unlocked", ...args: []): void }) {
     submitting.value = true
     unlockError.value = null
     try {
-      let error: unknown;
-      const data = await api.api.v1.competitions.byCompetitionId(props.competitionId).challenges.byCompetitionChallengeId(props.competitionChallengeId).hints.byHintId(hint.id).unlock.post().catch(cause => { error = cause; return undefined });
+      const { data, error } = await unlockChallengeHintEndpoint({
+        path: { competitionId: props.competitionId, competitionChallengeId: props.competitionChallengeId, hintId: hint.id },
+      })
       if (disposed) return
       if (error || !data?.gameplayFactId) throw parseApiError(error, describeMessage("challenges.error.unlockHintFailed"))
       confirmingId.value = null

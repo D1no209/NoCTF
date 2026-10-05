@@ -24,7 +24,7 @@ const { queried, includeHistory, rows, load, toggle, copy, adminFormatDateTime, 
       <EmptyHeader><EmptyTitle>{{ $t('runtimeFlags.empty') }}</EmptyTitle></EmptyHeader>
     </Empty>
     <template v-else-if="queried">
-      <div v-for="row in rows" :key="(row.flag?.id) ?? undefined" class="flex flex-col gap-2 py-2">
+      <div v-for="row in rows" :key="row.flag?.id" class="flex flex-col gap-2 py-2">
         <div class="flex flex-wrap items-center gap-2">
           <Badge variant="secondary">{{ translate(row.sourceKey) }}</Badge>
           <Badge :variant="row.state === 'Active' ? 'default' : 'outline'">{{ translate(row.stateKey) }}</Badge>

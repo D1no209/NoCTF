@@ -79,7 +79,7 @@ const { ShieldCheck, Swords, Users, directionGlyph, groupIcon, isCtf, isAwdp, lo
               <span>{{ $t('challenges.label.solvedTeams', { count: progressFor(item.challenge.id)?.solveCount ?? 0 }) }}</span>
             </span>
             <span v-if="bloodsFor(item.challenge.id).length" class="mt-auto flex min-w-0 flex-wrap items-center gap-1.5 pt-3">
-              <Hint v-for="blood in bloodsFor(item.challenge.id)" :key="blood.rank ?? undefined" :content="bloodTooltip(blood)">
+              <Hint v-for="blood in bloodsFor(item.challenge.id)" :key="blood.rank" :content="bloodTooltip(blood)">
                 <BloodMark :rank="blood.rank" :label="bloodTooltip(blood)" :highlighted="blood.earnedByMyTeam" />
               </Hint>
             </span>

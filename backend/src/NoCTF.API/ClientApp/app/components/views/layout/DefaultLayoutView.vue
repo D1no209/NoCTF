@@ -32,7 +32,7 @@ const { ShieldAlert, isHome, routePath, wallpaperActive, wallpaperStyle, isLogge
           <ScrollSurface as="nav" axis="x" class="scrollbar-none flex min-w-0 items-center gap-1 overflow-x-auto overflow-y-hidden" :aria-label="t('common.label.mainNavigation')">
             <span
               v-for="item in navItems.filter((i) => i.show)"
-              :key="item.to ?? undefined"
+              :key="item.to"
               v-top-nav-motion
               data-top-nav-slot
             >

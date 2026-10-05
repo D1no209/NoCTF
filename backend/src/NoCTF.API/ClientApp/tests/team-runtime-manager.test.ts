@@ -9,7 +9,7 @@ describe('team runtime management', () => {
     const card = await sourceFile(new URL('../app/features/challenges/useRuntimeCard.ts', import.meta.url)).text()
 
     expect(page).toContain("team.registrationStatus === 'Approved' && !team.isBanned")
-    expect(manager).toMatch(/api\.api\.v1\.competitions\.byCompetitionId\([^)]*\)\.teams\.me\.runtimes\.get\(/)
+    expect(manager).toContain('listMyTeamRuntimes({')
     expect(manager).toContain('useOffsetPagination<TeamRuntime>')
     expect(manager).toContain('onReconnected: () => { void refresh() }')
     expect(view).toContain(':is="RuntimeCard"')

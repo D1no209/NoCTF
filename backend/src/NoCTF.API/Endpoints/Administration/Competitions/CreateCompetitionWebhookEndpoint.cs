@@ -55,7 +55,7 @@ public sealed class CreateCompetitionWebhookEndpoint(
         Post("/admin/competitions/{competitionId}/webhooks");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("AdminCreateCompetitionWebhook"));
-        Summary(summary => { summary.Summary = "Creates an outbound competition webhook target."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Creates an outbound competition webhook target.");
     }
 
     public override async Task<Results<Created<CompetitionWebhookCreatedResponse>, NotFound, ForbidHttpResult,

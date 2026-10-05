@@ -75,7 +75,7 @@ public sealed class ListGameplayFactsEndpoint(
     {
         Get("/competitions/{competitionId}/gameplay-facts");
         AuthSchemes("Bearer");
-        Summary(summary => { summary.Summary = "Lists the current team's gameplay facts."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Lists the current team's gameplay facts.");
     }
 
     public override async Task<Results<Ok<GameplayFactListResponse>, NotFound>> ExecuteAsync(

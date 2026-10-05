@@ -1,15 +1,12 @@
-import { dateObject } from '../../../../../utils/date-value'
-
-import { api } from '../../../../../lib/api'
 import { message as describeMessage } from '../../../../../utils/i18n'
 import type { UiMessage } from '../../../../../utils/i18n'
 import { markRaw } from 'vue'
 
 import { toast } from '../../../../../utils/message-toast'
-
-import type { NoCTFAPIEndpointsAdministrationCompetitionsCompetitionConfigurationResponse } from '../../../../../api/models'
-import type { NoCTFAPIEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract } from '../../../../../api/models'
-import type { NoCTFAPIEndpointsCompetitionsRuntimeAccessModeProtocol } from '../../../../../api/models'
+import { adminGetCompetition, adminPatchCompetition } from '../../../../../api'
+import type { NoCtfapiEndpointsAdministrationCompetitionsCompetitionConfigurationResponse } from '../../../../../api'
+import type { NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract } from '../../../../../api'
+import type { NoCtfapiEndpointsCompetitionsRuntimeAccessModeProtocol } from '../../../../../api'
 
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
 import CompetitionModeConfigEditorComponent from '../../../../admin/CompetitionModeConfigEditor.vue'
@@ -36,7 +33,7 @@ export function useAdminCompetitionsByIdConfigurationPage() {
 
   const maxConcurrentRuntimeInstancesPerTeam = ref(1)
 
-  const runtimeAccessMode = ref<NoCTFAPIEndpointsCompetitionsRuntimeAccessModeProtocol>('Direct')
+  const runtimeAccessMode = ref<NoCtfapiEndpointsCompetitionsRuntimeAccessModeProtocol>('Direct')
 
   const trafficCaptureEnabled = ref(false)
 
@@ -120,12 +117,14 @@ export function useAdminCompetitionsByIdConfigurationPage() {
     }
     savingMeta.value = true
     try {
-      await api.api.v1.admin.competitions.byCompetitionId(competitionId).patch({
+      const { error } = await adminPatchCompetition({
+        path: { competitionId },
+        body: {
           metadata: {
             title: title.value.trim(),
             description: description.value.trim() || null,
-            startTime: dateObject(start ?? undefined),
-            endTime: dateObject(end ?? undefined),
+            startTime: start,
+            endTime: end,
             teamRegistrationAutoApprove: teamRegistrationAutoApprove.value,
             allowTeamRegistrationWhileRunning: allowTeamRegistrationWhileRunning.value,
             maxTeamMembers: maxTeamMembers.value,
@@ -143,7 +142,9 @@ export function useAdminCompetitionsByIdConfigurationPage() {
             writeUpSubmissionDeadlineHours: writeUpSubmissionDeadlineHours.value,
             accessMode: staffOnly.value ? 'StaffOnly' : 'Public',
           },
-        });
+        },
+      })
+      if (error) throw error
       toast.success(describeMessage("administration.competitionsBy.label.basicInformationSaved"))
       await refresh()
     }
@@ -155,7 +156,7 @@ export function useAdminCompetitionsByIdConfigurationPage() {
     }
   }
 
-  const config = ref<NoCTFAPIEndpointsAdministrationCompetitionsCompetitionConfigurationResponse | null>(null)
+  const config = ref<NoCtfapiEndpointsAdministrationCompetitionsCompetitionConfigurationResponse | null>(null)
 
   const configLoading = ref(true)
 
@@ -163,18 +164,20 @@ export function useAdminCompetitionsByIdConfigurationPage() {
 
   async function loadConfig() {
     configLoading.value = true
-    let error: unknown;
-    const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).get().catch(cause => { error = cause; return undefined });
+    const { data, error } = await adminGetCompetition({ path: { competitionId } })
     if (!error && data) config.value = data.modeConfiguration ?? null
     configLoading.value = false
   }
 
-  async function saveConfig(configuration: NoCTFAPIEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract) {
+  async function saveConfig(configuration: NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract) {
     if (!config.value) return
     savingConfig.value = true
     try {
-
-      const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).patch({ modeConfiguration: { configuration } });
+      const { data, error } = await adminPatchCompetition({
+        path: { competitionId },
+        body: { modeConfiguration: { configuration } },
+      })
+      if (error) throw error
       config.value = data?.modeConfiguration ?? config.value
       toast.success(describeMessage("administration.label.modeConfigurationSaved"))
     }

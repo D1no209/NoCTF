@@ -116,25 +116,30 @@ token；`Provider=None` 始终停用验证。
 
 ## OpenAPI 与前端构建门禁
 
-OpenAPI 的源头是强类型端点、绑定属性、Validator、Summary 和 Description。FastEndpoints.OpenApi 注册 `v1` 文档，生产 `/openapi/v1.json` 实时提供该文档，Scalar 提供浏览界面。
-
-在 `backend/src/NoCTF.API/ClientApp` 执行：
+OpenAPI 的源头是 API endpoint 元数据。导出命令会同时更新提交到仓库的
+`backend/artifacts/openapi/swagger.json` 和运行时提供的
+`backend/src/NoCTF.API/wwwroot/openapi/v1.json`：
 
 ```powershell
-bun install --frozen-lockfile
-bun run api:gen
-bun run api:export
-bun run api:check
+dotnet run --project backend/src/NoCTF.Host/NoCTF.Host.csproj -- --export-openapi
 ```
 
-`api:gen` 通过 Host 的 `--generateclients true` 直接生成 Kiota TypeScript request builders 和模型；`api:export` 使用 `--exportopenapijson true` 独立写出唯一入库文档 `backend/artifacts/openapi/v1.json`，导出文件不是客户端生成输入。两种模式均只装配 API、使用随机本地端口和进程内临时签名密钥，不启动外部消息 transport、数据库迁移、Runner、业务后台任务或遥测。
+前端 SDK 由 `ClientApp/openapi-ts.config.ts` 从 `wwwroot/openapi/v1.json` 生成到
+`ClientApp/app/api`：
 
-`api:check` 构建 Host 一次，分别运行两个生成进程，再检查文档和 SDK 的内容漂移及未跟踪文件。`backend/scripts/Verify-Backend.ps1` 和 PR 的 `api-contracts` 门禁调用相同检查。Endpoint、文档、SDK 和调用方在同一变更中提交。普通构建、发布和 Docker 使用已提交 SDK，不隐式改写源码。
+```powershell
+Push-Location backend/src/NoCTF.API/ClientApp
+bun install --frozen-lockfile
+bun run api:gen
+Pop-Location
+```
 
-FastEndpoints 8.2 使用 Kiota Builder 1.29.1 安全补丁；TypeScript 运行库固定为 preview.102，abstractions 的传递版本也被锁定。preview.103 起更改了基础集合反序列化签名，不能直接升级。FE 8.2 文档规范化仅处理 nullable 引用及被移除的 IFormFile 组件引用；本地化 ProblemDetails 扩展由单独 schema transformer 描述，枚举、绑定和验证仍使用 FE 原生能力。生成代码不手工修补。Nuxt 设置 `verbatimModuleSyntax: false`，由 TypeScript 消除 Kiota 1.29 生成的纯类型枚举导入；配置变化后运行 `bun run postinstall` 刷新 Nuxt 类型配置。
+`backend/scripts/Verify-Backend.ps1` 都会重新导出 OpenAPI、重新生成 SDK，
+并以 `git diff --exit-code` 拒绝未提交的漂移。因此 endpoint、OpenAPI 文档和前端
+调用代码必须在同一变更中更新。
 
 CI 仅执行构建，不运行单元、集成、契约、架构或 SDK 漂移测试。测试、typecheck、
-architecture audit 和 `bun run api:check` 在本地开发与提交前执行。
+architecture audit、OpenAPI 导出和 SDK 漂移检查在本地开发与提交前执行。
 普通 PR 由 `repository-build.yml` 构建完整 Host Docker 镜像，不读取发布凭据、不推送镜像。
 主分支和手动发布直接构建并推送镜像；后端专用发布同样不调用测试工作流。
 翻译资源准备仍作为构建输入处理；文档由 `docs-pages.yml` 构建，PR 不部署 Pages。

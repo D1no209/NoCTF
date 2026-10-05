@@ -1,25 +1,21 @@
-
-import { api } from '../../lib/api'
-
-
 import { message as describeMessage } from '../../utils/i18n'
 import type { UiMessage } from '../../utils/i18n'
 import { toRefs } from 'vue'
 
 import { toast } from '../../utils/message-toast'
 import { Crown, UserMinus } from '@lucide/vue'
-
-import type { NoCTFAPIEndpointsAuthenticationPublicUserProfileResponse, NoCTFAPIEndpointsTeamsTeamResponse } from '../../api/models'
+import { patchCompetitionTeam, userProfileGet } from '../../api'
+import type { NoCtfapiEndpointsAuthenticationPublicUserProfileResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../api'
 
 /** Owns state, effects and commands for TeamMembers. */
 export function useTeamMembers(props: Readonly<{
   competitionId: string
-  team: NoCTFAPIEndpointsTeamsTeamResponse
+  team: NoCtfapiEndpointsTeamsTeamResponse
   /** 队长视角:可移除成员 */
   canManage?: boolean
 }>,
 emit: { (event: "changed", ...args: []): void }) {
-  const profiles = ref<Record<string, NoCTFAPIEndpointsAuthenticationPublicUserProfileResponse>>({})
+  const profiles = ref<Record<string, NoCtfapiEndpointsAuthenticationPublicUserProfileResponse>>({})
 
   const loaded = ref(false)
 
@@ -33,8 +29,7 @@ emit: { (event: "changed", ...args: []): void }) {
     loadError.value = null
     const entries = await Promise.all(
       ids.map(async (id) => {
-        let error: unknown;
-        const data = await api.api.v1.users.byUserId(id).get().catch(cause => { error = cause; return undefined });
+        const { data, error } = await userProfileGet({ path: { userId: id } })
         return { id, data, error }
       }),
     )
@@ -56,13 +51,15 @@ emit: { (event: "changed", ...args: []): void }) {
 
   async function remove(userId: string) {
     removing.value = userId
-    let error: unknown;
-    await api.api.v1.competitions.byCompetitionId(props.competitionId).teams.byTeamId(props.team.id!).patch({
+    const { error } = await patchCompetitionTeam({
+      path: { competitionId: props.competitionId, teamId: props.team.id! },
+      body: {
         membership: {
           captainId: props.team.captainId!,
           memberIds: (props.team.memberIds ?? []).filter(id => id !== userId),
         },
-      }).catch(cause => { error = cause; return undefined });
+      },
+    })
     removing.value = null
     if (error) {
       toast.error(parseApiError(error, describeMessage("competitions.error.removeMemberFailed")).displayMessage)

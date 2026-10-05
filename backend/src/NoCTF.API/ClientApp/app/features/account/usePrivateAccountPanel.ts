@@ -1,17 +1,15 @@
-
-import { api } from '../../lib/api'
 import type { UiMessage } from '../../utils/i18n'
 import { markRaw, toRefs } from 'vue'
 
 import { LockKeyhole } from '@lucide/vue'
-
-import type { NoCTFAPIEndpointsAdministrationPlatformPrivateAccountResponse } from '../../api/models'
+import { adminGetPrivatePlatformUser, adminGetPrivateTeamMember } from '../../api'
+import type { NoCtfapiEndpointsAdministrationPlatformPrivateAccountResponse } from '../../api'
 import { summarizeAccountSources } from '../../utils/account-source-summary'
 import AdminDateTimeComponent from '../admin/AdminDateTime.vue'
 
 /** Owns state, effects and commands for PrivateAccountPanel. */
-export function usePrivateAccountPanel(props: Readonly<Omit<{ userId: string, competitionId?: string | null, teamId?: string | null, showActivities?: boolean }, "showActivities"> & Required<Pick<{ userId: string, competitionId?: string | null, teamId?: string | null, showActivities?: boolean }, "showActivities">>>) {
-  const data = ref<NoCTFAPIEndpointsAdministrationPlatformPrivateAccountResponse | null>(null)
+export function usePrivateAccountPanel(props: Readonly<Omit<{ userId: string, competitionId?: string, teamId?: string, showActivities?: boolean }, "showActivities"> & Required<Pick<{ userId: string, competitionId?: string, teamId?: string, showActivities?: boolean }, "showActivities">>>) {
+  const data = ref<NoCtfapiEndpointsAdministrationPlatformPrivateAccountResponse | null>(null)
 
   const loading = ref(false)
 
@@ -29,13 +27,12 @@ export function usePrivateAccountPanel(props: Readonly<Omit<{ userId: string, co
     loading.value = true
     error.value = null
     try {
-      let resultError: unknown;
-      const result = await (props.competitionId && props.teamId
-        ? api.api.v1.admin.competitions.byCompetitionId(props.competitionId).teams.byTeamId(props.teamId).members.byUserId(props.userId).privateProfile.get()
-        : api.api.v1.admin.platform.users.byUserId(props.userId).activity.get()).catch(cause => { resultError = cause; return undefined });
+      const result = props.competitionId && props.teamId
+        ? await adminGetPrivateTeamMember({ path: { competitionId: props.competitionId, teamId: props.teamId, userId: props.userId } })
+        : await adminGetPrivatePlatformUser({ path: { userId: props.userId } })
       if (ticket !== revision) return
-      if (resultError) throw resultError
-      data.value = result ?? null
+      if (result.error) throw result.error
+      data.value = result.data ?? null
     }
     catch (e) { if (ticket === revision) error.value = parseApiError(e).displayMessage }
     finally { if (ticket === revision) loading.value = false }

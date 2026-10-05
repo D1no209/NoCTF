@@ -20,7 +20,7 @@ const { open, title, mode, visibility, direction, description, definition, saveE
           <AlertDescription class="flex flex-col gap-2">
             <span>{{ $t('administration.challengeTemplate.description.correctFollowingIssuesTry') }}</span>
             <ul class="list-disc pl-5">
-              <li v-for="(message, index) in saveErrors" :key="index ?? undefined">{{ message }}</li>
+              <li v-for="(message, index) in saveErrors" :key="index">{{ message }}</li>
             </ul>
           </AlertDescription>
         </Alert>
@@ -67,7 +67,7 @@ const { open, title, mode, visibility, direction, description, definition, saveE
                   <Select v-model="direction">
                     <SelectTrigger id="create-template-direction" class="w-full" :aria-invalid="directionInvalid || undefined"><SelectValue /></SelectTrigger>
                     <SelectContent><SelectGroup>
-                      <SelectItem v-for="option in directionOptions" :key="option ?? undefined" :value="option">{{ directionLabel(option) }}</SelectItem>
+                      <SelectItem v-for="option in directionOptions" :key="option" :value="option">{{ directionLabel(option) }}</SelectItem>
                     </SelectGroup></SelectContent>
                   </Select>
                 </Field>

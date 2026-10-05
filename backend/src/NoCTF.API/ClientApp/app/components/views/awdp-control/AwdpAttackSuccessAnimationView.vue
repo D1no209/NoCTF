@@ -14,11 +14,11 @@ const { Crosshair, Swords, rays, shards, event } = toRefs(viewProps.state)
       <span class="target-label">{{ event.challengeTitle }}</span>
     </div>
     <div class="attack-rays">
-      <i v-for="ray in rays" :key="ray ?? undefined" :style="{ '--ray': ray }" />
+      <i v-for="ray in rays" :key="ray" :style="{ '--ray': ray }" />
     </div>
     <div class="attack-core"><Swords /></div>
     <div class="attack-shards">
-      <i v-for="shard in shards" :key="shard ?? undefined" :style="{ '--shard': shard }" />
+      <i v-for="shard in shards" :key="shard" :style="{ '--shard': shard }" />
     </div>
     <div class="attack-result">
       <small>{{ event.challengeTitle }}</small>

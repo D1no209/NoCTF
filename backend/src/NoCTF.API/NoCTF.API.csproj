@@ -23,9 +23,7 @@
   <ItemGroup>
     <PackageReference Include="FastEndpoints" />
     <PackageReference Include="FastEndpoints.Security" />
-    <PackageReference Include="FastEndpoints.OpenApi" />
-    <PackageReference Include="Microsoft.OpenApi" />
-    <PackageReference Include="Scalar.AspNetCore" />
+    <PackageReference Include="FastEndpoints.Swagger" />
     <PackageReference Include="Microsoft.AspNetCore.SpaProxy" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
     <PackageReference Include="Riok.Mapperly" PrivateAssets="all" />
@@ -44,9 +42,9 @@
              CopyToOutputDirectory="PreserveNewest"
              CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
-  <Target Name="DebugEnsureNodeEnv"
+  <Target Name="DebugEnsureBunEnv"
           BeforeTargets="Build"
-          Condition="'$(Configuration)' == 'Debug' And '$(BuildSpaOnPublish)' != 'false' And !Exists('$(SpaRoot)node_modules')">
+          Condition="'$(Configuration)' == 'Debug' And '$(BuildSpaOnPublish)' == 'true' And !Exists('$(SpaRoot)node_modules')">
     <Exec Command="bun --version" ContinueOnError="true">
       <Output TaskParameter="ExitCode" PropertyName="BunErrorCode" />
     </Exec>

@@ -29,5 +29,5 @@ public sealed class OpenApiMetadataTests
 
     private static string OpenApiPath() => Path.GetFullPath(Path.Combine(
         AppContext.BaseDirectory,
-        "..", "..", "..", "..", "..", "artifacts", "openapi", "v1.json"));
+        "..", "..", "..", "..", "..", "src", "NoCTF.API", "wwwroot", "openapi", "v1.json"));
 }

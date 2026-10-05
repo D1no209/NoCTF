@@ -25,7 +25,7 @@ describe('participant copy density', () => {
     ).text()
 
     expect(teamPage).not.toContain("common.description.invitationCodeGeneratedCreating")
-    expect(teamPage).toMatch(/api\.api\.v1\.competitions\.byCompetitionId\([^)]*\)\.teams\.byTeamId\([^)]*\)\.invitationToken\.get\(/)
+    expect(teamPage).toContain('getTeamInvitationEndpoint({')
     expect(teamPage).toContain('invitationToken.value = data.invitationToken')
     expect(teamPage).toContain('v-else-if="invitationToken"')
     expect(teamPage).toContain("$t('competitions.label.rotateInvitationCode')")

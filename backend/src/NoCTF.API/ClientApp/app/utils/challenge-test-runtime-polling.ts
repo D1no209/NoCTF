@@ -2,17 +2,17 @@ export type ChallengeTestRuntimeLoadOutcome = 'available' | 'missing' | 'failed'
 export type ChallengeTestRuntimeMutationKind = 'start' | 'stop' | 'reset' | 'extend'
 
 export interface ChallengeTestRuntimePollingSnapshot {
-  id?: string | null
-  state?: 'Queued' | 'Provisioning' | 'Running' | 'Stopping' | 'Stopped' | 'Failed' | null
-  flagState?: 'NotRequired' | 'Pending' | 'Succeeded' | 'Failed' | 'Canceled' | null
-  expiresAt?: Date | string | null
+  id?: string
+  state?: 'Queued' | 'Provisioning' | 'Running' | 'Stopping' | 'Stopped' | 'Failed'
+  flagState?: 'NotRequired' | 'Pending' | 'Succeeded' | 'Failed' | 'Canceled'
+  expiresAt?: string | null
 }
 
 export interface PendingChallengeTestRuntimeMutation {
   kind: ChallengeTestRuntimeMutationKind
-  runtimeInstanceId?: string | null
-  previousRuntimeInstanceId?: string | null
-  previousExpiresAt?: Date | string | null
+  runtimeInstanceId?: string
+  previousRuntimeInstanceId?: string
+  previousExpiresAt?: string | null
 }
 
 export interface ChallengeTestRuntimePollingDecision {

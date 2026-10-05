@@ -10,7 +10,7 @@ const { Plus, X, displayTemplateOptions, update, remove, add, modelValue, exposu
   <div class="flex flex-col gap-3">
     <div
       v-for="(binding, index) in modelValue"
-      :key="index ?? undefined"
+      :key="index"
       class="flex flex-col gap-2 rounded-md border p-3"
     >
       <div class="flex items-start gap-2">
@@ -28,7 +28,7 @@ const { Plus, X, displayTemplateOptions, update, remove, add, modelValue, exposu
               </SelectTrigger>
               <SelectContent position="popper">
                 <SelectGroup>
-                  <SelectItem v-for="template in displayTemplateOptions" :key="template ?? undefined" :value="template" class="font-mono">
+                  <SelectItem v-for="template in displayTemplateOptions" :key="template" :value="template" class="font-mono">
                     {{ template }}
                   </SelectItem>
                   <SelectItem
@@ -62,7 +62,7 @@ const { Plus, X, displayTemplateOptions, update, remove, add, modelValue, exposu
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  <SelectItem v-for="option in exposureOptions" :key="option.value ?? undefined" :value="String(option.value)">
+                  <SelectItem v-for="option in exposureOptions" :key="option.value" :value="String(option.value)">
                     {{ translate(option.label) }}
                   </SelectItem>
                 </SelectGroup>
@@ -85,7 +85,7 @@ const { Plus, X, displayTemplateOptions, update, remove, add, modelValue, exposu
             <Select :model-value="binding.serviceName" :disabled="disabled"
               @update:model-value="update(index, { serviceName: String($event ?? '') })">
               <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent><SelectGroup><SelectItem v-for="name in serviceNames" :key="name ?? undefined" :value="name">{{ name }}</SelectItem></SelectGroup></SelectContent>
+              <SelectContent><SelectGroup><SelectItem v-for="name in serviceNames" :key="name" :value="name">{{ name }}</SelectItem></SelectGroup></SelectContent>
             </Select>
           </Field>
         </div>

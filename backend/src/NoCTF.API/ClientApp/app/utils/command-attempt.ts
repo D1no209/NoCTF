@@ -26,10 +26,7 @@ function newRequestKey(): string {
 }
 
 async function localFingerprint(value: string): Promise<string> {
-  return fingerprintBytes(new TextEncoder().encode(value))
-}
-
-async function fingerprintBytes(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
+  const bytes = new TextEncoder().encode(value)
   if (crypto.subtle) {
     const hash = await crypto.subtle.digest('SHA-256', bytes)
     return Array.from(new Uint8Array(hash), x => x.toString(16).padStart(2, '0')).join('')
@@ -43,11 +40,7 @@ async function fingerprintBytes(bytes: Uint8Array<ArrayBuffer>): Promise<string>
 /** Only an indeterminate response is retried as the same intent. Successful requests are never content-deduplicated. */
 export async function prepareCommandRequest(request: Request, body: unknown): Promise<void> {
   if (['GET', 'HEAD', 'OPTIONS'].includes(request.method)) return
-  const content = body instanceof FormData ? await Promise.all(Array.from(body.entries(), async ([name, value]) => [name,
-    value instanceof File ? { name: value.name, length: value.size, type: value.type,
-      digest: await fingerprintBytes(new Uint8Array(await value.arrayBuffer())) } : value,
-  ])) : body
-  const serialized = JSON.stringify(content, (_key, value) => {
+  const serialized = JSON.stringify(body, (_key, value) => {
     if (typeof File !== 'undefined' && value instanceof File)
       return { file: value.name, length: value.size, modified: value.lastModified, type: value.type }
     if (typeof FormData !== 'undefined' && value instanceof FormData) return Array.from(value.entries())

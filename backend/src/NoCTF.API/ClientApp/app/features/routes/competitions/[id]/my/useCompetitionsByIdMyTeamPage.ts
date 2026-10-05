@@ -1,9 +1,3 @@
-
-import { api, multipartBody } from '../../../../../lib/api'
-
-import { ResponseMetadata, RequestPolicyOption } from '../../../../../lib/api'
-
-
 import { message as describeMessage } from '../../../../../utils/i18n'
 import type { UiMessage } from '../../../../../utils/i18n'
 import { proxyRefs } from 'vue'
@@ -11,8 +5,8 @@ import { markRaw } from 'vue'
 
 import { toast } from '../../../../../utils/message-toast'
 import { Copy, RefreshCw } from '@lucide/vue'
-
-import type { NoCTFAPIEndpointsCompetitionsTracksCompetitionTrackResponse, NoCTFAPIEndpointsTeamsMyTeamBanCaseResponse, NoCTFAPIEndpointsTeamsTeamResponse } from '../../../../../api/models'
+import { deleteTeamEndpoint, getMyTeamBanCase, getMyTeamEndpoint, getTeamInvitationEndpoint, leaveTeamEndpoint, listCompetitionTracks, patchCompetitionTeam, rotateTeamInvitationEndpoint, submitTeamBanAppeal, teamAvatarClear, teamAvatarReplace } from '../../../../../api'
+import type { NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse, NoCtfapiEndpointsTeamsMyTeamBanCaseResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../../../api'
 import { maximumAppealStatementLength, minimumAppealStatementLength, validateAppealStatement } from '../../../../../lib/participant-form-validation'
 import { teamRegistrationErrorMessage } from '../../../../../lib/competition-track'
 import { exceedsUploadLimit } from '../../../../account/upload-limits'
@@ -39,7 +33,7 @@ export function useCompetitionsByIdMyTeamPage() {
     || competition.value?.status === 'Running'
       && competition.value.allowTeamRegistrationWhileRunning === true)
 
-  const selectableTracks = ref<NoCTFAPIEndpointsCompetitionsTracksCompetitionTrackResponse[]>([])
+  const selectableTracks = ref<NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse[]>([])
 
   const tracksLoading = ref(false)
 
@@ -51,8 +45,7 @@ export function useCompetitionsByIdMyTeamPage() {
     if (!tracksEnabled.value) return
     tracksLoading.value = true
     try {
-      let error: unknown;
-      const data = await api.api.v1.competitions.byCompetitionId(competitionId).tracks.get().catch(cause => { error = cause; return undefined });
+      const { data, error } = await listCompetitionTracks({ path: { competitionId } })
       if (error || !data) throw error
       selectableTracks.value = (data.items ?? []).filter(track => track.isPublicSelectable)
     }
@@ -67,7 +60,7 @@ export function useCompetitionsByIdMyTeamPage() {
     }
   }
 
-  const team = ref<NoCTFAPIEndpointsTeamsTeamResponse | null>(null)
+  const team = ref<NoCtfapiEndpointsTeamsTeamResponse | null>(null)
 
   const loading = ref(true)
 
@@ -87,8 +80,9 @@ export function useCompetitionsByIdMyTeamPage() {
     }
     invitationLoading.value = true
     invitationError.value = null
-    let error: unknown;
-    const data = await api.api.v1.competitions.byCompetitionId(competitionId).teams.byTeamId(team.value.id!).invitationToken.get().catch(cause => { error = cause; return undefined });
+    const { data, error } = await getTeamInvitationEndpoint({
+      path: { competitionId, teamId: team.value.id! },
+    })
     invitationLoading.value = false
     if (error || !data?.invitationToken) {
       invitationError.value = parseApiError(error, describeMessage("competitions.competitionsBy.error.loadInvitationCodeFailed")).displayMessage
@@ -99,9 +93,7 @@ export function useCompetitionsByIdMyTeamPage() {
 
   async function load() {
     loadError.value = null
-    let error: unknown;
-    const response = new ResponseMetadata();
-    const data = await api.api.v1.competitions.byCompetitionId(competitionId).teams.me.get({ options: [new RequestPolicyOption({ response: response })] }).catch(cause => { error = cause; return undefined });
+    const { data, error, response } = await getMyTeamEndpoint({ path: { competitionId } })
     loading.value = false
     if (error || !data) {
       team.value = null
@@ -150,8 +142,9 @@ export function useCompetitionsByIdMyTeamPage() {
     if (!team.value) return
     rotating.value = true
     invitationError.value = null
-    let error: unknown;
-    const data = await api.api.v1.competitions.byCompetitionId(competitionId).teams.byTeamId(team.value.id!).invitationToken.rotate.post().catch(cause => { error = cause; return undefined });
+    const { data, error } = await rotateTeamInvitationEndpoint({
+      path: { competitionId, teamId: team.value.id! },
+    })
     rotating.value = false
     if (error || !data?.invitationToken) {
       toast.error(parseApiError(error, describeMessage("competitions.competitionsBy.error.rotateInvitationCodeFailed")).displayMessage)
@@ -203,7 +196,7 @@ export function useCompetitionsByIdMyTeamPage() {
     renameOpen.value = true
   }
 
-  function showOrganizationChangeSuccess(updatedTeam: NoCTFAPIEndpointsTeamsTeamResponse): void {
+  function showOrganizationChangeSuccess(updatedTeam: NoCtfapiEndpointsTeamsTeamResponse): void {
     toast.success(updatedTeam.registrationStatus === 'Unregistered'
       ? translate('competitions.competitionsBy.label.teamDraftSavedSubmit')
       : translate('competitions.competitionsBy.label.teamChangesSavedApproved'))
@@ -212,12 +205,14 @@ export function useCompetitionsByIdMyTeamPage() {
   async function submitRename() {
     if (!team.value || !renameValid.value) return
     renamePending.value = true
-    let error: unknown;
-    const data = await api.api.v1.competitions.byCompetitionId(competitionId).teams.byTeamId(team.value.id!).patch({ profile: {
+    const { data, error } = await patchCompetitionTeam({
+      path: { competitionId, teamId: team.value.id! },
+      body: { profile: {
         name: renameValue.value.trim(),
         trackKey: tracksEnabled.value ? renameTrackKey.value : null,
         trackInvitationCode: null,
-      } }).catch(cause => { error = cause; return undefined });
+      } },
+    })
     renamePending.value = false
     if (error || !data) {
       toast.error(teamRegistrationErrorMessage(error, translate("competitions.competitionsBy.error.modifyTeamNameFailed")))
@@ -251,8 +246,11 @@ export function useCompetitionsByIdMyTeamPage() {
     }
     avatarPending.value = true
     try {
-
-      await api.api.v1.competitions.byCompetitionId(competitionId).teams.byTeamId(team.value.id!).avatar.put(await multipartBody({ file }));
+      const { error } = await teamAvatarReplace({
+        path: { competitionId, teamId: team.value.id! },
+        body: { file },
+      })
+      if (error) throw error
       await load()
       if (team.value) showOrganizationChangeSuccess(team.value)
     }
@@ -268,7 +266,10 @@ export function useCompetitionsByIdMyTeamPage() {
     if (!team.value?.avatarUrl || avatarPending.value || !canEditOrganization.value) return
     avatarPending.value = true
     try {
-      await api.api.v1.competitions.byCompetitionId(competitionId).teams.byTeamId(team.value.id!).avatar.delete();
+      const { error } = await teamAvatarClear({
+        path: { competitionId, teamId: team.value.id! },
+      })
+      if (error) throw error
       await load()
       if (team.value) showOrganizationChangeSuccess(team.value)
     }
@@ -293,13 +294,15 @@ export function useCompetitionsByIdMyTeamPage() {
   async function submitTransfer() {
     if (!team.value || !transferTarget.value) return
     transferPending.value = true
-    let error: unknown;
-    const data = await api.api.v1.competitions.byCompetitionId(competitionId).teams.byTeamId(team.value.id!).patch({
+    const { data, error } = await patchCompetitionTeam({
+      path: { competitionId, teamId: team.value.id! },
+      body: {
         membership: {
           captainId: transferTarget.value,
           memberIds: team.value.memberIds ?? [],
         },
-      }).catch(cause => { error = cause; return undefined });
+      },
+    })
     transferPending.value = false
     if (error) {
       toast.error(parseApiError(error, describeMessage("competitions.error.transferCaptainFailed")).displayMessage)
@@ -318,8 +321,9 @@ export function useCompetitionsByIdMyTeamPage() {
   async function disband() {
     if (!team.value) return
     acting.value = true
-    let error: unknown;
-    await api.api.v1.competitions.byCompetitionId(competitionId).teams.byTeamId(team.value.id!).delete().catch(cause => { error = cause; return undefined });
+    const { error } = await deleteTeamEndpoint({
+      path: { competitionId, teamId: team.value.id! },
+    })
     acting.value = false
     if (error) {
       toast.error(parseApiError(error, describeMessage("competitions.competitionsBy.error.disbandTeamFailed")).displayMessage)
@@ -331,8 +335,7 @@ export function useCompetitionsByIdMyTeamPage() {
 
   async function leave() {
     acting.value = true
-    let error: unknown;
-    await api.api.v1.competitions.byCompetitionId(competitionId).teams.me.membership.delete().catch(cause => { error = cause; return undefined });
+    const { error } = await leaveTeamEndpoint({ path: { competitionId } })
     acting.value = false
     if (error) {
       toast.error(parseApiError(error, describeMessage("competitions.competitionsBy.error.quitTeamFailed")).displayMessage)
@@ -342,7 +345,7 @@ export function useCompetitionsByIdMyTeamPage() {
     team.value = null
   }
 
-  const banCase = ref<NoCTFAPIEndpointsTeamsMyTeamBanCaseResponse | null>(null)
+  const banCase = ref<NoCtfapiEndpointsTeamsMyTeamBanCaseResponse | null>(null)
 
   const appealOpen = ref(false)
 
@@ -356,8 +359,7 @@ export function useCompetitionsByIdMyTeamPage() {
 
   async function loadBanCase() {
     banCaseError.value = null
-    let error: unknown;
-    const data = await api.api.v1.competitions.byCompetitionId(competitionId).teamBanCase.get().catch(cause => { error = cause; return undefined });
+    const { data, error } = await getMyTeamBanCase({ path: { competitionId } })
     if (error || !data) {
       banCaseError.value = parseApiError(error, describeMessage("competitions.competitionsBy.error.loadBanAppealFailed")).displayMessage
       return
@@ -372,7 +374,7 @@ export function useCompetitionsByIdMyTeamPage() {
     },
   )
 
-  const appealStatusLabel = (status?: string | null) =>
+  const appealStatusLabel = (status?: string) =>
     ({ Submitted: translate("competitions.label.appealing"), Upheld: translate("common.label.dismissed"), Accepted: translate("common.label.passed") } as Record<string, string>)[String(status)] ?? translate("common.label.unknown")
 
   async function submitAppeal() {
@@ -382,8 +384,10 @@ export function useCompetitionsByIdMyTeamPage() {
 
     appealPending.value = true
     try {
-      let error: unknown;
-      await api.api.v1.competitions.byCompetitionId(competitionId).teamBanAppeals.post({ statement: appealStatement.value.trim() }).catch(cause => { error = cause; return undefined });
+      const { error } = await submitTeamBanAppeal({
+        path: { competitionId },
+        body: { statement: appealStatement.value.trim() },
+      })
       if (error) {
         appealError.value = parseApiError(error, describeMessage("competitions.error.submitAppealFailed")).displayMessage
         toast.error(appealError.value)

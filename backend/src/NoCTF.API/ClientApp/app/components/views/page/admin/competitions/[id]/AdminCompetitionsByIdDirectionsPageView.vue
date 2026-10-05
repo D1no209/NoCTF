@@ -16,7 +16,7 @@ const { Plus, Trash2, RefreshCw, items, loading, saving, error, canWrite, canSav
         <UiForm @submit.prevent="save">
           <FieldGroup>
             <Skeleton v-if="loading" class="h-24" />
-            <div v-for="item in items" v-else :key="item.id ?? undefined" class="flex items-start gap-3">
+            <div v-for="item in items" v-else :key="item.id" class="flex items-start gap-3">
               <LucideIcon :name="item.icon || 'flag'" class="mt-8 shrink-0 text-primary" />
               <div class="grid min-w-0 flex-1 gap-3 sm:grid-cols-2">
                 <Field>

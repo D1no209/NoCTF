@@ -4,12 +4,12 @@ import { currentLocale, isMessageKey, localizeMessage, translate } from './i18n'
 
 export class ApiError extends Error {
   readonly status?: number
-  readonly code?: string | null
+  readonly code?: string
   readonly fieldErrors?: Record<string, string[]>
   readonly fieldMessages?: Record<string, UiMessage[]>
   readonly displayMessage: UiMessage
 
-  constructor(value: UiMessage, init?: { status?: number; code?: string | null; fieldErrors?: Record<string, string[]>; fieldMessages?: Record<string, UiMessage[]> }) {
+  constructor(value: UiMessage, init?: { status?: number; code?: string; fieldErrors?: Record<string, string[]>; fieldMessages?: Record<string, UiMessage[]> }) {
     super(localizeMessage(value))
     this.name = 'ApiError'
     this.displayMessage = value
@@ -23,20 +23,18 @@ export class ApiError extends Error {
 
 interface ProblemDetailsLike {
   status?: number
-  authenticatedRequest?: boolean
-  responseStatusCode?: number
   statusCode?: number
-  title?: string | null
-  detail?: string | null
-  message?: string | null
-  code?: string | null
-  messageKey?: string | null
+  title?: string
+  detail?: string
+  message?: string
+  code?: string
+  messageKey?: string
   messageArguments?: unknown
   errors?: Record<string, string[] | string>
   errorMessages?: Record<string, Array<{ key: string; arguments?: unknown }>>
 }
 
-function descriptor(key: string | null | undefined, arguments_: unknown): MessageDescriptor | undefined {
+function descriptor(key: string | undefined, arguments_: unknown): MessageDescriptor | undefined {
   if (!key || !isMessageKey(key)) return undefined
   const argumentsObject = arguments_ && typeof arguments_ === 'object' && !Array.isArray(arguments_)
     ? Object.fromEntries(Object.entries(arguments_).filter(([, value]) => value === null || ['string', 'number', 'boolean'].includes(typeof value))) as Record<string, string | number | boolean | null>
@@ -51,7 +49,7 @@ export function userFacingErrorMessage(value: string | null | undefined, fallbac
     ? localizeMessage(fallback) : source
 }
 
-function stableCodeMessage(code: string | null | undefined): MessageDescriptor | null {
+function stableCodeMessage(code: string | undefined): MessageDescriptor | null {
   switch (code) {
     case 'HumanVerificationRequired': return describeMessage('security.verification.required')
     case 'HumanVerificationFailed': return describeMessage('security.verification.failed')
@@ -77,11 +75,9 @@ function stableCodeMessage(code: string | null | undefined): MessageDescriptor |
 /** Field errors retain precedence; protocol descriptors identify messages, never English prose. */
 export function parseApiError(error: unknown, fallback: UiMessage = describeMessage('common.error.requestFailed')): ApiError {
   if (error instanceof ApiError) return error
-  if (error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError'))
-    return new ApiError(describeMessage('common.error.requestTimeout'), { status: 503, code: 'RequestTimeout' })
   if (!error || typeof error !== 'object') return new ApiError(fallback)
   const problem = error as ProblemDetailsLike
-  const status = problem.status ?? problem.responseStatusCode ?? problem.statusCode
+  const status = problem.status ?? problem.statusCode
   const fieldErrors = problem.errors ? Object.fromEntries(Object.entries(problem.errors).map(([field, entries]) => [field, Array.isArray(entries) ? entries : [entries]])) : undefined
   const fields = new Set([...Object.keys(fieldErrors ?? {}), ...Object.keys(problem.errorMessages ?? {})])
   const fieldMessages = Object.fromEntries([...fields].map((field) => {
@@ -95,7 +91,7 @@ export function parseApiError(error: unknown, fallback: UiMessage = describeMess
     if (typeof value !== 'string' || value.trim()) unique.set(JSON.stringify(value), value)
   const validation = [...unique.values()]
   const statusFallback = status === undefined ? fallback
-    : (status === 400 || status === 422) && localizeMessage(fallback) !== translate('common.error.requestFailed') ? fallback : statusErrorDescriptor(status, problem.authenticatedRequest)
+    : (status === 400 || status === 422) && localizeMessage(fallback) !== translate('common.error.requestFailed') ? fallback : statusErrorDescriptor(status)
   const structured = descriptor(problem.messageKey, problem.messageArguments) ?? stableCodeMessage(problem.code)
   const raw = problem.detail ?? problem.message ?? problem.title
   const display: UiMessage = validation.length

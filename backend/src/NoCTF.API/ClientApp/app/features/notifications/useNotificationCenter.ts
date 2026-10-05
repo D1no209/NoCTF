@@ -1,17 +1,15 @@
-
-import { api } from '../../lib/api'
 import { message as describeMessage } from '../../utils/i18n'
 import type { UiMessage } from '../../utils/i18n'
 
 
 import { ArrowRight, Bell, Mail } from '@lucide/vue'
-
-import type { NoCTFAPIEndpointsNotificationsNotificationResponse } from '../../api/models'
+import { listNotificationsEndpoint, readNotificationThreadEndpoint } from '../../api'
+import type { NoCtfapiEndpointsNotificationsNotificationResponse } from '../../api'
 import { createLatestRequestGuard } from '../../lib/latest-request'
 import { createLatestPageRefresh } from '../../lib/latest-page-refresh'
 import { watchNotifications } from '../../composables/useNotificationHub'
 
-type Notification = NoCTFAPIEndpointsNotificationsNotificationResponse
+type Notification = NoCtfapiEndpointsNotificationsNotificationResponse
 
 /** Owns state, effects and commands for NotificationCenter. */
 export function useNotificationCenter() {
@@ -35,13 +33,14 @@ export function useNotificationCenter() {
 
   const { items, loading, error, hasMore, initialized, loadMore, reset } =
     useCursorPagination<Notification>(async (cursor) => {
-      let requestError: unknown;
-      const data = await api.api.v1.notifications.get({ queryParameters: {
+      const { data, error: requestError } = await listNotificationsEndpoint({
+        query: {
           scope: 'Inbox',
           offset: cursor ? Number(cursor) || 0 : 0,
           limit: 50,
           desc: true,
-        } }).catch(cause => { requestError = cause; return undefined });
+        },
+      })
       if (requestError || !data) throw requestError ?? new Error(translate("notifications.error.loadNotificationFailed"))
       const pageItems = data.items ?? []
       const offset = cursor ? Number(cursor) || 0 : 0
@@ -121,8 +120,9 @@ export function useNotificationCenter() {
     if (!rootId) return
     threadLoading.value = true
     try {
-      let requestError: unknown;
-      const data = await api.api.v1.notifications.byNotificationId(rootId).thread.get().catch(cause => { requestError = cause; return undefined });
+      const { data, error: requestError } = await readNotificationThreadEndpoint({
+        path: { notificationId: rootId },
+      })
       if (!threadRequests.isCurrent(request)) return
       if (requestError || !data) throw requestError ?? new Error(translate("notifications.notificationCenter.error.loadNotificationDetailsFailed"))
       thread.value = data.items ?? []
@@ -172,8 +172,9 @@ export function useNotificationCenter() {
     routeError.value = null
     threadLoading.value = true
     try {
-      let requestError: unknown;
-      const data = await api.api.v1.notifications.byNotificationId(selectedId).thread.get().catch(cause => { requestError = cause; return undefined });
+      const { data, error: requestError } = await readNotificationThreadEndpoint({
+        path: { notificationId: selectedId },
+      })
       if (!threadRequests.isCurrent(request)) return
       if (requestError || !data) throw requestError ?? new Error(translate("notifications.notificationCenter.error.loadNotificationDetailsFailed"))
       const routedNotification = data.items?.find(item => item.id === selectedId)
@@ -219,8 +220,9 @@ export function useNotificationCenter() {
     if (!rootId) return
     const request = threadRequests.begin()
     try {
-      let requestError: unknown;
-      const data = await api.api.v1.notifications.byNotificationId(rootId).thread.get().catch(cause => { requestError = cause; return undefined });
+      const { data, error: requestError } = await readNotificationThreadEndpoint({
+        path: { notificationId: rootId },
+      })
       if (!threadRequests.isCurrent(request) || selected.value?.id !== current.id) return
       if (requestError || !data) throw requestError
       thread.value = data.items ?? []

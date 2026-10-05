@@ -1,10 +1,8 @@
-
-import { api } from '../../../../lib/api'
 import { message as describeMessage } from '../../../../utils/i18n'
 import type { UiMessage } from '../../../../utils/i18n'
 import type { Edge, Node } from '@vue-flow/core'
-
-import type { NoCTFAPIEndpointsCompetitionsPlayerProgressionContract } from '../../../../api/models'
+import { getPlayerCompetitionProgression } from '../../../../api'
+import type { NoCtfapiEndpointsCompetitionsPlayerProgressionContract } from '../../../../api'
 import { buildProgressionLayout as calculateProgressionLayout } from '../../../../lib/progression-layout'
 import { progressionTopologyKey } from '../../../../lib/progression-layout'
 import { chooseProgressionFocus, unsatisfiedProgressionEdges } from '../../../../lib/progression-graph'
@@ -14,7 +12,7 @@ import { markRaw, nextTick } from 'vue'
 
 type ReadData = {
   title: string, description?: string | null, kind: 0 | 1, resourceId: string
-  active: boolean, complete: boolean, visited: boolean, firstOpenedAt?: Date | string | null
+  active: boolean, complete: boolean, visited: boolean, firstOpenedAt?: string | null
   requiresPrerequisites: boolean
   imageUrl?: string | null
 }
@@ -24,7 +22,7 @@ type ReadEdge = Edge<{ condition: 0 | 1 }>
 export function useCompetitionsByIdProgressionPage() {
   const route = useRoute()
   const competitionId = route.params.id as string
-  const data = ref<NoCTFAPIEndpointsCompetitionsPlayerProgressionContract | null>(null)
+  const data = ref<NoCtfapiEndpointsCompetitionsPlayerProgressionContract | null>(null)
   const loading = ref(true)
   const error = ref<UiMessage | null>(null)
   const nodes = shallowRef<ReadNode[]>([])
@@ -74,26 +72,25 @@ export function useCompetitionsByIdProgressionPage() {
   async function load() {
     const generation = ++loadGeneration
     if (!data.value) loading.value = true
-    let resultError: unknown;
-    const result = await api.api.v1.competitions.byCompetitionId(competitionId).progression.get().catch(cause => { resultError = cause; return undefined });
+    const result = await getPlayerCompetitionProgression({ path: { competitionId } })
     if (generation !== loadGeneration) return
-    if (!result || resultError) {
+    if (!result.data || result.error) {
       loading.value = false
-      error.value = parseApiError(resultError, describeMessage('progression.loadFailed')).displayMessage
+      error.value = parseApiError(result.error, describeMessage('progression.loadFailed')).displayMessage
       return
     }
-    if (result.nodes?.some(node => !node.id || !node.resourceId
+    if (result.data.nodes?.some(node => !node.id || !node.resourceId
       || typeof node.requiresPrerequisites !== 'boolean'
       || (node.kind !== 0 && node.kind !== 1))
-      || result.edges?.some(edge => !edge.id || !edge.sourceNodeId || !edge.targetNodeId
+      || result.data.edges?.some(edge => !edge.id || !edge.sourceNodeId || !edge.targetNodeId
         || (edge.condition !== 0 && edge.condition !== 1))) {
       loading.value = false
       error.value = describeMessage('progression.loadFailed')
       return
     }
-    data.value = result
+    data.value = result.data
     error.value = null
-    const incomingNodes: ReadNode[] = (result.nodes ?? []).map(node => ({
+    const incomingNodes: ReadNode[] = (result.data.nodes ?? []).map(node => ({
       id: node.id!, type: 'read-progression', position: { x: 0, y: 0 },
       data: {
         title: node.title ?? '', description: node.description,
@@ -104,7 +101,7 @@ export function useCompetitionsByIdProgressionPage() {
         imageUrl: node.imageUrl,
       },
     }))
-    const incomingEdges: ReadEdge[] = (result.edges ?? []).map(edge => ({
+    const incomingEdges: ReadEdge[] = (result.data.edges ?? []).map(edge => ({
       id: edge.id!, source: edge.sourceNodeId!, target: edge.targetNodeId!,
       type: 'smoothstep',
       class: edge.condition === 1 ? 'progression-incomplete-edge' : undefined,

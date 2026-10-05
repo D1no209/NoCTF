@@ -1,7 +1,7 @@
 import { markRaw, toRefs } from 'vue'
 
 import type { GameModeValue } from '../../utils/game-config'
-import type { NoCTFAPIEndpointsAdministrationChallengeBankChallengeDefinitionContract } from '../../api/models'
+import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract } from '../../api'
 import { applyCtfInteraction, CtfInteraction } from '../../utils/game-config'
 import DefinitionCheckerSectionComponent from './DefinitionCheckerSection.vue'
 import DefinitionFlagInjectionSectionComponent from './DefinitionFlagInjectionSection.vue'
@@ -10,15 +10,15 @@ import DefinitionRuntimeSectionComponent from './DefinitionRuntimeSection.vue'
 
 /** Owns state, effects and commands for DefinitionEditor. */
 export function useDefinitionEditor(props: Readonly<Omit<{
-  modelValue: NoCTFAPIEndpointsAdministrationChallengeBankChallengeDefinitionContract
+  modelValue: NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract
   mode: GameModeValue
   disabled?: boolean
 }, "disabled"> & Required<Pick<{
-  modelValue: NoCTFAPIEndpointsAdministrationChallengeBankChallengeDefinitionContract
+  modelValue: NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract
   mode: GameModeValue
   disabled?: boolean
 }, "disabled">>>,
-emit: { (event: "update:modelValue", ...args: [definition: NoCTFAPIEndpointsAdministrationChallengeBankChallengeDefinitionContract]): void }) {
+emit: { (event: "update:modelValue", ...args: [definition: NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract]): void }) {
   const { model, parseFailed } = useDefinitionModel(
     () => props.modelValue,
     () => props.mode,

@@ -1,4 +1,3 @@
-import { createTestApi, kiotaBindings } from './support/kiota-harness'
 import { describe, expect, test } from 'bun:test'
 import { computed, effectScope, nextTick, onScopeDispose, ref, watch } from 'vue'
 import { useOffsetPagination } from '../app/composables/useOffsetPagination'
@@ -14,31 +13,18 @@ const drain = async () => { await nextTick(); await new Promise(resolve => setTi
 function harness(writable = true) {
   const calls: Array<{ operation: string; options: any }> = []
   let failing = false
-  const query = async (options: any) => { calls.push({ operation:'list', options }); return { items:[], total:0 } }
+  const query = async (options: any) => { calls.push({ operation:'list', options }); return { data: { items:[], total:0 } } }
   const mutate = (operation: string) => async (options: any) => {
     calls.push({ operation, options })
-    return failing ? Promise.reject(new ApiError('rejected')) : { id:'announcement' }
+    return failing ? { error: new ApiError('rejected') } : { data: { id:'announcement' } }
   }
-  const deps = { ...kiotaBindings(source), api: createTestApi({ 'GET /api/v1/admin/competitions/{competitionId}/announcements': query,
-'POST /api/v1/admin/competitions/{competitionId}/announcements': mutate('create'),
-'PATCH /api/v1/admin/competitions/{competitionId}/announcements/{announcementId}': mutate('edit'),
-'DELETE /api/v1/admin/competitions/{competitionId}/announcements/{announcementId}': mutate('delete') }),
-computed,
-ref,
-watch,
-onScopeDispose,
-onMounted: (callback: () => void) => callback(),
-useCompetitionAdmin: () => ({ competitionId:'competition', canJudge: ref(writable) }),
-useOffsetPagination,
-watchNotifications: () => () => {},
-createTrailingRefresh,
-translate: (key: string) => key,
-describeMessage: (key: string) => ({ key }),
-parseApiError: (value: unknown) => value instanceof ApiError ? value : new ApiError('failed'),
-adminUserPath: () => '',
-adminFormatDateTime: () => '',
-toast:{success:()=>{}},
-document:{getElementById:()=>null} }
+  const deps = { computed, ref, watch, onScopeDispose, onMounted: (callback: () => void) => callback(),
+    useCompetitionAdmin: () => ({ competitionId:'competition', canJudge: ref(writable) }), useOffsetPagination,
+    adminListCompetitionAnnouncements: query, adminCreateCompetitionAnnouncement: mutate('create'),
+    adminUpdateCompetitionAnnouncement: mutate('edit'), adminDeleteCompetitionAnnouncement: mutate('delete'),
+    watchNotifications: () => () => {}, createTrailingRefresh, translate: (key: string) => key, describeMessage: (key: string) => ({ key }),
+    parseApiError: (value: unknown) => value instanceof ApiError ? value : new ApiError('failed'),
+    adminUserPath: () => '', adminFormatDateTime: () => '', toast:{success:()=>{}}, document:{getElementById:()=>null} }
   const factory = new Function('deps', `const { ${Object.keys(deps).join(', ')} } = deps; ${compiled}; return useAdminCompetitionsByIdAnnouncementsPage;`)(deps)
   const scope = effectScope()
   const state = scope.run(() => factory())!
@@ -48,7 +34,6 @@ document:{getElementById:()=>null} }
 describe('competition notification management', () => {
   test('publishes from its own page and retains the draft on failure', async () => {
     const app = harness()
-    await drain()
     app.state.title.value=' Title '
     app.state.body.value=' Body '
     app.fail(true)
@@ -64,7 +49,6 @@ describe('competition notification management', () => {
   })
   test('edits existing content without changing its audience and withdraws after confirmation', async () => {
     const app = harness()
-    await drain()
     const target={id:'notice',state:'Published',title:'Old',body:'Original',audience:'Collaborators'}
     app.state.edit(target)
     app.state.title.value='New'
@@ -105,9 +89,9 @@ test('announcements own the composer and Runtime Flags remain inside detail shee
   expect(shell).toContain('`${base}/announcements`')
   expect(shell).not.toContain('announcementOpen')
   const notice=await sourceFile(new URL('../app/pages/admin/competitions/[id]/announcements.vue',import.meta.url)).text()
-  expect(notice).toMatch(/api\.api\.v1\.admin\.competitions\.byCompetitionId\([^)]*\)\.announcements\.get\(/)
-  expect(notice).toMatch(/api\.api\.v1\.admin\.competitions\.byCompetitionId\([^)]*\)\.announcements\.byAnnouncementId\([^)]*\)\.patch\(/)
-  expect(notice).toMatch(/api\.api\.v1\.admin\.competitions\.byCompetitionId\([^)]*\)\.announcements\.byAnnouncementId\([^)]*\)\.delete\(/)
+  expect(notice).toContain('adminListCompetitionAnnouncements')
+  expect(notice).toContain('adminUpdateCompetitionAnnouncement')
+  expect(notice).toContain('adminDeleteCompetitionAnnouncement')
   for (const path of ['../app/pages/admin/platform/runtimes.vue','../app/pages/admin/competitions/[id]/runtimes.vue']) {
     const runtime=await sourceFile(new URL(path,import.meta.url)).text()
     expect(runtime).not.toContain('openFlagQuery')

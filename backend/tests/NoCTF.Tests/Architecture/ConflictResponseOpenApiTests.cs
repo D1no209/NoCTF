@@ -98,7 +98,10 @@ public sealed class ConflictResponseOpenApiTests
     private static string OpenApiPath() => Path.Combine(
         RepositoryRoot(),
         "backend",
-        "artifacts", "openapi",
+        "src",
+        "NoCTF.API",
+        "wwwroot",
+        "openapi",
         "v1.json");
 
     private static string RepositoryRoot()

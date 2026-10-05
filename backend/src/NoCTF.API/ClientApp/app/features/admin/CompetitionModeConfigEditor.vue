@@ -2,14 +2,14 @@
 import { bindViewState } from '~/features/shared/view-state'
 
 import type { GameModeValue } from '~/utils/game-config'
-import type { NoCTFAPIEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract } from '~/api/models'
+import type { NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract } from '~/api'
 
 import { useCompetitionModeConfigEditor } from './useCompetitionModeConfigEditor'
 import View from '~/components/views/admin/CompetitionModeConfigEditorView.vue'
 
 const props = withDefaults(defineProps<{
   mode: GameModeValue
-  configuration?: NoCTFAPIEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract | null
+  configuration?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract | null
   readonly?: boolean
   loading?: boolean
   saving?: boolean
@@ -19,7 +19,7 @@ const props = withDefaults(defineProps<{
   loading: false,
   saving: false,
 })
-const emit = defineEmits<{ save: [configuration: NoCTFAPIEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract] }>()
+const emit = defineEmits<{ save: [configuration: NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract] }>()
 const state = bindViewState(useCompetitionModeConfigEditor(props, emit))
 
 </script>

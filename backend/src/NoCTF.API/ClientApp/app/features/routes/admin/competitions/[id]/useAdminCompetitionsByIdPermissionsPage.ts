@@ -1,5 +1,3 @@
-
-import { api } from '../../../../../lib/api'
 import { message as describeMessage } from '../../../../../utils/i18n'
 import type { UiMessage } from '../../../../../utils/i18n'
 import { adminUserPath } from '~/features/admin/admin-navigation'
@@ -7,17 +5,17 @@ import { proxyRefs } from 'vue'
 
 import { X } from '@lucide/vue'
 import { toast } from '../../../../../utils/message-toast'
-
-import type { NoCTFAPIEndpointsAdministrationCompetitionsCompetitionPermissionCandidateResponse, NoCTFAPIEndpointsAdministrationCompetitionsCompetitionPermissionsResponse } from '../../../../../api/models'
+import { adminGetCompetition, adminListCompetitionPermissionCandidates, adminPatchCompetition } from '../../../../../api'
+import type { NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionCandidateResponse, NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionsResponse } from '../../../../../api'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
 
 /** Owns state, effects and commands for AdminCompetitionsByIdPermissionsPage. */
 export function useAdminCompetitionsByIdPermissionsPage() {
   const { competitionId, canManagePermissions, refresh } = useCompetitionAdmin()
 
-  const permissions = ref<NoCTFAPIEndpointsAdministrationCompetitionsCompetitionPermissionsResponse | null>(null)
+  const permissions = ref<NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionsResponse | null>(null)
 
-  const candidates = ref<NoCTFAPIEndpointsAdministrationCompetitionsCompetitionPermissionCandidateResponse[]>([])
+  const candidates = ref<NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionCandidateResponse[]>([])
 
   const loading = ref(true)
 
@@ -39,24 +37,20 @@ export function useAdminCompetitionsByIdPermissionsPage() {
   async function load() {
     loading.value = true
     error.value = null
-    const settledRequests = await Promise.allSettled([
-      api.api.v1.admin.competitions.byCompetitionId(competitionId).get(),
-      api.api.v1.admin.competitions.byCompetitionId(competitionId).permissionCandidates.get(),
-    ]);
-    const perm = settledRequests[0].status === 'fulfilled' ? settledRequests[0].value : undefined;
-    const permError = settledRequests[0].status === 'rejected' ? settledRequests[0].reason : undefined;
-    const cand = settledRequests[1].status === 'fulfilled' ? settledRequests[1].value : undefined;
-
-    if (permError) {
-      error.value = parseApiError(permError).displayMessage
+    const [perm, cand] = await Promise.all([
+      adminGetCompetition({ path: { competitionId } }),
+      adminListCompetitionPermissionCandidates({ path: { competitionId } }),
+    ])
+    if (perm.error) {
+      error.value = parseApiError(perm.error).displayMessage
       loading.value = false
       return
     }
-    permissions.value = perm?.permissions ?? null
-    candidates.value = cand?.items ?? []
-    managerIds.value = [...(perm?.permissions?.managerIds ?? [])]
-    judgeIds.value = [...(perm?.permissions?.judgeIds ?? [])]
-    observerIds.value = [...(perm?.permissions?.observerIds ?? [])]
+    permissions.value = perm.data?.permissions ?? null
+    candidates.value = cand.data?.items ?? []
+    managerIds.value = [...(perm.data?.permissions?.managerIds ?? [])]
+    judgeIds.value = [...(perm.data?.permissions?.judgeIds ?? [])]
+    observerIds.value = [...(perm.data?.permissions?.observerIds ?? [])]
     loading.value = false
   }
 
@@ -69,12 +63,12 @@ export function useAdminCompetitionsByIdPermissionsPage() {
     return list.filter(c => c.userName?.toLowerCase().includes(q)).slice(0, 20)
   })
 
-  function assigned(id?: string | null): boolean {
+  function assigned(id?: string): boolean {
     if (!id) return true
     return managerIds.value.includes(id) || judgeIds.value.includes(id) || observerIds.value.includes(id)
   }
 
-  function add(role: 'manager' | 'judge' | 'observer', id?: string | null) {
+  function add(role: 'manager' | 'judge' | 'observer', id?: string) {
     if (!id || assigned(id)) return
     if (role === 'manager') managerIds.value.push(id)
     else if (role === 'judge') judgeIds.value.push(id)
@@ -92,14 +86,18 @@ export function useAdminCompetitionsByIdPermissionsPage() {
     if (!permissions.value) return
     saving.value = true
     try {
-      const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).patch({
+      const { data, error } = await adminPatchCompetition({
+        path: { competitionId },
+        body: {
           permissions: {
             ownerId: permissions.value.ownerId!,
             managerIds: managerIds.value,
             judgeIds: judgeIds.value,
             observerIds: observerIds.value,
           },
-        });
+        },
+      })
+      if (error) throw error
       permissions.value = data?.permissions ?? permissions.value
       toast.success(describeMessage("administration.label.permissionsSaved"))
     }
@@ -123,14 +121,18 @@ export function useAdminCompetitionsByIdPermissionsPage() {
     try {
       const nextManagers = new Set(managerIds.value)
       nextManagers.add(permissions.value!.ownerId!)
-      await api.api.v1.admin.competitions.byCompetitionId(competitionId).patch({
+      const { error } = await adminPatchCompetition({
+        path: { competitionId },
+        body: {
           permissions: {
             ownerId: transferTarget.value,
             managerIds: [...nextManagers],
             judgeIds: judgeIds.value,
             observerIds: observerIds.value,
           },
-        });
+        },
+      })
+      if (error) throw error
       toast.success(describeMessage("administration.label.ownershipTransferred"))
       transferConfirm.value = false
       await Promise.all([load(), refresh()])

@@ -105,7 +105,7 @@ public sealed class PatchPlatformUserEndpoint(
         AuthSchemes("Bearer");
         Roles("Administrator");
         Description(builder => builder.WithName("AdminPlatformPatchUser"));
-        Summary(summary => { summary.Summary = "Updates selected platform-user administration fields."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Updates selected platform-user administration fields.");
     }
 
     public override async Task<Results<Ok<PlatformUserDetailResponse>, NotFound,

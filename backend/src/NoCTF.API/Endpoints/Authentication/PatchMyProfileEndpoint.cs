@@ -210,7 +210,7 @@ public sealed class PatchMyProfileEndpoint(
         Description(builder => builder
             .WithName("Authentication_PatchMyProfile")
             .ProducesProblemFE(StatusCodes.Status400BadRequest));
-        Summary(summary => { summary.Summary = "Updates selected current-user profile sections."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Updates selected current-user profile sections.");
     }
 
     public override async Task<Results<Ok<CurrentUserProfileResponse>, NotFound,

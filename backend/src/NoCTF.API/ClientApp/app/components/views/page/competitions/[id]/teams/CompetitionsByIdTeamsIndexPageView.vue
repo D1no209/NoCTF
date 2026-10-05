@@ -13,7 +13,7 @@ const { competitionId, teams, loading, error, teamDisplayNames, initialized, pag
     </Alert>
 
     <div v-if="loading" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <Skeleton v-for="i in 6" :key="i ?? undefined" class="h-24 w-full" />
+      <Skeleton v-for="i in 6" :key="i" class="h-24 w-full" />
     </div>
 
     <Empty v-else-if="!error && !teams.length" class="border py-12">
@@ -26,7 +26,7 @@ const { competitionId, teams, loading, error, teamDisplayNames, initialized, pag
     <div v-else-if="teams.length" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <NuxtLink
         v-for="team in teams"
-        :key="team.id ?? undefined"
+        :key="team.id"
         :to="`/competitions/${competitionId}/teams/${team.id}`"
         prefetch-on="interaction"
       >

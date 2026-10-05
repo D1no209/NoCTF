@@ -32,7 +32,7 @@ const { adminUserPath, adminTeamPath, adminChallengePath, competitionId, preview
         <Alert v-if="previewError" variant="destructive"><AlertDescription>{{ $message(previewError) }}</AlertDescription></Alert>
         <Skeleton v-else-if="previewLoading && !previewInitialized" class="h-24 w-full" />
         <Empty v-else-if="previewInitialized && !previewLoading && previewItems.length === 0">{{ $t('administration.competitionsBy.description.adjudicationBloodAwardDifferences') }}</Empty>
-        <div v-for="item in previewItems" :key="item.gameplayFactId ?? undefined" class="flex flex-col gap-3 py-4">
+        <div v-for="item in previewItems" :key="item.gameplayFactId" class="flex flex-col gap-3 py-4">
           <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p class="font-medium">{{ item.challengeTitle }} · {{ item.teamName ?? '—' }}</p>
@@ -48,7 +48,7 @@ const { adminUserPath, adminTeamPath, adminChallengePath, competitionId, preview
           </div>
           <FieldDescription>{{ adjudicationCompletenessLabel(item.evidenceCompleteness) }} · {{ $t('adjudication.changes') }} {{ item.resultChangeCount ?? '—' }}</FieldDescription>
           <ul class="flex list-disc flex-col gap-2 pl-5 text-sm">
-            <li v-for="difference in item.differences" :key="([difference.kind, difference.classification, difference.severity].join(':')) ?? undefined">
+            <li v-for="difference in item.differences" :key="[difference.kind, difference.classification, difference.severity].join(':')">
               <span>{{ adjudicationClassificationLabel(difference.classification) }}</span>
               <p class="text-muted-foreground">{{ translate(differenceLabels[difference.kind!]) }}</p>
             </li>
@@ -82,7 +82,7 @@ const { adminUserPath, adminTeamPath, adminChallengePath, competitionId, preview
             <TableHead>{{ $t('adjudication.eventState') }}</TableHead><TableHead>{{ $t('adjudication.eventResult') }}</TableHead>
             <TableHead>{{ $t('adjudication.eventIdentity') }}</TableHead><TableHead>{{ $t('adjudication.parentEvent') }}</TableHead>
           </TableRow></TableHeader>
-          <TableBody><TableRow v-for="event in evidenceRows" :key="event.eventId ?? undefined">
+          <TableBody><TableRow v-for="event in evidenceRows" :key="event.eventId">
             <TableCell>{{ adminFormatDateTime(event.occurredAt) }}</TableCell><TableCell>{{ adjudicationEventLabel(event.kind) }}</TableCell>
             <TableCell>{{ event.state ? enumLabel(GameplayFactStateLabel, event.state) : '—' }}</TableCell>
             <TableCell>{{ event.result ? enumLabel(GameplayFactResultLabel, event.result) : '—' }}</TableCell>
@@ -94,7 +94,7 @@ const { adminUserPath, adminTeamPath, adminChallengePath, competitionId, preview
         </Button>
         <template v-if="evidenceTarget?.eligibilityEvents?.length">
           <Separator /><p>{{ $t('adjudication.adjustments') }}</p>
-          <ul class="flex flex-col gap-2 text-sm"><li v-for="event in evidenceTarget.eligibilityEvents" :key="event.eventId ?? undefined">
+          <ul class="flex flex-col gap-2 text-sm"><li v-for="event in evidenceTarget.eligibilityEvents" :key="event.eventId">
             {{ adjudicationEventLabel(event.kind) }} · {{ adminFormatDateTime(event.occurredAt) }}
             <p class="break-all font-mono text-xs text-muted-foreground">{{ event.eventId }}</p>
           </li></ul>
@@ -111,7 +111,7 @@ const { adminUserPath, adminTeamPath, adminChallengePath, competitionId, preview
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem v-for="c in challengeOptions" :key="c.id ?? undefined" :value="c.id">{{ c.title }}</SelectItem>
+                <SelectItem v-for="c in challengeOptions" :key="c.id" :value="c.id">{{ c.title }}</SelectItem>
               </SelectGroup>
             </SelectContent>
           </Select>
@@ -121,7 +121,7 @@ const { adminUserPath, adminTeamPath, adminChallengePath, competitionId, preview
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem v-for="t in teamOptions" :key="t.id ?? undefined" :value="t.id">{{ t.name }}</SelectItem>
+                <SelectItem v-for="t in teamOptions" :key="t.id" :value="t.id">{{ t.name }}</SelectItem>
               </SelectGroup>
             </SelectContent>
           </Select>
@@ -131,7 +131,7 @@ const { adminUserPath, adminTeamPath, adminChallengePath, competitionId, preview
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem v-for="option in gameplayFactKindOptions" :key="option.value ?? undefined" :value="option.value">
+                <SelectItem v-for="option in gameplayFactKindOptions" :key="option.value" :value="option.value">
                   {{ option.label }}
                 </SelectItem>
               </SelectGroup>
@@ -143,7 +143,7 @@ const { adminUserPath, adminTeamPath, adminChallengePath, competitionId, preview
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem v-for="option in gameplayFactStateOptions" :key="option.value ?? undefined" :value="option.value">
+                <SelectItem v-for="option in gameplayFactStateOptions" :key="option.value" :value="option.value">
                   {{ translate(option.label) }}
                 </SelectItem>
               </SelectGroup>
@@ -155,7 +155,7 @@ const { adminUserPath, adminTeamPath, adminChallengePath, competitionId, preview
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem v-for="option in gameplayFactResultOptions" :key="option.value ?? undefined" :value="option.value">
+                <SelectItem v-for="option in gameplayFactResultOptions" :key="option.value" :value="option.value">
                   {{ translate(option.label) }}
                 </SelectItem>
               </SelectGroup>
@@ -178,7 +178,7 @@ const { adminUserPath, adminTeamPath, adminChallengePath, competitionId, preview
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  <SelectItem v-for="c in challengeOptions" :key="c.id ?? undefined" :value="c.id">{{ c.title }}</SelectItem>
+                  <SelectItem v-for="c in challengeOptions" :key="c.id" :value="c.id">{{ c.title }}</SelectItem>
                 </SelectGroup>
               </SelectContent>
             </Select>
@@ -214,7 +214,7 @@ const { adminUserPath, adminTeamPath, adminChallengePath, competitionId, preview
           </TableRow>
         </TableHeader>
         <TableBody>
-          <TableRow v-for="s in items" :key="s.id ?? undefined">
+          <TableRow v-for="s in items" :key="s.id">
             <TableCell class="font-medium"><NuxtLink v-if="s.teamId" :to="adminTeamPath(competitionId, s.teamId)" class="hover:underline">{{ teamName(s.teamId) }}</NuxtLink><span v-else>{{ teamName(s.teamId) }}</span></TableCell>
             <TableCell><NuxtLink v-if="s.competitionChallengeId" :to="adminChallengePath(competitionId, s.competitionChallengeId)" class="hover:underline">{{ challengeTitle(s.competitionChallengeId) }}</NuxtLink><span v-else>{{ challengeTitle(s.competitionChallengeId) }}</span></TableCell>
             <TableCell>{{ enumLabel(GameplayFactKindLabel, s.kind) }}</TableCell>

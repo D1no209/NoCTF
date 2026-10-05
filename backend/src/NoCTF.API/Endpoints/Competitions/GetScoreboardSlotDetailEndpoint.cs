@@ -69,7 +69,7 @@ public sealed class GetScoreboardSlotDetailEndpoint(
     {
         Get("/competitions/{competitionId}/leaderboard/teams/{teamId}/columns/{columnIndex}");
         AllowAnonymous();
-        Summary(summary => { summary.Summary = "Get one sparse scoreboard slot with signed cursor pagination."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Get one sparse scoreboard slot with signed cursor pagination.");
     }
 
     public override async Task<Results<Ok<ScoreboardSlotDetailResponse>, Accepted<LeaderboardProcessingProtocolResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(

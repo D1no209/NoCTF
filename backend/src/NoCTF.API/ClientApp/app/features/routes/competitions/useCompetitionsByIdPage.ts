@@ -1,16 +1,10 @@
-import { ProjectionResponseOption } from '../../../lib/api'
-import { createNoCTFAPIEndpointsCompetitionsScoreboardSnapshotResponseFromDiscriminatorValue } from '../../../api/models'
-
-import { ResponseMetadata, RequestPolicyOption } from '../../../lib/api'
-
-import { api } from '../../../lib/api'
 import { message as describeMessage } from '../../../utils/i18n'
 import type { UiMessage } from '../../../utils/i18n'
 import { markRaw } from 'vue'
 
 import { ClipboardCheck, FileText, GitBranch, LayoutDashboard, MessageCircleQuestion, Puzzle, Trophy, UserRound } from '@lucide/vue'
-
-import type { NoCTFAPIEndpointsCompetitionsCompetitionResponse, NoCTFAPIEndpointsCompetitionsScoreboardTeamResponse, NoCTFAPIEndpointsTeamsTeamResponse } from '../../../api/models'
+import { getCompetitionEndpoint, getLeaderboardEndpoint, getMyTeamEndpoint, getPlayerCompetitionProgression } from '../../../api'
+import type { NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsCompetitionsScoreboardTeamResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../api'
 import { competitionWorkspaceNavigationKey } from '../../app/workspace-nav'
 import type { WorkspaceNavGroup } from '../../app/workspace-nav'
 import { createTrailingRefresh } from '../../../lib/latest-page-refresh'
@@ -41,11 +35,11 @@ export function useCompetitionsByIdPage() {
     route.path === `/competitions/${competitionId.value}/progression`,
   )
 
-  const competition = ref<NoCTFAPIEndpointsCompetitionsCompetitionResponse | null>(null)
+  const competition = ref<NoCtfapiEndpointsCompetitionsCompetitionResponse | null>(null)
 
-  const myTeam = ref<NoCTFAPIEndpointsTeamsTeamResponse | null>(null)
+  const myTeam = ref<NoCtfapiEndpointsTeamsTeamResponse | null>(null)
 
-  const myStanding = ref<NoCTFAPIEndpointsCompetitionsScoreboardTeamResponse | null>(null)
+  const myStanding = ref<NoCtfapiEndpointsCompetitionsScoreboardTeamResponse | null>(null)
 
   const standingLoading = ref(false)
 
@@ -78,7 +72,9 @@ export function useCompetitionsByIdPage() {
       progressionEnabled.value = false
       return
     }
-    const data = await api.api.v1.competitions.byCompetitionId(competitionId.value).progression.get();
+    const { data } = await getPlayerCompetitionProgression({
+      path: { competitionId: competitionId.value },
+    })
     if (requestId === progressionRequestId)
       progressionEnabled.value = data?.enabled === true
   }
@@ -95,9 +91,9 @@ export function useCompetitionsByIdPage() {
       standingError.value = null
       return
     }
-    let teamError: unknown;
-    const response = new ResponseMetadata();
-    const data = await api.api.v1.competitions.byCompetitionId(competitionId.value).teams.me.get({ options: [new RequestPolicyOption({ response: response })] }).catch(cause => { teamError = cause; return undefined });
+    const { data, error: teamError, response } = await getMyTeamEndpoint({
+      path: { competitionId: competitionId.value },
+    })
     if (response?.status === 404) {
       myTeam.value = null
       teamLoadError.value = null
@@ -121,9 +117,10 @@ export function useCompetitionsByIdPage() {
       return
     }
     standingLoading.value = myStanding.value === null
-    let requestError: unknown;
-    const response = new ResponseMetadata();
-    const data = await api.api.v1.competitions.byCompetitionId(competitionId.value).leaderboard.get({ queryParameters: { endingRound: undefined } , options: [new RequestPolicyOption({ response: response }), new ProjectionResponseOption(createNoCTFAPIEndpointsCompetitionsScoreboardSnapshotResponseFromDiscriminatorValue)] }).catch(cause => { requestError = cause; return undefined });
+    const { data, error: requestError, response } = await getLeaderboardEndpoint({
+      path: { competitionId: competitionId.value },
+      query: { endingRound: null },
+    })
     standingLoading.value = false
     if (response?.status === 404) {
       myStanding.value = null
@@ -141,9 +138,9 @@ export function useCompetitionsByIdPage() {
   const refreshStandingLatest = createTrailingRefresh(refreshMyStanding)
 
   async function refresh(): Promise<'loaded' | 'not-found' | 'failed'> {
-    let err: unknown;
-    const response = new ResponseMetadata();
-    const data = await api.api.v1.competitions.byCompetitionId(competitionId.value).get({ options: [new RequestPolicyOption({ response: response })] }).catch(cause => { err = cause; return undefined });
+    const { data, error: err, response } = await getCompetitionEndpoint({
+      path: { competitionId: competitionId.value },
+    })
     loading.value = false
     if (err || !data) {
       error.value = parseApiError(err, describeMessage("common.error.loadingCompetitionFailed")).displayMessage

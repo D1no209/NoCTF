@@ -8,7 +8,7 @@ public class AdminOpenApiRulesTests
     public async Task Patch_download_contract_declares_binary_bytes_and_authenticated_error_responses()
     {
         using var swagger = JsonDocument.Parse(await File.ReadAllTextAsync(
-            Path.Combine(FindBackendRoot(), "artifacts", "openapi", "v1.json")));
+            Path.Combine(FindBackendRoot(), "artifacts", "openapi", "swagger.json")));
         var operation = swagger.RootElement.GetProperty("paths")
             .GetProperty("/api/v1/admin/competitions/{competitionId}/gameplay-facts/{gameplayFactId}/patch").GetProperty("get");
         var responses = operation.GetProperty("responses");
@@ -25,7 +25,7 @@ public class AdminOpenApiRulesTests
     {
         var backend = FindBackendRoot();
         using var swagger = JsonDocument.Parse(await File.ReadAllTextAsync(
-            Path.Combine(backend, "artifacts", "openapi", "v1.json")));
+            Path.Combine(backend, "artifacts", "openapi", "swagger.json")));
 
         var operations = swagger.RootElement.GetProperty("paths")
             .EnumerateObject()
@@ -87,7 +87,7 @@ public class AdminOpenApiRulesTests
     {
         var backend = FindBackendRoot();
         using var swagger = JsonDocument.Parse(await File.ReadAllTextAsync(
-            Path.Combine(backend, "artifacts", "openapi", "v1.json")));
+            Path.Combine(backend, "artifacts", "openapi", "swagger.json")));
         var schemas = swagger.RootElement
             .GetProperty("components")
             .GetProperty("schemas");

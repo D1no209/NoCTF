@@ -28,10 +28,6 @@ public enum AwdpBreakFlagJudgementFailureCodeProtocol
 
 public sealed class JudgeAwdpBreakFlagRequest
 {
-    /// <summary>One-time verification token; optional when platform policy disables verification. Maximum 4096 characters.</summary>
-    [FromHeader("X-NoCTF-Human-Verification", IsRequired = false, RemoveFromSchema = true)]
-    public string? HumanVerificationToken { get; set; }
-
     public string Flag { get; set; } = string.Empty;
 }
 
@@ -62,10 +58,6 @@ public sealed class JudgeAwdpBreakFlagEndpoint(
 {
     public override void Configure()
     {
-        Description(builder => builder
-            .ProducesProblem(StatusCodes.Status403Forbidden)
-            .ProducesProblem(StatusCodes.Status503ServiceUnavailable));
-
         Post("/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-break-flag-judgement");
         AuthSchemes("Bearer");
         Options(options => options.WithMetadata(
@@ -75,7 +67,6 @@ public sealed class JudgeAwdpBreakFlagEndpoint(
         Description(builder => builder.WithName("JudgeAwdpBreakFlag"));
         Summary(summary =>
         {
-            summary.Params["X-NoCTF-Human-Verification"] = "One-time verification token, at most 4096 characters. Required only when the configured platform policy enables verification for this operation.";
             summary.Summary = "Checks an AWDP Break Flag after the attack achievement succeeded.";
             summary.Description =
                 "Returns only correctness. It never creates GameplayFact, score, event, notification, cheat incident or Runtime changes.";

@@ -1,7 +1,10 @@
-import type { NoCTFAPIEndpointsAdministrationPlatformPlatformAuditLogResponse, NoCTFAPIEndpointsCompetitionsEventsCompetitionEventKindProtocol } from '../api/models'
+import type {
+  NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse,
+  NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol,
+} from '../api'
 import { translate } from './i18n'
 
-type AuditLog = NoCTFAPIEndpointsAdministrationPlatformPlatformAuditLogResponse
+type AuditLog = NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse
 
 const COMPETITION_STATUS_LABELS: Record<string, string> = {
   Draft: "common.label.draft",
@@ -37,7 +40,7 @@ const LIFECYCLE_REASON_LABELS: Record<string, string> = {
   manual_finish: "common.label.finishCompetition",
 }
 
-const EVENT_ACTION_LABELS: Partial<Record<NoCTFAPIEndpointsCompetitionsEventsCompetitionEventKindProtocol, string>> = {
+const EVENT_ACTION_LABELS: Partial<Record<NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol, string>> = {
   CompetitionCreated: "competitions.label.createContest",
   CompetitionUpdated: "common.label.updateCompetition",
   CompetitionDeleted: "administration.label.deleteContest",

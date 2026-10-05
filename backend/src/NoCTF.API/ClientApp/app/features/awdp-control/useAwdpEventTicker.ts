@@ -133,7 +133,7 @@ export function useAwdpEventTicker(props: Readonly<{ events: readonly AwdpResolv
     return `${event.teamName} · ${event.challengeTitle} · ${action}${outcome}`
   }
 
-  function eventTime(value: Date | string): string {
+  function eventTime(value: string): string {
     const date = new Date(value)
     return Number.isNaN(date.getTime()) ? '—' : date.toLocaleTimeString(undefined, { hour12: false })
   }

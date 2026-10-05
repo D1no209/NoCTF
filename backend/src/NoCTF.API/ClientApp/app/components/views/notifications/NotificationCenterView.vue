@@ -111,7 +111,7 @@ const { ArrowRight, Bell, Mail, selected, selectedId, thread, threadLoading, thr
                     </Alert>
                     <p v-else-if="thread.length <= 1" class="text-sm text-muted-foreground">{{ $t('notifications.notificationCenter.description.thereFollowReplyStatus') }}</p>
                     <ol v-else class="flex flex-col gap-4">
-                      <li v-for="entry in thread" :key="entry.id ?? undefined" class="grid grid-cols-[0.5rem_1fr] gap-3">
+                      <li v-for="entry in thread" :key="entry.id" class="grid grid-cols-[0.5rem_1fr] gap-3">
                         <span class="mt-1.5 size-2 rounded-full bg-primary" aria-hidden="true" />
                         <div class="min-w-0">
                           <div class="flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-xs tabular-nums text-muted-foreground">

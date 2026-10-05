@@ -93,7 +93,7 @@ const {
                     {{ $t('progression.noPrerequisites') }}
                   </p>
                   <ul v-else class="flex flex-col gap-2">
-                    <li v-for="requirement in selectedRequirements" :key="requirement.id ?? undefined"
+                    <li v-for="requirement in selectedRequirements" :key="requirement.id"
                       class="flex flex-wrap items-center justify-between gap-2 text-sm">
                       <span class="min-w-0 break-words">{{ requirement.title }}</span>
                       <Badge :variant="requirement.satisfied ? 'default' : 'secondary'">
@@ -127,12 +127,12 @@ const {
             <SheetDescription>{{ $t('progression.badgeCount', { count: data.badges?.length ?? 0 }) }}</SheetDescription>
           </SheetHeader>
           <div v-if="data.badges?.length" class="flex flex-col gap-2 px-4 pb-6">
-            <div v-for="badge in data.badges" :key="badge.id ?? undefined" class="flex flex-col">
+            <div v-for="badge in data.badges" :key="badge.id" class="flex flex-col">
               <Button type="button" variant="ghost" class="h-auto w-full justify-start gap-3 p-2 text-left whitespace-normal"
                 :aria-expanded="selectedBadgeId === badge.id"
                 :aria-controls="`progression-badge-details-${badge.id}`"
                 @click="toggleBadgeDetails(badge.id!)">
-                <img :src="badge.imageUrl ?? undefined" alt="" class="size-12 shrink-0 rounded-lg object-cover" />
+                <img :src="badge.imageUrl" alt="" class="size-12 shrink-0 rounded-lg object-cover" />
                 <span class="min-w-0 break-words font-medium">{{ badge.name }}</span>
               </Button>
               <div v-show="selectedBadgeId === badge.id" :id="`progression-badge-details-${badge.id}`"

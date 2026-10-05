@@ -1,5 +1,10 @@
-import { dateTimestamp } from './date-value'
-import type { NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse, NoCTFAPIEndpointsCompetitionsScoreboardChallengeCatalogResponse, NoCTFAPIEndpointsCompetitionsScoreboardSchemaResponse, NoCTFAPIEndpointsCompetitionsScoreboardSnapshotResponse, NoCTFAPIEndpointsCompetitionsScoreboardTeamResponse } from '../api/models'
+import type {
+  NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
+} from '../api'
 import { scoreboardBreakdown } from './scoreboard'
 import { directionLabel } from './directions'
 
@@ -14,7 +19,7 @@ export interface AwdpControlEvent {
   teamName: string
   competitionChallengeId: string
   challengeTitle: string
-  occurredAt: Date | string
+  occurredAt: string
   gameplayFactId: string | null
 }
 
@@ -53,7 +58,7 @@ export interface AwdpTeamChallengeState {
   defenseOutcome: AwdpControlOutcome | 'idle'
 }
 
-export interface AwdpRankedEntry extends NoCTFAPIEndpointsCompetitionsScoreboardTeamResponse {
+export interface AwdpRankedEntry extends NoCtfapiEndpointsCompetitionsScoreboardTeamResponse {
   rank: number | null
   attackScore: number
   defenseScore: number
@@ -75,7 +80,7 @@ export const awdpControlEventKinds = [
 ] as const
 
 export function normalizeAwdpControlEvent(
-  event: NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse,
+  event: NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse,
 ): AwdpControlEvent | null {
   if (!event.kind || !AWDP_EVENT_KINDS.has(event.kind)) return null
   if (!event.id || !event.occurredAt || !event.teamId || !event.competitionChallengeId) return null
@@ -102,12 +107,12 @@ export function normalizeAwdpControlEvent(
 }
 
 export function awdpControlEvents(
-  events: readonly NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse[],
+  events: readonly NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse[],
 ): AwdpControlEvent[] {
   return events
     .map(normalizeAwdpControlEvent)
     .filter((event): event is AwdpControlEvent => event !== null)
-    .sort((left, right) => (dateTimestamp(left.occurredAt) - dateTimestamp(right.occurredAt)) || left.id.localeCompare(right.id))
+    .sort((left, right) => left.occurredAt.localeCompare(right.occurredAt) || left.id.localeCompare(right.id))
 }
 
 export function reconcileAwdpControlEvents(
@@ -146,8 +151,8 @@ export function awdpOperationMetrics(events: readonly AwdpControlEvent[]): AwdpO
 
 export function awdpCurrentRoundEvents(
   events: readonly AwdpControlEvent[],
-  snapshot: NoCTFAPIEndpointsCompetitionsScoreboardSnapshotResponse | null,
-  schema: NoCTFAPIEndpointsCompetitionsScoreboardSchemaResponse | null,
+  snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse | null,
+  schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse | null,
 ): AwdpControlEvent[] {
   const round = (schema?.rounds ?? []).find(item => item.id === snapshot?.currentRoundId)
   const startAt = round?.startAt ? new Date(round.startAt).getTime() : Number.NaN
@@ -160,12 +165,12 @@ export function awdpCurrentRoundEvents(
 }
 
 export function awdpCurrentRoundOperationMetrics(
-  snapshot: NoCTFAPIEndpointsCompetitionsScoreboardSnapshotResponse | null,
-  schema: NoCTFAPIEndpointsCompetitionsScoreboardSchemaResponse | null,
-  teamId?: string | null,
+  snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse | null,
+  schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse | null,
+  teamId?: string,
 ): AwdpOperationMetrics {
   const columnIndexes = new Set((schema?.columns ?? [])
-    .filter(column => column.roundId === snapshot?.currentRoundId && column.index != null)
+    .filter(column => column.roundId === snapshot?.currentRoundId && column.index !== undefined)
     .map(column => column.index!))
   const metrics: AwdpOperationMetrics = {
     attack: { success: 0, total: 0 },
@@ -175,7 +180,7 @@ export function awdpCurrentRoundOperationMetrics(
   const teams = awdpPublicEntries(snapshot).filter(entry => !teamId || entry.teamId === teamId)
   for (const entry of teams) {
     for (const slot of entry.slots ?? []) {
-      if (slot.columnIndex == null || !columnIndexes.has(slot.columnIndex)) continue
+      if (slot.columnIndex === undefined || !columnIndexes.has(slot.columnIndex)) continue
       const attack = scoreboardBreakdown(slot, 'Attack')
       const defense = scoreboardBreakdown(slot, 'Defense')
       metrics.attack.success += attack?.successfulCount ?? 0
@@ -188,8 +193,8 @@ export function awdpCurrentRoundOperationMetrics(
 }
 
 export function awdpRoundClock(
-  snapshot: NoCTFAPIEndpointsCompetitionsScoreboardSnapshotResponse | null,
-  schema: NoCTFAPIEndpointsCompetitionsScoreboardSchemaResponse | null,
+  snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse | null,
+  schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse | null,
   now: number,
   advances: boolean,
 ): AwdpRoundClock {
@@ -210,8 +215,8 @@ export function awdpRoundClock(
 }
 
 export function awdpPublicEntries(
-  snapshot: NoCTFAPIEndpointsCompetitionsScoreboardSnapshotResponse | null,
-): NoCTFAPIEndpointsCompetitionsScoreboardTeamResponse[] {
+  snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse | null,
+): NoCtfapiEndpointsCompetitionsScoreboardTeamResponse[] {
   const publicTrackKeys = new Set(
     (snapshot?.tracks ?? [])
       .filter(track => track.isInternal !== true)
@@ -223,7 +228,7 @@ export function awdpPublicEntries(
 }
 
 export function awdpRankedEntries(
-  snapshot: NoCTFAPIEndpointsCompetitionsScoreboardSnapshotResponse | null,
+  snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse | null,
   previousRanks: ReadonlyMap<string, number> = new Map(),
 ): AwdpRankedEntry[] {
   return awdpPublicEntries(snapshot)
@@ -259,8 +264,8 @@ function latestOutcome(
 }
 
 export function awdpTeamChallengeStates(
-  catalog: NoCTFAPIEndpointsCompetitionsScoreboardChallengeCatalogResponse | null,
-  entry: NoCTFAPIEndpointsCompetitionsScoreboardTeamResponse | null,
+  catalog: NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse | null,
+  entry: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse | null,
   events: readonly AwdpControlEvent[],
 ): AwdpTeamChallengeState[] {
   if (!entry?.teamId) return []

@@ -10,10 +10,6 @@ namespace NoCTF.API.Endpoints.Runtime;
 
 public sealed class CreateRuntimeRequest
 {
-    /// <summary>One-time verification token; optional when platform policy disables verification. Maximum 4096 characters.</summary>
-    [FromHeader("X-NoCTF-Human-Verification", IsRequired = false, RemoveFromSchema = true)]
-    public string? HumanVerificationToken { get; set; }
-
     public Guid? ReplacesRuntimeId { get; set; }
 }
 
@@ -27,10 +23,6 @@ public sealed class CreateRuntimeEndpoint(
 {
     public override void Configure()
     {
-        Description(builder => builder
-            .ProducesProblem(StatusCodes.Status403Forbidden)
-            .ProducesProblem(StatusCodes.Status503ServiceUnavailable));
-
         Post("/competitions/{competitionId}/challenges/{competitionChallengeId}/runtimes");
         AuthSchemes("Bearer");
         Options(builder => builder
@@ -44,7 +36,6 @@ public sealed class CreateRuntimeEndpoint(
                 StatusCodes.Status503ServiceUnavailable));
         Summary(summary =>
         {
-            summary.Params["X-NoCTF-Human-Verification"] = "One-time verification token, at most 4096 characters. Required only when the configured platform policy enables verification for this operation.";
             summary.Summary = "Creates or atomically replaces the current team runtime.";
             summary.Description =
                 "ReplacesRuntimeId must identify the current runtime when a replacement is requested.";

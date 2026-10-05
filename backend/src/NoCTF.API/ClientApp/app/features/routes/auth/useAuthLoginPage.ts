@@ -1,12 +1,10 @@
-
-import { api } from '../../../lib/api'
 import { message as describeMessage } from '../../../utils/i18n'
 import type { UiMessage } from '../../../utils/i18n'
 import { toast } from '../../../utils/message-toast'
 import { useHumanVerification } from '~/features/security/useHumanVerification'
 import { useAuthThemeArtwork } from './useAuthThemeArtwork'
-
-import type { NoCTFAPIEndpointsAuthenticationPublicSsoProviderResponse } from '~/api/models'
+import { authenticationSsoBeginLogin, authenticationSsoListProviders } from '~/api'
+import type { NoCtfapiEndpointsAuthenticationPublicSsoProviderResponse } from '~/api'
 
 /** Owns the standalone login page workflow. */
 export function useAuthLoginPage() {
@@ -52,13 +50,13 @@ export function useAuthLoginPage() {
   })
   const capCanRetry = computed(() => capVerification.value?.state === 'error')
   const submitDisabled = computed(() => pending.value && !capCanRetry.value)
-  const ssoProviders = ref<NoCTFAPIEndpointsAuthenticationPublicSsoProviderResponse[]>([])
+  const ssoProviders = ref<NoCtfapiEndpointsAuthenticationPublicSsoProviderResponse[]>([])
   const ssoLoading = ref(true)
   const ssoPendingId = ref<string | null>(null)
 
   async function loadSsoProviders() {
     ssoLoading.value = true
-    const data = await api.api.v1.auth.sso.providers.get();
+    const { data } = await authenticationSsoListProviders()
     ssoProviders.value = data?.items ?? []
     ssoLoading.value = false
   }
@@ -72,8 +70,9 @@ export function useAuthLoginPage() {
       ? candidate
       : '/'
     try {
-      let requestError: unknown;
-      const data = await api.api.v1.auth.sso.login.flows.post({ providerId, returnPath }).catch(cause => { requestError = cause; return undefined });
+      const { data, error: requestError } = await authenticationSsoBeginLogin({
+        body: { providerId, returnPath },
+      })
       if (requestError || !data?.authorizationUrl) throw requestError
       window.location.assign(data.authorizationUrl)
     }

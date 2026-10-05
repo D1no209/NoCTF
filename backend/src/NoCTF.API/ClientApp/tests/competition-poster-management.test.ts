@@ -26,8 +26,8 @@ test('competition administration previews replaces and removes the current poste
   const view = await sourceFile('app/components/views/page/admin/competitions/[id]/AdminCompetitionsByIdIndexPageView.vue').text()
   const mock = await sourceFile('mock/api.ts').text()
 
-  expect(controller).toMatch(/api\.api\.v1\.admin\.competitions\.byCompetitionId\([^)]*\)\.poster\.put\(/)
-  expect(controller).toMatch(/api\.api\.v1\.admin\.competitions\.byCompetitionId\([^)]*\)\.poster\.delete\(/)
+  expect(controller).toContain('adminCompetitionPosterReplace')
+  expect(controller).toContain('adminCompetitionPosterClear')
   expect(controller).toContain('await refreshPoster()')
   expect(view).toContain(':src="posterUrl"')
   expect(view).toContain('@change="selectPoster"')

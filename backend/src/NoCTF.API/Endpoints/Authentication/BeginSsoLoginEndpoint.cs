@@ -65,7 +65,7 @@ public sealed class BeginSsoLoginEndpoint(
         Options(options => options.WithMetadata(
             new ProtectedEntryMetadata(ProtectedEntry.SsoAuthentication)));
         Description(builder => builder.WithName("Authentication_SsoBeginLogin"));
-        Summary(summary => { summary.Summary = "Starts a browser-bound SSO login flow."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Starts a browser-bound SSO login flow.");
     }
 
     public override async Task<Results<Ok<BeginSsoLoginResponse>, ProblemHttpResult>> ExecuteAsync(

@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { bindViewState } from '~/features/shared/view-state'
 import type { GameModeValue } from '~/utils/game-config'
-import type { NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeRulesContract, NoCTFAPIEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract } from '~/api/models'
+import type { NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract, NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract } from '~/api'
 
 import { useChallengeRulesEditor } from './useChallengeRulesEditor'
 import View from '~/components/views/admin/ChallengeRulesEditorView.vue'
 
 const props = withDefaults(defineProps<{
   mode: GameModeValue
-  rules?: NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeRulesContract | null
-  inheritedConfiguration?: NoCTFAPIEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract | null
+  rules?: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract | null
+  inheritedConfiguration?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract | null
   readonly?: boolean
   loading?: boolean
   saving?: boolean
@@ -22,7 +22,7 @@ const props = withDefaults(defineProps<{
   saving: false,
   hiddenKeys: () => [],
 })
-const emit = defineEmits<{ save: [rules: NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeRulesContract] }>()
+const emit = defineEmits<{ save: [rules: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract] }>()
 const state = bindViewState(useChallengeRulesEditor(props, emit))
 
 </script>

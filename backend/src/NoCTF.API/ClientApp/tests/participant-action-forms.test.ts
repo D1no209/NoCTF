@@ -71,10 +71,10 @@ describe('participant action page wiring', () => {
       new URL('../app/pages/auth/verify-email.vue', import.meta.url),
     ).text()
 
-    expect(register).toMatch(/api\.api\.v1\.auth\.emailVerification\.request\.post\(/)
+    expect(register).toContain('authenticationRequestEmailVerification')
     expect(register).toContain('verificationEmailQueued')
     expect(register).toContain('@click="resendVerification"')
-    expect(verification).toMatch(/api\.api\.v1\.auth\.emailVerification\.request\.post\(/)
+    expect(verification).toContain('authenticationRequestEmailVerification')
     expect(verification).toContain('v-model="email"')
     expect(verification).toContain("isLoggedIn.value")
     expect(register).not.toContain("common.description.verificationEmailSentCheck")

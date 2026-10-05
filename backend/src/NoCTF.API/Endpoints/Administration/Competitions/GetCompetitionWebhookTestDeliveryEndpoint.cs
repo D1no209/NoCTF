@@ -47,12 +47,6 @@ public sealed class GetCompetitionWebhookTestDeliveryEndpoint(
 {
     public override void Configure()
     {
-        Summary(summary =>
-        {
-            summary.Summary = "Returns the current result of a competition webhook test delivery.";
-            summary.Description = summary.Summary;
-        });
-
         Get("/admin/competitions/{competitionId}/webhooks/{targetId}/test-deliveries/{deliveryId}");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("AdminGetCompetitionWebhookTestDelivery"));

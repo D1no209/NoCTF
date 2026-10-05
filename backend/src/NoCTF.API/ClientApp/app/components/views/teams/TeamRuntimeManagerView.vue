@@ -29,7 +29,7 @@ const { RefreshCw, RuntimeCard, competitionId, items, loading, error, initialize
       </Empty>
       <template v-else-if="items.length">
         <ul class="flex min-w-0 flex-col gap-2" :aria-label="$t('runtime.teamInstancesTitle')">
-          <li v-for="item in items" :key="(item.runtime?.id) ?? undefined" class="min-w-0">
+          <li v-for="item in items" :key="item.runtime?.id" class="min-w-0">
             <Button
               type="button"
               :variant="selected?.runtime?.id === item.runtime?.id ? 'secondary' : 'ghost'"
@@ -51,7 +51,7 @@ const { RefreshCw, RuntimeCard, competitionId, items, loading, error, initialize
             >
               <component
                 :is="RuntimeCard"
-                :key="item.runtime.competitionChallengeId ?? undefined"
+                :key="item.runtime.competitionChallengeId"
                 :competition-id="competitionId"
                 :competition-challenge-id="item.runtime.competitionChallengeId"
                 controls="full"

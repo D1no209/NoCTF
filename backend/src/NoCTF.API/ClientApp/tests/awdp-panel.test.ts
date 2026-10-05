@@ -7,7 +7,7 @@ describe('AWDP participant panel', () => {
       new URL('../app/features/challenges/panels/AwdpPanel.vue', import.meta.url),
     ).text()
     const types = await sourceFile(
-      new URL('../app/api/models/index.ts', import.meta.url),
+      new URL('../app/api/types.gen.ts', import.meta.url),
     ).text()
 
     expect(source).toContain("challenges.label.attackTargetBreakEnvironment")
@@ -32,8 +32,8 @@ describe('AWDP participant panel', () => {
       new URL('../app/features/challenges/FixSubmit.vue', import.meta.url),
     ).text()
 
-    expect(source).toMatch(/api\.api\.v1\.competitions\.byCompetitionId\([^)]*\)\.challenges\.byCompetitionChallengeId\([^)]*\)\.awdpDefenseTargets\.post\(/)
-    expect(source).toMatch(/api\.api\.v1\.competitions\.byCompetitionId\([^)]*\)\.challenges\.byCompetitionChallengeId\([^)]*\)\.awdpDefenseTargets\.byRuntimeInstanceId\([^)]*\)\.fix\.post\(/)
+    expect(source).toContain('requestAwdpDefenseTargetEndpoint')
+    expect(source).toContain('uploadPatchEndpoint')
     expect(source).toContain("props.defense?.runtimeState === 'Queued'")
     expect(source).toContain("props.defense?.runtimeState === 'Provisioning'")
     expect(source).toContain("props.defense?.runtimeState === 'Running'")
@@ -100,8 +100,8 @@ describe('AWDP participant panel', () => {
       new URL('../app/features/challenges/FixSubmit.vue', import.meta.url),
     ).text()
 
-    expect(flag).toContain('NoCTFAPIEndpointsGameplayFactsGameplayFactAdmissionFailureCodeProtocol')
-    expect(flag).toMatch(/api\.api\.v1\.competitions\.byCompetitionId\([^)]*\)\.challenges\.byCompetitionChallengeId\([^)]*\)\.awdpBreakFlagJudgement\.post\(/)
+    expect(flag).toContain('NoCtfapiEndpointsGameplayFactsGameplayFactAdmissionFailureCodeProtocol')
+    expect(flag).toContain('judgeAwdpBreakFlag')
     expect(flag).toContain('readOnlyJudgement')
     expect(flag).toContain("code === 'AchievementAlreadySucceeded'")
     expect(flag).toContain("challenges.flagSubmit.description.breakAlreadySucceededVerification")
@@ -163,7 +163,7 @@ describe('AWDP participant panel', () => {
     expect(panel).toContain("challenges.error.defenseServiceAbnormalFailed")
     expect(panel).not.toContain('防御未通过')
     expect(panel).not.toContain("common.error.reasonFailed")
-    expect(history).toMatch(/api\.api\.v1\.competitions\.byCompetitionId\([^)]*\)\.gameplayFacts\.get\(/)
+    expect(history).toContain('listGameplayFactsEndpoint')
     expect(history).toContain('competitionChallengeId')
     expect(history).not.toContain('kind:')
     expect(history).not.toContain('/api/v1/')

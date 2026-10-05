@@ -8,7 +8,7 @@ public sealed class RuntimeProxyOpenApiTests
     public async Task Proxy_probe_and_capture_administration_are_typed()
     {
         using var document = JsonDocument.Parse(await File.ReadAllTextAsync(
-            Path.Combine(FindBackendRoot(), "artifacts", "openapi", "v1.json")));
+            Path.Combine(FindBackendRoot(), "artifacts", "openapi", "swagger.json")));
         var paths = document.RootElement.GetProperty("paths");
         var probe = paths.GetProperty(
             "/api/v1/runtime-proxies/{runtimeInstanceId}/{bindingIndex}")

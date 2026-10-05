@@ -57,7 +57,6 @@ public sealed class UploadMyWallpaperEndpoint(
         Put("/auth/me/wallpaper");
         AuthSchemes("Bearer");
         AllowFileUploads();
-        Description(builder => builder.Accepts<UploadMyWallpaperRequest>("multipart/form-data"));
         MaxRequestBodySize(FileUploadLimits.MaximumRequestBytes(
             uploadLimits.MaximumWallpaperBytes));
         Description(builder => builder
@@ -65,7 +64,7 @@ public sealed class UploadMyWallpaperEndpoint(
             .WithMetadata(new EnableRateLimitingAttribute("avatar"))
             .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
                 StatusCodes.Status413PayloadTooLarge));
-        Summary(summary => { summary.Summary = "Replaces and enables the current user's wallpaper."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Replaces and enables the current user's wallpaper.");
     }
 
     public override async Task<Results<Ok<CurrentUserResponse>, NotFound,

@@ -31,7 +31,7 @@ public sealed class CompleteSsoLoginEndpoint(
         Options(options => options.WithMetadata(
             new ProtectedEntryMetadata(ProtectedEntry.SsoAuthentication)));
         Description(builder => builder.WithName("Authentication_SsoCompleteLogin"));
-        Summary(summary => { summary.Summary = "Consumes an authenticated SSO flow and issues a NoCTF session."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Consumes an authenticated SSO flow and issues a NoCTF session.");
     }
 
     public override async Task<Results<Ok<CompleteSsoLoginResponse>, ProblemHttpResult>> ExecuteAsync(

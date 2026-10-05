@@ -1,14 +1,25 @@
-
-import { api } from '../../../../lib/api'
 import { message as describeMessage } from '../../../../utils/i18n'
 import type { UiMessage } from '../../../../utils/i18n'
 import { FlaskConical, Plus, RotateCw } from '@lucide/vue'
 import { toast } from '../../../../utils/message-toast'
+import {
+  adminPlatformSsoBeginAuthenticationTest,
+  adminPlatformSsoCreateProvider,
+  adminPlatformSsoGetConfiguration,
+  adminPlatformSsoPatchConfiguration,
+  adminPlatformSsoReplaceProviderSecret,
+  adminPlatformSsoTestProviderConnection,
+  adminPlatformSsoUpdateProvider,
+} from '../../../../api'
+import type {
+  NoCtfapiEndpointsAdministrationPlatformSsoConfigurationResponse,
+  NoCtfapiEndpointsAdministrationPlatformSsoProviderResponse,
+  NoCtfapiEndpointsAdministrationPlatformSsoProviderWriteRequest,
+  NoCtfapiEndpointsAdministrationPlatformSsoProtocolProtocol,
+} from '../../../../api'
 
-import type { NoCTFAPIEndpointsAdministrationPlatformSsoConfigurationResponse, NoCTFAPIEndpointsAdministrationPlatformSsoProviderResponse, NoCTFAPIEndpointsAdministrationPlatformCreateSsoProviderRequest, NoCTFAPIEndpointsAdministrationPlatformSsoProtocolProtocol } from '../../../../api/models'
-
-type Configuration = NoCTFAPIEndpointsAdministrationPlatformSsoConfigurationResponse
-type Provider = NoCTFAPIEndpointsAdministrationPlatformSsoProviderResponse
+type Configuration = NoCtfapiEndpointsAdministrationPlatformSsoConfigurationResponse
+type Provider = NoCtfapiEndpointsAdministrationPlatformSsoProviderResponse
 
 export function useAdminPlatformAuthenticationPage() {
   const configuration = ref<Configuration | null>(null)
@@ -23,7 +34,7 @@ export function useAdminPlatformAuthenticationPage() {
     id: '',
     name: '',
     iconUrl: '',
-    protocol: 'Oidc' as NoCTFAPIEndpointsAdministrationPlatformSsoProtocolProtocol,
+    protocol: 'Oidc' as NoCtfapiEndpointsAdministrationPlatformSsoProtocolProtocol,
     enabled: false,
     allowLogin: true,
     allowBinding: true,
@@ -55,8 +66,7 @@ export function useAdminPlatformAuthenticationPage() {
   async function load() {
     loading.value = true
     loadError.value = null
-    let error: unknown;
-    const data = await api.api.v1.admin.platform.sso.get().catch(cause => { error = cause; return undefined });
+    const { data, error } = await adminPlatformSsoGetConfiguration()
     loading.value = false
     if (error || !data) {
       loadError.value = parseApiError(error, describeMessage('sso.configurationUnavailable')).displayMessage
@@ -68,11 +78,12 @@ export function useAdminPlatformAuthenticationPage() {
   async function saveGlobal() {
     if (globalSaving.value) return
     globalSaving.value = true
-    let error: unknown;
-    const data = await api.api.v1.admin.platform.sso.patch({
+    const { data, error } = await adminPlatformSsoPatchConfiguration({
+      body: {
         enabled: globalForm.enabled,
         publicBaseUrl: globalForm.publicBaseUrl.trim(),
-      }).catch(cause => { error = cause; return undefined });
+      },
+    })
     globalSaving.value = false
     if (error || !data) {
       toast.error(parseApiError(error, describeMessage('sso.configurationSaveFailed')).displayMessage)
@@ -125,7 +136,7 @@ export function useAdminPlatformAuthenticationPage() {
     providerOpen.value = true
   }
 
-  function providerRequest(): NoCTFAPIEndpointsAdministrationPlatformCreateSsoProviderRequest {
+  function providerRequest(): NoCtfapiEndpointsAdministrationPlatformSsoProviderWriteRequest {
     const common = {
       name: providerForm.name.trim(),
       iconUrl: providerForm.iconUrl.trim() || null,
@@ -166,16 +177,18 @@ export function useAdminPlatformAuthenticationPage() {
     if (providerSaving.value) return
     providerSaving.value = true
     providerError.value = null
-    let responseError: unknown;
-    const response = await (providerForm.id
-      ? api.api.v1.admin.platform.sso.providers.byProviderId(providerForm.id).put(providerRequest())
-      : api.api.v1.admin.platform.sso.providers.post(providerRequest())).catch(cause => { responseError = cause; return undefined });
+    const response = providerForm.id
+      ? await adminPlatformSsoUpdateProvider({
+          path: { providerId: providerForm.id },
+          body: providerRequest(),
+        })
+      : await adminPlatformSsoCreateProvider({ body: providerRequest() })
     providerSaving.value = false
-    if (responseError || !response) {
-      providerError.value = parseApiError(responseError, describeMessage('sso.providerSaveFailed')).displayMessage
+    if (response.error || !response.data) {
+      providerError.value = parseApiError(response.error, describeMessage('sso.providerSaveFailed')).displayMessage
       return
     }
-    sync(response)
+    sync(response.data)
     providerOpen.value = false
     toast.success(describeMessage('sso.providerSaved'))
   }
@@ -190,8 +203,10 @@ export function useAdminPlatformAuthenticationPage() {
     const providerId = secretProvider.value?.id
     if (!providerId || !secret.value || secretSaving.value) return
     secretSaving.value = true
-    let error: unknown;
-    const data = await api.api.v1.admin.platform.sso.providers.byProviderId(providerId).secret.put({ secret: secret.value }).catch(cause => { error = cause; return undefined });
+    const { data, error } = await adminPlatformSsoReplaceProviderSecret({
+      path: { providerId },
+      body: { secret: secret.value },
+    })
     secretSaving.value = false
     if (error || !data) {
       toast.error(parseApiError(error, describeMessage('sso.secretReplaceFailed')).displayMessage)
@@ -206,8 +221,9 @@ export function useAdminPlatformAuthenticationPage() {
   async function testConnection(provider: Provider) {
     if (!provider.id || testingId.value) return
     testingId.value = provider.id
-    let error: unknown;
-    const data = await api.api.v1.admin.platform.sso.providers.byProviderId(provider.id).connectionTests.post().catch(cause => { error = cause; return undefined });
+    const { data, error } = await adminPlatformSsoTestProviderConnection({
+      path: { providerId: provider.id },
+    })
     testingId.value = null
     if (error || !data?.succeeded) {
       toast.error(data?.failureCode ?? parseApiError(error, describeMessage('sso.connectionTestFailed')).displayMessage)
@@ -219,8 +235,9 @@ export function useAdminPlatformAuthenticationPage() {
   async function testAuthentication(provider: Provider) {
     if (!provider.id || testingId.value) return
     testingId.value = provider.id
-    let error: unknown;
-    const data = await api.api.v1.admin.platform.sso.providers.byProviderId(provider.id).authenticationTests.post().catch(cause => { error = cause; return undefined });
+    const { data, error } = await adminPlatformSsoBeginAuthenticationTest({
+      path: { providerId: provider.id },
+    })
     if (error || !data?.authorizationUrl) {
       testingId.value = null
       toast.error(parseApiError(error, describeMessage('sso.authenticationTestFailed')).displayMessage)

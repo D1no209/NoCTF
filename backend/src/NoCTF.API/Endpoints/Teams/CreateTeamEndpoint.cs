@@ -163,13 +163,7 @@ internal static partial class TeamMapper
 public sealed class CreateTeamEndpoint(CreateTeam create, IUserContext user, LinkGenerator links, TimeProvider timeProvider)
     : Endpoint<CreateTeamRequest, Results<Created<TeamResponse>, NotFound, Conflict<TeamRegistrationFailureResponse>>>
 {
-    public override void Configure() {
-        Summary(summary =>
-        {
-            summary.Summary = "Creates a competition team and makes its creator the captain.";
-            summary.Description = summary.Summary;
-        });
- Post("/competitions/{competitionId}/teams"); AuthSchemes("Bearer"); }
+    public override void Configure() { Post("/competitions/{competitionId}/teams"); AuthSchemes("Bearer"); }
     public override async Task<Results<Created<TeamResponse>, NotFound, Conflict<TeamRegistrationFailureResponse>>> ExecuteAsync(CreateTeamRequest request, CancellationToken ct)
     {
         request.CompetitionId = Route<Guid>("competitionId");

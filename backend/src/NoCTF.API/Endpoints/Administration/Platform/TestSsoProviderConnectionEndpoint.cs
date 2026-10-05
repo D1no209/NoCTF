@@ -24,7 +24,7 @@ public sealed class TestSsoProviderConnectionEndpoint(ManageSsoProviders managem
             new NoCTF.API.Security.ProtectedEntryMetadata(
                 NoCTF.API.Security.ProtectedEntry.SsoAuthentication)));
         Description(builder => builder.WithName("AdminPlatformSsoTestProviderConnection"));
-        Summary(summary => { summary.Summary = "Tests provider network, TLS and protocol metadata without authenticating a user."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Tests provider network, TLS and protocol metadata without authenticating a user.");
     }
 
     public override async Task<Results<Ok<SsoProviderConnectionTestResponse>, NotFound>> ExecuteAsync(

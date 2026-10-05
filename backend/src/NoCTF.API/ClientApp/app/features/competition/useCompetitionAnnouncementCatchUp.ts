@@ -1,9 +1,7 @@
-
-import { api } from '../../lib/api'
 import type { Ref } from 'vue'
 
-
-import type { NoCTFAPIEndpointsNotificationsNotificationResponse } from '../../api/models'
+import { listNotificationsEndpoint } from '../../api'
+import type { NoCtfapiEndpointsNotificationsNotificationResponse } from '../../api'
 import { createTrailingRefresh } from '../../lib/latest-page-refresh'
 import { safeLocalStorage } from '../../lib/safe-storage'
 import { showNotificationNotice } from '../notifications/showNotificationNotice'
@@ -23,9 +21,9 @@ export function parseSeenCompetitionAnnouncementIds(raw: string | null): string[
 }
 
 export function missedCompetitionAnnouncements(
-  notifications: readonly NoCTFAPIEndpointsNotificationsNotificationResponse[],
+  notifications: readonly NoCtfapiEndpointsNotificationsNotificationResponse[],
   seenIds: readonly string[],
-): NoCTFAPIEndpointsNotificationsNotificationResponse[] {
+): NoCtfapiEndpointsNotificationsNotificationResponse[] {
   const seen = new Set(seenIds)
   return notifications
     .filter(notification => notification.kind === 'CompetitionAnnouncement'
@@ -36,7 +34,7 @@ export function missedCompetitionAnnouncements(
 
 export function mergeSeenCompetitionAnnouncementIds(
   current: readonly string[],
-  notifications: readonly NoCTFAPIEndpointsNotificationsNotificationResponse[],
+  notifications: readonly NoCtfapiEndpointsNotificationsNotificationResponse[],
 ): string[] {
   const ids = notifications
     .flatMap(notification => notification.kind === 'CompetitionAnnouncement' && notification.id
@@ -57,14 +55,15 @@ export function useCompetitionAnnouncementCatchUp(competitionId: Readonly<Ref<st
     const requestedCompetitionId = competitionId.value
     if (!userId || !requestedCompetitionId) return
 
-    let error: unknown;
-    const data = await api.api.v1.notifications.get({ queryParameters: {
+    const { data, error } = await listNotificationsEndpoint({
+      query: {
         competitionId: requestedCompetitionId,
         scope: 'Inbox',
         offset: 0,
         limit: 200,
         desc: true,
-      } }).catch(cause => { error = cause; return undefined });
+      },
+    })
     if (error || !data || user.value?.userId !== userId || competitionId.value !== requestedCompetitionId)
       return
 

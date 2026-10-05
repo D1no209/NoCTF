@@ -1,32 +1,31 @@
-
-import { api } from '../../../lib/api'
 import { message as describeMessage } from '../../../utils/i18n'
 import type { UiMessage } from '../../../utils/i18n'
 import { markRaw, toRefs } from 'vue'
 
-
-import type { NoCTFAPIEndpointsChallengesChallengeResponse, NoCTFAPIEndpointsCompetitionsCompetitionResponse, NoCTFAPIEndpointsRuntimeRuntimeTargetResponse } from '../../../api/models'
+import { listRuntimeTargetsEndpoint } from '../../../api'
+import type { NoCtfapiEndpointsChallengesChallengeResponse, NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsRuntimeRuntimeTargetResponse } from '../../../api'
 import FlagSubmitComponent from '../FlagSubmit.vue'
 import RuntimeAccessUrlComponent from '../RuntimeAccessUrl.vue'
 import RuntimeCardComponent from '../RuntimeCard.vue'
 
 /** Owns state, effects and commands for AwdPanel. */
 export function useAwdPanel(props: Readonly<{
-  competition: NoCTFAPIEndpointsCompetitionsCompetitionResponse
-  challenge: NoCTFAPIEndpointsChallengesChallengeResponse
-  flagDockTarget?: string | null
-  runtimeDockTarget?: string | null
+  competition: NoCtfapiEndpointsCompetitionsCompetitionResponse
+  challenge: NoCtfapiEndpointsChallengesChallengeResponse
+  flagDockTarget?: string
+  runtimeDockTarget?: string
 }>,
 emit: { (event: "submitted", ...args: []): void; (event: "remainingChanged", ...args: [remaining: number | null]): void }) {
-  const targets = ref<NoCTFAPIEndpointsRuntimeRuntimeTargetResponse[]>([])
+  const targets = ref<NoCtfapiEndpointsRuntimeRuntimeTargetResponse[]>([])
 
   const targetsError = ref<UiMessage | null>(null)
 
   const targetsLoaded = ref(false)
 
   onMounted(async () => {
-    let error: unknown;
-    const data = await api.api.v1.competitions.byCompetitionId(props.competition.id!).challenges.byCompetitionChallengeId(props.challenge.id!).targets.get().catch(cause => { error = cause; return undefined });
+    const { data, error } = await listRuntimeTargetsEndpoint({
+      path: { competitionId: props.competition.id!, competitionChallengeId: props.challenge.id! },
+    })
     targetsLoaded.value = true
     if (error || !data) {
       targetsError.value = parseApiError(error, describeMessage("challenges.awdPanel.error.loadAttackTargetFailed")).displayMessage

@@ -472,7 +472,7 @@ public sealed class PatchCompetitionEndpoint(
         Patch("/admin/competitions/{competitionId}");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("AdminPatchCompetition"));
-        Summary(summary => { summary.Summary = "Updates selected competition aggregate sections."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Updates selected competition aggregate sections.");
     }
 
     public override async Task<Results<Ok<AdminCompetitionResponse>, NotFound,

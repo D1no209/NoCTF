@@ -40,7 +40,7 @@ describe('authentication response refresh', () => {
     const competitionHub = await sourceFile(new URL('../app/composables/useCompetitionHub.ts', import.meta.url)).text()
     const platformHub = await sourceFile(new URL('../app/composables/usePlatformLogHub.ts', import.meta.url)).text()
 
-    expect(session).toContain('refreshClient.api.v1.auth.refresh.post()')
+    expect(session).toContain('refreshTokenEndpoint({ client: refreshClient })')
     expect(session).not.toContain("fetch('/api/v1/auth/refresh'")
     expect(competitionHub).toContain('accessTokenFactory: getRealtimeAccessToken')
     expect(platformHub).toContain('accessTokenFactory: getRealtimeAccessToken')

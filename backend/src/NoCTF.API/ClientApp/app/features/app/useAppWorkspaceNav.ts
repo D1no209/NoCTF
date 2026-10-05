@@ -7,7 +7,7 @@ import type { WorkspaceNavGroup, WorkspaceNavItem } from './workspace-nav'
 /** Owns state, effects and commands for AppWorkspaceNav. */
 export function useAppWorkspaceNav(props: Readonly<{
   groups: WorkspaceNavGroup[]
-  title?: string | null
+  title?: string
 }>) {
   const route = useRoute()
   const isDesktop = useMediaQuery('(min-width: 1024px)')

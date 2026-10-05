@@ -1,17 +1,15 @@
-
-import { api, nativeResponse } from '../../../../lib/api'
 import { message as describeMessage } from '../../../../utils/i18n'
 import type { UiMessage } from '../../../../utils/i18n'
 import { ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, RefreshCw, Scale } from '@lucide/vue'
 import { toast } from '../../../../utils/message-toast'
 
-
-import type { NoCTFAPIEndpointsTeamsWriteUpsTeamWriteUpChallengeScoreResponse, NoCTFAPIEndpointsTeamsWriteUpsTeamWriteUpReviewItemResponse, NoCTFAPIEndpointsTeamsWriteUpsTeamWriteUpReviewResponse } from '../../../../api/models'
+import { adminCreateManualAdjustment, createTeamWriteUpConsultation, downloadTeamWriteUp, issueTeamWriteUpPreview, listTeamWriteUps } from '../../../../api'
+import type { NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpChallengeScoreResponse, NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpReviewItemResponse, NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpReviewResponse } from '../../../../api'
 import { createTrailingRefresh } from '../../../../lib/latest-page-refresh'
 import { downloadSdkFile } from '../../../../utils/download'
 
-type ReviewItem = NoCTFAPIEndpointsTeamsWriteUpsTeamWriteUpReviewItemResponse
-type ChallengeScore = NoCTFAPIEndpointsTeamsWriteUpsTeamWriteUpChallengeScoreResponse
+type ReviewItem = NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpReviewItemResponse
+type ChallengeScore = NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpChallengeScoreResponse
 
 /** Owns staff WriteUp review, authenticated PDF preview, score decisions and consultation creation. */
 export function useCompetitionsByIdWriteUpsPage(options: { management?: boolean } = {}) {
@@ -20,7 +18,7 @@ export function useCompetitionsByIdWriteUpsPage(options: { management?: boolean 
   const competitionId = route.params.id as string
   const management = options.management === true
 
-  const review = ref<NoCTFAPIEndpointsTeamsWriteUpsTeamWriteUpReviewResponse | null>(null)
+  const review = ref<NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpReviewResponse | null>(null)
   const loading = ref(true)
   const loadError = ref<UiMessage | null>(null)
   const selectedTeamId = ref(typeof route.query.team === 'string' ? route.query.team : '')
@@ -49,8 +47,7 @@ export function useCompetitionsByIdWriteUpsPage(options: { management?: boolean 
   async function load() {
     loading.value = review.value === null
     loadError.value = null
-    let error: unknown;
-    const data = await api.api.v1.competitions.byCompetitionId(competitionId).writeups.get().catch(cause => { error = cause; return undefined });
+    const { data, error } = await listTeamWriteUps({ path: { competitionId } })
     loading.value = false
     if (error || !data) {
       loadError.value = parseApiError(error, describeMessage('writeUp.reviewLoadFailed')).displayMessage
@@ -65,7 +62,7 @@ export function useCompetitionsByIdWriteUpsPage(options: { management?: boolean 
       await selectTeam(selectedTeamId.value)
   }
 
-  async function selectTeam(teamId?: string | null) {
+  async function selectTeam(teamId?: string) {
     if (!teamId) return
     selectedTeamId.value = teamId
     void router.replace({
@@ -78,8 +75,9 @@ export function useCompetitionsByIdWriteUpsPage(options: { management?: boolean 
     previewLoading.value = true
     previewError.value = null
     try {
-      let error: unknown;
-      const data = await api.api.v1.competitions.byCompetitionId(competitionId).teams.byTeamId(teamId).writeup.preview.post().catch(cause => { error = cause; return undefined });
+      const { data, error } = await issueTeamWriteUpPreview({
+        path: { competitionId, teamId },
+      })
       if (error || !data?.previewUrl) throw error
       if (request !== previewRequest) return
       previewUrl.value = data.previewUrl
@@ -96,12 +94,14 @@ export function useCompetitionsByIdWriteUpsPage(options: { management?: boolean 
 
   async function download() {
     const writeUp = selected.value?.writeUp
-    const teamId = writeUp?.teamId
-    if (!writeUp || !teamId || downloadPending.value) return
+    if (!writeUp?.teamId || downloadPending.value) return
     downloadPending.value = true
     try {
       await downloadSdkFile(
-        nativeResponse(responseOptions => api.api.v1.competitions.byCompetitionId(competitionId).teams.byTeamId(teamId).writeup.content.get({ options: [...responseOptions] })),
+        downloadTeamWriteUp({
+          path: { competitionId, teamId: writeUp.teamId },
+          parseAs: 'blob',
+        }),
         writeUp.fileName ?? `writeup-${writeUp.teamId}.pdf`,
       )
     }
@@ -186,12 +186,14 @@ export function useCompetitionsByIdWriteUpsPage(options: { management?: boolean 
     adjustmentRequestPending.value = true
     adjustmentError.value = null
     try {
-      let error: unknown;
-      const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).gameplayFacts.manualAdjustments.post({
+      const { data, error } = await adminCreateManualAdjustment({
+        path: { competitionId },
+        body: {
           teamId: writeUp.teamId,
           competitionChallengeId: selectedChallengeId.value,
           delta,
-        }).catch(cause => { error = cause; return undefined });
+        },
+      })
       if (error || !data?.gameplayFactId) throw error
       adjustmentDelta.value = 0
       pendingAdjustment.value = {
@@ -275,14 +277,16 @@ export function useCompetitionsByIdWriteUpsPage(options: { management?: boolean 
     if (consultationError.value) return
     consultationPending.value = true
     try {
-      let error: unknown;
-      const data = await api.api.v1.competitions.byCompetitionId(competitionId).teams.byTeamId(writeUp.teamId).writeup.consultations.post({
+      const { data, error } = await createTeamWriteUpConsultation({
+        path: { competitionId, teamId: writeUp.teamId },
+        body: {
           competitionChallengeId: consultationChallengeId.value === 'none'
             ? null
             : consultationChallengeId.value,
           title,
           body,
-        }).catch(cause => { error = cause; return undefined });
+        },
+      })
       if (error || !data?.threadRootId) throw error
       consultationOpen.value = false
       toast.success(describeMessage('writeUp.consultationCreated'))

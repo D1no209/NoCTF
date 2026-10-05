@@ -1,10 +1,8 @@
-
-import { api } from '../../../lib/api'
 import type { UiMessage } from '../../../utils/i18n'
 import { message as describeMessage } from '../../../utils/i18n'
 
 
-
+import { authenticationRequestEmailVerification, resendEmailVerificationEndpoint, verifyEmailEndpoint } from '../../../api'
 
 /** Owns state, effects and commands for AuthVerifyEmailPage. */
 export function useAuthVerifyEmailPage() {
@@ -29,8 +27,7 @@ export function useAuthVerifyEmailPage() {
   onMounted(async () => {
     if (!token.value) return
     state.value = 'verifying'
-    let error: unknown;
-    await api.api.v1.auth.emailVerification.verify.post({ token: token.value }).catch(cause => { error = cause; return undefined });
+    const { error } = await verifyEmailEndpoint({ body: { token: token.value } })
     if (error) {
       state.value = 'failed'
       message.value = parseApiError(error, describeMessage("common.authVerify.error.verificationLinkExpiredInvalid")).displayMessage
@@ -44,10 +41,9 @@ export function useAuthVerifyEmailPage() {
     message.value = null
     resendPending.value = true
     try {
-      let error: unknown;
-      await (isLoggedIn.value
-        ? api.api.v1.auth.emailVerification.resend.post()
-        : api.api.v1.auth.emailVerification.request.post({ email: email.value })).catch(cause => { error = cause; return undefined });
+      const { error } = isLoggedIn.value
+        ? await resendEmailVerificationEndpoint()
+        : await authenticationRequestEmailVerification({ body: { email: email.value } })
       if (error) {
         message.value = parseApiError(error).displayMessage
         return

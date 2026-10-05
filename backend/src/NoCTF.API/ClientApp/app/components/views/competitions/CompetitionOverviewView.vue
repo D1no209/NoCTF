@@ -29,7 +29,7 @@ const { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn
           </Hint>
           <div data-scroll-dock-secondary class="flex w-fit max-w-full flex-col gap-3">
           <div class="flex flex-wrap items-center gap-2">
-            <component :is="LifecycleBadge" :status="competition.status ?? undefined" />
+            <component :is="LifecycleBadge" :status="competition.status" />
             <Badge v-if="competition.accessMode === 'StaffOnly'" variant="secondary">
               <EyeOff class="size-3" />{{ $t('competitionAccess.badge') }}
             </Badge>
@@ -118,7 +118,7 @@ const { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn
                         <Select v-model="createTrackKey" required>
                           <SelectTrigger id="team-track"><SelectValue :placeholder="$t('common.label.selectTrack')" /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem v-for="track in selectableTracks" :key="track.key ?? undefined" :value="track.key!">
+                            <SelectItem v-for="track in selectableTracks" :key="track.key" :value="track.key!">
                               <span class="flex items-center gap-2">
                                 <span>{{ track.name }}</span>
                                 <Badge v-if="track.requiredSsoProviderId" variant="outline">{{ track.requiredSsoProviderName }}</Badge>

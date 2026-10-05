@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { effectScope, nextTick, reactive } from 'vue'
 
-import type { NoCTFAPIEndpointsAdministrationChallengeBankChallengeDefinitionContract } from '../app/api/models'
+import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract } from '../app/api'
 import { useDefinitionModel } from '../app/composables/useDefinitionModel'
 import { defaultDefinition } from '../app/utils/game-config'
 import type { GameModeValue } from '../app/utils/game-config'
@@ -10,7 +10,7 @@ describe('useDefinitionModel', () => {
   test('loading an external definition does not emit it back or recurse', async () => {
     const scope = effectScope()
     const form = reactive({ mode: 'Ctf' as const, definition: defaultDefinition('Ctf') })
-    const emissions: NoCTFAPIEndpointsAdministrationChallengeBankChallengeDefinitionContract[] = []
+    const emissions: NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract[] = []
     const editor = scope.run(() => useDefinitionModel(
       () => form.definition,
       () => form.mode,
@@ -33,7 +33,7 @@ describe('useDefinitionModel', () => {
   test('a nested editor change emits once without replacing the active model', async () => {
     const scope = effectScope()
     const form = reactive({ mode: 'Ctf' as const, definition: defaultDefinition('Ctf') })
-    const emissions: NoCTFAPIEndpointsAdministrationChallengeBankChallengeDefinitionContract[] = []
+    const emissions: NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract[] = []
     const editor = scope.run(() => useDefinitionModel(
       () => form.definition,
       () => form.mode,
@@ -59,7 +59,7 @@ describe('useDefinitionModel', () => {
   test('external replacement after editing resets the draft without an echo', async () => {
     const scope = effectScope()
     const form = reactive({ mode: 'Ctf' as GameModeValue, definition: defaultDefinition('Ctf') })
-    const emissions: NoCTFAPIEndpointsAdministrationChallengeBankChallengeDefinitionContract[] = []
+    const emissions: NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract[] = []
     const editor = scope.run(() => useDefinitionModel(
       () => form.definition,
       () => form.mode,

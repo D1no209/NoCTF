@@ -51,7 +51,7 @@ describe('competition practice entry', () => {
     expect(overview).toContain("practiceOpen ? $t('competitions.label.enterPractice') : $t('competitions.label.enterCompetition')")
     expect(panel).toContain('isCtfPracticeOpen(props.competition)')
     expect(panel).toContain(':practice="practiceOpen"')
-    expect(submit).toMatch(/api\.api\.v1\.competitions\.byCompetitionId\([^)]*\)\.challenges\.byCompetitionChallengeId\([^)]*\)\.flagSubmissions\.post\(/)
+    expect(submit).toContain('await submitFlagEndpoint({')
     expect(submit).not.toContain('judgePracticeFlag')
     expect(panel).toContain("result === 'Correct' && !practiceOpen.value")
     expect(detail).toContain('ctx.competition.value?.status')

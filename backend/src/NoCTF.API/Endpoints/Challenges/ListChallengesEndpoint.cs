@@ -27,7 +27,7 @@ public sealed class ListChallengesEndpoint(
     {
         Get("/competitions/{competitionId}/challenges");
         AllowAnonymous();
-        Summary(summary => { summary.Summary = "Lists published challenges for a competition."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Lists published challenges for a competition.");
     }
 
     public override async Task<Results<Ok<ChallengeListResponse>, NotFound>> ExecuteAsync(

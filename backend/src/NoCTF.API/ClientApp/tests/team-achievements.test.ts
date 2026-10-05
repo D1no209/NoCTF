@@ -1,10 +1,10 @@
 import { sourceFile } from './support/feature-source'
 import { expect, test } from 'bun:test'
 import { scoreboardTeamAchievements } from '../app/utils/scoreboard'
-import type { NoCTFAPIEndpointsCompetitionsScoreboardTeamResponse } from '../app/api/models'
+import type { NoCtfapiEndpointsCompetitionsScoreboardTeamResponse } from '../app/api'
 
 test('only successful challenge metadata selects solved rows, not scores or truncated slots', () => {
-  const team: NoCTFAPIEndpointsCompetitionsScoreboardTeamResponse = {
+  const team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse = {
     totalScore: 9999,
     slots: [],
     achievements: [{ competitionChallengeId: 'solved', kind: 'Solve', displayName: 'Alice', occurredAt: '2026-09-08T01:00:00Z' }],
@@ -15,7 +15,7 @@ test('only successful challenge metadata selects solved rows, not scores or trun
 })
 
 test('AWDP keeps successful attack and defense attribution outside the displayed round window', () => {
-  const team: NoCTFAPIEndpointsCompetitionsScoreboardTeamResponse = { achievements: [
+  const team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse = { achievements: [
     { competitionChallengeId: 'pwn', kind: 'Defense', displayName: 'Bob', occurredAt: '2026-09-08T02:00:00Z' },
     { competitionChallengeId: 'pwn', kind: 'Attack', displayName: 'Alice', occurredAt: '2026-09-08T01:00:00Z' },
   ] }

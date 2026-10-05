@@ -57,7 +57,7 @@ public sealed class GetSsoFlowEndpoint(
         Options(options => options.WithMetadata(
             new ProtectedEntryMetadata(ProtectedEntry.SsoAuthentication)));
         Description(builder => builder.WithName("Authentication_SsoGetFlow"));
-        Summary(summary => { summary.Summary = "Returns browser-bound SSO flow status and a safe identity summary."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Returns browser-bound SSO flow status and a safe identity summary.");
     }
 
     public override async Task<Results<Ok<SsoFlowStatusResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(

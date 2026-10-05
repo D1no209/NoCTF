@@ -1,11 +1,9 @@
-
-import { api } from '../../../../../lib/api'
 import { message as describeMessage } from '../../../../../utils/i18n'
 import type { UiMessage } from '../../../../../utils/i18n'
 import { computed, onMounted, onScopeDispose, ref, watch } from 'vue'
 import { toast } from '../../../../../utils/message-toast'
-
-import type { NoCTFAPIEndpointsAdministrationCompetitionsAnnouncementAudience, NoCTFAPIEndpointsAdministrationCompetitionsManagedAnnouncementResponse } from '~/api/models'
+import { adminCreateCompetitionAnnouncement, adminDeleteCompetitionAnnouncement, adminListCompetitionAnnouncements, adminUpdateCompetitionAnnouncement } from '~/api'
+import type { NoCtfapiEndpointsAdministrationCompetitionsAnnouncementAudience, NoCtfapiEndpointsAdministrationCompetitionsManagedAnnouncementResponse } from '~/api'
 import { useCompetitionAdmin } from '~/lib/admin-competition'
 import { useOffsetPagination } from '~/composables/useOffsetPagination'
 import { watchNotifications } from '~/composables/useNotificationHub'
@@ -14,8 +12,8 @@ import { adminUserPath } from '~/features/admin/admin-navigation'
 import { adminFormatDateTime } from '~/utils/admin-format'
 import { parseApiError } from '~/utils/api-error'
 
-type Announcement = NoCTFAPIEndpointsAdministrationCompetitionsManagedAnnouncementResponse
-type Audience = NoCTFAPIEndpointsAdministrationCompetitionsAnnouncementAudience
+type Announcement = NoCtfapiEndpointsAdministrationCompetitionsManagedAnnouncementResponse
+type Audience = NoCtfapiEndpointsAdministrationCompetitionsAnnouncementAudience
 
 export function useAdminCompetitionsByIdAnnouncementsPage() {
   const { competitionId, canJudge } = useCompetitionAdmin()
@@ -34,8 +32,8 @@ export function useAdminCompetitionsByIdAnnouncementsPage() {
     && body.value.trim().length > 0 && body.value.trim().length <= 16_000)
 
   const pagination = useOffsetPagination<Announcement>(async ({ offset, limit, desc }) => {
-    let error: unknown;
-    const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).announcements.get({ queryParameters: { includeWithdrawn: includeWithdrawn.value, offset, limit, desc } }).catch(cause => { error = cause; return undefined });
+    const { data, error } = await adminListCompetitionAnnouncements({ path: { competitionId },
+      query: { includeWithdrawn: includeWithdrawn.value, offset, limit, desc } })
     if (error || !data) throw parseApiError(error, describeMessage('announcements.loadFailed'))
     return { items: data.items ?? [], total: data.total ?? 0 }
   }, { initialDesc: true })
@@ -71,11 +69,10 @@ export function useAdminCompetitionsByIdAnnouncementsPage() {
     formError.value = null
     try {
       const content = { title: title.value.trim(), body: body.value.trim() }
-      let resultError: unknown;
-      await (id
-        ? api.api.v1.admin.competitions.byCompetitionId(competitionId).announcements.byAnnouncementId(id).patch(content)
-        : api.api.v1.admin.competitions.byCompetitionId(competitionId).announcements.post({ ...content, audience: audience.value })).catch(cause => { resultError = cause; return undefined });
-      if (resultError) throw resultError
+      const result = id
+        ? await adminUpdateCompetitionAnnouncement({ path: { competitionId, announcementId: id }, body: content })
+        : await adminCreateCompetitionAnnouncement({ path: { competitionId }, body: { ...content, audience: audience.value } })
+      if (result.error) throw result.error
       toast.success(describeMessage(id ? 'announcements.updated' : 'administration.competitionsBy.label.competitionNoticeReleased'))
       saving.value = false
       resetEditor()
@@ -101,8 +98,8 @@ export function useAdminCompetitionsByIdAnnouncementsPage() {
     deleting.value = true
     deleteError.value = null
     try {
-
-      await api.api.v1.admin.competitions.byCompetitionId(competitionId).announcements.byAnnouncementId(target.id).delete();
+      const { error } = await adminDeleteCompetitionAnnouncement({ path: { competitionId, announcementId: target.id } })
+      if (error) throw error
       toast.success(describeMessage('announcements.deleted'))
       if (editingId.value === target.id) resetEditor()
       if (previewTarget.value?.id === target.id) previewTarget.value = null
@@ -114,7 +111,7 @@ export function useAdminCompetitionsByIdAnnouncementsPage() {
   }
   function preview(item: Announcement) { previewTarget.value = item }
   function setPreviewOpen(open: boolean) { if (!open) previewTarget.value = null }
-  function audienceKey(value?: Audience | null) { return value === 'Collaborators' ? 'common.label.eventStaff' : 'administration.label.contestants' }
+  function audienceKey(value?: Audience) { return value === 'Collaborators' ? 'common.label.eventStaff' : 'administration.label.contestants' }
   let stopNotifications: (() => void) | undefined
   onMounted(() => {
     void pagination.loadPage(1)

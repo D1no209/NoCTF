@@ -1,16 +1,17 @@
-
-import { api } from '../../../lib/api'
 import type { MessageKey } from '~/locales/en'
 import { message as describeMessage } from '../../../utils/i18n'
 import type { UiMessage } from '../../../utils/i18n'
 import { toast } from '../../../utils/message-toast'
-
-import type { NoCTFAPIEndpointsAuthenticationSsoFlowStatusResponse } from '~/api/models'
+import {
+  authenticationSsoCompleteBinding,
+  authenticationSsoGetFlow,
+} from '~/api'
+import type { NoCtfapiEndpointsAuthenticationSsoFlowStatusResponse } from '~/api'
 
 export function useAuthSsoCompletePage() {
   const route = useRoute()
   const auth = useAuth()
-  const flow = ref<NoCTFAPIEndpointsAuthenticationSsoFlowStatusResponse | null>(null)
+  const flow = ref<NoCtfapiEndpointsAuthenticationSsoFlowStatusResponse | null>(null)
   const loading = ref(true)
   const pending = ref(false)
   const error = ref<UiMessage | null>(null)
@@ -42,8 +43,9 @@ export function useAuthSsoCompletePage() {
       loading.value = false
       return
     }
-    let requestError: unknown;
-    const data = await api.api.v1.auth.sso.flows.byFlowId(flowId.value).get().catch(cause => { requestError = cause; return undefined });
+    const { data, error: requestError } = await authenticationSsoGetFlow({
+      path: { flowId: flowId.value },
+    })
     if (requestError || !data) {
       error.value = parseApiError(requestError, describeMessage('sso.flowExpired')).displayMessage
       loading.value = false
@@ -91,8 +93,9 @@ export function useAuthSsoCompletePage() {
     if (!flowId.value || pending.value) return
     pending.value = true
     error.value = null
-    let requestError: unknown;
-    await api.api.v1.auth.me.ssoBinding.flows.byFlowId(flowId.value).complete.post().catch(cause => { requestError = cause; return undefined });
+    const { error: requestError } = await authenticationSsoCompleteBinding({
+      path: { flowId: flowId.value },
+    })
     pending.value = false
     if (requestError) {
       error.value = parseApiError(requestError, describeMessage('sso.bindingFailed')).displayMessage
@@ -117,7 +120,7 @@ export function useAuthSsoCompletePage() {
   }
 }
 
-function ssoFailureMessage(code?: string | null): MessageKey {
+function ssoFailureMessage(code?: string): MessageKey {
   const messages: Record<string, MessageKey> = {
     SsoDisabled: 'sso.failure.ssoDisabled',
     ProviderUnavailable: 'sso.failure.providerUnavailable',

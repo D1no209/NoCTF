@@ -1,10 +1,20 @@
-
-import { api } from '../../../../../lib/api'
 import { message as describeMessage } from '../../../../../utils/i18n'
 import { Copy, Plus, RotateCw, Send, Trash2, Webhook } from '@lucide/vue'
 import { toast } from '../../../../../utils/message-toast'
-
-import type { NoCTFAPIEndpointsAdministrationCompetitionsCompetitionWebhookDeliveryDiagnosticResponse, NoCTFAPIEndpointsAdministrationCompetitionsCompetitionWebhookTargetResponse } from '../../../../../api/models'
+import {
+  adminCreateCompetitionWebhook,
+  adminCreateCompetitionWebhookTestDelivery,
+  adminDeleteCompetitionWebhook,
+  adminGetCompetitionWebhookTestDelivery,
+  adminListCompetitionWebhookDeliveries,
+  adminListCompetitionWebhooks,
+  adminRotateCompetitionWebhookSecret,
+  adminUpdateCompetitionWebhook,
+} from '../../../../../api'
+import type {
+  NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookDeliveryDiagnosticResponse,
+  NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookTargetResponse,
+} from '../../../../../api'
 import { useOffsetPagination } from '../../../../../composables/useOffsetPagination'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
 import { adminFormatDateTime } from '../../../../../utils/admin-format'
@@ -24,16 +34,18 @@ export function useAdminCompetitionsByIdWebhooksPage() {
   const form = reactive<WebhookForm>({ name: '', endpointUrl: '', enabled: false })
   const saving = ref(false)
   const pendingId = ref<string | null>(null)
-  const deletingTarget = ref<NoCTFAPIEndpointsAdministrationCompetitionsCompetitionWebhookTargetResponse | null>(null)
+  const deletingTarget = ref<NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookTargetResponse | null>(null)
   const signingSecret = ref<string | null>(null)
   const secretOpen = ref(false)
   const testStates = reactive<Record<string, 'Pending' | 'Succeeded' | 'Failed'>>({})
 
   const mayManage = computed(() => canWrite.value && canManage.value)
 
-  const pagination = useOffsetPagination<NoCTFAPIEndpointsAdministrationCompetitionsCompetitionWebhookTargetResponse>(async ({ offset, limit, desc }) => {
-    let requestError: unknown;
-    const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).webhooks.get({ queryParameters: { offset, limit, desc } }).catch(cause => { requestError = cause; return undefined });
+  const pagination = useOffsetPagination<NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookTargetResponse>(async ({ offset, limit, desc }) => {
+    const { data, error: requestError } = await adminListCompetitionWebhooks({
+      path: { competitionId },
+      query: { offset, limit, desc },
+    })
     if (requestError || !data)
       throw requestError ?? new Error(translate('webhook.loadFailed'))
     canManage.value = data.canManage ?? false
@@ -44,9 +56,11 @@ export function useAdminCompetitionsByIdWebhooksPage() {
   const loading = pagination.loading
   const error = computed(() => pagination.error.value?.message ?? null)
 
-  const deliveryPagination = useOffsetPagination<NoCTFAPIEndpointsAdministrationCompetitionsCompetitionWebhookDeliveryDiagnosticResponse>(async ({ offset, limit, desc }) => {
-    let requestError: unknown;
-    const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).webhookDeliveries.get({ queryParameters: { offset, limit, desc } }).catch(cause => { requestError = cause; return undefined });
+  const deliveryPagination = useOffsetPagination<NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookDeliveryDiagnosticResponse>(async ({ offset, limit, desc }) => {
+    const { data, error: requestError } = await adminListCompetitionWebhookDeliveries({
+      path: { competitionId },
+      query: { offset, limit, desc },
+    })
     if (requestError || !data)
       throw requestError ?? new Error(translate('webhook.diagnosticsLoadFailed'))
     return { items: data.items ?? [], total: data.total ?? 0 }
@@ -66,15 +80,15 @@ export function useAdminCompetitionsByIdWebhooksPage() {
     Invalid: 'webhook.payloadInvalid',
   }
 
-  function deliveryStateLabel(state?: string | null) {
+  function deliveryStateLabel(state?: string) {
     return translate(deliveryStateKeys[state ?? ''] ?? 'webhook.statePending')
   }
 
-  function payloadStateLabel(state?: string | null) {
+  function payloadStateLabel(state?: string) {
     return translate(payloadStateKeys[state ?? ''] ?? 'webhook.payloadUnknown')
   }
 
-  function deliveryStateVariant(state?: string | null): 'default' | 'secondary' | 'outline' | 'destructive' {
+  function deliveryStateVariant(state?: string): 'default' | 'secondary' | 'outline' | 'destructive' {
     if (state === 'Delivered') return 'default'
     if (state === 'DeadLetter') return 'destructive'
     if (state === 'InFlight') return 'outline'
@@ -104,7 +118,7 @@ export function useAdminCompetitionsByIdWebhooksPage() {
     formOpen.value = true
   }
 
-  function editTarget(target: NoCTFAPIEndpointsAdministrationCompetitionsCompetitionWebhookTargetResponse) {
+  function editTarget(target: NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookTargetResponse) {
     if (!target.id || !target.endpointUrl) return
     editingId.value = target.id
     Object.assign(form, {
@@ -128,17 +142,22 @@ export function useAdminCompetitionsByIdWebhooksPage() {
       return
     }
     saving.value = true
-    let resultError: unknown;
-    const result = await (editingId.value
-      ? api.api.v1.admin.competitions.byCompetitionId(competitionId).webhooks.byTargetId(editingId.value).put({ name, endpointUrl, enabled: form.enabled })
-      : api.api.v1.admin.competitions.byCompetitionId(competitionId).webhooks.post({ name, endpointUrl, enabled: form.enabled })).catch(cause => { resultError = cause; return undefined });
+    const result = editingId.value
+      ? await adminUpdateCompetitionWebhook({
+          path: { competitionId, targetId: editingId.value },
+          body: { name, endpointUrl, enabled: form.enabled },
+        })
+      : await adminCreateCompetitionWebhook({
+          path: { competitionId },
+          body: { name, endpointUrl, enabled: form.enabled },
+        })
     saving.value = false
-    if (resultError || !result) {
-      toast.error(parseApiError(resultError, describeMessage('webhook.saveFailed')).displayMessage)
+    if (result.error || !result.data) {
+      toast.error(parseApiError(result.error, describeMessage('webhook.saveFailed')).displayMessage)
       return
     }
-    if ('signingSecret' in result && result.signingSecret) {
-      signingSecret.value = result.signingSecret
+    if ('signingSecret' in result.data && result.data.signingSecret) {
+      signingSecret.value = result.data.signingSecret
       secretOpen.value = true
     }
     formOpen.value = false
@@ -147,13 +166,15 @@ export function useAdminCompetitionsByIdWebhooksPage() {
   }
 
   async function setEnabled(
-    target: NoCTFAPIEndpointsAdministrationCompetitionsCompetitionWebhookTargetResponse,
+    target: NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookTargetResponse,
     enabled: boolean,
   ) {
     if (!mayManage.value || !target.id || !target.endpointUrl) return
     pendingId.value = target.id
-    let requestError: unknown;
-    await api.api.v1.admin.competitions.byCompetitionId(competitionId).webhooks.byTargetId(target.id).put({ name: target.name ?? '', endpointUrl: target.endpointUrl, enabled }).catch(cause => { requestError = cause; return undefined });
+    const { error: requestError } = await adminUpdateCompetitionWebhook({
+      path: { competitionId, targetId: target.id },
+      body: { name: target.name ?? '', endpointUrl: target.endpointUrl, enabled },
+    })
     pendingId.value = null
     if (requestError) {
       toast.error(parseApiError(requestError, describeMessage('webhook.saveFailed')).displayMessage)
@@ -163,7 +184,7 @@ export function useAdminCompetitionsByIdWebhooksPage() {
     await reloadFirstPage()
   }
 
-  function requestDelete(target: NoCTFAPIEndpointsAdministrationCompetitionsCompetitionWebhookTargetResponse) {
+  function requestDelete(target: NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookTargetResponse) {
     deletingTarget.value = target
   }
 
@@ -171,11 +192,12 @@ export function useAdminCompetitionsByIdWebhooksPage() {
     if (!open && !pendingId.value) deletingTarget.value = null
   }
 
-  async function rotate(target: NoCTFAPIEndpointsAdministrationCompetitionsCompetitionWebhookTargetResponse) {
+  async function rotate(target: NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookTargetResponse) {
     if (!mayManage.value || !target.id) return
     pendingId.value = target.id
-    let requestError: unknown;
-    const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).webhooks.byTargetId(target.id).rotateSecret.post().catch(cause => { requestError = cause; return undefined });
+    const { data, error: requestError } = await adminRotateCompetitionWebhookSecret({
+      path: { competitionId, targetId: target.id },
+    })
     pendingId.value = null
     if (requestError || !data?.signingSecret) {
       toast.error(parseApiError(requestError, describeMessage('webhook.rotateFailed')).displayMessage)
@@ -197,8 +219,9 @@ export function useAdminCompetitionsByIdWebhooksPage() {
     const target = deletingTarget.value
     if (!target?.id || pendingId.value) return
     pendingId.value = target.id
-    let requestError: unknown;
-    await api.api.v1.admin.competitions.byCompetitionId(competitionId).webhooks.byTargetId(target.id).delete().catch(cause => { requestError = cause; return undefined });
+    const { error: requestError } = await adminDeleteCompetitionWebhook({
+      path: { competitionId, targetId: target.id },
+    })
     pendingId.value = null
     if (requestError) {
       toast.error(parseApiError(requestError, describeMessage('webhook.deleteFailed')).displayMessage)
@@ -209,11 +232,12 @@ export function useAdminCompetitionsByIdWebhooksPage() {
     await reloadFirstPage()
   }
 
-  async function test(target: NoCTFAPIEndpointsAdministrationCompetitionsCompetitionWebhookTargetResponse) {
+  async function test(target: NoCtfapiEndpointsAdministrationCompetitionsCompetitionWebhookTargetResponse) {
     if (!mayManage.value || !target.id || testStates[target.id] === 'Pending') return
     testStates[target.id] = 'Pending'
-    let requestError: unknown;
-    const data = await api.api.v1.admin.competitions.byCompetitionId(competitionId).webhooks.byTargetId(target.id).testDeliveries.post().catch(cause => { requestError = cause; return undefined });
+    const { data, error: requestError } = await adminCreateCompetitionWebhookTestDelivery({
+      path: { competitionId, targetId: target.id },
+    })
     if (requestError || !data?.deliveryId) {
       testStates[target.id] = 'Failed'
       toast.error(parseApiError(requestError, describeMessage('webhook.testFailed')).displayMessage)
@@ -221,11 +245,13 @@ export function useAdminCompetitionsByIdWebhooksPage() {
     }
     for (let attempt = 0; attempt < 20; attempt++) {
       await new Promise(resolve => setTimeout(resolve, 750))
-      const status = await api.api.v1.admin.competitions.byCompetitionId(competitionId).webhooks.byTargetId(target.id).testDeliveries.byDeliveryId(data.deliveryId!).get();
-      if (status?.state && status.state !== 'Pending') {
-        testStates[target.id] = status.state
-        toast[status.state === 'Succeeded' ? 'success' : 'error'](
-          status.state === 'Succeeded'
+      const status = await adminGetCompetitionWebhookTestDelivery({
+        path: { competitionId, targetId: target.id, deliveryId: data.deliveryId! },
+      })
+      if (status.data?.state && status.data.state !== 'Pending') {
+        testStates[target.id] = status.data.state
+        toast[status.data.state === 'Succeeded' ? 'success' : 'error'](
+          status.data.state === 'Succeeded'
             ? translate('webhook.testSucceeded')
             : translate('webhook.testFailed'),
         )

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-
 import { toRefs } from 'vue'
 import type { CompetitionsByIdLeaderboardPageViewState } from '~/features/routes/competitions/[id]/useCompetitionsByIdLeaderboardPage'
 
@@ -48,7 +47,7 @@ const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, 
             <SelectTrigger class="min-w-40" :aria-label="$t('leaderboard.label.selectLeaderboardTrack')"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem :value="allTracksKey">{{ $t('leaderboard.label.tracks') }}</SelectItem>
-              <SelectItem v-for="track in availableTracks" :key="track.key ?? undefined" :value="track.key!">{{ track.name }}</SelectItem>
+              <SelectItem v-for="track in availableTracks" :key="track.key" :value="track.key!">{{ track.name }}</SelectItem>
             </SelectContent>
           </Select>
           <Button variant="outline" :disabled="!teams.length" @click="exportCsv"><Download data-icon="inline-start" />{{ $t('leaderboard.label.downloadExcel') }}</Button>
@@ -64,7 +63,7 @@ const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, 
             <CardContent class="py-4">
               <Skeleton v-if="trendsLoading && !trends" class="h-[320px] w-full" />
               <Empty v-else-if="!visibleTrendSeries.length" class="h-[320px]"><EmptyHeader><EmptyTitle>{{ $t('leaderboard.scoreboardTeam.label.scoreTrendDataYet') }}</EmptyTitle></EmptyHeader></Empty>
-              <component :is="LazyScoreTrendChart" v-else :series="visibleTrendSeries" :revision="trendRevision" :range-start="dateIso(trendRangeStart)" :range-end="dateIso(trendRangeEnd)" height="clamp(220px, 32vh, 320px)" />
+              <component :is="LazyScoreTrendChart" v-else :series="visibleTrendSeries" :revision="trendRevision" :range-start="trendRangeStart" :range-end="trendRangeEnd" height="clamp(220px, 32vh, 320px)" />
             </CardContent>
           </Card>
         </div>
@@ -78,14 +77,14 @@ const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, 
                   <TableHead :rowspan="isCtf ? 1 : 2" data-scoreboard-frozen-corner="top-start" class="sticky left-0 z-30 w-20 min-w-20 max-w-20 bg-card text-center">{{ $t('leaderboard.label.ranking') }}</TableHead>
                   <TableHead :rowspan="isCtf ? 1 : 2" class="sticky left-20 z-30 w-56 min-w-56 max-w-56 bg-card">{{ $t('common.label.teams') }}</TableHead>
                   <TableHead :rowspan="isCtf ? 1 : 2" data-scoreboard-frozen-corner="top-end" class="sticky left-76 z-30 w-28 min-w-28 max-w-28 border-r bg-card text-right">{{ $t('common.label.totalScore') }}</TableHead>
-                  <TableHead v-for="group in columnGroups" :key="group.competitionChallengeId ?? undefined" :colspan="group.columns.length" class="border-l px-4 text-center">
+                  <TableHead v-for="group in columnGroups" :key="group.competitionChallengeId" :colspan="group.columns.length" class="border-l px-4 text-center">
                     <span class="inline-flex items-center gap-1.5 whitespace-nowrap"><LucideIcon v-if="group.challenge?.directionIcon" :name="group.challenge.directionIcon" class="size-4" :class="directionTextClass(group.challenge.direction)" /><component v-else :is="directionIcon(group.challenge?.direction)" class="size-4" :class="directionTextClass(group.challenge?.direction)" />{{ group.challenge?.title ?? $t('common.label.unknownQuestion') }}</span>
                   </TableHead>
                 </TableRow>
-                <TableRow v-if="!isCtf"><template v-for="group in columnGroups" :key="`${group.competitionChallengeId}-rounds`"><TableHead v-for="column in group.columns" :key="column.index ?? undefined" class="min-w-28 border-l px-3 text-center">{{ roundLabel(column) }}</TableHead></template></TableRow>
+                <TableRow v-if="!isCtf"><template v-for="group in columnGroups" :key="`${group.competitionChallengeId}-rounds`"><TableHead v-for="column in group.columns" :key="column.index" class="min-w-28 border-l px-3 text-center">{{ roundLabel(column) }}</TableHead></template></TableRow>
               </TableHeader>
               <TableBody>
-                <TableRow v-for="(team, teamIndex) in visibleTeams" :key="team.teamId ?? undefined" :class="(displayRank(team) ?? 99) <= 3 ? 'bg-primary/5' : ''">
+                <TableRow v-for="(team, teamIndex) in visibleTeams" :key="team.teamId" :class="(displayRank(team) ?? 99) <= 3 ? 'bg-primary/5' : ''">
                   <TableCell :data-scoreboard-frozen-corner="teamIndex === visibleTeams.length - 1 ? 'bottom-start' : undefined" class="sticky left-0 z-20 w-20 min-w-20 max-w-20 bg-card text-center"><Medal v-if="(displayRank(team) ?? 99) <= 3" class="size-5" :class="medalRankClass[displayRank(team) ?? 0]" /><span v-else class="font-mono tabular-nums">{{ displayRank(team) ?? $t('common.label.symbol') }}</span></TableCell>
                   <TableCell class="sticky left-20 z-20 w-56 min-w-56 max-w-56 bg-card"><div class="flex min-w-0 flex-col items-start gap-1"><Hint :content="displayTeamName(team)" ><ActionButton type="button" class="w-full whitespace-normal break-words rounded-sm text-left font-medium underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"  :aria-label="$t('leaderboard.label.viewDetailsTeam', { team: displayTeamName(team) })" @click="openTeamDetail(team)">{{ displayTeamName(team) }}</ActionButton></Hint><div v-if="(tracksEnabled && selectedAllTracks && availableTracks.length > 1) || team.rankingState !== 'Eligible'" class="flex flex-wrap items-center gap-1"><Hint v-if="tracksEnabled && selectedAllTracks && availableTracks.length > 1" :content="trackName(team.trackKey)"><Badge variant="outline" class="whitespace-normal break-words text-left">{{ trackName(team.trackKey) }}</Badge></Hint><Badge v-if="team.rankingState !== 'Eligible'" variant="destructive">{{ scoreboardRankingStateLabel(team.rankingState) }}</Badge></div></div></TableCell>
                   <TableCell :data-scoreboard-frozen-corner="teamIndex === visibleTeams.length - 1 ? 'bottom-end' : undefined" class="sticky left-76 z-20 w-28 min-w-28 max-w-28 border-r bg-card text-right">
@@ -96,8 +95,8 @@ const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, 
                     <span v-else class="font-mono font-semibold tabular-nums">{{ team.totalScore ?? 0 }} {{ $t('common.label.pts.scoreTrendChart') }}</span>
                   </TableCell>
                   <template v-for="group in columnGroups" :key="`${team.teamId}-${group.competitionChallengeId}`">
-                    <TableCell v-for="column in group.columns" :key="column.index ?? undefined" class="border-l p-1 text-center" :class="isCtf ? 'min-w-56' : 'min-w-28'">
-                      <ActionButton v-if="column.index != null && scoreboardSlot(team, column.index)" type="button" class="flex min-h-12 w-full items-center justify-center rounded-md px-1 py-1 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" :aria-label="$t('leaderboard.label.viewSDetails', { team: displayTeamName(team), challenge: group.challenge?.title ?? $t('common.label.unknownQuestion'), round: roundLabel(column) })" @click="openDetail(team, column)">
+                    <TableCell v-for="column in group.columns" :key="column.index" class="border-l p-1 text-center" :class="isCtf ? 'min-w-56' : 'min-w-28'">
+                      <ActionButton v-if="column.index !== undefined && scoreboardSlot(team, column.index)" type="button" class="flex min-h-12 w-full items-center justify-center rounded-md px-1 py-1 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" :aria-label="$t('leaderboard.label.viewSDetails', { team: displayTeamName(team), challenge: group.challenge?.title ?? $t('common.label.unknownQuestion'), round: roundLabel(column) })" @click="openDetail(team, column)">
                         <template v-if="isCtf">
                           <span v-if="ctfScore(scoreboardSlot(team, column.index!)) !== null" class="inline-flex items-center justify-center gap-2 whitespace-nowrap">
                             <span class="font-mono text-lg font-bold tabular-nums">{{ ctfScore(scoreboardSlot(team, column.index!)) }} {{ $t('common.label.pts.scoreTrendChart') }}</span>
@@ -141,8 +140,8 @@ const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, 
       :trend-series="teamDetailTrendSeries"
       :trend-loading="trendsLoading"
       :trend-error="trendsError"
-      :trend-range-start="dateIso(trendRangeStart)"
-      :trend-range-end="dateIso(trendRangeEnd)"
+      :trend-range-start="trendRangeStart"
+      :trend-range-end="trendRangeEnd"
       :trend-revision="trendRevision"
       @retry-trends="loadTrends"
     />
@@ -158,8 +157,8 @@ const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, 
             <div class="rounded-lg border p-3"><p class="text-xs text-muted-foreground">{{ $t('leaderboard.label.earned') }}</p><p class="mt-1 font-mono font-semibold">{{ detail.earnedPoints ?? $t('common.label.symbol') }}</p></div>
             <div class="rounded-lg border p-3"><p class="text-xs text-muted-foreground">{{ $t('leaderboard.label.netScore') }}</p><p class="mt-1 font-mono font-semibold">{{ detail.netPoints ?? $t('common.label.symbol') }}</p></div>
           </div>
-          <div v-if="detail.breakdown?.length" class="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2"><div v-for="item in detail.breakdown" :key="item.kind ?? undefined" class="flex items-center justify-between gap-4 bg-background p-3 text-sm"><div><p class="font-medium">{{ scoreboardEntryKindLabel(item.kind) }}</p><p class="text-xs text-muted-foreground">{{ $t('leaderboard.label.succeededSubmitted', { success: item.successfulCount ?? 0, attempt: item.attemptCount ?? 0 }) }}</p></div><span class="font-mono font-semibold tabular-nums">{{ item.netPoints ?? 0 }} {{ $t('common.label.pts.scoreTrendChart') }}</span></div></div>
-          <div class="flex flex-col gap-2"><div v-for="entry in detailEntries" :key="entry.id ?? undefined" class="flex items-start justify-between gap-4 rounded-lg border p-3 text-sm"><div><p class="font-medium">{{ scoreboardEntryKindLabel(entry.kind) }} · {{ scoreboardEntryOutcomeLabel(entry.outcome) }}</p><p class="text-xs text-muted-foreground">{{ entryActor(entry) }} · {{ formatDateTime(entry.occurredAt) }}</p></div><span class="font-mono tabular-nums">{{ entry.netPoints ?? $t('common.label.symbol') }}<template v-if="entry.netPoints !== null && entry.netPoints !== undefined"> {{ $t('common.label.pts.scoreTrendChart') }}</template></span></div><p v-if="!detailEntries.length" class="py-6 text-center text-sm text-muted-foreground">{{ $t('leaderboard.label.details') }}</p></div>
+          <div v-if="detail.breakdown?.length" class="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2"><div v-for="item in detail.breakdown" :key="item.kind" class="flex items-center justify-between gap-4 bg-background p-3 text-sm"><div><p class="font-medium">{{ scoreboardEntryKindLabel(item.kind) }}</p><p class="text-xs text-muted-foreground">{{ $t('leaderboard.label.succeededSubmitted', { success: item.successfulCount ?? 0, attempt: item.attemptCount ?? 0 }) }}</p></div><span class="font-mono font-semibold tabular-nums">{{ item.netPoints ?? 0 }} {{ $t('common.label.pts.scoreTrendChart') }}</span></div></div>
+          <div class="flex flex-col gap-2"><div v-for="entry in detailEntries" :key="entry.id" class="flex items-start justify-between gap-4 rounded-lg border p-3 text-sm"><div><p class="font-medium">{{ scoreboardEntryKindLabel(entry.kind) }} · {{ scoreboardEntryOutcomeLabel(entry.outcome) }}</p><p class="text-xs text-muted-foreground">{{ entryActor(entry) }} · {{ formatDateTime(entry.occurredAt) }}</p></div><span class="font-mono tabular-nums">{{ entry.netPoints ?? $t('common.label.symbol') }}<template v-if="entry.netPoints !== null && entry.netPoints !== undefined"> {{ $t('common.label.pts.scoreTrendChart') }}</template></span></div><p v-if="!detailEntries.length" class="py-6 text-center text-sm text-muted-foreground">{{ $t('leaderboard.label.details') }}</p></div>
           <Button v-if="detail.nextCursor" variant="outline" :disabled="detailLoadingMore" @click="loadDetailPage(detail.nextCursor ?? null, true)"><Spinner v-if="detailLoadingMore" />{{ $t('common.label.load') }}</Button>
         </template>
       </DialogScrollContent>
@@ -171,7 +170,7 @@ const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, 
         <Alert v-if="adjustmentError" variant="destructive"><AlertDescription>{{ $message(adjustmentError) }}</AlertDescription></Alert>
         <div v-if="adjustmentLoading" class="flex items-center justify-center py-10"><Spinner /></div>
         <template v-else-if="adjustmentDetail">
-          <div class="flex flex-col gap-2"><div v-for="entry in adjustmentEntries" :key="entry.id ?? undefined" class="flex items-start justify-between gap-4 rounded-lg border p-3 text-sm"><div><p class="font-medium">{{ adjustmentKind(entry) }}</p><p class="text-xs text-muted-foreground">{{ adjustmentActor(entry) }} · {{ formatDateTime(entry.occurredAt) }}</p></div><span class="font-mono font-semibold tabular-nums" :class="(entry.netPoints ?? 0) < 0 ? 'text-destructive' : 'text-emerald-600'">{{ (entry.netPoints ?? 0) > 0 ? '+' : '' }}{{ entry.netPoints ?? 0 }} {{ $t('common.label.pts.scoreTrendChart') }}</span></div><p v-if="!adjustmentEntries.length" class="py-6 text-center text-sm text-muted-foreground">{{ $t('leaderboard.label.details') }}</p></div>
+          <div class="flex flex-col gap-2"><div v-for="entry in adjustmentEntries" :key="entry.id" class="flex items-start justify-between gap-4 rounded-lg border p-3 text-sm"><div><p class="font-medium">{{ adjustmentKind(entry) }}</p><p class="text-xs text-muted-foreground">{{ adjustmentActor(entry) }} · {{ formatDateTime(entry.occurredAt) }}</p></div><span class="font-mono font-semibold tabular-nums" :class="(entry.netPoints ?? 0) < 0 ? 'text-destructive' : 'text-emerald-600'">{{ (entry.netPoints ?? 0) > 0 ? '+' : '' }}{{ entry.netPoints ?? 0 }} {{ $t('common.label.pts.scoreTrendChart') }}</span></div><p v-if="!adjustmentEntries.length" class="py-6 text-center text-sm text-muted-foreground">{{ $t('leaderboard.label.details') }}</p></div>
           <Button v-if="adjustmentDetail.nextCursor" variant="outline" :disabled="adjustmentLoadingMore" @click="loadAdjustmentPage(adjustmentDetail.nextCursor ?? null, true)"><Spinner v-if="adjustmentLoadingMore" />{{ $t('common.label.load') }}</Button>
         </template>
       </DialogScrollContent>

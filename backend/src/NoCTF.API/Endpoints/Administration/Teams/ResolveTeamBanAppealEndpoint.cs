@@ -48,7 +48,7 @@ public sealed class ResolveTeamBanAppealEndpoint(
         Description(builder => builder
             .WithName("AdminResolveTeamBanAppeal")
             .ProducesProblemFE(StatusCodes.Status409Conflict));
-        Summary(summary => { summary.Summary = "Resolves a private team-ban appeal."; summary.Description = summary.Summary; });
+        Summary(summary => summary.Summary = "Resolves a private team-ban appeal.");
     }
 
     public override async Task<

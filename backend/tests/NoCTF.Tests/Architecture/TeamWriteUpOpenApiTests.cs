@@ -91,8 +91,9 @@ public sealed class TeamWriteUpOpenApiTests
             .IsEquivalentTo(["scoreboardAvailable", "canJudge", "items"]);
         var reviewItem = ResolveSchema(
             root,
-            ResolveSchema(root, reviewSchema.GetProperty("properties")
-                .GetProperty("items")).GetProperty("items"));
+            reviewSchema.GetProperty("properties")
+                .GetProperty("items")
+                .GetProperty("items"));
         await Assert.That(reviewItem.GetProperty("properties")
                 .EnumerateObject()
                 .Select(property => property.Name))
@@ -174,6 +175,6 @@ public sealed class TeamWriteUpOpenApiTests
         if (directory is null)
             throw new DirectoryNotFoundException("Backend root was not found.");
         return JsonDocument.Parse(await File.ReadAllTextAsync(
-            Path.Combine(directory.FullName, "artifacts", "openapi", "v1.json")));
+            Path.Combine(directory.FullName, "artifacts", "openapi", "swagger.json")));
     }
 }

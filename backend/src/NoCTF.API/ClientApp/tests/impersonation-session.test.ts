@@ -27,8 +27,7 @@ describe('administrator impersonation session', () => {
       'impersonated-token',
       new Date(Date.now() + 60_000).toISOString(),
     )
-    while (!completeRefresh) await Bun.sleep(1)
-    completeRefresh(new Response(JSON.stringify({
+    completeRefresh?.(new Response(JSON.stringify({
       accessToken: 'late-administrator-token',
       expiresAt: new Date(Date.now() + 60_000).toISOString(),
     }), {
@@ -60,8 +59,7 @@ describe('administrator impersonation session', () => {
       'impersonated-token',
       new Date(Date.now() + 60_000).toISOString(),
     )
-    while (!failRefresh) await Bun.sleep(1)
-    failRefresh(new TypeError('offline'))
+    failRefresh?.(new TypeError('offline'))
 
     try {
       expect(await refreshing).toBeFalse()
@@ -133,10 +131,14 @@ describe('administrator impersonation session', () => {
   test('401 handling returns the original response before restoring the administrator', async () => {
     const plugin = await sourceFile(new URL('../app/plugins/api.client.ts', import.meta.url)).text()
     const auth = await sourceFile(new URL('../app/composables/useAuth.ts', import.meta.url)).text()
-    const transport = await sourceFile(new URL('../app/lib/api.ts', import.meta.url)).text()
-    expect(plugin).toContain("requestImpersonationEnd('unauthorized')")
-    expect(transport).toContain('if (currentToken === originalToken && session.impersonating()) session.endImpersonation()')
-    expect(transport).toContain('else if (!session.impersonating() && sameIdentity(currentToken))')
+    const branch = plugin.slice(
+      plugin.indexOf('if (isImpersonatingSession())'),
+      plugin.indexOf('const refreshed = await refreshSession()'),
+    )
+
+    expect(branch).toContain("requestImpersonationEnd('unauthorized')")
+    expect(branch).toContain('return response')
+    expect(branch).not.toContain('fetch(')
     expect(auth).toContain('restoreImpersonationAccessToken()')
     expect(auth).toContain('else if (await refreshSession())')
     expect(auth).toContain('user.value?.userId === active.administratorUserId')
@@ -148,7 +150,7 @@ describe('administrator impersonation session', () => {
     const view = await sourceFile(new URL('../app/components/views/page/admin/platform/AdminPlatformUsersPageView.vue', import.meta.url)).text()
     const layout = await sourceFile(new URL('../app/components/views/layout/DefaultLayoutView.vue', import.meta.url)).text()
 
-    expect(controller).toMatch(/api\.api\.v1\.admin\.platform\.users\.byUserId\([^)]*\)\.tokens\.post\(/)
+    expect(controller).toContain('adminPlatformIssueUserToken')
     expect(controller).not.toContain('adminPlatformListUserTokens')
     expect(controller).not.toContain('adminPlatformRevokeUserToken')
     expect(controller).toContain('issuedToken.value = null')
