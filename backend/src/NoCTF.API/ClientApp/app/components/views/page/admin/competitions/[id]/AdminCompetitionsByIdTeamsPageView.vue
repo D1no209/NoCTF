@@ -119,13 +119,13 @@ const { adminUserPath, teamDetailOpen, teamLoading, teamDetailError, competition
 
     <Sheet :open="teamDetailOpen" @update:open="onUpdateOpenOpen">
       <SheetContent data-scroll-surface class="overflow-y-auto sm:max-w-lg">
-        <SheetHeader>
+        <SheetHeader class="px-6 py-5 pr-14">
           <SheetTitle>{{ $t('common.label.teamDetails') }}</SheetTitle>
           <SheetDescription>{{ selectedTeam ? displayTeamName(selectedTeam) : '' }}</SheetDescription>
         </SheetHeader>
-        <Skeleton v-if="teamLoading" class="mt-6 h-48" />
+        <Skeleton v-if="teamLoading" class="mx-6 h-48" />
         <Alert v-else-if="teamDetailError" variant="destructive"><AlertDescription>{{ $message(teamDetailError) }}</AlertDescription></Alert>
-        <div v-else-if="selectedTeam" class="mt-6 flex flex-col gap-6">
+        <div v-else-if="selectedTeam" class="flex flex-col gap-6 px-6 pb-6">
           <dl class="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-4 gap-y-3 text-sm">
             <dt v-if="tracksEnabled" class="text-muted-foreground">{{ $t('common.label.tracks') }}</dt>
             <dd v-if="tracksEnabled">{{ selectedTeam.trackName ?? selectedTeam.trackKey }}</dd>
