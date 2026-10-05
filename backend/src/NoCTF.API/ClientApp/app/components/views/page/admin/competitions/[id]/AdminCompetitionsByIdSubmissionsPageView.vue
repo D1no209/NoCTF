@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdSubmissionsPageViewState } from '~/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdSubmissionsPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdSubmissionsPageViewState }>()
-const { adminUserPath, adminTeamPath, adminChallengePath, competitionId, previewIncludeInformational, previewScanned, previewCounts, evidenceOpen, evidenceTarget, evidenceRows, evidenceCursor, evidenceLoading, evidenceError, openEvidence, loadEvidence, adjudicationSeverity, adjudicationSeverityLabel, adjudicationClassificationLabel, adjudicationCompletenessLabel, adjudicationEventLabel, adjudicationVariant, Download, canWrite, canJudge, isAdministrator, canDownloadPatch, patchDownloading, patchErrors, downloadPatch, gameplayFactKindOptions, gameplayFactStateOptions, gameplayFactResultOptions, challengeOptions, teamOptions, teamName, challengeTitle, filterChallenge, filterTeam, filterKind, filterState, filterResult, filterFlag, previewItems, previewCursor, previewLoading, previewError, previewInitialized, differenceLabels, bloodRankLabel, loadPreview, items, loading, listError, hasMore, loadMore, initialized, applyFilters, detail, detailOpen, detailLoading, detailError, openDetail, actionPending, rejudgeOne, batchTarget, rejudgeBatch, queueEvaluation, flagDialog, flagResult, flagError, flagPending, openFlagAccess, closeFlagAccess, accessFlag, onClickFilterChallenge, onUpdateOpenChange } = toRefs(viewProps.state)
+const { adminUserPath, adminTeamPath, adminChallengePath, competitionId, previewIncludeInformational, previewScanned, previewCounts, evidenceOpen, evidenceTarget, evidenceRows, evidenceCursor, evidenceLoading, evidenceError, openEvidence, loadEvidence, adjudicationSeverity, adjudicationSeverityLabel, adjudicationClassificationLabel, adjudicationCompletenessLabel, adjudicationEventLabel, adjudicationVariant, Download, canWrite, canJudge, isAdministrator, canDownloadPatch, patchDownloading, patchErrors, downloadPatch, gameplayFactKindOptions, gameplayFactStateOptions, gameplayFactResultOptions, challengeOptions, teamOptions, teamName, challengeTitle, filterChallenge, filterTeam, filterKind, filterState, filterResult, filterFlag, previewItems, previewCursor, previewLoading, previewError, previewInitialized, differenceLabels, bloodRankLabel, loadPreview, items, loading, listError, page, pageCount, total, pageLimit, loadPage, setPageSize, initialized, applyFilters, detail, detailOpen, detailLoading, detailError, openDetail, actionPending, rejudgeOne, batchTarget, rejudgeBatch, queueEvaluation, flagDialog, flagResult, flagError, flagPending, openFlagAccess, closeFlagAccess, accessFlag, onClickFilterChallenge, onUpdateOpenChange } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -253,11 +253,17 @@ const { adminUserPath, adminTeamPath, adminChallengePath, competitionId, preview
           </TableRow>
         </TableBody>
       </Table>
-      <div v-if="hasMore" class="flex justify-center">
-        <Button variant="outline" :disabled="loading" @click="loadMore">
-          <Spinner v-if="loading" data-icon="inline-start" /> {{ $t('common.label.load') }} </Button>
-      </div>
     </template>
+    <OffsetPagination
+      v-if="initialized"
+      :page="page"
+      :page-count="pageCount"
+      :total="total"
+      :limit="pageLimit"
+      :loading="loading"
+      @update:page="loadPage"
+      @update:limit="setPageSize"
+    />
 
     <Sheet v-model:open="detailOpen">
       <SheetContent data-scroll-surface class="overflow-y-auto">

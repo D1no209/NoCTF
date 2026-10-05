@@ -9,6 +9,7 @@ import { downloadSdkFile } from '../../../../../utils/download'
 import { adminAccessCompetitionGameplayFactValue, adminCreateGameplayFactRejudgement, adminGetGameplayFact, adminDownloadGameplayFactPatch, adminListCompetitionChallenges, adminListGameplayFacts, adminPreviewHistoricalAdjudicationDifferences, adminListTeams, adminQueueGameplayFactEvaluation } from '../../../../../api'
 import type { NoCtfapiEndpointsGameplayFactsAdminGameplayFactStatusResponse, NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse, NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol, NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol, NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol, NoCtfapiEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferenceItemResponse, NoCtfapiEndpointsAdministrationGameplayFactsAdjudicationDifferenceKindProtocol } from '../../../../../api'
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
+import { useOffsetPagination } from '../../../../../composables/useOffsetPagination'
 import { adminGetGameplayFactAdjudicationEvents } from '../../../../../api'
 import type { NoCtfapiEndpointsAdministrationGameplayFactsAdjudicationEventResponse } from '../../../../../api'
 import { adjudicationCounts, adjudicationSeverity, adjudicationSeverityLabel, adjudicationClassificationLabel, adjudicationCompletenessLabel, adjudicationEventLabel, adjudicationVariant } from '../../../../admin/adjudication-preview'
@@ -147,6 +148,7 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
   })
   watch(previewIncludeInformational, () => { if (previewInitialized.value) void loadPreview(true) })
   onUnmounted(() => {
+    pagination.reset()
     resetEvidence()
     previewGeneration++
     evidenceAbort?.abort()
@@ -217,33 +219,50 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
     }
   }
 
-  const { items, loading, error: listError, hasMore, loadMore, reset, initialized } = useCursorPagination<
+  const appliedFilters = ref({
+    challengeId: filterChallenge.value,
+    teamId: filterTeam.value,
+    kind: filterKind.value,
+    state: filterState.value,
+    result: filterResult.value,
+    value: filterFlag.value,
+  })
+
+  const pagination = useOffsetPagination<
     NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse
-  >(async (cursor) => {
+  >(async ({ offset, limit, desc }) => {
+    const filters = appliedFilters.value
     const { data, error } = await adminListGameplayFacts({
       path: { competitionId },
       query: {
-        competitionChallengeId: filterChallenge.value || null,
-        teamId: filterTeam.value || null,
-        gameplayFactKind: filterKind.value || null,
-        state: filterState.value || null,
-        gameplayFactResult: filterResult.value || null,
-        value: filterFlag.value || null,
-        offset: cursor ? Number(cursor) || 0 : 0,
-        limit: 30,
-        desc: true,
+        competitionChallengeId: filters.challengeId || null,
+        teamId: filters.teamId || null,
+        gameplayFactKind: filters.kind || null,
+        state: filters.state || null,
+        gameplayFactResult: filters.result || null,
+        value: filters.value || null,
+        offset,
+        limit,
+        desc,
       },
     })
     if (error || !data) throw parseApiError(error)
-    const pageItems = data.items ?? []
-    const offset = cursor ? Number(cursor) || 0 : 0
-    const nextOffset = offset + pageItems.length
-    return { items: pageItems, nextCursor: nextOffset < (data.total ?? 0) ? String(nextOffset) : null }
-  })
+    return { items: data.items ?? [], total: data.total ?? 0 }
+  }, { initialPageSize: 10, initialDesc: true })
 
-  function applyFilters() {
-    reset({ preserveItems: true })
-    void loadMore()
+  const { items, loading, error: listError, initialized } = pagination
+
+  async function applyFilters() {
+    appliedFilters.value = {
+      challengeId: filterChallenge.value,
+      teamId: filterTeam.value,
+      kind: filterKind.value,
+      state: filterState.value,
+      result: filterResult.value,
+      value: filterFlag.value,
+    }
+    pagination.reset()
+    await pagination.loadPage(1)
     if (previewInitialized.value) void loadPreview(true)
   }
 
@@ -394,7 +413,7 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
 
   onMounted(() => {
     void loadRefs()
-    void loadMore()
+    void pagination.loadPage(1)
   })
 
   const viewBindings = {
@@ -435,8 +454,12 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
       items,
       loading,
       listError,
-      hasMore,
-      loadMore,
+      page: pagination.page,
+      pageCount: pagination.pageCount,
+      total: pagination.total,
+      pageLimit: pagination.limit,
+      loadPage: pagination.loadPage,
+      setPageSize: pagination.setPageSize,
       initialized,
       applyFilters,
       detail,

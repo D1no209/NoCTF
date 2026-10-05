@@ -9,7 +9,6 @@ describe('admin list error presentation', () => {
   test.each([
     'admin/platform/audit.vue',
     'admin/platform/logs.vue',
-    'admin/competitions/[id]/submissions.vue',
   ])('%s exposes cursor failures without replacing them with an empty state', async (path) => {
     const source = await pageSource(path)
 
@@ -18,6 +17,17 @@ describe('admin list error presentation', () => {
     expect(source).toContain('!listError && initialized && items.length === 0')
     expect(source).toMatch(/(?:Card|template) v-else-if="items\.length > 0"/)
     expect(source).toContain('reset({ preserveItems: true })')
+  })
+
+  test('competition submissions expose offset page failures without replacing loaded rows with an empty state', async () => {
+    const source = await pageSource('admin/competitions/[id]/submissions.vue')
+
+    expect(source).toContain('error: listError')
+    expect(source).toContain('<Alert v-if="listError" variant="destructive">')
+    expect(source).toContain('!listError && initialized && items.length === 0')
+    expect(source).toContain('v-else-if="items.length > 0"')
+    expect(source).toContain('useOffsetPagination<')
+    expect(source).toContain('<OffsetPagination')
   })
 
   test('competition runtimes keep the current offset page visible after a refresh failure', async () => {
