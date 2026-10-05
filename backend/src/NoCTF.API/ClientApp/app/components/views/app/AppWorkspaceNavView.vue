@@ -12,7 +12,7 @@ const {
 <template>
   <div data-slot="app-workspace-nav" class="settings-workspace-page" :data-collapsed="isCollapsed ? 'true' : undefined">
     <div class="settings-workspace-layout">
-      <div class="min-w-0">
+      <div data-workspace-nav-sidebar class="min-w-0">
         <ChoiceSidebar :groups="isCollapsed ? undefined : groupOptions" :compact="isCollapsed" :items="options" :model-value="selectedPath" :label="title || $t('common.label.mainNavigation')" :loading-label="title || $t('common.label.mainNavigation')" :empty-label="title || $t('common.label.mainNavigation')" controls="settings-workspace-content" @update:model-value="selectPath">
           <template #header>
             <header class="flex min-h-11 items-center justify-between gap-2 pr-10" data-workspace-nav-header>
