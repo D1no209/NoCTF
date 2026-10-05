@@ -59,8 +59,18 @@ export function useAdminCompetitionsByIdPermissionsPage() {
   const filteredCandidates = computed(() => {
     const q = search.value.trim().toLowerCase()
     const list = candidates.value.filter(c => c.id && c.id !== permissions.value?.ownerId)
-    if (!q) return list.slice(0, 20)
-    return list.filter(c => c.userName?.toLowerCase().includes(q)).slice(0, 20)
+    if (!q) return list
+    return list.filter(c => c.userName?.toLowerCase().includes(q))
+  })
+
+  const pagination = useOffsetPagination<NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionCandidateResponse>(async ({ offset, limit }) => ({
+    items: filteredCandidates.value.slice(offset, offset + limit),
+    total: filteredCandidates.value.length,
+  }), { initialPageSize: 10 })
+
+  watch([search, candidates, () => permissions.value?.ownerId], async () => {
+    pagination.reset()
+    await pagination.loadPage(1)
   })
 
   function assigned(id?: string): boolean {
@@ -165,7 +175,14 @@ export function useAdminCompetitionsByIdPermissionsPage() {
       user,
       candidateName,
       search,
-      filteredCandidates,
+      pageCandidates: pagination.items,
+      page: pagination.page,
+      pageCount: pagination.pageCount,
+      total: pagination.total,
+      pageLimit: pagination.limit,
+      pageLoading: pagination.loading,
+      loadPage: pagination.loadPage,
+      setPageSize: pagination.setPageSize,
       assigned,
       add,
       remove,

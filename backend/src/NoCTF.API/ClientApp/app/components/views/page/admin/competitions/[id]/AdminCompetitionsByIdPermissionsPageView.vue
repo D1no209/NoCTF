@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdPermissionsPageViewState } from '~/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdPermissionsPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdPermissionsPageViewState }>()
-const { adminUserPath, X, canManagePermissions, permissions, candidates, loading, error, candidateName, search, filteredCandidates, assigned, add, remove, saving, save, transferTarget, transferConfirm, transferring, transfer, roles, onClickTransferConfirm } = toRefs(viewProps.state)
+const { adminUserPath, X, canManagePermissions, permissions, candidates, loading, error, candidateName, search, pageCandidates, page, pageCount, total, pageLimit, pageLoading, loadPage, setPageSize, assigned, add, remove, saving, save, transferTarget, transferConfirm, transferring, transfer, roles, onClickTransferConfirm } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -53,7 +53,7 @@ const { adminUserPath, X, canManagePermissions, permissions, candidates, loading
             </Field>
             <div class="flex flex-col gap-1">
               <div
-                v-for="c in filteredCandidates"
+                v-for="c in pageCandidates"
                 :key="c.id"
                 class="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
               >
@@ -70,8 +70,18 @@ const { adminUserPath, X, canManagePermissions, permissions, candidates, loading
                   <Badge v-else variant="outline">{{ $t('administration.label.assigned') }}</Badge>
                 </div>
               </div>
-              <p v-if="filteredCandidates.length === 0" class="text-sm text-muted-foreground">{{ $t('administration.label.matchingCandidateUsers') }}</p>
+              <p v-if="total === 0" class="text-sm text-muted-foreground">{{ $t('administration.label.matchingCandidateUsers') }}</p>
             </div>
+            <OffsetPagination
+              v-if="total > 0"
+              :page="page"
+              :page-count="pageCount"
+              :total="total"
+              :limit="pageLimit"
+              :loading="pageLoading"
+              @update:page="loadPage"
+              @update:limit="setPageSize"
+            />
             <div>
               <Button :disabled="saving" @click="save">
                 <Spinner v-if="saving" data-icon="inline-start" /> {{ $t('administration.label.savePermissionChanges') }} </Button>
