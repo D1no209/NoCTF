@@ -1,7 +1,9 @@
 import { message as describeMessage } from '../../../../utils/i18n'
 import type { UiMessage } from '../../../../utils/i18n'
-
-
+import { ArrowLeft } from '@lucide/vue'
+import { competitionChallengesPath } from '../../../../utils/app-routes'
+import { useOffsetPagination } from '../../../../composables/useOffsetPagination'
+import { createTrailingRefresh } from '../../../../lib/latest-page-refresh'
 import { adminGetCompetition, listCompetitionEvents } from '../../../../api'
 import type { NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse, NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol, NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol } from '../../../../api'
 import { competitionEventHistoryRange } from '../../../../lib/competition-event-history'
@@ -13,6 +15,8 @@ export function useCompetitionsByIdEventsPage() {
   const route = useRoute()
 
   const competitionId = route.params.id as string
+
+  const competitionReturnPath = competitionChallengesPath(competitionId)
 
   const ctx = inject(competitionContextKey)!
 
@@ -37,28 +41,31 @@ export function useCompetitionsByIdEventsPage() {
     { value: 'QuestionOpened', label: "common.label.consultingCreation" }, { value: 'QuestionReplied', label: "common.label.consultationReply" }, { value: 'QuestionStatusChanged', label: "common.label.consultationStatus" },
   ]
 
-  const { items, loading, error, hasMore, initialized, loadMore, reset } =
-    useCursorPagination<CompetitionEvent>(async (cursor) => {
-      const competition = ctx.competition.value
-      const range = competitionEventHistoryRange(
-        hasStaffHistory.value,
-        competition?.startTime,
-      )
-      const { data, error: err } = await listCompetitionEvents({
-        path: { competitionId },
-        query: {
-          from: range.from,
-          to: range.to,
-          kind: kind.value === 'all' ? null : kind.value as NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol,
-          cursor,
-          offset: 0,
-          limit: 50,
-          desc: true,
-        },
-      })
-      if (err || !data) throw err ?? new Error(translate("competitions.error.loadFailed"))
-      return { items: data.items, nextCursor: data.nextCursor }
+  let latestEventAt = 0
+  const pagination = useOffsetPagination<CompetitionEvent>(async ({ offset, limit, desc }) => {
+    const competition = ctx.competition.value
+    const range = competitionEventHistoryRange(
+      hasStaffHistory.value,
+      competition?.startTime,
+      Math.max(Date.now(), latestEventAt),
+    )
+    const { data, error: err } = await listCompetitionEvents({
+      path: { competitionId },
+      query: {
+        from: range.from,
+        to: range.to,
+        kind: kind.value === 'all' ? null : kind.value as NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol,
+        offset,
+        limit,
+        desc,
+      },
     })
+    if (err || !data) throw err ?? new Error(translate("competitions.error.loadFailed"))
+    return { items: data.items ?? [], total: data.total ?? 0 }
+  }, { initialPageSize: 10, initialDesc: true })
+
+  const { items, loading, error, initialized } = pagination
+  const refreshEvents = createTrailingRefresh(() => pagination.loadPage())
 
   async function resolveHistoryScope() {
     if (!hasStaffHistory.value && canOrganize.value) {
@@ -77,24 +84,31 @@ export function useCompetitionsByIdEventsPage() {
   }
 
   watch(kind, () => {
-    reset()
-    void loadMore()
+    pagination.reset()
+    void pagination.loadPage(1)
   })
 
   function reload() {
-    reset()
-    void loadMore()
+    return refreshEvents()
   }
 
   let unwatch: (() => void) | undefined
 
   onMounted(() => {
     unwatch = watchCompetition(competitionId, {
-      competitionEventChanged: () => reload(),
+      competitionEventChanged: event => {
+        const occurredAt = Date.parse(event.occurredAt)
+        if (Number.isFinite(occurredAt)) latestEventAt = Math.max(latestEventAt, occurredAt)
+        void reload()
+      },
+      onReconnected: () => void reload(),
     })
   })
 
-  onUnmounted(() => unwatch?.())
+  onUnmounted(() => {
+    unwatch?.()
+    pagination.reset()
+  })
 
   const levelVariant = (level?: NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol) =>
     level === 'Error' ? ('destructive' as const) : level === 'Warning' ? ('secondary' as const) : ('outline' as const)
@@ -105,18 +119,20 @@ export function useCompetitionsByIdEventsPage() {
   watch(
     () => ctx.competition.value,
     (competition) => {
-      if (competition && historyScopeResolved.value && !initialized.value) void loadMore()
+      if (competition && historyScopeResolved.value && !initialized.value) void pagination.loadPage(1)
     },
     { immediate: true },
   )
 
   async function initialize() {
     await resolveHistoryScope()
-    if (ctx.competition.value && !initialized.value) await loadMore()
+    if (ctx.competition.value && !initialized.value) await pagination.loadPage(1)
   }
 
   return {
       initialize,
+      ArrowLeft,
+      competitionReturnPath,
       hasStaffHistory,
       historyScopeError,
       kind,
@@ -124,9 +140,13 @@ export function useCompetitionsByIdEventsPage() {
       items,
       loading,
       error,
-      hasMore,
       initialized,
-      loadMore,
+      page: pagination.page,
+      pageCount: pagination.pageCount,
+      total: pagination.total,
+      pageLimit: pagination.limit,
+      loadPage: pagination.loadPage,
+      setPageSize: pagination.setPageSize,
       reload,
       levelVariant,
       levelLabel

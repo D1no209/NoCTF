@@ -3,11 +3,18 @@ import { toRefs } from 'vue'
 import type { CompetitionsByIdEventsPageViewState } from '~/features/routes/competitions/[id]/useCompetitionsByIdEventsPage'
 
 const viewProps = defineProps<{ state: CompetitionsByIdEventsPageViewState }>()
-const { hasStaffHistory, historyScopeError, kind, kindOptions, items, loading, error, hasMore, initialized, loadMore, reload, levelVariant, levelLabel } = toRefs(viewProps.state)
+const { ArrowLeft, competitionReturnPath, hasStaffHistory, historyScopeError, kind, kindOptions, items, loading, error, initialized, page, pageCount, total, pageLimit, loadPage, setPageSize, reload, levelVariant, levelLabel } = toRefs(viewProps.state)
 </script>
 
 <template>
   <div class="flex flex-col gap-4">
+    <div>
+      <Button variant="ghost" size="sm" as-child>
+        <NuxtLink :to="competitionReturnPath">
+          <ArrowLeft data-icon="inline-start" />{{ $t('common.label.backCompetition') }}
+        </NuxtLink>
+      </Button>
+    </div>
     <div class="flex items-center justify-between gap-2">
       <div class="flex items-center gap-2">
         <Select v-model="kind">
@@ -41,7 +48,7 @@ const { hasStaffHistory, historyScopeError, kind, kindOptions, items, loading, e
       <Skeleton v-for="i in 6" :key="i" class="h-12 w-full" />
     </div>
 
-    <Empty v-else-if="initialized && !items.length" class="border py-12">
+    <Empty v-else-if="!error && initialized && !items.length" class="border py-12">
       <EmptyHeader>
         <EmptyTitle>{{ $t('competitions.label.newsYet') }}</EmptyTitle>
         <EmptyDescription>{{ $t('competitions.competitionsBy.description.announcementsTopicReleasesBlood') }}</EmptyDescription>
@@ -64,9 +71,15 @@ const { hasStaffHistory, historyScopeError, kind, kindOptions, items, loading, e
       </li>
     </ul>
 
-    <div v-if="hasMore" class="flex justify-center">
-      <Button variant="outline" :disabled="loading" @click="loadMore">
-        <Spinner v-if="loading" data-icon="inline-start" /> {{ $t('common.label.load') }} </Button>
-    </div>
+    <OffsetPagination
+      v-if="initialized"
+      :page="page"
+      :page-count="pageCount"
+      :total="total"
+      :limit="pageLimit"
+      :loading="loading"
+      @update:page="loadPage"
+      @update:limit="setPageSize"
+    />
   </div>
 </template>
