@@ -202,7 +202,7 @@ describe('competition broadcast projection', () => {
     expect(challengePage).toContain("<component :is=\"CompetitionChallengeDetail\"")
     expect(challengeNavigator).toContain("@update:model-value=\"selectChallenge\"")
     expect(shell).not.toContain("<component :is=\"AppWorkspaceNav\"")
-    expect(shell).toContain('v-else-if="competition"')
+    expect(shell).toContain('v-else-if="competition && !teamLoading"')
     expect(shell).not.toContain("label: '公告/通知'")
     expect(panel).toContain('kinds: competitionBroadcastKinds')
     expect(panel).toContain('competitionEventChanged: notification => {')

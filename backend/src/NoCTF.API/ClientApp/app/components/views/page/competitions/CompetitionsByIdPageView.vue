@@ -3,14 +3,15 @@ import { toRefs } from 'vue'
 import type { CompetitionsByIdPageViewState } from '~/features/routes/competitions/useCompetitionsByIdPage'
 
 const viewProps = defineProps<{ state: CompetitionsByIdPageViewState }>()
-const { isOverview, isControlScreen, isWriteUpReview, isProgression, competition, myStanding, standingLoading, teamLoadError, standingError, error, refreshMyTeam, refreshMyStanding, CompetitionCountdown, LifecycleBadge } = toRefs(viewProps.state)
+const { isOverview, isControlScreen, isWriteUpReview, isProgression, competitionId, myTeam, teamBanned, teamLoading, CompetitionTeamBanScreen, competition, myStanding, standingLoading, teamLoadError, standingError, error, refreshMyTeam, refreshMyStanding, CompetitionCountdown, LifecycleBadge } = toRefs(viewProps.state)
 </script>
 
 <template>
   <NuxtPage v-if="isOverview || isControlScreen" />
+  <component :is="CompetitionTeamBanScreen" v-else-if="teamBanned && myTeam?.id" :competition-id="competitionId" :team-id="myTeam.id" />
 
   <div
-    v-else-if="competition"
+    v-else-if="competition && !teamLoading"
     data-contained-workspace-page
     :data-progression-route="isProgression"
     class="mx-auto flex w-full max-w-[120rem] flex-col"
