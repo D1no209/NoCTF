@@ -60,6 +60,8 @@ public sealed class PlatformSettings : NoCTF.Domain.Shared.IConcurrencyTracked
     }
 
     public bool EmailVerificationEnabled { get; set; }
+    public NoCTF.Domain.Identity.Mfa.MfaPolicy MfaPolicy { get; set; }
+    public Guid MfaPolicyStamp { get; set; } = Guid.Parse("00000000-0000-0000-0000-000000000002");
 
     [MaxLength(2048)]
     public string EmailPublicBaseUrl { get; set; } = string.Empty;

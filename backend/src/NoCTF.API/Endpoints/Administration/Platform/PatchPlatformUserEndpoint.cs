@@ -58,6 +58,7 @@ public static partial class PlatformUserPatchMapper
     [MapperIgnoreTarget(nameof(User.PasswordHash))]
     [MapperIgnoreTarget(nameof(User.Kind))]
     [MapperIgnoreTarget(nameof(User.TokenVersion))]
+    [MapperIgnoreTarget(nameof(User.MfaRequired))]
     [MapperIgnoreTarget(nameof(User.ExternalIdentityProviderId))]
     [MapperIgnoreTarget(nameof(User.ExternalIdentity))]
     [MapperIgnoreTarget(nameof(User.ExternalIdentityProtocol))]

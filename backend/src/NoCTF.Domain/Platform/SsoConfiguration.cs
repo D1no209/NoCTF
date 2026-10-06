@@ -71,6 +71,36 @@ public sealed class OidcSsoProviderConfiguration()
     }
     public bool ReadUserInfo { get; set; }
     public string DisplayNameClaim { get; set; } = "name";
+    public bool MfaTrustEnabled { get; set; }
+    public Guid MfaTrustPolicyId { get; set; }
+    public int MfaAuthenticationMaxAgeSeconds { get; set; } = 300;
+    public List<OidcMfaAcr> MfaAcrEntries { get; set; } = [];
+    public List<OidcMfaAmrGroup> MfaAmrGroups { get; set; } = [];
+}
+
+[Table("oidc_mfa_acr_values")]
+public sealed class OidcMfaAcr
+{
+    public Guid SsoProviderId { get; set; }
+    public int Position { get; set; }
+    [Required, MaxLength(512)] public string Value { get; set; } = string.Empty;
+}
+
+[Table("oidc_mfa_amr_groups")]
+public sealed class OidcMfaAmrGroup
+{
+    [Key] public Guid Id { get; set; }
+    public Guid SsoProviderId { get; set; }
+    public int Position { get; set; }
+    public List<OidcMfaAmrValue> Values { get; set; } = [];
+}
+
+[Table("oidc_mfa_amr_values")]
+public sealed class OidcMfaAmrValue
+{
+    public Guid GroupId { get; set; }
+    public int Position { get; set; }
+    [Required, MaxLength(128)] public string Value { get; set; } = string.Empty;
 }
 
 public sealed class SsoProviderAllowedHost

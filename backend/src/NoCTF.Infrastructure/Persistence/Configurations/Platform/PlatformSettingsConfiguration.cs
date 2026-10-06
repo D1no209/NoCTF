@@ -103,6 +103,9 @@ internal sealed class OidcSsoProviderConfigurationEntityConfiguration
 {
     public void Configure(EntityTypeBuilder<OidcSsoProviderConfiguration> builder)
     {
+        builder.Property(value => value.MfaTrustEnabled).HasDefaultValue(false).ValueGeneratedNever();
+        builder.Property(value => value.MfaAuthenticationMaxAgeSeconds).HasDefaultValue(300).ValueGeneratedNever();
+        builder.Property(value => value.MfaTrustPolicyId).HasDefaultValue(Guid.Empty).ValueGeneratedNever();
         builder.Property(value => value.Issuer).HasMaxLength(2048);
         builder.Property(value => value.DiscoveryUrl).HasMaxLength(2048);
         builder.Property(value => value.ClientId).HasMaxLength(512);
@@ -111,7 +114,31 @@ internal sealed class OidcSsoProviderConfigurationEntityConfiguration
             .HasForeignKey(scope => scope.SsoProviderId)
             .OnDelete(DeleteBehavior.Cascade);
         builder.Navigation(value => value.ScopeEntries).AutoInclude();
+        builder.HasMany(value => value.MfaAcrEntries).WithOne().HasForeignKey(value => value.SsoProviderId).OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(value => value.MfaAcrEntries).AutoInclude();
+        builder.HasMany(value => value.MfaAmrGroups).WithOne().HasForeignKey(value => value.SsoProviderId).OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(value => value.MfaAmrGroups).AutoInclude();
     }
+}
+
+internal sealed class OidcMfaAmrGroupConfiguration : IEntityTypeConfiguration<OidcMfaAmrGroup>
+{
+    public void Configure(EntityTypeBuilder<OidcMfaAmrGroup> builder)
+    {
+        builder.HasIndex(value => new { value.SsoProviderId, value.Position }).IsUnique();
+        builder.HasMany(value => value.Values).WithOne().HasForeignKey(value => value.GroupId).OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(value => value.Values).AutoInclude();
+    }
+}
+
+internal sealed class OidcMfaAcrConfiguration : IEntityTypeConfiguration<OidcMfaAcr>
+{
+    public void Configure(EntityTypeBuilder<OidcMfaAcr> builder) => builder.HasKey(value => new { value.SsoProviderId, value.Position });
+}
+
+internal sealed class OidcMfaAmrValueConfiguration : IEntityTypeConfiguration<OidcMfaAmrValue>
+{
+    public void Configure(EntityTypeBuilder<OidcMfaAmrValue> builder) => builder.HasKey(value => new { value.GroupId, value.Position });
 }
 
 internal sealed class CasSsoProviderConfigurationEntityConfiguration

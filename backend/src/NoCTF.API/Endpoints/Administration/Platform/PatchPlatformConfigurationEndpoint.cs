@@ -192,6 +192,8 @@ public static partial class PlatformSettingsPatchMapper
     [MapperIgnoreTarget(nameof(PlatformSettings.UpdatedAt))]
     [MapperIgnoreTarget(nameof(PlatformSettings.SsoConfiguration))]
     [MapperIgnoreTarget(nameof(PlatformSettings.SsoEnabled))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.MfaPolicy))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.MfaPolicyStamp))]
     [MapperIgnoreTarget(nameof(PlatformSettings.SsoPublicBaseUrl))]
     [MapperIgnoreTarget(nameof(PlatformSettings.SsoProviders))]
     public static partial void ApplyBrandingAsAdministrator(
@@ -234,6 +236,8 @@ public static partial class PlatformSettingsPatchMapper
     [MapperIgnoreTarget(nameof(PlatformSettings.UpdatedAt))]
     [MapperIgnoreTarget(nameof(PlatformSettings.SsoConfiguration))]
     [MapperIgnoreTarget(nameof(PlatformSettings.SsoEnabled))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.MfaPolicy))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.MfaPolicyStamp))]
     [MapperIgnoreTarget(nameof(PlatformSettings.SsoPublicBaseUrl))]
     [MapperIgnoreTarget(nameof(PlatformSettings.SsoProviders))]
     public static partial void ApplyEmailAsAdministrator(
