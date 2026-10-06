@@ -7,7 +7,7 @@ import { message } from '../../utils/i18n'
 import type { UiMessage } from '../../utils/i18n'
 import { parseApiError } from '../../utils/api-error'
 
-export function useCompetitionTeamBanScreen(props: Readonly<{ competitionId: string; teamId: string }>) {
+export function useCompetitionTeamBanScreen(props: Readonly<{ competitionId: string; teamId: string }>, refreshTeam: () => void = () => {}) {
   const banCase = ref<NoCtfapiEndpointsTeamsMyTeamBanCaseResponse | null>(null)
   const loading = ref(true)
   const error = ref<UiMessage | null>(null)
@@ -27,11 +27,22 @@ export function useCompetitionTeamBanScreen(props: Readonly<{ competitionId: str
     request = current
     loading.value = true
     error.value = null
-    const { data, error: failure } = await getMyTeamBanCase({ path: { competitionId: props.competitionId }, signal: current.signal })
-    if (current.signal.aborted) return
-    loading.value = false
-    if (failure || !data) error.value = parseApiError(failure, message('teamBanScreen.loadFailed')).displayMessage
-    else if (data.teamId === props.teamId && data.isCurrentlyBanned) banCase.value = data
+    try {
+      const { data, error: failure } = await getMyTeamBanCase({ path: { competitionId: props.competitionId }, signal: current.signal })
+      if (current.signal.aborted) return
+      loading.value = false
+      if (failure || !data) error.value = parseApiError(failure, message('teamBanScreen.loadFailed')).displayMessage
+      else if (data.teamId === props.teamId && data.isCurrentlyBanned) banCase.value = data
+    }
+    catch (failure) {
+      if (current.signal.aborted) return
+      loading.value = false
+      error.value = parseApiError(failure, message('teamBanScreen.loadFailed')).displayMessage
+    }
+  }
+  function refreshScreen() {
+    refreshTeam()
+    return refresh()
   }
   function setAppealOpen(open: boolean) {
     if (pending.value) return
@@ -57,7 +68,7 @@ export function useCompetitionTeamBanScreen(props: Readonly<{ competitionId: str
   watch(() => [props.competitionId, props.teamId], () => { banCase.value = null; void refresh() }, { immediate: true })
   onScopeDispose(() => request?.abort())
   return { logoUrl, loading, error, titleKey, descriptionKey, isCheatingBan, canAppeal, appealStatus,
-    appealOpen, statement, pending, appealError, refresh, setAppealOpen, submitAppeal }
+    appealOpen, statement, pending, appealError, refresh, refreshScreen, setAppealOpen, submitAppeal }
 }
 
 export type CompetitionTeamBanScreenViewState = import('vue').ShallowUnwrapRef<ReturnType<typeof useCompetitionTeamBanScreen>>

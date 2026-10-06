@@ -3,6 +3,12 @@
 @import 'overlayscrollbars/styles/overlayscrollbars.css';
 @import "tailwindcss";
 
+@import "tw-animate-css";
+@import "shadcn-vue/tailwind.css";
+@import '../../motion/motion.css';
+@import '../../motion/flag-celebration.css';
+@import '../../motion/cap-verification.css';
+
 /* Team bans use an independent warning surface, matching the approved red reference. */
 [data-team-banned-screen] {
   --team-ban-background: #db1327;
@@ -39,12 +45,6 @@
   .team-ban-screen-logo { margin-bottom: 2rem; }
   .team-ban-screen-actions { gap: .25rem; }
 }
-@import "tw-animate-css";
-@import "shadcn-vue/tailwind.css";
-@import '../../motion/motion.css';
-@import '../../motion/flag-celebration.css';
-@import '../../motion/cap-verification.css';
-
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

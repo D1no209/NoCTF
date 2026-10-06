@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { CompetitionTeamBanScreenViewState } from '../../../features/competition/useCompetitionTeamBanScreen'
 const props = defineProps<{ state: CompetitionTeamBanScreenViewState }>()
 const { logoUrl, loading, error, titleKey, descriptionKey, isCheatingBan, canAppeal, appealStatus,
-  appealOpen, statement, pending, appealError, refresh, setAppealOpen, submitAppeal } = toRefs(props.state)
+  appealOpen, statement, pending, appealError, refreshScreen, setAppealOpen, submitAppeal } = toRefs(props.state)
 </script>
 
 <template>
@@ -23,13 +23,13 @@ const { logoUrl, loading, error, titleKey, descriptionKey, isCheatingBan, canApp
           <Button v-if="canAppeal" type="button" variant="ghost" @click="setAppealOpen(true)">{{ $t('teamBanScreen.appeal') }}</Button>
           <span v-else-if="appealStatus === 'Submitted'" role="status">{{ $t('teamBanScreen.pending') }}</span>
           <span v-else-if="appealStatus === 'Upheld'">{{ $t('teamBanScreen.upheld') }}</span>
-          <span v-else-if="!loading">{{ $t('teamBanScreen.captain') }}</span>
+          <span v-else-if="!loading && !error">{{ $t('teamBanScreen.captain') }}</span>
           <Button type="button" variant="ghost" as-child><NuxtLink to="/competitions">{{ $t('teamBanScreen.return') }}</NuxtLink></Button>
-          <Button type="button" variant="ghost" :disabled="loading" @click="refresh">{{ $t('teamBanScreen.refresh') }}</Button>
+          <Button type="button" variant="ghost" :disabled="loading" @click="refreshScreen">{{ $t('teamBanScreen.refresh') }}</Button>
         </nav>
+        <Alert v-if="error" variant="destructive" class="mt-4 max-w-xl bg-card"><AlertDescription>{{ $message(error) }}</AlertDescription></Alert>
       </div>
     </ScrollSurface>
-    <Alert v-if="error" variant="destructive"><AlertDescription>{{ $message(error) }}</AlertDescription></Alert>
     <Dialog :open="appealOpen" @update:open="setAppealOpen">
       <DialogContent>
         <DialogHeader><DialogTitle>{{ $t('teamBanScreen.appeal') }}</DialogTitle><DialogDescription>{{ $t('teamBanScreen.appealDescription') }}</DialogDescription></DialogHeader>

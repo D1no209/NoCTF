@@ -8,7 +8,9 @@ const { isOverview, isControlScreen, isWriteUpReview, isProgression, competition
 
 <template>
   <NuxtPage v-if="isOverview || isControlScreen" />
-  <component :is="CompetitionTeamBanScreen" v-else-if="teamBanned && myTeam?.id" :competition-id="competitionId" :team-id="myTeam.id" />
+  <NuxtPage v-else-if="teamBanned && myTeam?.id">
+    <component :is="CompetitionTeamBanScreen" :competition-id="competitionId" :team-id="myTeam.id" @refresh-team="refreshMyTeam" />
+  </NuxtPage>
 
   <div
     v-else-if="competition && !teamLoading"

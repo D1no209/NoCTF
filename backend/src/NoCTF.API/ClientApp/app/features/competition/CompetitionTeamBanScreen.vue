@@ -4,7 +4,8 @@ import { useCompetitionTeamBanScreen } from './useCompetitionTeamBanScreen'
 import View from '../../components/views/competition/CompetitionTeamBanScreenView.vue'
 
 const props = defineProps<{ competitionId: string; teamId: string }>()
-const state = bindViewState(useCompetitionTeamBanScreen(props))
+const emit = defineEmits<{ 'refresh-team': [] }>()
+const state = bindViewState(useCompetitionTeamBanScreen(props, () => emit('refresh-team')))
 </script>
 
 <template>

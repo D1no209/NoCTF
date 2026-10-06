@@ -8,17 +8,18 @@ const compiled = new Bun.Transpiler({ loader: 'ts' }).transformSync(source)
 const drain = async () => { await nextTick(); await new Promise(resolve => setTimeout(resolve, 0)) }
 
 function harness() {
-  const reads: Array<{ options: any; resolve: (value: any) => void }> = []
+  const reads: Array<{ options: any; resolve: (value: any) => void; reject: (error: unknown) => void }> = []
   const appeals: any[] = []
+  let teamRefreshes = 0
   const props = reactive({ competitionId: 'competition', teamId: 'team' })
   const dependencies = { computed, ref, watch, onScopeDispose, logoUrl: '/logo.svg', validateAppealStatement,
     message: (key: string) => ({ key }), parseApiError: (_: unknown, fallback: any) => ({ displayMessage: fallback }),
-    getMyTeamBanCase: (options: any) => new Promise(resolve => reads.push({ options, resolve })),
+    getMyTeamBanCase: (options: any) => new Promise((resolve, reject) => reads.push({ options, resolve, reject })),
     submitTeamBanAppeal: async (options: any) => { appeals.push(options); return {} } }
   const factory = new Function('dependencies', `const { ${Object.keys(dependencies).join(', ')} } = dependencies; ${compiled}; return useCompetitionTeamBanScreen;`)(dependencies)
   const scope = effectScope()
-  const state = scope.run(() => factory(props))!
-  return { props, state, reads, appeals, stop: () => scope.stop() }
+  const state = scope.run(() => factory(props, () => { teamRefreshes++ }))!
+  return { props, state, reads, appeals, teamRefreshes: () => teamRefreshes, stop: () => scope.stop() }
 }
 const ban = (source = 'CheatIncident', canAppeal = true) => ({ teamId: 'team', isCurrentlyBanned: true, source, canAppeal })
 
@@ -63,5 +64,28 @@ describe('team ban screen', () => {
     expect(app.state.isCheatingBan.value).toBe(false)
     app.stop()
     expect(app.reads[1]!.options.signal.aborted).toBe(true)
+  })
+
+  test('manual refresh rechecks the parent team so missed unban events can recover', async () => {
+    const app = harness()
+    app.reads[0]!.resolve({ data: ban() }); await drain()
+    const refreshed = app.state.refreshScreen()
+    expect(app.teamRefreshes()).toBe(1)
+    app.reads[1]!.resolve({ data: { ...ban(), isCurrentlyBanned: false } }); await refreshed
+    app.stop()
+  })
+
+  test('a network failure leaves the confirmed notice visible and allows retry', async () => {
+    const app = harness()
+    app.reads[0]!.resolve({ data: ban() }); await drain()
+    const refreshed = app.state.refresh()
+    app.reads[1]!.reject(new Error('offline')); await refreshed
+    expect(app.state.loading.value).toBe(false)
+    expect(app.state.error.value.key).toBe('teamBanScreen.loadFailed')
+    expect(app.state.isCheatingBan.value).toBe(true)
+    const retry = app.state.refresh()
+    app.reads[2]!.resolve({ data: ban() }); await retry
+    expect(app.state.error.value).toBe(null)
+    app.stop()
   })
 })
