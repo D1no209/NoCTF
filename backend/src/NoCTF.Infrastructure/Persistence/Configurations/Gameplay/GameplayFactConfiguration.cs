@@ -17,7 +17,13 @@ internal sealed class GameplayFactConfiguration : IEntityTypeConfiguration<Gamep
             .HasValue<HintUnlockGameplayFact>(GameplayFactKind.HintUnlock)
             .HasValue<ManualAdjustmentGameplayFact>(GameplayFactKind.ManualAdjustment)
             .HasValue<AwdServiceTransitionGameplayFact>(GameplayFactKind.AwdServiceTransition)
-            .HasValue<KohControlObservationGameplayFact>(GameplayFactKind.KohControlObservation);
+            .HasValue<KohControlObservationGameplayFact>(GameplayFactKind.KohControlObservation)
+            .HasValue<AttachmentDownloadGameplayFact>(GameplayFactKind.AttachmentDownload);
+        builder.OwnsOne(fact => fact.AcquisitionEvidence, evidence =>
+        {
+            evidence.ToTable("flag_acquisition_evidence");
+            evidence.Ignore(item => item.MissingEvidence);
+        });
         builder.Property(fact => fact.ReferenceKind).HasConversion<short>();
         builder.Property(fact => fact.State).HasConversion<short>();
         builder.Property(fact => fact.Result).HasConversion<short>();

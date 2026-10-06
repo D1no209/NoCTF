@@ -243,6 +243,51 @@ public static class CompetitionNotificationMessageHandlers
             ct);
     }
 
+    public static async Task Handle(
+        StaticFlagAcquisitionViolationDetected message,
+        NoCtfDbContext db,
+        CompetitionNotificationDelivery delivery,
+        CancellationToken ct)
+    {
+        var competition = await db.Competitions.AsNoTracking()
+            .Where(item => item.Id == message.CompetitionId && item.DeletedAt == null)
+            .Select(item => new
+            {
+                item.OwnerId,
+                item.ManagerIds,
+                item.JudgeIds
+            })
+            .SingleOrDefaultAsync(ct);
+        if (competition is null)
+            return;
+
+        var administratorIds = await db.Users.AsNoTracking()
+            .Where(user => user.Role == NoCTF.Domain.Identity.UserRole.Administrator)
+            .Select(user => user.Id)
+            .ToArrayAsync(ct);
+        var recipients = administratorIds
+            .Concat(competition.ManagerIds)
+            .Concat(competition.JudgeIds)
+            .Append(competition.OwnerId)
+            .Distinct()
+            .ToArray();
+        await delivery.DeliverToUsersAsync(
+            message.CompetitionId,
+            message.GameplayFactId,
+            NotificationKind.CheatIncidentDetected,
+            $"cheat-incident:{message.GameplayFactId:N}",
+            new CheatIncidentDetectedPayload(
+                message.CompetitionId,
+                message.GameplayFactId,
+                message.SourceTeamId,
+                null,
+                message.ActorUserId,
+                message.CompetitionChallengeId,
+                message.DetectedAt, message.FailureCode),
+            recipients,
+            ct);
+    }
+
     public static Task Handle(
         TeamBanCorrected message,
         CompetitionNotificationDelivery delivery,

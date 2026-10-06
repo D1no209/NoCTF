@@ -162,6 +162,10 @@ public sealed class GameplayFactIntakeStore(
             return received.Select(_ => new GameplayFactAcceptanceResult(
                 GameplayFactAcceptanceState.AttemptsExhausted)).ToArray();
 
+        var acquisitionEvidence = received[0].Kind == GameplayFactKind.FlagAttempt
+            ? await FlagAcquisitionEvidenceReader.CaptureAsync(db, current, templates,
+                received[0].OccurredAt, practice, cancellationToken)
+            : null;
         var entities = received.Select(item =>
         {
             var entity = GameplayFactGeneratedCatalog.Create(item.Kind);
@@ -175,6 +179,7 @@ public sealed class GameplayFactIntakeStore(
             entity.ValueSha256 = item.ValueSha256;
             entity.OccurredAt = item.OccurredAt;
             entity.State = GameplayFactState.Queued;
+            entity.AcquisitionEvidence = acquisitionEvidence?.Copy();
             entity.UpdatedAt = item.OccurredAt;
             return entity;
         }).ToArray();

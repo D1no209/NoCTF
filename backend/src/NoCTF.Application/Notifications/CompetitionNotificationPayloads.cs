@@ -67,7 +67,8 @@ public sealed record CheatIncidentDetectedPayload(
     Guid CompetitionId,
     Guid GameplayFactId,
     Guid SourceTeamId,
-    Guid OwnerTeamId,
+    Guid? OwnerTeamId,
     Guid ActorUserId,
     Guid CompetitionChallengeId,
-    DateTimeOffset DetectedAt);
+    DateTimeOffset DetectedAt,
+    NoCTF.Domain.Gameplay.GameplayFactFailureCode FailureCode = NoCTF.Domain.Gameplay.GameplayFactFailureCode.ForeignTeamFlagDetected);

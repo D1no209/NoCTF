@@ -13344,7 +13344,7 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Reads one protected cross-team Flag incident.",
+        "summary": "Reads one protected Flag cheat incident.",
         "description": "Administrator, owner, manager, and judge only. The full Flag response is never cached. Owner, manager, and judge reads are audited; platform Administrator reads are not.",
         "operationId": "AdminGetCheatIncident",
         "parameters": [
@@ -13400,7 +13400,7 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Lists cross-team Flag detection incidents.",
+        "summary": "Lists Flag ownership and acquisition-evidence incidents.",
         "description": "Observer and above may list redacted evidence. Only current scoring facts and immutable adjudication events are used.",
         "operationId": "AdminListCheatIncidents",
         "parameters": [
@@ -18226,7 +18226,10 @@
           "PatchStillExploitable",
           "PatchExecutionFailed",
           "PatchServiceAbnormal",
-          "PatchVerificationPlatformFailed"
+          "PatchVerificationPlatformFailed",
+          "StaticFlagWithoutContainer",
+          "StaticFlagWithoutAttachment",
+          "StaticFlagWithoutContainerAndAttachment"
         ],
         "enum": [
           0,
@@ -18264,7 +18267,10 @@
           32,
           33,
           34,
-          35
+          35,
+          36,
+          37,
+          38
         ]
       },
       "NoCTFApplicationNotificationsRuntimeStateChangedNotificationContent": {
@@ -18596,6 +18602,14 @@
                 "type": "string",
                 "format": "date-time",
                 "nullable": true
+              },
+              "failureCode": {
+                "nullable": true,
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/NoCTFDomainGameplayGameplayFactFailureCode"
+                  }
+                ]
               }
             }
           }
@@ -19117,7 +19131,8 @@
           "HintUnlock",
           "ManualAdjustment",
           "AwdServiceTransition",
-          "KohControlObservation"
+          "KohControlObservation",
+          "AttachmentDownload"
         ],
         "enum": [
           "FlagAttempt",
@@ -19126,7 +19141,8 @@
           "HintUnlock",
           "ManualAdjustment",
           "AwdServiceTransition",
-          "KohControlObservation"
+          "KohControlObservation",
+          "AttachmentDownload"
         ]
       },
       "NoCTFAPIEndpointsGameplayFactsGameplayFactStateProtocol": {
@@ -19216,7 +19232,10 @@
           "PatchStillExploitable",
           "PatchExecutionFailed",
           "PatchServiceAbnormal",
-          "PatchVerificationPlatformFailed"
+          "PatchVerificationPlatformFailed",
+          "StaticFlagWithoutContainer",
+          "StaticFlagWithoutAttachment",
+          "StaticFlagWithoutContainerAndAttachment"
         ],
         "enum": [
           "FlagNotSupported",
@@ -19254,7 +19273,10 @@
           "PatchStillExploitable",
           "PatchExecutionFailed",
           "PatchServiceAbnormal",
-          "PatchVerificationPlatformFailed"
+          "PatchVerificationPlatformFailed",
+          "StaticFlagWithoutContainer",
+          "StaticFlagWithoutAttachment",
+          "StaticFlagWithoutContainerAndAttachment"
         ]
       },
       "NoCTFAPIEndpointsGameplayFactsAwdpAchievementActivationResponse": {
@@ -19654,12 +19676,14 @@
         "x-enumNames": [
           "PatchUpload",
           "Hint",
-          "AwdRound"
+          "AwdRound",
+          "Attachment"
         ],
         "enum": [
           0,
           1,
-          2
+          2,
+          3
         ]
       },
       "NoCTFAPIEndpointsGameplayFactsListGameplayFactsRequest": {
@@ -29243,6 +29267,14 @@
           },
           "canCorrect": {
             "type": "boolean"
+          },
+          "acquisitionEvidence": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCheatIncidentsFlagAcquisitionEvidenceResponse"
+              }
+            ]
           }
         }
       },
@@ -29262,6 +29294,67 @@
           "Dismissed",
           "Superseded",
           "Corrected"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationCheatIncidentsFlagAcquisitionEvidenceResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "applicable": {
+            "type": "boolean"
+          },
+          "requiresContainer": {
+            "type": "boolean"
+          },
+          "requiresAttachment": {
+            "type": "boolean"
+          },
+          "containerAcquired": {
+            "type": "boolean"
+          },
+          "attachmentAcquired": {
+            "type": "boolean"
+          },
+          "source": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCheatIncidentsFlagAcquisitionEvidenceSourceProtocol"
+          },
+          "capturedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "runtimeInstanceId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "runtimeStartedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "attachmentDownloadFactId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "attachmentDownloadedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCheatIncidentsFlagAcquisitionEvidenceSourceProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Recorded",
+          "LegacySubmission"
+        ],
+        "enum": [
+          "Recorded",
+          "LegacySubmission"
         ]
       },
       "NoCTFAPIEndpointsAdministrationCheatIncidentsGetCheatIncidentRequest": {

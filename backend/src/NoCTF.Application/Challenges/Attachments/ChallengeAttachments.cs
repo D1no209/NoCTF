@@ -51,7 +51,8 @@ public sealed record ChallengeAttachmentUploadItem(
 
 public sealed record ChallengeAttachmentContent(
     ChallengeAttachmentView Metadata,
-    string ObjectKey);
+    string ObjectKey,
+    Guid TeamId = default);
 
 public enum AddChallengeAttachmentState
 {
@@ -78,6 +79,8 @@ public enum ChallengeAttachmentFailureCode
 
 public interface IChallengeAttachmentStore
 {
+    Task RecordPlayerDownloadAsync(Guid competitionId, Guid competitionChallengeId, Guid teamId,
+        Guid actorId, Guid attachmentId, CancellationToken cancellationToken);
     Task<bool> CanWriteAsync(
         Guid challengeId,
         Guid actorId,
@@ -558,6 +561,17 @@ public sealed class GetChallengeAttachments(
         if (selected is null)
             return null;
         var content = await objects.OpenRead(selected.ObjectKey, ct);
-        return content is null ? null : (selected.Metadata, content);
+        if (content is null) return null;
+        try
+        {
+            await store.RecordPlayerDownloadAsync(competitionId, competitionChallengeId,
+                selected.TeamId, userId, selected.Metadata.Id, ct);
+            return (selected.Metadata, content);
+        }
+        catch
+        {
+            await content.DisposeAsync();
+            throw;
+        }
     }
 }

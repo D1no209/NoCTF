@@ -89,7 +89,7 @@ internal static class NotificationContentProjection
             item.OwnerTeamId,
             item.ActorUserId,
             item.CompetitionChallengeId,
-            item.PayloadOccurredAt),
+            item.PayloadOccurredAt, item.GameplayFactFailureCode),
         NotificationKind.TeamBanCorrected => new TeamBanCorrectedNotificationContent(
             item.CompetitionId,
             item.TeamId,

@@ -65,7 +65,10 @@ public sealed record CheatIncidentDetail(
     bool SourceTeamIsBanned,
     DateTimeOffset? SourceTeamBannedAt,
     Guid? SourceTeamBannedByUserId,
-    string? SourceTeamBanReason);
+    string? SourceTeamBanReason)
+{
+    public FlagAcquisitionEvidence? AcquisitionEvidence { get; init; }
+}
 
 public sealed record CheatIncidentResolutionCommand(
     Guid CompetitionId,

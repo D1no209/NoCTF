@@ -26,3 +26,12 @@ public sealed record ForeignTeamFlagDetected(
     Guid ActorUserId,
     Guid CompetitionChallengeId,
     DateTimeOffset DetectedAt);
+
+public sealed record StaticFlagAcquisitionViolationDetected(
+    Guid CompetitionId,
+    Guid GameplayFactId,
+    Guid SourceTeamId,
+    Guid ActorUserId,
+    Guid CompetitionChallengeId,
+    NoCTF.Domain.Gameplay.GameplayFactFailureCode FailureCode,
+    DateTimeOffset DetectedAt);

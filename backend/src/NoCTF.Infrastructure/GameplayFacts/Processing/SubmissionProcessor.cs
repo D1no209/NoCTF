@@ -289,7 +289,7 @@ public sealed class GameplayFactProcessor(
                 && item.CompetitionChallengeId == submission.CompetitionChallengeId
                 && item.TeamId == submission.TeamId
                 && (item.Result == GameplayFactResult.Correct
-                    || item.FailureCode == GameplayFactFailureCode.ForeignTeamFlagDetected)
+                    || item.FailureCode != null && CheatIncidentFailures.All.Contains(item.FailureCode.Value))
                 && (item.OccurredAt < submission.OccurredAt
                     || item.OccurredAt == submission.OccurredAt
                     && item.Id.CompareTo(submission.Id) < 0));
@@ -525,7 +525,7 @@ public sealed class GameplayFactProcessor(
 
         var previousGameplayFactResult = submission.Result;
         var previousFailureCode = submission.FailureCode;
-        if (submission.FailureCode == GameplayFactFailureCode.ForeignTeamFlagDetected)
+        if (CheatIncidentFailures.IsIncident(submission.FailureCode))
         {
             var resolved = await db.CompetitionEvents.AsNoTracking().AnyAsync(
                 @event => (@event.SubjectType == EntityReferenceKind.GameplayFact
@@ -558,11 +558,12 @@ public sealed class GameplayFactProcessor(
         submission.State = GameplayFactState.Completed;
         submission.UpdatedAt = now;
         await outbox.PublishAsync(new GameplayFactStateChanged(submission.Id, submission.State));
-        if (submission.FailureCode == GameplayFactFailureCode.ForeignTeamFlagDetected
+        if (CheatIncidentFailures.IsIncident(submission.FailureCode)
             && submission.TeamId is Guid sourceTeamId
             && submission.ActorUserId is Guid actorUserId)
         {
-            if (submission.VictimTeamId is Guid ownerTeamId)
+            if (submission.FailureCode == GameplayFactFailureCode.ForeignTeamFlagDetected
+                && submission.VictimTeamId is Guid ownerTeamId)
             {
                 await outbox.PublishAsync(new ForeignTeamFlagDetected(
                     submission.CompetitionId,
@@ -573,6 +574,10 @@ public sealed class GameplayFactProcessor(
                     submission.CompetitionChallengeId,
                     submission.OccurredAt));
             }
+            if (submission.FailureCode != GameplayFactFailureCode.ForeignTeamFlagDetected)
+                await outbox.PublishAsync(new StaticFlagAcquisitionViolationDetected(
+                    submission.CompetitionId, submission.Id, sourceTeamId, actorUserId,
+                    submission.CompetitionChallengeId, submission.FailureCode!.Value, submission.OccurredAt));
             await events.RecordAsync(new(
                 submission.CompetitionId,
                 CompetitionEventKind.CheatIncidentDetected,
@@ -586,7 +591,7 @@ public sealed class GameplayFactProcessor(
                 GameplayFactKind: submission.Kind,
                 GameplayFactResult: submission.Result), cancellationToken);
             log.LogWarning(
-                "Foreign team Flag detected for competition {CompetitionId}, gameplay fact {GameplayFactId}, source team {SourceTeamId}, owner team {OwnerTeamId}.",
+                "Cheat incident detected for competition {CompetitionId}, gameplay fact {GameplayFactId}, source team {SourceTeamId}, owner team {OwnerTeamId}.",
                 submission.CompetitionId,
                 submission.Id,
                 submission.TeamId,

@@ -42,7 +42,35 @@ public sealed record CheatIncidentDetailResponse(
     string? SourceTeamBanReason,
     bool CanDismiss,
     bool CanConfirm,
-    bool CanCorrect);
+    bool CanCorrect)
+{
+    public FlagAcquisitionEvidenceResponse? AcquisitionEvidence { get; init; }
+}
+
+[System.Text.Json.Serialization.JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<FlagAcquisitionEvidenceSourceProtocol>))]
+public enum FlagAcquisitionEvidenceSourceProtocol { Recorded, LegacySubmission }
+
+public sealed record FlagAcquisitionEvidenceResponse(
+    bool Applicable, bool RequiresContainer, bool RequiresAttachment, bool ContainerAcquired, bool AttachmentAcquired,
+    FlagAcquisitionEvidenceSourceProtocol Source, DateTimeOffset? CapturedAt,
+    Guid? RuntimeInstanceId, DateTimeOffset? RuntimeStartedAt,
+    Guid? AttachmentDownloadFactId, DateTimeOffset? AttachmentDownloadedAt);
+
+internal static class FlagAcquisitionEvidenceMapper
+{
+    public static FlagAcquisitionEvidenceResponse ToResponse(FlagAcquisitionEvidence? value) => value is null
+        ? new(false, false, false, true, true, FlagAcquisitionEvidenceSourceProtocol.LegacySubmission, null, null, null, null, null)
+        : new(value.Scope == FlagAcquisitionScope.FormalStaticCtf,
+            value.Required.HasFlag(FlagAcquisitionResource.Container), value.Required.HasFlag(FlagAcquisitionResource.Attachment),
+            value.Acquired.HasFlag(FlagAcquisitionResource.Container), value.Acquired.HasFlag(FlagAcquisitionResource.Attachment),
+            value.Source switch
+            {
+                FlagAcquisitionEvidenceSource.Recorded => FlagAcquisitionEvidenceSourceProtocol.Recorded,
+                FlagAcquisitionEvidenceSource.LegacySubmission => FlagAcquisitionEvidenceSourceProtocol.LegacySubmission,
+                _ => throw new ArgumentOutOfRangeException(nameof(value))
+            }, value.CapturedAt, value.RuntimeInstanceId, value.RuntimeStartedAt,
+            value.AttachmentDownloadFactId, value.AttachmentDownloadedAt);
+}
 
 public sealed class GetCheatIncidentEndpoint(
     AccessCheatIncident access,
@@ -59,7 +87,7 @@ public sealed class GetCheatIncidentEndpoint(
         Description(builder => builder.WithName("AdminGetCheatIncident"));
         Summary(summary =>
         {
-            summary.Summary = "Reads one protected cross-team Flag incident.";
+            summary.Summary = "Reads one protected Flag cheat incident.";
             summary.Description =
                 "Administrator, owner, manager, and judge only. The full Flag response is never cached. Owner, manager, and judge reads are audited; platform Administrator reads are not.";
         });
@@ -127,6 +155,9 @@ public sealed class GetCheatIncidentEndpoint(
             canConfirm && detail.Status == CheatIncidentStatus.Pending,
             canConfirm
                 && detail.Status == CheatIncidentStatus.Confirmed
-                && detail.SourceTeamIsBanned));
+                && detail.SourceTeamIsBanned)
+        {
+            AcquisitionEvidence = FlagAcquisitionEvidenceMapper.ToResponse(detail.AcquisitionEvidence)
+        });
     }
 }

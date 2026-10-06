@@ -17,6 +17,24 @@ public sealed class ChallengeAttachmentStore(
     FileReferenceLock fileLock,
     TimeProvider? clock = null) : IChallengeAttachmentStore
 {
+    public async Task RecordPlayerDownloadAsync(Guid competitionId, Guid competitionChallengeId, Guid teamId,
+        Guid actorId, Guid attachmentId, CancellationToken ct)
+    {
+        var now = timeProvider.GetUtcNow();
+        var fact = NoCTF.Domain.Gameplay.GameplayFactGeneratedCatalog.Create(NoCTF.Domain.Gameplay.GameplayFactKind.AttachmentDownload);
+        fact.Id = Guid.CreateVersion7(now);
+        fact.CompetitionId = competitionId;
+        fact.CompetitionChallengeId = competitionChallengeId;
+        fact.TeamId = teamId;
+        fact.ActorUserId = actorId;
+        fact.ReferenceKind = NoCTF.Domain.Gameplay.GameplayFactReferenceKind.Attachment;
+        fact.ReferenceId = attachmentId;
+        fact.OccurredAt = fact.UpdatedAt = now;
+        fact.State = NoCTF.Domain.Gameplay.GameplayFactState.Completed;
+        fact.Result = NoCTF.Domain.Gameplay.GameplayFactResult.Applied;
+        db.GameplayFacts.Add(fact);
+        await db.SaveChangesAsync(ct);
+    }
     private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
 
     public ChallengeAttachmentStore(NoCtfDbContext db)
@@ -472,11 +490,11 @@ public sealed class ChallengeAttachmentStore(
                 if (winningAttachment is null
                     || !await objectExistsAsync(winningAttachment.File.ObjectKey, ct))
                     return null;
-                return new(Map(winningAttachment), winningAttachment.File.ObjectKey);
+                return new(Map(winningAttachment), winningAttachment.File.ObjectKey, scope.TeamId);
             }
         }
         await transaction.CommitAsync(ct);
-        return new(Map(attachment), attachment.File.ObjectKey);
+        return new(Map(attachment), attachment.File.ObjectKey, scope.TeamId);
     }
 
     private IQueryable<Challenge> WriteAuthorized(

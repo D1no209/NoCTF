@@ -125,9 +125,19 @@ public sealed class CtfGameplayFactEvaluator(IGameplayFactEvaluator inner) : IGa
                     .ToArray()
             }
             : context;
-        return ModeGameplayFactEvaluatorRules.DetectForeignTeamFlag(
-            effectiveContext,
-            inner.Evaluate(effectiveContext));
+        var decision = ModeGameplayFactEvaluatorRules.DetectForeignTeamFlag(
+            effectiveContext, inner.Evaluate(effectiveContext));
+        if (decision.Result != GameplayFactResult.Correct
+            || context.GameplayFact.AcquisitionEvidence?.MissingEvidence is not { } failure)
+            return decision;
+        if (context.PriorFacts.Any(fact => CheatIncidentFailures.IsIncident(fact.FailureCode)
+                && fact.FailureCode != GameplayFactFailureCode.ForeignTeamFlagDetected
+                && fact.TeamId == context.GameplayFact.TeamId
+                && fact.CompetitionChallengeId == context.GameplayFact.CompetitionChallengeId
+                && fact.Kind == GameplayFactKind.FlagAttempt
+                && string.Equals(fact.Value, context.GameplayFact.Value, StringComparison.Ordinal)))
+            return new(GameplayFactResult.Duplicate, null, context.GameplayFact.OccurredAt);
+        return ModeGameplayFactEvaluatorRules.Reject(context.GameplayFact, failure);
     }
 
 }
