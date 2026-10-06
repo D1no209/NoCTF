@@ -37,7 +37,7 @@ const { adminUserPath, teamDetailOpen, teamLoading, teamDetailError, competition
             <TableCell>
               <ActionButton
                 type="button"
-                class="rounded-sm font-medium underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                class="w-max max-w-64 whitespace-normal rounded-sm text-left font-medium underline-offset-4 [overflow-wrap:anywhere] hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 @click="openTeamDetail(t)"
               >
                 {{ displayTeamName(t) }}
@@ -57,7 +57,7 @@ const { adminUserPath, teamDetailOpen, teamLoading, teamDetailError, competition
                   </SelectItem>
                 </SelectContent>
               </Select>
-              <Badge v-else variant="outline">{{ t.trackName ?? t.trackKey }}</Badge>
+              <Badge v-else variant="outline" class="max-w-64 whitespace-normal text-left [overflow-wrap:anywhere]">{{ t.trackName ?? t.trackKey }}</Badge>
             </TableCell>
             <TableCell class="font-mono tabular-nums">{{ t.memberIds?.length ?? 0 }}</TableCell>
             <TableCell>
@@ -121,7 +121,7 @@ const { adminUserPath, teamDetailOpen, teamLoading, teamDetailError, competition
       <SheetContent data-scroll-surface class="overflow-y-auto sm:max-w-lg">
         <SheetHeader class="px-6 py-5 pr-14">
           <SheetTitle>{{ $t('common.label.teamDetails') }}</SheetTitle>
-          <SheetDescription>{{ selectedTeam ? displayTeamName(selectedTeam) : '' }}</SheetDescription>
+          <SheetDescription class="[overflow-wrap:anywhere]">{{ selectedTeam ? displayTeamName(selectedTeam) : '' }}</SheetDescription>
         </SheetHeader>
         <Skeleton v-if="teamLoading" class="mx-6 h-48" />
         <Alert v-else-if="teamDetailError" variant="destructive"><AlertDescription>{{ $message(teamDetailError) }}</AlertDescription></Alert>
@@ -204,7 +204,7 @@ const { adminUserPath, teamDetailOpen, teamLoading, teamDetailError, competition
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{{ $t('administration.label.scoreAdjustment') }}</DialogTitle>
-          <DialogDescription>
+          <DialogDescription class="[overflow-wrap:anywhere]">
             {{ $t('administration.competitionsBy.description.recordChallengeScoreAdjustment', { team: scoreAdjustmentTeam ? displayTeamName(scoreAdjustmentTeam) : '-' }) }}
           </DialogDescription>
         </DialogHeader>
@@ -262,7 +262,7 @@ const { adminUserPath, teamDetailOpen, teamLoading, teamDetailError, competition
         <Card v-for="a in appeals" :id="`appeal-${a.appeal?.id ?? a.banEventId}`" :key="a.banEventId" class="scroll-mt-24">
           <CardHeader>
             <div class="flex items-center justify-between gap-2">
-              <CardTitle class="text-base">{{ teamDisplayName(a, teamDisplayNames) }}</CardTitle>
+              <CardTitle class="min-w-0 text-base [overflow-wrap:anywhere]">{{ teamDisplayName(a, teamDisplayNames) }}</CardTitle>
               <div class="flex items-center gap-1">
                 <Badge variant="outline">{{ enumLabel(TeamBanSourceLabel, a.source) }}</Badge>
                 <Badge v-if="a.appeal" :variant="a.appeal.status === 'Submitted' ? 'secondary' : a.appeal.status === 'Accepted' ? 'default' : 'destructive'">
@@ -292,7 +292,7 @@ const { adminUserPath, teamDetailOpen, teamLoading, teamDetailError, competition
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{{ banDialog?.mode === 'ban' ? $t('administration.label.banTeam') : $t('administration.label.correctBan') }}</DialogTitle>
-          <DialogDescription>
+          <DialogDescription class="[overflow-wrap:anywhere]">
             {{ banDialog?.mode === 'ban'
               ? $t('administration.competitionsBy.description.banTeamLongerAble', { team: banDialog?.team.name ?? '-' })
               : $t('administration.competitionsBy.error.markBanPublishFailed', { team: banDialog?.team.name ?? '-' }) }}
@@ -330,7 +330,7 @@ const { adminUserPath, teamDetailOpen, teamLoading, teamDetailError, competition
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{{ appealDialog?.mode === 'accept' ? $t('administration.label.acceptAppeal') : $t('administration.label.maintainBan') }}</DialogTitle>
-          <DialogDescription>
+          <DialogDescription class="[overflow-wrap:anywhere]">
             {{ appealDialog?.mode === 'accept'
               ? $t('administration.competitionsBy.description.acceptSAppealLift', { team: appealDialog?.banCase.teamName ?? '-' })
               : $t('administration.competitionsBy.description.rejectSAppealUphold', { team: appealDialog?.banCase.teamName ?? '-' }) }}
