@@ -124,7 +124,7 @@ public sealed class SmtpEmailVerificationDelivery(
             UriKind.Absolute);
         var resetUrl = new Uri(
             publicBaseUri,
-            $"reset-password?token={Uri.EscapeDataString(token)}").AbsoluteUri;
+            $"auth/password-reset?token={Uri.EscapeDataString(token)}").AbsoluteUri;
         using var message = CreateMessage(
             configuration,
             user.Email,
