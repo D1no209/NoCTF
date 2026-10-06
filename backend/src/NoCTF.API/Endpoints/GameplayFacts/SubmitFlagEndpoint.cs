@@ -24,7 +24,8 @@ public enum GameplayFactKindProtocol
     HintUnlock,
     ManualAdjustment,
     AwdServiceTransition,
-    KohControlObservation
+    KohControlObservation,
+    AttachmentDownload
 }
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<GameplayFactStateProtocol>))]
@@ -91,7 +92,10 @@ public enum GameplayFactFailureCodeProtocol
     PatchStillExploitable,
     PatchExecutionFailed,
     PatchServiceAbnormal,
-    PatchVerificationPlatformFailed
+    PatchVerificationPlatformFailed,
+    StaticFlagWithoutContainer,
+    StaticFlagWithoutAttachment,
+    StaticFlagWithoutContainerAndAttachment
 }
 
 public sealed record AcceptedGameplayFactResponse(

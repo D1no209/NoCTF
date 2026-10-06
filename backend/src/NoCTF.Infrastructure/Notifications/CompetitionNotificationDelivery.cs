@@ -230,6 +230,7 @@ public sealed class CompetitionNotificationDelivery(
                 notification.ActorUserId = value.ActorUserId;
                 notification.CompetitionChallengeId = value.CompetitionChallengeId;
                 notification.PayloadOccurredAt = value.DetectedAt;
+                notification.GameplayFactFailureCode = value.FailureCode;
                 return;
             default:
                 throw new ArgumentOutOfRangeException(

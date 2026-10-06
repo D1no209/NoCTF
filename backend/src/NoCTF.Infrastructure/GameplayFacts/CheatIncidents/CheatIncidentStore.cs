@@ -155,7 +155,7 @@ public sealed class CheatIncidentStore(
                 cancellationToken);
         if (fact is null
             || fact.CompetitionId != command.CompetitionId
-            || fact.FailureCode != GameplayFactFailureCode.ForeignTeamFlagDetected
+            || !CheatIncidentFailures.IsIncident(fact.FailureCode)
             || fact.TeamId is null)
         {
             return new(CheatIncidentResolutionFailure.NotFound);
@@ -334,7 +334,7 @@ public sealed class CheatIncidentStore(
         db.GameplayFacts.AsNoTracking()
             .Where(fact => fact.CompetitionId == competitionId
                 && fact.Result == GameplayFactResult.Rejected
-                && fact.FailureCode == GameplayFactFailureCode.ForeignTeamFlagDetected
+                && fact.FailureCode != null && CheatIncidentFailures.All.Contains(fact.FailureCode.Value)
                 && fact.TeamId != null
                 && fact.ActorUserId != null);
 
@@ -404,7 +404,8 @@ public sealed class CheatIncidentStore(
                     item.sourceTeam.IsBanned,
                     item.sourceTeam.BannedAt,
                     item.sourceTeam.BannedById,
-                    item.sourceTeam.BanReason));
+                    item.sourceTeam.BanReason,
+                    item.fact.AcquisitionEvidence));
 
     private IQueryable<GameplayFact> FilterStatus(
         IQueryable<GameplayFact> incidents,
@@ -526,7 +527,7 @@ public sealed class CheatIncidentStore(
             fact.SourceTeamIsBanned,
             fact.SourceTeamBannedAt,
             fact.SourceTeamBannedByUserId,
-            fact.SourceTeamBanReason);
+            fact.SourceTeamBanReason) { AcquisitionEvidence = fact.AcquisitionEvidence };
 
     private static CompetitionEvent? Resolve(
         Guid gameplayFactId,
@@ -596,5 +597,6 @@ public sealed class CheatIncidentStore(
         bool SourceTeamIsBanned,
         DateTimeOffset? SourceTeamBannedAt,
         Guid? SourceTeamBannedByUserId,
-        string? SourceTeamBanReason);
+        string? SourceTeamBanReason,
+        FlagAcquisitionEvidence? AcquisitionEvidence);
 }

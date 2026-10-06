@@ -522,7 +522,7 @@ public sealed class DeploymentTopologyTests
         await Assert.That(actionReferences.All(line =>
             System.Text.RegularExpressions.Regex.IsMatch(
                 line,
-                "^uses: [a-z0-9-]+/[a-z0-9-]+@[a-f0-9]{40} # v[0-9]+$"))).IsTrue();
+                @"^uses: [a-z0-9-]+/[a-z0-9-]+@[a-f0-9]{40} # v[0-9]+(?:\.[0-9]+){0,2}$"))).IsTrue();
 
         await Assert.That(actionReferences.Count(line =>
             line.StartsWith("uses: actions/checkout@", StringComparison.Ordinal))).IsEqualTo(1);
@@ -533,7 +533,7 @@ public sealed class DeploymentTopologyTests
             .Select(line => line.TrimStart('-', ' ')).ToArray();
         await Assert.That(checkActions).IsNotEmpty();
         await Assert.That(checkActions.All(line => System.Text.RegularExpressions.Regex.IsMatch(
-            line, "^uses: [a-z0-9-]+/[a-z0-9-]+@[a-f0-9]{40} # v[0-9]+$"))).IsTrue();
+            line, @"^uses: [a-z0-9-]+/[a-z0-9-]+@[a-f0-9]{40} # v[0-9]+(?:\.[0-9]+){0,2}$"))).IsTrue();
         await Assert.That(checks).Contains("contents: read");
         await Assert.That(checks).DoesNotContain("secrets: inherit");
 

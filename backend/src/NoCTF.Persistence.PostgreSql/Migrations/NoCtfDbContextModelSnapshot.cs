@@ -4989,6 +4989,15 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.HasDiscriminator().HasValue("challenge");
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Gameplay.AttachmentDownloadGameplayFact", b =>
+                {
+                    b.HasBaseType("NoCTF.Domain.Gameplay.GameplayFact");
+
+                    b.ToTable("gameplay_facts", (string)null);
+
+                    b.HasDiscriminator().HasValue((short)7);
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Gameplay.AwdServiceTransitionGameplayFact", b =>
                 {
                     b.HasBaseType("NoCTF.Domain.Gameplay.GameplayFact");
@@ -6237,6 +6246,60 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasForeignKey("VictimTeamId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_gameplay_facts_teams_victim_team_id");
+
+                    b.OwnsOne("NoCTF.Domain.Gameplay.FlagAcquisitionEvidence", "AcquisitionEvidence", b1 =>
+                        {
+                            b1.Property<Guid>("GameplayFactId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<short>("Acquired")
+                                .HasColumnType("smallint")
+                                .HasColumnName("acquired");
+
+                            b1.Property<Guid?>("AttachmentDownloadFactId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("attachment_download_fact_id");
+
+                            b1.Property<long?>("AttachmentDownloadedAt")
+                                .HasColumnType("bigint")
+                                .HasColumnName("attachment_downloaded_at");
+
+                            b1.Property<long>("CapturedAt")
+                                .HasColumnType("bigint")
+                                .HasColumnName("captured_at");
+
+                            b1.Property<short>("Required")
+                                .HasColumnType("smallint")
+                                .HasColumnName("required");
+
+                            b1.Property<Guid?>("RuntimeInstanceId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("runtime_instance_id");
+
+                            b1.Property<long?>("RuntimeStartedAt")
+                                .HasColumnType("bigint")
+                                .HasColumnName("runtime_started_at");
+
+                            b1.Property<short>("Scope")
+                                .HasColumnType("smallint")
+                                .HasColumnName("scope");
+
+                            b1.Property<short>("Source")
+                                .HasColumnType("smallint")
+                                .HasColumnName("source");
+
+                            b1.HasKey("GameplayFactId")
+                                .HasName("pk_flag_acquisition_evidence");
+
+                            b1.ToTable("flag_acquisition_evidence", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("GameplayFactId")
+                                .HasConstraintName("fk_flag_acquisition_evidence_gameplay_facts_id");
+                        });
+
+                    b.Navigation("AcquisitionEvidence");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Gameplay.PatchUpload", b =>

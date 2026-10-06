@@ -127,7 +127,8 @@ public sealed record CheatIncidentDetectedNotificationContent(
     Guid? OwnerTeamId,
     Guid? ActorUserId,
     Guid? CompetitionChallengeId,
-    DateTimeOffset? DetectedAt) : NotificationContent;
+    DateTimeOffset? DetectedAt,
+    NoCTF.Domain.Gameplay.GameplayFactFailureCode? FailureCode = null) : NotificationContent;
 
 public sealed record TeamBanCorrectedNotificationContent(
     Guid? CompetitionId,

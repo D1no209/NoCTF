@@ -108,7 +108,7 @@ public sealed class ListCheatIncidentsEndpoint(
         Description(builder => builder.WithName("AdminListCheatIncidents"));
         Summary(summary =>
         {
-            summary.Summary = "Lists cross-team Flag detection incidents.";
+            summary.Summary = "Lists Flag ownership and acquisition-evidence incidents.";
             summary.Description =
                 "Observer and above may list redacted evidence. Only current scoring facts and immutable adjudication events are used.";
         });

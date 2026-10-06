@@ -9,7 +9,7 @@ describe('participant competition workspace layout', () => {
 
     expect(parent).not.toContain("<component :is=\"AppWorkspaceNav\"")
     expect(parent).not.toContain('usesParticipantWorkspace')
-    expect(parent).toContain('v-else-if="competition"')
+    expect(parent).toContain('v-else-if="competition && !teamLoading"')
   })
 
   test('keeps staff-only live screens, teams and events out of the participant navigation', async () => {

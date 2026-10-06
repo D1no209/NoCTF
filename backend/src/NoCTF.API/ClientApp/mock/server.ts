@@ -1,7 +1,8 @@
 import { createMockApi } from './api'
 import { createMockRealtime } from './realtime'
 
-const api = createMockApi()
+const source = process.env.NOCTF_MOCK_TEAM_BAN
+const api = createMockApi({ teamBanSource: source === 'CheatIncident' || source === 'ManualModeration' ? source : undefined })
 const realtime = createMockRealtime(api)
 const server = Bun.serve({
   hostname: '127.0.0.1', port: Number(process.env.NOCTF_MOCK_API_PORT ?? 5081), idleTimeout: 30,

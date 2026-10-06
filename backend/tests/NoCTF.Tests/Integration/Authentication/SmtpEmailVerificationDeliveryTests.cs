@@ -61,9 +61,9 @@ public sealed class SmtpEmailVerificationDeliveryTests
             var changed = messages.Single(message =>
                 message.Subject == "Your NoCTF password was changed");
             await Assert.That(reset.TextBody).Contains(
-                "reset-password?token=single-use-reset-token");
+                "https://noctf.test/auth/password-reset?token=single-use-reset-token");
             await Assert.That(reset.HtmlBody).Contains(
-                "reset-password?token=single-use-reset-token");
+                "https://noctf.test/auth/password-reset?token=single-use-reset-token");
             await Assert.That(changed.TextBody).DoesNotContain("single-use-reset-token");
             await Assert.That(changed.TextBody).Contains("existing sessions were signed out");
         });

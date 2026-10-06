@@ -1,3 +1,4 @@
+import CompetitionTeamBanScreenComponent from '../../competition/CompetitionTeamBanScreen.vue'
 import { message as describeMessage } from '../../../utils/i18n'
 import type { UiMessage } from '../../../utils/i18n'
 import { markRaw } from 'vue'
@@ -57,6 +58,10 @@ export function useCompetitionsByIdPage() {
 
   const hasCompetitionStaffAccess = computed(() => competition.value?.administrationRole != null)
 
+  const teamLoading = ref(false)
+  let teamRequestId = 0
+  const teamBanned = computed(() => myTeam.value?.isBanned === true && !hasCompetitionStaffAccess.value)
+
   const hasParticipantChallengeAccess = computed(() =>
     myTeam.value?.registrationStatus === 'Approved' && !myTeam.value.isBanned,
   )
@@ -84,7 +89,10 @@ export function useCompetitionsByIdPage() {
   }, { immediate: true })
 
   async function refreshMyTeam() {
+    const requestId = ++teamRequestId
+    teamLoading.value = myTeam.value === null
     if (!user.value) {
+      teamLoading.value = false
       myTeam.value = null
       myStanding.value = null
       teamLoadError.value = null
@@ -94,6 +102,8 @@ export function useCompetitionsByIdPage() {
     const { data, error: teamError, response } = await getMyTeamEndpoint({
       path: { competitionId: competitionId.value },
     })
+    if (requestId !== teamRequestId) return
+    teamLoading.value = false
     if (response?.status === 404) {
       myTeam.value = null
       teamLoadError.value = null
@@ -181,6 +191,8 @@ export function useCompetitionsByIdPage() {
         if (!isWriteUpReview.value) void refreshStandingLatest()
       },
       competitionEventChanged: event => {
+        if (event.kind === 'TeamBanned' || event.kind === 'TeamUnbanned' || event.kind === 'TeamBanCorrectionPublished' || event.kind === 'TeamMemberRemoved')
+          void refreshMyTeam()
         if (event.kind === 'CompetitionAudienceChanged')
           void handleAudienceChanged()
         if (event.kind === 'CompetitionUpdated')
@@ -192,6 +204,7 @@ export function useCompetitionsByIdPage() {
         if (!isWriteUpReview.value) void refreshStandingLatest()
       },
       onReconnected: () => {
+        if (!isWriteUpReview.value) void refreshMyTeam()
         if (!isWriteUpReview.value) void refreshStandingLatest()
         void refreshProgressionEnabled()
         void refreshMissedAnnouncements()
@@ -201,6 +214,7 @@ export function useCompetitionsByIdPage() {
 
   onUnmounted(() => {
     progressionRequestId++
+    teamRequestId++
     unwatch?.()
   })
 
@@ -252,6 +266,8 @@ export function useCompetitionsByIdPage() {
 
   provide(competitionWorkspaceNavigationKey, navGroups)
 
+  const CompetitionTeamBanScreen = markRaw(CompetitionTeamBanScreenComponent)
+
   const CompetitionCountdown = markRaw(CompetitionCountdownComponent)
 
   const LifecycleBadge = markRaw(LifecycleBadgeComponent)
@@ -271,6 +287,7 @@ export function useCompetitionsByIdPage() {
       isWriteUpReview,
       isProgression,
       competition,
+      competitionId, myTeam, teamBanned, teamLoading, CompetitionTeamBanScreen,
       myStanding,
       standingLoading,
       teamLoadError,

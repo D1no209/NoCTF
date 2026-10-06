@@ -33,6 +33,7 @@ bun mock/dev.ts
 
 - 四种赛制、6 场比赛、56 个题库模板、84 道比赛题目、56 个模板附件、48 支队伍、排行榜、趋势与公告。每场比赛按 Misc、Web、Crypto、Pwn、Reverse、Penetration、Forensics、OSINT、AI、Mobile、IoT、Hardware、Cloud、Blockchain 各提供一道题。
 - 默认账号在各比赛的 Aurora 队伍中；选手是队长。
+- 封禁界面演示：启动前设置 `$env:NOCTF_MOCK_TEAM_BAN = 'CheatIncident'`（确认作弊）或 `'ManualModeration'`（普通封禁），再登录 `player`。支持查看封禁来源、队长提交一次申诉，以及管理员在队伍管理中解封。清除该变量并重启恢复正常种子。
 - 支持资料/学校身份编辑、平台品牌编辑、比赛和题库创建编辑、添加比赛题目、队伍创建/加入/退出/编辑、生命周期切换、公告及提问创建。每道种子题提供一个可实际下载的纯文本演示附件。
 - Flag 演示：`flag{mock_success}` 为正确答案，其他内容为错误；重复正确提交不重复加分。提交结果写入演示记录并更新榜单。
 - CTF 第一题预置为本队已解出；AWDP 前三题依次预置攻击成功、防御成功、攻防均成功，用于验证四种独立 SVG 状态标记。

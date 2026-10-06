@@ -61,7 +61,7 @@ export function runtimeStateLabel(state?: NoCtfapiEndpointsRuntimeRuntimeStatePr
 
 export function gameplayFactKindLabel(kind?: NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol): string {
   if (!kind) return translate("common.label.gameplayFacts")
-  const labels = { FlagAttempt: 'Flag', BreakAttempt: 'Break', FixAttempt: translate('common.label.patchVerification'), HintUnlock: translate("common.label.promptUnlock"), ManualAdjustment: translate("common.label.manualAdjustment"), AwdServiceTransition: translate("common.label.awdServiceStatus"), KohControlObservation: translate("common.label.kohControlObservation") } satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol, string>
+  const labels = { FlagAttempt: 'Flag', BreakAttempt: 'Break', FixAttempt: translate('common.label.patchVerification'), HintUnlock: translate("common.label.promptUnlock"), ManualAdjustment: translate("common.label.manualAdjustment"), AwdServiceTransition: translate("common.label.awdServiceStatus"), AttachmentDownload: translate("cheats.label.attachmentDownload"), KohControlObservation: translate("common.label.kohControlObservation") } satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol, string>
   return labels[kind]
 }
 
@@ -110,6 +110,9 @@ export function gameplayFactFailureCodeLabel(code?: NoCtfapiEndpointsGameplayFac
     AwdpServiceAbnormal: translate("common.label.serviceException"),
     AwdpPlatformFailed: translate("common.error.awdpPlatformFailed"),
     ForeignTeamFlagDetected: translate("common.description.submittedFlagAssignedAnother"),
+    StaticFlagWithoutContainer: translate("cheats.reason.containerMissing"),
+    StaticFlagWithoutAttachment: translate("cheats.reason.attachmentMissing"),
+    StaticFlagWithoutContainerAndAttachment: translate("cheats.reason.bothMissing"),
     InsufficientScore: translate("common.label.insufficientScore"),
     HintUnavailable: translate("common.error.hintUnavailable"),
     PatchStillExploitable: translate("common.label.expStillSucceeds"),

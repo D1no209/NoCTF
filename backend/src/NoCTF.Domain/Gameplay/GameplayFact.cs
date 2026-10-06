@@ -28,6 +28,7 @@ public abstract class GameplayFact : IConcurrencyTracked
     public GameplayFactState State { get; set; }
     public GameplayFactResult? Result { get; set; }
     public GameplayFactFailureCode? FailureCode { get; set; }
+    public FlagAcquisitionEvidence? AcquisitionEvidence { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 }
 
@@ -39,14 +40,16 @@ public enum GameplayFactKind : short
     HintUnlock,
     ManualAdjustment,
     AwdServiceTransition,
-    KohControlObservation
+    KohControlObservation,
+    AttachmentDownload
 }
 
 public enum GameplayFactReferenceKind : short
 {
     PatchUpload,
     Hint,
-    AwdRound
+    AwdRound,
+    Attachment
 }
 
 public enum GameplayFactState : short
@@ -116,5 +119,8 @@ public enum GameplayFactFailureCode : short
     PatchStillExploitable,
     PatchExecutionFailed,
     PatchServiceAbnormal,
-    PatchVerificationPlatformFailed
+    PatchVerificationPlatformFailed,
+    StaticFlagWithoutContainer,
+    StaticFlagWithoutAttachment,
+    StaticFlagWithoutContainerAndAttachment
 }

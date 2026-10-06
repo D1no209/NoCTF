@@ -1104,5 +1104,19 @@
   "webhook.payloadUnknown": "待检查资源",
   "webhook.payloadComplete": "资源完整",
   "webhook.payloadProjectionNotReady": "投影未就绪",
-  "webhook.payloadInvalid": "资源无效"
+  "webhook.payloadInvalid": "资源无效",
+  "cheats.reason.containerMissing": "正确静态 Flag 缺少本队启动该题容器的证据。",
+  "cheats.reason.attachmentMissing": "正确静态 Flag 缺少本队下载该题附件的证据。",
+  "cheats.reason.bothMissing": "正确静态 Flag 同时缺少本队启动容器和下载附件的证据。",
+  "cheats.label.reason": "检测原因",
+  "cheats.label.evidenceSource": "获取证据来源",
+  "cheats.label.legacy": "旧提交兼容，视为已获取",
+  "cheats.label.recorded": "提交时记录",
+  "cheats.label.container": "容器启动",
+  "cheats.label.attachmentDownload": "附件下载",
+  "cheats.label.acquired": "已获取",
+  "cheats.label.missing": "缺失",
+  "cheats.label.runtimeStartedAt": "容器启动时间",
+  "cheats.label.attachmentDownloadedAt": "下载开始时间",
+  "cheats.label.notApplicable": "不适用"
 }
