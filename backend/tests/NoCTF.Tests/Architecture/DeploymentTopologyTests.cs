@@ -522,7 +522,7 @@ public sealed class DeploymentTopologyTests
         await Assert.That(actionReferences.All(line =>
             System.Text.RegularExpressions.Regex.IsMatch(
                 line,
-                "^uses: [a-z0-9-]+/[a-z0-9-]+@[a-f0-9]{40} # v[0-9]+$"))).IsTrue();
+                "^uses: [a-z0-9-]+/[a-z0-9-]+@[a-f0-9]{40} # v[0-9]+(?:\\.[0-9]+){0,2}$"))).IsTrue();
 
         await Assert.That(actionReferences.Count(line =>
             line.StartsWith("uses: actions/checkout@", StringComparison.Ordinal))).IsEqualTo(1);
