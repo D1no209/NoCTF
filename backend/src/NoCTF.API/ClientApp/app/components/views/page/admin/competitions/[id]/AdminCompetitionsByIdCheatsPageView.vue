@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdCheatsPageViewState } from '~/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdCheatsPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdCheatsPageViewState }>()
-const { adminUserPath, adminTeamPath, adminChallengePath, competitionId, filterStatus, filterFrom, filterTo, filterError, pendingCount, items, loading, listError, hasMore, initialized, loadNextPage, applyFilters, detail, detailOpen, detailLoading, showFlag, openDetail, ActionMeta, resolutionAction, canSubmitResolution, resolutionError, resolutionOpen, resolutionPending, resolutionReason, remainingCharacters, resolutionTargetLabel, openAction, handleResolutionSubmit, handleResolutionOpen, onClickShowFlag } = toRefs(viewProps.state)
+const { adminUserPath, adminTeamPath, adminChallengePath, cheatOwnerTeamLabel, cheatEvidenceSourceLabel, competitionId, filterStatus, filterFrom, filterTo, filterError, pendingCount, items, loading, listError, hasMore, initialized, loadNextPage, applyFilters, detail, detailOpen, detailLoading, showFlag, openDetail, ActionMeta, resolutionAction, canSubmitResolution, resolutionError, resolutionOpen, resolutionPending, resolutionReason, remainingCharacters, resolutionTargetLabel, openAction, handleResolutionSubmit, handleResolutionOpen, onClickShowFlag } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -64,9 +64,9 @@ const { adminUserPath, adminTeamPath, adminChallengePath, competitionId, filterS
               <NuxtLink :to="adminTeamPath(competitionId, i.sourceTeamId)" class="hover:underline">{{ i.sourceTeamName }}</NuxtLink>
               <Badge v-if="i.sourceTeamIsBanned" variant="destructive" class="ml-1">{{ $t('common.label.banned') }}</Badge>
             </TableCell>
-            <TableCell><NuxtLink v-if="i.ownerTeamId" :to="adminTeamPath(competitionId, i.ownerTeamId)" class="hover:underline">{{ i.ownerTeamName }}</NuxtLink><span v-else>{{ i.ownerTeamName ?? $t('administration.label.multipleTeamsUndetermined') }}</span></TableCell>
+            <TableCell><NuxtLink v-if="i.ownerTeamId" :to="adminTeamPath(competitionId, i.ownerTeamId)" class="hover:underline">{{ i.ownerTeamName }}</NuxtLink><span v-else>{{ cheatOwnerTeamLabel(i) }}</span></TableCell>
             <TableCell><NuxtLink :to="adminChallengePath(competitionId, i.competitionChallengeId)" class="hover:underline">{{ i.challengeTitle }}</NuxtLink></TableCell>
-            <TableCell>{{ enumLabel(GameplayFactKindLabel, i.gameplayFactKind) }}</TableCell>
+            <TableCell><span class="block">{{ enumLabel(GameplayFactKindLabel, i.gameplayFactKind) }}</span><span class="block text-xs text-muted-foreground">{{ gameplayFactFailureCodeLabel(i.failureCode) }}</span></TableCell>
             <TableCell>
               <Badge :variant="i.status === 'Pending' ? 'secondary' : i.status === 'Confirmed' ? 'destructive' : 'outline'">
                 {{ enumLabel(CheatIncidentStatusLabel, i.status) }}
@@ -94,10 +94,18 @@ const { adminUserPath, adminTeamPath, adminChallengePath, competitionId, filterS
         <Skeleton v-if="detailLoading" class="mx-4 h-48" />
         <div v-else-if="detail" class="flex flex-col gap-3 px-4 pb-4 text-sm">
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('administration.label.sourceTeam') }}</span><NuxtLink v-if="detail.sourceTeamId" :to="adminTeamPath(competitionId, detail.sourceTeamId)" class="hover:underline">{{ detail.sourceTeamName }}</NuxtLink><span v-else>{{ detail.sourceTeamName }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('administration.label.flagOwner') }}</span><NuxtLink v-if="detail.ownerTeamId" :to="adminTeamPath(competitionId, detail.ownerTeamId)" class="hover:underline">{{ detail.ownerTeamName ?? $t('administration.label.multipleTeamsUndetermined') }}</NuxtLink><span v-else>{{ detail.ownerTeamName ?? $t('administration.label.multipleTeamsUndetermined') }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('administration.label.flagOwner') }}</span><NuxtLink v-if="detail.ownerTeamId" :to="adminTeamPath(competitionId, detail.ownerTeamId)" class="hover:underline">{{ cheatOwnerTeamLabel(detail) }}</NuxtLink><span v-else>{{ cheatOwnerTeamLabel(detail) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('common.label.challenge.pageTitle') }}</span><NuxtLink v-if="detail.competitionChallengeId" :to="adminChallengePath(competitionId, detail.competitionChallengeId)" class="hover:underline">{{ detail.challengeTitle }}</NuxtLink><span v-else>{{ detail.challengeTitle }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('administration.label.author') }}</span><NuxtLink v-if="detail.actorUserId" :to="adminUserPath(detail.actorUserId)" class="hover:underline">{{ detail.submittedByUserName }}</NuxtLink><span v-else>{{ detail.submittedByUserName }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('common.label.type') }}</span><span>{{ enumLabel(GameplayFactKindLabel, detail.gameplayFactKind) }}</span></div>
+          <div class="flex justify-between gap-3"><span class="text-muted-foreground">{{ $t('cheats.label.reason') }}</span><span>{{ gameplayFactFailureCodeLabel(detail.failureCode) }}</span></div>
+          <template v-if="detail.acquisitionEvidence">
+            <div class="flex justify-between gap-3"><span class="text-muted-foreground">{{ $t('cheats.label.evidenceSource') }}</span><span>{{ cheatEvidenceSourceLabel(detail.acquisitionEvidence.source) }}</span></div>
+            <div v-if="detail.acquisitionEvidence.requiresContainer" class="flex justify-between gap-3"><span class="text-muted-foreground">{{ $t('cheats.label.container') }}</span><span>{{ $t(detail.acquisitionEvidence.containerAcquired ? 'cheats.label.acquired' : 'cheats.label.missing') }}</span></div>
+            <div v-if="detail.acquisitionEvidence.runtimeStartedAt" class="flex justify-between gap-3"><span class="text-muted-foreground">{{ $t('cheats.label.runtimeStartedAt') }}</span><span>{{ adminFormatDateTime(detail.acquisitionEvidence.runtimeStartedAt) }}</span></div>
+            <div v-if="detail.acquisitionEvidence.requiresAttachment" class="flex justify-between gap-3"><span class="text-muted-foreground">{{ $t('cheats.label.attachmentDownload') }}</span><span>{{ $t(detail.acquisitionEvidence.attachmentAcquired ? 'cheats.label.acquired' : 'cheats.label.missing') }}</span></div>
+            <div v-if="detail.acquisitionEvidence.attachmentDownloadedAt" class="flex justify-between gap-3"><span class="text-muted-foreground">{{ $t('cheats.label.attachmentDownloadedAt') }}</span><span>{{ adminFormatDateTime(detail.acquisitionEvidence.attachmentDownloadedAt) }}</span></div>
+          </template>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('common.label.result') }}</span><span>{{ enumLabel(GameplayFactResultLabel, detail.result) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('common.label.status') }}</span><span>{{ enumLabel(CheatIncidentStatusLabel, detail.status) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('common.label.submissionTime') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.submittedAt) }}</span></div>

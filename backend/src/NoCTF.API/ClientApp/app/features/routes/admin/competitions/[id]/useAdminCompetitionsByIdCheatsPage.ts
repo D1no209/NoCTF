@@ -1,3 +1,4 @@
+import { cheatOwnerTeamLabel, cheatEvidenceSourceLabel } from '../../../../../lib/cheat-acquisition'
 import { message as describeMessage } from '../../../../../utils/i18n'
 import type { UiMessage } from '../../../../../utils/i18n'
 import { adminUserPath, adminTeamPath, adminChallengePath } from '~/features/admin/admin-navigation'
@@ -186,7 +187,7 @@ export function useAdminCompetitionsByIdCheatsPage() {
 
   const viewBindings = {
       competitionId,
-      adminUserPath, adminTeamPath, adminChallengePath,
+      adminUserPath, adminTeamPath, adminChallengePath, cheatOwnerTeamLabel, cheatEvidenceSourceLabel,
       filterStatus,
       filterFrom,
       filterTo,

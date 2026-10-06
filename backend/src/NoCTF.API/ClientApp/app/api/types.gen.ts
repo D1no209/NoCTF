@@ -582,7 +582,7 @@ export type NoCtfDomainGameplayGameplayFactState = 0 | 1 | 2 | 3 | 4;
 
 export type NoCtfDomainGameplayGameplayFactResult = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 
-export type NoCtfDomainGameplayGameplayFactFailureCode = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23 | 24 | 25 | 26 | 27 | 28 | 29 | 30 | 31 | 32 | 33 | 34 | 35;
+export type NoCtfDomainGameplayGameplayFactFailureCode = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23 | 24 | 25 | 26 | 27 | 28 | 29 | 30 | 31 | 32 | 33 | 34 | 35 | 36 | 37 | 38;
 
 export type NoCtfApplicationNotificationsRuntimeStateChangedNotificationContent = Omit<NoCtfApplicationNotificationsNotificationContent, 'type'> & {
     code?: string | null;
@@ -657,6 +657,7 @@ export type NoCtfApplicationNotificationsCheatIncidentDetectedNotificationConten
     actorUserId?: string | null;
     competitionChallengeId?: string | null;
     detectedAt?: string | null;
+    failureCode?: NoCtfDomainGameplayGameplayFactFailureCode | null;
     type: 'cheat-incident-detected';
 };
 
@@ -776,13 +777,13 @@ export type NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse = {
     updatedAt?: string;
 };
 
-export type NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol = 'FlagAttempt' | 'BreakAttempt' | 'FixAttempt' | 'HintUnlock' | 'ManualAdjustment' | 'AwdServiceTransition' | 'KohControlObservation';
+export type NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol = 'FlagAttempt' | 'BreakAttempt' | 'FixAttempt' | 'HintUnlock' | 'ManualAdjustment' | 'AwdServiceTransition' | 'KohControlObservation' | 'AttachmentDownload';
 
 export type NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol = 'Pending' | 'Queued' | 'Processing' | 'Completed' | 'PlatformFailed';
 
 export type NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol = 'Correct' | 'Wrong' | 'Duplicate' | 'AttemptsExhausted' | 'Rejected' | 'Unlocked' | 'Applied' | 'ServiceUp' | 'ServiceDown' | 'Controlled' | 'Uncontrolled';
 
-export type NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol = 'FlagNotSupported' | 'FixNotSupported' | 'BreakAttemptsExhausted' | 'FixAttemptsExhausted' | 'BreakRequired' | 'ArchiveValidationUnavailable' | 'FixArchiveMissing' | 'FixArchiveLengthMismatch' | 'FixArchiveContentTypeMismatch' | 'FixArchiveHashMismatch' | 'StorageTimeout' | 'StorageUnavailable' | 'CheckerPlatformError' | 'SelfAttackRejected' | 'DuplicateAttack' | 'DuplicateAchievement' | 'UnknownTeamIdentifier' | 'InvalidObservation' | 'ProducerTimeout' | 'ProducerUnavailable' | 'AmbiguousFlagMatch' | 'FlagExpired' | 'RoundOutOfRange' | 'HardeningActive' | 'AwdpExploitSucceeded' | 'AwdpPatchFailed' | 'AwdpPatchTimeout' | 'AwdpServiceAbnormal' | 'AwdpPlatformFailed' | 'ForeignTeamFlagDetected' | 'InsufficientScore' | 'HintUnavailable' | 'PatchStillExploitable' | 'PatchExecutionFailed' | 'PatchServiceAbnormal' | 'PatchVerificationPlatformFailed';
+export type NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol = 'FlagNotSupported' | 'FixNotSupported' | 'BreakAttemptsExhausted' | 'FixAttemptsExhausted' | 'BreakRequired' | 'ArchiveValidationUnavailable' | 'FixArchiveMissing' | 'FixArchiveLengthMismatch' | 'FixArchiveContentTypeMismatch' | 'FixArchiveHashMismatch' | 'StorageTimeout' | 'StorageUnavailable' | 'CheckerPlatformError' | 'SelfAttackRejected' | 'DuplicateAttack' | 'DuplicateAchievement' | 'UnknownTeamIdentifier' | 'InvalidObservation' | 'ProducerTimeout' | 'ProducerUnavailable' | 'AmbiguousFlagMatch' | 'FlagExpired' | 'RoundOutOfRange' | 'HardeningActive' | 'AwdpExploitSucceeded' | 'AwdpPatchFailed' | 'AwdpPatchTimeout' | 'AwdpServiceAbnormal' | 'AwdpPlatformFailed' | 'ForeignTeamFlagDetected' | 'InsufficientScore' | 'HintUnavailable' | 'PatchStillExploitable' | 'PatchExecutionFailed' | 'PatchServiceAbnormal' | 'PatchVerificationPlatformFailed' | 'StaticFlagWithoutContainer' | 'StaticFlagWithoutAttachment' | 'StaticFlagWithoutContainerAndAttachment';
 
 export type NoCtfapiEndpointsGameplayFactsAwdpAchievementActivationResponse = {
     gameplayFactId?: string;
@@ -880,7 +881,7 @@ export type NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse = {
     updatedAt?: string;
 };
 
-export type NoCtfDomainGameplayGameplayFactReferenceKind = 0 | 1 | 2;
+export type NoCtfDomainGameplayGameplayFactReferenceKind = 0 | 1 | 2 | 3;
 
 export type NoCtfapiEndpointsGameplayFactsListGameplayFactsRequest = NoCtfapiPaginationPaginationRequest & {};
 
@@ -3441,9 +3442,26 @@ export type NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentDetailResp
     canDismiss?: boolean;
     canConfirm?: boolean;
     canCorrect?: boolean;
+    acquisitionEvidence?: NoCtfapiEndpointsAdministrationCheatIncidentsFlagAcquisitionEvidenceResponse | null;
 };
 
 export type NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentStatusProtocol = 'Pending' | 'Confirmed' | 'Dismissed' | 'Superseded' | 'Corrected';
+
+export type NoCtfapiEndpointsAdministrationCheatIncidentsFlagAcquisitionEvidenceResponse = {
+    applicable?: boolean;
+    requiresContainer?: boolean;
+    requiresAttachment?: boolean;
+    containerAcquired?: boolean;
+    attachmentAcquired?: boolean;
+    source?: NoCtfapiEndpointsAdministrationCheatIncidentsFlagAcquisitionEvidenceSourceProtocol;
+    capturedAt?: string | null;
+    runtimeInstanceId?: string | null;
+    runtimeStartedAt?: string | null;
+    attachmentDownloadFactId?: string | null;
+    attachmentDownloadedAt?: string | null;
+};
+
+export type NoCtfapiEndpointsAdministrationCheatIncidentsFlagAcquisitionEvidenceSourceProtocol = 'Recorded' | 'LegacySubmission';
 
 export type NoCtfapiEndpointsAdministrationCheatIncidentsGetCheatIncidentRequest = {
     [key: string]: never;

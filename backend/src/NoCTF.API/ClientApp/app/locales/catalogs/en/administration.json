@@ -1104,5 +1104,19 @@
   "webhook.payloadUnknown": "Resources unchecked",
   "webhook.payloadComplete": "Resources complete",
   "webhook.payloadProjectionNotReady": "Projection not ready",
-  "webhook.payloadInvalid": "Resources invalid"
+  "webhook.payloadInvalid": "Resources invalid",
+  "cheats.reason.containerMissing": "Correct static Flag submitted without starting this challenge’s container.",
+  "cheats.reason.attachmentMissing": "Correct static Flag submitted without downloading an attachment for this challenge.",
+  "cheats.reason.bothMissing": "Correct static Flag submitted without starting the container or downloading an attachment.",
+  "cheats.label.reason": "Detection reason",
+  "cheats.label.evidenceSource": "Acquisition evidence",
+  "cheats.label.legacy": "Earlier submission, treated as acquired",
+  "cheats.label.recorded": "Recorded at submission",
+  "cheats.label.container": "Container startup",
+  "cheats.label.attachmentDownload": "Attachment download",
+  "cheats.label.acquired": "Acquired",
+  "cheats.label.missing": "Missing",
+  "cheats.label.runtimeStartedAt": "Container started at",
+  "cheats.label.attachmentDownloadedAt": "Download started at",
+  "cheats.label.notApplicable": "Not applicable"
 }

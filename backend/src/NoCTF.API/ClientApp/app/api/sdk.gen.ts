@@ -3534,7 +3534,7 @@ export const adminValidateCompetitionStart = <ThrowOnError extends boolean = fal
 });
 
 /**
- * Reads one protected cross-team Flag incident.
+ * Reads one protected Flag cheat incident.
  *
  * Administrator, owner, manager, and judge only. The full Flag response is never cached. Owner, manager, and judge reads are audited; platform Administrator reads are not.
  */
@@ -3549,7 +3549,7 @@ export const adminGetCheatIncident = <ThrowOnError extends boolean = false>(opti
 });
 
 /**
- * Lists cross-team Flag detection incidents.
+ * Lists Flag ownership and acquisition-evidence incidents.
  *
  * Observer and above may list redacted evidence. Only current scoring facts and immutable adjudication events are used.
  */
