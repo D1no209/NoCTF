@@ -172,6 +172,19 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                 && item.Body == null))
                 .IsTrue();
 
+            var acquisition = new StaticFlagAcquisitionViolationDetected(
+                competitionId, Guid.CreateVersion7(), message.SourceTeamId, participantId,
+                message.CompetitionChallengeId, NoCTF.Domain.Gameplay.GameplayFactFailureCode.StaticFlagWithoutAttachment, now);
+            await CompetitionNotificationMessageHandlers.Handle(acquisition, db, delivery, ct);
+            await CompetitionNotificationMessageHandlers.Handle(acquisition, db, delivery, ct);
+            var acquisitionNotifications = await db.Notifications.AsNoTracking()
+                .Where(item => item.GameplayFactId == acquisition.GameplayFactId).ToArrayAsync(ct);
+            await Assert.That(acquisitionNotifications.Length).IsEqualTo(4);
+            await Assert.That(acquisitionNotifications.Select(item => item.TargetId)).IsEquivalentTo(
+                notifications.Select(item => item.TargetId));
+            await Assert.That(acquisitionNotifications.All(item => item.OwnerTeamId == null
+                && item.GameplayFactFailureCode == NoCTF.Domain.Gameplay.GameplayFactFailureCode.StaticFlagWithoutAttachment)).IsTrue();
+
             var appeal = new TeamBanAppealSubmitted(
                 competitionId,
                 Guid.CreateVersion7(),

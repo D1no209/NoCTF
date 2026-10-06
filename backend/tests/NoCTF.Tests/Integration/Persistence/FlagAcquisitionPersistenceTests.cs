@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using NSubstitute;
 using NoCTF.Application.GameplayFacts.Intake;
+using NoCTF.Application.GameplayFacts.CheatIncidents;
+using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.Messaging;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
@@ -12,6 +14,7 @@ using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Challenges.Attachments;
 using NoCTF.Infrastructure.GameplayFacts.Intake;
 using NoCTF.Infrastructure.GameplayFacts.Management;
+using NoCTF.Infrastructure.GameplayFacts.CheatIncidents;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Persistence.PostgreSql;
 using Testcontainers.PostgreSql;
@@ -69,6 +72,19 @@ public sealed class FlagAcquisitionPersistenceTests
         }
         var first = await Submit(users[0], now);
         await Assert.That(first.AcquisitionEvidence!.MissingEvidence).IsEqualTo(GameplayFactFailureCode.StaticFlagWithoutContainerAndAttachment);
+        first.State = GameplayFactState.Completed;
+        first.Result = GameplayFactResult.Rejected;
+        first.FailureCode = GameplayFactFailureCode.StaticFlagWithoutContainerAndAttachment;
+        await db.SaveChangesAsync(ct); db.ChangeTracker.Clear();
+        var incidents = new CheatIncidentStore(db, publisher, Substitute.For<ICompetitionEventRecorder>());
+        var listed = await incidents.ListAsync(new(competitionId, null, null, null, null, null,
+            now.AddHours(-1), now.AddHours(1), null, null, 10), ct);
+        await Assert.That(listed!.PendingCount).IsEqualTo(1);
+        await Assert.That(listed.Items.Single().OwnerTeamId).IsNull();
+        var detail = await incidents.GetDetailAsync(new(competitionId, first.Id, users[0], false, now), ct);
+        await Assert.That(detail!.AcquisitionEvidence!.MissingEvidence)
+            .IsEqualTo(GameplayFactFailureCode.StaticFlagWithoutContainerAndAttachment);
+        db.ChangeTracker.Clear();
         // Obtaining resources after this admission must not change the earlier snapshot.
         await new ChallengeAttachmentStore(db).RecordPlayerDownloadAsync(competitionId, ccId, teamId, users[1], attachmentId, ct);
         db.RuntimeInstances.Add(new PlayerRuntimeInstance { Id = Guid.NewGuid(), CompetitionId = competitionId, CompetitionChallengeId = ccId,
