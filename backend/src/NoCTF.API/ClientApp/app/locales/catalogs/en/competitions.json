@@ -392,7 +392,7 @@
   "directionSettings.errors.NameConflict": "Direction names conflicted. Refresh and try again.",
   "directionSettings.errors.CompetitionNotFound": "Competition not found.",
   "competitions.awdp.roundLabel": "Round {round}",
-  "teamBanScreen.cheating": "Cheating detected",
+  "teamBanScreen.cheating": "Cheater detected",
   "teamBanScreen.banned": "Your team has been banned",
   "teamBanScreen.confirmed": "The detected activity has been manually verified.",
   "teamBanScreen.restricted": "Your team is restricted from participating in this competition.",

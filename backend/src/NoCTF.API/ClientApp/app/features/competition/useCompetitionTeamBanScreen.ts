@@ -17,8 +17,6 @@ export function useCompetitionTeamBanScreen(props: Readonly<{ competitionId: str
   const appealError = ref<UiMessage | null>(null)
   let request: AbortController | undefined
   const isCheatingBan = computed(() => banCase.value?.source === 'CheatIncident')
-  const titleKey = computed(() => isCheatingBan.value ? 'teamBanScreen.cheating' as const : 'teamBanScreen.banned' as const)
-  const descriptionKey = computed(() => isCheatingBan.value ? 'teamBanScreen.confirmed' as const : 'teamBanScreen.restricted' as const)
   const appealStatus = computed(() => banCase.value?.appeal?.status)
   const canAppeal = computed(() => banCase.value?.canAppeal === true)
   async function refresh() {
@@ -67,7 +65,7 @@ export function useCompetitionTeamBanScreen(props: Readonly<{ competitionId: str
   }
   watch(() => [props.competitionId, props.teamId], () => { banCase.value = null; void refresh() }, { immediate: true })
   onScopeDispose(() => request?.abort())
-  return { logoUrl, loading, error, titleKey, descriptionKey, isCheatingBan, canAppeal, appealStatus,
+  return { logoUrl, loading, error, isCheatingBan, canAppeal, appealStatus,
     appealOpen, statement, pending, appealError, refresh, refreshScreen, setAppealOpen, submitAppeal }
 }
 

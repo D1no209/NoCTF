@@ -24,15 +24,13 @@ function harness() {
 const ban = (source = 'CheatIncident', canAppeal = true) => ({ teamId: 'team', isCurrentlyBanned: true, source, canAppeal })
 
 describe('team ban screen', () => {
-  test('uses the reference copy only for manually confirmed cheating', async () => {
+  test('preserves the ban source when refreshing manual and cheating bans', async () => {
     const app = harness()
     app.reads[0]!.resolve({ data: ban() }); await drain()
-    expect(app.state.titleKey.value).toBe('teamBanScreen.cheating')
-    expect(app.state.descriptionKey.value).toBe('teamBanScreen.confirmed')
+    expect(app.state.isCheatingBan.value).toBe(true)
     const refreshed = app.state.refresh()
     app.reads[1]!.resolve({ data: ban('ManualModeration') }); await refreshed
-    expect(app.state.titleKey.value).toBe('teamBanScreen.banned')
-    expect(app.state.descriptionKey.value).toBe('teamBanScreen.restricted')
+    expect(app.state.isCheatingBan.value).toBe(false)
     app.stop()
   })
 
