@@ -24,6 +24,22 @@ public sealed class AttachmentDownloadEvidenceTests
     }
 
     [Test]
+    public async Task Stream_is_disposed_if_persisting_evidence_fails()
+    {
+        var store = Substitute.For<IChallengeAttachmentStore>(); var objects = Substitute.For<IStore>();
+        var content = new MemoryStream([1]);
+        store.GetPlayerAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<Guid>(),
+            Arg.Any<Func<string, CancellationToken, Task<bool>>>(), Arg.Any<CancellationToken>()).Returns(
+            new ChallengeAttachmentContent(new(Guid.NewGuid(), Guid.NewGuid(), "a.txt", "text/plain", 1, "hash", null, null, DateTimeOffset.UtcNow), "object", Guid.NewGuid()));
+        objects.OpenRead("object", Arg.Any<CancellationToken>()).Returns(content);
+        store.RecordPlayerDownloadAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(new IOException("evidence unavailable")));
+        await Assert.That(async () => await new GetChallengeAttachments(store, objects)
+            .OpenAsync(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid())).Throws<IOException>();
+        await Assert.That(content.CanRead).IsFalse();
+    }
+
+    [Test]
     [Arguments(false)]
     [Arguments(true)]
     public async Task Denied_or_missing_object_stream_does_not_record_download(bool authorized)
