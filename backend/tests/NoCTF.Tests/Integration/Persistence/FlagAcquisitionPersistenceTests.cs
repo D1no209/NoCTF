@@ -36,7 +36,7 @@ public sealed class FlagAcquisitionPersistenceTests
         var users = new[] { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() };
         var competitionId = Guid.NewGuid(); var templateId = Guid.NewGuid(); var ccId = Guid.NewGuid();
         var teamId = Guid.NewGuid(); var otherTeamId = Guid.NewGuid(); var attachmentId = Guid.NewGuid(); var fileId = Guid.NewGuid();
-        foreach (var id in users) db.Users.Add(new User { Id = id, UserName = id.ToString("N"), Email = $"{id:N}@test.invalid",
+        foreach (var id in users) db.Users.Add(new User { Id = id, UserName = id.ToString("N"), NormalizedUserName = id.ToString("N").ToUpperInvariant(), Email = $"{id:N}@test.invalid",
             PasswordHash = "test", AccountStatus = UserAccountStatus.Active, CreatedAt = now, UpdatedAt = now });
         db.Competitions.Add(new CtfCompetition { Id = competitionId, OwnerId = users[0], Title = "Acquisition", Status = CompetitionStatus.Running,
             StartAt = now.AddHours(-1), EndAt = now.AddHours(1), ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf),
