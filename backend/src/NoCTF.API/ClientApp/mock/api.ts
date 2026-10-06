@@ -5,6 +5,7 @@ import { questionActorRole, questionView } from './questions'
 import { mockAttachmentResponse } from './attachments'
 import { mockRuntimeEndpoint } from './runtime'
 import { uniqueTags, validChallengeTags } from '../app/lib/challenge-tags'
+import { validateAppealStatement } from '../app/lib/participant-form-validation'
 
 function shape(schema: Data | undefined, value: any, skipDiscriminator = false): any {
   if (!schema) return value
@@ -45,8 +46,16 @@ function mockWriteUpPdf(teamName: string): Blob {
   return new Blob([pdf], { type: 'application/pdf' })
 }
 
-export function createMockApi() {
+export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'ManualModeration' } = {}) {
   const state = createFixtures()
+  const teamBanCases = new Map<string, Data>()
+  function recordTeamBan(team: Data, source: 'CheatIncident' | 'ManualModeration') {
+    team.isBanned = true
+    teamBanCases.set(team.id, { banEventId: crypto.randomUUID(), competitionId: team.competitionId,
+      teamId: team.id, teamName: team.name, source, bannedAt: now(), appeal: null })
+  }
+  if (options.teamBanSource) for (const team of state.teams.filter(team => team.captainId === id(1, 3)))
+    recordTeamBan(team, options.teamBanSource)
   const directionIcons: Record<string, string> = { Misc: 'puzzle', Web: 'globe', Crypto: 'key-round', Pwn: 'bug', Reverse: 'binary', Penetration: 'scan-search', Forensics: 'scan-search', OSINT: 'search', AI: 'bot', Mobile: 'smartphone', IoT: 'cpu', Hardware: 'circuit-board', Cloud: 'cloud', Blockchain: 'link-2' }
   const directionCatalogs = new Map(state.competitions.map(competition => [competition.id,
     Object.entries(directionIcons).map(([name, icon]) => ({ id: crypto.randomUUID(), name, icon }))]))
@@ -254,6 +263,13 @@ export function createMockApi() {
     let changed = false
 
     if (request.method === 'GET') {
+      if (route === '/competitions/{competitionId}/team-ban-case') {
+        if (!user) return problem(401, 'Mock sign-in required')
+        const banCase = myTeam ? teamBanCases.get(myTeam.id) : null
+        return banCase ? json({ ...banCase, isCurrentlyBanned: myTeam!.isBanned,
+          canAppeal: myTeam!.isBanned && myTeam!.captainId === user.userId && !banCase.appeal })
+          : problem(404, 'Mock team ban case not found')
+      }
       if (route === '/competitions/{competitionId}/teams/me/writeup') {
         if (!user) return problem(401, '请先登录演示账号 / Sign in to the Mock site')
         const writeUp = myTeam ? teamWriteUps.get(myTeam.id) : null
@@ -822,8 +838,22 @@ export function createMockApi() {
           team.trackKey = body.administration.trackKey
           team.registrationStatus = body.administration.registrationStatus
         }
-        if (body.ban) team.isBanned = body.ban.isBanned
+        if (body.ban) {
+          if (user!.role !== 'Administrator') return problem(403, 'Mock staff access required')
+          if (body.ban.isBanned && !team.isBanned) recordTeamBan(team, 'ManualModeration')
+          else team.isBanned = body.ban.isBanned
+        }
         value = team
+      }
+      else if (route === '/competitions/{competitionId}/team-ban-appeals' && request.method === 'POST') {
+        const banCase = myTeam ? teamBanCases.get(myTeam.id) : null
+        if (!myTeam || myTeam.captainId !== user!.userId) return problem(403, 'Mock captain required')
+        if (!myTeam.isBanned || !banCase || banCase.appeal) return problem(409, 'Mock appeal unavailable')
+        if (typeof body.statement !== 'string' || validateAppealStatement(body.statement)) return problem(400, 'Mock appeal must contain 16–512 characters')
+        banCase.appeal = { id: crypto.randomUUID(), actorUserId: user!.userId, submittedByUserName: user!.userName,
+          statement: body.statement.trim(), submittedAt: now(), status: 'Submitted', resolvedByUserId: null,
+          resolvedByUserName: null, resolutionReason: null, resolvedAt: null }
+        value = banCase.appeal
       }
       else if (cleanRoute.endsWith('/teams/me/membership') && request.method === 'DELETE') { if (myTeam) myTeam.memberIds = myTeam.memberIds.filter((member: string) => member !== user!.userId); value = {} }
       else if (cleanRoute.endsWith('/invitation-token/rotate')) {
