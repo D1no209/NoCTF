@@ -13,6 +13,25 @@ namespace NoCTF.Tests.Unit.Application;
 public class JwtIssuerTests
 {
     [Test]
+    public async Task Refresh_preserves_Mfa_time_and_access_expiry_is_clipped_to_the_Mfa_deadline()
+    {
+        var now = DateTimeOffset.Parse("2026-10-07T00:00:00Z");
+        var clock = new FakeTimeProvider(now);
+        var issuer = new JwtIssuer(Options.Create(new AuthenticationTokenOptions { SigningKey = new string('x', 32) }), clock);
+        var user = new AuthenticatedUser(Guid.NewGuid(), "mfa-user", UserRole.User, UserKind.Human, 1);
+        var context = new NoCTF.Domain.Identity.Mfa.AuthenticationContext(NoCTF.Domain.Identity.Mfa.AuthenticationMethod.Password,
+            now.AddDays(-29), NoCTF.Domain.Identity.Mfa.MfaSource.Totp, now.AddDays(-30).AddMinutes(1), Guid.NewGuid());
+        var refresh = issuer.IssueRefresh(user, context);
+        var parsed = issuer.ValidateRefresh(refresh.Token)!;
+        await Assert.That(parsed.Authentication).IsEqualTo(context);
+        var access = issuer.Issue(user, parsed.Authentication!, now);
+        await Assert.That(access.ExpiresAt).IsEqualTo(now.AddMinutes(1));
+        clock.Advance(TimeSpan.FromSeconds(10));
+        var replacement = issuer.IssueRefresh(user, parsed.Authentication!);
+        await Assert.That(issuer.ValidateRefresh(replacement.Token)!.Authentication).IsEqualTo(context);
+    }
+
+    [Test]
     public async Task Issue_ContainsValidatedIssuerAudienceAndSecurityClaims()
     {
         var options = Options.Create(new AuthenticationTokenOptions
@@ -25,7 +44,7 @@ public class JwtIssuerTests
         var now = DateTimeOffset.UtcNow;
         var user = new AuthenticatedUser(
             Guid.NewGuid(), "alice", UserRole.Administrator, UserKind.Human, 7);
-        var issued = new JwtIssuer(options, TimeProvider.System).Issue(user, now);
+        var issued = new JwtIssuer(options, TimeProvider.System).Issue(user, MfaTestSupport.Primary(now, user.Kind), now);
         var token = new JwtSecurityTokenHandler().ReadJwtToken(issued.Token);
 
         await Assert.That(token.Issuer).IsEqualTo("NoCTF.Test");
@@ -53,7 +72,7 @@ public class JwtIssuerTests
             UserKind.Bot,
             3);
 
-        var issued = new JwtIssuer(options, TimeProvider.System).Issue(user, now, lifetime);
+        var issued = new JwtIssuer(options, TimeProvider.System).Issue(user, MfaTestSupport.Primary(now, user.Kind), now, lifetime);
         var token = new JwtSecurityTokenHandler().ReadJwtToken(issued.Token);
 
         await Assert.That(issued.ExpiresAt).IsEqualTo(now.Add(lifetime));
@@ -83,6 +102,7 @@ public class JwtIssuerTests
 
         var issued = new JwtIssuer(options, TimeProvider.System).Issue(
             user,
+            MfaTestSupport.Primary(DateTimeOffset.UtcNow, user.Kind),
             DateTimeOffset.UtcNow,
             TimeSpan.FromMinutes(10));
         var token = new JwtSecurityTokenHandler().ReadJwtToken(issued.Token);
@@ -118,7 +138,7 @@ public class JwtIssuerTests
             Guid.NewGuid(), "alice", UserRole.Administrator, UserKind.Human, 7);
         var now = TimeProvider.System.GetUtcNow();
         var issuer = new JwtIssuer(options, new FakeTimeProvider(now));
-        var issued = issuer.IssueRefresh(user);
+        var issued = issuer.IssueRefresh(user, MfaTestSupport.Primary(now));
         var token = new JwtSecurityTokenHandler().ReadJwtToken(issued.Token);
 
         await Assert.That(token.Audiences.Single()).IsEqualTo("NoCTF.Refresh.Test");
@@ -126,7 +146,7 @@ public class JwtIssuerTests
         await Assert.That(token.Claims.Single(x => x.Type == "token_version").Value).IsEqualTo("7");
         await Assert.That(token.Claims.Single(x => x.Type == JwtRegisteredClaimNames.Iat).Value).IsNotNull();
         await Assert.That(issued.ExpiresAt).IsEqualTo(now.AddDays(30));
-        await Assert.That(issuer.ValidateRefresh(issued.Token)).IsEqualTo(new RefreshTokenPrincipal(user.Id, 7));
+        await Assert.That(issuer.ValidateRefresh(issued.Token)).IsEqualTo(new RefreshTokenPrincipal(user.Id, 7, MfaTestSupport.Primary(now)));
     }
 
     [Test]
@@ -144,6 +164,7 @@ public class JwtIssuerTests
                 UserRole.Administrator,
                 UserKind.Human,
                 7),
+            MfaTestSupport.Primary(DateTimeOffset.UtcNow),
             DateTimeOffset.UtcNow);
 
         await Assert.That(issuer.ValidateRefresh(access.Token)).IsNull();

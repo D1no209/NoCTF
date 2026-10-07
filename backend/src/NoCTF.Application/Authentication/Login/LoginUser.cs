@@ -1,33 +1,27 @@
 using NoCTF.Application.Authentication.Account;
 using NoCTF.Application.Common;
 using NoCTF.Domain.Identity;
+using NoCTF.Domain.Identity.Mfa;
+using NoCTF.Application.Authentication.Mfa;
 
 namespace NoCTF.Application.Authentication.Login;
 
 public sealed record LoginCommand(string Login, string Password);
 
-public sealed record LoginResult(
-    Guid UserId,
-    string UserName,
-    UserRole Role,
-    bool EmailVerified,
-    string AccessToken,
-    DateTimeOffset AccessTokenExpiresAt,
-    string RefreshToken);
-
 public enum LoginFailureCode
 {
-    InvalidCredentials
+    InvalidCredentials,
+    DependencyUnavailable
 }
 
 public sealed class LoginUser(
     IUserAuthenticationStore store,
-    IAccessTokenIssuer issuer,
+    CompleteAuthentication complete,
     TimeProvider timeProvider,
     NoCTF.Application.Authentication.Privacy.IAccountActivityRecorder? activities = null,
     NoCTF.Application.Admission.ICredentialWorkAdmission? admission = null)
 {
-    public async Task<OperationResult<LoginResult, LoginFailureCode>> ExecuteAsync(
+    public async Task<OperationResult<AuthenticationCompletion, LoginFailureCode>> ExecuteAsync(
         LoginCommand command,
         CancellationToken cancellationToken = default)
     {
@@ -41,22 +35,18 @@ public sealed class LoginUser(
         {
             if (activities is not null)
                 await activities.RecordLoginAsync(null, timeProvider.GetUtcNow(), cancellationToken);
-            return OperationResult<LoginResult, LoginFailureCode>.Failure(
+            return OperationResult<AuthenticationCompletion, LoginFailureCode>.Failure(
                 LoginFailureCode.InvalidCredentials,
                 "Invalid credentials.");
         }
 
-        var token = issuer.Issue(user, timeProvider.GetUtcNow());
-        var refreshToken = issuer.IssueRefresh(user);
-        if (activities is not null)
+        var completion = await complete.ExecuteAsync(new(user, AuthenticationMethod.Password, timeProvider.GetUtcNow()), cancellationToken);
+        if (!completion.Succeeded)
+            return OperationResult<AuthenticationCompletion, LoginFailureCode>.Failure(
+                completion.FailureCode == MfaFailure.AccountUnavailable ? LoginFailureCode.InvalidCredentials : LoginFailureCode.DependencyUnavailable,
+                "Authentication could not be completed.");
+        if (completion.Value!.State == AuthenticationState.Authenticated && activities is not null)
             await activities.RecordLoginAsync(user.Id, timeProvider.GetUtcNow(), cancellationToken);
-        return OperationResult<LoginResult, LoginFailureCode>.Success(new(
-            user.Id,
-            user.UserName,
-            user.Role,
-            user.EmailVerified,
-            token.Token,
-            token.ExpiresAt,
-            refreshToken.Token));
+        return OperationResult<AuthenticationCompletion, LoginFailureCode>.Success(completion.Value!);
     }
 }

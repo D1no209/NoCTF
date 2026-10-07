@@ -12,6 +12,7 @@ public static class AuthenticationRegistration
     public const string AccessScheme = JwtBearerDefaults.AuthenticationScheme;
     public const string InternalScheme = "Internal";
     public const string SsoFlowScheme = "SsoFlow";
+    public const string MfaFlowScheme = "MfaFlow";
 
     public static IServiceCollection AddNoCtfAuthentication(this IServiceCollection services, IConfiguration configuration)
     {
@@ -41,10 +42,18 @@ public static class AuthenticationRegistration
                     {
                         var validator = context.HttpContext.RequestServices
                             .GetRequiredService<CurrentAccessTokenValidator>();
-                        if (!await validator.IsCurrentAsync(
+                        var failure = await validator.ValidateAsync(
                                 context.Principal,
-                                context.HttpContext.RequestAborted))
-                            context.Fail("The access token is no longer current.");
+                                context.HttpContext.RequestAborted);
+                        if (failure is not null) context.Fail(new MfaAuthenticationDeniedException(failure.Value));
+                    },
+                    OnChallenge = async context =>
+                    {
+                        if (context.AuthenticateFailure is MfaAuthenticationDeniedException failure)
+                        {
+                            context.HandleResponse();
+                            await NoCTF.API.Endpoints.Authentication.Mfa.MfaEndpointResults.Failure(failure.Failure).ExecuteAsync(context.HttpContext);
+                        }
                     }
                 };
                 options.TokenValidationParameters = new TokenValidationParameters
@@ -78,11 +87,14 @@ public static class AuthenticationRegistration
             })
             .AddScheme<AuthenticationSchemeOptions, SsoFlowAuthenticationHandler>(
                 SsoFlowScheme,
-                _ => { });
+                _ => { })
+            .AddScheme<AuthenticationSchemeOptions, MfaFlowAuthenticationHandler>(MfaFlowScheme, _ => { });
         services.AddScoped<CurrentAccessTokenValidator>();
         services.AddSingleton<SsoBrowserCorrelation>();
+        services.AddSingleton<MfaBrowserFlow>();
         services.AddAuthorization(options =>
         {
+            options.AddPolicy(MfaFlowScheme, policy => policy.AddAuthenticationSchemes(MfaFlowScheme).RequireAuthenticatedUser());
             options.DefaultPolicy = new AuthorizationPolicyBuilder(AccessScheme)
                 .RequireAuthenticatedUser()
                 .Build();

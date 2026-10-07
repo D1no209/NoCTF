@@ -3,6 +3,8 @@ using NoCTF.Application.Authentication.Account;
 using NoCTF.Application.Authentication.Privacy;
 using NoCTF.Application.Common;
 using NoCTF.Domain.Identity;
+using NoCTF.Domain.Identity.Mfa;
+using NoCTF.Application.Authentication.Mfa;
 
 namespace NoCTF.Application.Authentication.Sso;
 
@@ -79,15 +81,7 @@ public interface ISsoAccountStore
         CancellationToken cancellationToken);
 }
 
-public sealed record SsoLoginSession(
-    Guid UserId,
-    string UserName,
-    UserRole Role,
-    bool EmailVerified,
-    string AccessToken,
-    DateTimeOffset AccessTokenExpiresAt,
-    string RefreshToken,
-    string ReturnPath);
+public sealed record SsoLoginSession(AuthenticationCompletion Completion);
 
 public sealed class GetSsoBinding(
     ISsoAccountStore accounts,
@@ -151,7 +145,7 @@ public sealed class CompleteSsoLogin(
     ISsoFlowStore flows,
     ISsoAccountStore accounts,
     ISsoProviderRuntimeReader providers,
-    IAccessTokenIssuer issuer,
+    CompleteAuthentication complete,
     IAccountActivityRecorder activities,
     TimeProvider clock)
 {
@@ -181,18 +175,14 @@ public sealed class CompleteSsoLogin(
         }
         var user = account.User;
         var now = clock.GetUtcNow();
-        var access = issuer.Issue(user, now);
-        var refresh = issuer.IssueRefresh(user);
-        await activities.RecordSsoAsync(user.Id, flow.ProviderId, true, now, ct);
-        return OperationResult<SsoLoginSession, SsoFailureCode>.Success(new(
-            user.Id,
-            user.UserName,
-            user.Role,
-            user.EmailVerified,
-            access.Token,
-            access.ExpiresAt,
-            refresh.Token,
-            flow.ReturnPath));
+        if (flow.AuthenticatedAt is null) return Failure(SsoFailureCode.FlowExpired);
+        var completion = await complete.ExecuteAsync(new(user,
+            flow.Protocol == SsoProtocol.Oidc ? AuthenticationMethod.Oidc : AuthenticationMethod.Cas,
+            flow.AuthenticatedAt.Value, flow.ExternalIdentity.MfaProof, flow.ReturnPath, flow.ProviderId), ct);
+        if (!completion.Succeeded) return Failure(SsoFailureCode.AccountUnavailable);
+        if (completion.Value!.State == AuthenticationState.Authenticated)
+            await activities.RecordSsoAsync(user.Id, flow.ProviderId, true, now, ct);
+        return OperationResult<SsoLoginSession, SsoFailureCode>.Success(new(completion.Value));
     }
 
     private static OperationResult<SsoLoginSession, SsoFailureCode> Failure(

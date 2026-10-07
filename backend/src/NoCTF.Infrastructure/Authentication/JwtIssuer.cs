@@ -4,6 +4,8 @@ using System.Text;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using NoCTF.Application.Authentication.Account;
+using NoCTF.Domain.Identity.Mfa;
+using NoCTF.Infrastructure.Authentication.Mfa;
 
 namespace NoCTF.Infrastructure.Authentication;
 
@@ -16,11 +18,14 @@ public sealed class JwtIssuer(
 
     public IssuedAccessToken Issue(
         AuthenticatedUser user,
+        AuthenticationContext authentication,
         DateTimeOffset now,
         TimeSpan? requestedLifetime = null)
     {
         var expires = now.Add(requestedLifetime
             ?? TimeSpan.FromMinutes(options.AccessTokenMinutes));
+        if (!authentication.IsWellFormed) throw new ArgumentException("Authentication context is invalid.", nameof(authentication));
+        if (authentication.MfaDeadline is { } deadline && expires > deadline) expires = deadline;
         var jwtId = Guid.NewGuid();
         var credentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256);
         var claims = new List<Claim>
@@ -35,6 +40,7 @@ public sealed class JwtIssuer(
             new(JwtRegisteredClaimNames.Iat, now.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
             new("token_type", "access")
         };
+        claims.AddRange(AuthenticationContextClaims.Write(authentication));
         var token = new JwtSecurityToken(
             issuer: options.Issuer,
             audience: options.Audience,
@@ -45,7 +51,7 @@ public sealed class JwtIssuer(
         return new(new JwtSecurityTokenHandler().WriteToken(token), expires, jwtId);
     }
 
-    public IssuedRefreshToken IssueRefresh(AuthenticatedUser user)
+    public IssuedRefreshToken IssueRefresh(AuthenticatedUser user, AuthenticationContext authentication)
     {
         var now = timeProvider.GetUtcNow();
         var expires = now.AddDays(30);
@@ -53,14 +59,14 @@ public sealed class JwtIssuer(
         var token = new JwtSecurityToken(
             issuer: options.Issuer,
             audience: options.RefreshAudience,
-            claims:
-            [
+            claims: new List<Claim>
+            {
                 new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
                 new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
                 new(JwtRegisteredClaimNames.Iat, now.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
                 new("token_type", "refresh"),
                 new("token_version", user.TokenVersion.ToString())
-            ],
+            }.Concat(AuthenticationContextClaims.Write(authentication)),
             notBefore: now.UtcDateTime,
             expires: expires.UtcDateTime,
             signingCredentials: credentials);
@@ -94,7 +100,7 @@ public sealed class JwtIssuer(
             if (!Guid.TryParse(subject, out var userId)
                 || !int.TryParse(principal.FindFirstValue("token_version"), out var tokenVersion))
                 return null;
-            return new(userId, tokenVersion);
+            return new(userId, tokenVersion, AuthenticationContextClaims.Read(principal));
         }
         catch (SecurityTokenException)
         {

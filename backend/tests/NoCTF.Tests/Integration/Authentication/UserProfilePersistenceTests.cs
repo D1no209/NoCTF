@@ -291,7 +291,8 @@ public sealed class UserProfilePersistenceTests
 
             var refresh = await new RefreshAccessToken(
                 users,
-                new StaleRefreshIssuer(new(userId, before.TokenVersion)),
+                new StaleRefreshIssuer(new(userId, before.TokenVersion, MfaTestSupport.Primary(now))),
+                MfaTestSupport.Unrequired(),
                 TimeProvider.System)
                 .ExecuteAsync("old-refresh", cancellationToken);
             await Assert.That(refresh.Succeeded).IsFalse();
@@ -302,12 +303,12 @@ public sealed class UserProfilePersistenceTests
     private sealed class StaleRefreshIssuer(RefreshTokenPrincipal principal) : IAccessTokenIssuer
     {
         public IssuedAccessToken Issue(
-            AuthenticatedUser user,
+            AuthenticatedUser user, NoCTF.Domain.Identity.Mfa.AuthenticationContext authentication,
             DateTimeOffset now,
             TimeSpan? lifetime = null) =>
             new("unused-access", now.AddMinutes(15));
 
-        public IssuedRefreshToken IssueRefresh(AuthenticatedUser user) =>
+        public IssuedRefreshToken IssueRefresh(AuthenticatedUser user, NoCTF.Domain.Identity.Mfa.AuthenticationContext authentication) =>
             new("unused-refresh", DateTimeOffset.UtcNow.AddDays(30));
 
         public RefreshTokenPrincipal? ValidateRefresh(string token) => principal;

@@ -19,7 +19,8 @@ public sealed record SsoFlowRecord(
     string? ServiceUrl = null,
     string? ProcessingToken = null,
     SsoExternalIdentity? ExternalIdentity = null,
-    SsoFailureCode? FailureCode = null);
+    SsoFailureCode? FailureCode = null,
+    DateTimeOffset? AuthenticatedAt = null);
 
 public enum SsoFlowClaimState
 {

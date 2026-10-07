@@ -1,5 +1,7 @@
 using NoCTF.Application.Authentication.Account;
 using NoCTF.Domain.Identity;
+using NoCTF.Domain.Identity.Mfa;
+using NoCTF.Application.Authentication.Mfa;
 
 namespace NoCTF.Application.Administration;
 
@@ -103,7 +105,8 @@ public enum IssuePlatformUserTokenFailure
     None,
     UserNotFound,
     AccountInactive,
-    InvalidLifetime
+    InvalidLifetime,
+    MfaRequired
 }
 
 public sealed record IssuePlatformUserTokenResult(
@@ -178,7 +181,8 @@ public interface IPlatformAdministrationStore
 
 public sealed class ManagePlatform(
     IPlatformAdministrationStore store,
-    IAccessTokenIssuer tokenIssuer)
+    IAccessTokenIssuer tokenIssuer,
+    IMfaAuthenticationStore mfa)
 {
     public const long MinimumIssuedTokenLifetimeSeconds = 60;
     public const long MaximumIssuedTokenLifetimeSeconds = 31_536_000;
@@ -220,6 +224,8 @@ public sealed class ManagePlatform(
             return new(null, null, IssuePlatformUserTokenFailure.UserNotFound);
         if (user.AccountStatus != UserAccountStatus.Active)
             return new(null, user, IssuePlatformUserTokenFailure.AccountInactive);
+        if (user.Kind == UserKind.Human && (await mfa.ReadAccountAsync(user.Id, ct))?.Required != false)
+            return new(null, user, IssuePlatformUserTokenFailure.MfaRequired);
         try
         {
             var lifetime = TimeSpan.FromTicks(checked(expiresInSeconds * TimeSpan.TicksPerSecond));
@@ -231,6 +237,7 @@ public sealed class ManagePlatform(
                     user.Kind,
                     user.TokenVersion,
                     user.EmailVerified),
+                new AuthenticationContext(user.Kind == UserKind.Bot ? AuthenticationMethod.Bot : AuthenticationMethod.AdministratorIssued, now),
                 now,
                 lifetime);
             return new(token, user, IssuePlatformUserTokenFailure.None);

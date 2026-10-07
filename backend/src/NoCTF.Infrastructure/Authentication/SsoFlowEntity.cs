@@ -33,6 +33,9 @@ public sealed class SsoFlowEntity : IConcurrencyTracked
     [MaxLength(255)] public string? ExternalSubject { get; set; }
     [MaxLength(512)] public string? ExternalDisplayName { get; set; }
     public SsoFailureCode? FailureCode { get; set; }
+    public DateTimeOffset? AuthenticatedAt { get; set; }
+    public DateTimeOffset? ExternalMfaAuthenticatedAt { get; set; }
+    public Guid? ExternalMfaTrustPolicyId { get; set; }
 }
 
 internal sealed class SsoFlowEntityConfiguration : IEntityTypeConfiguration<SsoFlowEntity>

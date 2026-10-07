@@ -34,11 +34,12 @@ public sealed class PlatformUserTokenHttpTests
         var issuer = Substitute.For<IAccessTokenIssuer>();
         issuer.Issue(
                 Arg.Any<AuthenticatedUser>(),
+                Arg.Any<NoCTF.Domain.Identity.Mfa.AuthenticationContext>(),
                 Arg.Any<DateTimeOffset>(),
                 TimeSpan.FromHours(1))
             .Returns(call => new IssuedAccessToken(
                 "administrator-issued-token",
-                call.ArgAt<DateTimeOffset>(1).AddHours(1),
+                call.ArgAt<DateTimeOffset>(2).AddHours(1),
                 Guid.NewGuid()));
         await using var app = await CreateApplicationAsync(store, issuer);
         using var client = app.GetTestClient();
@@ -61,8 +62,8 @@ public sealed class PlatformUserTokenHttpTests
         var targetId = Guid.NewGuid();
         var store = ActiveTargetStore(targetId);
         var issuer = Substitute.For<IAccessTokenIssuer>();
-        issuer.Issue(Arg.Any<AuthenticatedUser>(), Arg.Any<DateTimeOffset>(), Arg.Any<TimeSpan>())
-            .Returns(call => new IssuedAccessToken("ordinary-token", call.ArgAt<DateTimeOffset>(1).AddHours(1)));
+        issuer.Issue(Arg.Any<AuthenticatedUser>(), Arg.Any<NoCTF.Domain.Identity.Mfa.AuthenticationContext>(), Arg.Any<DateTimeOffset>(), Arg.Any<TimeSpan>())
+            .Returns(call => new IssuedAccessToken("ordinary-token", call.ArgAt<DateTimeOffset>(2).AddHours(1)));
         await using var app = await CreateApplicationAsync(store, issuer);
         using var client = app.GetTestClient();
 
@@ -79,7 +80,7 @@ public sealed class PlatformUserTokenHttpTests
 
         await Assert.That(forbiddenRole.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
         await Assert.That(administrator.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        issuer.Received(1).Issue(Arg.Any<AuthenticatedUser>(), Arg.Any<DateTimeOffset>(), Arg.Any<TimeSpan>());
+        issuer.Received(1).Issue(Arg.Any<AuthenticatedUser>(), Arg.Any<NoCTF.Domain.Identity.Mfa.AuthenticationContext>(), Arg.Any<DateTimeOffset>(), Arg.Any<TimeSpan>());
     }
 
     [Test]
@@ -125,11 +126,12 @@ public sealed class PlatformUserTokenHttpTests
         var issuer = Substitute.For<IAccessTokenIssuer>();
         issuer.Issue(
                 Arg.Any<AuthenticatedUser>(),
+                Arg.Any<NoCTF.Domain.Identity.Mfa.AuthenticationContext>(),
                 Arg.Any<DateTimeOffset>(),
                 Arg.Any<TimeSpan>())
             .Returns(call => new IssuedAccessToken(
                 "administrator-issued-token",
-                call.ArgAt<DateTimeOffset>(1).AddHours(1),
+                call.ArgAt<DateTimeOffset>(2).AddHours(1),
                 Guid.NewGuid()));
         await using var app = await CreateApplicationAsync(store, issuer);
         using var client = app.GetTestClient();

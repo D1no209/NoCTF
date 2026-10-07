@@ -15,7 +15,7 @@ public sealed record RefreshTokenResponse(
     DateTimeOffset ExpiresAt);
 
 public sealed class RefreshTokenEndpoint(RefreshAccessToken refresh, IOptions<RefreshHttpOptions> options)
-    : EndpointWithoutRequest<Results<Ok<RefreshTokenResponse>, UnauthorizedHttpResult>>
+    : EndpointWithoutRequest<Results<Ok<RefreshTokenResponse>, UnauthorizedHttpResult, ProblemHttpResult>>
 {
     public override void Configure()
     {
@@ -23,7 +23,7 @@ public sealed class RefreshTokenEndpoint(RefreshAccessToken refresh, IOptions<Re
         AllowAnonymous();
     }
 
-    public override async Task<Results<Ok<RefreshTokenResponse>, UnauthorizedHttpResult>> ExecuteAsync(
+    public override async Task<Results<Ok<RefreshTokenResponse>, UnauthorizedHttpResult, ProblemHttpResult>> ExecuteAsync(
         CancellationToken cancellationToken)
     {
         if (!RefreshRequestGuard.IsAllowed(HttpContext.Request, options.Value))
@@ -43,6 +43,8 @@ public sealed class RefreshTokenEndpoint(RefreshAccessToken refresh, IOptions<Re
             HttpContext.Response.Cookies.Delete(
                 cookieName,
                 RefreshCookie.DeleteOptions(options.Value));
+            if (result.FailureCode == NoCTF.Application.Authentication.RefreshJwt.RefreshAccessTokenFailureCode.MfaRequired)
+                return NoCTF.API.Endpoints.Authentication.Mfa.MfaEndpointResults.Failure(NoCTF.Application.Authentication.Mfa.MfaFailure.PrimaryAuthenticationRequired);
             return TypedResults.Unauthorized();
         }
 

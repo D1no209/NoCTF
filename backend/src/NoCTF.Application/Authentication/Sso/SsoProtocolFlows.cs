@@ -10,7 +10,8 @@ public sealed record OidcSsoRuntimeConfiguration(
     string ClientSecret,
     IReadOnlyList<string> Scopes,
     bool ReadUserInfo,
-    string DisplayNameClaim);
+    string DisplayNameClaim,
+    NoCTF.Application.Authentication.Mfa.OidcMfaTrust? MfaTrust = null);
 
 public sealed record CasSsoRuntimeConfiguration(
     string IdentityNamespace,

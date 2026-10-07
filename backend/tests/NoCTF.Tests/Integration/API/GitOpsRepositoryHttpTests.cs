@@ -90,7 +90,7 @@ public sealed class GitOpsRepositoryHttpTests
                     await db.SaveChangesAsync(ct);
                 }
                 var token = app.Services.GetRequiredService<IAccessTokenIssuer>().Issue(
-                    new AuthenticatedUser(botId, "gitops-http-bot", UserRole.Organizer, UserKind.Bot, 0, false), now).Token;
+                    new AuthenticatedUser(botId, "gitops-http-bot", UserRole.Organizer, UserKind.Bot, 0, false), MfaTestSupport.Primary(now, UserKind.Bot), now).Token;
                 var apiUrl = app.Urls.Single();
                 var faults = app.Services.GetRequiredService<TestFaults>();
                 var first = Guid.NewGuid();

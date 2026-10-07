@@ -98,7 +98,7 @@ public sealed class SsoFlowStoreTests
                 store,
                 accounts,
                 providers,
-                Substitute.For<IAccessTokenIssuer>(),
+                new NoCTF.Application.Authentication.Mfa.CompleteAuthentication(MfaTestSupport.Unrequired(), Substitute.For<IAccessTokenIssuer>(), TimeProvider.System),
                 activities,
                 TimeProvider.System);
 

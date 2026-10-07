@@ -224,11 +224,12 @@ internal sealed class SwaggerTokenIssuer : IAccessTokenIssuer
 {
     public IssuedAccessToken Issue(
         AuthenticatedUser user,
+        NoCTF.Domain.Identity.Mfa.AuthenticationContext authentication,
         DateTimeOffset now,
         TimeSpan? lifetime = null) =>
         new("swagger-export-token", now.Add(lifetime ?? TimeSpan.FromMinutes(15)));
 
-    public IssuedRefreshToken IssueRefresh(AuthenticatedUser user) =>
+    public IssuedRefreshToken IssueRefresh(AuthenticatedUser user, NoCTF.Domain.Identity.Mfa.AuthenticationContext authentication) =>
         new("swagger-export-refresh-token", DateTimeOffset.UtcNow.AddDays(30));
 
     public RefreshTokenPrincipal? ValidateRefresh(string token) => null;
