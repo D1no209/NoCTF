@@ -142,6 +142,7 @@ public sealed partial class MfaAuthenticationStore
             if (policy != MfaPolicy.Optional && (verified.User!.EmailVerifiedAt is null || !MailConfigured(settings))) return Failure<MfaPolicy>(MfaFailure.EmailNotConfigured);
             if (settings.MfaPolicy != policy) { settings.MfaPolicy = policy; settings.MfaPolicyStamp = Guid.NewGuid(); }
             verified.Challenge!.State = MfaChallengeState.Completed;
+            verified.Challenge.MailState = MfaMailState.Pending;
             SecurityEvent(actor.UserId, NoCTF.Application.Authentication.Privacy.AccountActivityKind.MfaPolicyChanged);
             return Success(policy);
         }, ct);
@@ -226,6 +227,7 @@ public sealed partial class MfaAuthenticationStore
                     Values = group.Distinct(StringComparer.Ordinal).Select((value, position) => new NoCTF.Domain.Platform.OidcMfaAmrValue { GroupId = id, Position = position, Value = value }).ToList() };
             }).ToList();
             verified.Challenge!.State = MfaChallengeState.Completed;
+            verified.Challenge.MailState = MfaMailState.Pending;
             SecurityEvent(actor.UserId, NoCTF.Application.Authentication.Privacy.AccountActivityKind.OidcMfaTrustChanged);
             return Success(new OidcMfaTrust(enabled, provider.MfaTrustPolicyId, maxAgeSeconds, acr, amr));
         }, ct);
