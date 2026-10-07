@@ -45,7 +45,10 @@ public sealed record SubmitWriteUp(Guid CompetitionId, Guid CompetitionChallenge
 public sealed record ReviewWriteUp(Guid CompetitionId, Guid CompetitionChallengeId, Guid WriteUpId,
     Guid VersionId, Guid ActorId, Guid ExpectedStamp, WriteUpReviewAction Action,
     string? Reason, DateTimeOffset Now);
-public sealed record WriteUpFileReference(Guid VersionId, string ObjectKey, string FileName, string ContentType);
+public sealed record WriteUpFileReference(Guid VersionId, string ObjectKey, string FileName, string ContentType)
+{
+    public Guid FileId { get; init; }
+}
 public sealed record WriteUpContentView(Guid VersionId, WriteUpFormat Format, string? Markdown,
     WriteUpFileReference? File, ChallengeWriteUpFailure? Failure = null);
 public sealed record UnlockWriteUp(Guid CompetitionId, Guid CompetitionChallengeId, Guid VersionId,
@@ -56,7 +59,7 @@ public sealed record UpdateWriteUpSettings(Guid CompetitionId, Guid? ChallengeId
     bool DeductionSpecified, DateTimeOffset Now);
 public sealed record WriteUpSettingsResult(WriteUpSettingsView? Settings, Guid? ConcurrencyStamp,
     ChallengeWriteUpFailure? Failure = null);
-public sealed record WriteUpPdfContent(string FileName, Stream Content);
+public sealed record WriteUpPdfContent(string FileName, Stream Content, Guid FileId);
 public sealed record ChallengeWriteUpQuote(Guid VersionId, Guid PolicyStamp, bool IsFree, bool IsUnlocked,
     bool CanUnlock, int DeductionPercent, long? GrossPoints, long? EstimatedDeductionPoints);
 
@@ -150,7 +153,7 @@ public sealed class ManageChallengeWriteUps(IChallengeWriteUpStore store, Manage
         var content = await ReadContentAsync(competitionId, challengeId, versionId, actorId, staff, now, ct);
         if (content.Failure is not null || content.Format != WriteUpFormat.Pdf || content.File is null) return null;
         var stream = await objects.OpenRead(content.File.ObjectKey, ct);
-        return stream is null ? null : new(content.File.FileName, stream);
+        return stream is null ? null : new(content.File.FileName, stream, content.File.FileId);
     }
     public async Task<ChallengeWriteUpQuote?> QuoteAsync(Guid competitionId, Guid challengeId, Guid versionId, Guid actorId,
         DateTimeOffset now, CancellationToken ct)

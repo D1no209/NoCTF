@@ -9,13 +9,18 @@ using NoCTF.Domain.Challenges.WriteUps;
 
 namespace NoCTF.API.Endpoints.Challenges.WriteUps;
 
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<ChallengeWriteUpReviewFilterProtocol>))]
+public enum ChallengeWriteUpReviewFilterProtocol { All, Submitted, Published, Rejected, Draft }
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<ChallengeWriteUpReviewSourceProtocol>))]
+public enum ChallengeWriteUpReviewSourceProtocol { Team, Official }
+
 public sealed class ListChallengeWriteUpReviewsRequest
 {
     public Guid CompetitionId { get; set; }
     public Guid? CompetitionChallengeId { get; set; }
     public string? Search { get; set; }
-    [JsonConverter(typeof(StrictPascalCaseEnumConverter<WriteUpSource>))] public WriteUpSource? Source { get; set; }
-    [JsonConverter(typeof(StrictPascalCaseEnumConverter<WriteUpReviewFilter>))] public WriteUpReviewFilter Filter { get; set; }
+    public ChallengeWriteUpReviewSourceProtocol? Source { get; set; }
+    public ChallengeWriteUpReviewFilterProtocol Filter { get; set; }
     public int Offset { get; set; }
     public int Limit { get; set; } = 25;
 }
@@ -43,7 +48,12 @@ public sealed class ListChallengeWriteUpReviewsEndpoint(ManageChallengeWriteUps 
     {
         HttpContext.Response.Headers.CacheControl = "private, no-store";
         var result = await writeUps.ListReviewAsync(new(request.CompetitionId, user.UserId, request.CompetitionChallengeId,
-            request.Search, request.Filter, request.Offset, request.Limit, clock.GetUtcNow(), request.Source), ct);
+            request.Search, request.Filter switch { ChallengeWriteUpReviewFilterProtocol.Submitted => WriteUpReviewFilter.Submitted,
+                ChallengeWriteUpReviewFilterProtocol.Published => WriteUpReviewFilter.Published,
+                ChallengeWriteUpReviewFilterProtocol.Rejected => WriteUpReviewFilter.Rejected,
+                ChallengeWriteUpReviewFilterProtocol.Draft => WriteUpReviewFilter.Draft, _ => WriteUpReviewFilter.All },
+            request.Offset, request.Limit, clock.GetUtcNow(), request.Source switch { ChallengeWriteUpReviewSourceProtocol.Team => WriteUpSource.Team,
+                ChallengeWriteUpReviewSourceProtocol.Official => WriteUpSource.Official, _ => null }), ct);
         return result is null ? TypedResults.Forbid() : TypedResults.Ok(new ChallengeWriteUpReviewPageResponse(
             result.Items.Select(ChallengeWriteUpProtocol.Map).ToArray(), result.TotalCount, result.CanManage, result.CanJudge));
     }

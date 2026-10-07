@@ -218,7 +218,7 @@ public sealed partial class ChallengeWriteUpStore(NoCtfDbContext db, ICompetitio
         }
         var version = root.Versions.Single(x => x.Id == versionId);
         var file = version.FileId is Guid fileId ? await db.Files.AsNoTracking().SingleOrDefaultAsync(x => x.Id == fileId, ct) : null;
-        return new(versionId, version.Format, version.Markdown, file is null ? null : new(versionId, file.ObjectKey, file.FileName, file.ContentType));
+        return new(versionId, version.Format, version.Markdown, file is null ? null : new WriteUpFileReference(versionId, file.ObjectKey, file.FileName, file.ContentType) { FileId = file.Id });
     }
 
     private ValueTask<Guid> RecordAsync(Context context, ChallengeWriteUp root, Guid actorId, CompetitionEventKind kind,

@@ -29,6 +29,10 @@ public sealed class DownloadChallengeWriteUpEndpoint(ManageChallengeWriteUps wri
         HttpContext.Response.Headers.XContentTypeOptions = "nosniff";
         var pdf = await writeUps.OpenPdfAsync(request.CompetitionId, request.CompetitionChallengeId,
             request.VersionId, user.UserId, request.Staff, clock.GetUtcNow(), ct);
+        if (pdf is not null && !WriteUpBrowserAccess.MatchesFile(HttpContext, pdf.FileId))
+        {
+            await pdf.Content.DisposeAsync(); return TypedResults.NotFound();
+        }
         return pdf is null ? TypedResults.NotFound() : TypedResults.Stream(pdf.Content, "application/pdf",
             fileDownloadName: request.Download ? pdf.FileName : null, enableRangeProcessing: pdf.Content.CanSeek);
     }

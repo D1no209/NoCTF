@@ -24,7 +24,7 @@ public sealed partial class ChallengeWriteUpStore
         var version = root.Versions.Single(x => x.Id == command.VersionId);
         var file = version.FileId is Guid id ? await db.Files.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct) : null;
         return new(version.Id, version.Format, version.Markdown,
-            file is null ? null : new(version.Id, file.ObjectKey, file.FileName, file.ContentType));
+            file is null ? null : new WriteUpFileReference(version.Id, file.ObjectKey, file.FileName, file.ContentType) { FileId = file.Id });
     }
 
     public async Task<WriteUpUnlockResult> UnlockAsync(UnlockWriteUp command, CancellationToken ct)

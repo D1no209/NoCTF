@@ -5424,7 +5424,7 @@
               "nullable": true,
               "allOf": [
                 {
-                  "$ref": "#/components/schemas/NoCTFDomainChallengesWriteUpsWriteUpSource2"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesWriteUpsChallengeWriteUpReviewSourceProtocol"
                 }
               ]
             }
@@ -5436,7 +5436,7 @@
             "schema": {
               "allOf": [
                 {
-                  "$ref": "#/components/schemas/NoCTFApplicationChallengesWriteUpsWriteUpReviewFilter2"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesWriteUpsChallengeWriteUpReviewFilterProtocol"
                 }
               ]
             }
@@ -26041,7 +26041,19 @@
         "type": "object",
         "additionalProperties": false
       },
-      "NoCTFApplicationChallengesWriteUpsWriteUpReviewFilter": {
+      "NoCTFAPIEndpointsChallengesWriteUpsChallengeWriteUpReviewSourceProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Team",
+          "Official"
+        ],
+        "enum": [
+          "Team",
+          "Official"
+        ]
+      },
+      "NoCTFAPIEndpointsChallengesWriteUpsChallengeWriteUpReviewFilterProtocol": {
         "type": "string",
         "description": "",
         "x-enumNames": [
@@ -26057,36 +26069,6 @@
           "Published",
           "Rejected",
           "Draft"
-        ]
-      },
-      "NoCTFDomainChallengesWriteUpsWriteUpSource2": {
-        "type": "integer",
-        "description": "",
-        "x-enumNames": [
-          "Team",
-          "Official"
-        ],
-        "enum": [
-          0,
-          1
-        ]
-      },
-      "NoCTFApplicationChallengesWriteUpsWriteUpReviewFilter2": {
-        "type": "integer",
-        "description": "",
-        "x-enumNames": [
-          "All",
-          "Submitted",
-          "Published",
-          "Rejected",
-          "Draft"
-        ],
-        "enum": [
-          0,
-          1,
-          2,
-          3,
-          4
         ]
       },
       "NoCTFAPIEndpointsChallengesWriteUpsChallengeWriteUpListResponse": {

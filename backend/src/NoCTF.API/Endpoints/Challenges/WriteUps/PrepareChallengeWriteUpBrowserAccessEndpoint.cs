@@ -30,7 +30,7 @@ public sealed class PrepareChallengeWriteUpBrowserAccessEndpoint(ManageChallenge
             request.VersionId, user.UserId, request.Staff, clock.GetUtcNow(), ct);
         if (content.Failure is not null || content.Format != WriteUpFormat.Pdf || content.File is null) return TypedResults.NotFound();
         var path = $"/api/v1/competitions/{request.CompetitionId}/challenges/{request.CompetitionChallengeId}/writeups/versions/{request.VersionId}/file";
-        browser.Write(HttpContext, path);
+        browser.Write(HttpContext, path, content.File.FileId);
         var query = request.Staff ? "?staff=true" : "?staff=false";
         return TypedResults.Ok(new WriteUpBrowserAccessResponse(path + query, path + query + "&download=true"));
     }

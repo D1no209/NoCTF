@@ -35,7 +35,8 @@ public sealed class ChallengeWriteUpEndpointTests
         var browser = new WriteUpBrowserAccess(new EphemeralDataProtectionProvider(), clock, environment);
         var writer = new DefaultHttpContext(); writer.Request.Headers.Authorization = "Bearer verified-test";
         const string path = "/api/v1/competitions/one/writeups/versions/two/file";
-        browser.Write(writer, path);
+        var fileId = Guid.NewGuid();
+        browser.Write(writer, path, fileId);
         var setCookie = writer.Response.Headers.SetCookie.ToString();
         await Assert.That(setCookie.ToLowerInvariant()).Contains("httponly");
         await Assert.That(setCookie.ToLowerInvariant()).Contains("secure");
@@ -44,6 +45,8 @@ public sealed class ChallengeWriteUpEndpointTests
         reader.Request.Headers.Cookie = setCookie.Split(';')[0];
         reader.SetEndpoint(new Endpoint(_ => Task.CompletedTask, new EndpointMetadataCollection(new WriteUpBrowserAccessMetadata()), "PDF"));
         await Assert.That(browser.Read(reader)).IsEqualTo("verified-test");
+        await Assert.That(WriteUpBrowserAccess.MatchesFile(reader, fileId)).IsTrue();
+        await Assert.That(WriteUpBrowserAccess.MatchesFile(reader, Guid.NewGuid())).IsFalse();
         await Assert.That(browser.Read(reader)).IsEqualTo("verified-test");
         reader.Request.Path = "/api/v1/admin/users";
         await Assert.That(browser.Read(reader)).IsNull();

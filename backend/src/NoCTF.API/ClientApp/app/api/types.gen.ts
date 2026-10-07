@@ -1725,11 +1725,9 @@ export type NoCtfapiEndpointsChallengesWriteUpsListChallengeWriteUpReviewsReques
     [key: string]: never;
 };
 
-export type NoCtfApplicationChallengesWriteUpsWriteUpReviewFilter = 'All' | 'Submitted' | 'Published' | 'Rejected' | 'Draft';
+export type NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpReviewSourceProtocol = 'Team' | 'Official';
 
-export type NoCtfDomainChallengesWriteUpsWriteUpSource2 = 0 | 1;
-
-export type NoCtfApplicationChallengesWriteUpsWriteUpReviewFilter2 = 0 | 1 | 2 | 3 | 4;
+export type NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpReviewFilterProtocol = 'All' | 'Submitted' | 'Published' | 'Rejected' | 'Draft';
 
 export type NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpListResponse = {
     access?: NoCtfApplicationChallengesWriteUpsWriteUpAccessView;
@@ -7242,8 +7240,8 @@ export type ListChallengeWriteUpReviewsData = {
     query: {
         competitionChallengeId?: string | null;
         search?: string | null;
-        source?: NoCtfDomainChallengesWriteUpsWriteUpSource2 | null;
-        filter: NoCtfApplicationChallengesWriteUpsWriteUpReviewFilter2;
+        source?: NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpReviewSourceProtocol | null;
+        filter: NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpReviewFilterProtocol;
         offset: number;
         limit: number;
     };

@@ -17,6 +17,7 @@ public sealed class ReviewChallengeWriteUpRequest
     public Guid VersionId { get; set; }
     public Guid ExpectedStamp { get; set; }
     [JsonConverter(typeof(StrictPascalCaseEnumConverter<WriteUpReviewAction>))]
+    [JsonRequired]
     public WriteUpReviewAction Action { get; set; }
     public string? Reason { get; set; }
 }
