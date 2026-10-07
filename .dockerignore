@@ -24,6 +24,7 @@ backend/artifacts/*
 !backend/artifacts/webhooks/
 backend/artifacts/webhooks/*
 !backend/artifacts/webhooks/competition-events-v1.schema.json
+!backend/artifacts/webhooks/staff-events-v1.schema.json
 backend/src/NoCTF.API/backend.log
 *.log
 
