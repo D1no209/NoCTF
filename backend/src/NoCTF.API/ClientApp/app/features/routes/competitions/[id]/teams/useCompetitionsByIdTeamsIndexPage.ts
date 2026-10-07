@@ -3,7 +3,7 @@ import { message as describeMessage } from '../../../../../utils/i18n'
 
 import { listCompetitionTeamsEndpoint } from '../../../../../api'
 import type { NoCtfapiEndpointsTeamsTeamResponse } from '../../../../../api'
-import { computed, ref } from 'vue'
+import { computed, defineAsyncComponent, markRaw, ref } from 'vue'
 import { useOffsetPagination } from '../../../../../composables/useOffsetPagination'
 import { parseApiError } from '../../../../../utils/api-error'
 import { buildTeamDisplayNames } from '../../../../../utils/team-display'
@@ -29,12 +29,14 @@ export function useCompetitionsByIdTeamsIndexPage() {
     || !pagination.initialized.value && pagination.error.value === null)
   const error = computed(() => pagination.error.value?.message ?? null)
   const teamDisplayNames = computed(() => buildTeamDisplayNames(allTeams.value ?? []))
+  const TeamMembers = markRaw(defineAsyncComponent(() => import('../../../../teams/TeamMembers.vue')))
 
   onMounted(() => pagination.loadPage(1))
   onBeforeUnmount(pagination.reset)
 
   return {
       competitionId,
+      TeamMembers,
       teams: pagination.items,
       loading,
       error,
