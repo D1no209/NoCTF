@@ -158,7 +158,7 @@ describe('leaderboard progressive display', () => {
     expect(trendChart).toContain('min: timeRange.axisMin')
     expect(trendChart).toContain('max: timeRange.axisMax')
     expect(trendChart).toContain("type: 'slider'")
-    expect(trendChart.match(/filterMode: 'none'/g)).toHaveLength(3)
+    expect(trendChart.match(/filterMode: 'none'/g)).toHaveLength(4)
     expect(trendChart).toContain("chart.on('datazoom', rememberZoom)")
     expect(trendChart).toContain("id: 'score-trend-score-inside'")
     expect(trendChart).toContain("zoomOnMouseWheel: 'ctrl'")
