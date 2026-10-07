@@ -60,6 +60,7 @@ public static class WorkerRole
         {
             services.AddHostedService<CompetitionWebhookOutboxAgent>();
             services.AddHostedService<CompetitionWebhookRetryAgent>();
+            services.AddHostedService<NoCTF.Worker.Competitions.StaffWebhooks.StaffWebhookAgent>();
         }
         services.AddSingleton<LeaderboardProjectionMergeQueue>();
         if (WorkerQueues.GetEnabled(configuration).Contains(WorkerQueue.Projection))
@@ -112,6 +113,7 @@ public static class WorkerRole
         options.Discovery.IncludeType(typeof(GameplayFactMessageHandler));
         options.Discovery.IncludeType(typeof(LeaderboardMessageHandler));
         options.Discovery.IncludeType(typeof(CompetitionWebhookMessageHandler));
+        options.Discovery.IncludeType(typeof(Competitions.StaffWebhooks.StaffWebhookMessageHandler));
         options.Discovery.IncludeType(typeof(CompetitionNotificationMessageHandlers));
         var enabledQueues = WorkerQueues.GetEnabled(configuration);
         if (enabledQueues.Contains(WorkerQueue.Background))

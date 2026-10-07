@@ -57,8 +57,8 @@ public static class StaffWebhookProtocol
         ManagementUrl = ManagementUrl(value.Kind, value.Id, competitionId, origin)
     };
     public static string ManagementUrl(StaffWorkItemKind kind, Guid id, Guid competitionId, Uri origin) => new Uri(origin, kind switch {
-            StaffWorkItemKind.CheatIncident => $"competitions/{competitionId}/staff?kind=CheatIncident&item={id}",
+            StaffWorkItemKind.CheatIncident => $"competitions/{competitionId}/staff?kind=CheatIncident&incident={id}",
             StaffWorkItemKind.Consultation => $"competitions/{competitionId}/questions?question={id}",
-            StaffWorkItemKind.BanAppeal => $"competitions/{competitionId}/staff?kind=BanAppeal&item={id}",
+            StaffWorkItemKind.BanAppeal => $"competitions/{competitionId}/staff?kind=BanAppeal&appeal={id}",
             _ => throw new ArgumentOutOfRangeException(nameof(kind)) }).AbsoluteUri;
 }

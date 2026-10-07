@@ -16,27 +16,33 @@ internal static class StaffWebhookEventCapture
         CompetitionEventKind.TeamBanAppealSubmitted, CompetitionEventKind.TeamBanAppealAccepted, CompetitionEventKind.TeamBanAppealUpheld,
         CompetitionEventKind.TeamBanned, CompetitionEventKind.TeamUnbanned, CompetitionEventKind.TeamBanCorrectionPublished,
         CompetitionEventKind.QuestionOpened, CompetitionEventKind.QuestionReplied, CompetitionEventKind.QuestionStatusChanged,
-        CompetitionEventKind.TeamUpdated, CompetitionEventKind.ChallengeUpdated, CompetitionEventKind.CompetitionUpdated];
+        CompetitionEventKind.TeamUpdated, CompetitionEventKind.ChallengeUpdated, CompetitionEventKind.ChallengeDescriptionUpdated, CompetitionEventKind.CompetitionUpdated];
     public static Guid[] ChangedCompetitions(NoCtfDbContext db) => db.ChangeTracker.Entries<CompetitionEvent>()
         .Where(value => value.State == EntityState.Added && Kinds.Contains(value.Entity.Kind)).Select(value => value.Entity.CompetitionId)
         .Concat(db.ChangeTracker.Entries<GameplayFact>().Where(value => value.State is EntityState.Added or EntityState.Modified
             && (CheatIncidentFailures.IsIncident(value.Entity.FailureCode) || CheatIncidentFailures.IsIncident(value.OriginalValues.GetValue<GameplayFactFailureCode?>(nameof(GameplayFact.FailureCode)))))
             .Select(value => value.Entity.CompetitionId))
         .Concat(db.ChangeTracker.Entries<Notification>().Where(value => value.State == EntityState.Added
-            && value.Entity.QuestionStatus != null && value.Entity.CompetitionId != null).Select(value => value.Entity.CompetitionId!.Value))
+            && value.Entity.QuestionStatus != null && value.Entity.TargetType == NotificationTargetType.CompetitionCollaborators)
+            .Select(value => value.Entity.TargetId))
         .Distinct().ToArray();
 
-    public static async Task CaptureAsync(NoCtfDbContext db, Guid[] competitions, DateTimeOffset now, CancellationToken ct)
+    public static async Task CaptureAsync(NoCtfDbContext db, Guid[] competitions, DateTimeOffset now, CancellationToken ct, bool force = false)
     {
         foreach (var id in competitions)
         {
+            // Unsubscribed competitions do not build an unnecessary read model on every business write.
+            // Initial/re-enabled subscriptions rebuild their baseline from authoritative facts.
+            if (!force && !db.StaffWebhookTargets.Local.Any(value => value.CompetitionId == id && value.Enabled && !value.Deleted)
+                && !await db.StaffWebhookTargets.AnyAsync(value => value.CompetitionId == id && value.Enabled && !value.Deleted, ct)) continue;
             var current = await StaffWorkItemProjection.ReadAsync(db, id, ct);
             if (current.Count == 0 && !await db.StaffWebhookWorkItems.AnyAsync(value => value.CompetitionId == id, ct)) continue;
             var stream = await StreamAsync(db, id, ct);
             var title = db.Competitions.Local.FirstOrDefault(value => value.Id == id)?.Title
                 ?? await db.Competitions.IgnoreQueryFilters().Where(value => value.Id == id).Select(value => value.Title).SingleAsync(ct);
             var existing = await db.StaffWebhookWorkItems.Where(value => value.CompetitionId == id).ToDictionaryAsync(value => (value.Kind, value.ItemId), ct);
-            var changedNodes = db.ChangeTracker.Entries<Notification>().Where(value => value.State == EntityState.Added && value.Entity.CompetitionId == id)
+            var changedNodes = db.ChangeTracker.Entries<Notification>().Where(value => value.State == EntityState.Added
+                    && value.Entity.TargetType == NotificationTargetType.CompetitionCollaborators && value.Entity.TargetId == id)
                 .Select(value => value.Entity).ToArray();
             foreach (var item in current.OrderBy(value => value.Kind).ThenBy(value => value.Id))
             {
@@ -51,8 +57,8 @@ internal static class StaffWebhookEventCapture
                     : old.Summary.CheatStatus != item.CheatStatus || old.Summary.ConsultationStatus != item.ConsultationStatus
                         || old.Summary.AppealStatus != item.AppealStatus || old.Summary.RequiresStaffAction != item.RequiresStaffAction
                         ? StaffWorkItemChangeKind.StatusChanged : StaffWorkItemChangeKind.MetadataChanged;
-                if (item.RequiresStaffAction && old?.Summary.RequiresStaffAction == true) item.ActionRequiredSince = old.Summary.ActionRequiredSince;
-                else if (item.RequiresStaffAction && old is not null) item.ActionRequiredSince = item.UpdatedAt;
+                if (item.Kind == StaffWorkItemKind.CheatIncident && item.RequiresStaffAction && old?.Summary.RequiresStaffAction == true)
+                    item.ActionRequiredSince = old.Summary.ActionRequiredSince;
                 var sequence = checked(++stream.Sequence); stream.LatestBusinessSequence = sequence; item.LastChangedSequence = sequence;
                 var row = old ?? new StaffWebhookWorkItem { CompetitionId = id, Kind = item.Kind, ItemId = item.Id };
                 row.Summary = item.Copy(); if (old is null) db.StaffWebhookWorkItems.Add(row);

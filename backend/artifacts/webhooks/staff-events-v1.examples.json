@@ -1,0 +1,117 @@
+{
+  "demoSigningSecret": "whsec_AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=",
+  "capturedAt": "2026-10-07T06:00:00+00:00",
+  "competitionId": "01990000-0000-7000-8000-000000000001",
+  "targetId": "01990000-0000-7000-8000-000000000002",
+  "origin": "https://noctf.example.test/",
+  "examples": [
+    {
+      "name": "CheatIncident-created",
+      "headers": {
+        "webhook-id": "9a6808da-d920-4db5-8368-b14ef712e0c2",
+        "webhook-timestamp": "1791352800",
+        "webhook-signature": "v1,XKJjJJ4qX7\u002B9lCeYcw5OuUP1TS5PdcwU1yKUD5tvaC0="
+      },
+      "rawBody": "{\u0022specversion\u0022:\u00221.0\u0022,\u0022id\u0022:\u00229a6808da-d920-4db5-8368-b14ef712e0c2\u0022,\u0022source\u0022:\u0022https://noctf.example.test/api/v1/competitions/01990000-0000-7000-8000-000000000001/staff-events\u0022,\u0022type\u0022:\u0022com.noctf.staff.work-item.created.v1\u0022,\u0022subject\u0022:\u0022CheatIncident/6255aa50-e78c-434a-a372-a3f412355d83\u0022,\u0022time\u0022:\u00222026-10-07T06:00:00\u002B00:00\u0022,\u0022datacontenttype\u0022:\u0022application/json\u0022,\u0022dataschema\u0022:\u0022https://noctf.example.test/schemas/webhooks/staff-events-v1.schema.json\u0022,\u0022data\u0022:{\u0022subscriptionId\u0022:\u002201990000-0000-7000-8000-000000000002\u0022,\u0022competition\u0022:{\u0022id\u0022:\u002201990000-0000-7000-8000-000000000001\u0022,\u0022title\u0022:\u0022Fictional CTF\u0022},\u0022sequence\u0022:1,\u0022changeKind\u0022:\u0022Created\u0022,\u0022item\u0022:{\u0022kind\u0022:\u0022CheatIncident\u0022,\u0022id\u0022:\u00226255aa50-e78c-434a-a372-a3f412355d83\u0022,\u0022status\u0022:\u0022Pending\u0022,\u0022requiresStaffAction\u0022:true,\u0022actionRequiredSince\u0022:\u00222026-10-07T05:59:00\u002B00:00\u0022,\u0022createdAt\u0022:\u00222026-10-07T05:59:00\u002B00:00\u0022,\u0022updatedAt\u0022:\u00222026-10-07T06:00:00\u002B00:00\u0022,\u0022team\u0022:{\u0022id\u0022:\u0022abc33f8c-261d-4735-b746-ac2bf2c84d1d\u0022,\u0022displayName\u0022:\u0022Fictional Blue Team\u0022},\u0022challenge\u0022:{\u0022id\u0022:\u00224e456ea2-b814-4b2b-beed-a037b56306c5\u0022,\u0022title\u0022:\u0022Fictional puzzle\u0022,\u0022direction\u0022:\u0022Web\u0022},\u0022lastChangedSequence\u0022:1,\u0022managementUrl\u0022:\u0022https://noctf.example.test/competitions/01990000-0000-7000-8000-000000000001/staff?kind=CheatIncident\\u0026incident=6255aa50-e78c-434a-a372-a3f412355d83\u0022}}}"
+    },
+    {
+      "name": "CheatIncident-updated",
+      "headers": {
+        "webhook-id": "928f08c9-5859-4050-8b79-a2a845352523",
+        "webhook-timestamp": "1791352800",
+        "webhook-signature": "v1,p\u002BFwceoLMyt0H87lyElVvwqSmAdM\u002BSzJ5QceY/8FMu0="
+      },
+      "rawBody": "{\u0022specversion\u0022:\u00221.0\u0022,\u0022id\u0022:\u0022928f08c9-5859-4050-8b79-a2a845352523\u0022,\u0022source\u0022:\u0022https://noctf.example.test/api/v1/competitions/01990000-0000-7000-8000-000000000001/staff-events\u0022,\u0022type\u0022:\u0022com.noctf.staff.work-item.updated.v1\u0022,\u0022subject\u0022:\u0022CheatIncident/6255aa50-e78c-434a-a372-a3f412355d83\u0022,\u0022time\u0022:\u00222026-10-07T06:00:00\u002B00:00\u0022,\u0022datacontenttype\u0022:\u0022application/json\u0022,\u0022dataschema\u0022:\u0022https://noctf.example.test/schemas/webhooks/staff-events-v1.schema.json\u0022,\u0022data\u0022:{\u0022subscriptionId\u0022:\u002201990000-0000-7000-8000-000000000002\u0022,\u0022competition\u0022:{\u0022id\u0022:\u002201990000-0000-7000-8000-000000000001\u0022,\u0022title\u0022:\u0022Fictional CTF\u0022},\u0022sequence\u0022:2,\u0022changeKind\u0022:\u0022StatusChanged\u0022,\u0022item\u0022:{\u0022kind\u0022:\u0022CheatIncident\u0022,\u0022id\u0022:\u00226255aa50-e78c-434a-a372-a3f412355d83\u0022,\u0022status\u0022:\u0022Confirmed\u0022,\u0022requiresStaffAction\u0022:false,\u0022createdAt\u0022:\u00222026-10-07T05:59:00\u002B00:00\u0022,\u0022updatedAt\u0022:\u00222026-10-07T06:00:00\u002B00:00\u0022,\u0022team\u0022:{\u0022id\u0022:\u0022abc33f8c-261d-4735-b746-ac2bf2c84d1d\u0022,\u0022displayName\u0022:\u0022Fictional Blue Team\u0022},\u0022challenge\u0022:{\u0022id\u0022:\u00224e456ea2-b814-4b2b-beed-a037b56306c5\u0022,\u0022title\u0022:\u0022Fictional puzzle\u0022,\u0022direction\u0022:\u0022Web\u0022},\u0022lastChangedSequence\u0022:2,\u0022managementUrl\u0022:\u0022https://noctf.example.test/competitions/01990000-0000-7000-8000-000000000001/staff?kind=CheatIncident\\u0026incident=6255aa50-e78c-434a-a372-a3f412355d83\u0022}}}"
+    },
+    {
+      "name": "Consultation-created",
+      "headers": {
+        "webhook-id": "78742882-aed6-484c-b4b8-0b3d52150e7a",
+        "webhook-timestamp": "1791352800",
+        "webhook-signature": "v1,C9BCPE979lZZVI\u002B3vdyAdBB5UBDsYRh/9OeI\u002BtDM8qE="
+      },
+      "rawBody": "{\u0022specversion\u0022:\u00221.0\u0022,\u0022id\u0022:\u002278742882-aed6-484c-b4b8-0b3d52150e7a\u0022,\u0022source\u0022:\u0022https://noctf.example.test/api/v1/competitions/01990000-0000-7000-8000-000000000001/staff-events\u0022,\u0022type\u0022:\u0022com.noctf.staff.work-item.created.v1\u0022,\u0022subject\u0022:\u0022Consultation/d80d4efd-d554-4128-adfb-a3ea04e6ac0e\u0022,\u0022time\u0022:\u00222026-10-07T06:00:00\u002B00:00\u0022,\u0022datacontenttype\u0022:\u0022application/json\u0022,\u0022dataschema\u0022:\u0022https://noctf.example.test/schemas/webhooks/staff-events-v1.schema.json\u0022,\u0022data\u0022:{\u0022subscriptionId\u0022:\u002201990000-0000-7000-8000-000000000002\u0022,\u0022competition\u0022:{\u0022id\u0022:\u002201990000-0000-7000-8000-000000000001\u0022,\u0022title\u0022:\u0022Fictional CTF\u0022},\u0022sequence\u0022:3,\u0022changeKind\u0022:\u0022Created\u0022,\u0022item\u0022:{\u0022kind\u0022:\u0022Consultation\u0022,\u0022id\u0022:\u0022d80d4efd-d554-4128-adfb-a3ea04e6ac0e\u0022,\u0022status\u0022:\u0022Pending\u0022,\u0022requiresStaffAction\u0022:true,\u0022actionRequiredSince\u0022:\u00222026-10-07T05:59:00\u002B00:00\u0022,\u0022createdAt\u0022:\u00222026-10-07T05:59:00\u002B00:00\u0022,\u0022updatedAt\u0022:\u00222026-10-07T06:00:00\u002B00:00\u0022,\u0022team\u0022:{\u0022id\u0022:\u002247898e1e-13bc-4e30-90c0-cffdcb9cf4e1\u0022,\u0022displayName\u0022:\u0022Fictional Blue Team\u0022},\u0022challenge\u0022:{\u0022id\u0022:\u00229d57771a-2cbf-48e4-9ddc-9fd0da2ad614\u0022,\u0022title\u0022:\u0022Fictional puzzle\u0022,\u0022direction\u0022:\u0022Web\u0022},\u0022subject\u0022:\u0022Challenge\u0022,\u0022lastChangedSequence\u0022:3,\u0022managementUrl\u0022:\u0022https://noctf.example.test/competitions/01990000-0000-7000-8000-000000000001/questions?question=d80d4efd-d554-4128-adfb-a3ea04e6ac0e\u0022}}}"
+    },
+    {
+      "name": "Consultation-updated",
+      "headers": {
+        "webhook-id": "509eea32-216e-4cdd-a0c6-f77f6c6fab9c",
+        "webhook-timestamp": "1791352800",
+        "webhook-signature": "v1,/VlOiqH8Uog7rZh3w06u6F3TQ/qHA1WuCIBkF7J8JZw="
+      },
+      "rawBody": "{\u0022specversion\u0022:\u00221.0\u0022,\u0022id\u0022:\u0022509eea32-216e-4cdd-a0c6-f77f6c6fab9c\u0022,\u0022source\u0022:\u0022https://noctf.example.test/api/v1/competitions/01990000-0000-7000-8000-000000000001/staff-events\u0022,\u0022type\u0022:\u0022com.noctf.staff.work-item.updated.v1\u0022,\u0022subject\u0022:\u0022Consultation/d80d4efd-d554-4128-adfb-a3ea04e6ac0e\u0022,\u0022time\u0022:\u00222026-10-07T06:00:00\u002B00:00\u0022,\u0022datacontenttype\u0022:\u0022application/json\u0022,\u0022dataschema\u0022:\u0022https://noctf.example.test/schemas/webhooks/staff-events-v1.schema.json\u0022,\u0022data\u0022:{\u0022subscriptionId\u0022:\u002201990000-0000-7000-8000-000000000002\u0022,\u0022competition\u0022:{\u0022id\u0022:\u002201990000-0000-7000-8000-000000000001\u0022,\u0022title\u0022:\u0022Fictional CTF\u0022},\u0022sequence\u0022:4,\u0022changeKind\u0022:\u0022StaffReply\u0022,\u0022item\u0022:{\u0022kind\u0022:\u0022Consultation\u0022,\u0022id\u0022:\u0022d80d4efd-d554-4128-adfb-a3ea04e6ac0e\u0022,\u0022status\u0022:\u0022Replied\u0022,\u0022requiresStaffAction\u0022:false,\u0022createdAt\u0022:\u00222026-10-07T05:59:00\u002B00:00\u0022,\u0022updatedAt\u0022:\u00222026-10-07T06:00:00\u002B00:00\u0022,\u0022team\u0022:{\u0022id\u0022:\u002247898e1e-13bc-4e30-90c0-cffdcb9cf4e1\u0022,\u0022displayName\u0022:\u0022Fictional Blue Team\u0022},\u0022challenge\u0022:{\u0022id\u0022:\u00229d57771a-2cbf-48e4-9ddc-9fd0da2ad614\u0022,\u0022title\u0022:\u0022Fictional puzzle\u0022,\u0022direction\u0022:\u0022Web\u0022},\u0022subject\u0022:\u0022Challenge\u0022,\u0022lastChangedSequence\u0022:4,\u0022managementUrl\u0022:\u0022https://noctf.example.test/competitions/01990000-0000-7000-8000-000000000001/questions?question=d80d4efd-d554-4128-adfb-a3ea04e6ac0e\u0022}}}"
+    },
+    {
+      "name": "BanAppeal-created",
+      "headers": {
+        "webhook-id": "16c0611d-5a94-4f74-a044-88cef73be406",
+        "webhook-timestamp": "1791352800",
+        "webhook-signature": "v1,YvDBf6bN\u002B8jir/otR\u002BpLrOcKb/N68jn7fRjCPQyYDD0="
+      },
+      "rawBody": "{\u0022specversion\u0022:\u00221.0\u0022,\u0022id\u0022:\u002216c0611d-5a94-4f74-a044-88cef73be406\u0022,\u0022source\u0022:\u0022https://noctf.example.test/api/v1/competitions/01990000-0000-7000-8000-000000000001/staff-events\u0022,\u0022type\u0022:\u0022com.noctf.staff.work-item.created.v1\u0022,\u0022subject\u0022:\u0022BanAppeal/79585c6b-a44b-427a-83d2-2308f9348115\u0022,\u0022time\u0022:\u00222026-10-07T06:00:00\u002B00:00\u0022,\u0022datacontenttype\u0022:\u0022application/json\u0022,\u0022dataschema\u0022:\u0022https://noctf.example.test/schemas/webhooks/staff-events-v1.schema.json\u0022,\u0022data\u0022:{\u0022subscriptionId\u0022:\u002201990000-0000-7000-8000-000000000002\u0022,\u0022competition\u0022:{\u0022id\u0022:\u002201990000-0000-7000-8000-000000000001\u0022,\u0022title\u0022:\u0022Fictional CTF\u0022},\u0022sequence\u0022:5,\u0022changeKind\u0022:\u0022Created\u0022,\u0022item\u0022:{\u0022kind\u0022:\u0022BanAppeal\u0022,\u0022id\u0022:\u002279585c6b-a44b-427a-83d2-2308f9348115\u0022,\u0022status\u0022:\u0022Submitted\u0022,\u0022requiresStaffAction\u0022:true,\u0022actionRequiredSince\u0022:\u00222026-10-07T05:59:00\u002B00:00\u0022,\u0022createdAt\u0022:\u00222026-10-07T05:59:00\u002B00:00\u0022,\u0022updatedAt\u0022:\u00222026-10-07T06:00:00\u002B00:00\u0022,\u0022team\u0022:{\u0022id\u0022:\u0022ee78a581-d8e7-4e1d-a670-f4e8057676b5\u0022,\u0022displayName\u0022:\u0022Fictional Blue Team\u0022},\u0022challenge\u0022:{\u0022id\u0022:\u0022e8c51fb8-888e-42ea-8703-9a089b15e498\u0022,\u0022title\u0022:\u0022Fictional puzzle\u0022,\u0022direction\u0022:\u0022Web\u0022},\u0022lastChangedSequence\u0022:5,\u0022managementUrl\u0022:\u0022https://noctf.example.test/competitions/01990000-0000-7000-8000-000000000001/staff?kind=BanAppeal\\u0026appeal=79585c6b-a44b-427a-83d2-2308f9348115\u0022}}}"
+    },
+    {
+      "name": "BanAppeal-updated",
+      "headers": {
+        "webhook-id": "bd75d89a-3e24-43b0-aa2a-ee52dee55e52",
+        "webhook-timestamp": "1791352800",
+        "webhook-signature": "v1,fi78tYu0/pS1ZzR\u002Bx5aX2sRLCnnfbs2/KXzFBAob0io="
+      },
+      "rawBody": "{\u0022specversion\u0022:\u00221.0\u0022,\u0022id\u0022:\u0022bd75d89a-3e24-43b0-aa2a-ee52dee55e52\u0022,\u0022source\u0022:\u0022https://noctf.example.test/api/v1/competitions/01990000-0000-7000-8000-000000000001/staff-events\u0022,\u0022type\u0022:\u0022com.noctf.staff.work-item.updated.v1\u0022,\u0022subject\u0022:\u0022BanAppeal/79585c6b-a44b-427a-83d2-2308f9348115\u0022,\u0022time\u0022:\u00222026-10-07T06:00:00\u002B00:00\u0022,\u0022datacontenttype\u0022:\u0022application/json\u0022,\u0022dataschema\u0022:\u0022https://noctf.example.test/schemas/webhooks/staff-events-v1.schema.json\u0022,\u0022data\u0022:{\u0022subscriptionId\u0022:\u002201990000-0000-7000-8000-000000000002\u0022,\u0022competition\u0022:{\u0022id\u0022:\u002201990000-0000-7000-8000-000000000001\u0022,\u0022title\u0022:\u0022Fictional CTF\u0022},\u0022sequence\u0022:6,\u0022changeKind\u0022:\u0022StatusChanged\u0022,\u0022item\u0022:{\u0022kind\u0022:\u0022BanAppeal\u0022,\u0022id\u0022:\u002279585c6b-a44b-427a-83d2-2308f9348115\u0022,\u0022status\u0022:\u0022Accepted\u0022,\u0022requiresStaffAction\u0022:false,\u0022createdAt\u0022:\u00222026-10-07T05:59:00\u002B00:00\u0022,\u0022updatedAt\u0022:\u00222026-10-07T06:00:00\u002B00:00\u0022,\u0022team\u0022:{\u0022id\u0022:\u0022ee78a581-d8e7-4e1d-a670-f4e8057676b5\u0022,\u0022displayName\u0022:\u0022Fictional Blue Team\u0022},\u0022challenge\u0022:{\u0022id\u0022:\u0022e8c51fb8-888e-42ea-8703-9a089b15e498\u0022,\u0022title\u0022:\u0022Fictional puzzle\u0022,\u0022direction\u0022:\u0022Web\u0022},\u0022lastChangedSequence\u0022:6,\u0022managementUrl\u0022:\u0022https://noctf.example.test/competitions/01990000-0000-7000-8000-000000000001/staff?kind=BanAppeal\\u0026appeal=79585c6b-a44b-427a-83d2-2308f9348115\u0022}}}"
+    },
+    {
+      "name": "empty-snapshot",
+      "headers": {
+        "webhook-id": "7f7aa1bb-ce45-46dd-8460-e29d426cb02b",
+        "webhook-timestamp": "1791352800",
+        "webhook-signature": "v1,yuUDGEi44s9stDQNJdoEYhQOfDz5n8tCKOdBLe\u002BdqbM="
+      },
+      "rawBody": "{\u0022specversion\u0022:\u00221.0\u0022,\u0022id\u0022:\u00227f7aa1bb-ce45-46dd-8460-e29d426cb02b\u0022,\u0022source\u0022:\u0022https://noctf.example.test/api/v1/competitions/01990000-0000-7000-8000-000000000001/staff-events\u0022,\u0022type\u0022:\u0022com.noctf.staff.pending.snapshot.v1\u0022,\u0022time\u0022:\u00222026-10-07T06:00:00\u002B00:00\u0022,\u0022datacontenttype\u0022:\u0022application/json\u0022,\u0022dataschema\u0022:\u0022https://noctf.example.test/schemas/webhooks/staff-events-v1.schema.json\u0022,\u0022data\u0022:{\u0022subscriptionId\u0022:\u002201990000-0000-7000-8000-000000000002\u0022,\u0022competition\u0022:{\u0022id\u0022:\u002201990000-0000-7000-8000-000000000001\u0022,\u0022title\u0022:\u0022Fictional CTF\u0022},\u0022sequence\u0022:7,\u0022snapshotId\u0022:\u00229493e900-2794-4be9-ac52-e228e4e14a36\u0022,\u0022snapshotReason\u0022:\u0022Initial\u0022,\u0022asOfSequence\u0022:6,\u0022pageIndex\u0022:0,\u0022pageCount\u0022:1,\u0022items\u0022:[],\u0022pendingUrl\u0022:\u0022https://noctf.example.test/competitions/01990000-0000-7000-8000-000000000001/staff\u0022}}"
+    },
+    {
+      "name": "multi-page-snapshot-0",
+      "headers": {
+        "webhook-id": "2c89671d-aa23-469d-b2bc-8ba23a2a4e43",
+        "webhook-timestamp": "1791352800",
+        "webhook-signature": "v1,jQ6bwpQmcnzww0UOVFqJazijMfoF0eJJcpN\u002BEgS8wAo="
+      },
+      "rawBody": "{\u0022specversion\u0022:\u00221.0\u0022,\u0022id\u0022:\u00222c89671d-aa23-469d-b2bc-8ba23a2a4e43\u0022,\u0022source\u0022:\u0022https://noctf.example.test/api/v1/competitions/01990000-0000-7000-8000-000000000001/staff-events\u0022,\u0022type\u0022:\u0022com.noctf.staff.pending.snapshot.v1\u0022,\u0022time\u0022:\u00222026-10-07T06:00:00\u002B00:00\u0022,\u0022datacontenttype\u0022:\u0022application/json\u0022,\u0022dataschema\u0022:\u0022https://noctf.example.test/schemas/webhooks/staff-events-v1.schema.json\u0022,\u0022data\u0022:{\u0022subscriptionId\u0022:\u002201990000-0000-7000-8000-000000000002\u0022,\u0022competition\u0022:{\u0022id\u0022:\u002201990000-0000-7000-8000-000000000001\u0022,\u0022title\u0022:\u0022Fictional CTF\u0022},\u0022sequence\u0022:8,\u0022snapshotId\u0022:\u0022c3ab6732-d535-4400-9938-01780785b7a1\u0022,\u0022snapshotReason\u0022:\u0022Resync\u0022,\u0022asOfSequence\u0022:6,\u0022pageIndex\u0022:0,\u0022pageCount\u0022:2,\u0022items\u0022:[{\u0022kind\u0022:\u0022Consultation\u0022,\u0022id\u0022:\u0022f4d0099f-a023-4c3b-93b7-23dcb4f60311\u0022,\u0022status\u0022:\u0022Pending\u0022,\u0022requiresStaffAction\u0022:true,\u0022actionRequiredSince\u0022:\u00222026-10-07T05:58:00\u002B00:00\u0022,\u0022createdAt\u0022:\u00222026-10-07T05:58:00\u002B00:00\u0022,\u0022updatedAt\u0022:\u00222026-10-07T06:00:00\u002B00:00\u0022,\u0022lastChangedSequence\u0022:5,\u0022managementUrl\u0022:\u0022https://noctf.example.test/competitions/01990000-0000-7000-8000-000000000001/questions?question=f4d0099f-a023-4c3b-93b7-23dcb4f60311\u0022}],\u0022pendingUrl\u0022:\u0022https://noctf.example.test/competitions/01990000-0000-7000-8000-000000000001/staff\u0022}}"
+    },
+    {
+      "name": "multi-page-snapshot-1",
+      "headers": {
+        "webhook-id": "95170161-c63f-4dee-a208-3d7045b97d06",
+        "webhook-timestamp": "1791352800",
+        "webhook-signature": "v1,FtF/EgI5S\u002BDn92Bc0\u002Bk8\u002BXNXsK6K2DqBR2O3y6gvOgk="
+      },
+      "rawBody": "{\u0022specversion\u0022:\u00221.0\u0022,\u0022id\u0022:\u002295170161-c63f-4dee-a208-3d7045b97d06\u0022,\u0022source\u0022:\u0022https://noctf.example.test/api/v1/competitions/01990000-0000-7000-8000-000000000001/staff-events\u0022,\u0022type\u0022:\u0022com.noctf.staff.pending.snapshot.v1\u0022,\u0022time\u0022:\u00222026-10-07T06:00:00\u002B00:00\u0022,\u0022datacontenttype\u0022:\u0022application/json\u0022,\u0022dataschema\u0022:\u0022https://noctf.example.test/schemas/webhooks/staff-events-v1.schema.json\u0022,\u0022data\u0022:{\u0022subscriptionId\u0022:\u002201990000-0000-7000-8000-000000000002\u0022,\u0022competition\u0022:{\u0022id\u0022:\u002201990000-0000-7000-8000-000000000001\u0022,\u0022title\u0022:\u0022Fictional CTF\u0022},\u0022sequence\u0022:9,\u0022snapshotId\u0022:\u0022c3ab6732-d535-4400-9938-01780785b7a1\u0022,\u0022snapshotReason\u0022:\u0022Resync\u0022,\u0022asOfSequence\u0022:6,\u0022pageIndex\u0022:1,\u0022pageCount\u0022:2,\u0022items\u0022:[{\u0022kind\u0022:\u0022Consultation\u0022,\u0022id\u0022:\u002209710117-d3fa-4cad-92f8-27a8fa14b43e\u0022,\u0022status\u0022:\u0022Pending\u0022,\u0022requiresStaffAction\u0022:true,\u0022actionRequiredSince\u0022:\u00222026-10-07T05:58:00\u002B00:00\u0022,\u0022createdAt\u0022:\u00222026-10-07T05:58:00\u002B00:00\u0022,\u0022updatedAt\u0022:\u00222026-10-07T06:00:00\u002B00:00\u0022,\u0022lastChangedSequence\u0022:6,\u0022managementUrl\u0022:\u0022https://noctf.example.test/competitions/01990000-0000-7000-8000-000000000001/questions?question=09710117-d3fa-4cad-92f8-27a8fa14b43e\u0022}],\u0022pendingUrl\u0022:\u0022https://noctf.example.test/competitions/01990000-0000-7000-8000-000000000001/staff\u0022}}"
+    },
+    {
+      "name": "Heartbeat",
+      "headers": {
+        "webhook-id": "e7b18951-d84b-4055-8939-9285d4197e40",
+        "webhook-timestamp": "1791352800",
+        "webhook-signature": "v1,cUU\u002B/b\u002BxzjouQbniTtO6BB0ehdb\u002BXLMwoCQvBfNwRcw="
+      },
+      "rawBody": "{\u0022specversion\u0022:\u00221.0\u0022,\u0022id\u0022:\u0022e7b18951-d84b-4055-8939-9285d4197e40\u0022,\u0022source\u0022:\u0022https://noctf.example.test/api/v1/competitions/01990000-0000-7000-8000-000000000001/staff-events\u0022,\u0022type\u0022:\u0022com.noctf.staff.heartbeat.v1\u0022,\u0022time\u0022:\u00222026-10-07T06:00:00\u002B00:00\u0022,\u0022datacontenttype\u0022:\u0022application/json\u0022,\u0022dataschema\u0022:\u0022https://noctf.example.test/schemas/webhooks/staff-events-v1.schema.json\u0022,\u0022data\u0022:{\u0022subscriptionId\u0022:\u002201990000-0000-7000-8000-000000000002\u0022,\u0022competition\u0022:{\u0022id\u0022:\u002201990000-0000-7000-8000-000000000001\u0022,\u0022title\u0022:\u0022Fictional CTF\u0022},\u0022sequence\u0022:10,\u0022capturedAt\u0022:\u00222026-10-07T06:00:00\u002B00:00\u0022,\u0022latestBusinessSequence\u0022:6}}"
+    },
+    {
+      "name": "SubscriptionDisabled",
+      "headers": {
+        "webhook-id": "61115772-ca81-4bd7-af51-232a9d50aa5d",
+        "webhook-timestamp": "1791352800",
+        "webhook-signature": "v1,xJCJQz84Awd\u002BZO7X7TbzM5kZQsfjJXNSxvlmY2Hocx8="
+      },
+      "rawBody": "{\u0022specversion\u0022:\u00221.0\u0022,\u0022id\u0022:\u002261115772-ca81-4bd7-af51-232a9d50aa5d\u0022,\u0022source\u0022:\u0022https://noctf.example.test/api/v1/competitions/01990000-0000-7000-8000-000000000001/staff-events\u0022,\u0022type\u0022:\u0022com.noctf.staff.subscription.disabled.v1\u0022,\u0022time\u0022:\u00222026-10-07T06:00:00\u002B00:00\u0022,\u0022datacontenttype\u0022:\u0022application/json\u0022,\u0022dataschema\u0022:\u0022https://noctf.example.test/schemas/webhooks/staff-events-v1.schema.json\u0022,\u0022data\u0022:{\u0022subscriptionId\u0022:\u002201990000-0000-7000-8000-000000000002\u0022,\u0022competition\u0022:{\u0022id\u0022:\u002201990000-0000-7000-8000-000000000001\u0022,\u0022title\u0022:\u0022Fictional CTF\u0022},\u0022sequence\u0022:11,\u0022disabledAt\u0022:\u00222026-10-07T06:00:00\u002B00:00\u0022}}"
+    },
+    {
+      "name": "Test",
+      "headers": {
+        "webhook-id": "8617c6b8-0c60-4bc7-883c-faad7d94ebe8",
+        "webhook-timestamp": "1791352800",
+        "webhook-signature": "v1,Mw\u002BT9jJ0W4R2\u002Bq4nqmN/r/Bk6eUyyd3QnEwZSVtaBFo="
+      },
+      "rawBody": "{\u0022specversion\u0022:\u00221.0\u0022,\u0022id\u0022:\u00228617c6b8-0c60-4bc7-883c-faad7d94ebe8\u0022,\u0022source\u0022:\u0022https://noctf.example.test/api/v1/competitions/01990000-0000-7000-8000-000000000001/staff-events\u0022,\u0022type\u0022:\u0022com.noctf.staff.test.v1\u0022,\u0022time\u0022:\u00222026-10-07T06:00:00\u002B00:00\u0022,\u0022datacontenttype\u0022:\u0022application/json\u0022,\u0022dataschema\u0022:\u0022https://noctf.example.test/schemas/webhooks/staff-events-v1.schema.json\u0022,\u0022data\u0022:{\u0022subscriptionId\u0022:\u002201990000-0000-7000-8000-000000000002\u0022,\u0022competition\u0022:{\u0022id\u0022:\u002201990000-0000-7000-8000-000000000001\u0022,\u0022title\u0022:\u0022Fictional CTF\u0022},\u0022sequence\u0022:12}}"
+    }
+  ]
+}

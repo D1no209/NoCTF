@@ -28,14 +28,14 @@ public sealed record StaffWorkItemPage(IReadOnlyList<StaffWorkItemView> Items, i
 
 public interface IStaffWebhookStore
 {
-    Task<OperationResult<StaffWebhookTargetPage, StaffWebhookFailure>> ListAsync(Guid competitionId, Guid actorId, int offset, int limit, CancellationToken ct);
+    Task<OperationResult<StaffWebhookTargetPage, StaffWebhookFailure>> ListAsync(Guid competitionId, Guid actorId, int offset, int limit, CancellationToken ct, bool descending = true);
     Task<OperationResult<StaffWebhookMutation, StaffWebhookFailure>> SaveAsync(SaveStaffWebhook command, CancellationToken ct);
     Task<OperationResult<StaffWebhookMutation, StaffWebhookFailure>> RotateAsync(Guid competitionId, Guid targetId, Guid actorId, CancellationToken ct);
     Task<StaffWebhookFailure?> DeleteAsync(Guid competitionId, Guid targetId, Guid actorId, CancellationToken ct);
     Task<OperationResult<Guid, StaffWebhookFailure>> TestAsync(Guid competitionId, Guid targetId, Guid actorId, CancellationToken ct);
-    Task<OperationResult<StaffWebhookDeliveryPage, StaffWebhookFailure>> DiagnosticsAsync(Guid competitionId, Guid? targetId, Guid actorId, int offset, int limit, CancellationToken ct);
+    Task<OperationResult<StaffWebhookDeliveryPage, StaffWebhookFailure>> DiagnosticsAsync(Guid competitionId, Guid? targetId, Guid actorId, int offset, int limit, CancellationToken ct, bool descending = true);
     Task<OperationResult<StaffWebhookDeliveryView, StaffWebhookFailure>> TestStatusAsync(Guid competitionId, Guid targetId, Guid eventId, Guid actorId, CancellationToken ct);
-    Task<OperationResult<StaffWorkItemPage, StaffWebhookFailure>> WorkItemsAsync(Guid competitionId, Guid actorId, int offset, int limit, bool pendingOnly, CancellationToken ct);
+    Task<OperationResult<StaffWorkItemPage, StaffWebhookFailure>> WorkItemsAsync(Guid competitionId, Guid actorId, int offset, int limit, bool pendingOnly, CancellationToken ct, bool descending = false);
     Task TickAsync(bool recovering, CancellationToken ct);
     Task<IReadOnlyList<DeliverStaffWebhook>> ClaimAsync(int limit, CancellationToken ct);
     Task<StaffWebhookPreparedDelivery> PrepareAsync(DeliverStaffWebhook command, CancellationToken ct);

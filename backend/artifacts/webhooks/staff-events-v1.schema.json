@@ -1,0 +1,654 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://noctf.example/schemas/webhooks/staff-events-v1.schema.json",
+  "title": "NoCTF staff webhook event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "specversion",
+    "id",
+    "source",
+    "type",
+    "time",
+    "datacontenttype",
+    "dataschema",
+    "data"
+  ],
+  "properties": {
+    "specversion": {
+      "const": "1.0"
+    },
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "source": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://"
+    },
+    "type": {
+      "enum": [
+        "com.noctf.staff.work-item.created.v1",
+        "com.noctf.staff.work-item.updated.v1",
+        "com.noctf.staff.pending.snapshot.v1",
+        "com.noctf.staff.heartbeat.v1",
+        "com.noctf.staff.subscription.disabled.v1",
+        "com.noctf.staff.test.v1"
+      ]
+    },
+    "subject": {
+      "type": "string"
+    },
+    "time": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "datacontenttype": {
+      "const": "application/json"
+    },
+    "dataschema": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://"
+    },
+    "data": {
+      "type": "object"
+    }
+  },
+  "$defs": {
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "CheatIncident",
+            "Consultation",
+            "BanAppeal"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "status": {
+          "type": "string"
+        },
+        "requiresStaffAction": {
+          "type": "boolean"
+        },
+        "actionRequiredSince": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "detectedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "team": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "displayName": {
+              "type": "string",
+              "maxLength": 256
+            }
+          },
+          "required": [
+            "id"
+          ]
+        },
+        "relatedTeam": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "displayName": {
+              "type": "string",
+              "maxLength": 256
+            }
+          },
+          "required": [
+            "id"
+          ]
+        },
+        "challenge": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "title": {
+              "type": "string",
+              "maxLength": 512
+            },
+            "direction": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          "required": [
+            "id"
+          ]
+        },
+        "reasonCode": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "subject": {
+          "enum": [
+            "Challenge",
+            "Platform"
+          ]
+        },
+        "actorDisplayName": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "managementUrl": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "lastChangedSequence": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "status",
+        "requiresStaffAction",
+        "createdAt",
+        "updatedAt",
+        "managementUrl",
+        "lastChangedSequence"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "CheatIncident"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "Pending",
+                  "Confirmed",
+                  "Dismissed",
+                  "Superseded",
+                  "Corrected"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "Consultation"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "Pending",
+                  "Replied",
+                  "Resolved",
+                  "Closed"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "BanAppeal"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "Submitted",
+                  "Upheld",
+                  "Accepted"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "requiresStaffAction": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "actionRequiredSince"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "com.noctf.staff.work-item.created.v1"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "subscriptionId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "competition": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  }
+                },
+                "required": [
+                  "id",
+                  "title"
+                ]
+              },
+              "sequence": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "changeKind": {
+                "const": "Created"
+              },
+              "item": {
+                "$ref": "#/$defs/item"
+              }
+            },
+            "required": [
+              "subscriptionId",
+              "competition",
+              "sequence",
+              "changeKind",
+              "item"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "com.noctf.staff.work-item.updated.v1"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "subscriptionId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "competition": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  }
+                },
+                "required": [
+                  "id",
+                  "title"
+                ]
+              },
+              "sequence": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "changeKind": {
+                "enum": [
+                  "Created",
+                  "ParticipantMessage",
+                  "StaffReply",
+                  "StatusChanged",
+                  "MetadataChanged"
+                ]
+              },
+              "item": {
+                "$ref": "#/$defs/item"
+              }
+            },
+            "required": [
+              "subscriptionId",
+              "competition",
+              "sequence",
+              "changeKind",
+              "item"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "com.noctf.staff.pending.snapshot.v1"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "subscriptionId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "competition": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  }
+                },
+                "required": [
+                  "id",
+                  "title"
+                ]
+              },
+              "sequence": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "snapshotId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "snapshotReason": {
+                "enum": [
+                  "Initial",
+                  "Reenabled",
+                  "Resync"
+                ]
+              },
+              "asOfSequence": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "pageIndex": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "pageCount": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "items": {
+                "type": "array",
+                "maxItems": 100,
+                "items": {
+                  "$ref": "#/$defs/item"
+                }
+              },
+              "pendingUrl": {
+                "type": "string",
+                "format": "uri",
+                "pattern": "^https://"
+              }
+            },
+            "required": [
+              "subscriptionId",
+              "competition",
+              "sequence",
+              "snapshotId",
+              "snapshotReason",
+              "asOfSequence",
+              "pageIndex",
+              "pageCount",
+              "items",
+              "pendingUrl"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "com.noctf.staff.heartbeat.v1"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "subscriptionId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "competition": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  }
+                },
+                "required": [
+                  "id",
+                  "title"
+                ]
+              },
+              "sequence": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "capturedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "latestBusinessSequence": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "subscriptionId",
+              "competition",
+              "sequence",
+              "capturedAt",
+              "latestBusinessSequence"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "com.noctf.staff.subscription.disabled.v1"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "subscriptionId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "competition": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  }
+                },
+                "required": [
+                  "id",
+                  "title"
+                ]
+              },
+              "sequence": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "disabledAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "subscriptionId",
+              "competition",
+              "sequence",
+              "disabledAt"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "com.noctf.staff.test.v1"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "subscriptionId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "competition": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  }
+                },
+                "required": [
+                  "id",
+                  "title"
+                ]
+              },
+              "sequence": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "required": [
+              "subscriptionId",
+              "competition",
+              "sequence"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

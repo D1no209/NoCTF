@@ -409,7 +409,8 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
             "活跃数量检查必须使用集合查询，而不是逐条读取历史线程。",
             1000), ct);
         await Assert.That(created.Failure).IsNull();
-        await Assert.That(counter.ReaderCount).IsLessThanOrEqualTo(15);
+        // One constant subscription-existence query is added by transactional staff event capture.
+        await Assert.That(counter.ReaderCount).IsLessThanOrEqualTo(16);
     }, ct);
 
     [Test]

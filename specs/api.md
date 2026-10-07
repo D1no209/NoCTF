@@ -695,3 +695,19 @@ DELETE /api/v1/auth/me/passkeys/{credentialId}
 ```
 
 Passkey 为人类账号提供主认证，仍进入现有 MFA 完成判定。创建选项状态保存在服务器关系表并加密，浏览器仅持有 HttpOnly、Secure、SameSite=Strict 绑定 Cookie。注册和断言状态具有用途、过期时间和单次消费约束。注册绑定当前账号、凭据版本和必要的本地第二因素证明；新增及撤销递增 TokenVersion。`publicKey` 是 WebAuthn 的标准协议对象，`credentialJson` 是浏览器序列化的标准凭据，不是业务设置 JSON。
+
+## Staff Webhooks
+
+See [the staff-only contract](staff-webhooks.md).
+
+```text
+GET /api/v1/admin/competitions/{competitionId}/staff-webhooks
+POST /api/v1/admin/competitions/{competitionId}/staff-webhooks
+PUT /api/v1/admin/competitions/{competitionId}/staff-webhooks/{targetId}
+DELETE /api/v1/admin/competitions/{competitionId}/staff-webhooks/{targetId}
+POST /api/v1/admin/competitions/{competitionId}/staff-webhooks/{targetId}/rotate-secret
+POST /api/v1/admin/competitions/{competitionId}/staff-webhooks/{targetId}/test-deliveries
+GET /api/v1/admin/competitions/{competitionId}/staff-webhooks/{targetId}/test-deliveries/{deliveryId}
+GET /api/v1/admin/competitions/{competitionId}/staff-webhooks/{targetId}/deliveries
+GET /api/v1/competitions/{competitionId}/staff-work-items
+```

@@ -2178,6 +2178,125 @@ export type NoCtfapiEndpointsAdministrationTeamsResolveTeamBanAppealRequest = {
 
 export type NoCtfapiEndpointsAdministrationTeamsTeamBanAppealResolutionProtocol = 'Accepted' | 'Upheld';
 
+export type NoCtfapiEndpointsAdministrationStaffWebhooksStaffWebhookMutationResponse = {
+    target?: NoCtfapiEndpointsAdministrationStaffWebhooksStaffWebhookTargetResponse;
+    signingSecret?: string | null;
+};
+
+export type NoCtfapiEndpointsAdministrationStaffWebhooksStaffWebhookTargetResponse = {
+    id?: string;
+    name?: string;
+    endpointUrl?: string | null;
+    enabled?: boolean;
+    authorizationRevoked?: boolean;
+    categories?: Array<NoCtfapiEndpointsAdministrationStaffWebhooksStaffWorkItemKindProtocol>;
+    createdAt?: string;
+    updatedAt?: string;
+    previousSecretValidUntil?: string | null;
+    synchronizing?: boolean;
+    failureSince?: string | null;
+};
+
+export type NoCtfapiEndpointsAdministrationStaffWebhooksStaffWorkItemKindProtocol = 'CheatIncident' | 'Consultation' | 'BanAppeal';
+
+export type NoCtfapiEndpointsAdministrationStaffWebhooksCreateStaffWebhookRequest = {
+    name: string;
+    endpointUrl: string;
+    enabled?: boolean;
+    categories: Array<NoCtfapiEndpointsAdministrationStaffWebhooksStaffWorkItemKindProtocol>;
+};
+
+export type NoCtfapiEndpointsAdministrationStaffWebhooksDeleteStaffWebhookRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfApplicationCompetitionsStaffWebhooksStaffWebhookDeliveryView = {
+    eventId?: string;
+    targetId?: string;
+    kind?: NoCtfDomainCompetitionsStaffWebhooksStaffWebhookEventKind;
+    sequence?: number;
+    state?: NoCtfDomainCompetitionsStaffWebhooksStaffWebhookDeliveryState;
+    createdAt?: string;
+    completedAt?: string | null;
+    nextAttemptAt?: string;
+    attempts?: number;
+    lastStatusCode?: number | null;
+};
+
+export type NoCtfDomainCompetitionsStaffWebhooksStaffWebhookEventKind = 0 | 1 | 2 | 3 | 4 | 5;
+
+export type NoCtfDomainCompetitionsStaffWebhooksStaffWebhookDeliveryState = 0 | 1 | 2 | 3 | 4;
+
+export type NoCtfapiEndpointsAdministrationStaffWebhooksGetStaffWebhookTestRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfApplicationCompetitionsStaffWebhooksStaffWebhookDeliveryPage = {
+    items?: Array<NoCtfApplicationCompetitionsStaffWebhooksStaffWebhookDeliveryView>;
+    total?: number;
+};
+
+export type NoCtfapiEndpointsAdministrationStaffWebhooksListStaffWebhookDeliveriesRequest = NoCtfapiPaginationPaginationRequest & {};
+
+export type NoCtfapiEndpointsAdministrationStaffWebhooksStaffWebhookTargetPageResponse = {
+    items?: Array<NoCtfapiEndpointsAdministrationStaffWebhooksStaffWebhookTargetResponse>;
+    total?: number;
+    canManage?: boolean;
+};
+
+export type NoCtfapiEndpointsAdministrationStaffWebhooksListStaffWebhooksRequest = NoCtfapiPaginationPaginationRequest & {};
+
+export type NoCtfApplicationCompetitionsStaffWebhooksStaffWorkItemPage = {
+    items?: Array<NoCtfApplicationCompetitionsStaffWebhooksStaffWorkItemView>;
+    total?: number;
+};
+
+export type NoCtfApplicationCompetitionsStaffWebhooksStaffWorkItemView = {
+    kind?: NoCtfDomainCompetitionsStaffWebhooksStaffWorkItemKind;
+    id?: string;
+    cheatStatus?: NoCtfDomainGameplayCheatIncidentStatus | null;
+    consultationStatus?: NoCtfDomainChallengesQuestionsCompetitionQuestionStatus | null;
+    appealStatus?: NoCtfDomainTeamsTeamBanAppealStatus | null;
+    requiresStaffAction?: boolean;
+    actionRequiredSince?: string | null;
+    createdAt?: string;
+    updatedAt?: string;
+    teamId?: string | null;
+    teamName?: string | null;
+    challengeId?: string | null;
+    challengeTitle?: string | null;
+    reasonCode?: NoCtfDomainGameplayGameplayFactFailureCode | null;
+    managementUrl?: string;
+};
+
+export type NoCtfDomainCompetitionsStaffWebhooksStaffWorkItemKind = 0 | 1 | 2;
+
+export type NoCtfDomainGameplayCheatIncidentStatus = 0 | 1 | 2 | 3 | 4;
+
+export type NoCtfDomainTeamsTeamBanAppealStatus = 0 | 1 | 2;
+
+export type NoCtfapiEndpointsAdministrationStaffWebhooksListStaffWorkItemsRequest = NoCtfapiPaginationPaginationRequest & {};
+
+export type NoCtfapiEndpointsAdministrationStaffWebhooksRotateStaffWebhookSecretRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsAdministrationStaffWebhooksStaffWebhookTestResponse = {
+    deliveryId?: string;
+    statusUrl?: string;
+};
+
+export type NoCtfapiEndpointsAdministrationStaffWebhooksTestStaffWebhookRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsAdministrationStaffWebhooksUpdateStaffWebhookRequest = {
+    name: string;
+    endpointUrl: string;
+    enabled?: boolean;
+    categories: Array<NoCtfapiEndpointsAdministrationStaffWebhooksStaffWorkItemKindProtocol>;
+};
+
 export type NoCtfapiEndpointsAdministrationRuntimeCreateForceTerminationRequest = {
     reason: string;
 };
@@ -8629,6 +8748,341 @@ export type AdminResolveTeamBanAppealResponses = {
 };
 
 export type AdminResolveTeamBanAppealResponse = AdminResolveTeamBanAppealResponses[keyof AdminResolveTeamBanAppealResponses];
+
+export type AdminListStaffWebhooksData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query: {
+        offset: number;
+        limit: number;
+        desc: boolean;
+    };
+    url: '/api/v1/admin/competitions/{competitionId}/staff-webhooks';
+};
+
+export type AdminListStaffWebhooksErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminListStaffWebhooksError = AdminListStaffWebhooksErrors[keyof AdminListStaffWebhooksErrors];
+
+export type AdminListStaffWebhooksResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationStaffWebhooksStaffWebhookTargetPageResponse;
+};
+
+export type AdminListStaffWebhooksResponse = AdminListStaffWebhooksResponses[keyof AdminListStaffWebhooksResponses];
+
+export type AdminCreateStaffWebhookData = {
+    body: NoCtfapiEndpointsAdministrationStaffWebhooksCreateStaffWebhookRequest;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/staff-webhooks';
+};
+
+export type AdminCreateStaffWebhookErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminCreateStaffWebhookError = AdminCreateStaffWebhookErrors[keyof AdminCreateStaffWebhookErrors];
+
+export type AdminCreateStaffWebhookResponses = {
+    /**
+     * Created
+     */
+    201: NoCtfapiEndpointsAdministrationStaffWebhooksStaffWebhookMutationResponse;
+};
+
+export type AdminCreateStaffWebhookResponse = AdminCreateStaffWebhookResponses[keyof AdminCreateStaffWebhookResponses];
+
+export type AdminDeleteStaffWebhookData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        targetId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/staff-webhooks/{targetId}';
+};
+
+export type AdminDeleteStaffWebhookErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminDeleteStaffWebhookError = AdminDeleteStaffWebhookErrors[keyof AdminDeleteStaffWebhookErrors];
+
+export type AdminDeleteStaffWebhookResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type AdminDeleteStaffWebhookResponse = AdminDeleteStaffWebhookResponses[keyof AdminDeleteStaffWebhookResponses];
+
+export type AdminUpdateStaffWebhookData = {
+    body: NoCtfapiEndpointsAdministrationStaffWebhooksUpdateStaffWebhookRequest;
+    path: {
+        competitionId: string;
+        targetId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/staff-webhooks/{targetId}';
+};
+
+export type AdminUpdateStaffWebhookErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminUpdateStaffWebhookError = AdminUpdateStaffWebhookErrors[keyof AdminUpdateStaffWebhookErrors];
+
+export type AdminUpdateStaffWebhookResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationStaffWebhooksStaffWebhookMutationResponse;
+};
+
+export type AdminUpdateStaffWebhookResponse = AdminUpdateStaffWebhookResponses[keyof AdminUpdateStaffWebhookResponses];
+
+export type AdminGetStaffWebhookTestData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        targetId: string;
+        deliveryId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/staff-webhooks/{targetId}/test-deliveries/{deliveryId}';
+};
+
+export type AdminGetStaffWebhookTestErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminGetStaffWebhookTestError = AdminGetStaffWebhookTestErrors[keyof AdminGetStaffWebhookTestErrors];
+
+export type AdminGetStaffWebhookTestResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationCompetitionsStaffWebhooksStaffWebhookDeliveryView;
+};
+
+export type AdminGetStaffWebhookTestResponse = AdminGetStaffWebhookTestResponses[keyof AdminGetStaffWebhookTestResponses];
+
+export type AdminListStaffWebhookDeliveriesData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        targetId: string;
+    };
+    query: {
+        offset: number;
+        limit: number;
+        desc: boolean;
+    };
+    url: '/api/v1/admin/competitions/{competitionId}/staff-webhooks/{targetId}/deliveries';
+};
+
+export type AdminListStaffWebhookDeliveriesErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminListStaffWebhookDeliveriesError = AdminListStaffWebhookDeliveriesErrors[keyof AdminListStaffWebhookDeliveriesErrors];
+
+export type AdminListStaffWebhookDeliveriesResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationCompetitionsStaffWebhooksStaffWebhookDeliveryPage;
+};
+
+export type AdminListStaffWebhookDeliveriesResponse = AdminListStaffWebhookDeliveriesResponses[keyof AdminListStaffWebhookDeliveriesResponses];
+
+export type ListStaffWorkItemsEndpointData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query: {
+        pendingOnly: boolean;
+        offset: number;
+        limit: number;
+        desc: boolean;
+    };
+    url: '/api/v1/competitions/{competitionId}/staff-work-items';
+};
+
+export type ListStaffWorkItemsEndpointErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type ListStaffWorkItemsEndpointError = ListStaffWorkItemsEndpointErrors[keyof ListStaffWorkItemsEndpointErrors];
+
+export type ListStaffWorkItemsEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationCompetitionsStaffWebhooksStaffWorkItemPage;
+};
+
+export type ListStaffWorkItemsEndpointResponse = ListStaffWorkItemsEndpointResponses[keyof ListStaffWorkItemsEndpointResponses];
+
+export type AdminRotateStaffWebhookSecretData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        targetId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/staff-webhooks/{targetId}/rotate-secret';
+};
+
+export type AdminRotateStaffWebhookSecretErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminRotateStaffWebhookSecretError = AdminRotateStaffWebhookSecretErrors[keyof AdminRotateStaffWebhookSecretErrors];
+
+export type AdminRotateStaffWebhookSecretResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationStaffWebhooksStaffWebhookMutationResponse;
+};
+
+export type AdminRotateStaffWebhookSecretResponse = AdminRotateStaffWebhookSecretResponses[keyof AdminRotateStaffWebhookSecretResponses];
+
+export type AdminTestStaffWebhookData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        targetId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/staff-webhooks/{targetId}/test-deliveries';
+};
+
+export type AdminTestStaffWebhookErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminTestStaffWebhookError = AdminTestStaffWebhookErrors[keyof AdminTestStaffWebhookErrors];
+
+export type AdminTestStaffWebhookResponses = {
+    /**
+     * Accepted
+     */
+    202: NoCtfapiEndpointsAdministrationStaffWebhooksStaffWebhookTestResponse;
+};
+
+export type AdminTestStaffWebhookResponse = AdminTestStaffWebhookResponses[keyof AdminTestStaffWebhookResponses];
 
 export type AdminCreateRuntimeForceTerminationData = {
     body: NoCtfapiEndpointsAdministrationRuntimeCreateForceTerminationRequest;

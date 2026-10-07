@@ -8183,6 +8183,656 @@
         ]
       }
     },
+    "/api/v1/admin/competitions/{competitionId}/staff-webhooks": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Creates a staff-only outbound webhook subscription.",
+        "description": "Explicitly authorizes sharing the selected staff summaries with the external receiver. Only platform administrators, competition owners and managers may create subscriptions.",
+        "operationId": "AdminCreateStaffWebhook",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "CreateStaffWebhookRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationStaffWebhooksCreateStaffWebhookRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationStaffWebhooksStaffWebhookMutationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "ListStaffWebhooks for a staff-only subscription.",
+        "description": "Requires current competition staff authorization. Mutations are limited to platform administrators, owners and managers; read-only staff receive redacted subscription metadata.",
+        "operationId": "AdminListStaffWebhooks",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "desc",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationStaffWebhooksStaffWebhookTargetPageResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/competitions/{competitionId}/staff-webhooks/{targetId}": {
+      "delete": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "DeleteStaffWebhook for a staff-only subscription.",
+        "description": "Requires current competition staff authorization. Mutations are limited to platform administrators, owners and managers; read-only staff receive redacted subscription metadata.",
+        "operationId": "AdminDeleteStaffWebhook",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "targetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "UpdateStaffWebhook for a staff-only subscription.",
+        "description": "Requires current competition staff authorization. Mutations are limited to platform administrators, owners and managers; read-only staff receive redacted subscription metadata.",
+        "operationId": "AdminUpdateStaffWebhook",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "targetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "UpdateStaffWebhookRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationStaffWebhooksUpdateStaffWebhookRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationStaffWebhooksStaffWebhookMutationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/competitions/{competitionId}/staff-webhooks/{targetId}/test-deliveries/{deliveryId}": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "GetStaffWebhookTest for a staff-only subscription.",
+        "description": "Requires current competition staff authorization. Mutations are limited to platform administrators, owners and managers; read-only staff receive redacted subscription metadata.",
+        "operationId": "AdminGetStaffWebhookTest",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "targetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "deliveryId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationCompetitionsStaffWebhooksStaffWebhookDeliveryView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/competitions/{competitionId}/staff-webhooks/{targetId}/deliveries": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "ListStaffWebhookDeliveries for a staff-only subscription.",
+        "description": "Requires current competition staff authorization. Mutations are limited to platform administrators, owners and managers; read-only staff receive redacted subscription metadata.",
+        "operationId": "AdminListStaffWebhookDeliveries",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "targetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "desc",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationCompetitionsStaffWebhooksStaffWebhookDeliveryPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/competitions/{competitionId}/staff-work-items": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "List Staff Work Items Endpoint",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/staff-work-items.",
+        "operationId": "ListStaffWorkItemsEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "pendingOnly",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "desc",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationCompetitionsStaffWebhooksStaffWorkItemPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/competitions/{competitionId}/staff-webhooks/{targetId}/rotate-secret": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "RotateStaffWebhookSecret for a staff-only subscription.",
+        "description": "Requires current competition staff authorization. Mutations are limited to platform administrators, owners and managers; read-only staff receive redacted subscription metadata.",
+        "operationId": "AdminRotateStaffWebhookSecret",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "targetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationStaffWebhooksStaffWebhookMutationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/competitions/{competitionId}/staff-webhooks/{targetId}/test-deliveries": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "TestStaffWebhook for a staff-only subscription.",
+        "description": "Requires current competition staff authorization. Mutations are limited to platform administrators, owners and managers; read-only staff receive redacted subscription metadata.",
+        "operationId": "AdminTestStaffWebhook",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "targetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationStaffWebhooksStaffWebhookTestResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/runtimes/{runtimeInstanceId}/force-terminations": {
       "post": {
         "tags": [
@@ -25633,6 +26283,476 @@
           "Accepted",
           "Upheld"
         ]
+      },
+      "NoCTFAPIEndpointsAdministrationStaffWebhooksStaffWebhookMutationResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "target": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationStaffWebhooksStaffWebhookTargetResponse"
+          },
+          "signingSecret": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationStaffWebhooksStaffWebhookTargetResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "endpointUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "authorizationRevoked": {
+            "type": "boolean"
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationStaffWebhooksStaffWorkItemKindProtocol"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "previousSecretValidUntil": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "synchronizing": {
+            "type": "boolean"
+          },
+          "failureSince": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationStaffWebhooksStaffWorkItemKindProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "CheatIncident",
+          "Consultation",
+          "BanAppeal"
+        ],
+        "enum": [
+          "CheatIncident",
+          "Consultation",
+          "BanAppeal"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationStaffWebhooksCreateStaffWebhookRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "endpointUrl",
+          "categories"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 0,
+            "nullable": false
+          },
+          "endpointUrl": {
+            "type": "string",
+            "maxLength": 2048,
+            "minLength": 0,
+            "nullable": false
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "categories": {
+            "type": "array",
+            "minLength": 1,
+            "nullable": false,
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationStaffWebhooksStaffWorkItemKindProtocol"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationStaffWebhooksDeleteStaffWebhookRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFApplicationCompetitionsStaffWebhooksStaffWebhookDeliveryView": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "targetId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsStaffWebhooksStaffWebhookEventKind"
+          },
+          "sequence": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "state": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsStaffWebhooksStaffWebhookDeliveryState"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "nextAttemptAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "attempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lastStatusCode": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFDomainCompetitionsStaffWebhooksStaffWebhookEventKind": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "WorkItemCreated",
+          "WorkItemUpdated",
+          "PendingSnapshot",
+          "Heartbeat",
+          "SubscriptionDisabled",
+          "Test"
+        ],
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      },
+      "NoCTFDomainCompetitionsStaffWebhooksStaffWebhookDeliveryState": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Pending",
+          "InFlight",
+          "Delivered",
+          "Suppressed",
+          "DeadLetter"
+        ],
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationStaffWebhooksGetStaffWebhookTestRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFApplicationCompetitionsStaffWebhooksStaffWebhookDeliveryPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationCompetitionsStaffWebhooksStaffWebhookDeliveryView"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationStaffWebhooksListStaffWebhookDeliveriesRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFAPIPaginationPaginationRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationStaffWebhooksStaffWebhookTargetPageResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationStaffWebhooksStaffWebhookTargetResponse"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "canManage": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationStaffWebhooksListStaffWebhooksRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFAPIPaginationPaginationRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
+      },
+      "NoCTFApplicationCompetitionsStaffWebhooksStaffWorkItemPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationCompetitionsStaffWebhooksStaffWorkItemView"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFApplicationCompetitionsStaffWebhooksStaffWorkItemView": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsStaffWebhooksStaffWorkItemKind"
+          },
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "cheatStatus": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainGameplayCheatIncidentStatus"
+              }
+            ]
+          },
+          "consultationStatus": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainChallengesQuestionsCompetitionQuestionStatus"
+              }
+            ]
+          },
+          "appealStatus": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainTeamsTeamBanAppealStatus"
+              }
+            ]
+          },
+          "requiresStaffAction": {
+            "type": "boolean"
+          },
+          "actionRequiredSince": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "teamId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "teamName": {
+            "type": "string",
+            "nullable": true
+          },
+          "challengeId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "challengeTitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "reasonCode": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainGameplayGameplayFactFailureCode"
+              }
+            ]
+          },
+          "managementUrl": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFDomainCompetitionsStaffWebhooksStaffWorkItemKind": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "CheatIncident",
+          "Consultation",
+          "BanAppeal"
+        ],
+        "enum": [
+          0,
+          1,
+          2
+        ]
+      },
+      "NoCTFDomainGameplayCheatIncidentStatus": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Pending",
+          "Confirmed",
+          "Dismissed",
+          "Superseded",
+          "Corrected"
+        ],
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "NoCTFDomainTeamsTeamBanAppealStatus": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Submitted",
+          "Upheld",
+          "Accepted"
+        ],
+        "enum": [
+          0,
+          1,
+          2
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationStaffWebhooksListStaffWorkItemsRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFAPIPaginationPaginationRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationStaffWebhooksRotateStaffWebhookSecretRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAdministrationStaffWebhooksStaffWebhookTestResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "deliveryId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "statusUrl": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationStaffWebhooksTestStaffWebhookRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAdministrationStaffWebhooksUpdateStaffWebhookRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "endpointUrl",
+          "categories"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 0,
+            "nullable": false
+          },
+          "endpointUrl": {
+            "type": "string",
+            "maxLength": 2048,
+            "minLength": 0,
+            "nullable": false
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "categories": {
+            "type": "array",
+            "minLength": 1,
+            "nullable": false,
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationStaffWebhooksStaffWorkItemKindProtocol"
+            }
+          }
+        }
       },
       "NoCTFAPIEndpointsAdministrationRuntimeCreateForceTerminationRequest": {
         "type": "object",

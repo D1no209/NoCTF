@@ -43,14 +43,15 @@ internal static class StaffWorkItemProjection
         foreach (var value in db.ChangeTracker.Entries<CompetitionEvent>().Where(entry => entry.State == EntityState.Added
                      && entry.Entity.CompetitionId == competitionId && RelevantEvents.Contains(entry.Entity.Kind)).Select(entry => entry.Entity))
             events[value.Id] = new(value.Id, value.Kind, value.GameplayFactId, value.ParentEventId, value.TeamId, value.ActorUserId, value.OccurredAt);
-        var nodes = (await db.Notifications.AsNoTracking().Where(value => value.CompetitionId == competitionId
+        var nodes = (await db.Notifications.AsNoTracking().Where(value => value.TargetType == NotificationTargetType.CompetitionCollaborators && value.TargetId == competitionId
                 && (value.Kind == NotificationKind.QuestionOpened || value.Kind == NotificationKind.QuestionStatusChanged
                     || value.Kind == NotificationKind.Message && value.ThreadRootId != null))
             .Select(value => new Node(value.Id, value.ThreadRootId, value.Kind, value.TeamId, value.CompetitionChallengeId,
                 value.QuestionSubject, value.QuestionStatus, value.QuestionActorRole, value.ActorUserId ?? value.SourceId, value.SentAt))
             .ToArrayAsync(ct)).ToDictionary(value => value.Id);
         foreach (var value in db.ChangeTracker.Entries<Notification>().Where(entry => entry.State == EntityState.Added
-                     && entry.Entity.CompetitionId == competitionId && (entry.Entity.Kind == NotificationKind.QuestionOpened
+                     && entry.Entity.TargetType == NotificationTargetType.CompetitionCollaborators
+                     && entry.Entity.TargetId == competitionId && (entry.Entity.Kind == NotificationKind.QuestionOpened
                          || entry.Entity.ThreadRootId != null && entry.Entity.QuestionStatus != null)).Select(entry => entry.Entity))
             nodes[value.Id] = new(value.Id, value.ThreadRootId, value.Kind, value.TeamId, value.CompetitionChallengeId,
                 value.QuestionSubject, value.QuestionStatus, value.QuestionActorRole, value.ActorUserId ?? value.SourceId, value.SentAt);

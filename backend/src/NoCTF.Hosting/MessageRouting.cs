@@ -49,6 +49,7 @@ public static class MessageRouting
         Route<ExpireAccountSourceAddresses>(options, WorkerQueue.Background, durableOutbox: true);
         Route<DispatchCompetitionWebhooks>(options, WorkerQueue.Webhook);
         Route<DeliverCompetitionWebhook>(options, WorkerQueue.Webhook);
+        Route<NoCTF.Application.Competitions.StaffWebhooks.DeliverStaffWebhook>(options, WorkerQueue.Webhook);
         Route<TestCompetitionWebhook>(options, WorkerQueue.Webhook);
         Route<InvalidateDeletedCompetitionReadModels>(options, WorkerQueue.Background, durableOutbox: true);
         Route<ChallengePublished>(options, WorkerQueue.Background);

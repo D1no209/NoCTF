@@ -68,7 +68,7 @@ public sealed class StaffWorkItemSummary
     [MaxLength(160)] public string? RelatedTeamName { get; set; }
     public Guid? ChallengeId { get; set; }
     [MaxLength(160)] public string? ChallengeTitle { get; set; }
-    [MaxLength(64)] public string? Direction { get; set; }
+    [MaxLength(96)] public string? Direction { get; set; }
     public GameplayFactFailureCode? ReasonCode { get; set; }
     public CompetitionQuestionSubject? Subject { get; set; }
     [MaxLength(160)] public string? ActorDisplayName { get; set; }

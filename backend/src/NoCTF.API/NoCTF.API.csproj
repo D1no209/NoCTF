@@ -41,6 +41,9 @@
              Link="wwwroot\schemas\webhooks\competition-events-v1.schema.json"
              CopyToOutputDirectory="PreserveNewest"
              CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\artifacts\webhooks\staff-events-v1.schema.json"
+             Link="wwwroot\schemas\webhooks\staff-events-v1.schema.json"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
   <Target Name="DebugEnsureBunEnv"
           BeforeTargets="Build"

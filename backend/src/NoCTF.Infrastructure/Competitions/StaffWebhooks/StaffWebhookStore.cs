@@ -29,13 +29,14 @@ public sealed class StaffWebhookStore(NoCtfDbContext db, PlatformSecretProtector
                 && (member.Role == CompetitionCollaboratorRole.Manager || !manage && (member.Role == CompetitionCollaboratorRole.Judge
                     || member.Role == CompetitionCollaboratorRole.Observer)))), ct);
     }
-    public async Task<OperationResult<StaffWebhookTargetPage, StaffWebhookFailure>> ListAsync(Guid competitionId, Guid actorId, int offset, int limit, CancellationToken ct)
+    public async Task<OperationResult<StaffWebhookTargetPage, StaffWebhookFailure>> ListAsync(Guid competitionId, Guid actorId, int offset, int limit, CancellationToken ct, bool descending = true)
     {
         if (!await AuthorizedAsync(actorId, competitionId, false, ct)) return Fail<StaffWebhookTargetPage>(StaffWebhookFailure.Forbidden);
         var manage = await AuthorizedAsync(actorId, competitionId, true, ct);
         var query = db.StaffWebhookTargets.AsNoTracking().Where(value => value.CompetitionId == competitionId && !value.Deleted);
         var total = await query.CountAsync(ct);
-        var rows = await query.OrderByDescending(value => value.UpdatedAt).ThenBy(value => value.Id).Skip(offset).Take(limit).ToArrayAsync(ct);
+        var ordered = descending ? query.OrderByDescending(value => value.UpdatedAt) : query.OrderBy(value => value.UpdatedAt);
+        var rows = await ordered.ThenBy(value => value.Id).Skip(offset).Take(limit).ToArrayAsync(ct);
         return Ok(new StaffWebhookTargetPage(rows.Select(value => View(value, manage)).ToArray(), total, manage));
     }
     public Task<OperationResult<StaffWebhookMutation, StaffWebhookFailure>> SaveAsync(SaveStaffWebhook command, CancellationToken ct) => TransactionAsync(async () =>
@@ -69,7 +70,6 @@ public sealed class StaffWebhookStore(NoCtfDbContext db, PlatformSecretProtector
         if (disabling) await DisableEventAsync(row, ct);
         if (command.Enabled && resync)
         {
-            await StaffWebhookEventCapture.CaptureAsync(db, [row.CompetitionId], Now, ct);
             await SnapshotAsync(row, isNew ? StaffSnapshotReason.Initial : StaffSnapshotReason.Reenabled, ct);
             row.NextHeartbeatAt = Now;
         }
@@ -105,14 +105,14 @@ public sealed class StaffWebhookStore(NoCtfDbContext db, PlatformSecretProtector
         AddDelivery(row, target); row.DispatchedAt = Now; return Ok(row.Id);
     }, ct);
 
-    public async Task<OperationResult<StaffWebhookDeliveryPage, StaffWebhookFailure>> DiagnosticsAsync(Guid competitionId, Guid? targetId, Guid actorId, int offset, int limit, CancellationToken ct)
+    public async Task<OperationResult<StaffWebhookDeliveryPage, StaffWebhookFailure>> DiagnosticsAsync(Guid competitionId, Guid? targetId, Guid actorId, int offset, int limit, CancellationToken ct, bool descending = true)
     {
         if (!await AuthorizedAsync(actorId, competitionId, false, ct)) return Fail<StaffWebhookDeliveryPage>(StaffWebhookFailure.Forbidden);
         var query = db.StaffWebhookDeliveries.AsNoTracking().Where(value => value.CompetitionId == competitionId && (targetId == null || value.TargetId == targetId));
         var total = await query.CountAsync(ct);
-        var items = await query.Join(db.StaffWebhookEvents, delivery => delivery.EventId, item => item.Id,
-                (delivery, item) => new { delivery, item.Kind, item.Sequence })
-            .OrderByDescending(value => value.Sequence).ThenBy(value => value.delivery.TargetId).Skip(offset).Take(limit)
+        var joined = query.Join(db.StaffWebhookEvents, delivery => delivery.EventId, item => item.Id, (delivery, item) => new { delivery, item.Kind, item.Sequence });
+        var ordered = descending ? joined.OrderByDescending(value => value.Sequence) : joined.OrderBy(value => value.Sequence);
+        var items = await ordered.ThenBy(value => value.delivery.TargetId).Skip(offset).Take(limit)
             .Select(value => new StaffWebhookDeliveryView(value.delivery.EventId, value.delivery.TargetId, value.Kind, value.Sequence,
                 value.delivery.State, value.delivery.CreatedAt, value.delivery.CompletedAt, value.delivery.NextAttemptAt, value.delivery.Attempts, value.delivery.LastStatusCode)).ToArrayAsync(ct);
         return Ok(new StaffWebhookDeliveryPage(items, total));
@@ -127,12 +127,14 @@ public sealed class StaffWebhookStore(NoCtfDbContext db, PlatformSecretProtector
                     delivery.CreatedAt, delivery.CompletedAt, delivery.NextAttemptAt, delivery.Attempts, delivery.LastStatusCode)).SingleOrDefaultAsync(ct);
         return row is null ? Fail<StaffWebhookDeliveryView>(StaffWebhookFailure.NotFound) : Ok(row);
     }
-    public async Task<OperationResult<StaffWorkItemPage, StaffWebhookFailure>> WorkItemsAsync(Guid competitionId, Guid actorId, int offset, int limit, bool pendingOnly, CancellationToken ct)
+    public async Task<OperationResult<StaffWorkItemPage, StaffWebhookFailure>> WorkItemsAsync(Guid competitionId, Guid actorId, int offset, int limit, bool pendingOnly, CancellationToken ct, bool descending = false)
     {
         if (!await AuthorizedAsync(actorId, competitionId, false, ct)) return Fail<StaffWorkItemPage>(StaffWebhookFailure.Forbidden);
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, ct);
         var current = await StaffWorkItemProjection.ReadAsync(db, competitionId, ct);
-        var filtered = current.Where(value => !pendingOnly || value.RequiresStaffAction).OrderBy(value => value.ActionRequiredSince ?? value.UpdatedAt).ThenBy(value => value.Id).ToArray();
+        var eligible = current.Where(value => !pendingOnly || value.RequiresStaffAction);
+        var ordered = descending ? eligible.OrderByDescending(value => value.ActionRequiredSince ?? value.UpdatedAt) : eligible.OrderBy(value => value.ActionRequiredSince ?? value.UpdatedAt);
+        var filtered = ordered.ThenBy(value => value.Id).ToArray();
         var items = filtered.Skip(offset).Take(limit).Select(value => new StaffWorkItemView(value.Kind, value.Id, value.CheatStatus,
             value.ConsultationStatus, value.AppealStatus, value.RequiresStaffAction, value.ActionRequiredSince, value.CreatedAt, value.UpdatedAt,
             value.TeamId, value.TeamName, value.ChallengeId, value.ChallengeTitle, value.ReasonCode, StaffWebhookProtocol.ManagementUrl(value.Kind, value.Id, competitionId, options.PublicBaseUrl))).ToArray();
@@ -246,7 +248,7 @@ public sealed class StaffWebhookStore(NoCtfDbContext db, PlatformSecretProtector
                 target.FailureSince ??= Now;
                 if (Now - target.FailureSince >= TimeSpan.FromSeconds(180)) target.NeedsResync = true;
                 if (status == 410)
-                { target.Enabled = false; target.AuthorizationRevoked = true; target.Generation = Guid.NewGuid(); await DisableEventAsync(target, ct); }
+                { target.Enabled = false; target.AuthorizationRevoked = false; target.Generation = Guid.NewGuid(); await DisableEventAsync(target, ct); }
                 if (permanent || Now - row.CreatedAt >= TimeSpan.FromHours(24))
                 { row.State = StaffWebhookDeliveryState.DeadLetter; row.CompletedAt = Now; target.NeedsResync = true; }
                 else
@@ -262,6 +264,7 @@ public sealed class StaffWebhookStore(NoCtfDbContext db, PlatformSecretProtector
     }
     private async Task SnapshotAsync(StaffWebhookTarget target, StaffSnapshotReason reason, CancellationToken ct)
     {
+        await StaffWebhookEventCapture.CaptureAsync(db, [target.CompetitionId], Now, ct, force: true);
         var stream = await StaffWebhookEventCapture.StreamAsync(db, target.CompetitionId, ct);
         // Include unsaved projections produced by initial capture.
         var stored = await db.StaffWebhookWorkItems.Where(value => value.CompetitionId == target.CompetitionId).ToArrayAsync(ct);
@@ -300,7 +303,12 @@ public sealed class StaffWebhookStore(NoCtfDbContext db, PlatformSecretProtector
         value.EventId == command.EventId && value.TargetId == command.TargetId && value.CompetitionId == command.CompetitionId && value.AttemptToken == command.AttemptToken, ct);
     private byte[] Protect(string value, StaffWebhookTarget target) => secrets.Protect(value, PlatformSecretPurpose.StaffWebhookSecret, target.CompetitionId, target.Id);
     private string Unprotect(byte[] value, StaffWebhookTarget target) => secrets.Unprotect(value, PlatformSecretPurpose.StaffWebhookSecret, target.CompetitionId, target.Id);
-    private static string Secret() => "whsec_" + Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+    private static string Secret()
+    {
+        var bytes = RandomNumberGenerator.GetBytes(32);
+        try { return "whsec_" + Convert.ToBase64String(bytes); }
+        finally { CryptographicOperations.ZeroMemory(bytes); }
+    }
     private static StaffWebhookTargetView View(StaffWebhookTarget value, bool manage) => new(value.Id, value.Name, manage ? value.EndpointUrl : null,
         value.Enabled, value.AuthorizationRevoked, value.Categories.Select(category => category.Kind).Order().ToArray(), value.CreatedAt, value.UpdatedAt,
         manage ? value.PreviousSecretValidUntil : null, value.ActiveSnapshotId is not null || value.NeedsResync, value.FailureSince);

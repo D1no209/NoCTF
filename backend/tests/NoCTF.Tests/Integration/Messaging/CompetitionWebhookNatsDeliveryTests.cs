@@ -3,6 +3,7 @@ using JasperFx;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using NoCTF.Application.Competitions.Webhooks;
+using NoCTF.Application.Competitions.StaffWebhooks;
 using NoCTF.Hosting;
 using Testcontainers.PostgreSql;
 using Wolverine;
@@ -54,6 +55,9 @@ public sealed class CompetitionWebhookNatsDeliveryTests
                         .ToNatsSubject(NatsSubjects.Subject(
                             NoCTF.Application.Messaging.WorkerQueue.Webhook))
                         .UseJetStream(NatsSubjects.WebhookStream);
+                    options.PublishMessage<DeliverStaffWebhook>()
+                        .ToNatsSubject(NatsSubjects.Subject(NoCTF.Application.Messaging.WorkerQueue.Webhook))
+                        .UseJetStream(NatsSubjects.WebhookStream);
                     options.ListenToNatsSubject(NatsSubjects.Subject(
                             NoCTF.Application.Messaging.WorkerQueue.Webhook))
                         .UseJetStream(NatsSubjects.WebhookStream, "webhook-delivery-test");
@@ -72,6 +76,9 @@ public sealed class CompetitionWebhookNatsDeliveryTests
                     TimeSpan.FromSeconds(20),
                     cancellationToken);
                 await Assert.That(actual).IsEqualTo(expected);
+                var staffExpected = new DeliverStaffWebhook(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+                await host.Services.GetRequiredService<IMessageBus>().PublishAsync(staffExpected);
+                await Assert.That(await probe.StaffReceived.Task.WaitAsync(TimeSpan.FromSeconds(20), cancellationToken)).IsEqualTo(staffExpected);
             }
             finally
             {
@@ -84,11 +91,13 @@ public sealed class CompetitionWebhookNatsDeliveryTests
     {
         public TaskCompletionSource<DeliverCompetitionWebhook> Received { get; } =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource<DeliverStaffWebhook> StaffReceived { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 
     public sealed class WebhookDeliveryProbeHandler(WebhookDeliveryProbe probe)
     {
         public void Handle(DeliverCompetitionWebhook message) =>
             probe.Received.TrySetResult(message);
+        public void Handle(DeliverStaffWebhook message) => probe.StaffReceived.TrySetResult(message);
     }
 }

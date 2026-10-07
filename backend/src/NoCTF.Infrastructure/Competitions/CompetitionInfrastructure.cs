@@ -126,6 +126,9 @@ internal static class CompetitionInfrastructure
         services.AddScoped<ExportCompetitionEvents>();
         services.AddScoped<AccessGameplayFactValue>();
         services.AddScoped<ICompetitionWebhookStore, CompetitionWebhookStore>();
+        services.AddScoped<NoCTF.Application.Competitions.StaffWebhooks.IStaffWebhookStore,
+            NoCTF.Infrastructure.Competitions.StaffWebhooks.StaffWebhookStore>();
+        services.AddScoped<NoCTF.Application.Competitions.StaffWebhooks.ManageStaffWebhooks>();
         services.AddScoped<ListCompetitionWebhookTargets>();
         services.AddScoped<CreateCompetitionWebhookTarget>();
         services.AddScoped<UpdateCompetitionWebhookTarget>();
