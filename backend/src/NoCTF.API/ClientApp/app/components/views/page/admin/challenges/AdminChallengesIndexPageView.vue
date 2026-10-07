@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminChallengesIndexPageViewState } from '~/features/routes/admin/challenges/useAdminChallengesIndexPage'
 
 const viewProps = defineProps<{ state: AdminChallengesIndexPageViewState }>()
-const { Plus, canOrganize, templates, filteredTemplates, search, directionFilter, directionOptions, loading, loadError, includeDeleted, createOpen, setCreateOpen, templateCreated, visibilityLabel, AdminDateTime, AdminGameModeBadge, ChallengeTemplateCreateDialog, page, pageCount, total, pageLimit, pageLoading, loadPage, setPageSize } = toRefs(viewProps.state)
+const { Filter, Plus, canOrganize, templates, filteredTemplates, search, directionFilter, directionOptions, loading, loadError, includeDeleted, createOpen, setCreateOpen, templateCreated, visibilityLabel, AdminDateTime, AdminGameModeBadge, ChallengeTemplateCreateDialog, page, pageCount, total, pageLimit, pageLoading, loadPage, setPageSize } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -21,23 +21,9 @@ const { Plus, canOrganize, templates, filteredTemplates, search, directionFilter
 
     <template v-else>
       <div class="flex flex-wrap items-end gap-4">
-        <Field class="w-full sm:w-72">
+        <Field class="w-full min-w-0 sm:min-w-80 sm:max-w-2xl sm:flex-1">
           <FieldLabel>{{ $t('administration.label.searchQuestionBankTemplates') }}</FieldLabel>
-          <Input v-model="search" :placeholder="$t('administration.label.searchQuestionBankTemplates')" />
-        </Field>
-        <Field class="w-full sm:w-56">
-          <FieldLabel>{{ $t('administration.label.category') }}</FieldLabel>
-          <Select v-model="directionFilter">
-            <SelectTrigger class="w-full"><SelectValue /></SelectTrigger>
-            <SelectContent position="popper">
-              <SelectGroup>
-                <SelectItem value="all">{{ $t('administration.label.directions') }}</SelectItem>
-                <SelectItem v-for="option in directionOptions" :key="option.value" :value="option.value!">
-                  {{ option.label }}
-                </SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
+          <Input v-model="search" :placeholder="$t('administration.label.searchQuestionBankTemplates')" :aria-label="$t('administration.label.searchQuestionBankTemplates')" />
         </Field>
         <div class="flex h-10 items-center gap-2">
           <Switch id="include-deleted" v-model="includeDeleted" />
@@ -55,20 +41,29 @@ const { Plus, canOrganize, templates, filteredTemplates, search, directionFilter
         </CardContent>
       </Card>
 
-      <Empty v-else-if="filteredTemplates.length === 0 && !loadError">
-        <EmptyHeader>
-          <EmptyTitle>{{ $t('administration.label.questionTemplateYet') }}</EmptyTitle>
-          <EmptyDescription>{{ $t('administration.challengesIndex.description.clickNewTemplateUpper') }}</EmptyDescription>
-        </EmptyHeader>
-      </Empty>
-
       <Card v-else>
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>{{ $t('common.label.title') }}</TableHead>
               <TableHead>{{ $t('administration.label.mode') }}</TableHead>
-              <TableHead>{{ $t('administration.label.category') }}</TableHead>
+              <TableHead>
+                <DropdownMenu>
+                  <DropdownMenuTrigger as-child>
+                    <Button variant="ghost" size="sm" :class="directionFilter !== 'all' ? 'text-primary' : ''" :aria-label="$t('challengeLibrary.filterDirection')">
+                      {{ $t('administration.label.category') }}<Filter data-icon="inline-end" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuRadioGroup v-model="directionFilter">
+                      <DropdownMenuRadioItem value="all">{{ $t('administration.label.directions') }}</DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem v-for="option in directionOptions" :key="option.value" :value="option.value">
+                        {{ option.label }}
+                      </DropdownMenuRadioItem>
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </TableHead>
               <TableHead>{{ $t('administration.label.visibility') }}</TableHead>
               <TableHead>{{ $t('administration.label.quoted') }}</TableHead>
               <TableHead>{{ $t('administration.label.updateTime') }}</TableHead>
@@ -76,6 +71,16 @@ const { Plus, canOrganize, templates, filteredTemplates, search, directionFilter
             </TableRow>
           </TableHeader>
           <TableBody>
+            <TableRow v-if="filteredTemplates.length === 0 && !loadError">
+              <TableCell :colspan="7">
+                <Empty>
+                  <EmptyHeader>
+                    <EmptyTitle>{{ $t('administration.label.questionTemplateYet') }}</EmptyTitle>
+                    <EmptyDescription>{{ $t('administration.challengesIndex.description.clickNewTemplateUpper') }}</EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              </TableCell>
+            </TableRow>
             <TableRow v-for="template in filteredTemplates" :key="template.id">
               <TableCell>
                 <NuxtLink :to="`/admin/challenges/${template.id}`" prefetch-on="interaction" class="font-medium hover:underline">
