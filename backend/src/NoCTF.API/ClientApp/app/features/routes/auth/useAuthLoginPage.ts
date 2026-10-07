@@ -4,6 +4,7 @@ import { toast } from '../../../utils/message-toast'
 import { useHumanVerification } from '~/features/security/useHumanVerification'
 import { bindViewState } from '../../shared/view-state'
 import { usePasskeyLogin } from '../../authentication/passkeys/usePasskeyLogin'
+import type { HumanVerificationHeaders } from '~/lib/human-verification-coordinator'
 import { useAuthThemeArtwork } from './useAuthThemeArtwork'
 import { authenticationSsoBeginLogin, authenticationSsoListProviders } from '~/api'
 import type { NoCtfapiEndpointsAuthenticationPublicSsoProviderResponse } from '~/api'
@@ -16,16 +17,37 @@ export function useAuthLoginPage() {
   const {
     request: requestHumanVerification,
     inlineCap,
+    inlineCapReady,
     retryInlineCap,
+    consumeInlineCap,
   } = useHumanVerification()
   const { authArtwork } = useAuthThemeArtwork()
-  const { configuration } = usePlatform()
+  const { configuration, ensureLoaded } = usePlatform()
   const loginName = ref('')
   const password = ref('')
   const error = ref<UiMessage | null>(null)
   const pending = ref(false)
-  const capVerified = ref(false)
   const lastCapChallengeId = ref(0)
+  let preparedCap: Promise<HumanVerificationHeaders | null> | null = null
+  let disposed = false
+
+  onScopeDispose(() => {
+    disposed = true
+    preparedCap = null
+  })
+
+  async function prepareLoginCap() {
+    await ensureLoaded()
+    if (disposed || configuration.value?.humanVerification?.provider !== 'Cap') return null
+    preparedCap ??= requestHumanVerification('login', 'login-inline')
+    return preparedCap
+  }
+
+  watch(inlineCapReady, ready => {
+    if (ready || pending.value || disposed) return
+    preparedCap = null
+    void prepareLoginCap()
+  })
 
   watch(inlineCap, current => {
     if (!current) return
@@ -43,7 +65,7 @@ export function useAuthLoginPage() {
           ?? translate('common.authLogin.label.computingProofWorkProgress', { progress: inlineCap.value.progress }),
       }
     }
-    if (!capVerified.value) return null
+    if (!inlineCapReady.value) return null
     return {
       id: lastCapChallengeId.value,
       state: 'success' as const,
@@ -85,7 +107,10 @@ export function useAuthLoginPage() {
     }
   }
 
-  onMounted(() => void loadSsoProviders())
+  onMounted(() => {
+    void loadSsoProviders()
+    void prepareLoginCap()
+  })
 
   async function submit() {
     if (pending.value) {
@@ -98,14 +123,28 @@ export function useAuthLoginPage() {
       return
     }
     pending.value = true
-    capVerified.value = false
-    lastCapChallengeId.value = 0
     try {
-      const verificationHeaders = await requestHumanVerification('login', 'login-inline')
-      if (verificationHeaders === null) return
-      if (lastCapChallengeId.value > 0) {
-        capVerified.value = true
+      await ensureLoaded()
+      if (disposed) return
+      let verificationHeaders: HumanVerificationHeaders | null
+      if (configuration.value?.humanVerification?.provider === 'Cap') {
+        if (capCanRetry.value) retryInlineCap()
+        const prepared = await prepareLoginCap()
+        preparedCap = null
+        if (disposed || prepared === null) return
+        verificationHeaders = consumeInlineCap(prepared)
+        // Renew a proof that expired while submission was waiting for verification.
+        if (verificationHeaders === null) {
+          const renewed = await prepareLoginCap()
+          preparedCap = null
+          if (disposed || renewed === null) return
+          verificationHeaders = consumeInlineCap(renewed)
+        }
       }
+      else {
+        verificationHeaders = await requestHumanVerification('login', 'login-inline')
+      }
+      if (disposed || verificationHeaders === null) return
       const authenticated = await login(loginName.value, password.value, verificationHeaders)
       password.value = ''
       if (!authenticated) return
@@ -121,7 +160,7 @@ export function useAuthLoginPage() {
     }
     finally {
       pending.value = false
-      capVerified.value = false
+      if (!disposed) void prepareLoginCap()
     }
   }
 
@@ -136,6 +175,7 @@ export function useAuthLoginPage() {
     capVerification,
     capCanRetry,
     submitDisabled,
+    retryInlineCap,
     submit,
     ssoProviders,
     ssoLoading,

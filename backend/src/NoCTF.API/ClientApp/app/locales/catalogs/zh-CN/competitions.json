@@ -392,7 +392,7 @@
   "directionSettings.errors.NameConflict": "方向名称发生冲突，请刷新后重试。",
   "directionSettings.errors.CompetitionNotFound": "比赛不存在。",
   "competitions.awdp.roundLabel": "第 {round} 轮",
-  "teamBanScreen.cheating": "检测到作弊行为",
+  "teamBanScreen.cheating": "检测到作弊者",
   "teamBanScreen.banned": "本队伍已被封禁",
   "teamBanScreen.confirmed": "系统检测异常并经人工核实。",
   "teamBanScreen.restricted": "你的队伍已被禁止参加当前比赛。",

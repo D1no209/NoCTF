@@ -26,7 +26,11 @@
 }
 .noctf-page-slide-enter-from { transform: translate3d(56px, 0, 0); }
 .noctf-page-slide-leave-to { transform: translate3d(-56px, 0, 0); }
-.noctf-motion-viewport { position: relative; overflow: hidden; }
+.noctf-motion-viewport {
+  position: relative;
+  overflow: clip;
+  overflow-clip-margin: var(--control-glow-gutter);
+}
 .noctf-wave-item {
   transform: translateX(var(--wave-offset, 0px)) scale(var(--wave-scale, 1));
   transform-origin: left center;

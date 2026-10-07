@@ -11,7 +11,7 @@ const { navGroups, activePath, AppWorkspaceNav } = toRefs(viewProps.state)
     <div data-workspace-scroll-content data-platform-workspace-content class="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col gap-6 px-4 pt-8 md:px-6">
       <h1 class="shrink-0 text-display text-2xl">{{ $t('common.label.platformAdmin') }}</h1>
       <ScrollSurface axis="y" :reset-key="activePath" class="min-h-0 flex-1 overscroll-contain pr-3" :aria-label="$t('common.label.platformAdmin')">
-        <div class="px-1 pb-8">
+        <div class="p-4 pb-8">
           <MotionSwap :identity="activePath" preset="film-up">
             <NuxtPage />
           </MotionSwap>

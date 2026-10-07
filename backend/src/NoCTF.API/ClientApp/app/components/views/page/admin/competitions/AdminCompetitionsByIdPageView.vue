@@ -23,7 +23,7 @@ const { competition, role, loading, error, RoleLabel, navGroups, activePath, isP
         :class="usesPageScroll ? 'overflow-visible' : 'min-h-0 flex-1 overscroll-contain pr-3'"
         :aria-label="$t('navigation.competitionAdmin')">
         <div :data-admin-writeup-review-workspace="isWriteUpReview ? '' : undefined"
-          :class="isWriteUpReview ? 'h-full min-h-0 px-1 pb-1' : 'px-1 pb-8'">
+          :class="isWriteUpReview ? 'h-full min-h-0 px-1 pb-1' : usesPageScroll ? 'px-1 pb-8' : 'p-4 pb-8'">
           <MotionSwap :identity="activePath" preset="film-up">
             <NuxtPage />
           </MotionSwap>

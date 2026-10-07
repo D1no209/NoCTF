@@ -28,24 +28,25 @@ const { competitionId, teams, loading, error, teamDisplayNames, initialized, pag
         v-for="team in teams"
         :key="team.id"
         :to="`/competitions/${competitionId}/teams/${team.id}`"
+        class="min-w-0"
         prefetch-on="interaction"
       >
         <Card class="h-full transition-colors hover:border-primary/50">
           <CardHeader>
             <div class="flex items-center gap-3">
-              <Avatar class="size-10">
+              <Avatar class="size-10 shrink-0">
                 <AvatarImage v-if="team.avatarUrl" :src="team.avatarUrl" :alt="team.name ?? ''" />
                 <AvatarFallback>{{ team.name?.slice(0, 2) ?? '?' }}</AvatarFallback>
               </Avatar>
-              <div class="flex flex-col gap-1">
-                <CardTitle class="text-base">{{ teamDisplayName(team, teamDisplayNames) }}</CardTitle>
-                <div class="flex items-center gap-2">
+              <div class="flex min-w-0 flex-1 flex-col gap-1">
+                <CardTitle class="text-base [overflow-wrap:anywhere]">{{ teamDisplayName(team, teamDisplayNames) }}</CardTitle>
+                <div class="flex flex-wrap items-center gap-2">
                   <Badge
                     :variant="team.registrationStatus === 'Approved' ? 'default' : team.registrationStatus === 'Rejected' ? 'destructive' : 'secondary'"
                   >
                     {{ teamRegistrationStatusLabel(team.registrationStatus) }}
                   </Badge>
-                  <Badge variant="outline">{{ team.trackName ?? team.trackKey }}</Badge>
+                  <Badge variant="outline" class="whitespace-normal text-left [overflow-wrap:anywhere]">{{ team.trackName ?? team.trackKey }}</Badge>
                   <span class="text-xs text-muted-foreground">{{ $t('competitions.label.members', { count: team.memberIds?.length ?? 0 }) }}</span>
                 </div>
               </div>

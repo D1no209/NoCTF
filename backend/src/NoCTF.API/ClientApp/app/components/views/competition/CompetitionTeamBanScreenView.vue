@@ -2,7 +2,7 @@
 import { toRefs } from 'vue'
 import type { CompetitionTeamBanScreenViewState } from '../../../features/competition/useCompetitionTeamBanScreen'
 const props = defineProps<{ state: CompetitionTeamBanScreenViewState }>()
-const { logoUrl, loading, error, titleKey, descriptionKey, isCheatingBan, canAppeal, appealStatus,
+const { logoUrl, loading, error, canAppeal, appealStatus,
   appealOpen, statement, pending, appealError, refreshScreen, setAppealOpen, submitAppeal } = toRefs(props.state)
 </script>
 
@@ -12,10 +12,11 @@ const { logoUrl, loading, error, titleKey, descriptionKey, isCheatingBan, canApp
       <div class="team-ban-screen-content">
         <img :src="logoUrl" :alt="$t('common.label.noctf')" class="team-ban-screen-logo" width="520" height="155">
         <div role="status" aria-live="polite">
-          <h1 id="team-ban-title" class="team-ban-screen-title">{{ $t(titleKey) }}</h1>
-          <h2 v-if="isCheatingBan" class="team-ban-screen-subtitle">{{ $t('teamBanScreen.banned') }}</h2>
+          <h1 id="team-ban-title" class="team-ban-screen-title">
+            <span class="block">{{ $t('teamBanScreen.cheating') }}</span>
+            <span class="block">{{ $t('teamBanScreen.banned') }}</span>
+          </h1>
           <div class="team-ban-screen-description">
-            <p>{{ $t(descriptionKey) }}</p>
             <p>{{ $t('teamBanScreen.help') }}</p>
           </div>
         </div>

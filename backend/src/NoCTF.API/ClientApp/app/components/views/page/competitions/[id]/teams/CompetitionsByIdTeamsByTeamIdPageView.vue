@@ -19,17 +19,17 @@ const { competitionId, team, loading, error, TeamMembers } = toRefs(viewProps.st
 
     <template v-else-if="team">
       <div class="flex flex-wrap items-center gap-3">
-        <Avatar class="size-12">
+        <Avatar class="size-12 shrink-0">
           <AvatarImage v-if="team.avatarUrl" :src="team.avatarUrl" :alt="team.name ?? ''" />
           <AvatarFallback>{{ team.name?.slice(0, 2) ?? '?' }}</AvatarFallback>
         </Avatar>
-        <h2 class="text-xl font-semibold">{{ team.name }}</h2>
+        <h2 class="min-w-0 max-w-full text-xl font-semibold [overflow-wrap:anywhere]">{{ team.name }}</h2>
         <Badge
           :variant="team.registrationStatus === 'Approved' ? 'default' : team.registrationStatus === 'Rejected' ? 'destructive' : 'secondary'"
         >
           {{ teamRegistrationStatusLabel(team.registrationStatus) }}
         </Badge>
-        <Badge variant="outline">{{ team.trackName ?? team.trackKey }}</Badge>
+        <Badge variant="outline" class="whitespace-normal text-left [overflow-wrap:anywhere]">{{ team.trackName ?? team.trackKey }}</Badge>
         <Badge v-if="team.isBanned" variant="destructive">{{ $t('common.label.banned') }}</Badge>
       </div>
       <p class="text-sm text-muted-foreground">{{ $t('competitions.label.registered', { time: formatDateTime(team.registeredAt) }) }}</p>
