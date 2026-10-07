@@ -311,11 +311,11 @@ const { adminUserPath, teamDetailOpen, teamLoading, teamDetailError, competition
             </FieldDescription>
           </Field>
           <Field v-if="banDialog?.mode === 'ban'" orientation="horizontal">
-            <Checkbox id="ban-announce-publicly" v-model="banAnnouncePublicly" />
-            <div class="grid gap-1.5 leading-none">
+            <Checkbox id="ban-announce-publicly" v-model="banAnnouncePublicly" aria-describedby="ban-announce-publicly-description" />
+            <FieldContent class="min-w-0">
               <FieldLabel for="ban-announce-publicly">{{ $t('administration.competitionsBy.description.releaseEventDisciplineAnnouncement') }}</FieldLabel>
-              <FieldDescription> {{ $t('administration.competitionsBy.description.offDefaultOpeningParticipants') }} </FieldDescription>
-            </div>
+              <FieldDescription id="ban-announce-publicly-description">{{ $t('administration.competitionsBy.description.offDefaultOpeningParticipants') }}</FieldDescription>
+            </FieldContent>
           </Field>
         </FieldGroup>
         <DialogFooter>
