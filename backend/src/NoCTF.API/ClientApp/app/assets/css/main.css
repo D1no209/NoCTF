@@ -35,8 +35,8 @@
 }
 .team-ban-screen-logo { position: relative; width: min(80vw, 52rem); max-width: 100%; margin-bottom: 2.65rem; }
 .team-ban-screen-logo-art { position: relative; display: block; width: 100%; height: auto; mask-image: url('../svg/brand/noctf-team-ban-avatar-mask.svg'); mask-size: 100% 100%; mask-repeat: no-repeat; }
-/* The source artwork's circular aperture is centered at (992, 345), radius 162. */
-.team-ban-screen-logo-avatar { position: absolute; left: 41.8558%; top: 23.077%; width: 16.3389%; height: auto; aspect-ratio: 1; overflow: hidden; }
+/* Aperture: center (992, 345), radius 162; clip its final 23px at the wordmark edge (y=484). */
+.team-ban-screen-logo-avatar { position: absolute; left: 41.8558%; top: 23.077%; width: 16.3389%; height: auto; aspect-ratio: 1; overflow: hidden; clip-path: inset(0 0 7.0988%); filter: grayscale(1); }
 .team-ban-screen-logo-avatar [data-slot='avatar-fallback'] { font-size: clamp(.75rem, 3vw, 2.5rem); }
 .team-ban-screen-title { max-width: 18ch; font-size: clamp(2rem, 4.95vw, 5.3rem); line-height: 1.2; font-weight: 700; }
 .team-ban-screen-description { margin-top: 1.6rem; font-size: clamp(1rem, 1.95vw, 2rem); line-height: 1.7; }
