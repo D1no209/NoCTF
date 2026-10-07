@@ -1,3 +1,4 @@
+import { Webhook } from '@lucide/vue'
 import { adminCreateStaffWebhook, adminListStaffWebhooks, adminUpdateStaffWebhook, adminDeleteStaffWebhook,
   adminRotateStaffWebhookSecret, adminTestStaffWebhook, adminGetStaffWebhookTest, adminListStaffWebhookDeliveries } from '../../../api'
 import type { NoCtfapiEndpointsAdministrationStaffWebhooksStaffWebhookTargetResponse as Target,
@@ -97,7 +98,7 @@ export function useStaffWebhooks() {
   async function copySecret() { if (signingSecret.value) { await navigator.clipboard.writeText(signingSecret.value); toast.success(message('webhook.secretCopied')) } }
   onMounted(() => void reload())
   onBeforeUnmount(() => { poll.stop(); signingSecret.value = null })
-  return { page, records, categories, categoryKeys, stateKeys, mayManage, formOpen, editingId, form, pending, signingSecret, secretOpen,
+  return { Webhook, page, records, categories, categoryKeys, stateKeys, mayManage, formOpen, editingId, form, pending, signingSecret, secretOpen,
     deleting, recordsTarget, testState, poll, create, edit, setFormOpen, toggleCategory, setSecretOpen, requestDelete, setDeleteOpen,
     reload, save, rotate, remove, test, showRecords, copySecret }
 }

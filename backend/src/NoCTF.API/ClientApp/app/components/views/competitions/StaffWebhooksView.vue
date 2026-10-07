@@ -2,14 +2,17 @@
 import { toRefs } from 'vue'
 import type { StaffWebhooksViewState } from '~/features/competitions/staff-webhooks/useStaffWebhooks'
 const props = defineProps<{ state: StaffWebhooksViewState }>()
-const { page, records, categories, categoryKeys, stateKeys, mayManage, formOpen, editingId, form, pending, signingSecret, secretOpen,
+const { Webhook, page, records, categories, categoryKeys, stateKeys, mayManage, formOpen, editingId, form, pending, signingSecret, secretOpen,
   deleting, recordsTarget, testState, poll, create, edit, setFormOpen, toggleCategory, setSecretOpen, requestDelete, setDeleteOpen,
   reload, save, rotate, remove, test, showRecords, copySecret } = toRefs(props.state)
 </script>
 <template>
   <Card>
-    <CardHeader class="flex-row flex-wrap items-center justify-between gap-3">
-      <CardTitle>{{ $t('staffWebhook.title') }}</CardTitle>
+    <CardHeader class="flex flex-col items-start gap-3">
+      <CardTitle class="flex items-center gap-2">
+        <component :is="Webhook" class="size-5 shrink-0 text-primary" />
+        {{ $t('staffWebhook.title') }}
+      </CardTitle>
       <Button v-if="mayManage" @click="create">{{ $t('webhook.add') }}</Button>
     </CardHeader>
     <CardContent class="flex flex-col gap-4">

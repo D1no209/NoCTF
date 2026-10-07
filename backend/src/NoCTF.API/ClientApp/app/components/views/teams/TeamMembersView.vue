@@ -19,9 +19,9 @@ const { Crown, UserMinus, profiles, loaded, loadError, removing, loadProfiles, r
     <li
       v-for="memberId in team.memberIds ?? []"
       :key="memberId"
-      class="flex items-center gap-3 rounded-md border px-3 py-2"
+      class="flex min-w-0 items-center gap-3 rounded-md border px-3 py-2"
     >
-      <Avatar class="size-8">
+      <Avatar class="size-8 shrink-0">
         <AvatarImage
           v-if="profiles[memberId]?.avatarUrl"
           :src="profiles[memberId]!.avatarUrl!"
@@ -29,10 +29,10 @@ const { Crown, UserMinus, profiles, loaded, loadError, removing, loadProfiles, r
         />
         <AvatarFallback>{{ profiles[memberId]?.userName?.slice(0, 2) ?? '?' }}</AvatarFallback>
       </Avatar>
-      <NuxtLink :to="`/users/${memberId}`" class="text-sm font-medium hover:underline">
+      <NuxtLink :to="`/users/${memberId}`" class="min-w-0 text-sm font-medium [overflow-wrap:anywhere] hover:underline">
         {{ profiles[memberId]?.userName ?? memberId.slice(0, 8) }}
       </NuxtLink>
-      <Badge v-if="memberId === team.captainId" variant="secondary" class="gap-1">
+      <Badge v-if="memberId === team.captainId" variant="secondary" class="shrink-0 gap-1">
         <Crown class="size-3" /> {{ $t('common.label.captain') }} </Badge>
       <Button
         v-if="canManage && memberId !== team.captainId"

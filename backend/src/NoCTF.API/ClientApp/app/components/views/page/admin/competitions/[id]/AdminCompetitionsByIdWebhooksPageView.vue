@@ -4,7 +4,7 @@ import type { AdminCompetitionsByIdWebhooksPageViewState } from '~/features/rout
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdWebhooksPageViewState }>()
 const {
-  StaffWebhooks, Webhook, Plus, Copy, RotateCw, Send, Trash2,
+  StaffWebhooks, Webhook, Copy, RotateCw,
   targets, mayManage, loading, error, page, pageCount, total, pageLimit,
   loadPage, setPageSize,
   formOpen, editingId, form, saving, pendingId, deletingTarget,
@@ -22,17 +22,13 @@ const {
 <template>
   <div class="flex flex-col gap-6">
     <component :is="StaffWebhooks" />
-    <Card class="gap-0">
-      <CardHeader class="flex-row items-start justify-between gap-4">
-        <div class="flex flex-col gap-1.5">
-          <CardTitle class="flex items-center gap-2">
-            <component :is="Webhook" class="size-5 text-primary" />
-            {{ $t('webhook.title') }}
-          </CardTitle>
-          <CardDescription>{{ $t('webhook.description') }}</CardDescription>
-        </div>
+    <Card>
+      <CardHeader class="flex flex-col items-start gap-3">
+        <CardTitle class="flex items-center gap-2">
+          <component :is="Webhook" class="size-5 shrink-0 text-primary" />
+          {{ $t('webhook.title') }}
+        </CardTitle>
         <Button v-if="mayManage" @click="createTarget">
-          <component :is="Plus" data-icon="inline-start" />
           {{ $t('webhook.add') }}
         </Button>
       </CardHeader>
@@ -54,63 +50,54 @@ const {
             <EmptyDescription>{{ $t('webhook.emptyDescription') }}</EmptyDescription>
           </EmptyHeader>
         </Empty>
-        <div v-else class="flex flex-col gap-3">
-          <Card v-for="target in targets" :key="target.id" class="gap-4 bg-card/45">
-            <CardHeader class="flex-row items-start justify-between gap-4">
-              <div class="min-w-0">
-                <CardTitle class="truncate text-base">{{ target.name }}</CardTitle>
-                <CardDescription class="truncate font-mono text-xs">{{ target.endpointUrl ?? target.endpointHost }}</CardDescription>
-              </div>
-              <div class="flex items-center gap-2">
-                <Badge :variant="target.enabled ? 'default' : 'secondary'">
-                  {{ target.enabled ? $t('webhook.enabled') : $t('webhook.disabled') }}
-                </Badge>
-                <Switch
-                  v-if="mayManage"
-                  :model-value="target.enabled"
-                  :disabled="pendingId === target.id"
-                  @update:model-value="setEnabled(target, $event)"
-                />
-              </div>
-            </CardHeader>
-            <CardContent class="flex flex-wrap items-center gap-2">
-              <Button v-if="mayManage" variant="secondary" size="sm" @click="editTarget(target)">
+        <template v-else>
+          <div v-for="target in targets" :key="target.id" class="flex flex-col gap-3 py-3">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="min-w-0 flex-1 break-words font-semibold">{{ target.name }}</span>
+              <Badge :variant="target.enabled ? 'default' : 'secondary'">
+                {{ target.enabled ? $t('webhook.enabled') : $t('webhook.disabled') }}
+              </Badge>
+              <Switch
+                v-if="mayManage"
+                :model-value="target.enabled"
+                :disabled="pendingId === target.id"
+                :aria-label="$t('webhook.enabled')"
+                @update:model-value="setEnabled(target, $event)"
+              />
+            </div>
+            <span class="break-all text-sm text-muted-foreground">{{ target.endpointUrl ?? target.endpointHost }}</span>
+            <div class="flex flex-wrap items-center gap-2">
+              <Button v-if="mayManage" variant="secondary" @click="editTarget(target)">
                 {{ $t('administration.label.edit') }}
               </Button>
               <Button
                 v-if="mayManage"
                 variant="secondary"
-                size="sm"
-                :disabled="pendingId === target.id"
-                @click="test(target)"
-              >
-                <Spinner v-if="testStates[target.id!] === 'Pending'" data-icon="inline-start" />
-                <component v-else :is="Send" data-icon="inline-start" />
-                {{ $t('webhook.test') }}
-              </Button>
-              <Button
-                v-if="mayManage"
-                variant="secondary"
-                size="sm"
                 :disabled="pendingId === target.id"
                 @click="rotate(target)"
               >
-                <component :is="RotateCw" data-icon="inline-start" />
                 {{ $t('webhook.rotate') }}
               </Button>
               <Button
                 v-if="mayManage"
+                variant="secondary"
+                :disabled="pendingId === target.id || testStates[target.id!] === 'Pending'"
+                @click="test(target)"
+              >
+                <Spinner v-if="testStates[target.id!] === 'Pending'" data-icon="inline-start" />
+                {{ $t('webhook.test') }}
+              </Button>
+              <Button
+                v-if="mayManage"
                 variant="destructive"
-                size="sm"
                 @click="requestDelete(target)"
               >
-                <component :is="Trash2" data-icon="inline-start" />
                 {{ $t('common.action.delete') }}
               </Button>
               <Badge v-if="testStates[target.id!] === 'Succeeded'" variant="outline">{{ $t('webhook.testSucceeded') }}</Badge>
               <Badge v-else-if="testStates[target.id!] === 'Failed'" variant="destructive">{{ $t('webhook.testFailed') }}</Badge>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
           <OffsetPagination
             :page="page"
             :page-count="pageCount"
@@ -120,7 +107,7 @@ const {
             @update:page="loadPage"
             @update:limit="setPageSize"
           />
-        </div>
+        </template>
       </CardContent>
     </Card>
 
