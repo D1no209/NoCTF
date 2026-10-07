@@ -9058,9 +9058,9 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Change Oidc Mfa Trust Endpoint",
-        "description": "Executes PUT /api/v1/admin/platform/sso/providers/{providerId}/mfa-trust.",
-        "operationId": "ChangeOidcMfaTrustEndpoint",
+        "summary": "Replaces an OIDC provider MFA trust policy and invalidates proofs issued under the previous policy.",
+        "description": "Replaces an OIDC provider MFA trust policy and invalidates proofs issued under the previous policy.",
+        "operationId": "AdminPlatformMfaChangeOidcTrust",
         "parameters": [
           {
             "name": "providerId",
@@ -9126,9 +9126,9 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Change Platform Mfa Policy Endpoint",
-        "description": "Executes PATCH /api/v1/admin/platform/mfa-policy.",
-        "operationId": "ChangePlatformMfaPolicyEndpoint",
+        "summary": "Changes the platform MFA policy after operation-bound local second-factor verification.",
+        "description": "Changes the platform MFA policy after operation-bound local second-factor verification.",
+        "operationId": "AdminPlatformMfaChangePolicy",
         "requestBody": {
           "x-name": "ChangePlatformMfaPolicyRequest",
           "description": "",
@@ -9184,9 +9184,9 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Change User Mfa Requirement Endpoint",
-        "description": "Executes PATCH /api/v1/admin/platform/users/{userId}/mfa-requirement.",
-        "operationId": "ChangeUserMfaRequirementEndpoint",
+        "summary": "Changes an account MFA requirement for a human target after administrator local second-factor verification.",
+        "description": "Changes an account MFA requirement for a human target after administrator local second-factor verification.",
+        "operationId": "AdminPlatformMfaChangeUserRequirement",
         "parameters": [
           {
             "name": "userId",
@@ -10072,9 +10072,9 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Get Platform Mfa Configuration Endpoint",
-        "description": "Executes GET /api/v1/admin/platform/mfa.",
-        "operationId": "GetPlatformMfaConfigurationEndpoint",
+        "summary": "Reads the platform MFA policy and OIDC trust rules for human administrators.",
+        "description": "Reads the platform MFA policy and OIDC trust rules for human administrators.",
+        "operationId": "AdminPlatformMfaGetConfiguration",
         "responses": {
           "200": {
             "description": "Success",
@@ -10246,9 +10246,9 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Grant User Mfa Recovery Endpoint",
-        "description": "Executes POST /api/v1/admin/platform/users/{userId}/mfa-recovery.",
-        "operationId": "GrantUserMfaRecoveryEndpoint",
+        "summary": "Creates a single-use restricted email recovery authorization after manual review and local administrator verification.",
+        "description": "Creates a single-use restricted email recovery authorization after manual review and local administrator verification.",
+        "operationId": "AdminPlatformMfaGrantUserRecovery",
         "parameters": [
           {
             "name": "userId",
@@ -23779,6 +23779,9 @@
           },
           "primaryAuthenticationRequired": {
             "type": "boolean"
+          },
+          "recoveryMailAvailable": {
+            "type": "boolean"
           }
         }
       },
@@ -25828,6 +25831,9 @@
                 "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformUserSsoBindingResponse"
               }
             ]
+          },
+          "mfaRequired": {
+            "type": "boolean"
           }
         }
       },

@@ -3,11 +3,12 @@ import { toRefs } from 'vue'
 import type { AdminPlatformAuthenticationPageViewState } from '~/features/routes/admin/platform/useAdminPlatformAuthenticationPage'
 
 const viewProps = defineProps<{ state: AdminPlatformAuthenticationPageViewState }>()
-const { Plus, RotateCw, FlaskConical, configuration, loading, loadError, globalForm, globalSaving, providerOpen, providerSaving, providerError, providerForm, secretOpen, secretProvider, secret, secretSaving, testingId, load, saveGlobal, openCreateProvider, openEditProvider, saveProvider, openSecret, replaceSecret, testConnection, testAuthentication } = toRefs(viewProps.state)
+const { Plus, RotateCw, FlaskConical, MfaPlatformSettings, configuration, loading, loadError, globalForm, globalSaving, providerOpen, providerSaving, providerError, providerForm, secretOpen, secretProvider, secret, secretSaving, testingId, load, saveGlobal, openCreateProvider, openEditProvider, saveProvider, openSecret, replaceSecret, testConnection, testAuthentication } = toRefs(viewProps.state)
 </script>
 
 <template>
   <section class="flex min-w-0 flex-col gap-6">
+    <component :is="MfaPlatformSettings" />
     <Alert v-if="loadError" variant="destructive"><AlertDescription>{{ $message(loadError) }}</AlertDescription></Alert>
     <template v-if="loading">
       <Skeleton class="h-48 w-full" />

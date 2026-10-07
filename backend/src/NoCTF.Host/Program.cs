@@ -124,7 +124,11 @@ if (!exportOpenApi)
 var app = builder.Build();
 if (mfaRecoveryOnly)
 {
-    await NoCTF.Hosting.Authentication.OfflineMfaRecovery.ExecuteAsync(app.Services, app.Configuration, CancellationToken.None);
+    await using var recoveryScope = app.Services.CreateAsyncScope();
+    await NoCTF.Hosting.Authentication.OfflineMfaRecovery.ExecuteAsync(
+        recoveryScope.ServiceProvider.GetRequiredService<NoCTF.Infrastructure.Persistence.NoCtfDbContext>(),
+        recoveryScope.ServiceProvider.GetRequiredService<NoCTF.Application.Authentication.Mfa.IMfaManagementStore>(),
+        app.Configuration, CancellationToken.None);
     return;
 }
 if (generateHandlers)

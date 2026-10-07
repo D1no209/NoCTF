@@ -1730,6 +1730,7 @@ export type NoCtfapiEndpointsAuthenticationMfaMfaFlowResponse = {
     secret?: string | null;
     provisioningUri?: string | null;
     primaryAuthenticationRequired?: boolean;
+    recoveryMailAvailable?: boolean;
 };
 
 export type NoCtfDomainIdentityMfaMfaChallengePurpose = 'Login' | 'Enrollment' | 'Rebind' | 'RecoveryGrant' | 'RecoveryEnrollment' | 'StepUp';
@@ -2319,6 +2320,7 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse = {
     createdAt?: string;
     updatedAt?: string;
     ssoBinding?: NoCtfapiEndpointsAdministrationPlatformPlatformUserSsoBindingResponse | null;
+    mfaRequired?: boolean;
 };
 
 export type NoCtfapiEndpointsAuthenticationUserAccountStatusProtocol = 'Active' | 'Banned' | 'Disabled' | 'Anonymized';
@@ -8950,7 +8952,7 @@ export type AdminPlatformSsoBeginAuthenticationTestResponses = {
 
 export type AdminPlatformSsoBeginAuthenticationTestResponse = AdminPlatformSsoBeginAuthenticationTestResponses[keyof AdminPlatformSsoBeginAuthenticationTestResponses];
 
-export type ChangeOidcMfaTrustEndpointData = {
+export type AdminPlatformMfaChangeOidcTrustData = {
     body: NoCtfapiEndpointsAdministrationPlatformChangeOidcMfaTrustRequest;
     path: {
         providerId: string;
@@ -8959,7 +8961,7 @@ export type ChangeOidcMfaTrustEndpointData = {
     url: '/api/v1/admin/platform/sso/providers/{providerId}/mfa-trust';
 };
 
-export type ChangeOidcMfaTrustEndpointErrors = {
+export type AdminPlatformMfaChangeOidcTrustErrors = {
     /**
      * Bad Request
      */
@@ -8974,25 +8976,25 @@ export type ChangeOidcMfaTrustEndpointErrors = {
     403: unknown;
 };
 
-export type ChangeOidcMfaTrustEndpointError = ChangeOidcMfaTrustEndpointErrors[keyof ChangeOidcMfaTrustEndpointErrors];
+export type AdminPlatformMfaChangeOidcTrustError = AdminPlatformMfaChangeOidcTrustErrors[keyof AdminPlatformMfaChangeOidcTrustErrors];
 
-export type ChangeOidcMfaTrustEndpointResponses = {
+export type AdminPlatformMfaChangeOidcTrustResponses = {
     /**
      * Success
      */
     200: NoCtfApplicationAuthenticationMfaOidcMfaTrust;
 };
 
-export type ChangeOidcMfaTrustEndpointResponse = ChangeOidcMfaTrustEndpointResponses[keyof ChangeOidcMfaTrustEndpointResponses];
+export type AdminPlatformMfaChangeOidcTrustResponse = AdminPlatformMfaChangeOidcTrustResponses[keyof AdminPlatformMfaChangeOidcTrustResponses];
 
-export type ChangePlatformMfaPolicyEndpointData = {
+export type AdminPlatformMfaChangePolicyData = {
     body: NoCtfapiEndpointsAdministrationPlatformChangePlatformMfaPolicyRequest;
     path?: never;
     query?: never;
     url: '/api/v1/admin/platform/mfa-policy';
 };
 
-export type ChangePlatformMfaPolicyEndpointErrors = {
+export type AdminPlatformMfaChangePolicyErrors = {
     /**
      * Bad Request
      */
@@ -9007,18 +9009,18 @@ export type ChangePlatformMfaPolicyEndpointErrors = {
     403: unknown;
 };
 
-export type ChangePlatformMfaPolicyEndpointError = ChangePlatformMfaPolicyEndpointErrors[keyof ChangePlatformMfaPolicyEndpointErrors];
+export type AdminPlatformMfaChangePolicyError = AdminPlatformMfaChangePolicyErrors[keyof AdminPlatformMfaChangePolicyErrors];
 
-export type ChangePlatformMfaPolicyEndpointResponses = {
+export type AdminPlatformMfaChangePolicyResponses = {
     /**
      * Success
      */
     200: NoCtfapiEndpointsAdministrationPlatformPlatformMfaPolicyResponse;
 };
 
-export type ChangePlatformMfaPolicyEndpointResponse = ChangePlatformMfaPolicyEndpointResponses[keyof ChangePlatformMfaPolicyEndpointResponses];
+export type AdminPlatformMfaChangePolicyResponse = AdminPlatformMfaChangePolicyResponses[keyof AdminPlatformMfaChangePolicyResponses];
 
-export type ChangeUserMfaRequirementEndpointData = {
+export type AdminPlatformMfaChangeUserRequirementData = {
     body: NoCtfapiEndpointsAdministrationPlatformChangeUserMfaRequirementRequest;
     path: {
         userId: string;
@@ -9027,7 +9029,7 @@ export type ChangeUserMfaRequirementEndpointData = {
     url: '/api/v1/admin/platform/users/{userId}/mfa-requirement';
 };
 
-export type ChangeUserMfaRequirementEndpointErrors = {
+export type AdminPlatformMfaChangeUserRequirementErrors = {
     /**
      * Bad Request
      */
@@ -9042,16 +9044,16 @@ export type ChangeUserMfaRequirementEndpointErrors = {
     403: unknown;
 };
 
-export type ChangeUserMfaRequirementEndpointError = ChangeUserMfaRequirementEndpointErrors[keyof ChangeUserMfaRequirementEndpointErrors];
+export type AdminPlatformMfaChangeUserRequirementError = AdminPlatformMfaChangeUserRequirementErrors[keyof AdminPlatformMfaChangeUserRequirementErrors];
 
-export type ChangeUserMfaRequirementEndpointResponses = {
+export type AdminPlatformMfaChangeUserRequirementResponses = {
     /**
      * Success
      */
     200: NoCtfApplicationAuthenticationMfaMfaChangeResult;
 };
 
-export type ChangeUserMfaRequirementEndpointResponse = ChangeUserMfaRequirementEndpointResponses[keyof ChangeUserMfaRequirementEndpointResponses];
+export type AdminPlatformMfaChangeUserRequirementResponse = AdminPlatformMfaChangeUserRequirementResponses[keyof AdminPlatformMfaChangeUserRequirementResponses];
 
 export type AdminPlatformCreateBotData = {
     body: NoCtfapiEndpointsAdministrationPlatformCreatePlatformBotRequest;
@@ -9489,14 +9491,14 @@ export type AdminPlatformGetInformationResponses = {
 
 export type AdminPlatformGetInformationResponse = AdminPlatformGetInformationResponses[keyof AdminPlatformGetInformationResponses];
 
-export type GetPlatformMfaConfigurationEndpointData = {
+export type AdminPlatformMfaGetConfigurationData = {
     body?: never;
     path?: never;
     query?: never;
     url: '/api/v1/admin/platform/mfa';
 };
 
-export type GetPlatformMfaConfigurationEndpointErrors = {
+export type AdminPlatformMfaGetConfigurationErrors = {
     /**
      * Unauthorized
      */
@@ -9507,14 +9509,14 @@ export type GetPlatformMfaConfigurationEndpointErrors = {
     403: unknown;
 };
 
-export type GetPlatformMfaConfigurationEndpointResponses = {
+export type AdminPlatformMfaGetConfigurationResponses = {
     /**
      * Success
      */
     200: NoCtfapiEndpointsAdministrationPlatformPlatformMfaConfigurationResponse;
 };
 
-export type GetPlatformMfaConfigurationEndpointResponse = GetPlatformMfaConfigurationEndpointResponses[keyof GetPlatformMfaConfigurationEndpointResponses];
+export type AdminPlatformMfaGetConfigurationResponse = AdminPlatformMfaGetConfigurationResponses[keyof AdminPlatformMfaGetConfigurationResponses];
 
 export type AdminGetPrivatePlatformUserData = {
     body?: never;
@@ -9609,7 +9611,7 @@ export type AdminPlatformSsoPatchConfigurationResponses = {
 
 export type AdminPlatformSsoPatchConfigurationResponse = AdminPlatformSsoPatchConfigurationResponses[keyof AdminPlatformSsoPatchConfigurationResponses];
 
-export type GrantUserMfaRecoveryEndpointData = {
+export type AdminPlatformMfaGrantUserRecoveryData = {
     body: NoCtfapiEndpointsAdministrationPlatformGrantUserMfaRecoveryRequest;
     path: {
         userId: string;
@@ -9618,7 +9620,7 @@ export type GrantUserMfaRecoveryEndpointData = {
     url: '/api/v1/admin/platform/users/{userId}/mfa-recovery';
 };
 
-export type GrantUserMfaRecoveryEndpointErrors = {
+export type AdminPlatformMfaGrantUserRecoveryErrors = {
     /**
      * Bad Request
      */
@@ -9633,16 +9635,16 @@ export type GrantUserMfaRecoveryEndpointErrors = {
     403: unknown;
 };
 
-export type GrantUserMfaRecoveryEndpointError = GrantUserMfaRecoveryEndpointErrors[keyof GrantUserMfaRecoveryEndpointErrors];
+export type AdminPlatformMfaGrantUserRecoveryError = AdminPlatformMfaGrantUserRecoveryErrors[keyof AdminPlatformMfaGrantUserRecoveryErrors];
 
-export type GrantUserMfaRecoveryEndpointResponses = {
+export type AdminPlatformMfaGrantUserRecoveryResponses = {
     /**
      * Success
      */
     200: NoCtfApplicationAuthenticationMfaMfaRecoveryGrant;
 };
 
-export type GrantUserMfaRecoveryEndpointResponse = GrantUserMfaRecoveryEndpointResponses[keyof GrantUserMfaRecoveryEndpointResponses];
+export type AdminPlatformMfaGrantUserRecoveryResponse = AdminPlatformMfaGrantUserRecoveryResponses[keyof AdminPlatformMfaGrantUserRecoveryResponses];
 
 export type AdminPlatformListAuditLogsData = {
     body?: never;

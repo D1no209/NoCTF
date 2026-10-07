@@ -14,8 +14,11 @@ function jwtExpiry(token: string): number | null {
   }
 }
 
-export function shouldRefreshSession(responseStatus: number, requestHeaders: Headers): boolean {
-  return responseStatus === 401 && requestHeaders.has('Authorization')
+export function requiresInteractiveAuthentication(code: unknown): boolean {
+  return typeof code === 'string' && ['PrimaryAuthenticationRequired', 'LocalMfaRequired', 'NotEnrolled', 'PolicyChanged', 'AccountUnavailable'].includes(code)
+}
+export function shouldRefreshSession(responseStatus: number, requestHeaders: Headers, path = '', code?: unknown): boolean {
+  return responseStatus === 401 && requestHeaders.has('Authorization') && !path.includes('/auth/mfa/') && !requiresInteractiveAuthentication(code)
 }
 
 export function accessTokenNeedsRefresh(

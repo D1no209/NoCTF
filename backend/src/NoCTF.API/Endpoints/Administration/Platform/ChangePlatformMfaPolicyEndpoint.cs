@@ -24,7 +24,9 @@ public sealed record PlatformMfaPolicyResponse([property: JsonConverter(typeof(S
 public sealed class ChangePlatformMfaPolicyEndpoint(IMfaManagementStore management, MfaBrowserFlow browser, IOptions<RefreshHttpOptions> options)
     : Endpoint<ChangePlatformMfaPolicyRequest, Results<Ok<PlatformMfaPolicyResponse>, ProblemHttpResult>>
 {
-    public override void Configure() { Patch("/admin/platform/mfa-policy"); AuthSchemes("Bearer"); Roles("Administrator"); }
+    public override void Configure() { Patch("/admin/platform/mfa-policy"); AuthSchemes("Bearer"); Roles("Administrator");
+        Description(builder => builder.WithName("AdminPlatformMfaChangePolicy"));
+        Summary(summary => { summary.Summary = "Changes the platform MFA policy after operation-bound local second-factor verification."; summary.Description = "Changes the platform MFA policy after operation-bound local second-factor verification."; }); }
     public override async Task<Results<Ok<PlatformMfaPolicyResponse>, ProblemHttpResult>> ExecuteAsync(ChangePlatformMfaPolicyRequest request, CancellationToken ct)
     {
         HttpContext.Response.Headers.CacheControl = "private, no-store";

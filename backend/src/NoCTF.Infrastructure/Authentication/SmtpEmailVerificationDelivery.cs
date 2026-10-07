@@ -175,7 +175,7 @@ public sealed class SmtpEmailVerificationDelivery(
         var (_, configuration) = await LoadConfigurationAsync(false, ct);
         if (configuration is null) return NoCTF.Application.Authentication.Mfa.MfaMailDeliveryState.NotConfigured;
         var user = await LoadRecipientAsync(userId, ct);
-        if (user is null) return NoCTF.Application.Authentication.Mfa.MfaMailDeliveryState.RecipientNotFound;
+        if (user is null || !user.Verified) return NoCTF.Application.Authentication.Mfa.MfaMailDeliveryState.RecipientNotFound;
         var url = new Uri(new Uri(configuration.PublicBaseUrl.TrimEnd('/') + "/"), $"auth/mfa/recovery?token={Uri.EscapeDataString(token)}").AbsoluteUri;
         using var message = CreateMessage(configuration, user.Email, "Recover your NoCTF authenticator",
             $"A restricted authenticator recovery was authorized. Verify your password or SSO identity and bind a new authenticator using this single-use link:\n\n{url}\n\nIf you did not request this, contact a platform administrator.",
@@ -224,7 +224,7 @@ public sealed class SmtpEmailVerificationDelivery(
         await using var db = await dbContextFactory.CreateDbContextAsync(ct);
         return await db.Users.AsNoTracking()
             .Where(user => user.Id == userId)
-            .Select(user => new EmailRecipient(user.UserName, user.Email))
+            .Select(user => new EmailRecipient(user.UserName, user.Email, user.EmailVerifiedAt != null))
             .SingleOrDefaultAsync(ct);
     }
 
@@ -427,5 +427,5 @@ public sealed class SmtpEmailVerificationDelivery(
             ? $"SMTP phase failed with {exceptionType}."
             : $"SMTP phase failed with {exceptionType}; status={smtpStatusCode}.");
 
-    private sealed record EmailRecipient(string UserName, string Email);
+    private sealed record EmailRecipient(string UserName, string Email, bool Verified);
 }

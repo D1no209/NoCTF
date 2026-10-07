@@ -5,7 +5,7 @@ import {
   logoutEndpoint,
   authenticationSsoCompleteLogin,
 } from '../api'
-import type { NoCtfapiEndpointsAuthenticationCurrentUserResponse } from '../api'
+import type { NoCtfapiEndpointsAuthenticationAuthenticationResponse, NoCtfapiEndpointsAuthenticationCurrentUserResponse } from '../api'
 import {
   beginImpersonationAccessToken,
   clearImpersonationAccessToken,
@@ -29,6 +29,7 @@ export type ImpersonationSession = {
 let endingImpersonation: Promise<void> | null = null
 
 export function useAuth() {
+  const route = useRoute()
   const user = useState<CurrentUser | null>('auth:user', () => null)
   /** Whether the initial session restore attempt has finished. */
   const ready = useState<boolean>('auth:ready', () => false)
@@ -74,16 +75,26 @@ export function useAuth() {
     login: string,
     password: string,
     humanVerificationHeaders: Record<string, string>,
-  ): Promise<void> {
+  ): Promise<boolean> {
     const { data, error } = await loginEndpoint({
       headers: humanVerificationHeaders,
       body: { login, password },
     })
-    if (error || !data?.accessToken) {
+    if (error || !data) {
       throw parseApiError(error)
+    }
+    return acceptAuthentication(data)
+  }
+
+  async function acceptAuthentication(data: NoCtfapiEndpointsAuthenticationAuthenticationResponse): Promise<boolean> {
+    if (data.state !== 'Authenticated') {
+      invalidate()
+      await navigateTo({ path: '/auth/mfa', query: route.query.redirect ? { redirect: route.query.redirect } : {} })
+      return false
     }
     setAccessToken(data.accessToken)
     await fetchMe()
+    return true
   }
 
   async function logout(): Promise<void> {
@@ -111,11 +122,10 @@ export function useAuth() {
     const { data, error } = await authenticationSsoCompleteLogin({
       path: { flowId },
     })
-    if (error || !data?.accessToken)
+    if (error || !data)
       throw parseApiError(error)
-    setAccessToken(data.accessToken)
-    await fetchMe()
-    return data.returnPath ?? '/'
+    if (!await acceptAuthentication(data)) return '/auth/mfa'
+    return data.state === 'Authenticated' ? data.returnPath : '/auth/mfa'
   }
 
   async function startImpersonation(input: {
@@ -183,6 +193,7 @@ export function useAuth() {
     invalidate,
     restore,
     login,
+    acceptAuthentication,
     completeSsoLogin,
     logout,
     logoutAll,

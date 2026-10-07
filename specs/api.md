@@ -60,7 +60,7 @@ GET  /api/v1/users/{userId}
 GET  /api/v1/users/{userId}/avatar
 ```
 
-Login/Refresh 返回 AccessToken 与 ExpiresAt；Refresh Cookie 不出现在 body。
+Login 和 SSO 登录完成响应是 `Authenticated` / `MfaRequired` / `EnrollmentRequired` 判别联合，仅 `Authenticated` 返回 Access Token 并设置 Refresh Cookie。Refresh 返回 AccessToken 与 ExpiresAt，保留原始认证上下文，Cookie 不出现在 body。
 公开用户资料默认隐藏邮箱；本人和 Administrator 始终可见，其他访问者仅在用户主动公开后可见。
 密码重置请求对所有合法邮箱格式统一返回 202；完成接口成功返回 204，无效、过期或已消费 Token 返回 typed 400 `InvalidOrExpired`。完成后不会签发新 Token，并清除当前 Refresh Cookie。
 
@@ -654,3 +654,28 @@ PUT /api/v1/auth/me/profile-cover
 比赛方向目录由管理端独立配置；新比赛和升级后的既有比赛提供默认方向。
 `PUT /admin/competitions/{competitionId}/directions` 的 `items` 按展示顺序包含 `id`、`name` 和 `icon`（Lucide 名称后缀）。名称不可重复，图标必须存在于当前包。使用中的方向（含软删除题目）不能移除。
 题目 PATCH 的 `presentation.directionId` 选择本比赛目录中的方向，省略时保留当前选择。题目详情、列表和计分目录返回有效方向名称及 `directionIcon`；目录修改不改变全局题库模板。
+
+## 平台账号 MFA
+
+```text
+GET /api/v1/auth/mfa/flow
+DELETE /api/v1/auth/mfa/flow
+POST /api/v1/auth/mfa/verify
+POST /api/v1/auth/mfa/enrollment
+POST /api/v1/auth/mfa/enrollment/confirm
+POST /api/v1/auth/mfa/account/enrollment/confirm
+GET /api/v1/auth/mfa/status
+POST /api/v1/auth/mfa/step-up
+POST /api/v1/auth/mfa/step-up/verify
+POST /api/v1/auth/mfa/rebind
+POST /api/v1/auth/mfa/recovery-codes/regenerate
+POST /api/v1/auth/mfa/disable
+POST /api/v1/auth/mfa/recovery
+GET /api/v1/admin/platform/mfa
+PATCH /api/v1/admin/platform/mfa-policy
+PUT /api/v1/admin/platform/sso/providers/{providerId}/mfa-trust
+PATCH /api/v1/admin/platform/users/{userId}/mfa-requirement
+POST /api/v1/admin/platform/users/{userId}/mfa-recovery
+```
+
+流程接口使用浏览器绑定的独立 Cookie，不形成业务身份，所有写操作以及流程读取检查 Origin/Referer。账户设置确认仅返回一次性恢复码并清除旧登录态；受限登录绑定或恢复确认才签发完整登录态。敏感证明与操作和目标绑定，单次消费。MFA 策略与管理接口仅面向人类账号，Bot 与内部服务凭据机制不变。

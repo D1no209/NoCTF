@@ -18,6 +18,7 @@ import {
 } from '../../api'
 import type { NoCtfapiEndpointsAuthenticationMySsoBindingConfigurationResponse } from '../../api'
 import AvatarCropDialogComponent from './AvatarCropDialog.vue'
+import MfaAccountSecurityComponent from '../authentication/mfa/MfaAccountSecurity.vue'
 import AdminDateTimeComponent from '../admin/AdminDateTime.vue'
 import { exceedsUploadLimit } from './upload-limits'
 import { runDownRevealTransition } from '../../motion/reveal-transition'
@@ -509,6 +510,7 @@ export function useAccountPanel() {
     logoutAll,
     AvatarCropDialog,
     AdminDateTime,
+    MfaAccountSecurity: markRaw(MfaAccountSecurityComponent),
   }
 }
 

@@ -19,7 +19,8 @@ public sealed record PlatformUserView(
     Guid? SsoProviderId = null,
     SsoProtocol? SsoProtocol = null,
     string? SsoSubject = null,
-    DateTimeOffset? SsoBoundAt = null);
+    DateTimeOffset? SsoBoundAt = null,
+    bool MfaRequired = false);
 
 public sealed record PlatformUserListQuery(
     string? Keyword,

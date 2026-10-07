@@ -63,7 +63,7 @@ public sealed partial class MfaAuthenticationStore(NoCtfDbContext db, IMfaCrypto
     {
         var settings = await SettingsAsync(ct);
         if (!settings.SsoEnabled) return null;
-        var provider = settings.SsoConfiguration.Providers.SingleOrDefault(value => value.Id == providerId && value.Enabled && value.AllowLogin);
+        var provider = await db.Set<SsoProviderConfiguration>().AsSplitQuery().SingleOrDefaultAsync(value => value.Id == providerId && value.Enabled && value.AllowLogin, ct);
         return provider is null ? null : SsoProviderRuntimeReader.Fingerprint(provider, settings.SsoConfiguration.PublicBaseUrl)
             + (provider.Oidc?.MfaTrustPolicyId.ToString("N") ?? string.Empty);
     }
@@ -88,7 +88,7 @@ public sealed partial class MfaAuthenticationStore(NoCtfDbContext db, IMfaCrypto
             ReturnPath = SafeReturnPath(primary.ReturnPath),
             PrimaryProviderFingerprint = primary.ProviderId is { } providerId ? await ProviderFingerprintAsync(providerId, ct) : null };
         db.MfaChallenges.Add(challenge); await db.SaveChangesAsync(ct);
-        return (View(challenge, account.User.UserName, account.RecoveryCodesRemaining > 0), new(challenge.Id, secret));
+        return (View(challenge, account.User.UserName, account.RecoveryCodesRemaining > 0, mail: account.RecoveryMailAvailable), new(challenge.Id, secret));
     }
 
     public async Task<OperationResult<MfaFlowView, MfaFailure>> ReadFlowAsync(MfaBrowserCredential browser, CancellationToken ct)
@@ -104,7 +104,7 @@ public sealed partial class MfaAuthenticationStore(NoCtfDbContext db, IMfaCrypto
         }
         var credential = await db.UserTotpCredentials.AsNoTracking().SingleOrDefaultAsync(value => value.UserId == user.Id, ct);
         var recovery = credential is not null && await db.UserMfaRecoveryCodes.AnyAsync(value => value.UserId == user.Id && value.BatchId == credential.RecoveryBatchId && value.ConsumedAt == null, ct);
-        return Success(View(challenge, user.UserName, recovery, secret, uri));
+        return Success(View(challenge, user.UserName, recovery, secret, uri, user.EmailVerifiedAt is not null && MailConfigured(await SettingsAsync(ct))));
     }
 
     public async Task CancelFlowAsync(MfaBrowserCredential browser, CancellationToken ct)
@@ -130,6 +130,7 @@ public sealed partial class MfaAuthenticationStore(NoCtfDbContext db, IMfaCrypto
             challenge.State = MfaChallengeState.Completed;
             var context = new AuthenticationContext(challenge.PrimaryMethod, challenge.PrimaryAuthenticatedAt,
                 verification.Method == MfaVerificationMethod.Totp ? MfaSource.Totp : MfaSource.RecoveryCode, clock.GetUtcNow(), credential.Id);
+            RecordCompletedLogin(challenge, user);
             return Success(new MfaAuthenticationResult(ToAuthenticated(user), context, challenge.ReturnPath));
         }, ct);
 
@@ -146,7 +147,7 @@ public sealed partial class MfaAuthenticationStore(NoCtfDbContext db, IMfaCrypto
                 : protector.Unprotect(challenge.PendingSecretCiphertext, PlatformSecretPurpose.PendingTotpSecret, user.Id, challenge.Id);
             challenge.PendingCredentialId ??= Guid.NewGuid();
             challenge.PendingSecretCiphertext ??= protector.Protect(secret, PlatformSecretPurpose.PendingTotpSecret, user.Id, challenge.Id);
-            return Success(View(challenge, user.UserName, false, secret, ProvisioningUri((await SettingsAsync(ct)).Name, user.UserName, secret)));
+            return Success(View(challenge, user.UserName, false, secret, ProvisioningUri((await SettingsAsync(ct)).Name, user.UserName, secret), user.EmailVerifiedAt is not null && MailConfigured(await SettingsAsync(ct))));
         }, ct);
 
     public Task<OperationResult<MfaAuthenticationResult, MfaFailure>> ConfirmEnrollmentAsync(MfaBrowserCredential browser, string code, CancellationToken ct, bool accountManagement = false) =>
@@ -177,6 +178,7 @@ public sealed partial class MfaAuthenticationStore(NoCtfDbContext db, IMfaCrypto
             challenge.State = MfaChallengeState.Completed; challenge.PendingSecretCiphertext = null; challenge.MailState = MfaMailState.Pending;
             SecurityEvent(user.Id, challenge.Purpose == MfaChallengePurpose.Enrollment ? AccountActivityKind.MfaEnabled
                 : challenge.Purpose == MfaChallengePurpose.RecoveryEnrollment ? AccountActivityKind.MfaRecovered : AccountActivityKind.MfaRebound);
+            if (!accountManagement) RecordCompletedLogin(challenge, user);
             return Success(new MfaAuthenticationResult(ToAuthenticated(user), new(challenge.PrimaryMethod, challenge.PrimaryAuthenticatedAt,
                 MfaSource.Totp, clock.GetUtcNow(), credential.Id), challenge.ReturnPath, codes));
         }, ct);
@@ -284,14 +286,24 @@ public sealed partial class MfaAuthenticationStore(NoCtfDbContext db, IMfaCrypto
         && (value.OwnerId == userId || value.Collaborators.Any(member => member.UserId == userId && (member.Role == CompetitionCollaboratorRole.Manager || member.Role == CompetitionCollaboratorRole.Judge))), ct);
     private static AuthenticatedUser ToAuthenticated(User user) => new(user.Id, user.UserName, user.Role, user.Kind, user.TokenVersion, user.EmailVerifiedAt is not null);
     private static bool MailConfigured(PlatformSettings settings) => settings.EmailSmtpHost.Length > 0 && settings.EmailSmtpFromAddress.Length > 0
-        && settings.EmailSmtpPort > 0 && settings.EmailSmtpSecurityMode is not null && Uri.TryCreate(settings.EmailPublicBaseUrl, UriKind.Absolute, out _);
+        && settings.EmailSmtpPort is > 0 and <= 65535 && settings.EmailSmtpSecurityMode is not null
+        && (string.IsNullOrWhiteSpace(settings.EmailSmtpUserName) || settings.EmailSmtpPasswordCiphertext is { Length: > 0 })
+        && Uri.TryCreate(settings.EmailPublicBaseUrl, UriKind.Absolute, out var address) && address.Scheme is "http" or "https";
     private static string FailureKey(string kind, string value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"rate:mfa-failure:{kind}:{value}")));
     private static string SafeReturnPath(string path) => path.StartsWith('/') && !path.StartsWith("//", StringComparison.Ordinal) && !path.Contains('\\') ? path : "/";
     private static string ProvisioningUri(string issuer, string account, string secret) => $"otpauth://totp/{Uri.EscapeDataString(issuer)}:{Uri.EscapeDataString(account)}?secret={secret}&issuer={Uri.EscapeDataString(issuer)}&algorithm=SHA1&digits=6&period=30";
-    private static MfaFlowView View(MfaChallenge challenge, string name, bool recovery, string? secret = null, string? uri = null) =>
-        new(challenge.Id, challenge.Purpose, challenge.ExpiresAt, Math.Max(0, 5 - challenge.FailedAttempts), name, recovery, challenge.ReturnPath, secret, uri, challenge.PrimaryAuthenticatedAt == default);
+    private static MfaFlowView View(MfaChallenge challenge, string name, bool recovery, string? secret = null, string? uri = null, bool mail = false) =>
+        new(challenge.Id, challenge.Purpose, challenge.ExpiresAt, Math.Max(0, 5 - challenge.FailedAttempts), name, recovery, challenge.ReturnPath, secret, uri, challenge.PrimaryAuthenticatedAt == default, mail);
     private static OperationResult<T, MfaFailure> Failure<T>(MfaFailure failure) => OperationResult<T, MfaFailure>.Failure(failure, "MFA operation could not be completed.");
     private static OperationResult<T, MfaFailure> Success<T>(T value) => OperationResult<T, MfaFailure>.Success(value);
+    private void RecordCompletedLogin(MfaChallenge challenge, User user)
+    {
+        var notification = challenge.PrimaryProviderId is { } provider
+            ? Privacy.AuthenticationActivity.CreateSso(user.Id, provider, true, source?.Address, clock.GetUtcNow())
+            : Privacy.AuthenticationActivity.Create(user.Id, AccountActivityKind.LoggedIn, source?.Address, clock.GetUtcNow());
+        notification.UserId = user.Id; db.Notifications.Add(notification);
+    }
+
     private void SecurityEvent(Guid userId, AccountActivityKind action, Guid? actor = null)
     {
         var notification = Privacy.AuthenticationActivity.Create(actor ?? userId, action, source?.Address, clock.GetUtcNow());

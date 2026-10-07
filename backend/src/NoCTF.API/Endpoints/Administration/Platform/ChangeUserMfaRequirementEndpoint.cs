@@ -17,7 +17,9 @@ public sealed class ChangeUserMfaRequirementValidator : Validator<ChangeUserMfaR
 public sealed class ChangeUserMfaRequirementEndpoint(IMfaManagementStore management, MfaBrowserFlow browser, IOptions<RefreshHttpOptions> options)
     : Endpoint<ChangeUserMfaRequirementRequest, Results<Ok<MfaChangeResult>, ProblemHttpResult>>
 {
-    public override void Configure() { Patch("/admin/platform/users/{userId}/mfa-requirement"); AuthSchemes("Bearer"); Roles("Administrator"); }
+    public override void Configure() { Patch("/admin/platform/users/{userId}/mfa-requirement"); AuthSchemes("Bearer"); Roles("Administrator");
+        Description(builder => builder.WithName("AdminPlatformMfaChangeUserRequirement"));
+        Summary(summary => { summary.Summary = "Changes an account MFA requirement for a human target after administrator local second-factor verification."; summary.Description = "Changes an account MFA requirement for a human target after administrator local second-factor verification."; }); }
     public override async Task<Results<Ok<MfaChangeResult>, ProblemHttpResult>> ExecuteAsync(ChangeUserMfaRequirementRequest request, CancellationToken ct)
     {
         HttpContext.Response.Headers.CacheControl = "private, no-store";

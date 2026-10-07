@@ -7,7 +7,7 @@ namespace NoCTF.Domain.Identity.Mfa;
 public enum MfaChallengePurpose : short { Login, Enrollment, Rebind, RecoveryGrant, RecoveryEnrollment, StepUp }
 public enum MfaChallengeState : short { Pending, Completed, Cancelled, Failed, Verified }
 public enum MfaOperation : short { EnableTotp, RebindTotp, RegenerateRecoveryCodes, DisableTotp, ChangePolicy, ChangeOidcTrust, ChangeAccountRequirement, GrantRecovery }
-public enum MfaMailState : short { None, Pending, Sent }
+public enum MfaMailState : short { None, Pending, Sent, Sending }
 
 [Table("mfa_challenges")]
 public sealed class MfaChallenge : IConcurrencyTracked
@@ -37,6 +37,7 @@ public sealed class MfaChallenge : IConcurrencyTracked
     [Length(32, 32)] public byte[]? RecoveryGrantSha256 { get; set; }
     [MaxLength(256)] public byte[]? RecoveryGrantCiphertext { get; set; }
     public MfaMailState MailState { get; set; }
+    public DateTimeOffset? MailAttemptedAt { get; set; }
     [MaxLength(2048)] public string ReturnPath { get; set; } = "/";
     [MaxLength(1024)] public string? Reason { get; set; }
     public Guid ConcurrencyStamp { get; set; } = Guid.NewGuid();

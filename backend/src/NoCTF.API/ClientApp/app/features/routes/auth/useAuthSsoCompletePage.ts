@@ -71,7 +71,7 @@ export function useAuthSsoCompletePage() {
     error.value = null
     try {
       const returnPath = await auth.completeSsoLogin(flowId.value)
-      toast.success(describeMessage('sso.loginSuccessful'))
+      if (returnPath !== '/auth/mfa') toast.success(describeMessage('sso.loginSuccessful'))
       await navigateTo(returnPath)
     }
     catch (requestError) {

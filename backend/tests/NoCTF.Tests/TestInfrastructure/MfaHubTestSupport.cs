@@ -15,7 +15,7 @@ internal static class MfaHubTestSupport
         store.ValidateContextsAsync(Arg.Any<IReadOnlyList<MfaContextValidationRequest>>(), Arg.Any<CancellationToken>())
             .Returns(call => (IReadOnlyDictionary<string, MfaFailure?>)call.Arg<IReadOnlyList<MfaContextValidationRequest>>()!.ToDictionary(value => value.Key, _ => (MfaFailure?)null));
         var services = new ServiceCollection().AddSingleton(store).BuildServiceProvider();
-        var guard = new MfaConnectionGuard(services.GetRequiredService<IServiceScopeFactory>(), TimeProvider.System);
+        var guard = new MfaConnectionGuard(new NoCTF.API.Composition.ScopedMfaConnectionContextValidator(services.GetRequiredService<IServiceScopeFactory>()), TimeProvider.System);
         foreach (var connection in connections)
         {
             var context = Substitute.For<HubCallerContext>();

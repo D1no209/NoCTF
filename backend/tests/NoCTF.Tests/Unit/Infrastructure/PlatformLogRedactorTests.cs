@@ -5,6 +5,17 @@ namespace NoCTF.Tests.Unit.Infrastructure;
 public sealed class PlatformLogRedactorTests
 {
     [Test]
+    public async Task Mfa_codes_and_provisioning_material_are_redacted()
+    {
+        const string code = "123456";
+        const string recovery = "12345678-ABCDEF00-12345678-ABCDEF00";
+        var result = PlatformLogRedactor.Redact($"code={code} recoveryCode={recovery} otpauth://totp/NoCTF:user?secret=EXAMPLEKEY&issuer=NoCTF", []);
+        await Assert.That(result).DoesNotContain(code);
+        await Assert.That(result).DoesNotContain(recovery);
+        await Assert.That(result).DoesNotContain("EXAMPLEKEY");
+    }
+
+    [Test]
     public async Task Secrets_and_flags_are_redacted_before_export()
     {
         const string password = "password-value";

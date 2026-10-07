@@ -21,7 +21,8 @@ public sealed record PlatformUserResponse(
     bool EmailVerified,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    PlatformUserSsoBindingResponse? SsoBinding = null);
+    PlatformUserSsoBindingResponse? SsoBinding = null,
+    bool MfaRequired = false);
 
 public sealed record PlatformUserSsoBindingResponse(
     Guid ProviderId,

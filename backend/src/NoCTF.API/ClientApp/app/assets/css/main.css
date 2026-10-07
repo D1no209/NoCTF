@@ -1216,3 +1216,8 @@ body:has([data-modal-scroll-lock]) {
 }
 [data-slot='terminal-caret'] { position: absolute; inset-inline-start: 0; top: 0; pointer-events: none; color: var(--primary); font: var(--terminal-font); }
 [data-slot='terminal-command'][data-disabled] { color: var(--muted-foreground); opacity: 0.6; cursor: not-allowed; }
+
+:root {
+  --qr-code-dark: oklch(0 0 0);
+  --qr-code-light: oklch(1 0 0);
+}

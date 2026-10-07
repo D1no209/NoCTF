@@ -125,7 +125,7 @@ public sealed class OidcSsoProtocolAdapter(ISsoBackchannel backchannel, TimeProv
                 oidc.Issuer,
                 subject!,
                 NormalizeDisplayName(displayName),
-                oidc.MfaTrust?.Verify(provider.ProviderId, principal.FindFirstValue("acr"), ReadAmr(validated), ReadAuthenticationTime(principal), clock.GetUtcNow())));
+                oidc.MfaTrust?.Verify(provider.ProviderId, principal.FindFirstValue("acr"), principal.FindAll("amr").Select(claim => claim.Value).ToArray(), ReadAuthenticationTime(principal), clock.GetUtcNow())));
         }
         catch (Exception exception) when (exception is SecurityTokenException
             or JsonException
@@ -136,8 +136,6 @@ public sealed class OidcSsoProtocolAdapter(ISsoBackchannel backchannel, TimeProv
         }
     }
 
-    private static IReadOnlyList<string> ReadAmr(JwtSecurityToken token) => token.Payload.TryGetValue("amr", out var value)
-        && value is IEnumerable<object> items ? items.OfType<string>().ToArray() : [];
     private static DateTimeOffset? ReadAuthenticationTime(ClaimsPrincipal principal)
     {
         if (!long.TryParse(principal.FindFirstValue("auth_time"), out var time)) return null;

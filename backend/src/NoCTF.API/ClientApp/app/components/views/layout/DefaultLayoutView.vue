@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { DefaultLayoutViewState } from '~/features/shell/useDefaultLayout'
 
 const viewProps = defineProps<{ state: DefaultLayoutViewState }>()
-const { ShieldAlert, isHome, routePath, wallpaperActive, wallpaperStyle, isLoggedIn, impersonation, impersonationEnding, impersonationExpiresAt, endImpersonation, configuration, platformError, platformLoading, ensureLoaded, t, navItems, isActive, LanguageToggle, ThemeToggle, ThemePalettePanel, AccountPanel } = toRefs(viewProps.state)
+const { ShieldAlert, isHome, restrictedMfa, routePath, wallpaperActive, wallpaperStyle, isLoggedIn, impersonation, impersonationEnding, impersonationExpiresAt, endImpersonation, configuration, platformError, platformLoading, ensureLoaded, t, navItems, isActive, LanguageToggle, ThemeToggle, ThemePalettePanel, AccountPanel } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -17,7 +17,7 @@ const { ShieldAlert, isHome, routePath, wallpaperActive, wallpaperStyle, isLogge
       aria-hidden="true"
     />
     <div data-slot="default-layout-foreground" class="flex h-full min-h-0 flex-col overflow-hidden">
-    <header class="pointer-events-none sticky top-0 z-40">
+    <header v-if="!restrictedMfa" class="pointer-events-none sticky top-0 z-40">
       <div data-slot="topbar-frame" class="mx-auto grid h-20 w-full max-w-[96rem] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 md:px-6">
         <div data-slot="topbar-capsule" data-position="left">
           <NuxtLink to="/" class="flex min-w-0 items-center gap-2.5 font-mono text-base font-semibold tracking-tight" :aria-label="configuration?.name ?? $t('common.label.noctf')">

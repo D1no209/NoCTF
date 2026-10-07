@@ -2318,6 +2318,10 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("failed_attempts");
 
+                    b.Property<long?>("MailAttemptedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("mail_attempted_at");
+
                     b.Property<short>("MailState")
                         .HasColumnType("smallint")
                         .HasColumnName("mail_state");

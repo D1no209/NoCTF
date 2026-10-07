@@ -12,7 +12,11 @@ public sealed class MfaMailHandler(NoCtfDbContext db, PlatformSecretProtector pr
     public async Task Handle(SendMfaMail message, CancellationToken ct)
     {
         var challenge = await db.MfaChallenges.SingleOrDefaultAsync(value => value.Id == message.ChallengeId, ct);
-        if (challenge is null || challenge.MailState != MfaMailState.Pending) return;
+        if (challenge is null || challenge.MailState is MfaMailState.None or MfaMailState.Sent
+            || challenge.MailState == MfaMailState.Sending && challenge.MailAttemptedAt > clock.GetUtcNow().AddMinutes(-5)) return;
+        challenge.MailState = MfaMailState.Sending; challenge.MailAttemptedAt = clock.GetUtcNow();
+        try { await db.SaveChangesAsync(ct); }
+        catch (DbUpdateConcurrencyException) { db.ChangeTracker.Clear(); return; }
         if (challenge.Purpose == MfaChallengePurpose.RecoveryGrant)
         {
             if (challenge.State != MfaChallengeState.Pending || challenge.ExpiresAt <= clock.GetUtcNow() || challenge.RecoveryGrantCiphertext is null)
@@ -24,7 +28,7 @@ public sealed class MfaMailHandler(NoCtfDbContext db, PlatformSecretProtector pr
         else
         {
             var operation = challenge.Operation ?? (challenge.Purpose == MfaChallengePurpose.Enrollment ? MfaOperation.EnableTotp : MfaOperation.RebindTotp);
-            _ = await delivery.SendSecurityNotificationAsync(challenge.UserId, operation, ct);
+            _ = await delivery.SendSecurityNotificationAsync(operation == MfaOperation.ChangeAccountRequirement ? challenge.TargetResourceId!.Value : challenge.UserId, operation, ct);
         }
         challenge.MailState = MfaMailState.Sent; challenge.RecoveryGrantCiphertext = null;
         await db.SaveChangesAsync(ct);

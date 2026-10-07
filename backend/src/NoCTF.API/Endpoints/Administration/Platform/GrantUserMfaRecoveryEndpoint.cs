@@ -20,7 +20,9 @@ public sealed class GrantUserMfaRecoveryValidator : Validator<GrantUserMfaRecove
 public sealed class GrantUserMfaRecoveryEndpoint(IMfaManagementStore management, MfaBrowserFlow browser, IOptions<RefreshHttpOptions> options)
     : Endpoint<GrantUserMfaRecoveryRequest, Results<Ok<MfaRecoveryGrant>, ProblemHttpResult>>
 {
-    public override void Configure() { Post("/admin/platform/users/{userId}/mfa-recovery"); AuthSchemes("Bearer"); Roles("Administrator"); }
+    public override void Configure() { Post("/admin/platform/users/{userId}/mfa-recovery"); AuthSchemes("Bearer"); Roles("Administrator");
+        Description(builder => builder.WithName("AdminPlatformMfaGrantUserRecovery"));
+        Summary(summary => { summary.Summary = "Creates a single-use restricted email recovery authorization after manual review and local administrator verification."; summary.Description = "Creates a single-use restricted email recovery authorization after manual review and local administrator verification."; }); }
     public override async Task<Results<Ok<MfaRecoveryGrant>, ProblemHttpResult>> ExecuteAsync(GrantUserMfaRecoveryRequest request, CancellationToken ct)
     {
         HttpContext.Response.Headers.CacheControl = "private, no-store";

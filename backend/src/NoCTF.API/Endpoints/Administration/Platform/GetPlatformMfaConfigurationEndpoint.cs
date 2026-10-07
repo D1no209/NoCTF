@@ -17,7 +17,9 @@ public sealed record PlatformMfaConfigurationResponse(
 public sealed class GetPlatformMfaConfigurationEndpoint(IMfaManagementStore store)
     : EndpointWithoutRequest<Results<Ok<PlatformMfaConfigurationResponse>, ProblemHttpResult>>
 {
-    public override void Configure() { Get("/admin/platform/mfa"); AuthSchemes("Bearer"); Roles("Administrator"); }
+    public override void Configure() { Get("/admin/platform/mfa"); AuthSchemes("Bearer"); Roles("Administrator");
+        Description(builder => builder.WithName("AdminPlatformMfaGetConfiguration"));
+        Summary(summary => { summary.Summary = "Reads the platform MFA policy and OIDC trust rules for human administrators."; summary.Description = "Reads the platform MFA policy and OIDC trust rules for human administrators."; }); }
     public override async Task<Results<Ok<PlatformMfaConfigurationResponse>, ProblemHttpResult>> ExecuteAsync(CancellationToken ct)
     {
         HttpContext.Response.Headers.CacheControl = "private, no-store";

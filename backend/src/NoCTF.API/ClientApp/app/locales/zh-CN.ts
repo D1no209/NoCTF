@@ -8,6 +8,7 @@ import AccountMessages from './catalogs/zh-CN/account.json'
 import NotificationsMessages from './catalogs/zh-CN/notifications.json'
 import RuntimeMessages from './catalogs/zh-CN/runtime.json'
 import WriteupsMessages from './catalogs/zh-CN/writeups.json'
+import MfaMessages from './catalogs/zh-CN/mfa.json'
 import ApiMessages from './catalogs/zh-CN/api.json'
 
 const translatedMessages = {
@@ -21,6 +22,7 @@ const translatedMessages = {
   ...RuntimeMessages,
   ...WriteupsMessages,
   ...ApiMessages,
+  ...MfaMessages,
 }
 export const chineseMessages = {
   ...englishMessages,

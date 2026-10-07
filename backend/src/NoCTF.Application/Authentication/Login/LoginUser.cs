@@ -11,7 +11,8 @@ public sealed record LoginCommand(string Login, string Password, MfaBrowserCrede
 public enum LoginFailureCode
 {
     InvalidCredentials,
-    DependencyUnavailable
+    DependencyUnavailable,
+    InvalidRecoveryGrant
 }
 
 public sealed class LoginUser(
@@ -43,7 +44,7 @@ public sealed class LoginUser(
         var completion = await complete.ExecuteAsync(new(user, AuthenticationMethod.Password, timeProvider.GetUtcNow()), cancellationToken, command.Recovery);
         if (!completion.Succeeded)
             return OperationResult<AuthenticationCompletion, LoginFailureCode>.Failure(
-                completion.FailureCode == MfaFailure.AccountUnavailable ? LoginFailureCode.InvalidCredentials : LoginFailureCode.DependencyUnavailable,
+                completion.FailureCode switch { MfaFailure.AccountUnavailable => LoginFailureCode.InvalidCredentials, MfaFailure.InvalidRecoveryGrant => LoginFailureCode.InvalidRecoveryGrant, _ => LoginFailureCode.DependencyUnavailable },
                 "Authentication could not be completed.");
         if (completion.Value!.State == AuthenticationState.Authenticated && activities is not null)
             await activities.RecordLoginAsync(user.Id, timeProvider.GetUtcNow(), cancellationToken);

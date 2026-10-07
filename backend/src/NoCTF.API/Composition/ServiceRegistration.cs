@@ -212,6 +212,7 @@ public static class ServiceRegistration
         var requestAdmissionLimits = configuration
             .GetSection("RequestAdmission")
             .Get<RequestAdmissionOptions>() ?? new RequestAdmissionOptions();
+        services.AddSingleton<IMfaConnectionContextValidator, ScopedMfaConnectionContextValidator>();
         services.AddSingleton<MfaConnectionGuard>();
         services.AddSingleton<MfaHubFilter>();
         services.AddSignalR(options => options.AddFilter<MfaHubFilter>());

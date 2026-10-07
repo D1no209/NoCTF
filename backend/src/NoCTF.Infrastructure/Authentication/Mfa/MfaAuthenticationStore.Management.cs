@@ -17,7 +17,9 @@ public sealed partial class MfaAuthenticationStore
         if (account is null || account.User.Kind != UserKind.Human || account.User.Role != UserRole.Administrator
             || account.User.TokenVersion != actor.TokenVersion) return Failure<MfaPlatformConfiguration>(MfaFailure.NotApplicable);
         var settings = await SettingsAsync(ct);
-        var providers = settings.SsoConfiguration.Providers.OfType<NoCTF.Domain.Platform.OidcSsoProviderConfiguration>()
+        var configured = await db.Set<NoCTF.Domain.Platform.OidcSsoProviderConfiguration>().AsNoTracking()
+            .Include(value => value.MfaAcrEntries).Include(value => value.MfaAmrGroups).ThenInclude(value => value.Values).AsSplitQuery().ToArrayAsync(ct);
+        var providers = configured
             .Select(value => new MfaProviderTrust(value.Id, value.Name,
                 new OidcMfaTrust(value.MfaTrustEnabled, value.MfaTrustPolicyId, value.MfaAuthenticationMaxAgeSeconds,
                     value.MfaAcrEntries.OrderBy(member => member.Position).Select(member => member.Value).ToArray(),
@@ -32,7 +34,7 @@ public sealed partial class MfaAuthenticationStore
         if (account is null || account.User.Kind != UserKind.Human || account.User.TokenVersion != actor.TokenVersion) return Failure<MfaCreatedFlow>(MfaFailure.NotApplicable);
         if (account.CredentialId is not null) return Failure<MfaCreatedFlow>(MfaFailure.AlreadyEnrolled);
         if (!actor.Authentication.IsInteractive || clock.GetUtcNow() - actor.Authentication.AuthenticatedAt > TimeSpan.FromMinutes(5)) return Failure<MfaCreatedFlow>(MfaFailure.PrimaryAuthenticationRequired);
-        var (flow, browser) = await CreateFlowAsync(new(account.User, actor.Authentication.Method, actor.Authentication.AuthenticatedAt), MfaChallengePurpose.Enrollment, ct);
+        var (flow, browser) = await CreateFlowAsync(new(account.User, actor.Authentication.Method, actor.Authentication.AuthenticatedAt, ProviderId: actor.Authentication.ProviderId), MfaChallengePurpose.Enrollment, ct);
         var challenge = await db.MfaChallenges.SingleAsync(value => value.Id == flow.Id, ct);
         challenge.Operation = MfaOperation.EnableTotp;
         await db.SaveChangesAsync(ct);
@@ -45,7 +47,7 @@ public sealed partial class MfaAuthenticationStore
         if (account is null || account.User.Kind != UserKind.Human || account.User.TokenVersion != actor.TokenVersion || !actor.Authentication.IsInteractive) return Failure<MfaCreatedFlow>(MfaFailure.NotApplicable);
         if (account.CredentialId is null) return Failure<MfaCreatedFlow>(MfaFailure.LocalMfaRequired);
         if (IsAdministrative(operation) && account.User.Role != UserRole.Administrator) return Failure<MfaCreatedFlow>(MfaFailure.NotApplicable);
-        var (flow, browser) = await CreateFlowAsync(new(account.User, actor.Authentication.Method, actor.Authentication.AuthenticatedAt), MfaChallengePurpose.StepUp, ct);
+        var (flow, browser) = await CreateFlowAsync(new(account.User, actor.Authentication.Method, actor.Authentication.AuthenticatedAt, ProviderId: actor.Authentication.ProviderId), MfaChallengePurpose.StepUp, ct);
         var challenge = await db.MfaChallenges.SingleAsync(value => value.Id == flow.Id, ct);
         challenge.Operation = operation; challenge.TargetResourceId = target;
         await db.SaveChangesAsync(ct);
@@ -94,7 +96,7 @@ public sealed partial class MfaAuthenticationStore
             var verified = await ProofAsync(actor, proof, MfaOperation.RebindTotp, actor.UserId, ct);
             if (verified.Failure is { } failure) return Failure<MfaCreatedFlow>(failure);
             verified.Challenge!.State = MfaChallengeState.Completed;
-            var (flow, browser) = await CreateFlowAsync(new(ToAuthenticated(verified.User!), actor.Authentication.Method, actor.Authentication.AuthenticatedAt), MfaChallengePurpose.Rebind, ct);
+            var (flow, browser) = await CreateFlowAsync(new(ToAuthenticated(verified.User!), actor.Authentication.Method, actor.Authentication.AuthenticatedAt, ProviderId: actor.Authentication.ProviderId), MfaChallengePurpose.Rebind, ct);
             var challenge = await db.MfaChallenges.SingleAsync(value => value.Id == flow.Id, ct);
             challenge.Operation = MfaOperation.RebindTotp;
             return Success(new MfaCreatedFlow(flow, browser));
@@ -153,6 +155,7 @@ public sealed partial class MfaAuthenticationStore
             if (user is null || user.Kind != UserKind.Human) return Failure<MfaChangeResult>(MfaFailure.NotApplicable);
             user.MfaRequired = required; user.TokenVersion = checked(user.TokenVersion + 1);
             verified.Challenge!.State = MfaChallengeState.Completed;
+            verified.Challenge.MailState = MfaMailState.Pending;
             SecurityEvent(user.Id, NoCTF.Application.Authentication.Privacy.AccountActivityKind.MfaRequirementChanged, actor.UserId);
             return Success(new MfaChangeResult(user.Id, user.TokenVersion));
         }, ct);
@@ -188,7 +191,7 @@ public sealed partial class MfaAuthenticationStore
             var hash = SHA256.HashData(Encoding.UTF8.GetBytes(token));
             var grant = await db.MfaChallenges.SingleOrDefaultAsync(value => value.Purpose == MfaChallengePurpose.RecoveryGrant && value.RecoveryGrantSha256 == hash, ct);
             if (grant is null || grant.State != MfaChallengeState.Pending || grant.ExpiresAt <= clock.GetUtcNow()) return Failure<MfaCreatedFlow>(MfaFailure.InvalidRecoveryGrant);
-            var user = await db.Users.SingleOrDefaultAsync(value => value.Id == grant.UserId && value.AccountStatus == UserAccountStatus.Active && value.Kind == UserKind.Human && value.TokenVersion == grant.TokenVersion, ct);
+            var user = await db.Users.SingleOrDefaultAsync(value => value.Id == grant.UserId && value.AccountStatus == UserAccountStatus.Active && value.Kind == UserKind.Human && value.TokenVersion == grant.TokenVersion && value.EmailVerifiedAt != null, ct);
             if (user is null || grant.PolicyStamp != (await SettingsAsync(ct)).MfaPolicyStamp) return Failure<MfaCreatedFlow>(MfaFailure.InvalidRecoveryGrant);
             grant.State = MfaChallengeState.Completed; grant.RecoveryGrantCiphertext = null; grant.MailState = MfaMailState.Sent;
             var secret = crypto.GenerateBrowserSecret(); var now = clock.GetUtcNow();

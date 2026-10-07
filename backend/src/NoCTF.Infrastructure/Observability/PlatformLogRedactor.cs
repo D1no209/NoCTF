@@ -25,6 +25,7 @@ public static partial class PlatformLogRedactor
                 result = result.Replace(sensitiveValue, Redacted, StringComparison.Ordinal);
         }
 
+        result = TotpUriRegex().Replace(result, Redacted);
         result = BearerTokenRegex().Replace(result, "Bearer " + Redacted);
         result = JwtRegex().Replace(result, Redacted);
         result = FlagPayloadRegex().Replace(result, Redacted);
@@ -53,7 +54,11 @@ public static partial class PlatformLogRedactor
             || normalized.Contains("authorization", StringComparison.Ordinal)
             || normalized.Contains("cookie", StringComparison.Ordinal)
             || normalized.Contains("userid", StringComparison.Ordinal)
-            || normalized.Contains("smtpuser", StringComparison.Ordinal);
+            || normalized.Contains("smtpuser", StringComparison.Ordinal)
+            || normalized.Equals("code", StringComparison.Ordinal)
+            || normalized.Contains("recoverycode", StringComparison.Ordinal)
+            || normalized.Contains("totp", StringComparison.Ordinal)
+            || normalized.Contains("provisioninguri", StringComparison.Ordinal);
     }
 
     [GeneratedRegex(
@@ -82,7 +87,10 @@ public static partial class PlatformLogRedactor
     private static partial Regex UriUserInfoRegex();
 
     [GeneratedRegex(
-        "(?i)(\\\"?(?:password|passwd|pwd|(?:access[_-]?|refresh[_-]?|internal[_-]?)?token|(?:client[_-]?)?secret|credential|authorization|cookie|smtp(?:user(?:name)?|password)?)\\\"?)\\s*[:=]\\s*(?:\\\"[^\\\"]*\\\"|'[^']*'|[^\\s,;]+)",
+        "(?i)(\\\"?(?:password|passwd|pwd|code|totp|recovery[_-]?code|provisioning[_-]?uri|(?:access[_-]?|refresh[_-]?|internal[_-]?)?token|(?:client[_-]?)?secret|credential|authorization|cookie|smtp(?:user(?:name)?|password)?)\\\"?)\\s*[:=]\\s*(?:\\\"[^\\\"]*\\\"|'[^']*'|[^\\s,;]+)",
         RegexOptions.CultureInvariant | RegexOptions.NonBacktracking)]
     private static partial Regex SecretAssignmentRegex();
+
+    [GeneratedRegex("(?i)otpauth://[^\\s\"<>]+", RegexOptions.CultureInvariant | RegexOptions.NonBacktracking)]
+    private static partial Regex TotpUriRegex();
 }

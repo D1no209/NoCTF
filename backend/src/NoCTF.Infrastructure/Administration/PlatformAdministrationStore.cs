@@ -28,7 +28,7 @@ public sealed class PlatformAdministrationStore(
                 user.ExternalIdentity == null ? null : user.ExternalIdentity.ProviderId,
                 user.ExternalIdentity == null ? null : user.ExternalIdentity.Protocol,
                 user.ExternalIdentity == null ? null : user.ExternalIdentity.Subject,
-                user.ExternalIdentity == null ? null : user.ExternalIdentity.BoundAt))
+                user.ExternalIdentity == null ? null : user.ExternalIdentity.BoundAt, user.MfaRequired))
             .ToListAsync(ct);
 
     public async Task<PlatformUserListPage> ListUsersPageAsync(
@@ -69,7 +69,7 @@ public sealed class PlatformAdministrationStore(
                 user.ExternalIdentity == null ? null : user.ExternalIdentity.ProviderId,
                 user.ExternalIdentity == null ? null : user.ExternalIdentity.Protocol,
                 user.ExternalIdentity == null ? null : user.ExternalIdentity.Subject,
-                user.ExternalIdentity == null ? null : user.ExternalIdentity.BoundAt))
+                user.ExternalIdentity == null ? null : user.ExternalIdentity.BoundAt, user.MfaRequired))
             .ToListAsync(ct);
         return new(items, total);
     }
@@ -84,7 +84,7 @@ public sealed class PlatformAdministrationStore(
                 user.ExternalIdentity == null ? null : user.ExternalIdentity.ProviderId,
                 user.ExternalIdentity == null ? null : user.ExternalIdentity.Protocol,
                 user.ExternalIdentity == null ? null : user.ExternalIdentity.Subject,
-                user.ExternalIdentity == null ? null : user.ExternalIdentity.BoundAt))
+                user.ExternalIdentity == null ? null : user.ExternalIdentity.BoundAt, user.MfaRequired))
             .SingleOrDefaultAsync(ct);
 
     public async Task<CreateBotResult> CreateBotAsync(
@@ -393,7 +393,7 @@ public sealed class PlatformAdministrationStore(
             user.ExternalIdentityProviderId,
             user.ExternalIdentityProtocol,
             user.ExternalIdentitySubject,
-            user.ExternalIdentityBoundAt);
+            user.ExternalIdentityBoundAt, user.MfaRequired);
 
     private void RecordAccountStatusChange(
         User user,

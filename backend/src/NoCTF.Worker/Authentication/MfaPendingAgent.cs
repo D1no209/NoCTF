@@ -18,7 +18,8 @@ public sealed class MfaPendingAgent(IServiceScopeFactory scopes, TimeProvider cl
             try
             {
                 await using var scope = scopes.CreateAsyncScope(); var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
-                var pending = await db.MfaChallenges.AsNoTracking().Where(value => value.MailState == MfaMailState.Pending).OrderBy(value => value.CreatedAt).Take(100).Select(value => value.Id).ToArrayAsync(stoppingToken);
+                var pending = await db.MfaChallenges.AsNoTracking().Where(value => value.MailState == MfaMailState.Pending
+                    || value.MailState == MfaMailState.Sending && value.MailAttemptedAt <= clock.GetUtcNow().AddMinutes(-5)).OrderBy(value => value.CreatedAt).Take(100).Select(value => value.Id).ToArrayAsync(stoppingToken);
                 var publisher = scope.ServiceProvider.GetRequiredService<IPostCommitMessagePublisher>();
                 foreach (var id in pending) await publisher.PublishAsync(new SendMfaMail(id));
                 var expiredSecrets = await db.MfaChallenges.Where(value => value.ExpiresAt <= clock.GetUtcNow()
@@ -27,9 +28,10 @@ public sealed class MfaPendingAgent(IServiceScopeFactory scopes, TimeProvider cl
                 {
                     challenge.PendingSecretCiphertext = null;
                     challenge.RecoveryGrantCiphertext = null;
+                    if (challenge.Purpose == MfaChallengePurpose.RecoveryGrant) challenge.MailState = MfaMailState.Sent;
                     if (challenge.State is MfaChallengeState.Pending or MfaChallengeState.Verified) challenge.State = MfaChallengeState.Failed;
                 }
-                var expired = await db.MfaChallenges.Where(value => value.ExpiresAt < clock.GetUtcNow().AddDays(-1) && value.MailState != MfaMailState.Pending).Take(500).ToArrayAsync(stoppingToken);
+                var expired = await db.MfaChallenges.Where(value => value.ExpiresAt < clock.GetUtcNow().AddDays(-1) && value.MailState != MfaMailState.Pending && value.MailState != MfaMailState.Sending).Take(500).ToArrayAsync(stoppingToken);
                 db.MfaChallenges.RemoveRange(expired); await db.SaveChangesAsync(stoppingToken);
             }
             catch (Exception exception) when (!stoppingToken.IsCancellationRequested) { logger.LogWarning(exception, "MFA pending work will be retried."); }

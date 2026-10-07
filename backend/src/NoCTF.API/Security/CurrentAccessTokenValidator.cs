@@ -23,6 +23,8 @@ public sealed class CurrentAccessTokenValidator(IMfaAuthenticationStore mfa)
         var version = principal?.FindFirstValue("token_version");
         if (principal is null || !Guid.TryParse(subject, out var userId) || !int.TryParse(version, out var tokenVersion)
             || principal.FindFirstValue("token_type") != "access") return MfaFailure.AccountUnavailable;
-        return await mfa.ValidateContextAsync(userId, tokenVersion, AuthenticationContextClaims.Read(principal), cancellationToken);
+        try { return await mfa.ValidateContextAsync(userId, tokenVersion, AuthenticationContextClaims.Read(principal), cancellationToken); }
+        catch (Exception exception) when (exception is System.Data.Common.DbException or Microsoft.EntityFrameworkCore.DbUpdateException or System.Security.Cryptography.CryptographicException)
+        { return MfaFailure.DependencyUnavailable; }
     }
 }

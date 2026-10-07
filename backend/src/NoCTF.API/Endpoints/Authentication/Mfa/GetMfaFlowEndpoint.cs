@@ -13,10 +13,10 @@ namespace NoCTF.API.Endpoints.Authentication.Mfa;
 public sealed record MfaFlowResponse(Guid Id,
     [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<MfaChallengePurpose>))] MfaChallengePurpose Purpose,
     DateTimeOffset ExpiresAt, int RemainingAttempts, string UserName, bool RecoveryAvailable, string ReturnPath,
-    string? Secret, string? ProvisioningUri, bool PrimaryAuthenticationRequired)
+    string? Secret, string? ProvisioningUri, bool PrimaryAuthenticationRequired, bool RecoveryMailAvailable)
 {
     public static MfaFlowResponse From(MfaFlowView value) => new(value.Id, value.Purpose, value.ExpiresAt, value.RemainingAttempts,
-        value.UserName, value.RecoveryAvailable, value.ReturnPath, value.Secret, value.ProvisioningUri, value.PrimaryAuthenticationRequired);
+        value.UserName, value.RecoveryAvailable, value.ReturnPath, value.Secret, value.ProvisioningUri, value.PrimaryAuthenticationRequired, value.RecoveryMailAvailable);
 }
 
 public sealed record MfaFailureResponse(
@@ -32,13 +32,14 @@ public static class MfaEndpointResults
     }, title: "MFA verification could not be completed.", extensions: new Dictionary<string, object?> { ["code"] = failure.ToString() });
 }
 
-public sealed class GetMfaFlowEndpoint(IMfaAuthenticationStore mfa, MfaBrowserFlow browser)
+public sealed class GetMfaFlowEndpoint(IMfaAuthenticationStore mfa, MfaBrowserFlow browser, IOptions<RefreshHttpOptions> options)
     : EndpointWithoutRequest<Results<Ok<MfaFlowResponse>, ProblemHttpResult>>
 {
     public override void Configure() { Get("/auth/mfa/flow"); Policies(AuthenticationRegistration.MfaFlowScheme); }
     public override async Task<Results<Ok<MfaFlowResponse>, ProblemHttpResult>> ExecuteAsync(CancellationToken ct)
     {
         HttpContext.Response.Headers.CacheControl = "private, no-store";
+        if (!RefreshRequestGuard.IsAllowed(HttpContext.Request, options.Value)) return MfaEndpointResults.Failure(MfaFailure.InvalidBrowser);
         var credential = browser.Read(HttpContext);
         if (credential is null) return MfaEndpointResults.Failure(MfaFailure.FlowExpired);
         var result = await mfa.ReadFlowAsync(credential, ct);

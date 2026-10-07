@@ -28,7 +28,9 @@ public sealed class ChangeOidcMfaTrustValidator : Validator<ChangeOidcMfaTrustRe
 public sealed class ChangeOidcMfaTrustEndpoint(IMfaManagementStore management, MfaBrowserFlow browser, IOptions<RefreshHttpOptions> options)
     : Endpoint<ChangeOidcMfaTrustRequest, Results<Ok<OidcMfaTrust>, ProblemHttpResult>>
 {
-    public override void Configure() { Put("/admin/platform/sso/providers/{providerId}/mfa-trust"); AuthSchemes("Bearer"); Roles("Administrator"); }
+    public override void Configure() { Put("/admin/platform/sso/providers/{providerId}/mfa-trust"); AuthSchemes("Bearer"); Roles("Administrator");
+        Description(builder => builder.WithName("AdminPlatformMfaChangeOidcTrust"));
+        Summary(summary => { summary.Summary = "Replaces an OIDC provider MFA trust policy and invalidates proofs issued under the previous policy."; summary.Description = "Replaces an OIDC provider MFA trust policy and invalidates proofs issued under the previous policy."; }); }
     public override async Task<Results<Ok<OidcMfaTrust>, ProblemHttpResult>> ExecuteAsync(ChangeOidcMfaTrustRequest request, CancellationToken ct)
     {
         if (!RefreshRequestGuard.IsAllowed(HttpContext.Request, options.Value)) return MfaEndpointResults.Failure(MfaFailure.InvalidBrowser);

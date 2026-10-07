@@ -7,7 +7,7 @@ namespace NoCTF.Application.Authentication.Mfa;
 public enum AuthenticationState : short { Authenticated, MfaRequired, EnrollmentRequired }
 public sealed record MfaBrowserCredential(Guid ChallengeId, string Secret);
 public sealed record MfaFlowView(Guid Id, MfaChallengePurpose Purpose, DateTimeOffset ExpiresAt, int RemainingAttempts,
-    string UserName, bool RecoveryAvailable, string ReturnPath, string? Secret = null, string? ProvisioningUri = null, bool PrimaryAuthenticationRequired = false);
+    string UserName, bool RecoveryAvailable, string ReturnPath, string? Secret = null, string? ProvisioningUri = null, bool PrimaryAuthenticationRequired = false, bool RecoveryMailAvailable = false);
 public sealed record MfaAccountSnapshot(AuthenticatedUser User, bool Mandated, bool Required, Guid PolicyStamp,
     Guid? CredentialId, int RecoveryCodesRemaining, bool RecoveryMailAvailable);
 public sealed record PrimaryAuthentication(AuthenticatedUser User, AuthenticationMethod Method, DateTimeOffset AuthenticatedAt,
