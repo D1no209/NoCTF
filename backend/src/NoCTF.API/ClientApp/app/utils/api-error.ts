@@ -50,6 +50,7 @@ export function userFacingErrorMessage(value: string | null | undefined, fallbac
 }
 
 function stableCodeMessage(code: string | undefined): MessageDescriptor | null {
+  if (code?.startsWith('Passkey') && isMessageKey(`passkeys.error.${code.slice(7)}`)) return describeMessage(`passkeys.error.${code.slice(7)}` as import('../locales/en').MessageKey)
   if (code && isMessageKey(`mfa.error.${code}`)) return describeMessage(`mfa.error.${code}` as import('../locales/en').MessageKey)
   switch (code) {
     case 'MfaRequired': return describeMessage('mfa.error.DelegationNotAllowed')

@@ -2,6 +2,8 @@ import { message as describeMessage } from '../../../utils/i18n'
 import type { UiMessage } from '../../../utils/i18n'
 import { toast } from '../../../utils/message-toast'
 import { useHumanVerification } from '~/features/security/useHumanVerification'
+import { bindViewState } from '../../shared/view-state'
+import { usePasskeyLogin } from '../../authentication/passkeys/usePasskeyLogin'
 import { useAuthThemeArtwork } from './useAuthThemeArtwork'
 import { authenticationSsoBeginLogin, authenticationSsoListProviders } from '~/api'
 import type { NoCtfapiEndpointsAuthenticationPublicSsoProviderResponse } from '~/api'
@@ -9,6 +11,7 @@ import type { NoCtfapiEndpointsAuthenticationPublicSsoProviderResponse } from '~
 /** Owns the standalone login page workflow. */
 export function useAuthLoginPage() {
   const route = useRoute()
+  const passkeys = bindViewState(usePasskeyLogin())
   const { login } = useAuth()
   const {
     request: requestHumanVerification,
@@ -124,6 +127,7 @@ export function useAuthLoginPage() {
 
   return {
     authArtwork,
+    passkeys,
     configuration,
     loginName,
     password,

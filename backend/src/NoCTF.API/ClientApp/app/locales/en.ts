@@ -7,6 +7,7 @@ import AccountMessages from './catalogs/en/account.json'
 import NotificationsMessages from './catalogs/en/notifications.json'
 import RuntimeMessages from './catalogs/en/runtime.json'
 import WriteupsMessages from './catalogs/en/writeups.json'
+import PasskeyMessages from './catalogs/en/passkeys.json'
 import MfaMessages from './catalogs/en/mfa.json'
 import ApiMessages from './catalogs/en/api.json'
 
@@ -22,5 +23,6 @@ export const englishMessages = {
   ...WriteupsMessages,
   ...ApiMessages,
   ...MfaMessages,
+  ...PasskeyMessages,
 }
 export type MessageKey = keyof typeof englishMessages

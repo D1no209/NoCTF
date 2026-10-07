@@ -235,6 +235,12 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
       for (const [key, value] of sessions) if (value === userId) sessions.delete(key)
       return new Response(null, { status: 204, headers: { 'Set-Cookie': 'noctf_mock_session=guest; Path=/; HttpOnly; SameSite=Strict', 'X-NoCTF-Mock': 'true' } })
     }
+    if (route === '/auth/passkeys/capabilities') return json({ available: true })
+    if (route === '/auth/me/passkeys' && request.method === 'GET') {
+      if (!userFor(request)) return problem(401, 'Mock session expired')
+      return json({ available: true, needsLocalProof: false, recentPrimaryAuthentication: true, maximumCredentials: 10,
+        credentials: [{ id: '00000001-1000-4000-8000-000000000001', name: 'Windows Hello', createdAt: now(), lastUsedAt: null, isBackedUp: false, isBackupEligible: false }] })
+    }
     const mfaResponse = await mfa.handle(request, route, body, p)
     if (mfaResponse) return mfaResponse
     const user = userFor(request)

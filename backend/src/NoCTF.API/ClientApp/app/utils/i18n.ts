@@ -16,6 +16,7 @@ export const localeDomains = [
   'writeups',
   'api',
   'mfa',
+  'passkeys',
 ] as const
 export type LocaleDomain = typeof localeDomains[number]
 
@@ -32,7 +33,7 @@ const catalogRevision = shallowRef(0)
 const catalogs: Record<AppLocale, LocaleCatalog> = { 'zh-CN': {}, en: {} }
 const loadedDomains: Record<AppLocale, Set<LocaleDomain>> = { 'zh-CN': new Set(), en: new Set() }
 const pendingDomains = new Map<string, Promise<void>>()
-const activeDomains = new Set<LocaleDomain>(['core', 'api', 'mfa'])
+const activeDomains = new Set<LocaleDomain>(['core', 'api', 'mfa', 'passkeys'])
 
 export function mergeLocaleCatalog(english: LocaleCatalog, translated: LocaleCatalog): LocaleCatalog {
   return { ...english, ...Object.fromEntries(Object.entries(translated).filter(([, value]) => value?.trim())) }
@@ -51,6 +52,7 @@ const catalogLoaders: Record<AppLocale, Record<LocaleDomain, () => Promise<Local
     writeups: () => import('../locales/catalogs/zh-CN/writeups.json').then(chunk => chunk.default),
     api: () => import('../locales/catalogs/zh-CN/api.json').then(chunk => chunk.default),
     mfa: () => import('../locales/catalogs/zh-CN/mfa.json').then(chunk => chunk.default),
+    passkeys: () => import('../locales/catalogs/zh-CN/passkeys.json').then(chunk => chunk.default),
   },
   'en': {
     core: () => import('../locales/catalogs/en/core.json').then(chunk => chunk.default),
@@ -64,6 +66,7 @@ const catalogLoaders: Record<AppLocale, Record<LocaleDomain, () => Promise<Local
     writeups: () => import('../locales/catalogs/en/writeups.json').then(chunk => chunk.default),
     api: () => import('../locales/catalogs/en/api.json').then(chunk => chunk.default),
     mfa: () => import('../locales/catalogs/en/mfa.json').then(chunk => chunk.default),
+    passkeys: () => import('../locales/catalogs/en/passkeys.json').then(chunk => chunk.default),
   },
 }
 
@@ -111,7 +114,7 @@ async function loadLocaleDomain(locale: AppLocale, domain: LocaleDomain): Promis
 /** Loads the core catalog before Nuxt mounts, preventing a mixed-language first frame. */
 export async function initializeLocale(): Promise<AppLocale> {
   const locale = detectLocale()
-  await Promise.all(['core', 'api', 'mfa'].map(domain => loadLocaleDomain(locale, domain as LocaleDomain)))
+  await Promise.all(['core', 'api', 'mfa', 'passkeys'].map(domain => loadLocaleDomain(locale, domain as LocaleDomain)))
   activeLocale.value = locale
   if (import.meta.client)
     document.documentElement.lang = locale

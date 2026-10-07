@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AuthLoginPageViewState } from '~/features/routes/auth/useAuthLoginPage'
 
 const viewProps = defineProps<{ state: AuthLoginPageViewState }>()
-const { authArtwork, configuration, loginName, password, error, pending, capVerification, capCanRetry, submitDisabled, submit, ssoProviders, ssoLoading, ssoPendingId, beginSso } = toRefs(viewProps.state)
+const { authArtwork, passkeys, configuration, loginName, password, error, pending, capVerification, capCanRetry, submitDisabled, submit, ssoProviders, ssoLoading, ssoPendingId, beginSso } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -53,6 +53,11 @@ const { authArtwork, configuration, loginName, password, error, pending, capVeri
             </Field>
           </FieldGroup>
         </UiForm>
+        <template v-if="passkeys.available">
+          <Separator class="my-5" />
+          <Button type="button" variant="outline" class="w-full" :disabled="passkeys.pending || pending" @click="passkeys.signIn"><Spinner v-if="passkeys.pending" data-icon="inline-start" />{{ $t('passkeys.signIn') }}</Button>
+          <Alert v-if="passkeys.error" variant="destructive"><AlertDescription>{{ $message(passkeys.error) }}</AlertDescription></Alert>
+        </template>
         <template v-if="ssoLoading || ssoProviders.length">
           <div class="my-5 flex items-center gap-3" aria-hidden="true">
             <Separator class="flex-1" />
