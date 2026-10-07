@@ -71,6 +71,8 @@ public sealed class NoCtfDbContext(
     public DbSet<AccountToken> AccountTokens => Set<AccountToken>();
     public DbSet<NoCTF.Domain.Identity.Mfa.UserTotpCredential> UserTotpCredentials => Set<NoCTF.Domain.Identity.Mfa.UserTotpCredential>();
     public DbSet<NoCTF.Domain.Identity.Mfa.UserMfaRecoveryCode> UserMfaRecoveryCodes => Set<NoCTF.Domain.Identity.Mfa.UserMfaRecoveryCode>();
+    public DbSet<NoCTF.Domain.Identity.Passkeys.UserPasskey> UserPasskeys => Set<NoCTF.Domain.Identity.Passkeys.UserPasskey>();
+    public DbSet<NoCTF.Domain.Identity.Passkeys.PasskeyCeremony> PasskeyCeremonies => Set<NoCTF.Domain.Identity.Passkeys.PasskeyCeremony>();
     public DbSet<NoCTF.Domain.Identity.Mfa.MfaChallenge> MfaChallenges => Set<NoCTF.Domain.Identity.Mfa.MfaChallenge>();
     public DbSet<SsoFlowEntity> SsoFlows => Set<SsoFlowEntity>();
     public DbSet<RequestAdmissionWindow> RequestAdmissionWindows => Set<RequestAdmissionWindow>();

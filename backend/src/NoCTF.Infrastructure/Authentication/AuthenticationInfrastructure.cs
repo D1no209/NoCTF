@@ -41,6 +41,7 @@ internal static class AuthenticationInfrastructure
                 "RunnerScoring:CallbackBaseUrl must be an absolute HTTP(S) URI.")
             .ValidateOnStart();
         services.AddNoCtfDatabaseStartup(configuration);
+        Passkeys.PasskeyInfrastructure.AddNoCtfPasskeys(services, configuration, development);
         services.AddOptions<EmailVerificationProtectionOptions>()
             .Bind(configuration.GetSection(EmailVerificationProtectionOptions.SectionName))
             .Validate(options => allowDevelopmentProtection
