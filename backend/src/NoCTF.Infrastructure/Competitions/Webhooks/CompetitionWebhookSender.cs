@@ -81,6 +81,8 @@ public sealed class CompetitionWebhookSender(
         using (response)
         {
             var code = (int)response.StatusCode;
+            if (delivery.RequireNoContent && code is >= 200 and <= 299 && code != 204)
+                throw new CompetitionWebhookTransientException("Staff webhook requires durable HTTP 204 acknowledgement.", httpStatusCode: code);
             if (code is >= 200 and <= 299)
                 return new(CompetitionWebhookSendResult.Delivered, code);
             if (response.StatusCode == HttpStatusCode.Gone)

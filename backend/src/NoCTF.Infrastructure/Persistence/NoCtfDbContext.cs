@@ -7,6 +7,7 @@ using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Progression;
 using NoCTF.Infrastructure.Competitions.Webhooks;
+using NoCTF.Infrastructure.Competitions.StaffWebhooks;
 using NoCTF.Domain.Teams;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Platform;
@@ -50,6 +51,11 @@ public sealed class NoCtfDbContext(
     public DbSet<CompetitionWebhookOutboxEvent> CompetitionWebhookOutboxEvents => Set<CompetitionWebhookOutboxEvent>();
     public DbSet<CompetitionWebhookDeliveryRecord> CompetitionWebhookDeliveries => Set<CompetitionWebhookDeliveryRecord>();
     public DbSet<CompetitionWebhookFrozenProjection> CompetitionWebhookFrozenProjections => Set<CompetitionWebhookFrozenProjection>();
+    public DbSet<StaffWebhookStream> StaffWebhookStreams => Set<StaffWebhookStream>();
+    public DbSet<StaffWebhookTarget> StaffWebhookTargets => Set<StaffWebhookTarget>();
+    public DbSet<StaffWebhookWorkItem> StaffWebhookWorkItems => Set<StaffWebhookWorkItem>();
+    public DbSet<StaffWebhookEvent> StaffWebhookEvents => Set<StaffWebhookEvent>();
+    public DbSet<StaffWebhookDelivery> StaffWebhookDeliveries => Set<StaffWebhookDelivery>();
     public DbSet<ProgressionNode> ProgressionNodes => Set<ProgressionNode>();
     public DbSet<ProgressionEdge> ProgressionEdges => Set<ProgressionEdge>();
     public DbSet<CompetitionBadge> CompetitionBadges => Set<CompetitionBadge>();
@@ -124,16 +130,25 @@ public sealed class NoCtfDbContext(
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
+        if (StaffWebhookEventCapture.ChangedCompetitions(this).Length != 0)
+            throw new InvalidOperationException("Staff-event source mutations require SaveChangesAsync for transactional projection capture.");
         EnsureAppendOnlyFacts();
         return base.SaveChanges(acceptAllChangesOnSuccess);
     }
 
-    public override Task<int> SaveChangesAsync(
+    public override async Task<int> SaveChangesAsync(
         bool acceptAllChangesOnSuccess,
         CancellationToken cancellationToken = default)
     {
+        var changed = StaffWebhookEventCapture.ChangedCompetitions(this);
+        await using var transaction = changed.Length != 0 && Database.IsRelational() && Database.CurrentTransaction is null
+            ? await Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken) : null;
+        if (changed.Length != 0)
+            await StaffWebhookEventCapture.CaptureAsync(this, changed, timeProvider.GetUtcNow(), cancellationToken);
         EnsureAppendOnlyFacts();
-        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        var result = await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        if (transaction is not null) await transaction.CommitAsync(cancellationToken);
+        return result;
     }
 
     private void EnsureAppendOnlyFacts()

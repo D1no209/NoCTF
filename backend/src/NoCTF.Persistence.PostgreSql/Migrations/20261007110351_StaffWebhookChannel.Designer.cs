@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NoCTF.Infrastructure.Persistence;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace NoCTF.Persistence.PostgreSql.Migrations
 {
     [DbContext(typeof(NoCtfDbContext))]
-    partial class NoCtfDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261007110351_StaffWebhookChannel")]
+    partial class StaffWebhookChannel
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -4346,6 +4349,7 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
             modelBuilder.Entity("NoCTF.Infrastructure.Competitions.StaffWebhooks.StaffWebhookStream", b =>
                 {
                     b.Property<Guid>("CompetitionId")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("competition_id");
 
@@ -7859,16 +7863,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasConstraintName("fk_competition_staff_webhook_deliveries_competition_staff_webh1");
                 });
 
-            modelBuilder.Entity("NoCTF.Infrastructure.Competitions.StaffWebhooks.StaffWebhookEvent", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Competitions.Competition", null)
-                        .WithMany()
-                        .HasForeignKey("CompetitionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_competition_staff_webhook_events_competitions_competition_id");
-                });
-
             modelBuilder.Entity("NoCTF.Infrastructure.Competitions.StaffWebhooks.StaffWebhookEventItem", b =>
                 {
                     b.HasOne("NoCTF.Infrastructure.Competitions.StaffWebhooks.StaffWebhookEvent", null)
@@ -7990,16 +7984,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("NoCTF.Infrastructure.Competitions.StaffWebhooks.StaffWebhookStream", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Competitions.Competition", null)
-                        .WithMany()
-                        .HasForeignKey("CompetitionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_competition_staff_webhook_streams_competitions_competition_");
-                });
-
             modelBuilder.Entity("NoCTF.Infrastructure.Competitions.StaffWebhooks.StaffWebhookTarget", b =>
                 {
                     b.HasOne("NoCTF.Domain.Identity.User", null)
@@ -8019,13 +8003,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
 
             modelBuilder.Entity("NoCTF.Infrastructure.Competitions.StaffWebhooks.StaffWebhookWorkItem", b =>
                 {
-                    b.HasOne("NoCTF.Domain.Competitions.Competition", null)
-                        .WithMany()
-                        .HasForeignKey("CompetitionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_competition_staff_webhook_work_items_competitions_competiti");
-
                     b.OwnsOne("NoCTF.Infrastructure.Competitions.StaffWebhooks.StaffWorkItemSummary", "Summary", b1 =>
                         {
                             b1.Property<Guid>("StaffWebhookWorkItemCompetitionId")

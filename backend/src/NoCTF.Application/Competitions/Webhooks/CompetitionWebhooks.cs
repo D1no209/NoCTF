@@ -147,7 +147,8 @@ public sealed record CompetitionWebhookDelivery(
     Uri? Endpoint = null,
     byte[]? Body = null,
     string? CurrentSigningSecret = null,
-    string? PreviousSigningSecret = null);
+    string? PreviousSigningSecret = null,
+    bool RequireNoContent = false);
 
 public interface ICompetitionWebhookDeliveryStore
 {

@@ -147,6 +147,17 @@ public sealed class CompetitionWebhookSenderTests
         _ = await receiver.Request;
     }
 
+    [Test]
+    [Arguments(200)]
+    [Arguments(202)]
+    public async Task Staff_receiver_must_acknowledge_durable_delivery_with_204(int status)
+    {
+        var receiver = StartReceiver(status);
+        await Assert.That(async () => await receiver.Sender.SendAsync(receiver.Delivery with { RequireNoContent = true }, CancellationToken.None))
+            .Throws<CompetitionWebhookTransientException>();
+        _ = await receiver.Request;
+    }
+
     private static ReceiverFixture StartReceiver(int status, string? retryAfter = null)
     {
         var listener = new TcpListener(IPAddress.Loopback, 0);
