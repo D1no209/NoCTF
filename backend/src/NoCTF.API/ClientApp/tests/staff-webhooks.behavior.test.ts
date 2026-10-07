@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test'
 import { computed, reactive, ref, shallowRef } from 'vue'
+import { Webhook } from '@lucide/vue'
 
 const source = new Bun.Transpiler({ loader: 'ts' }).transformSync(await Bun.file(new URL('../app/features/competitions/staff-webhooks/useStaffWebhooks.ts', import.meta.url)).text())
   .replace(/^import[\s\S]*?from ["'][^"']+["'];?\s*$/gm, '').replace(/export function /g, 'function ')
@@ -15,7 +16,7 @@ function harness(canManage = true) {
     return page
   }
   const target = { id: 'subscription-1', name: 'Staff', endpointUrl: canManage ? 'https://bot.example/staff/key' : null, categories: ['Consultation'], enabled: true }
-  const dependencies = { computed, reactive, ref, shallowRef,
+  const dependencies = { Webhook, computed, reactive, ref, shallowRef,
     useCompetitionAdmin: () => ({ competitionId: 'competition-1', canWrite: ref(canManage) }), useOffsetPagination: makePage,
     onMounted: (fn: () => void) => mounted.push(fn), onBeforeUnmount: (fn: () => void) => disposed.push(fn),
     message: (key: string) => ({ key }), toast: { success: () => {}, error: () => {} }, parseApiError: () => ({ displayMessage: 'error' }),
