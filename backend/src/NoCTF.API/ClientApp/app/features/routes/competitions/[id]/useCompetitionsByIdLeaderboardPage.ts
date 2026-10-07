@@ -11,6 +11,7 @@ import type { TrendSeries } from '../../../leaderboard/types'
 import { scoreboardChallengeColumnGroupsByDirection, scoreboardBloodAward, scoreboardBreakdown, scoreboardEntryKindLabel, scoreboardEntryOutcomeLabel, scoreboardRankingStateLabel, scoreboardSlot } from '../../../../utils/scoreboard'
 import { competitionChallengesPath } from '../../../../utils/app-routes'
 import ScoreboardSlotStatusComponent from '../../../leaderboard/ScoreboardSlotStatus.vue'
+import { useLeaderboardMatrixFilters } from '../../../leaderboard/useLeaderboardMatrixFilters'
 
 export const leaderboardWheelDamping = 0.55
 
@@ -108,8 +109,6 @@ export function useCompetitionsByIdLeaderboardPage() {
   const displayRank = (team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse) =>
     displayRanks.value.get(team.teamId) ?? null
 
-  const visibleTeams = computed(() => teams.value.slice(0, visibleTeamCount.value))
-
   function showMoreTeams(): void {
     visibleTeamCount.value += 50
   }
@@ -137,12 +136,21 @@ export function useCompetitionsByIdLeaderboardPage() {
   const displayTeamName = (team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse) =>
     teamDisplayName(team, teamDisplayNames.value)
 
-  watch(teams, () => { visibleTeamCount.value = 50 })
-
   const columnGroups = computed(() => scoreboardChallengeColumnGroupsByDirection(
     board.schema.value,
     board.catalog.value?.items,
   ))
+
+  const matrixFilters = useLeaderboardMatrixFilters(columnGroups, teams, displayTeamName)
+  const { filteredTeams, filteredColumnGroups } = matrixFilters
+  const visibleTeams = computed(() => filteredTeams.value.slice(0, visibleTeamCount.value))
+  watch(filteredTeams, () => { visibleTeamCount.value = 50 })
+  const hasLeaderboardFilters = computed(() => matrixFilters.hasMatrixFilters.value || !selectedAllTracks.value)
+
+  function clearLeaderboardFilters() {
+    matrixFilters.clearMatrixFilters()
+    selectedTrackKey.value = allTracksKey
+  }
 
   const isCtf = computed(() => board.schema.value?.mode === 'Ctf')
 
@@ -251,7 +259,7 @@ export function useCompetitionsByIdLeaderboardPage() {
     { flush: 'post' },
   )
 
-  const flatColumns = computed(() => columnGroups.value.flatMap(group => group.columns))
+  const flatColumns = computed(() => filteredColumnGroups.value.flatMap(group => group.columns))
 
   const roundWindowLabel = computed(() => {
     const start = board.schema.value?.roundWindowStart
@@ -290,7 +298,7 @@ export function useCompetitionsByIdLeaderboardPage() {
         return `${challenge?.title ?? translate("common.label.unknownQuestion")} · ${roundLabel(column)}`
       }),
     ]
-    const rows = teams.value.map(team => [
+    const rows = filteredTeams.value.map(team => [
       displayRank(team) ?? '',
       displayTeamName(team),
       ...(tracksEnabled.value && selectedAllTracks.value ? [trackName(team.trackKey)] : []),
@@ -562,6 +570,9 @@ export function useCompetitionsByIdLeaderboardPage() {
       showMoreTeams,
       displayTeamName,
       columnGroups,
+      ...matrixFilters,
+      hasLeaderboardFilters,
+      clearLeaderboardFilters,
       isCtf,
       trends,
       trendsLoading,

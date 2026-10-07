@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { CompetitionsByIdLeaderboardPageViewState } from '~/features/routes/competitions/[id]/useCompetitionsByIdLeaderboardPage'
 
 const viewProps = defineProps<{ state: CompetitionsByIdLeaderboardPageViewState }>()
-const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, medalBloodRankClass, medalRankClass, scoreboardBloodAward, scoreboardEntryKindLabel, scoreboardEntryOutcomeLabel, scoreboardRankingStateLabel, scoreboardSlot, competitionId, competitionReturnPath, dampenLeaderboardWheel, board, allTracksKey, selectedTrackKey, tracksEnabled, canViewInternalTracks, showLeaderboardHiddenTeams, availableTracks, selectedAllTracks, trackName, teams, displayRank, visibleTeams, showMoreTeams, displayTeamName, columnGroups, isCtf, trends, trendsLoading, trendsError, visibleTrendSeries, trendRangeStart, trendRangeEnd, trendRevision, loadTrends, roundWindowLabel, roundLabel, slotTitle, ctfScore, exportCsv, detailOpen, teamDetailOpen, teamDetailTeam, teamDetailTrendSeries, detailLoading, detailLoadingMore, detailError, detail, detailEntries, detailTeam, detailColumn, loadDetailPage, openDetail, openTeamDetail, showOlderRoundWindow, showNewerRoundWindow, showLatestRoundWindow, entryActor, adjustmentOpen, adjustmentLoading, adjustmentLoadingMore, adjustmentError, adjustmentDetail, adjustmentEntries, adjustmentTeam, loadAdjustmentPage, openAdjustments, adjustmentActor, adjustmentKind, ScoreboardSlotStatus, LazyScoreTrendChart, LazyScoreboardTeamDetailDialog } = toRefs(viewProps.state)
+const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, medalBloodRankClass, medalRankClass, scoreboardBloodAward, scoreboardEntryKindLabel, scoreboardEntryOutcomeLabel, scoreboardRankingStateLabel, scoreboardSlot, competitionId, competitionReturnPath, dampenLeaderboardWheel, board, allTracksKey, selectedTrackKey, tracksEnabled, canViewInternalTracks, showLeaderboardHiddenTeams, availableTracks, selectedAllTracks, trackName, teams, displayRank, visibleTeams, showMoreTeams, displayTeamName, columnGroups, allDirectionsKey, allChallengesKey, selectedDirectionKey, selectedChallengeId, teamSearch, challengeSearch, availableDirections, availableChallenges, filteredColumnGroups, filteredTeams, hasLeaderboardFilters, clearLeaderboardFilters, isCtf, trends, trendsLoading, trendsError, visibleTrendSeries, trendRangeStart, trendRangeEnd, trendRevision, loadTrends, roundWindowLabel, roundLabel, slotTitle, ctfScore, exportCsv, detailOpen, teamDetailOpen, teamDetailTeam, teamDetailTrendSeries, detailLoading, detailLoadingMore, detailError, detail, detailEntries, detailTeam, detailColumn, loadDetailPage, openDetail, openTeamDetail, showOlderRoundWindow, showNewerRoundWindow, showLatestRoundWindow, entryActor, adjustmentOpen, adjustmentLoading, adjustmentLoadingMore, adjustmentError, adjustmentDetail, adjustmentEntries, adjustmentTeam, loadAdjustmentPage, openAdjustments, adjustmentActor, adjustmentKind, ScoreboardSlotStatus, LazyScoreTrendChart, LazyScoreboardTeamDetailDialog } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -43,14 +43,7 @@ const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, 
             <Label :for="`leaderboard-hidden-teams-${competitionId}`" class="cursor-pointer text-sm font-medium">{{ $t('leaderboard.label.showLeaderboardHiddenTeams') }}</Label>
             <Switch :id="`leaderboard-hidden-teams-${competitionId}`" v-model="showLeaderboardHiddenTeams" />
           </div>
-          <Select v-if="tracksEnabled && availableTracks.length > 1" v-model="selectedTrackKey">
-            <SelectTrigger class="min-w-40" :aria-label="$t('leaderboard.label.selectLeaderboardTrack')"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem :value="allTracksKey">{{ $t('leaderboard.label.tracks') }}</SelectItem>
-              <SelectItem v-for="track in availableTracks" :key="track.key" :value="track.key!">{{ track.name }}</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button variant="outline" :disabled="!teams.length" @click="exportCsv"><Download data-icon="inline-start" />{{ $t('leaderboard.label.downloadExcel') }}</Button>
+          <Button variant="outline" :disabled="!filteredTeams.length || !filteredColumnGroups.length" @click="exportCsv"><Download data-icon="inline-start" />{{ $t('leaderboard.label.downloadExcel') }}</Button>
         </div>
       </div>
       <Alert v-if="board.processing.value"><AlertDescription>{{ $t('common.competitionChallenge.description.scoreboardDataProjectedWait') }}</AlertDescription></Alert>
@@ -69,7 +62,37 @@ const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, 
         </div>
       <Card>
         <CardContent class="pt-6">
+          <div data-slot="leaderboard-matrix-filters" class="mb-4 flex flex-wrap items-center gap-3">
+            <Input v-model="teamSearch" type="search" :placeholder="$t('common.label.searchTeam')" :aria-label="$t('common.label.searchTeam')" class="w-full min-w-0 sm:w-44 sm:flex-1" />
+            <Input v-model="challengeSearch" type="search" :placeholder="$t('leaderboard.filters.searchChallenges')" :aria-label="$t('leaderboard.filters.searchChallenges')" class="w-full min-w-0 sm:w-44 sm:flex-1" />
+            <Select v-model="selectedDirectionKey">
+              <SelectTrigger class="w-full sm:w-40" :aria-label="$t('leaderboard.filters.selectDirection')"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem :value="allDirectionsKey">{{ $t('leaderboard.filters.allDirections') }}</SelectItem>
+                <SelectItem v-for="direction in availableDirections" :key="direction.key" :value="direction.key">{{ direction.label || $t('common.label.uncategorized') }}</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select v-if="tracksEnabled && availableTracks.length > 1" v-model="selectedTrackKey">
+              <SelectTrigger class="w-full sm:w-40" :aria-label="$t('leaderboard.label.selectLeaderboardTrack')"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem :value="allTracksKey">{{ $t('leaderboard.label.tracks') }}</SelectItem>
+                <SelectItem v-for="track in availableTracks" :key="track.key" :value="track.key!">{{ track.name }}</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select v-model="selectedChallengeId" :disabled="!availableChallenges.length">
+              <SelectTrigger class="w-full sm:w-52" :aria-label="$t('leaderboard.filters.selectChallenge')"><SelectValue class="min-w-0 flex-1 text-left" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem :value="allChallengesKey">{{ $t('leaderboard.filters.allChallenges') }}</SelectItem>
+                <SelectItem v-for="group in availableChallenges" :key="group.competitionChallengeId" :value="group.competitionChallengeId">{{ group.challenge?.title ?? $t('common.label.unknownQuestion') }}</SelectItem>
+              </SelectContent>
+            </Select>
+            <div class="flex w-full items-center justify-between gap-3">
+              <p class="text-sm text-muted-foreground" role="status">{{ $t('leaderboard.filters.count', { teams: filteredTeams.length, challenges: filteredColumnGroups.length }) }}</p>
+              <Button variant="ghost" size="sm" :disabled="!hasLeaderboardFilters" @click="clearLeaderboardFilters">{{ $t('leaderboard.filters.clear') }}</Button>
+            </div>
+          </div>
           <Empty v-if="!teams.length" class="border py-8"><EmptyHeader><EmptyTitle>{{ $t('common.competitionsBy.label.teamScoredYet') }}</EmptyTitle></EmptyHeader></Empty>
+          <Empty v-else-if="!filteredTeams.length || !filteredColumnGroups.length" class="py-8"><EmptyHeader><EmptyTitle>{{ $t(!filteredTeams.length ? 'leaderboard.filters.noTeams' : 'leaderboard.filters.noChallenges') }}</EmptyTitle><EmptyDescription>{{ $t('leaderboard.filters.adjustFilters') }}</EmptyDescription></EmptyHeader></Empty>
           <div v-else class="min-w-0">
             <Table pin-horizontal-scrollbar class="min-w-max table-auto">
               <TableHeader>
@@ -77,11 +100,11 @@ const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, 
                   <TableHead :rowspan="isCtf ? 1 : 2" data-scoreboard-frozen-corner="top-start" class="sticky left-0 z-30 w-20 min-w-20 max-w-20 bg-card text-center">{{ $t('leaderboard.label.ranking') }}</TableHead>
                   <TableHead :rowspan="isCtf ? 1 : 2" class="sticky left-20 z-30 w-56 min-w-56 max-w-56 bg-card">{{ $t('common.label.teams') }}</TableHead>
                   <TableHead :rowspan="isCtf ? 1 : 2" data-scoreboard-frozen-corner="top-end" class="sticky left-76 z-30 w-28 min-w-28 max-w-28 border-r bg-card text-right">{{ $t('common.label.totalScore') }}</TableHead>
-                  <TableHead v-for="group in columnGroups" :key="group.competitionChallengeId" :colspan="group.columns.length" class="border-l px-4 text-center">
+                  <TableHead v-for="group in filteredColumnGroups" :key="group.competitionChallengeId" :colspan="group.columns.length" class="border-l px-4 text-center">
                     <span class="inline-flex items-center gap-1.5 whitespace-nowrap"><LucideIcon v-if="group.challenge?.directionIcon" :name="group.challenge.directionIcon" class="size-4" :class="directionTextClass(group.challenge.direction)" /><component v-else :is="directionIcon(group.challenge?.direction)" class="size-4" :class="directionTextClass(group.challenge?.direction)" />{{ group.challenge?.title ?? $t('common.label.unknownQuestion') }}</span>
                   </TableHead>
                 </TableRow>
-                <TableRow v-if="!isCtf"><template v-for="group in columnGroups" :key="`${group.competitionChallengeId}-rounds`"><TableHead v-for="column in group.columns" :key="column.index" class="min-w-28 border-l px-3 text-center">{{ roundLabel(column) }}</TableHead></template></TableRow>
+                <TableRow v-if="!isCtf"><template v-for="group in filteredColumnGroups" :key="`${group.competitionChallengeId}-rounds`"><TableHead v-for="column in group.columns" :key="column.index" class="min-w-28 border-l px-3 text-center">{{ roundLabel(column) }}</TableHead></template></TableRow>
               </TableHeader>
               <TableBody>
                 <TableRow v-for="(team, teamIndex) in visibleTeams" :key="team.teamId" :class="(displayRank(team) ?? 99) <= 3 ? 'bg-primary/5' : ''">
@@ -94,7 +117,7 @@ const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, 
                     </ActionButton>
                     <span v-else class="font-mono font-semibold tabular-nums">{{ team.totalScore ?? 0 }} {{ $t('common.label.pts.scoreTrendChart') }}</span>
                   </TableCell>
-                  <template v-for="group in columnGroups" :key="`${team.teamId}-${group.competitionChallengeId}`">
+                  <template v-for="group in filteredColumnGroups" :key="`${team.teamId}-${group.competitionChallengeId}`">
                     <TableCell v-for="column in group.columns" :key="column.index" class="border-l p-1 text-center" :class="isCtf ? 'min-w-56' : 'min-w-28'">
                       <ActionButton v-if="column.index !== undefined && scoreboardSlot(team, column.index)" type="button" class="flex min-h-12 w-full items-center justify-center rounded-md px-1 py-1 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" :aria-label="$t('leaderboard.label.viewSDetails', { team: displayTeamName(team), challenge: group.challenge?.title ?? $t('common.label.unknownQuestion'), round: roundLabel(column) })" @click="openDetail(team, column)">
                         <template v-if="isCtf">
@@ -125,7 +148,7 @@ const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, 
               </TableBody>
             </Table>
           </div>
-          <div v-if="visibleTeams.length < teams.length" class="mt-4 flex justify-center"><Button variant="outline" @click="showMoreTeams">{{ $t('common.label.load') }}</Button></div>
+          <div v-if="visibleTeams.length < filteredTeams.length" class="mt-4 flex justify-center"><Button variant="outline" @click="showMoreTeams">{{ $t('common.label.load') }}</Button></div>
         </CardContent>
       </Card>
       </template>

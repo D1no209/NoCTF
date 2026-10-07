@@ -82,5 +82,15 @@
   "leaderboard.label.teamSystem": "Team / system",
   "leaderboard.scoreboardTeam.label.memberAttributedScoreYet": "No member-attributed score yet",
   "leaderboard.scoreboardTeam.description.automatedSettlementHistoricalWindows": "Automated settlement, historical windows, and other points without an individual owner are grouped under “Team / system”.",
-  "leaderboard.label.pts": "pts，"
+  "leaderboard.label.pts": "pts，",
+  "leaderboard.filters.searchChallenges": "Search challenges",
+  "leaderboard.filters.allDirections": "All directions",
+  "leaderboard.filters.allChallenges": "All challenges",
+  "leaderboard.filters.selectDirection": "Filter by direction",
+  "leaderboard.filters.selectChallenge": "Filter by challenge",
+  "leaderboard.filters.clear": "Clear filters",
+  "leaderboard.filters.count": "{teams} teams · {challenges} challenges",
+  "leaderboard.filters.noTeams": "No matching teams",
+  "leaderboard.filters.noChallenges": "No matching challenges",
+  "leaderboard.filters.adjustFilters": "Adjust the filters or clear your search."
 }

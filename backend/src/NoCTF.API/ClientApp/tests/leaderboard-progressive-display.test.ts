@@ -27,9 +27,9 @@ const theme = await sourceFile(
 describe('leaderboard progressive display', () => {
   test('keeps the full snapshot and progressively reveals stable entries', () => {
     expect(page).toContain('const visibleTeamCount = ref(50)')
-    expect(page).toContain('teams.value.slice(0, visibleTeamCount.value)')
+    expect(page).toContain('filteredTeams.value.slice(0, visibleTeamCount.value)')
     expect(page).toContain('v-for="(team, teamIndex) in visibleTeams"')
-    expect(page).toContain('visibleTeams.length < teams.length')
+    expect(page).toContain('visibleTeams.length < filteredTeams.length')
     expect(page).toContain('function showMoreTeams(): void')
     expect(page).toContain('@click="showMoreTeams"')
   })
