@@ -67,7 +67,12 @@ public enum CompetitionEventKind : short
     CompetitionAudienceChanged,
     TeamWriteUpSubmitted,
     RuntimeTrafficCaptureStored,
-    RuntimeTrafficCaptureDeleted
+    RuntimeTrafficCaptureDeleted,
+    ChallengeWriteUpSubmitted,
+    ChallengeWriteUpPublished,
+    ChallengeWriteUpWithdrawn,
+    ChallengeWriteUpRejected,
+    ChallengeWriteUpUnlocked
 }
 
 public enum CompetitionEventLevel : short

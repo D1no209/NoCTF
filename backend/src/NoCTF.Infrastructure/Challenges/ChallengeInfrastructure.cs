@@ -74,6 +74,8 @@ internal static class ChallengeInfrastructure
         services.AddScoped<ICompetitionQuestionWriter, CompetitionQuestionTransactionWriter>();
         services.AddScoped<CreateCompetitionQuestion>();
         services.AddScoped<CreateTeamWriteUpConsultation>();
+        services.AddScoped<NoCTF.Application.Challenges.WriteUps.IChallengeWriteUpStore, NoCTF.Infrastructure.Challenges.WriteUps.ChallengeWriteUpStore>();
+        services.AddScoped<NoCTF.Application.Challenges.WriteUps.ManageChallengeWriteUps>();
         services.AddScoped<ListCompetitionQuestions>();
         services.AddScoped<GetCompetitionQuestion>();
         services.AddScoped<AddCompetitionQuestionMessage>();

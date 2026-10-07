@@ -54,6 +54,8 @@ internal sealed class CompetitionEntityConfiguration : IEntityTypeConfiguration<
             .HasDefaultValue(NoCTF.Domain.Runtime.RuntimeAccessMode.Direct);
         builder.Property(competition => competition.TrafficCaptureEnabled)
             .HasDefaultValue(false);
+        builder.Property(competition => competition.SingleWriteUpDeductionPercent).HasDefaultValue(20).ValueGeneratedNever();
+        builder.Property(competition => competition.SingleWriteUpDeadlineHours).HasDefaultValue(24).ValueGeneratedNever();
         builder.Property(competition => competition.TracksEnabled)
             .ValueGeneratedNever();
         // Data Annotations cannot express these current database defaults.

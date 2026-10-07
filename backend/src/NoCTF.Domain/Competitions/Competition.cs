@@ -68,6 +68,9 @@ public abstract class Competition : IConcurrencyTracked
     public bool PracticeModeEnabled { get; set; }
     public bool WriteUpSubmissionRequired { get; set; }
     public int WriteUpSubmissionDeadlineHours { get; set; }
+    public bool SingleWriteUpsEnabled { get; set; }
+    public int SingleWriteUpDeductionPercent { get; set; } = 20;
+    public int SingleWriteUpDeadlineHours { get; set; } = 24;
     public int MaxTeamMembers { get; set; } = 5;
     public int MaxConcurrentRuntimeInstancesPerTeam { get; set; }
     public RuntimeAccessMode RuntimeAccessMode { get; set; }
