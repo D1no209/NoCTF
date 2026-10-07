@@ -306,6 +306,10 @@ const groups: DefaultTheme.SidebarItem[] = [
           {
             "text": "双重验证",
             "link": "/platform/security/mfa"
+          },
+          {
+            "text": "通行密钥",
+            "link": "/platform/security/passkeys"
           }
         ]
       },

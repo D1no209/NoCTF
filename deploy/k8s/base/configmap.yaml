@@ -20,6 +20,10 @@ data:
   Authentication__Issuer: NoCTF
   Authentication__Audience: NoCTF.Api
   Authentication__AccessTokenMinutes: '15'
+  Passkeys__ServerDomain: noctf.invalid
+  Passkeys__AllowedOrigins__0: https://noctf.invalid
+  Passkeys__MaximumCredentials: '10'
+  Passkeys__CeremonyLifetimeSeconds: '180'
   Sso__AllowInsecurePublicBaseUrl: 'false'
   Sso__AllowInsecureProviderUrls: 'false'
   HumanVerification__Provider: None
