@@ -718,3 +718,5 @@ GET /api/v1/competitions/{competitionId}/staff-work-items
 POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/attachments/{attachmentId}/browser-download
 POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/attachment/browser-download
 ```
+
+Browser attachment preparation returns `downloadUrl` and an encrypted, HttpOnly, SameSite=Strict cookie scoped to that exact GET path. The cookie expires after two minutes and is cleared when handed to the existing access JWT validator. It cannot authenticate other endpoints or replace an explicitly supplied Bearer header. Current account, TokenVersion and MFA validation still run before opening the file stream. Preparation never opens a file, records acquisition evidence, or assigns a random attachment variant. The native browser consumes the file response directly; no attachment Blob is constructed in the SPA.

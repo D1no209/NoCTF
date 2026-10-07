@@ -132,8 +132,20 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
         ? { provider: 'Cap', siteKey: configuration.capSiteKey, apiEndpoint: `${configuration.capServerUrl.replace(/\/$/, '')}/${encodeURIComponent(configuration.capSiteKey)}/`, runtimeRequired: configuration.runtimeEnabled !== false, evaluationRequired: configuration.evaluationEnabled !== false }
         : { provider: 'Turnstile', siteKey: configuration.turnstileSiteKey, apiEndpoint: null, runtimeRequired: configuration.runtimeEnabled !== false, evaluationRequired: configuration.evaluationEnabled !== false }
   }
+  const nativeDownloads = new Map<string, { userId: string; path: string; expiresAt: number }>()
+  function prepareMockAttachmentDownload(user: Data, path: string) {
+    const ticket = crypto.randomUUID()
+    nativeDownloads.set(ticket, { userId: user.userId, path, expiresAt: Date.now() + 120_000 })
+    return json({ downloadUrl: path }, 200, { 'Set-Cookie': `noctf_mock_download=${ticket}; Path=${path}; Max-Age=120; HttpOnly; SameSite=Strict` })
+  }
   const userFor = (request: Request) => {
     const bearer = request.headers.get('Authorization')?.replace(/^Bearer /, '')
+    if (!bearer && request.method === 'GET') {
+      const ticket = request.headers.get('cookie')?.match(/(?:^|;\s*)noctf_mock_download=([^;]+)/)?.[1]
+      const grant = nativeDownloads.get(ticket ?? '')
+      if (grant && grant.path === new URL(request.url).pathname && grant.expiresAt > Date.now())
+        return state.users.find(user => user.userId === grant.userId)
+    }
     return state.users.find(user => user.userId === tokens.get(bearer ?? ''))
   }
   function signIn(user: Data) {
@@ -963,6 +975,14 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
         })
         state.questions.unshift(question)
         value = questionView(question, user, myTeam)
+      }
+      else if (route === '/competitions/{competitionId}/challenges/{competitionChallengeId}/attachments/{attachmentId}/browser-download') {
+        if (!user || !attachment) return problem(404, 'Mock attachment not found')
+        return prepareMockAttachmentDownload(user, `/api/v1/competitions/${p.competitionId}/challenges/${p.competitionChallengeId}/attachments/${p.attachmentId}`)
+      }
+      else if (route === '/competitions/{competitionId}/challenges/{competitionChallengeId}/attachment/browser-download') {
+        if (!user || !challenge) return problem(404, 'Mock challenge not found')
+        return prepareMockAttachmentDownload(user, `/api/v1/competitions/${p.competitionId}/challenges/${p.competitionChallengeId}/attachment`)
       }
       else if (route === '/competitions/{competitionId}/questions') {
         const rootId = crypto.randomUUID()

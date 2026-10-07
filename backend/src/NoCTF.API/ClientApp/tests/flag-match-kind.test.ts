@@ -110,7 +110,7 @@ describe('attachment delivery editor', () => {
     ).text()
 
     expect(page).toContain("attachmentDeliveryPolicy === 'RandomOnePerTeam'")
-    expect(page).toContain('downloadRandomChallengeAttachmentEndpoint')
+    expect(page).toContain('prepareRandomChallengeAttachmentDownloadEndpoint')
     expect(page).toContain('v-for="attachment in attachments"')
     expect(page).not.toContain("common.description.firstDownloadAssignsOne")
   })
