@@ -124,7 +124,11 @@ public sealed record CompetitionResponse(
     DateTimeOffset? WriteUpSubmissionDeadlineAt = null,
     RuntimeAccessModeProtocol RuntimeAccessMode = RuntimeAccessModeProtocol.Direct,
     bool TrafficCaptureEnabled = false,
-    long? TrafficCaptureLimitBytes = null);
+    long? TrafficCaptureLimitBytes = null,
+    bool SingleWriteUpsEnabled = false,
+    int SingleWriteUpDeductionPercent = 20,
+    int SingleWriteUpDeadlineHours = 24,
+    DateTimeOffset? SingleWriteUpDeadlineAt = null);
 
 internal static class CompetitionMapper
 {
@@ -167,7 +171,8 @@ internal static class CompetitionMapper
                 view.WriteUpSubmissionDeadlineHours),
             CompetitionProtocolMapper.ToProtocol(view.RuntimeAccessMode),
             view.TrafficCaptureEnabled,
-            view.TrafficCaptureLimitBytes);
+            view.TrafficCaptureLimitBytes, view.SingleWriteUpsEnabled, view.SingleWriteUpDeductionPercent, view.SingleWriteUpDeadlineHours,
+            CompetitionWriteUpPolicy.DeadlineAt(view.EndTime, view.SingleWriteUpDeadlineHours));
 
     internal static string PosterUrl(Guid competitionId, Guid posterFileId) =>
         $"/api/v1/competitions/{competitionId}/poster?revision={posterFileId:N}";

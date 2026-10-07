@@ -66,6 +66,12 @@ public sealed record LeaderboardEntry(
     public long? AttackScore { get; init; }
     public long? DefenseScore { get; init; }
     public long? PenaltyScore { get; init; }
+    public int AttackCount { get; init; }
+    public int FixCount { get; init; }
+    public int UpRoundCount { get; init; }
+    public DateTimeOffset? LastFixAt { get; init; }
+    public int ControlledChallengeCount { get; init; }
+    public DateTimeOffset? FirstControlAt { get; init; }
 
     /// <summary>Only solved/corrected cells are serialized; the matrix is sparse.</summary>
     public IReadOnlyList<LeaderboardCell> Cells { get; init; } = [];
@@ -103,7 +109,8 @@ public enum ScoreboardBreakdownKind
     Penalty,
     BloodAward,
     Hint,
-    ManualAdjustment
+    ManualAdjustment,
+    WriteUp
 }
 
 public enum ScoreboardEntryKind
@@ -116,7 +123,8 @@ public enum ScoreboardEntryKind
     Penalty,
     BloodAward,
     Hint,
-    ManualAdjustment
+    ManualAdjustment,
+    WriteUp
 }
 
 public enum ScoreboardEntryOutcome
@@ -268,6 +276,9 @@ public sealed record ScoreboardChallengeScore(
     long AttackScore,
     long DefenseScore);
 
+public sealed record ScoreboardChallengeBenefit(Guid CompetitionChallengeId, long GrossPoints,
+    long WriteUpDeductionPoints, int? WriteUpDeductionPercent, DateTimeOffset? WriteUpUnlockedAt);
+
 public sealed record ScoreboardMemberContribution(
     Guid UserId,
     string DisplayName,
@@ -291,6 +302,7 @@ public sealed record ScoreboardTeam(
     public long? AttackScore { get; init; }
     public long? DefenseScore { get; init; }
     public IReadOnlyList<ScoreboardChallengeScore> ChallengeScores { get; init; } = [];
+    public IReadOnlyList<ScoreboardChallengeBenefit> ChallengeBenefits { get; init; } = [];
     public IReadOnlyList<ScoreboardMemberContribution> MemberContributions { get; init; } = [];
     // Null identifies snapshots written before achievement attribution was available.
     public IReadOnlyList<ScoreboardChallengeAchievement>? Achievements { get; init; }

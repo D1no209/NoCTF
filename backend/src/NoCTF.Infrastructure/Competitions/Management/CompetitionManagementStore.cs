@@ -263,7 +263,7 @@ public sealed class CompetitionManagementStore(
             x.WriteUpSubmissionDeadlineHours,
             x.RuntimeAccessMode,
             x.TrafficCaptureEnabled,
-            x.TrafficCaptureLimitBytes));
+            x.TrafficCaptureLimitBytes, x.SingleWriteUpsEnabled, x.SingleWriteUpDeductionPercent, x.SingleWriteUpDeadlineHours));
 
     private static CompetitionView Map(Competition x) =>
         new(x.Id, x.Title, x.Description, x.Mode, x.StartAt, x.EndAt, x.Status,
@@ -283,7 +283,7 @@ public sealed class CompetitionManagementStore(
             x.WriteUpSubmissionDeadlineHours,
             x.RuntimeAccessMode,
             x.TrafficCaptureEnabled,
-            x.TrafficCaptureLimitBytes);
+            x.TrafficCaptureLimitBytes, x.SingleWriteUpsEnabled, x.SingleWriteUpDeductionPercent, x.SingleWriteUpDeadlineHours);
 
     private Task InvalidateReadModelsAsync(
         Guid competitionId,

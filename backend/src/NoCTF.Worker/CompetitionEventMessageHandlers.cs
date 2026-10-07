@@ -54,6 +54,7 @@ public sealed class CompetitionEventLeaderboardMessageHandler(
             or CompetitionEventKind.ChallengeUnpublished
             or CompetitionEventKind.ChallengeDeleted
             or CompetitionEventKind.HintUnlocked
+            or CompetitionEventKind.ChallengeWriteUpUnlocked
             or CompetitionEventKind.TeamRegistered
             or CompetitionEventKind.TeamRegistrationChanged
             or CompetitionEventKind.TeamUpdated

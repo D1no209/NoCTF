@@ -79,6 +79,7 @@ const entryKindLabels = {
   BloodAward: "common.label.bloodListReward",
   Hint: "administration.label.hint",
   ManualAdjustment: "common.label.manualAdjustment",
+  WriteUp: "challengeWriteUp.viewed",
 } satisfies Record<NoCtfapiEndpointsCompetitionsScoreboardEntryKindProtocol, string>
 
 const entryOutcomeLabels = {

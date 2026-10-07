@@ -19,7 +19,11 @@ public sealed record LeaderboardProjectionInput(
     IReadOnlyList<LeaderboardGameplayFact>? ScoreboardGameplayFacts = null,
     int? ScoreboardRoundWindowEnd = null,
     int? ScoreboardLatestRound = null,
-    IReadOnlyList<LeaderboardAwdAggregateFact>? AwdAggregates = null);
+    IReadOnlyList<LeaderboardAwdAggregateFact>? AwdAggregates = null,
+    IReadOnlyList<LeaderboardWriteUpUnlock>? WriteUpUnlocks = null);
+
+public sealed record LeaderboardWriteUpUnlock(Guid GameplayFactId, Guid TeamId, Guid CompetitionChallengeId,
+    int DeductionPercent, DateTimeOffset UnlockedAt);
 
 public sealed record LeaderboardTeamFact(
     Guid Id,
@@ -78,7 +82,9 @@ public sealed record LeaderboardAwdAggregateFact(
     long AttackPoints,
     int AttackCount,
     int UpRoundCount,
-    DateTimeOffset? LastAttackAt);
+    DateTimeOffset? LastAttackAt,
+    long PositivePoints = 0,
+    long PositivePointsBeforeWindow = 0);
 
 public sealed record GameModeLeaderboardProjection(
     IReadOnlyList<LeaderboardEntry> Entries,

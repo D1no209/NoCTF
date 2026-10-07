@@ -39,6 +39,8 @@ public static class AuthenticationRegistration
                             context.Token = token;
                         else if (context.HttpContext.GetEndpoint()?.Metadata.GetMetadata<AttachmentBrowserDownloadMetadata>() is not null)
                             context.Token = context.HttpContext.RequestServices.GetRequiredService<AttachmentBrowserDownload>().Read(context.HttpContext);
+                        else if (context.HttpContext.GetEndpoint()?.Metadata.GetMetadata<WriteUpBrowserAccessMetadata>() is not null)
+                            context.Token = context.HttpContext.RequestServices.GetRequiredService<WriteUpBrowserAccess>().Read(context.HttpContext);
                         return Task.CompletedTask;
                     },
                     OnTokenValidated = async context =>
@@ -96,6 +98,7 @@ public static class AuthenticationRegistration
         services.AddDataProtection();
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<AttachmentBrowserDownload>();
+        services.AddSingleton<WriteUpBrowserAccess>();
         services.AddSingleton<SsoBrowserCorrelation>();
         services.AddSingleton<MfaBrowserFlow>();
         services.AddAuthorization(options =>

@@ -35,6 +35,7 @@ public sealed class ChallengeWriteUpPersistenceTests
             var owner = User("writeup-owner", now);
             var author = User("writeup-author", now);
             var reader = User("writeup-reader", now);
+            var readerMember = User("writeup-reader-member", now);
             var competition = new CtfCompetition { Id = Guid.NewGuid(), OwnerId = owner.Id, Title = "Single WriteUps",
                 ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf), FlagDerivationSecret = new byte[32],
                 StartAt = now.AddHours(-1), EndAt = now.AddHours(1), Status = CompetitionStatus.Running,
@@ -43,8 +44,9 @@ public sealed class ChallengeWriteUpPersistenceTests
                 Definition = TestConfigurations.Definition(GameMode.Ctf), CreatedAt = now, UpdatedAt = now };
             var challenge = new CtfCompetitionChallenge { Id = Guid.NewGuid(), CompetitionId = competition.Id, ChallengeId = template.Id,
                 IsPublished = true, Rules = TestConfigurations.Rules(GameMode.Ctf), UpdatedAt = now };
-            db.Users.AddRange(owner, author, reader); db.Competitions.Add(competition); db.Challenges.Add(template);
-            db.CompetitionChallenges.Add(challenge); db.Teams.AddRange(Team(author.Id, competition.Id, 'a', now), Team(reader.Id, competition.Id, 'b', now));
+            db.Users.AddRange(owner, author, reader, readerMember); db.Competitions.Add(competition); db.Challenges.Add(template);
+            var readerTeam = Team(reader.Id, competition.Id, 'b', now); readerTeam.MemberIds = [reader.Id, readerMember.Id];
+            db.CompetitionChallenges.Add(challenge); db.Teams.AddRange(Team(author.Id, competition.Id, 'a', now), readerTeam);
             await db.SaveChangesAsync(ct);
             var store = new ChallengeWriteUpStore(db, new CompetitionModerationAuthorizer(db), new CompetitionChallengeReadAccess(db),
                 NullCompetitionEventRecorder.Instance, Substitute.For<IPostCommitMessagePublisher>());
@@ -63,6 +65,22 @@ public sealed class ChallengeWriteUpPersistenceTests
             await Assert.That(refused.Failure).IsEqualTo(ChallengeWriteUpFailure.Forbidden);
             var own = await store.ReadContentAsync(competition.Id, challenge.Id, v1, author.Id, false, now, ct);
             await Assert.That(own.Markdown).IsEqualTo("# old secret");
+            var unlock = new UnlockWriteUp(competition.Id, challenge.Id, v1, reader.Id, listed.Access.Settings.PolicyStamp, now);
+            var changed = await store.UnlockAsync(unlock with { PolicyStamp = Guid.NewGuid() }, ct);
+            await Assert.That(changed.Failure).IsEqualTo(ChallengeWriteUpFailure.ConfirmationChanged);
+            var parallel = await Task.WhenAll(Enumerable.Range(0, 4).Select(async i =>
+            {
+                await using var parallelDb = new NoCtfDbContext(options);
+                var parallelStore = new ChallengeWriteUpStore(parallelDb, new CompetitionModerationAuthorizer(parallelDb),
+                    new CompetitionChallengeReadAccess(parallelDb), NullCompetitionEventRecorder.Instance,
+                    Substitute.For<IPostCommitMessagePublisher>());
+                return await parallelStore.UnlockAsync(unlock with { ActorId = i % 2 == 0 ? reader.Id : readerMember.Id }, ct);
+            }));
+            await Assert.That(parallel.Count(x => x.Created)).IsEqualTo(1);
+            await Assert.That(parallel.All(x => x.Failure is null)).IsTrue();
+            await Assert.That(await db.WriteUpUnlockReceipts.CountAsync(ct)).IsEqualTo(1);
+            var shared = await store.ReadContentAsync(competition.Id, challenge.Id, v1, readerMember.Id, false, now, ct);
+            await Assert.That(shared.Markdown).IsEqualTo("# old secret");
             var second = await store.SaveDraftAsync(save with { Markdown = "# new secret", ExpectedStamp = published.WriteUp!.ConcurrencyStamp }, ct);
             var secondSubmit = await store.SubmitAsync(new(competition.Id, challenge.Id, author.Id, false, second.WriteUp!.ConcurrencyStamp, now), ct);
             await Assert.That(secondSubmit.WriteUp!.PublishedVersionId).IsEqualTo(v1);
@@ -75,7 +93,7 @@ public sealed class ChallengeWriteUpPersistenceTests
             competition.Status = CompetitionStatus.Finished; await db.SaveChangesAsync(ct);
             var free = await store.ReadContentAsync(competition.Id, challenge.Id, v1, reader.Id, false, now, ct);
             await Assert.That(free.Markdown).IsEqualTo("# old secret");
-            await Assert.That(await db.WriteUpUnlockReceipts.CountAsync(ct)).IsEqualTo(0);
+            await Assert.That(await db.WriteUpUnlockReceipts.CountAsync(ct)).IsEqualTo(1);
             competition.SingleWriteUpsEnabled = false; await db.SaveChangesAsync(ct);
             await Assert.That(await store.ListAsync(competition.Id, challenge.Id, reader.Id, false, now, ct)).IsNull();
             await Assert.That(await store.ListAsync(competition.Id, challenge.Id, owner.Id, true, now, ct)).IsNotNull();

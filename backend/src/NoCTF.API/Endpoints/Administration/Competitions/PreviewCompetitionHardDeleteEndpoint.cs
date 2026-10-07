@@ -23,7 +23,8 @@ public enum CompetitionHardDeleteReferenceCode
     NotificationScopeConflict,
     ProgressionGraph,
     Badge,
-    BadgeGrant
+    BadgeGrant,
+    ChallengeWriteUp
 }
 
 public sealed record CompetitionHardDeleteReferenceResponse(

@@ -10,12 +10,25 @@ namespace NoCTF.Worker;
 public sealed class GameplayFactMessageHandler(
     IGameplayFactProcessor processor,
     NoCtfDbContext db,
-    IGameplayFactStateChangedNotification notifications)
+    IGameplayFactStateChangedNotification notifications,
+    IPostCommitMessagePublisher publisher)
 {
-    public Task Handle(
+    public async Task Handle(
         EvaluateGameplayFact message,
-        CancellationToken cancellationToken) =>
-        processor.ProcessAsync(message.GameplayFactId, cancellationToken);
+        CancellationToken cancellationToken)
+    {
+        var unlock = await db.GameplayFacts.AsNoTracking().Where(x => x.Id == message.GameplayFactId
+            && x.Kind == NoCTF.Domain.Gameplay.GameplayFactKind.WriteUpUnlock
+            && x.State == NoCTF.Domain.Gameplay.GameplayFactState.Queued)
+            .Select(x => (Guid?)x.CompetitionId).SingleOrDefaultAsync(cancellationToken);
+        if (unlock is Guid competitionId)
+        {
+            await publisher.PublishAsync(new ProjectLeaderboard(competitionId));
+            await publisher.FlushCommittedMessagesAsync();
+            return;
+        }
+        await processor.ProcessAsync(message.GameplayFactId, cancellationToken);
+    }
 
     public async Task Handle(
         GameplayFactStateChanged message,

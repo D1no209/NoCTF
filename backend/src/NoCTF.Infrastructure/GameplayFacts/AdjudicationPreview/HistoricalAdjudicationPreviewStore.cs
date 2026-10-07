@@ -29,7 +29,7 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db) : IHis
         CompetitionEventKind.TrackConfigurationUpdated, CompetitionEventKind.TeamTrackChanged,
         CompetitionEventKind.TeamBanned, CompetitionEventKind.TeamUnbanned, CompetitionEventKind.TeamDeleted,
         CompetitionEventKind.TeamRegistrationChanged, CompetitionEventKind.TeamBanAppealAccepted,
-        CompetitionEventKind.TeamBanCorrectionPublished
+        CompetitionEventKind.TeamBanCorrectionPublished, CompetitionEventKind.ChallengeWriteUpUnlocked
     ];
 
     public Task<HistoricalAdjudicationEvidencePage> ReadAsync(Guid competitionId, Guid? competitionChallengeId,
@@ -163,7 +163,9 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db) : IHis
             CtfCompletionEligibility.CanParticipate(team.RegistrationStatus, team.IsBanned, team.DeletedAt != null)
             && (window is null || team.RegisteredAt < window.Value.EndAt)
             && CtfCompletionEligibility.Track(tracks, team.TrackKey).EarnsBlood).Select(team => team.Id).ToHashSet();
-        bool Eligible(Guid teamId) => eligibleTeams.Contains(teamId);
+        var writeUpReceipts = await db.WriteUpUnlockReceipts.AsNoTracking().Where(x => x.CompetitionId == competitionId).ToArrayAsync(ct);
+        bool Eligible(Guid teamId, Guid challengeId, DateTimeOffset submittedAt) => eligibleTeams.Contains(teamId)
+            && !writeUpReceipts.Any(x => x.TeamId == teamId && x.CompetitionChallengeId == challengeId && x.UnlockedAt <= submittedAt);
         var firstsByChallenge = firstCorrects.GroupBy(item => item.CompetitionChallengeId).ToDictionary(group => group.Key, group => group.ToArray());
         var evidence = facts.Select(fact =>
         {
@@ -171,7 +173,7 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db) : IHis
             var own = firsts.Length == 0 ? null : firsts.SingleOrDefault(item => item.TeamId == fact.TeamId);
             var earlier = firsts.Length == 0 ? [] : firsts.Where(item => item.TeamId != fact.TeamId
                 && CtfCompletionEligibility.IsBefore(item.OccurredAt, item.Id, fact.OccurredAt, fact.Id)).ToArray();
-            var currentEligible = fact.TeamId is { } teamId && Eligible(teamId);
+            var currentEligible = fact.TeamId is { } teamId && Eligible(teamId, fact.CompetitionChallengeId, fact.OccurredAt);
             var ownEvents = eventsByFact.GetValueOrDefault(fact.Id, []);
             // The retained prefix is already sorted descending by (OccurredAt, Id).
             var timeline = ownEvents.Length == 0 ? [] : ownEvents.Take(MaximumEventsPerFact).Reverse().Select(ReadEvent).ToArray();
@@ -184,8 +186,8 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db) : IHis
                 fact.TeamId, fact.TeamId is { } owner ? teams.GetValueOrDefault(owner)?.Name ?? owner.ToString() : null,
                 competition.Mode, fact.Kind, fact.Result, fact.FailureCode, fact.OccurredAt,
                 own is not null && CtfCompletionEligibility.IsBefore(own.OccurredAt, own.Id, fact.OccurredAt, fact.Id),
-                earlier.Count(item => Eligible(item.TeamId)),
-                competition.Mode == GameMode.Ctf && (!currentEligible || earlier.Any(item => !Eligible(item.TeamId)) || eligibilityEvents.Length > 64),
+                earlier.Count(item => Eligible(item.TeamId, item.CompetitionChallengeId, item.OccurredAt)),
+                competition.Mode == GameMode.Ctf && (!currentEligible || earlier.Any(item => !Eligible(item.TeamId, item.CompetitionChallengeId, item.OccurredAt)) || eligibilityEvents.Length > 64),
                 timeline, timeline.Length == 0 ? [] : timeline.Where(item => HistoricalAdjudicationAnalyzer.IsBlood(item.Kind)).Select(item => ToBloodRank(item.Kind)).ToArray(),
                 fact.State, ownEvents.Length > MaximumEventsPerFact || eligibilityEvents.Length > 64
                     ? AdjudicationEvidenceCompleteness.Truncated : AdjudicationEvidenceCompleteness.Complete,

@@ -68,7 +68,7 @@ namespace Internal.Generated.WolverineHandlers
 
             System.Diagnostics.Activity.Current?.SetTag("message.handler", "NoCTF.Worker.GameplayFactMessageHandler");
             System.Diagnostics.Activity.Current?.SetTag("handler.type", "NoCTF.Worker.GameplayFactMessageHandler");
-            var gameplayFactMessageHandler = new NoCTF.Worker.GameplayFactMessageHandler(gameplayFactProcessor, noCtfDbContext, _gameplayFactStateChangedNotification);
+            var gameplayFactMessageHandler = new NoCTF.Worker.GameplayFactMessageHandler(gameplayFactProcessor, noCtfDbContext, _gameplayFactStateChangedNotification, wolverinePostCommitMessagePublisher);
             
             // The actual message execution
             await gameplayFactMessageHandler.Handle(gameplayFactStateChanged, cancellation).ConfigureAwait(false);

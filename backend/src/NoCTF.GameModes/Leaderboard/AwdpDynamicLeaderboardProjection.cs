@@ -191,7 +191,10 @@ internal static class AwdpDynamicLeaderboardProjection
                 {
                     AttackScore = attackScore,
                     DefenseScore = defenseScore,
-                    PenaltyScore = penalty
+                    PenaltyScore = penalty,
+                    AttackCount = own.Count(item => item.Fact.Kind == GameplayFactKind.BreakAttempt),
+                    FixCount = own.Count(item => item.Fact.Kind == GameplayFactKind.FixAttempt),
+                    LastFixAt = lastFixAt
                 },
                 own.Count(item => item.Fact.Kind == GameplayFactKind.FixAttempt),
                 own.Count(item => item.Fact.Kind == GameplayFactKind.BreakAttempt),

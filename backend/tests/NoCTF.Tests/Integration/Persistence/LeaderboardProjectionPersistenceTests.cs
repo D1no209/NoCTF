@@ -96,7 +96,7 @@ public sealed class LeaderboardProjectionPersistenceTests
                         await handler.Handle(new(change.CompetitionId, change.Id, change.Kind, change.Level, change.OccurredAt), ct);
                 clock.Advance(TimeSpan.FromMilliseconds(500));
                 await Assert.That(queue.TakeDue(clock.GetUtcNow())).IsEquivalentTo([fixture.Competition.Id]);
-                await new LeaderboardMessageHandler(cache).Handle(new(fixture.Competition.Id), ct);
+                await new LeaderboardMessageHandler(cache, db, TimeProvider.System).Handle(new(fixture.Competition.Id), ct);
                 return (await cache.GetScoreboardAsync(fixture.Competition.Id, ct))!;
             }
             long Score(ScoreboardProjection projection, Guid team) => projection.Snapshot.Teams.Single(item => item.TeamId == team).TotalScore;
@@ -269,7 +269,7 @@ public sealed class LeaderboardProjectionPersistenceTests
                 change.CompetitionId, change.Id, change.Kind, change.Level, change.OccurredAt), ct);
             clock.Advance(TimeSpan.FromMilliseconds(500));
             await Assert.That(queue.TakeDue(clock.GetUtcNow())).IsEquivalentTo([fixture.Competition.Id]);
-            await new LeaderboardMessageHandler(cache).Handle(new(fixture.Competition.Id), ct);
+            await new LeaderboardMessageHandler(cache, db, TimeProvider.System).Handle(new(fixture.Competition.Id), ct);
             var after = (await cache.GetScoreboardAsync(fixture.Competition.Id, ct))!;
             await Assert.That(before.Schema.LatestRound).IsEqualTo(3);
             await Assert.That(after.Schema.LatestRound).IsEqualTo(2);
@@ -1680,7 +1680,7 @@ public sealed class LeaderboardProjectionPersistenceTests
         ILeaderboardCache cache,
         CancellationToken cancellationToken)
     {
-        await new LeaderboardMessageHandler(cache).Handle(
+        await new LeaderboardMessageHandler(cache, db, TimeProvider.System).Handle(
             new ProjectLeaderboard(db.Competitions.Select(item => item.Id).Single()),
             cancellationToken);
     }

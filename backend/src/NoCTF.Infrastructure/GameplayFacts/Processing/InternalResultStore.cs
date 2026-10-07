@@ -407,11 +407,15 @@ public sealed class InternalResultStore(
         var currentTrack = CtfCompletionEligibility.Track(tracks, currentTrackKey);
         if (currentTrack?.EarnsBlood != true)
             return null;
+        if (await db.WriteUpUnlockReceipts.AsNoTracking().AnyAsync(x => x.TeamId == fact.TeamId
+            && x.CompetitionChallengeId == fact.CompetitionChallengeId && x.UnlockedAt <= fact.OccurredAt, ct)) return null;
         var bloodTrackKeys = tracks.Tracks.Where(track => track.EarnsBlood)
             .Select(track => track.Key.ToLowerInvariant())
             .ToArray();
         var solvedTeamIds = await db.GameplayFacts.AsNoTracking()
             .Where(CtfCompletionEligibility.Before(fact.OccurredAt, fact.Id))
+            .Where(candidate => !db.WriteUpUnlockReceipts.Any(x => x.TeamId == candidate.TeamId
+                && x.CompetitionChallengeId == candidate.CompetitionChallengeId && x.UnlockedAt <= candidate.OccurredAt))
             .Where(candidate => candidate.CompetitionId == fact.CompetitionId
                 && candidate.CompetitionChallengeId == fact.CompetitionChallengeId
                 && candidate.Kind == GameplayFactKind.FixAttempt

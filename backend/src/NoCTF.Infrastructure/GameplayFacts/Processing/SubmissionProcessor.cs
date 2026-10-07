@@ -912,12 +912,16 @@ public sealed class GameplayFactProcessor(
         var currentTrack = CtfCompletionEligibility.Track(tracks, currentTrackKey);
         if (currentTrack?.EarnsBlood != true)
             return null;
+        if (await db.WriteUpUnlockReceipts.AsNoTracking().AnyAsync(x => x.TeamId == submission.TeamId
+            && x.CompetitionChallengeId == submission.CompetitionChallengeId && x.UnlockedAt <= submission.OccurredAt, ct)) return null;
         var bloodTrackKeys = tracks.Tracks.Where(track => track.EarnsBlood)
             .Select(track => track.Key.ToLowerInvariant())
             .ToArray();
 
         var solvedTeamIds = await db.GameplayFacts.AsNoTracking()
             .Where(CtfCompletionEligibility.Before(submission.OccurredAt, submission.Id))
+            .Where(candidate => !db.WriteUpUnlockReceipts.Any(x => x.TeamId == candidate.TeamId
+                && x.CompetitionChallengeId == candidate.CompetitionChallengeId && x.UnlockedAt <= candidate.OccurredAt))
             .Where(candidate =>
                 candidate.CompetitionId == submission.CompetitionId
                 && candidate.CompetitionChallengeId == submission.CompetitionChallengeId

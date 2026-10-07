@@ -19,9 +19,10 @@ using NoCTF.Infrastructure.Persistence;
 
 namespace NoCTF.Infrastructure.Challenges.WriteUps;
 
-public sealed class ChallengeWriteUpStore(NoCtfDbContext db, ICompetitionModerationAuthorizer authorizer,
+public sealed partial class ChallengeWriteUpStore(NoCtfDbContext db, ICompetitionModerationAuthorizer authorizer,
     ICompetitionChallengeReadAccess readAccess, ICompetitionEventRecorder events,
-    IPostCommitMessagePublisher messages) : IChallengeWriteUpStore
+    IPostCommitMessagePublisher messages,
+    NoCTF.Application.Scoring.Leaderboard.ILeaderboardCache? leaderboards = null) : IChallengeWriteUpStore
 {
     private sealed record Context(Competition Competition, CompetitionChallenge Challenge,
         Guid? TeamId, bool CanObserve, bool CanJudge, bool CanManage);
@@ -52,10 +53,11 @@ public sealed class ChallengeWriteUpStore(NoCtfDbContext db, ICompetitionModerat
     {
         var context = await ContextAsync(competitionId, challengeId, actorId, staff, now, ct);
         if (context is null) return null;
-        var roots = await db.ChallengeWriteUps.AsNoTracking().Include(x => x.Versions)
+        var roots = await db.ChallengeWriteUps.AsNoTracking()
             .Where(x => x.CompetitionId == competitionId && x.CompetitionChallengeId == challengeId
                 && (staff || x.PublishedVersionId != null || x.TeamId == context.TeamId))
             .OrderByDescending(x => x.Source).ThenByDescending(x => x.UpdatedAt).ThenBy(x => x.Id).ToArrayAsync(ct);
+        await LoadVersionMetadataAsync(roots, ct, staff ? null : roots.Where(x => x.TeamId == context.TeamId).Select(x => x.Id).ToArray());
         var receipt = context.TeamId is Guid teamId ? await db.WriteUpUnlockReceipts.AsNoTracking()
             .SingleOrDefaultAsync(x => x.TeamId == teamId && x.CompetitionChallengeId == challengeId, ct) : null;
         var access = Access(context, receipt, now);
@@ -64,10 +66,11 @@ public sealed class ChallengeWriteUpStore(NoCtfDbContext db, ICompetitionModerat
             .ToDictionaryAsync(x => x.Id, x => x.Name, ct);
         var title = context.Challenge.CustomTitle ?? await db.Challenges.AsNoTracking()
             .Where(x => x.Id == context.Challenge.ChallengeId).Select(x => x.Title).SingleAsync(ct);
+        var actors = await ActorNamesAsync(roots, ct);
         foreach (var root in roots)
             items.Add(Map(root, title, root.TeamId is Guid id ? names.GetValueOrDefault(id, string.Empty) : string.Empty,
-                staff || root.TeamId == context.TeamId));
-        return new(access, items);
+                staff || root.TeamId == context.TeamId, actors));
+        return new(access, items.OrderByDescending(x => x.Source).ThenByDescending(x => x.Published?.PublishedAt ?? x.UpdatedAt).ThenBy(x => x.Id).ToArray());
     }
 
     private static WriteUpAccessView Access(Context context, WriteUpUnlockReceipt? receipt, DateTimeOffset now)
@@ -84,10 +87,14 @@ public sealed class ChallengeWriteUpStore(NoCtfDbContext db, ICompetitionModerat
                 competition.EndAt, competition.SingleWriteUpDeadlineHours, now),
             competition.Status == CompetitionStatus.Finished, receipt is not null,
             receipt?.DeductionPercent ?? percent, receipt?.UnlockedAt,
-            context.TeamId is not null && competition.Status == CompetitionStatus.Running, settings, context.TeamId);
+            context.TeamId is not null && competition.Status == CompetitionStatus.Running, settings, context.TeamId,
+            context.TeamId is null || CompetitionLeaderboardVisibilityPolicy.EffectiveAt(competition.FrozenStartAt,
+                competition.HiddenStartAt, now) == CompetitionLeaderboardVisibility.Normal);
     }
 
-    public async Task<WriteUpMutationResult> SaveDraftAsync(SaveWriteUpDraft command, CancellationToken ct)
+    public Task<WriteUpMutationResult> SaveDraftAsync(SaveWriteUpDraft command, CancellationToken ct) =>
+        MutateAsync(() => SaveDraftCoreAsync(command, ct));
+    private async Task<WriteUpMutationResult> SaveDraftCoreAsync(SaveWriteUpDraft command, CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         var context = await ContextAsync(command.CompetitionId, command.CompetitionChallengeId, command.ActorId,
@@ -129,7 +136,9 @@ public sealed class ChallengeWriteUpStore(NoCtfDbContext db, ICompetitionModerat
         return await MutationViewAsync(root, context, ct);
     }
 
-    public async Task<WriteUpMutationResult> SubmitAsync(SubmitWriteUp command, CancellationToken ct)
+    public Task<WriteUpMutationResult> SubmitAsync(SubmitWriteUp command, CancellationToken ct) =>
+        MutateAsync(() => SubmitCoreAsync(command, ct));
+    private async Task<WriteUpMutationResult> SubmitCoreAsync(SubmitWriteUp command, CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         var context = await ContextAsync(command.CompetitionId, command.CompetitionChallengeId, command.ActorId, command.Official, command.Now, ct);
@@ -151,7 +160,9 @@ public sealed class ChallengeWriteUpStore(NoCtfDbContext db, ICompetitionModerat
         return await MutationViewAsync(root, context, ct);
     }
 
-    public async Task<WriteUpMutationResult> ReviewAsync(ReviewWriteUp command, CancellationToken ct)
+    public Task<WriteUpMutationResult> ReviewAsync(ReviewWriteUp command, CancellationToken ct) =>
+        MutateAsync(() => ReviewCoreAsync(command, ct));
+    private async Task<WriteUpMutationResult> ReviewCoreAsync(ReviewWriteUp command, CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         var context = await ContextAsync(command.CompetitionId, command.CompetitionChallengeId, command.ActorId, true, command.Now, ct);
@@ -170,7 +181,8 @@ public sealed class ChallengeWriteUpStore(NoCtfDbContext db, ICompetitionModerat
         }
         else
         {
-            if (root.SubmittedVersionId != version.Id || version.State is not (WriteUpVersionState.Submitted or WriteUpVersionState.Approved))
+            if (!(root.SubmittedVersionId == version.Id && version.State == WriteUpVersionState.Submitted)
+                && !(command.Action == WriteUpReviewAction.Publish && version.State == WriteUpVersionState.Approved))
                 return new(Failure: ChallengeWriteUpFailure.Conflict);
             if (command.Action == WriteUpReviewAction.Reject && (string.IsNullOrWhiteSpace(command.Reason) || command.Reason.Length > 4000))
                 return new(Failure: ChallengeWriteUpFailure.InvalidContent);
@@ -211,8 +223,10 @@ public sealed class ChallengeWriteUpStore(NoCtfDbContext db, ICompetitionModerat
 
     private ValueTask<Guid> RecordAsync(Context context, ChallengeWriteUp root, Guid actorId, CompetitionEventKind kind,
         DateTimeOffset now, CancellationToken ct) => events.RecordAsync(new(context.Competition.Id, kind,
-            CompetitionEventLevel.Information, CompetitionEventVisibility.Staff, now, ActorUserId: actorId,
-            TeamId: root.TeamId, SubjectType: EntityReferenceKind.CompetitionChallenge,
+            CompetitionEventLevel.Information, kind is CompetitionEventKind.ChallengeWriteUpPublished or CompetitionEventKind.ChallengeWriteUpWithdrawn
+                ? CompetitionEventVisibility.Public : kind == CompetitionEventKind.ChallengeWriteUpRejected && root.TeamId is not null
+                    ? CompetitionEventVisibility.Team : CompetitionEventVisibility.Staff, now, ActorUserId: actorId,
+            TeamId: root.TeamId, CompetitionChallengeId: root.CompetitionChallengeId, SubjectType: EntityReferenceKind.CompetitionChallenge,
             SubjectId: root.CompetitionChallengeId), ct);
 
     private async Task<WriteUpMutationResult> MutationViewAsync(ChallengeWriteUp root, Context context, CancellationToken ct)
@@ -220,17 +234,30 @@ public sealed class ChallengeWriteUpStore(NoCtfDbContext db, ICompetitionModerat
         var title = context.Challenge.CustomTitle ?? await db.Challenges.AsNoTracking().Where(x => x.Id == context.Challenge.ChallengeId)
             .Select(x => x.Title).SingleAsync(ct);
         var name = root.TeamId is Guid teamId ? await db.Teams.AsNoTracking().Where(x => x.Id == teamId).Select(x => x.Name).SingleAsync(ct) : string.Empty;
-        return new(Map(root, title, name, true));
+        return new(Map(root, title, name, true, await ActorNamesAsync([root], ct)));
     }
 
-    private static ChallengeWriteUpView Map(ChallengeWriteUp root, string title, string authorName, bool privateVersions)
+    private static ChallengeWriteUpView Map(ChallengeWriteUp root, string title, string authorName, bool privateVersions,
+        IReadOnlyDictionary<Guid, string>? actorNames = null)
     {
         WriteUpVersionView Metadata(ChallengeWriteUpVersion v) => new(v.Id, v.Number, v.Format,
-            v.State, v.ConcurrencyStamp, v.ActorUserId, v.UpdatedAt, v.SubmittedAt, privateVersions ? v.ReviewReason : null);
+            v.State, v.ConcurrencyStamp, v.ActorUserId, v.UpdatedAt, v.SubmittedAt, privateVersions ? v.ReviewReason : null,
+            ActorDisplayName: actorNames?.GetValueOrDefault(v.ActorUserId),
+            PublishedAt: v.State == WriteUpVersionState.Approved ? v.ReviewedAt : null);
         WriteUpVersionView? Version(Guid? id) => root.Versions.SingleOrDefault(x => x.Id == id) is { } v ? Metadata(v) : null;
         return new(root.Id, root.CompetitionChallengeId, title, root.Source, root.TeamId, authorName, root.ConcurrencyStamp,
-            root.PublishedVersionId, root.UpdatedAt, privateVersions ? Version(root.DraftVersionId) : null,
+            root.PublishedVersionId, privateVersions ? root.UpdatedAt : Version(root.PublishedVersionId)?.PublishedAt ?? root.UpdatedAt,
+            privateVersions ? Version(root.DraftVersionId) : null,
             privateVersions ? Version(root.SubmittedVersionId) : null, Version(root.PublishedVersionId),
             privateVersions ? root.Versions.OrderByDescending(x => x.Number).Select(Metadata).ToArray() : []);
+    }
+    private async Task<WriteUpMutationResult> MutateAsync(Func<Task<WriteUpMutationResult>> mutate)
+    {
+        try { return await mutate(); }
+        catch (Exception exception) when (exception is DbUpdateException || TransactionFailureClassifier.IsRetryable(exception))
+        {
+            db.ChangeTracker.Clear(); messages.DiscardPendingMessages();
+            return new(Failure: ChallengeWriteUpFailure.Conflict);
+        }
     }
 }

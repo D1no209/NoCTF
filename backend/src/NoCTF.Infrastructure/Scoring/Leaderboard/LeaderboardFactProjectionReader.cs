@@ -78,6 +78,14 @@ internal static class LeaderboardFactProjectionReader
                 ct);
             var aggregateRows = await ReadAwdManualAdjustmentsAsync(query, ct);
             var windowRows = await ReadAwdWindowAsync(query, awdWindowRounds ?? [], ct);
+            if (awdWindowRounds is { Count: > 0 } && await db.WriteUpUnlockReceipts.AsNoTracking()
+                .AnyAsync(x => x.CompetitionId == competitionId && x.UnlockedAt <= projectedAt, ct))
+            {
+                var carry = await ReadAwdAggregatesAsync(db, competitionId, competitionConfiguration, challenges,
+                    teams, awdWindowRounds.Min(x => x.StartsAt), ct);
+                var prior = carry.ToDictionary(x => (x.TeamId, x.CompetitionChallengeId), x => x.PositivePoints);
+                aggregates = aggregates.Select(x => x with { PositivePointsBeforeWindow = prior.GetValueOrDefault((x.TeamId, x.CompetitionChallengeId)) }).ToArray();
+            }
             return new(
                 Map(aggregateRows, hintCosts),
                 Map(windowRows.Concat(aggregateRows), hintCosts),
@@ -391,7 +399,8 @@ internal static class LeaderboardFactProjectionReader
                 pair.Value.AttackPoints,
                 pair.Value.AttackCount,
                 pair.Value.UpRoundCount,
-                pair.Value.LastAttackAt))
+                pair.Value.LastAttackAt,
+                checked(pair.Value.AttackPoints + (long)pair.Value.UpRoundCount * settingsByChallenge[pair.Key.ChallengeId].ServiceHealthyPoints)))
             .ToArray();
     }
 

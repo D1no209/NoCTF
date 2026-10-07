@@ -99,19 +99,21 @@ internal static class CtfLeaderboardProjection
                 precedingDynamicSolves[challengeId] = priceOrdinal;
             if (!validTeams.TryGetValue(solve.TeamId!.Value, out var team))
             {
-                if (atSolve && CtfCompletionEligibility.EarnsBlood(activeTeams[solve.TeamId.Value]))
+                if (atSolve && CtfCompletionEligibility.EarnsBlood(activeTeams[solve.TeamId.Value])
+                    && WriteUpBenefitProjection.CanEarnBlood(input, solve))
                     bloodSolveNumber[challengeId] = checked(bloodSolveNumber.GetValueOrDefault(challengeId) + 1);
                 continue;
             }
             var bloodIndex = bloodSolveNumber.GetValueOrDefault(challengeId);
-            var solveOrdinal = team.EarnsBlood ? checked(bloodIndex + 1) : 0;
+            var earnsBlood = team.EarnsBlood && WriteUpBenefitProjection.CanEarnBlood(input, solve);
+            var solveOrdinal = earnsBlood ? checked(bloodIndex + 1) : 0;
             var score = ScoreCurve.Evaluate(
                 curve,
                 atSolve ? priceOrdinal : Math.Max(1, currentSolveCounts.GetValueOrDefault(challengeId)),
                 dynamicTeams.Count);
             var basePoints = score;
             var bloodPoints = 0L;
-            if (team.EarnsBlood)
+            if (earnsBlood)
             {
                 bloodPoints = BloodRewardAt(
                     configuration.BloodRewards ?? defaults.BloodRewards,
@@ -423,7 +425,7 @@ internal static class AwdLeaderboardProjection
                     values[team.Id],
                     attackCount,
                     lastAttackAt,
-                    team.TrackKey),
+                    team.TrackKey) { AttackScore = attackPoints[team.Id], AttackCount = attackCount, UpRoundCount = upRoundCounts[team.Id] },
                 attackPoints[team.Id],
                 upRoundCounts[team.Id],
                 attackCount,
@@ -516,7 +518,8 @@ internal static class AwdLeaderboardProjection
                     score,
                     attackCount,
                     lastAttackAt.GetValueOrDefault(team.Id),
-                    team.TrackKey),
+                    team.TrackKey) { AttackScore = attackPoints.GetValueOrDefault(team.Id), AttackCount = attackCount,
+                        UpRoundCount = upRoundCounts.GetValueOrDefault(team.Id) },
                 attackPoints.GetValueOrDefault(team.Id),
                 upRoundCounts.GetValueOrDefault(team.Id),
                 attackCount,
@@ -700,7 +703,8 @@ internal static class KohLeaderboardProjection
                         + manualAdjustments.GetValueOrDefault(team.Id)),
                     observationCount,
                     last == default ? null : own.Max(fact => fact.LastOccurredAt ?? fact.OccurredAt),
-                    team.TrackKey),
+                    team.TrackKey) { ControlledChallengeCount = own.Select(fact => fact.CompetitionChallengeId!.Value).Distinct().Count(),
+                        FirstControlAt = first == default ? null : first },
                 observationCount,
                 own.Select(fact => fact.CompetitionChallengeId!.Value).Distinct().Count(),
                 first == default ? null : first,
