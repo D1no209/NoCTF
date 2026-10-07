@@ -11,7 +11,7 @@ function harness() {
   const reads: Array<{ options: any; resolve: (value: any) => void; reject: (error: unknown) => void }> = []
   const appeals: any[] = []
   let teamRefreshes = 0
-  const props = reactive({ competitionId: 'competition', teamId: 'team' })
+  const props = reactive({ competitionId: 'competition', teamId: 'team', teamName: undefined as string | undefined, teamAvatarUrl: null as string | null })
   const dependencies = { computed, ref, watch, onScopeDispose, logoUrl: '/logo.svg', validateAppealStatement,
     message: (key: string) => ({ key }), parseApiError: (_: unknown, fallback: any) => ({ displayMessage: fallback }),
     getMyTeamBanCase: (options: any) => new Promise((resolve, reject) => reads.push({ options, resolve, reject })),
@@ -24,6 +24,30 @@ function harness() {
 const ban = (source = 'CheatIncident', canAppeal = true) => ({ teamId: 'team', isCurrentlyBanned: true, source, canAppeal })
 
 describe('team ban screen', () => {
+  test('uses the banned team avatar and responds to refreshed team identity', async () => {
+    const app = harness()
+    app.props.teamName = '  Alpha squad  '
+    app.props.teamAvatarUrl = '/api/v1/teams/team/avatar?revision=first'
+    expect(app.state.teamAvatarUrl.value).toBe('/api/v1/teams/team/avatar?revision=first')
+    expect(app.state.teamInitials.value).toBe('AL')
+    app.props.teamName = '星月'
+    app.props.teamAvatarUrl = '/api/v1/teams/team/avatar?revision=second'
+    expect(app.state.teamName.value).toBe('星月')
+    expect(app.state.teamInitials.value).toBe('星月')
+    expect(app.state.teamAvatarUrl.value).toContain('revision=second')
+    app.stop()
+  })
+
+  test('uses the case team name as fallback when no avatar or parent name is available', async () => {
+    const app = harness()
+    app.reads[0]!.resolve({ data: { ...ban(), teamName: '🦖 Squad' } }); await drain()
+    expect(app.state.teamAvatarUrl.value).toBe(undefined)
+    expect(app.state.teamInitials.value).toBe('🦖 ')
+    app.props.teamName = 'Beta'
+    expect(app.state.teamInitials.value).toBe('BE')
+    app.stop()
+  })
+
   test('preserves the ban source when refreshing manual and cheating bans', async () => {
     const app = harness()
     app.reads[0]!.resolve({ data: ban() }); await drain()

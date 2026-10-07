@@ -1,13 +1,13 @@
 import { computed, onScopeDispose, ref, watch } from 'vue'
 import { getMyTeamBanCase, submitTeamBanAppeal } from '../../api'
 import type { NoCtfapiEndpointsTeamsMyTeamBanCaseResponse } from '../../api'
-import logoUrl from '../../assets/svg/brand/noctf-wordmark-white.svg?url'
+import logoUrl from '../../assets/images/brand/noctf-team-ban-logo.png'
 import { validateAppealStatement } from '../../lib/participant-form-validation'
 import { message } from '../../utils/i18n'
 import type { UiMessage } from '../../utils/i18n'
 import { parseApiError } from '../../utils/api-error'
 
-export function useCompetitionTeamBanScreen(props: Readonly<{ competitionId: string; teamId: string }>, refreshTeam: () => void = () => {}) {
+export function useCompetitionTeamBanScreen(props: Readonly<{ competitionId: string; teamId: string; teamName?: string; teamAvatarUrl?: string | null }>, refreshTeam: () => void = () => {}) {
   const banCase = ref<NoCtfapiEndpointsTeamsMyTeamBanCaseResponse | null>(null)
   const loading = ref(true)
   const error = ref<UiMessage | null>(null)
@@ -19,6 +19,9 @@ export function useCompetitionTeamBanScreen(props: Readonly<{ competitionId: str
   const isCheatingBan = computed(() => banCase.value?.source === 'CheatIncident')
   const appealStatus = computed(() => banCase.value?.appeal?.status)
   const canAppeal = computed(() => banCase.value?.canAppeal === true)
+  const teamName = computed(() => props.teamName ?? banCase.value?.teamName ?? '')
+  const teamAvatarUrl = computed(() => props.teamAvatarUrl ?? undefined)
+  const teamInitials = computed(() => Array.from(teamName.value.trim()).slice(0, 2).join('').toUpperCase())
   async function refresh() {
     request?.abort()
     const current = new AbortController()
@@ -65,7 +68,7 @@ export function useCompetitionTeamBanScreen(props: Readonly<{ competitionId: str
   }
   watch(() => [props.competitionId, props.teamId], () => { banCase.value = null; void refresh() }, { immediate: true })
   onScopeDispose(() => request?.abort())
-  return { logoUrl, loading, error, isCheatingBan, canAppeal, appealStatus,
+  return { logoUrl, teamName, teamAvatarUrl, teamInitials, loading, error, isCheatingBan, canAppeal, appealStatus,
     appealOpen, statement, pending, appealError, refresh, refreshScreen, setAppealOpen, submitAppeal }
 }
 

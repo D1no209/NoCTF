@@ -2,7 +2,7 @@
 import { toRefs } from 'vue'
 import type { CompetitionTeamBanScreenViewState } from '../../../features/competition/useCompetitionTeamBanScreen'
 const props = defineProps<{ state: CompetitionTeamBanScreenViewState }>()
-const { logoUrl, loading, error, canAppeal, appealStatus,
+const { logoUrl, teamName, teamAvatarUrl, teamInitials, loading, error, canAppeal, appealStatus,
   appealOpen, statement, pending, appealError, refreshScreen, setAppealOpen, submitAppeal } = toRefs(props.state)
 </script>
 
@@ -10,7 +10,13 @@ const { logoUrl, loading, error, canAppeal, appealStatus,
   <section data-team-banned-screen aria-labelledby="team-ban-title">
     <ScrollSurface class="team-ban-screen-scroll">
       <div class="team-ban-screen-content">
-        <img :src="logoUrl" :alt="$t('common.label.noctf')" class="team-ban-screen-logo" width="520" height="155">
+        <div class="team-ban-screen-logo">
+          <Avatar class="team-ban-screen-logo-avatar">
+            <AvatarImage v-if="teamAvatarUrl" :src="teamAvatarUrl" :alt="teamName" />
+            <AvatarFallback>{{ teamInitials }}</AvatarFallback>
+          </Avatar>
+          <img :src="logoUrl" :alt="$t('common.label.noctf')" class="team-ban-screen-logo-art" width="1983" height="793">
+        </div>
         <div role="status" aria-live="polite">
           <h1 id="team-ban-title" class="team-ban-screen-title">
             <span class="block">{{ $t('teamBanScreen.cheating') }}</span>

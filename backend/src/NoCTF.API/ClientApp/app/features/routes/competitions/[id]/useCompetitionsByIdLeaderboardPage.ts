@@ -117,11 +117,17 @@ export function useCompetitionsByIdLeaderboardPage() {
   function dampenLeaderboardWheel(event: WheelEvent): void {
     if (event.ctrlKey || event.shiftKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return
     const surface = event.currentTarget as HTMLElement | null
-    if (!surface || surface.scrollHeight <= surface.clientHeight) return
-    const lineHeight = Number.parseFloat(getComputedStyle(surface).lineHeight) || 16
-    const delta = dampenedLeaderboardWheelDelta(event, surface.clientHeight, lineHeight)
-    const next = Math.min(surface.scrollHeight - surface.clientHeight, Math.max(0, surface.scrollTop + delta))
-    if (next === surface.scrollTop) return
+    if (!surface) return
+    const viewportHeight = surface.clientHeight
+    const maximumScrollTop = surface.scrollHeight - viewportHeight
+    if (maximumScrollTop <= 0) return
+    const scrollTop = surface.scrollTop
+    const lineHeight = event.deltaMode === 1
+      ? Number.parseFloat(getComputedStyle(surface).lineHeight) || 16
+      : 16
+    const delta = dampenedLeaderboardWheelDelta(event, viewportHeight, lineHeight)
+    const next = Math.min(maximumScrollTop, Math.max(0, scrollTop + delta))
+    if (next === scrollTop) return
     event.preventDefault()
     surface.scrollTop = next
   }
