@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { computed, effectScope, nextTick, onScopeDispose, reactive, ref, toRefs, watch } from 'vue'
 import { challengeTagOptions, matchesAllTags, tagKey, tagsFromQuery, uniqueTags, validChallengeTags } from '../app/lib/challenge-tags'
-import { isChallengeVisible } from '../app/features/competition/useCompetitionChallengeNavigator'
+import { compileChallengeTitleSearch, isChallengeVisible } from '../app/features/competition/useCompetitionChallengeNavigator'
 
 const source = await Bun.file(new URL('../app/features/competition/useCompetitionChallengeNavigator.ts', import.meta.url)).text()
 const compiled = new Bun.Transpiler({ loader: 'ts' }).transformSync(source)
@@ -27,6 +27,7 @@ function harness(query: Record<string, any> = {}) {
     createTrailingRefresh: (callback: any) => callback,
     onMounted: (callback: () => void) => callback(), onUnmounted: onScopeDispose,
     translate: (key: string) => key, directionLabel: (value: string) => value,
+    describeMessage: (key: string) => ({ key }),
     bloodRankLabel: () => '', scoreboardCurrentChallengeScore: () => null,
   }
   const factory = new Function('deps', `const { ${Object.keys(deps).join(', ')} } = deps; ${compiled}; return useCompetitionChallengeNavigator;`)(deps)
@@ -57,6 +58,58 @@ describe('competition challenge tags', () => {
     expect(isChallengeVisible(row, { ...filters, search: 'crypto' })).toBe(false)
     expect(isChallengeVisible(row, { ...filters, hideSolved: true, solvedByMyTeam: true })).toBe(false)
     expect(isChallengeVisible({ ...row, locked: true }, { ...filters, hideLocked: true })).toBe(false)
+  })
+
+  test('keeps ordinary searches literal while regex mode supports anchors and alternatives', () => {
+    const filters = { hideSolved: false, hideLocked: false, solvedByMyTeam: false }
+    const literal = compileChallengeTitleSearch(' [day1] ', false)
+    expect(isChallengeVisible({ title: '[day1]nc' }, { ...filters, search: literal })).toBe(true)
+    expect(isChallengeVisible({ title: 'day1' }, { ...filters, search: literal })).toBe(false)
+    const expression = compileChallengeTitleSearch(' ^\\[day1\\].*(fmt|nc)$ ', true)
+    expect(isChallengeVisible({ title: '[DAY1]FMT' }, { ...filters, search: expression })).toBe(true)
+    expect(isChallengeVisible({ title: '[day1]nc' }, { ...filters, search: expression })).toBe(true)
+    expect(isChallengeVisible({ title: '[day2]nc' }, { ...filters, search: expression })).toBe(false)
+    expect(isChallengeVisible({ title: '[day1]orw' }, { ...filters, search: expression })).toBe(false)
+    expect(isChallengeVisible({ title: '[day1]nc' }, { ...filters, search: expression, hideSolved: true, solvedByMyTeam: true })).toBe(false)
+    expect(isChallengeVisible({ title: '[day1]nc', locked: true }, { ...filters, search: expression, hideLocked: true })).toBe(false)
+    expect(isChallengeVisible({ title: '[day1]nc', tags: ['Pwn'] }, { ...filters, search: expression, tags: ['Web'] })).toBe(false)
+  })
+
+  test('preserves case-sensitive regex escapes and rejects malformed expressions without throwing', () => {
+    const expression = compileChallengeTitleSearch('^\\D+$', true) as RegExp
+    expect(expression.test('NC')).toBe(true)
+    expect(expression.test('123')).toBe(false)
+    expect(expression.test('NC')).toBe(true)
+    expect(compileChallengeTitleSearch('[', true)).toBeNull()
+    expect(isChallengeVisible({ title: '[' }, { search: null, hideSolved: false, hideLocked: false, solvedByMyTeam: false })).toBe(false)
+    expect(compileChallengeTitleSearch('   ', true)).toBe('')
+    expect(compileChallengeTitleSearch(' FOO.* ', false)).toBe('foo.*')
+  })
+
+  test('combines regex mode with tag filters and recovers from invalid typing without changing selection', async () => {
+    const app = harness({ tag: 'Web' })
+    await drain()
+    app.state.regexSearch.value = true
+    app.state.search.value = '^(SQL|HTTP)$'
+    await drain()
+    expect(app.state.listOptions.value.map((item: any) => item.value)).toEqual(['sql', 'http'])
+    expect(app.state.searchError.value).toBeNull()
+    const readyCount = app.ready.length
+    app.state.search.value = '('
+    await drain()
+    expect(app.state.listOptions.value).toEqual([])
+    expect(app.state.searchError.value).toEqual({ key: 'challengeNavigator.invalidRegex' })
+    expect(app.ready).toHaveLength(readyCount)
+    app.state.search.value = '^http$'
+    await drain()
+    expect(app.state.listOptions.value.map((item: any) => item.value)).toEqual(['http'])
+    expect(app.state.searchError.value).toBeNull()
+    expect(app.state.selectedTags.value).toEqual(['Web'])
+    app.state.regexSearch.value = false
+    expect(app.state.listOptions.value).toEqual([])
+    app.state.search.value = ' HTTP '
+    expect(app.state.listOptions.value.map((item: any) => item.value)).toEqual(['http'])
+    app.stop()
   })
 
   test('restores repeated query tags and preserves other query state', async () => {
