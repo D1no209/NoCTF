@@ -2,6 +2,8 @@
 
 入口：平台设置 → 认证，`/admin/platform/authentication`。支持 OIDC 机密客户端授权码 + PKCE S256，以及 CAS 3.0。外部身份关联现有 Human 账号，不自动注册、按邮箱合并或映射平台角色。
 
+平台账号的验证器、恢复码和 OIDC MFA 信任见 [双重验证](./mfa.md)。
+
 ## 全局配置
 
 开启 SSO 并填写真实 Public Base URL，保存后重新读取。URL 用来生成回调，域名改变需同步外部客户端登记、proxy Origin、Cookie 和允许网络。
