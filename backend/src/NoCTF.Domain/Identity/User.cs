@@ -17,6 +17,7 @@ public sealed class User : NoCTF.Domain.Shared.IConcurrencyTracked
     public UserRole Role { get; set; }
     public UserAccountStatus AccountStatus { get; set; }
     public int TokenVersion { get; set; }
+    public bool MfaRequired { get; set; }
     public ExternalIdentity? ExternalIdentity { get; set; }
     [NotMapped]
     public Guid? ExternalIdentityProviderId

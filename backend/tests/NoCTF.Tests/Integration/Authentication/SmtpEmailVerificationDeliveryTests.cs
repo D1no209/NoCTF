@@ -30,6 +30,27 @@ public sealed class SmtpEmailVerificationDeliveryTests
 
     [Test]
     [Timeout(300_000)]
+    public async Task Mfa_recovery_mail_uses_the_real_Nuxt_route_and_security_mail_contains_no_recovery_material(CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var mail = BuildGreenMail(authenticationDisabled: false); await mail.StartAsync(ct);
+            var configuration = Configuration(mail.GetMappedPublicPort(SmtpsPort), SmtpSecurityMode.SslOnConnect, "mailer", "secret") with { Enabled = false };
+            var delivery = CreateDelivery(configuration); var token = new string('x', 43);
+            await Assert.That(await delivery.SendRecoveryAsync(UserId, token, ct)).IsEqualTo(NoCTF.Application.Authentication.Mfa.MfaMailDeliveryState.Sent);
+            await Assert.That(await delivery.SendSecurityNotificationAsync(UserId, NoCTF.Domain.Identity.Mfa.MfaOperation.RebindTotp, ct)).IsEqualTo(NoCTF.Application.Authentication.Mfa.MfaMailDeliveryState.Sent);
+            var messages = await ReadMessagesAsync(mail, ct); await Assert.That(messages.Count).IsEqualTo(2);
+            var recovery = messages.Single(value => value.Subject == "Recover your NoCTF authenticator");
+            await Assert.That(recovery.TextBody).Contains($"https://noctf.test/auth/mfa/recovery?token={token}");
+            await Assert.That(recovery.HtmlBody).Contains($"https://noctf.test/auth/mfa/recovery?token={token}");
+            var security = messages.Single(value => value.Subject == "NoCTF account security changed");
+            await Assert.That(security.TextBody).DoesNotContain(token);
+            await Assert.That(security.HtmlBody).DoesNotContain(token);
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task Password_reset_and_change_notice_work_when_registration_verification_is_disabled(
         CancellationToken cancellationToken)
     {

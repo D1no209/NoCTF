@@ -11,7 +11,10 @@ public enum PlatformSecretPurpose
     HumanVerificationTurnstileSecret,
     SsoOidcClientSecret,
     SsoDataProtectionKey,
-    CompetitionWebhookSecret
+    CompetitionWebhookSecret,
+    TotpCredentialSecret,
+    PendingTotpSecret,
+    MfaRecoveryGrant
 }
 
 public sealed class PlatformSecretProtector
@@ -194,6 +197,9 @@ public sealed class PlatformSecretProtector
                 "NoCTF.Sso.DataProtectionKey.v1",
             PlatformSecretPurpose.CompetitionWebhookSecret =>
                 "NoCTF.Competition.WebhookSecret.v1",
+            PlatformSecretPurpose.TotpCredentialSecret => "NoCTF.Authentication.TotpCredential.v1",
+            PlatformSecretPurpose.PendingTotpSecret => "NoCTF.Authentication.PendingTotp.v1",
+            PlatformSecretPurpose.MfaRecoveryGrant => "NoCTF.Authentication.MfaRecoveryGrant.v1",
             _ => throw new ArgumentOutOfRangeException(nameof(purpose), purpose, null)
         };
         return Encoding.UTF8.GetBytes(scopeId is null

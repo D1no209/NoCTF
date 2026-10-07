@@ -19,7 +19,7 @@ export function usePrivateAccountPanel(props: Readonly<Omit<{ userId: string, co
 
   const commonSources = computed(() => summarizeAccountSources(data.value?.activities ?? []))
 
-  const kinds: Record<string, string> = { Registered: "common.label.registrationSuccessful", LoggedIn: "common.label.loginSuccessful", LoginFailed: "auth.login.failed", FlagSubmitted: "administration.label.flagSubmission", PatchUploaded: "common.label.patchUpload" }
+  const kinds: Record<string, string> = { Registered: "common.label.registrationSuccessful", LoggedIn: "common.label.loginSuccessful", LoginFailed: "auth.login.failed", FlagSubmitted: "administration.label.flagSubmission", PatchUploaded: "common.label.patchUpload", MfaEnabled: "mfa.activity.MfaEnabled", MfaDisabled: "mfa.activity.MfaDisabled", MfaRebound: "mfa.activity.MfaRebound", MfaRecoveryCodesRegenerated: "mfa.activity.MfaRecoveryCodesRegenerated", MfaRecoveryGranted: "mfa.activity.MfaRecoveryGranted", MfaRecovered: "mfa.activity.MfaRecovered", MfaRequirementChanged: "mfa.activity.MfaRequirementChanged", MfaPolicyChanged: "mfa.activity.MfaPolicyChanged", OidcMfaTrustChanged: "mfa.activity.OidcMfaTrustChanged" }
 
   async function load() {
     const ticket = ++revision

@@ -164,6 +164,11 @@ internal static class AuthenticationInfrastructure
         services.AddScoped<RequestEmailVerification>();
         services.AddScoped<VerifyEmail>();
         services.AddScoped<IAccessTokenVersionReader, AccessTokenVersionReader>();
+        services.AddSingleton<NoCTF.Application.Authentication.Mfa.IMfaCryptography, Mfa.MfaCryptography>();
+        services.AddScoped<NoCTF.Application.Authentication.Mfa.IMfaAuthenticationStore, Mfa.MfaAuthenticationStore>();
+        services.AddScoped<NoCTF.Application.Authentication.Mfa.IMfaManagementStore, Mfa.MfaAuthenticationStore>();
+        services.AddScoped<NoCTF.Application.Authentication.Mfa.CompleteAuthentication>();
+        services.AddSingleton<NoCTF.Application.Authentication.Mfa.IMfaEmailDelivery, SmtpEmailVerificationDelivery>();
         services.AddSingleton<IAccessTokenIssuer, JwtIssuer>();
         return services;
     }

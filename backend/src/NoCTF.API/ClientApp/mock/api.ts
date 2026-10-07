@@ -1,3 +1,4 @@
+import { createMockMfa } from './mfa'
 import { accounts, createFixtures, mockModeConfiguration, mockRules } from './data/fixtures'
 import { date, id, matchOperation, model, now, resolve, responseSchema, sample, type Data } from './schema'
 import { leaderboardRead } from './leaderboard'
@@ -46,7 +47,7 @@ function mockWriteUpPdf(teamName: string): Blob {
   return new Blob([pdf], { type: 'application/pdf' })
 }
 
-export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'ManualModeration' } = {}) {
+export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'ManualModeration'; mfa?: boolean } = {}) {
   const state = createFixtures()
   const teamBanCases = new Map<string, Data>()
   function recordTeamBan(team: Data, source: 'CheatIncident' | 'ManualModeration') {
@@ -140,8 +141,9 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
     sessions.set(session, user.userId)
     const accessToken = `mock.${Buffer.from(JSON.stringify({ sub: user.userId, exp: Math.floor(Date.now() / 1000) + 86400 })).toString('base64url')}.${crypto.randomUUID()}`
     tokens.set(accessToken, user.userId)
-    return json({ accessToken }, 200, { 'Set-Cookie': `noctf_mock_session=${session}; Path=/; HttpOnly; SameSite=Strict` })
+    return json({ ...user, state: 'Authenticated', accessToken, expiresAt: date(24), returnPath: '/' }, 200, { 'Set-Cookie': `noctf_mock_session=${session}; Path=/; HttpOnly; SameSite=Strict` })
   }
+  const mfa = createMockMfa({ users: state.users, signIn, userFor, loginRequiresMfa: options.mfa ?? false })
   function challengeSummary(item: Data) {
     return {
       id: item.id,
@@ -224,7 +226,7 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
     }
     if (route === '/auth/login') {
       const account = accounts.find(a => a.login === body.login && a.password === body.password)
-      return account ? signIn(state.users.find(u => u.userId === account.userId)!) : problem(401, '演示账号：admin / organizer / player，密码：Mock123!')
+      return account ? (mfa.login(state.users.find(u => u.userId === account.userId)!) ?? signIn(state.users.find(u => u.userId === account.userId)!)) : problem(401, '演示账号：admin / organizer / player，密码：Mock123!')
     }
     if (route === '/auth/logout' || route === '/auth/logout-all') {
       const token = request.headers.get('Authorization')?.replace(/^Bearer /, '') ?? ''
@@ -233,6 +235,8 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
       for (const [key, value] of sessions) if (value === userId) sessions.delete(key)
       return new Response(null, { status: 204, headers: { 'Set-Cookie': 'noctf_mock_session=guest; Path=/; HttpOnly; SameSite=Strict', 'X-NoCTF-Mock': 'true' } })
     }
+    const mfaResponse = await mfa.handle(request, route, body, p)
+    if (mfaResponse) return mfaResponse
     const user = userFor(request)
     if ((route.startsWith('/admin') || route.startsWith('/auth/me') || request.method !== 'GET') && !user) return problem(401, '请先登录演示账号 / Sign in to the Mock site')
     if (route.startsWith('/admin/platform') && user?.role !== 'Administrator') return problem(403, '需要 Mock 管理员账号 / Administrator required')

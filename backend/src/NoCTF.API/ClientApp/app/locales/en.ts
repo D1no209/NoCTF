@@ -7,6 +7,7 @@ import AccountMessages from './catalogs/en/account.json'
 import NotificationsMessages from './catalogs/en/notifications.json'
 import RuntimeMessages from './catalogs/en/runtime.json'
 import WriteupsMessages from './catalogs/en/writeups.json'
+import MfaMessages from './catalogs/en/mfa.json'
 import ApiMessages from './catalogs/en/api.json'
 
 export const englishMessages = {
@@ -20,5 +21,6 @@ export const englishMessages = {
   ...RuntimeMessages,
   ...WriteupsMessages,
   ...ApiMessages,
+  ...MfaMessages,
 }
 export type MessageKey = keyof typeof englishMessages

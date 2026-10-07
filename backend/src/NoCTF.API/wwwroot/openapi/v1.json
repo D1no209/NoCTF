@@ -5703,7 +5703,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationCompleteSsoLoginResponse"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationAuthenticationResponse"
                 }
               }
             }
@@ -6185,7 +6185,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationLoginResponse"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationAuthenticationResponse"
                 }
               }
             }
@@ -6764,6 +6764,571 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/auth/mfa/enrollment": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Begin Mfa Enrollment Endpoint",
+        "description": "Executes POST /api/v1/auth/mfa/enrollment.",
+        "operationId": "BeginMfaEnrollmentEndpoint",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationMfaMfaFlowResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "RunnerScoringBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/mfa/rebind": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Begin Mfa Rebind Endpoint",
+        "description": "Executes POST /api/v1/auth/mfa/rebind.",
+        "operationId": "BeginMfaRebindEndpoint",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationMfaMfaFlowResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/mfa/step-up": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Begin Mfa Step Up Endpoint",
+        "description": "Executes POST /api/v1/auth/mfa/step-up.",
+        "operationId": "BeginMfaStepUpEndpoint",
+        "requestBody": {
+          "x-name": "BeginMfaStepUpRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationMfaBeginMfaStepUpRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationMfaMfaFlowResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/mfa/flow": {
+      "delete": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Cancel Mfa Flow Endpoint",
+        "description": "Executes DELETE /api/v1/auth/mfa/flow.",
+        "operationId": "CancelMfaFlowEndpoint",
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "RunnerScoringBearer": []
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Get Mfa Flow Endpoint",
+        "description": "Executes GET /api/v1/auth/mfa/flow.",
+        "operationId": "GetMfaFlowEndpoint",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationMfaMfaFlowResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "RunnerScoringBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/mfa/account/enrollment/confirm": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Confirm Account Mfa Enrollment Endpoint",
+        "description": "Executes POST /api/v1/auth/mfa/account/enrollment/confirm.",
+        "operationId": "ConfirmAccountMfaEnrollmentEndpoint",
+        "requestBody": {
+          "x-name": "ConfirmAccountMfaEnrollmentRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationMfaConfirmAccountMfaEnrollmentRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationMfaConfirmAccountMfaEnrollmentResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "RunnerScoringBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/mfa/enrollment/confirm": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Confirm Mfa Enrollment Endpoint",
+        "description": "Executes POST /api/v1/auth/mfa/enrollment/confirm.",
+        "operationId": "ConfirmMfaEnrollmentEndpoint",
+        "requestBody": {
+          "x-name": "ConfirmMfaEnrollmentRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationMfaConfirmMfaEnrollmentRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationAuthenticationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "RunnerScoringBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/mfa/disable": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Disable Mfa Endpoint",
+        "description": "Executes POST /api/v1/auth/mfa/disable.",
+        "operationId": "DisableMfaEndpoint",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationAuthenticationMfaMfaChangeResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/mfa/recovery": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Exchange Mfa Recovery Endpoint",
+        "description": "Executes POST /api/v1/auth/mfa/recovery.",
+        "operationId": "ExchangeMfaRecoveryEndpoint",
+        "requestBody": {
+          "x-name": "ExchangeMfaRecoveryRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationMfaExchangeMfaRecoveryRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationMfaMfaFlowResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/mfa/status": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Get Mfa Status Endpoint",
+        "description": "Executes GET /api/v1/auth/mfa/status.",
+        "operationId": "GetMfaStatusEndpoint",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationMfaMfaStatusResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/mfa/recovery-codes/regenerate": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Regenerate Mfa Recovery Codes Endpoint",
+        "description": "Executes POST /api/v1/auth/mfa/recovery-codes/regenerate.",
+        "operationId": "RegenerateMfaRecoveryCodesEndpoint",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationMfaMfaRecoveryCodesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/mfa/verify": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Verify Mfa Challenge Endpoint",
+        "description": "Executes POST /api/v1/auth/mfa/verify.",
+        "operationId": "VerifyMfaChallengeEndpoint",
+        "requestBody": {
+          "x-name": "VerifyMfaChallengeRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationMfaVerifyMfaChallengeRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationAuthenticationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          },
+          {
+            "RunnerScoringBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/mfa/step-up/verify": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Verify Mfa Step Up Endpoint",
+        "description": "Executes POST /api/v1/auth/mfa/step-up/verify.",
+        "operationId": "VerifyMfaStepUpEndpoint",
+        "requestBody": {
+          "x-name": "VerifyMfaStepUpRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationMfaVerifyMfaStepUpRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationMfaMfaFlowResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
       }
     },
     "/api/v1/admin/competitions/{competitionId}/teams/{teamId}/correct-ban": {
@@ -8488,6 +9053,200 @@
         ]
       }
     },
+    "/api/v1/admin/platform/sso/providers/{providerId}/mfa-trust": {
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Replaces an OIDC provider MFA trust policy and invalidates proofs issued under the previous policy.",
+        "description": "Replaces an OIDC provider MFA trust policy and invalidates proofs issued under the previous policy.",
+        "operationId": "AdminPlatformMfaChangeOidcTrust",
+        "parameters": [
+          {
+            "name": "providerId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "ChangeOidcMfaTrustRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformChangeOidcMfaTrustRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationAuthenticationMfaOidcMfaTrust"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Administrator"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/platform/mfa-policy": {
+      "patch": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Changes the platform MFA policy after operation-bound local second-factor verification.",
+        "description": "Changes the platform MFA policy after operation-bound local second-factor verification.",
+        "operationId": "AdminPlatformMfaChangePolicy",
+        "requestBody": {
+          "x-name": "ChangePlatformMfaPolicyRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformChangePlatformMfaPolicyRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformMfaPolicyResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Administrator"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/platform/users/{userId}/mfa-requirement": {
+      "patch": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Changes an account MFA requirement for a human target after administrator local second-factor verification.",
+        "description": "Changes an account MFA requirement for a human target after administrator local second-factor verification.",
+        "operationId": "AdminPlatformMfaChangeUserRequirement",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "ChangeUserMfaRequirementRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformChangeUserMfaRequirementRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationAuthenticationMfaMfaChangeResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Administrator"
+            ]
+          }
+        ]
+      }
+    },
     "/api/v1/admin/platform/bots": {
       "post": {
         "tags": [
@@ -9308,6 +10067,41 @@
         ]
       }
     },
+    "/api/v1/admin/platform/mfa": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Reads the platform MFA policy and OIDC trust rules for human administrators.",
+        "description": "Reads the platform MFA policy and OIDC trust rules for human administrators.",
+        "operationId": "AdminPlatformMfaGetConfiguration",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformMfaConfigurationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Administrator"
+            ]
+          }
+        ]
+      }
+    },
     "/api/v1/admin/platform/users/{userId}/activity": {
       "get": {
         "tags": [
@@ -9417,6 +10211,74 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformSsoConfigurationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Administrator"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/platform/users/{userId}/mfa-recovery": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Creates a single-use restricted email recovery authorization after manual review and local administrator verification.",
+        "description": "Creates a single-use restricted email recovery authorization after manual review and local administrator verification.",
+        "operationId": "AdminPlatformMfaGrantUserRecovery",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "GrantUserMfaRecoveryRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformGrantUserMfaRecoveryRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationAuthenticationMfaMfaRecoveryGrant"
                 }
               }
             }
@@ -22771,9 +23633,42 @@
           "Cas"
         ]
       },
-      "NoCTFAPIEndpointsAuthenticationCompleteSsoLoginResponse": {
-        "type": "object",
+      "NoCTFAPIEndpointsAuthenticationAuthenticationResponse": {
+        "discriminator": {
+          "propertyName": "state",
+          "mapping": {
+            "Authenticated": "#/components/schemas/NoCTFAPIEndpointsAuthenticationAuthenticatedResponse",
+            "MfaRequired": "#/components/schemas/NoCTFAPIEndpointsAuthenticationMfaRequiredResponse",
+            "EnrollmentRequired": "#/components/schemas/NoCTFAPIEndpointsAuthenticationEnrollmentRequiredResponse"
+          }
+        },
+        "x-abstract": true,
         "additionalProperties": false,
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationAuthenticatedResponse"
+          },
+          {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationMfaRequiredResponse"
+          },
+          {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationEnrollmentRequiredResponse"
+          }
+        ]
+      },
+      "NoCTFAPIEndpointsAuthenticationAuthenticatedResponse": {
+        "type": "object",
+        "required": [
+          "state",
+          "userId",
+          "userName",
+          "role",
+          "emailVerified",
+          "accessToken",
+          "expiresAt",
+          "returnPath",
+          "state"
+        ],
         "properties": {
           "userId": {
             "type": "string",
@@ -22797,6 +23692,19 @@
           },
           "returnPath": {
             "type": "string"
+          },
+          "recoveryCodes": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "Authenticated"
+            ]
           }
         }
       },
@@ -22813,6 +23721,108 @@
           "Organizer",
           "Administrator"
         ]
+      },
+      "NoCTFAPIEndpointsAuthenticationMfaRequiredResponse": {
+        "type": "object",
+        "required": [
+          "state",
+          "flow",
+          "state"
+        ],
+        "properties": {
+          "flow": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationMfaMfaFlowResponse"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "MfaRequired"
+            ]
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAuthenticationMfaMfaFlowResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "purpose": {
+            "$ref": "#/components/schemas/NoCTFDomainIdentityMfaMfaChallengePurpose"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "remainingAttempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "userName": {
+            "type": "string"
+          },
+          "recoveryAvailable": {
+            "type": "boolean"
+          },
+          "returnPath": {
+            "type": "string"
+          },
+          "secret": {
+            "type": "string",
+            "nullable": true
+          },
+          "provisioningUri": {
+            "type": "string",
+            "nullable": true
+          },
+          "primaryAuthenticationRequired": {
+            "type": "boolean"
+          },
+          "recoveryMailAvailable": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFDomainIdentityMfaMfaChallengePurpose": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Login",
+          "Enrollment",
+          "Rebind",
+          "RecoveryGrant",
+          "RecoveryEnrollment",
+          "StepUp"
+        ],
+        "enum": [
+          "Login",
+          "Enrollment",
+          "Rebind",
+          "RecoveryGrant",
+          "RecoveryEnrollment",
+          "StepUp"
+        ]
+      },
+      "NoCTFAPIEndpointsAuthenticationEnrollmentRequiredResponse": {
+        "type": "object",
+        "required": [
+          "state",
+          "flow",
+          "state"
+        ],
+        "properties": {
+          "flow": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationMfaMfaFlowResponse"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "EnrollmentRequired"
+            ]
+          }
+        }
       },
       "NoCTFAPIEndpointsAuthenticationCurrentUserResponse": {
         "type": "object",
@@ -23189,32 +24199,6 @@
           },
           "protocol": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationPublicSsoProtocol"
-          }
-        }
-      },
-      "NoCTFAPIEndpointsAuthenticationLoginResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "userId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "userName": {
-            "type": "string"
-          },
-          "role": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationUserRoleProtocol"
-          },
-          "emailVerified": {
-            "type": "boolean"
-          },
-          "accessToken": {
-            "type": "string"
-          },
-          "expiresAt": {
-            "type": "string",
-            "format": "date-time"
           }
         }
       },
@@ -23665,6 +24649,186 @@
           "token": {
             "type": "string",
             "maxLength": 128,
+            "minLength": 0,
+            "nullable": false
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAuthenticationMfaBeginMfaStepUpRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "operation": {
+            "$ref": "#/components/schemas/NoCTFDomainIdentityMfaMfaOperation"
+          },
+          "targetId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFDomainIdentityMfaMfaOperation": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "EnableTotp",
+          "RebindTotp",
+          "RegenerateRecoveryCodes",
+          "DisableTotp",
+          "ChangePolicy",
+          "ChangeOidcTrust",
+          "ChangeAccountRequirement",
+          "GrantRecovery"
+        ],
+        "enum": [
+          "EnableTotp",
+          "RebindTotp",
+          "RegenerateRecoveryCodes",
+          "DisableTotp",
+          "ChangePolicy",
+          "ChangeOidcTrust",
+          "ChangeAccountRequirement",
+          "GrantRecovery"
+        ]
+      },
+      "NoCTFAPIEndpointsAuthenticationMfaConfirmAccountMfaEnrollmentResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "recoveryCodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAuthenticationMfaConfirmAccountMfaEnrollmentRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[0-9]{6}$"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAuthenticationMfaConfirmMfaEnrollmentRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[0-9]{6}$"
+          }
+        }
+      },
+      "NoCTFApplicationAuthenticationMfaMfaChangeResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "tokenVersion": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAuthenticationMfaExchangeMfaRecoveryRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "type": "string",
+            "maxLength": 43,
+            "minLength": 43
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAuthenticationMfaMfaStatusResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enrolled": {
+            "type": "boolean"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "mandated": {
+            "type": "boolean"
+          },
+          "recoveryCodesRemaining": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "recoveryMailAvailable": {
+            "type": "boolean"
+          },
+          "recentPrimaryAuthentication": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAuthenticationMfaMfaRecoveryCodesResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAuthenticationMfaVerifyMfaChallengeRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code"
+        ],
+        "properties": {
+          "method": {
+            "$ref": "#/components/schemas/NoCTFApplicationAuthenticationMfaMfaVerificationMethod"
+          },
+          "code": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0,
+            "nullable": false
+          }
+        }
+      },
+      "NoCTFApplicationAuthenticationMfaMfaVerificationMethod": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Totp",
+          "RecoveryCode"
+        ],
+        "enum": [
+          "Totp",
+          "RecoveryCode"
+        ]
+      },
+      "NoCTFAPIEndpointsAuthenticationMfaVerifyMfaStepUpRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code"
+        ],
+        "properties": {
+          "method": {
+            "$ref": "#/components/schemas/NoCTFApplicationAuthenticationMfaMfaVerificationMethod"
+          },
+          "code": {
+            "type": "string",
+            "maxLength": 64,
             "minLength": 0,
             "nullable": false
           }
@@ -24517,6 +25681,111 @@
           }
         ]
       },
+      "NoCTFApplicationAuthenticationMfaOidcMfaTrust": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "policyId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "maxAgeSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "acrValues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "amrCombinations": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformChangeOidcMfaTrustRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "maxAgeSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 300.0,
+            "minimum": 1.0
+          },
+          "acrValues": {
+            "type": "array",
+            "maximum": 20.0,
+            "items": {
+              "type": "string"
+            }
+          },
+          "amrCombinations": {
+            "type": "array",
+            "maximum": 20.0,
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformPlatformMfaPolicyResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "policy": {
+            "$ref": "#/components/schemas/NoCTFDomainIdentityMfaMfaPolicy"
+          }
+        }
+      },
+      "NoCTFDomainIdentityMfaMfaPolicy": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Optional",
+          "RequirePrivileged",
+          "RequireAllHumanUsers"
+        ],
+        "enum": [
+          "Optional",
+          "RequirePrivileged",
+          "RequireAllHumanUsers"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformChangePlatformMfaPolicyRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "policy": {
+            "$ref": "#/components/schemas/NoCTFDomainIdentityMfaMfaPolicy"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformChangeUserMfaRequirementRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "required": {
+            "type": "boolean"
+          }
+        }
+      },
       "NoCTFAPIEndpointsAdministrationPlatformPlatformUserResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -24562,6 +25831,9 @@
                 "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformUserSsoBindingResponse"
               }
             ]
+          },
+          "mfaRequired": {
+            "type": "boolean"
           }
         }
       },
@@ -25351,6 +26623,56 @@
           }
         }
       },
+      "NoCTFAPIEndpointsAdministrationPlatformPlatformMfaConfigurationResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "policy": {
+            "$ref": "#/components/schemas/NoCTFDomainIdentityMfaMfaPolicy"
+          },
+          "providers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformOidcMfaTrustResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformOidcMfaTrustResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "providerId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "maxAgeSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "acrValues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "amrCombinations": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
       "NoCTFAPIEndpointsAdministrationPlatformPlatformUserDetailResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -25360,6 +26682,39 @@
           },
           "schoolIdentity": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationCurrentUserSchoolIdentityResponse"
+          }
+        }
+      },
+      "NoCTFApplicationAuthenticationMfaMfaRecoveryGrant": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "userId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformGrantUserMfaRecoveryRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 1024,
+            "minLength": 0,
+            "nullable": false
           }
         }
       },
@@ -25406,10 +26761,12 @@
         "type": "string",
         "description": "",
         "x-enumNames": [
-          "AccountInactive"
+          "AccountInactive",
+          "MfaRequired"
         ],
         "enum": [
-          "AccountInactive"
+          "AccountInactive",
+          "MfaRequired"
         ]
       },
       "NoCTFAPIEndpointsAdministrationPlatformIssuePlatformUserTokenRequest": {

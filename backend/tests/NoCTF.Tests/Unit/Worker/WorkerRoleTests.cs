@@ -171,14 +171,19 @@ public sealed class WorkerRoleTests
     public async Task Account_notification_messages_require_exactly_one_handler()
     {
         WorkerMessageTopologyStartupValidator.ValidateAccountNotificationHandlerTypes(
-            [typeof(AccountNotificationMessageHandler)]);
+            typeof(SendPasswordReset), [typeof(AccountNotificationMessageHandler)]);
+        WorkerMessageTopologyStartupValidator.ValidateAccountNotificationHandlerTypes(
+            typeof(SendMfaMail), [typeof(NoCTF.Worker.Authentication.MfaMailHandler)]);
+        await Assert.That(() => WorkerMessageTopologyStartupValidator.ValidateAccountNotificationHandlerTypes(
+            typeof(SendMfaMail), [typeof(AccountNotificationMessageHandler)]))
+            .Throws<InvalidOperationException>();
 
         await Assert.That(() =>
-                WorkerMessageTopologyStartupValidator.ValidateAccountNotificationHandlerTypes([]))
+                WorkerMessageTopologyStartupValidator.ValidateAccountNotificationHandlerTypes(typeof(SendPasswordReset), []))
             .Throws<InvalidOperationException>();
         await Assert.That(() =>
                 WorkerMessageTopologyStartupValidator.ValidateAccountNotificationHandlerTypes(
-                    [typeof(AccountNotificationMessageHandler), typeof(AccountNotificationMessageHandler)]))
+                    typeof(SendPasswordReset), [typeof(AccountNotificationMessageHandler), typeof(AccountNotificationMessageHandler)]))
             .Throws<InvalidOperationException>();
     }
 }

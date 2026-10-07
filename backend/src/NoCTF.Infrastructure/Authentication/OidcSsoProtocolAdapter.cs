@@ -13,8 +13,9 @@ using NoCTF.Domain.Identity;
 
 namespace NoCTF.Infrastructure.Authentication;
 
-public sealed class OidcSsoProtocolAdapter(ISsoBackchannel backchannel) : ISsoProtocolAdapter
+public sealed class OidcSsoProtocolAdapter(ISsoBackchannel backchannel, TimeProvider? timeProvider = null) : ISsoProtocolAdapter
 {
+    private readonly TimeProvider clock = timeProvider ?? TimeProvider.System;
     private const int MaximumMetadataBytes = 256 * 1024;
     private const int MaximumJwksBytes = 1024 * 1024;
     private const int MaximumTokenResponseBytes = 128 * 1024;
@@ -60,6 +61,7 @@ public sealed class OidcSsoProtocolAdapter(ISsoBackchannel backchannel) : ISsoPr
             ["code_challenge"] = challenge,
             ["code_challenge_method"] = "S256"
         };
+        if (oidc.MfaTrust is { Enabled: true } trust) parameters["max_age"] = trust.MaxAgeSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
         var authorizationUrl = AppendQuery(authorizationEndpoint, parameters);
         return new(authorizationUrl, nonce, verifier);
     }
@@ -122,7 +124,8 @@ public sealed class OidcSsoProtocolAdapter(ISsoBackchannel backchannel) : ISsoPr
                 SsoProtocol.Oidc,
                 oidc.Issuer,
                 subject!,
-                NormalizeDisplayName(displayName)));
+                NormalizeDisplayName(displayName),
+                oidc.MfaTrust?.Verify(provider.ProviderId, principal.FindFirstValue("acr"), principal.FindAll("amr").Select(claim => claim.Value).ToArray(), ReadAuthenticationTime(principal), clock.GetUtcNow())));
         }
         catch (Exception exception) when (exception is SecurityTokenException
             or JsonException
@@ -131,6 +134,12 @@ public sealed class OidcSsoProtocolAdapter(ISsoBackchannel backchannel) : ISsoPr
         {
             return Failure("OIDC validation failed.");
         }
+    }
+
+    private static DateTimeOffset? ReadAuthenticationTime(ClaimsPrincipal principal)
+    {
+        if (!long.TryParse(principal.FindFirstValue("auth_time"), out var time)) return null;
+        try { return DateTimeOffset.FromUnixTimeSeconds(time); } catch (ArgumentOutOfRangeException) { return null; }
     }
 
     private async Task<OidcTokenResponse> ExchangeCodeAsync(

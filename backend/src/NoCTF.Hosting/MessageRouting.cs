@@ -43,6 +43,8 @@ public static class MessageRouting
         Route<SendEmailVerification>(options, WorkerQueue.Background);
         Route<SendPasswordReset>(options, WorkerQueue.Background);
         Route<SendPasswordChangedNotification>(options, WorkerQueue.Background);
+        Route<SendMfaMail>(options, WorkerQueue.Background);
+        Route<MfaAuthenticationChanged>(options, WorkerQueue.Background);
         Route<CleanupFile>(options, WorkerQueue.Background, durableOutbox: true);
         Route<ExpireAccountSourceAddresses>(options, WorkerQueue.Background, durableOutbox: true);
         Route<DispatchCompetitionWebhooks>(options, WorkerQueue.Webhook);

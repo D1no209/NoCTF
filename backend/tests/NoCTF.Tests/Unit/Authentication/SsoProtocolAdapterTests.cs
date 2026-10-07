@@ -59,6 +59,31 @@ public sealed class SsoProtocolAdapterTests
     }
 
     [Test]
+    [Arguments("otp", 0, true, true)]
+    [Arguments("otp", 301, true, false)]
+    [Arguments("otp", 0, false, false)]
+    [Arguments("OTP", 0, true, false)]
+    public async Task Oidc_Mfa_uses_only_signed_fresh_authentication_claims(string secondMethod, int ageSeconds, bool includeAuthenticationTime, bool expectedProof, CancellationToken ct)
+    {
+        using var rsa = RSA.Create(2048); var key = new RsaSecurityKey(rsa) { KeyId = "test-key" };
+        string? token = null;
+        var backchannel = new FakeBackchannel(request => request.RequestUri!.AbsolutePath switch {
+            "/.well-known/openid-configuration" => Response(Metadata()), "/jwks" => Response(Jwks(rsa, key.KeyId)),
+            "/token" => Response(JsonSerializer.Serialize(new { id_token = token })), _ => throw new InvalidOperationException() });
+        var original = OidcProvider();
+        var provider = original with { Oidc = original.Oidc! with { MfaTrust = new(true, Guid.NewGuid(), 300, [], [["pwd", "otp"]]) } };
+        var adapter = new OidcSsoProtocolAdapter(backchannel);
+        var authorization = await adapter.CreateAuthorizationAsync(provider, "state", ct);
+        var claims = new List<Claim> { new("amr", "pwd"), new("amr", secondMethod), new("amr", "extra") };
+        if (includeAuthenticationTime) claims.Add(new("auth_time", DateTimeOffset.UtcNow.AddSeconds(-ageSeconds).ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64));
+        token = IdToken(key, provider.Oidc.Issuer, provider.Oidc.ClientId, authorization.Nonce!, "subject", claims);
+        var result = await adapter.AuthenticateAsync(provider, Flow(provider, SsoProtocol.Oidc, authorization.Nonce, authorization.PkceVerifier), "code", ct);
+        await Assert.That(result.Succeeded).IsTrue();
+        await Assert.That(result.Value!.MfaProof is not null).IsEqualTo(expectedProof);
+        await Assert.That(authorization.AuthorizationUrl.Query).Contains("max_age=300");
+    }
+
+    [Test]
     public async Task Oidc_rejects_a_nonce_mismatch(CancellationToken cancellationToken)
     {
         using var rsa = RSA.Create(2048);
@@ -146,18 +171,19 @@ public sealed class SsoProtocolAdapterTests
         string issuer,
         string audience,
         string nonce,
-        string subject)
+        string subject, IReadOnlyList<Claim>? extra = null)
     {
         var now = DateTimeOffset.UtcNow;
         var token = new JwtSecurityToken(
             issuer,
             audience,
-            [
+            new Claim[]
+            {
                 new Claim("sub", subject),
                 new Claim("nonce", nonce),
                 new Claim("iat", now.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
                 new Claim("name", "Test User")
-            ],
+            }.Concat(extra ?? []),
             now.AddMinutes(-1).UtcDateTime,
             now.AddMinutes(5).UtcDateTime,
             new SigningCredentials(key, SecurityAlgorithms.RsaSha256));

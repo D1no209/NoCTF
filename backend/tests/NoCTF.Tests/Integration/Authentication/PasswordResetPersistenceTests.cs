@@ -43,6 +43,10 @@ public sealed class PasswordResetPersistenceTests
                     emailVerified: true,
                     now,
                     cancellationToken);
+                var mfaUser = await setupDb.Users.SingleAsync(value => value.Id == userId, cancellationToken);
+                mfaUser.MfaRequired = true;
+                setupDb.UserTotpCredentials.Add(new() { Id = Guid.NewGuid(), UserId = userId, SecretCiphertext = [1, 2, 3], EnabledAt = now, RecoveryBatchId = Guid.NewGuid() });
+                await setupDb.SaveChangesAsync(cancellationToken);
             }
 
             await using var firstIssueDb = new NoCtfDbContext(options);
@@ -107,6 +111,8 @@ public sealed class PasswordResetPersistenceTests
             var users = new AuthenticationStore(verificationDb, hasher);
             var user = await users.FindByIdAsync(userId, cancellationToken);
             await Assert.That(user!.TokenVersion).IsEqualTo(1);
+            await Assert.That(await verificationDb.UserTotpCredentials.CountAsync(value => value.UserId == userId, cancellationToken)).IsEqualTo(1);
+            await Assert.That(await verificationDb.Users.Where(value => value.Id == userId).Select(value => value.MfaRequired).SingleAsync(cancellationToken)).IsTrue();
             await Assert.That(await new AccessTokenVersionReader(verificationDb).IsCurrentAsync(
                 userId, tokenVersion: 0, cancellationToken)).IsFalse();
             var winningPassword = completionResults[0] == PasswordResetCompletionState.Reset

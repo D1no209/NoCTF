@@ -26,7 +26,7 @@ public class AccountSourceAddressTests
         var id = Guid.NewGuid();
         NSubstitute.SubstituteExtensions.Returns(store.FindByLoginAsync("known-user", default),
             new NoCTF.Application.Authentication.Account.AuthenticatedUser(id, "known-user", UserRole.User, UserKind.Human, 0));
-        var login = new NoCTF.Application.Authentication.Login.LoginUser(store, issuer, TimeProvider.System, recorder);
+        var login = new NoCTF.Application.Authentication.Login.LoginUser(store, new NoCTF.Application.Authentication.Mfa.CompleteAuthentication(MfaTestSupport.Unrequired(), issuer, TimeProvider.System), TimeProvider.System, recorder);
         await login.ExecuteAsync(new("known-user", "wrong-password"));
         await NSubstitute.SubstituteExtensions.Received(recorder, 1).RecordLoginAsync(null, NSubstitute.Arg.Any<DateTimeOffset>(), default);
         await NSubstitute.SubstituteExtensions.DidNotReceive(recorder).RecordLoginAsync(id, NSubstitute.Arg.Any<DateTimeOffset>(), default);

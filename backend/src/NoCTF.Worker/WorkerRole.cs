@@ -38,6 +38,8 @@ public static class WorkerRole
                 "Worker:Queues must select at least one queue.")
             .ValidateOnStart();
         services.AddTransient<AccountNotificationMessageHandler>();
+        services.AddTransient<Authentication.MfaMailHandler>();
+        services.AddTransient<Authentication.MfaAuthenticationChangedHandler>();
         services.AddTransient<GameplayFactMessageHandler>();
         services.AddTransient<LeaderboardMessageHandler>();
         services.AddTransient<FileCleanupMessageHandler>();
@@ -64,6 +66,7 @@ public static class WorkerRole
             services.AddHostedService<LeaderboardProjectionDispatchAgent>();
         if (WorkerQueues.GetEnabled(configuration).Contains(WorkerQueue.Background))
         {
+            services.AddHostedService<Authentication.MfaPendingAgent>();
             services.AddScoped<IReadinessDependency,
                 AccountNotificationReadinessDependency>();
         }
@@ -91,6 +94,8 @@ public static class WorkerRole
         bool durable = true)
     {
         options.Discovery.IncludeType(typeof(FileCleanupMessageHandler));
+        options.Discovery.IncludeType(typeof(Authentication.MfaMailHandler));
+        options.Discovery.IncludeType(typeof(Authentication.MfaAuthenticationChangedHandler));
         options.Discovery.IncludeType(typeof(Competitions.CompetitionDeletionMessageHandler));
         options.Discovery.IncludeType(typeof(AwdMessageHandler));
         options.Discovery.IncludeType(typeof(KohPollingHandler));

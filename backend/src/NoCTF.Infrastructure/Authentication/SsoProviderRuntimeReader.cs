@@ -46,7 +46,10 @@ public sealed class SsoProviderRuntimeReader(
                     : string.Empty,
                 provider.Oidc.Scopes,
                 provider.Oidc.ReadUserInfo,
-                provider.Oidc.DisplayNameClaim),
+                provider.Oidc.DisplayNameClaim,
+                new NoCTF.Application.Authentication.Mfa.OidcMfaTrust(provider.Oidc.MfaTrustEnabled, provider.Oidc.MfaTrustPolicyId,
+                    provider.Oidc.MfaAuthenticationMaxAgeSeconds, provider.Oidc.MfaAcrEntries.OrderBy(value => value.Position).Select(value => value.Value).ToArray(),
+                    provider.Oidc.MfaAmrGroups.OrderBy(value => value.Position).Select(value => (IReadOnlyList<string>)value.Values.OrderBy(member => member.Position).Select(member => member.Value).ToArray()).ToArray())),
             provider.Cas is null ? null : new CasSsoRuntimeConfiguration(
                 provider.Cas.IdentityNamespace,
                 provider.Cas.LoginUrl,

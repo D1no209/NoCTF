@@ -70,3 +70,7 @@ node node_modules/@nuxt/cli/bin/nuxi.mjs typecheck mock
 Mock 显式沿用生产的原语注册路径及无前缀约定，禁止回退到 Nuxt 默认扫描整个 `components/`。`check-frontend.ts` 比较生成的原语清单并检查业务插件只注册一次。
 
 Mock 的 `vite.server.forwardConsole` 关闭浏览器日志向终端的转发，浏览器控制台仍正常显示原始错误。避免将 Vue 警告中完整的响应式对象序列化成巨量文本。
+
+## MFA 演示
+
+账户安全支持扫码绑定、验证码错误反馈和恢复码保存。仅用于本地 UI 验收，验证码为 `123456`；密钥和恢复码均为虚构演示数据，不采用真实密码学验证。设置 `NOCTF_MOCK_MFA=true` 后启动，可演示登录第二步。生产防重放、并发、权限和恢复授权行为由后端测试验证。

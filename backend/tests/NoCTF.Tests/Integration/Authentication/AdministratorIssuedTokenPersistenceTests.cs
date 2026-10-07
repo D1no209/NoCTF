@@ -34,7 +34,7 @@ public sealed class AdministratorIssuedTokenPersistenceTests
             await db.SaveChangesAsync(ct);
             var platform = new ManagePlatform(
                 new PlatformAdministrationStore(db, new PasswordHasher<User>()),
-                new StubIssuer(now));
+                new StubIssuer(now), MfaTestSupport.Unrequired());
 
             var issued = await platform.IssueUserTokenAsync(targetId, 3600, now, ct);
 
@@ -82,9 +82,9 @@ public sealed class AdministratorIssuedTokenPersistenceTests
 
     private sealed class StubIssuer(DateTimeOffset now) : IAccessTokenIssuer
     {
-        public IssuedAccessToken Issue(AuthenticatedUser user, DateTimeOffset issuedAt, TimeSpan? lifetime = null) =>
+        public IssuedAccessToken Issue(AuthenticatedUser user, NoCTF.Domain.Identity.Mfa.AuthenticationContext authentication, DateTimeOffset issuedAt, TimeSpan? lifetime = null) =>
             new("ordinary-access-token", issuedAt.Add(lifetime ?? TimeSpan.FromMinutes(15)), Guid.NewGuid());
-        public IssuedRefreshToken IssueRefresh(AuthenticatedUser user) =>
+        public IssuedRefreshToken IssueRefresh(AuthenticatedUser user, NoCTF.Domain.Identity.Mfa.AuthenticationContext authentication) =>
             new("unused-refresh", now.AddDays(30));
         public RefreshTokenPrincipal? ValidateRefresh(string token) => null;
     }

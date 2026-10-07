@@ -302,6 +302,10 @@ const groups: DefaultTheme.SidebarItem[] = [
           {
             "text": "SSO 配置与测试",
             "link": "/platform/security/authentication"
+          },
+          {
+            "text": "双重验证",
+            "link": "/platform/security/mfa"
           }
         ]
       },

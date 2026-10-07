@@ -7,7 +7,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using NoCTF.API.Composition;
 using NoCTF.API.Security;
-using NoCTF.Application.Authentication.RefreshSession;
+using NoCTF.Application.Authentication.Mfa;
+using NSubstitute;
 
 namespace NoCTF.Tests.Unit.API;
 
@@ -18,7 +19,7 @@ public class CurrentAccessTokenValidatorTests
     {
         var userId = Guid.NewGuid();
 
-        var isCurrent = await new CurrentAccessTokenValidator(new Versions(userId, 4))
+        var isCurrent = await new CurrentAccessTokenValidator(Versions(userId, 4))
             .IsCurrentAsync(Principal(userId, 4), CancellationToken.None);
 
         await Assert.That(isCurrent).IsTrue();
@@ -29,7 +30,7 @@ public class CurrentAccessTokenValidatorTests
     {
         var userId = Guid.NewGuid();
 
-        var isCurrent = await new CurrentAccessTokenValidator(new Versions(userId, 4))
+        var isCurrent = await new CurrentAccessTokenValidator(Versions(userId, 4))
             .IsCurrentAsync(Principal(userId, 3), CancellationToken.None);
 
         await Assert.That(isCurrent).IsFalse();
@@ -42,7 +43,7 @@ public class CurrentAccessTokenValidatorTests
             [new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString())],
             "Bearer"));
 
-        var isCurrent = await new CurrentAccessTokenValidator(new Versions(Guid.Empty, 0))
+        var isCurrent = await new CurrentAccessTokenValidator(Versions(Guid.Empty, 0))
             .IsCurrentAsync(principal, CancellationToken.None);
 
         await Assert.That(isCurrent).IsFalse();
@@ -62,7 +63,7 @@ public class CurrentAccessTokenValidatorTests
             .Build();
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddSingleton<IAccessTokenVersionReader>(new Versions(userId, 4));
+        services.AddSingleton<IMfaAuthenticationStore>(Versions(userId, 4));
         services.AddNoCtfAuthentication(configuration);
         await using var provider = services.BuildServiceProvider();
         await using var scope = provider.CreateAsyncScope();
@@ -93,15 +94,15 @@ public class CurrentAccessTokenValidatorTests
         new(new ClaimsIdentity(
         [
             new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
-            new Claim("token_version", version.ToString())
+            new Claim("token_version", version.ToString()),
+            new Claim("token_type", "access")
         ], "Bearer"));
 
-    private sealed class Versions(Guid userId, int currentVersion) : IAccessTokenVersionReader
+    private static IMfaAuthenticationStore Versions(Guid userId, int currentVersion)
     {
-        public Task<bool> IsCurrentAsync(
-            Guid requestedUserId,
-            int tokenVersion,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(requestedUserId == userId && tokenVersion == currentVersion);
+        var store = Substitute.For<IMfaAuthenticationStore>();
+        store.ValidateContextAsync(Arg.Any<Guid>(), Arg.Any<int>(), Arg.Any<NoCTF.Domain.Identity.Mfa.AuthenticationContext?>(), Arg.Any<CancellationToken>())
+            .Returns(call => call.Arg<Guid>() == userId && call.Arg<int>() == currentVersion ? (MfaFailure?)null : MfaFailure.AccountUnavailable);
+        return store;
     }
 }

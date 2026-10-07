@@ -13,9 +13,9 @@ public sealed class RefreshAccessTokenTests
         var userId = Guid.NewGuid();
         var store = new Store(new AuthenticatedUser(
             userId, "alice", UserRole.User, UserKind.Human, 8));
-        var issuer = new Issuer(new RefreshTokenPrincipal(userId, 7));
+        var issuer = new Issuer(new RefreshTokenPrincipal(userId, 7, MfaTestSupport.Primary(DateTimeOffset.UtcNow)));
 
-        var result = await new RefreshAccessToken(store, issuer, TimeProvider.System)
+        var result = await new RefreshAccessToken(store, issuer, MfaTestSupport.Unrequired(), TimeProvider.System)
             .ExecuteAsync("refresh-token");
 
         await Assert.That(result.Succeeded).IsFalse();
@@ -28,9 +28,9 @@ public sealed class RefreshAccessTokenTests
         var user = new AuthenticatedUser(
             Guid.NewGuid(), "alice", UserRole.User, UserKind.Human, 7);
         var store = new Store(user);
-        var issuer = new Issuer(new RefreshTokenPrincipal(user.Id, user.TokenVersion));
+        var issuer = new Issuer(new RefreshTokenPrincipal(user.Id, user.TokenVersion, MfaTestSupport.Primary(DateTimeOffset.UtcNow, user.Kind)));
 
-        var result = await new RefreshAccessToken(store, issuer, TimeProvider.System)
+        var result = await new RefreshAccessToken(store, issuer, MfaTestSupport.Unrequired(), TimeProvider.System)
             .ExecuteAsync("refresh-token");
 
         await Assert.That(result.Succeeded).IsTrue();
@@ -42,9 +42,9 @@ public sealed class RefreshAccessTokenTests
     {
         var user = new AuthenticatedUser(
             Guid.NewGuid(), "gitops-bot", UserRole.Organizer, UserKind.Bot, 2);
-        var issuer = new Issuer(new RefreshTokenPrincipal(user.Id, user.TokenVersion));
+        var issuer = new Issuer(new RefreshTokenPrincipal(user.Id, user.TokenVersion, MfaTestSupport.Primary(DateTimeOffset.UtcNow, user.Kind)));
 
-        var result = await new RefreshAccessToken(new Store(user), issuer, TimeProvider.System)
+        var result = await new RefreshAccessToken(new Store(user), issuer, MfaTestSupport.Unrequired(), TimeProvider.System)
             .ExecuteAsync("refresh-token");
 
         await Assert.That(result.Succeeded).IsFalse();
@@ -86,12 +86,12 @@ public sealed class RefreshAccessTokenTests
     private sealed class Issuer(RefreshTokenPrincipal? principal) : IAccessTokenIssuer
     {
         public IssuedAccessToken Issue(
-            AuthenticatedUser user,
+            AuthenticatedUser user, NoCTF.Domain.Identity.Mfa.AuthenticationContext authentication,
             DateTimeOffset now,
             TimeSpan? lifetime = null) =>
             new("access-token", now.Add(lifetime ?? TimeSpan.FromMinutes(15)));
 
-        public IssuedRefreshToken IssueRefresh(AuthenticatedUser user) =>
+        public IssuedRefreshToken IssueRefresh(AuthenticatedUser user, NoCTF.Domain.Identity.Mfa.AuthenticationContext authentication) =>
             new("new-refresh-token", DateTimeOffset.UtcNow.AddDays(30));
 
         public RefreshTokenPrincipal? ValidateRefresh(string token) => principal;

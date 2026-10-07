@@ -70,7 +70,7 @@ public sealed class WorkerMessageTopologyStartupValidator(
             var handlerTypes = root.HandlerCalls()
                 .Select(call => call.HandlerType)
                 .ToArray();
-            ValidateAccountNotificationHandlerTypes(handlerTypes);
+            ValidateAccountNotificationHandlerTypes(messageType, handlerTypes);
         }
     }
 
@@ -186,13 +186,18 @@ public sealed class WorkerMessageTopologyStartupValidator(
     }
 
     internal static void ValidateAccountNotificationHandlerTypes(
-        IReadOnlyCollection<Type> handlerTypes)
+        Type messageType, IReadOnlyCollection<Type> handlerTypes)
     {
+        var expected = messageType == typeof(SendMfaMail)
+            ? typeof(Authentication.MfaMailHandler)
+            : typeof(AccountNotificationMessageHandler);
+        if (!AccountNotificationMessageTypes.Contains(messageType))
+            throw new InvalidOperationException("The account notification message type is not registered.");
         if (handlerTypes.Count != 1
-            || handlerTypes.Single() != typeof(AccountNotificationMessageHandler))
+            || handlerTypes.Single() != expected)
         {
             throw new InvalidOperationException(
-                "Each account notification message must have exactly one AccountNotificationMessageHandler.");
+                $"Account notification '{messageType.Name}' must have exactly one '{expected.Name}' handler.");
         }
     }
 
@@ -229,6 +234,7 @@ public sealed class WorkerMessageTopologyStartupValidator(
     [
         typeof(SendEmailVerification),
         typeof(SendPasswordReset),
-        typeof(SendPasswordChangedNotification)
+        typeof(SendPasswordChangedNotification),
+        typeof(SendMfaMail)
     ];
 }

@@ -66,4 +66,5 @@ public sealed record SsoExternalIdentity(
     SsoProtocol Protocol,
     string IdentityNamespace,
     string Subject,
-    string? DisplayName);
+    string? DisplayName,
+    NoCTF.Application.Authentication.Mfa.OidcMfaProof? MfaProof = null);

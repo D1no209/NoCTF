@@ -8,7 +8,8 @@ namespace NoCTF.API.SignalR.Publishing;
 /// <summary>Development single-process equivalent of the NATS fanout path.</summary>
 public sealed class LocalNotificationChangePublisher(
     NotificationChangeAudienceResolver audienceResolver,
-    IHubContext<NotificationHub, INotificationHubClient> hub)
+    IHubContext<NotificationHub, INotificationHubClient> hub,
+    MfaConnectionGuard guard)
     : INotificationChangePublisher
 {
     public async Task PublishAsync(
@@ -17,7 +18,7 @@ public sealed class LocalNotificationChangePublisher(
     {
         var users = await audienceResolver.ResolveAsync(change.Audiences, cancellationToken);
         if (users.Count == 0) return;
-        await hub.Clients.Users(users.Select(id => id.ToString()).ToArray())
+        await hub.Clients.Clients(await guard.EligibleAsync(MfaHubKind.Notifications, users.ToHashSet(), cancellationToken))
             .NotificationChanged(cancellationToken);
     }
 }

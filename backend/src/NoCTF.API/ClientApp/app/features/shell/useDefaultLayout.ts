@@ -28,6 +28,7 @@ export function useDefaultLayout() {
 
   const route = useRoute()
   const isHome = computed(() => route.path === '/')
+  const restrictedMfa = computed(() => route.path.startsWith('/auth/mfa'))
   const routePath = computed(() => adminWorkspacePath(route.path))
   const {
     wallpaperActive,
@@ -136,6 +137,7 @@ export function useDefaultLayout() {
   return {
       ShieldAlert,
       isHome,
+      restrictedMfa,
       routePath,
       wallpaperActive,
       wallpaperStyle,

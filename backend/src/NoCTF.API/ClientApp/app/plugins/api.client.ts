@@ -1,6 +1,6 @@
 import { client } from '../api/client.gen'
 import { currentLocale } from '../utils/i18n'
-import { shouldRefreshSession } from '../lib/auth-refresh'
+import { requiresInteractiveAuthentication, shouldRefreshSession } from '../lib/auth-refresh'
 import {
   getAccessToken,
   isImpersonatingSession,
@@ -18,6 +18,7 @@ import { prepareCommandRequest, observeCommandResponse } from '../utils/command-
  *   synthesize a status-based message so callers never see a bare「请求失败」.
  */
 export default defineNuxtPlugin(() => {
+  const auth = useAuth()
   client.interceptors.request.use(async (request, options) => {
     request.headers.set('Accept-Language', currentLocale())
     const token = getAccessToken()
@@ -29,7 +30,13 @@ export default defineNuxtPlugin(() => {
   })
 
   client.interceptors.response.use(async (response, request, options) => {
-    if (!shouldRefreshSession(response.status, request.headers)) {
+    const problem = (response.status === 401 || response.status === 403) ? await response.clone().json().catch(() => null) as { code?: unknown } | null : null
+    if ((response.status === 401 || response.status === 403) && requiresInteractiveAuthentication(problem?.code) && !request.url.includes('/auth/mfa/')) {
+      auth.invalidate()
+      await navigateTo('/auth/login')
+      return response
+    }
+    if (!shouldRefreshSession(response.status, request.headers, request.url, problem?.code)) {
       if (response.ok) observeCommandResponse(request, response.status)
       return response
     }

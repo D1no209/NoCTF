@@ -27,7 +27,8 @@ public sealed class IssuePlatformUserTokenValidator
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<IssuePlatformUserTokenFailureCode>))]
 public enum IssuePlatformUserTokenFailureCode
 {
-    AccountInactive
+    AccountInactive,
+    MfaRequired
 }
 
 public sealed record IssuePlatformUserTokenFailureResponse(
@@ -85,6 +86,8 @@ public sealed class IssuePlatformUserTokenEndpoint(
                 new IssuePlatformUserTokenFailureResponse(
                     IssuePlatformUserTokenFailureCode.AccountInactive,
                     "Only active accounts can receive administrator-issued tokens.")),
+            IssuePlatformUserTokenFailure.MfaRequired => TypedResults.Conflict(new IssuePlatformUserTokenFailureResponse(
+                IssuePlatformUserTokenFailureCode.MfaRequired, "Interactive MFA authentication is required for this human account.")),
             IssuePlatformUserTokenFailure.InvalidLifetime => ApiProblems.Problem(
                     statusCode: StatusCodes.Status400BadRequest,
                     title: ApiMessages.Get(ApiMessageId.IssuePlatformUserTokenTitleTokenWasIssued)),

@@ -1692,17 +1692,53 @@ export type NoCtfapiEndpointsAuthenticationMySsoBindingResponse = {
 
 export type NoCtfapiEndpointsAuthenticationPublicSsoProtocol = 'Oidc' | 'Cas';
 
-export type NoCtfapiEndpointsAuthenticationCompleteSsoLoginResponse = {
-    userId?: string;
-    userName?: string;
-    role?: NoCtfapiEndpointsAuthenticationUserRoleProtocol;
-    emailVerified?: boolean;
-    accessToken?: string;
-    expiresAt?: string;
-    returnPath?: string;
+export type NoCtfapiEndpointsAuthenticationAuthenticationResponse = ({
+    state: 'Authenticated';
+} & NoCtfapiEndpointsAuthenticationAuthenticatedResponse) | ({
+    state: 'MfaRequired';
+} & NoCtfapiEndpointsAuthenticationMfaRequiredResponse) | ({
+    state: 'EnrollmentRequired';
+} & NoCtfapiEndpointsAuthenticationEnrollmentRequiredResponse);
+
+export type NoCtfapiEndpointsAuthenticationAuthenticatedResponse = {
+    userId: string;
+    userName: string;
+    role: NoCtfapiEndpointsAuthenticationUserRoleProtocol;
+    emailVerified: boolean;
+    accessToken: string;
+    expiresAt: string;
+    returnPath: string;
+    recoveryCodes?: Array<string> | null;
+    state: 'Authenticated';
 };
 
 export type NoCtfapiEndpointsAuthenticationUserRoleProtocol = 'User' | 'Organizer' | 'Administrator';
+
+export type NoCtfapiEndpointsAuthenticationMfaRequiredResponse = {
+    flow: NoCtfapiEndpointsAuthenticationMfaMfaFlowResponse;
+    state: 'MfaRequired';
+};
+
+export type NoCtfapiEndpointsAuthenticationMfaMfaFlowResponse = {
+    id?: string;
+    purpose?: NoCtfDomainIdentityMfaMfaChallengePurpose;
+    expiresAt?: string;
+    remainingAttempts?: number;
+    userName?: string;
+    recoveryAvailable?: boolean;
+    returnPath?: string;
+    secret?: string | null;
+    provisioningUri?: string | null;
+    primaryAuthenticationRequired?: boolean;
+    recoveryMailAvailable?: boolean;
+};
+
+export type NoCtfDomainIdentityMfaMfaChallengePurpose = 'Login' | 'Enrollment' | 'Rebind' | 'RecoveryGrant' | 'RecoveryEnrollment' | 'StepUp';
+
+export type NoCtfapiEndpointsAuthenticationEnrollmentRequiredResponse = {
+    flow: NoCtfapiEndpointsAuthenticationMfaMfaFlowResponse;
+    state: 'EnrollmentRequired';
+};
 
 export type NoCtfapiEndpointsAuthenticationCurrentUserResponse = {
     userId?: string;
@@ -1823,15 +1859,6 @@ export type NoCtfapiEndpointsAuthenticationPublicSsoProviderResponse = {
     name?: string;
     iconUrl?: string | null;
     protocol?: NoCtfapiEndpointsAuthenticationPublicSsoProtocol;
-};
-
-export type NoCtfapiEndpointsAuthenticationLoginResponse = {
-    userId?: string;
-    userName?: string;
-    role?: NoCtfapiEndpointsAuthenticationUserRoleProtocol;
-    emailVerified?: boolean;
-    accessToken?: string;
-    expiresAt?: string;
 };
 
 export type NoCtfapiEndpointsAuthenticationLoginRequest = {
@@ -1961,6 +1988,59 @@ export type NoCtfapiEndpointsAuthenticationUploadMyWallpaperRequest = {
 
 export type NoCtfapiEndpointsAuthenticationVerifyEmailRequest = {
     token: string;
+};
+
+export type NoCtfapiEndpointsAuthenticationMfaBeginMfaStepUpRequest = {
+    operation?: NoCtfDomainIdentityMfaMfaOperation;
+    targetId?: string | null;
+};
+
+export type NoCtfDomainIdentityMfaMfaOperation = 'EnableTotp' | 'RebindTotp' | 'RegenerateRecoveryCodes' | 'DisableTotp' | 'ChangePolicy' | 'ChangeOidcTrust' | 'ChangeAccountRequirement' | 'GrantRecovery';
+
+export type NoCtfapiEndpointsAuthenticationMfaConfirmAccountMfaEnrollmentResponse = {
+    recoveryCodes?: Array<string>;
+};
+
+export type NoCtfapiEndpointsAuthenticationMfaConfirmAccountMfaEnrollmentRequest = {
+    code?: string;
+};
+
+export type NoCtfapiEndpointsAuthenticationMfaConfirmMfaEnrollmentRequest = {
+    code?: string;
+};
+
+export type NoCtfApplicationAuthenticationMfaMfaChangeResult = {
+    userId?: string;
+    tokenVersion?: number;
+};
+
+export type NoCtfapiEndpointsAuthenticationMfaExchangeMfaRecoveryRequest = {
+    token?: string;
+};
+
+export type NoCtfapiEndpointsAuthenticationMfaMfaStatusResponse = {
+    enrolled?: boolean;
+    required?: boolean;
+    mandated?: boolean;
+    recoveryCodesRemaining?: number;
+    recoveryMailAvailable?: boolean;
+    recentPrimaryAuthentication?: boolean;
+};
+
+export type NoCtfapiEndpointsAuthenticationMfaMfaRecoveryCodesResponse = {
+    codes?: Array<string>;
+};
+
+export type NoCtfapiEndpointsAuthenticationMfaVerifyMfaChallengeRequest = {
+    method?: NoCtfApplicationAuthenticationMfaMfaVerificationMethod;
+    code: string;
+};
+
+export type NoCtfApplicationAuthenticationMfaMfaVerificationMethod = 'Totp' | 'RecoveryCode';
+
+export type NoCtfapiEndpointsAuthenticationMfaVerifyMfaStepUpRequest = {
+    method?: NoCtfApplicationAuthenticationMfaMfaVerificationMethod;
+    code: string;
 };
 
 export type NoCtfapiEndpointsAdministrationTeamsCorrectTeamBanRequest = {
@@ -2199,6 +2279,35 @@ export type NoCtfapiEndpointsAdministrationRuntimeRuntimeTrafficCaptureResponse 
 
 export type NoCtfapiEndpointsAdministrationRuntimeListRuntimeTrafficCapturesRequest = NoCtfapiPaginationPaginationRequest & {};
 
+export type NoCtfApplicationAuthenticationMfaOidcMfaTrust = {
+    enabled?: boolean;
+    policyId?: string;
+    maxAgeSeconds?: number;
+    acrValues?: Array<string>;
+    amrCombinations?: Array<Array<string>>;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformChangeOidcMfaTrustRequest = {
+    enabled?: boolean;
+    maxAgeSeconds?: number;
+    acrValues?: Array<string>;
+    amrCombinations?: Array<Array<string>>;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformPlatformMfaPolicyResponse = {
+    policy?: NoCtfDomainIdentityMfaMfaPolicy;
+};
+
+export type NoCtfDomainIdentityMfaMfaPolicy = 'Optional' | 'RequirePrivileged' | 'RequireAllHumanUsers';
+
+export type NoCtfapiEndpointsAdministrationPlatformChangePlatformMfaPolicyRequest = {
+    policy?: NoCtfDomainIdentityMfaMfaPolicy;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformChangeUserMfaRequirementRequest = {
+    required?: boolean;
+};
+
 export type NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse = {
     id?: string;
     userName?: string;
@@ -2211,6 +2320,7 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse = {
     createdAt?: string;
     updatedAt?: string;
     ssoBinding?: NoCtfapiEndpointsAdministrationPlatformPlatformUserSsoBindingResponse | null;
+    mfaRequired?: boolean;
 };
 
 export type NoCtfapiEndpointsAuthenticationUserAccountStatusProtocol = 'Active' | 'Banned' | 'Disabled' | 'Anonymized';
@@ -2423,9 +2533,33 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformContributorResponse =
     avatarUrl?: string;
 };
 
+export type NoCtfapiEndpointsAdministrationPlatformPlatformMfaConfigurationResponse = {
+    policy?: NoCtfDomainIdentityMfaMfaPolicy;
+    providers?: Array<NoCtfapiEndpointsAdministrationPlatformOidcMfaTrustResponse>;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformOidcMfaTrustResponse = {
+    providerId?: string;
+    name?: string;
+    enabled?: boolean;
+    maxAgeSeconds?: number;
+    acrValues?: Array<string>;
+    amrCombinations?: Array<Array<string>>;
+};
+
 export type NoCtfapiEndpointsAdministrationPlatformPlatformUserDetailResponse = {
     user?: NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse;
     schoolIdentity?: NoCtfapiEndpointsAuthenticationCurrentUserSchoolIdentityResponse;
+};
+
+export type NoCtfApplicationAuthenticationMfaMfaRecoveryGrant = {
+    id?: string;
+    userId?: string;
+    expiresAt?: string;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformGrantUserMfaRecoveryRequest = {
+    reason: string;
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformIssuePlatformUserTokenResponse = {
@@ -2444,7 +2578,7 @@ export type NoCtfapiEndpointsAdministrationPlatformIssuePlatformUserTokenFailure
     };
 };
 
-export type NoCtfapiEndpointsAdministrationPlatformIssuePlatformUserTokenFailureCode = 'AccountInactive';
+export type NoCtfapiEndpointsAdministrationPlatformIssuePlatformUserTokenFailureCode = 'AccountInactive' | 'MfaRequired';
 
 export type NoCtfapiEndpointsAdministrationPlatformIssuePlatformUserTokenRequest = {
     expiresInSeconds: number;
@@ -6888,7 +7022,7 @@ export type AuthenticationSsoCompleteLoginResponses = {
     /**
      * Success
      */
-    200: NoCtfapiEndpointsAuthenticationCompleteSsoLoginResponse;
+    200: NoCtfapiEndpointsAuthenticationAuthenticationResponse;
 };
 
 export type AuthenticationSsoCompleteLoginResponse = AuthenticationSsoCompleteLoginResponses[keyof AuthenticationSsoCompleteLoginResponses];
@@ -7246,7 +7380,7 @@ export type LoginEndpointResponses = {
     /**
      * Success
      */
-    200: NoCtfapiEndpointsAuthenticationLoginResponse;
+    200: NoCtfapiEndpointsAuthenticationAuthenticationResponse;
 };
 
 export type LoginEndpointResponse = LoginEndpointResponses[keyof LoginEndpointResponses];
@@ -7563,6 +7697,385 @@ export type VerifyEmailEndpointResponses = {
 };
 
 export type VerifyEmailEndpointResponse = VerifyEmailEndpointResponses[keyof VerifyEmailEndpointResponses];
+
+export type BeginMfaEnrollmentEndpointData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/mfa/enrollment';
+};
+
+export type BeginMfaEnrollmentEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type BeginMfaEnrollmentEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAuthenticationMfaMfaFlowResponse;
+};
+
+export type BeginMfaEnrollmentEndpointResponse = BeginMfaEnrollmentEndpointResponses[keyof BeginMfaEnrollmentEndpointResponses];
+
+export type BeginMfaRebindEndpointData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/mfa/rebind';
+};
+
+export type BeginMfaRebindEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type BeginMfaRebindEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAuthenticationMfaMfaFlowResponse;
+};
+
+export type BeginMfaRebindEndpointResponse = BeginMfaRebindEndpointResponses[keyof BeginMfaRebindEndpointResponses];
+
+export type BeginMfaStepUpEndpointData = {
+    body: NoCtfapiEndpointsAuthenticationMfaBeginMfaStepUpRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/mfa/step-up';
+};
+
+export type BeginMfaStepUpEndpointErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type BeginMfaStepUpEndpointError = BeginMfaStepUpEndpointErrors[keyof BeginMfaStepUpEndpointErrors];
+
+export type BeginMfaStepUpEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAuthenticationMfaMfaFlowResponse;
+};
+
+export type BeginMfaStepUpEndpointResponse = BeginMfaStepUpEndpointResponses[keyof BeginMfaStepUpEndpointResponses];
+
+export type CancelMfaFlowEndpointData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/mfa/flow';
+};
+
+export type CancelMfaFlowEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type CancelMfaFlowEndpointResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type CancelMfaFlowEndpointResponse = CancelMfaFlowEndpointResponses[keyof CancelMfaFlowEndpointResponses];
+
+export type GetMfaFlowEndpointData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/mfa/flow';
+};
+
+export type GetMfaFlowEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type GetMfaFlowEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAuthenticationMfaMfaFlowResponse;
+};
+
+export type GetMfaFlowEndpointResponse = GetMfaFlowEndpointResponses[keyof GetMfaFlowEndpointResponses];
+
+export type ConfirmAccountMfaEnrollmentEndpointData = {
+    body: NoCtfapiEndpointsAuthenticationMfaConfirmAccountMfaEnrollmentRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/mfa/account/enrollment/confirm';
+};
+
+export type ConfirmAccountMfaEnrollmentEndpointErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type ConfirmAccountMfaEnrollmentEndpointError = ConfirmAccountMfaEnrollmentEndpointErrors[keyof ConfirmAccountMfaEnrollmentEndpointErrors];
+
+export type ConfirmAccountMfaEnrollmentEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAuthenticationMfaConfirmAccountMfaEnrollmentResponse;
+};
+
+export type ConfirmAccountMfaEnrollmentEndpointResponse = ConfirmAccountMfaEnrollmentEndpointResponses[keyof ConfirmAccountMfaEnrollmentEndpointResponses];
+
+export type ConfirmMfaEnrollmentEndpointData = {
+    body: NoCtfapiEndpointsAuthenticationMfaConfirmMfaEnrollmentRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/mfa/enrollment/confirm';
+};
+
+export type ConfirmMfaEnrollmentEndpointErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type ConfirmMfaEnrollmentEndpointError = ConfirmMfaEnrollmentEndpointErrors[keyof ConfirmMfaEnrollmentEndpointErrors];
+
+export type ConfirmMfaEnrollmentEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAuthenticationAuthenticationResponse;
+};
+
+export type ConfirmMfaEnrollmentEndpointResponse = ConfirmMfaEnrollmentEndpointResponses[keyof ConfirmMfaEnrollmentEndpointResponses];
+
+export type DisableMfaEndpointData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/mfa/disable';
+};
+
+export type DisableMfaEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type DisableMfaEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationAuthenticationMfaMfaChangeResult;
+};
+
+export type DisableMfaEndpointResponse = DisableMfaEndpointResponses[keyof DisableMfaEndpointResponses];
+
+export type ExchangeMfaRecoveryEndpointData = {
+    body: NoCtfapiEndpointsAuthenticationMfaExchangeMfaRecoveryRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/mfa/recovery';
+};
+
+export type ExchangeMfaRecoveryEndpointErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+};
+
+export type ExchangeMfaRecoveryEndpointError = ExchangeMfaRecoveryEndpointErrors[keyof ExchangeMfaRecoveryEndpointErrors];
+
+export type ExchangeMfaRecoveryEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAuthenticationMfaMfaFlowResponse;
+};
+
+export type ExchangeMfaRecoveryEndpointResponse = ExchangeMfaRecoveryEndpointResponses[keyof ExchangeMfaRecoveryEndpointResponses];
+
+export type GetMfaStatusEndpointData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/mfa/status';
+};
+
+export type GetMfaStatusEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type GetMfaStatusEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAuthenticationMfaMfaStatusResponse;
+};
+
+export type GetMfaStatusEndpointResponse = GetMfaStatusEndpointResponses[keyof GetMfaStatusEndpointResponses];
+
+export type RegenerateMfaRecoveryCodesEndpointData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/mfa/recovery-codes/regenerate';
+};
+
+export type RegenerateMfaRecoveryCodesEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type RegenerateMfaRecoveryCodesEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAuthenticationMfaMfaRecoveryCodesResponse;
+};
+
+export type RegenerateMfaRecoveryCodesEndpointResponse = RegenerateMfaRecoveryCodesEndpointResponses[keyof RegenerateMfaRecoveryCodesEndpointResponses];
+
+export type VerifyMfaChallengeEndpointData = {
+    body: NoCtfapiEndpointsAuthenticationMfaVerifyMfaChallengeRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/mfa/verify';
+};
+
+export type VerifyMfaChallengeEndpointErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type VerifyMfaChallengeEndpointError = VerifyMfaChallengeEndpointErrors[keyof VerifyMfaChallengeEndpointErrors];
+
+export type VerifyMfaChallengeEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAuthenticationAuthenticationResponse;
+};
+
+export type VerifyMfaChallengeEndpointResponse = VerifyMfaChallengeEndpointResponses[keyof VerifyMfaChallengeEndpointResponses];
+
+export type VerifyMfaStepUpEndpointData = {
+    body: NoCtfapiEndpointsAuthenticationMfaVerifyMfaStepUpRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/mfa/step-up/verify';
+};
+
+export type VerifyMfaStepUpEndpointErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type VerifyMfaStepUpEndpointError = VerifyMfaStepUpEndpointErrors[keyof VerifyMfaStepUpEndpointErrors];
+
+export type VerifyMfaStepUpEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAuthenticationMfaMfaFlowResponse;
+};
+
+export type VerifyMfaStepUpEndpointResponse = VerifyMfaStepUpEndpointResponses[keyof VerifyMfaStepUpEndpointResponses];
 
 export type AdminCorrectTeamBanData = {
     body: NoCtfapiEndpointsAdministrationTeamsCorrectTeamBanRequest;
@@ -8439,6 +8952,109 @@ export type AdminPlatformSsoBeginAuthenticationTestResponses = {
 
 export type AdminPlatformSsoBeginAuthenticationTestResponse = AdminPlatformSsoBeginAuthenticationTestResponses[keyof AdminPlatformSsoBeginAuthenticationTestResponses];
 
+export type AdminPlatformMfaChangeOidcTrustData = {
+    body: NoCtfapiEndpointsAdministrationPlatformChangeOidcMfaTrustRequest;
+    path: {
+        providerId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/platform/sso/providers/{providerId}/mfa-trust';
+};
+
+export type AdminPlatformMfaChangeOidcTrustErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminPlatformMfaChangeOidcTrustError = AdminPlatformMfaChangeOidcTrustErrors[keyof AdminPlatformMfaChangeOidcTrustErrors];
+
+export type AdminPlatformMfaChangeOidcTrustResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationAuthenticationMfaOidcMfaTrust;
+};
+
+export type AdminPlatformMfaChangeOidcTrustResponse = AdminPlatformMfaChangeOidcTrustResponses[keyof AdminPlatformMfaChangeOidcTrustResponses];
+
+export type AdminPlatformMfaChangePolicyData = {
+    body: NoCtfapiEndpointsAdministrationPlatformChangePlatformMfaPolicyRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/platform/mfa-policy';
+};
+
+export type AdminPlatformMfaChangePolicyErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminPlatformMfaChangePolicyError = AdminPlatformMfaChangePolicyErrors[keyof AdminPlatformMfaChangePolicyErrors];
+
+export type AdminPlatformMfaChangePolicyResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationPlatformPlatformMfaPolicyResponse;
+};
+
+export type AdminPlatformMfaChangePolicyResponse = AdminPlatformMfaChangePolicyResponses[keyof AdminPlatformMfaChangePolicyResponses];
+
+export type AdminPlatformMfaChangeUserRequirementData = {
+    body: NoCtfapiEndpointsAdministrationPlatformChangeUserMfaRequirementRequest;
+    path: {
+        userId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/platform/users/{userId}/mfa-requirement';
+};
+
+export type AdminPlatformMfaChangeUserRequirementErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminPlatformMfaChangeUserRequirementError = AdminPlatformMfaChangeUserRequirementErrors[keyof AdminPlatformMfaChangeUserRequirementErrors];
+
+export type AdminPlatformMfaChangeUserRequirementResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationAuthenticationMfaMfaChangeResult;
+};
+
+export type AdminPlatformMfaChangeUserRequirementResponse = AdminPlatformMfaChangeUserRequirementResponses[keyof AdminPlatformMfaChangeUserRequirementResponses];
+
 export type AdminPlatformCreateBotData = {
     body: NoCtfapiEndpointsAdministrationPlatformCreatePlatformBotRequest;
     path?: never;
@@ -8875,6 +9491,33 @@ export type AdminPlatformGetInformationResponses = {
 
 export type AdminPlatformGetInformationResponse = AdminPlatformGetInformationResponses[keyof AdminPlatformGetInformationResponses];
 
+export type AdminPlatformMfaGetConfigurationData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/platform/mfa';
+};
+
+export type AdminPlatformMfaGetConfigurationErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminPlatformMfaGetConfigurationResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationPlatformPlatformMfaConfigurationResponse;
+};
+
+export type AdminPlatformMfaGetConfigurationResponse = AdminPlatformMfaGetConfigurationResponses[keyof AdminPlatformMfaGetConfigurationResponses];
+
 export type AdminGetPrivatePlatformUserData = {
     body?: never;
     path: {
@@ -8967,6 +9610,41 @@ export type AdminPlatformSsoPatchConfigurationResponses = {
 };
 
 export type AdminPlatformSsoPatchConfigurationResponse = AdminPlatformSsoPatchConfigurationResponses[keyof AdminPlatformSsoPatchConfigurationResponses];
+
+export type AdminPlatformMfaGrantUserRecoveryData = {
+    body: NoCtfapiEndpointsAdministrationPlatformGrantUserMfaRecoveryRequest;
+    path: {
+        userId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/platform/users/{userId}/mfa-recovery';
+};
+
+export type AdminPlatformMfaGrantUserRecoveryErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminPlatformMfaGrantUserRecoveryError = AdminPlatformMfaGrantUserRecoveryErrors[keyof AdminPlatformMfaGrantUserRecoveryErrors];
+
+export type AdminPlatformMfaGrantUserRecoveryResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationAuthenticationMfaMfaRecoveryGrant;
+};
+
+export type AdminPlatformMfaGrantUserRecoveryResponse = AdminPlatformMfaGrantUserRecoveryResponses[keyof AdminPlatformMfaGrantUserRecoveryResponses];
 
 export type AdminPlatformListAuditLogsData = {
     body?: never;

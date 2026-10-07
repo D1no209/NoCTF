@@ -86,6 +86,9 @@ public sealed class SsoBodylessCompletionEndpointTests
         builder.Services.AddSingleton(Substitute.For<IAccountActivityRecorder>());
         builder.Services.AddScoped<CompleteSsoBinding>();
         builder.Services.AddScoped<CompleteSsoLogin>();
+        builder.Services.AddScoped<NoCTF.Application.Authentication.Mfa.CompleteAuthentication>();
+        builder.Services.AddSingleton(MfaTestSupport.Unrequired());
+        builder.Services.AddSingleton<MfaBrowserFlow>();
         builder.Services.AddScoped<IUserContext, HttpUserContext>();
         builder.Services.AddSingleton<SsoBrowserCorrelation>();
 

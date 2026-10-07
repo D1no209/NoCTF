@@ -28,6 +28,7 @@ using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Application.Admission;
 using NoCTF.API.SignalR.Publishing;
 using NoCTF.API.SignalR.Hubs;
+using Microsoft.AspNetCore.SignalR;
 using NoCTF.API.Endpoints.Authentication;
 using NoCTF.API.Endpoints.Teams.WriteUps;
 using NoCTF.API.Pagination;
@@ -120,6 +121,7 @@ public static class ServiceRegistration
                     new HumanVerificationOperationProcessor());
                 settings.DocumentProcessors.Add(
                     new AwdpFixResultOutcomeDocumentProcessor());
+                settings.DocumentProcessors.Add(new AuthenticationCompletionDocumentProcessor());
                 settings.DocumentProcessors.Add(
                     new EndpointMetadataDocumentProcessor());
                 settings.AddAuth("Bearer", new OpenApiSecurityScheme
@@ -210,7 +212,11 @@ public static class ServiceRegistration
         var requestAdmissionLimits = configuration
             .GetSection("RequestAdmission")
             .Get<RequestAdmissionOptions>() ?? new RequestAdmissionOptions();
-        services.AddSignalR();
+        services.AddSingleton<IMfaConnectionContextValidator, ScopedMfaConnectionContextValidator>();
+        services.AddSingleton<MfaConnectionGuard>();
+        services.AddSingleton<MfaHubFilter>();
+        services.AddSignalR(options => options.AddFilter<MfaHubFilter>());
+        if (includeInfrastructure && !configuration.GetValue<bool>("OpenApi:Exporting")) services.AddHostedService<MfaConnectionRevalidationAgent>();
         services.AddSingleton<CompetitionHubSubscriptionRegistry>();
         services.AddSingleton<ICompetitionHubAudienceAccess, CompetitionHubAudienceAccess>();
         services.AddSingleton<ICompetitionHubAudienceRouter, CompetitionHubAudienceRouter>();
@@ -237,6 +243,7 @@ public static class ServiceRegistration
             services.AddHostedService<NoCTF.API.SignalR.Publishing.NatsPlatformLogRelay>();
             services.AddHostedService<NoCTF.API.SignalR.Publishing.NatsCompetitionEventRefreshRelay>();
             services.AddHostedService<NatsNotificationChangeRelay>();
+            services.AddHostedService<NatsMfaAuthenticationRelay>();
         }
         services.AddRateLimiter(options =>
         {

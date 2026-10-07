@@ -17,7 +17,7 @@ public sealed record IssuedAccessToken(
     DateTimeOffset ExpiresAt,
     Guid JwtId = default);
 public sealed record IssuedRefreshToken(string Token, DateTimeOffset ExpiresAt);
-public sealed record RefreshTokenPrincipal(Guid UserId, int TokenVersion);
+public sealed record RefreshTokenPrincipal(Guid UserId, int TokenVersion, NoCTF.Domain.Identity.Mfa.AuthenticationContext? Authentication);
 public sealed record UserProfile(
     Guid Id,
     string UserName,
@@ -154,8 +154,9 @@ public interface IAccessTokenIssuer
 {
     IssuedAccessToken Issue(
         AuthenticatedUser user,
+        NoCTF.Domain.Identity.Mfa.AuthenticationContext authentication,
         DateTimeOffset now,
         TimeSpan? lifetime = null);
-    IssuedRefreshToken IssueRefresh(AuthenticatedUser user);
+    IssuedRefreshToken IssueRefresh(AuthenticatedUser user, NoCTF.Domain.Identity.Mfa.AuthenticationContext authentication);
     RefreshTokenPrincipal? ValidateRefresh(string token);
 }

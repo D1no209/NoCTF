@@ -142,8 +142,9 @@ export function useAuthLoginPage() {
         verificationHeaders = await requestHumanVerification('login', 'login-inline')
       }
       if (disposed || verificationHeaders === null) return
-      await login(loginName.value, password.value, verificationHeaders)
+      const authenticated = await login(loginName.value, password.value, verificationHeaders)
       password.value = ''
+      if (!authenticated) return
       toast.success(describeMessage('common.label.loginSuccessful'))
       const candidate = route.query.redirect
       const redirect = typeof candidate === 'string' && candidate.startsWith('/') && !candidate.startsWith('//')

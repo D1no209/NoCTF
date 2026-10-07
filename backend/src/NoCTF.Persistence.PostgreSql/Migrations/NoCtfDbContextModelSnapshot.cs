@@ -2281,6 +2281,228 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.ToTable("external_identities", (string)null);
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Identity.Mfa.MfaChallenge", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_user_id");
+
+                    b.Property<string>("BrowserBindingHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("browser_binding_hash");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CredentialId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("credential_id");
+
+                    b.Property<long>("ExpiresAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("expires_at");
+
+                    b.Property<int>("FailedAttempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("failed_attempts");
+
+                    b.Property<long?>("MailAttemptedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("mail_attempted_at");
+
+                    b.Property<short>("MailState")
+                        .HasColumnType("smallint")
+                        .HasColumnName("mail_state");
+
+                    b.Property<short?>("Operation")
+                        .HasColumnType("smallint")
+                        .HasColumnName("operation");
+
+                    b.Property<Guid?>("PendingCredentialId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("pending_credential_id");
+
+                    b.Property<byte[]>("PendingSecretCiphertext")
+                        .HasMaxLength(256)
+                        .HasColumnType("bytea")
+                        .HasColumnName("pending_secret_ciphertext");
+
+                    b.Property<Guid>("PolicyStamp")
+                        .HasColumnType("uuid")
+                        .HasColumnName("policy_stamp");
+
+                    b.Property<long>("PrimaryAuthenticatedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("primary_authenticated_at");
+
+                    b.Property<short>("PrimaryMethod")
+                        .HasColumnType("smallint")
+                        .HasColumnName("primary_method");
+
+                    b.Property<string>("PrimaryProviderFingerprint")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("primary_provider_fingerprint");
+
+                    b.Property<Guid?>("PrimaryProviderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("primary_provider_id");
+
+                    b.Property<short>("Purpose")
+                        .HasColumnType("smallint")
+                        .HasColumnName("purpose");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("reason");
+
+                    b.Property<byte[]>("RecoveryGrantCiphertext")
+                        .HasMaxLength(256)
+                        .HasColumnType("bytea")
+                        .HasColumnName("recovery_grant_ciphertext");
+
+                    b.Property<byte[]>("RecoveryGrantSha256")
+                        .HasColumnType("bytea")
+                        .HasColumnName("recovery_grant_sha256");
+
+                    b.Property<string>("ReturnPath")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("return_path");
+
+                    b.Property<short>("State")
+                        .HasColumnType("smallint")
+                        .HasColumnName("state");
+
+                    b.Property<Guid?>("TargetResourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_resource_id");
+
+                    b.Property<Guid?>("TargetUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_user_id");
+
+                    b.Property<int>("TokenVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("token_version");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_mfa_challenges");
+
+                    b.HasIndex("ExpiresAt")
+                        .HasDatabaseName("ix_mfa_challenges_expires_at");
+
+                    b.HasIndex("UserId", "Purpose")
+                        .HasDatabaseName("ix_mfa_challenges_user_id_purpose");
+
+                    b.ToTable("mfa_challenges", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Identity.Mfa.UserMfaRecoveryCode", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BatchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("batch_id");
+
+                    b.Property<byte[]>("CodeSha256")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("code_sha256");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<long?>("ConsumedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("consumed_at");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_user_mfa_recovery_codes");
+
+                    b.HasIndex("UserId", "BatchId", "CodeSha256")
+                        .IsUnique()
+                        .HasDatabaseName("ix_user_mfa_recovery_codes_user_id_batch_id_code_sha256");
+
+                    b.ToTable("user_mfa_recovery_codes", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Identity.Mfa.UserTotpCredential", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<long>("EnabledAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("enabled_at");
+
+                    b.Property<long>("LastAcceptedStep")
+                        .HasColumnType("bigint")
+                        .HasColumnName("last_accepted_step");
+
+                    b.Property<Guid>("RecoveryBatchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("recovery_batch_id");
+
+                    b.Property<byte[]>("SecretCiphertext")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("bytea")
+                        .HasColumnName("secret_ciphertext");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_user_totp_credentials");
+
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_user_totp_credentials_user_id");
+
+                    b.ToTable("user_totp_credentials", (string)null);
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Identity.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2323,6 +2545,10 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Property<short>("Kind")
                         .HasColumnType("smallint")
                         .HasColumnName("kind");
+
+                    b.Property<bool>("MfaRequired")
+                        .HasColumnType("boolean")
+                        .HasColumnName("mfa_required");
 
                     b.Property<string>("NormalizedEmail")
                         .IsRequired()
@@ -2710,6 +2936,75 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.ToTable("human_verification_turnstile_hostnames", (string)null);
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Platform.OidcMfaAcr", b =>
+                {
+                    b.Property<Guid>("SsoProviderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sso_provider_id");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("value");
+
+                    b.HasKey("SsoProviderId", "Position")
+                        .HasName("pk_oidc_mfa_acr_values");
+
+                    b.ToTable("oidc_mfa_acr_values", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Platform.OidcMfaAmrGroup", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<Guid>("SsoProviderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sso_provider_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_oidc_mfa_amr_groups");
+
+                    b.HasIndex("SsoProviderId", "Position")
+                        .IsUnique()
+                        .HasDatabaseName("ix_oidc_mfa_amr_groups_sso_provider_id_position");
+
+                    b.ToTable("oidc_mfa_amr_groups", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Platform.OidcMfaAmrValue", b =>
+                {
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("group_id");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("value");
+
+                    b.HasKey("GroupId", "Position")
+                        .HasName("pk_oidc_mfa_amr_values");
+
+                    b.ToTable("oidc_mfa_amr_values", (string)null);
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Platform.OidcSsoScope", b =>
                 {
                     b.Property<Guid>("SsoProviderId")
@@ -2877,6 +3172,14 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("logo_file_id");
 
+                    b.Property<short>("MfaPolicy")
+                        .HasColumnType("smallint")
+                        .HasColumnName("mfa_policy");
+
+                    b.Property<Guid>("MfaPolicyStamp")
+                        .HasColumnType("uuid")
+                        .HasColumnName("mfa_policy_stamp");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -2930,6 +3233,8 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                             HumanVerificationEvaluationEnabled = true,
                             HumanVerificationRuntimeEnabled = true,
                             HumanVerificationTurnstileSiteKey = "",
+                            MfaPolicy = (short)0,
+                            MfaPolicyStamp = new Guid("00000000-0000-0000-0000-000000000002"),
                             Name = "NoCTF",
                             SsoEnabled = false,
                             SsoPublicBaseUrl = "",
@@ -3523,6 +3828,10 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<long?>("AuthenticatedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("authenticated_at");
+
                     b.Property<string>("BrowserIdHash")
                         .IsRequired()
                         .HasMaxLength(128)
@@ -3552,6 +3861,14 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)")
                         .HasColumnName("external_display_name");
+
+                    b.Property<long?>("ExternalMfaAuthenticatedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("external_mfa_authenticated_at");
+
+                    b.Property<Guid?>("ExternalMfaTrustPolicyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("external_mfa_trust_policy_id");
 
                     b.Property<string>("ExternalNamespace")
                         .HasMaxLength(512)
@@ -5359,6 +5676,21 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("character varying(2048)")
                         .HasColumnName("issuer");
 
+                    b.Property<int>("MfaAuthenticationMaxAgeSeconds")
+                        .HasColumnType("integer")
+                        .HasDefaultValue(300)
+                        .HasColumnName("mfa_authentication_max_age_seconds");
+
+                    b.Property<bool>("MfaTrustEnabled")
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("mfa_trust_enabled");
+
+                    b.Property<Guid>("MfaTrustPolicyId")
+                        .HasColumnType("uuid")
+                        .HasDefaultValue(new Guid("00000000-0000-0000-0000-000000000000"))
+                        .HasColumnName("mfa_trust_policy_id");
+
                     b.Property<bool>("ReadUserInfo")
                         .HasColumnType("boolean")
                         .HasColumnName("read_user_info");
@@ -6368,6 +6700,42 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasConstraintName("fk_external_identities_users_user_id");
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Identity.Mfa.MfaChallenge", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Identity.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_mfa_challenges_users_user_id");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Identity.Mfa.UserMfaRecoveryCode", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Identity.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_user_mfa_recovery_codes_users_user_id");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Identity.Mfa.UserTotpCredential", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Identity.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_user_totp_credentials_users_user_id");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Identity.User", b =>
                 {
                     b.HasOne("NoCTF.Domain.Storage.StoredFile", "AvatarFile")
@@ -6428,6 +6796,36 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_human_verification_turnstile_hostnames_platform_settings_pl");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Platform.OidcMfaAcr", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Platform.OidcSsoProviderConfiguration", null)
+                        .WithMany("MfaAcrEntries")
+                        .HasForeignKey("SsoProviderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_oidc_mfa_acr_values_sso_provider_configuration_sso_provider");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Platform.OidcMfaAmrGroup", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Platform.OidcSsoProviderConfiguration", null)
+                        .WithMany("MfaAmrGroups")
+                        .HasForeignKey("SsoProviderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_oidc_mfa_amr_groups_sso_provider_configuration_sso_provider");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Platform.OidcMfaAmrValue", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Platform.OidcMfaAmrGroup", null)
+                        .WithMany("Values")
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_oidc_mfa_amr_values_oidc_mfa_amr_groups_group_id");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Platform.OidcSsoScope", b =>
@@ -6967,6 +7365,11 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Navigation("ReferenceCounts");
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Platform.OidcMfaAmrGroup", b =>
+                {
+                    b.Navigation("Values");
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Platform.PlatformSettings", b =>
                 {
                     b.Navigation("HumanVerificationTurnstileHostnames");
@@ -7010,6 +7413,10 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
 
             modelBuilder.Entity("NoCTF.Domain.Platform.OidcSsoProviderConfiguration", b =>
                 {
+                    b.Navigation("MfaAcrEntries");
+
+                    b.Navigation("MfaAmrGroups");
+
                     b.Navigation("ScopeEntries");
                 });
 #pragma warning restore 612, 618

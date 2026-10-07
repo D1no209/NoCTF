@@ -22,6 +22,7 @@ function harness(provider = 'Cap', delayConfiguration = false) {
   let configurationLoaded: () => void = () => {}
   const configurationPromise = delayConfiguration ? new Promise<void>(resolve => { configurationLoaded = resolve }) : Promise.resolve()
   let loginError: unknown = null
+  let mfaRequired = false
   let sequence = 0
   const sharedState = ref(null)
 
@@ -56,6 +57,8 @@ function harness(provider = 'Cap', delayConfiguration = false) {
     useRoute: () => ({ query: { redirect: '/admin/competitions/example' }, fullPath: '/auth/login' }),
     useAuth: () => ({ login: async (name: string, password: string, headers: Record<string, string>) => {
       logins.push({ name, password, headers }); if (loginError) throw loginError
+      if (mfaRequired) { navigations.push('/auth/mfa'); scopes[0]!.stop(); return false }
+      return true
     } }),
     useAuthThemeArtwork: () => ({ authArtwork: ref(null) }),
     loadCap: async () => ({ default: FakeCap }),
@@ -76,6 +79,7 @@ function harness(provider = 'Cap', delayConfiguration = false) {
   return {
     state, mount, credentials, challenges, logins, navigations, notices, configurationLoaded,
     rejectLogin: () => { loginError = new Error('invalid credentials') },
+    requireMfa: () => { mfaRequired = true },
     stop: () => { for (const scope of scopes) scope.stop() },
     stopPage: () => scopes[0]!.stop(),
     extraVerification: () => {
@@ -117,6 +121,20 @@ describe('login CAP precomputation', () => {
       expect(app.challenges).toHaveLength(1)
       app.challenges[0]!.complete(); await submitted
       expect(app.logins).toHaveLength(1)
+    }
+    finally { app.stop() }
+  })
+
+  test('preserves the MFA continuation without announcing authentication or redirecting past it', async () => {
+    const app = harness()
+    try {
+      await app.mount(); app.challenges[0]!.complete(); await drain()
+      app.credentials(); app.requireMfa(); await app.state.submit(); await drain()
+      expect(app.logins).toHaveLength(1)
+      expect(app.navigations).toEqual(['/auth/mfa'])
+      expect(app.notices).toHaveLength(0)
+      expect(app.state.password.value).toBe('')
+      expect(app.challenges).toHaveLength(1)
     }
     finally { app.stop() }
   })

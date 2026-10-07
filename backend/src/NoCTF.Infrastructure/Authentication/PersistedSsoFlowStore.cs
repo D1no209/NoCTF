@@ -114,6 +114,9 @@ public sealed class PersistedSsoFlowStore(
             flow.ExternalNamespace = identity?.IdentityNamespace;
             flow.ExternalSubject = identity?.Subject;
             flow.ExternalDisplayName = identity?.DisplayName;
+            flow.AuthenticatedAt = identity is null ? null : now;
+            flow.ExternalMfaAuthenticatedAt = identity?.MfaProof?.AuthenticatedAt;
+            flow.ExternalMfaTrustPolicyId = identity?.MfaProof?.TrustPolicyId;
             flow.FailureCode = failure;
             await db.SaveChangesAsync(ct);
             return true;
@@ -207,9 +210,11 @@ public sealed class PersistedSsoFlowStore(
             && flow.ExternalNamespace is { } identityNamespace
             && flow.ExternalSubject is { } subject
             ? new SsoExternalIdentity(providerId, protocol, identityNamespace,
-                subject, flow.ExternalDisplayName)
+                subject, flow.ExternalDisplayName,
+                flow.ExternalMfaAuthenticatedAt is { } time && flow.ExternalMfaTrustPolicyId is { } policy
+                    ? new NoCTF.Application.Authentication.Mfa.OidcMfaProof(providerId, policy, time) : null)
             : null,
-        flow.FailureCode);
+        flow.FailureCode, flow.AuthenticatedAt);
 
     private static string Hash(string value) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)));

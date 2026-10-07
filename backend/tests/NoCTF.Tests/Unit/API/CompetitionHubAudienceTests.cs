@@ -23,23 +23,21 @@ public sealed class CompetitionHubAudienceTests
         var clients = Substitute.For<IHubClients<ICompetitionHubClient>>();
         var client = Substitute.For<ICompetitionHubClient>();
         context.Clients.Returns(clients);
+        clients.Clients(Arg.Any<IReadOnlyList<string>>()).Returns(client);
         clients.Groups(Arg.Any<IReadOnlyList<string>>()).Returns(client);
         clients.Group(Arg.Any<string>()).Returns(client);
-        var router = new CompetitionHubAudienceRouter(
-            access,
-            context);
+        var publicUser = Guid.NewGuid(); var staffUser = Guid.NewGuid();
+        var registry = new CompetitionHubSubscriptionRegistry();
+        registry.Set(new("public", publicUser, competitionId, CompetitionHubGroups.Public(competitionId), false));
+        registry.Set(new("staff", staffUser, competitionId, CompetitionHubGroups.Staff(competitionId), true));
+        var router = new CompetitionHubAudienceRouter(access, context, registry,
+            MfaHubTestSupport.Guard(("public", publicUser, MfaHubKind.Competition), ("staff", staffUser, MfaHubKind.Competition)));
 
         _ = await router.CurrentAsync(competitionId, CancellationToken.None);
         _ = await router.CurrentAsync(competitionId, CancellationToken.None);
 
-        string[] expectedGroups =
-        [
-            CompetitionHubGroups.Public(competitionId),
-            CompetitionHubGroups.Staff(competitionId)
-        ];
-        _ = clients.Received(1).Groups(Arg.Is<IReadOnlyList<string>>(groups =>
-            groups != null && groups.SequenceEqual(expectedGroups)));
-        _ = clients.Received(1).Group(CompetitionHubGroups.Staff(competitionId));
+        _ = clients.Received(1).Clients(Arg.Is<IReadOnlyList<string>>(ids => ids != null && ids.Count == 2 && ids.Contains("public") && ids.Contains("staff")));
+        _ = clients.Received(1).Clients(Arg.Is<IReadOnlyList<string>>(ids => ids != null && ids.Count == 1 && ids.Contains("staff")));
     }
 
     [Test]

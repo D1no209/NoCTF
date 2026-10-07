@@ -1,5 +1,7 @@
 import { message as describeMessage } from '../../../../utils/i18n'
 import type { UiMessage } from '../../../../utils/i18n'
+import { markRaw } from 'vue'
+import MfaPlatformSettingsComponent from '../../../authentication/mfa/MfaPlatformSettings.vue'
 import { FlaskConical, Plus, RotateCw } from '@lucide/vue'
 import { toast } from '../../../../utils/message-toast'
 import {
@@ -250,6 +252,7 @@ export function useAdminPlatformAuthenticationPage() {
 
   return {
     Plus, RotateCw, FlaskConical,
+    MfaPlatformSettings: markRaw(MfaPlatformSettingsComponent),
     configuration, loading, loadError, globalForm, globalSaving,
     providerOpen, providerSaving, providerError, providerForm,
     secretOpen, secretProvider, secret, secretSaving, testingId,

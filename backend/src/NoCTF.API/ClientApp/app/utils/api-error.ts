@@ -50,7 +50,9 @@ export function userFacingErrorMessage(value: string | null | undefined, fallbac
 }
 
 function stableCodeMessage(code: string | undefined): MessageDescriptor | null {
+  if (code && isMessageKey(`mfa.error.${code}`)) return describeMessage(`mfa.error.${code}` as import('../locales/en').MessageKey)
   switch (code) {
+    case 'MfaRequired': return describeMessage('mfa.error.DelegationNotAllowed')
     case 'HumanVerificationRequired': return describeMessage('security.verification.required')
     case 'HumanVerificationFailed': return describeMessage('security.verification.failed')
     case 'HumanVerificationUnavailable': return describeMessage('security.verification.unavailable')

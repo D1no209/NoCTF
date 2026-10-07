@@ -8,6 +8,7 @@ import { toast } from '../../../../utils/message-toast'
 import { adminPlatformCreateBot, adminPlatformDeleteUser, adminPlatformDeleteUserTokens, adminPlatformGetUser, adminPlatformIssueUserToken, adminPlatformListUsers, adminPlatformPatchUser, adminPlatformPreviewUserDeletion, adminPlatformSsoGetConfiguration, adminPlatformUnbindSsoIdentity } from '../../../../api'
 import type { NoCtfapiEndpointsAdministrationPlatformIssuePlatformUserTokenResponse, NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionMode, NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionPreviewResponse, NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse, NoCtfapiEndpointsAdministrationPlatformPlatformManagedUserAccountStatusProtocol, NoCtfapiEndpointsAdministrationPlatformSsoProviderResponse, NoCtfapiEndpointsAuthenticationUserKindProtocol, NoCtfapiEndpointsAuthenticationUserRoleProtocol } from '../../../../api'
 import { createLatestRequestGuard } from '../../../../lib/latest-request'
+import MfaUserManagementComponent from '../../../authentication/mfa/MfaUserManagement.vue'
 import PrivateAccountPanelComponent from '../../../account/PrivateAccountPanel.vue'
 import AdminDateTimeComponent from '../../../admin/AdminDateTime.vue'
 import { useOffsetPagination } from '../../../../composables/useOffsetPagination'
@@ -523,6 +524,7 @@ export function useAdminPlatformUsersPage() {
       startDelete,
       confirmDelete,
       PrivateAccountPanel,
+    MfaUserManagement: markRaw(MfaUserManagementComponent),
       AdminDateTime
     }
 }

@@ -33,7 +33,7 @@ public sealed class BotIdentityTests
             .Returns(new CreateBotResult(CreateBotState.Created));
         var platform = new ManagePlatform(
             store,
-            Substitute.For<IAccessTokenIssuer>());
+            Substitute.For<IAccessTokenIssuer>(), MfaTestSupport.Unrequired());
 
         var result = await platform.CreateBotAsync(
             "repository-bot",
@@ -57,7 +57,7 @@ public sealed class BotIdentityTests
         var store = Substitute.For<IPlatformAdministrationStore>();
         var platform = new ManagePlatform(
             store,
-            Substitute.For<IAccessTokenIssuer>());
+            Substitute.For<IAccessTokenIssuer>(), MfaTestSupport.Unrequired());
 
         var result = await platform.IssueUserTokenAsync(
             Guid.NewGuid(),
@@ -87,7 +87,7 @@ public sealed class BotIdentityTests
             now,
             now));
         var tokenIssuer = Substitute.For<IAccessTokenIssuer>();
-        var platform = new ManagePlatform(store, tokenIssuer);
+        var platform = new ManagePlatform(store, tokenIssuer, MfaTestSupport.Unrequired());
 
         var result = await platform.IssueUserTokenAsync(
             userId,
@@ -96,7 +96,7 @@ public sealed class BotIdentityTests
 
         await Assert.That(result.Failure)
             .IsEqualTo(IssuePlatformUserTokenFailure.AccountInactive);
-        tokenIssuer.DidNotReceiveWithAnyArgs().Issue(default!, default, default);
+        tokenIssuer.DidNotReceiveWithAnyArgs().Issue(default!, default!, default, default);
     }
 
     [Test]
@@ -126,10 +126,11 @@ public sealed class BotIdentityTests
         var issuer = Substitute.For<IAccessTokenIssuer>();
         issuer.Issue(
                 Arg.Any<AuthenticatedUser>(),
+                Arg.Any<NoCTF.Domain.Identity.Mfa.AuthenticationContext>(),
                 now,
                 TimeSpan.FromHours(1))
             .Returns(new IssuedAccessToken("token", now.AddHours(1), jwtId));
-        var platform = new ManagePlatform(store, issuer);
+        var platform = new ManagePlatform(store, issuer, MfaTestSupport.Unrequired());
 
         var result = await platform.IssueUserTokenAsync(
             userId,
@@ -146,6 +147,7 @@ public sealed class BotIdentityTests
                 && target.Kind == kind
                 && target.TokenVersion == 6
                 && !target.EmailVerified),
+            Arg.Any<NoCTF.Domain.Identity.Mfa.AuthenticationContext>(),
             now,
             TimeSpan.FromHours(1));
     }

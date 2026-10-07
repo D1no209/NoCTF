@@ -48,12 +48,12 @@ public sealed class LocalLeaderboardRefreshPublisher(
 }
 
 public sealed class LocalGameplayFactStatePublisher(
-    IHubContext<CompetitionHub, ICompetitionHubClient> hub) : IGameplayFactStateChangedNotification
+    IHubContext<CompetitionHub, ICompetitionHubClient> hub, MfaConnectionGuard guard) : IGameplayFactStateChangedNotification
 {
-    public Task PublishAsync(
+    public async Task PublishAsync(
         GameplayFactStateChangedNotification notification,
         CancellationToken cancellationToken) =>
-        hub.Clients.User(notification.UserId.ToString()).GameplayFactStateChanged(
+        await hub.Clients.Clients(await guard.EligibleAsync(MfaHubKind.Competition, new HashSet<Guid> { notification.UserId }, cancellationToken)).GameplayFactStateChanged(
             GameplayFactMapper.ToStatusResponse(notification.Result),
             cancellationToken);
 }
@@ -67,7 +67,7 @@ public sealed class LocalCompetitionEventMessageHandler(
         CancellationToken cancellationToken)
     {
         var clients = message.Kind == CompetitionEventKind.CompetitionAudienceChanged
-            ? audiences.AllKnown(message.CompetitionId)
+            ? await audiences.AllKnownAsync(message.CompetitionId, cancellationToken)
             : await audiences.CurrentAsync(message.CompetitionId, cancellationToken);
         if (clients is null)
             return;

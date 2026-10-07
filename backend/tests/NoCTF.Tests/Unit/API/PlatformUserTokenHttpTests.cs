@@ -27,6 +27,24 @@ public sealed class PlatformUserTokenHttpTests
         "e2360300-837e-4c56-a713-2257d00bce79");
 
     [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task Human_Mfa_target_cannot_receive_delegated_login_even_from_a_Bot_administrator(bool botCaller)
+    {
+        var targetId = Guid.NewGuid(); var store = ActiveTargetStore(targetId); var issuer = Substitute.For<IAccessTokenIssuer>();
+        var mfa = Substitute.For<NoCTF.Application.Authentication.Mfa.IMfaAuthenticationStore>();
+        mfa.ReadAccountAsync(targetId, Arg.Any<CancellationToken>()).Returns(new NoCTF.Application.Authentication.Mfa.MfaAccountSnapshot(
+            new(targetId, "target", UserRole.User, UserKind.Human, 3), true, true, Guid.NewGuid(), null, 0, false));
+        await using var app = await CreateApplicationAsync(store, issuer, mfa); using var client = app.GetTestClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", botCaller ? "BotAdministrator" : "Administrator");
+        using var response = await client.PostAsJsonAsync($"/api/v1/admin/platform/users/{targetId}/tokens", new { expiresInSeconds = 3600 });
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Conflict);
+        var body = await response.Content.ReadFromJsonAsync<IssuePlatformUserTokenFailureResponse>();
+        await Assert.That(body!.Code).IsEqualTo(IssuePlatformUserTokenFailureCode.MfaRequired);
+        issuer.DidNotReceive().Issue(Arg.Any<AuthenticatedUser>(), Arg.Any<NoCTF.Domain.Identity.Mfa.AuthenticationContext>(), Arg.Any<DateTimeOffset>(), Arg.Any<TimeSpan>());
+    }
+
+    [Test]
     public async Task Administrator_can_issue_without_receiving_a_refresh_cookie()
     {
         var targetId = Guid.NewGuid();
@@ -34,11 +52,12 @@ public sealed class PlatformUserTokenHttpTests
         var issuer = Substitute.For<IAccessTokenIssuer>();
         issuer.Issue(
                 Arg.Any<AuthenticatedUser>(),
+                Arg.Any<NoCTF.Domain.Identity.Mfa.AuthenticationContext>(),
                 Arg.Any<DateTimeOffset>(),
                 TimeSpan.FromHours(1))
             .Returns(call => new IssuedAccessToken(
                 "administrator-issued-token",
-                call.ArgAt<DateTimeOffset>(1).AddHours(1),
+                call.ArgAt<DateTimeOffset>(2).AddHours(1),
                 Guid.NewGuid()));
         await using var app = await CreateApplicationAsync(store, issuer);
         using var client = app.GetTestClient();
@@ -61,8 +80,8 @@ public sealed class PlatformUserTokenHttpTests
         var targetId = Guid.NewGuid();
         var store = ActiveTargetStore(targetId);
         var issuer = Substitute.For<IAccessTokenIssuer>();
-        issuer.Issue(Arg.Any<AuthenticatedUser>(), Arg.Any<DateTimeOffset>(), Arg.Any<TimeSpan>())
-            .Returns(call => new IssuedAccessToken("ordinary-token", call.ArgAt<DateTimeOffset>(1).AddHours(1)));
+        issuer.Issue(Arg.Any<AuthenticatedUser>(), Arg.Any<NoCTF.Domain.Identity.Mfa.AuthenticationContext>(), Arg.Any<DateTimeOffset>(), Arg.Any<TimeSpan>())
+            .Returns(call => new IssuedAccessToken("ordinary-token", call.ArgAt<DateTimeOffset>(2).AddHours(1)));
         await using var app = await CreateApplicationAsync(store, issuer);
         using var client = app.GetTestClient();
 
@@ -79,7 +98,7 @@ public sealed class PlatformUserTokenHttpTests
 
         await Assert.That(forbiddenRole.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
         await Assert.That(administrator.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        issuer.Received(1).Issue(Arg.Any<AuthenticatedUser>(), Arg.Any<DateTimeOffset>(), Arg.Any<TimeSpan>());
+        issuer.Received(1).Issue(Arg.Any<AuthenticatedUser>(), Arg.Any<NoCTF.Domain.Identity.Mfa.AuthenticationContext>(), Arg.Any<DateTimeOffset>(), Arg.Any<TimeSpan>());
     }
 
     [Test]
@@ -125,11 +144,12 @@ public sealed class PlatformUserTokenHttpTests
         var issuer = Substitute.For<IAccessTokenIssuer>();
         issuer.Issue(
                 Arg.Any<AuthenticatedUser>(),
+                Arg.Any<NoCTF.Domain.Identity.Mfa.AuthenticationContext>(),
                 Arg.Any<DateTimeOffset>(),
                 Arg.Any<TimeSpan>())
             .Returns(call => new IssuedAccessToken(
                 "administrator-issued-token",
-                call.ArgAt<DateTimeOffset>(1).AddHours(1),
+                call.ArgAt<DateTimeOffset>(2).AddHours(1),
                 Guid.NewGuid()));
         await using var app = await CreateApplicationAsync(store, issuer);
         using var client = app.GetTestClient();
@@ -171,7 +191,7 @@ public sealed class PlatformUserTokenHttpTests
 
     private static async Task<WebApplication> CreateApplicationAsync(
         IPlatformAdministrationStore store,
-        IAccessTokenIssuer issuer)
+        IAccessTokenIssuer issuer, NoCTF.Application.Authentication.Mfa.IMfaAuthenticationStore? mfa = null)
     {
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
@@ -192,6 +212,7 @@ public sealed class PlatformUserTokenHttpTests
         });
         builder.Services.AddSingleton(store);
         builder.Services.AddSingleton(issuer);
+        builder.Services.AddSingleton(mfa ?? NoCTF.Tests.MfaTestSupport.Unrequired());
         builder.Services.AddScoped<ManagePlatform>();
         var app = builder.Build();
         app.UseAuthentication();
@@ -220,7 +241,7 @@ public sealed class PlatformUserTokenHttpTests
             {
                 new(ClaimTypes.NameIdentifier, ActorId.ToString()),
                 new(ClaimTypes.Role, role),
-                new("user_kind", "Human")
+                new("user_kind", token.Contains("Bot", StringComparison.Ordinal) ? "Bot" : "Human")
             };
             var identity = new ClaimsIdentity(claims, Scheme.Name);
             return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(
@@ -229,3 +250,4 @@ public sealed class PlatformUserTokenHttpTests
         }
     }
 }
+

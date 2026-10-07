@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminPlatformUsersPageViewState } from '~/features/routes/admin/platform/useAdminPlatformUsersPage'
 
 const viewProps = defineProps<{ state: AdminPlatformUsersPageViewState }>()
-const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageLoading, loadError, search, roleFilter, ssoProviders, ssoProviderFilter, ROLE_LABELS, STATUS_LABELS, MANAGED_ACCOUNT_STATUS_OPTIONS, REFERENCE_LABELS, filteredUsers, page, pageCount, total, pageLimit, loadPage, setPageSize, createBotOpen, creatingBot, botName, botRole, openCreateBot, setCreateBotOpen, createBot, detailError, detailOpen, detailLoading, detail, pendingRole, pendingAccountStatus, pendingEmailVerification, roleSaving, accountStatusSaving, emailVerificationSaving, invalidating, ssoUnbinding, tokenOpen, tokenIntent, identitySwitchActive, tokenIssuing, tokenExpiresInSeconds, issuedToken, openToken, setTokenOpen, issueToken, copyIssuedToken, openDetail, saveRole, saveAccountStatus, saveEmailVerification, invalidateTokens, unbindManagedSsoIdentity, deleteOpen, previewLoading, preview, deletionMode, deletionReason, deleting, startDelete, confirmDelete, PrivateAccountPanel, AdminDateTime } = toRefs(viewProps.state)
+const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageLoading, loadError, search, roleFilter, ssoProviders, ssoProviderFilter, ROLE_LABELS, STATUS_LABELS, MANAGED_ACCOUNT_STATUS_OPTIONS, REFERENCE_LABELS, filteredUsers, page, pageCount, total, pageLimit, loadPage, setPageSize, createBotOpen, creatingBot, botName, botRole, openCreateBot, setCreateBotOpen, createBot, detailError, detailOpen, detailLoading, detail, pendingRole, pendingAccountStatus, pendingEmailVerification, roleSaving, accountStatusSaving, emailVerificationSaving, invalidating, ssoUnbinding, tokenOpen, tokenIntent, identitySwitchActive, tokenIssuing, tokenExpiresInSeconds, issuedToken, openToken, setTokenOpen, issueToken, copyIssuedToken, openDetail, saveRole, saveAccountStatus, saveEmailVerification, invalidateTokens, unbindManagedSsoIdentity, deleteOpen, previewLoading, preview, deletionMode, deletionReason, deleting, startDelete, confirmDelete, PrivateAccountPanel, AdminDateTime, MfaUserManagement } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -242,6 +242,7 @@ const { Copy, KeyRound, LogIn, Plus, Trash2, Unlink, currentUser, loading, pageL
             <p v-else class="text-sm text-muted-foreground">{{ $t('sso.notBound') }}</p>
           </section>
 
+          <component :is="MfaUserManagement" v-if="detail.id && detail.kind === 'Human'" :key="detail.id" :user-id="detail.id" :required="detail.mfaRequired ?? false" />
           <component :is="PrivateAccountPanel" v-if="detail.id" :key="detail.id" :user-id="detail.id" :show-activities="false" />
 
           <Separator />
