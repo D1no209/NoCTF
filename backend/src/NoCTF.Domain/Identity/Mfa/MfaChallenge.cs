@@ -4,9 +4,9 @@ using NoCTF.Domain.Shared;
 
 namespace NoCTF.Domain.Identity.Mfa;
 
-public enum MfaChallengePurpose : short { Login, Enrollment, Rebind, RecoveryGrant, RecoveryEnrollment, StepUp }
+public enum MfaChallengePurpose : short { Login, Enrollment, Rebind, RecoveryGrant, RecoveryEnrollment, StepUp, SecurityNotification }
 public enum MfaChallengeState : short { Pending, Completed, Cancelled, Failed, Verified }
-public enum MfaOperation : short { EnableTotp, RebindTotp, RegenerateRecoveryCodes, DisableTotp, ChangePolicy, ChangeOidcTrust, ChangeAccountRequirement, GrantRecovery }
+public enum MfaOperation : short { EnableTotp, RebindTotp, RegenerateRecoveryCodes, DisableTotp, ChangePolicy, ChangeOidcTrust, ChangeAccountRequirement, GrantRecovery, AddPasskey, RemovePasskey, RenamePasskey }
 public enum MfaMailState : short { None, Pending, Sent, Sending }
 
 [Table("mfa_challenges")]
@@ -32,6 +32,7 @@ public sealed class MfaChallenge : IConcurrencyTracked
     [MaxLength(256)] public byte[]? PendingSecretCiphertext { get; set; }
     public AuthenticationMethod PrimaryMethod { get; set; }
     public DateTimeOffset PrimaryAuthenticatedAt { get; set; }
+    public Guid? PrimaryCredentialId { get; set; }
     public Guid? PrimaryProviderId { get; set; }
     [MaxLength(128)] public string? PrimaryProviderFingerprint { get; set; }
     [Length(32, 32)] public byte[]? RecoveryGrantSha256 { get; set; }

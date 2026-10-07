@@ -6766,6 +6766,378 @@
         }
       }
     },
+    "/api/v1/auth/passkeys/login/options": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Begin Passkey Login Endpoint",
+        "description": "Executes POST /api/v1/auth/passkeys/login/options.",
+        "operationId": "BeginPasskeyLoginEndpoint",
+        "requestBody": {
+          "x-name": "BeginPasskeyLoginRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationPasskeysBeginPasskeyLoginRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationPasskeysPasskeyOptionsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/me/passkeys/options": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Begin Passkey Registration Endpoint",
+        "description": "Executes POST /api/v1/auth/me/passkeys/options.",
+        "operationId": "BeginPasskeyRegistrationEndpoint",
+        "requestBody": {
+          "x-name": "BeginPasskeyRegistrationRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationPasskeysBeginPasskeyRegistrationRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationPasskeysPasskeyOptionsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/passkeys/flow": {
+      "delete": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Cancel Passkey Ceremony Endpoint",
+        "description": "Executes DELETE /api/v1/auth/passkeys/flow.",
+        "operationId": "CancelPasskeyCeremonyEndpoint",
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/passkeys/login/complete": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Complete Passkey Login Endpoint",
+        "description": "Executes POST /api/v1/auth/passkeys/login/complete.",
+        "operationId": "CompletePasskeyLoginEndpoint",
+        "requestBody": {
+          "x-name": "CompletePasskeyLoginRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationPasskeysCompletePasskeyLoginRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationAuthenticationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/me/passkeys": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Complete Passkey Registration Endpoint",
+        "description": "Executes POST /api/v1/auth/me/passkeys.",
+        "operationId": "CompletePasskeyRegistrationEndpoint",
+        "requestBody": {
+          "x-name": "CompletePasskeyRegistrationRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationPasskeysCompletePasskeyRegistrationRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationAuthenticationPasskeysPasskeyAccountCredential"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Get My Passkeys Endpoint",
+        "description": "Executes GET /api/v1/auth/me/passkeys.",
+        "operationId": "GetMyPasskeysEndpoint",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationAuthenticationPasskeysPasskeyAccountStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/passkeys/capabilities": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Get Passkey Capabilities Endpoint",
+        "description": "Executes GET /api/v1/auth/passkeys/capabilities.",
+        "operationId": "GetPasskeyCapabilitiesEndpoint",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationPasskeysPasskeyCapabilitiesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/me/passkeys/{credentialId}": {
+      "delete": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Remove My Passkey Endpoint",
+        "description": "Executes DELETE /api/v1/auth/me/passkeys/{credentialId}.",
+        "operationId": "RemoveMyPasskeyEndpoint",
+        "parameters": [
+          {
+            "name": "credentialId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Rename My Passkey Endpoint",
+        "description": "Executes PATCH /api/v1/auth/me/passkeys/{credentialId}.",
+        "operationId": "RenameMyPasskeyEndpoint",
+        "parameters": [
+          {
+            "name": "credentialId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "RenameMyPasskeyRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationPasskeysRenameMyPasskeyRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationAuthenticationPasskeysPasskeyAccountCredential"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/auth/mfa/enrollment": {
       "post": {
         "tags": [
@@ -23794,7 +24166,8 @@
           "Rebind",
           "RecoveryGrant",
           "RecoveryEnrollment",
-          "StepUp"
+          "StepUp",
+          "SecurityNotification"
         ],
         "enum": [
           "Login",
@@ -23802,7 +24175,8 @@
           "Rebind",
           "RecoveryGrant",
           "RecoveryEnrollment",
-          "StepUp"
+          "StepUp",
+          "SecurityNotification"
         ]
       },
       "NoCTFAPIEndpointsAuthenticationEnrollmentRequiredResponse": {
@@ -24654,6 +25028,158 @@
           }
         }
       },
+      "NoCTFAPIEndpointsAuthenticationPasskeysPasskeyOptionsResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "publicKey": {},
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAuthenticationPasskeysBeginPasskeyLoginRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "returnPath"
+        ],
+        "properties": {
+          "returnPath": {
+            "type": "string",
+            "maxLength": 2048,
+            "minLength": 0,
+            "nullable": false
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAuthenticationPasskeysBeginPasskeyRegistrationRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0,
+            "nullable": false
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAuthenticationPasskeysCompletePasskeyLoginRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "credentialJson"
+        ],
+        "properties": {
+          "credentialJson": {
+            "type": "string",
+            "maxLength": 65536,
+            "minLength": 0,
+            "nullable": false
+          }
+        }
+      },
+      "NoCTFApplicationAuthenticationPasskeysPasskeyAccountCredential": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastUsedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "isBackedUp": {
+            "type": "boolean"
+          },
+          "isBackupEligible": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAuthenticationPasskeysCompletePasskeyRegistrationRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "credentialJson"
+        ],
+        "properties": {
+          "credentialJson": {
+            "type": "string",
+            "maxLength": 65536,
+            "minLength": 0,
+            "nullable": false
+          }
+        }
+      },
+      "NoCTFApplicationAuthenticationPasskeysPasskeyAccountStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "needsLocalProof": {
+            "type": "boolean"
+          },
+          "recentPrimaryAuthentication": {
+            "type": "boolean"
+          },
+          "maximumCredentials": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "credentials": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationAuthenticationPasskeysPasskeyAccountCredential"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAuthenticationPasskeysPasskeyCapabilitiesResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "available": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAuthenticationPasskeysRemoveMyPasskeyRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAuthenticationPasskeysRenameMyPasskeyRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0,
+            "nullable": false
+          }
+        }
+      },
       "NoCTFAPIEndpointsAuthenticationMfaBeginMfaStepUpRequest": {
         "type": "object",
         "additionalProperties": false,
@@ -24679,7 +25205,10 @@
           "ChangePolicy",
           "ChangeOidcTrust",
           "ChangeAccountRequirement",
-          "GrantRecovery"
+          "GrantRecovery",
+          "AddPasskey",
+          "RemovePasskey",
+          "RenamePasskey"
         ],
         "enum": [
           "EnableTotp",
@@ -24689,7 +25218,10 @@
           "ChangePolicy",
           "ChangeOidcTrust",
           "ChangeAccountRequirement",
-          "GrantRecovery"
+          "GrantRecovery",
+          "AddPasskey",
+          "RemovePasskey",
+          "RenamePasskey"
         ]
       },
       "NoCTFAPIEndpointsAuthenticationMfaConfirmAccountMfaEnrollmentResponse": {

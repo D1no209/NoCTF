@@ -26,3 +26,9 @@ public interface IMfaManagementStore
     Task<OperationResult<NoCTF.Application.Authentication.Account.AuthenticatedUser, MfaFailure>> ConsumeStepUpAsync(MfaActor actor, MfaBrowserCredential proof, MfaOperation operation, Guid? target, CancellationToken ct);
     Task<OperationResult<OidcMfaTrust, MfaFailure>> ChangeOidcTrustAsync(MfaActor actor, MfaBrowserCredential proof, Guid providerId, bool enabled, int maxAgeSeconds, IReadOnlyList<string> acr, IReadOnlyList<IReadOnlyList<string>> amr, CancellationToken ct);
 }
+
+public interface IMfaSensitiveOperationProof
+{
+    // The caller owns the serializable transaction and commits the protected operation with proof consumption.
+    Task<MfaFailure?> ConsumeInTransactionAsync(MfaActor actor, MfaBrowserCredential proof, MfaOperation operation, Guid? target, CancellationToken ct);
+}

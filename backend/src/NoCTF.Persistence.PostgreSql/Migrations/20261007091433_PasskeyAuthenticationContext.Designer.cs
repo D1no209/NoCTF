@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NoCTF.Infrastructure.Persistence;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace NoCTF.Persistence.PostgreSql.Migrations
 {
     [DbContext(typeof(NoCtfDbContext))]
-    partial class NoCtfDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261007091433_PasskeyAuthenticationContext")]
+    partial class PasskeyAuthenticationContext
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -2538,10 +2541,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Property<long>("ExpiresAt")
                         .HasColumnType("bigint")
                         .HasColumnName("expires_at");
-
-                    b.Property<bool>("LocalProofSatisfied")
-                        .HasColumnType("boolean")
-                        .HasColumnName("local_proof_satisfied");
 
                     b.Property<Guid>("MfaPolicyStamp")
                         .HasColumnType("uuid")

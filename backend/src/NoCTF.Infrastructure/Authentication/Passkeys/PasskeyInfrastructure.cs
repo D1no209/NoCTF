@@ -31,5 +31,7 @@ internal static class PasskeyInfrastructure
         });
         services.AddScoped<IPasskeyHandler<User>, PasskeyHandler<User>>();
         services.AddScoped<IPasskeyProtocol, PasskeyProtocol>();
+        services.AddScoped<IPasskeyStore, PasskeyStore>();
+        services.AddScoped<AuthenticateWithPasskey>();
     }
 }

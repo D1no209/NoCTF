@@ -18,7 +18,7 @@ namespace NoCTF.Infrastructure.Authentication.Mfa;
 
 public sealed partial class MfaAuthenticationStore(NoCtfDbContext db, IMfaCryptography crypto,
     PlatformSecretProtector protector, TimeProvider clock, IRequestSourceAddress? source = null,
-    NoCTF.Application.Messaging.IPostCommitMessagePublisher? publisher = null) : IMfaAuthenticationStore, IMfaManagementStore
+    NoCTF.Application.Messaging.IPostCommitMessagePublisher? publisher = null) : IMfaAuthenticationStore, IMfaManagementStore, IMfaSensitiveOperationProof
 {
     public async Task<MfaAccountSnapshot?> ReadAccountAsync(Guid userId, CancellationToken ct)
     {
@@ -40,6 +40,7 @@ public sealed partial class MfaAuthenticationStore(NoCtfDbContext db, IMfaCrypto
         if (account.User.Kind == UserKind.Bot) return null;
         var now = clock.GetUtcNow();
         if (context is null || !context.IsWellFormed || context.Method == AuthenticationMethod.Bot || context.AuthenticatedAt > now.AddSeconds(30)) return MfaFailure.PrimaryAuthenticationRequired;
+        if (context.Method == AuthenticationMethod.Passkey && !await db.UserPasskeys.AsNoTracking().AnyAsync(value => value.Id == context.PrimaryCredentialId && value.UserId == userId, ct)) return MfaFailure.PrimaryAuthenticationRequired;
         if (context.HasMfa)
         {
             if (context.MfaAuthenticatedAt > now.AddSeconds(30) || context.MfaDeadline <= now) return MfaFailure.PrimaryAuthenticationRequired;
@@ -75,7 +76,7 @@ public sealed partial class MfaAuthenticationStore(NoCtfDbContext db, IMfaCrypto
 
     public async Task<(MfaFlowView Flow, MfaBrowserCredential Browser)> CreateFlowAsync(PrimaryAuthentication primary, MfaChallengePurpose purpose, CancellationToken ct)
     {
-        if (primary.User.Kind != UserKind.Human || primary.Method is not (AuthenticationMethod.Password or AuthenticationMethod.Oidc or AuthenticationMethod.Cas))
+        if (primary.User.Kind != UserKind.Human || primary.Method is not (AuthenticationMethod.Password or AuthenticationMethod.Oidc or AuthenticationMethod.Cas or AuthenticationMethod.Passkey))
             throw new InvalidOperationException("Interactive authentication is required.");
         var account = await ReadAccountAsync(primary.User.Id, ct) ?? throw new InvalidOperationException("Account is unavailable.");
         if (account.User.TokenVersion != primary.User.TokenVersion) throw new InvalidOperationException("Primary authentication is no longer current.");
@@ -84,7 +85,7 @@ public sealed partial class MfaAuthenticationStore(NoCtfDbContext db, IMfaCrypto
             BrowserBindingHash = crypto.HashBrowserSecret(secret), CreatedAt = now,
             ExpiresAt = now.AddMinutes(purpose is MfaChallengePurpose.Enrollment or MfaChallengePurpose.Rebind or MfaChallengePurpose.RecoveryEnrollment ? 10 : 5),
             TokenVersion = account.User.TokenVersion, PolicyStamp = account.PolicyStamp, CredentialId = account.CredentialId,
-            PrimaryMethod = primary.Method, PrimaryAuthenticatedAt = primary.AuthenticatedAt, PrimaryProviderId = primary.ProviderId,
+            PrimaryMethod = primary.Method, PrimaryAuthenticatedAt = primary.AuthenticatedAt, PrimaryProviderId = primary.ProviderId, PrimaryCredentialId = primary.CredentialId,
             ReturnPath = SafeReturnPath(primary.ReturnPath),
             PrimaryProviderFingerprint = primary.ProviderId is { } providerId ? await ProviderFingerprintAsync(providerId, ct) : null };
         db.MfaChallenges.Add(challenge); await db.SaveChangesAsync(ct);
@@ -129,7 +130,7 @@ public sealed partial class MfaAuthenticationStore(NoCtfDbContext db, IMfaCrypto
             if (failure is not null) return await FailedAsync<MfaAuthenticationResult>(challenge, user.Id, failure.Value, ct);
             challenge.State = MfaChallengeState.Completed;
             var context = new AuthenticationContext(challenge.PrimaryMethod, challenge.PrimaryAuthenticatedAt,
-                verification.Method == MfaVerificationMethod.Totp ? MfaSource.Totp : MfaSource.RecoveryCode, clock.GetUtcNow(), credential.Id);
+                verification.Method == MfaVerificationMethod.Totp ? MfaSource.Totp : MfaSource.RecoveryCode, clock.GetUtcNow(), credential.Id, PrimaryCredentialId: challenge.PrimaryCredentialId);
             RecordCompletedLogin(challenge, user);
             return Success(new MfaAuthenticationResult(ToAuthenticated(user), context, challenge.ReturnPath));
         }, ct);
@@ -180,7 +181,7 @@ public sealed partial class MfaAuthenticationStore(NoCtfDbContext db, IMfaCrypto
                 : challenge.Purpose == MfaChallengePurpose.RecoveryEnrollment ? AccountActivityKind.MfaRecovered : AccountActivityKind.MfaRebound);
             if (!accountManagement) RecordCompletedLogin(challenge, user);
             return Success(new MfaAuthenticationResult(ToAuthenticated(user), new(challenge.PrimaryMethod, challenge.PrimaryAuthenticatedAt,
-                MfaSource.Totp, clock.GetUtcNow(), credential.Id), challenge.ReturnPath, codes));
+                MfaSource.Totp, clock.GetUtcNow(), credential.Id, PrimaryCredentialId: challenge.PrimaryCredentialId), challenge.ReturnPath, codes));
         }, ct);
 
     private async Task<MfaFailure?> VerifyFactorAsync(User user, UserTotpCredential credential, MfaVerification verification, CancellationToken ct)
@@ -219,6 +220,7 @@ public sealed partial class MfaAuthenticationStore(NoCtfDbContext db, IMfaCrypto
         var user = await db.Users.SingleOrDefaultAsync(value => value.Id == challenge.UserId, ct);
         if (user is null || user.Kind != UserKind.Human || user.AccountStatus != UserAccountStatus.Active || user.TokenVersion != challenge.TokenVersion) return (null, null, MfaFailure.AccountUnavailable);
         if (challenge.PolicyStamp != (await SettingsAsync(ct)).MfaPolicyStamp) return (null, null, MfaFailure.PolicyChanged);
+        if (challenge.PrimaryMethod == AuthenticationMethod.Passkey && !await db.UserPasskeys.AnyAsync(value => value.Id == challenge.PrimaryCredentialId && value.UserId == user.Id, ct)) return (null, null, MfaFailure.AccountUnavailable);
         if (challenge.PrimaryProviderId is { } provider && (challenge.PrimaryProviderFingerprint is null || challenge.PrimaryProviderFingerprint != await ProviderFingerprintAsync(provider, ct))) return (null, null, MfaFailure.PolicyChanged);
         return (challenge, user, null);
     }

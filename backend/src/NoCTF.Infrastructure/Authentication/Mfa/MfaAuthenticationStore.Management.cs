@@ -34,7 +34,7 @@ public sealed partial class MfaAuthenticationStore
         if (account is null || account.User.Kind != UserKind.Human || account.User.TokenVersion != actor.TokenVersion) return Failure<MfaCreatedFlow>(MfaFailure.NotApplicable);
         if (account.CredentialId is not null) return Failure<MfaCreatedFlow>(MfaFailure.AlreadyEnrolled);
         if (!actor.Authentication.IsInteractive || clock.GetUtcNow() - actor.Authentication.AuthenticatedAt > TimeSpan.FromMinutes(5)) return Failure<MfaCreatedFlow>(MfaFailure.PrimaryAuthenticationRequired);
-        var (flow, browser) = await CreateFlowAsync(new(account.User, actor.Authentication.Method, actor.Authentication.AuthenticatedAt, ProviderId: actor.Authentication.ProviderId), MfaChallengePurpose.Enrollment, ct);
+        var (flow, browser) = await CreateFlowAsync(new(account.User, actor.Authentication.Method, actor.Authentication.AuthenticatedAt, ProviderId: actor.Authentication.ProviderId, CredentialId: actor.Authentication.PrimaryCredentialId), MfaChallengePurpose.Enrollment, ct);
         var challenge = await db.MfaChallenges.SingleAsync(value => value.Id == flow.Id, ct);
         challenge.Operation = MfaOperation.EnableTotp;
         await db.SaveChangesAsync(ct);
@@ -47,7 +47,7 @@ public sealed partial class MfaAuthenticationStore
         if (account is null || account.User.Kind != UserKind.Human || account.User.TokenVersion != actor.TokenVersion || !actor.Authentication.IsInteractive) return Failure<MfaCreatedFlow>(MfaFailure.NotApplicable);
         if (account.CredentialId is null) return Failure<MfaCreatedFlow>(MfaFailure.LocalMfaRequired);
         if (IsAdministrative(operation) && account.User.Role != UserRole.Administrator) return Failure<MfaCreatedFlow>(MfaFailure.NotApplicable);
-        var (flow, browser) = await CreateFlowAsync(new(account.User, actor.Authentication.Method, actor.Authentication.AuthenticatedAt, ProviderId: actor.Authentication.ProviderId), MfaChallengePurpose.StepUp, ct);
+        var (flow, browser) = await CreateFlowAsync(new(account.User, actor.Authentication.Method, actor.Authentication.AuthenticatedAt, ProviderId: actor.Authentication.ProviderId, CredentialId: actor.Authentication.PrimaryCredentialId), MfaChallengePurpose.StepUp, ct);
         var challenge = await db.MfaChallenges.SingleAsync(value => value.Id == flow.Id, ct);
         challenge.Operation = operation; challenge.TargetResourceId = target;
         await db.SaveChangesAsync(ct);
@@ -68,6 +68,15 @@ public sealed partial class MfaAuthenticationStore
             challenge.State = MfaChallengeState.Verified;
             return Success(View(challenge, user.UserName, false));
         }, ct);
+
+    public async Task<MfaFailure?> ConsumeInTransactionAsync(MfaActor actor, MfaBrowserCredential proof, MfaOperation operation, Guid? target, CancellationToken ct)
+    {
+        if (db.Database.CurrentTransaction is null) throw new InvalidOperationException("A transaction must protect proof consumption and the credential change.");
+        var result = await ProofAsync(actor, proof, operation, target, ct);
+        if (result.Failure is not null) return result.Failure;
+        result.Challenge!.State = MfaChallengeState.Completed;
+        return null;
+    }
 
     private async Task<(User? User, MfaChallenge? Challenge, MfaFailure? Failure)> ProofAsync(MfaActor actor, MfaBrowserCredential proof, MfaOperation operation, Guid? target, CancellationToken ct)
     {
@@ -96,7 +105,7 @@ public sealed partial class MfaAuthenticationStore
             var verified = await ProofAsync(actor, proof, MfaOperation.RebindTotp, actor.UserId, ct);
             if (verified.Failure is { } failure) return Failure<MfaCreatedFlow>(failure);
             verified.Challenge!.State = MfaChallengeState.Completed;
-            var (flow, browser) = await CreateFlowAsync(new(ToAuthenticated(verified.User!), actor.Authentication.Method, actor.Authentication.AuthenticatedAt, ProviderId: actor.Authentication.ProviderId), MfaChallengePurpose.Rebind, ct);
+            var (flow, browser) = await CreateFlowAsync(new(ToAuthenticated(verified.User!), actor.Authentication.Method, actor.Authentication.AuthenticatedAt, ProviderId: actor.Authentication.ProviderId, CredentialId: actor.Authentication.PrimaryCredentialId), MfaChallengePurpose.Rebind, ct);
             var challenge = await db.MfaChallenges.SingleAsync(value => value.Id == flow.Id, ct);
             challenge.Operation = MfaOperation.RebindTotp;
             return Success(new MfaCreatedFlow(flow, browser));
@@ -239,8 +248,9 @@ public sealed partial class MfaAuthenticationStore
             if (flow.Failure is { } failure) return Failure<MfaFlowView>(failure);
             if (flow.Challenge!.Purpose != MfaChallengePurpose.RecoveryEnrollment) return Failure<MfaFlowView>(MfaFailure.NotApplicable);
             if (flow.User!.Id != primary.User.Id || flow.User.TokenVersion != primary.User.TokenVersion
-                || primary.Method is not (AuthenticationMethod.Password or AuthenticationMethod.Oidc or AuthenticationMethod.Cas)) return Failure<MfaFlowView>(MfaFailure.InvalidRecoveryGrant);
+                || primary.Method is not (AuthenticationMethod.Password or AuthenticationMethod.Oidc or AuthenticationMethod.Cas or AuthenticationMethod.Passkey)) return Failure<MfaFlowView>(MfaFailure.InvalidRecoveryGrant);
             flow.Challenge.PrimaryMethod = primary.Method; flow.Challenge.PrimaryAuthenticatedAt = primary.AuthenticatedAt;
+            flow.Challenge.PrimaryCredentialId = primary.CredentialId;
             flow.Challenge.PrimaryProviderId = primary.ProviderId;
             flow.Challenge.PrimaryProviderFingerprint = primary.ProviderId is { } providerId ? await ProviderFingerprintAsync(providerId, ct) : null;
             return Success(View(flow.Challenge, flow.User.UserName, false));

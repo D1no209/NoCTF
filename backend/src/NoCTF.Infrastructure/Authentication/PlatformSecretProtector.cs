@@ -14,7 +14,8 @@ public enum PlatformSecretPurpose
     CompetitionWebhookSecret,
     TotpCredentialSecret,
     PendingTotpSecret,
-    MfaRecoveryGrant
+    MfaRecoveryGrant,
+    PasskeyCeremonyState
 }
 
 public sealed class PlatformSecretProtector
@@ -200,6 +201,7 @@ public sealed class PlatformSecretProtector
             PlatformSecretPurpose.TotpCredentialSecret => "NoCTF.Authentication.TotpCredential.v1",
             PlatformSecretPurpose.PendingTotpSecret => "NoCTF.Authentication.PendingTotp.v1",
             PlatformSecretPurpose.MfaRecoveryGrant => "NoCTF.Authentication.MfaRecoveryGrant.v1",
+            PlatformSecretPurpose.PasskeyCeremonyState => "NoCTF.Authentication.PasskeyCeremony.v1",
             _ => throw new ArgumentOutOfRangeException(nameof(purpose), purpose, null)
         };
         return Encoding.UTF8.GetBytes(scopeId is null

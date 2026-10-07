@@ -17,7 +17,7 @@ public enum AccountActivityKind
     SsoLoggedIn,
     SsoLoginFailed,
     MfaEnabled, MfaDisabled, MfaRebound, MfaRecoveryCodesRegenerated, MfaRecoveryGranted, MfaRecovered,
-    MfaRequirementChanged, MfaPolicyChanged, OidcMfaTrustChanged
+    MfaRequirementChanged, MfaPolicyChanged, OidcMfaTrustChanged, PasskeyAdded, PasskeyRemoved
 }
 
 public sealed record AccountActivity(Guid Id, AccountActivityKind Kind, DateTimeOffset OccurredAt,

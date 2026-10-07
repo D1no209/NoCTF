@@ -196,6 +196,8 @@ public sealed class SmtpEmailVerificationDelivery(
             NoCTF.Domain.Identity.Mfa.MfaOperation.RebindTotp => "Your authenticator was replaced.",
             NoCTF.Domain.Identity.Mfa.MfaOperation.DisableTotp => "Your authenticator was disabled.",
             NoCTF.Domain.Identity.Mfa.MfaOperation.RegenerateRecoveryCodes => "Your recovery codes were regenerated and the previous batch is no longer valid.",
+            NoCTF.Domain.Identity.Mfa.MfaOperation.AddPasskey => "A passkey was added to your account.",
+            NoCTF.Domain.Identity.Mfa.MfaOperation.RemovePasskey => "A passkey was removed from your account.",
             _ => "Your account's MFA security settings changed."
         };
         using var message = CreateMessage(configuration, user.Email, "NoCTF account security changed", action + " If this was not you, contact a platform administrator.",

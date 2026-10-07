@@ -104,6 +104,7 @@ public static class ServiceRegistration
         services.AddNoCtfStaticAssetDelivery();
         services.AddHttpContextAccessor();
         services.AddScoped<NoCTF.Application.Commands.Idempotency.IRequestCommandKey, NoCTF.API.Security.RequestCommandKey>();
+        services.AddSingleton<NoCTF.API.Endpoints.Authentication.Passkeys.PasskeyBrowserFlow>();
         services.AddScoped<NoCTF.Application.Authentication.Privacy.IRequestSourceAddress, NoCTF.API.Security.RequestSourceAddress>();
         services.AddNoCtfForwardedHeaders(configuration);
         if (endpointAssemblies is null)

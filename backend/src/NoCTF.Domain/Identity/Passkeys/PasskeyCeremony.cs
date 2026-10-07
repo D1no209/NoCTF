@@ -14,6 +14,7 @@ public sealed class PasskeyCeremony : IConcurrencyTracked
     public Guid? UserId { get; set; }
     [ForeignKey(nameof(UserId))] public User? User { get; set; }
     public int? TokenVersion { get; set; }
+    public bool LocalProofSatisfied { get; set; }
     public Guid MfaPolicyStamp { get; set; }
     public PasskeyCeremonyPurpose Purpose { get; set; }
     public PasskeyCeremonyState State { get; set; }

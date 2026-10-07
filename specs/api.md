@@ -679,3 +679,19 @@ POST /api/v1/admin/platform/users/{userId}/mfa-recovery
 ```
 
 流程接口使用浏览器绑定的独立 Cookie，不形成业务身份，所有写操作以及流程读取检查 Origin/Referer。账户设置确认仅返回一次性恢复码并清除旧登录态；受限登录绑定或恢复确认才签发完整登录态。敏感证明与操作和目标绑定，单次消费。MFA 策略与管理接口仅面向人类账号，Bot 与内部服务凭据机制不变。
+
+## 平台账号 Passkey
+
+```text
+GET /api/v1/auth/passkeys/capabilities
+POST /api/v1/auth/passkeys/login/options
+POST /api/v1/auth/passkeys/login/complete
+DELETE /api/v1/auth/passkeys/flow
+GET /api/v1/auth/me/passkeys
+POST /api/v1/auth/me/passkeys/options
+POST /api/v1/auth/me/passkeys
+PATCH /api/v1/auth/me/passkeys/{credentialId}
+DELETE /api/v1/auth/me/passkeys/{credentialId}
+```
+
+Passkey 为人类账号提供主认证，仍进入现有 MFA 完成判定。创建选项状态保存在服务器关系表并加密，浏览器仅持有 HttpOnly、Secure、SameSite=Strict 绑定 Cookie。注册和断言状态具有用途、过期时间和单次消费约束。注册绑定当前账号、凭据版本和必要的本地第二因素证明；新增及撤销递增 TokenVersion。`publicKey` 是 WebAuthn 的标准协议对象，`credentialJson` 是浏览器序列化的标准凭据，不是业务设置 JSON。

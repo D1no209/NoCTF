@@ -11,7 +11,7 @@ public sealed record MfaFlowView(Guid Id, MfaChallengePurpose Purpose, DateTimeO
 public sealed record MfaAccountSnapshot(AuthenticatedUser User, bool Mandated, bool Required, Guid PolicyStamp,
     Guid? CredentialId, int RecoveryCodesRemaining, bool RecoveryMailAvailable);
 public sealed record PrimaryAuthentication(AuthenticatedUser User, AuthenticationMethod Method, DateTimeOffset AuthenticatedAt,
-    OidcMfaProof? OidcProof = null, string ReturnPath = "/", Guid? ProviderId = null);
+    OidcMfaProof? OidcProof = null, string ReturnPath = "/", Guid? ProviderId = null, Guid? CredentialId = null);
 public sealed record MfaAuthenticationResult(AuthenticatedUser User, AuthenticationContext Context, string ReturnPath, IReadOnlyList<string>? RecoveryCodes = null);
 public sealed record MfaContextValidationRequest(string Key, Guid UserId, int TokenVersion, AuthenticationContext? Authentication);
 public sealed record AuthenticationCompletion(AuthenticationState State, MfaAuthenticationResult? Authentication = null,
@@ -44,7 +44,7 @@ public sealed class CompleteAuthentication(IMfaAuthenticationStore store, IAcces
             if (resumed.Succeeded) return OperationResult<AuthenticationCompletion, MfaFailure>.Success(new(AuthenticationState.EnrollmentRequired, Flow: resumed.Value, Browser: recovery));
             if (resumed.FailureCode == MfaFailure.InvalidRecoveryGrant) return OperationResult<AuthenticationCompletion, MfaFailure>.Failure(MfaFailure.InvalidRecoveryGrant, "Recovery authorization does not match this account.");
         }
-        var context = new AuthenticationContext(primary.Method, primary.AuthenticatedAt);
+        var context = new AuthenticationContext(primary.Method, primary.AuthenticatedAt, PrimaryCredentialId: primary.CredentialId);
         if (primary.OidcProof is { } proof && await store.IsOidcProofCurrentAsync(proof, ct))
             context = context with { MfaSource = MfaSource.Oidc, MfaAuthenticatedAt = proof.AuthenticatedAt, ProviderId = proof.ProviderId, TrustPolicyId = proof.TrustPolicyId };
         if (!snapshot.Required || context.HasMfa)

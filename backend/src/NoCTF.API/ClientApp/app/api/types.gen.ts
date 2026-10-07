@@ -1733,7 +1733,7 @@ export type NoCtfapiEndpointsAuthenticationMfaMfaFlowResponse = {
     recoveryMailAvailable?: boolean;
 };
 
-export type NoCtfDomainIdentityMfaMfaChallengePurpose = 'Login' | 'Enrollment' | 'Rebind' | 'RecoveryGrant' | 'RecoveryEnrollment' | 'StepUp';
+export type NoCtfDomainIdentityMfaMfaChallengePurpose = 'Login' | 'Enrollment' | 'Rebind' | 'RecoveryGrant' | 'RecoveryEnrollment' | 'StepUp' | 'SecurityNotification';
 
 export type NoCtfapiEndpointsAuthenticationEnrollmentRequiredResponse = {
     flow: NoCtfapiEndpointsAuthenticationMfaMfaFlowResponse;
@@ -1990,12 +1990,62 @@ export type NoCtfapiEndpointsAuthenticationVerifyEmailRequest = {
     token: string;
 };
 
+export type NoCtfapiEndpointsAuthenticationPasskeysPasskeyOptionsResponse = {
+    publicKey?: unknown;
+    expiresAt?: string;
+};
+
+export type NoCtfapiEndpointsAuthenticationPasskeysBeginPasskeyLoginRequest = {
+    returnPath: string;
+};
+
+export type NoCtfapiEndpointsAuthenticationPasskeysBeginPasskeyRegistrationRequest = {
+    name: string;
+};
+
+export type NoCtfapiEndpointsAuthenticationPasskeysCompletePasskeyLoginRequest = {
+    credentialJson: string;
+};
+
+export type NoCtfApplicationAuthenticationPasskeysPasskeyAccountCredential = {
+    id?: string;
+    name?: string;
+    createdAt?: string;
+    lastUsedAt?: string | null;
+    isBackedUp?: boolean;
+    isBackupEligible?: boolean;
+};
+
+export type NoCtfapiEndpointsAuthenticationPasskeysCompletePasskeyRegistrationRequest = {
+    credentialJson: string;
+};
+
+export type NoCtfApplicationAuthenticationPasskeysPasskeyAccountStatus = {
+    available?: boolean;
+    needsLocalProof?: boolean;
+    recentPrimaryAuthentication?: boolean;
+    maximumCredentials?: number;
+    credentials?: Array<NoCtfApplicationAuthenticationPasskeysPasskeyAccountCredential>;
+};
+
+export type NoCtfapiEndpointsAuthenticationPasskeysPasskeyCapabilitiesResponse = {
+    available?: boolean;
+};
+
+export type NoCtfapiEndpointsAuthenticationPasskeysRemoveMyPasskeyRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsAuthenticationPasskeysRenameMyPasskeyRequest = {
+    name: string;
+};
+
 export type NoCtfapiEndpointsAuthenticationMfaBeginMfaStepUpRequest = {
     operation?: NoCtfDomainIdentityMfaMfaOperation;
     targetId?: string | null;
 };
 
-export type NoCtfDomainIdentityMfaMfaOperation = 'EnableTotp' | 'RebindTotp' | 'RegenerateRecoveryCodes' | 'DisableTotp' | 'ChangePolicy' | 'ChangeOidcTrust' | 'ChangeAccountRequirement' | 'GrantRecovery';
+export type NoCtfDomainIdentityMfaMfaOperation = 'EnableTotp' | 'RebindTotp' | 'RegenerateRecoveryCodes' | 'DisableTotp' | 'ChangePolicy' | 'ChangeOidcTrust' | 'ChangeAccountRequirement' | 'GrantRecovery' | 'AddPasskey' | 'RemovePasskey' | 'RenamePasskey';
 
 export type NoCtfapiEndpointsAuthenticationMfaConfirmAccountMfaEnrollmentResponse = {
     recoveryCodes?: Array<string>;
@@ -7697,6 +7747,245 @@ export type VerifyEmailEndpointResponses = {
 };
 
 export type VerifyEmailEndpointResponse = VerifyEmailEndpointResponses[keyof VerifyEmailEndpointResponses];
+
+export type BeginPasskeyLoginEndpointData = {
+    body: NoCtfapiEndpointsAuthenticationPasskeysBeginPasskeyLoginRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/passkeys/login/options';
+};
+
+export type BeginPasskeyLoginEndpointErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+};
+
+export type BeginPasskeyLoginEndpointError = BeginPasskeyLoginEndpointErrors[keyof BeginPasskeyLoginEndpointErrors];
+
+export type BeginPasskeyLoginEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAuthenticationPasskeysPasskeyOptionsResponse;
+};
+
+export type BeginPasskeyLoginEndpointResponse = BeginPasskeyLoginEndpointResponses[keyof BeginPasskeyLoginEndpointResponses];
+
+export type BeginPasskeyRegistrationEndpointData = {
+    body: NoCtfapiEndpointsAuthenticationPasskeysBeginPasskeyRegistrationRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/me/passkeys/options';
+};
+
+export type BeginPasskeyRegistrationEndpointErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type BeginPasskeyRegistrationEndpointError = BeginPasskeyRegistrationEndpointErrors[keyof BeginPasskeyRegistrationEndpointErrors];
+
+export type BeginPasskeyRegistrationEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAuthenticationPasskeysPasskeyOptionsResponse;
+};
+
+export type BeginPasskeyRegistrationEndpointResponse = BeginPasskeyRegistrationEndpointResponses[keyof BeginPasskeyRegistrationEndpointResponses];
+
+export type CancelPasskeyCeremonyEndpointData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/passkeys/flow';
+};
+
+export type CancelPasskeyCeremonyEndpointResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type CancelPasskeyCeremonyEndpointResponse = CancelPasskeyCeremonyEndpointResponses[keyof CancelPasskeyCeremonyEndpointResponses];
+
+export type CompletePasskeyLoginEndpointData = {
+    body: NoCtfapiEndpointsAuthenticationPasskeysCompletePasskeyLoginRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/passkeys/login/complete';
+};
+
+export type CompletePasskeyLoginEndpointErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+};
+
+export type CompletePasskeyLoginEndpointError = CompletePasskeyLoginEndpointErrors[keyof CompletePasskeyLoginEndpointErrors];
+
+export type CompletePasskeyLoginEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAuthenticationAuthenticationResponse;
+};
+
+export type CompletePasskeyLoginEndpointResponse = CompletePasskeyLoginEndpointResponses[keyof CompletePasskeyLoginEndpointResponses];
+
+export type GetMyPasskeysEndpointData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/me/passkeys';
+};
+
+export type GetMyPasskeysEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type GetMyPasskeysEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationAuthenticationPasskeysPasskeyAccountStatus;
+};
+
+export type GetMyPasskeysEndpointResponse = GetMyPasskeysEndpointResponses[keyof GetMyPasskeysEndpointResponses];
+
+export type CompletePasskeyRegistrationEndpointData = {
+    body: NoCtfapiEndpointsAuthenticationPasskeysCompletePasskeyRegistrationRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/me/passkeys';
+};
+
+export type CompletePasskeyRegistrationEndpointErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type CompletePasskeyRegistrationEndpointError = CompletePasskeyRegistrationEndpointErrors[keyof CompletePasskeyRegistrationEndpointErrors];
+
+export type CompletePasskeyRegistrationEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationAuthenticationPasskeysPasskeyAccountCredential;
+};
+
+export type CompletePasskeyRegistrationEndpointResponse = CompletePasskeyRegistrationEndpointResponses[keyof CompletePasskeyRegistrationEndpointResponses];
+
+export type GetPasskeyCapabilitiesEndpointData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/passkeys/capabilities';
+};
+
+export type GetPasskeyCapabilitiesEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAuthenticationPasskeysPasskeyCapabilitiesResponse;
+};
+
+export type GetPasskeyCapabilitiesEndpointResponse = GetPasskeyCapabilitiesEndpointResponses[keyof GetPasskeyCapabilitiesEndpointResponses];
+
+export type RemoveMyPasskeyEndpointData = {
+    body?: never;
+    path: {
+        credentialId: string;
+    };
+    query?: never;
+    url: '/api/v1/auth/me/passkeys/{credentialId}';
+};
+
+export type RemoveMyPasskeyEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type RemoveMyPasskeyEndpointResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type RemoveMyPasskeyEndpointResponse = RemoveMyPasskeyEndpointResponses[keyof RemoveMyPasskeyEndpointResponses];
+
+export type RenameMyPasskeyEndpointData = {
+    body: NoCtfapiEndpointsAuthenticationPasskeysRenameMyPasskeyRequest;
+    path: {
+        credentialId: string;
+    };
+    query?: never;
+    url: '/api/v1/auth/me/passkeys/{credentialId}';
+};
+
+export type RenameMyPasskeyEndpointErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type RenameMyPasskeyEndpointError = RenameMyPasskeyEndpointErrors[keyof RenameMyPasskeyEndpointErrors];
+
+export type RenameMyPasskeyEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationAuthenticationPasskeysPasskeyAccountCredential;
+};
+
+export type RenameMyPasskeyEndpointResponse = RenameMyPasskeyEndpointResponses[keyof RenameMyPasskeyEndpointResponses];
 
 export type BeginMfaEnrollmentEndpointData = {
     body?: never;
