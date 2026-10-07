@@ -711,3 +711,10 @@ GET /api/v1/admin/competitions/{competitionId}/staff-webhooks/{targetId}/test-de
 GET /api/v1/admin/competitions/{competitionId}/staff-webhooks/{targetId}/deliveries
 GET /api/v1/competitions/{competitionId}/staff-work-items
 ```
+
+### Browser attachment handoff
+
+```text
+POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/attachments/{attachmentId}/browser-download
+POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/attachment/browser-download
+```

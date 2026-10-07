@@ -13,7 +13,7 @@ public sealed class DownloadRandomChallengeAttachmentEndpoint(
     public override void Configure()
     {
         Options(builder => builder.WithMetadata(new NoCTF.Hosting.Observability.ApiRequestMetricsMetadata(
-            NoCTF.Application.Observability.ApiRequestKind.Download)));
+            NoCTF.Application.Observability.ApiRequestKind.Download), new AttachmentBrowserDownloadMetadata()));
         Get("/competitions/{competitionId}/challenges/{competitionChallengeId}/attachment");
         AuthSchemes("Bearer");
         Summary(summary =>

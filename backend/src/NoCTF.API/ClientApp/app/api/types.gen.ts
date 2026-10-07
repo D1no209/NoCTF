@@ -1572,6 +1572,18 @@ export type NoCtfapiEndpointsChallengesListChallengesRequest = {
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsChallengesAttachmentBrowserDownloadResponse = {
+    downloadUrl?: string;
+};
+
+export type NoCtfapiEndpointsChallengesPrepareChallengeAttachmentDownloadRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsChallengesPrepareRandomChallengeAttachmentDownloadRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsChallengesProgressionStartConflict = {
     code?: NoCtfapiEndpointsChallengesProgressionStartFailureCode;
     detail?: string;
@@ -6724,6 +6736,87 @@ export type ListChallengesEndpointResponses = {
 };
 
 export type ListChallengesEndpointResponse = ListChallengesEndpointResponses[keyof ListChallengesEndpointResponses];
+
+export type PrepareChallengeAttachmentDownloadEndpointData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        competitionChallengeId: string;
+        attachmentId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/attachments/{attachmentId}/browser-download';
+};
+
+export type PrepareChallengeAttachmentDownloadEndpointErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type PrepareChallengeAttachmentDownloadEndpointError = PrepareChallengeAttachmentDownloadEndpointErrors[keyof PrepareChallengeAttachmentDownloadEndpointErrors];
+
+export type PrepareChallengeAttachmentDownloadEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsChallengesAttachmentBrowserDownloadResponse;
+};
+
+export type PrepareChallengeAttachmentDownloadEndpointResponse = PrepareChallengeAttachmentDownloadEndpointResponses[keyof PrepareChallengeAttachmentDownloadEndpointResponses];
+
+export type PrepareRandomChallengeAttachmentDownloadEndpointData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        competitionChallengeId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/attachment/browser-download';
+};
+
+export type PrepareRandomChallengeAttachmentDownloadEndpointErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type PrepareRandomChallengeAttachmentDownloadEndpointError = PrepareRandomChallengeAttachmentDownloadEndpointErrors[keyof PrepareRandomChallengeAttachmentDownloadEndpointErrors];
+
+export type PrepareRandomChallengeAttachmentDownloadEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsChallengesAttachmentBrowserDownloadResponse;
+};
+
+export type PrepareRandomChallengeAttachmentDownloadEndpointResponse = PrepareRandomChallengeAttachmentDownloadEndpointResponses[keyof PrepareRandomChallengeAttachmentDownloadEndpointResponses];
 
 export type StartProgressionChallengeData = {
     body: NoCtfapiEndpointsChallengesStartProgressionChallengeRequest;

@@ -4822,6 +4822,147 @@
         }
       }
     },
+    "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/attachments/{attachmentId}/browser-download": {
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Authorizes a native browser attachment download.",
+        "description": "Sets a short-lived encrypted HttpOnly cookie restricted to this attachment GET. File bytes are streamed directly by the browser; preparation does not record download evidence.",
+        "operationId": "PrepareChallengeAttachmentDownloadEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "competitionChallengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "attachmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesAttachmentBrowserDownloadResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/attachment/browser-download": {
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Authorizes a native browser RandomOnePerTeam attachment download.",
+        "description": "Random assignment and download evidence are recorded by the authenticated file GET, never by preparing the browser handoff.",
+        "operationId": "PrepareRandomChallengeAttachmentDownloadEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "competitionChallengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesAttachmentBrowserDownloadResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/start": {
       "post": {
         "tags": [
@@ -24271,6 +24412,23 @@
         }
       },
       "NoCTFAPIEndpointsChallengesListChallengesRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsChallengesAttachmentBrowserDownloadResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "downloadUrl": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsChallengesPrepareChallengeAttachmentDownloadRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsChallengesPrepareRandomChallengeAttachmentDownloadRequest": {
         "type": "object",
         "additionalProperties": false
       },

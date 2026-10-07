@@ -48,6 +48,7 @@ internal static class ChallengeInfrastructure
         services.AddScoped<IChallengeAttachmentStore, ChallengeAttachmentStore>();
         services.AddScoped<ManageChallengeAttachments>();
         services.AddScoped<GetChallengeAttachments>();
+        services.AddScoped<PrepareChallengeAttachmentDownload>();
         services.AddScoped<IChallengeFlagStore, ChallengeFlagManagementStore>();
         services.AddScoped<ManageChallengeFlags>();
         services.AddScoped<IMissingFlagGenerator, MissingFlagGenerator>();
