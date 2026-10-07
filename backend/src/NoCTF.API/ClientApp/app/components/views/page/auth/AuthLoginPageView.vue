@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AuthLoginPageViewState } from '~/features/routes/auth/useAuthLoginPage'
 
 const viewProps = defineProps<{ state: AuthLoginPageViewState }>()
-const { authArtwork, configuration, loginName, password, error, pending, capVerification, capCanRetry, submitDisabled, submit, ssoProviders, ssoLoading, ssoPendingId, beginSso } = toRefs(viewProps.state)
+const { authArtwork, configuration, loginName, password, error, pending, capVerification, capCanRetry, submitDisabled, retryInlineCap, submit, ssoProviders, ssoLoading, ssoPendingId, beginSso } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -46,9 +46,12 @@ const { authArtwork, configuration, loginName, password, error, pending, capVeri
                 :progress="capVerification.progress"
                 :label="capVerification.label"
               />
-              <Button type="submit" :disabled="submitDisabled" class="w-full sm:mx-auto sm:w-2/3">
-                <Spinner v-if="pending && !capCanRetry" data-icon="inline-start" />
-                {{ capCanRetry ? $t('common.label.retry') : $t('auth.login.action') }}
+              <Button v-if="capCanRetry" type="button" class="w-full sm:mx-auto sm:w-2/3" @click="retryInlineCap">
+                {{ $t('common.label.retry') }}
+              </Button>
+              <Button v-else type="submit" :disabled="submitDisabled" class="w-full sm:mx-auto sm:w-2/3">
+                <Spinner v-if="pending" data-icon="inline-start" />
+                {{ $t('auth.login.action') }}
               </Button>
             </Field>
           </FieldGroup>

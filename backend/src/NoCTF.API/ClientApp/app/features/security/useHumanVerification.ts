@@ -1,5 +1,5 @@
 import { message as describeMessage } from '../../utils/i18n'
-import { markRaw } from 'vue'
+import { markRaw, ref } from 'vue'
 import type { Ref } from 'vue'
 import { ShieldCheck } from '@lucide/vue'
 import TurnstileWidgetComponent from '@nuxtjs/turnstile/runtime/components/NuxtTurnstile.vue'
@@ -25,6 +25,8 @@ interface ChallengeState {
 let nextChallengeId = 0
 const requestCoordinator = createHumanVerificationCoordinator()
 let capInstance: import('@cap.js/widget').Cap | null = null
+const inlineCapReady = ref(false)
+let inlineCapOwner: object | null = null
 let challengeTimeout: ReturnType<typeof setTimeout> | null = null
 
 function sharedChallenge() {
@@ -37,6 +39,7 @@ function clearTimeoutHandle(): void {
 }
 
 function removeCapInstance(): void {
+  inlineCapReady.value = false
   capInstance?.widget.remove()
   capInstance = null
 }
@@ -50,7 +53,13 @@ function settleChallenge(
   headers: HumanVerificationHeaders | null,
 ): void {
   clearTimeoutHandle()
-  removeCapInstance()
+  if (headers && challenge.value?.surface === 'login-inline') {
+    // Keep CAP's own expiration timer alive until the precomputed proof is consumed.
+    inlineCapReady.value = true
+  }
+  else {
+    removeCapInstance()
+  }
   challenge.value = null
   requestCoordinator.settle(headers)
 }
@@ -95,6 +104,9 @@ async function solveCapChallenge(
       'data-cap-worker-count': String(workers),
     })
     capInstance = instance
+    instance.addEventListener('reset', () => {
+      if (capInstance === instance) inlineCapReady.value = false
+    })
     instance.addEventListener('progress', (event) => {
       if (challenge.value?.id === id)
         challenge.value = { ...challenge.value, progress: event.detail.progress }
@@ -112,16 +124,27 @@ async function solveCapChallenge(
   }
 }
 
-/** Requests exactly one provider token for the immediately following sensitive API call. */
+/** Requests one provider token; an inline login proof can be prepared before submission. */
 export function useHumanVerification() {
   const challenge = sharedChallenge()
   const { configuration, ensureLoaded } = usePlatform()
+  let disposed = false
+  const owner = {}
+
+  onScopeDispose(() => {
+    disposed = true
+    if (inlineCapOwner !== owner) return
+    inlineCapOwner = null
+    if (challenge.value?.surface === 'login-inline') settleChallenge(challenge, null)
+    else if (!challenge.value) removeCapInstance()
+  })
 
   async function request(
     action: HumanVerificationAction,
     requestedSurface: HumanVerificationSurface = 'dialog',
   ): Promise<HumanVerificationHeaders | null> {
     await ensureLoaded()
+    if (disposed) return null
     const provider = providerConfiguration(configuration.value)
     if (!provider?.provider) {
       toast.error(describeMessage('common.error.humanVerificationConfigurationUnavailable'))
@@ -160,6 +183,7 @@ export function useHumanVerification() {
       progress: 0,
       errorKey: null,
     }
+    inlineCapOwner = challenge.value.surface === 'login-inline' ? owner : null
     beginChallengeTimeout(challenge, id)
 
     if (provider.provider === 'Cap') {
@@ -197,7 +221,13 @@ export function useHumanVerification() {
     )
   }
 
-  return { request, inlineCap, retryInlineCap }
+  function consumeInlineCap(headers: HumanVerificationHeaders): HumanVerificationHeaders | null {
+    if (!inlineCapReady.value || capInstance?.token !== headers['X-NoCTF-Human-Verification']) return null
+    removeCapInstance()
+    return headers
+  }
+
+  return { request, inlineCap, inlineCapReady: computed(() => inlineCapReady.value), retryInlineCap, consumeInlineCap }
 }
 
 /** Owns the single application-level challenge surface rendered by ApplicationRoot. */
