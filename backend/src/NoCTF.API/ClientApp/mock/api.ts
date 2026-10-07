@@ -470,6 +470,17 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
         leaderboardVisibility: { competitionId: competition!.id, effectiveVisibility: 'Normal', frozenStartAt: null, hiddenStartAt: null },
         capabilities: { canObserve: true, canModerate: true, canManagePermissions: true },
       }
+      else if (route === '/admin/competitions/{competitionId}/staff-webhooks') value = {
+        canManage: user?.role === 'Administrator' || user?.role === 'Organizer', total: 1,
+        items: [{ id: id(98001), name: '工作人员演示群 / Demo staff channel', endpointUrl: user?.role === 'Administrator' || user?.role === 'Organizer' ? 'https://bot.mock.invalid/webhooks/noctf/staff/demo' : null,
+          enabled: true, categories: ['CheatIncident', 'Consultation', 'BanAppeal'], synchronizing: false, authorizationRevoked: false, createdAt: date(-60), updatedAt: date(-10) }],
+      }
+      else if (route === '/competitions/{competitionId}/staff-work-items') value = { total: 1, items: [{ kind: 1,
+        id: id(98002), teamName: 'Aurora', challengeTitle: 'Web · Session Review', requiresStaffAction: true,
+        actionRequiredSince: date(-10), createdAt: date(-30), updatedAt: date(-10),
+        managementUrl: `https://noctf.mock.invalid/competitions/${p.competitionId}/questions?question=${state.questions[0]?.threadRootId ?? id(98002)}` }] }
+      else if (route === '/admin/competitions/{competitionId}/staff-webhooks/{targetId}/deliveries') value = { total: 1,
+        items: [{ eventId: id(98003), targetId: p.targetId, kind: 2, sequence: 1042, state: 2, attempts: 1, lastStatusCode: 204, createdAt: date(-10), completedAt: date(-9) }] }
       else if (route === '/admin/competitions/{competitionId}/challenges/{competitionChallengeId}') value = {
         challenge,
         mode: competition!.mode,

@@ -13,7 +13,7 @@ const administrationDomains: readonly LocaleDomain[] = [
 
 /** Maps routes to feature catalogs without coupling individual views to loading. */
 export function localeDomainsForPath(path: string): readonly LocaleDomain[] {
-  if (path.startsWith('/admin'))
+  if (path.startsWith('/admin') || path.includes('/staff'))
     return administrationDomains
 
   // The account panel belongs to the global application shell and can open on

@@ -247,6 +247,10 @@ const groups: DefaultTheme.SidebarItem[] = [
           {
             "text": "Webhook 与自动化",
             "link": "/competition/integrations/webhooks"
+            },
+            {
+              "text": "工作人员 Webhook",
+              "link": "/competition/integrations/staff-webhooks"
           },
           {
             "text": "赛事导出",

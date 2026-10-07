@@ -1,5 +1,7 @@
 # Webhook 与自动化接入
 
+工作人员私有摘要请使用独立的 [工作人员 Webhook](./staff-webhooks.md) 通道。
+
 ## 创建赛事 Webhook
 
 入口 `/admin/competitions/比赛ID/webhooks`。目标列表与投递监控分别加载，目标保存成功不代表真实事件已经完成 HTTP 投递。

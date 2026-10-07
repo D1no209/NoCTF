@@ -258,6 +258,7 @@ export function useCompetitionsByIdPage() {
             label: translate("common.label.management"),
             items: [
               { to: `${base}/writeups`, label: translate("writeUp.review"), icon: ClipboardCheck },
+              { to: `${base}/staff`, label: translate('staffWebhook.workbench'), icon: ClipboardCheck },
             ],
           }]
         : []),

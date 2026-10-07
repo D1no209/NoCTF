@@ -1,4 +1,6 @@
 import { message as describeMessage } from '../../../../../utils/i18n'
+import { markRaw } from 'vue'
+import StaffWebhooks from '../../../../competitions/staff-webhooks/StaffWebhooks.vue'
 import { Copy, Plus, RotateCw, Send, Trash2, Webhook } from '@lucide/vue'
 import { toast } from '../../../../../utils/message-toast'
 import {
@@ -268,6 +270,7 @@ export function useAdminCompetitionsByIdWebhooksPage() {
   })
 
   return {
+    StaffWebhooks: markRaw(StaffWebhooks),
     Webhook,
     Plus,
     Copy,

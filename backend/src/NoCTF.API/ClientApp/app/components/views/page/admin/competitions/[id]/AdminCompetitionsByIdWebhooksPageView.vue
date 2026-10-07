@@ -4,7 +4,7 @@ import type { AdminCompetitionsByIdWebhooksPageViewState } from '~/features/rout
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdWebhooksPageViewState }>()
 const {
-  Webhook, Plus, Copy, RotateCw, Send, Trash2,
+  StaffWebhooks, Webhook, Plus, Copy, RotateCw, Send, Trash2,
   targets, mayManage, loading, error, page, pageCount, total, pageLimit,
   loadPage, setPageSize,
   formOpen, editingId, form, saving, pendingId, deletingTarget,
@@ -21,6 +21,7 @@ const {
 
 <template>
   <div class="flex flex-col gap-6">
+    <component :is="StaffWebhooks" />
     <Card class="gap-0">
       <CardHeader class="flex-row items-start justify-between gap-4">
         <div class="flex flex-col gap-1.5">
