@@ -95,6 +95,7 @@ public static class AuthenticationRegistration
         services.AddAuthorization(options =>
         {
             options.AddPolicy(MfaFlowScheme, policy => policy.AddAuthenticationSchemes(MfaFlowScheme).RequireAuthenticatedUser());
+            options.AddPolicy("MfaEnrollment", policy => policy.AddAuthenticationSchemes(AccessScheme, MfaFlowScheme).RequireAuthenticatedUser());
             options.DefaultPolicy = new AuthorizationPolicyBuilder(AccessScheme)
                 .RequireAuthenticatedUser()
                 .Build();

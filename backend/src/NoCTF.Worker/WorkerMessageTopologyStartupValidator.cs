@@ -230,5 +230,6 @@ public sealed class WorkerMessageTopologyStartupValidator(
         typeof(SendEmailVerification),
         typeof(SendPasswordReset),
         typeof(SendPasswordChangedNotification)
+        , typeof(SendMfaMail)
     ];
 }

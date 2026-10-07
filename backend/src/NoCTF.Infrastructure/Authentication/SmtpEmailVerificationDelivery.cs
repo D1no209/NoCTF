@@ -31,7 +31,8 @@ public sealed class SmtpEmailVerificationDelivery(
     IEmailVerificationSmtpClientFactory clientFactory,
     ILogger<SmtpEmailVerificationDelivery> logger)
     : IEmailVerificationDelivery,
-        IPasswordResetEmailDelivery
+        IPasswordResetEmailDelivery,
+        NoCTF.Application.Authentication.Mfa.IMfaEmailDelivery
 {
     public async Task<EmailVerificationDeliveryState> SendVerificationAsync(
         Guid userId,
@@ -167,6 +168,40 @@ public sealed class SmtpEmailVerificationDelivery(
         await SendAsync(configuration, message, ct);
         logger.LogInformation("Sent a password change notice to user {UserId}.", userId);
         return PasswordResetEmailDeliveryState.Sent;
+    }
+
+    public async Task<NoCTF.Application.Authentication.Mfa.MfaMailDeliveryState> SendRecoveryAsync(Guid userId, string token, CancellationToken ct)
+    {
+        var (_, configuration) = await LoadConfigurationAsync(false, ct);
+        if (configuration is null) return NoCTF.Application.Authentication.Mfa.MfaMailDeliveryState.NotConfigured;
+        var user = await LoadRecipientAsync(userId, ct);
+        if (user is null) return NoCTF.Application.Authentication.Mfa.MfaMailDeliveryState.RecipientNotFound;
+        var url = new Uri(new Uri(configuration.PublicBaseUrl.TrimEnd('/') + "/"), $"auth/mfa/recovery?token={Uri.EscapeDataString(token)}").AbsoluteUri;
+        using var message = CreateMessage(configuration, user.Email, "Recover your NoCTF authenticator",
+            $"A restricted authenticator recovery was authorized. Verify your password or SSO identity and bind a new authenticator using this single-use link:\n\n{url}\n\nIf you did not request this, contact a platform administrator.",
+            $"<p>A restricted authenticator recovery was authorized. You must still verify your identity and bind a new authenticator.</p><p><a href=\"{WebUtility.HtmlEncode(url)}\">Recover authenticator</a></p><p>If you did not request this, contact a platform administrator.</p>");
+        await SendAsync(configuration, message, ct);
+        return NoCTF.Application.Authentication.Mfa.MfaMailDeliveryState.Sent;
+    }
+
+    public async Task<NoCTF.Application.Authentication.Mfa.MfaMailDeliveryState> SendSecurityNotificationAsync(Guid userId, NoCTF.Domain.Identity.Mfa.MfaOperation operation, CancellationToken ct)
+    {
+        var (_, configuration) = await LoadConfigurationAsync(false, ct);
+        if (configuration is null) return NoCTF.Application.Authentication.Mfa.MfaMailDeliveryState.NotConfigured;
+        var user = await LoadRecipientAsync(userId, ct);
+        if (user is null) return NoCTF.Application.Authentication.Mfa.MfaMailDeliveryState.RecipientNotFound;
+        var action = operation switch
+        {
+            NoCTF.Domain.Identity.Mfa.MfaOperation.EnableTotp => "An authenticator was enabled.",
+            NoCTF.Domain.Identity.Mfa.MfaOperation.RebindTotp => "Your authenticator was replaced.",
+            NoCTF.Domain.Identity.Mfa.MfaOperation.DisableTotp => "Your authenticator was disabled.",
+            NoCTF.Domain.Identity.Mfa.MfaOperation.RegenerateRecoveryCodes => "Your recovery codes were regenerated and the previous batch is no longer valid.",
+            _ => "Your account's MFA security settings changed."
+        };
+        using var message = CreateMessage(configuration, user.Email, "NoCTF account security changed", action + " If this was not you, contact a platform administrator.",
+            $"<p>{WebUtility.HtmlEncode(action)}</p><p>If this was not you, contact a platform administrator.</p>");
+        await SendAsync(configuration, message, ct);
+        return NoCTF.Application.Authentication.Mfa.MfaMailDeliveryState.Sent;
     }
 
     private async Task<(bool Enabled, EmailVerificationDeliveryConfiguration? Configuration)>

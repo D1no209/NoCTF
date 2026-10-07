@@ -50,7 +50,8 @@ if (args.Contains("--initialize-storage-only", StringComparer.OrdinalIgnoreCase)
     return;
 }
 var migrateOnly = args.Contains("--migrate-only", StringComparer.OrdinalIgnoreCase);
-var roles = migrateOnly || exportOpenApi
+var mfaRecoveryOnly = builder.Configuration["mfa-recovery-user"] is not null;
+var roles = migrateOnly || exportOpenApi || mfaRecoveryOnly
     ? HostRoles.Only(HostRole.Api)
     : HostRoles.FromConfiguration(builder.Configuration);
 var development = builder.Environment.IsDevelopment();
@@ -121,6 +122,11 @@ if (!exportOpenApi)
         $"noctf-host-{string.Join('-', roles.Values).ToLowerInvariant()}");
 
 var app = builder.Build();
+if (mfaRecoveryOnly)
+{
+    await NoCTF.Hosting.Authentication.OfflineMfaRecovery.ExecuteAsync(app.Services, app.Configuration, CancellationToken.None);
+    return;
+}
 if (generateHandlers)
 {
     await app.RunJasperFxCommands(args);
@@ -139,9 +145,9 @@ if (roles.Has(HostRole.Api))
 {
     app.UseNoCtfPipeline();
     app.UseNoCtfEndpoints();
-    app.MapHub<CompetitionHub>("/hubs/v1/competitions");
-    app.MapHub<NotificationHub>("/hubs/v1/notifications");
-    app.MapHub<PlatformLogHub>("/hubs/v1/admin/platform-logs");
+    app.MapHub<CompetitionHub>("/hubs/v1/competitions", options => options.CloseOnAuthenticationExpiration = true);
+    app.MapHub<NotificationHub>("/hubs/v1/notifications", options => options.CloseOnAuthenticationExpiration = true);
+    app.MapHub<PlatformLogHub>("/hubs/v1/admin/platform-logs", options => options.CloseOnAuthenticationExpiration = true);
 }
 
 app.MapNoCtfHealthChecks();

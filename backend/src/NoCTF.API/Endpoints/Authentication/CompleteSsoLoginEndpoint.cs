@@ -33,7 +33,7 @@ public sealed class CompleteSsoLoginEndpoint(
         if (browserId is null)
             return SsoEndpointProblems.Create(SsoFailureCode.InvalidCorrelation);
         var result = await complete.ExecuteAsync(
-            Route<Guid>("flowId"), correlation.Hash(browserId), ct);
+            Route<Guid>("flowId"), correlation.Hash(browserId), ct, mfaBrowser.Read(HttpContext));
         if (!result.Succeeded)
             return SsoEndpointProblems.Create(result.FailureCode!.Value);
         return TypedResults.Ok(AuthenticationResponseMapping.Map(result.Value!.Completion, HttpContext, refreshOptions.Value, mfaBrowser));

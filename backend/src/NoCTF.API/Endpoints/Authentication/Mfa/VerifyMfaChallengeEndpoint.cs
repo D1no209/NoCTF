@@ -10,6 +10,7 @@ namespace NoCTF.API.Endpoints.Authentication.Mfa;
 
 public sealed class VerifyMfaChallengeRequest
 {
+    [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<MfaVerificationMethod>))]
     public MfaVerificationMethod Method { get; set; }
     public string Code { get; set; } = string.Empty;
 }

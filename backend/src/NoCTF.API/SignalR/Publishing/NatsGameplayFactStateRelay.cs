@@ -11,7 +11,8 @@ namespace NoCTF.API.SignalR.Publishing;
 public sealed class NatsGameplayFactStateRelay(
     INatsConnection connection,
     IHubContext<CompetitionHub, ICompetitionHubClient> hub,
-    ILogger<NatsGameplayFactStateRelay> logger) : BackgroundService
+    ILogger<NatsGameplayFactStateRelay> logger,
+    MfaConnectionGuard guard) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -25,7 +26,7 @@ public sealed class NatsGameplayFactStateRelay(
                 var notification = JsonSerializer.Deserialize(message.Data,
                     NoCtfMessageJsonContext.Default.GameplayFactStateChangedNotification);
                 if (notification is null) continue;
-                await hub.Clients.User(notification.UserId.ToString()).GameplayFactStateChanged(
+                await hub.Clients.Clients(await guard.EligibleAsync(MfaHubKind.Competition, new HashSet<Guid> { notification.UserId }, stoppingToken)).GameplayFactStateChanged(
                     GameplayFactMapper.ToStatusResponse(notification.Result),
                     stoppingToken);
             }

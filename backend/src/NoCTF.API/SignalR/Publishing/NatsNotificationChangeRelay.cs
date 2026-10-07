@@ -14,7 +14,8 @@ public sealed class NatsNotificationChangeRelay(
     INatsConnection connection,
     NotificationChangeAudienceResolver audienceResolver,
     IHubContext<NotificationHub, INotificationHubClient> hub,
-    ILogger<NatsNotificationChangeRelay> logger) : BackgroundService
+    ILogger<NatsNotificationChangeRelay> logger,
+    MfaConnectionGuard guard) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -32,7 +33,7 @@ public sealed class NatsNotificationChangeRelay(
 
                 var users = await audienceResolver.ResolveAsync(change.Audiences, stoppingToken);
                 if (users.Count == 0) continue;
-                await hub.Clients.Users(users.Select(id => id.ToString()).ToArray())
+                await hub.Clients.Clients(await guard.EligibleAsync(MfaHubKind.Notifications, users.ToHashSet(), stoppingToken))
                     .NotificationChanged(stoppingToken);
                 NoCtfTelemetry.RecordSignalRPublish(
                     "notifications", "success",

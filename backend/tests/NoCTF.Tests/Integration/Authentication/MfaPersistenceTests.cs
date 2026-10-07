@@ -19,6 +19,57 @@ namespace NoCTF.Tests.Integration.Authentication;
 public sealed class MfaPersistenceTests
 {
     [Test, Timeout(300_000)]
+    public Task Step_up_is_bound_to_operation_and_required_factors_cannot_be_disabled(CancellationToken ct) => DockerIntegrationTest.RunAsync(async () =>
+    {
+        await using var postgres = Container(); await postgres.StartAsync(ct); var options = Options(postgres);
+        var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-10-07T00:00:00Z")); var crypto = new MfaCryptography(); var protector = Protector();
+        var userId = Guid.NewGuid(); var credentialId = Guid.NewGuid(); var secret = crypto.GenerateSecret();
+        await using var db = new NoCtfDbContext(options); await db.Database.MigrateAsync(ct);
+        var user = User(userId, UserKind.Human); user.MfaRequired = true; db.Users.Add(user);
+        db.UserTotpCredentials.Add(new() { Id = credentialId, UserId = userId, SecretCiphertext = protector.Protect(secret, PlatformSecretPurpose.TotpCredentialSecret, userId, credentialId), EnabledAt = clock.GetUtcNow(), RecoveryBatchId = Guid.NewGuid() });
+        await db.SaveChangesAsync(ct);
+        var store = new MfaAuthenticationStore(db, crypto, protector, clock);
+        var actor = new MfaActor(userId, 0, new(AuthenticationMethod.Password, clock.GetUtcNow(), MfaSource.Totp, clock.GetUtcNow(), credentialId));
+        var step = await store.BeginStepUpAsync(actor, MfaOperation.DisableTotp, userId, ct);
+        await Assert.That((await store.VerifyStepUpAsync(step.Value!.Browser, new(MfaVerificationMethod.Totp, Code(secret, clock)), ct)).Succeeded).IsTrue();
+        await Assert.That((await store.RegenerateRecoveryCodesAsync(actor, step.Value.Browser, ct)).FailureCode).IsEqualTo(MfaFailure.StepUpRequired);
+        await Assert.That((await store.DisableAsync(actor, step.Value.Browser, ct)).FailureCode).IsEqualTo(MfaFailure.PolicyRequiresMfa);
+        await Assert.That(await db.UserTotpCredentials.CountAsync(ct)).IsEqualTo(1);
+        db.ChangeTracker.Clear(); var current = await db.Users.SingleAsync(ct); current.MfaRequired = false; await db.SaveChangesAsync(ct);
+        await Assert.That((await store.DisableAsync(actor, step.Value.Browser, ct)).Succeeded).IsTrue();
+        await Assert.That(await db.UserTotpCredentials.CountAsync(ct)).IsEqualTo(0);
+        await Assert.That((await store.DisableAsync(actor, step.Value.Browser, ct)).Succeeded).IsFalse();
+    });
+
+    [Test, Timeout(300_000)]
+    public Task Recovery_grants_are_single_use_and_cannot_bind_before_primary_authentication(CancellationToken ct) => DockerIntegrationTest.RunAsync(async () =>
+    {
+        await using var postgres = Container(); await postgres.StartAsync(ct); var options = Options(postgres);
+        var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-10-07T00:00:00Z")); var crypto = new MfaCryptography(); var protector = Protector();
+        var userId = Guid.NewGuid();
+        await using var db = new NoCtfDbContext(options); await db.Database.MigrateAsync(ct);
+        var user = User(userId, UserKind.Human); user.EmailVerifiedAt = clock.GetUtcNow(); db.Users.Add(user);
+        var settings = await db.PlatformSettings.SingleAsync(ct); settings.EmailSmtpHost = "smtp.test.invalid"; settings.EmailSmtpFromAddress = "no-reply@test.invalid";
+        settings.EmailSmtpSecurityMode = SmtpSecurityMode.None; settings.EmailPublicBaseUrl = "https://noctf.test";
+        await db.SaveChangesAsync(ct); var store = new MfaAuthenticationStore(db, crypto, protector, clock);
+        var granted = await store.GrantRecoveryAsync(null, null, userId, "Offline operator verified account ownership", ct);
+        await Assert.That(granted.Succeeded).IsTrue();
+        var grant = await db.MfaChallenges.SingleAsync(value => value.Id == granted.Value!.Id, ct);
+        var token = protector.Unprotect(grant.RecoveryGrantCiphertext!, PlatformSecretPurpose.MfaRecoveryGrant, userId, grant.Id);
+        var exchange = await store.ExchangeRecoveryAsync(token, ct);
+        await Assert.That(exchange.Succeeded).IsTrue();
+        await Assert.That((await store.ExchangeRecoveryAsync(token, ct)).Succeeded).IsFalse();
+        await Assert.That((await store.BeginEnrollmentAsync(exchange.Value!.Browser, ct)).FailureCode).IsEqualTo(MfaFailure.PrimaryAuthenticationRequired);
+        var account = (await store.ReadAccountAsync(userId, ct))!;
+        await Assert.That((await store.ApplyRecoveryPrimaryAsync(exchange.Value.Browser, new(account.User, AuthenticationMethod.Password, clock.GetUtcNow()), ct)).Succeeded).IsTrue();
+        var enrollment = await store.BeginEnrollmentAsync(exchange.Value.Browser, ct);
+        var confirmed = await store.ConfirmEnrollmentAsync(exchange.Value.Browser, Code(enrollment.Value!.Secret!, clock), ct);
+        await Assert.That(confirmed.Succeeded).IsTrue();
+        await Assert.That(confirmed.Value!.User.TokenVersion).IsEqualTo(2);
+        await Assert.That(confirmed.Value.Context.MfaSource).IsEqualTo(MfaSource.Totp);
+    });
+
+    [Test, Timeout(300_000)]
     public Task Enrollment_and_concurrent_challenge_code_consumption_are_atomic(CancellationToken ct) => DockerIntegrationTest.RunAsync(async () =>
     {
         await using var postgres = Container(); await postgres.StartAsync(ct);

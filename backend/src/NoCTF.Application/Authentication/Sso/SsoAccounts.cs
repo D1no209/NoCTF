@@ -152,7 +152,8 @@ public sealed class CompleteSsoLogin(
     public async Task<OperationResult<SsoLoginSession, SsoFailureCode>> ExecuteAsync(
         Guid flowId,
         string browserIdHash,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        MfaBrowserCredential? recovery = null)
     {
         var consumed = await flows.ConsumeAuthenticatedAsync(flowId, browserIdHash, ct);
         if (consumed.State == SsoFlowReadState.DependencyUnavailable)
@@ -178,7 +179,7 @@ public sealed class CompleteSsoLogin(
         if (flow.AuthenticatedAt is null) return Failure(SsoFailureCode.FlowExpired);
         var completion = await complete.ExecuteAsync(new(user,
             flow.Protocol == SsoProtocol.Oidc ? AuthenticationMethod.Oidc : AuthenticationMethod.Cas,
-            flow.AuthenticatedAt.Value, flow.ExternalIdentity.MfaProof, flow.ReturnPath, flow.ProviderId), ct);
+            flow.AuthenticatedAt.Value, flow.ExternalIdentity.MfaProof, flow.ReturnPath, flow.ProviderId), ct, recovery);
         if (!completion.Succeeded) return Failure(SsoFailureCode.AccountUnavailable);
         if (completion.Value!.State == AuthenticationState.Authenticated)
             await activities.RecordSsoAsync(user.Id, flow.ProviderId, true, now, ct);

@@ -6,7 +6,7 @@ using NoCTF.Application.Authentication.Mfa;
 
 namespace NoCTF.Application.Authentication.Login;
 
-public sealed record LoginCommand(string Login, string Password);
+public sealed record LoginCommand(string Login, string Password, MfaBrowserCredential? Recovery = null);
 
 public enum LoginFailureCode
 {
@@ -40,7 +40,7 @@ public sealed class LoginUser(
                 "Invalid credentials.");
         }
 
-        var completion = await complete.ExecuteAsync(new(user, AuthenticationMethod.Password, timeProvider.GetUtcNow()), cancellationToken);
+        var completion = await complete.ExecuteAsync(new(user, AuthenticationMethod.Password, timeProvider.GetUtcNow()), cancellationToken, command.Recovery);
         if (!completion.Succeeded)
             return OperationResult<AuthenticationCompletion, LoginFailureCode>.Failure(
                 completion.FailureCode == MfaFailure.AccountUnavailable ? LoginFailureCode.InvalidCredentials : LoginFailureCode.DependencyUnavailable,

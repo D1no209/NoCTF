@@ -194,6 +194,7 @@ public sealed class PlatformUserTokenHttpTests
         });
         builder.Services.AddSingleton(store);
         builder.Services.AddSingleton(issuer);
+        builder.Services.AddSingleton(NoCTF.Tests.MfaTestSupport.Unrequired());
         builder.Services.AddScoped<ManagePlatform>();
         var app = builder.Build();
         app.UseAuthentication();
@@ -231,3 +232,4 @@ public sealed class PlatformUserTokenHttpTests
         }
     }
 }
+

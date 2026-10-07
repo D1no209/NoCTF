@@ -99,7 +99,7 @@ public sealed class CompetitionHubSubscriptionRegistry
 
 public interface ICompetitionHubAudienceRouter
 {
-    ICompetitionHubClient AllKnown(Guid competitionId);
+    Task<ICompetitionHubClient> AllKnownAsync(Guid competitionId, CancellationToken ct);
 
     Task<ICompetitionHubClient?> CurrentAsync(
         Guid competitionId,
@@ -120,14 +120,16 @@ public interface ICompetitionHubAudienceAccess
 
 public sealed class CompetitionHubAudienceRouter(
     ICompetitionHubAudienceAccess access,
-    IHubContext<CompetitionHub, ICompetitionHubClient> hub)
+    IHubContext<CompetitionHub, ICompetitionHubClient> hub,
+    CompetitionHubSubscriptionRegistry subscriptions, MfaConnectionGuard guard)
     : ICompetitionHubAudienceRouter
 {
-    public ICompetitionHubClient AllKnown(Guid competitionId) =>
-        hub.Clients.Groups([
-            CompetitionHubGroups.Public(competitionId),
-            CompetitionHubGroups.Staff(competitionId)
-        ]);
+    public async Task<ICompetitionHubClient> AllKnownAsync(Guid competitionId, CancellationToken ct)
+    {
+        var eligible = await guard.EligibleAsync(MfaHubKind.Competition, null, ct);
+        var subscribed = subscriptions.Get(competitionId).Select(value => value.ConnectionId).ToHashSet();
+        return hub.Clients.Clients(eligible.Where(subscribed.Contains).ToArray());
+    }
 
     public async Task<ICompetitionHubClient?> CurrentAsync(
         Guid competitionId,
@@ -138,9 +140,10 @@ public sealed class CompetitionHubAudienceRouter(
             cancellationToken);
         return accessMode switch
         {
-            CompetitionAccessMode.Public => AllKnown(competitionId),
+            CompetitionAccessMode.Public => await AllKnownAsync(competitionId, cancellationToken),
             CompetitionAccessMode.StaffOnly =>
-                hub.Clients.Group(CompetitionHubGroups.Staff(competitionId)),
+                hub.Clients.Clients((await guard.EligibleAsync(MfaHubKind.Competition, null, cancellationToken))
+                    .Where(id => subscriptions.Get(competitionId).Any(value => value.ConnectionId == id && value.IsStaff)).ToArray()),
             _ => null
         };
     }

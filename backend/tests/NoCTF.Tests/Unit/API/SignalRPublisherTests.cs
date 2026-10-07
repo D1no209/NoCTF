@@ -32,10 +32,10 @@ public sealed class SignalRPublisherTests
             DateTimeOffset.UnixEpoch,
             DateTimeOffset.UnixEpoch.AddSeconds(1));
 
-        await new SignalRGameplayFactStatePublisher(harness.Context)
+        await new SignalRGameplayFactStatePublisher(harness.Context, MfaHubTestSupport.Guard(("connection", userId, MfaHubKind.Competition)))
             .PublishAsync(userId, view, CancellationToken.None);
 
-        _ = harness.Clients.Received(1).User(userId.ToString());
+        _ = harness.Clients.Received(1).Clients(Arg.Is<IReadOnlyList<string>>(value => value != null && value.Contains("connection")));
         await harness.Client.Received(1).GameplayFactStateChanged(
             Arg.Is<GameplayFactStatusResponse>(notification =>
                 notification != null
@@ -119,7 +119,7 @@ public sealed class SignalRPublisherTests
                 harness.Coordinator)
             .Handle(message, CancellationToken.None);
 
-        _ = harness.Audiences.Received(1).AllKnown(competitionId);
+        _ = harness.Audiences.Received(1).AllKnownAsync(competitionId, CancellationToken.None);
         await harness.Coordinator.Received(1).ApplyAsync(message, CancellationToken.None);
     }
 
@@ -132,10 +132,11 @@ public sealed class SignalRPublisherTests
         var coordinator = Substitute.For<ICompetitionHubAudienceCoordinator>();
         context.Clients.Returns(clients);
         clients.User(Arg.Any<string>()).Returns(client);
+        clients.Clients(Arg.Any<IReadOnlyList<string>>()).Returns(client);
         clients.Group(Arg.Any<string>()).Returns(client);
         audiences.CurrentAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns(client);
-        audiences.AllKnown(Arg.Any<Guid>()).Returns(client);
+        audiences.AllKnownAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(client);
         return new(context, clients, client, audiences, coordinator);
     }
 

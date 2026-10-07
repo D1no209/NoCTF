@@ -126,7 +126,16 @@ public sealed class SsoConfigurationStore(
                 && secret is null)
                 return Mutation.Invalid(SsoConfigurationMutationState.SecretRequired);
 
-            configuration.Providers[index] = ToConfiguration(providerId, provider, secret);
+            var replacement = ToConfiguration(providerId, provider, secret);
+            if (replacement is OidcSsoProviderConfiguration updatedOidc && current is OidcSsoProviderConfiguration oldOidc)
+            {
+                updatedOidc.MfaTrustEnabled = oldOidc.MfaTrustEnabled && SameTrustBoundary(current, provider);
+                updatedOidc.MfaTrustPolicyId = SameTrustBoundary(current, provider) ? oldOidc.MfaTrustPolicyId : Guid.NewGuid();
+                updatedOidc.MfaAuthenticationMaxAgeSeconds = oldOidc.MfaAuthenticationMaxAgeSeconds;
+                updatedOidc.MfaAcrEntries = oldOidc.MfaAcrEntries;
+                updatedOidc.MfaAmrGroups = oldOidc.MfaAmrGroups;
+            }
+            configuration.Providers[index] = replacement;
             return Mutation.Success(new SsoProviderAuditFact(
                 1,
                 SsoProviderAuditAction.ProviderUpdated,
@@ -265,7 +274,13 @@ public sealed class SsoConfigurationStore(
             ClientSecretCiphertext = oidc.ClientSecretCiphertext?.ToArray(),
             Scopes = oidc.Scopes.ToArray(),
             ReadUserInfo = oidc.ReadUserInfo,
-            DisplayNameClaim = oidc.DisplayNameClaim
+            DisplayNameClaim = oidc.DisplayNameClaim,
+            MfaTrustEnabled = oidc.MfaTrustEnabled,
+            MfaTrustPolicyId = oidc.MfaTrustPolicyId,
+            MfaAuthenticationMaxAgeSeconds = oidc.MfaAuthenticationMaxAgeSeconds,
+            MfaAcrEntries = oidc.MfaAcrEntries.Select(value => new OidcMfaAcr { SsoProviderId = oidc.Id, Position = value.Position, Value = value.Value }).ToList(),
+            MfaAmrGroups = oidc.MfaAmrGroups.Select(group => new OidcMfaAmrGroup { Id = group.Id, SsoProviderId = oidc.Id, Position = group.Position,
+                Values = group.Values.Select(value => new OidcMfaAmrValue { GroupId = group.Id, Position = value.Position, Value = value.Value }).ToList() }).ToList()
         }, provider),
         CasSsoProviderConfiguration cas => Common(new CasSsoProviderConfiguration
         {

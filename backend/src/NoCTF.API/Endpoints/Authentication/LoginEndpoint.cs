@@ -82,7 +82,7 @@ public sealed class LoginEndpoint(LoginUser login, IOptions<RefreshHttpOptions> 
         LoginRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await login.ExecuteAsync(new(request.Login, request.Password), cancellationToken);
+        var result = await login.ExecuteAsync(new(request.Login, request.Password, browser.Read(HttpContext)), cancellationToken);
         if (!result.Succeeded)
         {
             if (result.FailureCode == LoginFailureCode.DependencyUnavailable) return MfaEndpointResults.Failure(MfaFailure.DependencyUnavailable);

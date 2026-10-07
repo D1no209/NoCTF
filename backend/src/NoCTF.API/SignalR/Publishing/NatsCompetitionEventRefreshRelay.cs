@@ -31,7 +31,7 @@ public sealed class NatsCompetitionEventRefreshRelay(
                     NoCtfMessageJsonContext.Default.CompetitionEventCommitted);
                 if (notification is null) continue;
                 var clients = notification.Kind == CompetitionEventKind.CompetitionAudienceChanged
-                    ? audiences.AllKnown(notification.CompetitionId)
+                    ? await audiences.AllKnownAsync(notification.CompetitionId, stoppingToken)
                     : await audiences.CurrentAsync(notification.CompetitionId, stoppingToken);
                 if (clients is null) continue;
                 await clients.CompetitionEventChanged(

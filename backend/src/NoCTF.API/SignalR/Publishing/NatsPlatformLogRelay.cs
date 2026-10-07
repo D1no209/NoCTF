@@ -11,7 +11,8 @@ namespace NoCTF.API.SignalR.Publishing;
 public sealed class NatsPlatformLogRelay(
     INatsConnection connection,
     IHubContext<PlatformLogHub, IPlatformLogHubClient> hub,
-    ILogger<NatsPlatformLogRelay> logger) : BackgroundService
+    ILogger<NatsPlatformLogRelay> logger,
+    MfaConnectionGuard guard) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -25,7 +26,7 @@ public sealed class NatsPlatformLogRelay(
                 var view = JsonSerializer.Deserialize(message.Data,
                     NoCtfWebMessageJsonContext.Default.PlatformLogView);
                 if (view is null) continue;
-                await hub.Clients.Group(PlatformLogHub.AdministratorsGroup)
+                await hub.Clients.Clients(await guard.EligibleAsync(MfaHubKind.PlatformLogs, null, stoppingToken))
                     .PlatformLogReceived(PlatformLogMapping.ToResponse(view), stoppingToken);
             }
             catch (JsonException exception)

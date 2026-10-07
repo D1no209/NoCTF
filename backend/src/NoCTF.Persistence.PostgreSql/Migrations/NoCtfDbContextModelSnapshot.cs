@@ -2347,6 +2347,11 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("smallint")
                         .HasColumnName("primary_method");
 
+                    b.Property<string>("PrimaryProviderFingerprint")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("primary_provider_fingerprint");
+
                     b.Property<Guid?>("PrimaryProviderId")
                         .HasColumnType("uuid")
                         .HasColumnName("primary_provider_id");
@@ -2378,6 +2383,10 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Property<short>("State")
                         .HasColumnType("smallint")
                         .HasColumnName("state");
+
+                    b.Property<Guid?>("TargetResourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_resource_id");
 
                     b.Property<Guid?>("TargetUserId")
                         .HasColumnType("uuid")

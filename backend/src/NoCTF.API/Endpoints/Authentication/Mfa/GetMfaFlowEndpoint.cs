@@ -13,10 +13,10 @@ namespace NoCTF.API.Endpoints.Authentication.Mfa;
 public sealed record MfaFlowResponse(Guid Id,
     [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<MfaChallengePurpose>))] MfaChallengePurpose Purpose,
     DateTimeOffset ExpiresAt, int RemainingAttempts, string UserName, bool RecoveryAvailable, string ReturnPath,
-    string? Secret, string? ProvisioningUri)
+    string? Secret, string? ProvisioningUri, bool PrimaryAuthenticationRequired)
 {
     public static MfaFlowResponse From(MfaFlowView value) => new(value.Id, value.Purpose, value.ExpiresAt, value.RemainingAttempts,
-        value.UserName, value.RecoveryAvailable, value.ReturnPath, value.Secret, value.ProvisioningUri);
+        value.UserName, value.RecoveryAvailable, value.ReturnPath, value.Secret, value.ProvisioningUri, value.PrimaryAuthenticationRequired);
 }
 
 public sealed record MfaFailureResponse(
