@@ -23,9 +23,10 @@ export interface HorizontalScrollbarPinPosition {
 export function horizontalScrollbarPinPosition(
   target: ScrollbarPinRect,
   scrollRoot: ScrollbarPinRect,
-  scrollTop: number,
-  scrollLeft: number,
+  host: ScrollbarPinRect,
   scrollbarSize: number,
+  hostScrollTop = 0,
+  hostScrollLeft = 0,
 ): HorizontalScrollbarPinPosition | null {
   const visibleTop = Math.max(target.top, scrollRoot.top)
   const visibleRight = Math.min(target.right, scrollRoot.right)
@@ -34,8 +35,8 @@ export function horizontalScrollbarPinPosition(
   if (visibleBottom <= visibleTop || visibleRight <= visibleLeft) return null
 
   return {
-    top: scrollTop + visibleBottom - scrollRoot.top - scrollbarSize,
-    left: scrollLeft + visibleLeft - scrollRoot.left,
+    top: hostScrollTop + visibleBottom - host.top - scrollbarSize,
+    left: hostScrollLeft + visibleLeft - host.left,
     width: visibleRight - visibleLeft,
   }
 }
@@ -74,15 +75,22 @@ export function createScrollbars(
   const originalPosition = target.style.getPropertyValue('position')
   const originalPriority = target.style.getPropertyPriority('position')
   const positioned = position === 'fixed' || position === 'absolute'
-  const idleAutoHide = options.pinHorizontalTo ? 'never' as const : 'leave' as const
+  const pinnedRoot = options.pinHorizontalTo
+  // Keep the control outside scrolling content so compositor scrolls cannot move it.
+  const pinnedHost = pinnedRoot?.parentElement
+  const hostPosition = pinnedHost?.style.getPropertyValue('position') ?? ''
+  const hostPriority = pinnedHost?.style.getPropertyPriority('position') ?? ''
+  const positionHost = pinnedHost && getComputedStyle(pinnedHost).position === 'static'
+  if (positionHost) pinnedHost.style.setProperty('position', 'relative')
+  const idleAutoHide = pinnedHost ? 'never' as const : 'leave' as const
   const instance = OverlayScrollbars({
     target,
     elements: { viewport: target },
-    ...(options.pinHorizontalTo ? { scrollbars: { slot: options.pinHorizontalTo } } : {}),
+    ...(pinnedHost ? { scrollbars: { slot: pinnedHost } } : {}),
   }, {
     ...baseOptions,
     overflow: overflowOptions(axis),
-    ...(options.pinHorizontalTo ? { scrollbars: { ...baseOptions.scrollbars, autoHide: idleAutoHide } } : {}),
+    ...(pinnedHost ? { scrollbars: { ...baseOptions.scrollbars, autoHide: idleAutoHide } } : {}),
   })
 
   if (positioned)
@@ -100,27 +108,30 @@ export function createScrollbars(
   target.addEventListener('focusin', focus)
   target.addEventListener('focusout', blur)
 
-  const pinnedRoot = options.pinHorizontalTo
-  const pinnedScrollbar = pinnedRoot ? instance.elements().scrollbarHorizontal.scrollbar : null
+  const pinnedScrollbar = pinnedHost ? instance.elements().scrollbarHorizontal.scrollbar : null
+  let previousPinPosition: HorizontalScrollbarPinPosition | null = null
   let pinFrame = 0
   let pinObserver: ResizeObserver | undefined
   let pinIntersectionObserver: IntersectionObserver | undefined
   const updatePinnedScrollbar = () => {
-    if (!pinnedRoot || !pinnedScrollbar) return
+    if (!pinnedRoot || !pinnedHost || !pinnedScrollbar) return
     const position = horizontalScrollbarPinPosition(
       target.getBoundingClientRect(),
       pinnedRoot.getBoundingClientRect(),
-      pinnedRoot.scrollTop,
-      pinnedRoot.scrollLeft,
+      pinnedHost.getBoundingClientRect(),
       Math.max(pinnedScrollbar.offsetHeight, 8),
+      pinnedHost.scrollTop,
+      pinnedHost.scrollLeft,
     )
     pinnedScrollbar.hidden = position === null
     if (!position) return
-    pinnedScrollbar.style.setProperty('top', `${position.top}px`)
-    pinnedScrollbar.style.setProperty('right', 'auto')
-    pinnedScrollbar.style.setProperty('bottom', 'auto')
-    pinnedScrollbar.style.setProperty('left', `${position.left}px`)
-    pinnedScrollbar.style.setProperty('width', `${position.width}px`)
+    if (position.top !== previousPinPosition?.top)
+      pinnedScrollbar.style.setProperty('top', `${position.top}px`)
+    if (position.left !== previousPinPosition?.left)
+      pinnedScrollbar.style.setProperty('left', `${position.left}px`)
+    if (position.width !== previousPinPosition?.width)
+      pinnedScrollbar.style.setProperty('width', `${position.width}px`)
+    previousPinPosition = position
   }
   const schedulePinnedScrollbarUpdate = () => {
     if (pinFrame) return
@@ -129,13 +140,20 @@ export function createScrollbars(
       updatePinnedScrollbar()
     })
   }
-  if (pinnedRoot && pinnedScrollbar) {
+  const updateAfterTransition = (event: TransitionEvent) => {
+    if (event.propertyName === 'transform') schedulePinnedScrollbarUpdate()
+  }
+  if (pinnedRoot && pinnedHost && pinnedScrollbar) {
     pinnedScrollbar.classList.add('os-scrollbar-pinned-horizontal')
+    pinnedScrollbar.style.setProperty('right', 'auto')
+    pinnedScrollbar.style.setProperty('bottom', 'auto')
     pinnedRoot.addEventListener('scroll', schedulePinnedScrollbarUpdate, { passive: true })
+    pinnedRoot.addEventListener('transitionend', updateAfterTransition)
     window.addEventListener('resize', schedulePinnedScrollbarUpdate, { passive: true })
     pinObserver = new ResizeObserver(schedulePinnedScrollbarUpdate)
     pinObserver.observe(target)
     pinObserver.observe(pinnedRoot)
+    pinObserver.observe(pinnedHost)
     pinIntersectionObserver = new IntersectionObserver(schedulePinnedScrollbarUpdate, { root: pinnedRoot })
     pinIntersectionObserver.observe(target)
     schedulePinnedScrollbarUpdate()
@@ -151,11 +169,16 @@ export function createScrollbars(
       pinObserver?.disconnect()
       pinIntersectionObserver?.disconnect()
       pinnedRoot?.removeEventListener('scroll', schedulePinnedScrollbarUpdate)
+      pinnedRoot?.removeEventListener('transitionend', updateAfterTransition)
       if (pinnedRoot)
         window.removeEventListener('resize', schedulePinnedScrollbarUpdate)
       target.removeEventListener('focusin', focus)
       target.removeEventListener('focusout', blur)
       instance.destroy()
+      if (positionHost && pinnedHost) {
+        if (hostPosition) pinnedHost.style.setProperty('position', hostPosition, hostPriority)
+        else pinnedHost.style.removeProperty('position')
+      }
       if (!positioned)
         return
       if (originalPosition)

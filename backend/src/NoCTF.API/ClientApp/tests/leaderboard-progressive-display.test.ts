@@ -117,15 +117,13 @@ describe('leaderboard progressive display', () => {
     expect(horizontalScrollbarPinPosition(
       { top: 420, right: 1880, bottom: 1600, left: 60 },
       { top: 290, right: 1900, bottom: 1010, left: 40 },
-      300,
-      0,
+      { top: 180, right: 1920, bottom: 1050, left: 20 },
       8,
-    )).toEqual({ top: 1012, left: 20, width: 1820 })
+    )).toEqual({ top: 822, left: 40, width: 1820 })
     expect(horizontalScrollbarPinPosition(
       { top: 1100, right: 1880, bottom: 1600, left: 60 },
       { top: 290, right: 1900, bottom: 1010, left: 40 },
-      300,
-      0,
+      { top: 180, right: 1920, bottom: 1050, left: 20 },
       8,
     )).toBeNull()
   })

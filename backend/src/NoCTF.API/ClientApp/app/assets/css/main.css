@@ -487,7 +487,11 @@
 }
 .os-theme-noctf .os-scrollbar-handle { min-height: 24px; }
 .os-theme-noctf.os-scrollbar-horizontal .os-scrollbar-handle { min-height: 0; min-width: 24px; }
-.os-theme-noctf.os-scrollbar-pinned-horizontal { z-index: 40; }
+.os-theme-noctf.os-scrollbar-pinned-horizontal {
+  z-index: 40;
+  /* Scroll coordinates must track the viewport without positional easing. */
+  transition-property: opacity, visibility;
+}
 @media (pointer: coarse) {
   :is([data-slot='button'], [data-slot='input'], [data-slot='select-trigger'], [data-slot='select-item']) { min-height: 44px; }
   .os-theme-noctf { --os-size: 12px; }
