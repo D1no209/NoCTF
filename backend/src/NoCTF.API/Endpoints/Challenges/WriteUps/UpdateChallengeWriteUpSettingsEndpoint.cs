@@ -35,7 +35,8 @@ public sealed class UpdateChallengeWriteUpSettingsEndpoint(ManageChallengeWriteU
     public override void Configure()
     {
         Patch("/admin/competitions/{competitionId}/writeup-settings"); AuthSchemes("Bearer");
-        Description(x => x.WithName("UpdateChallengeWriteUpSettings"));
+        Description(x => x.WithName("AdminUpdateChallengeWriteUpSettings").WithTags("Competition WriteUps")
+            .WithDescription("Administrators, owners and managers can update the independent single-challenge policy. Existing unlock percentages are immutable."));
         Summary(x => x.Summary = "Updates the competition policy or nullable per-challenge override; omitted fields preserve current values.");
     }
     public override async Task<Results<Ok<ChallengeWriteUpSettingsResponse>, ForbidHttpResult,

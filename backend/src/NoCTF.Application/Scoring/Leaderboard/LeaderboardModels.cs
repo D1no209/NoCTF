@@ -277,7 +277,10 @@ public sealed record ScoreboardChallengeScore(
     long DefenseScore);
 
 public sealed record ScoreboardChallengeBenefit(Guid CompetitionChallengeId, long GrossPoints,
-    long WriteUpDeductionPoints, int? WriteUpDeductionPercent, DateTimeOffset? WriteUpUnlockedAt);
+    long WriteUpDeductionPoints, int? WriteUpDeductionPercent, DateTimeOffset? WriteUpUnlockedAt)
+{
+    public long NetPoints { get; init; }
+}
 
 public sealed record ScoreboardMemberContribution(
     Guid UserId,

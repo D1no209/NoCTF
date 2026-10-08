@@ -41,7 +41,8 @@ public sealed class ListChallengeWriteUpReviewsEndpoint(ManageChallengeWriteUps 
     public override void Configure()
     {
         Get("/admin/competitions/{competitionId}/challenge-writeups"); AuthSchemes("Bearer");
-        Description(x => x.WithName("ListChallengeWriteUpReviews"));
+        Description(x => x.WithName("AdminListChallengeWriteUpReviews").WithTags("Competition WriteUps")
+            .WithDescription("Observers can read metadata; judges can review; administrators, owners and managers can publish. Document bodies use separate authorized endpoints."));
         Summary(x => x.Summary = "Pages private challenge WriteUps for observers and reviewers without returning document bodies.");
     }
     public override async Task<Results<Ok<ChallengeWriteUpReviewPageResponse>, ForbidHttpResult>> ExecuteAsync(ListChallengeWriteUpReviewsRequest request, CancellationToken ct)

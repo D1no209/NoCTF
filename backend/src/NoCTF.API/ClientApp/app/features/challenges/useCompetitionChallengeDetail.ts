@@ -198,6 +198,8 @@ export function useCompetitionChallengeDetail(props: Readonly<{
 
   const route = useRoute(), router = useRouter()
   const singleWriteUpsEnabled = computed(() => ctx.competition.value?.singleWriteUpsEnabled === true)
+  const writeUpBenefit = computed(() => ctx.standing.value?.challengeBenefits?.find(x => x.competitionChallengeId === props.competitionChallengeId
+    && x.writeUpUnlockedAt != null) ?? null)
   function openWriteUps() { void router.push({ path: `/competitions/${props.competitionId}/challenge-writeups/${props.competitionChallengeId}`, query: route.query }) }
 
   const mode = computed(() => ctx.competition.value?.mode)
@@ -216,7 +218,7 @@ export function useCompetitionChallengeDetail(props: Readonly<{
 
   return {
       ...toRefs(props),
-      BookOpen, singleWriteUpsEnabled, openWriteUps,
+      BookOpen, singleWriteUpsEnabled, openWriteUps, writeUpBenefit,
       Dice5,
       FileDown,
       History,

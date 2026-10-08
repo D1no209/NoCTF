@@ -157,7 +157,12 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
     return json({ ...user, state: 'Authenticated', accessToken, expiresAt: date(24), returnPath: '/' }, 200, { 'Set-Cookie': `noctf_mock_session=${session}; Path=/; HttpOnly; SameSite=Strict` })
   }
   const mfa = createMockMfa({ users: state.users, signIn, userFor, loginRequiresMfa: options.mfa ?? false })
-  const singleWriteUps = createMockChallengeWriteUps({ state, json, pdf: mockWriteUpPdf, prepareDownload: prepareMockAttachmentDownload })
+  const singleWriteUps = createMockChallengeWriteUps({ state, json, pdf: mockWriteUpPdf, prepareDownload: prepareMockAttachmentDownload,
+    gross: (competitionId, teamId, challengeId) => {
+      const snapshot = leaderboardRead(state, '', competitionId)!
+      const index = state.challenges.filter(x => x.competitionId === competitionId && x.isPublished && !x.deletedAt).findIndex(x => x.id === challengeId)
+      return snapshot.teams.find((x: Data) => x.teamId === teamId)?.slots[index]?.earnedPoints ?? 0
+    } })
   function challengeSummary(item: Data) {
     return {
       id: item.id,
@@ -576,7 +581,11 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
         key: 'open', name: '公开赛道 / Open', isDefault: true, isPublicSelectable: true, earnsScore: true, earnsBlood: true,
         affectsDynamicChallengeScore: true, visibleOnLeaderboard: true, affectsCompetitiveResults: true, isViewerTrack: true,
       })] }
-      else if (cleanRoute.includes('/leaderboard')) value = leaderboardRead(state, cleanRoute.split('/leaderboard')[1]!, p.competitionId!)
+      else if (cleanRoute.includes('/leaderboard')) {
+        const suffix = cleanRoute.split('/leaderboard')[1]!
+        value = leaderboardRead(state, suffix, p.competitionId!)
+        if (suffix === '' && value) value = singleWriteUps.decorateLeaderboard(value, p.competitionId!)
+      }
       else if (route === '/admin/competitions/{competitionId}/directions') value = { items: directionCatalogs.get(competition!.id) ?? [] }
       else if (route === '/admin/competitions/{competitionId}/announcements') {
         value = list(state.notifications.filter(item => item.kind === 'CompetitionAnnouncement' && item.sourceType === 1

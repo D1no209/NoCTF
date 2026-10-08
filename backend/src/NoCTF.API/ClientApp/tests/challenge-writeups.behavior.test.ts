@@ -12,7 +12,7 @@ const readerFactory = await compile('../app/features/writeups/useChallengeWriteU
 const editorFactory = await compile('../app/features/writeups/useChallengeWriteUpEditor.ts', 'useChallengeWriteUpEditor')
 const reviewFactory = await compile('../app/features/writeups/useChallengeWriteUpReview.ts', 'useChallengeWriteUpReview')
 const drain = async () => { await nextTick(); await new Promise(resolve => setTimeout(resolve, 0)) }
-const baseDeps = { ref, computed, watch, markRaw, nextTick, onMounted: () => {}, onBeforeUnmount: () => {},
+const baseDeps = { getCompetitionEndpoint: async () => ({ data: { status: 'Running' } }), ref, computed, watch, markRaw, nextTick, onMounted: () => {}, onBeforeUnmount: () => {},
   translate: (key: string) => key, message: (key: string) => ({ key }),
   parseApiError: (error: unknown) => ({ displayMessage: error }), toast: { success: () => {}, error: () => {} } }
 function reader() {
@@ -28,7 +28,7 @@ function reader() {
   const moves: unknown[] = []
   const deps = { ...baseDeps, ...Object.fromEntries(['ArrowLeft', 'BookOpen', 'Download', 'RefreshCw'].map(x => [x, {}])),
     useMediaQuery: () => ref(false), CompetitionParticipantWorkspaceComponent: {}, ChallengeWriteUpEditorComponent: {}, competitionContextKey: Symbol(),
-    inject: () => ({ competition: ref({ mode: 'Ctf', singleWriteUpsEnabled: true }) }), useRoute: () => route,
+    inject: () => ({ competition: ref({ mode: 'Ctf', singleWriteUpsEnabled: true }), standing: ref(null), refreshStanding: async () => {} }), useRoute: () => route,
     useRouter: () => ({ replace: async (value: unknown) => { moves.push(value) }, push: async (value: unknown) => { moves.push(value) } }),
     onMounted: (callback: () => void) => mounted.push(callback),
     watchCompetition: (_id: string, callbacks: { competitionEventChanged: typeof event }) => { event = callbacks.competitionEventChanged; return () => {} },
@@ -141,18 +141,41 @@ test('review restores URL filters, preserves selection during new arrivals, and 
   const route = reactive({ query: { reviewStatus: 'Published', reviewSource: 'Official', reviewPage: '2', tag: ['Web'] } })
   const row = { id: 'root', competitionChallengeId: 'challenge', publishedVersionId: 'old', published: { id: 'old' }, submitted: { id: 'new', state: 'Submitted' } }
   const state = scope.run(() => reviewFactory({ ...baseDeps, useRoute: () => route, useRouter: () => ({ replace: async (next: unknown) => moves.push(next) }),
-    SingleWriteUpSettingsComponent: {}, ChallengeWriteUpEditorComponent: {}, writeUpStatusKey,
-    listChallengeWriteUpReviews: async () => ({ data: { items: [row], totalCount: 30, canManage: true, canJudge: true } }),
+    useMediaQuery: () => ref(true), SingleWriteUpSettingsComponent: {}, ChallengeWriteUpEditorComponent: {}, writeUpStatusKey,
+    adminListChallengeWriteUpReviews: async () => ({ data: { items: [row], totalCount: 30, canManage: true, canJudge: true } }),
     getChallengeWriteUpSettings: async () => ({ data: { settings: { enabled: true, deductionPercent: 25 } } }),
     getChallengeWriteUpContent: async () => ({ data: { format: 'Markdown', markdown: '# Review' } }),
   })({ competitionId: 'competition' }))!
   try {
     expect(state.filter.value).toBe('Published'); expect(state.source.value).toBe('Official'); expect(state.page.value).toBe(2)
     await state.load(); expect(state.selected.value.id).toBe('root'); await state.load(); expect(state.selected.value.id).toBe('root')
+    expect(state.panel.value).toBe('list'); await state.select('root'); expect(state.panel.value).toBe('preview')
+    state.setPanel('actions'); expect(state.panel.value).toBe('actions')
     await state.requestPublish(); expect(state.confirmationSettings.value.deductionPercent).toBe(25)
     state.officialOpen.value = true; state.bindOfficialEditor({ confirmDiscard: async () => false }); await state.setOfficialOpen(false)
     expect(state.officialOpen.value).toBeTrue()
     state.bindOfficialEditor({ confirmDiscard: async () => true }); await state.setOfficialOpen(false); expect(state.officialOpen.value).toBeFalse()
     expect(Array.from((moves[0] as { query: { tag: string[] } }).query.tag)).toEqual(['Web'])
+  } finally { scope.stop() }
+})
+
+test('official saved drafts can publish directly while the server still seals a submitted version first', async () => {
+  const scope = effectScope(), calls: string[] = []
+  const draft = { id: 'draft', number: 2, format: 'Markdown', state: 'Draft' }
+  const root = { id: 'official', source: 'Official', concurrencyStamp: 'saved', draft, submitted: null, versions: [draft] }
+  const state = scope.run(() => editorFactory({ ...baseDeps, latestWriteUpVersion, writeUpStatusKey,
+    useNow: () => ref(new Date()), onBeforeRouteLeave: () => {}, onBeforeRouteUpdate: () => {},
+    listChallengeWriteUps: async () => ({ data: { items: [root], access: { canManage: true, settings: { enabled: true } } } }),
+    getChallengeWriteUpContent: async () => ({ data: { format: 'Markdown', markdown: '# Official' } }),
+    submitChallengeWriteUp: async () => { calls.push('seal'); return { data: { ...root, draft: null, concurrencyStamp: 'sealed', submitted: { ...draft, state: 'Submitted' } } } },
+    reviewChallengeWriteUp: async ({ body }: { body: { expectedStamp: string; versionId: string } }) => {
+      expect(body.expectedStamp).toBe('sealed'); expect(body.versionId).toBe('draft'); calls.push('publish')
+      return { data: { ...root, draft: null, publishedVersionId: 'draft', published: { ...draft, state: 'Approved' } } }
+    },
+  })({ competitionId: 'competition', competitionChallengeId: 'challenge', official: true }, () => {}))!
+  try {
+    await state.reload(); expect(state.canPublish.value).toBeTrue()
+    await state.requestPublish(); expect(state.publishOpen.value).toBeTrue(); await state.publish()
+    expect(calls).toEqual(['seal', 'publish']); expect(state.root.value.publishedVersionId).toBe('draft')
   } finally { scope.stop() }
 })

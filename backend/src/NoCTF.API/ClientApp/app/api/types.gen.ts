@@ -1172,6 +1172,7 @@ export type NoCtfApplicationScoringLeaderboardScoreboardChallengeBenefit = {
     writeUpDeductionPoints?: number;
     writeUpDeductionPercent?: number | null;
     writeUpUnlockedAt?: string | null;
+    netPoints?: number;
 };
 
 export type NoCtfapiEndpointsCompetitionsScoreboardTrackResponse = {
@@ -1768,6 +1769,7 @@ export type NoCtfapiEndpointsChallengesWriteUpsPrepareChallengeWriteUpBrowserAcc
 export type NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpFailureResponse = {
     code?: NoCtfApplicationChallengesWriteUpsChallengeWriteUpFailure;
     messageKey?: string;
+    message?: string;
 };
 
 export type NoCtfApplicationChallengesWriteUpsChallengeWriteUpFailure = 'NotFound' | 'Forbidden' | 'Disabled' | 'DeadlinePassed' | 'InvalidContent' | 'Conflict' | 'NotPublished' | 'ConfirmationChanged' | 'CompetitionNotRunning' | 'ContentUnavailable';
@@ -7125,6 +7127,15 @@ export type DownloadChallengeWriteUpErrors = {
     404: unknown;
 };
 
+export type DownloadChallengeWriteUpResponses = {
+    /**
+     * Success
+     */
+    200: Blob | File;
+};
+
+export type DownloadChallengeWriteUpResponse = DownloadChallengeWriteUpResponses[keyof DownloadChallengeWriteUpResponses];
+
 export type GetChallengeWriteUpContentData = {
     body?: never;
     path: {
@@ -7232,7 +7243,7 @@ export type GetChallengeWriteUpSettingsResponses = {
 
 export type GetChallengeWriteUpSettingsResponse = GetChallengeWriteUpSettingsResponses[keyof GetChallengeWriteUpSettingsResponses];
 
-export type ListChallengeWriteUpReviewsData = {
+export type AdminListChallengeWriteUpReviewsData = {
     body?: never;
     path: {
         competitionId: string;
@@ -7248,7 +7259,7 @@ export type ListChallengeWriteUpReviewsData = {
     url: '/api/v1/admin/competitions/{competitionId}/challenge-writeups';
 };
 
-export type ListChallengeWriteUpReviewsErrors = {
+export type AdminListChallengeWriteUpReviewsErrors = {
     /**
      * Bad Request
      */
@@ -7263,16 +7274,16 @@ export type ListChallengeWriteUpReviewsErrors = {
     403: unknown;
 };
 
-export type ListChallengeWriteUpReviewsError = ListChallengeWriteUpReviewsErrors[keyof ListChallengeWriteUpReviewsErrors];
+export type AdminListChallengeWriteUpReviewsError = AdminListChallengeWriteUpReviewsErrors[keyof AdminListChallengeWriteUpReviewsErrors];
 
-export type ListChallengeWriteUpReviewsResponses = {
+export type AdminListChallengeWriteUpReviewsResponses = {
     /**
      * Success
      */
     200: NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpReviewPageResponse;
 };
 
-export type ListChallengeWriteUpReviewsResponse = ListChallengeWriteUpReviewsResponses[keyof ListChallengeWriteUpReviewsResponses];
+export type AdminListChallengeWriteUpReviewsResponse = AdminListChallengeWriteUpReviewsResponses[keyof AdminListChallengeWriteUpReviewsResponses];
 
 export type ListChallengeWriteUpsData = {
     body?: never;
@@ -7585,7 +7596,7 @@ export type UnlockChallengeWriteUpResponses = {
 
 export type UnlockChallengeWriteUpResponse = UnlockChallengeWriteUpResponses[keyof UnlockChallengeWriteUpResponses];
 
-export type UpdateChallengeWriteUpSettingsData = {
+export type AdminUpdateChallengeWriteUpSettingsData = {
     body: NoCtfapiEndpointsChallengesWriteUpsUpdateChallengeWriteUpSettingsRequest;
     path: {
         competitionId: string;
@@ -7594,7 +7605,7 @@ export type UpdateChallengeWriteUpSettingsData = {
     url: '/api/v1/admin/competitions/{competitionId}/writeup-settings';
 };
 
-export type UpdateChallengeWriteUpSettingsErrors = {
+export type AdminUpdateChallengeWriteUpSettingsErrors = {
     /**
      * Bad Request
      */
@@ -7610,16 +7621,16 @@ export type UpdateChallengeWriteUpSettingsErrors = {
     409: NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpFailureResponse;
 };
 
-export type UpdateChallengeWriteUpSettingsError = UpdateChallengeWriteUpSettingsErrors[keyof UpdateChallengeWriteUpSettingsErrors];
+export type AdminUpdateChallengeWriteUpSettingsError = AdminUpdateChallengeWriteUpSettingsErrors[keyof AdminUpdateChallengeWriteUpSettingsErrors];
 
-export type UpdateChallengeWriteUpSettingsResponses = {
+export type AdminUpdateChallengeWriteUpSettingsResponses = {
     /**
      * Success
      */
     200: NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpSettingsResponse;
 };
 
-export type UpdateChallengeWriteUpSettingsResponse = UpdateChallengeWriteUpSettingsResponses[keyof UpdateChallengeWriteUpSettingsResponses];
+export type AdminUpdateChallengeWriteUpSettingsResponse = AdminUpdateChallengeWriteUpSettingsResponses[keyof AdminUpdateChallengeWriteUpSettingsResponses];
 
 export type AddCompetitionQuestionMessageData = {
     body: NoCtfapiEndpointsChallengesQuestionsAddCompetitionQuestionMessageRequest;

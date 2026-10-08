@@ -5174,6 +5174,17 @@
           "404": {
             "description": "Not Found"
           },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized"
           },
@@ -5385,11 +5396,12 @@
     "/api/v1/admin/competitions/{competitionId}/challenge-writeups": {
       "get": {
         "tags": [
+          "Competition WriteUps",
           "Admin"
         ],
         "summary": "Pages private challenge WriteUps for observers and reviewers without returning document bodies.",
         "description": "Executes GET /api/v1/admin/competitions/{competitionId}/challenge-writeups.",
-        "operationId": "ListChallengeWriteUpReviews",
+        "operationId": "AdminListChallengeWriteUpReviews",
         "parameters": [
           {
             "name": "competitionId",
@@ -6190,11 +6202,12 @@
     "/api/v1/admin/competitions/{competitionId}/writeup-settings": {
       "patch": {
         "tags": [
+          "Competition WriteUps",
           "Admin"
         ],
         "summary": "Updates the competition policy or nullable per-challenge override; omitted fields preserve current values.",
         "description": "Executes PATCH /api/v1/admin/competitions/{competitionId}/writeup-settings.",
-        "operationId": "UpdateChallengeWriteUpSettings",
+        "operationId": "AdminUpdateChallengeWriteUpSettings",
         "parameters": [
           {
             "name": "competitionId",
@@ -24021,6 +24034,10 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
+          },
+          "netPoints": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -26167,6 +26184,9 @@
             "$ref": "#/components/schemas/NoCTFApplicationChallengesWriteUpsChallengeWriteUpFailure"
           },
           "messageKey": {
+            "type": "string"
+          },
+          "message": {
             "type": "string"
           }
         }

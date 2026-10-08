@@ -3,6 +3,7 @@ using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Gameplay;
 using NoCTF.GameModes.Leaderboard;
+using NSubstitute;
 
 namespace NoCTF.Tests.Unit.GameModes;
 
@@ -40,6 +41,7 @@ public sealed class WriteUpBenefitProjectionTests
         var deduction = ChallengeWriteUpPolicy.Deduction(gross, 20);
         await Assert.That(actual.TotalScore).IsEqualTo(plain.TotalScore - deduction);
         await Assert.That(actual.ChallengeBenefits.Single().WriteUpDeductionPoints).IsEqualTo(deduction);
+        await Assert.That(actual.ChallengeBenefits.Single().NetPoints).IsEqualTo(actual.TotalScore);
         await Assert.That(actual.Slots.Sum(x => x.NetPoints ?? 0) + actual.ScoreOutsideWindow
             + actual.GlobalAdjustments.Sum(x => x.NetPoints)).IsEqualTo(actual.TotalScore);
     }
@@ -90,9 +92,54 @@ public sealed class WriteUpBenefitProjectionTests
         await Assert.That(row.TotalScore).IsEqualTo(0);
         await Assert.That(row.Achievements!).IsEmpty();
         await Assert.That(row.ChallengeBenefits.Single().WriteUpDeductionPercent).IsEqualTo(20);
+        await Assert.That(row.ChallengeBenefits.Single().NetPoints).IsEqualTo(0);
     }
 
     private static LeaderboardGameplayFact Fact(Guid team, Guid challenge, GameplayFactKind kind, GameplayFactResult result,
         DateTimeOffset? at = null) => new(Guid.NewGuid(), team, challenge, kind, at ?? Start,
             GameplayFactState.Completed, result, null);
+
+    [Test]
+    [Arguments(0)]
+    [Arguments(20)]
+    [Arguments(100)]
+    public async Task Ctf_trend_does_not_charge_future_benefits_at_an_earlier_read_time(int percent)
+    {
+        var team = Guid.NewGuid(); var challenge = Guid.NewGuid(); var solveAt = Start.AddMinutes(10);
+        var projection = Project(new(Guid.NewGuid(), GameMode.Ctf, [new(team, "team", false, false)],
+            [Fact(team, challenge, GameplayFactKind.FlagAttempt, GameplayFactResult.Correct, solveAt)],
+            [new(challenge, "Web", "challenge", false)], ProjectedAt: Start.AddHours(1),
+            WriteUpUnlocks: [new(Guid.NewGuid(), team, challenge, percent, Start)]));
+        var reader = Substitute.For<IScoreboardTrendFactReader>();
+        reader.ReadManualAdjustmentsAsync(Arg.Any<Guid>(), Arg.Any<IReadOnlyList<Guid>>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<ScoreboardTrendAdjustment>>([]));
+        var trend = (await new BuildScoreboardTrends(reader).ExecuteAsync(projection))!.Teams.Single();
+        await Assert.That(trend.Points.All(x => x.Score >= 0 && x.At >= solveAt)).IsTrue();
+        await Assert.That(trend.Points.LastOrDefault()?.Score ?? 0).IsEqualTo(projection.Snapshot.Teams.Single().TotalScore);
+    }
+
+    [Test]
+    public async Task Awdp_long_history_allocates_one_total_deduction_across_round_windows()
+    {
+        var team = Guid.NewGuid(); var challenge = Guid.NewGuid();
+        var input = new LeaderboardProjectionInput(Guid.NewGuid(), GameMode.Awdp, [new(team, "team", false, false)],
+            [Fact(team, challenge, GameplayFactKind.BreakAttempt, GameplayFactResult.Correct),
+             Fact(team, challenge, GameplayFactKind.FixAttempt, GameplayFactResult.Correct, Start.AddSeconds(1)),
+             Fact(team, challenge, GameplayFactKind.HintUnlock, GameplayFactResult.Unlocked) with { HintCost = 7 },
+             Fact(team, challenge, GameplayFactKind.ManualAdjustment, GameplayFactResult.Applied) with { Value = "-13" }],
+            [new(challenge, "Web", "challenge", false)], TestConfigurations.Competition(GameMode.Awdp), Start,
+            ProjectedAt: Start.AddHours(10), CompetitionStatus: CompetitionStatus.Running,
+            WriteUpUnlocks: [new(Guid.NewGuid(), team, challenge, 33, Start.AddMinutes(1))]);
+        var projection = Project(input); var row = projection.Snapshot.Teams.Single(); var benefit = row.ChallengeBenefits.Single();
+        await Assert.That(projection.Schema.RoundWindowStart.GetValueOrDefault()).IsGreaterThan(1);
+        await Assert.That(benefit.WriteUpDeductionPoints).IsEqualTo(ChallengeWriteUpPolicy.Deduction(benefit.GrossPoints, 33));
+        await Assert.That(benefit.NetPoints).IsEqualTo(benefit.GrossPoints - benefit.WriteUpDeductionPoints - 20);
+        await Assert.That(row.TotalScore).IsEqualTo(benefit.NetPoints);
+        await Assert.That(row.Slots.Sum(x => x.NetPoints ?? 0) + row.ScoreOutsideWindow
+            + row.GlobalAdjustments.Sum(x => x.NetPoints)).IsEqualTo(row.TotalScore);
+        var column = row.Slots.First().ColumnIndex;
+        var page = ScoreboardSlotDetailProjection.Project(projection, team, column, row.Slots.First().ScoreState,
+            null, [], null, null, 50);
+        await Assert.That(page.Entries.Any(x => x.Kind == ScoreboardEntryKind.WriteUp)).IsTrue();
+    }
 }

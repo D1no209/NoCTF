@@ -138,7 +138,7 @@ internal static class AwdpDynamicLeaderboardProjection
         var awardsByTeam = awards
             .GroupBy(item => item.Fact.TeamId!.Value)
             .ToDictionary(group => group.Key, group => group.ToList());
-        var penalties = input.GameplayFacts
+        var challengePenalties = input.GameplayFacts
             .Where(fact => fact.OccurredAt <= projectedAt
                 && fact.TeamId is Guid teamId
                 && scoringTeams.ContainsKey(teamId)
@@ -150,13 +150,15 @@ internal static class AwdpDynamicLeaderboardProjection
                     input.CompetitionStartTime,
                     competition.RoundDurationSeconds) <= settledThroughRound
                 && (challenges.Count == 0 || challenges.ContainsKey(challengeId)))
-            .GroupBy(fact => fact.TeamId!.Value)
+            .GroupBy(fact => (TeamId: fact.TeamId!.Value, CompetitionChallengeId: fact.CompetitionChallengeId!.Value))
             .ToDictionary(
                 group => group.Key,
                 group => group.Aggregate(0L, (total, fact) => checked(total + PenaltyFor(
                     fact,
                     SettingsFor(fact.CompetitionChallengeId!.Value))
                     * fact.Multiplicity)));
+        var penalties = challengePenalties.GroupBy(pair => pair.Key.TeamId)
+            .ToDictionary(group => group.Key, group => group.Sum(pair => pair.Value));
         var hintCosts = ProjectionPenalties.HintCosts(input, scoringTeams.Keys);
         var manualAdjustments = ProjectionPenalties.ManualAdjustments(input, scoringTeams.Keys);
         var rows = scoringTeams.Values.Select(team =>
@@ -253,7 +255,10 @@ internal static class AwdpDynamicLeaderboardProjection
             currentRound,
             settledThroughRound,
             competition.RoundDurationSeconds,
-            currentRoundRemainingSeconds);
+            currentRoundRemainingSeconds)
+        {
+            ChallengeNetScores = ProjectionPenalties.ChallengeNetScores(input, cells, challengePenalties)
+        };
     }
 
     private static void ProjectTrack(

@@ -13,6 +13,8 @@ public sealed class DownloadChallengeWriteUpRequest
     public bool Staff { get; set; }
     public bool Download { get; set; }
 }
+[NJsonSchema.Annotations.JsonSchema(NJsonSchema.JsonObjectType.String, Format = "binary")]
+public sealed class ChallengeWriteUpBinaryResponse;
 public sealed class DownloadChallengeWriteUpEndpoint(ManageChallengeWriteUps writeUps, IUserContext user, TimeProvider clock)
     : Endpoint<DownloadChallengeWriteUpRequest, Results<FileStreamHttpResult, NotFound>>
 {
@@ -20,7 +22,7 @@ public sealed class DownloadChallengeWriteUpEndpoint(ManageChallengeWriteUps wri
     {
         Get("/competitions/{competitionId}/challenges/{competitionChallengeId}/writeups/versions/{versionId}/file"); AuthSchemes("Bearer");
         Options(x => x.WithMetadata(new WriteUpBrowserAccessMetadata()));
-        Description(x => x.WithName("DownloadChallengeWriteUp"));
+        Description(x => x.WithName("DownloadChallengeWriteUp").Produces<ChallengeWriteUpBinaryResponse>(StatusCodes.Status200OK, "application/pdf"));
         Summary(x => x.Summary = "Streams an authorized PDF and rechecks current publication, team and account access for each request.");
     }
     public override async Task<Results<FileStreamHttpResult, NotFound>> ExecuteAsync(DownloadChallengeWriteUpRequest request, CancellationToken ct)

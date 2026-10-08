@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { ChallengeWriteUpPageState } from '~/features/writeups/useChallengeWriteUpPage'
 const props = defineProps<{ state: ChallengeWriteUpPageState }>()
 const { ArrowLeft, BookOpen, Download, RefreshCw, competitionId, challengeId, selectedId, selected, access, options, loading, reading,
-  downloading, confirmPending, error, contentError, content, pdfUrl, pdfKey, quote, confirmOpen, search, mine, disabled, mode, title, own, retained, narrow,
+  downloading, confirmPending, error, contentError, content, pdfUrl, pdfKey, quote, confirmOpen, search, mine, disabled, mode, title, own, retained, narrow, benefit,
   load, select, read, confirm, setConfirmOpen, download, back, openMine, openPublic, CompetitionParticipantWorkspace, Editor } = toRefs(props.state)
 </script>
 <template>
@@ -27,6 +27,7 @@ const { ArrowLeft, BookOpen, Download, RefreshCw, competitionId, challengeId, se
               <p v-if="access?.isFree" class="text-sm text-muted-foreground">{{ $t('challengeWriteUp.free') }} <span v-if="access.isUnlocked">{{ $t('challengeWriteUp.historyPreserved') }}</span></p>
               <p v-else-if="own" class="text-sm text-muted-foreground">{{ $t('challengeWriteUp.ownFree') }}</p>
               <p v-else-if="access?.isUnlocked" class="text-sm text-muted-foreground">{{ $t('challengeWriteUp.unlocked', { percent: retained }) }}</p>
+              <ScoreBreakdownSummary v-if="benefit" :gross-points="benefit.grossPoints ?? 0" :deduction-points="benefit.writeUpDeductionPoints ?? 0" :net-points="benefit.netPoints ?? 0" :gross-label="$t('challengeWriteUp.grossLabel')" :deduction-label="$t('challengeWriteUp.deductionLabel')" :net-label="$t('challengeWriteUp.netLabel')" />
               <ScrollSurface v-if="content?.format === 'Markdown'" axis="both" class="min-h-0 flex-1"><MarkdownContent :source="content.markdown ?? ''" class="mx-auto max-w-[75ch] py-3 leading-7" /></ScrollSurface>
               <PdfPreview v-else-if="content?.format === 'Pdf'" :key="pdfKey" fill retryable @retry="read" :source="pdfUrl" :error="contentError" :accessible-label="$t('challengeWriteUp.preview')" :empty-label="$t('challengeWriteUp.previewEmpty')" />
               <Empty v-else><EmptyHeader><EmptyMedia><component :is="BookOpen" /></EmptyMedia><EmptyTitle>{{ $t('challengeWriteUp.select') }}</EmptyTitle><EmptyDescription v-if="!own && !access?.isFree && !access?.isUnlocked">{{ $t('challengeWriteUp.deduction', { percent: access?.deductionPercent ?? 20, retained }) }}</EmptyDescription></EmptyHeader><EmptyContent><Button :disabled="reading" @click="read">{{ $t('challengeWriteUp.read') }}</Button></EmptyContent></Empty>

@@ -1,4 +1,4 @@
-import { getChallengeWriteUpSettings, updateChallengeWriteUpSettings } from '~/api'
+import { getChallengeWriteUpSettings, adminUpdateChallengeWriteUpSettings } from '~/api'
 import type { NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpSettingsResponse } from '~/api'
 import { message } from '~/utils/i18n'
 import type { UiMessage } from '~/utils/i18n'
@@ -33,7 +33,7 @@ export function useSingleWriteUpSettings(props: Readonly<{ competitionId: string
       error.value = message('challengeWriteUp.error.InvalidContent'); return
     }
     pending.value = true; error.value = null
-    const result = await updateChallengeWriteUpSettings({ path: { competitionId: props.competitionId }, body: {
+    const result = await adminUpdateChallengeWriteUpSettings({ path: { competitionId: props.competitionId }, body: {
       competitionChallengeId: props.competitionChallengeId,
       expectedStamp: data.value.concurrencyStamp,
       deductionPercent: perChallenge.value && inherit.value ? null : percent.value,

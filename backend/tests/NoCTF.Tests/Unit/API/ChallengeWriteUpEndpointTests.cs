@@ -66,7 +66,7 @@ public sealed class ChallengeWriteUpEndpointTests
         objects.ObjectExists(reference.ObjectKey, Arg.Any<CancellationToken>()).Returns(true);
         objects.OpenRead(reference.ObjectKey, Arg.Any<CancellationToken>()).Returns(Task.FromException<Stream>(new IOException("Unavailable")));
         var manager = new ManageChallengeWriteUps(store, new ManagedFileUploads(Substitute.For<IManagedFileUploadRegistry>(), objects), objects);
-        await Assert.That(async () => await manager.UnlockAsync(command, CancellationToken.None)).Throws<IOException>();
+        await Assert.That((await manager.UnlockAsync(command, CancellationToken.None)).Failure).IsEqualTo(ChallengeWriteUpFailure.ContentUnavailable);
         await store.DidNotReceive().UnlockAsync(Arg.Any<UnlockWriteUp>(), Arg.Any<CancellationToken>());
     }
 

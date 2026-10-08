@@ -19,8 +19,10 @@ export function localeDomainsForPath(path: string): readonly LocaleDomain[] {
   // The account panel belongs to the global application shell and can open on
   // every route, so its catalog must be ready before the shell renders.
   const domains = new Set<LocaleDomain>(['account'])
-  if (path.startsWith('/competitions'))
+  if (path.startsWith('/competitions')) {
     domains.add('competitions')
+    domains.add('writeups')
+  }
   if (path.includes('/challenges')) {
     domains.add('challenges')
     domains.add('runtime')

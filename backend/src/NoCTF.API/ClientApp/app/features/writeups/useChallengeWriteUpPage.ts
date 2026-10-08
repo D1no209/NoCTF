@@ -35,6 +35,8 @@ export function useChallengeWriteUpPage(props: Readonly<{ mine?: boolean }>) {
       ? translate('challengeWriteUp.official') : x.authorName ?? '', row: x })))
   const own = computed(() => !!selected.value?.teamId && selected.value.teamId === access.value?.teamId)
   const retained = computed(() => 100 - (access.value?.deductionPercent ?? 20))
+  const benefit = computed(() => access.value?.canShowCurrentScore === false ? null
+    : ctx.standing.value?.challengeBenefits?.find(x => x.competitionChallengeId === challengeId) ?? null)
   let loadSequence = 0, readSequence = 0, unwatch: (() => void) | undefined
   function clearContent() { readSequence++; content.value = null; pdfUrl.value = null; quote.value = null; confirmOpen.value = false; contentError.value = null; reading.value = false }
   async function load() {
@@ -90,6 +92,7 @@ export function useChallengeWriteUpPage(props: Readonly<{ mine?: boolean }>) {
     if (access.value) access.value = { ...access.value, isUnlocked: true, deductionPercent: result.data.deductionPercent }
     confirmOpen.value = false; reading.value = true
     await showContent(versionId, request)
+    void ctx.refreshStanding()
     if (request === readSequence) reading.value = false
   }
   function setConfirmOpen(open: boolean) { if (!confirmPending.value) confirmOpen.value = open }
@@ -111,7 +114,7 @@ export function useChallengeWriteUpPage(props: Readonly<{ mine?: boolean }>) {
   onBeforeUnmount(() => { loadSequence++; readSequence++; unwatch?.() })
   return { ArrowLeft, BookOpen, Download, RefreshCw, competitionId, challengeId, selectedId, selected, items, access, options,
     loading, reading, downloading, confirmPending, error, contentError, content, pdfUrl, pdfKey, quote, confirmOpen, search, mine,
-    disabled, mode, title, own, retained, narrow, load, select, read, confirm, setConfirmOpen, download, back, openMine, openPublic,
+    disabled, mode, title, own, retained, narrow, benefit, load, select, read, confirm, setConfirmOpen, download, back, openMine, openPublic,
     CompetitionParticipantWorkspace: computed(() => mine.value ? markRaw(CompetitionParticipantWorkspaceComponent) : 'section'), Editor: markRaw(ChallengeWriteUpEditorComponent) }
 }
 export type ChallengeWriteUpPageState = import('vue').ShallowUnwrapRef<ReturnType<typeof useChallengeWriteUpPage>>

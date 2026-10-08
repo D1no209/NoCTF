@@ -1,8 +1,8 @@
 import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
 import { useNow } from '@vueuse/core'
 import { listChallengeWriteUps, getChallengeWriteUpContent, prepareChallengeWriteUpBrowserAccess,
-  saveChallengeWriteUpDraft, saveChallengeWriteUpPdfDraft, submitChallengeWriteUp, reviewChallengeWriteUp } from '~/api'
-import type { NoCtfDomainChallengesWriteUpsWriteUpFormat } from '~/api'
+  saveChallengeWriteUpDraft, saveChallengeWriteUpPdfDraft, submitChallengeWriteUp, reviewChallengeWriteUp, getCompetitionEndpoint } from '~/api'
+import type { NoCtfDomainChallengesWriteUpsWriteUpFormat, NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol } from '~/api'
 import { message } from '~/utils/i18n'
 import type { UiMessage } from '~/utils/i18n'
 import { toast } from '~/utils/message-toast'
@@ -19,6 +19,7 @@ export function useChallengeWriteUpEditor(props: Readonly<{ competitionId: strin
   const now = useNow({ interval: 1000 })
   const historyId = ref(''), historyContent = ref<WriteUpContent | null>(null), historyPdf = ref<string | null>(null), historyLoading = ref(false)
   const publishOpen = ref(false)
+  const competitionStatus = ref<NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol | null>(null)
   const canSave = computed(() => props.official ? access.value?.canManage === true && access.value.settings?.enabled === true : access.value?.canSubmit === true
     && !!access.value.settings?.deadlineAt && now.value.getTime() <= Date.parse(access.value.settings.deadlineAt))
   const currentVersion = computed(() => latestWriteUpVersion(root.value))
@@ -27,7 +28,8 @@ export function useChallengeWriteUpEditor(props: Readonly<{ competitionId: strin
   const canSubmit = computed(() => canSave.value && !!root.value?.draft && !dirty.value && !pending.value)
   const historyVersion = computed(() => root.value?.versions?.find(x => x.id === historyId.value))
   const historyOptions = computed(() => (root.value?.versions ?? []).filter(x => x.id !== currentVersion.value?.id))
-  const canPublish = computed(() => props.official && canSave.value && root.value?.submitted?.state === 'Submitted' && !dirty.value && !pending.value)
+  const publicationVersion = computed(() => root.value?.draft ?? root.value?.submitted)
+  const canPublish = computed(() => props.official && canSave.value && (!!root.value?.draft || root.value?.submitted?.state === 'Submitted') && !dirty.value && !pending.value)
   let sequence = 0, historySequence = 0, loadingDraft = false, resolveLeave: ((value: boolean) => void) | undefined
   async function load() {
     if (pending.value) return
@@ -121,12 +123,24 @@ export function useChallengeWriteUpEditor(props: Readonly<{ competitionId: strin
     catch (cause) { if (request === historySequence) error.value = parseApiError(cause, message('challengeWriteUp.readFailed')).displayMessage }
     finally { if (request === historySequence) historyLoading.value = false }
   }
-  function requestPublish() { if (canPublish.value) publishOpen.value = true }
+  async function requestPublish() {
+    if (!canPublish.value) return
+    const result = await getCompetitionEndpoint({ path: { competitionId: props.competitionId } })
+    competitionStatus.value = result.data?.status ?? null
+    if (canPublish.value) publishOpen.value = true
+  }
   function setPublishOpen(value: boolean) { if (!pending.value) publishOpen.value = value }
   async function publish() {
-    if (!canPublish.value || !root.value?.id || !root.value.submitted?.id || !root.value.concurrencyStamp) return
+    if (!canPublish.value || !root.value?.id || !publicationVersion.value?.id || !root.value.concurrencyStamp) return
     pending.value = true; error.value = null
     try {
+      if (root.value.draft) {
+        const submission = await submitChallengeWriteUp({ path: { competitionId: props.competitionId, competitionChallengeId: props.competitionChallengeId },
+          body: { official: true, expectedStamp: root.value.concurrencyStamp } })
+        if (submission.error || !submission.data) { error.value = parseApiError(submission.error, message('challengeWriteUp.saveFailed')).displayMessage; return }
+        root.value = submission.data
+      }
+      if (!root.value.id || !root.value.submitted?.id || !root.value.concurrencyStamp) return
       const result = await reviewChallengeWriteUp({ path: { competitionId: props.competitionId, competitionChallengeId: props.competitionChallengeId, writeUpId: root.value.id },
         body: { action: 'Publish', versionId: root.value.submitted.id, expectedStamp: root.value.concurrencyStamp } })
       if (result.error || !result.data) { error.value = parseApiError(result.error, message('challengeWriteUp.reviewFailed')).displayMessage; return }
@@ -150,7 +164,7 @@ export function useChallengeWriteUpEditor(props: Readonly<{ competitionId: strin
   onBeforeUnmount(() => { sequence++; historySequence++; window.removeEventListener('beforeunload', beforeUnload); resolveLeave?.(false) })
   return { root, access, loading, pending, dirty, error, markdown, format, pdfUrl, fileName, uploadKey, leaveOpen,
     canSave, canSubmit, currentVersion, statusKey, deadlineAt, selectFile, save, submit, reload, stay, discard, setLeaveOpen, confirmDiscard,
-    historyId, historyContent, historyPdf, historyLoading, historyVersion, historyOptions, viewHistory, publishOpen, canPublish, requestPublish, setPublishOpen, publish,
+    historyId, historyContent, historyPdf, historyLoading, historyVersion, historyOptions, viewHistory, publishOpen, canPublish, publicationVersion, competitionStatus, requestPublish, setPublishOpen, publish,
     official: computed(() => props.official === true) }
 }
 export type ChallengeWriteUpEditorState = import('vue').ShallowUnwrapRef<ReturnType<typeof useChallengeWriteUpEditor>>

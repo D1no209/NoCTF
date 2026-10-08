@@ -133,11 +133,14 @@ public sealed class ManageChallengeWriteUps(IChallengeWriteUpStore store, Manage
         if (candidate.Failure is { } failure) return new(false, 0, failure);
         if (candidate.Format == WriteUpFormat.Pdf)
         {
-            if (candidate.File is null || !await objects.ObjectExists(candidate.File.ObjectKey, ct))
-                return new(false, 0, ChallengeWriteUpFailure.ContentUnavailable);
-            await using var content = await objects.OpenRead(candidate.File.ObjectKey, ct);
-            if (content is null) return new(false, 0, ChallengeWriteUpFailure.ContentUnavailable);
-            return await store.UnlockAsync(command, ct);
+            try
+            {
+                if (candidate.File is null || !await objects.ObjectExists(candidate.File.ObjectKey, ct))
+                    return new(false, 0, ChallengeWriteUpFailure.ContentUnavailable);
+                await using var content = await objects.OpenRead(candidate.File.ObjectKey, ct);
+                if (content is null) return new(false, 0, ChallengeWriteUpFailure.ContentUnavailable);
+            }
+            catch (IOException) { return new(false, 0, ChallengeWriteUpFailure.ContentUnavailable); }
         }
         return await store.UnlockAsync(command, ct);
     }

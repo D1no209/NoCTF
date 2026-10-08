@@ -6,6 +6,7 @@ export function createMockChallengeWriteUps(context: {
   json: (value: unknown, status?: number, headers?: HeadersInit) => Response
   pdf: (name: string) => Blob
   prepareDownload: (user: Data, path: string) => Response
+  gross: (competitionId: string, teamId: string | undefined, challengeId: string) => number
 }) {
   const { state, json } = context
   const roots: Data[] = [], documents = new Map<string, { markdown: string | null; pdf: Blob | null; fileName: string | null }>()
@@ -136,9 +137,10 @@ export function createMockChallengeWriteUps(context: {
     const version = root.versions.find((x: Data) => x.id === p.versionId), doc = documents.get(p.versionId)
     const own = root.teamId === team?.id, published = root.publishedVersionId === p.versionId
     if (!version || !doc || !useStaff && !own && !published) return failure('NotPublished', 404)
+    const gross = context.gross(competition.id, team?.id, challengeId)
     if (route.endsWith('/quote')) return json({ versionId: version.id, policyStamp: policy.policyStamp, isFree: free || own,
       isUnlocked: !!receipt, canUnlock: competition.status === 'Running', deductionPercent: receipt?.deductionPercent ?? policy.deductionPercent,
-      grossPoints: 500, estimatedDeductionPoints: Math.ceil(500 * (receipt?.deductionPercent ?? policy.deductionPercent) / 100) })
+      grossPoints: gross, estimatedDeductionPoints: Math.ceil(gross * (receipt?.deductionPercent ?? policy.deductionPercent) / 100) })
     if (route.endsWith('/unlock')) {
       if (!receipt && !own && !free) {
         if (competition.status !== 'Running') return failure('CompetitionNotRunning')
@@ -157,5 +159,20 @@ export function createMockChallengeWriteUps(context: {
       'Content-Disposition': `${url.searchParams.get('download') === 'true' ? 'attachment' : 'inline'}; filename="solution.pdf"` } }) : failure('ContentUnavailable', 404)
     return json({ versionId: version.id, format: version.format, markdown: doc.markdown, fileName: doc.fileName })
   }
-  return { handle, roots, receipts }
+  function decorateLeaderboard(snapshot: Data, competitionId: string) {
+    const challenges = state.challenges.filter(x => x.competitionId === competitionId && x.isPublished && !x.deletedAt)
+    for (const team of snapshot.teams ?? []) {
+      team.challengeBenefits = challenges.map((challenge, index) => {
+        const slot = team.slots[index], receipt = receipts.get(`${team.teamId}:${challenge.id}`)
+        const gross = slot?.earnedPoints ?? 0, deduction = Math.ceil(gross * (receipt?.deductionPercent ?? 0) / 100)
+        const net = (slot?.netPoints ?? 0) - deduction
+        if (slot && receipt) { slot.deductedPoints += deduction; slot.netPoints = net; team.totalScore -= deduction }
+        return { competitionChallengeId: challenge.id, grossPoints: gross, writeUpDeductionPoints: deduction,
+          netPoints: net, writeUpDeductionPercent: receipt?.deductionPercent ?? null, writeUpUnlockedAt: receipt?.unlockedAt ?? null }
+      })
+    }
+    snapshot.teams.sort((a: Data, b: Data) => b.totalScore - a.totalScore).forEach((team: Data, index: number) => { team.rank = index + 1 })
+    return snapshot
+  }
+  return { handle, roots, receipts, decorateLeaderboard }
 }

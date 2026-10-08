@@ -1,8 +1,9 @@
 import { markRaw } from 'vue'
-import { listChallengeWriteUpReviews, adminListCompetitionChallenges, getChallengeWriteUpContent,
-  prepareChallengeWriteUpBrowserAccess, reviewChallengeWriteUp, createTeamWriteUpConsultation, getChallengeWriteUpSettings } from '~/api'
+import { useMediaQuery } from '@vueuse/core'
+import { adminListChallengeWriteUpReviews, adminListCompetitionChallenges, getChallengeWriteUpContent,
+  prepareChallengeWriteUpBrowserAccess, reviewChallengeWriteUp, createTeamWriteUpConsultation, getChallengeWriteUpSettings, listChallengeWriteUps, getCompetitionEndpoint } from '~/api'
 import type { NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpReviewFilterProtocol, NoCtfDomainChallengesWriteUpsWriteUpSource,
-  NoCtfDomainChallengesWriteUpsWriteUpReviewAction, NoCtfApplicationChallengesWriteUpsWriteUpSettingsView } from '~/api'
+  NoCtfDomainChallengesWriteUpsWriteUpReviewAction, NoCtfApplicationChallengesWriteUpsWriteUpSettingsView, NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol } from '~/api'
 import { message } from '~/utils/i18n'
 import type { UiMessage } from '~/utils/i18n'
 import { toast } from '~/utils/message-toast'
@@ -13,6 +14,7 @@ import type { WriteUp, WriteUpContent } from './writeup-state'
 
 export function useChallengeWriteUpReview(props: Readonly<{ competitionId: string }>) {
   const route = useRoute(), router = useRouter()
+  const narrow = useMediaQuery('(max-width: 1279px)'), panel = ref('list')
   const rows = ref<WriteUp[]>([]), selected = ref<WriteUp | null>(null)
   const loading = ref(true), previewLoading = ref(false), pending = ref(false)
   const error = ref<UiMessage | null>(null), previewError = ref<UiMessage | null>(null)
@@ -26,13 +28,15 @@ export function useChallengeWriteUpReview(props: Readonly<{ competitionId: strin
   const submittedContent = ref<WriteUpContent | null>(null), publishedContent = ref<WriteUpContent | null>(null)
   const submittedPdf = ref<string | null>(null), publishedPdf = ref<string | null>(null)
   const reason = ref(''), confirmation = ref<NoCtfDomainChallengesWriteUpsWriteUpReviewAction | null>(null)
+  const competitionStatus = ref<NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol | null>(null)
   const settingsOpen = ref(false), officialOpen = ref(false), officialChallengeId = ref('')
   const settings = ref<NoCtfApplicationChallengesWriteUpsWriteUpSettingsView | null>(null), confirmationSettings = ref<NoCtfApplicationChallengesWriteUpsWriteUpSettingsView | null>(null)
   let officialEditor: { confirmDiscard: () => Promise<boolean> } | null = null
   const challengeOptions = ref<{ value: string; label: string }[]>([])
   const pageCount = computed(() => Math.max(1, Math.ceil(total.value / limit.value)))
   const selectedId = computed(() => selected.value?.id ?? null)
-  const selectedVersion = computed(() => selected.value?.submitted ?? selected.value?.draft ?? selected.value?.published)
+  const selectedVersion = computed(() => selected.value?.submitted?.state === 'Submitted' ? selected.value.submitted
+    : selected.value?.draft ?? selected.value?.submitted ?? selected.value?.published)
   const publishedVersion = computed(() => selected.value?.published)
   const publishVersion = computed(() => selected.value?.submitted?.state === 'Submitted' ? selected.value.submitted
     : !selected.value?.publishedVersionId ? selected.value?.versions?.find(x => x.state === 'Approved') : null)
@@ -43,7 +47,7 @@ export function useChallengeWriteUpReview(props: Readonly<{ competitionId: strin
   let loadSequence = 0, previewSequence = 0, unwatch: (() => void) | undefined, searchTimer: ReturnType<typeof setTimeout> | undefined
   async function load() {
     const request = ++loadSequence; loading.value = rows.value.length === 0; error.value = null
-    const [result, policy] = await Promise.all([listChallengeWriteUpReviews({ path: { competitionId: props.competitionId }, query: { filter: filter.value,
+    const [result, policy] = await Promise.all([adminListChallengeWriteUpReviews({ path: { competitionId: props.competitionId }, query: { filter: filter.value,
       source: source.value === 'All' ? undefined : source.value as NoCtfDomainChallengesWriteUpsWriteUpSource,
       search: search.value.trim() || undefined, offset: (page.value - 1) * limit.value, limit: limit.value } }), getChallengeWriteUpSettings({ path: { competitionId: props.competitionId }, query: {} })])
     if (request !== loadSequence) return
@@ -52,7 +56,12 @@ export function useChallengeWriteUpReview(props: Readonly<{ competitionId: strin
     rows.value = result.data.items ?? []; total.value = result.data.totalCount ?? 0
     settings.value = policy.data?.settings ?? null
     canManage.value = result.data.canManage ?? false; canJudge.value = result.data.canJudge ?? false
-    const current = rows.value.find(row => row.id === selected.value?.id)
+    let current = rows.value.find(row => row.id === selected.value?.id)
+    if (!current && selected.value?.competitionChallengeId) {
+      const result = await listChallengeWriteUps({ path: { competitionId: props.competitionId, competitionChallengeId: selected.value.competitionChallengeId }, query: { staff: true } })
+      if (request !== loadSequence) return
+      current = result.data?.items?.find(row => row.id === selected.value?.id)
+    }
     if (current) {
       const previousIds = [selectedVersion.value?.id, publishedVersion.value?.id].join(':')
       selected.value = current
@@ -60,7 +69,7 @@ export function useChallengeWriteUpReview(props: Readonly<{ competitionId: strin
     }
     if (!selected.value) {
       const id = typeof route.query.review === 'string' ? route.query.review : rows.value[0]?.id
-      if (id) await select(id)
+      if (id) await select(id, false)
     }
   }
   async function readVersion(versionId?: string): Promise<{ content: WriteUpContent | null; pdf: string | null }> {
@@ -87,14 +96,16 @@ export function useChallengeWriteUpReview(props: Readonly<{ competitionId: strin
     catch (cause) { if (request === previewSequence) previewError.value = parseApiError(cause, message('challengeWriteUp.readFailed')).displayMessage }
     finally { if (request === previewSequence) previewLoading.value = false }
   }
-  async function select(id: string) {
+  async function select(id: string, advance = true) {
     const row = rows.value.find(item => item.id === id)
     if (!row) return
     selected.value = row; reason.value = ''; display.value = 'submitted'
+    if (narrow.value && advance) panel.value = 'preview'
     void router.replace({ query: { ...route.query, review: id } })
     await preview()
   }
   function setDisplay(value: unknown) { if (value === 'submitted' || value === 'published' || value === 'compare') display.value = value }
+  function setPanel(value: unknown) { if (value === 'list' || selected.value && (value === 'preview' || value === 'actions')) panel.value = value }
   function resetFilter() {
     page.value = 1; selected.value = null
     void router.replace({ query: { ...route.query, review: undefined, reviewSearch: search.value || undefined,
@@ -107,6 +118,7 @@ export function useChallengeWriteUpReview(props: Readonly<{ competitionId: strin
   watch(search, () => { clearTimeout(searchTimer); searchTimer = setTimeout(resetFilter, 250) })
   watch(display, () => void preview())
   async function review(action: NoCtfDomainChallengesWriteUpsWriteUpReviewAction) {
+    if (action === 'Reject' ? !canJudge.value : !canManage.value) return
     const row = selected.value
     const versionId = action === 'Withdraw' ? row?.publishedVersionId : action === 'Publish' ? publishVersion.value?.id : row?.submitted?.id
     if (!row?.id || !row.competitionChallengeId || !row.concurrencyStamp || !versionId || pending.value) return
@@ -121,11 +133,12 @@ export function useChallengeWriteUpReview(props: Readonly<{ competitionId: strin
   }
   async function requestPublish() {
     if (!canManage.value || !publishVersion.value?.id || !selected.value?.competitionChallengeId) return
-    const result = await getChallengeWriteUpSettings({ path: { competitionId: props.competitionId }, query: { competitionChallengeId: selected.value.competitionChallengeId } })
+    const [result, competition] = await Promise.all([getChallengeWriteUpSettings({ path: { competitionId: props.competitionId }, query: { competitionChallengeId: selected.value.competitionChallengeId } }), getCompetitionEndpoint({ path: { competitionId: props.competitionId } })])
     if (result.error || !result.data?.settings) { error.value = parseApiError(result.error, message('challengeWriteUp.settingsFailed')).displayMessage; return }
+    competitionStatus.value = competition.data?.status ?? null
     confirmationSettings.value = result.data.settings; confirmation.value = 'Publish'
   }
-  function requestWithdraw() { confirmation.value = 'Withdraw' }
+  function requestWithdraw() { if (canManage.value && selected.value?.publishedVersionId) confirmation.value = 'Withdraw' }
   function setConfirmationOpen(open: boolean) { if (!open && !pending.value) confirmation.value = null }
   function confirmReview() { if (confirmation.value) void review(confirmation.value) }
   function reject() { void review('Reject') }
@@ -166,7 +179,7 @@ export function useChallengeWriteUpReview(props: Readonly<{ competitionId: strin
     canManage, canJudge, display, submittedContent, publishedContent, submittedPdf, publishedPdf, reason, confirmation,
     settingsOpen, officialOpen, officialChallengeId, challengeOptions, selectedId, selectedVersion, publishedVersion, statusKey,
     pageCount, options, load, select, changePage, changeLimit, requestPublish, requestWithdraw, setConfirmationOpen, confirmReview, reject,
-    setDisplay, enabled, publishVersion, confirmationSettings, bindOfficialEditor, setOfficialOpen, changeOfficialChallenge,
+    setDisplay, setPanel, narrow, panel, enabled, publishVersion, confirmationSettings, competitionStatus, bindOfficialEditor, setOfficialOpen, changeOfficialChallenge,
     openOfficial, consultation, competitionId: computed(() => props.competitionId),
     Settings: markRaw(SingleWriteUpSettingsComponent), Editor: markRaw(ChallengeWriteUpEditorComponent) }
 }

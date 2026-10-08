@@ -82,6 +82,7 @@ open: Ref<boolean>) {
       : { attack: 0, defense: 0 }
     return {
       group,
+      benefit: props.team?.challengeBenefits?.find(x => x.competitionChallengeId === group.competitionChallengeId),
       title: group.challenge?.title ?? translate("common.label.unknownQuestion"),
       score: props.team ? scoreboardTeamChallengeScore(props.team, group, props.mode) : 0,
       attackScore: split.attack,
@@ -91,7 +92,7 @@ open: Ref<boolean>) {
         : null,
       achievements: scoreboardTeamAchievements(props.team, group.competitionChallengeId, props.mode),
     }
-  }).filter(row => props.mode !== 'Ctf' && props.mode !== 'Awdp' || row.achievements.length > 0))
+  }).filter(row => props.mode !== 'Ctf' && props.mode !== 'Awdp' || row.achievements.length > 0 || row.benefit?.writeUpUnlockedAt != null))
 
   const directionGroups = computed(() => scoreboardDirectionGroups(props.columnGroups))
 

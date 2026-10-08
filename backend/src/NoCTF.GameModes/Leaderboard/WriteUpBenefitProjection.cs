@@ -20,6 +20,7 @@ internal static class WriteUpBenefitProjection
         var unlocks = (input.WriteUpUnlocks ?? []).Where(x => x.UnlockedAt <= input.ProjectedAt)
             .ToDictionary(x => (x.TeamId, x.CompetitionChallengeId));
         var gross = Gross(input, raw, scoreboard);
+        var net = raw.ChallengeNetScores.ToDictionary(x => (x.TeamId, ChallengeId: x.CompetitionChallengeId), x => x.NetPoints);
         var columns = scoreboard.Schema.Columns.ToDictionary(x => x.Index);
         var rounds = scoreboard.Schema.Rounds.ToDictionary(x => x.Id);
         var beforeWindow = new Dictionary<(Guid TeamId, Guid ChallengeId), long>();
@@ -36,17 +37,19 @@ internal static class WriteUpBenefitProjection
         var adjusted = new List<ScoreboardTeam>();
         foreach (var team in scoreboard.Snapshot.Teams)
         {
-            var benefits = gross.Where(x => x.Key.TeamId == team.TeamId && (x.Value != 0 || unlocks.ContainsKey(x.Key))).OrderBy(x => x.Key.ChallengeId).Select(x =>
+            var benefits = gross.Keys.Concat(net.Keys).Concat(unlocks.Keys)
+                .Select(key => (key.TeamId, ChallengeId: key.Item2)).Distinct()
+                .Where(key => key.TeamId == team.TeamId).OrderBy(key => key.ChallengeId).Select(key =>
             {
-                unlocks.TryGetValue(x.Key, out var unlock);
-                return new ScoreboardChallengeBenefit(x.Key.ChallengeId, x.Value,
-                    unlock is null ? 0 : ChallengeWriteUpPolicy.Deduction(x.Value, unlock.DeductionPercent),
-                    unlock?.DeductionPercent, unlock?.UnlockedAt);
+                unlocks.TryGetValue(key, out var unlock);
+                var positive = gross.GetValueOrDefault(key);
+                var deduction = unlock is null ? 0 : ChallengeWriteUpPolicy.Deduction(positive, unlock.DeductionPercent);
+                return new ScoreboardChallengeBenefit(key.ChallengeId, positive, deduction,
+                    unlock?.DeductionPercent, unlock?.UnlockedAt)
+                {
+                    NetPoints = checked(net.GetValueOrDefault(key) - deduction)
+                };
             }).ToArray();
-            // Retain an observable zero-benefit receipt for unsolved or unscored challenges.
-            benefits = benefits.Concat(unlocks.Where(x => x.Key.TeamId == team.TeamId && !gross.ContainsKey(x.Key))
-                .Select(x => new ScoreboardChallengeBenefit(x.Key.CompetitionChallengeId, 0, 0,
-                    x.Value.DeductionPercent, x.Value.UnlockedAt))).OrderBy(x => x.CompetitionChallengeId).ToArray();
             var slots = team.Slots.ToDictionary(x => x.ColumnIndex);
             if (!raw.Entries.Any(x => x.TeamId == team.TeamId)) { adjusted.Add(team with { ChallengeBenefits = benefits }); continue; }
             var visibleDeduction = 0L;
@@ -63,8 +66,17 @@ internal static class WriteUpBenefitProjection
                         - ChallengeWriteUpPolicy.Deduction(prefix, unlock.DeductionPercent));
                     prefix = checked(prefix + positive);
                     visibleDeduction = checked(visibleDeduction + deduction);
+                    var appliedAt = unlock.UnlockedAt;
+                    if (input.Mode == GameMode.Ctf)
+                    {
+                        var earnedAt = scoreboard.EntryAllocations.Where(x => x.TeamId == team.TeamId && x.ColumnIndex == slot.ColumnIndex
+                                && x.Entry.Kind is ScoreboardEntryKind.Solve or ScoreboardEntryKind.BloodAward
+                                && x.Entry.EarnedPoints > 0)
+                            .Select(x => (DateTimeOffset?)x.Entry.OccurredAt).Max();
+                        if (earnedAt > appliedAt) appliedAt = earnedAt.Value;
+                    }
                     var entry = new ScoreboardSlotEntry(unlock.GameplayFactId, ScoreboardEntryKind.WriteUp,
-                        ScoreboardEntryOutcome.Succeeded, null, null, unlock.UnlockedAt, null, 0, deduction, -deduction);
+                        ScoreboardEntryOutcome.Succeeded, null, null, appliedAt, null, 0, deduction, -deduction);
                     slots[slot.ColumnIndex] = slot with { DeductedPoints = slot.DeductedPoints is null ? null : checked(slot.DeductedPoints + deduction),
                         NetPoints = slot.NetPoints is null ? null : checked(slot.NetPoints - deduction), EntryCount = checked(slot.EntryCount + 1),
                         Breakdowns = slot.Breakdowns.Append(new ScoreboardBreakdown(ScoreboardBreakdownKind.WriteUp, 1, 1, 0, deduction, -deduction)).ToArray(),

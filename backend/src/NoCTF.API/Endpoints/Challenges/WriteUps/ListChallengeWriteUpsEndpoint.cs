@@ -29,6 +29,20 @@ public sealed record ChallengeWriteUpFailureResponse(
     [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<ChallengeWriteUpFailure>))] ChallengeWriteUpFailure Code)
 {
     public string MessageKey => $"challengeWriteUp.error.{Code}";
+    public string Message => Code switch
+    {
+        ChallengeWriteUpFailure.NotFound => "The writeup is unavailable.",
+        ChallengeWriteUpFailure.Forbidden => "You do not have permission for this operation.",
+        ChallengeWriteUpFailure.Disabled => "Single-challenge writeups are disabled.",
+        ChallengeWriteUpFailure.DeadlinePassed => "The submission deadline has passed.",
+        ChallengeWriteUpFailure.InvalidContent => "Check the solution content, file format or return reason.",
+        ChallengeWriteUpFailure.Conflict => "This record changed. Reload its current version before retrying.",
+        ChallengeWriteUpFailure.NotPublished => "This version is not currently published.",
+        ChallengeWriteUpFailure.ConfirmationChanged => "The publication or policy changed. Review the updated confirmation.",
+        ChallengeWriteUpFailure.CompetitionNotRunning => "First-time access requires a running competition.",
+        ChallengeWriteUpFailure.ContentUnavailable => "The document could not be opened. No new access deduction was recorded.",
+        _ => throw new ArgumentOutOfRangeException(nameof(Code), Code, null)
+    };
 }
 internal static class ChallengeWriteUpProtocol
 {

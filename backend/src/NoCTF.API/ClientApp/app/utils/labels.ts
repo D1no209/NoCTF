@@ -3,6 +3,7 @@ import type { InjectionKey, Ref } from 'vue'
 import { localeTag, translate } from './i18n'
 import type {
   NoCtfapiEndpointsCompetitionsCompetitionResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
   NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse,
   NoCtfapiEndpointsNotificationsNotificationResponse,
   NoCtfapiEndpointsCompetitionsGameModeProtocol,
@@ -31,6 +32,8 @@ export interface CompetitionContext {
   loading: Ref<boolean>
   error: Ref<UiMessage | null>
   refresh: () => Promise<void>
+  standing: Ref<NoCtfapiEndpointsCompetitionsScoreboardTeamResponse | null>
+  refreshStanding: () => Promise<void>
 }
 
 export const competitionContextKey: InjectionKey<CompetitionContext> = Symbol('competition-context')
@@ -187,6 +190,11 @@ export function competitionEventText(
     GameplayFactPatchDownloaded: translate("common.description.downloadedPatchArchiveTeam", { actor, team }),
     CompetitionAudienceChanged: translate("competitionAccess.changed"),
     TeamWriteUpSubmitted: translate("writeUp.submittedEvent"),
+    ChallengeWriteUpSubmitted: translate('challengeWriteUp.event.submitted', { team, challenge }),
+    ChallengeWriteUpPublished: translate('challengeWriteUp.event.published', { challenge }),
+    ChallengeWriteUpWithdrawn: translate('challengeWriteUp.event.withdrawn', { challenge }),
+    ChallengeWriteUpRejected: translate('challengeWriteUp.event.rejected', { team, challenge }),
+    ChallengeWriteUpUnlocked: translate('challengeWriteUp.event.unlocked', { team, challenge }),
     RuntimeTrafficCaptureStored: translate("runtime.captureStoredEvent"),
     RuntimeTrafficCaptureDeleted: translate("runtime.captureDeletedEvent"),
     CompetitionCreated: translate("common.label.contestCreated"), CompetitionUpdated: translate("common.label.competitionInformationUpdated"), CompetitionLifecycleChanged: translate("common.label.competitionLifeCycleChanges"),

@@ -95,7 +95,12 @@ public sealed record GameModeLeaderboardProjection(
     int? CurrentRound = null,
     int? SettledThroughRound = null,
     int? RoundDurationSeconds = null,
-    int? CurrentRoundRemainingSeconds = null);
+    int? CurrentRoundRemainingSeconds = null)
+{
+    public IReadOnlyList<LeaderboardChallengeNetScore> ChallengeNetScores { get; init; } = [];
+}
+
+public sealed record LeaderboardChallengeNetScore(Guid TeamId, Guid CompetitionChallengeId, long NetPoints);
 
 public interface IGameModeLeaderboardProjector
 {

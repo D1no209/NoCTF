@@ -202,5 +202,12 @@
   "challengeWriteUp.currentEditor": "Current editor",
   "challengeWriteUp.historyReadOnly": "Historical versions are read-only. Your unsaved changes remain in the current editor.",
   "challengeWriteUp.withdrawn": "Withdrawn",
-  "challengeWriteUp.editorLayout": "Editor layout"
+  "challengeWriteUp.editorLayout": "Editor layout",
+  "challengeWriteUp.event.submitted": "{team} submitted a writeup for {challenge}",
+  "challengeWriteUp.event.published": "A writeup for {challenge} was published",
+  "challengeWriteUp.event.withdrawn": "A writeup for {challenge} was withdrawn",
+  "challengeWriteUp.event.rejected": "The writeup from {team} for {challenge} was returned",
+  "challengeWriteUp.event.unlocked": "{team} accessed writeups for {challenge}",
+  "challengeWriteUp.submissions": "Submissions",
+  "challengeWriteUp.reviewActions": "Review actions"
 }

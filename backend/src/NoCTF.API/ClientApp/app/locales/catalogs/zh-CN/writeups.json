@@ -202,5 +202,12 @@
   "challengeWriteUp.currentEditor": "当前编辑内容",
   "challengeWriteUp.historyReadOnly": "历史版本为只读。未保存内容仍保留在当前编辑器中。",
   "challengeWriteUp.withdrawn": "已撤下",
-  "challengeWriteUp.editorLayout": "编辑器布局"
+  "challengeWriteUp.editorLayout": "编辑器布局",
+  "challengeWriteUp.event.submitted": "{team} 提交了 {challenge} 的题解",
+  "challengeWriteUp.event.published": "{challenge} 的题解已公开",
+  "challengeWriteUp.event.withdrawn": "{challenge} 的题解已撤下",
+  "challengeWriteUp.event.rejected": "{team} 的 {challenge} 题解已退回",
+  "challengeWriteUp.event.unlocked": "{team} 已查阅 {challenge} 的题解",
+  "challengeWriteUp.submissions": "投稿列表",
+  "challengeWriteUp.reviewActions": "审核操作"
 }
