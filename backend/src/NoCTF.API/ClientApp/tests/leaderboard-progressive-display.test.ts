@@ -27,9 +27,9 @@ const theme = await sourceFile(
 describe('leaderboard progressive display', () => {
   test('keeps the full snapshot and progressively reveals stable entries', () => {
     expect(page).toContain('const visibleTeamCount = ref(50)')
-    expect(page).toContain('teams.value.slice(0, visibleTeamCount.value)')
+    expect(page).toContain('filteredTeams.value.slice(0, visibleTeamCount.value)')
     expect(page).toContain('v-for="(team, teamIndex) in visibleTeams"')
-    expect(page).toContain('visibleTeams.length < teams.length')
+    expect(page).toContain('visibleTeams.length < filteredTeams.length')
     expect(page).toContain('function showMoreTeams(): void')
     expect(page).toContain('@click="showMoreTeams"')
   })
@@ -158,7 +158,7 @@ describe('leaderboard progressive display', () => {
     expect(trendChart).toContain('min: timeRange.axisMin')
     expect(trendChart).toContain('max: timeRange.axisMax')
     expect(trendChart).toContain("type: 'slider'")
-    expect(trendChart.match(/filterMode: 'none'/g)).toHaveLength(3)
+    expect(trendChart.match(/filterMode: 'none'/g)).toHaveLength(4)
     expect(trendChart).toContain("chart.on('datazoom', rememberZoom)")
     expect(trendChart).toContain("id: 'score-trend-score-inside'")
     expect(trendChart).toContain("zoomOnMouseWheel: 'ctrl'")

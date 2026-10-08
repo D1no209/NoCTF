@@ -16,14 +16,28 @@ type Challenge = NoCtfapiEndpointsChallengesChallengeSummaryResponse
 type BloodRank = 'First' | 'Second' | 'Third'
 const bloodOrder: Record<BloodRank, number> = { First: 0, Second: 1, Third: 2 }
 
+/** Null denotes an invalid expression; an empty string matches all challenge names. */
+export function compileChallengeTitleSearch(search: string, regex: boolean): string | RegExp | null {
+  const query = search.trim()
+  if (!regex || !query) return query.toLocaleLowerCase()
+  try {
+    return new RegExp(query, 'i')
+  } catch {
+    return null
+  }
+}
+
 export function isChallengeVisible(
   challenge: Pick<Challenge, 'title' | 'locked' | 'tags'>,
-  filters: { hideSolved: boolean; hideLocked: boolean; solvedByMyTeam: boolean; search: string; tags?: readonly string[] },
+  filters: { hideSolved: boolean; hideLocked: boolean; solvedByMyTeam: boolean; search: string | RegExp | null; tags?: readonly string[] },
 ): boolean {
   return (!filters.hideSolved || !filters.solvedByMyTeam)
     && (!filters.hideLocked || !challenge.locked)
     && matchesAllTags(challenge.tags ?? [], filters.tags ?? [])
-    && (!filters.search || (challenge.title ?? '').toLocaleLowerCase().includes(filters.search))
+    && filters.search !== null
+    && (filters.search instanceof RegExp
+      ? filters.search.test(challenge.title ?? '')
+      : !filters.search || (challenge.title ?? '').toLocaleLowerCase().includes(filters.search))
 }
 
 export function affectsCompetitionChallengeList(kind: string): boolean {
@@ -91,6 +105,7 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
   const hidesLockedChallenges = computed(() => isCtf.value && hideLocked.value)
 
   const search = ref('')
+  const regexSearch = ref(false)
   const route = useRoute()
   const router = useRouter()
   const selectedTags = computed(() => tagsFromQuery(route.query.tag))
@@ -278,7 +293,10 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
     }))
   })
 
-  const normalizedSearch = computed(() => search.value.trim().toLocaleLowerCase())
+  const normalizedSearch = computed(() => search.value.trim())
+  const titleSearch = computed(() => compileChallengeTitleSearch(search.value, regexSearch.value))
+  const searchError = computed<UiMessage | null>(() => titleSearch.value === null
+    ? describeMessage('challengeNavigator.invalidRegex') : null)
 
   const visibleGroups = computed(() => groups.value
     .map(group => ({
@@ -287,7 +305,7 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
         hideSolved: hideSolved.value,
         hideLocked: hidesLockedChallenges.value,
         solvedByMyTeam: hideSolved.value && !!progressFor(challenge.id)?.solvedByMyTeam,
-        search: normalizedSearch.value,
+        search: titleSearch.value,
         tags: selectedTags.value,
       })),
     }))
@@ -337,6 +355,8 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
       hideSolved,
       hideLocked,
       search,
+      regexSearch,
+      searchError,
       selectedTags, tagOptions, updateSelectedTags,
       board,
       progressFor,

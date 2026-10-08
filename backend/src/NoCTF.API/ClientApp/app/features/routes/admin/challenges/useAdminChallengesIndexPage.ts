@@ -1,7 +1,7 @@
 import type { UiMessage } from '../../../../utils/i18n'
 import { markRaw } from 'vue'
 
-import { Plus } from '@lucide/vue'
+import { Filter, Plus } from '@lucide/vue'
 import { adminChallengeBankListTemplates } from '../../../../api'
 import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateSummaryResponse } from '../../../../api'
 import AdminDateTimeComponent from '../../../admin/AdminDateTime.vue'
@@ -187,6 +187,7 @@ export function useAdminChallengesIndexPage() {
   const ChallengeTemplateCreateDialog = markRaw(ChallengeTemplateCreateDialogComponent)
 
   return {
+      Filter,
       Plus,
       canOrganize,
       templates,

@@ -1,5 +1,6 @@
 import { toRefs } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
+import type { TooltipComponentOption } from 'echarts/components'
 import { chartTooltipTheme, echarts, trendChartPalette } from '../../utils/echarts'
 import { themeColor } from '../../utils/theme-color'
 import type { TrendSeries } from './types'
@@ -33,6 +34,8 @@ export function useScoreTrendChart(props: Readonly<ScoreTrendChartProps>) {
 
   let focusedTeamName: string | null = null
 
+  let hoveredLine: { seriesIndex: number, at: number } | null = null
+
   let applyingOption = false
 
   let renderFrame = 0
@@ -48,42 +51,27 @@ export function useScoreTrendChart(props: Readonly<ScoreTrendChartProps>) {
     return timeRange.axisMin + (timeRange.axisMax - timeRange.axisMin) * ratio
   }
 
-  function rememberZoom(...args: unknown[]) {
-    const event = (args[0] ?? {}) as {
-    start?: number
-    end?: number
-    startValue?: number
-    endValue?: number
-    batch?: Array<{
-      start?: number
-      end?: number
-      startValue?: number
-      endValue?: number
-      dataZoomId?: string
-      dataZoomIndex?: number
+  function rememberZoom() {
+    if (!chart || applyingOption) return
+    // Read the resolved windows: wheel batches and toolbox selections use different payloads.
+    const zooms = chart.getOption().dataZoom as Array<{
+      id: string, start: number, end: number, startValue?: number, endValue?: number,
     }>
-    dataZoomId?: string
-    dataZoomIndex?: number
+    const timeZoom = zooms.find(zoom => zoom.id === 'score-trend-time-slider')
+    if (timeZoom) {
+      const start = zoomValue(timeZoom.startValue, timeZoom.start, 'start')
+      const end = zoomValue(timeZoom.endValue, timeZoom.end, 'end')
+      selectedWindow = timeZoom.start <= 0 && timeZoom.end >= 100 || start >= end
+        ? null
+        : { start, end }
     }
-    if (applyingOption) return
-    const change = event.batch?.[0] ?? event
-    const dataZoomId = change.dataZoomId ?? event.dataZoomId
-    const dataZoomIndex = change.dataZoomIndex ?? event.dataZoomIndex
-    if (dataZoomId === 'score-trend-score-inside' || dataZoomIndex === 2) {
-      const start = Math.min(100, Math.max(0, change.start ?? 0))
-      const end = Math.min(100, Math.max(0, change.end ?? 100))
+    const scoreZoom = zooms.find(zoom => zoom.id === 'score-trend-score-inside')
+    if (scoreZoom) {
+      const { start, end } = scoreZoom
       selectedScoreRange = start <= 0 && end >= 100 || start >= end
         ? null
         : { start, end }
-      return
     }
-    if ((change.start ?? 0) <= 0 && (change.end ?? 100) >= 100) {
-      selectedWindow = null
-      return
-    }
-    const start = zoomValue(change.startValue, change.start, 'start')
-    const end = zoomValue(change.endValue, change.end, 'end')
-    selectedWindow = start < end ? { start, end } : null
   }
 
   function restoreChartView() {
@@ -91,6 +79,7 @@ export function useScoreTrendChart(props: Readonly<ScoreTrendChartProps>) {
       selectedWindow = null
       selectedScoreRange = null
       focusedTeamName = null
+      scheduleRender()
     }
   }
 
@@ -105,6 +94,21 @@ export function useScoreTrendChart(props: Readonly<ScoreTrendChartProps>) {
   function releaseWheelToScrollSurface(event: WheelEvent) {
     if (!event.ctrlKey) event.stopImmediatePropagation()
   }
+
+  function rememberHoveredLine(event: echarts.ECElementEvent) {
+    if (!event.event || event.seriesIndex === undefined) {
+      hoveredLine = null
+      return
+    }
+    const at = chart?.convertFromPixel({ xAxisIndex: 0 }, event.event.offsetX)
+    hoveredLine = typeof at === 'number' && Number.isFinite(at)
+      ? { seriesIndex: event.seriesIndex, at }
+      : null
+    // Axis tooltips otherwise reuse cached content while moving between sparse step lines.
+    chart?.dispatchAction({ type: 'hideTip' })
+  }
+
+  function clearHoveredLine() { hoveredLine = null }
 
   function buildOption(): echarts.EChartsCoreOption {
     timeRange = scoreTrendTimeRange(
@@ -132,6 +136,34 @@ export function useScoreTrendChart(props: Readonly<ScoreTrendChartProps>) {
       name,
       focusedTeamName === null || focusedTeamName === name,
     ]))
+    const tooltipPoints: [number, number][][] = []
+    const tooltipFormatter: TooltipComponentOption['formatter'] = (params) => {
+      const entries = Array.isArray(params) ? params : [params]
+      const point = entries[0]?.value
+      const at = hoveredLine?.at ?? (Array.isArray(point) ? Number(point[0]) : Number.NaN)
+      const heading = Number.isFinite(at) ? echarts.format.encodeHTML(new Date(at).toLocaleString(locale.value)) : ''
+      const scoreText = (score: unknown) => echarts.format.encodeHTML(`${score} ${translate('common.label.pts.scoreTrendChart')}`)
+      if (hoveredLine) {
+        const { seriesIndex } = hoveredLine
+        const points = tooltipPoints[seriesIndex] ?? []
+        let low = 0
+        let high = points.length
+        while (low < high) {
+          const middle = Math.floor((low + high) / 2)
+          if (points[middle]![0] <= at) low = middle + 1
+          else high = middle
+        }
+        const marker = echarts.format.getTooltipMarker(palette[seriesIndex % Math.max(1, palette.length)] ?? '')
+        const name = echarts.format.encodeHTML(teamNames[seriesIndex] ?? '')
+        return `${heading}<br/>${marker}${name} <strong>${scoreText(points[Math.max(0, low - 1)]?.[1] ?? 0)}</strong>`
+      }
+      return [heading, ...entries.map(entry => {
+        const marker = typeof entry.marker === 'string' ? entry.marker : ''
+        const name = echarts.format.encodeHTML(entry.seriesName ?? '')
+        const score = Array.isArray(entry.value) ? entry.value[1] : entry.value
+        return `${marker}${name} <strong>${scoreText(score)}</strong>`
+      })].join('<br/>')
+    }
     return {
       backgroundColor: 'transparent',
       textStyle: { fontFamily },
@@ -150,11 +182,11 @@ export function useScoreTrendChart(props: Readonly<ScoreTrendChartProps>) {
         appendTo: 'body',
         confine: true,
         className: 'noctf-chart-tooltip',
+        formatter: tooltipFormatter,
         axisPointer: {
           type: 'line',
           lineStyle: { color: primary, width: 1, type: 'dashed', opacity: 0.7 },
         },
-        valueFormatter: (value: number | string) => `${value} ${translate('common.label.pts.scoreTrendChart')}`,
       },
       legend: {
         bottom: 36,
@@ -174,7 +206,7 @@ export function useScoreTrendChart(props: Readonly<ScoreTrendChartProps>) {
         emphasis: { iconStyle: { borderColor: primary } },
         feature: {
           saveAsImage: { title: translate("leaderboard.label.downloadImage") },
-          dataZoom: { title: { zoom: translate("leaderboard.label.areaZoom"), back: translate("leaderboard.label.zoomRestore") }, yAxisIndex: 'none' },
+          dataZoom: { title: { zoom: translate("leaderboard.label.areaZoom"), back: translate("leaderboard.label.zoomRestore") }, xAxisIndex: 0, yAxisIndex: 0, filterMode: 'none' },
           restore: { title: translate("leaderboard.label.restore") },
         },
       },
@@ -182,6 +214,7 @@ export function useScoreTrendChart(props: Readonly<ScoreTrendChartProps>) {
         type: 'time',
         min: timeRange.axisMin,
         max: timeRange.axisMax,
+        axisPointer: { snap: false, triggerEmphasis: false },
         axisLine: { lineStyle: { color: border } },
         axisTick: { lineStyle: { color: border } },
         axisLabel: { hideOverlap: true, color: muted },
@@ -199,6 +232,7 @@ export function useScoreTrendChart(props: Readonly<ScoreTrendChartProps>) {
         {
           id: 'score-trend-time-slider',
           type: 'slider',
+          xAxisIndex: 0,
           bottom: 4,
           height: 24,
           filterMode: 'none',
@@ -207,8 +241,9 @@ export function useScoreTrendChart(props: Readonly<ScoreTrendChartProps>) {
         {
           id: 'score-trend-time-inside',
           type: 'inside',
+          xAxisIndex: 0,
           filterMode: 'none',
-          zoomOnMouseWheel: false,
+          zoomOnMouseWheel: 'ctrl',
           moveOnMouseWheel: false,
           moveOnMouseMove: false,
           ...zoomWindow,
@@ -241,6 +276,7 @@ export function useScoreTrendChart(props: Readonly<ScoreTrendChartProps>) {
           if (raw[raw.length - 1]![0] < timeRange.end)
             data.push([timeRange.end, raw[raw.length - 1]![1]])
         }
+        tooltipPoints.push(data)
         const lineColor = palette[index % Math.max(1, palette.length)]
         return {
           id: team.teamId || team.teamName || `team-${index}`,
@@ -248,6 +284,7 @@ export function useScoreTrendChart(props: Readonly<ScoreTrendChartProps>) {
           colorBy: 'series' as const,
           name: team.teamName ?? translate("common.label.team"),
           step: 'end' as const,
+          triggerEvent: 'line' as const,
           showSymbol: false,
           symbol: 'circle',
           symbolSize: 7,
@@ -274,6 +311,7 @@ export function useScoreTrendChart(props: Readonly<ScoreTrendChartProps>) {
 
   function applyRender() {
     if (!chart) return
+    clearHoveredLine()
     const seriesSignature = props.series
       .map((team, index) => team.teamId || team.teamName || `team-${index}`)
       .join('\u0000')
@@ -305,6 +343,8 @@ export function useScoreTrendChart(props: Readonly<ScoreTrendChartProps>) {
     chart.on('datazoom', rememberZoom)
     chart.on('restore', restoreChartView)
     chart.on('legendselectchanged', toggleTeamFocus)
+    chart.on('mousemove', 'series.line', rememberHoveredLine)
+    chart.on('mouseout', 'series.line', clearHoveredLine)
     scheduleRender()
   })
 
@@ -348,6 +388,8 @@ export function useScoreTrendChart(props: Readonly<ScoreTrendChartProps>) {
     chart?.off('datazoom', rememberZoom)
     chart?.off('restore', restoreChartView)
     chart?.off('legendselectchanged', toggleTeamFocus)
+    chart?.off('mousemove', rememberHoveredLine)
+    chart?.off('mouseout', clearHoveredLine)
     chart?.dispose()
     chart = null
   })

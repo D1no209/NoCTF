@@ -82,5 +82,15 @@
   "leaderboard.label.teamSystem": "团队/系统",
   "leaderboard.scoreboardTeam.label.memberAttributedScoreYet": "暂无可归属的队员得分",
   "leaderboard.scoreboardTeam.description.automatedSettlementHistoricalWindows": "自动结算、历史窗口及其他无法归属个人的分值归入“团队/系统”。",
-  "leaderboard.label.pts": "pts，"
+  "leaderboard.label.pts": "pts，",
+  "leaderboard.filters.searchChallenges": "搜索题目",
+  "leaderboard.filters.allDirections": "所有方向",
+  "leaderboard.filters.allChallenges": "所有题目",
+  "leaderboard.filters.selectDirection": "按方向筛选",
+  "leaderboard.filters.selectChallenge": "按题目筛选",
+  "leaderboard.filters.clear": "清空筛选",
+  "leaderboard.filters.count": "{teams} 支队伍 · {challenges} 道题目",
+  "leaderboard.filters.noTeams": "没有符合条件的队伍",
+  "leaderboard.filters.noChallenges": "没有符合条件的题目",
+  "leaderboard.filters.adjustFilters": "请调整筛选条件或清空搜索。"
 }

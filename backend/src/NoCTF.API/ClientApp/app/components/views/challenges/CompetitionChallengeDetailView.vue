@@ -44,8 +44,8 @@ const { BookOpen, singleWriteUpsEnabled, openWriteUps, writeUpBenefit, Dice5, Fi
         <Button v-if="singleWriteUpsEnabled" variant="ghost" size="sm" @click="openWriteUps"><BookOpen />{{ $t('challengeWriteUp.title') }}</Button>
         <span class="sr-only">{{ challenge.direction || '' }}</span>
         <Badge v-if="mode === 'Awdp'" variant="secondary">{{ $t('challenges.label.scoresSettleRound') }}</Badge>
-        <div v-if="challenge.tags?.length" class="relative z-10 flex basis-full flex-wrap gap-1.5" :aria-label="$t('challengeTags.label')">
-          <Badge v-for="tag in challenge.tags" :key="tag" variant="secondary" class="max-w-full break-words whitespace-normal">{{ tag }}</Badge>
+        <div v-if="challenge.tags?.length" class="relative z-10 flex min-w-0 basis-full flex-wrap gap-2" :aria-label="$t('challengeTags.label')">
+          <Badge v-for="tag in challenge.tags" :key="tag" variant="secondary" class="min-w-0 max-w-full wrap-anywhere whitespace-normal px-3 py-1 text-sm leading-5">{{ tag }}</Badge>
         </div>
       </header>
 
