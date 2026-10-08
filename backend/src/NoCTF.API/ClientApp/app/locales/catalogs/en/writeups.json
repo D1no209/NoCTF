@@ -195,5 +195,12 @@
   "challengeWriteUp.error.NotPublished": "This version is not currently published.",
   "challengeWriteUp.error.ConfirmationChanged": "The publication or policy changed. Review the updated confirmation before continuing.",
   "challengeWriteUp.error.CompetitionNotRunning": "First-time access is unavailable while the competition is paused.",
-  "challengeWriteUp.error.ContentUnavailable": "The document could not be opened. No new access deduction was recorded."
+  "challengeWriteUp.error.ContentUnavailable": "The document could not be opened. No new access deduction was recorded.",
+  "challengeWriteUp.markdown": "Markdown",
+  "challengeWriteUp.pdf": "PDF",
+  "challengeWriteUp.history": "Version history",
+  "challengeWriteUp.currentEditor": "Current editor",
+  "challengeWriteUp.historyReadOnly": "Historical versions are read-only. Your unsaved changes remain in the current editor.",
+  "challengeWriteUp.withdrawn": "Withdrawn",
+  "challengeWriteUp.editorLayout": "Editor layout"
 }

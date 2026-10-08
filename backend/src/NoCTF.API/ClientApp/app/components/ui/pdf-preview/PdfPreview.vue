@@ -12,7 +12,9 @@ const props = defineProps<{
   loading?: boolean
   error?: UiMessage | null
   fill?: boolean
+  retryable?: boolean
 }>()
+const emit = defineEmits<{ retry: [] }>()
 
 const minimumZoom = 0.5
 const maximumZoom = 3
@@ -247,6 +249,7 @@ onBeforeUnmount(() => {
         <EmptyTitle>{{ error ? $message(error) : $t('pdfPreview.loadFailed') }}</EmptyTitle>
         <EmptyDescription>{{ $t('pdfPreview.loadFailedDescription') }}</EmptyDescription>
       </EmptyHeader>
+      <EmptyContent v-if="retryable"><Button type="button" variant="outline" :disabled="busy" @click="emit('retry')">{{ $t('common.label.retry') }}</Button></EmptyContent>
     </Empty>
 
     <template v-else-if="pdfDocument">

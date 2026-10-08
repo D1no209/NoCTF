@@ -3,7 +3,7 @@ import type { UiMessage } from '../../utils/i18n'
 import { markRaw, provide, toRefs } from 'vue'
 
 import { toast } from '../../utils/message-toast'
-import { Dice5, FileDown, History } from '@lucide/vue'
+import { Dice5, FileDown, History, BookOpen } from '@lucide/vue'
 import { prepareChallengeAttachmentDownloadEndpoint, prepareRandomChallengeAttachmentDownloadEndpoint, getChallengeEndpoint, listChallengeAttachmentsEndpoint, startProgressionChallenge } from '../../api'
 import type { NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol, NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse, NoCtfapiEndpointsChallengesChallengeResponse } from '../../api'
 import { startAttachmentBrowserDownload } from '../../utils/download'
@@ -196,6 +196,10 @@ export function useCompetitionChallengeDetail(props: Readonly<{
     }
   }
 
+  const route = useRoute(), router = useRouter()
+  const singleWriteUpsEnabled = computed(() => ctx.competition.value?.singleWriteUpsEnabled === true)
+  function openWriteUps() { void router.push({ path: `/competitions/${props.competitionId}/challenge-writeups/${props.competitionChallengeId}`, query: route.query }) }
+
   const mode = computed(() => ctx.competition.value?.mode)
 
   const ChallengeHints = markRaw(ChallengeHintsComponent)
@@ -212,6 +216,7 @@ export function useCompetitionChallengeDetail(props: Readonly<{
 
   return {
       ...toRefs(props),
+      BookOpen, singleWriteUpsEnabled, openWriteUps,
       Dice5,
       FileDown,
       History,

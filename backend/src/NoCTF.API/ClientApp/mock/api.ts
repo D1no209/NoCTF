@@ -1,4 +1,5 @@
 import { createMockMfa } from './mfa'
+import { createMockChallengeWriteUps } from './challenge-writeups'
 import { accounts, createFixtures, mockModeConfiguration, mockRules } from './data/fixtures'
 import { date, id, matchOperation, model, now, resolve, responseSchema, sample, type Data } from './schema'
 import { leaderboardRead } from './leaderboard'
@@ -156,6 +157,7 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
     return json({ ...user, state: 'Authenticated', accessToken, expiresAt: date(24), returnPath: '/' }, 200, { 'Set-Cookie': `noctf_mock_session=${session}; Path=/; HttpOnly; SameSite=Strict` })
   }
   const mfa = createMockMfa({ users: state.users, signIn, userFor, loginRequiresMfa: options.mfa ?? false })
+  const singleWriteUps = createMockChallengeWriteUps({ state, json, pdf: mockWriteUpPdf, prepareDownload: prepareMockAttachmentDownload })
   function challengeSummary(item: Data) {
     return {
       id: item.id,
@@ -256,6 +258,8 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
     const mfaResponse = await mfa.handle(request, route, body, p)
     if (mfaResponse) return mfaResponse
     const user = userFor(request)
+    const singleWriteUpResponse = await singleWriteUps.handle(request, route, p, body, user)
+    if (singleWriteUpResponse) return singleWriteUpResponse
     if ((route.startsWith('/admin') || route.startsWith('/auth/me') || request.method !== 'GET') && !user) return problem(401, '请先登录演示账号 / Sign in to the Mock site')
     if (route.startsWith('/admin/platform') && user?.role !== 'Administrator') return problem(403, '需要 Mock 管理员账号 / Administrator required')
     if (route.startsWith('/admin/') && !['Administrator', 'Organizer'].includes(user?.role)) return problem(403, '需要 Mock 管理账号 / Staff account required')

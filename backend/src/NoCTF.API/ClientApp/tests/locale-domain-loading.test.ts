@@ -14,14 +14,17 @@ describe('locale feature catalogs', () => {
       'competitions',
       'challenges',
       'runtime',
+      'writeups',
     ])
     expect(localeDomainsForPath('/competitions/c1/leaderboard')).toEqual([
       'account',
       'competitions',
       'leaderboard',
+      'writeups',
     ])
     expect(localeDomainsForPath('/notifications')).toEqual(['account', 'notifications'])
     expect(localeDomainsForPath('/users/user-1')).toEqual(['account', 'competitions'])
+    expect(localeDomainsForPath('/competitions/c1/challenge-writeups/c2')).toEqual(['account', 'competitions', 'writeups', 'challenges'])
   })
 
   test('keeps complete catalogs out of the runtime i18n entry', async () => {

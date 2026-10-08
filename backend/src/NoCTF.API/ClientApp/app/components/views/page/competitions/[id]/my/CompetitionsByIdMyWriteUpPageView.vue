@@ -3,11 +3,15 @@ import { toRefs } from 'vue'
 import type { CompetitionsByIdMyWriteUpPageViewState } from '~/features/routes/competitions/[id]/my/useCompetitionsByIdMyWriteUpPage'
 
 const viewProps = defineProps<{ state: CompetitionsByIdMyWriteUpPageViewState }>()
-const { Download, Eye, FileText, maximumWriteUpBytes, competitionId, submissionRequired, submissionDeadlineAt, submissionClosed, writeUp, selectedFile, uploadInputKey, loading, loadError, uploadError, uploadPending, previewUrl, previewLoading, previewError, downloadPending, load, selectFile, submit, preview, download, CompetitionParticipantWorkspace } = toRefs(viewProps.state)
+const { activeTab, singleEnabled, MySingleWriteUps, Download, Eye, FileText, maximumWriteUpBytes, competitionId, submissionRequired, submissionDeadlineAt, submissionClosed, writeUp, selectedFile, uploadInputKey, loading, loadError, uploadError, uploadPending, previewUrl, previewLoading, previewError, downloadPending, load, selectFile, submit, preview, download, CompetitionParticipantWorkspace } = toRefs(viewProps.state)
 </script>
 
 <template>
   <component :is="CompetitionParticipantWorkspace" :competition-id="competitionId">
+    <Tabs v-model="activeTab">
+      <TabsList><TabsTrigger v-if="singleEnabled" value="single">{{ $t('challengeWriteUp.title') }}</TabsTrigger><TabsTrigger value="whole">{{ $t('challengeWriteUp.whole') }}</TabsTrigger></TabsList>
+      <TabsContent v-if="singleEnabled" value="single"><component :is="MySingleWriteUps" :competition-id="competitionId" /></TabsContent>
+      <TabsContent value="whole">
     <Card class="min-h-[38rem]">
       <CardHeader>
         <div class="flex flex-wrap items-center justify-between gap-3">
@@ -100,5 +104,7 @@ const { Download, Eye, FileText, maximumWriteUpBytes, competitionId, submissionR
         </template>
       </CardContent>
     </Card>
+      </TabsContent>
+    </Tabs>
   </component>
 </template>

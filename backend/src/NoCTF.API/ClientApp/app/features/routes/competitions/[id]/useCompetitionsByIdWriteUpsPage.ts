@@ -1,3 +1,5 @@
+import { markRaw } from 'vue'
+import ChallengeWriteUpReviewComponent from '~/features/writeups/ChallengeWriteUpReview.vue'
 import { message as describeMessage } from '../../../../utils/i18n'
 import type { UiMessage } from '../../../../utils/i18n'
 import { ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, RefreshCw, Scale } from '@lucide/vue'
@@ -17,6 +19,9 @@ export function useCompetitionsByIdWriteUpsPage(options: { management?: boolean 
   const router = useRouter()
   const competitionId = route.params.id as string
   const management = options.management === true
+  const activeTab = ref(route.query.writeupMode === 'whole' ? 'whole' : 'single')
+  const ChallengeWriteUpReview = markRaw(ChallengeWriteUpReviewComponent)
+  watch(activeTab, value => { void router.replace({ query: { ...route.query, writeupMode: value } }) })
 
   const review = ref<NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpReviewResponse | null>(null)
   const loading = ref(true)
@@ -314,14 +319,18 @@ export function useCompetitionsByIdWriteUpsPage(options: { management?: boolean 
   }
 
   let unwatch: (() => void) | undefined
+  watch(activeTab, tab => {
+    void router.replace({ query: { ...route.query, writeupMode: tab } })
+    if (tab === 'whole') void load()
+  })
   onMounted(() => {
-    void load()
+    if (activeTab.value === 'whole') void load()
     unwatch = watchCompetition(competitionId, {
       competitionEventChanged: event => {
-        if (event.kind === 'TeamWriteUpSubmitted') void refreshLatest()
+        if (activeTab.value === 'whole' && event.kind === 'TeamWriteUpSubmitted') void refreshLatest()
       },
-      scoreboardUpdated: () => void refreshLatest(),
-      onReconnected: () => void refreshLatest(),
+      scoreboardUpdated: () => { if (activeTab.value === 'whole') void refreshLatest() },
+      onReconnected: () => { if (activeTab.value === 'whole') void refreshLatest() },
     })
   })
   onUnmounted(() => {
@@ -331,6 +340,7 @@ export function useCompetitionsByIdWriteUpsPage(options: { management?: boolean 
   })
 
   const viewBindings = {
+    activeTab, ChallengeWriteUpReview,
     ArrowLeft,
     Download,
     FileSearch,

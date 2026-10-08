@@ -195,5 +195,12 @@
   "challengeWriteUp.error.NotPublished": "此版本当前未公开。",
   "challengeWriteUp.error.ConfirmationChanged": "公开版本或策略已变化，请核对最新确认信息。",
   "challengeWriteUp.error.CompetitionNotRunning": "比赛暂停期间不能首次解锁题解。",
-  "challengeWriteUp.error.ContentUnavailable": "文件无法打开，未记录新的查阅扣分。"
+  "challengeWriteUp.error.ContentUnavailable": "文件无法打开，未记录新的查阅扣分。",
+  "challengeWriteUp.markdown": "Markdown",
+  "challengeWriteUp.pdf": "PDF",
+  "challengeWriteUp.history": "版本历史",
+  "challengeWriteUp.currentEditor": "当前编辑内容",
+  "challengeWriteUp.historyReadOnly": "历史版本为只读。未保存内容仍保留在当前编辑器中。",
+  "challengeWriteUp.withdrawn": "已撤下",
+  "challengeWriteUp.editorLayout": "编辑器布局"
 }

@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { CompetitionChallengeDetailViewState } from '~/features/challenges/useCompetitionChallengeDetail'
 
 const viewProps = defineProps<{ state: CompetitionChallengeDetailViewState }>()
-const { Dice5, FileDown, History, ctx, isLoggedIn, user, challenge, loading, error, attachments, attachmentDeliveryPolicy, attachmentsLoading, attachmentError, downloading, historyRefreshKey, historyOpen, refreshSubmissionHistory, updateRemainingAttempts, loadAttachments, downloadAttachment, downloadRandom, mode, ChallengeHints, ChallengeSubmissionHistory, AwdPanel, AwdpPanel, CtfPanel, KohPanel, competitionId, competitionChallengeId, flagDockTarget } = toRefs(viewProps.state)
+const { BookOpen, singleWriteUpsEnabled, openWriteUps, Dice5, FileDown, History, ctx, isLoggedIn, user, challenge, loading, error, attachments, attachmentDeliveryPolicy, attachmentsLoading, attachmentError, downloading, historyRefreshKey, historyOpen, refreshSubmissionHistory, updateRemainingAttempts, loadAttachments, downloadAttachment, downloadRandom, mode, ChallengeHints, ChallengeSubmissionHistory, AwdPanel, AwdpPanel, CtfPanel, KohPanel, competitionId, competitionChallengeId, flagDockTarget } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -41,6 +41,7 @@ const { Dice5, FileDown, History, ctx, isLoggedIn, user, challenge, loading, err
             </ScrollSurface>
           </DialogContent>
         </Dialog>
+        <Button v-if="singleWriteUpsEnabled" variant="ghost" size="sm" @click="openWriteUps"><BookOpen />{{ $t('challengeWriteUp.title') }}</Button>
         <span class="sr-only">{{ challenge.direction || '' }}</span>
         <Badge v-if="mode === 'Awdp'" variant="secondary">{{ $t('challenges.label.scoresSettleRound') }}</Badge>
         <div v-if="challenge.tags?.length" class="relative z-10 flex basis-full flex-wrap gap-1.5" :aria-label="$t('challengeTags.label')">

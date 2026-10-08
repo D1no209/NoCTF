@@ -114,3 +114,19 @@ export function startAttachmentBrowserDownload(downloadUrl: string): void {
   anchor.click()
   anchor.remove()
 }
+
+/** Native, authenticated WriteUp transfer. Only the two presentation switches may appear in the URL. */
+export function startWriteUpBrowserDownload(downloadUrl: string): void {
+  const url = new URL(downloadUrl, window.location.origin)
+  const keys = [...url.searchParams.keys()]
+  if (url.origin !== window.location.origin || !['http:', 'https:'].includes(url.protocol)
+    || url.hash || url.username || url.password
+    || !/^\/api\/v1\/competitions\/[\da-f-]{36}\/challenges\/[\da-f-]{36}\/writeups\/versions\/[\da-f-]{36}\/file$/i.test(url.pathname)
+    || keys.some(key => !['staff', 'download'].includes(key))
+    || new Set(keys).size !== keys.length
+    || keys.some(key => !['true', 'false'].includes(url.searchParams.get(key) ?? '')))
+    throw new ApiError(translate('common.download.error.downloadResponseFormatInvalid'))
+  const anchor = document.createElement('a')
+  anchor.href = url.href; anchor.download = ''; anchor.hidden = true
+  document.body.append(anchor); anchor.click(); anchor.remove()
+}

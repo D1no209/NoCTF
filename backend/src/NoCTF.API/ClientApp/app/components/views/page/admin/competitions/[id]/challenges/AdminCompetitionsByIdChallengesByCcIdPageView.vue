@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdChallengesByCcIdPageViewState } from '~/features/routes/admin/competitions/[id]/challenges/useAdminCompetitionsByIdChallengesByCcIdPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdChallengesByCcIdPageViewState }>()
-const { adminTeamPath, adminTemplatePath, Plus, competitionId, competition, canWrite, canJudge, challenge, loading, loadError, activeSection, sectionOptions, directions, directionLoading, directionError, editDirectionId, loadDirections, editCustomTitle, editTags, tagOptions, updateEditTags, editOrder, editPublished, savingEdit, saveEdit, config, configLoading, savingConfig, inheritedConfiguration, saveConfig, hints, hintsLoading, hintsLoadError, includeDeletedHints, hintDialogOpen, editingHint, hintForm, hintError, savingHint, pendingHintId, openHintDialog, saveHint, deleteHint, restoreHint, scoringLoading, scoringError, scoringSearch, loadChallengeTeamScoring, scoringPage, scoringPageCount, scoringTotal, scoringPageLimit, scoringPageLoading, loadScoringPage, setScoringPageSize, scoringDisplayNames, scoringRows, adjustmentTarget, adjustmentDelta, adjustmentPending, adjustmentError, adjustmentValid, openAdjustment, closeAdjustment, submitAdjustment, ChallengeRulesEditor, hiddenRuleKeys, onClickAdjustmentTarget, onClickHintDialogOpen } = toRefs(viewProps.state)
+const { ccId, SingleWriteUpSettings, adminTeamPath, adminTemplatePath, Plus, competitionId, competition, canWrite, canJudge, challenge, loading, loadError, activeSection, sectionOptions, directions, directionLoading, directionError, editDirectionId, loadDirections, editCustomTitle, editTags, tagOptions, updateEditTags, editOrder, editPublished, savingEdit, saveEdit, config, configLoading, savingConfig, inheritedConfiguration, saveConfig, hints, hintsLoading, hintsLoadError, includeDeletedHints, hintDialogOpen, editingHint, hintForm, hintError, savingHint, pendingHintId, openHintDialog, saveHint, deleteHint, restoreHint, scoringLoading, scoringError, scoringSearch, loadChallengeTeamScoring, scoringPage, scoringPageCount, scoringTotal, scoringPageLimit, scoringPageLoading, loadScoringPage, setScoringPageSize, scoringDisplayNames, scoringRows, adjustmentTarget, adjustmentDelta, adjustmentPending, adjustmentError, adjustmentValid, openAdjustment, closeAdjustment, submitAdjustment, ChallengeRulesEditor, hiddenRuleKeys, onClickAdjustmentTarget, onClickHintDialogOpen } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -305,5 +305,6 @@ const { adminTeamPath, adminTemplatePath, Plus, competitionId, competition, canW
         </DialogContent>
       </Dialog>
     </template>
+    <Card v-if="challenge"><CardContent><component :is="SingleWriteUpSettings" :competition-id="competitionId" :competition-challenge-id="ccId" :can-write="canWrite" /></CardContent></Card>
   </div>
 </template>

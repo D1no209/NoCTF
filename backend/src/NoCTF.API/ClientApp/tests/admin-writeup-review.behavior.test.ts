@@ -50,7 +50,7 @@ function harness(canJudge: boolean) {
   let observe!: () => Promise<boolean>
   const polling = ref(false)
   const deps = {
-    ref, computed, watch, createTrailingRefresh,
+    ref, computed, watch, createTrailingRefresh, markRaw, ChallengeWriteUpReviewComponent: {},
     ...Object.fromEntries('ArrowLeft Download FileSearch MessageCircleQuestion MinusCircle RefreshCw Scale'.split(' ').map(name => [name, {}])),
     useRoute: () => route,
     useRouter: () => ({ replace: async (next: { query: typeof route.query }) => { route.query = next.query }, push: async () => {} }),

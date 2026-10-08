@@ -3,11 +3,14 @@ import { toRefs } from 'vue'
 import type { CompetitionsByIdWriteUpsPageViewState } from '~/features/routes/competitions/[id]/useCompetitionsByIdWriteUpsPage'
 
 const viewProps = defineProps<{ state: CompetitionsByIdWriteUpsPageViewState }>()
-const { ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, RefreshCw, Scale, competitionId, management, review, loading, loadError, teamOptions, selectedTeamId, selected, canJudge, previewUrl, previewLoading, previewError, downloadPending, load, selectTeam, download, selectedChallengeId, adjustmentDelta, adjustmentPending, adjustmentRefreshing, adjustmentBusy, adjustmentError, submitAdjustment, clearAdjustmentError, selectChallenge, deduction, openDeduction, setDeductionOpen, confirmDeduction, consultationOpen, consultationChallengeId, consultationTitle, consultationBody, consultationPending, consultationError, openConsultation, submitConsultation, setConsultationOpen, clearConsultationError } = toRefs(viewProps.state)
+const { activeTab, ChallengeWriteUpReview, ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, RefreshCw, Scale, competitionId, management, review, loading, loadError, teamOptions, selectedTeamId, selected, canJudge, previewUrl, previewLoading, previewError, downloadPending, load, selectTeam, download, selectedChallengeId, adjustmentDelta, adjustmentPending, adjustmentRefreshing, adjustmentBusy, adjustmentError, submitAdjustment, clearAdjustmentError, selectChallenge, deduction, openDeduction, setDeductionOpen, confirmDeduction, consultationOpen, consultationChallengeId, consultationTitle, consultationBody, consultationPending, consultationError, openConsultation, submitConsultation, setConsultationOpen, clearConsultationError } = toRefs(viewProps.state)
 </script>
 
 <template>
   <div data-writeup-review-workspace class="flex min-h-0 flex-1 flex-col">
+    <Tabs v-model="activeTab" class="flex min-h-0 flex-1 flex-col gap-4"><TabsList class="self-start"><TabsTrigger value="single">{{ $t('challengeWriteUp.title') }}</TabsTrigger><TabsTrigger value="whole">{{ $t('challengeWriteUp.whole') }}</TabsTrigger></TabsList>
+      <TabsContent value="single" class="flex min-h-0 flex-1 flex-col"><component :is="ChallengeWriteUpReview" :competition-id="competitionId" /></TabsContent>
+      <TabsContent value="whole" class="flex min-h-0 flex-1 flex-col">
     <div v-scroll-surface data-scroll-surface data-scroll-axis="y" class="grid h-full min-h-0 gap-4 overflow-y-auto p-1 xl:grid-cols-[minmax(13rem,15rem)_minmax(0,1fr)_minmax(18rem,22rem)] xl:grid-rows-[minmax(0,1fr)] xl:overflow-hidden">
       <ChoiceSidebar
         :items="teamOptions"
@@ -276,5 +279,7 @@ const { ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, Ref
         </DialogFooter>
       </DialogContent>
     </Dialog>
+      </TabsContent>
+    </Tabs>
   </div>
 </template>

@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdConfigurationPageViewState } from '~/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdConfigurationPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdConfigurationPageViewState }>()
-const { competition, canWrite, title, description, startTime, endTime, teamRegistrationAutoApprove, allowTeamRegistrationWhileRunning, maxTeamMembers, maxConcurrentRuntimeInstancesPerTeam, runtimeAccessMode, trafficCaptureEnabled, trafficCaptureLimitMiB, trafficCaptureHasDirectBypass, maxActiveQuestionsPerTeam, maxParticipantMessagesBeforeHandlerReply, allowChallengeOwnersToHandleQuestions, practiceModeEnabled, writeUpSubmissionRequired, writeUpSubmissionDeadlineHours, maximumWriteUpDeadlineHours, staffOnly, savingMeta, metaError, saveMeta, config, configLoading, savingConfig, saveConfig, CompetitionModeConfigEditor } = toRefs(viewProps.state)
+const { competitionId, SingleWriteUpSettings, refreshCompetition, competition, canWrite, title, description, startTime, endTime, teamRegistrationAutoApprove, allowTeamRegistrationWhileRunning, maxTeamMembers, maxConcurrentRuntimeInstancesPerTeam, runtimeAccessMode, trafficCaptureEnabled, trafficCaptureLimitMiB, trafficCaptureHasDirectBypass, maxActiveQuestionsPerTeam, maxParticipantMessagesBeforeHandlerReply, allowChallengeOwnersToHandleQuestions, practiceModeEnabled, writeUpSubmissionRequired, writeUpSubmissionDeadlineHours, maximumWriteUpDeadlineHours, staffOnly, savingMeta, metaError, saveMeta, config, configLoading, savingConfig, saveConfig, CompetitionModeConfigEditor } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -183,6 +183,8 @@ const { competition, canWrite, title, description, startTime, endTime, teamRegis
         />
       </CardContent>
       </section>
+      <Separator />
+      <CardContent class="py-5"><component :is="SingleWriteUpSettings" :competition-id="competitionId" :can-write="canWrite" @saved="refreshCompetition" /></CardContent>
     </Card>
   </div>
 </template>
