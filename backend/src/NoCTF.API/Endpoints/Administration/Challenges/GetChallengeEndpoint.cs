@@ -26,6 +26,7 @@ public sealed class CompetitionChallengeRulesContract
     public AwdCompetitionChallengeRulesContract? Awd { get; set; }
     public AwdpCompetitionChallengeRulesContract? Awdp { get; set; }
     public KohCompetitionChallengeRulesContract? Koh { get; set; }
+    public LiveSoloCompetitionChallengeRulesContract? LiveSolo { get; set; }
 }
 public sealed class CtfCompetitionChallengeRulesContract
 {
@@ -66,6 +67,8 @@ public sealed class KohCompetitionChallengeRulesContract
     public long? ControlPointsPerInterval { get; set; }
 }
 
+public sealed class LiveSoloCompetitionChallengeRulesContract;
+
 public static class CompetitionChallengeRulesContractMapper
 {
     public static bool HasValidShape(CompetitionChallengeRulesContract? contract)
@@ -75,7 +78,8 @@ public static class CompetitionChallengeRulesContractMapper
         var count = (contract.Ctf is not null ? 1 : 0)
             + (contract.Awd is not null ? 1 : 0)
             + (contract.Awdp is not null ? 1 : 0)
-            + (contract.Koh is not null ? 1 : 0);
+            + (contract.Koh is not null ? 1 : 0)
+            + (contract.LiveSolo is not null ? 1 : 0);
         return count == 1 && (contract.Mode switch
         {
             GameModeProtocol.Ctf => contract.Ctf is not null
@@ -88,6 +92,7 @@ public static class CompetitionChallengeRulesContractMapper
             GameModeProtocol.Awdp => contract.Awdp is not null
                 && ValidFlagTemplate(contract.Awdp.FlagTemplate),
             GameModeProtocol.Koh => contract.Koh is not null,
+            GameModeProtocol.LiveSolo => contract.LiveSolo is not null,
             _ => false
         });
     }
@@ -172,6 +177,9 @@ public static class CompetitionChallengeRulesContractMapper
                     ControlPointsPerInterval = value.ControlPointsPerInterval
                 };
                 break;
+            case NoCTF.Domain.LiveSolo.LiveSoloCompetitionChallengeRules:
+                result.LiveSolo = new LiveSoloCompetitionChallengeRulesContract();
+                break;
             default:
                 throw new InvalidOperationException($"Unsupported rules {value.GetType().Name}.");
         }
@@ -233,6 +241,7 @@ public static class CompetitionChallengeRulesContractMapper
                 PollIntervalSeconds = value.Koh!.PollIntervalSeconds,
                 ControlPointsPerInterval = value.Koh.ControlPointsPerInterval
             },
+            GameModeProtocol.LiveSolo => new NoCTF.Domain.LiveSolo.LiveSoloCompetitionChallengeRules(),
             _ => throw new InvalidOperationException("Unsupported rules mode.")
         };
         result.CompetitionChallengeId = competitionChallengeId;

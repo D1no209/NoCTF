@@ -19,6 +19,7 @@ public sealed class ActiveRuntimeSlot
             throw new InvalidOperationException(
                 $"Runtime {instance.Id} has no scope from which to build an active slot.");
         var team = instance.TeamId?.ToString("N") ?? "shared";
-        return $"competition-challenge:{competitionChallengeId:N}:team:{team}:purpose:{(short)instance.Purpose}";
+        var key = $"competition-challenge:{competitionChallengeId:N}:team:{team}:purpose:{(short)instance.Purpose}";
+        return instance.ExecutionScopeId is Guid executionScopeId ? $"{key}:scope:{executionScopeId:N}" : key;
     }
 }

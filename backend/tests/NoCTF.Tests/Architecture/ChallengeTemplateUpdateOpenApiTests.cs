@@ -76,7 +76,7 @@ public sealed class ChallengeTemplateUpdateOpenApiTests
         await AssertNamedStringEnumAsync(
             root,
             content.GetProperty("properties").GetProperty("mode"),
-            ["Ctf", "Awd", "Awdp", "Koh"]);
+            ["Ctf", "Awd", "Awdp", "Koh", "LiveSolo"]);
         await AssertNamedStringEnumAsync(
             root,
             content.GetProperty("properties").GetProperty("visibility"),

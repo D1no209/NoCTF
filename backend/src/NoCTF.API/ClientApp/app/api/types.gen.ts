@@ -727,6 +727,37 @@ export type NoCtfapiEndpointsNotificationsReadNotificationFeedRequest = {
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsLiveSoloLiveSoloConfigurationContract = {
+    enabled?: boolean;
+    bracketFormat?: NoCtfapiEndpointsLiveSoloLiveSoloBracketFormatProtocol;
+    requiredWins?: number;
+    countdownSeconds?: number;
+    questionIntervalSeconds?: number;
+    roundLimitSeconds?: number;
+    publicDelaySeconds?: number;
+    participantsMayViewOpponents?: boolean;
+    recordingEnabled?: boolean;
+    recordingRetentionDays?: number;
+    maximumConcurrentMatches?: number;
+    maximumRosterMembers?: number;
+    maximumViewers?: number;
+    stageRules?: Array<NoCtfapiEndpointsLiveSoloLiveSoloStageRuleContract>;
+};
+
+export type NoCtfapiEndpointsLiveSoloLiveSoloBracketFormatProtocol = 'SingleElimination' | 'DoubleElimination';
+
+export type NoCtfapiEndpointsLiveSoloLiveSoloStageRuleContract = {
+    lane?: NoCtfapiEndpointsLiveSoloLiveSoloBracketLaneProtocol;
+    stage?: number;
+    requiredWins?: number;
+};
+
+export type NoCtfapiEndpointsLiveSoloLiveSoloBracketLaneProtocol = 'Winners' | 'Losers' | 'GrandFinal' | 'ResetFinal';
+
+export type NoCtfapiEndpointsLiveSoloGetLiveSoloConfigurationRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsInternalInternalResultResponse = {
     disposition?: NoCtfapiEndpointsInternalInternalResultDispositionProtocol;
     detail?: string | null;
@@ -1026,7 +1057,7 @@ export type NoCtfapiEndpointsCompetitionsCompetitionResponse = {
     singleWriteUpDeadlineAt?: string | null;
 };
 
-export type NoCtfapiEndpointsCompetitionsGameModeProtocol = 'Ctf' | 'Awd' | 'Awdp' | 'Koh';
+export type NoCtfapiEndpointsCompetitionsGameModeProtocol = 'Ctf' | 'Awd' | 'Awdp' | 'Koh' | 'LiveSolo';
 
 export type NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol = 'Draft' | 'Visible' | 'Published' | 'Running' | 'Paused' | 'Finished';
 
@@ -3505,6 +3536,7 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurat
     awd?: NoCtfapiEndpointsAdministrationCompetitionsAwdCompetitionModeConfigurationContract | null;
     awdp?: NoCtfapiEndpointsAdministrationCompetitionsAwdpCompetitionModeConfigurationContract | null;
     koh?: NoCtfapiEndpointsAdministrationCompetitionsKohCompetitionModeConfigurationContract | null;
+    liveSolo?: NoCtfapiEndpointsLiveSoloLiveSoloConfigurationContract | null;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsFlagTemplateContract = {
@@ -4077,6 +4109,7 @@ export type NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesCo
     awd?: NoCtfapiEndpointsAdministrationChallengesAwdCompetitionChallengeRulesContract | null;
     awdp?: NoCtfapiEndpointsAdministrationChallengesAwdpCompetitionChallengeRulesContract | null;
     koh?: NoCtfapiEndpointsAdministrationChallengesKohCompetitionChallengeRulesContract | null;
+    liveSolo?: NoCtfapiEndpointsAdministrationChallengesLiveSoloCompetitionChallengeRulesContract | null;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengesCtfCompetitionChallengeRulesContract = {
@@ -4115,6 +4148,10 @@ export type NoCtfapiEndpointsAdministrationChallengesAwdpCompetitionChallengeRul
 export type NoCtfapiEndpointsAdministrationChallengesKohCompetitionChallengeRulesContract = {
     pollIntervalSeconds?: number | null;
     controlPointsPerInterval?: number | null;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengesLiveSoloCompetitionChallengeRulesContract = {
+    [key: string]: never;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengesGetAdminChallengeRequest = {
@@ -4222,6 +4259,7 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContr
     awd?: NoCtfapiEndpointsAdministrationChallengeBankAwdChallengeDefinitionContract | null;
     awdp?: NoCtfapiEndpointsAdministrationChallengeBankAwdpChallengeDefinitionContract | null;
     koh?: NoCtfapiEndpointsAdministrationChallengeBankKohChallengeDefinitionContract | null;
+    liveSolo?: NoCtfapiEndpointsAdministrationChallengeBankLiveSoloChallengeDefinitionContract | null;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeContract = {
@@ -4315,6 +4353,10 @@ export type NoCtfapiEndpointsAdministrationChallengeBankAwdpChallengeDefinitionC
 };
 
 export type NoCtfapiEndpointsAdministrationChallengeBankKohChallengeDefinitionContract = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankLiveSoloChallengeDefinitionContract = {
     [key: string]: never;
 };
 
@@ -5658,6 +5700,39 @@ export type ReadNotificationThreadEndpointResponses = {
 };
 
 export type ReadNotificationThreadEndpointResponse = ReadNotificationThreadEndpointResponses[keyof ReadNotificationThreadEndpointResponses];
+
+export type GetLiveSoloConfigurationData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/configuration';
+};
+
+export type GetLiveSoloConfigurationErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetLiveSoloConfigurationResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsLiveSoloLiveSoloConfigurationContract;
+};
+
+export type GetLiveSoloConfigurationResponse = GetLiveSoloConfigurationResponses[keyof GetLiveSoloConfigurationResponses];
 
 export type DownloadFixArchiveEndpointData = {
     body?: never;

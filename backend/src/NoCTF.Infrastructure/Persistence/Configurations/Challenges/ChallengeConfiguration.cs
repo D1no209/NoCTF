@@ -26,10 +26,11 @@ internal sealed class ChallengeEntityConfiguration : IEntityTypeConfiguration<Ch
             .HasValue<CtfChallenge>(GameMode.Ctf)
             .HasValue<AwdChallenge>(GameMode.Awd)
             .HasValue<AwdpChallenge>(GameMode.Awdp)
-            .HasValue<KohChallenge>(GameMode.Koh);
+            .HasValue<KohChallenge>(GameMode.Koh)
+            .HasValue<LiveSoloChallenge>(GameMode.LiveSolo);
         builder.Property(challenge => challenge.Mode)
             .HasConversion<GameModeStringConverter>()
-            .HasMaxLength(4);
+            .HasMaxLength(8);
         builder.HasOne(challenge => challenge.Definition)
             .WithOne()
             .HasForeignKey<ChallengeDefinition>(definition => definition.ChallengeId)

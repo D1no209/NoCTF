@@ -44,10 +44,11 @@ internal sealed class CompetitionEntityConfiguration : IEntityTypeConfiguration<
             .HasValue<CtfCompetition>(GameMode.Ctf)
             .HasValue<AwdCompetition>(GameMode.Awd)
             .HasValue<AwdpCompetition>(GameMode.Awdp)
-            .HasValue<KohCompetition>(GameMode.Koh);
+            .HasValue<KohCompetition>(GameMode.Koh)
+            .HasValue<LiveSoloCompetition>(GameMode.LiveSolo);
         builder.Property(competition => competition.Mode)
             .HasConversion<GameModeStringConverter>()
-            .HasMaxLength(4);
+            .HasMaxLength(8);
         builder.Property(competition => competition.Status).HasConversion<short>();
         builder.Property(competition => competition.RuntimeAccessMode)
             .HasConversion<short>()
@@ -87,10 +88,11 @@ internal sealed class CompetitionModeConfigurationEntityConfiguration
             .HasValue<CtfCompetitionModeConfiguration>(GameMode.Ctf)
             .HasValue<AwdCompetitionModeConfiguration>(GameMode.Awd)
             .HasValue<AwdpCompetitionModeConfiguration>(GameMode.Awdp)
-            .HasValue<KohCompetitionModeConfiguration>(GameMode.Koh);
+            .HasValue<KohCompetitionModeConfiguration>(GameMode.Koh)
+            .HasValue<NoCTF.Domain.LiveSolo.LiveSoloCompetitionModeConfiguration>(GameMode.LiveSolo);
         builder.Property(configuration => configuration.Mode)
             .HasConversion<GameModeStringConverter>()
-            .HasMaxLength(4);
+            .HasMaxLength(8);
         builder.ComplexProperty(configuration => configuration.FlagTemplate);
     }
 }

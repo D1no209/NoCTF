@@ -17,7 +17,8 @@ public enum GameModeProtocol
     Ctf,
     Awd,
     Awdp,
-    Koh
+    Koh,
+    LiveSolo
 }
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<CompetitionStatusProtocol>))]

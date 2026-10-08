@@ -40,7 +40,7 @@ export const competitionContextKey: InjectionKey<CompetitionContext> = Symbol('c
 
 export function gameModeLabel(mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol): string {
   if (!mode) return translate("common.label.unknown")
-  const labels = { Ctf: 'CTF', Awd: 'AWD', Awdp: 'AWDP', Koh: 'KoH' } satisfies Record<NoCtfapiEndpointsCompetitionsGameModeProtocol, string>
+  const labels = { Ctf: 'CTF', Awd: 'AWD', Awdp: 'AWDP', Koh: 'KoH', LiveSolo: 'LiveSolo' } satisfies Record<NoCtfapiEndpointsCompetitionsGameModeProtocol, string>
   return labels[mode]
 }
 

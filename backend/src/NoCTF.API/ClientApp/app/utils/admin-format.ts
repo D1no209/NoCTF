@@ -22,7 +22,7 @@ import { localeTag, translate } from './i18n'
 /** Protocol enum label maps. HTTP enums are PascalCase strings. */
 
 export const GameModeLabel = {
-  Ctf: 'CTF', Awd: 'AWD', Awdp: 'AWDP', Koh: 'KoH',
+  Ctf: 'CTF', Awd: 'AWD', Awdp: 'AWDP', Koh: 'KoH', LiveSolo: 'LiveSolo',
 } satisfies Record<NoCtfapiEndpointsCompetitionsGameModeProtocol, string>
 
 export const CompetitionStatusLabel = {

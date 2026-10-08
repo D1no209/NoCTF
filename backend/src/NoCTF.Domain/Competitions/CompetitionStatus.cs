@@ -17,5 +17,6 @@ public enum GameMode
     Ctf,
     Awd,
     Awdp,
-    Koh
+    Koh,
+    LiveSolo
 }

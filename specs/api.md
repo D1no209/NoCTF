@@ -741,3 +741,11 @@ POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/wr
 PUT /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/writeups/draft
 PUT /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/writeups/draft/pdf
 ```
+
+## LiveSolo
+
+独立对局与媒体业务不使用普通题目计分投影；配置、上场名单、Round 与执行作用域分别鉴权。
+
+```text
+GET /api/v1/competitions/{competitionId}/live-solo/configuration
+```

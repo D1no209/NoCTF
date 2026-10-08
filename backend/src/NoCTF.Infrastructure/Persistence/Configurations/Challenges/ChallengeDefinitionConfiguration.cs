@@ -16,10 +16,11 @@ internal sealed class ChallengeDefinitionConfiguration : IEntityTypeConfiguratio
             .HasValue<CtfChallengeDefinition>(GameMode.Ctf)
             .HasValue<AwdChallengeDefinition>(GameMode.Awd)
             .HasValue<AwdpChallengeDefinition>(GameMode.Awdp)
-            .HasValue<KohChallengeDefinition>(GameMode.Koh);
+            .HasValue<KohChallengeDefinition>(GameMode.Koh)
+            .HasValue<NoCTF.Domain.LiveSolo.LiveSoloChallengeDefinition>(GameMode.LiveSolo);
         builder.Property(definition => definition.Mode)
             .HasConversion<GameModeStringConverter>()
-            .HasMaxLength(4);
+            .HasMaxLength(8);
         builder.ComplexProperty(definition => definition.FlagTemplate);
         builder.HasOne(definition => definition.Runtime)
             .WithOne()
@@ -179,10 +180,11 @@ internal sealed class CompetitionChallengeRulesConfiguration
             .HasValue<CtfCompetitionChallengeRules>(GameMode.Ctf)
             .HasValue<AwdCompetitionChallengeRules>(GameMode.Awd)
             .HasValue<AwdpCompetitionChallengeRules>(GameMode.Awdp)
-            .HasValue<KohCompetitionChallengeRules>(GameMode.Koh);
+            .HasValue<KohCompetitionChallengeRules>(GameMode.Koh)
+            .HasValue<NoCTF.Domain.LiveSolo.LiveSoloCompetitionChallengeRules>(GameMode.LiveSolo);
         builder.Property(rules => rules.Mode)
             .HasConversion<GameModeStringConverter>()
-            .HasMaxLength(4);
+            .HasMaxLength(8);
         builder.Property(rules => rules.AttackRewardMode).HasConversion<short>();
         builder.Property(rules => rules.EvaluationDispatchMode).HasConversion<short>();
         builder.ComplexProperty(rules => rules.ScoreCurve,

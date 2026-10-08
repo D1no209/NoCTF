@@ -80,8 +80,8 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
 
                     b.Property<string>("Mode")
                         .IsRequired()
-                        .HasMaxLength(4)
-                        .HasColumnType("character varying(4)")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
                         .HasColumnName("mode");
 
                     b.Property<string>("NormalizedDirection")
@@ -218,8 +218,8 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
 
                     b.Property<string>("Mode")
                         .IsRequired()
-                        .HasMaxLength(4)
-                        .HasColumnType("character varying(4)")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
                         .HasColumnName("mode");
 
                     b.Property<string>("PatchEntrypoint")
@@ -650,8 +650,8 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
 
                     b.Property<string>("Mode")
                         .IsRequired()
-                        .HasMaxLength(4)
-                        .HasColumnType("character varying(4)")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
                         .HasColumnName("mode");
 
                     b.Property<string>("NormalizedCustomTitle")
@@ -794,8 +794,8 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
 
                     b.Property<string>("Mode")
                         .IsRequired()
-                        .HasMaxLength(4)
-                        .HasColumnType("character varying(4)")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
                         .HasColumnName("mode");
 
                     b.Property<int?>("PollIntervalSeconds")
@@ -1304,8 +1304,8 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
 
                     b.Property<string>("Mode")
                         .IsRequired()
-                        .HasMaxLength(4)
-                        .HasColumnType("character varying(4)")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
                         .HasColumnName("mode");
 
                     b.Property<string>("NormalizedTitle")
@@ -1478,8 +1478,8 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
 
                     b.Property<string>("Mode")
                         .IsRequired()
-                        .HasMaxLength(4)
-                        .HasColumnType("character varying(4)")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
                         .HasColumnName("mode");
 
                     b.ComplexProperty(typeof(Dictionary<string, object>), "FlagTemplate", "NoCTF.Domain.Competitions.CompetitionModeConfiguration.FlagTemplate#FlagTemplateValue", b1 =>
@@ -3050,6 +3050,863 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.ToTable("users", (string)null);
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloActiveTeamSlot", b =>
+                {
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("team_id");
+
+                    b.Property<Guid>("MatchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("match_id");
+
+                    b.HasKey("CompetitionId", "TeamId")
+                        .HasName("pk_live_solo_active_team_slots");
+
+                    b.HasIndex("MatchId")
+                        .HasDatabaseName("ix_live_solo_active_team_slots_match_id");
+
+                    b.HasIndex("TeamId")
+                        .HasDatabaseName("ix_live_solo_active_team_slots_team_id");
+
+                    b.ToTable("live_solo_active_team_slots", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloChallengeSource", b =>
+                {
+                    b.Property<Guid>("ChallengeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("challenge_id");
+
+                    b.Property<Guid>("CanonicalChallengeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("canonical_challenge_id");
+
+                    b.Property<long>("CopiedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("copied_at");
+
+                    b.Property<Guid>("OriginalChallengeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("original_challenge_id");
+
+                    b.HasKey("ChallengeId")
+                        .HasName("pk_live_solo_challenge_sources");
+
+                    b.HasIndex("CanonicalChallengeId")
+                        .HasDatabaseName("ix_live_solo_challenge_sources_canonical_challenge_id");
+
+                    b.ToTable("live_solo_challenge_sources", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloDownloadEvidence", b =>
+                {
+                    b.Property<Guid>("GameplayFactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("gameplay_fact_id");
+
+                    b.Property<Guid>("RoundQuestionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("round_question_id");
+
+                    b.HasKey("GameplayFactId")
+                        .HasName("pk_live_solo_download_evidence");
+
+                    b.HasIndex("RoundQuestionId")
+                        .HasDatabaseName("ix_live_solo_download_evidence_round_question_id");
+
+                    b.ToTable("live_solo_download_evidence", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloMatch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AdjudicationReason")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("adjudication_reason");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<long?>("CompletedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("completed_at");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<bool>("Conditional")
+                        .HasColumnType("boolean")
+                        .HasColumnName("conditional");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CurrentRoundId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("current_round_id");
+
+                    b.Property<short>("Lane")
+                        .HasColumnType("smallint")
+                        .HasColumnName("lane");
+
+                    b.Property<int>("LeftWins")
+                        .HasColumnType("integer")
+                        .HasColumnName("left_wins");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<int>("RequiredWins")
+                        .HasColumnType("integer")
+                        .HasColumnName("required_wins");
+
+                    b.Property<int>("RightWins")
+                        .HasColumnType("integer")
+                        .HasColumnName("right_wins");
+
+                    b.Property<int>("Stage")
+                        .HasColumnType("integer")
+                        .HasColumnName("stage");
+
+                    b.Property<long?>("StartedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("started_at");
+
+                    b.Property<short>("State")
+                        .HasColumnType("smallint")
+                        .HasColumnName("state");
+
+                    b.Property<Guid?>("WinnerTeamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("winner_team_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_live_solo_matches");
+
+                    b.HasIndex("CurrentRoundId")
+                        .HasDatabaseName("ix_live_solo_matches_current_round_id");
+
+                    b.HasIndex("WinnerTeamId")
+                        .HasDatabaseName("ix_live_solo_matches_winner_team_id");
+
+                    b.HasIndex("CompetitionId", "Lane", "Stage", "Position")
+                        .IsUnique()
+                        .HasDatabaseName("ix_live_solo_matches_competition_id_lane_stage_position");
+
+                    b.ToTable("live_solo_matches", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloMatchSlot", b =>
+                {
+                    b.Property<Guid>("MatchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("match_id");
+
+                    b.Property<short>("Side")
+                        .HasColumnType("smallint")
+                        .HasColumnName("side");
+
+                    b.Property<long?>("ReadyConfirmedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("ready_confirmed_at");
+
+                    b.Property<bool>("Resolved")
+                        .HasColumnType("boolean")
+                        .HasColumnName("resolved");
+
+                    b.Property<long?>("RosterLockedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("roster_locked_at");
+
+                    b.Property<int?>("Seed")
+                        .HasColumnType("integer")
+                        .HasColumnName("seed");
+
+                    b.Property<short>("Source")
+                        .HasColumnType("smallint")
+                        .HasColumnName("source");
+
+                    b.Property<Guid?>("SourceMatchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_match_id");
+
+                    b.Property<Guid?>("TeamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("team_id");
+
+                    b.HasKey("MatchId", "Side")
+                        .HasName("pk_live_solo_match_slots");
+
+                    b.HasIndex("SourceMatchId")
+                        .HasDatabaseName("ix_live_solo_match_slots_source_match_id");
+
+                    b.HasIndex("TeamId")
+                        .HasDatabaseName("ix_live_solo_match_slots_team_id");
+
+                    b.ToTable("live_solo_match_slots", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloMediaParticipant", b =>
+                {
+                    b.Property<Guid>("MediaSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("media_session_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("Identity")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("identity");
+
+                    b.Property<long>("ObservedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("observed_at");
+
+                    b.Property<short>("ScreenState")
+                        .HasColumnType("smallint")
+                        .HasColumnName("screen_state");
+
+                    b.Property<string>("ScreenTrackId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("screen_track_id");
+
+                    b.Property<short>("Side")
+                        .HasColumnType("smallint")
+                        .HasColumnName("side");
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("team_id");
+
+                    b.HasKey("MediaSessionId", "UserId")
+                        .HasName("pk_live_solo_media_participants");
+
+                    b.HasIndex("TeamId")
+                        .HasDatabaseName("ix_live_solo_media_participants_team_id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_live_solo_media_participants_user_id");
+
+                    b.HasIndex("MediaSessionId", "Identity")
+                        .IsUnique()
+                        .HasDatabaseName("ix_live_solo_media_participants_media_session_id_identity");
+
+                    b.ToTable("live_solo_media_participants", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloMediaSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("Generation")
+                        .HasColumnType("uuid")
+                        .HasColumnName("generation");
+
+                    b.Property<Guid>("MatchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("match_id");
+
+                    b.Property<bool>("ParticipantsMayViewOpponents")
+                        .HasColumnType("boolean")
+                        .HasColumnName("participants_may_view_opponents");
+
+                    b.Property<int>("PublicDelaySeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("public_delay_seconds");
+
+                    b.Property<bool>("RecordingEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("recording_enabled");
+
+                    b.Property<string>("RoomIdentity")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("room_identity");
+
+                    b.Property<short>("State")
+                        .HasColumnType("smallint")
+                        .HasColumnName("state");
+
+                    b.Property<long?>("StoppedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("stopped_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_live_solo_media_sessions");
+
+                    b.HasIndex("RoomIdentity")
+                        .IsUnique()
+                        .HasDatabaseName("ix_live_solo_media_sessions_room_identity");
+
+                    b.HasIndex("MatchId", "Generation")
+                        .IsUnique()
+                        .HasDatabaseName("ix_live_solo_media_sessions_match_id_generation");
+
+                    b.ToTable("live_solo_media_sessions", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloPauseInterval", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long?>("EndedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("ended_at");
+
+                    b.Property<Guid>("RoundId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("round_id");
+
+                    b.Property<short>("Source")
+                        .HasColumnType("smallint")
+                        .HasColumnName("source");
+
+                    b.Property<long>("StartedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("started_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_live_solo_pause_intervals");
+
+                    b.HasIndex("RoundId", "StartedAt")
+                        .HasDatabaseName("ix_live_solo_pause_intervals_round_id_started_at");
+
+                    b.ToTable("live_solo_pause_intervals", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloProgramSegment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("EndedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("ended_at");
+
+                    b.Property<Guid>("FileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("file_id");
+
+                    b.Property<Guid>("MediaSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("media_session_id");
+
+                    b.Property<long>("PublicAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("public_at");
+
+                    b.Property<long>("RemoveAfter")
+                        .HasColumnType("bigint")
+                        .HasColumnName("remove_after");
+
+                    b.Property<long>("Sequence")
+                        .HasColumnType("bigint")
+                        .HasColumnName("sequence");
+
+                    b.Property<long>("StartedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("started_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_live_solo_program_segments");
+
+                    b.HasIndex("FileId")
+                        .HasDatabaseName("ix_live_solo_program_segments_file_id");
+
+                    b.HasIndex("RemoveAfter")
+                        .HasDatabaseName("ix_live_solo_program_segments_remove_after");
+
+                    b.HasIndex("MediaSessionId", "Sequence")
+                        .IsUnique()
+                        .HasDatabaseName("ix_live_solo_program_segments_media_session_id_sequence");
+
+                    b.ToTable("live_solo_program_segments", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloQuestionExposure", b =>
+                {
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<Guid>("CanonicalChallengeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("canonical_challenge_id");
+
+                    b.Property<Guid>("MatchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("match_id");
+
+                    b.Property<long>("PublicAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("public_at");
+
+                    b.HasKey("CompetitionId", "CanonicalChallengeId")
+                        .HasName("pk_live_solo_question_exposures");
+
+                    b.HasIndex("MatchId")
+                        .HasDatabaseName("ix_live_solo_question_exposures_match_id");
+
+                    b.ToTable("live_solo_question_exposures", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloQuestionGroup", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<bool>("Reserve")
+                        .HasColumnType("boolean")
+                        .HasColumnName("reserve");
+
+                    b.Property<int?>("RoundLimitSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("round_limit_seconds");
+
+                    b.HasKey("Id")
+                        .HasName("pk_live_solo_question_groups");
+
+                    b.HasIndex("CompetitionId", "Position")
+                        .IsUnique()
+                        .HasDatabaseName("ix_live_solo_question_groups_competition_id_position");
+
+                    b.ToTable("live_solo_question_groups", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloQuestionGroupItem", b =>
+                {
+                    b.Property<Guid>("QuestionGroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("question_group_id");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<Guid>("CompetitionChallengeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_challenge_id");
+
+                    b.Property<int?>("OpenOffsetSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("open_offset_seconds");
+
+                    b.HasKey("QuestionGroupId", "Position")
+                        .HasName("pk_live_solo_question_group_items");
+
+                    b.HasIndex("CompetitionChallengeId")
+                        .HasDatabaseName("ix_live_solo_question_group_items_competition_challenge_id");
+
+                    b.HasIndex("QuestionGroupId", "CompetitionChallengeId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_live_solo_question_group_items_question_group_id_competitio");
+
+                    b.ToTable("live_solo_question_group_items", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloRecording", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_at");
+
+                    b.Property<bool>("DisputeHold")
+                        .HasColumnType("boolean")
+                        .HasColumnName("dispute_hold");
+
+                    b.Property<string>("EgressId")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("egress_id");
+
+                    b.Property<long?>("EndedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("ended_at");
+
+                    b.Property<Guid?>("FileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("file_id");
+
+                    b.Property<long>("KeepUntil")
+                        .HasColumnType("bigint")
+                        .HasColumnName("keep_until");
+
+                    b.Property<Guid>("MediaSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("media_session_id");
+
+                    b.Property<bool>("Published")
+                        .HasColumnType("boolean")
+                        .HasColumnName("published");
+
+                    b.Property<Guid?>("RoundId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("round_id");
+
+                    b.Property<long?>("StartedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("started_at");
+
+                    b.Property<short>("State")
+                        .HasColumnType("smallint")
+                        .HasColumnName("state");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_live_solo_recordings");
+
+                    b.HasIndex("FileId")
+                        .HasDatabaseName("ix_live_solo_recordings_file_id");
+
+                    b.HasIndex("MediaSessionId")
+                        .HasDatabaseName("ix_live_solo_recordings_media_session_id");
+
+                    b.HasIndex("RoundId")
+                        .HasDatabaseName("ix_live_solo_recordings_round_id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_live_solo_recordings_user_id");
+
+                    b.HasIndex("State", "KeepUntil")
+                        .HasDatabaseName("ix_live_solo_recordings_state_keep_until");
+
+                    b.ToTable("live_solo_recordings", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloRosterMember", b =>
+                {
+                    b.Property<Guid>("MatchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("match_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<long>("ConfirmedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("confirmed_at");
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("team_id");
+
+                    b.HasKey("MatchId", "UserId")
+                        .HasName("pk_live_solo_roster_members");
+
+                    b.HasIndex("TeamId")
+                        .HasDatabaseName("ix_live_solo_roster_members_team_id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_live_solo_roster_members_user_id");
+
+                    b.ToTable("live_solo_roster_members", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloRound", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AdjudicationReason")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("adjudication_reason");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<long?>("CountdownAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("countdown_at");
+
+                    b.Property<int>("CountdownSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("countdown_seconds");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_at");
+
+                    b.Property<long?>("EndedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("ended_at");
+
+                    b.Property<long>("LastAdmissionSequence")
+                        .HasColumnType("bigint")
+                        .HasColumnName("last_admission_sequence");
+
+                    b.Property<long>("LastResolvedSequence")
+                        .HasColumnType("bigint")
+                        .HasColumnName("last_resolved_sequence");
+
+                    b.Property<int>("LimitSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("limit_seconds");
+
+                    b.Property<Guid>("MatchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("match_id");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("integer")
+                        .HasColumnName("number");
+
+                    b.Property<Guid>("QuestionGroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("question_group_id");
+
+                    b.Property<int>("Replay")
+                        .HasColumnType("integer")
+                        .HasColumnName("replay");
+
+                    b.Property<long?>("StartedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("started_at");
+
+                    b.Property<short>("State")
+                        .HasColumnType("smallint")
+                        .HasColumnName("state");
+
+                    b.Property<long>("TimelineRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("timeline_revision");
+
+                    b.Property<Guid?>("WinnerTeamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("winner_team_id");
+
+                    b.Property<Guid?>("WinningGameplayFactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("winning_gameplay_fact_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_live_solo_rounds");
+
+                    b.HasIndex("QuestionGroupId")
+                        .HasDatabaseName("ix_live_solo_rounds_question_group_id");
+
+                    b.HasIndex("WinnerTeamId")
+                        .HasDatabaseName("ix_live_solo_rounds_winner_team_id");
+
+                    b.HasIndex("WinningGameplayFactId")
+                        .HasDatabaseName("ix_live_solo_rounds_winning_gameplay_fact_id");
+
+                    b.HasIndex("MatchId", "Number", "Replay")
+                        .IsUnique()
+                        .HasDatabaseName("ix_live_solo_rounds_match_id_number_replay");
+
+                    b.ToTable("live_solo_rounds", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloRoundQuestion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CompetitionChallengeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_challenge_id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<int>("OpenOffsetSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("open_offset_seconds");
+
+                    b.Property<long?>("OpenedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("opened_at");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<short>("Readiness")
+                        .HasColumnType("smallint")
+                        .HasColumnName("readiness");
+
+                    b.Property<Guid>("RoundId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("round_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_live_solo_round_questions");
+
+                    b.HasIndex("CompetitionChallengeId")
+                        .HasDatabaseName("ix_live_solo_round_questions_competition_challenge_id");
+
+                    b.HasIndex("RoundId", "CompetitionChallengeId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_live_solo_round_questions_round_id_competition_challenge_id");
+
+                    b.HasIndex("RoundId", "Position")
+                        .IsUnique()
+                        .HasDatabaseName("ix_live_solo_round_questions_round_id_position");
+
+                    b.ToTable("live_solo_round_questions", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloRuntimeBinding", b =>
+                {
+                    b.Property<Guid>("RoundQuestionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("round_question_id");
+
+                    b.Property<short>("Side")
+                        .HasColumnType("smallint")
+                        .HasColumnName("side");
+
+                    b.Property<Guid>("RuntimeInstanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("runtime_instance_id");
+
+                    b.HasKey("RoundQuestionId", "Side")
+                        .HasName("pk_live_solo_runtime_bindings");
+
+                    b.HasIndex("RuntimeInstanceId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_live_solo_runtime_bindings_runtime_instance_id");
+
+                    b.ToTable("live_solo_runtime_bindings", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloStageRule", b =>
+                {
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<short>("Lane")
+                        .HasColumnType("smallint")
+                        .HasColumnName("lane");
+
+                    b.Property<int>("Stage")
+                        .HasColumnType("integer")
+                        .HasColumnName("stage");
+
+                    b.Property<int>("RequiredWins")
+                        .HasColumnType("integer")
+                        .HasColumnName("required_wins");
+
+                    b.HasKey("CompetitionId", "Lane", "Stage")
+                        .HasName("pk_live_solo_stage_rules");
+
+                    b.ToTable("live_solo_stage_rules", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloSubmission", b =>
+                {
+                    b.Property<Guid>("GameplayFactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("gameplay_fact_id");
+
+                    b.Property<long>("AdmissionSequence")
+                        .HasColumnType("bigint")
+                        .HasColumnName("admission_sequence");
+
+                    b.Property<Guid>("RoundId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("round_id");
+
+                    b.Property<Guid>("RoundQuestionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("round_question_id");
+
+                    b.HasKey("GameplayFactId")
+                        .HasName("pk_live_solo_submissions");
+
+                    b.HasIndex("RoundQuestionId")
+                        .HasDatabaseName("ix_live_solo_submissions_round_question_id");
+
+                    b.HasIndex("RoundId", "AdmissionSequence")
+                        .IsUnique()
+                        .HasDatabaseName("ix_live_solo_submissions_round_id_admission_sequence");
+
+                    b.ToTable("live_solo_submissions", (string)null);
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Notifications.Notification", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3817,6 +4674,10 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Property<long>("CreatedAt")
                         .HasColumnType("bigint")
                         .HasColumnName("created_at");
+
+                    b.Property<Guid?>("ExecutionScopeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("execution_scope_id");
 
                     b.Property<long?>("ExpiresAt")
                         .HasColumnType("bigint")
@@ -4923,6 +5784,15 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.HasDiscriminator().HasValue("koh");
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Challenges.LiveSoloChallenge", b =>
+                {
+                    b.HasBaseType("NoCTF.Domain.Challenges.Challenge");
+
+                    b.ToTable("challenges", (string)null);
+
+                    b.HasDiscriminator().HasValue("livesolo");
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Challenges.AwdChallengeDefinition", b =>
                 {
                     b.HasBaseType("NoCTF.Domain.Challenges.ChallengeDefinition");
@@ -4973,6 +5843,15 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.ToTable("challenge_definitions", (string)null);
 
                     b.HasDiscriminator().HasValue("koh");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloChallengeDefinition", b =>
+                {
+                    b.HasBaseType("NoCTF.Domain.Challenges.ChallengeDefinition");
+
+                    b.ToTable("challenge_definitions", (string)null);
+
+                    b.HasDiscriminator().HasValue("livesolo");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Challenges.AwdRoundChallengeFlag", b =>
@@ -5105,6 +5984,15 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.HasDiscriminator().HasValue("koh");
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Challenges.LiveSoloCompetitionChallenge", b =>
+                {
+                    b.HasBaseType("NoCTF.Domain.Challenges.CompetitionChallenge");
+
+                    b.ToTable("competition_challenges", (string)null);
+
+                    b.HasDiscriminator().HasValue("livesolo");
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Challenges.AwdCompetitionChallengeRules", b =>
                 {
                     b.HasBaseType("NoCTF.Domain.Challenges.CompetitionChallengeRules");
@@ -5143,6 +6031,15 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.ToTable("competition_challenge_rules", (string)null);
 
                     b.HasDiscriminator().HasValue("koh");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloCompetitionChallengeRules", b =>
+                {
+                    b.HasBaseType("NoCTF.Domain.Challenges.CompetitionChallengeRules");
+
+                    b.ToTable("competition_challenge_rules", (string)null);
+
+                    b.HasDiscriminator().HasValue("livesolo");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Commands.AdminRuntimeMutationCommandReceipt", b =>
@@ -5251,6 +6148,15 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.ToTable("competitions", (string)null);
 
                     b.HasDiscriminator().HasValue("koh");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.LiveSoloCompetition", b =>
+                {
+                    b.HasBaseType("NoCTF.Domain.Competitions.Competition");
+
+                    b.ToTable("competitions", (string)null);
+
+                    b.HasDiscriminator().HasValue("livesolo");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Competitions.AwdCompetitionModeConfiguration", b =>
@@ -5448,6 +6354,67 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.ToTable("competition_mode_configurations", (string)null);
 
                     b.HasDiscriminator().HasValue("koh");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloCompetitionModeConfiguration", b =>
+                {
+                    b.HasBaseType("NoCTF.Domain.Competitions.CompetitionModeConfiguration");
+
+                    b.Property<short>("BracketFormat")
+                        .HasColumnType("smallint")
+                        .HasColumnName("bracket_format");
+
+                    b.Property<int>("CountdownSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("countdown_seconds");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enabled");
+
+                    b.Property<int>("MaximumConcurrentMatches")
+                        .HasColumnType("integer")
+                        .HasColumnName("maximum_concurrent_matches");
+
+                    b.Property<int>("MaximumRosterMembers")
+                        .HasColumnType("integer")
+                        .HasColumnName("maximum_roster_members");
+
+                    b.Property<int>("MaximumViewers")
+                        .HasColumnType("integer")
+                        .HasColumnName("maximum_viewers");
+
+                    b.Property<bool>("ParticipantsMayViewOpponents")
+                        .HasColumnType("boolean")
+                        .HasColumnName("participants_may_view_opponents");
+
+                    b.Property<int>("PublicDelaySeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("public_delay_seconds");
+
+                    b.Property<int>("QuestionIntervalSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("question_interval_seconds");
+
+                    b.Property<bool>("RecordingEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("recording_enabled");
+
+                    b.Property<int>("RecordingRetentionDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("recording_retention_days");
+
+                    b.Property<int>("RequiredWins")
+                        .HasColumnType("integer")
+                        .HasColumnName("required_wins");
+
+                    b.Property<int>("RoundLimitSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("round_limit_seconds");
+
+                    b.ToTable("competition_mode_configurations", (string)null);
+
+                    b.HasDiscriminator().HasValue("livesolo");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Competitions.Events.AnnouncementPublishedEvent", b =>
@@ -7683,6 +8650,356 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Navigation("WallpaperFile");
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloActiveTeamSlot", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Competitions.Competition", null)
+                        .WithMany()
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_active_team_slots_competitions_competition_id");
+
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloMatch", null)
+                        .WithMany()
+                        .HasForeignKey("MatchId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_active_team_slots_live_solo_matches_match_id");
+
+                    b.HasOne("NoCTF.Domain.Teams.Team", null)
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_active_team_slots_teams_team_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloChallengeSource", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Challenges.Challenge", null)
+                        .WithOne()
+                        .HasForeignKey("NoCTF.Domain.LiveSolo.LiveSoloChallengeSource", "ChallengeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_challenge_sources_challenges_challenge_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloDownloadEvidence", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Gameplay.GameplayFact", null)
+                        .WithOne()
+                        .HasForeignKey("NoCTF.Domain.LiveSolo.LiveSoloDownloadEvidence", "GameplayFactId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_download_evidence_gameplay_facts_gameplay_fact_id");
+
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloRoundQuestion", null)
+                        .WithMany()
+                        .HasForeignKey("RoundQuestionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_download_evidence_live_solo_round_questions_round");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloMatch", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Competitions.Competition", null)
+                        .WithMany()
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_matches_competitions_competition_id");
+
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloRound", null)
+                        .WithMany()
+                        .HasForeignKey("CurrentRoundId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_live_solo_matches_live_solo_rounds_current_round_id");
+
+                    b.HasOne("NoCTF.Domain.Teams.Team", null)
+                        .WithMany()
+                        .HasForeignKey("WinnerTeamId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_live_solo_matches_teams_winner_team_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloMatchSlot", b =>
+                {
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloMatch", null)
+                        .WithMany("Slots")
+                        .HasForeignKey("MatchId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_match_slots_live_solo_matches_match_id");
+
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloMatch", null)
+                        .WithMany()
+                        .HasForeignKey("SourceMatchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_live_solo_match_slots_live_solo_matches_source_match_id");
+
+                    b.HasOne("NoCTF.Domain.Teams.Team", null)
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_live_solo_match_slots_teams_team_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloMediaParticipant", b =>
+                {
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloMediaSession", null)
+                        .WithMany("Participants")
+                        .HasForeignKey("MediaSessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_media_participants_live_solo_media_sessions_media");
+
+                    b.HasOne("NoCTF.Domain.Teams.Team", null)
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_media_participants_teams_team_id");
+
+                    b.HasOne("NoCTF.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_media_participants_users_user_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloMediaSession", b =>
+                {
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloMatch", null)
+                        .WithMany()
+                        .HasForeignKey("MatchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_media_sessions_live_solo_matches_match_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloPauseInterval", b =>
+                {
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloRound", null)
+                        .WithMany("Pauses")
+                        .HasForeignKey("RoundId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_pause_intervals_live_solo_rounds_round_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloProgramSegment", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Storage.StoredFile", null)
+                        .WithMany()
+                        .HasForeignKey("FileId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_program_segments_files_file_id");
+
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloMediaSession", null)
+                        .WithMany()
+                        .HasForeignKey("MediaSessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_program_segments_live_solo_media_sessions_media_s");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloQuestionExposure", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Competitions.Competition", null)
+                        .WithMany()
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_question_exposures_competitions_competition_id");
+
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloMatch", null)
+                        .WithMany()
+                        .HasForeignKey("MatchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_question_exposures_live_solo_matches_match_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloQuestionGroup", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Competitions.Competition", null)
+                        .WithMany()
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_question_groups_competitions_competition_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloQuestionGroupItem", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Challenges.CompetitionChallenge", null)
+                        .WithMany()
+                        .HasForeignKey("CompetitionChallengeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_question_group_items_competition_challenges_compe");
+
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloQuestionGroup", null)
+                        .WithMany("Items")
+                        .HasForeignKey("QuestionGroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_question_group_items_live_solo_question_groups_qu");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloRecording", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Storage.StoredFile", null)
+                        .WithMany()
+                        .HasForeignKey("FileId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_live_solo_recordings_files_file_id");
+
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloMediaSession", null)
+                        .WithMany()
+                        .HasForeignKey("MediaSessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_recordings_live_solo_media_sessions_media_session");
+
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloRound", null)
+                        .WithMany()
+                        .HasForeignKey("RoundId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_live_solo_recordings_live_solo_rounds_round_id");
+
+                    b.HasOne("NoCTF.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_recordings_users_user_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloRosterMember", b =>
+                {
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloMatch", null)
+                        .WithMany("Roster")
+                        .HasForeignKey("MatchId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_roster_members_live_solo_matches_match_id");
+
+                    b.HasOne("NoCTF.Domain.Teams.Team", null)
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_roster_members_teams_team_id");
+
+                    b.HasOne("NoCTF.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_roster_members_users_user_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloRound", b =>
+                {
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloMatch", null)
+                        .WithMany("Rounds")
+                        .HasForeignKey("MatchId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_rounds_live_solo_matches_match_id");
+
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloQuestionGroup", null)
+                        .WithMany()
+                        .HasForeignKey("QuestionGroupId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_rounds_live_solo_question_groups_question_group_id");
+
+                    b.HasOne("NoCTF.Domain.Teams.Team", null)
+                        .WithMany()
+                        .HasForeignKey("WinnerTeamId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_live_solo_rounds_teams_winner_team_id");
+
+                    b.HasOne("NoCTF.Domain.Gameplay.GameplayFact", null)
+                        .WithMany()
+                        .HasForeignKey("WinningGameplayFactId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_live_solo_rounds_gameplay_facts_winning_gameplay_fact_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloRoundQuestion", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Challenges.CompetitionChallenge", null)
+                        .WithMany()
+                        .HasForeignKey("CompetitionChallengeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_round_questions_competition_challenges_competitio");
+
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloRound", null)
+                        .WithMany("Questions")
+                        .HasForeignKey("RoundId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_round_questions_live_solo_rounds_round_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloRuntimeBinding", b =>
+                {
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloRoundQuestion", null)
+                        .WithMany("Runtimes")
+                        .HasForeignKey("RoundQuestionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_runtime_bindings_live_solo_round_questions_round_");
+
+                    b.HasOne("NoCTF.Domain.Runtime.RuntimeInstance", null)
+                        .WithMany()
+                        .HasForeignKey("RuntimeInstanceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_runtime_bindings_runtime_instances_runtime_instan");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloStageRule", b =>
+                {
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloCompetitionModeConfiguration", null)
+                        .WithMany("StageRules")
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_stage_rules_competition_mode_configuration_compet");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloSubmission", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Gameplay.GameplayFact", null)
+                        .WithOne()
+                        .HasForeignKey("NoCTF.Domain.LiveSolo.LiveSoloSubmission", "GameplayFactId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_submissions_gameplay_facts_gameplay_fact_id");
+
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloRound", null)
+                        .WithMany()
+                        .HasForeignKey("RoundId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_submissions_live_solo_rounds_round_id");
+
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloRoundQuestion", null)
+                        .WithMany()
+                        .HasForeignKey("RoundQuestionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_submissions_live_solo_round_questions_round_quest");
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Notifications.Notification", b =>
                 {
                     b.HasOne("NoCTF.Domain.Notifications.Notification", null)
@@ -8600,6 +9917,37 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Navigation("ExternalIdentity");
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloMatch", b =>
+                {
+                    b.Navigation("Roster");
+
+                    b.Navigation("Rounds");
+
+                    b.Navigation("Slots");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloMediaSession", b =>
+                {
+                    b.Navigation("Participants");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloQuestionGroup", b =>
+                {
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloRound", b =>
+                {
+                    b.Navigation("Pauses");
+
+                    b.Navigation("Questions");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloRoundQuestion", b =>
+                {
+                    b.Navigation("Runtimes");
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Notifications.Notification", b =>
                 {
                     b.Navigation("ReferenceCounts");
@@ -8659,6 +10007,11 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
             modelBuilder.Entity("NoCTF.Domain.Competitions.CtfCompetitionModeConfiguration", b =>
                 {
                     b.Navigation("BloodRewards");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloCompetitionModeConfiguration", b =>
+                {
+                    b.Navigation("StageRules");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Platform.OidcSsoProviderConfiguration", b =>

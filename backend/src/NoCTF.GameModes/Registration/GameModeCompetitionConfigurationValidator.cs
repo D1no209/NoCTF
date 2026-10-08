@@ -1,6 +1,8 @@
 using NoCTF.Application.Competitions.Configuration;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.LiveSolo;
+using NoCTF.GameModes.LiveSolo.Configuration;
 
 namespace NoCTF.GameModes.Registration;
 
@@ -22,6 +24,7 @@ public sealed class GameModeCompetitionConfigurationValidator : ICompetitionConf
             GameMode.Koh when configuration is KohCompetitionModeConfiguration koh =>
                 Koh.Configuration.KohConfigurationValidator.Validate(
                     TypedGameModeConfiguration.Koh(koh)),
+            GameMode.LiveSolo when configuration is LiveSoloCompetitionModeConfiguration liveSolo => LiveSoloConfigurationValidator.Validate(liveSolo),
             _ => ["The competition configuration type does not match its mode."]
         };
 

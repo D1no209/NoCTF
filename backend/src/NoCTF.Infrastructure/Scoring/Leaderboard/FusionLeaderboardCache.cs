@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Notifications;
 using NoCTF.Application.Observability;
 using NoCTF.Application.Scoring.Leaderboard;
+using NoCTF.Application.Competitions.Modes;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
@@ -155,6 +156,8 @@ public sealed class FusionLeaderboardCache(
         var competition = await db.Competitions.AsNoTracking().AsSplitQuery()
             .SingleOrDefaultAsync(candidate => candidate.Id == competitionId, ct);
         if (competition is null)
+            return null;
+        if (!CompetitionModeCapabilities.For(competition.Mode).OrdinaryScoreboard)
             return null;
         // Capture the checkpoint before reading projection inputs. A later
         // checkpoint could acknowledge a newly committed event whose facts

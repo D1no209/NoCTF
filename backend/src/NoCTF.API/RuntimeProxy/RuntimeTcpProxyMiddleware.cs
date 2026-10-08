@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Net.Sockets;
 using System.Net.WebSockets;
+using System.Security.Claims;
 using NoCTF.Application.Runtime.Access;
 
 namespace NoCTF.API.RuntimeProxy;
@@ -8,7 +9,9 @@ namespace NoCTF.API.RuntimeProxy;
 public sealed class RuntimeTcpProxyMiddleware(
     RequestDelegate next,
     ILogger<RuntimeTcpProxyMiddleware> logger,
-    RuntimeProxyOptions? configuredOptions = null)
+    RuntimeProxyOptions? configuredOptions = null,
+    IExecutionScopeAccess? executionAccess = null,
+    TimeProvider? configuredClock = null)
 {
     private static readonly PathString RoutePrefix = "/api/v1/runtime-proxies";
     private readonly RuntimeProxyOptions options = configuredOptions ?? new();
@@ -34,6 +37,18 @@ public sealed class RuntimeTcpProxyMiddleware(
         {
             context.Response.StatusCode = StatusCodes.Status404NotFound;
             return;
+        }
+        if (target.ExecutionScopeId is Guid executionScope)
+        {
+            var actorText = context.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? context.User.FindFirstValue("sub");
+            if (target.CompetitionId is not Guid competitionId || target.CompetitionChallengeId is not Guid challengeId
+                || !Guid.TryParse(actorText, out var actorId) || executionAccess is null
+                || !await executionAccess.CanAccessAsync(new(executionScope, competitionId, challengeId, target.TeamId,
+                    actorId, ExecutionScopeOperation.Read, (configuredClock ?? TimeProvider.System).GetUtcNow()), context.RequestAborted))
+            {
+                context.Response.StatusCode = StatusCodes.Status404NotFound;
+                return;
+            }
         }
 
         await using var lease = await connectionGate.TryAcquireAsync(

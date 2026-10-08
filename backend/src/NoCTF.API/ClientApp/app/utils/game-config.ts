@@ -201,17 +201,17 @@ export function emptyUrlBinding(): UrlBindingModel {
 
 export function emptyRuntimeTemplate(mode: GameModeValue): RuntimeTemplateModel {
   const accessBinding = emptyUrlBinding()
-  accessBinding.exposure = mode === 'Ctf' || mode === 'Awdp'
+  accessBinding.exposure = mode === 'Ctf' || mode === 'Awdp' || mode === 'LiveSolo'
     ? UrlExposure.OwnerOnly
     : UrlExposure.Participants
   return {
     allocation: mode === 'Koh' ? RuntimeAllocation.Shared : RuntimeAllocation.PerTeam,
-    definition: emptyContainerDefinition(mode === 'Ctf' || mode === 'Awdp'),
+    definition: emptyContainerDefinition(mode === 'Ctf' || mode === 'Awdp' || mode === 'LiveSolo'),
     limits: defaultRuntimeLimits(),
     ttlSeconds: DEFAULT_RUNTIME_TTL_SECONDS,
     operationTimeoutSeconds: DEFAULT_RUNTIME_OPERATION_TIMEOUT_SECONDS,
     urlBindings: [accessBinding],
-    flagSource: mode === 'Ctf' || mode === 'Awdp'
+    flagSource: mode === 'Ctf' || mode === 'Awdp' || mode === 'LiveSolo'
       ? FlagSource.PerTeam
       : mode === 'Awd'
         ? FlagSource.AwdRotation
@@ -372,8 +372,8 @@ export function definitionContractToModel(
   mode: GameModeValue,
 ): DefinitionModel {
   if (contract.mode !== mode) throw new Error('Challenge definition mode does not match the editor.')
-  const selected = mode === 'Ctf' ? contract.ctf : mode === 'Awd' ? contract.awd : mode === 'Awdp' ? contract.awdp : contract.koh
-  if (!selected || [contract.ctf, contract.awd, contract.awdp, contract.koh].filter(Boolean).length !== 1)
+  const selected = mode === 'Ctf' ? contract.ctf : mode === 'Awd' ? contract.awd : mode === 'Awdp' ? contract.awdp : mode === 'LiveSolo' ? contract.liveSolo : contract.koh
+  if (!selected || [contract.ctf, contract.awd, contract.awdp, contract.koh, contract.liveSolo].filter(Boolean).length !== 1)
     throw new Error('Invalid challenge definition branch.')
   const model = emptyDefinition(mode)
   model.flagTemplate = contract.flagTemplate ? parseFlagTemplate(contract.flagTemplate) : null
@@ -538,6 +538,7 @@ const POINTS_CURVE_DEFAULT: PointsCurveValue = {
 
 export function competitionConfigFields(mode: GameModeValue): ConfigFieldDef[] {
   switch (mode) {
+    case 'LiveSolo': return [] // The independent LiveSolo feature owns match and media configuration.
     case 'Ctf':
       return [
         { key: 'scoreSettlementMode', label: translate('common.label.ctfScoreSettlementMode'), type: 'select', options: CTF_SCORE_SETTLEMENT_MODES, defaultValue: 'DynamicRecalculation', description: translate('common.label.ctfScoreSettlementHint') },
@@ -583,6 +584,7 @@ export function competitionConfigFields(mode: GameModeValue): ConfigFieldDef[] {
 /** Challenge rule fields are nullable; null means inheriting the competition value. */
 export function challengeRuleFields(mode: GameModeValue): ConfigFieldDef[] {
   switch (mode) {
+    case 'LiveSolo': return [] // No challenge points or paid rule overrides in match play.
     case 'Ctf':
       return [
         { key: 'scoreSettlementMode', label: translate('common.label.ctfScoreSettlementMode'), type: 'select', options: CTF_SCORE_SETTLEMENT_MODES, defaultValue: 'DynamicRecalculation', description: translate('common.label.ctfScoreSettlementHint') },
@@ -819,6 +821,8 @@ export function definitionModelToContract(
       }
     case 'Awdp':
       return { mode, ...common, awdp: {} }
+    case 'LiveSolo':
+      return { mode, ...common, liveSolo: {}, checker: null, patchEntrypoint: null, patchCommand: [], patchTimeoutSeconds: null, maximumPatchUploadBytes: null, checkerFixInput: false }
     case 'Koh':
       return { mode, ...common, koh: {} }
   }
@@ -835,11 +839,11 @@ export function readConfigValues(
 ): { values: ConfigValues; overridden: Record<string, boolean> } | null {
   if (!configuration) return null
   const mode = configuration.mode
-  if (mode !== 'Ctf' && mode !== 'Awd' && mode !== 'Awdp' && mode !== 'Koh') return null
+  if (mode !== 'Ctf' && mode !== 'Awd' && mode !== 'Awdp' && mode !== 'Koh' && mode !== 'LiveSolo') return null
   if (!options.rules && !asObject(configuration.flagTemplate)) return null
-  const branchName = mode.toLowerCase()
+  const branchName = mode === 'LiveSolo' ? 'liveSolo' : mode.toLowerCase()
   const branch = asObject(configuration[branchName])
-  if (!branch || ['ctf', 'awd', 'awdp', 'koh'].filter(key => configuration[key] != null).length !== 1)
+  if (!branch || ['ctf', 'awd', 'awdp', 'koh', 'liveSolo'].filter(key => configuration[key] != null).length !== 1)
     return null
   const values: ConfigValues = {}
   const overridden: Record<string, boolean> = {}
@@ -923,7 +927,7 @@ export function buildConfigValues(
   options: { rules: boolean; overridden?: Record<string, boolean> },
 ): Record<string, unknown> {
   const branch: JsonObject = {}
-  const out: JsonObject = { mode, [mode.toLowerCase()]: branch }
+  const out: JsonObject = { mode, [mode === 'LiveSolo' ? 'liveSolo' : mode.toLowerCase()]: branch }
   for (const field of fields) {
     if (options.rules && !options.overridden?.[field.key]) continue
     writeFieldValue(!options.rules && field.key === 'flagTemplate' ? out : branch, field, values[field.key])

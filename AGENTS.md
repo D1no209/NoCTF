@@ -61,7 +61,7 @@
 
 ## Product scope
 
-- The only game modes are CTF, AWD, AWDP, and KoH. Penetration is ordinary CTF content, not a game mode, and multi-stage or static-container-fleet challenge types are out of scope.
+- The game modes are CTF, AWD, AWDP, KoH, and LiveSolo. LiveSolo owns independent Match/Round, admission-order results and media/program projections; the original four modes must not depend on its implementation or media SDK. Penetration is ordinary CTF content, not a game mode, and multi-stage or static-container-fleet challenge types are out of scope.
 - Production roles are `Api`, `Worker`, and `Runner`. `NoCTF.Host` is the only executable process and may run any non-empty role combination; it defaults to all three roles. `NoCTF.API`, `NoCTF.Worker`, and `NoCTF.Runner` are class-library feature modules and must not regain executable entry points. Role changes take effect only after restart. Durable business work uses Wolverine over NATS JetStream, except the competition Webhook transactional outbox and delivery ledger stored in PostgreSQL.
 
 ## Frontend (ClientApp)

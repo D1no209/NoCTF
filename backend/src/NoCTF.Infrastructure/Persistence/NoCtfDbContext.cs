@@ -9,6 +9,7 @@ using NoCTF.Domain.Competitions.Progression;
 using NoCTF.Infrastructure.Competitions.Webhooks;
 using NoCTF.Infrastructure.Competitions.StaffWebhooks;
 using NoCTF.Domain.Teams;
+using NoCTF.Domain.LiveSolo;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Platform;
 using NoCTF.Domain.Challenges.Questions;
@@ -45,6 +46,19 @@ public sealed class NoCtfDbContext(
             notificationChangeTracker.Saves,
             notificationChangeTracker.Transactions);
     }
+    public DbSet<LiveSoloMatch> LiveSoloMatches => Set<LiveSoloMatch>();
+    public DbSet<LiveSoloRound> LiveSoloRounds => Set<LiveSoloRound>();
+    public DbSet<LiveSoloRoundQuestion> LiveSoloRoundQuestions => Set<LiveSoloRoundQuestion>();
+    public DbSet<LiveSoloActiveTeamSlot> LiveSoloActiveTeamSlots => Set<LiveSoloActiveTeamSlot>();
+    public DbSet<LiveSoloSubmission> LiveSoloSubmissions => Set<LiveSoloSubmission>();
+    public DbSet<LiveSoloDownloadEvidence> LiveSoloDownloadEvidences => Set<LiveSoloDownloadEvidence>();
+    public DbSet<LiveSoloQuestionGroup> LiveSoloQuestionGroups => Set<LiveSoloQuestionGroup>();
+    public DbSet<LiveSoloChallengeSource> LiveSoloChallengeSources => Set<LiveSoloChallengeSource>();
+    public DbSet<LiveSoloQuestionExposure> LiveSoloQuestionExposures => Set<LiveSoloQuestionExposure>();
+    public DbSet<LiveSoloMediaSession> LiveSoloMediaSessions => Set<LiveSoloMediaSession>();
+    public DbSet<LiveSoloMediaParticipant> LiveSoloMediaParticipants => Set<LiveSoloMediaParticipant>();
+    public DbSet<LiveSoloProgramSegment> LiveSoloProgramSegments => Set<LiveSoloProgramSegment>();
+    public DbSet<LiveSoloRecording> LiveSoloRecordings => Set<LiveSoloRecording>();
     public DbSet<User> Users => Set<User>();
     public DbSet<Competition> Competitions => Set<Competition>();
     public DbSet<CompetitionProgression> CompetitionProgressions => Set<CompetitionProgression>();
@@ -201,6 +215,9 @@ public sealed class NoCtfDbContext(
 
         if (ChangeTracker.Entries<StoredFile>().Any(entry => entry.State == EntityState.Modified))
             throw new InvalidOperationException("Stored file metadata is immutable.");
+        if (ChangeTracker.Entries<LiveSoloSubmission>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted)
+            || ChangeTracker.Entries<LiveSoloDownloadEvidence>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("Execution-scoped gameplay associations are immutable.");
         if (ChangeTracker.Entries<NoCTF.Domain.Challenges.WriteUps.WriteUpUnlockReceipt>().Any(entry =>
                 entry.State is EntityState.Modified or EntityState.Deleted))
             throw new InvalidOperationException("WriteUp unlock receipts are immutable.");

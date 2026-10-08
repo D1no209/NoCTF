@@ -17,7 +17,10 @@ public sealed record RuntimeProxyTarget(
     Guid? CompetitionChallengeId,
     Guid? TeamId,
     bool TrafficCaptureEnabled,
-    long? TrafficCaptureLimitBytes);
+    long? TrafficCaptureLimitBytes)
+{
+    public Guid? ExecutionScopeId { get; init; }
+}
 
 public interface IRuntimeProxyTargetReader
 {

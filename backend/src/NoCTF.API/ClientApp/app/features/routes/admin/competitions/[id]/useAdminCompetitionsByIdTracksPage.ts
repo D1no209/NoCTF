@@ -36,7 +36,7 @@ interface PendingTrackRemoval {
 export function useAdminCompetitionsByIdTracksPage() {
   const { competitionId, canWrite } = useCompetitionAdmin()
 
-  const mode = ref<'Ctf' | 'Awd' | 'Awdp' | 'Koh'>('Ctf')
+  const mode = ref<import('~/api').NoCtfapiEndpointsCompetitionsGameModeProtocol>('Ctf')
   const enabled = ref(false)
   const canUpdate = ref(false)
   const tracks = ref<TrackForm[]>([])

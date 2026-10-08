@@ -2164,6 +2164,53 @@
         ]
       }
     },
+    "/api/v1/competitions/{competitionId}/live-solo/configuration": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Reads the independent LiveSolo match, timing and media policy.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/live-solo/configuration.",
+        "operationId": "GetLiveSoloConfiguration",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloConfigurationContract"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/internal/v1/awdp/fix-archives/{gameplayFactId}": {
       "get": {
         "tags": [
@@ -22091,6 +22138,115 @@
         "type": "object",
         "additionalProperties": false
       },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloConfigurationContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "bracketFormat": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloBracketFormatProtocol"
+          },
+          "requiredWins": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "countdownSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "questionIntervalSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "roundLimitSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "publicDelaySeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "participantsMayViewOpponents": {
+            "type": "boolean"
+          },
+          "recordingEnabled": {
+            "type": "boolean"
+          },
+          "recordingRetentionDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maximumConcurrentMatches": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maximumRosterMembers": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maximumViewers": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "stageRules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloStageRuleContract"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloBracketFormatProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "SingleElimination",
+          "DoubleElimination"
+        ],
+        "enum": [
+          "SingleElimination",
+          "DoubleElimination"
+        ]
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloStageRuleContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "lane": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloBracketLaneProtocol"
+          },
+          "stage": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "requiredWins": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloBracketLaneProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Winners",
+          "Losers",
+          "GrandFinal",
+          "ResetFinal"
+        ],
+        "enum": [
+          "Winners",
+          "Losers",
+          "GrandFinal",
+          "ResetFinal"
+        ]
+      },
+      "NoCTFAPIEndpointsLiveSoloGetLiveSoloConfigurationRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
       "NoCTFAPIEndpointsInternalInternalResultResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -23379,13 +23535,15 @@
           "Ctf",
           "Awd",
           "Awdp",
-          "Koh"
+          "Koh",
+          "LiveSolo"
         ],
         "enum": [
           "Ctf",
           "Awd",
           "Awdp",
-          "Koh"
+          "Koh",
+          "LiveSolo"
         ]
       },
       "NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol": {
@@ -32652,6 +32810,14 @@
                 "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsKohCompetitionModeConfigurationContract"
               }
             ]
+          },
+          "liveSolo": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloConfigurationContract"
+              }
+            ]
           }
         }
       },
@@ -34755,6 +34921,14 @@
                 "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesKohCompetitionChallengeRulesContract"
               }
             ]
+          },
+          "liveSolo": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesLiveSoloCompetitionChallengeRulesContract"
+              }
+            ]
           }
         }
       },
@@ -34939,6 +35113,10 @@
             "nullable": true
           }
         }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengesLiveSoloCompetitionChallengeRulesContract": {
+        "type": "object",
+        "additionalProperties": false
       },
       "NoCTFAPIEndpointsAdministrationChallengesGetAdminChallengeRequest": {
         "type": "object",
@@ -35301,6 +35479,14 @@
                 "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankKohChallengeDefinitionContract"
               }
             ]
+          },
+          "liveSolo": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankLiveSoloChallengeDefinitionContract"
+              }
+            ]
           }
         }
       },
@@ -35642,6 +35828,10 @@
         "additionalProperties": false
       },
       "NoCTFAPIEndpointsAdministrationChallengeBankKohChallengeDefinitionContract": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankLiveSoloChallengeDefinitionContract": {
         "type": "object",
         "additionalProperties": false
       },

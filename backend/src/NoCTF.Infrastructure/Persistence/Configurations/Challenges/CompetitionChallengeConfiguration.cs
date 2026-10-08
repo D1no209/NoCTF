@@ -15,10 +15,11 @@ internal sealed class CompetitionChallengeConfiguration : IEntityTypeConfigurati
             .HasValue<CtfCompetitionChallenge>(GameMode.Ctf)
             .HasValue<AwdCompetitionChallenge>(GameMode.Awd)
             .HasValue<AwdpCompetitionChallenge>(GameMode.Awdp)
-            .HasValue<KohCompetitionChallenge>(GameMode.Koh);
+            .HasValue<KohCompetitionChallenge>(GameMode.Koh)
+            .HasValue<LiveSoloCompetitionChallenge>(GameMode.LiveSolo);
         builder.Property(item => item.Mode)
             .HasConversion<GameModeStringConverter>()
-            .HasMaxLength(4);
+            .HasMaxLength(8);
         builder.HasOne(item => item.Rules)
             .WithOne()
             .HasForeignKey<CompetitionChallengeRules>(rules => rules.CompetitionChallengeId)

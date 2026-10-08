@@ -15,6 +15,7 @@ using NoCTF.Application.Commands.Idempotency;
 using NoCTF.Domain.Commands;
 using NoCTF.Domain.Challenges;
 using NoCTF.Infrastructure.Competitions.Progression;
+using NoCTF.Application.Competitions.Modes;
 
 namespace NoCTF.Infrastructure.Runtime.Instances;
 
@@ -69,6 +70,7 @@ public sealed class RuntimeInstanceStore(
         var query = db.RuntimeInstances.IgnoreAutoIncludes().AsNoTracking()
             .Where(instance => instance.CompetitionId == competitionId
                 && instance.TeamId == teamId
+                && instance.ExecutionScopeId == null
                 && instance.ActiveSlot != null
                 && (instance.Purpose == RuntimePurpose.Player
                     || instance.Purpose == RuntimePurpose.Practice
@@ -135,6 +137,7 @@ public sealed class RuntimeInstanceStore(
     {
         var scope = await ResolveReadScopeAsync(competitionId, competitionChallengeId, userId, ct);
         if (scope is null
+            || !CompetitionModeCapabilities.For(scope.Mode).OrdinaryPlayerChallengeAccess
             || !(scope.Status == CompetitionStatus.Running
                 && (scope.Mode != GameMode.Awdp || scope.ValidAwdpConfiguration)
                 || scope.Mode == GameMode.Ctf
@@ -212,7 +215,7 @@ public sealed class RuntimeInstanceStore(
             command.CompetitionChallengeId,
             command.UserId,
             ct);
-        if (scope is null || !AllowsRuntimeActions(scope))
+        if (scope is null || !CompetitionModeCapabilities.For(scope.Mode).OrdinaryPlayerChallengeAccess || !AllowsRuntimeActions(scope))
             return new(null, RuntimeMutationFailure.NotFound);
         if (scope.Mode == GameMode.Ctf
             && command.Action is RuntimeAction.Start or RuntimeAction.Reset or RuntimeAction.Extend

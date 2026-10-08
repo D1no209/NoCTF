@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Challenges.Management;
 using NoCTF.Application.Competitions.Visibility;
 using NoCTF.Application.Scoring.Leaderboard;
+using NoCTF.Application.Competitions.Modes;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Teams;
@@ -45,6 +46,11 @@ public sealed class CompetitionChallengeReadAccess(NoCtfDbContext db)
             })
             .SingleOrDefaultAsync(cancellationToken);
         if (competition is null)
+            return null;
+        // Scoped modes expose live resources through their own authorized execution context.
+        // Post-event writeup/catalog access retains the ordinary participant qualification.
+        if (!CompetitionModeCapabilities.For(competition.Mode).OrdinaryPlayerChallengeAccess
+            && competition.Status != CompetitionStatus.Finished)
             return null;
 
         var isStaff = identity.Role == UserRole.Administrator

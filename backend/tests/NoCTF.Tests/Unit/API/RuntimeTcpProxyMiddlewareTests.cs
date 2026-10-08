@@ -14,6 +14,24 @@ namespace NoCTF.Tests.Unit.API;
 public sealed class RuntimeTcpProxyMiddlewareTests
 {
     [Test, Timeout(30_000)]
+    public async Task Execution_scoped_runtime_requires_authorization_before_any_tcp_connection(CancellationToken ct)
+    {
+        using var listener = new TcpListener(IPAddress.Loopback, 0); listener.Start();
+        var target = new RuntimeProxyTarget(Guid.NewGuid(), 0, "127.0.0.1", ((IPEndPoint)listener.LocalEndpoint).Port,
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), false, null) { ExecutionScopeId = Guid.NewGuid() };
+        var builder = WebApplication.CreateBuilder(); builder.WebHost.UseUrls("http://127.0.0.1:0");
+        builder.Services.AddSingleton(new RuntimeProxyOptions());
+        builder.Services.AddSingleton<IRuntimeProxyTargetReader>(new FixedTargetReader(target));
+        builder.Services.AddSingleton<IRuntimeProxyConnectionGate>(new RuntimeProxyConnectionGate(new RuntimeProxyOptions()));
+        builder.Services.AddSingleton<IRuntimeTrafficCaptureFactory, NullCaptureFactory>();
+        await using var app = builder.Build(); app.UseWebSockets(); app.UseMiddleware<RuntimeTcpProxyMiddleware>(); await app.StartAsync(ct);
+        using var socket = new ClientWebSocket();
+        var address = new UriBuilder(app.Urls.Single()) { Scheme = "ws", Path = $"/api/v1/runtime-proxies/{target.RuntimeInstanceId}/0" };
+        await Assert.That(async () => await socket.ConnectAsync(address.Uri, ct)).Throws<WebSocketException>();
+        await Assert.That(listener.Pending()).IsFalse();
+    }
+
+    [Test, Timeout(30_000)]
     public async Task Tcp_eof_delivers_all_bytes_and_a_normal_close_through_real_Kestrel(CancellationToken ct)
     {
         var runtimeId = Guid.NewGuid();

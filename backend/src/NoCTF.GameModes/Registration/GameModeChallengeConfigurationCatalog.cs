@@ -6,6 +6,8 @@ using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Ctf.Configuration;
 using NoCTF.GameModes.Koh.Configuration;
+using NoCTF.Domain.LiveSolo;
+using NoCTF.GameModes.LiveSolo.Configuration;
 
 namespace NoCTF.GameModes.Registration;
 
@@ -21,6 +23,7 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
             GameMode.Awd => new AwdCompetitionChallengeRules(),
             GameMode.Awdp => new AwdpCompetitionChallengeRules(),
             GameMode.Koh => new KohCompetitionChallengeRules(),
+            GameMode.LiveSolo => new LiveSoloCompetitionChallengeRules(),
             _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, null)
         };
         rules.CompetitionChallengeId = competitionChallengeId;
@@ -41,6 +44,7 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
                 MaximumPatchUploadBytes = PatchUploadRules.DefaultMaximumArchiveBytes
             },
             GameMode.Koh => new KohChallengeDefinition(),
+            GameMode.LiveSolo => new LiveSoloChallengeDefinition(),
             _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, null)
         };
         definition.ChallengeId = challengeId;
@@ -68,6 +72,7 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
             (KohCompetitionChallengeRules kohRules,
                 KohCompetitionModeConfiguration) =>
                 KohConfigurationValidator.Validate(TypedGameModeConfiguration.Koh(kohRules)),
+            (LiveSoloCompetitionChallengeRules, LiveSoloCompetitionModeConfiguration liveSolo) => LiveSoloConfigurationValidator.Validate(liveSolo),
             _ => ["Challenge rules type does not match the competition mode."]
         };
 
@@ -91,6 +96,7 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
                 TypedGameModeConfiguration.Awdp(awdp)),
             KohChallengeDefinition koh => KohConfigurationValidator.Validate(
                 TypedGameModeConfiguration.Koh(koh)),
+            LiveSoloChallengeDefinition liveSolo => LiveSoloConfigurationValidator.ValidateDefinition(liveSolo),
             _ => ["Unsupported challenge definition type."]
         });
         return errors;

@@ -34,6 +34,6 @@ public sealed class RuntimeProxyTargetReader(
                 runtime.CompetitionChallengeId,
                 runtime.TeamId,
                 runtime.TrafficCaptureEnabled,
-                runtime.TrafficCaptureLimitBytes);
+                runtime.TrafficCaptureLimitBytes) { ExecutionScopeId = runtime.ExecutionScopeId };
     }
 }
