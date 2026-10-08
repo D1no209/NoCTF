@@ -30,6 +30,7 @@ public sealed partial class LiveSoloMatchStore
             var questionIds = round.Questions.Select(x => x.Id).ToArray();
             var runtimes = await db.RuntimeInstances.AsNoTracking().IgnoreAutoIncludes().Where(x => x.ExecutionScopeId != null
                     && questionIds.Contains(x.ExecutionScopeId.Value)).Select(x => new { x.Id, x.ExecutionScopeId, x.RunningAt }).ToArrayAsync(ct);
+            var assignments = await db.LiveSoloAttachmentAssignments.AsNoTracking().Where(x => questionIds.Contains(x.RoundQuestionId)).ToArrayAsync(ct);
             var flags = await db.ChallengeFlags.AsNoTracking().Where(x => x.DeletedAt == null
                 && (directory.Values.Select(d => d.Template.Id).Contains(x.ChallengeId ?? Guid.Empty)
                     || directory.Keys.Contains(x.CompetitionChallengeId ?? Guid.Empty))).ToArrayAsync(ct);
@@ -51,12 +52,13 @@ public sealed partial class LiveSoloMatchStore
                         // Historical Runtime UUIDs remain eligible only for their original scope and validity interval.
                         SpecificationKind.RuntimeInstance => runtimes.Any(r => r.ExecutionScopeId == question.Id && r.Id == flag.SpecificationId
                             && r.RunningAt != null && r.RunningAt <= fact.OccurredAt),
-                        SpecificationKind.Attachment => true,
+                        SpecificationKind.Attachment => flag.ChallengeId == challenge.Template.Id && flag.TeamId == null,
                         null => flag.TeamId is null && (flag.ChallengeId == challenge.Template.Id || flag.CompetitionChallengeId == challenge.Entry.Id),
                         _ => false
                     }).Where(flag => flag.ChallengeId == challenge.Template.Id || flag.CompetitionChallengeId == challenge.Entry.Id).ToArray();
+                    var assignedFlags = LiveSoloAttachmentFlagPolicy.Bind(applicable, assignments, question.Id, challenge.Entry.Id, fact.TeamId!.Value, fact.OccurredAt);
                     var decision = evaluator.Evaluate(new(fact, associations.Where(a => a.RoundQuestionId == question.Id && a.AdmissionSequence < association.AdmissionSequence)
-                        .Select(a => facts[a.GameplayFactId]).ToArray(), applicable, null, competition.ModeConfiguration!, challenge.Entry.Rules!,
+                        .Select(a => facts[a.GameplayFactId]).ToArray(), assignedFlags, null, competition.ModeConfiguration!, challenge.Entry.Rules!,
                         ChallengeDefinition: challenge.Template.Definition));
                     fact.Result = decision.Result; fact.FailureCode = decision.FailureCode; fact.VictimTeamId = decision.VictimTeamId;
                     fact.State = decision.Result is null ? GameplayFactState.PlatformFailed : GameplayFactState.Completed; fact.UpdatedAt = now;

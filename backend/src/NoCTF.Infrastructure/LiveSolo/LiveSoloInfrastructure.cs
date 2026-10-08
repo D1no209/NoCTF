@@ -27,6 +27,8 @@ public static class LiveSoloInfrastructure
         services.AddScoped<IExecutionScopeAccess, LiveSoloExecutionAccess>();
         services.AddScoped<IScopedRuntimeControl, ScopedRuntimeControl>();
         services.AddScoped<ILiveSoloRuntimePreparation, LiveSoloRuntimePreparation>();
+        services.AddScoped<ILiveSoloAttachmentStore, LiveSoloAttachmentStore>();
+        services.AddScoped<AccessLiveSoloAttachments>();
         services.AddScoped<IClusterScheduleContributor, LiveSoloScheduleSource>();
         services.TryAddSingleton<ILiveSoloMediaGateway, UnconfiguredLiveSoloMediaGateway>();
         return services;

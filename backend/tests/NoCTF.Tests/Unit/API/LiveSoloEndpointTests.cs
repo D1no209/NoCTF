@@ -22,6 +22,8 @@ using NoCTF.Application.LiveSolo.Matches;
 using NoCTF.Application.LiveSolo.Rounds;
 using NoCTF.Application.Messaging;
 using NSubstitute;
+using NoCTF.Application.LiveSolo.Resources;
+using FluentStorage.Storage;
 
 namespace NoCTF.Tests.Unit.API;
 
@@ -88,12 +90,39 @@ public sealed class LiveSoloEndpointTests
     }
 
     private static async Task<WebApplication> HostAsync(ILiveSoloMatchStore store)
+        => await HostAsync(store, Substitute.For<ILiveSoloAttachmentStore>(), Substitute.For<IStore>());
+
+    [Test]
+    public async Task Scoped_attachment_get_never_records_evidence_if_authorization_or_object_open_fails()
+    {
+        var store = Substitute.For<ILiveSoloAttachmentStore>(); var objects = Substitute.For<IStore>();
+        var attachment = Guid.NewGuid();
+        store.SelectAsync(Arg.Any<LiveSoloResourceRequest>(), attachment, Arg.Any<CancellationToken>()).Returns((LiveSoloAttachmentCandidate?)null);
+        await using var app = await HostAsync(Substitute.For<ILiveSoloMatchStore>(), store, objects);
+        using var client = app.GetTestClient(); client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "verified-test");
+        var path = $"/api/v1/competitions/{Guid.NewGuid()}/live-solo/matches/{Guid.NewGuid()}/rounds/{Guid.NewGuid()}/questions/{Guid.NewGuid()}/attachments/{attachment}";
+        using var unauthorized = await client.GetAsync(path);
+        await Assert.That(unauthorized.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+        await objects.DidNotReceive().OpenRead(Arg.Any<string>(), Arg.Any<CancellationToken>());
+        store.SelectAsync(Arg.Any<LiveSoloResourceRequest>(), attachment, Arg.Any<CancellationToken>()).Returns(new LiveSoloAttachmentCandidate(
+            new(attachment, "safe.bin", "application/octet-stream", 4), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "scoped/private-object"));
+        objects.ObjectExists(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(true);
+        objects.OpenRead(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(Task.FromException<Stream>(new IOException("Failed object open")));
+        using var unavailable = await client.GetAsync(path);
+        await Assert.That(unavailable.StatusCode).IsEqualTo(HttpStatusCode.ServiceUnavailable);
+        await store.DidNotReceive().RecordDownloadAsync(Arg.Any<LiveSoloResourceRequest>(), Arg.Any<LiveSoloAttachmentCandidate>(), Arg.Any<CancellationToken>());
+        await Assert.That(await unavailable.Content.ReadAsStringAsync()).DoesNotContain("private-object");
+    }
+
+    private static async Task<WebApplication> HostAsync(ILiveSoloMatchStore store, ILiveSoloAttachmentStore attachmentStore, IStore objects)
     {
         var builder = WebApplication.CreateBuilder(); builder.WebHost.UseTestServer();
         builder.Services.AddFastEndpoints(options => { options.DisableAutoDiscovery = true; options.Assemblies = [typeof(GetLiveSoloMatchEndpoint).Assembly];
-            options.Filter = x => x == typeof(ListLiveSoloQuestionsEndpoint) || x == typeof(SubmitLiveSoloFlagEndpoint) || x == typeof(StartLiveSoloCountdownEndpoint); });
+            options.Filter = x => x == typeof(ListLiveSoloQuestionsEndpoint) || x == typeof(SubmitLiveSoloFlagEndpoint)
+                || x == typeof(StartLiveSoloCountdownEndpoint) || x == typeof(DownloadLiveSoloAttachmentEndpoint); });
         builder.Services.AddAuthentication("Bearer").AddScheme<AuthenticationSchemeOptions, TestAuthentication>("Bearer", _ => { });
         builder.Services.AddAuthorization(); builder.Services.AddSingleton(store); builder.Services.AddSingleton<ManageLiveSoloMatches>();
+        builder.Services.AddSingleton(attachmentStore); builder.Services.AddSingleton(objects); builder.Services.AddSingleton<AccessLiveSoloAttachments>();
         builder.Services.AddSingleton<IUserContext>(new TestUser()); builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton<IRequestAdmission>(new Admission());
         var source = Substitute.For<IRequestSourceAddress>(); source.Address.Returns("192.0.2.10");

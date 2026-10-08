@@ -26,8 +26,9 @@ public sealed class LiveSoloFoundationPersistenceTests
                 provider => provider.MigrationsAssembly("NoCTF.Persistence.PostgreSql")).UseSnakeCaseNamingConvention().Options;
             await using var db = new NoCtfDbContext(options);
             var migrations = db.Database.GetMigrations().ToArray();
-            var previous = migrations[^2]; var newest = migrations[^1];
-            await Assert.That(newest).Contains("LiveSoloFoundation");
+            var foundation = Array.FindIndex(migrations, x => x.Contains("LiveSoloFoundation", StringComparison.Ordinal));
+            await Assert.That(foundation).IsGreaterThan(0);
+            var previous = migrations[foundation - 1];
             await db.GetService<IMigrator>().MigrateAsync(previous, ct);
             var now = DateTimeOffset.UtcNow;
             var user = new User { Id = Guid.NewGuid(), UserName = "livesolo-owner", Email = "livesolo@example.test", PasswordHash = "unused",

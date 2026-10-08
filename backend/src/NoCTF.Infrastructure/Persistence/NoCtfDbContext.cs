@@ -52,6 +52,7 @@ public sealed class NoCtfDbContext(
     public DbSet<LiveSoloActiveTeamSlot> LiveSoloActiveTeamSlots => Set<LiveSoloActiveTeamSlot>();
     public DbSet<LiveSoloSubmission> LiveSoloSubmissions => Set<LiveSoloSubmission>();
     public DbSet<LiveSoloDownloadEvidence> LiveSoloDownloadEvidences => Set<LiveSoloDownloadEvidence>();
+    public DbSet<LiveSoloAttachmentAssignment> LiveSoloAttachmentAssignments => Set<LiveSoloAttachmentAssignment>();
     public DbSet<LiveSoloQuestionGroup> LiveSoloQuestionGroups => Set<LiveSoloQuestionGroup>();
     public DbSet<LiveSoloChallengeSource> LiveSoloChallengeSources => Set<LiveSoloChallengeSource>();
     public DbSet<LiveSoloQuestionExposure> LiveSoloQuestionExposures => Set<LiveSoloQuestionExposure>();
@@ -216,7 +217,8 @@ public sealed class NoCtfDbContext(
         if (ChangeTracker.Entries<StoredFile>().Any(entry => entry.State == EntityState.Modified))
             throw new InvalidOperationException("Stored file metadata is immutable.");
         if (ChangeTracker.Entries<LiveSoloSubmission>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted)
-            || ChangeTracker.Entries<LiveSoloDownloadEvidence>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
+            || ChangeTracker.Entries<LiveSoloDownloadEvidence>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted)
+            || ChangeTracker.Entries<LiveSoloAttachmentAssignment>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
             throw new InvalidOperationException("Execution-scoped gameplay associations are immutable.");
         if (ChangeTracker.Entries<NoCTF.Domain.Challenges.WriteUps.WriteUpUnlockReceipt>().Any(entry =>
                 entry.State is EntityState.Modified or EntityState.Deleted))

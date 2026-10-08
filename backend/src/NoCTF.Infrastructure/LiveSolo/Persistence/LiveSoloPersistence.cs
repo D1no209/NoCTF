@@ -114,6 +114,16 @@ internal sealed class LiveSoloDownloadEvidenceConfiguration : IEntityTypeConfigu
         builder.HasOne<LiveSoloRoundQuestion>().WithMany().HasForeignKey(x => x.RoundQuestionId).OnDelete(DeleteBehavior.Restrict);
     }
 }
+internal sealed class LiveSoloAttachmentAssignmentConfiguration : IEntityTypeConfiguration<LiveSoloAttachmentAssignment>
+{
+    public void Configure(EntityTypeBuilder<LiveSoloAttachmentAssignment> builder)
+    {
+        builder.ToTable("live_solo_attachment_assignments"); builder.HasKey(x => new { x.RoundQuestionId, x.TeamId });
+        builder.HasOne<LiveSoloRoundQuestion>().WithMany().HasForeignKey(x => x.RoundQuestionId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<Team>().WithMany().HasForeignKey(x => x.TeamId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<ChallengeAttachment>().WithMany().HasForeignKey(x => x.AttachmentId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
 internal sealed class LiveSoloQuestionGroupConfiguration : IEntityTypeConfiguration<LiveSoloQuestionGroup>
 {
     public void Configure(EntityTypeBuilder<LiveSoloQuestionGroup> builder)

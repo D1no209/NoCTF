@@ -761,6 +761,11 @@ POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{ro
 GET /api/v1/competitions/{competitionId}/live-solo/question-groups
 POST /api/v1/competitions/{competitionId}/live-solo/question-groups
 POST /api/v1/competitions/{competitionId}/live-solo/templates/copies
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/attachments
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/attachments/{attachmentId}
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/attachments/{attachmentId}/browser-download
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/attachment
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/attachment/browser-download
 ```
 
 以上是本队和工作人员即时投影，不作为观众节目接口。题目正文仅在实际开放后返回，并重查当前 Round、锁定名单、队伍及账号资格。Flag 提交要求 UUID `Idempotency-Key`，响应的 `AdmissionSequence` 是整个 Round 两方、多成员、多题共享的持久化顺序，202 不代表评测结果。准备和开赛失败以 `LiveSoloFailure` 返回；媒体服务未就绪时不得开始正式倒计时。普通题目重判不能修改独立对局结果。

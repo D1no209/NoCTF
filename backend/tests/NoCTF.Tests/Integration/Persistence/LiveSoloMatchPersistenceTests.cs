@@ -375,7 +375,7 @@ public sealed class LiveSoloMatchPersistenceTests
         }
     }
 
-    private sealed class Fixture(PostgreSqlContainer postgres, DbContextOptions<NoCtfDbContext> options, NoCtfDbContext db) : IAsyncDisposable
+    internal sealed class Fixture(PostgreSqlContainer postgres, DbContextOptions<NoCtfDbContext> options, NoCtfDbContext db) : IAsyncDisposable
     {
         public DbContextOptions<NoCtfDbContext> Options { get; } = options;
         public NoCtfDbContext Db { get; } = db;
@@ -445,7 +445,7 @@ public sealed class LiveSoloMatchPersistenceTests
             await Assert.That(group.Failure).IsNull();
             var created = await store.CreateAsync(new(Competition.Id, Owner.Id, LeftTeam.Id, RightTeam.Id, null, Now), ct);
             await Assert.That(created.Failure).IsNull(); Match = created.Match!;
-            var left = await store.LockRosterAsync(new(Competition.Id, Match.Id, Left.Id, LeftTeam.Id, Match.ConcurrencyStamp, [Left.Id], Now), ct);
+            var left = await store.LockRosterAsync(new(Competition.Id, Match.Id, Left.Id, LeftTeam.Id, Match.ConcurrencyStamp, LeftTeam.MemberIds, Now), ct);
             await Assert.That(left.Failure).IsNull(); Match = left.Match!;
             var right = await store.LockRosterAsync(new(Competition.Id, Match.Id, Right.Id, RightTeam.Id, Match.ConcurrencyStamp, [Right.Id], Now), ct);
             await Assert.That(right.Failure).IsNull(); Match = right.Match!;
@@ -453,10 +453,13 @@ public sealed class LiveSoloMatchPersistenceTests
             await Assert.That(prepared.Failure).IsNull();
             Round = await Db.LiveSoloRounds.Include(x => x.Questions).SingleAsync(x => x.Id == prepared.Round!.Id, ct);
             Match = (await store.FindAsync(Competition.Id, Match.Id, Owner.Id, true, Now, ct))!;
+            var participants = Match.Rosters.SelectMany(roster => roster.UserIds.Select(id => new LiveSoloMediaParticipant {
+                UserId = id, TeamId = roster.TeamId, Side = roster.TeamId == LeftTeam.Id ? LiveSoloSide.Left : LiveSoloSide.Right,
+                Identity = id == Left.Id ? "left-screen" : id == Right.Id ? "right-screen" : id.ToString("N"), ObservedAt = Now })).ToList();
             Db.LiveSoloMediaSessions.Add(new() { Id = Guid.NewGuid(), MatchId = Match.Id, Generation = Guid.NewGuid(), RoomIdentity = Guid.NewGuid().ToString("N"),
-                State = LiveSoloMediaState.Ready, CreatedAt = Now, Participants = [
-                    new() { UserId = Left.Id, TeamId = LeftTeam.Id, Side = LiveSoloSide.Left, Identity = "left-screen", ObservedAt = Now },
-                    new() { UserId = Right.Id, TeamId = RightTeam.Id, Side = LiveSoloSide.Right, Identity = "right-screen", ObservedAt = Now }] });
+                State = LiveSoloMediaState.Ready, CreatedAt = Now, Participants = participants });
+            media.ObserveAsync(Arg.Any<string>(), ct).Returns(new LiveSoloRoomObservation(participants.Select(x =>
+                new LiveSoloObservedScreen(x.Identity, LiveSoloScreenState.Sharing, "track-" + x.Identity, Now)).ToArray()));
             await Db.SaveChangesAsync(ct);
         }
 
