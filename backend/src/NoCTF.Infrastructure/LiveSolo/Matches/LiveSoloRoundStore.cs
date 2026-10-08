@@ -65,7 +65,10 @@ public sealed partial class LiveSoloMatchStore
         var publicCanonical = match.StartedAt is null ? await db.LiveSoloQuestionExposures.AsNoTracking()
             .Where(x => x.CompetitionId == match.CompetitionId && x.PublicAt <= now).Select(x => x.CanonicalChallengeId).ToArrayAsync(ct) : [];
         var usedGroups = await db.LiveSoloRounds.Where(x => x.MatchId == match.Id).Select(x => x.QuestionGroupId).ToArrayAsync(ct);
-        return groups.FirstOrDefault(group => !usedGroups.Contains(group.Id) && group.Items.All(item => directory.Any(d => d.Id == item.CompetitionChallengeId
+        return groups.FirstOrDefault(group => !usedGroups.Contains(group.Id)
+            && group.Items.All(item => directory.Any(d => d.Id == item.CompetitionChallengeId))
+            && group.Items.Select(item => Canonical(directory.Single(d => d.Id == item.CompetitionChallengeId).ChallengeId)).Distinct().Count() == group.Items.Count
+            && group.Items.All(item => directory.Any(d => d.Id == item.CompetitionChallengeId
             && !priorCanonical.Contains(Canonical(d.ChallengeId)) && !publicCanonical.Contains(Canonical(d.ChallengeId)))));
     }
 

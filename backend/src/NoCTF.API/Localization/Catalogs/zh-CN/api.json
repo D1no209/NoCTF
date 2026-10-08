@@ -1,4 +1,9 @@
 {
+  "api.liveSolo.templateCopy.notFound": "源题目或目标比赛不可用。",
+  "api.liveSolo.templateCopy.unsupportedSource": "仅支持兼容 Flag 提交的 CTF 或 LiveSolo 题目，不能转换 Patch 或 Checker 交互。",
+  "api.liveSolo.templateCopy.attachmentsForbidden": "复制附件前需要具备源附件的访问权限。",
+  "api.liveSolo.templateCopy.flagsForbidden": "复制 Flag 前需要具备源 Flag 的明确访问权限。",
+  "api.liveSolo.templateCopy.attachmentsRequired": "附件绑定的 Flag 必须与对应附件一同复制。",
   "api.liveSolo.notFound": "对局、轮次或题目不可用。",
   "api.liveSolo.forbidden": "你没有执行此操作的资格。",
   "api.liveSolo.disabled": "本比赛未启用 LiveSolo。",

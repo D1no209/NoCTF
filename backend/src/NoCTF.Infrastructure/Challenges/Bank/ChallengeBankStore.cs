@@ -210,9 +210,7 @@ public sealed class ChallengeBankStore(
                 Detail:
                     "Stop every active Runtime created from this template before changing its technical definition.");
         }
-        var supportsRegularExpression = command.Mode == GameMode.Ctf
-            && RuntimeTemplates.Get(command.Definition)?.FlagSource
-                is null or RuntimeFlagSource.Static;
+        var supportsRegularExpression = StaticFlagConfiguration.SupportsRegularExpression(command.Definition, RuntimeTemplates);
         if (!supportsRegularExpression)
         {
             var competitionChallengeIds = db.CompetitionChallenges.IgnoreQueryFilters()

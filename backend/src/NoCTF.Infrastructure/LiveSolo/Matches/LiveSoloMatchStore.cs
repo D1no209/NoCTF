@@ -126,6 +126,12 @@ public sealed partial class LiveSoloMatchStore(NoCtfDbContext db, ICompetitionMo
             if (LiveSoloConfigurationValidator.ValidateGroup(candidate, config.RoundLimitSeconds, config.QuestionIntervalSeconds).Count != 0
                 || await db.CompetitionChallenges.CountAsync(x => x.CompetitionId == competitionId && entries.Select(e => e.CompetitionChallengeId).Contains(x.Id), ct) != entries.Count)
                 return new(null, LiveSoloFailure.InvalidConfiguration);
+            var templates = await db.CompetitionChallenges.AsNoTracking().Where(x => entries.Select(e => e.CompetitionChallengeId).Contains(x.Id))
+                .Select(x => x.ChallengeId).ToArrayAsync(ct);
+            var sources = await db.LiveSoloChallengeSources.AsNoTracking().Where(x => templates.Contains(x.ChallengeId))
+                .ToDictionaryAsync(x => x.ChallengeId, x => x.CanonicalChallengeId, ct);
+            if (templates.Select(id => sources.GetValueOrDefault(id, id)).Distinct().Count() != entries.Count)
+                return new(null, LiveSoloFailure.InvalidConfiguration);
             group.Name = candidate.Name; group.RoundLimitSeconds = input.LimitSeconds; group.Reserve = input.Reserve;
             group.ConcurrencyStamp = Guid.NewGuid();
             if (input.Id is null) db.LiveSoloQuestionGroups.Add(group);

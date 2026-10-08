@@ -11,6 +11,8 @@ using NoCTF.Infrastructure.LiveSolo.Resources;
 using NoCTF.Infrastructure.Runtime.Instances;
 using NoCTF.Infrastructure.Messaging;
 using NoCTF.Infrastructure.LiveSolo.Rounds;
+using NoCTF.Application.LiveSolo.Templates;
+using NoCTF.Infrastructure.LiveSolo.Templates;
 
 namespace NoCTF.Infrastructure.LiveSolo;
 
@@ -20,6 +22,8 @@ public static class LiveSoloInfrastructure
     {
         services.AddScoped<ILiveSoloMatchStore, LiveSoloMatchStore>();
         services.AddScoped<ManageLiveSoloMatches>();
+        services.AddScoped<ILiveSoloTemplateCopyStore, LiveSoloTemplateCopyStore>();
+        services.AddScoped<CopyLiveSoloTemplate>();
         services.AddScoped<IExecutionScopeAccess, LiveSoloExecutionAccess>();
         services.AddScoped<IScopedRuntimeControl, ScopedRuntimeControl>();
         services.AddScoped<ILiveSoloRuntimePreparation, LiveSoloRuntimePreparation>();

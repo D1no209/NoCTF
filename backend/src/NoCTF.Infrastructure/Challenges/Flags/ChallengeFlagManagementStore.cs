@@ -25,13 +25,7 @@ public sealed class ChallengeFlagManagementStore(
         var challenge = await LoadChallengeAsync(scope, actorId, isAdministrator, ct);
         if (challenge is null)
             return null;
-        if (challenge.Mode == GameMode.Awdp)
-            return true;
-        return challenge.Mode == GameMode.Ctf
-            && challenge.Definition is CtfChallengeDefinition
-                { InteractionKind: CtfInteractionKind.FlagSubmission }
-            && runtimeTemplates.Get(challenge.Definition)?.FlagSource
-                is null or RuntimeFlagSource.Static;
+        return StaticFlagConfiguration.SupportsManualFlags(challenge.Definition, runtimeTemplates);
     }
 
     public async Task<bool?> SupportsRegularExpressionAsync(
@@ -43,11 +37,7 @@ public sealed class ChallengeFlagManagementStore(
         var challenge = await LoadChallengeAsync(scope, actorId, isAdministrator, ct);
         if (challenge is null)
             return null;
-        return challenge.Mode == GameMode.Ctf
-            && challenge.Definition is CtfChallengeDefinition
-                { InteractionKind: CtfInteractionKind.FlagSubmission }
-            && runtimeTemplates.Get(challenge.Definition)?.FlagSource
-                is null or RuntimeFlagSource.Static;
+        return StaticFlagConfiguration.SupportsRegularExpression(challenge.Definition, runtimeTemplates);
     }
 
     public async Task<IReadOnlyList<ChallengeFlagView>?> ListAsync(

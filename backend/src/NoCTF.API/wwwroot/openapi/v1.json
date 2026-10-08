@@ -2263,6 +2263,96 @@
         ]
       }
     },
+    "/api/v1/competitions/{competitionId}/live-solo/templates/copies": {
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Copies FlagSubmission-compatible material into independent LiveSolo template and competition instances with canonical provenance.",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/live-solo/templates/copies.",
+        "operationId": "CopyLiveSoloTemplate",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "CopyLiveSoloTemplateRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloCopyLiveSoloTemplateRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloTemplateCopyResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloTemplateCopyFailureResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloTemplateCopyFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/competitions/{competitionId}/live-solo/matches": {
       "post": {
         "tags": [
@@ -23373,6 +23463,109 @@
             "format": "guid",
             "minLength": 1,
             "nullable": false
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloTemplateCopyResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "challengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "competitionChallengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "canonicalChallengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "attachmentCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "flagCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "allocationChanged": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloTemplateCopyFailureResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NoCTFApplicationLiveSoloTemplatesLiveSoloTemplateCopyFailure"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        }
+      },
+      "NoCTFApplicationLiveSoloTemplatesLiveSoloTemplateCopyFailure": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "NotFound",
+          "Forbidden",
+          "UnsupportedSource",
+          "AttachmentsForbidden",
+          "FlagsForbidden",
+          "Conflict",
+          "AttachmentsRequired",
+          "InvalidTags"
+        ],
+        "enum": [
+          "NotFound",
+          "Forbidden",
+          "UnsupportedSource",
+          "AttachmentsForbidden",
+          "FlagsForbidden",
+          "Conflict",
+          "AttachmentsRequired",
+          "InvalidTags"
+        ]
+      },
+      "NoCTFAPIEndpointsLiveSoloCopyLiveSoloTemplateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sourceChallengeId"
+        ],
+        "properties": {
+          "sourceChallengeId": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          },
+          "copyAttachments": {
+            "type": "boolean"
+          },
+          "copyFlags": {
+            "type": "boolean"
+          },
+          "tags": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "string"
+            }
           }
         }
       },

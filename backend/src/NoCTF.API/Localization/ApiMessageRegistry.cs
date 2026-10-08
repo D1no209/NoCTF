@@ -2,6 +2,11 @@ namespace NoCTF.API.Localization;
 
 public enum ApiMessageId
 {
+    LiveSoloCopyTemplateNotFound,
+    LiveSoloCopyUnsupportedSource,
+    LiveSoloCopyAttachmentsForbidden,
+    LiveSoloCopyFlagsForbidden,
+    LiveSoloCopyAttachmentsRequired,
     LiveSoloNotFound,
     LiveSoloForbidden,
     LiveSoloDisabled,
@@ -731,6 +736,11 @@ public static partial class ApiMessages
 {
     public static string Key(ApiMessageId id) => id switch
     {
+        ApiMessageId.LiveSoloCopyTemplateNotFound => "api.liveSolo.templateCopy.notFound",
+        ApiMessageId.LiveSoloCopyUnsupportedSource => "api.liveSolo.templateCopy.unsupportedSource",
+        ApiMessageId.LiveSoloCopyAttachmentsForbidden => "api.liveSolo.templateCopy.attachmentsForbidden",
+        ApiMessageId.LiveSoloCopyFlagsForbidden => "api.liveSolo.templateCopy.flagsForbidden",
+        ApiMessageId.LiveSoloCopyAttachmentsRequired => "api.liveSolo.templateCopy.attachmentsRequired",
         ApiMessageId.LiveSoloNotFound => "api.liveSolo.notFound",
         ApiMessageId.LiveSoloForbidden => "api.liveSolo.forbidden",
         ApiMessageId.LiveSoloDisabled => "api.liveSolo.disabled",
@@ -1459,6 +1469,14 @@ public static partial class ApiMessages
 
     public static ApiMessage For(Enum? code) => Get(code switch
     {
+        NoCTF.Application.LiveSolo.Templates.LiveSoloTemplateCopyFailure.NotFound => ApiMessageId.LiveSoloCopyTemplateNotFound,
+        NoCTF.Application.LiveSolo.Templates.LiveSoloTemplateCopyFailure.UnsupportedSource => ApiMessageId.LiveSoloCopyUnsupportedSource,
+        NoCTF.Application.LiveSolo.Templates.LiveSoloTemplateCopyFailure.AttachmentsForbidden => ApiMessageId.LiveSoloCopyAttachmentsForbidden,
+        NoCTF.Application.LiveSolo.Templates.LiveSoloTemplateCopyFailure.FlagsForbidden => ApiMessageId.LiveSoloCopyFlagsForbidden,
+        NoCTF.Application.LiveSolo.Templates.LiveSoloTemplateCopyFailure.AttachmentsRequired => ApiMessageId.LiveSoloCopyAttachmentsRequired,
+        NoCTF.Application.LiveSolo.Templates.LiveSoloTemplateCopyFailure.Forbidden => ApiMessageId.LiveSoloForbidden,
+        NoCTF.Application.LiveSolo.Templates.LiveSoloTemplateCopyFailure.Conflict => ApiMessageId.LiveSoloConflict,
+        NoCTF.Application.LiveSolo.Templates.LiveSoloTemplateCopyFailure.InvalidTags => ApiMessageId.ChallengeMutationFailureInvalidTags,
         NoCTF.Application.LiveSolo.Rounds.LiveSoloFailure.NotFound => ApiMessageId.LiveSoloNotFound,
         NoCTF.Application.LiveSolo.Rounds.LiveSoloFailure.Forbidden => ApiMessageId.LiveSoloForbidden,
         NoCTF.Application.LiveSolo.Rounds.LiveSoloFailure.Disabled => ApiMessageId.LiveSoloDisabled,

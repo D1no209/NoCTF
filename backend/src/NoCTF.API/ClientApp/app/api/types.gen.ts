@@ -768,6 +768,34 @@ export type NoCtfapiEndpointsLiveSoloConfirmLiveSoloReadyRequest = {
     expectedStamp: string;
 };
 
+export type NoCtfapiEndpointsLiveSoloLiveSoloTemplateCopyResponse = {
+    challengeId?: string;
+    competitionChallengeId?: string;
+    canonicalChallengeId?: string;
+    title?: string;
+    attachmentCount?: number;
+    flagCount?: number;
+    allocationChanged?: boolean;
+};
+
+export type NoCtfapiEndpointsLiveSoloLiveSoloTemplateCopyFailureResponse = {
+    code?: NoCtfApplicationLiveSoloTemplatesLiveSoloTemplateCopyFailure;
+    detail?: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
+};
+
+export type NoCtfApplicationLiveSoloTemplatesLiveSoloTemplateCopyFailure = 'NotFound' | 'Forbidden' | 'UnsupportedSource' | 'AttachmentsForbidden' | 'FlagsForbidden' | 'Conflict' | 'AttachmentsRequired' | 'InvalidTags';
+
+export type NoCtfapiEndpointsLiveSoloCopyLiveSoloTemplateRequest = {
+    sourceChallengeId: string;
+    copyAttachments?: boolean;
+    copyFlags?: boolean;
+    tags?: Array<string> | null;
+};
+
 export type NoCtfapiEndpointsLiveSoloCreateLiveSoloMatchRequest = {
     leftTeamId: string;
     rightTeamId: string;
@@ -5901,6 +5929,47 @@ export type ConfirmLiveSoloReadyResponses = {
 };
 
 export type ConfirmLiveSoloReadyResponse = ConfirmLiveSoloReadyResponses[keyof ConfirmLiveSoloReadyResponses];
+
+export type CopyLiveSoloTemplateData = {
+    body: NoCtfapiEndpointsLiveSoloCopyLiveSoloTemplateRequest;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/templates/copies';
+};
+
+export type CopyLiveSoloTemplateErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsLiveSoloLiveSoloTemplateCopyFailureResponse;
+    422: NoCtfapiEndpointsLiveSoloLiveSoloTemplateCopyFailureResponse;
+};
+
+export type CopyLiveSoloTemplateError = CopyLiveSoloTemplateErrors[keyof CopyLiveSoloTemplateErrors];
+
+export type CopyLiveSoloTemplateResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsLiveSoloLiveSoloTemplateCopyResponse;
+};
+
+export type CopyLiveSoloTemplateResponse = CopyLiveSoloTemplateResponses[keyof CopyLiveSoloTemplateResponses];
 
 export type ListLiveSoloMatchesData = {
     body?: never;

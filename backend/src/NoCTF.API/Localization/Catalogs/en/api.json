@@ -1,4 +1,9 @@
 {
+  "api.liveSolo.templateCopy.notFound": "The source template or destination competition is unavailable.",
+  "api.liveSolo.templateCopy.unsupportedSource": "Only FlagSubmission-compatible CTF or LiveSolo definitions can be copied. Patch and checker interactions are not converted.",
+  "api.liveSolo.templateCopy.attachmentsForbidden": "You need source attachment access before copying its files.",
+  "api.liveSolo.templateCopy.flagsForbidden": "You need explicit source Flag access before copying Flags.",
+  "api.liveSolo.templateCopy.attachmentsRequired": "Attachment-linked Flags must be copied together with their matching attachments.",
   "api.liveSolo.notFound": "The Match, Round or question is unavailable.",
   "api.liveSolo.forbidden": "You are not eligible for this operation.",
   "api.liveSolo.disabled": "LiveSolo is disabled for this competition.",
