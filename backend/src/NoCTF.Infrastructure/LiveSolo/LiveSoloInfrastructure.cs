@@ -14,6 +14,7 @@ using NoCTF.Infrastructure.LiveSolo.Rounds;
 using NoCTF.Application.LiveSolo.Templates;
 using NoCTF.Infrastructure.LiveSolo.Templates;
 using NoCTF.Application.Challenges.Configuration;
+using NoCTF.Application.LiveSolo.Brackets;
 
 namespace NoCTF.Infrastructure.LiveSolo;
 
@@ -22,6 +23,8 @@ public static class LiveSoloInfrastructure
     public static IServiceCollection AddNoCtfLiveSolo(this IServiceCollection services)
     {
         services.AddScoped<ILiveSoloMatchStore, LiveSoloMatchStore>();
+        services.AddScoped<ILiveSoloBracketStore, LiveSoloMatchStore>();
+        services.AddScoped<ManageLiveSoloBracket>();
         services.AddScoped<ManageLiveSoloMatches>();
         services.AddScoped<ILiveSoloTemplateCopyStore, LiveSoloTemplateCopyStore>();
         services.AddScoped<CopyLiveSoloTemplate>();

@@ -761,6 +761,8 @@ POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{ro
 GET /api/v1/competitions/{competitionId}/live-solo/question-groups
 POST /api/v1/competitions/{competitionId}/live-solo/question-groups
 POST /api/v1/competitions/{competitionId}/live-solo/templates/copies
+GET /api/v1/competitions/{competitionId}/live-solo/bracket
+POST /api/v1/competitions/{competitionId}/live-solo/bracket
 GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/attachments
 GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/attachments/{attachmentId}
 POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/attachments/{attachmentId}/browser-download

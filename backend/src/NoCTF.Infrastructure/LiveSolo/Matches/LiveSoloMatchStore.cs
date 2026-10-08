@@ -18,7 +18,7 @@ namespace NoCTF.Infrastructure.LiveSolo.Matches;
 public sealed partial class LiveSoloMatchStore(NoCtfDbContext db, ICompetitionModerationAuthorizer authorizer,
     ILiveSoloMediaGateway media, ILiveSoloRuntimePreparation runtimePreparation, IPostCommitMessagePublisher messages,
     IRequestReplay? replay = null, TimeProvider? clock = null)
-    : ILiveSoloMatchStore
+    : ILiveSoloMatchStore, NoCTF.Application.LiveSolo.Brackets.ILiveSoloBracketStore
 {
     private async Task<T> TransactionAsync<T>(Func<Task<T>> work, Func<T> conflict, CancellationToken ct)
     {
@@ -68,6 +68,8 @@ public sealed partial class LiveSoloMatchStore(NoCtfDbContext db, ICompetitionMo
             if (!await ActiveAsync(command.ActorId, ct) || !await authorizer.CanModerateAsync(command.ActorId, command.CompetitionId, ct)) return new LiveSoloMatchResult(null, LiveSoloFailure.Forbidden);
             var configuration = await db.Set<LiveSoloCompetitionModeConfiguration>().AsNoTracking().SingleOrDefaultAsync(x => x.CompetitionId == command.CompetitionId, ct);
             if (configuration is null) return new(null, LiveSoloFailure.NotFound);
+            if (await db.LiveSoloMatches.AnyAsync(x => x.CompetitionId == command.CompetitionId && x.Slots.Any(s => s.SourceMatchId != null), ct))
+                return new(null, LiveSoloFailure.Conflict);
             var ids = new[] { command.LeftTeamId, command.RightTeamId };
             if (ids.Distinct().Count() != 2 || await db.Teams.CountAsync(x => ids.Contains(x.Id) && x.CompetitionId == command.CompetitionId
                 && !x.IsBanned && x.RegistrationStatus == TeamRegistrationStatus.Approved, ct) != 2) return new(null, LiveSoloFailure.InvalidConfiguration);

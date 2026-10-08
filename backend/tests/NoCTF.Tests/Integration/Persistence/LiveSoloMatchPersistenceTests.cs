@@ -437,14 +437,18 @@ public sealed class LiveSoloMatchPersistenceTests
                 new TransactionalRequestReplay(context, new CommandKey(requestKey, actorId), clock), clock);
         }
 
-        public async Task PrepareAsync(CancellationToken ct)
+        public async Task PrepareAsync(CancellationToken ct, Guid? existingMatch = null)
         {
             var store = Store(Db);
             var group = await store.SaveGroupAsync(Competition.Id, Owner.Id, new(null, "Round group", false, null,
                 Entries.Select(x => new LiveSoloQuestionGroupEntry(x.Id, null)).ToArray(), null), Now, ct);
             await Assert.That(group.Failure).IsNull();
-            var created = await store.CreateAsync(new(Competition.Id, Owner.Id, LeftTeam.Id, RightTeam.Id, null, Now), ct);
-            await Assert.That(created.Failure).IsNull(); Match = created.Match!;
+            if (existingMatch is Guid matchId) Match = (await store.FindAsync(Competition.Id, matchId, Owner.Id, true, Now, ct))!;
+            else
+            {
+                var created = await store.CreateAsync(new(Competition.Id, Owner.Id, LeftTeam.Id, RightTeam.Id, null, Now), ct);
+                await Assert.That(created.Failure).IsNull(); Match = created.Match!;
+            }
             var left = await store.LockRosterAsync(new(Competition.Id, Match.Id, Left.Id, LeftTeam.Id, Match.ConcurrencyStamp, LeftTeam.MemberIds, Now), ct);
             await Assert.That(left.Failure).IsNull(); Match = left.Match!;
             var right = await store.LockRosterAsync(new(Competition.Id, Match.Id, Right.Id, RightTeam.Id, Match.ConcurrencyStamp, [Right.Id], Now), ct);

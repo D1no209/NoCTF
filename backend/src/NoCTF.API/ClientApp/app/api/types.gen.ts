@@ -810,6 +810,49 @@ export type NoCtfapiEndpointsLiveSoloDownloadLiveSoloRandomAttachmentRequest = {
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsLiveSoloLiveSoloBracketResponse = {
+    competitionId?: string;
+    concurrencyStamp?: string;
+    format?: NoCtfDomainLiveSoloLiveSoloBracketFormat;
+    matches?: Array<NoCtfapiEndpointsLiveSoloLiveSoloBracketMatchResponse>;
+    championTeamId?: string | null;
+};
+
+export type NoCtfDomainLiveSoloLiveSoloBracketFormat = 'SingleElimination' | 'DoubleElimination';
+
+export type NoCtfapiEndpointsLiveSoloLiveSoloBracketMatchResponse = {
+    match?: NoCtfapiEndpointsLiveSoloLiveSoloMatchResponse;
+    lane?: NoCtfDomainLiveSoloLiveSoloBracketLane;
+    stage?: number;
+    position?: number;
+    conditional?: boolean;
+    sources?: Array<NoCtfapiEndpointsLiveSoloLiveSoloBracketSourceResponse>;
+};
+
+export type NoCtfDomainLiveSoloLiveSoloBracketLane = 'Winners' | 'Losers' | 'GrandFinal' | 'ResetFinal';
+
+export type NoCtfapiEndpointsLiveSoloLiveSoloBracketSourceResponse = {
+    side?: NoCtfDomainLiveSoloLiveSoloSide;
+    source?: NoCtfDomainLiveSoloLiveSoloSlotSource;
+    seed?: number | null;
+    sourceMatchId?: string | null;
+    resolved?: boolean;
+    teamId?: string | null;
+};
+
+export type NoCtfDomainLiveSoloLiveSoloSide = 'Left' | 'Right';
+
+export type NoCtfDomainLiveSoloLiveSoloSlotSource = 'Seed' | 'Winner' | 'Loser' | 'Bye';
+
+export type NoCtfapiEndpointsLiveSoloGenerateLiveSoloBracketRequest = {
+    expectedStamp: string;
+    teamIds: Array<string>;
+};
+
+export type NoCtfapiEndpointsLiveSoloGetLiveSoloBracketRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsLiveSoloLiveSoloConfigurationContract = {
     enabled?: boolean;
     bracketFormat?: NoCtfapiEndpointsLiveSoloLiveSoloBracketFormatProtocol;
@@ -6135,6 +6178,80 @@ export type DownloadLiveSoloRandomAttachmentErrors = {
      */
     404: unknown;
 };
+
+export type GetLiveSoloBracketData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/bracket';
+};
+
+export type GetLiveSoloBracketErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetLiveSoloBracketResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsLiveSoloLiveSoloBracketResponse;
+};
+
+export type GetLiveSoloBracketResponse = GetLiveSoloBracketResponses[keyof GetLiveSoloBracketResponses];
+
+export type GenerateLiveSoloBracketData = {
+    body: NoCtfapiEndpointsLiveSoloGenerateLiveSoloBracketRequest;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/bracket';
+};
+
+export type GenerateLiveSoloBracketErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsLiveSoloLiveSoloFailureResponse;
+    422: NoCtfapiEndpointsLiveSoloLiveSoloFailureResponse;
+};
+
+export type GenerateLiveSoloBracketError = GenerateLiveSoloBracketErrors[keyof GenerateLiveSoloBracketErrors];
+
+export type GenerateLiveSoloBracketResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsLiveSoloLiveSoloBracketResponse;
+};
+
+export type GenerateLiveSoloBracketResponse = GenerateLiveSoloBracketResponses[keyof GenerateLiveSoloBracketResponses];
 
 export type GetLiveSoloConfigurationData = {
     body?: never;

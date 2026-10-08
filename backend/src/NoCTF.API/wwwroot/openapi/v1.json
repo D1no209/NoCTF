@@ -2633,6 +2633,141 @@
         ]
       }
     },
+    "/api/v1/competitions/{competitionId}/live-solo/bracket": {
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Generates a seeded single/double elimination bracket before Matches exist; byes do not count as defeats.",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/live-solo/bracket.",
+        "operationId": "GenerateLiveSoloBracket",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "GenerateLiveSoloBracketRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloGenerateLiveSoloBracketRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloBracketResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Reads the authorized staff bracket and seed/source graph; public delayed projections are separate.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/live-solo/bracket.",
+        "operationId": "GetLiveSoloBracket",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloBracketResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/competitions/{competitionId}/live-solo/configuration": {
       "get": {
         "tags": [
@@ -23971,6 +24106,178 @@
         "additionalProperties": false
       },
       "NoCTFAPIEndpointsLiveSoloDownloadLiveSoloRandomAttachmentRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloBracketResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "concurrencyStamp": {
+            "type": "string",
+            "format": "guid"
+          },
+          "format": {
+            "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloBracketFormat"
+          },
+          "matches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloBracketMatchResponse"
+            }
+          },
+          "championTeamId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFDomainLiveSoloLiveSoloBracketFormat": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "SingleElimination",
+          "DoubleElimination"
+        ],
+        "enum": [
+          "SingleElimination",
+          "DoubleElimination"
+        ]
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloBracketMatchResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "match": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloMatchResponse"
+          },
+          "lane": {
+            "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloBracketLane"
+          },
+          "stage": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "position": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "conditional": {
+            "type": "boolean"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloBracketSourceResponse"
+            }
+          }
+        }
+      },
+      "NoCTFDomainLiveSoloLiveSoloBracketLane": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Winners",
+          "Losers",
+          "GrandFinal",
+          "ResetFinal"
+        ],
+        "enum": [
+          "Winners",
+          "Losers",
+          "GrandFinal",
+          "ResetFinal"
+        ]
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloBracketSourceResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "side": {
+            "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloSide"
+          },
+          "source": {
+            "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloSlotSource"
+          },
+          "seed": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "sourceMatchId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "resolved": {
+            "type": "boolean"
+          },
+          "teamId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFDomainLiveSoloLiveSoloSide": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Left",
+          "Right"
+        ],
+        "enum": [
+          "Left",
+          "Right"
+        ]
+      },
+      "NoCTFDomainLiveSoloLiveSoloSlotSource": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Seed",
+          "Winner",
+          "Loser",
+          "Bye"
+        ],
+        "enum": [
+          "Seed",
+          "Winner",
+          "Loser",
+          "Bye"
+        ]
+      },
+      "NoCTFAPIEndpointsLiveSoloGenerateLiveSoloBracketRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expectedStamp",
+          "teamIds"
+        ],
+        "properties": {
+          "expectedStamp": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          },
+          "teamIds": {
+            "type": "array",
+            "minLength": 1,
+            "nullable": false,
+            "items": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloGetLiveSoloBracketRequest": {
         "type": "object",
         "additionalProperties": false
       },
