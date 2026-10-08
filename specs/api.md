@@ -748,4 +748,18 @@ PUT /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/wri
 
 ```text
 GET /api/v1/competitions/{competitionId}/live-solo/configuration
+GET /api/v1/competitions/{competitionId}/live-solo/matches
+POST /api/v1/competitions/{competitionId}/live-solo/matches
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/roster
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/ready
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/countdown
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/flag-submissions
+GET /api/v1/competitions/{competitionId}/live-solo/question-groups
+POST /api/v1/competitions/{competitionId}/live-solo/question-groups
 ```
+
+以上是本队和工作人员即时投影，不作为观众节目接口。题目正文仅在实际开放后返回，并重查当前 Round、锁定名单、队伍及账号资格。Flag 提交要求 UUID `Idempotency-Key`，响应的 `AdmissionSequence` 是整个 Round 两方、多成员、多题共享的持久化顺序，202 不代表评测结果。准备和开赛失败以 `LiveSoloFailure` 返回；媒体服务未就绪时不得开始正式倒计时。普通题目重判不能修改独立对局结果。

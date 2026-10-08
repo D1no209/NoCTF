@@ -60,7 +60,7 @@ internal static class FlagAcquisitionEvidenceMapper
 {
     public static FlagAcquisitionEvidenceResponse ToResponse(FlagAcquisitionEvidence? value) => value is null
         ? new(false, false, false, true, true, FlagAcquisitionEvidenceSourceProtocol.LegacySubmission, null, null, null, null, null)
-        : new(value.Scope == FlagAcquisitionScope.FormalStaticCtf,
+        : new(value.Scope is FlagAcquisitionScope.FormalStaticCtf or FlagAcquisitionScope.FormalStaticExecution,
             value.Required.HasFlag(FlagAcquisitionResource.Container), value.Required.HasFlag(FlagAcquisitionResource.Attachment),
             value.Acquired.HasFlag(FlagAcquisitionResource.Container), value.Acquired.HasFlag(FlagAcquisitionResource.Attachment),
             value.Source switch

@@ -4,6 +4,7 @@ using NoCTF.Application.Messaging;
 using NoCTF.Application.GameplayFacts.Management;
 using NoCTF.Application.GameplayFacts.Status;
 using NoCTF.Domain.Gameplay;
+using NoCTF.Application.Competitions.Modes;
 
 namespace NoCTF.Infrastructure.GameplayFacts.Management;
 
@@ -214,7 +215,7 @@ public sealed class GameplayFactManagementStore(
                     fact.Value!))
             .SingleOrDefaultAsync(ct);
 
-    public async Task QueueDrainAsync(
+    public async Task<GameplayFactWorkQueueState> QueueDrainAsync(
         Guid competitionId,
         Guid competitionChallengeId,
         DateTimeOffset cutoff,
@@ -222,6 +223,10 @@ public sealed class GameplayFactManagementStore(
         Guid? gameplayFactId,
         CancellationToken ct)
     {
+        var mode = await db.Competitions.AsNoTracking().Where(x => x.Id == competitionId).Select(x => (NoCTF.Domain.Competitions.GameMode?)x.Mode).SingleOrDefaultAsync(ct);
+        if (mode is null) return GameplayFactWorkQueueState.NotFound;
+        if (rejudge && CompetitionModeCapabilities.For(mode.Value).ScopedExecution)
+            return GameplayFactWorkQueueState.IndependentAdjudicationRequired;
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         if (rejudge)
             await outbox.PublishAsync(new DrainGameplayFactRejudge(
@@ -232,6 +237,7 @@ public sealed class GameplayFactManagementStore(
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushCommittedMessagesAsync();
+        return GameplayFactWorkQueueState.Queued;
     }
 
     private static IQueryable<GameplayFact> Page(

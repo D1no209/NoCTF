@@ -56,6 +56,10 @@ internal static partial class BackendMessageOperations
         CancellationToken cancellationToken)
     {
         const int batchSize = 500;
+        var mode = await db.Competitions.AsNoTracking().Where(x => x.Id == competitionId)
+            .Select(x => (NoCTF.Domain.Competitions.GameMode?)x.Mode).SingleOrDefaultAsync(cancellationToken);
+        if (mode is null || rejudge && NoCTF.Application.Competitions.Modes.CompetitionModeCapabilities.For(mode.Value).ScopedExecution)
+            return;
         var candidates = db.GameplayFacts.Where(submission =>
             submission.CompetitionId == competitionId
             && submission.CompetitionChallengeId == competitionChallengeId

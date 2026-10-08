@@ -21,6 +21,7 @@ public sealed class RuntimeTcpProxyMiddlewareTests
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), false, null) { ExecutionScopeId = Guid.NewGuid() };
         var builder = WebApplication.CreateBuilder(); builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.Services.AddSingleton(new RuntimeProxyOptions());
+        builder.Services.AddSingleton<IExecutionScopeAccess, DenyExecutionScopeAccess>();
         builder.Services.AddSingleton<IRuntimeProxyTargetReader>(new FixedTargetReader(target));
         builder.Services.AddSingleton<IRuntimeProxyConnectionGate>(new RuntimeProxyConnectionGate(new RuntimeProxyOptions()));
         builder.Services.AddSingleton<IRuntimeTrafficCaptureFactory, NullCaptureFactory>();
@@ -42,6 +43,7 @@ public sealed class RuntimeTcpProxyMiddlewareTests
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.Services.AddSingleton(new RuntimeProxyOptions());
+        builder.Services.AddSingleton<IExecutionScopeAccess, DenyExecutionScopeAccess>();
         builder.Services.AddSingleton<IRuntimeProxyTargetReader>(new FixedTargetReader(target));
         builder.Services.AddSingleton<IRuntimeProxyConnectionGate>(new RuntimeProxyConnectionGate(new RuntimeProxyOptions()));
         builder.Services.AddSingleton<IRuntimeTrafficCaptureFactory, NullCaptureFactory>();
@@ -97,6 +99,7 @@ public sealed class RuntimeTcpProxyMiddlewareTests
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
         builder.Services.AddSingleton(new RuntimeProxyOptions());
+        builder.Services.AddSingleton<IExecutionScopeAccess, DenyExecutionScopeAccess>();
         builder.Services.AddSingleton<IRuntimeProxyTargetReader>(
             new FixedTargetReader(target));
         builder.Services.AddSingleton<IRuntimeProxyConnectionGate>(

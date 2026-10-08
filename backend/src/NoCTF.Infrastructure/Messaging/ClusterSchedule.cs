@@ -10,7 +10,8 @@ public enum ClusterScheduleKind
     CompetitionLifecycle,
     AccountPrivacyRetention,
     RuntimeDispatch,
-    GameplayFactRecovery
+    GameplayFactRecovery,
+    LiveSoloRound
 }
 
 public sealed record ClusterScheduleEntry(
@@ -35,6 +36,9 @@ public interface IClusterScheduleSource
         DateTimeOffset now,
         CancellationToken cancellationToken);
 }
+
+/// <summary>Capability-owned scheduling sources compose without dependencies on other modes.</summary>
+public interface IClusterScheduleContributor : IClusterScheduleSource;
 
 public static class ClusterScheduleClock
 {
@@ -185,6 +189,7 @@ internal static class ClusterScheduleMessageClock
             new NoCTF.Application.Messaging.DispatchQueuedRuntimes(dueAt),
         NoCTF.Application.Messaging.DispatchPendingGameplayFacts =>
             new NoCTF.Application.Messaging.DispatchPendingGameplayFacts(dueAt),
+        NoCTF.Application.LiveSolo.Rounds.AdvanceLiveSoloRound value => value with { At = dueAt },
         _ => throw new ArgumentOutOfRangeException(
             nameof(message),
             message.GetType().FullName,

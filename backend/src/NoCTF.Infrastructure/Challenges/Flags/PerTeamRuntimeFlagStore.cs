@@ -134,25 +134,9 @@ public sealed class PerTeamRuntimeFlagStore(
             .SingleOrDefaultAsync(cancellationToken)
             ?? throw new InvalidOperationException(
                 "The competition challenge does not belong to the competition.");
-        var configuration = AwdpConfigurationResolver.Resolve(
-            (AwdpCompetitionModeConfiguration)scope.Configuration,
-            (AwdpCompetitionChallengeRules)scope.Rules,
-            (AwdpChallengeDefinition)scope.Definition);
-        if (configuration.Runtime is not
-            {
-                Allocation: NoCTF.Application.Runtime.Provisioning.RuntimeAllocation.PerTeam,
-                FlagSource: NoCTF.Application.Runtime.Provisioning.RuntimeFlagSource.PerTeam,
-                Definition: NoCTF.Application.Runtime.Provisioning.ContainerRuntimeDefinition
-                {
-                    Services: [{ FlagEnvironmentVariableName.Length: > 0 }]
-                }
-            })
-        {
-            throw new InvalidOperationException(
-                "AWDP generation flags require a PerTeam Container runtime flag environment variable.");
-        }
+        var template = NoCTF.GameModes.Registration.RuntimeInstanceFlagConfiguration.Resolve(scope.Configuration, scope.Rules, scope.Definition);
         var flag = PerTeamFlagGenerator.Generate(
-            configuration.FlagTemplate,
+            template,
             new(
                 scope.FlagDerivationSecret,
                 competitionId,

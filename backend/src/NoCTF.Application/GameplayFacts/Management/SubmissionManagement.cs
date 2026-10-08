@@ -2,6 +2,8 @@ using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.Application.GameplayFacts.Management;
 
+public enum GameplayFactWorkQueueState : short { Queued, NotFound, IndependentAdjudicationRequired }
+
 public sealed record GameplayFactListFilter(
     Guid CompetitionId,
     Guid? CompetitionChallengeId,
@@ -83,7 +85,7 @@ public interface IGameplayFactManagementStore
         Guid gameplayFactId,
         Guid userId,
         CancellationToken cancellationToken);
-    Task QueueDrainAsync(
+    Task<GameplayFactWorkQueueState> QueueDrainAsync(
         Guid competitionId,
         Guid competitionChallengeId,
         DateTimeOffset cutoff,
@@ -158,7 +160,7 @@ public sealed class ListGameplayFacts(IGameplayFactManagementStore store)
 
 public sealed class QueueGameplayFactWork(IGameplayFactManagementStore store)
 {
-    public Task QueueAsync(
+    public Task<GameplayFactWorkQueueState> QueueAsync(
         Guid competitionId,
         Guid competitionChallengeId,
         DateTimeOffset cutoff,

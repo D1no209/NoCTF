@@ -21,6 +21,7 @@ public static class MessageRouting
         options.Policies.Add(new DurableRunnerCommandPolicy());
         Route<EvaluateGameplayFact>(options, WorkerQueue.Gameplay);
         Route<DispatchPendingGameplayFacts>(options, WorkerQueue.Control);
+        Route<NoCTF.Application.LiveSolo.Rounds.AdvanceLiveSoloRound>(options, WorkerQueue.Control);
         Route<GameplayFactStateChanged>(options, WorkerQueue.Gameplay);
         Route<ProjectLeaderboard>(options, WorkerQueue.Projection);
         Route<ApplyCompetitionVisibility>(options, WorkerQueue.Control);
@@ -56,6 +57,7 @@ public static class MessageRouting
         Route<PublishHintNotification>(options, WorkerQueue.Background);
         Route<TeamBanned>(options, WorkerQueue.Background);
         Route<ForeignTeamFlagDetected>(options, WorkerQueue.Gameplay);
+        Route<StaticFlagAcquisitionViolationDetected>(options, WorkerQueue.Gameplay);
         Route<TeamBanCorrected>(options, WorkerQueue.Background);
         Route<DeliverCompetitionQuestionNotification>(options, WorkerQueue.Background);
         FanOutCompetitionEvents(options);

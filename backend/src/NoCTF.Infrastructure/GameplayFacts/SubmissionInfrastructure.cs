@@ -60,7 +60,8 @@ internal static class GameplayFactInfrastructure
         services.AddScoped<IHistoricalAdjudicationEventStore, HistoricalAdjudicationPreviewStore>();
         services.AddScoped<ReadHistoricalAdjudicationEvents>();
         services.AddScoped<PreviewHistoricalAdjudicationDifferences>();
-        services.AddScoped<IGameplayFactProcessor, GameplayFactProcessor>();
+        services.AddScoped<GameplayFactProcessor>();
+        services.AddScoped<IGameplayFactProcessor, GameplayFactProcessorRouter>();
         services.AddScoped<BloodRankCriticalSection>();
         services.AddScoped<IInternalResultStore, InternalResultStore>();
         services.AddScoped<IAwdpFixExecutionFence, AwdpFixExecutionFence>();

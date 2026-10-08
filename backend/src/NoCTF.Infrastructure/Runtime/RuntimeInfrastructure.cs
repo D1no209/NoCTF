@@ -87,6 +87,7 @@ internal static class RuntimeInfrastructure
         services.AddScoped<SharedRuntimeCriticalSection>();
 
         services.AddScoped<IRuntimeInstanceStore, RuntimeInstanceStore>();
+        services.TryAddSingleton<IExecutionScopeAccess, DenyExecutionScopeAccess>();
         services.AddScoped<IRuntimeProxyTargetReader, RuntimeProxyTargetReader>();
         services.AddScoped<IRuntimeTrafficCaptureFactory, RuntimeTrafficCaptureFactory>();
         services.AddScoped<IRuntimeTrafficCaptureStore, RuntimeTrafficCaptureStore>();

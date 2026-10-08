@@ -10,7 +10,6 @@ public sealed class RuntimeTcpProxyMiddleware(
     RequestDelegate next,
     ILogger<RuntimeTcpProxyMiddleware> logger,
     RuntimeProxyOptions? configuredOptions = null,
-    IExecutionScopeAccess? executionAccess = null,
     TimeProvider? configuredClock = null)
 {
     private static readonly PathString RoutePrefix = "/api/v1/runtime-proxies";
@@ -20,7 +19,8 @@ public sealed class RuntimeTcpProxyMiddleware(
         HttpContext context,
         IRuntimeProxyTargetReader targetReader,
         IRuntimeProxyConnectionGate connectionGate,
-        IRuntimeTrafficCaptureFactory captureFactory)
+        IRuntimeTrafficCaptureFactory captureFactory,
+        IExecutionScopeAccess executionAccess)
     {
         if (!context.WebSockets.IsWebSocketRequest
             || !TryReadRoute(context.Request.Path, out var runtimeInstanceId, out var bindingIndex))

@@ -2164,6 +2164,248 @@
         ]
       }
     },
+    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/ready": {
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Confirms a locked roster member's team is ready for the current preparation.",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/ready.",
+        "operationId": "ConfirmLiveSoloReady",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "ConfirmLiveSoloReadyRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloConfirmLiveSoloReadyRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloMatchResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/competitions/{competitionId}/live-solo/matches": {
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Creates a staff-managed direct Match with exclusive active team slots.",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/live-solo/matches.",
+        "operationId": "CreateLiveSoloMatch",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "CreateLiveSoloMatchRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloCreateLiveSoloMatchRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloMatchResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Lists the caller's Matches or an authorized staff bracket; public delayed state is separate.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/live-solo/matches.",
+        "operationId": "ListLiveSoloMatches",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "staff",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloMatchesResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/competitions/{competitionId}/live-solo/configuration": {
       "get": {
         "tags": [
@@ -2202,6 +2444,812 @@
           },
           "403": {
             "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Reads a participating team's Match or an authorized staff projection.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}.",
+        "operationId": "GetLiveSoloMatch",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "staff",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloMatchResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Reads the authorized Round clock and durable result, without unopened questions.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}.",
+        "operationId": "GetLiveSoloRound",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "roundId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "staff",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloRoundResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/competitions/{competitionId}/live-solo/question-groups": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Lists question-pool scheduling metadata for authorized staff only.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/live-solo/question-groups.",
+        "operationId": "ListLiveSoloQuestionGroups",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloQuestionGroupsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Creates or replaces a staff question group; a group allocated to an active Round cannot be changed.",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/live-solo/question-groups.",
+        "operationId": "SaveLiveSoloQuestionGroup",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "SaveLiveSoloQuestionGroupRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloSaveLiveSoloQuestionGroupRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloQuestionGroupResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Lists only actually opened questions for an eligible locked roster member in the current Round.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions.",
+        "operationId": "ListLiveSoloQuestions",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "roundId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloQuestionsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/roster": {
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Locks a captain-approved team roster before the Match starts.",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/roster.",
+        "operationId": "LockLiveSoloRoster",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "LockLiveSoloRosterRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLockLiveSoloRosterRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloMatchResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds": {
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Prepares a fresh Round and scoped resources from a suitable unexposed question group.",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds.",
+        "operationId": "PrepareLiveSoloRound",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "PrepareLiveSoloRoundRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloPrepareLiveSoloRoundRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloRoundResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/countdown": {
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Starts a judge-controlled countdown only after roster screens, resources and capacity are ready.",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/countdown.",
+        "operationId": "StartLiveSoloCountdown",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "roundId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "StartLiveSoloCountdownRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloStartLiveSoloCountdownRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloRoundResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/flag-submissions": {
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Atomically admits one Flag to the Round-wide server order; requires a UUID Idempotency-Key.",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/flag-submissions.",
+        "operationId": "SubmitLiveSoloFlag",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "roundId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "questionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "X-NoCTF-Human-Verification",
+            "in": "header",
+            "description": "One-time token from the provider selected by public platform configuration. Omit only when that provider is None.",
+            "schema": {
+              "type": "string",
+              "maxLength": 4096
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "SubmitLiveSoloFlagRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloSubmitLiveSoloFlagRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFlagAcceptedResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Human verification is required or was rejected.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "messageKey": {
+                      "type": "string",
+                      "description": "Stable semantic message identity. Translate with messageArguments; never infer identity from detail text."
+                    },
+                    "messageArguments": {
+                      "type": "object",
+                      "description": "Named interpolation arguments."
+                    }
+                  },
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The selected human verification provider is unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "messageKey": {
+                      "type": "string",
+                      "description": "Stable semantic message identity. Translate with messageArguments; never infer identity from detail text."
+                    },
+                    "messageArguments": {
+                      "type": "object",
+                      "description": "Named interpolation arguments."
+                    }
+                  },
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -22138,6 +23186,225 @@
         "type": "object",
         "additionalProperties": false
       },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloMatchResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "state": {
+            "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloMatchState"
+          },
+          "concurrencyStamp": {
+            "type": "string",
+            "format": "guid"
+          },
+          "requiredWins": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "leftWins": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rightWins": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "leftTeamId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "leftTeamName": {
+            "type": "string",
+            "nullable": true
+          },
+          "rightTeamId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "rightTeamName": {
+            "type": "string",
+            "nullable": true
+          },
+          "currentRoundId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "winnerTeamId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "rosters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloRosterResponse"
+            }
+          }
+        }
+      },
+      "NoCTFDomainLiveSoloLiveSoloMatchState": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "AwaitingOpponents",
+          "Preparing",
+          "Countdown",
+          "Running",
+          "Paused",
+          "AwaitingAdjudication",
+          "Completed",
+          "Canceled"
+        ],
+        "enum": [
+          "AwaitingOpponents",
+          "Preparing",
+          "Countdown",
+          "Running",
+          "Paused",
+          "AwaitingAdjudication",
+          "Completed",
+          "Canceled"
+        ]
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloRosterResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "userIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          "locked": {
+            "type": "boolean"
+          },
+          "ready": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NoCTFApplicationLiveSoloRoundsLiveSoloFailure"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        }
+      },
+      "NoCTFApplicationLiveSoloRoundsLiveSoloFailure": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "NotFound",
+          "Forbidden",
+          "Disabled",
+          "InvalidConfiguration",
+          "Conflict",
+          "RosterLocked",
+          "NotReady",
+          "MediaUnavailable",
+          "IsolationUnavailable",
+          "RoundNotRunning",
+          "RoundPaused",
+          "QuestionNotOpen",
+          "DeadlinePassed",
+          "AlreadyEnded",
+          "NoSuitableQuestionGroup",
+          "DependencyUnavailable",
+          "IdempotencyConflict"
+        ],
+        "enum": [
+          "NotFound",
+          "Forbidden",
+          "Disabled",
+          "InvalidConfiguration",
+          "Conflict",
+          "RosterLocked",
+          "NotReady",
+          "MediaUnavailable",
+          "IsolationUnavailable",
+          "RoundNotRunning",
+          "RoundPaused",
+          "QuestionNotOpen",
+          "DeadlinePassed",
+          "AlreadyEnded",
+          "NoSuitableQuestionGroup",
+          "DependencyUnavailable",
+          "IdempotencyConflict"
+        ]
+      },
+      "NoCTFAPIEndpointsLiveSoloConfirmLiveSoloReadyRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expectedStamp"
+        ],
+        "properties": {
+          "expectedStamp": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloCreateLiveSoloMatchRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "leftTeamId",
+          "rightTeamId"
+        ],
+        "properties": {
+          "leftTeamId": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          },
+          "rightTeamId": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          },
+          "requiredWins": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 1024.0,
+            "minimum": 1.0,
+            "nullable": true
+          }
+        }
+      },
       "NoCTFAPIEndpointsLiveSoloLiveSoloConfigurationContract": {
         "type": "object",
         "additionalProperties": false,
@@ -22246,6 +23513,384 @@
       "NoCTFAPIEndpointsLiveSoloGetLiveSoloConfigurationRequest": {
         "type": "object",
         "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsLiveSoloGetLiveSoloMatchRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloRoundResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "matchId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "number": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "replay": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "state": {
+            "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloRoundState"
+          },
+          "concurrencyStamp": {
+            "type": "string",
+            "format": "guid"
+          },
+          "timelineRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "countdownAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "limitSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "activeElapsedMilliseconds": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "paused": {
+            "type": "boolean"
+          },
+          "winnerTeamId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "winningGameplayFactId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFDomainLiveSoloLiveSoloRoundState": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Preparing",
+          "Countdown",
+          "Running",
+          "ConfirmingResult",
+          "Won",
+          "TimedOut",
+          "Canceled"
+        ],
+        "enum": [
+          "Preparing",
+          "Countdown",
+          "Running",
+          "ConfirmingResult",
+          "Won",
+          "TimedOut",
+          "Canceled"
+        ]
+      },
+      "NoCTFAPIEndpointsLiveSoloGetLiveSoloRoundRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloMatchesResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloMatchResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloListLiveSoloMatchesRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloQuestionGroupsResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloQuestionGroupResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloQuestionGroupResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "reserve": {
+            "type": "boolean"
+          },
+          "limitSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "concurrencyStamp": {
+            "type": "string",
+            "format": "guid"
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloQuestionGroupEntryContract"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloQuestionGroupEntryContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "competitionChallengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "openOffsetSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloListLiveSoloQuestionGroupsRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloQuestionsResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloQuestionResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloQuestionResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "competitionChallengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "position": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "direction": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "openedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "runtimeInstanceId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloListLiveSoloQuestionsRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsLiveSoloLockLiveSoloRosterRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "teamId",
+          "expectedStamp",
+          "userIds"
+        ],
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          },
+          "expectedStamp": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          },
+          "userIds": {
+            "type": "array",
+            "minLength": 1,
+            "nullable": false,
+            "items": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloPrepareLiveSoloRoundRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expectedStamp"
+        ],
+        "properties": {
+          "expectedStamp": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          },
+          "questionGroupId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloSaveLiveSoloQuestionGroupRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "questions"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "expectedStamp": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 0,
+            "nullable": false
+          },
+          "reserve": {
+            "type": "boolean"
+          },
+          "limitSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 86400.0,
+            "minimum": 1.0,
+            "nullable": true
+          },
+          "questions": {
+            "type": "array",
+            "minLength": 1,
+            "nullable": false,
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloQuestionGroupEntryContract"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloStartLiveSoloCountdownRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expectedStamp"
+        ],
+        "properties": {
+          "expectedStamp": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloFlagAcceptedResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "gameplayFactId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "admissionSequence": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "acceptedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "statusUrl": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloSubmitLiveSoloFlagRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "flag"
+        ],
+        "properties": {
+          "flag": {
+            "type": "string",
+            "maxLength": 4096,
+            "minLength": 0,
+            "nullable": false
+          }
+        }
       },
       "NoCTFAPIEndpointsInternalInternalResultResponse": {
         "type": "object",
