@@ -711,3 +711,33 @@ GET /api/v1/admin/competitions/{competitionId}/staff-webhooks/{targetId}/test-de
 GET /api/v1/admin/competitions/{competitionId}/staff-webhooks/{targetId}/deliveries
 GET /api/v1/competitions/{competitionId}/staff-work-items
 ```
+
+### Browser attachment handoff
+
+```text
+POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/attachments/{attachmentId}/browser-download
+POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/attachment/browser-download
+```
+
+Browser attachment preparation returns `downloadUrl` and an encrypted, HttpOnly, SameSite=Strict cookie scoped to that exact GET path. The cookie expires after two minutes and is cleared when handed to the existing access JWT validator. It cannot authenticate other endpoints or replace an explicitly supplied Bearer header. Current account, TokenVersion and MFA validation still run before opening the file stream. Preparation never opens a file, records acquisition evidence, or assigns a random attachment variant. The native browser consumes the file response directly; no attachment Blob is constructed in the SPA.
+
+## 单题题解
+
+比赛开关、默认扣分比例与单题截止期限独立于整场 PDF。元数据和计分确认不返回正文；正式首次查阅需要显式 POST 解锁，版本与比例政策变化时重新确认。PDF 浏览器授权以 HttpOnly Cookie 绑定用户、版本路径和文件，文件 GET 支持原生下载。
+
+```text
+GET /api/v1/admin/competitions/{competitionId}/challenge-writeups
+GET /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/writeups
+GET /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/writeups/versions/{versionId}
+GET /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/writeups/versions/{versionId}/file
+GET /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/writeups/versions/{versionId}/quote
+GET /api/v1/competitions/{competitionId}/teams/me/challenge-writeups
+GET /api/v1/competitions/{competitionId}/writeup-settings
+PATCH /api/v1/admin/competitions/{competitionId}/writeup-settings
+POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/writeups/submit
+POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/writeups/versions/{versionId}/browser-access
+POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/writeups/versions/{versionId}/unlock
+POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/writeups/{writeUpId}/review
+PUT /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/writeups/draft
+PUT /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/writeups/draft/pdf
+```

@@ -43,7 +43,7 @@ export const TeamBanAppealStatusLabel = {
 
 export const GameplayFactKindLabel = {
   FlagAttempt: 'Flag', BreakAttempt: 'Break', FixAttempt: 'Fix', HintUnlock: "common.label.promptUnlock",
-  ManualAdjustment: "common.label.manualAdjustment", AwdServiceTransition: "common.label.awdServiceStatus", KohControlObservation: "common.label.kohControlObservation", AttachmentDownload: "cheats.label.attachmentDownload",
+  ManualAdjustment: "common.label.manualAdjustment", AwdServiceTransition: "common.label.awdServiceStatus", KohControlObservation: "common.label.kohControlObservation", AttachmentDownload: "cheats.label.attachmentDownload", WriteUpUnlock: "challengeWriteUp.viewed",
 } satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol, string>
 
 export const GameplayFactStateLabel = {

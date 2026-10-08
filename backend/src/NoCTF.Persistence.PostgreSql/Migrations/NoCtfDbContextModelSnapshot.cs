@@ -667,6 +667,10 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("updated_at");
 
+                    b.Property<int?>("WriteUpDeductionPercent")
+                        .HasColumnType("integer")
+                        .HasColumnName("write_up_deduction_percent");
+
                     b.HasKey("Id")
                         .HasName("pk_competition_challenges");
 
@@ -926,6 +930,204 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.UseTphMappingStrategy();
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Challenges.WriteUps.ChallengeWriteUp", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AuthorScopeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("author_scope_id");
+
+                    b.Property<Guid>("CompetitionChallengeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_challenge_id");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<Guid?>("DraftVersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("draft_version_id");
+
+                    b.Property<int>("NextVersionNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("next_version_number");
+
+                    b.Property<Guid?>("PublishedVersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("published_version_id");
+
+                    b.Property<short>("Source")
+                        .HasColumnType("smallint")
+                        .HasColumnName("source");
+
+                    b.Property<Guid?>("SubmittedVersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("submitted_version_id");
+
+                    b.Property<Guid?>("TeamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("team_id");
+
+                    b.Property<long>("UpdatedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_competition_challenge_writeups");
+
+                    b.HasIndex("CompetitionId")
+                        .HasDatabaseName("ix_competition_challenge_writeups_competition_id");
+
+                    b.HasIndex("TeamId")
+                        .HasDatabaseName("ix_competition_challenge_writeups_team_id");
+
+                    b.HasIndex("CompetitionChallengeId", "Source", "AuthorScopeId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_competition_challenge_writeups_competition_challenge_id_sou");
+
+                    b.ToTable("competition_challenge_writeups", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.WriteUps.ChallengeWriteUpVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_user_id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<Guid?>("FileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("file_id");
+
+                    b.Property<short>("Format")
+                        .HasColumnType("smallint")
+                        .HasColumnName("format");
+
+                    b.Property<string>("Markdown")
+                        .HasMaxLength(262144)
+                        .HasColumnType("character varying(262144)")
+                        .HasColumnName("markdown");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("integer")
+                        .HasColumnName("number");
+
+                    b.Property<string>("ReviewReason")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("review_reason");
+
+                    b.Property<long?>("ReviewedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("reviewed_at");
+
+                    b.Property<Guid?>("ReviewedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reviewed_by_user_id");
+
+                    b.Property<short>("State")
+                        .HasColumnType("smallint")
+                        .HasColumnName("state");
+
+                    b.Property<long?>("SubmittedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("submitted_at");
+
+                    b.Property<long>("UpdatedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("WriteUpId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("write_up_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_competition_challenge_writeup_versions");
+
+                    b.HasIndex("ActorUserId")
+                        .HasDatabaseName("ix_competition_challenge_writeup_versions_actor_user_id");
+
+                    b.HasIndex("FileId")
+                        .HasDatabaseName("ix_competition_challenge_writeup_versions_file_id");
+
+                    b.HasIndex("ReviewedByUserId")
+                        .HasDatabaseName("ix_competition_challenge_writeup_versions_reviewed_by_user_id");
+
+                    b.HasIndex("WriteUpId", "Number")
+                        .IsUnique()
+                        .HasDatabaseName("ix_competition_challenge_writeup_versions_write_up_id_number");
+
+                    b.ToTable("competition_challenge_writeup_versions", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.WriteUps.WriteUpUnlockReceipt", b =>
+                {
+                    b.Property<Guid>("GameplayFactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("gameplay_fact_id");
+
+                    b.Property<Guid>("CompetitionChallengeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_challenge_id");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<int>("DeductionPercent")
+                        .HasColumnType("integer")
+                        .HasColumnName("deduction_percent");
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("team_id");
+
+                    b.Property<long>("UnlockedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("unlocked_at");
+
+                    b.Property<Guid>("VersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("version_id");
+
+                    b.HasKey("GameplayFactId")
+                        .HasName("pk_competition_challenge_writeup_unlocks");
+
+                    b.HasIndex("CompetitionChallengeId")
+                        .HasDatabaseName("ix_competition_challenge_writeup_unlocks_competition_challenge");
+
+                    b.HasIndex("CompetitionId")
+                        .HasDatabaseName("ix_competition_challenge_writeup_unlocks_competition_id");
+
+                    b.HasIndex("VersionId")
+                        .HasDatabaseName("ix_competition_challenge_writeup_unlocks_version_id");
+
+                    b.HasIndex("TeamId", "CompetitionChallengeId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_competition_challenge_writeup_unlocks_team_id_competition_c");
+
+                    b.ToTable("competition_challenge_writeup_unlocks", (string)null);
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Commands.CommandReceipt", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1129,6 +1331,20 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("smallint")
                         .HasDefaultValue((short)0)
                         .HasColumnName("runtime_access_mode");
+
+                    b.Property<int>("SingleWriteUpDeadlineHours")
+                        .HasColumnType("integer")
+                        .HasDefaultValue(24)
+                        .HasColumnName("single_write_up_deadline_hours");
+
+                    b.Property<int>("SingleWriteUpDeductionPercent")
+                        .HasColumnType("integer")
+                        .HasDefaultValue(20)
+                        .HasColumnName("single_write_up_deduction_percent");
+
+                    b.Property<bool>("SingleWriteUpsEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("single_write_ups_enabled");
 
                     b.Property<long>("StartAt")
                         .HasColumnType("bigint")
@@ -5333,6 +5549,51 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.HasDiscriminator().HasValue((short)6);
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Events.ChallengeWriteUpPublishedEvent", b =>
+                {
+                    b.HasBaseType("NoCTF.Domain.Competitions.Events.CompetitionEvent");
+
+                    b.ToTable("competition_events", (string)null);
+
+                    b.HasDiscriminator().HasValue((short)64);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Events.ChallengeWriteUpRejectedEvent", b =>
+                {
+                    b.HasBaseType("NoCTF.Domain.Competitions.Events.CompetitionEvent");
+
+                    b.ToTable("competition_events", (string)null);
+
+                    b.HasDiscriminator().HasValue((short)66);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Events.ChallengeWriteUpSubmittedEvent", b =>
+                {
+                    b.HasBaseType("NoCTF.Domain.Competitions.Events.CompetitionEvent");
+
+                    b.ToTable("competition_events", (string)null);
+
+                    b.HasDiscriminator().HasValue((short)63);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Events.ChallengeWriteUpUnlockedEvent", b =>
+                {
+                    b.HasBaseType("NoCTF.Domain.Competitions.Events.CompetitionEvent");
+
+                    b.ToTable("competition_events", (string)null);
+
+                    b.HasDiscriminator().HasValue((short)67);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Events.ChallengeWriteUpWithdrawnEvent", b =>
+                {
+                    b.HasBaseType("NoCTF.Domain.Competitions.Events.CompetitionEvent");
+
+                    b.ToTable("competition_events", (string)null);
+
+                    b.HasDiscriminator().HasValue((short)65);
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Competitions.Events.CheatIncidentConfirmedEvent", b =>
                 {
                     b.HasBaseType("NoCTF.Domain.Competitions.Events.CompetitionEvent");
@@ -5904,6 +6165,15 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.ToTable("gameplay_facts", (string)null);
 
                     b.HasDiscriminator().HasValue((short)4);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Gameplay.WriteUpUnlockGameplayFact", b =>
+                {
+                    b.HasBaseType("NoCTF.Domain.Gameplay.GameplayFact");
+
+                    b.ToTable("gameplay_facts", (string)null);
+
+                    b.HasDiscriminator().HasValue((short)8);
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Notifications.AuthenticationSecurityActivityNotification", b =>
@@ -6633,6 +6903,96 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_competition_challenge_rules_competition_challenges_competit");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.WriteUps.ChallengeWriteUp", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Challenges.CompetitionChallenge", null)
+                        .WithMany()
+                        .HasForeignKey("CompetitionChallengeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_competition_challenge_writeups_competition_challenges_compe");
+
+                    b.HasOne("NoCTF.Domain.Competitions.Competition", null)
+                        .WithMany()
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_competition_challenge_writeups_competitions_competition_id");
+
+                    b.HasOne("NoCTF.Domain.Teams.Team", null)
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_competition_challenge_writeups_teams_team_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.WriteUps.ChallengeWriteUpVersion", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_competition_challenge_writeup_versions_users_actor_user_id");
+
+                    b.HasOne("NoCTF.Domain.Storage.StoredFile", null)
+                        .WithMany()
+                        .HasForeignKey("FileId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_competition_challenge_writeup_versions_files_file_id");
+
+                    b.HasOne("NoCTF.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_competition_challenge_writeup_versions_users_reviewed_by_us");
+
+                    b.HasOne("NoCTF.Domain.Challenges.WriteUps.ChallengeWriteUp", null)
+                        .WithMany("Versions")
+                        .HasForeignKey("WriteUpId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_competition_challenge_writeup_versions_competition_challeng");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.WriteUps.WriteUpUnlockReceipt", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Challenges.CompetitionChallenge", null)
+                        .WithMany()
+                        .HasForeignKey("CompetitionChallengeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_competition_challenge_writeup_unlocks_competition_challenge");
+
+                    b.HasOne("NoCTF.Domain.Competitions.Competition", null)
+                        .WithMany()
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_competition_challenge_writeup_unlocks_competitions_competit");
+
+                    b.HasOne("NoCTF.Domain.Gameplay.GameplayFact", null)
+                        .WithOne()
+                        .HasForeignKey("NoCTF.Domain.Challenges.WriteUps.WriteUpUnlockReceipt", "GameplayFactId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_competition_challenge_writeup_unlocks_gameplay_facts_gamepl");
+
+                    b.HasOne("NoCTF.Domain.Teams.Team", null)
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_competition_challenge_writeup_unlocks_teams_team_id");
+
+                    b.HasOne("NoCTF.Domain.Challenges.WriteUps.ChallengeWriteUpVersion", null)
+                        .WithMany()
+                        .HasForeignKey("VersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_competition_challenge_writeup_unlocks_competition_challenge1");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Commands.CommandReceiptGameplayFactResult", b =>
@@ -8202,6 +8562,11 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
             modelBuilder.Entity("NoCTF.Domain.Challenges.CompetitionChallengeRules", b =>
                 {
                     b.Navigation("BloodRewards");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Challenges.WriteUps.ChallengeWriteUp", b =>
+                {
+                    b.Navigation("Versions");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Commands.CommandReceipt", b =>

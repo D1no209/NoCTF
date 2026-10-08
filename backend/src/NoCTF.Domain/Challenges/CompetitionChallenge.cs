@@ -24,6 +24,7 @@ public abstract class CompetitionChallenge : IConcurrencyTracked
     public string? NormalizedCustomTitle { get; set; }
     public int Order { get; set; }
     public bool IsPublished { get; set; }
+    public int? WriteUpDeductionPercent { get; set; }
     public CompetitionChallengeRules? Rules { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public DateTimeOffset? DeletedAt { get; set; }

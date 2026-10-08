@@ -9,6 +9,7 @@ import type { NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigur
 import type { NoCtfapiEndpointsCompetitionsRuntimeAccessModeProtocol } from '../../../../../api'
 
 import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
+import SingleWriteUpSettingsComponent from '~/features/writeups/SingleWriteUpSettings.vue'
 import CompetitionModeConfigEditorComponent from '../../../../admin/CompetitionModeConfigEditor.vue'
 
 const maximumWriteUpDeadlineHours = 24 * 365
@@ -194,6 +195,7 @@ export function useAdminCompetitionsByIdConfigurationPage() {
   const CompetitionModeConfigEditor = markRaw(CompetitionModeConfigEditorComponent)
 
   return {
+      competitionId, SingleWriteUpSettings: markRaw(SingleWriteUpSettingsComponent), refreshCompetition: refresh,
       competition,
       canWrite,
       title,

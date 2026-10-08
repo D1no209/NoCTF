@@ -4,12 +4,12 @@ import WaveSelectionList from '../selection-list/WaveSelectionList.vue'
 import { Skeleton } from '../skeleton'
 import { Empty, EmptyHeader, EmptyTitle } from '../empty'
 
-defineProps<{ items: T[]; groups?: { value: string; label: string; items: T[] }[]; modelValue: string | null; label: string; loading?: boolean; loadingLabel: string; emptyLabel: string; controls?: string; compact?: boolean }>()
+defineProps<{ items: T[]; groups?: { value: string; label: string; items: T[] }[]; modelValue: string | null; label: string; loading?: boolean; loadingLabel: string; emptyLabel: string; controls?: string; compact?: boolean; contained?: boolean }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 </script>
 
 <template>
-  <FloatingSidebar :label="label">
+  <FloatingSidebar :label="label" :contained="contained">
     <slot name="header" />
     <slot name="feedback" />
     <div v-if="loading" class="flex flex-col gap-3 pr-10" :aria-label="loadingLabel"><Skeleton v-for="i in 3" :key="i" class="h-24 w-full" /></div>

@@ -5,6 +5,7 @@ import { adminTeamPath, adminTemplatePath } from '~/features/admin/admin-navigat
 import { proxyRefs } from 'vue'
 import { markRaw } from 'vue'
 
+import SingleWriteUpSettingsComponent from '~/features/writeups/SingleWriteUpSettings.vue'
 import { Plus } from '@lucide/vue'
 import { toast } from '../../../../../../utils/message-toast'
 import { adminListCompetitionChallenges, adminGetCompetitionDirections, adminCreateManualAdjustment, adminCreateCompetitionChallengeHint, adminDeleteCompetitionChallengeHint, adminGetCompetition, adminGetCompetitionChallenge, adminListGameplayFacts, adminListCompetitionChallengeHints, adminListTeams, adminPatchCompetitionChallenge, adminRestoreCompetitionChallengeHint, adminUpdateCompetitionChallengeHint, getLeaderboardEndpoint, getScoreboardSchemaEndpoint } from '../../../../../../api'
@@ -609,7 +610,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
     viewState.hintDialogOpen = value
   }
 
-  return { ...viewBindings, onClickAdjustmentTarget, onClickHintDialogOpen }
+  return { ...viewBindings, ccId, SingleWriteUpSettings: markRaw(SingleWriteUpSettingsComponent), onClickAdjustmentTarget, onClickHintDialogOpen }
 }
 
 export type AdminCompetitionsByIdChallengesByCcIdPageViewState = import('vue').ShallowUnwrapRef<Awaited<ReturnType<typeof useAdminCompetitionsByIdChallengesByCcIdPage>>>

@@ -54,7 +54,10 @@ public sealed record CompetitionView(
     int WriteUpSubmissionDeadlineHours = 0,
     RuntimeAccessMode RuntimeAccessMode = RuntimeAccessMode.Direct,
     bool TrafficCaptureEnabled = false,
-    long? TrafficCaptureLimitBytes = null);
+    long? TrafficCaptureLimitBytes = null,
+    bool SingleWriteUpsEnabled = false,
+    int SingleWriteUpDeductionPercent = 20,
+    int SingleWriteUpDeadlineHours = 24);
 
 public enum CompetitionCreationState
 {

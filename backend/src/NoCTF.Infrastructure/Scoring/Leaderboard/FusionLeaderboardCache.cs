@@ -331,7 +331,9 @@ public sealed class FusionLeaderboardCache(
             scoreboardFacts,
             selectedRoundWindowEnd,
             awdWindow.LatestRound,
-            factRows.AwdAggregates);
+            factRows.AwdAggregates,
+            await db.WriteUpUnlockReceipts.AsNoTracking().Where(x => x.CompetitionId == competitionId && x.UnlockedAt <= projectedAt)
+                .Select(x => new LeaderboardWriteUpUnlock(x.GameplayFactId, x.TeamId, x.CompetitionChallengeId, x.DeductionPercent, x.UnlockedAt)).ToArrayAsync(ct));
         var scoreboard = projectionEngine.Project(projectionInput);
         ScoreboardProjection AddResponseMetadata(ScoreboardProjection value) => value with
         {
@@ -363,7 +365,8 @@ public sealed class FusionLeaderboardCache(
             && awdWindow.Rounds.All(round =>
                 publishedChallengeIds.Contains(round.CompetitionChallengeId))
             && (factRows.AwdAggregates is null || factRows.AwdAggregates.All(fact =>
-                publishedChallengeIds.Contains(fact.CompetitionChallengeId)));
+                publishedChallengeIds.Contains(fact.CompetitionChallengeId)))
+            && (projectionInput.WriteUpUnlocks ?? []).All(fact => publishedChallengeIds.Contains(fact.CompetitionChallengeId));
         if (participantProjectionMatchesFull)
         {
             participantScoreboard = scoreboard;
@@ -380,7 +383,8 @@ public sealed class FusionLeaderboardCache(
                     .ToArray(),
                 AwdAggregates = factRows.AwdAggregates?
                     .Where(fact => publishedChallengeIds.Contains(fact.CompetitionChallengeId))
-                    .ToArray()
+                    .ToArray(),
+                WriteUpUnlocks = (projectionInput.WriteUpUnlocks ?? []).Where(fact => publishedChallengeIds.Contains(fact.CompetitionChallengeId)).ToArray()
             };
             participantScoreboard = AddResponseMetadata(
                 projectionEngine.Project(participantInput));

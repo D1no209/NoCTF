@@ -1,4 +1,5 @@
 import { createMockMfa } from './mfa'
+import { createMockChallengeWriteUps } from './challenge-writeups'
 import { accounts, createFixtures, mockModeConfiguration, mockRules } from './data/fixtures'
 import { date, id, matchOperation, model, now, resolve, responseSchema, sample, type Data } from './schema'
 import { leaderboardRead } from './leaderboard'
@@ -132,8 +133,20 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
         ? { provider: 'Cap', siteKey: configuration.capSiteKey, apiEndpoint: `${configuration.capServerUrl.replace(/\/$/, '')}/${encodeURIComponent(configuration.capSiteKey)}/`, runtimeRequired: configuration.runtimeEnabled !== false, evaluationRequired: configuration.evaluationEnabled !== false }
         : { provider: 'Turnstile', siteKey: configuration.turnstileSiteKey, apiEndpoint: null, runtimeRequired: configuration.runtimeEnabled !== false, evaluationRequired: configuration.evaluationEnabled !== false }
   }
+  const nativeDownloads = new Map<string, { userId: string; path: string; expiresAt: number }>()
+  function prepareMockAttachmentDownload(user: Data, path: string) {
+    const ticket = crypto.randomUUID()
+    nativeDownloads.set(ticket, { userId: user.userId, path, expiresAt: Date.now() + 120_000 })
+    return json({ downloadUrl: path }, 200, { 'Set-Cookie': `noctf_mock_download=${ticket}; Path=${path}; Max-Age=120; HttpOnly; SameSite=Strict` })
+  }
   const userFor = (request: Request) => {
     const bearer = request.headers.get('Authorization')?.replace(/^Bearer /, '')
+    if (!bearer && request.method === 'GET') {
+      const ticket = request.headers.get('cookie')?.match(/(?:^|;\s*)noctf_mock_download=([^;]+)/)?.[1]
+      const grant = nativeDownloads.get(ticket ?? '')
+      if (grant && grant.path === new URL(request.url).pathname && grant.expiresAt > Date.now())
+        return state.users.find(user => user.userId === grant.userId)
+    }
     return state.users.find(user => user.userId === tokens.get(bearer ?? ''))
   }
   function signIn(user: Data) {
@@ -144,6 +157,12 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
     return json({ ...user, state: 'Authenticated', accessToken, expiresAt: date(24), returnPath: '/' }, 200, { 'Set-Cookie': `noctf_mock_session=${session}; Path=/; HttpOnly; SameSite=Strict` })
   }
   const mfa = createMockMfa({ users: state.users, signIn, userFor, loginRequiresMfa: options.mfa ?? false })
+  const singleWriteUps = createMockChallengeWriteUps({ state, json, pdf: mockWriteUpPdf, prepareDownload: prepareMockAttachmentDownload,
+    gross: (competitionId, teamId, challengeId) => {
+      const snapshot = leaderboardRead(state, '', competitionId)!
+      const index = state.challenges.filter(x => x.competitionId === competitionId && x.isPublished && !x.deletedAt).findIndex(x => x.id === challengeId)
+      return snapshot.teams.find((x: Data) => x.teamId === teamId)?.slots[index]?.earnedPoints ?? 0
+    } })
   function challengeSummary(item: Data) {
     return {
       id: item.id,
@@ -244,6 +263,8 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
     const mfaResponse = await mfa.handle(request, route, body, p)
     if (mfaResponse) return mfaResponse
     const user = userFor(request)
+    const singleWriteUpResponse = await singleWriteUps.handle(request, route, p, body, user)
+    if (singleWriteUpResponse) return singleWriteUpResponse
     if ((route.startsWith('/admin') || route.startsWith('/auth/me') || request.method !== 'GET') && !user) return problem(401, '请先登录演示账号 / Sign in to the Mock site')
     if (route.startsWith('/admin/platform') && user?.role !== 'Administrator') return problem(403, '需要 Mock 管理员账号 / Administrator required')
     if (route.startsWith('/admin/') && !['Administrator', 'Organizer'].includes(user?.role)) return problem(403, '需要 Mock 管理账号 / Staff account required')
@@ -560,7 +581,11 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
         key: 'open', name: '公开赛道 / Open', isDefault: true, isPublicSelectable: true, earnsScore: true, earnsBlood: true,
         affectsDynamicChallengeScore: true, visibleOnLeaderboard: true, affectsCompetitiveResults: true, isViewerTrack: true,
       })] }
-      else if (cleanRoute.includes('/leaderboard')) value = leaderboardRead(state, cleanRoute.split('/leaderboard')[1]!, p.competitionId!)
+      else if (cleanRoute.includes('/leaderboard')) {
+        const suffix = cleanRoute.split('/leaderboard')[1]!
+        value = leaderboardRead(state, suffix, p.competitionId!)
+        if (suffix === '' && value) value = singleWriteUps.decorateLeaderboard(value, p.competitionId!)
+      }
       else if (route === '/admin/competitions/{competitionId}/directions') value = { items: directionCatalogs.get(competition!.id) ?? [] }
       else if (route === '/admin/competitions/{competitionId}/announcements') {
         value = list(state.notifications.filter(item => item.kind === 'CompetitionAnnouncement' && item.sourceType === 1
@@ -963,6 +988,14 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
         })
         state.questions.unshift(question)
         value = questionView(question, user, myTeam)
+      }
+      else if (route === '/competitions/{competitionId}/challenges/{competitionChallengeId}/attachments/{attachmentId}/browser-download') {
+        if (!user || !attachment) return problem(404, 'Mock attachment not found')
+        return prepareMockAttachmentDownload(user, `/api/v1/competitions/${p.competitionId}/challenges/${p.competitionChallengeId}/attachments/${p.attachmentId}`)
+      }
+      else if (route === '/competitions/{competitionId}/challenges/{competitionChallengeId}/attachment/browser-download') {
+        if (!user || !challenge) return problem(404, 'Mock challenge not found')
+        return prepareMockAttachmentDownload(user, `/api/v1/competitions/${p.competitionId}/challenges/${p.competitionChallengeId}/attachment`)
       }
       else if (route === '/competitions/{competitionId}/questions') {
         const rootId = crypto.randomUUID()

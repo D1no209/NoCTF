@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { CompetitionChallengeDetailViewState } from '~/features/challenges/useCompetitionChallengeDetail'
 
 const viewProps = defineProps<{ state: CompetitionChallengeDetailViewState }>()
-const { Dice5, FileDown, History, ctx, isLoggedIn, user, challenge, loading, error, attachments, attachmentDeliveryPolicy, attachmentsLoading, attachmentError, downloading, historyRefreshKey, historyOpen, refreshSubmissionHistory, updateRemainingAttempts, loadAttachments, downloadAttachment, downloadRandom, mode, ChallengeHints, ChallengeSubmissionHistory, AwdPanel, AwdpPanel, CtfPanel, KohPanel, competitionId, competitionChallengeId, flagDockTarget } = toRefs(viewProps.state)
+const { BookOpen, singleWriteUpsEnabled, openWriteUps, writeUpBenefit, Dice5, FileDown, History, ctx, isLoggedIn, user, challenge, loading, error, attachments, attachmentDeliveryPolicy, attachmentsLoading, attachmentError, downloading, historyRefreshKey, historyOpen, refreshSubmissionHistory, updateRemainingAttempts, loadAttachments, downloadAttachment, downloadRandom, mode, ChallengeHints, ChallengeSubmissionHistory, AwdPanel, AwdpPanel, CtfPanel, KohPanel, competitionId, competitionChallengeId, flagDockTarget } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -41,6 +41,7 @@ const { Dice5, FileDown, History, ctx, isLoggedIn, user, challenge, loading, err
             </ScrollSurface>
           </DialogContent>
         </Dialog>
+        <Button v-if="singleWriteUpsEnabled" variant="ghost" size="sm" @click="openWriteUps"><BookOpen />{{ $t('challengeWriteUp.title') }}</Button>
         <span class="sr-only">{{ challenge.direction || '' }}</span>
         <Badge v-if="mode === 'Awdp'" variant="secondary">{{ $t('challenges.label.scoresSettleRound') }}</Badge>
         <div v-if="challenge.tags?.length" class="relative z-10 flex min-w-0 basis-full flex-wrap gap-2" :aria-label="$t('challengeTags.label')">
@@ -48,6 +49,7 @@ const { Dice5, FileDown, History, ctx, isLoggedIn, user, challenge, loading, err
         </div>
       </header>
 
+      <div v-if="writeUpBenefit" class="space-y-3 border-b py-4"><Badge variant="secondary">{{ $t('challengeWriteUp.unlocked', { percent: 100 - (writeUpBenefit.writeUpDeductionPercent ?? 0) }) }}</Badge><ScoreBreakdownSummary :gross-points="writeUpBenefit.grossPoints ?? 0" :deduction-points="writeUpBenefit.writeUpDeductionPoints ?? 0" :net-points="writeUpBenefit.netPoints ?? 0" :gross-label="$t('challengeWriteUp.grossLabel')" :deduction-label="$t('challengeWriteUp.deductionLabel')" :net-label="$t('challengeWriteUp.netLabel')" /></div>
       <section v-if="challenge.description" class="border-b py-5" :aria-label="challenge.title">
         <MarkdownContent :source="challenge.description" class="text-foreground/90" />
       </section>

@@ -8,6 +8,7 @@ import { toast } from '../../../../../utils/message-toast'
 import { downloadMyTeamWriteUp, getMyTeamWriteUp, replaceMyTeamWriteUp } from '../../../../../api'
 import type { NoCtfapiEndpointsTeamsWriteUpsTeamWriteUpResponse } from '../../../../../api'
 import { downloadSdkFile, readProtectedDownload } from '../../../../../utils/download'
+import MySingleWriteUpsComponent from '~/features/writeups/MySingleWriteUps.vue'
 import CompetitionParticipantWorkspaceComponent from '../../../../competition/CompetitionParticipantWorkspace.vue'
 
 const maximumWriteUpBytes = 64 * 1024 * 1024
@@ -17,6 +18,10 @@ export function useCompetitionsByIdMyWriteUpPage() {
   const route = useRoute()
   const competitionId = route.params.id as string
   const ctx = inject(competitionContextKey)!
+  const activeTab = ref(ctx.competition.value?.singleWriteUpsEnabled ? 'single' : 'whole')
+  const singleEnabled = computed(() => ctx.competition.value?.singleWriteUpsEnabled === true)
+  watch(singleEnabled, enabled => { if (!enabled) activeTab.value = 'whole' })
+  const MySingleWriteUps = markRaw(MySingleWriteUpsComponent)
   const now = useNow({ interval: 1000 })
 
   const submissionRequired = computed(() =>
@@ -173,6 +178,7 @@ export function useCompetitionsByIdMyWriteUpPage() {
 
   const CompetitionParticipantWorkspace = markRaw(CompetitionParticipantWorkspaceComponent)
   const viewBindings = {
+    activeTab, singleEnabled, MySingleWriteUps,
     Download,
     Eye,
     FileText,

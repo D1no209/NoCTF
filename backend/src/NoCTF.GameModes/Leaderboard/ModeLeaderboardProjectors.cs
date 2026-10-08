@@ -26,14 +26,18 @@ internal static class CtfLeaderboardProjection
 
     public static GameModeLeaderboardProjection Project(LeaderboardProjectionInput input)
     {
-        var (entries, cells, currentScores) = ProjectCore(input);
-        return new(entries, cells, currentScores);
+        var (entries, cells, currentScores, challengePenalties) = ProjectCore(input);
+        return new(entries, cells, currentScores)
+        {
+            ChallengeNetScores = ProjectionPenalties.ChallengeNetScores(input, cells, challengePenalties)
+        };
     }
 
     private static (
         IReadOnlyList<LeaderboardEntry> Entries,
         IReadOnlyList<LeaderboardCellFact> Cells,
-        IReadOnlyDictionary<Guid, long> CurrentScores)
+        IReadOnlyDictionary<Guid, long> CurrentScores,
+        IReadOnlyDictionary<(Guid TeamId, Guid CompetitionChallengeId), long> ChallengePenalties)
         ProjectCore(LeaderboardProjectionInput input)
     {
         var activeTeams = input.Teams
@@ -99,19 +103,21 @@ internal static class CtfLeaderboardProjection
                 precedingDynamicSolves[challengeId] = priceOrdinal;
             if (!validTeams.TryGetValue(solve.TeamId!.Value, out var team))
             {
-                if (atSolve && CtfCompletionEligibility.EarnsBlood(activeTeams[solve.TeamId.Value]))
+                if (atSolve && CtfCompletionEligibility.EarnsBlood(activeTeams[solve.TeamId.Value])
+                    && WriteUpBenefitProjection.CanEarnBlood(input, solve))
                     bloodSolveNumber[challengeId] = checked(bloodSolveNumber.GetValueOrDefault(challengeId) + 1);
                 continue;
             }
             var bloodIndex = bloodSolveNumber.GetValueOrDefault(challengeId);
-            var solveOrdinal = team.EarnsBlood ? checked(bloodIndex + 1) : 0;
+            var earnsBlood = team.EarnsBlood && WriteUpBenefitProjection.CanEarnBlood(input, solve);
+            var solveOrdinal = earnsBlood ? checked(bloodIndex + 1) : 0;
             var score = ScoreCurve.Evaluate(
                 curve,
                 atSolve ? priceOrdinal : Math.Max(1, currentSolveCounts.GetValueOrDefault(challengeId)),
                 dynamicTeams.Count);
             var basePoints = score;
             var bloodPoints = 0L;
-            if (team.EarnsBlood)
+            if (earnsBlood)
             {
                 bloodPoints = BloodRewardAt(
                     configuration.BloodRewards ?? defaults.BloodRewards,
@@ -138,6 +144,7 @@ internal static class CtfLeaderboardProjection
                 && fact.Result == GameplayFactResult.Wrong)
             .Select(fact =>
                 (TeamId: fact.TeamId!.Value,
+                fact.CompetitionChallengeId,
                 fact.OccurredAt,
                 fact.GameplayFactId,
                 fact.Multiplicity,
@@ -195,7 +202,11 @@ internal static class CtfLeaderboardProjection
                 string.IsNullOrWhiteSpace(item.Fact.SubmitterName) ? null : item.Fact.SubmitterName)
             { BasePoints = item.BasePoints, BloodAwardPoints = item.BloodPoints }))
             .ToList());
-        return (entries, cells, currentScores);
+        var challengePenalties = wrongFacts.Where(fact => fact.CompetitionChallengeId is not null)
+            .GroupBy(fact => (fact.TeamId, CompetitionChallengeId: fact.CompetitionChallengeId!.Value))
+            .ToDictionary(group => group.Key, group => group.Aggregate(0L,
+                (total, fact) => checked(total + fact.Penalty * fact.Multiplicity)));
+        return (entries, cells, currentScores, challengePenalties);
     }
 
     private static long BloodRewardAt(
@@ -256,7 +267,10 @@ public sealed class AwdLeaderboardProjector : IGameModeLeaderboardProjector
     public GameModeLeaderboardProjection Project(LeaderboardProjectionInput input)
     {
         var projection = AwdLeaderboardProjection.Project(input);
-        return new(projection.Entries, projection.Cells);
+        return new(projection.Entries, projection.Cells)
+        {
+            ChallengeNetScores = ProjectionPenalties.ChallengeNetScores(input, projection.Cells)
+        };
     }
 }
 
@@ -423,7 +437,7 @@ internal static class AwdLeaderboardProjection
                     values[team.Id],
                     attackCount,
                     lastAttackAt,
-                    team.TrackKey),
+                    team.TrackKey) { AttackScore = attackPoints[team.Id], AttackCount = attackCount, UpRoundCount = upRoundCounts[team.Id] },
                 attackPoints[team.Id],
                 upRoundCounts[team.Id],
                 attackCount,
@@ -516,7 +530,8 @@ internal static class AwdLeaderboardProjection
                     score,
                     attackCount,
                     lastAttackAt.GetValueOrDefault(team.Id),
-                    team.TrackKey),
+                    team.TrackKey) { AttackScore = attackPoints.GetValueOrDefault(team.Id), AttackCount = attackCount,
+                        UpRoundCount = upRoundCounts.GetValueOrDefault(team.Id) },
                 attackPoints.GetValueOrDefault(team.Id),
                 upRoundCounts.GetValueOrDefault(team.Id),
                 attackCount,
@@ -617,7 +632,10 @@ public sealed class KohLeaderboardProjector : IGameModeLeaderboardProjector
     public GameModeLeaderboardProjection Project(LeaderboardProjectionInput input)
     {
         var projection = KohLeaderboardProjection.Project(input);
-        return new(projection.Entries, projection.Cells);
+        return new(projection.Entries, projection.Cells)
+        {
+            ChallengeNetScores = ProjectionPenalties.ChallengeNetScores(input, projection.Cells)
+        };
     }
 }
 
@@ -700,7 +718,8 @@ internal static class KohLeaderboardProjection
                         + manualAdjustments.GetValueOrDefault(team.Id)),
                     observationCount,
                     last == default ? null : own.Max(fact => fact.LastOccurredAt ?? fact.OccurredAt),
-                    team.TrackKey),
+                    team.TrackKey) { ControlledChallengeCount = own.Select(fact => fact.CompetitionChallengeId!.Value).Distinct().Count(),
+                        FirstControlAt = first == default ? null : first },
                 observationCount,
                 own.Select(fact => fact.CompetitionChallengeId!.Value).Distinct().Count(),
                 first == default ? null : first,
@@ -768,6 +787,27 @@ internal static class KohLeaderboardProjection
 
 internal static class ProjectionPenalties
 {
+    public static IReadOnlyList<LeaderboardChallengeNetScore> ChallengeNetScores(
+        LeaderboardProjectionInput input, IReadOnlyList<LeaderboardCellFact> cells,
+        IReadOnlyDictionary<(Guid TeamId, Guid CompetitionChallengeId), long>? penalties = null)
+    {
+        var values = cells.GroupBy(cell => (cell.TeamId, cell.CompetitionChallengeId))
+            .ToDictionary(group => group.Key, group => group.Sum(cell => cell.Score));
+        var teams = input.Teams.Where(team => !team.IsBanned && !team.IsDeleted && team.EarnsScore)
+            .Select(team => team.Id).ToHashSet();
+        foreach (var hint in input.GameplayFacts.Where(fact => fact.TeamId is Guid teamId && teams.Contains(teamId)
+                     && fact.CompetitionChallengeId is not null && fact.Kind == GameplayFactKind.HintUnlock
+                     && fact.Result == GameplayFactResult.Unlocked))
+        {
+            var key = (hint.TeamId!.Value, hint.CompetitionChallengeId!.Value);
+            values[key] = checked(values.GetValueOrDefault(key) - (hint.HintCost ?? 0) * hint.Multiplicity);
+        }
+        foreach (var penalty in penalties ?? new Dictionary<(Guid, Guid), long>())
+            values[penalty.Key] = checked(values.GetValueOrDefault(penalty.Key) - penalty.Value);
+        return values.OrderBy(pair => pair.Key.TeamId).ThenBy(pair => pair.Key.CompetitionChallengeId)
+            .Select(pair => new LeaderboardChallengeNetScore(pair.Key.TeamId, pair.Key.CompetitionChallengeId, pair.Value)).ToArray();
+    }
+
     public static IReadOnlyList<LeaderboardCellFact> ApplyManualAdjustments(
         LeaderboardProjectionInput input,
         IReadOnlyList<LeaderboardCellFact> projectedCells)

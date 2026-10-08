@@ -79,6 +79,7 @@ const entryKindLabels = {
   BloodAward: "common.label.bloodListReward",
   Hint: "administration.label.hint",
   ManualAdjustment: "common.label.manualAdjustment",
+  WriteUp: "challengeWriteUp.deductionLabel",
 } satisfies Record<NoCtfapiEndpointsCompetitionsScoreboardEntryKindProtocol, string>
 
 const entryOutcomeLabels = {
@@ -224,6 +225,8 @@ export function scoreboardTeamChallengeScore(
   group: ScoreboardChallengeColumnGroup,
   mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol | null,
 ): number {
+  const benefit = team.challengeBenefits?.find(x => x.competitionChallengeId === group.competitionChallengeId)
+  if (benefit) return benefit.netPoints ?? 0
   if (mode === 'Awdp') {
     const aggregate = (team.challengeScores ?? []).find(
       item => item.competitionChallengeId === group.competitionChallengeId,

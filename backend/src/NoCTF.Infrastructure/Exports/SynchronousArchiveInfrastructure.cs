@@ -232,6 +232,9 @@ public sealed class SynchronousArchiveGenerator(
                 competition.TeamRegistrationAutoApprove,
                 competition.AllowTeamRegistrationWhileRunning,
                 competition.PracticeModeEnabled,
+                competition.SingleWriteUpsEnabled,
+                competition.SingleWriteUpDeductionPercent,
+                competition.SingleWriteUpDeadlineHours,
                 competition.MaxTeamMembers,
                 competition.MaxConcurrentRuntimeInstancesPerTeam,
                 competition.MaxActiveQuestionsPerTeam,
@@ -363,6 +366,19 @@ public sealed class SynchronousArchiveGenerator(
                 .AsAsyncEnumerable(),
             budget,
             cancellationToken);
+        var writeUpIds = db.ChallengeWriteUps.Where(item => item.CompetitionId == command.CompetitionId).Select(item => item.Id);
+        counts["challenge-writeups.ndjson"] = await WriteRowsAsync(archive, "challenge-writeups.ndjson",
+            db.ChallengeWriteUps.AsNoTracking().Where(item => item.CompetitionId == command.CompetitionId)
+                .OrderBy(item => item.Id).AsAsyncEnumerable(), budget, cancellationToken);
+        counts["challenge-writeup-versions.ndjson"] = await WriteRowsAsync(archive, "challenge-writeup-versions.ndjson",
+            db.ChallengeWriteUpVersions.AsNoTracking().Where(item => writeUpIds.Contains(item.WriteUpId))
+                .OrderBy(item => item.WriteUpId).ThenBy(item => item.Number).AsAsyncEnumerable(), budget, cancellationToken);
+        counts["challenge-writeup-unlocks.ndjson"] = await WriteRowsAsync(archive, "challenge-writeup-unlocks.ndjson",
+            db.WriteUpUnlockReceipts.AsNoTracking().Where(item => item.CompetitionId == command.CompetitionId)
+                .OrderBy(item => item.UnlockedAt).ThenBy(item => item.GameplayFactId).AsAsyncEnumerable(), budget, cancellationToken);
+        counts["challenge-writeup-files.ndjson"] = await WriteRowsAsync(archive, "challenge-writeup-files.ndjson",
+            db.Files.AsNoTracking().Where(file => db.ChallengeWriteUpVersions.Any(version => version.FileId == file.Id
+                && writeUpIds.Contains(version.WriteUpId))).OrderBy(file => file.Id).AsAsyncEnumerable(), budget, cancellationToken);
         counts["runtime-instances.ndjson"] = await WriteRowsAsync(
             archive,
             "runtime-instances.ndjson",

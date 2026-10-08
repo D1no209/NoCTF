@@ -41,7 +41,8 @@ public enum GameplayFactKind : short
     ManualAdjustment,
     AwdServiceTransition,
     KohControlObservation,
-    AttachmentDownload
+    AttachmentDownload,
+    WriteUpUnlock
 }
 
 public enum GameplayFactReferenceKind : short
@@ -49,7 +50,8 @@ public enum GameplayFactReferenceKind : short
     PatchUpload,
     Hint,
     AwdRound,
-    Attachment
+    Attachment,
+    WriteUpVersion
 }
 
 public enum GameplayFactState : short

@@ -243,7 +243,10 @@ public sealed class CompetitionQuestionStore(
         var teamExists = await db.Teams.AsNoTracking().AnyAsync(team =>
             team.Id == command.TeamId
             && team.CompetitionId == command.CompetitionId
-            && team.WriteUpFileId != null,
+            && (team.WriteUpFileId != null || command.CompetitionChallengeId != null
+                && db.ChallengeWriteUps.Any(writeUp => writeUp.TeamId == team.Id
+                    && writeUp.CompetitionChallengeId == command.CompetitionChallengeId
+                    && writeUp.SubmittedVersionId != null)),
             ct);
         if (!teamExists)
         {

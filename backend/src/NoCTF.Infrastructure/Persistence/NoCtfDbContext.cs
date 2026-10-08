@@ -87,6 +87,9 @@ public sealed class NoCtfDbContext(
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<CommandReceipt> CommandReceipts => Set<CommandReceipt>();
     public DbSet<GameplayFact> GameplayFacts => Set<GameplayFact>();
+    public DbSet<NoCTF.Domain.Challenges.WriteUps.ChallengeWriteUp> ChallengeWriteUps => Set<NoCTF.Domain.Challenges.WriteUps.ChallengeWriteUp>();
+    public DbSet<NoCTF.Domain.Challenges.WriteUps.ChallengeWriteUpVersion> ChallengeWriteUpVersions => Set<NoCTF.Domain.Challenges.WriteUps.ChallengeWriteUpVersion>();
+    public DbSet<NoCTF.Domain.Challenges.WriteUps.WriteUpUnlockReceipt> WriteUpUnlockReceipts => Set<NoCTF.Domain.Challenges.WriteUps.WriteUpUnlockReceipt>();
     public DbSet<StoredFile> Files => Set<StoredFile>();
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -198,6 +201,18 @@ public sealed class NoCtfDbContext(
 
         if (ChangeTracker.Entries<StoredFile>().Any(entry => entry.State == EntityState.Modified))
             throw new InvalidOperationException("Stored file metadata is immutable.");
+        if (ChangeTracker.Entries<NoCTF.Domain.Challenges.WriteUps.WriteUpUnlockReceipt>().Any(entry =>
+                entry.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("WriteUp unlock receipts are immutable.");
+        foreach (var entry in ChangeTracker.Entries<NoCTF.Domain.Challenges.WriteUps.ChallengeWriteUpVersion>()
+                     .Where(entry => entry.State == EntityState.Modified
+                         && entry.OriginalValues.GetValue<NoCTF.Domain.Challenges.WriteUps.WriteUpVersionState>("State")
+                             != NoCTF.Domain.Challenges.WriteUps.WriteUpVersionState.Draft))
+        {
+            if (new[] { "Markdown", "FileId", "Format", "Number", "WriteUpId", "ActorUserId", "SubmittedAt" }
+                .Any(name => entry.Property(name).IsModified))
+                throw new InvalidOperationException("Submitted WriteUp content is immutable.");
+        }
     }
 
     private void SynchronizeNormalizedSearchFields()

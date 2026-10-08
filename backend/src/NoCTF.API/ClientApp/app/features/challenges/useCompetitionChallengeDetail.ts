@@ -3,10 +3,10 @@ import type { UiMessage } from '../../utils/i18n'
 import { markRaw, provide, toRefs } from 'vue'
 
 import { toast } from '../../utils/message-toast'
-import { Dice5, FileDown, History } from '@lucide/vue'
-import { downloadChallengeAttachmentEndpoint, downloadRandomChallengeAttachmentEndpoint, getChallengeEndpoint, listChallengeAttachmentsEndpoint, startProgressionChallenge } from '../../api'
+import { Dice5, FileDown, History, BookOpen } from '@lucide/vue'
+import { prepareChallengeAttachmentDownloadEndpoint, prepareRandomChallengeAttachmentDownloadEndpoint, getChallengeEndpoint, listChallengeAttachmentsEndpoint, startProgressionChallenge } from '../../api'
 import type { NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol, NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse, NoCtfapiEndpointsChallengesChallengeResponse } from '../../api'
-import { downloadSdkFileToDisk } from '../../utils/download'
+import { startAttachmentBrowserDownload } from '../../utils/download'
 import ChallengeHintsComponent from './ChallengeHints.vue'
 import ChallengeSubmissionHistoryComponent from './ChallengeSubmissionHistory.vue'
 import AwdPanelComponent from './panels/AwdPanel.vue'
@@ -158,21 +158,16 @@ export function useCompetitionChallengeDetail(props: Readonly<{
       void loadChallenge()
   })
 
-  async function downloadAttachment(attachmentId: string, fileName: string): Promise<void> {
+  async function downloadAttachment(attachmentId: string, _fileName: string): Promise<void> {
     if (downloading.value) return
     downloading.value = true
     try {
-      await downloadSdkFileToDisk(
-        parseAs => downloadChallengeAttachmentEndpoint({
-          path: {
-            competitionId: props.competitionId,
-            competitionChallengeId: props.competitionChallengeId,
-            attachmentId,
-          },
-          parseAs,
-        }),
-        fileName,
-      )
+      const result = await prepareChallengeAttachmentDownloadEndpoint({
+        path: { competitionId: props.competitionId, competitionChallengeId: props.competitionChallengeId, attachmentId },
+        signal: reads.signal,
+      })
+      if (result.error || !result.data?.downloadUrl) throw result.error
+      startAttachmentBrowserDownload(result.data.downloadUrl)
     }
     catch (downloadError) {
       toast.error(parseApiError(downloadError, describeMessage("challenges.error.attachmentDownloadFailed")).displayMessage)
@@ -186,16 +181,12 @@ export function useCompetitionChallengeDetail(props: Readonly<{
     if (downloading.value) return
     downloading.value = true
     try {
-      await downloadSdkFileToDisk(
-        parseAs => downloadRandomChallengeAttachmentEndpoint({
-          path: {
-            competitionId: props.competitionId,
-            competitionChallengeId: props.competitionChallengeId,
-          },
-          parseAs,
-        }),
-        'attachment',
-      )
+      const result = await prepareRandomChallengeAttachmentDownloadEndpoint({
+        path: { competitionId: props.competitionId, competitionChallengeId: props.competitionChallengeId },
+        signal: reads.signal,
+      })
+      if (result.error || !result.data?.downloadUrl) throw result.error
+      startAttachmentBrowserDownload(result.data.downloadUrl)
     }
     catch (downloadError) {
       toast.error(parseApiError(downloadError, describeMessage("challenges.error.attachmentDownloadFailed")).displayMessage)
@@ -204,6 +195,12 @@ export function useCompetitionChallengeDetail(props: Readonly<{
       downloading.value = false
     }
   }
+
+  const route = useRoute(), router = useRouter()
+  const singleWriteUpsEnabled = computed(() => ctx.competition.value?.singleWriteUpsEnabled === true)
+  const writeUpBenefit = computed(() => ctx.standing.value?.challengeBenefits?.find(x => x.competitionChallengeId === props.competitionChallengeId
+    && x.writeUpUnlockedAt != null) ?? null)
+  function openWriteUps() { void router.push({ path: `/competitions/${props.competitionId}/challenge-writeups/${props.competitionChallengeId}`, query: route.query }) }
 
   const mode = computed(() => ctx.competition.value?.mode)
 
@@ -221,6 +218,7 @@ export function useCompetitionChallengeDetail(props: Readonly<{
 
   return {
       ...toRefs(props),
+      BookOpen, singleWriteUpsEnabled, openWriteUps, writeUpBenefit,
       Dice5,
       FileDown,
       History,

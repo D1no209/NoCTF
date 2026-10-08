@@ -25,7 +25,8 @@ public enum GameplayFactKindProtocol
     ManualAdjustment,
     AwdServiceTransition,
     KohControlObservation,
-    AttachmentDownload
+    AttachmentDownload,
+    WriteUpUnlock
 }
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<GameplayFactStateProtocol>))]

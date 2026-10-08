@@ -21,7 +21,8 @@ public sealed class PendingGameplayFactDispatchHandler(
             .Where(fact => fact.Kind == GameplayFactKind.FlagAttempt
                 || fact.Kind == GameplayFactKind.BreakAttempt
                 || fact.Kind == GameplayFactKind.HintUnlock
-                || fact.Kind == GameplayFactKind.ManualAdjustment)
+                || fact.Kind == GameplayFactKind.ManualAdjustment
+                || fact.Kind == GameplayFactKind.WriteUpUnlock)
             .Where(fact => fact.State == GameplayFactState.Queued
                     && fact.UpdatedAt <= queuedCutoff
                 || fact.State == GameplayFactState.Processing

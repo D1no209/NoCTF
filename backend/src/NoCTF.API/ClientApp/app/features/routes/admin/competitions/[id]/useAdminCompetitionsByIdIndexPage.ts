@@ -275,6 +275,7 @@ export function useAdminCompetitionsByIdIndexPage() {
     Notification: "common.label.notificationsQuestions",
     PosterFile: "common.label.competitionPoster",
     TeamWriteUp: "writeUp.teamWriteUpFiles",
+    ChallengeWriteUp: "challengeWriteUp.title",
     ActiveRuntimeResource: "competitions.deletion.activeRuntimeResources",
     NotificationScopeConflict: "common.competitionsBy.description.crossScopeUnprovenNotification",
     ProgressionGraph: 'progression.referenceGraph',

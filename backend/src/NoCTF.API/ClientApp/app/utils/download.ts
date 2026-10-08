@@ -10,20 +10,6 @@ export interface ProtectedDownloadResponse {
 
 export type ProtectedDownloadRequest = () => PromiseLike<ProtectedDownloadResponse>
 
-export type ProtectedDownloadParseMode = 'blob' | 'stream'
-
-export type ProtectedDownloadRequestFactory = (
-  parseAs: ProtectedDownloadParseMode,
-) => PromiseLike<ProtectedDownloadResponse>
-
-type SaveFileHandle = {
-  createWritable: () => Promise<WritableStream<Uint8Array>>
-}
-
-type SaveFilePicker = (options: { suggestedName: string }) => Promise<SaveFileHandle>
-
-export type ProtectedDownloadOutcome = 'downloaded' | 'canceled'
-
 export interface ProtectedDownload {
   blob: Blob
   fileName: string
@@ -100,50 +86,6 @@ export async function downloadSdkFile(
   setTimeout(() => URL.revokeObjectURL(objectUrl), 1_000)
 }
 
-/** Stream an authenticated SDK response directly to disk when the browser supports it. */
-export async function downloadSdkFileToDisk(
-  request: ProtectedDownloadRequestFactory,
-  fallbackName = 'download',
-): Promise<ProtectedDownloadOutcome> {
-  const browser = globalThis as typeof globalThis & {
-    showSaveFilePicker?: SaveFilePicker
-  }
-  const picker = browser.showSaveFilePicker
-
-  if (!picker) {
-    await downloadSdkFile(request('blob'), fallbackName)
-    return 'downloaded'
-  }
-
-  let handle: SaveFileHandle
-  try {
-    handle = await picker.call(browser, {
-      suggestedName: sanitizeDownloadFileName(fallbackName),
-    })
-  }
-  catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError')
-      return 'canceled'
-    await downloadSdkFile(request('blob'), fallbackName)
-    return 'downloaded'
-  }
-
-  const { data, error, response } = await request('stream')
-  if (error || response?.ok === false) {
-    throw parseApiError(
-      error,
-      describeMessage("common.error.downloadFailed.download", { status: response?.status ?? '-' }),
-    )
-  }
-  if (!(data instanceof ReadableStream)) {
-    throw new ApiError(translate("common.download.error.downloadResponseFormatInvalid"))
-  }
-
-  const writable = await handle.createWritable()
-  await data.pipeTo(writable)
-  return 'downloaded'
-}
-
 /** @deprecated Prefer downloadSdkFile with the generated SDK promise directly. */
 export async function downloadProtectedFile(
   request: ProtectedDownloadRequest,
@@ -156,4 +98,35 @@ export async function downloadProtectedFile(
   anchor.download = fileName
   anchor.click()
   URL.revokeObjectURL(objectUrl)
+}
+
+/** Hand the authenticated attachment stream to the browser without materializing file bytes in JavaScript. */
+export function startAttachmentBrowserDownload(downloadUrl: string): void {
+  const url = new URL(downloadUrl, window.location.origin)
+  if (url.origin !== window.location.origin || !['https:', 'http:'].includes(url.protocol)
+    || url.search || url.hash || url.username || url.password)
+    throw new ApiError(translate('common.download.error.downloadResponseFormatInvalid'))
+  const anchor = document.createElement('a')
+  anchor.href = url.href
+  anchor.download = ''
+  anchor.hidden = true
+  document.body.append(anchor)
+  anchor.click()
+  anchor.remove()
+}
+
+/** Native, authenticated WriteUp transfer. Only the two presentation switches may appear in the URL. */
+export function startWriteUpBrowserDownload(downloadUrl: string): void {
+  const url = new URL(downloadUrl, window.location.origin)
+  const keys = [...url.searchParams.keys()]
+  if (url.origin !== window.location.origin || !['http:', 'https:'].includes(url.protocol)
+    || url.hash || url.username || url.password
+    || !/^\/api\/v1\/competitions\/[\da-f-]{36}\/challenges\/[\da-f-]{36}\/writeups\/versions\/[\da-f-]{36}\/file$/i.test(url.pathname)
+    || keys.some(key => !['staff', 'download'].includes(key))
+    || new Set(keys).size !== keys.length
+    || keys.some(key => !['true', 'false'].includes(url.searchParams.get(key) ?? '')))
+    throw new ApiError(translate('common.download.error.downloadResponseFormatInvalid'))
+  const anchor = document.createElement('a')
+  anchor.href = url.href; anchor.download = ''; anchor.hidden = true
+  document.body.append(anchor); anchor.click(); anchor.remove()
 }

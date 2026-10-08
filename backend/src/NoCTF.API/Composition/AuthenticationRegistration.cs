@@ -4,6 +4,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.AspNetCore.Authorization;
 using NoCTF.API.Security;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace NoCTF.API.Composition;
 
@@ -36,6 +37,10 @@ public static class AuthenticationRegistration
                                     "/hubs/v1/admin/platform-logs"))
                             && context.Request.Query.TryGetValue("access_token", out var token))
                             context.Token = token;
+                        else if (context.HttpContext.GetEndpoint()?.Metadata.GetMetadata<AttachmentBrowserDownloadMetadata>() is not null)
+                            context.Token = context.HttpContext.RequestServices.GetRequiredService<AttachmentBrowserDownload>().Read(context.HttpContext);
+                        else if (context.HttpContext.GetEndpoint()?.Metadata.GetMetadata<WriteUpBrowserAccessMetadata>() is not null)
+                            context.Token = context.HttpContext.RequestServices.GetRequiredService<WriteUpBrowserAccess>().Read(context.HttpContext);
                         return Task.CompletedTask;
                     },
                     OnTokenValidated = async context =>
@@ -90,6 +95,10 @@ public static class AuthenticationRegistration
                 _ => { })
             .AddScheme<AuthenticationSchemeOptions, MfaFlowAuthenticationHandler>(MfaFlowScheme, _ => { });
         services.AddScoped<CurrentAccessTokenValidator>();
+        services.AddDataProtection();
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddSingleton<AttachmentBrowserDownload>();
+        services.AddSingleton<WriteUpBrowserAccess>();
         services.AddSingleton<SsoBrowserCorrelation>();
         services.AddSingleton<MfaBrowserFlow>();
         services.AddAuthorization(options =>

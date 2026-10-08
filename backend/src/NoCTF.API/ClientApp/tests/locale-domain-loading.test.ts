@@ -5,23 +5,26 @@ import { sourceFile } from './support/feature-source'
 describe('locale feature catalogs', () => {
   test('loads only the feature domains required by public routes', () => {
     expect(localeDomainsForPath('/')).toEqual(['account'])
-    expect(localeDomainsForPath('/competitions')).toEqual(['account', 'competitions'])
+    expect(localeDomainsForPath('/competitions')).toEqual(['account', 'competitions', 'writeups'])
     expect(localeDomainsForPath('/competitions/c1/my/team')).toEqual([
-      'account', 'competitions', 'runtime',
+      'account', 'competitions', 'writeups', 'runtime',
     ])
     expect(localeDomainsForPath('/competitions/c1/challenges/c2')).toEqual([
       'account',
       'competitions',
+      'writeups',
       'challenges',
       'runtime',
     ])
     expect(localeDomainsForPath('/competitions/c1/leaderboard')).toEqual([
       'account',
       'competitions',
+      'writeups',
       'leaderboard',
     ])
     expect(localeDomainsForPath('/notifications')).toEqual(['account', 'notifications'])
     expect(localeDomainsForPath('/users/user-1')).toEqual(['account', 'competitions'])
+    expect(localeDomainsForPath('/competitions/c1/challenge-writeups/c2')).toEqual(['account', 'competitions', 'writeups', 'challenges'])
   })
 
   test('keeps complete catalogs out of the runtime i18n entry', async () => {

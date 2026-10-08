@@ -37,13 +37,13 @@ public enum ScoreboardOperationStateProtocol { None, Failed, Succeeded }
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<ScoreboardBreakdownKindProtocol>))]
 public enum ScoreboardBreakdownKindProtocol
 {
-    Solve, Attack, Defense, Availability, Control, Penalty, BloodAward, Hint, ManualAdjustment
+    Solve, Attack, Defense, Availability, Control, Penalty, BloodAward, Hint, ManualAdjustment, WriteUp
 }
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<ScoreboardEntryKindProtocol>))]
 public enum ScoreboardEntryKindProtocol
 {
-    Solve, Attack, Defense, Availability, Control, Penalty, BloodAward, Hint, ManualAdjustment
+    Solve, Attack, Defense, Availability, Control, Penalty, BloodAward, Hint, ManualAdjustment, WriteUp
 }
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<ScoreboardEntryOutcomeProtocol>))]
@@ -130,6 +130,7 @@ public sealed record ScoreboardTeamResponse(
     IReadOnlyList<ScoreboardSlotResponse> Slots)
 {
     public IReadOnlyList<ScoreboardChallengeAchievementResponse>? Achievements { get; init; }
+    public IReadOnlyList<ScoreboardChallengeBenefit> ChallengeBenefits { get; init; } = [];
 }
 
 public sealed record ScoreboardTrackResponse(
@@ -252,6 +253,7 @@ internal static partial class ScoreboardProtocolMapper
             ToProtocol(slot.OffenseState),
             ToProtocol(slot.DefenseState))).ToArray())
     {
+        ChallengeBenefits = value.ChallengeBenefits,
         Achievements = value.Achievements?.Select(item => new ScoreboardChallengeAchievementResponse(
             item.CompetitionChallengeId, ToProtocol(item.Kind), item.UserId, item.DisplayName, item.OccurredAt)).ToArray()
     };

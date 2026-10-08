@@ -16,7 +16,8 @@ public sealed class LeaderboardProjectionEngine(
         input = input with { ProjectedAt = input.ProjectedAt ?? timeProvider.GetUtcNow() };
         var projection = projectors.Get(input.Mode).Project(input);
         var aggregate = ProjectAggregate(input, projection);
-        return NormalizedScoreboardProjection.Project(input, aggregate);
+        var normalized = NormalizedScoreboardProjection.Project(input, aggregate);
+        return WriteUpBenefitProjection.Apply(input, projection, normalized, projectors);
     }
 
     private static LeaderboardAggregateProjection ProjectAggregate(
@@ -90,6 +91,7 @@ public sealed class LeaderboardProjectionEngine(
             .ToDictionary(challenge => challenge.Id);
         return input.GameplayFacts
             .Where(fact => fact.TeamId is Guid teamId && validTeams.Contains(teamId)
+                && WriteUpBenefitProjection.CanEarnBlood(input, fact)
                 && fact.CompetitionChallengeId is not null
                 && (validChallenges.Count == 0 ? fact.Kind == GameplayFactKind.FlagAttempt
                     : validChallenges.TryGetValue(fact.CompetitionChallengeId.Value, out var challenge)

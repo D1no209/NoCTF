@@ -553,6 +553,8 @@ public sealed class AdminCompetitionStore(
         AddReference(references, CompetitionHardDeleteReferenceKind.ProgressionGraph,
             await db.CompetitionProgressions.CountAsync(item =>
                 item.CompetitionId == competitionId, ct));
+        AddReference(references, CompetitionHardDeleteReferenceKind.ChallengeWriteUp,
+            await db.ChallengeWriteUps.CountAsync(item => item.CompetitionId == competitionId, ct));
         AddReference(references, CompetitionHardDeleteReferenceKind.Badge,
             await db.CompetitionBadges.CountAsync(item =>
                 item.CompetitionId == competitionId, ct));
@@ -630,6 +632,9 @@ public sealed class AdminCompetitionStore(
             .Where(item => item.CompetitionId == competitionId)
             .Select(item => item.FileId)
             .ToArrayAsync(ct));
+        ids.AddRange(await db.ChallengeWriteUpVersions.Where(version => version.FileId != null
+                && db.ChallengeWriteUps.Any(root => root.Id == version.WriteUpId && root.CompetitionId == competitionId))
+            .Select(version => version.FileId!.Value).ToArrayAsync(ct));
         ids.AddRange(await db.CompetitionBadges
             .Where(item => item.CompetitionId == competitionId)
             .Select(item => item.ImageFileId)
@@ -673,6 +678,8 @@ public sealed class AdminCompetitionStore(
             .ExecuteDeleteAsync(ct);
         await db.RuntimeInstances.Where(item => item.CompetitionId == competitionId)
             .ExecuteDeleteAsync(ct);
+        await db.WriteUpUnlockReceipts.Where(item => item.CompetitionId == competitionId).ExecuteDeleteAsync(ct);
+        await db.ChallengeWriteUps.Where(item => item.CompetitionId == competitionId).ExecuteDeleteAsync(ct);
         await db.GameplayFacts.Where(item => item.CompetitionId == competitionId)
             .ExecuteDeleteAsync(ct);
         var competitionChallengeIds = db.CompetitionChallenges.IgnoreQueryFilters()

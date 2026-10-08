@@ -223,6 +223,8 @@ export function useCompetitionsByIdPage() {
     loading,
     error,
     refresh: async () => { await refresh() },
+    standing: myStanding,
+    refreshStanding: refreshMyStanding,
   })
 
   const navGroups = computed<WorkspaceNavGroup[]>(() => {

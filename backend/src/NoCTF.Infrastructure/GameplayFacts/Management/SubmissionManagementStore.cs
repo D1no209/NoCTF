@@ -31,7 +31,7 @@ public sealed class GameplayFactManagementStore(
         if (filter.Kind is GameplayFactKind kind)
             query = query.Where(submission => submission.Kind == kind);
         else
-            query = query.Where(submission => submission.Kind != GameplayFactKind.AttachmentDownload);
+            query = query.Where(submission => submission.Kind != GameplayFactKind.AttachmentDownload && submission.Kind != GameplayFactKind.WriteUpUnlock);
         if (filter.State is GameplayFactState state)
             query = query.Where(submission => submission.State == state);
         if (filter.Result is GameplayFactResult result)
@@ -125,7 +125,7 @@ public sealed class GameplayFactManagementStore(
         if (filter.Kind is GameplayFactKind kind)
             query = query.Where(submission => submission.Kind == kind);
         else
-            query = query.Where(submission => submission.Kind != GameplayFactKind.AttachmentDownload);
+            query = query.Where(submission => submission.Kind != GameplayFactKind.AttachmentDownload && submission.Kind != GameplayFactKind.WriteUpUnlock);
         if (filter.State is GameplayFactState state)
             query = query.Where(submission => submission.State == state);
         if (filter.Result is GameplayFactResult result)

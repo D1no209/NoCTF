@@ -98,12 +98,12 @@ const { ChartSpline, Flag, ShieldCheck, Target, Trophy, scoreboardRankingStateLa
                 <TableHead v-if="mode === 'Ctf' || isAwdp" class="whitespace-nowrap">{{ $t('leaderboard.label.solved.detailDialogView') }}</TableHead>
                 <TableHead v-if="isAwdp" class="whitespace-nowrap text-right">{{ $t('common.label.attackScore') }}</TableHead>
                 <TableHead v-if="isAwdp" class="whitespace-nowrap text-right">{{ $t('common.label.defenseScore') }}</TableHead>
-                <TableHead class="whitespace-nowrap text-right">{{ scoreLabel }}</TableHead>
+                <TableHead class="whitespace-nowrap text-right">{{ $t('challengeWriteUp.grossLabel') }}</TableHead><TableHead class="whitespace-nowrap text-right">{{ $t('challengeWriteUp.deductionLabel') }}</TableHead><TableHead class="whitespace-nowrap text-right">{{ $t('challengeWriteUp.grossLabel') }}</TableHead><TableHead class="whitespace-nowrap text-right">{{ $t('challengeWriteUp.deductionLabel') }}</TableHead><TableHead class="whitespace-nowrap text-right">{{ scoreLabel }}</TableHead>
               </TableRow></TableHeader>
               <TableBody>
                 <template v-for="row in rows" :key="row.group.competitionChallengeId">
                   <TableRow v-for="(achievement, index) in row.achievements.length ? row.achievements : [null]" :key="achievement?.kind ?? 'status'">
-                    <TableCell v-if="index === 0" :rowspan="Math.max(1, row.achievements.length)" class="max-w-64 whitespace-normal break-words font-medium">{{ row.title }}</TableCell>
+                    <TableCell v-if="index === 0" :rowspan="Math.max(1, row.achievements.length)" class="max-w-64 whitespace-normal break-words font-medium">{{ row.title }}<Badge v-if="row.benefit?.writeUpUnlockedAt" variant="secondary" class="mt-1">{{ $t('challengeWriteUp.viewed') }}</Badge></TableCell>
                     <TableCell class="whitespace-nowrap">
                       <span v-if="achievement" class="inline-flex items-center gap-1.5 text-xs">
                         <ShieldCheck v-if="achievement.kind === 'Defense'" class="size-4 text-primary" aria-hidden="true" /><Flag v-else class="size-4 text-primary" aria-hidden="true" />
@@ -118,7 +118,7 @@ const { ChartSpline, Flag, ShieldCheck, Target, Trophy, scoreboardRankingStateLa
                     <TableCell v-if="mode === 'Ctf' || isAwdp" class="whitespace-nowrap font-mono text-xs tabular-nums">{{ achievement?.occurredAt ? formatDateTime(achievement.occurredAt) : $t('common.label.symbol') }}</TableCell>
                     <TableCell v-if="isAwdp && index === 0" :rowspan="Math.max(1, row.achievements.length)" class="whitespace-nowrap text-right font-mono tabular-nums">{{ row.attackScore }} {{ $t('common.label.pts.scoreTrendChart') }}</TableCell>
                     <TableCell v-if="isAwdp && index === 0" :rowspan="Math.max(1, row.achievements.length)" class="whitespace-nowrap text-right font-mono tabular-nums">{{ row.defenseScore }} {{ $t('common.label.pts.scoreTrendChart') }}</TableCell>
-                    <TableCell v-if="index === 0" :rowspan="Math.max(1, row.achievements.length)" class="whitespace-nowrap text-right font-mono font-semibold tabular-nums">{{ row.score }} {{ $t('common.label.pts.scoreTrendChart') }}</TableCell>
+                    <TableCell v-if="index === 0" :rowspan="Math.max(1, row.achievements.length)" class="whitespace-nowrap text-right font-mono tabular-nums">{{ row.benefit?.grossPoints ?? 0 }}</TableCell><TableCell v-if="index === 0" :rowspan="Math.max(1, row.achievements.length)" class="whitespace-nowrap text-right font-mono tabular-nums">{{ row.benefit?.writeUpDeductionPoints ?? 0 }}</TableCell><TableCell v-if="index === 0" :rowspan="Math.max(1, row.achievements.length)" class="whitespace-nowrap text-right font-mono tabular-nums">{{ row.benefit?.grossPoints ?? 0 }}</TableCell><TableCell v-if="index === 0" :rowspan="Math.max(1, row.achievements.length)" class="whitespace-nowrap text-right font-mono tabular-nums">{{ row.benefit?.writeUpDeductionPoints ?? 0 }}</TableCell><TableCell v-if="index === 0" :rowspan="Math.max(1, row.achievements.length)" class="whitespace-nowrap text-right font-mono font-semibold tabular-nums">{{ row.score }} {{ $t('common.label.pts.scoreTrendChart') }}</TableCell>
                   </TableRow>
                 </template>
               </TableBody>

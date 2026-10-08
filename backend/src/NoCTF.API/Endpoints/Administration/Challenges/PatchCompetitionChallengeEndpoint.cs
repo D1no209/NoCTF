@@ -117,6 +117,7 @@ public static partial class CompetitionChallengePatchMapper
 {
     [MapperIgnoreTarget(nameof(CompetitionChallenge.Id))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.ConcurrencyStamp))]
+    [MapperIgnoreTarget(nameof(CompetitionChallenge.WriteUpDeductionPercent))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.CompetitionId))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.ChallengeId))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.Direction))]
@@ -139,6 +140,7 @@ public static partial class CompetitionChallengePatchMapper
     [MapperIgnoreTarget(nameof(CompetitionChallenge.Mode))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.Id))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.ConcurrencyStamp))]
+    [MapperIgnoreTarget(nameof(CompetitionChallenge.WriteUpDeductionPercent))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.CompetitionId))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.ChallengeId))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.CustomTitle))]
