@@ -19,7 +19,8 @@ public sealed class ChallengeManagementStore(
     IPostCommitMessagePublisher outbox,
     IChallengeRuntimeTemplateCatalog runtimeTemplates,
     ICompetitionEventRecorder? eventRecorder = null,
-    IExperimentalFeatureReader? experimentalFeatures = null) : IChallengeManagementStore
+    IExperimentalFeatureReader? experimentalFeatures = null,
+    NoCTF.Application.Challenges.Configuration.IChallengeMaterialMutationGate? material = null) : IChallengeManagementStore
 {
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
@@ -193,7 +194,7 @@ public sealed class ChallengeManagementStore(
         UpdateCompetitionChallengeCommand command,
         CancellationToken ct)
     {
-        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, System.Data.IsolationLevel.Serializable, ct);
         if (await CompetitionStateReader.ReadAsync(db, command.CompetitionId, ct) is null)
             return new(null, ChallengeMutationFailure.CompetitionNotFound);
 
@@ -204,6 +205,7 @@ public sealed class ChallengeManagementStore(
                 item.CompetitionId == command.CompetitionId, ct);
         if (entity is null)
             return new(null, ChallengeMutationFailure.ChallengeNotFound);
+        if (material is not null) await material.RequireMutableAsync(new(null, entity.Id), ct);
         if (command.DirectionId is Guid directionId)
         {
             var direction = await db.Set<NoCTF.Domain.Competitions.Directions.CompetitionDirection>()
@@ -318,7 +320,7 @@ public sealed class ChallengeManagementStore(
         bool restore,
         CancellationToken ct)
     {
-        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, System.Data.IsolationLevel.Serializable, ct);
         if (await CompetitionStateReader.ReadAsync(db, competitionId, ct) is null)
             return ChallengeMutationFailure.CompetitionNotFound;
 
@@ -328,6 +330,7 @@ public sealed class ChallengeManagementStore(
             item.CompetitionId == competitionId, ct);
         if (entity is null)
             return ChallengeMutationFailure.ChallengeNotFound;
+        if (material is not null) await material.RequireMutableAsync(new(null, entity.Id), ct);
         if ((entity.DeletedAt is null) == restore)
             return ChallengeMutationFailure.LifecycleStateConflict;
         if (restore)

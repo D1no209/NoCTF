@@ -24,6 +24,9 @@ using NoCTF.Application.Messaging;
 using NSubstitute;
 using NoCTF.Application.LiveSolo.Resources;
 using FluentStorage.Storage;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging.Abstractions;
+using NoCTF.Application.Challenges.Configuration;
 
 namespace NoCTF.Tests.Unit.API;
 
@@ -91,6 +94,22 @@ public sealed class LiveSoloEndpointTests
 
     private static async Task<WebApplication> HostAsync(ILiveSoloMatchStore store)
         => await HostAsync(store, Substitute.For<ILiveSoloAttachmentStore>(), Substitute.For<IStore>());
+
+    [Test]
+    public async Task Active_material_failure_returns_a_localizable_conflict_without_source_content()
+    {
+        using var services = new ServiceCollection().AddLogging().BuildServiceProvider();
+        var context = new DefaultHttpContext { RequestServices = services };
+        context.Response.Body = new MemoryStream();
+        var handled = await new RequestSafetyExceptionHandler(NullLogger<RequestSafetyExceptionHandler>.Instance).TryHandleAsync(context,
+            new ChallengeMaterialMutationException(ChallengeMaterialMutationFailure.ActiveExecutionScope), CancellationToken.None);
+        await Assert.That(handled).IsTrue(); await Assert.That(context.Response.StatusCode).IsEqualTo(409);
+        context.Response.Body.Position = 0;
+        using var body = await JsonDocument.ParseAsync(context.Response.Body);
+        await Assert.That(body.RootElement.GetProperty("code").GetString()).IsEqualTo("ActiveExecutionScope");
+        await Assert.That(body.RootElement.GetProperty("messageKey").GetString()).IsEqualTo("api.challenges.material.activeExecutionScope");
+        await Assert.That(body.RootElement.GetProperty("detail").GetString()).IsNotEmpty();
+    }
 
     [Test]
     public async Task Scoped_attachment_get_never_records_evidence_if_authorization_or_object_open_fails()

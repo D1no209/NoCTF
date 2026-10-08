@@ -24,6 +24,9 @@ public sealed partial class LiveSoloMatchStore
                 return new(null, LiveSoloFailure.AlreadyEnded);
             var group = await SuitableGroupAsync(match, command.GroupId, command.Now, ct);
             if (group is null) return new(null, LiveSoloFailure.NoSuitableQuestionGroup);
+            var entryIds = group.Items.Select(x => x.CompetitionChallengeId).ToArray();
+            var templateIds = await db.CompetitionChallenges.Where(x => entryIds.Contains(x.Id)).Select(x => x.ChallengeId).ToArrayAsync(ct);
+            _ = await db.Challenges.Where(x => templateIds.Contains(x.Id)).Select(x => new { x.Id, x.ConcurrencyStamp }).ToArrayAsync(ct);
             var last = rounds.LastOrDefault();
             var replay = last?.State is LiveSoloRoundState.TimedOut or LiveSoloRoundState.Canceled;
             var round = new LiveSoloRound { Id = Guid.CreateVersion7(command.Now), MatchId = match.Id,

@@ -2,6 +2,7 @@ namespace NoCTF.API.Localization;
 
 public enum ApiMessageId
 {
+    ChallengeMaterialActiveExecutionScope,
     LiveSoloCopyTemplateNotFound,
     LiveSoloCopyUnsupportedSource,
     LiveSoloCopyAttachmentsForbidden,
@@ -736,6 +737,7 @@ public static partial class ApiMessages
 {
     public static string Key(ApiMessageId id) => id switch
     {
+        ApiMessageId.ChallengeMaterialActiveExecutionScope => "api.challenges.material.activeExecutionScope",
         ApiMessageId.LiveSoloCopyTemplateNotFound => "api.liveSolo.templateCopy.notFound",
         ApiMessageId.LiveSoloCopyUnsupportedSource => "api.liveSolo.templateCopy.unsupportedSource",
         ApiMessageId.LiveSoloCopyAttachmentsForbidden => "api.liveSolo.templateCopy.attachmentsForbidden",
@@ -1469,6 +1471,7 @@ public static partial class ApiMessages
 
     public static ApiMessage For(Enum? code) => Get(code switch
     {
+        NoCTF.Application.Challenges.Configuration.ChallengeMaterialMutationFailure.ActiveExecutionScope => ApiMessageId.ChallengeMaterialActiveExecutionScope,
         NoCTF.Application.LiveSolo.Templates.LiveSoloTemplateCopyFailure.NotFound => ApiMessageId.LiveSoloCopyTemplateNotFound,
         NoCTF.Application.LiveSolo.Templates.LiveSoloTemplateCopyFailure.UnsupportedSource => ApiMessageId.LiveSoloCopyUnsupportedSource,
         NoCTF.Application.LiveSolo.Templates.LiveSoloTemplateCopyFailure.AttachmentsForbidden => ApiMessageId.LiveSoloCopyAttachmentsForbidden,

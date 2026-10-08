@@ -15,7 +15,8 @@ namespace NoCTF.Infrastructure.Challenges.Attachments;
 public sealed class ChallengeAttachmentStore(
     NoCtfDbContext db,
     FileReferenceLock fileLock,
-    TimeProvider? clock = null) : IChallengeAttachmentStore
+    TimeProvider? clock = null,
+    NoCTF.Application.Challenges.Configuration.IChallengeMaterialMutationGate? material = null) : IChallengeAttachmentStore
 {
     public async Task RecordPlayerDownloadAsync(Guid competitionId, Guid competitionChallengeId, Guid teamId,
         Guid actorId, Guid attachmentId, CancellationToken ct)
@@ -40,14 +41,18 @@ public sealed class ChallengeAttachmentStore(
     public ChallengeAttachmentStore(NoCtfDbContext db)
         : this(db, new FileReferenceLock()) { }
 
-    public Task<bool> CanWriteAsync(
+    public async Task<bool> CanWriteAsync(
         Guid challengeId,
         Guid actorId,
         bool isAdministrator,
-        CancellationToken ct) =>
-        WriteAuthorized(actorId, isAdministrator)
+        CancellationToken ct)
+    {
+        var allowed = await WriteAuthorized(actorId, isAdministrator)
             .AsNoTracking()
             .AnyAsync(item => item.Id == challengeId, ct);
+        if (allowed && material is not null) await material.RequireMutableAsync(new(challengeId, null), ct);
+        return allowed;
+    }
 
     public Task<bool> AttachmentIdExistsAsync(
         Guid attachmentId,
@@ -107,7 +112,7 @@ public sealed class ChallengeAttachmentStore(
         DateTimeOffset now,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
         var challenge = await LockWritableChallengeAsync(
             challengeId, actorId, isAdministrator, ct);
         if (challenge is null)
@@ -146,7 +151,7 @@ public sealed class ChallengeAttachmentStore(
         IReadOnlyList<ChallengeAttachmentBatchEntry> entries,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
         var challenge = await LockWritableChallengeAsync(
             challengeId, actorId, isAdministrator, ct);
         if (challenge is null)
@@ -194,7 +199,7 @@ public sealed class ChallengeAttachmentStore(
         IReadOnlyList<RandomAttachmentBatchEntry> entries,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
         var challenge = await LockWritableChallengeAsync(
             challengeId, actorId, isAdministrator, ct);
         if (challenge is null)
@@ -284,7 +289,7 @@ public sealed class ChallengeAttachmentStore(
         DateTimeOffset now,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
         var challenge = await LockWritableChallengeAsync(challengeId, actorId, isAdministrator, ct);
         if (challenge is null)
             return false;
@@ -316,7 +321,7 @@ public sealed class ChallengeAttachmentStore(
         DateTimeOffset now,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
         var challenge = await LockWritableChallengeAsync(challengeId, actorId, isAdministrator, ct);
         if (challenge is null)
             return false;
@@ -565,13 +570,13 @@ public sealed class ChallengeAttachmentStore(
         CancellationToken ct)
     {
         var challenge = await ChallengeTemplateCriticalSection.AcquireAsync(db, challengeId, ct);
-        return challenge is not null
+        var allowed = challenge is not null
             && challenge.DeletedAt is null
             && (isAdministrator
                 || challenge.OwnerId == actorId
-                || challenge.Managers.Any(manager => manager.UserId == actorId))
-            ? challenge
-            : null;
+                || challenge.Managers.Any(manager => manager.UserId == actorId));
+        if (allowed && material is not null) await material.RequireMutableAsync(new(challengeId, null), ct);
+        return allowed ? challenge : null;
     }
 
     private async Task AcquireCompetitionChallengeAssignmentLockAsync(

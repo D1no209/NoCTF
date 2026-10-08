@@ -1,4 +1,5 @@
 {
+  "api.challenges.material.activeExecutionScope": "此题正在有效轮次中使用。请先结束或作废轮次，再修改正文、定义、Flag 或附件。",
   "api.liveSolo.templateCopy.notFound": "源题目或目标比赛不可用。",
   "api.liveSolo.templateCopy.unsupportedSource": "仅支持兼容 Flag 提交的 CTF 或 LiveSolo 题目，不能转换 Patch 或 Checker 交互。",
   "api.liveSolo.templateCopy.attachmentsForbidden": "复制附件前需要具备源附件的访问权限。",

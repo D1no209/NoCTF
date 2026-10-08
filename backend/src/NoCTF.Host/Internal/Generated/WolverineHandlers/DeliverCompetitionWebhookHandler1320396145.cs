@@ -64,11 +64,12 @@ namespace Internal.Generated.WolverineHandlers
             var fileReferenceLock = new NoCTF.Infrastructure.Storage.FileReferenceLock();
             var postCommitDispatchStatus = new NoCTF.Application.Messaging.PostCommitDispatchStatus();
             await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider, _notificationChangePublisher, _loggerOfNoCtfDbContext);
+            var liveSoloMaterialMutationGate = new NoCTF.Infrastructure.LiveSolo.Templates.LiveSoloMaterialMutationGate(noCtfDbContext);
             var wolverinePostCommitMessagePublisher = new NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher(context, noCtfDbContext, _loggerOfWolverinePostCommitMessagePublisher, postCommitDispatchStatus);
             var platformConfigurationStore = new NoCTF.Infrastructure.Administration.PlatformConfigurationStore(noCtfDbContext, _fusionCacheProvider1, wolverinePostCommitMessagePublisher, fileReferenceLock);
             var competitionEventStore = new NoCTF.Infrastructure.Competitions.Events.CompetitionEventStore(noCtfDbContext, wolverinePostCommitMessagePublisher, _timeProvider);
             var competitionTrackStore = new NoCTF.Infrastructure.Competitions.Tracks.CompetitionTrackStore(noCtfDbContext, wolverinePostCommitMessagePublisher, competitionEventStore);
-            var challengeManagementStore = new NoCTF.Infrastructure.Challenges.Management.ChallengeManagementStore(noCtfDbContext, wolverinePostCommitMessagePublisher, _challengeRuntimeTemplateCatalog, competitionEventStore, platformConfigurationStore);
+            var challengeManagementStore = new NoCTF.Infrastructure.Challenges.Management.ChallengeManagementStore(noCtfDbContext, wolverinePostCommitMessagePublisher, _challengeRuntimeTemplateCatalog, competitionEventStore, platformConfigurationStore, liveSoloMaterialMutationGate);
             var fusionLeaderboardCache = new NoCTF.Infrastructure.Scoring.Leaderboard.FusionLeaderboardCache(noCtfDbContext, _leaderboardProjectionEngine, _leaderboardRefreshPublisher, _fusionCacheProvider2, _leaderboardPublicationFence, _leaderboardProjectionKeyedLock, _timeProvider);
             var getCompetitionTracks = new NoCTF.Application.Competitions.Tracks.GetCompetitionTracks(competitionTrackStore);
             var getChallenge = new NoCTF.Application.Challenges.Management.GetChallenge(challengeManagementStore);

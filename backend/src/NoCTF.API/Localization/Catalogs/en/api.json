@@ -1,4 +1,5 @@
 {
+  "api.challenges.material.activeExecutionScope": "This challenge is in an active Round. Finish or void the Round before changing its text, definition, Flags or attachments.",
   "api.liveSolo.templateCopy.notFound": "The source template or destination competition is unavailable.",
   "api.liveSolo.templateCopy.unsupportedSource": "Only FlagSubmission-compatible CTF or LiveSolo definitions can be copied. Patch and checker interactions are not converted.",
   "api.liveSolo.templateCopy.attachmentsForbidden": "You need source attachment access before copying its files.",
