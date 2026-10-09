@@ -64,6 +64,8 @@ public static class LiveSoloInfrastructure
             || media.ClientUrl.Scheme == "ws" && !media.ClientUrl.IsLoopback || string.IsNullOrWhiteSpace(media.ApiKey)
             || System.Text.Encoding.UTF8.GetByteCount(media.ApiSecret) < 32 || media.RequestTimeoutSeconds is < 1 or > 60
             || media.MaximumParticipants is < 4 or > 64 || !media.EgressOutputRoot.StartsWith('/')
+            || media.RecordingQuotaBytes < 1 || media.RecordingExportLimitBytes < 16L*1024*1024 || media.RecordingExportLimitBytes > long.MaxValue/2
+            || media.RecordingExportLimitBytes > media.RecordingQuotaBytes
             || media.EgressOutputRoot.Contains("..", StringComparison.Ordinal)))
             throw new InvalidOperationException("LiveSolo media configuration is invalid.");
         services.AddSingleton(media);

@@ -44,9 +44,12 @@ public sealed partial class LiveSoloCaptureStore(NoCtfDbContext db, ILiveSoloEgr
             {
                 foreach (var member in session.Participants.Where(x => x.ScreenState == LiveSoloScreenState.Sharing && x.ScreenTrackId != null))
                 {
-                    if (await db.LiveSoloRecordings.AnyAsync(x => x.MediaSessionId == session.Id && x.UserId == member.UserId && x.VideoTrackId == member.ScreenTrackId, ct)) continue;
+                    var latest = await db.LiveSoloRecordings.Where(x=>x.MediaSessionId==session.Id&&x.UserId==member.UserId&&x.VideoTrackId==member.ScreenTrackId)
+                        .OrderByDescending(x=>x.Chunk).FirstOrDefaultAsync(ct);
+                    if (latest is not null && (latest.State!=LiveSoloRecordingState.Completed || latest.RawRemovedAt is null)) continue;
                     db.LiveSoloRecordings.Add(new() { Id = Guid.CreateVersion7(clock.GetUtcNow()), MediaSessionId = session.Id,
                         UserId = member.UserId, VideoTrackId = member.ScreenTrackId!, State = LiveSoloRecordingState.Pending, CreatedAt = clock.GetUtcNow(),
+                        Chunk=(latest?.Chunk??-1)+1,
                         KeepUntil = clock.GetUtcNow().AddDays(session.RecordingRetentionDays) });
                 }
             }

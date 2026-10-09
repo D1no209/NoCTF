@@ -219,7 +219,7 @@ internal sealed class LiveSoloRecordingConfiguration : IEntityTypeConfiguration<
     {
         builder.ToTable("live_solo_recordings"); builder.HasKey(x => x.Id);
         builder.HasIndex(x => new { x.State, x.KeepUntil });
-        builder.HasIndex(x => new { x.MediaSessionId, x.UserId, x.VideoTrackId }).IsUnique();
+        builder.HasIndex(x => new { x.MediaSessionId, x.UserId, x.VideoTrackId, x.Chunk }).IsUnique();
         builder.HasOne<LiveSoloMediaSession>().WithMany().HasForeignKey(x => x.MediaSessionId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<LiveSoloRound>().WithMany().HasForeignKey(x => x.RoundId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<StoredFile>().WithMany().HasForeignKey(x => x.FileId).OnDelete(DeleteBehavior.Restrict);

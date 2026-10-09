@@ -6,11 +6,31 @@ namespace NoCTF.Infrastructure.LiveSolo.Media;
 
 public sealed partial class LiveSoloCaptureFiles(LiveKitMediaOptions options) : ILiveSoloCaptureFiles
 {
-    private string DirectoryFor(Guid id) => Path.Combine(options.CaptureSpoolPath, "live-solo", id.ToString("N"));
+    private string DirectoryFor(Guid id)
+    {
+        var root = Path.GetFullPath(options.CaptureSpoolPath);
+        var parent = Path.Combine(root, "live-solo");
+        var directory = Path.Combine(parent, id.ToString("N"));
+        foreach (var path in new[] { root, parent, directory })
+            if (new DirectoryInfo(path).LinkTarget is not null)
+                throw new InvalidDataException("Capture directories cannot be symbolic links.");
+        return directory;
+    }
+    private static bool RegularFileExists(string path)
+    {
+        var file = new FileInfo(path);
+        if (file.LinkTarget is not null) throw new InvalidDataException("Capture files cannot be symbolic links.");
+        return file.Exists;
+    }
+    public Task<long?> RecordingLengthAsync(Guid id,CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();var path=Path.Combine(DirectoryFor(id),"recording.mp4");
+        return Task.FromResult<long?>(RegularFileExists(path)?new FileInfo(path).Length:null);
+    }
     public async Task<IReadOnlyList<LiveSoloCapturedSegment>> SegmentsAsync(Guid id, CancellationToken ct)
     {
         var playlist = Path.Combine(DirectoryFor(id), "program.m3u8");
-        if (!File.Exists(playlist)) return [];
+        if (!RegularFileExists(playlist)) return [];
         var entries = new List<LiveSoloCapturedSegment>(); double? seconds = null;
         foreach (var line in await File.ReadAllLinesAsync(playlist, ct))
         {
@@ -25,7 +45,7 @@ public sealed partial class LiveSoloCaptureFiles(LiveKitMediaOptions options) : 
             var match = SegmentName().Match(line.Trim());
             if (!match.Success || seconds is null || !long.TryParse(match.Groups[1].Value, CultureInfo.InvariantCulture, out var sequence))
                 throw new InvalidDataException("Invalid media segment identity.");
-            if (File.Exists(Path.Combine(DirectoryFor(id), line.Trim()))) entries.Add(new(sequence, line.Trim(), TimeSpan.FromSeconds(seconds.Value)));
+            if (RegularFileExists(Path.Combine(DirectoryFor(id), line.Trim()))) entries.Add(new(sequence, line.Trim(), TimeSpan.FromSeconds(seconds.Value)));
             seconds = null;
         }
         return entries;
@@ -35,7 +55,7 @@ public sealed partial class LiveSoloCaptureFiles(LiveKitMediaOptions options) : 
         ct.ThrowIfCancellationRequested();
         if (fileName != "recording.mp4" && !SegmentName().IsMatch(fileName)) throw new InvalidDataException("Invalid media file identity.");
         var path = Path.Combine(DirectoryFor(id), fileName);
-        return Task.FromResult<Stream?>(File.Exists(path) ? new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 81920,
+        return Task.FromResult<Stream?>(RegularFileExists(path) ? new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 81920,
             FileOptions.Asynchronous | FileOptions.SequentialScan) : null);
     }
     public Task RemoveAsync(Guid id, CancellationToken ct)

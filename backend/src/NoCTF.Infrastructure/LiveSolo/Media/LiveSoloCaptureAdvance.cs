@@ -58,7 +58,7 @@ public sealed partial class LiveSoloCaptureStore
             { await egress.StopAsync(current.Id, ct); program.State = LiveSoloCaptureState.Stopping; await db.SaveChangesAsync(ct); }
         }
         foreach (var record in await db.LiveSoloRecordings.Where(x => x.MediaSessionId == sessionId && x.State != LiveSoloRecordingState.Completed
-            && x.State != LiveSoloRecordingState.Failed && (x.State != LiveSoloRecordingState.RequiresReview || x.EgressId == null) && x.State != LiveSoloRecordingState.Deleting).ToArrayAsync(ct))
+            && x.State != LiveSoloRecordingState.Failed && (x.State != LiveSoloRecordingState.RequiresReview || x.EgressId == null && x.RequestedAt != null) && x.State != LiveSoloRecordingState.Deleting).ToArrayAsync(ct))
         {
             var current = jobs.SingleOrDefault(x => x.Id == record.EgressId || x.RequestId == record.Id);
             var stillSharing = active && session.Participants.Any(x => x.UserId == record.UserId && x.ScreenTrackId == record.VideoTrackId && x.ScreenState == LiveSoloScreenState.Sharing);
@@ -70,7 +70,13 @@ public sealed partial class LiveSoloCaptureStore
                     claimed = false;
                     await db.Entry(record).ReloadAsync(ct);
                     if (record.State != LiveSoloRecordingState.Pending) return;
-                    if (!await db.LiveSoloMediaSessions.AnyAsync(x => x.Id == session.Id && x.State == LiveSoloMediaState.Ready, ct)) return;
+                    if (!await db.LiveSoloMediaSessions.AnyAsync(x => x.Id == session.Id && x.State == LiveSoloMediaState.Ready
+                        && db.LiveSoloMatches.Any(m=>m.Id==x.MatchId&&m.CurrentMediaSessionId==x.Id), ct)
+                        || !await db.Set<LiveSoloMediaParticipant>().AnyAsync(p=>p.MediaSessionId==session.Id&&p.UserId==record.UserId
+                            &&p.ScreenTrackId==record.VideoTrackId&&p.ScreenState==LiveSoloScreenState.Sharing,ct)) return;
+                    var used=await RecordingCapacityUsedAsync(ct);var reservation=checked(options.RecordingExportLimitBytes*2);
+                    if (reservation>options.RecordingQuotaBytes-used) {record.State=LiveSoloRecordingState.RequiresReview;return;}
+                    record.ReservedBytes=reservation;
                     record.State = LiveSoloRecordingState.Starting; record.RequestedAt = clock.GetUtcNow();
                     claimed = true;
                 }, ct);
@@ -88,9 +94,21 @@ public sealed partial class LiveSoloCaptureStore
             record.EgressId = current.Id; record.StartedAt ??= current.StartedAt; record.EndedAt = current.EndedAt;
             record.State = RecordingState(current.State); await db.SaveChangesAsync(ct);
             if (current.State == LiveSoloExportState.Complete) await ImportRecordingAsync(session, record, current, ct);
-            if (!stillSharing && current.State is LiveSoloExportState.Starting or LiveSoloExportState.Active)
+            if (current.State is LiveSoloExportState.Failed or LiveSoloExportState.Aborted or LiveSoloExportState.LimitReached)
+            {
+                await RemoveRecordingRawAsync(record.Id, ct);
+            }
+            var limitReached=current.State==LiveSoloExportState.Active && await files.RecordingLengthAsync(record.Id,ct)
+                >= options.RecordingExportLimitBytes-4L*1024*1024;
+            if ((!stillSharing || limitReached) && current.State is LiveSoloExportState.Starting or LiveSoloExportState.Active)
             { await egress.StopAsync(current.Id, ct); record.State = LiveSoloRecordingState.Finalizing; await db.SaveChangesAsync(ct); }
         }
+    }
+    private async Task<long> RecordingCapacityUsedAsync(CancellationToken ct)
+    {
+        var retained=await db.LiveSoloRecordings.Where(x=>x.FileId!=null).Join(db.Files,r=>r.FileId,f=>(Guid?)f.Id,(r,f)=>f.ByteLength*(r.RawRemovedAt==null?2:1)).SumAsync(ct);
+        var reserved=await db.LiveSoloRecordings.Where(x=>x.FileId==null).SumAsync(x=>x.ReservedBytes,ct);
+        return checked(retained+reserved);
     }
     private static LiveSoloCaptureState ProgramState(LiveSoloExportState state) => state switch
     {

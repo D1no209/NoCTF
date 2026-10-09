@@ -5,6 +5,26 @@ namespace NoCTF.Tests.Unit.LiveSolo;
 public sealed class LiveSoloCaptureFilesTests
 {
     [Test]
+    public async Task Recording_size_observes_the_current_file_and_cleanup_removes_only_its_capture_directory()
+    {
+        var root=Path.Combine(Path.GetTempPath(),"noctf-capture-test-"+Guid.NewGuid().ToString("N"));
+        var id=Guid.NewGuid();var folder=Path.Combine(root,"live-solo",id.ToString("N"));Directory.CreateDirectory(folder);
+        var path=Path.Combine(folder,"recording.mp4");var files=new LiveSoloCaptureFiles(new() {CaptureSpoolPath=root});
+        try
+        {
+            await Assert.That(await files.RecordingLengthAsync(id,CancellationToken.None)).IsNull();
+            await File.WriteAllBytesAsync(path,[1,2,3,4]);
+            await Assert.That(await files.RecordingLengthAsync(id,CancellationToken.None)).IsEqualTo(4L);
+            await File.WriteAllBytesAsync(path,[1,2,3,4,5,6]);
+            await Assert.That(await files.RecordingLengthAsync(id,CancellationToken.None)).IsEqualTo(6L);
+            await files.RemoveAsync(id,CancellationToken.None);
+            await Assert.That(Directory.Exists(folder)).IsFalse();
+            await Assert.That(Directory.Exists(root)).IsTrue();
+        }
+        finally { if(File.Exists(path))File.Delete(path);if(Directory.Exists(folder))Directory.Delete(folder);
+            Directory.Delete(Path.Combine(root,"live-solo"));Directory.Delete(root); }
+    }
+    [Test]
     public async Task Playlist_parser_accepts_only_completed_local_segments_and_rejects_traversal()
     {
         var root = Path.Combine(Path.GetTempPath(), "noctf-capture-test-" + Guid.NewGuid().ToString("N"));

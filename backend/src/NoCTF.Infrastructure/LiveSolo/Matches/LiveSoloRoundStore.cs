@@ -100,10 +100,20 @@ public sealed partial class LiveSoloMatchStore
         if (program?.EgressId is null || !await ProgramReadyAsync(session.Id, program.Id, program.EgressId, ct)) return new(null, LiveSoloFailure.MediaUnavailable);
         var observed = await media.ObserveAsync(session.RoomIdentity, ct);
         LiveSoloExportObservation? export;
+        LiveSoloRecording[] recordingProof = [];
         try
         {
             var jobs = await egress.ListAsync(session.RoomIdentity, ct);
             export = jobs.SingleOrDefault(x => x.Id == program.EgressId && x.RequestId == program.Id && x.RoomIdentity == session.RoomIdentity);
+            if(session.RecordingEnabled)
+            {
+                recordingProof=await db.LiveSoloRecordings.AsNoTracking().Where(x=>x.MediaSessionId==session.Id&&x.State==LiveSoloRecordingState.Recording&&x.ReservedBytes>0).ToArrayAsync(ct);
+                foreach(var member in session.Participants)
+                    if(!recordingProof.Any(record=>record.UserId==member.UserId&&record.VideoTrackId==member.ScreenTrackId
+                        &&jobs.Any(job=>job.Id==record.EgressId&&job.RequestId==record.Id&&job.RoomIdentity==session.RoomIdentity
+                            &&job.State==LiveSoloExportState.Active&&job.StartedAt!=null&&job.StartedAt<=(clock??TimeProvider.System).GetUtcNow()&&job.EndedAt==null)))
+                        return new(null,LiveSoloFailure.MediaUnavailable);
+            }
         }
         catch (Exception ex) when (ex is HttpRequestException or IOException or TimeoutException || ex is TaskCanceledException && !ct.IsCancellationRequested)
         { return new(null, LiveSoloFailure.MediaUnavailable); }
@@ -126,6 +136,19 @@ public sealed partial class LiveSoloMatchStore
                 && x.State == LiveSoloMediaState.Ready, ct)) return new(null, LiveSoloFailure.MediaUnavailable);
             if (!observed.Exists || !LiveSoloMediaPolicy.FreshStartProof(checkedAt, (clock ?? TimeProvider.System).GetUtcNow())
                 || !await ProgramReadyAsync(session.Id, program.Id, program.EgressId, ct)) return new(null, LiveSoloFailure.MediaUnavailable);
+            if (session.RecordingEnabled)
+            {
+                foreach (var member in session.Participants)
+                {
+                    var proof = recordingProof.SingleOrDefault(x => x.UserId == member.UserId && x.VideoTrackId == member.ScreenTrackId);
+                    if (proof is null || !await db.LiveSoloRecordings.AnyAsync(x => x.Id == proof.Id
+                        && x.MediaSessionId == session.Id && x.State == LiveSoloRecordingState.Recording
+                        && x.ReservedBytes > 0 && x.EgressId == proof.EgressId
+                        && db.Set<LiveSoloMediaParticipant>().Any(p => p.MediaSessionId == session.Id && p.UserId == x.UserId
+                            && p.ScreenTrackId == x.VideoTrackId && p.ScreenState == LiveSoloScreenState.Sharing), ct))
+                        return new(null, LiveSoloFailure.MediaUnavailable);
+                }
+            }
             if (!await RosterEligibleAsync(match, ct)) return new(null, LiveSoloFailure.NotReady);
             if (!await HasMatchCapacityAsync(match, config.MaximumConcurrentMatches, ct))
                 return new(null, LiveSoloFailure.NotReady);

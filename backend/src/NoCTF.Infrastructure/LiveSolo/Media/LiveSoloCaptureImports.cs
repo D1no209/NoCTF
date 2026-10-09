@@ -47,6 +47,7 @@ public sealed partial class LiveSoloCaptureStore
         if (record.FileId is not null) { record.State = LiveSoloRecordingState.Completed; await db.SaveChangesAsync(ct); return; }
         var file = observation.Files.SingleOrDefault(x => x.ObjectKey.EndsWith("/recording.mp4", StringComparison.Ordinal));
         if (file is null || file.ByteLength <= 0) return;
+        if(file.ByteLength>options.RecordingExportLimitBytes) {record.State=LiveSoloRecordingState.RequiresReview;await db.SaveChangesAsync(ct);return;}
         await using var content = await files.OpenAsync(record.Id, "recording.mp4", ct);
         if (content is null) return;
         var id = Guid.CreateVersion7(clock.GetUtcNow());
@@ -58,14 +59,16 @@ public sealed partial class LiveSoloCaptureStore
             {
                 attached = false; await db.Entry(record).ReloadAsync(ct);
                 if (record.FileId is not null) return;
-                var retained = await db.LiveSoloRecordings.Where(x => x.FileId != null)
-                    .Join(db.Files, r => r.FileId, f => (Guid?)f.Id, (_, f) => f.ByteLength).SumAsync(ct);
-                if (upload.ByteLength > options.RecordingQuotaBytes - retained)
+                var used=await RecordingCapacityUsedAsync(ct);
+                if (upload.ByteLength>options.RecordingExportLimitBytes || checked(upload.ByteLength*2)>options.RecordingQuotaBytes-used+record.ReservedBytes)
                 { record.State = LiveSoloRecordingState.RequiresReview; return; }
                 record.FileId = upload.FileId; record.State = LiveSoloRecordingState.Completed;
+                record.ReservedBytes=0;
                 record.KeepUntil = (record.EndedAt ?? clock.GetUtcNow()).AddDays(session.RecordingRetentionDays); attached = true;
+                await messages.PublishAsync(new NoCTF.Application.LiveSolo.Media.RemoveLiveSoloRecordingRaw(record.Id));
             }, ct);
         }
         finally { if (!attached) await uploads.AbandonAsync(upload.FileId); }
+        if(attached)await messages.FlushCommittedMessagesAsync();
     }
 }

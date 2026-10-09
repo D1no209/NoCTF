@@ -6,6 +6,17 @@ namespace NoCTF.Infrastructure.LiveSolo.Media;
 
 public sealed partial class LiveSoloCaptureStore
 {
+    public async Task RemoveRecordingRawAsync(Guid recordingId,CancellationToken ct)
+    {
+        if(!await db.LiveSoloRecordings.AsNoTracking().AnyAsync(x=>x.Id==recordingId&&x.RawRemovedAt==null
+            && (x.State==LiveSoloRecordingState.Completed&&x.FileId!=null || x.State==LiveSoloRecordingState.Failed),ct))return;
+        await files.RemoveAsync(recordingId,ct);
+        await TransactionAsync(async()=>{
+            var record=await db.LiveSoloRecordings.SingleOrDefaultAsync(x=>x.Id==recordingId
+                && (x.State==LiveSoloRecordingState.Completed&&x.FileId!=null || x.State==LiveSoloRecordingState.Failed),ct);
+            if(record is not null) { record.RawRemovedAt=clock.GetUtcNow(); record.ReservedBytes=0; }
+        },ct);
+    }
     public async Task PruneAsync(Guid sessionId, CancellationToken ct)
     {
         var now = clock.GetUtcNow();
@@ -32,6 +43,9 @@ public sealed partial class LiveSoloCaptureStore
             foreach (var program in await db.LiveSoloProgramCaptures.Where(x => x.MediaSessionId == sessionId && x.ImportedAt != null && x.RawRemovedAt == null
                 && (x.State == LiveSoloCaptureState.Completed || x.State == LiveSoloCaptureState.Failed)).Select(x => x.Id).ToArrayAsync(ct)) raw.Add(program);
             foreach (var id in raw) await messages.PublishAsync(new NoCTF.Application.LiveSolo.Media.RemoveLiveSoloCaptureFiles(id));
+            foreach(var id in await db.LiveSoloRecordings.Where(x=>x.MediaSessionId==sessionId&&x.RawRemovedAt==null
+                && (x.State==LiveSoloRecordingState.Completed&&x.FileId!=null || x.State==LiveSoloRecordingState.Failed)).Select(x=>x.Id).ToArrayAsync(ct))
+                await messages.PublishAsync(new NoCTF.Application.LiveSolo.Media.RemoveLiveSoloRecordingRaw(id));
         }, ct);
         await messages.FlushCommittedMessagesAsync();
     }
