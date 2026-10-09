@@ -19,6 +19,7 @@ namespace Internal.Generated.WolverineHandlers
         private readonly Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> _dbContextOptionsOfNoCtfDbContext;
         private readonly Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> _loggerOfWolverinePostCommitMessagePublisher;
         private readonly Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> _loggerOfNoCtfDbContext;
+        private readonly NoCTF.Application.LiveSolo.Media.ILiveSoloEgressGateway _liveSoloEgressGateway;
         private readonly NoCTF.Application.LiveSolo.Media.ILiveSoloMediaGateway _liveSoloMediaGateway;
         private readonly NoCTF.Application.Notifications.INotificationChangePublisher _notificationChangePublisher;
         private readonly NoCTF.Application.Runtime.Provisioning.IChallengeRuntimeTemplateCatalog _challengeRuntimeTemplateCatalog;
@@ -27,12 +28,13 @@ namespace Internal.Generated.WolverineHandlers
         private readonly NoCTF.Infrastructure.Runtime.Capacity.NatsRunnerAvailabilityRegistry _natsRunnerAvailabilityRegistry;
         private readonly System.TimeProvider _timeProvider;
 
-        public AdvanceLiveSoloRoundHandler1565352609(Microsoft.AspNetCore.Http.IHttpContextAccessor httpContextAccessor, Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, NoCTF.Application.LiveSolo.Media.ILiveSoloMediaGateway liveSoloMediaGateway, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.Application.Runtime.Provisioning.IChallengeRuntimeTemplateCatalog challengeRuntimeTemplateCatalog, NoCTF.Application.Runtime.Provisioning.IRuntimePlacementPolicy __runtimePlacementPolicy1, NoCTF.Application.Runtime.Provisioning.IRuntimePlacementPolicy __runtimePlacementPolicy2, NoCTF.Infrastructure.Runtime.Capacity.NatsRunnerAvailabilityRegistry natsRunnerAvailabilityRegistry, System.TimeProvider timeProvider)
+        public AdvanceLiveSoloRoundHandler1565352609(Microsoft.AspNetCore.Http.IHttpContextAccessor httpContextAccessor, Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, NoCTF.Application.LiveSolo.Media.ILiveSoloEgressGateway liveSoloEgressGateway, NoCTF.Application.LiveSolo.Media.ILiveSoloMediaGateway liveSoloMediaGateway, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.Application.Runtime.Provisioning.IChallengeRuntimeTemplateCatalog challengeRuntimeTemplateCatalog, NoCTF.Application.Runtime.Provisioning.IRuntimePlacementPolicy __runtimePlacementPolicy1, NoCTF.Application.Runtime.Provisioning.IRuntimePlacementPolicy __runtimePlacementPolicy2, NoCTF.Infrastructure.Runtime.Capacity.NatsRunnerAvailabilityRegistry natsRunnerAvailabilityRegistry, System.TimeProvider timeProvider)
         {
             _httpContextAccessor = httpContextAccessor;
             _dbContextOptionsOfNoCtfDbContext = dbContextOptionsOfNoCtfDbContext;
             _loggerOfWolverinePostCommitMessagePublisher = loggerOfWolverinePostCommitMessagePublisher;
             _loggerOfNoCtfDbContext = loggerOfNoCtfDbContext;
+            _liveSoloEgressGateway = liveSoloEgressGateway;
             _liveSoloMediaGateway = liveSoloMediaGateway;
             _notificationChangePublisher = notificationChangePublisher;
             _challengeRuntimeTemplateCatalog = challengeRuntimeTemplateCatalog;
@@ -57,7 +59,7 @@ namespace Internal.Generated.WolverineHandlers
             var scopedRuntimeControl = new NoCTF.Infrastructure.Runtime.Instances.ScopedRuntimeControl(noCtfDbContext, _challengeRuntimeTemplateCatalog, _runtimePlacementPolicy1, perTeamRuntimeFlagStore, wolverinePostCommitMessagePublisher, runnerExecutionRuntimeIsolation, liveSoloExecutionAccess, _timeProvider, transactionalRequestReplay);
             var liveSoloRuntimePreparation = new NoCTF.Infrastructure.LiveSolo.Resources.LiveSoloRuntimePreparation(noCtfDbContext, scopedRuntimeControl);
             var competitionModerationAuthorizer = new NoCTF.Infrastructure.Teams.Moderation.CompetitionModerationAuthorizer(noCtfDbContext);
-            var liveSoloMatchStore = new NoCTF.Infrastructure.LiveSolo.Matches.LiveSoloMatchStore(noCtfDbContext, competitionModerationAuthorizer, _liveSoloMediaGateway, liveSoloRuntimePreparation, wolverinePostCommitMessagePublisher, transactionalRequestReplay, _timeProvider);
+            var liveSoloMatchStore = new NoCTF.Infrastructure.LiveSolo.Matches.LiveSoloMatchStore(noCtfDbContext, competitionModerationAuthorizer, _liveSoloMediaGateway, _liveSoloEgressGateway, liveSoloRuntimePreparation, wolverinePostCommitMessagePublisher, transactionalRequestReplay, _timeProvider);
             // The actual message body
             var advanceLiveSoloRound = (NoCTF.Application.LiveSolo.Rounds.AdvanceLiveSoloRound)context.Envelope.Message;
 

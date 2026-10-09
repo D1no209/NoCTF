@@ -82,7 +82,7 @@ public sealed class LiveSoloResumeAndReadinessPersistenceTests
             // A failing adapter that leaves persisted Ready unchanged must still never authorize opening.
             var preparation = Substitute.For<ILiveSoloRuntimePreparation>();
             preparation.PrepareAsync(Arg.Any<Guid>(), Arg.Any<DateTimeOffset>(), ct).Returns(failure);
-            var store = new LiveSoloMatchStore(fixture.Db, new CompetitionModerationAuthorizer(fixture.Db), fixture.media, preparation,
+            var store = new LiveSoloMatchStore(fixture.Db, new CompetitionModerationAuthorizer(fixture.Db), fixture.media, fixture.egress, preparation,
                 Substitute.For<IPostCommitMessagePublisher>(), clock: fixture.Clock);
             await store.TickAsync(fixture.Round.Id, fixture.Round.TimelineRevision, fixture.Now, ct);
             await Assert.That(fixture.Round.State).IsEqualTo(LiveSoloRoundState.Countdown);

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.LiveSolo.Matches;
+using NoCTF.Application.LiveSolo.Media;
 using NoCTF.Application.LiveSolo.Rounds;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.LiveSolo;
@@ -93,8 +94,21 @@ public sealed partial class LiveSoloMatchStore
                 && db.LiveSoloMatches.Any(match => match.Id == command.MatchId && match.CurrentMediaSessionId == x.Id))
             .OrderByDescending(x => x.CreatedAt).FirstOrDefaultAsync(ct);
         if (session is null) return new(null, LiveSoloFailure.MediaUnavailable);
-        if (!await ProgramReadyAsync(session.Id, ct)) return new(null, LiveSoloFailure.MediaUnavailable);
+        var program = await db.LiveSoloProgramCaptures.AsNoTracking().SingleOrDefaultAsync(x => x.Id == session.CurrentProgramCaptureId
+            && x.MediaSessionId == session.Id && x.State == LiveSoloCaptureState.Active, ct);
+        if (program?.EgressId is null || !await ProgramReadyAsync(session.Id, program.Id, program.EgressId, ct)) return new(null, LiveSoloFailure.MediaUnavailable);
         var observed = await media.ObserveAsync(session.RoomIdentity, ct);
+        LiveSoloExportObservation? export;
+        try
+        {
+            var jobs = await egress.ListAsync(session.RoomIdentity, ct);
+            export = jobs.SingleOrDefault(x => x.Id == program.EgressId && x.RequestId == program.Id && x.RoomIdentity == session.RoomIdentity);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException or TimeoutException || ex is TaskCanceledException && !ct.IsCancellationRequested)
+        { return new(null, LiveSoloFailure.MediaUnavailable); }
+        var checkedAt = (clock ?? TimeProvider.System).GetUtcNow();
+        if (export is not { State: LiveSoloExportState.Active, StartedAt: not null, EndedAt: null }
+            || export.StartedAt > checkedAt) return new(null, LiveSoloFailure.MediaUnavailable);
         return await TransactionAsync(async () =>
         {
             var match = await MatchAsync(command.CompetitionId, command.MatchId, ct);
@@ -109,7 +123,8 @@ public sealed partial class LiveSoloMatchStore
             if (!config.Enabled) return new(null, LiveSoloFailure.Disabled);
             if (match.CurrentMediaSessionId != session.Id || !await db.LiveSoloMediaSessions.AnyAsync(x => x.Id == session.Id
                 && x.State == LiveSoloMediaState.Ready, ct)) return new(null, LiveSoloFailure.MediaUnavailable);
-            if (!await ProgramReadyAsync(session.Id, ct)) return new(null, LiveSoloFailure.MediaUnavailable);
+            if (!observed.Exists || !LiveSoloMediaPolicy.FreshStartProof(checkedAt, (clock ?? TimeProvider.System).GetUtcNow())
+                || !await ProgramReadyAsync(session.Id, program.Id, program.EgressId, ct)) return new(null, LiveSoloFailure.MediaUnavailable);
             if (!await RosterEligibleAsync(match, ct)) return new(null, LiveSoloFailure.NotReady);
             if (!await HasMatchCapacityAsync(match, config.MaximumConcurrentMatches, ct))
                 return new(null, LiveSoloFailure.NotReady);
@@ -135,8 +150,8 @@ public sealed partial class LiveSoloMatchStore
         var actualNow = (clock ?? TimeProvider.System).GetUtcNow();
         return !publicTimes.Any(x => x <= actualNow);
     }
-    private Task<bool> ProgramReadyAsync(Guid sessionId, CancellationToken ct) => db.LiveSoloProgramCaptures.AnyAsync(x => x.MediaSessionId == sessionId
-        && x.State == LiveSoloCaptureState.Active && db.LiveSoloMediaSessions.Any(s => s.Id == sessionId && s.CurrentProgramCaptureId == x.Id)
+    private Task<bool> ProgramReadyAsync(Guid sessionId, Guid captureId, string egressId, CancellationToken ct) => db.LiveSoloProgramCaptures.AnyAsync(x => x.MediaSessionId == sessionId
+        && x.Id == captureId && x.EgressId == egressId && x.State == LiveSoloCaptureState.Active && db.LiveSoloMediaSessions.Any(s => s.Id == sessionId && s.CurrentProgramCaptureId == x.Id)
         && db.LiveSoloProgramSegments.Any(segment => segment.ProgramCaptureId == x.Id
             && db.Files.Any(file => file.Id == segment.FileId && file.ByteLength > 0)), ct);
 

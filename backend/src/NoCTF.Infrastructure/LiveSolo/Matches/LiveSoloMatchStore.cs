@@ -16,7 +16,7 @@ using NoCTF.Infrastructure.Persistence;
 namespace NoCTF.Infrastructure.LiveSolo.Matches;
 
 public sealed partial class LiveSoloMatchStore(NoCtfDbContext db, ICompetitionModerationAuthorizer authorizer,
-    ILiveSoloMediaGateway media, ILiveSoloRuntimePreparation runtimePreparation, IPostCommitMessagePublisher messages,
+    ILiveSoloMediaGateway media, ILiveSoloEgressGateway egress, ILiveSoloRuntimePreparation runtimePreparation, IPostCommitMessagePublisher messages,
     IRequestReplay? replay = null, TimeProvider? clock = null)
     : ILiveSoloMatchStore, NoCTF.Application.LiveSolo.Brackets.ILiveSoloBracketStore,
         NoCTF.Application.LiveSolo.Adjudication.ILiveSoloAdjudicationStore

@@ -96,7 +96,7 @@ public sealed class LiveSoloAdjudicationPersistenceTests
                 fixture.Round.Questions.Single(x => x.Position == 0).Id, fixture.Left.Id, "flag{first}", fixture.Now), ct);
             await Assert.That(accepted.Failure).IsNull();
             var preparation = Substitute.For<ILiveSoloRuntimePreparation>();
-            var store = new LiveSoloMatchStore(fixture.Db, new CompetitionModerationAuthorizer(fixture.Db), fixture.media,
+            var store = new LiveSoloMatchStore(fixture.Db, new CompetitionModerationAuthorizer(fixture.Db), fixture.media, fixture.egress,
                 preparation, Substitute.For<IPostCommitMessagePublisher>(), clock: fixture.Clock);
             var result = await store.ApplyAsync(await CommandAsync(fixture, LiveSoloJudgeAction.VoidRound, ct), ct);
             await Assert.That(result.Failure).IsNull();
@@ -149,7 +149,7 @@ public sealed class LiveSoloAdjudicationPersistenceTests
             var command = await CommandAsync(fixture, LiveSoloJudgeAction.VoidRound, ct);
             await using var failing = new NoCtfDbContext(new DbContextOptionsBuilder<NoCtfDbContext>(fixture.Options).AddInterceptors(new RejectCommit()).Options);
             var preparation = Substitute.For<ILiveSoloRuntimePreparation>(); var messages = Substitute.For<IPostCommitMessagePublisher>();
-            var store = new LiveSoloMatchStore(failing, new CompetitionModerationAuthorizer(failing), fixture.media, preparation, messages, clock: fixture.Clock);
+            var store = new LiveSoloMatchStore(failing, new CompetitionModerationAuthorizer(failing), fixture.media, fixture.egress, preparation, messages, clock: fixture.Clock);
             await Assert.That(async () => await store.ApplyAsync(command, ct)).Throws<InvalidOperationException>();
             await preparation.DidNotReceive().StopRoundAsync(Arg.Any<Guid>(), Arg.Any<DateTimeOffset>(), ct);
             await messages.DidNotReceive().FlushCommittedMessagesAsync();

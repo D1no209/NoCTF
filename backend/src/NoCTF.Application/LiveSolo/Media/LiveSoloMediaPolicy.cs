@@ -4,6 +4,7 @@ namespace NoCTF.Application.LiveSolo.Media;
 
 public static class LiveSoloMediaPolicy
 {
+    public static bool FreshStartProof(DateTimeOffset checkedAt, DateTimeOffset now) => checkedAt <= now && now - checkedAt <= TimeSpan.FromSeconds(10);
     public static bool MayPrepare(LiveSoloMatch match) => Active(match.State)
         && match.Slots.Count == 2 && match.Slots.All(x => x.TeamId is not null && x.RosterLockedAt is not null);
     public static bool Active(LiveSoloMatchState state) => state is LiveSoloMatchState.Preparing or LiveSoloMatchState.Countdown

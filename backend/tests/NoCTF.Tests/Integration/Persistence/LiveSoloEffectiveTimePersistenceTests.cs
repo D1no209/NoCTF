@@ -43,7 +43,7 @@ public sealed class LiveSoloEffectiveTimePersistenceTests
             });
             var retry = new DelayAndRetry(fixture.Clock);
             await using var db = new NoCtfDbContext(new DbContextOptionsBuilder<NoCtfDbContext>(fixture.Options).AddInterceptors(retry).Options);
-            var store = new LiveSoloMatchStore(db, new CompetitionModerationAuthorizer(db), fixture.media,
+            var store = new LiveSoloMatchStore(db, new CompetitionModerationAuthorizer(db), fixture.media, fixture.egress,
                 Substitute.For<ILiveSoloRuntimePreparation>(), Substitute.For<IPostCommitMessagePublisher>(), clock: fixture.Clock);
             retry.Armed = true;
             var result = await store.StartCountdownAsync(new(fixture.Competition.Id, fixture.Match.Id, fixture.Round.Id, fixture.Owner.Id,
@@ -68,7 +68,7 @@ public sealed class LiveSoloEffectiveTimePersistenceTests
             var prepare = Substitute.For<ILiveSoloRuntimePreparation>();
             prepare.PrepareAsync(Arg.Any<Guid>(), Arg.Any<DateTimeOffset>(), ct).Returns(_ =>
             { fixture.Clock.Advance(TimeSpan.FromSeconds(25)); return (NoCTF.Application.LiveSolo.Rounds.LiveSoloFailure?)null; });
-            var store = new LiveSoloMatchStore(fixture.Db, new CompetitionModerationAuthorizer(fixture.Db), fixture.media, prepare,
+            var store = new LiveSoloMatchStore(fixture.Db, new CompetitionModerationAuthorizer(fixture.Db), fixture.media, fixture.egress, prepare,
                 Substitute.For<IPostCommitMessagePublisher>(), clock: fixture.Clock);
             await store.TickAsync(fixture.Round.Id, fixture.Round.TimelineRevision, scheduledAt, ct);
             await Assert.That(fixture.Round.State).IsEqualTo(LiveSoloRoundState.TimedOut);

@@ -329,7 +329,7 @@ public sealed class LiveSoloMatchPersistenceTests
             {
                 services.AddSingleton(probe); services.AddSingleton<TimeProvider>(clock);
                 services.AddSingleton(fixture.Options); services.AddScoped<NoCtfDbContext>();
-                services.AddSingleton(fixture.media);
+                services.AddSingleton(fixture.media); services.AddSingleton(fixture.egress);
                 services.AddSingleton<IChallengeRuntimeTemplateCatalog, ChallengeRuntimeTemplateCatalog>();
                 services.AddSingleton(Substitute.For<IRuntimePlacementPolicy>());
                 services.AddSingleton(Substitute.For<IPerTeamRuntimeFlagStore>());
@@ -395,6 +395,7 @@ public sealed class LiveSoloMatchPersistenceTests
         public LiveSoloMatchView Match { get; private set; } = null!;
         public LiveSoloRound Round { get; private set; } = null!;
         public readonly ILiveSoloMediaGateway media = Substitute.For<ILiveSoloMediaGateway>();
+        public readonly ILiveSoloEgressGateway egress = Substitute.For<ILiveSoloEgressGateway>();
 
         public static async Task<Fixture> CreateAsync(CancellationToken ct)
         {
@@ -437,7 +438,7 @@ public sealed class LiveSoloMatchPersistenceTests
             var runtime = new ScopedRuntimeControl(context, new ChallengeRuntimeTemplateCatalog(), Substitute.For<IRuntimePlacementPolicy>(),
                 Substitute.For<IPerTeamRuntimeFlagStore>(), messages);
             var clock = Clock;
-            return new(context, new CompetitionModerationAuthorizer(context), media, new LiveSoloRuntimePreparation(context, runtime), messages,
+            return new(context, new CompetitionModerationAuthorizer(context), media, egress, new LiveSoloRuntimePreparation(context, runtime), messages,
                 new TransactionalRequestReplay(context, new CommandKey(requestKey, actorId), clock), clock);
         }
 
@@ -479,7 +480,10 @@ public sealed class LiveSoloMatchPersistenceTests
         // Kernel tests use an explicit simulated media qualification, not a claim of real video acceptance.
         public async Task PrepareProgramAsync(LiveSoloMediaSession session, CancellationToken ct)
         {
-            var capture = new LiveSoloProgramCapture { Id = Guid.NewGuid(), MediaSessionId = session.Id, State = LiveSoloCaptureState.Active, CreatedAt = Now, StartedAt = Now };
+            var capture = new LiveSoloProgramCapture { Id = Guid.NewGuid(), MediaSessionId = session.Id, State = LiveSoloCaptureState.Active, CreatedAt = Now, StartedAt = Now,
+                EgressId = "fixture-export-" + session.Id.ToString("N") };
+            egress.ListAsync(session.RoomIdentity, ct).Returns(_ => Task.FromResult<IReadOnlyList<LiveSoloExportObservation>>([
+                new(capture.EgressId, session.RoomIdentity, LiveSoloExportState.Active, capture.StartedAt, null, null, [], capture.Id)]));
             var frame = new LiveSoloProgramFrame { Id = Guid.NewGuid(), MediaSessionId = session.Id, OccurredAt = Now, RequiredWins = 2 };
             var file = new NoCTF.Domain.Storage.StoredFile { Id = Guid.NewGuid(), ObjectKey = Guid.NewGuid().ToString("N"), FileName = "fixture.ts", ContentType = "video/mp2t",
                 ByteLength = 4, Sha256 = new byte[32], CreatedAt = Now };

@@ -81,7 +81,7 @@ public sealed class LiveSoloTemplateCopyPersistenceTests
             await Assert.That(second.Failure).IsNull(); await Assert.That(reCopy.Failure).IsNull();
             await Assert.That(first.Copy.CanonicalChallengeId).IsEqualTo(source.Id);
             await Assert.That(reCopy.Copy!.CanonicalChallengeId).IsEqualTo(source.Id);
-            var matchStore = new LiveSoloMatchStore(db, new CompetitionModerationAuthorizer(db), Substitute.For<ILiveSoloMediaGateway>(),
+            var matchStore = new LiveSoloMatchStore(db, new CompetitionModerationAuthorizer(db), Substitute.For<ILiveSoloMediaGateway>(), Substitute.For<ILiveSoloEgressGateway>(),
                 Substitute.For<ILiveSoloRuntimePreparation>(), Substitute.For<IPostCommitMessagePublisher>());
             var duplicateSource = await matchStore.SaveGroupAsync(competition.Id, actor.Id, new(null, "Duplicate source", false, null, [
                 new(first.Copy.CompetitionChallengeId, null), new(second.Copy!.CompetitionChallengeId, null)], null), now, ct);
