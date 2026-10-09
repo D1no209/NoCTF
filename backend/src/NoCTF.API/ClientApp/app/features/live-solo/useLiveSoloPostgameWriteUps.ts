@@ -14,6 +14,7 @@ import { startAttachmentBrowserDownload } from '~/utils/download'
 import { latestWriteUpVersion, writeUpStatusKey } from '~/features/writeups/writeup-state'
 import { canManageLiveSolo } from './settings-draft'
 import { postgameQuestion,postgameReviewVersion } from './postgame-state'
+import { PostgamePreviewLease } from './postgame-preview-lease'
 
 export function useLiveSoloPostgameWriteUps() {
   const route=useRoute(),router=useRouter(),context=inject(competitionContextKey)
@@ -28,6 +29,10 @@ export function useLiveSoloPostgameWriteUps() {
   const now=useNow({interval:1000}),leaveOpen=ref(false),reviewOpen=ref(false),reviewAction=ref<Action>('Publish'),reason=ref('')
   const reviewTarget=ref<{writeUpId:string;versionId:string;expectedStamp:string}|null>(null)
   let disposed=false,request=0,bodyRequest=0,allowLeave=false,leaveTo:string|null=null,initialized=false
+  const previewLease=new PostgamePreviewLease({
+    changed:url=>{pdf.value=url},
+    failed:cause=>{if(!disposed)error.value=parseApiError(cause,message('challengeWriteUp.loadFailed')).displayMessage},
+  })
   const currentQuestion=computed(()=>postgameQuestion(questions.value,questionId.value,route.params.roundId))
   const questionOptions=computed(()=>questions.value.filter(q=>q.id).map(q=>({value:q.id!,label:`${q.roundNumber ?? 1} · ${q.title ?? '—'}`})))
   const root=computed(()=>editor.value ? listing.value?.items?.find(row=>official.value?row.source==='Official':row.teamId===listing.value?.access?.teamId)??null
@@ -44,7 +49,7 @@ export function useLiveSoloPostgameWriteUps() {
   function path() { const q=currentQuestion.value!;return {competitionId:competitionId.value,matchId:matchId.value,roundId:q.roundId!,questionId:q.id!} }
   async function selectQuestion(id:string) {const q=questions.value.find(row=>row.id===id);if(q?.roundId)await router.push(`/competitions/${competitionId.value}/live-solo/postgame/${matchId.value}/${q.roundId}/${id}`)}
   async function read() {
-    const sequence=++bodyRequest;content.value=null;pdf.value=null
+    const sequence=++bodyRequest;content.value=null;previewLease.close()
     const v=version.value;if(!v?.id||!currentQuestion.value)return
     try {
       const target={...path(),versionId:v.id},isStaff=official.value||mode.value==='Review'
@@ -54,16 +59,17 @@ export function useLiveSoloPostgameWriteUps() {
       content.value=result.data
       if(editor.value) {format.value=result.data.format??'Markdown';markdown.value=result.data.markdown??'';file.value=null;original.value=JSON.stringify([format.value,markdown.value])}
       if(result.data.format==='Pdf') {
-        const grant=await prepareLiveSoloWriteUpBrowserAccess({path:target,body:{staff:isStaff}})
-        if(disposed||sequence!==bodyRequest)return
-        if(grant.error||!grant.data)throw parseApiError(grant.error,message('challengeWriteUp.loadFailed'))
-        pdf.value=grant.data.previewUrl??null
+        await previewLease.open(async signal=>{
+          const grant=await prepareLiveSoloWriteUpBrowserAccess({path:target,body:{staff:isStaff},signal})
+          if(grant.error||!grant.data?.previewUrl)throw parseApiError(grant.error,message('challengeWriteUp.loadFailed'))
+          return grant.data.previewUrl
+        })
       }
     }catch(cause){if(!disposed&&sequence===bodyRequest)error.value=parseApiError(cause,message('challengeWriteUp.loadFailed')).displayMessage}
   }
   async function load() {
     if(disposed||busy.value)return
-    const sequence=++request;loading.value=true
+    const sequence=++request;bodyRequest++;previewLease.close();content.value=null;loading.value=true
     try {
       if(!context?.competition.value)await context?.refresh()
       if(!initialized){if(staff.value)mode.value='Review';initialized=true}
@@ -131,7 +137,7 @@ export function useLiveSoloPostgameWriteUps() {
   function beforeUnload(event:BeforeUnloadEvent){if(dirty.value){event.preventDefault();event.returnValue=''}}
   onBeforeRouteLeave(to=>{if(allowLeave)return true;if(busy.value)return false;if(!dirty.value)return true;leaveTo=to.fullPath;leaveOpen.value=true;return false})
   onMounted(()=>{void load();window.addEventListener('beforeunload',beforeUnload)})
-  onScopeDispose(()=>{disposed=true;request++;bodyRequest++;window.removeEventListener('beforeunload',beforeUnload)})
+  onScopeDispose(()=>{disposed=true;request++;bodyRequest++;previewLease.close();window.removeEventListener('beforeunload',beforeUnload)})
   return {questionOptions,questionId,selectQuestion,mode,tab,staff,manager,loading,busy,error,listing,items,selected,select,root,version,stateKey,content,pdf,
     editor,official,format,chooseFormat,markdown,chooseFile,uploadKey,dirty,canSave,canSubmit,save,submit,reviewable,reviewOpen,setReview,reviewAction,reason,openReview,review,
     download,reload,back,leaveOpen,setLeave,leave,settingEnabled,enable}
