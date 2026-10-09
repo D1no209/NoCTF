@@ -16,6 +16,7 @@ namespace NoCTF.Infrastructure.LiveSolo.Media;
 public sealed partial class LiveKitMediaGateway(IHttpClientFactory clients, LiveKitMediaOptions options, TimeProvider clock) : ILiveSoloMediaGateway
 {
     public const string ClientName = "live-solo-livekit";
+    public const string EgressStartClientName="live-solo-livekit-start";
     private readonly SemaphoreSlim policyGate = new(1, 1);
     private DateTimeOffset policyVerifiedAt;
 

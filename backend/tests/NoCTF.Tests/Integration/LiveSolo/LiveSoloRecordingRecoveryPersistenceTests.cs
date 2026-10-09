@@ -84,6 +84,20 @@ public sealed class LiveSoloRecordingRecoveryPersistenceTests
     private static ChangeLiveSoloRecording Command(LiveSoloMatchPersistenceTests.Fixture f,LiveSoloRecording r,LiveSoloRecordingAction action)=>
         new(f.Competition.Id,f.Match.Id,r.Id,f.Owner.Id,r.ConcurrencyStamp,action,"reviewed capture recovery");
     [Test,Timeout(300_000)]
+    public async Task Startup_timeout_persists_uncertainty_and_reservation_without_reissuing_the_export(CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async()=>{
+            await using var f=await LiveSoloMatchPersistenceTests.Fixture.CreateAsync(ct);await f.PrepareAsync(ct);var record=await Record(f,ct);
+            record.State=LiveSoloRecordingState.Pending;record.Failure=null;await f.Db.SaveChangesAsync(ct);
+            var gateway=Substitute.For<ILiveSoloEgressGateway>();gateway.ListAsync(Arg.Any<string>(),ct).Returns([]);
+            gateway.StartAsync(Arg.Any<LiveSoloExportRequest>(),ct).Returns(Task.FromException<LiveSoloExportObservation>(new TaskCanceledException("provider start timeout")));
+            var store=Store(f,gateway);await store.AdvanceAsync(record.MediaSessionId,ct);await store.AdvanceAsync(record.MediaSessionId,ct);
+            await Assert.That(record.State).IsEqualTo(LiveSoloRecordingState.RequiresReview);await Assert.That(record.Failure).IsEqualTo(LiveSoloRecordingFailure.StartUncertain);
+            await Assert.That(record.ReservedBytes).IsEqualTo(32L*1024*1024);
+            await gateway.Received(1).StartAsync(Arg.Is<LiveSoloExportRequest>(x=>x!=null&&x.Id==record.Id),ct);
+        });
+    }
+    [Test,Timeout(300_000)]
     public async Task Archive_recovery_requires_a_complete_matching_job_and_capacity_then_preserves_the_original_job_identity(CancellationToken ct)
     {
         await DockerIntegrationTest.RunAsync(async () =>

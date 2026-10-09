@@ -31,7 +31,8 @@ public sealed class LiveKitEgressIntegrationTests
                 { var host = p.HostConfig ??= new(); host.CapAdd = ["SYS_ADMIN"]; host.Tmpfs = new Dictionary<string, string> { ["/out"] = "rw,size=256m,mode=1777" }; })
                 .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(8080)).Build();
             await egress.StartAsync(ct);
-            using var services = new ServiceCollection().AddHttpClient(LiveKitMediaGateway.ClientName).Services.BuildServiceProvider();
+            using var services = new ServiceCollection().AddHttpClient(LiveKitMediaGateway.ClientName).Services
+                .AddHttpClient(LiveKitMediaGateway.EgressStartClientName,client=>client.Timeout=TimeSpan.FromSeconds(30)).Services.BuildServiceProvider();
             var gateway = new LiveKitMediaGateway(services.GetRequiredService<IHttpClientFactory>(), new()
             {
                 Enabled = true, ApiKey = key, ApiSecret = secret, ApiUrl = new($"http://{server.Hostname}:{server.GetMappedPublicPort(7880)}"),

@@ -39,7 +39,8 @@ public sealed partial class LiveSoloCaptureStore
                 }, ct);
                 if (!claimed) continue;
                 try { current = await egress.StartAsync(new(program.Id, session.RoomIdentity, LiveSoloExportKind.Program), ct); }
-                catch (HttpRequestException) { program.State = LiveSoloCaptureState.RequiresReview; await db.SaveChangesAsync(ct); continue; }
+                catch(Exception ex) when(ex is HttpRequestException or TimeoutException || ex is TaskCanceledException&&!ct.IsCancellationRequested)
+                { program.State = LiveSoloCaptureState.RequiresReview; await db.SaveChangesAsync(ct); continue; }
             }
             if (current is null)
             {
@@ -119,7 +120,8 @@ public sealed partial class LiveSoloCaptureStore
                 }, ct);
                 if (!claimed) continue;
                 try { current = await egress.StartAsync(new(record.Id, session.RoomIdentity, LiveSoloExportKind.ScreenRecording, record.VideoTrackId), ct); }
-                catch (HttpRequestException) { await RecordingFailureAsync(session,record,LiveSoloRecordingState.RequiresReview,LiveSoloRecordingFailure.StartUncertain,ct);
+                catch(Exception ex) when(ex is HttpRequestException or TimeoutException || ex is TaskCanceledException&&!ct.IsCancellationRequested)
+                { await RecordingFailureAsync(session,record,LiveSoloRecordingState.RequiresReview,LiveSoloRecordingFailure.StartUncertain,ct);
                     await messages.FlushCommittedMessagesAsync();continue; }
             }
             if (current is null)

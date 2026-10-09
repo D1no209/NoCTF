@@ -15,7 +15,8 @@ public sealed partial class LiveKitMediaGateway : ILiveSoloEgressGateway
         using var message = new HttpRequestMessage(HttpMethod.Post, new Uri(options.ApiUrl!, "/twirp/livekit.Egress/" + operation));
         message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Token("noctf-egress", new(roomIdentity, RoomRecord: true), clock.GetUtcNow().AddMinutes(1)));
         message.Content = JsonContent.Create(request, requestType);
-        using var response = await clients.CreateClient(ClientName).SendAsync(message, HttpCompletionOption.ResponseHeadersRead, ct);
+        using var response = await clients.CreateClient(operation==LiveKitEgressOperation.StartEgress?EgressStartClientName:ClientName)
+            .SendAsync(message, HttpCompletionOption.ResponseHeadersRead, ct);
         if (!response.IsSuccessStatusCode) throw new HttpRequestException($"The media export service rejected {operation}: {response.StatusCode}.", null, response.StatusCode);
         return await response.Content.ReadFromJsonAsync(responseType, ct) ?? throw new InvalidDataException("Invalid media export response.");
     }

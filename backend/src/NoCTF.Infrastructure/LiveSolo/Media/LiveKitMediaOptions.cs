@@ -10,6 +10,7 @@ public sealed class LiveKitMediaOptions
     public string ApiSecret { get; set; } = "";
     public Uri? EgressHealthUrl { get; set; }
     public int RequestTimeoutSeconds { get; set; } = 10;
+    public int EgressStartTimeoutSeconds { get; set; } = 30;
     public int MaximumParticipants { get; set; } = 16;
     public string EgressOutputRoot { get; set; } = "/out";
     public string CaptureSpoolPath { get; set; } = "/out";
