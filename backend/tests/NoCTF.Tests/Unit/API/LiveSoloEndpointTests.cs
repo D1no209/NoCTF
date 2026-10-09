@@ -306,7 +306,7 @@ public sealed class LiveSoloEndpointTests
         var state = new LiveSoloProgramStateView(DateTimeOffset.UtcNow.AddMinutes(-1), LiveSoloMatchState.Running, 2, 0, 1,
             Guid.NewGuid(), Guid.NewGuid(), "left", "right", Guid.NewGuid(), 1, LiveSoloRoundState.Running, 2, 10000, 900, false, []);
         reader.ReadAsync(competition, match, Actor, Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(new LiveSoloProgramView(Guid.NewGuid(), 60, state,
-            [new(segment, 8, TimeSpan.FromSeconds(2), state)], false));
+            [new(segment, 8, TimeSpan.FromSeconds(2), state)], false,new(DateTimeOffset.UtcNow.AddMinutes(-1),DateTimeOffset.UtcNow.AddSeconds(-1),LiveSoloMatchState.Completed,2,1,state.LeftTeamId,"left")));
         await using var app = await HostAsync(Substitute.For<ILiveSoloMatchStore>(), Substitute.For<ILiveSoloAttachmentStore>(), Substitute.For<IStore>(), programs: reader, viewers: Viewer());
         using var client = app.GetTestClient();
         var path = $"/api/v1/competitions/{competition}/live-solo/matches/{match}/program";
@@ -324,6 +324,7 @@ public sealed class LiveSoloEndpointTests
         await Assert.That(json).DoesNotContain("token"); await Assert.That(json).DoesNotContain("roomIdentity");
         using var body = JsonDocument.Parse(json);
         await Assert.That(body.RootElement.GetProperty("segments")[0].GetProperty("state").GetProperty("rightWins").GetInt32()).IsEqualTo(1);
+        await Assert.That(body.RootElement.GetProperty("result").GetProperty("leftWins").GetInt32()).IsEqualTo(2);
         using var playlist = await client.GetAsync(path + "/playlist");
         await Assert.That(await playlist.Content.ReadAsStringAsync()).Contains("#EXT-X-MEDIA-SEQUENCE:8");
         await Assert.That(await playlist.Content.ReadAsStringAsync()).Contains("segments/" + segment);

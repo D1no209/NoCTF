@@ -1,16 +1,28 @@
 using NoCTF.Application.Messaging;
 using NoCTF.Infrastructure.Messaging;
+using NSubstitute;
 
 namespace NoCTF.Tests.Unit.Infrastructure;
 
 public sealed class ClusterScheduleTests
 {
     [Test]
+    public async Task LiveSolo_schedule_messages_have_explicit_typed_publication_routes()
+    {
+        var bus=NSubstitute.Substitute.For<Wolverine.IMessageBus>();var id=Guid.NewGuid();
+        object[] messages=[new NoCTF.Application.LiveSolo.Media.RefreshLiveSoloMedia(id,"room"),
+            new NoCTF.Application.LiveSolo.Media.AdvanceLiveSoloCapture(id),new NoCTF.Application.LiveSolo.Media.PruneLiveSoloCapture(id),
+            new NoCTF.Application.LiveSolo.Media.SnapshotLiveSoloResult(id)];
+        foreach(var message in messages)await MaintenanceTickAgent.PublishMessageAsync(bus,message);
+        await Assert.That(bus.ReceivedCalls().Count()).IsEqualTo(4);
+    }
+    [Test]
     public async Task LiveSolo_media_and_capture_ticks_keep_their_exact_scope_when_retimed()
     {
         var id=Guid.NewGuid();var now=DateTimeOffset.UtcNow;
         object[] messages=[new NoCTF.Application.LiveSolo.Media.RefreshLiveSoloMedia(id,"opaque-room"),
-            new NoCTF.Application.LiveSolo.Media.AdvanceLiveSoloCapture(id),new NoCTF.Application.LiveSolo.Media.PruneLiveSoloCapture(id)];
+            new NoCTF.Application.LiveSolo.Media.AdvanceLiveSoloCapture(id),new NoCTF.Application.LiveSolo.Media.PruneLiveSoloCapture(id),
+            new NoCTF.Application.LiveSolo.Media.SnapshotLiveSoloResult(id)];
         foreach(var message in messages)
         {
             var moved=new ClusterScheduleEntry("media",ClusterScheduleKind.LiveSoloCapture,now,TimeSpan.FromSeconds(2),message).At(now.AddSeconds(10));

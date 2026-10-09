@@ -296,7 +296,9 @@ public sealed class MaintenanceTickAgent(
         cancellationToken.ThrowIfCancellationRequested();
         await using var scope = scopeFactory.CreateAsyncScope();
         var bus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
-        await (message switch
+        await PublishMessageAsync(bus,message);
+    }
+    internal static ValueTask PublishMessageAsync(IMessageBus bus,object message)=>message switch
         {
             AdvanceAwdRound value => bus.PublishAsync(value),
             DispatchAwdCheckers value => bus.PublishAsync(value),
@@ -309,12 +311,12 @@ public sealed class MaintenanceTickAgent(
             NoCTF.Application.LiveSolo.Media.RefreshLiveSoloMedia value => bus.PublishAsync(value),
             NoCTF.Application.LiveSolo.Media.AdvanceLiveSoloCapture value => bus.PublishAsync(value),
             NoCTF.Application.LiveSolo.Media.PruneLiveSoloCapture value => bus.PublishAsync(value),
+            NoCTF.Application.LiveSolo.Media.SnapshotLiveSoloResult value => bus.PublishAsync(value),
             _ => throw new ArgumentOutOfRangeException(
                 nameof(message),
                 message.GetType().FullName,
                 "Unsupported cluster schedule message type.")
-        });
-    }
+        };
 
     private void AddFixedSchedules(DateTimeOffset now)
     {

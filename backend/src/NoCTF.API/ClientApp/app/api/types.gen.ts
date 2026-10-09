@@ -1086,6 +1086,7 @@ export type NoCtfapiEndpointsLiveSoloLiveSoloProgramResponse = {
     segments?: Array<NoCtfapiEndpointsLiveSoloLiveSoloProgramSegmentResponse>;
     ended?: boolean;
     playlistUrl?: string;
+    result?: NoCtfapiEndpointsLiveSoloLiveSoloDelayedResultResponse | null;
 };
 
 export type NoCtfapiEndpointsLiveSoloLiveSoloProgramSegmentResponse = {
@@ -1121,6 +1122,16 @@ export type NoCtfapiEndpointsLiveSoloLiveSoloProgramQuestionResponse = {
     position?: number;
     title?: string;
     openedAt?: string;
+};
+
+export type NoCtfapiEndpointsLiveSoloLiveSoloDelayedResultResponse = {
+    asOf?: string;
+    publicAt?: string;
+    state?: NoCtfDomainLiveSoloLiveSoloMatchState;
+    leftWins?: number;
+    rightWins?: number;
+    winnerTeamId?: string | null;
+    winnerTeamName?: string | null;
 };
 
 export type NoCtfapiEndpointsLiveSoloGetLiveSoloProgramRequest = {

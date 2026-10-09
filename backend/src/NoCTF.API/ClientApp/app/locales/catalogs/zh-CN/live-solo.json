@@ -1,4 +1,10 @@
 {
+  "liveSolo.program.voided": "对局已作废",
+  "liveSolo.program.noWinner": "无胜者",
+  "liveSolo.program.resultAsOf": "结果快照截至 {time}。视频比分仍对应各自片段。",
+  "liveSolo.program.resultTitle": "延迟对局结算",
+  "liveSolo.program.videoWindowEnded": "本场直播视频窗口已结束。",
+  "liveSolo.program.winner": "胜者：{team}",
   "liveSolo.programControl.active": "输出中",
   "liveSolo.programControl.completed": "已完成",
   "liveSolo.programControl.failed": "失败",

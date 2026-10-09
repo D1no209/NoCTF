@@ -1,4 +1,10 @@
 {
+  "liveSolo.program.voided": "Match voided",
+  "liveSolo.program.noWinner": "No winner",
+  "liveSolo.program.resultAsOf": "Result snapshot as of {time}. The video score stays bound to its own fragment.",
+  "liveSolo.program.resultTitle": "Delayed match result",
+  "liveSolo.program.videoWindowEnded": "The live video window has ended.",
+  "liveSolo.program.winner": "Winner: {team}",
   "liveSolo.programControl.active": "Producing video",
   "liveSolo.programControl.completed": "Completed",
   "liveSolo.programControl.failed": "Failed",

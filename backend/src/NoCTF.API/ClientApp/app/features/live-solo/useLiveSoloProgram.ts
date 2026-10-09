@@ -16,7 +16,9 @@ export function useLiveSoloProgram() {
   const admitted = ref(false), entering = ref(false)
   const publishedStates = ref<ReadonlyMap<string, NonNullable<NonNullable<Program['segments']>[number]['state']>>>(new Map())
   const state = computed(() => playingId.value ? publishedStates.value.get(playingId.value) ?? null : null)
-  const source = computed(() => program.value?.programCaptureId ? program.value.playlistUrl ?? null : null)
+  const source = computed(() => (program.value?.segments?.length ?? 0) > 0 ? program.value?.playlistUrl ?? null : null)
+  const result = computed(() => program.value?.result ?? null)
+  const resultVoided = computed(() => result.value?.state === 'Canceled')
   const stateKey = computed(() => matchStateKey(state.value?.matchState))
   const clock = computed(() => formatRoundClock(state.value?.limitSeconds == null ? null
     : Math.max(0, Math.ceil((state.value.limitSeconds * 1000 - (state.value.activeElapsedMilliseconds ?? 0)) / 1000))))
@@ -94,6 +96,6 @@ export function useLiveSoloProgram() {
   })
   onMounted(() => { void tick() })
   onScopeDispose(() => { disposed = true; lease.dispose(); request++; if (timer) clearTimeout(timer) })
-  return { program, playingId, state, source, stateKey, clock, loading, error, load, fragment, failed, requestHeaders, admitted, entering, enter, leave }
+  return { program, playingId, state, source, result, resultVoided, stateKey, clock, loading, error, load, fragment, failed, requestHeaders, admitted, entering, enter, leave }
 }
 export type LiveSoloProgramViewState = import('vue').ShallowUnwrapRef<ReturnType<typeof useLiveSoloProgram>>

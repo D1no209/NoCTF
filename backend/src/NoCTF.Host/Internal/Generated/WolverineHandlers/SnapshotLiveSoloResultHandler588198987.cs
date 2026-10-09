@@ -4,16 +4,15 @@ using FluentStorage.Storage;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using NoCTF.Application.LiveSolo.Media;
-using NoCTF.Application.LiveSolo.Realtime;
 using NoCTF.Application.Notifications;
 using NoCTF.Infrastructure.LiveSolo.Media;
 using System;
 
 namespace Internal.Generated.WolverineHandlers
 {
-    // START: LiveSoloMatchChangedHandler719035674
+    // START: SnapshotLiveSoloResultHandler588198987
     [global::System.CodeDom.Compiler.GeneratedCode("JasperFx", "1.0.0")]
-    public sealed class LiveSoloMatchChangedHandler719035674 : Wolverine.Runtime.Handlers.MessageHandler
+    public sealed class SnapshotLiveSoloResultHandler588198987 : Wolverine.Runtime.Handlers.MessageHandler
     {
         private readonly FluentStorage.Storage.IStore _store1;
         private readonly FluentStorage.Storage.IStore _store2;
@@ -22,14 +21,13 @@ namespace Internal.Generated.WolverineHandlers
         private readonly Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> _loggerOfNoCtfDbContext;
         private readonly Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Storage.ManagedFileUploadRegistry> _loggerOfManagedFileUploadRegistry;
         private readonly NoCTF.Application.LiveSolo.Media.ILiveSoloEgressGateway _liveSoloEgressGateway;
-        private readonly NoCTF.Application.LiveSolo.Realtime.ILiveSoloRealtimePublisher _liveSoloRealtimePublisher;
         private readonly NoCTF.Application.Notifications.INotificationChangePublisher _notificationChangePublisher;
         private readonly NoCTF.Infrastructure.LiveSolo.Media.LiveKitMediaOptions _liveKitMediaOptions1;
         private readonly NoCTF.Infrastructure.LiveSolo.Media.LiveKitMediaOptions _liveKitMediaOptions2;
         private readonly System.TimeProvider _timeProvider1;
         private readonly System.TimeProvider _timeProvider2;
 
-        public LiveSoloMatchChangedHandler719035674(FluentStorage.Storage.IStore __store1, FluentStorage.Storage.IStore __store2, Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Storage.ManagedFileUploadRegistry> loggerOfManagedFileUploadRegistry, NoCTF.Application.LiveSolo.Media.ILiveSoloEgressGateway liveSoloEgressGateway, NoCTF.Application.LiveSolo.Realtime.ILiveSoloRealtimePublisher liveSoloRealtimePublisher, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.Infrastructure.LiveSolo.Media.LiveKitMediaOptions __liveKitMediaOptions1, NoCTF.Infrastructure.LiveSolo.Media.LiveKitMediaOptions __liveKitMediaOptions2, System.TimeProvider __timeProvider1, System.TimeProvider __timeProvider2)
+        public SnapshotLiveSoloResultHandler588198987(FluentStorage.Storage.IStore __store1, FluentStorage.Storage.IStore __store2, Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Storage.ManagedFileUploadRegistry> loggerOfManagedFileUploadRegistry, NoCTF.Application.LiveSolo.Media.ILiveSoloEgressGateway liveSoloEgressGateway, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.Infrastructure.LiveSolo.Media.LiveKitMediaOptions __liveKitMediaOptions1, NoCTF.Infrastructure.LiveSolo.Media.LiveKitMediaOptions __liveKitMediaOptions2, System.TimeProvider __timeProvider1, System.TimeProvider __timeProvider2)
         {
             _store1 = __store1;
             _store2 = __store2;
@@ -38,7 +36,6 @@ namespace Internal.Generated.WolverineHandlers
             _loggerOfNoCtfDbContext = loggerOfNoCtfDbContext;
             _loggerOfManagedFileUploadRegistry = loggerOfManagedFileUploadRegistry;
             _liveSoloEgressGateway = liveSoloEgressGateway;
-            _liveSoloRealtimePublisher = liveSoloRealtimePublisher;
             _notificationChangePublisher = notificationChangePublisher;
             _liveKitMediaOptions1 = __liveKitMediaOptions1;
             _liveKitMediaOptions2 = __liveKitMediaOptions2;
@@ -59,20 +56,20 @@ namespace Internal.Generated.WolverineHandlers
             var liveSoloCaptureFiles = new NoCTF.Infrastructure.LiveSolo.Media.LiveSoloCaptureFiles(_liveKitMediaOptions1);
             var liveSoloCaptureStore = new NoCTF.Infrastructure.LiveSolo.Media.LiveSoloCaptureStore(noCtfDbContext, _liveSoloEgressGateway, liveSoloCaptureFiles, managedFileUploads, _liveKitMediaOptions2, _timeProvider2, wolverinePostCommitMessagePublisher, _store2, competitionModerationAuthorizer);
             // The actual message body
-            var liveSoloMatchChanged = (NoCTF.Application.LiveSolo.Realtime.LiveSoloMatchChanged)context.Envelope.Message;
+            var snapshotLiveSoloResult = (NoCTF.Application.LiveSolo.Media.SnapshotLiveSoloResult)context.Envelope.Message;
 
-            System.Diagnostics.Activity.Current?.SetTag("message.handler", "NoCTF.Worker.LiveSolo.LiveSoloRealtimeMessageHandler");
-            System.Diagnostics.Activity.Current?.SetTag("handler.type", "NoCTF.Worker.LiveSolo.LiveSoloRealtimeMessageHandler");
-            var liveSoloRealtimeMessageHandler = new NoCTF.Worker.LiveSolo.LiveSoloRealtimeMessageHandler(_liveSoloRealtimePublisher, liveSoloCaptureStore);
+            System.Diagnostics.Activity.Current?.SetTag("message.handler", "NoCTF.Worker.LiveSolo.LiveSoloCaptureMessageHandler");
+            System.Diagnostics.Activity.Current?.SetTag("handler.type", "NoCTF.Worker.LiveSolo.LiveSoloCaptureMessageHandler");
+            var liveSoloCaptureMessageHandler = new NoCTF.Worker.LiveSolo.LiveSoloCaptureMessageHandler(liveSoloCaptureStore);
             
             // The actual message execution
-            await liveSoloRealtimeMessageHandler.Handle(liveSoloMatchChanged, cancellation).ConfigureAwait(false);
+            await liveSoloCaptureMessageHandler.Handle(snapshotLiveSoloResult, cancellation).ConfigureAwait(false);
 
         }
 
     }
 
-    // END: LiveSoloMatchChangedHandler719035674
+    // END: SnapshotLiveSoloResultHandler588198987
     
     
 }

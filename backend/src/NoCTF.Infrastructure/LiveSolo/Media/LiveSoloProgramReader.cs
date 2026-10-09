@@ -23,10 +23,23 @@ public sealed class LiveSoloProgramReader(NoCtfDbContext db, ICompetitionModerat
         if (!await AllowedAsync(competitionId, matchId, actorId, leaseId, ct)) return null;
         await MarkExposureAsync(competitionId, ct);
         var now = clock.GetUtcNow();
+        var terminal=await db.LiveSoloProgramFrames.AsNoTracking().Include(x=>x.Questions).Where(x=>x.Kind==LiveSoloProgramFrameKind.DelayedResult
+            &&x.PublicAt!=null&&x.PublicAt<=now&&db.LiveSoloMediaSessions.Any(s=>s.Id==x.MediaSessionId&&s.MatchId==matchId))
+            .OrderByDescending(x=>x.OccurredAt).FirstOrDefaultAsync(ct);
+        var result=terminal is null?null:new LiveSoloDelayedResultView(terminal.OccurredAt,terminal.PublicAt!.Value,terminal.MatchState,terminal.LeftWins,terminal.RightWins,
+            terminal.MatchState==LiveSoloMatchState.Completed?terminal.WinnerTeamId:null,
+            terminal.MatchState!=LiveSoloMatchState.Completed?null:terminal.WinnerTeamId==terminal.LeftTeamId?terminal.LeftTeamName:terminal.WinnerTeamId==terminal.RightTeamId?terminal.RightTeamName:null);
         var latest = await db.LiveSoloProgramSegments.AsNoTracking().Where(x => x.PublicAt <= now && x.RemoveAfter > now
             && db.LiveSoloMediaSessions.Any(s => s.Id == x.MediaSessionId && s.MatchId == matchId))
             .OrderByDescending(x => x.EndedAt).ThenByDescending(x => x.Sequence).FirstOrDefaultAsync(ct);
-        if (latest is null) return null;
+        if (latest is null)
+        {
+            if(terminal is null)return null;
+            var endedSession=await db.LiveSoloMediaSessions.AsNoTracking().SingleAsync(x=>x.Id==terminal.MediaSessionId,ct);
+            var endedCapture=await db.LiveSoloProgramCaptures.AsNoTracking().Where(x=>x.MediaSessionId==endedSession.Id&&x.NextSegmentSequence>0)
+                .OrderByDescending(x=>x.CreatedAt).Select(x=>x.Id).FirstAsync(ct);
+            return new(endedCapture,endedSession.PublicDelaySeconds,State(terminal),[],true,result);
+        }
         var session = await db.LiveSoloMediaSessions.AsNoTracking().SingleAsync(x => x.Id == latest.MediaSessionId, ct);
         var segments = await db.LiveSoloProgramSegments.AsNoTracking().Where(x => x.ProgramCaptureId == latest.ProgramCaptureId
             && x.PublicAt <= now && x.RemoveAfter > now).OrderBy(x => x.Sequence)
@@ -36,7 +49,7 @@ public sealed class LiveSoloProgramReader(NoCtfDbContext db, ICompetitionModerat
         var frame = frames[latest.FrameId];
         var capture = await db.LiveSoloProgramCaptures.AsNoTracking().SingleAsync(x => x.Id == latest.ProgramCaptureId, ct);
         return new(capture.Id, session.PublicDelaySeconds, State(frame),
-            segments.Select(x => new LiveSoloProgramSegmentView(x.Id, x.Sequence, x.EndedAt - x.StartedAt, State(frames[x.FrameId]))).ToArray(), capture.State == LiveSoloCaptureState.Completed);
+            segments.Select(x => new LiveSoloProgramSegmentView(x.Id, x.Sequence, x.EndedAt - x.StartedAt, State(frames[x.FrameId]))).ToArray(), capture.State == LiveSoloCaptureState.Completed,result);
     }
     private static LiveSoloProgramStateView State(LiveSoloProgramFrame frame) => new(frame.OccurredAt, frame.MatchState, frame.RequiredWins, frame.LeftWins, frame.RightWins,
             frame.LeftTeamId, frame.RightTeamId, frame.LeftTeamName, frame.RightTeamName, frame.RoundId, frame.RoundNumber, frame.RoundState,

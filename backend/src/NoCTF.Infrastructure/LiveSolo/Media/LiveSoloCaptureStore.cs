@@ -60,11 +60,13 @@ public sealed partial class LiveSoloCaptureStore(NoCtfDbContext db, ILiveSoloEgr
             await FrameAsync(session, ct);
         }, ct);
     }
-    private async Task FrameAsync(LiveSoloMediaSession session, CancellationToken ct)
+    private async Task FrameAsync(LiveSoloMediaSession session, CancellationToken ct,LiveSoloProgramFrameKind kind=LiveSoloProgramFrameKind.VideoObservation)
     {
         var at = clock.GetUtcNow();
-        if (await db.LiveSoloProgramFrames.AnyAsync(x => x.MediaSessionId == session.Id && x.OccurredAt == at, ct)) return;
+        if (await db.LiveSoloProgramFrames.AnyAsync(x => x.MediaSessionId == session.Id && x.Kind==kind && x.OccurredAt == at, ct)) return;
         var match = await db.LiveSoloMatches.AsNoTracking().Include(x => x.Slots).SingleAsync(x => x.Id == session.MatchId, ct);
+        if(kind==LiveSoloProgramFrameKind.DelayedResult && (match.State is not (LiveSoloMatchState.Completed or LiveSoloMatchState.Canceled)
+            || await db.LiveSoloProgramFrames.AnyAsync(x=>x.MediaSessionId==session.Id&&x.Kind==kind&&x.MatchRevision==match.ConcurrencyStamp,ct)))return;
         var round = match.CurrentRoundId is Guid roundId ? await db.LiveSoloRounds.AsNoTracking().Include(x => x.Pauses).SingleOrDefaultAsync(x => x.Id == roundId, ct) : null;
         var teams = match.Slots.Where(x => x.TeamId != null).Select(x => x.TeamId!.Value).ToArray();
         var names = await db.Teams.IgnoreQueryFilters().Where(x => teams.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, ct);
@@ -77,6 +79,8 @@ public sealed partial class LiveSoloCaptureStore(NoCtfDbContext db, ILiveSoloEgr
         var left = match.Slots.Single(x => x.Side == LiveSoloSide.Left).TeamId;
         var right = match.Slots.Single(x => x.Side == LiveSoloSide.Right).TeamId;
         var frame = new LiveSoloProgramFrame { Id = Guid.CreateVersion7(at), MediaSessionId = session.Id, OccurredAt = at,
+            Kind=kind,MatchRevision=kind==LiveSoloProgramFrameKind.DelayedResult?match.ConcurrencyStamp:null,
+            PublicAt=kind==LiveSoloProgramFrameKind.DelayedResult?at.AddSeconds(session.PublicDelaySeconds):null,WinnerTeamId=match.WinnerTeamId,
             MatchState = match.State, RequiredWins = match.RequiredWins, LeftWins = match.LeftWins, RightWins = match.RightWins,
             LeftTeamId = left, RightTeamId = right, LeftTeamName = left is Guid l ? names.GetValueOrDefault(l) : null,
             RightTeamName = right is Guid r ? names.GetValueOrDefault(r) : null, RoundId = round?.Id, RoundNumber = round?.Number,

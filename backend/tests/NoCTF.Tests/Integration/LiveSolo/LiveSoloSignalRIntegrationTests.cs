@@ -59,7 +59,7 @@ public sealed class LiveSoloSignalRIntegrationTests
             await Send(socket, JsonSerializer.Serialize(new { type = 1, invocationId = "join", target = "JoinMatch", arguments = new object[] { competition, match, 0 } }), ct);
             using var joined = await Receive(socket, ct); await Assert.That(joined.RootElement.GetProperty("type").GetInt32()).IsEqualTo(3);
             await Assert.That(joined.RootElement.TryGetProperty("error", out _)).IsFalse();
-            var publisher = new LiveSoloRealtimeMessageHandler(new NatsLiveSoloRealtimePublisher(connection));
+            var publisher = new LiveSoloRealtimeMessageHandler(new NatsLiveSoloRealtimePublisher(connection),NSubstitute.Substitute.For<NoCTF.Application.LiveSolo.Media.ILiveSoloCaptureStore>());
             await publisher.Handle(new(competition, match, DateTimeOffset.UtcNow), ct);
             using var pushed = await Receive(socket, ct); var root = pushed.RootElement;
             await Assert.That(root.GetProperty("target").GetString()).IsEqualTo("MatchChanged");

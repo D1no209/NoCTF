@@ -28202,6 +28202,14 @@
           },
           "playlistUrl": {
             "type": "string"
+          },
+          "result": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloDelayedResultResponse"
+              }
+            ]
           }
         }
       },
@@ -28332,6 +28340,40 @@
           "openedAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloDelayedResultResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "asOf": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "publicAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "state": {
+            "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloMatchState"
+          },
+          "leftWins": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rightWins": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "winnerTeamId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "winnerTeamName": {
+            "type": "string",
+            "nullable": true
           }
         }
       },

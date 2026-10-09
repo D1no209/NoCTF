@@ -30,6 +30,11 @@ public sealed class LiveSoloCaptureScheduleSource(NoCtfDbContext db) : IClusterS
         return ids.Select(id => new ClusterScheduleEntry($"live-solo-capture:{id:N}", ClusterScheduleKind.LiveSoloCapture, now,
             TimeSpan.FromSeconds(2), new AdvanceLiveSoloCapture(id)))
             .Concat(pruning.Select(id => new ClusterScheduleEntry($"live-solo-capture-prune:{id:N}", ClusterScheduleKind.LiveSoloCapture, now,
-                TimeSpan.FromMinutes(1), new PruneLiveSoloCapture(id)))).ToArray();
+                TimeSpan.FromMinutes(1), new PruneLiveSoloCapture(id))))
+            .Concat((await db.LiveSoloMatches.AsNoTracking().Where(m=>(m.State==LiveSoloMatchState.Completed||m.State==LiveSoloMatchState.Canceled)
+                &&db.LiveSoloMediaSessions.Any(s=>s.MatchId==m.Id&&db.LiveSoloProgramCaptures.Any(video=>video.MediaSessionId==s.Id&&video.NextSegmentSequence>0)
+                    &&!db.LiveSoloProgramFrames.Any(f=>f.MediaSessionId==s.Id&&f.Kind==LiveSoloProgramFrameKind.DelayedResult&&f.MatchRevision==m.ConcurrencyStamp)))
+                .Select(x=>x.Id).ToArrayAsync(ct)).Select(id=>new ClusterScheduleEntry($"live-solo-result:{id:N}",ClusterScheduleKind.LiveSoloCapture,now,
+                    TimeSpan.FromSeconds(5),new SnapshotLiveSoloResult(id)))).ToArray();
     }
 }

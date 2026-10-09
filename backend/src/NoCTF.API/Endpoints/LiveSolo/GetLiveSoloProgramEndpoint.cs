@@ -22,7 +22,10 @@ public sealed record LiveSoloProgramStateResponse(DateTimeOffset AsOf,
         state.TimelineRevision, state.ActiveElapsedMilliseconds, state.LimitSeconds, state.Paused, state.Questions.Select(x => new LiveSoloProgramQuestionResponse(x.Id, x.CompetitionChallengeId, x.Position, x.Title, x.OpenedAt)).ToArray());
 }
 public sealed record LiveSoloProgramSegmentResponse(Guid Id, long Sequence, double DurationSeconds, LiveSoloProgramStateResponse State);
-public sealed record LiveSoloProgramResponse(Guid ProgramCaptureId, int DelaySeconds, IReadOnlyList<LiveSoloProgramSegmentResponse> Segments, bool Ended, string PlaylistUrl);
+public sealed record LiveSoloDelayedResultResponse(DateTimeOffset AsOf,DateTimeOffset PublicAt,
+    [property:JsonConverter(typeof(StrictPascalCaseEnumConverter<LiveSoloMatchState>))]LiveSoloMatchState State,int LeftWins,int RightWins,Guid? WinnerTeamId,string? WinnerTeamName);
+public sealed record LiveSoloProgramResponse(Guid ProgramCaptureId, int DelaySeconds, IReadOnlyList<LiveSoloProgramSegmentResponse> Segments, bool Ended, string PlaylistUrl,
+    LiveSoloDelayedResultResponse? Result=null);
 public sealed class GetLiveSoloProgramEndpoint(ILiveSoloProgramReader programs, IUserContext user, LiveSoloViewerBrowserAccess browser)
     : Endpoint<GetLiveSoloProgramRequest, Results<Ok<LiveSoloProgramResponse>, NotFound>>
 {
@@ -38,6 +41,7 @@ public sealed class GetLiveSoloProgramEndpoint(ILiveSoloProgramReader programs, 
         var program = await programs.ReadAsync(req.CompetitionId, req.MatchId, user.UserId, browser.LeaseId(HttpContext, req.CompetitionId, req.MatchId), ct);
         return program is null ? TypedResults.NotFound() : TypedResults.Ok(new LiveSoloProgramResponse(program.ProgramCaptureId, program.DelaySeconds,
             program.Segments.Select(x => new LiveSoloProgramSegmentResponse(x.Id, x.Sequence, x.Duration.TotalSeconds, LiveSoloProgramStateResponse.From(x.State))).ToArray(), program.Ended,
-            $"/api/v1/competitions/{req.CompetitionId:D}/live-solo/matches/{req.MatchId:D}/program/playlist"));
+            $"/api/v1/competitions/{req.CompetitionId:D}/live-solo/matches/{req.MatchId:D}/program/playlist",
+            program.Result is { } result?new LiveSoloDelayedResultResponse(result.AsOf,result.PublicAt,result.State,result.LeftWins,result.RightWins,result.WinnerTeamId,result.WinnerTeamName):null));
     }
 }

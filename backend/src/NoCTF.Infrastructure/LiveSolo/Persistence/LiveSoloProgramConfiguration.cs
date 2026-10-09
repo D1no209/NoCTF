@@ -20,7 +20,8 @@ internal sealed class LiveSoloProgramFrameConfiguration : IEntityTypeConfigurati
     {
         builder.ToTable("live_solo_program_frames"); builder.HasKey(x => x.Id);
         builder.HasAlternateKey(x => new { x.Id, x.MediaSessionId });
-        builder.HasIndex(x => new { x.MediaSessionId, x.OccurredAt }).IsUnique();
+        builder.HasIndex(x => new { x.MediaSessionId, x.Kind, x.OccurredAt }).IsUnique();
+        builder.HasIndex(x => new { x.MediaSessionId, x.Kind, x.MatchRevision }).IsUnique();
         builder.HasOne<LiveSoloMediaSession>().WithMany().HasForeignKey(x => x.MediaSessionId).OnDelete(DeleteBehavior.Restrict);
         builder.HasMany(x => x.Questions).WithOne().HasForeignKey(x => x.FrameId).OnDelete(DeleteBehavior.Cascade);
     }

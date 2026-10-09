@@ -25,12 +25,17 @@ public sealed class LiveSoloProgramCapture : IConcurrencyTracked
     public DateTimeOffset? RawCleanupAuthorizedAt { get; set; }
 }
 
+public enum LiveSoloProgramFrameKind:short { VideoObservation, DelayedResult }
 /// <summary>Immutable state at a server observation time, never a projection of future current state.</summary>
 public sealed class LiveSoloProgramFrame
 {
     public Guid Id { get; set; }
     public Guid MediaSessionId { get; set; }
     public DateTimeOffset OccurredAt { get; set; }
+    public LiveSoloProgramFrameKind Kind { get; set; }
+    public Guid? MatchRevision { get; set; }
+    public DateTimeOffset? PublicAt { get; set; }
+    public Guid? WinnerTeamId { get; set; }
     public LiveSoloMatchState MatchState { get; set; }
     public int RequiredWins { get; set; }
     public int LeftWins { get; set; }

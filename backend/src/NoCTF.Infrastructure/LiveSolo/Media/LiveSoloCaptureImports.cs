@@ -21,7 +21,7 @@ public sealed partial class LiveSoloCaptureStore
             if(item.Sequence!=program.NextSegmentSequence)throw new InvalidDataException("Media export has a missing segment.");
             cursor=program.ImportedThrough??started;
             var from = cursor; cursor += item.Duration;
-            var frame = await db.LiveSoloProgramFrames.AsNoTracking().Where(x => x.MediaSessionId == session.Id && x.OccurredAt <= cursor)
+            var frame = await db.LiveSoloProgramFrames.AsNoTracking().Where(x => x.MediaSessionId == session.Id && x.Kind==LiveSoloProgramFrameKind.VideoObservation && x.OccurredAt <= cursor)
                 .OrderByDescending(x => x.OccurredAt).Select(x => (Guid?)x.Id).FirstOrDefaultAsync(ct);
             if (frame is null) return false;
             await using var content = await files.OpenAsync(program.Id, item.FileName, ct);

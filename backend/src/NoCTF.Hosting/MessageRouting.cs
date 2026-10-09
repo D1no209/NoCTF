@@ -26,6 +26,7 @@ public static class MessageRouting
         Route<NoCTF.Application.LiveSolo.Media.LiveSoloMediaAlertCreated>(options, WorkerQueue.Control);
         Route<NoCTF.Application.LiveSolo.Media.RefreshLiveSoloMedia>(options, WorkerQueue.Control);
         Route<NoCTF.Application.LiveSolo.Media.AdvanceLiveSoloCapture>(options, WorkerQueue.Control);
+        Route<NoCTF.Application.LiveSolo.Media.SnapshotLiveSoloResult>(options, WorkerQueue.Control);
         Route<NoCTF.Application.LiveSolo.Media.PruneLiveSoloCapture>(options, WorkerQueue.Control);
         Route<NoCTF.Application.LiveSolo.Media.RemoveLiveSoloCaptureFiles>(options, WorkerQueue.Control);
         Route<NoCTF.Application.LiveSolo.Media.RemoveLiveSoloRecordingRaw>(options, WorkerQueue.Control);

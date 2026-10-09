@@ -195,6 +195,7 @@ internal static class ClusterScheduleMessageClock
         NoCTF.Application.LiveSolo.Media.RefreshLiveSoloMedia value => value,
         NoCTF.Application.LiveSolo.Media.AdvanceLiveSoloCapture value => value,
         NoCTF.Application.LiveSolo.Media.PruneLiveSoloCapture value => value,
+        NoCTF.Application.LiveSolo.Media.SnapshotLiveSoloResult value => value,
         _ => throw new ArgumentOutOfRangeException(
             nameof(message),
             message.GetType().FullName,

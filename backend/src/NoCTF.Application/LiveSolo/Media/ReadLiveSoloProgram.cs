@@ -9,7 +9,9 @@ public sealed record LiveSoloProgramStateView(DateTimeOffset AsOf, LiveSoloMatch
     int? LimitSeconds, bool Paused, IReadOnlyList<LiveSoloProgramQuestionView> Questions);
 public sealed record LiveSoloProgramSegmentView(Guid Id, long Sequence, TimeSpan Duration, LiveSoloProgramStateView State);
 public sealed record LiveSoloProgramView(Guid ProgramCaptureId, int DelaySeconds, LiveSoloProgramStateView State,
-    IReadOnlyList<LiveSoloProgramSegmentView> Segments, bool Ended);
+    IReadOnlyList<LiveSoloProgramSegmentView> Segments, bool Ended,LiveSoloDelayedResultView? Result=null);
+public sealed record LiveSoloDelayedResultView(DateTimeOffset AsOf,DateTimeOffset PublicAt,LiveSoloMatchState State,int LeftWins,int RightWins,
+    Guid? WinnerTeamId,string? WinnerTeamName);
 public sealed record LiveSoloProgramContent(Stream Content, string ContentType);
 public interface ILiveSoloProgramReader
 {
