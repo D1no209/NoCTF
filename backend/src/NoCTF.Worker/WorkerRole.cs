@@ -42,6 +42,7 @@ public static class WorkerRole
         services.AddTransient<Authentication.MfaAuthenticationChangedHandler>();
         services.AddTransient<GameplayFactMessageHandler>();
         services.AddTransient<LiveSolo.LiveSoloRoundMessageHandler>();
+        services.AddTransient<LiveSolo.LiveSoloMediaMessageHandler>();
         services.AddTransient<LeaderboardMessageHandler>();
         services.AddTransient<FileCleanupMessageHandler>();
         services.AddTransient<Competitions.CompetitionDeletionMessageHandler>();
@@ -113,6 +114,7 @@ public static class WorkerRole
         options.Discovery.IncludeType(typeof(AccountNotificationMessageHandler));
         options.Discovery.IncludeType(typeof(GameplayFactMessageHandler));
         options.Discovery.IncludeType(typeof(LiveSolo.LiveSoloRoundMessageHandler));
+        options.Discovery.IncludeType(typeof(LiveSolo.LiveSoloMediaMessageHandler));
         options.Discovery.IncludeType(typeof(LeaderboardMessageHandler));
         options.Discovery.IncludeType(typeof(CompetitionWebhookMessageHandler));
         options.Discovery.IncludeType(typeof(Competitions.StaffWebhooks.StaffWebhookMessageHandler));

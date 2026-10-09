@@ -15,12 +15,13 @@ using NoCTF.Application.LiveSolo.Templates;
 using NoCTF.Infrastructure.LiveSolo.Templates;
 using NoCTF.Application.Challenges.Configuration;
 using NoCTF.Application.LiveSolo.Brackets;
+using Microsoft.Extensions.Configuration;
 
 namespace NoCTF.Infrastructure.LiveSolo;
 
 public static class LiveSoloInfrastructure
 {
-    public static IServiceCollection AddNoCtfLiveSolo(this IServiceCollection services)
+    public static IServiceCollection AddNoCtfLiveSolo(this IServiceCollection services, IConfiguration? configuration = null)
     {
         services.AddScoped<ILiveSoloMatchStore, LiveSoloMatchStore>();
         services.AddScoped<ILiveSoloBracketStore, LiveSoloMatchStore>();
@@ -39,8 +40,21 @@ public static class LiveSoloInfrastructure
         services.AddScoped<AccessLiveSoloAttachments>();
         services.AddScoped<ILiveSoloRuntimeStore, LiveSoloRuntimeStore>();
         services.AddScoped<ManageLiveSoloRuntimes>();
+        services.AddScoped<ILiveSoloMediaStore, LiveSoloMediaStore>();
+        services.AddScoped<ManageLiveSoloMedia>();
+        services.AddScoped<IClusterScheduleContributor, LiveSoloMediaScheduleSource>();
         services.AddScoped<IClusterScheduleContributor, LiveSoloScheduleSource>();
-        services.TryAddSingleton<ILiveSoloMediaGateway, UnconfiguredLiveSoloMediaGateway>();
+        var media = configuration?.GetSection(LiveKitMediaOptions.Section).Get<LiveKitMediaOptions>() ?? new();
+        if (media.Enabled && (media.ApiUrl?.Scheme is not ("http" or "https") || media.ClientUrl?.Scheme is not ("ws" or "wss")
+            || media.ClientUrl.Scheme == "ws" && !media.ClientUrl.IsLoopback || string.IsNullOrWhiteSpace(media.ApiKey)
+            || System.Text.Encoding.UTF8.GetByteCount(media.ApiSecret) < 32 || media.RequestTimeoutSeconds is < 1 or > 60
+            || media.MaximumParticipants is < 4 or > 64))
+            throw new InvalidOperationException("LiveSolo media configuration is invalid.");
+        services.AddSingleton(media);
+        services.AddHttpClient(LiveKitMediaGateway.ClientName, client => client.Timeout = TimeSpan.FromSeconds(media.RequestTimeoutSeconds))
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
+        if (media.Enabled) services.AddSingleton<ILiveSoloMediaGateway, LiveKitMediaGateway>();
+        else services.TryAddSingleton<ILiveSoloMediaGateway, UnconfiguredLiveSoloMediaGateway>();
         return services;
     }
 }

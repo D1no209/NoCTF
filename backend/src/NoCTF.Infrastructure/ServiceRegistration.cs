@@ -53,7 +53,7 @@ public static class ServiceRegistration
         services.AddNoCtfChallenges();
         services.AddNoCtfStorage(configuration);
         services.AddNoCtfCompetitions(configuration, development || exporting);
-        services.AddNoCtfLiveSolo();
+        services.AddNoCtfLiveSolo(configuration);
         services.AddNoCtfAuthentication(configuration, development);
         services.AddNoCtfAdministration(configuration, exporting, development);
         services.AddNoCtfSynchronousArchives(configuration);

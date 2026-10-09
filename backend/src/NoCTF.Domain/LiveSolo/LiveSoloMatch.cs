@@ -22,6 +22,7 @@ public sealed class LiveSoloMatch : IConcurrencyTracked
     public int RightWins { get; set; }
     public Guid? WinnerTeamId { get; set; }
     public Guid? CurrentRoundId { get; set; }
+    public Guid? CurrentMediaSessionId { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? StartedAt { get; set; }
     public DateTimeOffset? CompletedAt { get; set; }

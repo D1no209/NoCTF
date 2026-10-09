@@ -755,6 +755,9 @@ GET /api/v1/competitions/{competitionId}/live-solo/configuration
 GET /api/v1/competitions/{competitionId}/live-solo/matches
 POST /api/v1/competitions/{competitionId}/live-solo/matches
 GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/media
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/media
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/media/token
 GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/adjudications
 POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/adjudications
 POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/roster

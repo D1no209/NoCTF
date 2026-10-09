@@ -3035,6 +3035,146 @@
         ]
       }
     },
+    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/media": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Reads the current private media generation and roster sharing state.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/media.",
+        "operationId": "GetLiveSoloMedia",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloMediaResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Prepares an opaque room after roster lock without granting business access.",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/media.",
+        "operationId": "PrepareLiveSoloMedia",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "PrepareLiveSoloMediaRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloPrepareLiveSoloMediaRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloMediaResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}": {
       "get": {
         "tags": [
@@ -3321,6 +3461,92 @@
                     }
                   },
                   "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/media/token": {
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Issues a short private screen-publisher or authorized staff token for the current room generation.",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/media/token.",
+        "operationId": "JoinLiveSoloMedia",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "JoinLiveSoloMediaRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloJoinLiveSoloMediaRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloJoinLiveSoloMediaResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
                 }
               }
             }
@@ -25030,6 +25256,100 @@
         "type": "object",
         "additionalProperties": false
       },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloMediaResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "matchId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "generation": {
+            "type": "string",
+            "format": "guid"
+          },
+          "state": {
+            "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloMediaState"
+          },
+          "participantsMayViewOpponents": {
+            "type": "boolean"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloMediaMemberResponse"
+            }
+          }
+        }
+      },
+      "NoCTFDomainLiveSoloLiveSoloMediaState": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Preparing",
+          "Ready",
+          "Rotating",
+          "Stopping",
+          "Stopped",
+          "Failed"
+        ],
+        "enum": [
+          "Preparing",
+          "Ready",
+          "Rotating",
+          "Stopping",
+          "Stopped",
+          "Failed"
+        ]
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloMediaMemberResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "teamId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "side": {
+            "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloSide"
+          },
+          "state": {
+            "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloScreenState"
+          },
+          "identity": {
+            "type": "string"
+          },
+          "userName": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFDomainLiveSoloLiveSoloScreenState": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Disconnected",
+          "Connected",
+          "Sharing"
+        ],
+        "enum": [
+          "Disconnected",
+          "Connected",
+          "Sharing"
+        ]
+      },
+      "NoCTFAPIEndpointsLiveSoloGetLiveSoloMediaRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
       "NoCTFAPIEndpointsLiveSoloGetLiveSoloRoundRequest": {
         "type": "object",
         "additionalProperties": false
@@ -25037,6 +25357,58 @@
       "NoCTFAPIEndpointsLiveSoloGetLiveSoloRuntimeRequest": {
         "type": "object",
         "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsLiveSoloJoinLiveSoloMediaResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "session": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloMediaResponse"
+          },
+          "serverUrl": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloJoinLiveSoloMediaRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "role",
+          "generation"
+        ],
+        "properties": {
+          "generation": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          },
+          "role": {
+            "$ref": "#/components/schemas/NoCTFApplicationLiveSoloMediaLiveSoloMediaRole"
+          }
+        }
+      },
+      "NoCTFApplicationLiveSoloMediaLiveSoloMediaRole": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Publisher",
+          "Judge",
+          "Director"
+        ],
+        "enum": [
+          "Publisher",
+          "Judge",
+          "Director"
+        ]
       },
       "NoCTFAPIEndpointsLiveSoloListLiveSoloAdjudicationsRequest": {
         "type": "object",
@@ -25305,6 +25677,21 @@
       "NoCTFAPIEndpointsLiveSoloPrepareLiveSoloAttachmentDownloadRequest": {
         "type": "object",
         "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsLiveSoloPrepareLiveSoloMediaRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expectedMatchStamp"
+        ],
+        "properties": {
+          "expectedMatchStamp": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          }
+        }
       },
       "NoCTFAPIEndpointsLiveSoloPrepareLiveSoloRandomAttachmentDownloadRequest": {
         "type": "object",

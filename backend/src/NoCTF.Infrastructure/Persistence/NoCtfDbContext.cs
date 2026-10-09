@@ -58,6 +58,7 @@ public sealed class NoCtfDbContext(
     public DbSet<LiveSoloChallengeSource> LiveSoloChallengeSources => Set<LiveSoloChallengeSource>();
     public DbSet<LiveSoloQuestionExposure> LiveSoloQuestionExposures => Set<LiveSoloQuestionExposure>();
     public DbSet<LiveSoloMediaSession> LiveSoloMediaSessions => Set<LiveSoloMediaSession>();
+    public DbSet<LiveSoloMediaGrant> LiveSoloMediaGrants => Set<LiveSoloMediaGrant>();
     public DbSet<LiveSoloMediaParticipant> LiveSoloMediaParticipants => Set<LiveSoloMediaParticipant>();
     public DbSet<LiveSoloProgramSegment> LiveSoloProgramSegments => Set<LiveSoloProgramSegment>();
     public DbSet<LiveSoloRecording> LiveSoloRecordings => Set<LiveSoloRecording>();

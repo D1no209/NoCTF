@@ -89,7 +89,9 @@ public sealed partial class LiveSoloMatchStore
         if (first is null) return new(null, LiveSoloFailure.NotFound);
         if (await runtimePreparation.PrepareAsync(first.Value, command.Now, ct) is { } failed) return new(null, failed);
         var session = await db.LiveSoloMediaSessions.AsNoTracking().Include(x => x.Participants)
-            .Where(x => x.MatchId == command.MatchId && x.State == LiveSoloMediaState.Ready).OrderByDescending(x => x.CreatedAt).FirstOrDefaultAsync(ct);
+            .Where(x => x.MatchId == command.MatchId && x.State == LiveSoloMediaState.Ready
+                && db.LiveSoloMatches.Any(match => match.Id == command.MatchId && match.CurrentMediaSessionId == x.Id))
+            .OrderByDescending(x => x.CreatedAt).FirstOrDefaultAsync(ct);
         if (session is null) return new(null, LiveSoloFailure.MediaUnavailable);
         var observed = await media.ObserveAsync(session.RoomIdentity, ct);
         return await TransactionAsync(async () =>
@@ -104,6 +106,8 @@ public sealed partial class LiveSoloMatchStore
                 || round.Questions.Single(x => x.Position == 0).Readiness != LiveSoloQuestionReadiness.Ready) return new(null, LiveSoloFailure.NotReady);
             var config = (LiveSoloCompetitionModeConfiguration)competition.ModeConfiguration!;
             if (!config.Enabled) return new(null, LiveSoloFailure.Disabled);
+            if (match.CurrentMediaSessionId != session.Id || !await db.LiveSoloMediaSessions.AnyAsync(x => x.Id == session.Id
+                && x.State == LiveSoloMediaState.Ready, ct)) return new(null, LiveSoloFailure.MediaUnavailable);
             if (!await RosterEligibleAsync(match, ct)) return new(null, LiveSoloFailure.NotReady);
             if (!await HasMatchCapacityAsync(match, config.MaximumConcurrentMatches, ct))
                 return new(null, LiveSoloFailure.NotReady);

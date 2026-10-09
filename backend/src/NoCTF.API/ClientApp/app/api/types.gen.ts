@@ -946,6 +946,32 @@ export type NoCtfapiEndpointsLiveSoloGetLiveSoloMatchRequest = {
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsLiveSoloLiveSoloMediaResponse = {
+    id?: string;
+    matchId?: string;
+    generation?: string;
+    state?: NoCtfDomainLiveSoloLiveSoloMediaState;
+    participantsMayViewOpponents?: boolean;
+    members?: Array<NoCtfapiEndpointsLiveSoloLiveSoloMediaMemberResponse>;
+};
+
+export type NoCtfDomainLiveSoloLiveSoloMediaState = 'Preparing' | 'Ready' | 'Rotating' | 'Stopping' | 'Stopped' | 'Failed';
+
+export type NoCtfapiEndpointsLiveSoloLiveSoloMediaMemberResponse = {
+    userId?: string;
+    teamId?: string;
+    side?: NoCtfDomainLiveSoloLiveSoloSide;
+    state?: NoCtfDomainLiveSoloLiveSoloScreenState;
+    identity?: string;
+    userName?: string;
+};
+
+export type NoCtfDomainLiveSoloLiveSoloScreenState = 'Disconnected' | 'Connected' | 'Sharing';
+
+export type NoCtfapiEndpointsLiveSoloGetLiveSoloMediaRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsLiveSoloGetLiveSoloRoundRequest = {
     [key: string]: never;
 };
@@ -953,6 +979,20 @@ export type NoCtfapiEndpointsLiveSoloGetLiveSoloRoundRequest = {
 export type NoCtfapiEndpointsLiveSoloGetLiveSoloRuntimeRequest = {
     [key: string]: never;
 };
+
+export type NoCtfapiEndpointsLiveSoloJoinLiveSoloMediaResponse = {
+    session?: NoCtfapiEndpointsLiveSoloLiveSoloMediaResponse;
+    serverUrl?: string;
+    token?: string;
+    expiresAt?: string;
+};
+
+export type NoCtfapiEndpointsLiveSoloJoinLiveSoloMediaRequest = {
+    generation: string;
+    role: NoCtfApplicationLiveSoloMediaLiveSoloMediaRole;
+};
+
+export type NoCtfApplicationLiveSoloMediaLiveSoloMediaRole = 'Publisher' | 'Judge' | 'Director';
 
 export type NoCtfapiEndpointsLiveSoloListLiveSoloAdjudicationsRequest = {
     [key: string]: never;
@@ -1045,6 +1085,10 @@ export type NoCtfapiEndpointsChallengesAttachmentBrowserDownloadResponse = {
 
 export type NoCtfapiEndpointsLiveSoloPrepareLiveSoloAttachmentDownloadRequest = {
     [key: string]: never;
+};
+
+export type NoCtfapiEndpointsLiveSoloPrepareLiveSoloMediaRequest = {
+    expectedMatchStamp: string;
 };
 
 export type NoCtfapiEndpointsLiveSoloPrepareLiveSoloRandomAttachmentDownloadRequest = {
@@ -6452,6 +6496,77 @@ export type GetLiveSoloMatchResponses = {
 
 export type GetLiveSoloMatchResponse = GetLiveSoloMatchResponses[keyof GetLiveSoloMatchResponses];
 
+export type GetLiveSoloMediaData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        matchId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/media';
+};
+
+export type GetLiveSoloMediaErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetLiveSoloMediaResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsLiveSoloLiveSoloMediaResponse;
+};
+
+export type GetLiveSoloMediaResponse = GetLiveSoloMediaResponses[keyof GetLiveSoloMediaResponses];
+
+export type PrepareLiveSoloMediaData = {
+    body: NoCtfapiEndpointsLiveSoloPrepareLiveSoloMediaRequest;
+    path: {
+        competitionId: string;
+        matchId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/media';
+};
+
+export type PrepareLiveSoloMediaErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    409: NoCtfapiEndpointsLiveSoloLiveSoloFailureResponse;
+};
+
+export type PrepareLiveSoloMediaError = PrepareLiveSoloMediaErrors[keyof PrepareLiveSoloMediaErrors];
+
+export type PrepareLiveSoloMediaResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsLiveSoloLiveSoloMediaResponse;
+};
+
+export type PrepareLiveSoloMediaResponse = PrepareLiveSoloMediaResponses[keyof PrepareLiveSoloMediaResponses];
+
 export type GetLiveSoloRoundData = {
     body?: never;
     path: {
@@ -6577,6 +6692,43 @@ export type MutateLiveSoloRuntimeResponses = {
 };
 
 export type MutateLiveSoloRuntimeResponse = MutateLiveSoloRuntimeResponses[keyof MutateLiveSoloRuntimeResponses];
+
+export type JoinLiveSoloMediaData = {
+    body: NoCtfapiEndpointsLiveSoloJoinLiveSoloMediaRequest;
+    path: {
+        competitionId: string;
+        matchId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/media/token';
+};
+
+export type JoinLiveSoloMediaErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    409: NoCtfapiEndpointsLiveSoloLiveSoloFailureResponse;
+};
+
+export type JoinLiveSoloMediaError = JoinLiveSoloMediaErrors[keyof JoinLiveSoloMediaErrors];
+
+export type JoinLiveSoloMediaResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsLiveSoloJoinLiveSoloMediaResponse;
+};
+
+export type JoinLiveSoloMediaResponse = JoinLiveSoloMediaResponses[keyof JoinLiveSoloMediaResponses];
 
 export type ListLiveSoloAttachmentsData = {
     body?: never;

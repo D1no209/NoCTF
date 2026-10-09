@@ -24,6 +24,9 @@ using NoCTF.Application.Messaging;
 using NSubstitute;
 using NoCTF.Application.LiveSolo.Resources;
 using NoCTF.Application.LiveSolo.Adjudication;
+using NoCTF.Application.LiveSolo.Media;
+using NoCTF.Domain.Identity.Mfa;
+using NoCTF.Infrastructure.Authentication.Mfa;
 using NoCTF.Domain.LiveSolo;
 using FluentStorage.Storage;
 using Microsoft.AspNetCore.Http;
@@ -218,20 +221,46 @@ public sealed class LiveSoloEndpointTests
         await Assert.That(history.Headers.CacheControl!.NoStore).IsTrue();
     }
 
+    [Test]
+    public async Task Media_tokens_require_server_authentication_context_and_route_scope_and_cannot_request_a_public_viewer_role()
+    {
+        var media = Substitute.For<ILiveSoloMediaStore>(); var competition = Guid.NewGuid(); var match = Guid.NewGuid(); var generation = Guid.NewGuid();
+        media.JoinAsync(Arg.Any<JoinLiveSoloMedia>(), Arg.Any<CancellationToken>()).Returns(new LiveSoloMediaResult(
+            new(Guid.NewGuid(), match, generation, LiveSoloMediaState.Ready, false, []), new("wss://media.invalid", "private-token", DateTimeOffset.UtcNow.AddMinutes(1))));
+        await using var app = await HostAsync(Substitute.For<ILiveSoloMatchStore>(), Substitute.For<ILiveSoloAttachmentStore>(), Substitute.For<IStore>(), media: media);
+        using var client = app.GetTestClient();
+        var path = $"/api/v1/competitions/{competition}/live-solo/matches/{match}/media/token";
+        client.DefaultRequestHeaders.Authorization = new("Bearer", "verified-test");
+        using var incomplete = await client.PostAsJsonAsync(path, new { generation, role = "Publisher", tokenVersion = 999,
+            authentication = new { method = "Password", authenticatedAt = DateTimeOffset.UtcNow } });
+        await Assert.That(incomplete.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
+        await media.DidNotReceive().JoinAsync(Arg.Any<JoinLiveSoloMedia>(), Arg.Any<CancellationToken>());
+        client.DefaultRequestHeaders.Authorization = new("Bearer", "verified-media-test");
+        using var publicRole = await client.PostAsJsonAsync(path, new { generation, role = "Viewer" });
+        await Assert.That(publicRole.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+        using var accepted = await client.PostAsJsonAsync(path, new { generation, role = "Publisher", competitionId = Guid.NewGuid(), matchId = Guid.NewGuid(), tokenVersion = 999 });
+        await Assert.That(accepted.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(accepted.Headers.CacheControl!.NoStore).IsTrue();
+        await media.Received(1).JoinAsync(Arg.Is<JoinLiveSoloMedia>(x => x != null && x.ActorId == Actor && x.CompetitionId == competition
+            && x.MatchId == match && x.TokenVersion == 3 && x.Authentication!.Method == AuthenticationMethod.Password), Arg.Any<CancellationToken>());
+    }
+
     private static async Task<WebApplication> HostAsync(ILiveSoloMatchStore store, ILiveSoloAttachmentStore attachmentStore, IStore objects,
-        ILiveSoloAdjudicationStore? decisions = null, ILiveSoloRuntimeStore? runtimes = null)
+        ILiveSoloAdjudicationStore? decisions = null, ILiveSoloRuntimeStore? runtimes = null, ILiveSoloMediaStore? media = null)
     {
         var builder = WebApplication.CreateBuilder(); builder.WebHost.UseTestServer();
         builder.Services.AddFastEndpoints(options => { options.DisableAutoDiscovery = true; options.Assemblies = [typeof(GetLiveSoloMatchEndpoint).Assembly];
             options.Filter = x => x == typeof(ListLiveSoloQuestionsEndpoint) || x == typeof(SubmitLiveSoloFlagEndpoint)
                 || x == typeof(StartLiveSoloCountdownEndpoint) || x == typeof(DownloadLiveSoloAttachmentEndpoint)
                 || x == typeof(AdjudicateLiveSoloMatchEndpoint) || x == typeof(ListLiveSoloAdjudicationsEndpoint)
-                || x == typeof(GetLiveSoloRuntimeEndpoint) || x == typeof(MutateLiveSoloRuntimeEndpoint); });
+                || x == typeof(GetLiveSoloRuntimeEndpoint) || x == typeof(MutateLiveSoloRuntimeEndpoint)
+                || x == typeof(GetLiveSoloMediaEndpoint) || x == typeof(PrepareLiveSoloMediaEndpoint) || x == typeof(JoinLiveSoloMediaEndpoint); });
         builder.Services.AddAuthentication("Bearer").AddScheme<AuthenticationSchemeOptions, TestAuthentication>("Bearer", _ => { });
         builder.Services.AddAuthorization(); builder.Services.AddSingleton(store); builder.Services.AddSingleton<ManageLiveSoloMatches>();
         builder.Services.AddSingleton(attachmentStore); builder.Services.AddSingleton(objects); builder.Services.AddSingleton<AccessLiveSoloAttachments>();
         builder.Services.AddSingleton(decisions ?? Substitute.For<ILiveSoloAdjudicationStore>()); builder.Services.AddSingleton<ManageLiveSoloAdjudication>();
         builder.Services.AddSingleton(runtimes ?? Substitute.For<ILiveSoloRuntimeStore>()); builder.Services.AddSingleton<ManageLiveSoloRuntimes>();
+        builder.Services.AddSingleton(media ?? Substitute.For<ILiveSoloMediaStore>()); builder.Services.AddSingleton<ManageLiveSoloMedia>();
         builder.Services.AddSingleton<IUserContext>(new TestUser()); builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton<IRequestAdmission>(new Admission());
         var source = Substitute.For<IRequestSourceAddress>(); source.Address.Returns("192.0.2.10");
@@ -254,8 +283,14 @@ public sealed class LiveSoloEndpointTests
     private sealed class TestAuthentication(IOptionsMonitor<AuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder)
         : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
     {
-        protected override Task<AuthenticateResult> HandleAuthenticateAsync() => Task.FromResult(Request.Headers.Authorization == "Bearer verified-test"
-            ? AuthenticateResult.Success(new AuthenticationTicket(new ClaimsPrincipal(new ClaimsIdentity([
-                new Claim(ClaimTypes.NameIdentifier, Actor.ToString())], "Bearer")), "Bearer")) : AuthenticateResult.NoResult());
+        protected override Task<AuthenticateResult> HandleAuthenticateAsync()
+        {
+            var bearer = Request.Headers.Authorization.ToString();
+            if (bearer is not ("Bearer verified-test" or "Bearer verified-media-test")) return Task.FromResult(AuthenticateResult.NoResult());
+            var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, Actor.ToString()) };
+            if (bearer == "Bearer verified-media-test")
+            { claims.Add(new("token_version", "3")); claims.AddRange(AuthenticationContextClaims.Write(new(AuthenticationMethod.Password, DateTimeOffset.UtcNow))); }
+            return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(new ClaimsPrincipal(new ClaimsIdentity(claims, "Bearer")), "Bearer")));
+        }
     }
 }

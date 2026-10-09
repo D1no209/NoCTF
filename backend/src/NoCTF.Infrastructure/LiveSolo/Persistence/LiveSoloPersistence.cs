@@ -23,6 +23,7 @@ internal sealed class LiveSoloMatchConfiguration : IEntityTypeConfiguration<Live
         builder.HasMany(x => x.Roster).WithOne().HasForeignKey(x => x.MatchId).OnDelete(DeleteBehavior.Cascade);
         builder.HasMany(x => x.Rounds).WithOne().HasForeignKey(x => x.MatchId).OnDelete(DeleteBehavior.Cascade);
         builder.HasOne<LiveSoloRound>().WithMany().HasForeignKey(x => x.CurrentRoundId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<LiveSoloMediaSession>().WithMany().HasForeignKey(x => x.CurrentMediaSessionId).OnDelete(DeleteBehavior.Restrict);
     }
 }
 internal sealed class LiveSoloMatchSlotConfiguration : IEntityTypeConfiguration<LiveSoloMatchSlot>

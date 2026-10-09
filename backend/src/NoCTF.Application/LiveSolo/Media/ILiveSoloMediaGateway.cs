@@ -8,7 +8,7 @@ public sealed record LiveSoloMediaAuthorization(Guid SessionId, Guid Generation,
     string ParticipantIdentity, LiveSoloMediaRole Role, bool MaySubscribe, DateTimeOffset ExpiresAt);
 public sealed record LiveSoloMediaToken(string ServerUrl, string Token, DateTimeOffset ExpiresAt);
 public sealed record LiveSoloObservedScreen(string Identity, LiveSoloScreenState State, string? TrackId, DateTimeOffset ObservedAt);
-public sealed record LiveSoloRoomObservation(IReadOnlyList<LiveSoloObservedScreen> Screens);
+public sealed record LiveSoloRoomObservation(IReadOnlyList<LiveSoloObservedScreen> Screens, bool Exists = true);
 public sealed record LiveSoloMediaReadiness(bool Configured, bool Available, bool EgressAvailable);
 
 /// <summary>Provider-neutral media boundary. Business code never handles an SFU SDK type.</summary>

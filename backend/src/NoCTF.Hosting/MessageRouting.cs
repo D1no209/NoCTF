@@ -22,6 +22,7 @@ public static class MessageRouting
         Route<EvaluateGameplayFact>(options, WorkerQueue.Gameplay);
         Route<DispatchPendingGameplayFacts>(options, WorkerQueue.Control);
         Route<NoCTF.Application.LiveSolo.Rounds.AdvanceLiveSoloRound>(options, WorkerQueue.Control);
+        Route<NoCTF.Application.LiveSolo.Media.RefreshLiveSoloMedia>(options, WorkerQueue.Control);
         Route<GameplayFactStateChanged>(options, WorkerQueue.Gameplay);
         Route<ProjectLeaderboard>(options, WorkerQueue.Projection);
         Route<ApplyCompetitionVisibility>(options, WorkerQueue.Control);

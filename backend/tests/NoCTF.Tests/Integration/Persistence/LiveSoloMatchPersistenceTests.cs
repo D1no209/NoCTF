@@ -465,11 +465,14 @@ public sealed class LiveSoloMatchPersistenceTests
             var participants = Match.Rosters.SelectMany(roster => roster.UserIds.Select(id => new LiveSoloMediaParticipant {
                 UserId = id, TeamId = roster.TeamId, Side = roster.TeamId == LeftTeam.Id ? LiveSoloSide.Left : LiveSoloSide.Right,
                 Identity = id == Left.Id ? "left-screen" : id == Right.Id ? "right-screen" : id.ToString("N"), ObservedAt = Now })).ToList();
-            Db.LiveSoloMediaSessions.Add(new() { Id = Guid.NewGuid(), MatchId = Match.Id, Generation = Guid.NewGuid(), RoomIdentity = Guid.NewGuid().ToString("N"),
-                State = LiveSoloMediaState.Ready, CreatedAt = Now, Participants = participants });
+            var mediaSession = new LiveSoloMediaSession { Id = Guid.NewGuid(), MatchId = Match.Id, Generation = Guid.NewGuid(), RoomIdentity = Guid.NewGuid().ToString("N"),
+                State = LiveSoloMediaState.Ready, CreatedAt = Now, Participants = participants };
+            Db.LiveSoloMediaSessions.Add(mediaSession);
+            (await Db.LiveSoloMatches.SingleAsync(x => x.Id == Match.Id, ct)).CurrentMediaSessionId = mediaSession.Id;
             media.ObserveAsync(Arg.Any<string>(), ct).Returns(new LiveSoloRoomObservation(participants.Select(x =>
                 new LiveSoloObservedScreen(x.Identity, LiveSoloScreenState.Sharing, "track-" + x.Identity, Now)).ToArray()));
             await Db.SaveChangesAsync(ct);
+            Match = (await store.FindAsync(Competition.Id, Match.Id, Owner.Id, true, Now, ct))!;
         }
 
         public async Task StartAsync(CancellationToken ct)

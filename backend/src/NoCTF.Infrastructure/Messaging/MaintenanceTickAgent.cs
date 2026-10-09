@@ -26,7 +26,8 @@ public sealed class MaintenanceTickAgent(
         ClusterScheduleKind.AwdRound,
         ClusterScheduleKind.AwdChecker,
         ClusterScheduleKind.KohPoll,
-        ClusterScheduleKind.LiveSoloRound
+        ClusterScheduleKind.LiveSoloRound,
+        ClusterScheduleKind.LiveSoloMedia
     ];
 
     private readonly Dictionary<string, ClusterScheduleEntry> entries =
@@ -304,6 +305,7 @@ public sealed class MaintenanceTickAgent(
             DispatchQueuedRuntimes value => bus.PublishAsync(value),
             DispatchPendingGameplayFacts value => bus.PublishAsync(value),
             NoCTF.Application.LiveSolo.Rounds.AdvanceLiveSoloRound value => bus.PublishAsync(value),
+            NoCTF.Application.LiveSolo.Media.RefreshLiveSoloMedia value => bus.PublishAsync(value),
             _ => throw new ArgumentOutOfRangeException(
                 nameof(message),
                 message.GetType().FullName,
@@ -350,6 +352,7 @@ public sealed class MaintenanceTickAgent(
         ClusterScheduleKind.RuntimeDispatch => "runtime_dispatch",
         ClusterScheduleKind.GameplayFactRecovery => "gameplay_fact_recovery",
         ClusterScheduleKind.LiveSoloRound => "live_solo_round",
+        ClusterScheduleKind.LiveSoloMedia => "live_solo_media",
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
     };
 }

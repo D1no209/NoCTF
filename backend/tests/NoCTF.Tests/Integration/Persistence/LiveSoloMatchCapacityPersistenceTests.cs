@@ -128,10 +128,12 @@ public sealed class LiveSoloMatchCapacityPersistenceTests
         var prepared = await store.PrepareRoundAsync(new(fixture.Competition.Id, match.Id, fixture.Owner.Id, match.ConcurrencyStamp,
             fixture.Round.QuestionGroupId, fixture.Now), ct);
         await Assert.That(prepared.Failure).IsNull();
-        fixture.Db.LiveSoloMediaSessions.Add(new() { Id = Guid.NewGuid(), MatchId = match.Id, Generation = Guid.NewGuid(),
+        var mediaSession = new LiveSoloMediaSession { Id = Guid.NewGuid(), MatchId = match.Id, Generation = Guid.NewGuid(),
             RoomIdentity = Guid.NewGuid().ToString("N"), State = LiveSoloMediaState.Ready, CreatedAt = fixture.Now,
             Participants = users.Select((user, i) => new LiveSoloMediaParticipant { UserId = user.Id, TeamId = teams[i].Id,
-                Side = i == 0 ? LiveSoloSide.Left : LiveSoloSide.Right, Identity = user.Id.ToString("N"), ObservedAt = fixture.Now }).ToList() });
+                Side = i == 0 ? LiveSoloSide.Left : LiveSoloSide.Right, Identity = user.Id.ToString("N"), ObservedAt = fixture.Now }).ToList() };
+        fixture.Db.LiveSoloMediaSessions.Add(mediaSession);
+        (await fixture.Db.LiveSoloMatches.SingleAsync(x => x.Id == match.Id, ct)).CurrentMediaSessionId = mediaSession.Id;
         await fixture.Db.SaveChangesAsync(ct);
         var identities = await fixture.Db.LiveSoloMediaParticipants.Select(x => x.Identity).ToArrayAsync(ct);
         fixture.media.ObserveAsync(Arg.Any<string>(), ct).Returns(new LiveSoloRoomObservation(identities.Select(id =>
