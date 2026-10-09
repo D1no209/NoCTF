@@ -24,6 +24,12 @@ namespace NoCTF.Tests.Integration.LiveSolo;
 [Category("Integration")]
 public sealed class LiveSoloPublicExposurePersistenceTests
 {
+    private static async Task<Guid> Viewer(LiveSoloMatchPersistenceTests.Fixture f, Guid actor, CancellationToken ct)
+    {
+        await using var db = new NoCtfDbContext(f.Options);
+        return (await new LiveSoloViewerStore(db, new CompetitionModerationAuthorizer(db), f.Clock)
+            .EnterAsync(f.Competition.Id, f.Match.Id, actor, null, ct)).Admission?.Id ?? Guid.Empty;
+    }
     [Test, Timeout(300_000)]
     public async Task Published_metadata_without_a_viewer_persists_immutable_static_risk_even_after_flags_are_removed(CancellationToken ct)
     {
@@ -33,14 +39,14 @@ public sealed class LiveSoloPublicExposurePersistenceTests
             foreach (var flag in await f.Db.ChallengeFlags.ToArrayAsync(ct)) flag.DeletedAt = f.Now;
             await f.Db.SaveChangesAsync(ct); f.Now = segment.PublicAt.AddTicks(-1);
             var objects = Substitute.For<IStore>(); var reader = Reader(f, objects);
-            await reader.ReadAsync(f.Competition.Id, f.Match.Id, Guid.Empty, ct);
+            await reader.ReadAsync(f.Competition.Id, f.Match.Id, Guid.Empty, await Viewer(f, Guid.Empty, ct), ct);
             await Assert.That(await f.Db.LiveSoloQuestionExposures.CountAsync(ct)).IsEqualTo(0);
-            f.Now = segment.PublicAt; await reader.ReadAsync(f.Competition.Id, f.Match.Id, Guid.Empty, ct);
+            f.Now = segment.PublicAt; await reader.ReadAsync(f.Competition.Id, f.Match.Id, Guid.Empty, await Viewer(f, Guid.Empty, ct), ct);
             var exposure = await f.Db.LiveSoloQuestionExposures.SingleAsync(ct);
             await Assert.That(exposure.CanonicalChallengeId).IsEqualTo(f.Templates[0].Id);
             await Assert.That(exposure.PublicAt).IsEqualTo(segment.PublicAt);
             await objects.DidNotReceiveWithAnyArgs().OpenRead(default!, default);
-            await reader.ReadAsync(f.Competition.Id, f.Match.Id, Guid.Empty, ct);
+            await reader.ReadAsync(f.Competition.Id, f.Match.Id, Guid.Empty, await Viewer(f, Guid.Empty, ct), ct);
             await Assert.That(await f.Db.LiveSoloQuestionExposures.CountAsync(ct)).IsEqualTo(1);
         });
     }
@@ -53,7 +59,7 @@ public sealed class LiveSoloPublicExposurePersistenceTests
             foreach (var flag in await f.Db.ChallengeFlags.ToArrayAsync(ct)) f.Db.ChallengeFlags.Remove(flag);
             await f.Db.SaveChangesAsync(ct); var segment = await Segment(f, ct); f.Now = segment.PublicAt;
             var reader = Reader(f, Substitute.For<IStore>());
-            await reader.ReadAsync(f.Competition.Id, f.Match.Id, Guid.Empty, ct);
+            await reader.ReadAsync(f.Competition.Id, f.Match.Id, Guid.Empty, await Viewer(f, Guid.Empty, ct), ct);
             await Assert.That(await f.Db.LiveSoloQuestionExposures.CountAsync(ct)).IsEqualTo(0);
             // Create an immutable static frame in a separate capture generation while access remains staff-only.
             (await f.Db.Competitions.SingleAsync(ct)).AccessMode = CompetitionAccessMode.StaffOnly;
@@ -64,7 +70,7 @@ public sealed class LiveSoloPublicExposurePersistenceTests
             await Assert.That(frame.Questions.First().HasStaticAnswer).IsTrue();
             f.Db.LiveSoloProgramSegments.Add(new() { Id = Guid.NewGuid(), MediaSessionId = segment.MediaSessionId, ProgramCaptureId = segment.ProgramCaptureId,
                 FrameId = frame.Id, FileId = segment.FileId, Sequence = 2, StartedAt = f.Now, EndedAt = f.Now, PublicAt = f.Now, RemoveAfter = f.Now.AddMinutes(5) });
-            await f.Db.SaveChangesAsync(ct); await reader.ReadAsync(f.Competition.Id, f.Match.Id, f.Owner.Id, ct);
+            await f.Db.SaveChangesAsync(ct); await reader.ReadAsync(f.Competition.Id, f.Match.Id, f.Owner.Id, await Viewer(f, f.Owner.Id, ct), ct);
             await Assert.That(await f.Db.LiveSoloQuestionExposures.CountAsync(ct)).IsEqualTo(0);
         });
     }
@@ -116,7 +122,7 @@ public sealed class LiveSoloPublicExposurePersistenceTests
             async Task Read()
             {
                 await using var db = new NoCtfDbContext(f.Options);
-                await new LiveSoloProgramReader(db, new CompetitionModerationAuthorizer(db), Substitute.For<IStore>(), f.Clock).ReadAsync(f.Competition.Id, f.Match.Id, Guid.Empty, ct);
+                await new LiveSoloProgramReader(db, new CompetitionModerationAuthorizer(db), Substitute.For<IStore>(), f.Clock).ReadAsync(f.Competition.Id, f.Match.Id, Guid.Empty, await Viewer(f, Guid.Empty, ct), ct);
             }
             await Task.WhenAll(Read(), Read()); await Assert.That(await f.Db.LiveSoloQuestionExposures.CountAsync(ct)).IsEqualTo(1);
             f.Now = segment.RemoveAfter.AddSeconds(1); await Capture(f).PruneAsync(segment.MediaSessionId, ct);

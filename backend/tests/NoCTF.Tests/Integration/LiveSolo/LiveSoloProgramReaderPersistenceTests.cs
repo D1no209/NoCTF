@@ -21,20 +21,21 @@ public sealed class LiveSoloProgramReaderPersistenceTests
             var segment = await fixture.Db.LiveSoloProgramSegments.SingleAsync(ct);
             var objects = Substitute.For<IStore>(); objects.ObjectExists(Arg.Any<string>(), ct).Returns(true);
             objects.OpenRead(Arg.Any<string>(), ct).Returns(_ => Task.FromResult<Stream?>(new MemoryStream([0x47, 1, 2, 3])));
+            var leaseId=Guid.NewGuid(); fixture.Db.Add(new LiveSoloViewerLease {Id=leaseId, CompetitionId=fixture.Competition.Id, MatchId=fixture.Match.Id, ExpiresAt=fixture.Now.AddHours(1), UserId=null}); await fixture.Db.SaveChangesAsync(ct);
             var reader = new LiveSoloProgramReader(fixture.Db, new CompetitionModerationAuthorizer(fixture.Db), objects, fixture.Clock);
-            await Assert.That(await reader.ReadAsync(fixture.Competition.Id, fixture.Match.Id, Guid.Empty, ct)).IsNull();
-            await Assert.That(await reader.OpenSegmentAsync(fixture.Competition.Id, fixture.Match.Id, segment.Id, Guid.Empty, ct)).IsNull();
+            await Assert.That(await reader.ReadAsync(fixture.Competition.Id, fixture.Match.Id, Guid.Empty, leaseId, ct)).IsNull();
+            await Assert.That(await reader.OpenSegmentAsync(fixture.Competition.Id, fixture.Match.Id, segment.Id, Guid.Empty, leaseId, ct)).IsNull();
             await objects.DidNotReceive().OpenRead(Arg.Any<string>(), ct);
             var match = await fixture.Db.LiveSoloMatches.SingleAsync(ct); match.LeftWins = 99; await fixture.Db.SaveChangesAsync(ct);
             fixture.Now = segment.PublicAt;
-            var result = await reader.ReadAsync(fixture.Competition.Id, fixture.Match.Id, Guid.Empty, ct);
+            var result = await reader.ReadAsync(fixture.Competition.Id, fixture.Match.Id, Guid.Empty, leaseId, ct);
             await Assert.That(result).IsNotNull(); await Assert.That(result!.State.LeftWins).IsEqualTo(0);
             await Assert.That(result.Segments.Single().State.AsOf).IsEqualTo(result.State.AsOf);
-            var content = await reader.OpenSegmentAsync(fixture.Competition.Id, fixture.Match.Id, segment.Id, Guid.Empty, ct);
+            var content = await reader.OpenSegmentAsync(fixture.Competition.Id, fixture.Match.Id, segment.Id, Guid.Empty, leaseId, ct);
             await Assert.That(content).IsNotNull(); await content!.Content.DisposeAsync();
-            await Assert.That(await reader.OpenSegmentAsync(Guid.NewGuid(), fixture.Match.Id, segment.Id, Guid.Empty, ct)).IsNull();
+            await Assert.That(await reader.OpenSegmentAsync(Guid.NewGuid(), fixture.Match.Id, segment.Id, Guid.Empty, leaseId, ct)).IsNull();
             fixture.Now = segment.RemoveAfter;
-            await Assert.That(await reader.OpenSegmentAsync(fixture.Competition.Id, fixture.Match.Id, segment.Id, Guid.Empty, ct)).IsNull();
+            await Assert.That(await reader.OpenSegmentAsync(fixture.Competition.Id, fixture.Match.Id, segment.Id, Guid.Empty, leaseId, ct)).IsNull();
         });
     }
     [Test, Timeout(300_000)]
@@ -46,12 +47,13 @@ public sealed class LiveSoloProgramReaderPersistenceTests
             fixture.Now = (await fixture.Db.LiveSoloProgramSegments.SingleAsync(ct)).PublicAt;
             var competition = await fixture.Db.Competitions.SingleAsync(ct); competition.AccessMode = CompetitionAccessMode.StaffOnly;
             await fixture.Db.SaveChangesAsync(ct);
+            var leaseId=Guid.NewGuid(); fixture.Db.Add(new LiveSoloViewerLease {Id=leaseId, CompetitionId=fixture.Competition.Id, MatchId=fixture.Match.Id, ExpiresAt=fixture.Now.AddHours(1), UserId=fixture.Owner.Id}); await fixture.Db.SaveChangesAsync(ct);
             var reader = new LiveSoloProgramReader(fixture.Db, new CompetitionModerationAuthorizer(fixture.Db), Substitute.For<IStore>(), fixture.Clock);
-            await Assert.That(await reader.ReadAsync(fixture.Competition.Id, fixture.Match.Id, Guid.Empty, ct)).IsNull();
-            await Assert.That(await reader.ReadAsync(fixture.Competition.Id, fixture.Match.Id, fixture.Left.Id, ct)).IsNull();
-            await Assert.That(await reader.ReadAsync(fixture.Competition.Id, fixture.Match.Id, fixture.Owner.Id, ct)).IsNotNull();
+            await Assert.That(await reader.ReadAsync(fixture.Competition.Id, fixture.Match.Id, Guid.Empty, leaseId, ct)).IsNull();
+            await Assert.That(await reader.ReadAsync(fixture.Competition.Id, fixture.Match.Id, fixture.Left.Id, leaseId, ct)).IsNull();
+            await Assert.That(await reader.ReadAsync(fixture.Competition.Id, fixture.Match.Id, fixture.Owner.Id, leaseId, ct)).IsNotNull();
             (await fixture.Db.Set<LiveSoloCompetitionModeConfiguration>().SingleAsync(ct)).Enabled = false; await fixture.Db.SaveChangesAsync(ct);
-            await Assert.That(await reader.ReadAsync(fixture.Competition.Id, fixture.Match.Id, fixture.Owner.Id, ct)).IsNull();
+            await Assert.That(await reader.ReadAsync(fixture.Competition.Id, fixture.Match.Id, fixture.Owner.Id, leaseId, ct)).IsNull();
         });
     }
 }

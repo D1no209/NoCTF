@@ -97,6 +97,13 @@ public sealed class LiveSoloEndpointTests
         await Assert.That(body.RootElement.TryGetProperty("startedAt", out _)).IsFalse();
     }
 
+    private static ILiveSoloViewerStore Viewer()
+    {
+        var store=Substitute.For<ILiveSoloViewerStore>();
+        store.EnterAsync(Arg.Any<Guid>(),Arg.Any<Guid>(),Actor,Arg.Any<Guid?>(),Arg.Any<CancellationToken>())
+            .Returns(new LiveSoloViewerResult(new(Guid.NewGuid(),DateTimeOffset.UtcNow.AddSeconds(15))));
+        return store;
+    }
     private static async Task<WebApplication> HostAsync(ILiveSoloMatchStore store)
         => await HostAsync(store, Substitute.For<ILiveSoloAttachmentStore>(), Substitute.For<IStore>());
 
@@ -251,11 +258,19 @@ public sealed class LiveSoloEndpointTests
         var reader = Substitute.For<ILiveSoloProgramReader>(); var competition = Guid.NewGuid(); var match = Guid.NewGuid(); var segment = Guid.NewGuid();
         var state = new LiveSoloProgramStateView(DateTimeOffset.UtcNow.AddMinutes(-1), LiveSoloMatchState.Running, 2, 0, 1,
             Guid.NewGuid(), Guid.NewGuid(), "left", "right", Guid.NewGuid(), 1, LiveSoloRoundState.Running, 2, 10000, 900, false, []);
-        reader.ReadAsync(competition, match, Actor, Arg.Any<CancellationToken>()).Returns(new LiveSoloProgramView(Guid.NewGuid(), 60, state,
+        reader.ReadAsync(competition, match, Actor, Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(new LiveSoloProgramView(Guid.NewGuid(), 60, state,
             [new(segment, 8, TimeSpan.FromSeconds(2), state)], false));
-        await using var app = await HostAsync(Substitute.For<ILiveSoloMatchStore>(), Substitute.For<ILiveSoloAttachmentStore>(), Substitute.For<IStore>(), programs: reader);
+        await using var app = await HostAsync(Substitute.For<ILiveSoloMatchStore>(), Substitute.For<ILiveSoloAttachmentStore>(), Substitute.For<IStore>(), programs: reader, viewers: Viewer());
         using var client = app.GetTestClient();
         var path = $"/api/v1/competitions/{competition}/live-solo/matches/{match}/program";
+        using var missingLease = await client.GetAsync(path);
+        await Assert.That(missingLease.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+        using var noOrigin = await client.PostAsJsonAsync(path + "/viewer", new {action="Enter"});
+        await Assert.That(noOrigin.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
+        client.DefaultRequestHeaders.Add("Origin", "http://localhost");
+        using var enter = await client.PostAsJsonAsync(path + "/viewer", new {action="Enter"});
+        await Assert.That(enter.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        client.DefaultRequestHeaders.Add("Cookie",enter.Headers.GetValues("Set-Cookie").Single().Split(';')[0]);
         using var metadata = await client.GetAsync(path);
         await Assert.That(metadata.StatusCode).IsEqualTo(HttpStatusCode.OK);
         var json = await metadata.Content.ReadAsStringAsync();
@@ -267,6 +282,9 @@ public sealed class LiveSoloEndpointTests
         await Assert.That(await playlist.Content.ReadAsStringAsync()).Contains("segments/" + segment);
         using var hidden = await client.GetAsync(path + "/segments/" + segment);
         await Assert.That(hidden.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+        using var staleExit = await client.PostAsJsonAsync(path + "/viewer", new {action="Leave", expectedLeaseId=Guid.NewGuid()});
+        await Assert.That(staleExit.StatusCode).IsEqualTo(HttpStatusCode.NoContent);
+        await Assert.That(staleExit.Headers.Contains("Set-Cookie")).IsFalse();
     }
     [Test]
     public async Task Recording_contract_authenticates_decisions_and_streams_ranges_without_storage_metadata()
@@ -379,7 +397,7 @@ public sealed class LiveSoloEndpointTests
     private static async Task<WebApplication> HostAsync(ILiveSoloMatchStore store, ILiveSoloAttachmentStore attachmentStore, IStore objects,
         ILiveSoloAdjudicationStore? decisions = null, ILiveSoloRuntimeStore? runtimes = null, ILiveSoloMediaStore? media = null, ILiveSoloProgramReader? programs = null,
         ILiveSoloRecordingStore? recordings = null, ILiveSoloPlayerPolicyReader? policies = null, ManageLiveSoloConfiguration? settings = null, ILiveSoloHintReader? hints = null,
-        ManageLiveSoloWriteUps? postgame = null)
+        ManageLiveSoloWriteUps? postgame = null, ILiveSoloViewerStore? viewers = null)
     {
         var builder = WebApplication.CreateBuilder(); builder.WebHost.UseTestServer();
         builder.Services.AddFastEndpoints(options => { options.DisableAutoDiscovery = true; options.Assemblies = [typeof(GetLiveSoloMatchEndpoint).Assembly];
@@ -388,7 +406,7 @@ public sealed class LiveSoloEndpointTests
                 || x == typeof(AdjudicateLiveSoloMatchEndpoint) || x == typeof(ListLiveSoloAdjudicationsEndpoint)
                 || x == typeof(GetLiveSoloRuntimeEndpoint) || x == typeof(MutateLiveSoloRuntimeEndpoint)
                 || x == typeof(GetLiveSoloMediaEndpoint) || x == typeof(PrepareLiveSoloMediaEndpoint) || x == typeof(JoinLiveSoloMediaEndpoint)
-                || x == typeof(GetLiveSoloProgramEndpoint) || x == typeof(GetLiveSoloProgramPlaylistEndpoint) || x == typeof(GetLiveSoloProgramSegmentEndpoint)
+                || x == typeof(ManageLiveSoloViewerEndpoint) || x == typeof(GetLiveSoloProgramEndpoint) || x == typeof(GetLiveSoloProgramPlaylistEndpoint) || x == typeof(GetLiveSoloProgramSegmentEndpoint)
                 || x == typeof(ListLiveSoloRecordingsEndpoint) || x == typeof(ChangeLiveSoloRecordingEndpoint) || x == typeof(GetLiveSoloRecordingEndpoint)
                 || x == typeof(GetLiveSoloPlayerPolicyEndpoint) || x == typeof(ListLiveSoloHintsEndpoint) || settings is not null && x == typeof(SaveLiveSoloConfigurationEndpoint)
                 || postgame is not null && x == typeof(SaveLiveSoloWriteUpDraftEndpoint); });
@@ -398,6 +416,8 @@ public sealed class LiveSoloEndpointTests
         builder.Services.AddSingleton(decisions ?? Substitute.For<ILiveSoloAdjudicationStore>()); builder.Services.AddSingleton<ManageLiveSoloAdjudication>();
         builder.Services.AddSingleton(runtimes ?? Substitute.For<ILiveSoloRuntimeStore>()); builder.Services.AddSingleton<ManageLiveSoloRuntimes>();
         builder.Services.AddSingleton(media ?? Substitute.For<ILiveSoloMediaStore>()); builder.Services.AddSingleton<ManageLiveSoloMedia>();
+        builder.Services.AddSingleton<LiveSoloViewerBrowserAccess>();
+        builder.Services.AddSingleton(viewers ?? Substitute.For<ILiveSoloViewerStore>()); builder.Services.Configure<NoCTF.API.Endpoints.Authentication.RefreshHttpOptions>(_ => {});
         builder.Services.AddSingleton(programs ?? Substitute.For<ILiveSoloProgramReader>());
         builder.Services.AddSingleton(recordings ?? Substitute.For<ILiveSoloRecordingStore>()); builder.Services.AddSingleton<ManageLiveSoloRecordings>();
         builder.Services.AddSingleton(policies ?? Substitute.For<ILiveSoloPlayerPolicyReader>());

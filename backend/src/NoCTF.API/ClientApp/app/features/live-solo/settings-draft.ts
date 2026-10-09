@@ -2,7 +2,7 @@ import type { NoCtfapiEndpointsLiveSoloLiveSoloConfigurationContract as Configur
 import type { MessageKey } from '../../locales/en'
 
 export type LiveSoloSettingsDraft = Required<Omit<Configuration, 'stageRules'>> & { stageRules: Required<NonNullable<Configuration['stageRules']>[number]>[] }
-export type NumberSetting = 'requiredWins' | 'countdownSeconds' | 'questionIntervalSeconds' | 'roundLimitSeconds' | 'publicDelaySeconds' | 'recordingRetentionDays' | 'maximumConcurrentMatches' | 'maximumRosterMembers'
+export type NumberSetting = 'requiredWins' | 'countdownSeconds' | 'questionIntervalSeconds' | 'roundLimitSeconds' | 'publicDelaySeconds' | 'recordingRetentionDays' | 'maximumConcurrentMatches' | 'maximumRosterMembers' | 'maximumViewers'
 export const settingFields: { key: NumberSetting; label: MessageKey; min: number; max: number; section: 'match' | 'timing' | 'media' }[] = [
   { key: 'requiredWins', label: 'liveSolo.settings.wins', min: 1, max: 1024, section: 'match' },
   { key: 'maximumRosterMembers', label: 'liveSolo.settings.roster', min: 1, max: 64, section: 'match' },
@@ -12,6 +12,7 @@ export const settingFields: { key: NumberSetting; label: MessageKey; min: number
   { key: 'roundLimitSeconds', label: 'liveSolo.settings.limit', min: 1, max: 86400, section: 'timing' },
   { key: 'publicDelaySeconds', label: 'liveSolo.settings.delay', min: 0, max: 86400, section: 'media' },
   { key: 'recordingRetentionDays', label: 'liveSolo.settings.retention', min: 1, max: 3650, section: 'media' },
+  { key: 'maximumViewers', label: 'liveSolo.settings.viewers', min: 1, max: 100000, section: 'media' },
 ]
 export function settingsDraft(value: Configuration): LiveSoloSettingsDraft {
   return { enabled: value.enabled ?? false, bracketFormat: value.bracketFormat ?? 'SingleElimination', requiredWins: value.requiredWins ?? 2,

@@ -23,18 +23,19 @@ public sealed record LiveSoloProgramStateResponse(DateTimeOffset AsOf,
 }
 public sealed record LiveSoloProgramSegmentResponse(Guid Id, long Sequence, double DurationSeconds, LiveSoloProgramStateResponse State);
 public sealed record LiveSoloProgramResponse(Guid ProgramCaptureId, int DelaySeconds, IReadOnlyList<LiveSoloProgramSegmentResponse> Segments, bool Ended, string PlaylistUrl);
-public sealed class GetLiveSoloProgramEndpoint(ILiveSoloProgramReader programs, IUserContext user)
+public sealed class GetLiveSoloProgramEndpoint(ILiveSoloProgramReader programs, IUserContext user, LiveSoloViewerBrowserAccess browser)
     : Endpoint<GetLiveSoloProgramRequest, Results<Ok<LiveSoloProgramResponse>, NotFound>>
 {
     public override void Configure()
     {
         Get("/competitions/{competitionId}/live-solo/matches/{matchId}/program"); AllowAnonymous();
-        Description(x => x.WithName("GetLiveSoloProgram")); Summary(x => x.Summary = "Reads only published delayed video segments and their immutable matching state frames.");
+        Description(x => x.WithName("GetLiveSoloProgram").WithMetadata(new LiveSoloViewerBrowserAccessMetadata())); Summary(x => x.Summary = "Reads only published delayed video segments and their immutable matching state frames.");
     }
     public override async Task<Results<Ok<LiveSoloProgramResponse>, NotFound>> ExecuteAsync(GetLiveSoloProgramRequest req, CancellationToken ct)
     {
         HttpContext.Response.Headers.CacheControl = "private, no-store";
-        var program = await programs.ReadAsync(req.CompetitionId, req.MatchId, user.UserId, ct);
+        if (browser.LeaseId(HttpContext, req.CompetitionId, req.MatchId) == Guid.Empty) return TypedResults.NotFound();
+        var program = await programs.ReadAsync(req.CompetitionId, req.MatchId, user.UserId, browser.LeaseId(HttpContext, req.CompetitionId, req.MatchId), ct);
         return program is null ? TypedResults.NotFound() : TypedResults.Ok(new LiveSoloProgramResponse(program.ProgramCaptureId, program.DelaySeconds,
             program.Segments.Select(x => new LiveSoloProgramSegmentResponse(x.Id, x.Sequence, x.Duration.TotalSeconds, LiveSoloProgramStateResponse.From(x.State))).ToArray(), program.Ended,
             $"/api/v1/competitions/{req.CompetitionId:D}/live-solo/matches/{req.MatchId:D}/program/playlist"));

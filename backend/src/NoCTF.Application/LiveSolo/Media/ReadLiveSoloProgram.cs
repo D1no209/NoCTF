@@ -13,6 +13,6 @@ public sealed record LiveSoloProgramView(Guid ProgramCaptureId, int DelaySeconds
 public sealed record LiveSoloProgramContent(Stream Content, string ContentType);
 public interface ILiveSoloProgramReader
 {
-    Task<LiveSoloProgramView?> ReadAsync(Guid competitionId, Guid matchId, Guid actorId, CancellationToken cancellationToken);
-    Task<LiveSoloProgramContent?> OpenSegmentAsync(Guid competitionId, Guid matchId, Guid segmentId, Guid actorId, CancellationToken cancellationToken);
+    Task<LiveSoloProgramView?> ReadAsync(Guid competitionId, Guid matchId, Guid actorId, Guid leaseId, CancellationToken cancellationToken);
+    Task<LiveSoloProgramContent?> OpenSegmentAsync(Guid competitionId, Guid matchId, Guid segmentId, Guid actorId, Guid leaseId, CancellationToken cancellationToken);
 }

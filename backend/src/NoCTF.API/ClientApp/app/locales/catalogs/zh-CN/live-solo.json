@@ -1,4 +1,10 @@
 {
+  "liveSolo.program.capacity": "观众名额已满，请稍后重新进入。",
+  "liveSolo.program.enter": "进入观赛",
+  "liveSolo.program.entry": "进入延迟观赛",
+  "liveSolo.program.leaseExpired": "观赛资格已过期或撤销，请重新进入以检查资格。",
+  "liveSolo.program.leave": "退出观赛",
+  "liveSolo.settings.viewers": "每场比赛的浏览器观众上限",
   "liveSolo.program.title": "LiveSolo 节目",
   "liveSolo.program.play": "播放节目",
   "liveSolo.program.delay": "延迟 {seconds} 秒",

@@ -1,4 +1,10 @@
 {
+  "liveSolo.program.capacity": "The audience is full. Try entering again later.",
+  "liveSolo.program.enter": "Enter broadcast",
+  "liveSolo.program.entry": "Enter the delayed broadcast",
+  "liveSolo.program.leaseExpired": "Broadcast access expired or was withdrawn. Enter again to check access.",
+  "liveSolo.program.leave": "Leave broadcast",
+  "liveSolo.settings.viewers": "Maximum browser viewers per competition",
   "liveSolo.program.title": "LiveSolo program",
   "liveSolo.program.play": "Play program",
   "liveSolo.program.delay": "{seconds}-second delay",

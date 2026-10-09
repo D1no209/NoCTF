@@ -2,8 +2,6 @@ using FluentStorage.Storage;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.LiveSolo.Media;
 using NoCTF.Application.Teams.Moderation;
-using NoCTF.Domain.Competitions;
-using NoCTF.Domain.Challenges;
 using System.Data;
 using NoCTF.Domain.LiveSolo;
 using NoCTF.Infrastructure.Persistence;
@@ -12,17 +10,17 @@ namespace NoCTF.Infrastructure.LiveSolo.Media;
 
 public sealed class LiveSoloProgramReader(NoCtfDbContext db, ICompetitionModerationAuthorizer authorizer, IStore objects, TimeProvider clock) : ILiveSoloProgramReader
 {
-    private async Task<bool> AllowedAsync(Guid competitionId, Guid matchId, Guid actorId, CancellationToken ct)
+    private async Task<bool> AllowedAsync(Guid competitionId, Guid matchId, Guid actorId, Guid leaseId, CancellationToken ct)
     {
-        var competition = await db.Competitions.AsNoTracking().SingleOrDefaultAsync(x => x.Id == competitionId && x.Mode == GameMode.LiveSolo, ct);
-        if (competition is null || competition.Status is not (CompetitionStatus.Running or CompetitionStatus.Paused or CompetitionStatus.Finished)
-            || !await db.Set<LiveSoloCompetitionModeConfiguration>().AnyAsync(x => x.CompetitionId == competitionId && x.Enabled, ct)
-            || !await db.LiveSoloMatches.AnyAsync(x => x.Id == matchId && x.CompetitionId == competitionId && x.StartedAt != null, ct)) return false;
-        return competition.AccessMode == CompetitionAccessMode.Public || actorId != Guid.Empty && await authorizer.CanObserveAsync(actorId, competitionId, ct);
+        if (!await LiveSoloViewerEligibility.AllowedAsync(db, authorizer, competitionId, matchId, actorId, ct)) return false;
+        var userId = actorId == Guid.Empty ? (Guid?)null : actorId;
+        return await db.Set<LiveSoloViewerLease>().AnyAsync(x => x.Id == leaseId && x.CompetitionId == competitionId
+            && x.MatchId == matchId && x.UserId == userId && x.ExpiresAt > clock.GetUtcNow(), ct)
+            && await LiveSoloViewerEligibility.WithinCapacityAsync(db, competitionId, leaseId, clock.GetUtcNow(), ct);
     }
-    public async Task<LiveSoloProgramView?> ReadAsync(Guid competitionId, Guid matchId, Guid actorId, CancellationToken ct)
+    public async Task<LiveSoloProgramView?> ReadAsync(Guid competitionId, Guid matchId, Guid actorId, Guid leaseId, CancellationToken ct)
     {
-        if (!await AllowedAsync(competitionId, matchId, actorId, ct)) return null;
+        if (!await AllowedAsync(competitionId, matchId, actorId, leaseId, ct)) return null;
         await MarkExposureAsync(competitionId, ct);
         var now = clock.GetUtcNow();
         var latest = await db.LiveSoloProgramSegments.AsNoTracking().Where(x => x.PublicAt <= now && x.RemoveAfter > now
@@ -44,9 +42,9 @@ public sealed class LiveSoloProgramReader(NoCtfDbContext db, ICompetitionModerat
             frame.LeftTeamId, frame.RightTeamId, frame.LeftTeamName, frame.RightTeamName, frame.RoundId, frame.RoundNumber, frame.RoundState,
             frame.TimelineRevision, frame.ActiveElapsedMilliseconds, frame.LimitSeconds, frame.Paused,
             frame.Questions.OrderBy(x => x.Position).Select(x => new LiveSoloProgramQuestionView(x.RoundQuestionId, x.CompetitionChallengeId, x.Position, x.Title, x.OpenedAt)).ToArray());
-    public async Task<LiveSoloProgramContent?> OpenSegmentAsync(Guid competitionId, Guid matchId, Guid segmentId, Guid actorId, CancellationToken ct)
+    public async Task<LiveSoloProgramContent?> OpenSegmentAsync(Guid competitionId, Guid matchId, Guid segmentId, Guid actorId, Guid leaseId, CancellationToken ct)
     {
-        if (!await AllowedAsync(competitionId, matchId, actorId, ct)) return null;
+        if (!await AllowedAsync(competitionId, matchId, actorId, leaseId, ct)) return null;
         var now = clock.GetUtcNow();
         var segment = await db.LiveSoloProgramSegments.AsNoTracking().SingleOrDefaultAsync(x => x.Id == segmentId && x.PublicAt <= now && x.RemoveAfter > now
             && db.LiveSoloMediaSessions.Any(s => s.Id == x.MediaSessionId && s.MatchId == matchId), ct);
@@ -55,7 +53,7 @@ public sealed class LiveSoloProgramReader(NoCtfDbContext db, ICompetitionModerat
         if (!await objects.ObjectExists(file.ObjectKey, ct)) return null;
         var stream = await objects.OpenRead(file.ObjectKey, ct);
         if (stream is null) return null;
-        if (!await AllowedAsync(competitionId, matchId, actorId, ct)
+        if (!await AllowedAsync(competitionId, matchId, actorId, leaseId, ct)
             || !LiveSoloProgramPolicy.MayReadSegment(segment.PublicAt, segment.RemoveAfter, clock.GetUtcNow()))
         { await stream.DisposeAsync(); return null; }
         try { await MarkExposureAsync(competitionId, ct); }

@@ -11,6 +11,18 @@ using NoCTF.Domain.Teams;
 
 namespace NoCTF.Infrastructure.LiveSolo.Persistence;
 
+internal sealed class LiveSoloViewerLeaseConfiguration : IEntityTypeConfiguration<LiveSoloViewerLease>
+{
+    public void Configure(EntityTypeBuilder<LiveSoloViewerLease> builder)
+    {
+        builder.ToTable("live_solo_viewer_leases"); builder.HasKey(x => x.Id);
+        builder.HasIndex(x => new { x.CompetitionId, x.ExpiresAt });
+        builder.HasOne<Competition>().WithMany().HasForeignKey(x => x.CompetitionId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<LiveSoloMatch>().WithMany().HasForeignKey(x => x.MatchId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
 internal sealed class LiveSoloMatchConfiguration : IEntityTypeConfiguration<LiveSoloMatch>
 {
     public void Configure(EntityTypeBuilder<LiveSoloMatch> builder)

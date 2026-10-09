@@ -759,6 +759,7 @@ POST /api/v1/competitions/{competitionId}/live-solo/matches
 GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}
 GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/media
 GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/program
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/program/viewer
 GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/program/playlist
 GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/program/segments/{segmentId}
 GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/recordings

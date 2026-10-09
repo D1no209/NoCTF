@@ -4887,6 +4887,74 @@
         ]
       }
     },
+    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/program/viewer": {
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Enters, renews or leaves a browser-bound delayed-programme viewer lease.",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/program/viewer.",
+        "operationId": "ManageLiveSoloViewer",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "ManageLiveSoloViewerRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloManageLiveSoloViewerRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloViewerResponse"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/attachments/{attachmentId}/browser-download": {
       "post": {
         "tags": [
@@ -28166,6 +28234,48 @@
             }
           }
         }
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloViewerResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "leaseId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloManageLiveSoloViewerRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "expectedLeaseId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "action": {
+            "$ref": "#/components/schemas/NoCTFApplicationLiveSoloMediaLiveSoloViewerAction"
+          }
+        }
+      },
+      "NoCTFApplicationLiveSoloMediaLiveSoloViewerAction": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Enter",
+          "Renew",
+          "Leave"
+        ],
+        "enum": [
+          "Enter",
+          "Renew",
+          "Leave"
+        ]
       },
       "NoCTFAPIEndpointsLiveSoloMutateLiveSoloRuntimeRequest": {
         "type": "object",

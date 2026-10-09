@@ -1338,6 +1338,18 @@ export type NoCtfapiEndpointsLiveSoloLockLiveSoloRosterRequest = {
     userIds: Array<string>;
 };
 
+export type NoCtfapiEndpointsLiveSoloLiveSoloViewerResponse = {
+    leaseId?: string;
+    expiresAt?: string;
+};
+
+export type NoCtfapiEndpointsLiveSoloManageLiveSoloViewerRequest = {
+    expectedLeaseId?: string | null;
+    action?: NoCtfApplicationLiveSoloMediaLiveSoloViewerAction;
+};
+
+export type NoCtfApplicationLiveSoloMediaLiveSoloViewerAction = 'Enter' | 'Renew' | 'Leave';
+
 export type NoCtfapiEndpointsLiveSoloMutateLiveSoloRuntimeRequest = {
     action: NoCtfapiEndpointsLiveSoloLiveSoloRuntimeActionProtocol;
     expectedRuntimeInstanceId?: string | null;
@@ -7602,6 +7614,38 @@ export type LockLiveSoloRosterResponses = {
 };
 
 export type LockLiveSoloRosterResponse = LockLiveSoloRosterResponses[keyof LockLiveSoloRosterResponses];
+
+export type ManageLiveSoloViewerData = {
+    body: NoCtfapiEndpointsLiveSoloManageLiveSoloViewerRequest;
+    path: {
+        competitionId: string;
+        matchId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/program/viewer';
+};
+
+export type ManageLiveSoloViewerErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+};
+
+export type ManageLiveSoloViewerError = ManageLiveSoloViewerErrors[keyof ManageLiveSoloViewerErrors];
+
+export type ManageLiveSoloViewerResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsLiveSoloLiveSoloViewerResponse;
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type ManageLiveSoloViewerResponse = ManageLiveSoloViewerResponses[keyof ManageLiveSoloViewerResponses];
 
 export type PrepareLiveSoloAttachmentDownloadData = {
     body?: never;
