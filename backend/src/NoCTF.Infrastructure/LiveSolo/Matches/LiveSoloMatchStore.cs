@@ -26,10 +26,15 @@ public sealed partial class LiveSoloMatchStore(NoCtfDbContext db, ICompetitionMo
         for (var attempt = 0; ; attempt++)
         {
             var committed = false;
+            var changedMatches = new HashSet<Guid>(); var changedRounds = new HashSet<Guid>();
+            EventHandler<SavingChangesEventArgs> capture = (_, _) => CaptureChanges(changedMatches, changedRounds);
+            db.SavingChanges += capture;
             try
             {
                 await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
                 var result = await work();
+                CaptureChanges(changedMatches, changedRounds);
+                await PublishChangesAsync(changedMatches, changedRounds, ct);
                 await db.SaveChangesAsync(ct); await tx.CommitAsync(ct); committed = true;
                 await messages.FlushCommittedMessagesAsync(); return result;
             }
@@ -37,7 +42,30 @@ public sealed partial class LiveSoloMatchStore(NoCtfDbContext db, ICompetitionMo
             { db.ChangeTracker.Clear(); messages.DiscardPendingMessages(); }
             catch (Exception ex) when (!committed && (ex is DbUpdateException || TransactionFailureClassifier.IsRetryable(ex)))
             { db.ChangeTracker.Clear(); messages.DiscardPendingMessages(); return conflict(); }
+            catch when (!committed) { messages.DiscardPendingMessages(); throw; }
+            finally { db.SavingChanges -= capture; }
         }
+    }
+
+    private void CaptureChanges(HashSet<Guid> ids, HashSet<Guid> rounds)
+    {
+        db.ChangeTracker.DetectChanges();
+        static bool Changed(EntityState state) => state is EntityState.Added or EntityState.Modified or EntityState.Deleted;
+        ids.UnionWith(db.ChangeTracker.Entries<LiveSoloMatch>().Where(x => Changed(x.State)).Select(x => x.Entity.Id)
+            .Concat(db.ChangeTracker.Entries<LiveSoloRound>().Where(x => Changed(x.State)).Select(x => x.Entity.MatchId))
+            .Concat(db.ChangeTracker.Entries<LiveSoloMatchSlot>().Where(x => Changed(x.State)).Select(x => x.Entity.MatchId))
+            .Concat(db.ChangeTracker.Entries<LiveSoloRosterMember>().Where(x => Changed(x.State)).Select(x => x.Entity.MatchId)));
+        rounds.UnionWith(db.ChangeTracker.Entries<LiveSoloRoundQuestion>().Where(x => Changed(x.State)).Select(x => x.Entity.RoundId));
+    }
+    private async Task PublishChangesAsync(HashSet<Guid> ids, HashSet<Guid> rounds, CancellationToken ct)
+    {
+        var roundIds = rounds.ToArray();
+        foreach (var id in await db.LiveSoloRounds.Where(x => roundIds.Contains(x.Id)).Select(x => x.MatchId).ToArrayAsync(ct)) ids.Add(id);
+        var matchIds = ids.ToArray();
+        var competitions = await db.LiveSoloMatches.AsNoTracking().Where(x => matchIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.CompetitionId, ct);
+        foreach (var match in db.ChangeTracker.Entries<LiveSoloMatch>().Select(x => x.Entity).Where(x => ids.Contains(x.Id))) competitions[match.Id] = match.CompetitionId;
+        foreach (var match in competitions)
+            await messages.PublishAsync(new NoCTF.Application.LiveSolo.Realtime.LiveSoloMatchChanged(match.Value, match.Key, (clock ?? TimeProvider.System).GetUtcNow()));
     }
 
     private async Task<bool> ActiveAsync(Guid actor, CancellationToken ct) => actor != Guid.Empty

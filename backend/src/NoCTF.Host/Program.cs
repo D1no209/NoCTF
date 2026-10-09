@@ -150,6 +150,7 @@ if (roles.Has(HostRole.Api))
     app.UseNoCtfPipeline();
     app.UseNoCtfEndpoints();
     app.MapHub<CompetitionHub>("/hubs/v1/competitions", options => options.CloseOnAuthenticationExpiration = true);
+    app.MapHub<NoCTF.API.LiveSolo.Realtime.LiveSoloHub>("/hubs/v1/live-solo", options => options.CloseOnAuthenticationExpiration = true);
     app.MapHub<NotificationHub>("/hubs/v1/notifications", options => options.CloseOnAuthenticationExpiration = true);
     app.MapHub<PlatformLogHub>("/hubs/v1/admin/platform-logs", options => options.CloseOnAuthenticationExpiration = true);
 }

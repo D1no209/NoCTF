@@ -47,6 +47,8 @@ public static class LiveSoloInfrastructure
         services.AddScoped<ILiveSoloProgramReader, LiveSoloProgramReader>();
         services.AddScoped<ILiveSoloRecordingStore, LiveSoloRecordingStore>();
         services.AddScoped<ManageLiveSoloRecordings>();
+        services.AddScoped<NoCTF.Application.LiveSolo.Realtime.ILiveSoloRealtimeAccess, Realtime.LiveSoloRealtimeAccess>();
+        services.AddSingleton<NoCTF.Application.LiveSolo.Realtime.ILiveSoloRealtimePublisher, Realtime.NatsLiveSoloRealtimePublisher>();
         services.AddScoped<IClusterScheduleContributor, LiveSoloCaptureScheduleSource>();
         services.AddScoped<IClusterScheduleContributor, LiveSoloMediaScheduleSource>();
         services.AddScoped<IClusterScheduleContributor, LiveSoloScheduleSource>();

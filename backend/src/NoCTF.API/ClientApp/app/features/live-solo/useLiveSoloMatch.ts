@@ -13,6 +13,7 @@ import { parseLiveSoloError } from './live-solo-errors'
 import { matchStateKey, canJudgeLiveSolo, roundRemainingSeconds, formatRoundClock, canPlayLiveSolo } from './live-solo-state'
 import LiveSoloQuestions from './LiveSoloQuestions.vue'
 import { useLiveSoloScreen } from './media/useLiveSoloScreen'
+import { useLiveSoloHub } from './useLiveSoloHub'
 import CompetitionParticipantWorkspace from '~/features/competition/CompetitionParticipantWorkspace.vue'
 
 export function useLiveSoloMatch() {
@@ -24,6 +25,7 @@ export function useLiveSoloMatch() {
   const loading = ref(true), busy = ref(false), error = ref<UiMessage | null>(null)
   const selectedRoster = ref<string[]>([]), memberNames = ref<ReadonlyMap<string, string>>(new Map())
   const staff = computed(() => ctx?.competition.value?.administrationRole != null)
+  useLiveSoloHub(competitionId, matchId, staff, load)
   const judge = computed(() => canJudgeLiveSolo(ctx?.competition.value?.administrationRole))
   const myRoster = computed(() => match.value?.rosters?.find(x => x.teamId === team.value?.id) ?? null)
   const captain = computed(() => user.value?.userId != null && team.value?.captainId === user.value.userId)
@@ -46,13 +48,14 @@ export function useLiveSoloMatch() {
   const decision = shallowRef<JudgeRequest | null>(null)
   const leaveOpen = ref(false)
   let leaveTo: string | null = null, allowLeave = false
-  let disposed = false, request = 0, pending = false, timer: ReturnType<typeof setTimeout> | undefined, clockTimer: ReturnType<typeof setInterval> | undefined
+  let disposed = false, request = 0, pending = false, refreshQueued = false, timer: ReturnType<typeof setTimeout> | undefined, clockTimer: ReturnType<typeof setInterval> | undefined
   const elapsedSinceSnapshot = ref(0)
   let observedAt = 0
   const clock = computed(() => formatRoundClock(roundRemainingSeconds(round.value, elapsedSinceSnapshot.value)))
 
   async function load() {
-    if (pending || disposed) return
+    if (disposed) return
+    if (pending) { refreshQueued = true; return }
     pending = true; const id = ++request
     try {
       if (!ctx?.competition.value) await ctx?.refresh()
@@ -87,7 +90,7 @@ export function useLiveSoloMatch() {
     catch (cause) {
       if (!disposed && id === request) { error.value = parseLiveSoloError(cause, message('liveSolo.error.load')).displayMessage; await screen.disconnect() }
     }
-    finally { pending = false; loading.value = false }
+    finally { pending = false; loading.value = false; if (refreshQueued && !disposed) { refreshQueued = false; void load() } }
   }
   async function operation(work: () => PromiseLike<{ error?: unknown; response?: Response }>) {
     if (busy.value) return

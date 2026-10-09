@@ -6,7 +6,7 @@ using NoCTF.Infrastructure.Authentication.Mfa;
 
 namespace NoCTF.API.SignalR.Hubs;
 
-public enum MfaHubKind : short { Competition, Notifications, PlatformLogs }
+public enum MfaHubKind : short { Competition, Notifications, PlatformLogs, LiveSolo }
 
 public interface IMfaConnectionContextValidator
 {
@@ -55,7 +55,8 @@ public sealed class MfaHubFilter(MfaConnectionGuard guard) : IHubFilter
 {
     public async Task OnConnectedAsync(HubLifetimeContext context, Func<HubLifetimeContext, Task> next)
     {
-        var kind = context.Hub switch { CompetitionHub => MfaHubKind.Competition, NotificationHub => MfaHubKind.Notifications, _ => MfaHubKind.PlatformLogs };
+        var kind = context.Hub switch { CompetitionHub => MfaHubKind.Competition, NotificationHub => MfaHubKind.Notifications,
+            NoCTF.API.LiveSolo.Realtime.LiveSoloHub => MfaHubKind.LiveSolo, _ => MfaHubKind.PlatformLogs };
         guard.Register(context.Context, kind); await guard.RevalidateAsync(context.Context.ConnectionAborted);
         if (!guard.IsRegistered(context.Context.ConnectionId)) throw new HubException("Authentication is no longer sufficient.");
         await next(context);

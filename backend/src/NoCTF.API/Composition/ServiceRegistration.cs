@@ -216,8 +216,15 @@ public static class ServiceRegistration
         services.AddSingleton<IMfaConnectionContextValidator, ScopedMfaConnectionContextValidator>();
         services.AddSingleton<MfaConnectionGuard>();
         services.AddSingleton<MfaHubFilter>();
+        services.AddSingleton<NoCTF.API.LiveSolo.Realtime.ILiveSoloConnectionAccess, ScopedLiveSoloConnectionAccess>();
+        services.AddSingleton<NoCTF.API.LiveSolo.Realtime.LiveSoloConnectionGuard>();
         services.AddSignalR(options => options.AddFilter<MfaHubFilter>());
-        if (includeInfrastructure && !configuration.GetValue<bool>("OpenApi:Exporting")) services.AddHostedService<MfaConnectionRevalidationAgent>();
+        if (includeInfrastructure && !configuration.GetValue<bool>("OpenApi:Exporting"))
+        {
+            services.AddHostedService<MfaConnectionRevalidationAgent>();
+            services.AddHostedService<NoCTF.API.LiveSolo.Realtime.LiveSoloConnectionRevalidationAgent>();
+            services.AddHostedService<NoCTF.API.LiveSolo.Realtime.NatsLiveSoloRealtimeRelay>();
+        }
         services.AddSingleton<CompetitionHubSubscriptionRegistry>();
         services.AddSingleton<ICompetitionHubAudienceAccess, CompetitionHubAudienceAccess>();
         services.AddSingleton<ICompetitionHubAudienceRouter, CompetitionHubAudienceRouter>();

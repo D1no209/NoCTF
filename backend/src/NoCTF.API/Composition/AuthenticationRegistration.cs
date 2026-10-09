@@ -31,6 +31,7 @@ public static class AuthenticationRegistration
                     OnMessageReceived = context =>
                     {
                         if ((context.HttpContext.Request.Path.StartsWithSegments("/hubs/v1/competitions")
+                                || context.HttpContext.Request.Path.StartsWithSegments("/hubs/v1/live-solo")
                                 || context.HttpContext.Request.Path.StartsWithSegments(
                                     "/hubs/v1/notifications")
                                 || context.HttpContext.Request.Path.StartsWithSegments(
