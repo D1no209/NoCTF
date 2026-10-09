@@ -11,11 +11,16 @@ public sealed partial class LiveSoloCaptureStore
         if (program.StartedAt is not { } started) return false;
         var segments = await files.SegmentsAsync(program.Id, ct);
         if (segments.Count == 0) return false;
-        var cursor = started;
+        var cursor = program.ImportedThrough ?? started;
+        if(program.ImportedThrough is null && await db.LiveSoloProgramSegments.AnyAsync(x=>x.ProgramCaptureId==program.Id,ct))
+            throw new InvalidDataException("A media capture without a durable import cursor cannot continue.");
         foreach (var item in segments.OrderBy(x => x.Sequence))
         {
+            if(item.Sequence<program.NextSegmentSequence)
+            {await files.RemoveSegmentAsync(program.Id,item.FileName,ct);continue;}
+            if(item.Sequence!=program.NextSegmentSequence)throw new InvalidDataException("Media export has a missing segment.");
+            cursor=program.ImportedThrough??started;
             var from = cursor; cursor += item.Duration;
-            if (await db.LiveSoloProgramSegments.AnyAsync(x => x.ProgramCaptureId == program.Id && x.Sequence == item.Sequence, ct)) continue;
             var frame = await db.LiveSoloProgramFrames.AsNoTracking().Where(x => x.MediaSessionId == session.Id && x.OccurredAt <= cursor)
                 .OrderByDescending(x => x.OccurredAt).Select(x => (Guid?)x.Id).FirstOrDefaultAsync(ct);
             if (frame is null) return false;
@@ -29,16 +34,22 @@ public sealed partial class LiveSoloCaptureStore
                 await TransactionAsync(async () =>
                 {
                     attached = false;
-                    if (await db.LiveSoloProgramSegments.AnyAsync(x => x.ProgramCaptureId == program.Id && x.Sequence == item.Sequence, ct)) return;
+                    await db.Entry(program).ReloadAsync(ct);
+                    if(program.NextSegmentSequence>item.Sequence)return;
+                    if(program.NextSegmentSequence!=item.Sequence || (program.ImportedThrough??started)!=from)
+                        throw new InvalidDataException("Media import cursor changed.");
                     // Upload/observation time is a conservative floor. Provider timing never permits early publication.
                     var observed = clock.GetUtcNow(); var publicAt = LiveSoloProgramPolicy.PublicationTime(cursor, observed, session.PublicDelaySeconds);
                     db.LiveSoloProgramSegments.Add(new() { Id = Guid.CreateVersion7(observed), MediaSessionId = session.Id,
                         ProgramCaptureId = program.Id, FrameId = frame.Value, Sequence = item.Sequence, FileId = upload.FileId,
                         StartedAt = from, EndedAt = cursor, PublicAt = publicAt, RemoveAfter = publicAt.AddMinutes(5) });
+                    program.NextSegmentSequence=checked(item.Sequence+1);program.ImportedThrough=cursor;
                     attached = true;
                 }, ct);
             }
             finally { if (!attached) await uploads.AbandonAsync(upload.FileId); }
+            await content.DisposeAsync();
+            await files.RemoveSegmentAsync(program.Id,item.FileName,ct);
         }
         return true;
     }

@@ -45,7 +45,8 @@ public sealed partial class LiveSoloCaptureFiles(LiveKitMediaOptions options) : 
             var match = SegmentName().Match(line.Trim());
             if (!match.Success || seconds is null || !long.TryParse(match.Groups[1].Value, CultureInfo.InvariantCulture, out var sequence))
                 throw new InvalidDataException("Invalid media segment identity.");
-            if (RegularFileExists(Path.Combine(DirectoryFor(id), line.Trim()))) entries.Add(new(sequence, line.Trim(), TimeSpan.FromSeconds(seconds.Value)));
+            RegularFileExists(Path.Combine(DirectoryFor(id), line.Trim()));
+            entries.Add(new(sequence, line.Trim(), TimeSpan.FromSeconds(seconds.Value)));
             seconds = null;
         }
         return entries;
@@ -57,6 +58,14 @@ public sealed partial class LiveSoloCaptureFiles(LiveKitMediaOptions options) : 
         var path = Path.Combine(DirectoryFor(id), fileName);
         return Task.FromResult<Stream?>(RegularFileExists(path) ? new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 81920,
             FileOptions.Asynchronous | FileOptions.SequentialScan) : null);
+    }
+    public Task RemoveSegmentAsync(Guid id,string fileName,CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        if(!SegmentName().IsMatch(fileName))throw new InvalidDataException("Invalid media segment identity.");
+        var path=Path.Combine(DirectoryFor(id),fileName);
+        if(RegularFileExists(path))File.Delete(path);
+        return Task.CompletedTask;
     }
     public Task RemoveAsync(Guid id, CancellationToken ct)
     {

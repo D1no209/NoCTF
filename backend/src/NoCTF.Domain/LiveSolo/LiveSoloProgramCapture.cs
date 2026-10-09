@@ -17,6 +17,8 @@ public sealed class LiveSoloProgramCapture : IConcurrencyTracked
     public DateTimeOffset? EndedAt { get; set; }
     public DateTimeOffset? ImportedAt { get; set; }
     public DateTimeOffset? RawRemovedAt { get; set; }
+    public long NextSegmentSequence { get; set; }
+    public DateTimeOffset? ImportedThrough { get; set; }
 }
 
 /// <summary>Immutable state at a server observation time, never a projection of future current state.</summary>

@@ -25,7 +25,7 @@ public sealed class LiveSoloCaptureFilesTests
             Directory.Delete(Path.Combine(root,"live-solo"));Directory.Delete(root); }
     }
     [Test]
-    public async Task Playlist_parser_accepts_only_completed_local_segments_and_rejects_traversal()
+    public async Task Playlist_parser_retains_segment_metadata_after_raw_cleanup_and_rejects_traversal()
     {
         var root = Path.Combine(Path.GetTempPath(), "noctf-capture-test-" + Guid.NewGuid().ToString("N"));
         var id = Guid.NewGuid(); var folder = Path.Combine(root, "live-solo", id.ToString("N"));
@@ -38,8 +38,11 @@ public sealed class LiveSoloCaptureFilesTests
             var files = new LiveSoloCaptureFiles(new() { CaptureSpoolPath = root });
             var rows = await files.SegmentsAsync(id, CancellationToken.None);
             await Assert.That(rows.Count).IsEqualTo(1); await Assert.That(rows[0].Sequence).IsEqualTo(0L);
-            await using var stream = await files.OpenAsync(id, rows[0].FileName, CancellationToken.None);
-            await Assert.That(stream!.Length).IsEqualTo(4L);
+            await using (var stream = await files.OpenAsync(id, rows[0].FileName, CancellationToken.None))
+                await Assert.That(stream!.Length).IsEqualTo(4L);
+            await files.RemoveSegmentAsync(id,rows[0].FileName,CancellationToken.None);
+            await Assert.That((await files.SegmentsAsync(id,CancellationToken.None)).Single().Duration).IsEqualTo(TimeSpan.FromSeconds(2));
+            await Assert.That(await files.OpenAsync(id,rows[0].FileName,CancellationToken.None)).IsNull();
             await File.WriteAllTextAsync(playlist, "#EXTM3U\n#EXTINF:2.000,\n../../secret.ts\n");
             await Assert.That(async () => await files.SegmentsAsync(id, CancellationToken.None)).Throws<InvalidDataException>();
             await Assert.That(async () => await files.OpenAsync(id, "../recording.mp4", CancellationToken.None)).Throws<InvalidDataException>();
