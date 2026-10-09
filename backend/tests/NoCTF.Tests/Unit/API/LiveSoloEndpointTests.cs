@@ -295,9 +295,24 @@ public sealed class LiveSoloEndpointTests
         await Assert.That((await range.Content.ReadAsByteArrayAsync()).SequenceEqual(new byte[] { 2, 3 })).IsTrue();
         await Assert.That(range.Headers.CacheControl!.NoStore).IsTrue();
     }
+    [Test]
+    public async Task Participant_policy_is_authenticated_minimal_and_uses_only_the_principal_actor()
+    {
+        var policies = Substitute.For<ILiveSoloPlayerPolicyReader>(); var competition = Guid.NewGuid();
+        policies.ReadAsync(competition, Actor, Arg.Any<CancellationToken>()).Returns(new LiveSoloPlayerPolicy(true, 2, 2, 60, false, false));
+        await using var app = await HostAsync(Substitute.For<ILiveSoloMatchStore>(), Substitute.For<ILiveSoloAttachmentStore>(), Substitute.For<IStore>(), policies: policies);
+        using var client = app.GetTestClient(); var path = $"/api/v1/competitions/{competition}/live-solo/player-policy";
+        using var anonymous = await client.GetAsync(path); await Assert.That(anonymous.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
+        client.DefaultRequestHeaders.Authorization = new("Bearer", "verified-test");
+        using var allowed = await client.GetAsync(path + "?actorId=" + Guid.NewGuid()); await Assert.That(allowed.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using var body = JsonDocument.Parse(await allowed.Content.ReadAsStringAsync());
+        await Assert.That(body.RootElement.EnumerateObject().Count()).IsEqualTo(6);
+        await Assert.That(body.RootElement.TryGetProperty("stageRules", out _)).IsFalse();
+        await policies.Received(1).ReadAsync(competition, Actor, Arg.Any<CancellationToken>());
+    }
     private static async Task<WebApplication> HostAsync(ILiveSoloMatchStore store, ILiveSoloAttachmentStore attachmentStore, IStore objects,
         ILiveSoloAdjudicationStore? decisions = null, ILiveSoloRuntimeStore? runtimes = null, ILiveSoloMediaStore? media = null, ILiveSoloProgramReader? programs = null,
-        ILiveSoloRecordingStore? recordings = null)
+        ILiveSoloRecordingStore? recordings = null, ILiveSoloPlayerPolicyReader? policies = null)
     {
         var builder = WebApplication.CreateBuilder(); builder.WebHost.UseTestServer();
         builder.Services.AddFastEndpoints(options => { options.DisableAutoDiscovery = true; options.Assemblies = [typeof(GetLiveSoloMatchEndpoint).Assembly];
@@ -307,7 +322,8 @@ public sealed class LiveSoloEndpointTests
                 || x == typeof(GetLiveSoloRuntimeEndpoint) || x == typeof(MutateLiveSoloRuntimeEndpoint)
                 || x == typeof(GetLiveSoloMediaEndpoint) || x == typeof(PrepareLiveSoloMediaEndpoint) || x == typeof(JoinLiveSoloMediaEndpoint)
                 || x == typeof(GetLiveSoloProgramEndpoint) || x == typeof(GetLiveSoloProgramPlaylistEndpoint) || x == typeof(GetLiveSoloProgramSegmentEndpoint)
-                || x == typeof(ListLiveSoloRecordingsEndpoint) || x == typeof(ChangeLiveSoloRecordingEndpoint) || x == typeof(GetLiveSoloRecordingEndpoint); });
+                || x == typeof(ListLiveSoloRecordingsEndpoint) || x == typeof(ChangeLiveSoloRecordingEndpoint) || x == typeof(GetLiveSoloRecordingEndpoint)
+                || x == typeof(GetLiveSoloPlayerPolicyEndpoint); });
         builder.Services.AddAuthentication("Bearer").AddScheme<AuthenticationSchemeOptions, TestAuthentication>("Bearer", _ => { });
         builder.Services.AddAuthorization(); builder.Services.AddSingleton(store); builder.Services.AddSingleton<ManageLiveSoloMatches>();
         builder.Services.AddSingleton(attachmentStore); builder.Services.AddSingleton(objects); builder.Services.AddSingleton<AccessLiveSoloAttachments>();
@@ -316,6 +332,7 @@ public sealed class LiveSoloEndpointTests
         builder.Services.AddSingleton(media ?? Substitute.For<ILiveSoloMediaStore>()); builder.Services.AddSingleton<ManageLiveSoloMedia>();
         builder.Services.AddSingleton(programs ?? Substitute.For<ILiveSoloProgramReader>());
         builder.Services.AddSingleton(recordings ?? Substitute.For<ILiveSoloRecordingStore>()); builder.Services.AddSingleton<ManageLiveSoloRecordings>();
+        builder.Services.AddSingleton(policies ?? Substitute.For<ILiveSoloPlayerPolicyReader>());
         builder.Services.AddSingleton<IUserContext>(new TestUser()); builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton<IRequestAdmission>(new Admission());
         var source = Substitute.For<IRequestSourceAddress>(); source.Address.Returns("192.0.2.10");

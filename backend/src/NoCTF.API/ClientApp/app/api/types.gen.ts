@@ -1018,6 +1018,19 @@ export type NoCtfapiEndpointsLiveSoloGetLiveSoloMediaRequest = {
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsLiveSoloLiveSoloPlayerPolicyResponse = {
+    enabled?: boolean;
+    requiredWins?: number;
+    maximumRosterMembers?: number;
+    publicDelaySeconds?: number;
+    participantsMayViewOpponents?: boolean;
+    recordingEnabled?: boolean;
+};
+
+export type NoCtfapiEndpointsLiveSoloGetLiveSoloPlayerPolicyRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsLiveSoloLiveSoloProgramResponse = {
     programCaptureId?: string;
     delaySeconds?: number;
@@ -6794,6 +6807,39 @@ export type PrepareLiveSoloMediaResponses = {
 };
 
 export type PrepareLiveSoloMediaResponse = PrepareLiveSoloMediaResponses[keyof PrepareLiveSoloMediaResponses];
+
+export type GetLiveSoloPlayerPolicyData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/player-policy';
+};
+
+export type GetLiveSoloPlayerPolicyErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetLiveSoloPlayerPolicyResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsLiveSoloLiveSoloPlayerPolicyResponse;
+};
+
+export type GetLiveSoloPlayerPolicyResponse = GetLiveSoloPlayerPolicyResponses[keyof GetLiveSoloPlayerPolicyResponses];
 
 export type GetLiveSoloProgramData = {
     body?: never;

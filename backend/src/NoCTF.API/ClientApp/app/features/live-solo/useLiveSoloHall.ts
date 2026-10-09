@@ -1,6 +1,6 @@
 import { computed, inject, markRaw, onMounted, onScopeDispose, ref } from 'vue'
-import { listLiveSoloMatches, getLiveSoloConfiguration } from '~/api'
-import type { NoCtfapiEndpointsLiveSoloLiveSoloMatchResponse as Match, NoCtfapiEndpointsLiveSoloLiveSoloConfigurationContract as Configuration } from '~/api'
+import { listLiveSoloMatches, getLiveSoloPlayerPolicy } from '~/api'
+import type { NoCtfapiEndpointsLiveSoloLiveSoloMatchResponse as Match, NoCtfapiEndpointsLiveSoloLiveSoloPlayerPolicyResponse as Configuration } from '~/api'
 import { competitionContextKey } from '~/utils/labels'
 import { message, type UiMessage } from '~/utils/i18n'
 import { parseLiveSoloError } from './live-solo-errors'
@@ -30,7 +30,7 @@ export function useLiveSoloHall() {
       if (!ctx?.competition.value) await ctx?.refresh()
       if (ctx?.competition.value?.mode !== 'LiveSolo') { matches.value = []; configuration.value = null; return }
       const [config, rows] = await Promise.all([
-        getLiveSoloConfiguration({ path: { competitionId: competitionId.value } }),
+        getLiveSoloPlayerPolicy({ path: { competitionId: competitionId.value } }),
         listLiveSoloMatches({ path: { competitionId: competitionId.value }, query: { staff: ctx?.competition.value?.administrationRole != null } }),
       ])
       if (disposed || id !== request) return

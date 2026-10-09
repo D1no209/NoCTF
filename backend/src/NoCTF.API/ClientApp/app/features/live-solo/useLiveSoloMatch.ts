@@ -1,10 +1,10 @@
 import { computed, inject, markRaw, onMounted, onScopeDispose, ref, shallowRef, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
-import { getLiveSoloMatch, getLiveSoloMedia, getLiveSoloRound, getLiveSoloConfiguration, getMyTeamEndpoint,
+import { getLiveSoloMatch, getLiveSoloMedia, getLiveSoloRound, getLiveSoloPlayerPolicy, getMyTeamEndpoint,
   prepareLiveSoloMedia, lockLiveSoloRoster, confirmLiveSoloReady, prepareLiveSoloRound, startLiveSoloCountdown,
   adjudicateLiveSoloMatch, userProfileGet } from '~/api'
 import type { NoCtfapiEndpointsLiveSoloLiveSoloMatchResponse as Match, NoCtfapiEndpointsLiveSoloLiveSoloRoundResponse as Round,
-  NoCtfapiEndpointsLiveSoloLiveSoloMediaResponse as Media, NoCtfapiEndpointsLiveSoloLiveSoloConfigurationContract as Configuration,
+  NoCtfapiEndpointsLiveSoloLiveSoloMediaResponse as Media, NoCtfapiEndpointsLiveSoloLiveSoloPlayerPolicyResponse as Configuration,
   NoCtfapiEndpointsTeamsTeamResponse as Team, NoCtfDomainLiveSoloLiveSoloJudgeAction as JudgeAction,
   NoCtfapiEndpointsLiveSoloAdjudicateLiveSoloMatchRequest as JudgeRequest } from '~/api'
 import { competitionContextKey } from '~/utils/labels'
@@ -61,7 +61,7 @@ export function useLiveSoloMatch() {
       if (!ctx?.competition.value) await ctx?.refresh()
       const path = { competitionId: competitionId.value, matchId: matchId.value }
       const [result, config, mine, room] = await Promise.all([getLiveSoloMatch({ path, query: { staff: staff.value } }),
-        getLiveSoloConfiguration({ path: { competitionId: path.competitionId } }),
+        getLiveSoloPlayerPolicy({ path: { competitionId: path.competitionId } }),
         getMyTeamEndpoint({ path: { competitionId: path.competitionId } }), getLiveSoloMedia({ path })])
       if (disposed || id !== request) return
       if (result.error || !result.data || config.error || !config.data) throw parseLiveSoloError(result.error ?? config.error, message('liveSolo.error.load'))

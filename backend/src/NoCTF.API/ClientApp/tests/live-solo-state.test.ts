@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { sourceFile } from './support/feature-source'
 import { canPlayLiveSolo, canJudgeLiveSolo, retainQuestionSelection, questionFromWorkspaceRoute,
   roundRemainingSeconds, formatRoundClock } from '../app/features/live-solo/live-solo-state'
 import { canEnterCompetition } from '../app/lib/competition-participation'
@@ -46,5 +47,12 @@ describe('LiveSolo participant state', () => {
     }
     expect(canEnterCompetition({ mode: 'Ctf', status: 'Finished', practiceModeEnabled: true }, team)).toBe(true)
     expect(canEnterCompetition({ mode: 'LiveSolo', status: 'Draft' }, team)).toBe(false)
+  })
+  test('participant surfaces read their minimal policy instead of the staff-only configuration', async () => {
+    for (const name of ['useLiveSoloHall.ts', 'useLiveSoloMatch.ts']) {
+      const source = await sourceFile(new URL(`../app/features/live-solo/${name}`, import.meta.url)).text()
+      expect(source).toContain('getLiveSoloPlayerPolicy(')
+      expect(source).not.toContain('getLiveSoloConfiguration(')
+    }
   })
 })

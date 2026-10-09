@@ -3346,6 +3346,53 @@
         ]
       }
     },
+    "/api/v1/competitions/{competitionId}/live-solo/player-policy": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Returns minimal preparation and sharing policy to approved participants or authorized staff.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/live-solo/player-policy.",
+        "operationId": "GetLiveSoloPlayerPolicy",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloPlayerPolicyResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/program": {
       "get": {
         "tags": [
@@ -26126,6 +26173,37 @@
         }
       },
       "NoCTFAPIEndpointsLiveSoloGetLiveSoloMediaRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloPlayerPolicyResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "requiredWins": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maximumRosterMembers": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "publicDelaySeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "participantsMayViewOpponents": {
+            "type": "boolean"
+          },
+          "recordingEnabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloGetLiveSoloPlayerPolicyRequest": {
         "type": "object",
         "additionalProperties": false
       },
