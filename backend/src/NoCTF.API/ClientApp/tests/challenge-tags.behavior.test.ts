@@ -60,12 +60,12 @@ describe('competition challenge tags', () => {
     expect(isChallengeVisible({ ...row, locked: true }, { ...filters, hideLocked: true })).toBe(false)
   })
 
-  test('keeps ordinary searches literal while regex mode supports anchors and alternatives', () => {
+  test('matches names case-insensitively and supports regex anchors and alternatives by default', () => {
     const filters = { hideSolved: false, hideLocked: false, solvedByMyTeam: false }
-    const literal = compileChallengeTitleSearch(' [day1] ', false)
-    expect(isChallengeVisible({ title: '[day1]nc' }, { ...filters, search: literal })).toBe(true)
-    expect(isChallengeVisible({ title: 'day1' }, { ...filters, search: literal })).toBe(false)
-    const expression = compileChallengeTitleSearch(' ^\\[day1\\].*(fmt|nc)$ ', true)
+    const name = compileChallengeTitleSearch(' NC ')
+    expect(isChallengeVisible({ title: '[day1]nc' }, { ...filters, search: name })).toBe(true)
+    expect(isChallengeVisible({ title: 'day1' }, { ...filters, search: name })).toBe(false)
+    const expression = compileChallengeTitleSearch(' ^\\[day1\\].*(fmt|nc)$ ')
     expect(isChallengeVisible({ title: '[DAY1]FMT' }, { ...filters, search: expression })).toBe(true)
     expect(isChallengeVisible({ title: '[day1]nc' }, { ...filters, search: expression })).toBe(true)
     expect(isChallengeVisible({ title: '[day2]nc' }, { ...filters, search: expression })).toBe(false)
@@ -76,20 +76,18 @@ describe('competition challenge tags', () => {
   })
 
   test('preserves case-sensitive regex escapes and rejects malformed expressions without throwing', () => {
-    const expression = compileChallengeTitleSearch('^\\D+$', true) as RegExp
+    const expression = compileChallengeTitleSearch('^\\D+$') as RegExp
     expect(expression.test('NC')).toBe(true)
     expect(expression.test('123')).toBe(false)
     expect(expression.test('NC')).toBe(true)
-    expect(compileChallengeTitleSearch('[', true)).toBeNull()
+    expect(compileChallengeTitleSearch('[')).toBeNull()
     expect(isChallengeVisible({ title: '[' }, { search: null, hideSolved: false, hideLocked: false, solvedByMyTeam: false })).toBe(false)
-    expect(compileChallengeTitleSearch('   ', true)).toBe('')
-    expect(compileChallengeTitleSearch(' FOO.* ', false)).toBe('foo.*')
+    expect(compileChallengeTitleSearch('   ')).toBe('')
   })
 
-  test('combines regex mode with tag filters and recovers from invalid typing without changing selection', async () => {
+  test('uses regex search immediately with tag filters and recovers from invalid typing without changing selection', async () => {
     const app = harness({ tag: 'Web' })
     await drain()
-    app.state.regexSearch.value = true
     app.state.search.value = '^(SQL|HTTP)$'
     await drain()
     expect(app.state.listOptions.value.map((item: any) => item.value)).toEqual(['sql', 'http'])
@@ -105,8 +103,6 @@ describe('competition challenge tags', () => {
     expect(app.state.listOptions.value.map((item: any) => item.value)).toEqual(['http'])
     expect(app.state.searchError.value).toBeNull()
     expect(app.state.selectedTags.value).toEqual(['Web'])
-    app.state.regexSearch.value = false
-    expect(app.state.listOptions.value).toEqual([])
     app.state.search.value = ' HTTP '
     expect(app.state.listOptions.value.map((item: any) => item.value)).toEqual(['http'])
     app.stop()

@@ -2,7 +2,7 @@
 import { toRefs } from 'vue'
 import type { CompetitionChallengeNavigatorViewState } from '~/features/competition/useCompetitionChallengeNavigator'
 const viewProps = defineProps<{ state: CompetitionChallengeNavigatorViewState }>()
-const { ShieldCheck, Swords, Users, directionGlyph, groupIcon, isCtf, isAwdp, loading, error, dataScope, hideSolved, hideLocked, search, regexSearch, searchError, selectedTags, tagOptions, updateSelectedTags, board, progressFor, currentScore, bloodsFor, bloodTooltip, progressIcon, progressIconLabel, emptyLabel, groupOptions, listOptions, selectChallenge, competitionId, selectedChallengeId } = toRefs(viewProps.state)
+const { ShieldCheck, Swords, Users, directionGlyph, groupIcon, isCtf, isAwdp, loading, error, dataScope, hideSolved, hideLocked, search, searchError, selectedTags, tagOptions, updateSelectedTags, board, progressFor, currentScore, bloodsFor, bloodTooltip, progressIcon, progressIconLabel, emptyLabel, groupOptions, listOptions, selectChallenge, competitionId, selectedChallengeId } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -11,11 +11,7 @@ const { ShieldCheck, Swords, Users, directionGlyph, groupIcon, isCtf, isAwdp, lo
       <header data-challenge-navigator-header class="flex flex-col gap-3 pr-10">
         <div class="flex min-w-0 items-center gap-3">
           <h2 class="shrink-0 text-base font-semibold">{{ $t('challenges.label.challengeList') }}</h2>
-          <Input :id="`challenge-search-${competitionId}`" v-model="search" class="min-w-0 flex-1" :placeholder="$t(regexSearch ? 'challengeNavigator.regexPlaceholder' : 'challengeNavigator.searchPlaceholder')" :aria-label="$t('challengeNavigator.searchPlaceholder')" :aria-invalid="!!searchError" />
-        </div>
-        <div class="flex items-center justify-between gap-3">
-          <Hint :content="$t('challengeNavigator.regexHelp')"><Label :for="`regex-search-${competitionId}`" class="cursor-pointer text-xs font-medium">{{ $t('challengeNavigator.regexSearch') }}</Label></Hint>
-          <Switch :id="`regex-search-${competitionId}`" v-model="regexSearch" />
+          <Input :id="`challenge-search-${competitionId}`" v-model="search" class="min-w-0 flex-1" :placeholder="$t('challengeNavigator.searchPlaceholder')" :aria-label="$t('challengeNavigator.searchPlaceholder')" :aria-invalid="!!searchError" />
         </div>
         <TagPicker :model-value="selectedTags" :options="tagOptions" :label="$t('challengeTags.filter')" @update:model-value="updateSelectedTags" />
         <div class="flex items-center justify-between gap-3">
