@@ -43,6 +43,15 @@ public sealed class WorkerRoleTests
         await Assert.That(WorkerQueues.GetConcurrency(configuration, WorkerQueue.Webhook)).IsEqualTo(32);
         await Assert.That(WorkerQueues.GetConcurrency(configuration, WorkerQueue.LiveSoloMedia)).IsEqualTo(4);
     }
+    [Test]
+    public async Task Shipped_worker_configuration_enables_every_typed_queue_including_media()
+    {
+        var root=new DirectoryInfo(AppContext.BaseDirectory);
+        while(root is not null&&!File.Exists(Path.Combine(root.FullName,"AGENTS.md")))root=root.Parent;
+        var path=Path.Combine(root?.FullName??throw new DirectoryNotFoundException(),"backend","src","NoCTF.API","appsettings.json");
+        var configuration=new ConfigurationBuilder().AddJsonFile(path).Build();
+        await Assert.That(WorkerQueues.GetEnabled(configuration)).IsEquivalentTo(WorkerQueues.All);
+    }
 
     [Test]
     public async Task Worker_queue_selection_and_concurrency_are_configuration_driven()
