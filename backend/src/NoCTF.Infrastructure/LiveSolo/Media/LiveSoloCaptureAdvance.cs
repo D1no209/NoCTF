@@ -53,9 +53,18 @@ public sealed partial class LiveSoloCaptureStore
             await db.SaveChangesAsync(ct);
             if (current.State is LiveSoloExportState.Active or LiveSoloExportState.Complete)
             {
-                if (await ImportSegmentsAsync(session, program, ct) && current.State == LiveSoloExportState.Complete)
-                { program.ImportedAt = clock.GetUtcNow(); await db.SaveChangesAsync(ct); }
+                try
+                {
+                    if (await ImportSegmentsAsync(session, program, ct) && current.State == LiveSoloExportState.Complete)
+                    { program.ImportedAt = clock.GetUtcNow(); await db.SaveChangesAsync(ct); }
+                }
+                catch(Exception ex) when(ex is IOException)
+                {
+                    await CheckProgramProgressAsync(session,program,ct);
+                    await messages.FlushCommittedMessagesAsync();throw;
+                }
             }
+            if(active && current.State==LiveSoloExportState.Active)await CheckProgramProgressAsync(session,program,ct);
             if(active && current.State==LiveSoloExportState.Active && program.StartedAt is { } programStart
                 && clock.GetUtcNow()-programStart>=TimeSpan.FromSeconds(options.ProgramChunkSeconds))
             {
@@ -98,7 +107,9 @@ public sealed partial class LiveSoloCaptureStore
                         || !await db.Set<LiveSoloMediaParticipant>().AnyAsync(p=>p.MediaSessionId==session.Id&&p.UserId==record.UserId
                             &&p.ScreenTrackId==record.VideoTrackId&&p.ScreenState==LiveSoloScreenState.Sharing,ct)) return;
                     var used=await RecordingCapacityUsedAsync(ct);var reservation=checked(options.RecordingExportLimitBytes*2);
-                    if (reservation>options.RecordingQuotaBytes-used) {record.State=LiveSoloRecordingState.RequiresReview;record.Failure=LiveSoloRecordingFailure.CapacityUnavailable;return;}
+                    if (reservation>options.RecordingQuotaBytes-used) {
+                        record.State=LiveSoloRecordingState.RequiresReview;record.Failure=LiveSoloRecordingFailure.CapacityUnavailable;
+                        await CaptureAlertAsync(session,record.Id,record.ConcurrencyStamp,LiveSoloMediaAlertKind.RecordingFailed,ct);return;}
                     record.ReservedBytes=reservation;
                     record.State = LiveSoloRecordingState.Starting; record.RequestedAt = clock.GetUtcNow();
                     record.Failure=null;
@@ -106,12 +117,13 @@ public sealed partial class LiveSoloCaptureStore
                 }, ct);
                 if (!claimed) continue;
                 try { current = await egress.StartAsync(new(record.Id, session.RoomIdentity, LiveSoloExportKind.ScreenRecording, record.VideoTrackId), ct); }
-                catch (HttpRequestException) { record.State = LiveSoloRecordingState.RequiresReview; record.Failure=LiveSoloRecordingFailure.StartUncertain;await db.SaveChangesAsync(ct); continue; }
+                catch (HttpRequestException) { await RecordingFailureAsync(session,record,LiveSoloRecordingState.RequiresReview,LiveSoloRecordingFailure.StartUncertain,ct);
+                    await messages.FlushCommittedMessagesAsync();continue; }
             }
             if (current is null)
             {
                 if (record.State == LiveSoloRecordingState.Starting && record.RequestedAt < clock.GetUtcNow().AddMinutes(-1))
-                { record.State = LiveSoloRecordingState.RequiresReview;record.Failure=LiveSoloRecordingFailure.StartUncertain; await db.SaveChangesAsync(ct); }
+                { await RecordingFailureAsync(session,record,LiveSoloRecordingState.RequiresReview,LiveSoloRecordingFailure.StartUncertain,ct); }
                 else if (record.State == LiveSoloRecordingState.Pending && !stillSharing) { record.State = LiveSoloRecordingState.Failed; await db.SaveChangesAsync(ct); }
                 continue;
             }
@@ -120,7 +132,7 @@ public sealed partial class LiveSoloCaptureStore
             if (current.State == LiveSoloExportState.Complete) await ImportRecordingAsync(session, record, current, ct);
             if (current.State is LiveSoloExportState.Failed or LiveSoloExportState.Aborted or LiveSoloExportState.LimitReached)
             {
-                record.Failure=LiveSoloRecordingFailure.ExportFailed;await db.SaveChangesAsync(ct);
+                await RecordingFailureAsync(session,record,LiveSoloRecordingState.Failed,LiveSoloRecordingFailure.ExportFailed,ct);
                 await RemoveRecordingRawAsync(record.Id, ct);
             }
             var limitReached=current.State==LiveSoloExportState.Active && await files.RecordingLengthAsync(record.Id,ct)

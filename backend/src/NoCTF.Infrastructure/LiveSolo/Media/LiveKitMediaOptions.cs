@@ -16,4 +16,5 @@ public sealed class LiveKitMediaOptions
     public long RecordingQuotaBytes { get; set; } = 100L * 1024 * 1024 * 1024;
     public long RecordingExportLimitBytes { get; set; } = 512L * 1024 * 1024;
     public int ProgramChunkSeconds { get; set; } = 300;
+    public int ProgramStallSeconds { get; set; } = 15;
 }

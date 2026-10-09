@@ -363,7 +363,7 @@ export function notificationBody(
   const payload = notificationContent(notification)
   if (notification.kind === 'LiveSoloMediaInterrupted') {
     const user = typeof payload.userName === 'string' ? payload.userName : translate('common.label.unknownUser')
-    const reasons = { ScreenInterrupted: 'liveSolo.notice.screenInterrupted', RoomUnavailable: 'liveSolo.notice.roomUnavailable', AuthorizationChanged: 'liveSolo.notice.authorizationChanged' } as const
+    const reasons = { ScreenInterrupted: 'liveSolo.notice.screenInterrupted', RoomUnavailable: 'liveSolo.notice.roomUnavailable', AuthorizationChanged: 'liveSolo.notice.authorizationChanged', ProgramStalled: 'liveSolo.notice.programStalled', RecordingFailed: 'liveSolo.notice.recordingFailed' } as const
     const reason = typeof payload.reason === 'string' && Object.hasOwn(reasons, payload.reason) ? payload.reason as keyof typeof reasons : 'RoomUnavailable'
     return `${translate(reasons[reason], { user })} ${translate('liveSolo.notice.noAutomaticDecision')}`
   }

@@ -1,4 +1,6 @@
 {
+  "liveSolo.notice.programStalled": "节目未继续产生新视频，请工作人员检查。",
+  "liveSolo.notice.recordingFailed": "屏幕录像未能继续，请工作人员检查。",
   "liveSolo.recording.openReplacement": "查看新的录制分段",
   "liveSolo.recording.chunk": "录制分段 {number}",
   "liveSolo.recording.failure.archiveCapacity": "归档容量不足，原始录像及预留仍保留。",

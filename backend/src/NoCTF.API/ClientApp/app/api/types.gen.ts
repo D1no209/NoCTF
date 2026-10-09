@@ -724,7 +724,7 @@ export type NoCtfApplicationNotificationsLiveSoloMediaInterruptedNotificationCon
     type: 'live-solo-media-interrupted';
 };
 
-export type NoCtfDomainLiveSoloLiveSoloMediaAlertKind = 'ScreenInterrupted' | 'RoomUnavailable' | 'AuthorizationChanged';
+export type NoCtfDomainLiveSoloLiveSoloMediaAlertKind = 'ScreenInterrupted' | 'RoomUnavailable' | 'AuthorizationChanged' | 'ProgramStalled' | 'RecordingFailed';
 
 export type NoCtfDomainLiveSoloLiveSoloScreenState = 'Disconnected' | 'Connected' | 'Sharing';
 

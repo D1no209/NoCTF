@@ -26512,12 +26512,16 @@
         "x-enumNames": [
           "ScreenInterrupted",
           "RoomUnavailable",
-          "AuthorizationChanged"
+          "AuthorizationChanged",
+          "ProgramStalled",
+          "RecordingFailed"
         ],
         "enum": [
           "ScreenInterrupted",
           "RoomUnavailable",
-          "AuthorizationChanged"
+          "AuthorizationChanged",
+          "ProgramStalled",
+          "RecordingFailed"
         ]
       },
       "NoCTFDomainLiveSoloLiveSoloScreenState": {

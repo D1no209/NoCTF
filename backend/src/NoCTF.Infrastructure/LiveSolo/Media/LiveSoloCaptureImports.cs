@@ -44,6 +44,13 @@ public sealed partial class LiveSoloCaptureStore
                         ProgramCaptureId = program.Id, FrameId = frame.Value, Sequence = item.Sequence, FileId = upload.FileId,
                         StartedAt = from, EndedAt = cursor, PublicAt = publicAt, RemoveAfter = publicAt.AddMinutes(5) });
                     program.NextSegmentSequence=checked(item.Sequence+1);program.ImportedThrough=cursor;
+                    var recovered=program.StalledAt!=null;
+                    program.LastFragmentImportedAt=observed;program.StalledAt=null;
+                    if(recovered)
+                    {
+                        var match=await db.LiveSoloMatches.SingleAsync(x=>x.Id==session.MatchId,ct);
+                        await messages.PublishAsync(new NoCTF.Application.LiveSolo.Realtime.LiveSoloMatchChanged(match.CompetitionId,match.Id,observed));
+                    }
                     attached = true;
                 }, ct);
             }
@@ -58,7 +65,7 @@ public sealed partial class LiveSoloCaptureStore
         if (record.FileId is not null) { record.State = LiveSoloRecordingState.Completed; await db.SaveChangesAsync(ct); return; }
         var file = observation.Files.SingleOrDefault(x => x.ObjectKey.EndsWith("/recording.mp4", StringComparison.Ordinal));
         if (file is null || file.ByteLength <= 0) return;
-        if(file.ByteLength>options.RecordingExportLimitBytes) {record.State=LiveSoloRecordingState.RequiresReview;record.Failure=LiveSoloRecordingFailure.ExportTooLarge;await db.SaveChangesAsync(ct);return;}
+        if(file.ByteLength>options.RecordingExportLimitBytes) {await RecordingFailureAsync(session,record,LiveSoloRecordingState.RequiresReview,LiveSoloRecordingFailure.ExportTooLarge,ct);return;}
         await using var content = await files.OpenAsync(record.Id, "recording.mp4", ct);
         if (content is null) return;
         var id = Guid.CreateVersion7(clock.GetUtcNow());
@@ -73,7 +80,8 @@ public sealed partial class LiveSoloCaptureStore
                 var used=await RecordingCapacityUsedAsync(ct);
                 if (upload.ByteLength>options.RecordingExportLimitBytes || checked(upload.ByteLength*2)>options.RecordingQuotaBytes-used+record.ReservedBytes)
                 { record.State = LiveSoloRecordingState.RequiresReview;record.Failure=upload.ByteLength>options.RecordingExportLimitBytes
-                    ? LiveSoloRecordingFailure.ExportTooLarge : LiveSoloRecordingFailure.ArchiveCapacityUnavailable; return; }
+                    ? LiveSoloRecordingFailure.ExportTooLarge : LiveSoloRecordingFailure.ArchiveCapacityUnavailable;
+                    await CaptureAlertAsync(session,record.Id,record.ConcurrencyStamp,LiveSoloMediaAlertKind.RecordingFailed,ct);return; }
                 record.FileId = upload.FileId; record.State = LiveSoloRecordingState.Completed;
                 record.ReservedBytes=0;
                 record.Failure=null;

@@ -19,5 +19,7 @@ describe('LiveSolo durable media notices', () => {
     setLocale('en')
     expect(notificationBody({ ...alert, content: { reason: 'RoomUnavailable' } })).toContain('became unavailable')
     expect(notificationBody({ ...alert, content: { reason: 'AuthorizationChanged' } })).toContain('authorization no longer qualified')
+    expect(notificationBody({ ...alert, content: { reason: 'ProgramStalled' } })).toContain('stopped producing new video')
+    expect(notificationBody({ ...alert, content: { reason: 'RecordingFailed' } })).toContain('recording could not continue')
   })
 })

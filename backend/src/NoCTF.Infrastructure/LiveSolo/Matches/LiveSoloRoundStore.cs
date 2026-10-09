@@ -179,6 +179,7 @@ public sealed partial class LiveSoloMatchStore
     }
     private Task<bool> ProgramReadyAsync(Guid sessionId, Guid captureId, string egressId, CancellationToken ct) => db.LiveSoloProgramCaptures.AnyAsync(x => x.MediaSessionId == sessionId
         && x.Id == captureId && x.EgressId == egressId && x.State == LiveSoloCaptureState.Active && db.LiveSoloMediaSessions.Any(s => s.Id == sessionId && s.CurrentProgramCaptureId == x.Id)
+        && x.StalledAt == null
         && db.LiveSoloProgramSegments.Any(segment => segment.ProgramCaptureId == x.Id
             && db.Files.Any(file => file.Id == segment.FileId && file.ByteLength > 0)), ct);
 
