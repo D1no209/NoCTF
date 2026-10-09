@@ -64,7 +64,9 @@ describe('participant competition workspace layout', () => {
     expect(leaderboard).toContain('<ScrollSurface as="div" axis="y" data-scoreboard-page-scroll')
     expect(writeUpReview).not.toContain('CompetitionParticipantWorkspace')
     expect(writeUpReview).toContain('data-writeup-review-workspace')
-    expect(writeUpReview).toContain("$t('common.label.backCompetition')")
+    const competitionShell = await page('../app/pages/competitions/[id].vue')
+    expect(competitionShell).toContain(':to="competitionReturnPath"')
+    expect(competitionShell).toContain("'common.label.backCompetition'")
   })
 
   test('removes the standalone submissions navigation item', async () => {
