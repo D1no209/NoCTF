@@ -221,5 +221,7 @@
   "liveSolo.groups.moveDown": "Open {question} later in the question order",
   "liveSolo.groups.copyAttachmentsSkipped": "Attachments omitted",
   "liveSolo.groups.copyFlagsSkipped": "Flags omitted",
-  "liveSolo.groups.copySucceeded": "Created {title}: {attachments} attachments and {flags} configured Flags. The independent question is available in the group picker."
+  "liveSolo.groups.copySucceeded": "Created {title}: {attachments} attachments and {flags} configured Flags. The independent question is available in the group picker.",
+  "liveSolo.hints.title": "Published hints",
+  "liveSolo.hints.free": "Free for both sides; no score or submission cost"
 }

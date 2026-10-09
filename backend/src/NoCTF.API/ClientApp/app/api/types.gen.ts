@@ -1134,6 +1134,20 @@ export type NoCtfapiEndpointsLiveSoloListLiveSoloAttachmentsRequest = {
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsLiveSoloLiveSoloHintsResponse = {
+    items?: Array<NoCtfapiEndpointsLiveSoloLiveSoloHintResponse>;
+};
+
+export type NoCtfapiEndpointsLiveSoloLiveSoloHintResponse = {
+    id?: string;
+    content?: string;
+    publishedAt?: string;
+};
+
+export type NoCtfapiEndpointsLiveSoloListLiveSoloHintsRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsLiveSoloLiveSoloMatchesResponse = {
     items?: Array<NoCtfapiEndpointsLiveSoloLiveSoloMatchResponse>;
 };
@@ -7165,6 +7179,42 @@ export type ListLiveSoloAttachmentsResponses = {
 };
 
 export type ListLiveSoloAttachmentsResponse = ListLiveSoloAttachmentsResponses[keyof ListLiveSoloAttachmentsResponses];
+
+export type ListLiveSoloHintsData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        matchId: string;
+        roundId: string;
+        questionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/hints';
+};
+
+export type ListLiveSoloHintsErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type ListLiveSoloHintsResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsLiveSoloLiveSoloHintsResponse;
+};
+
+export type ListLiveSoloHintsResponse = ListLiveSoloHintsResponses[keyof ListLiveSoloHintsResponses];
 
 export type ListLiveSoloQuestionGroupsData = {
     body?: never;

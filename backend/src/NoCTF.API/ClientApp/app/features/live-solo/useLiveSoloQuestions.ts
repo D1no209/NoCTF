@@ -1,8 +1,9 @@
 import { computed, markRaw, onMounted, onScopeDispose, ref, watch } from 'vue'
 import { listLiveSoloQuestions, listLiveSoloAttachments, prepareLiveSoloAttachmentDownload, prepareLiveSoloRandomAttachmentDownload,
-  submitLiveSoloFlag, getGameplayFactStatusEndpoint, getLiveSoloRuntime, mutateLiveSoloRuntime } from '~/api'
+  submitLiveSoloFlag, getGameplayFactStatusEndpoint, getLiveSoloRuntime, mutateLiveSoloRuntime, listLiveSoloHints } from '~/api'
 import type { NoCtfapiEndpointsLiveSoloLiveSoloQuestionResponse as Question, NoCtfapiEndpointsLiveSoloLiveSoloRoundResponse as Round,
   NoCtfapiEndpointsLiveSoloLiveSoloAttachmentsResponse as Attachments, NoCtfapiEndpointsRuntimeRuntimeResponse as Runtime,
+  NoCtfapiEndpointsLiveSoloLiveSoloHintResponse as Hint,
   NoCtfapiEndpointsLiveSoloLiveSoloRuntimeActionProtocol as RuntimeAction } from '~/api'
 import { useHumanVerification } from '~/features/security/useHumanVerification'
 import RuntimeAccessUrl from '~/features/challenges/RuntimeAccessUrl.vue'
@@ -17,6 +18,8 @@ export function useLiveSoloQuestions(props: Readonly<{ competitionId: string; ma
   const { request: verification } = useHumanVerification()
   const questions = ref<Question[]>([]), selected = ref<string | null>(null), loading = ref(true), error = ref<UiMessage | null>(null)
   const attachments = ref<Attachments | null>(null), runtime = ref<Runtime | null>(null), resourceError = ref<UiMessage | null>(null)
+  const hints = ref<Hint[]>([])
+  const hintsError = ref<UiMessage | null>(null)
   const submitting = ref(false), runtimeBusy = ref(false), downloading = ref(false), feedback = ref<UiMessage | null>(null)
   const drafts = useState<Record<string, string>>('live-solo:flag-drafts', () => ({}))
   const scopeKey = () => `${user.value?.userId}:${props.competitionId}:${props.matchId}:${props.round.id}`
@@ -24,7 +27,7 @@ export function useLiveSoloQuestions(props: Readonly<{ competitionId: string; ma
     set: (value: string) => { if (selected.value) drafts.value[`${scopeKey()}:${selected.value}`] = value } })
   const current = computed(() => questions.value.find(x => x.id === selected.value) ?? null)
   const options = computed(() => questions.value.filter(x => x.id).map(row => ({ value: row.id!, label: row.title ?? '—' })))
-  let disposed = false, request = 0, resourceRequest = 0, pending = false, timer: ReturnType<typeof setTimeout> | undefined
+  let disposed = false, request = 0, resourceRequest = 0, hintRequest = 0, pending = false, timer: ReturnType<typeof setTimeout> | undefined
   let accepted: { id: string; sequence: number } | null = null
   const path = (questionId: string) => ({ competitionId: props.competitionId, matchId: props.matchId, roundId: props.round.id!, questionId })
   const statusPolling = usePolling(async () => {
@@ -49,6 +52,17 @@ export function useLiveSoloQuestions(props: Readonly<{ competitionId: string; ma
     if (environment.response?.status !== 404 && environment.error) resourceError.value = parseLiveSoloError(environment.error, message('liveSolo.error.load')).displayMessage
     else runtime.value = environment.data ?? null
   }
+  async function refreshHints() {
+    const questionId = selected.value, roundId = props.round.id, sequence = ++hintRequest
+    if (!questionId || !roundId) { hints.value = []; return }
+    try {
+      const result = await listLiveSoloHints({ path: path(questionId) })
+      if (disposed || sequence !== hintRequest || selected.value !== questionId || props.round.id !== roundId) return
+      if (result.error || !result.data) { hints.value = []; hintsError.value = result.response?.status === 404 ? null : parseLiveSoloError(result.error,message('liveSolo.error.load')).displayMessage }
+      else { hints.value = result.data.items ?? []; hintsError.value = null }
+    }
+    catch (cause) { if (!disposed && sequence === hintRequest && selected.value === questionId) { hints.value = []; hintsError.value = parseLiveSoloError(cause,message('liveSolo.error.load')).displayMessage } }
+  }
   async function load() {
     if (disposed || pending || !props.round.id) return
     pending = true; const id = ++request
@@ -58,9 +72,10 @@ export function useLiveSoloQuestions(props: Readonly<{ competitionId: string; ma
       if (result.error || !result.data) throw parseLiveSoloError(result.error, message('liveSolo.error.load'))
       questions.value = result.data.items ?? []; error.value = null
       syncSelection()
+      await refreshHints()
     }
     catch (cause) {
-      if (!disposed && id === request) { questions.value = []; selected.value = null; attachments.value = null; runtime.value = null; error.value = parseLiveSoloError(cause, message('liveSolo.error.load')).displayMessage }
+      if (!disposed && id === request) { questions.value = []; selected.value = null; attachments.value = null; runtime.value = null; hints.value = []; error.value = parseLiveSoloError(cause, message('liveSolo.error.load')).displayMessage }
     }
     finally { pending = false; loading.value = false }
   }
@@ -124,13 +139,13 @@ export function useLiveSoloQuestions(props: Readonly<{ competitionId: string; ma
     finally { runtimeBusy.value = false }
   }
   async function tick() { await load(); if (!disposed) timer = setTimeout(tick, 5000) }
-  watch(selected, () => { runtimePolling.stop(); void resources() })
+  watch(selected, () => { runtimePolling.stop(); hints.value = []; hintsError.value = null; void resources(); void refreshHints() })
   watch(() => route.params.workspace, syncSelection)
-  watch(() => user.value?.userId, () => { drafts.value = {}; questions.value = []; selected.value = null })
+  watch(() => user.value?.userId, () => { drafts.value = {}; questions.value = []; selected.value = null; hints.value = [] })
   onMounted(() => { void tick() })
-  onScopeDispose(() => { disposed = true; request++; resourceRequest++; if (timer) clearTimeout(timer); accepted = null })
-  return { loading, error, current, selected, options, select, input, submitting, submit, feedback, attachments, runtime,
-    resourceError, downloading, download, runtimeBusy, environment, RuntimeAccess: markRaw(RuntimeAccessUrl),
+  onScopeDispose(() => { disposed = true; request++; resourceRequest++; hintRequest++; if (timer) clearTimeout(timer); accepted = null })
+  return { loading, error, current, selected, options, select, input, submitting, submit, feedback, attachments, runtime, hints,
+    resourceError: computed(() => resourceError.value ?? hintsError.value), downloading, download, runtimeBusy, environment, RuntimeAccess: markRaw(RuntimeAccessUrl),
     canSubmit: computed(() => props.canSubmit), statusPending: statusPolling.polling, statusTimedOut: statusPolling.timedOut,
     inputPending: computed(() => submitting.value || statusPolling.polling.value),
     mayStartRuntime: computed(() => runtime.value?.state === 'Stopped' || runtime.value?.state === 'Failed'),

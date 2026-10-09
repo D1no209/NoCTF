@@ -339,9 +339,24 @@ public sealed class LiveSoloEndpointTests
         authorizer.CanModerateAsync(Actor, competition, Arg.Any<CancellationToken>()).Returns(false);
         using var forbidden = await client.PutAsJsonAsync(path, body); await Assert.That(forbidden.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
     }
+    [Test]
+    public async Task Free_hint_contract_is_scoped_authenticated_and_omits_price_or_acquisition_evidence()
+    {
+        var reader=Substitute.For<ILiveSoloHintReader>();var competition=Guid.NewGuid();var match=Guid.NewGuid();var round=Guid.NewGuid();var question=Guid.NewGuid();
+        reader.ReadAsync(Arg.Any<LiveSoloResourceRequest>(),Arg.Any<CancellationToken>()).Returns((IReadOnlyList<LiveSoloHintView>?)null);
+        reader.ReadAsync(Arg.Is<LiveSoloResourceRequest>(x=>x!=null&&x.CompetitionId==competition&&x.MatchId==match&&x.RoundId==round&&x.QuestionId==question&&x.ActorId==Actor),Arg.Any<CancellationToken>())
+            .Returns(new[]{new LiveSoloHintView(Guid.NewGuid(),"Hint body",DateTimeOffset.UtcNow)});
+        await using var app=await HostAsync(Substitute.For<ILiveSoloMatchStore>(),Substitute.For<ILiveSoloAttachmentStore>(),Substitute.For<IStore>(),hints:reader);
+        using var client=app.GetTestClient();var path=$"/api/v1/competitions/{competition}/live-solo/matches/{match}/rounds/{round}/questions/{question}/hints";
+        using var anonymous=await client.GetAsync(path);await Assert.That(anonymous.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
+        client.DefaultRequestHeaders.Authorization=new("Bearer","verified-test");
+        using var allowed=await client.GetAsync(path+"?actorId="+Guid.NewGuid());await Assert.That(allowed.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        var text=await allowed.Content.ReadAsStringAsync();await Assert.That(text).Contains("Hint body");await Assert.That(text).DoesNotContain("cost");
+        using var wrong=await client.GetAsync(path.Replace(question.ToString(),Guid.NewGuid().ToString()));await Assert.That(wrong.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+    }
     private static async Task<WebApplication> HostAsync(ILiveSoloMatchStore store, ILiveSoloAttachmentStore attachmentStore, IStore objects,
         ILiveSoloAdjudicationStore? decisions = null, ILiveSoloRuntimeStore? runtimes = null, ILiveSoloMediaStore? media = null, ILiveSoloProgramReader? programs = null,
-        ILiveSoloRecordingStore? recordings = null, ILiveSoloPlayerPolicyReader? policies = null, ManageLiveSoloConfiguration? settings = null)
+        ILiveSoloRecordingStore? recordings = null, ILiveSoloPlayerPolicyReader? policies = null, ManageLiveSoloConfiguration? settings = null, ILiveSoloHintReader? hints = null)
     {
         var builder = WebApplication.CreateBuilder(); builder.WebHost.UseTestServer();
         builder.Services.AddFastEndpoints(options => { options.DisableAutoDiscovery = true; options.Assemblies = [typeof(GetLiveSoloMatchEndpoint).Assembly];
@@ -352,7 +367,7 @@ public sealed class LiveSoloEndpointTests
                 || x == typeof(GetLiveSoloMediaEndpoint) || x == typeof(PrepareLiveSoloMediaEndpoint) || x == typeof(JoinLiveSoloMediaEndpoint)
                 || x == typeof(GetLiveSoloProgramEndpoint) || x == typeof(GetLiveSoloProgramPlaylistEndpoint) || x == typeof(GetLiveSoloProgramSegmentEndpoint)
                 || x == typeof(ListLiveSoloRecordingsEndpoint) || x == typeof(ChangeLiveSoloRecordingEndpoint) || x == typeof(GetLiveSoloRecordingEndpoint)
-                || x == typeof(GetLiveSoloPlayerPolicyEndpoint) || settings is not null && x == typeof(SaveLiveSoloConfigurationEndpoint); });
+                || x == typeof(GetLiveSoloPlayerPolicyEndpoint) || x == typeof(ListLiveSoloHintsEndpoint) || settings is not null && x == typeof(SaveLiveSoloConfigurationEndpoint); });
         builder.Services.AddAuthentication("Bearer").AddScheme<AuthenticationSchemeOptions, TestAuthentication>("Bearer", _ => { });
         builder.Services.AddAuthorization(); builder.Services.AddSingleton(store); builder.Services.AddSingleton<ManageLiveSoloMatches>();
         builder.Services.AddSingleton(attachmentStore); builder.Services.AddSingleton(objects); builder.Services.AddSingleton<AccessLiveSoloAttachments>();
@@ -362,6 +377,7 @@ public sealed class LiveSoloEndpointTests
         builder.Services.AddSingleton(programs ?? Substitute.For<ILiveSoloProgramReader>());
         builder.Services.AddSingleton(recordings ?? Substitute.For<ILiveSoloRecordingStore>()); builder.Services.AddSingleton<ManageLiveSoloRecordings>();
         builder.Services.AddSingleton(policies ?? Substitute.For<ILiveSoloPlayerPolicyReader>());
+        builder.Services.AddSingleton(hints ?? Substitute.For<ILiveSoloHintReader>());
         if (settings is not null) builder.Services.AddSingleton(settings);
         builder.Services.AddSingleton<IUserContext>(new TestUser()); builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton<IRequestAdmission>(new Admission());

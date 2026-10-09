@@ -221,5 +221,7 @@
   "liveSolo.groups.moveDown": "将 {question} 的开题顺序下移",
   "liveSolo.groups.copyAttachmentsSkipped": "不复制附件",
   "liveSolo.groups.copyFlagsSkipped": "不复制 Flag",
-  "liveSolo.groups.copySucceeded": "已创建 {title}：附件 {attachments} 个、已配置 Flag {flags} 个，独立题目已加入题组选项。"
+  "liveSolo.groups.copySucceeded": "已创建 {title}：附件 {attachments} 个、已配置 Flag {flags} 个，独立题目已加入题组选项。",
+  "liveSolo.hints.title": "已发布提示",
+  "liveSolo.hints.free": "双方免费查阅，不扣分也不占提交次数"
 }

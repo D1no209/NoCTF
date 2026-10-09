@@ -40,6 +40,7 @@ public static class LiveSoloInfrastructure
         services.AddScoped<ILiveSoloRuntimePreparation, LiveSoloRuntimePreparation>();
         services.AddScoped<ILiveSoloAttachmentStore, LiveSoloAttachmentStore>();
         services.AddScoped<AccessLiveSoloAttachments>();
+        services.AddScoped<ILiveSoloHintReader, LiveSoloHintReader>();
         services.AddScoped<ILiveSoloRuntimeStore, LiveSoloRuntimeStore>();
         services.AddScoped<ManageLiveSoloRuntimes>();
         services.AddScoped<ILiveSoloMediaStore, LiveSoloMediaStore>();
