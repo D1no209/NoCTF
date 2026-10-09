@@ -96,4 +96,28 @@ public sealed class LiveSoloWriteUpPersistenceTests
     }
     private static ChallengeWriteUpStore Store(NoCtfDbContext db)=>new(db,new CompetitionModerationAuthorizer(db),Substitute.For<NoCTF.Application.Challenges.Management.ICompetitionChallengeReadAccess>(),
         NullCompetitionEventRecorder.Instance,Substitute.For<IPostCommitMessagePublisher>());
+    [Test,Timeout(300_000)]
+    public async Task Postgame_directory_executes_relational_ordering_and_preserves_replay_scopes_and_access_rules(CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async()=>{
+            await using var f=await LiveSoloMatchPersistenceTests.Fixture.CreateAsync(ct);await f.PrepareAsync(ct);await f.StartAsync(ct);
+            var access=new LiveSoloPostgameQuestionAccess(f.Db,new CompetitionModerationAuthorizer(f.Db));
+            await Assert.That(await access.ListAsync(f.Competition.Id,f.Match.Id,f.Left.Id,ct)).IsNull();
+            (await f.Db.Competitions.SingleAsync(ct)).Status=CompetitionStatus.Finished;await f.Db.SaveChangesAsync(ct);
+            var first=f.Round.Questions.Single(x=>x.Position==0);var second=f.Round.Questions.Single(x=>x.Position==1);
+            var initial=await access.ListAsync(f.Competition.Id,f.Match.Id,f.Left.Id,ct);
+            await Assert.That(initial!.Select(x=>x.Id)).IsEquivalentTo(new[]{first.Id});
+            second.OpenedAt=f.Now;var replay=new LiveSoloRound {Id=Guid.NewGuid(),MatchId=f.Match.Id,Number=f.Round.Number,Replay=1,
+                QuestionGroupId=f.Round.QuestionGroupId,CreatedAt=f.Now,State=LiveSoloRoundState.Won};
+            var replayQuestion=new LiveSoloRoundQuestion {Id=Guid.NewGuid(),RoundId=replay.Id,CompetitionChallengeId=first.CompetitionChallengeId,Position=0,OpenedAt=f.Now};
+            replay.Questions.Add(replayQuestion);f.Db.LiveSoloRounds.Add(replay);await f.Db.SaveChangesAsync(ct);
+            var listed=await access.ListAsync(f.Competition.Id,f.Match.Id,f.Left.Id,ct)??throw new InvalidOperationException("Expected scoped directory.");
+            await Assert.That(listed.Select(x=>x.Id).SequenceEqual(new[]{first.Id,second.Id,replayQuestion.Id})).IsTrue();
+            await Assert.That(listed.Last().Replay).IsEqualTo(1);await Assert.That(listed.Last().RoundId).IsEqualTo(replay.Id);
+            await Assert.That(await access.ListAsync(Guid.NewGuid(),f.Match.Id,f.Left.Id,ct)).IsNull();
+            await Assert.That(await access.ListAsync(f.Competition.Id,Guid.NewGuid(),f.Left.Id,ct)).IsNull();
+            (await f.Db.Teams.SingleAsync(x=>x.Id==f.LeftTeam.Id,ct)).IsBanned=true;await f.Db.SaveChangesAsync(ct);
+            await Assert.That(await access.ListAsync(f.Competition.Id,f.Match.Id,f.Left.Id,ct)).IsNull();
+        });
+    }
 }

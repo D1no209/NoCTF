@@ -22,9 +22,10 @@ public sealed class LiveSoloPostgameQuestionAccess(NoCtfDbContext db,ICompetitio
         return await db.LiveSoloRoundQuestions.AsNoTracking().Where(x=>x.OpenedAt!=null)
             .Join(db.LiveSoloRounds.AsNoTracking().Where(x=>x.MatchId==matchId),q=>q.RoundId,r=>r.Id,(q,r)=>new {Question=q,Round=r})
             .Join(db.CompetitionChallenges.AsNoTracking(),x=>x.Question.CompetitionChallengeId,c=>c.Id,(x,c)=>new {x.Question,x.Round,Challenge=c})
-            .Join(db.Challenges.AsNoTracking(),x=>x.Challenge.ChallengeId,c=>c.Id,(x,c)=>new LiveSoloPostgameQuestion(x.Question.Id,x.Round.Id,
-                x.Challenge.Id,x.Round.Number,x.Question.Position,x.Challenge.CustomTitle??c.Title,x.Question.OpenedAt!.Value))
-            .OrderBy(x=>x.RoundNumber).ThenBy(x=>x.Position).ToArrayAsync(ct);
+            .Join(db.Challenges.AsNoTracking(),x=>x.Challenge.ChallengeId,c=>c.Id,(x,c)=>new {x.Question,x.Round,Entry=x.Challenge,Title=x.Challenge.CustomTitle??c.Title})
+            .OrderBy(x=>x.Round.Number).ThenBy(x=>x.Round.Replay).ThenBy(x=>x.Question.Position)
+            .Select(x=>new LiveSoloPostgameQuestion(x.Question.Id,x.Round.Id,x.Entry.Id,x.Round.Number,x.Question.Position,x.Title,x.Question.OpenedAt!.Value,x.Round.Replay))
+            .ToArrayAsync(ct);
     }
     public async Task<Guid?> ResolveAsync(LiveSoloResourceRequest request,CancellationToken ct)
     {

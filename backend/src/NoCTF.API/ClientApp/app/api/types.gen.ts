@@ -1264,6 +1264,7 @@ export type NoCtfApplicationLiveSoloResourcesLiveSoloPostgameQuestion = {
     position?: number;
     title?: string;
     openedAt?: string;
+    replay?: number;
 };
 
 export type NoCtfapiEndpointsLiveSoloListLiveSoloPostgameQuestionsRequest = {

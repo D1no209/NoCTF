@@ -130,3 +130,19 @@ export function startWriteUpBrowserDownload(downloadUrl: string): void {
   anchor.href = url.href; anchor.download = ''; anchor.hidden = true
   document.body.append(anchor); anchor.click(); anchor.remove()
 }
+
+/** Native transfer for exact LiveSolo recording or scoped post-event PDF routes. */
+export function startLiveSoloBrowserDownload(downloadUrl: string): void {
+  const url = new URL(downloadUrl, window.location.origin)
+  const keys = [...url.searchParams.keys()]
+  if (url.origin !== window.location.origin || !['http:', 'https:'].includes(url.protocol)
+    || url.hash || url.username || url.password
+    || !/^\/api\/v1\/competitions\/[\da-f-]{36}\/live-solo\/matches\/[\da-f-]{36}\/(?:recordings\/[\da-f-]{36}\/file|rounds\/[\da-f-]{36}\/questions\/[\da-f-]{36}\/writeups\/versions\/[\da-f-]{36}\/file)$/i.test(url.pathname)
+    || keys.some(key => !['staff', 'download'].includes(key))
+    || new Set(keys).size !== keys.length
+    || keys.some(key => !['true', 'false'].includes(url.searchParams.get(key) ?? '')))
+    throw new ApiError(translate('common.download.error.downloadResponseFormatInvalid'))
+  const anchor = document.createElement('a')
+  anchor.href = url.href; anchor.download = ''; anchor.hidden = true
+  document.body.append(anchor); anchor.click(); anchor.remove()
+}

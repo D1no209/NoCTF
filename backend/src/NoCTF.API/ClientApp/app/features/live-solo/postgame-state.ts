@@ -7,3 +7,9 @@ export function postgameQuestion(questions:Question[],questionId:string|null,rou
 export function postgameReviewVersion(root:WriteUp|null,action:Action):string|null {
   return action==='Withdraw'?root?.published?.id??null:latestWriteUpVersion(root)?.id??null
 }
+export function postgameReviewTarget(root:WriteUp|null,action:Action) {
+  const version=action==='Withdraw'?root?.published:latestWriteUpVersion(root)
+  if(!root?.id||!root.concurrencyStamp||!version?.id)return null
+  return {writeUpId:root.id,versionId:version.id,expectedStamp:root.concurrencyStamp,title:root.challengeTitle??'—',
+    source:root.source,authorName:root.authorName??'—',versionNumber:version.number??1}
+}

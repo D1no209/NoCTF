@@ -8,7 +8,7 @@ public interface ILiveSoloPostgameQuestionAccess
     Task<Guid?> ResolveAsync(LiveSoloResourceRequest request, CancellationToken ct);
     Task<IReadOnlyList<LiveSoloPostgameQuestion>?> ListAsync(Guid competitionId,Guid matchId,Guid actorId,CancellationToken ct);
 }
-public sealed record LiveSoloPostgameQuestion(Guid Id,Guid RoundId,Guid CompetitionChallengeId,int RoundNumber,int Position,string Title,DateTimeOffset OpenedAt);
+public sealed record LiveSoloPostgameQuestion(Guid Id,Guid RoundId,Guid CompetitionChallengeId,int RoundNumber,int Position,string Title,DateTimeOffset OpenedAt,int Replay);
 public sealed class ManageLiveSoloWriteUps(ILiveSoloPostgameQuestionAccess access, ManageChallengeWriteUps writeUps)
 {
     public async Task<WriteUpListView?> ListAsync(LiveSoloResourceRequest request, bool staff, CancellationToken ct)

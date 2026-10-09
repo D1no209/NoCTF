@@ -10,14 +10,15 @@ import type { NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpContentResponse
 import { competitionContextKey } from '~/utils/labels'
 import { message, type UiMessage } from '~/utils/i18n'
 import { parseApiError } from '~/utils/api-error'
-import { startAttachmentBrowserDownload } from '~/utils/download'
+import { startLiveSoloBrowserDownload } from '~/utils/download'
 import { latestWriteUpVersion, writeUpStatusKey } from '~/features/writeups/writeup-state'
 import { canManageLiveSolo } from './settings-draft'
-import { postgameQuestion,postgameReviewVersion } from './postgame-state'
+import { postgameQuestion,postgameReviewTarget } from './postgame-state'
 import { PostgamePreviewLease } from './postgame-preview-lease'
 
 export function useLiveSoloPostgameWriteUps() {
   const route=useRoute(),router=useRouter(),context=inject(competitionContextKey)
+  const {t}=useLocale()
   const competitionId=computed(()=>route.params.id as string),matchId=computed(()=>route.params.matchId as string)
   const questionId=computed(()=>typeof route.params.questionId==='string'?route.params.questionId:null)
   const staff=computed(()=>context?.competition.value?.administrationRole!=null),manager=computed(()=>canManageLiveSolo(context?.competition.value?.administrationRole))
@@ -27,14 +28,19 @@ export function useLiveSoloPostgameWriteUps() {
   const settingStamp=ref<string|null>(null),settingEnabled=ref(false)
   const official=computed(()=>mode.value==='Official'),editor=computed(()=>mode.value==='Mine'||official.value)
   const now=useNow({interval:1000}),leaveOpen=ref(false),reviewOpen=ref(false),reviewAction=ref<Action>('Publish'),reason=ref('')
-  const reviewTarget=ref<{writeUpId:string;versionId:string;expectedStamp:string}|null>(null)
+  const reviewTarget=ref<ReturnType<typeof postgameReviewTarget>>(null)
+  const reviewCaption=computed(()=>reviewTarget.value?message('liveSolo.postgame.reviewTarget',{
+    title:reviewTarget.value.title,author:reviewTarget.value.source==='Official'?message('liveSolo.postgame.official'):reviewTarget.value.authorName,
+    version:reviewTarget.value.versionNumber}):null)
   let disposed=false,request=0,bodyRequest=0,allowLeave=false,leaveTo:string|null=null,initialized=false
   const previewLease=new PostgamePreviewLease({
     changed:url=>{pdf.value=url},
     failed:cause=>{if(!disposed)error.value=parseApiError(cause,message('challengeWriteUp.loadFailed')).displayMessage},
   })
   const currentQuestion=computed(()=>postgameQuestion(questions.value,questionId.value,route.params.roundId))
-  const questionOptions=computed(()=>questions.value.filter(q=>q.id).map(q=>({value:q.id!,label:`${q.roundNumber ?? 1} · ${q.title ?? '—'}`})))
+  const questionOptions=computed(()=>questions.value.filter(q=>q.id).map(q=>({value:q.id!,label:(q.replay??0)>0
+    ?t('liveSolo.postgame.replayedQuestion',{round:q.roundNumber??1,replay:q.replay??0,title:q.title??'—'})
+    :t('liveSolo.postgame.roundQuestion',{round:q.roundNumber??1,title:q.title??'—'})})))
   const root=computed(()=>editor.value ? listing.value?.items?.find(row=>official.value?row.source==='Official':row.teamId===listing.value?.access?.teamId)??null
     :listing.value?.items?.find(row=>row.id===selected.value)??null)
   const version=computed(()=>editor.value||mode.value==='Review'?latestWriteUpVersion(root.value):root.value?.published??null)
@@ -115,16 +121,16 @@ export function useLiveSoloPostgameWriteUps() {
     if(result.error||!result.data)throw parseApiError(result.error,message('challengeWriteUp.saveFailed'));error.value=null
   }catch(cause){error.value=parseApiError(cause,message('challengeWriteUp.saveFailed')).displayMessage}finally{busy.value=false;const problem=error.value;await load();if(problem)error.value=problem}}
   function openReview(action:Action){if(!reviewable.value||!root.value?.id||!version.value?.id||!root.value.concurrencyStamp||dirty.value||busy.value)return;
-    const targetVersion=postgameReviewVersion(root.value,action);if(!targetVersion)return;
-    reviewTarget.value={writeUpId:root.value.id,versionId:targetVersion,expectedStamp:root.value.concurrencyStamp};reviewAction.value=action;reason.value='';reviewOpen.value=true}
+    const target=postgameReviewTarget(root.value,action);if(!target)return;
+    reviewTarget.value=target;reviewAction.value=action;reason.value='';reviewOpen.value=true}
   function setReview(value:boolean){if(!busy.value)reviewOpen.value=value}
   async function review(){const target=reviewTarget.value;if(!target||busy.value)return;busy.value=true;try{
-    const result=await reviewLiveSoloWriteUp({path:{...path(),writeUpId:target.writeUpId},body:{...target,action:reviewAction.value,reason:reason.value||null}})
+    const result=await reviewLiveSoloWriteUp({path:{...path(),writeUpId:target.writeUpId},body:{versionId:target.versionId,expectedStamp:target.expectedStamp,action:reviewAction.value,reason:reason.value||null}})
     if(result.error||!result.data)throw parseApiError(result.error,message('challengeWriteUp.saveFailed'));reviewOpen.value=false;error.value=null
   }catch(cause){error.value=parseApiError(cause,message('challengeWriteUp.saveFailed')).displayMessage}finally{busy.value=false;if(!reviewOpen.value)await load()}}
   async function download(){if(!version.value?.id||busy.value)return;busy.value=true;try{
     const result=await prepareLiveSoloWriteUpBrowserAccess({path:{...path(),versionId:version.value.id},body:{staff:official.value||mode.value==='Review'}})
-    if(result.error||!result.data?.downloadUrl)throw parseApiError(result.error,message('challengeWriteUp.loadFailed'));startAttachmentBrowserDownload(result.data.downloadUrl)
+    if(result.error||!result.data?.downloadUrl)throw parseApiError(result.error,message('challengeWriteUp.loadFailed'));startLiveSoloBrowserDownload(result.data.downloadUrl)
   }catch(cause){error.value=parseApiError(cause,message('challengeWriteUp.loadFailed')).displayMessage}finally{busy.value=false}}
   async function reload(){if(!dirty.value&&!busy.value)await load()}
   async function enable(){if(!manager.value||!settingStamp.value||busy.value)return;busy.value=true;try{
@@ -139,7 +145,7 @@ export function useLiveSoloPostgameWriteUps() {
   onMounted(()=>{void load();window.addEventListener('beforeunload',beforeUnload)})
   onScopeDispose(()=>{disposed=true;request++;bodyRequest++;previewLease.close();window.removeEventListener('beforeunload',beforeUnload)})
   return {questionOptions,questionId,selectQuestion,mode,tab,staff,manager,loading,busy,error,listing,items,selected,select,root,version,stateKey,content,pdf,
-    editor,official,format,chooseFormat,markdown,chooseFile,uploadKey,dirty,canSave,canSubmit,save,submit,reviewable,reviewOpen,setReview,reviewAction,reason,openReview,review,
+    editor,official,format,chooseFormat,markdown,chooseFile,uploadKey,dirty,canSave,canSubmit,save,submit,reviewable,reviewOpen,setReview,reviewAction,reviewCaption,reason,openReview,review,
     download,reload,back,leaveOpen,setLeave,leave,settingEnabled,enable}
 }
 export type LiveSoloPostgameWriteUpsState=import('vue').ShallowUnwrapRef<ReturnType<typeof useLiveSoloPostgameWriteUps>>

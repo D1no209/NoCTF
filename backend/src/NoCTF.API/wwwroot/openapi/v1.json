@@ -28700,6 +28700,10 @@
           "openedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "replay": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },

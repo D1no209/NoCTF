@@ -2,7 +2,7 @@ import { computed, onMounted, onScopeDispose, ref, watch } from 'vue'
 import { changeLiveSoloRecording, listLiveSoloRecordings, listLiveSoloRecordingDecisions, prepareLiveSoloRecordingDownload, prepareLiveSoloRecordingPreview } from '~/api'
 import type { NoCtfapiEndpointsLiveSoloLiveSoloRecordingResponse as Recording, NoCtfapiEndpointsLiveSoloLiveSoloRecordingDecisionResponse as Decision, NoCtfDomainLiveSoloLiveSoloRecordingAction as Action } from '~/api'
 import { message, type UiMessage } from '~/utils/i18n'
-import { startAttachmentBrowserDownload } from '~/utils/download'
+import { startLiveSoloBrowserDownload } from '~/utils/download'
 import { parseLiveSoloError } from './live-solo-errors'
 import { ApiError } from '~/utils/api-error'
 import type { MessageKey } from '~/locales/en'
@@ -71,9 +71,9 @@ export function useLiveSoloRecordings() {
       if (staff.value) {
         const result = await prepareLiveSoloRecordingDownload({ path: { competitionId: competitionId.value, matchId: matchId.value, recordingId: current.value.id } })
         if (result.error || !result.data?.downloadUrl) throw parseLiveSoloError(result.error, message('liveSolo.error.operation'))
-        if (!disposed) startAttachmentBrowserDownload(result.data.downloadUrl)
+        if (!disposed) startLiveSoloBrowserDownload(result.data.downloadUrl)
       }
-      else if (current.value.fileUrl) startAttachmentBrowserDownload(current.value.fileUrl + '?download=true')
+      else if (current.value.fileUrl) startLiveSoloBrowserDownload(current.value.fileUrl + '?download=true')
     }
     catch (cause) { if (!disposed) error.value = parseLiveSoloError(cause, message('liveSolo.error.operation')).displayMessage }
     finally { busy.value = false }
