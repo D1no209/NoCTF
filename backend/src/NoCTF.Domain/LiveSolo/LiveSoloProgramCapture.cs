@@ -45,6 +45,8 @@ public sealed class LiveSoloProgramFrame
 
 public sealed class LiveSoloProgramFrameQuestion
 {
+    public Guid CanonicalChallengeId { get; set; }
+    public bool HasStaticAnswer { get; set; }
     public Guid FrameId { get; set; }
     public int Position { get; set; }
     public Guid RoundQuestionId { get; set; }

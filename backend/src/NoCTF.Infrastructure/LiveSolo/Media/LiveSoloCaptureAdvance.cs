@@ -11,6 +11,8 @@ public sealed partial class LiveSoloCaptureStore
         await EnsureAsync(sessionId, ct);
         var session = await db.LiveSoloMediaSessions.AsNoTracking().Include(x => x.Participants).SingleOrDefaultAsync(x => x.Id == sessionId, ct);
         if (session is null) return;
+        var competitionId = await db.LiveSoloMatches.Where(x => x.Id == session.MatchId).Select(x => x.CompetitionId).SingleAsync(ct);
+        await TransactionAsync(() => NoCTF.Infrastructure.LiveSolo.Questions.LiveSoloPublicExposure.RememberAsync(db, competitionId, clock.GetUtcNow(), ct), ct);
         if (session.State != LiveSoloMediaState.Ready && await db.LiveSoloProgramCaptures.AnyAsync(x => x.MediaSessionId == session.Id
             && (x.State == LiveSoloCaptureState.Active || x.State == LiveSoloCaptureState.Stopping), ct))
             await TransactionAsync(() => FrameAsync(session, ct), ct);

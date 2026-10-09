@@ -23,6 +23,7 @@ public sealed class LiveSoloProgramReader(NoCtfDbContext db, ICompetitionModerat
     public async Task<LiveSoloProgramView?> ReadAsync(Guid competitionId, Guid matchId, Guid actorId, CancellationToken ct)
     {
         if (!await AllowedAsync(competitionId, matchId, actorId, ct)) return null;
+        await MarkExposureAsync(competitionId, ct);
         var now = clock.GetUtcNow();
         var latest = await db.LiveSoloProgramSegments.AsNoTracking().Where(x => x.PublicAt <= now && x.RemoveAfter > now
             && db.LiveSoloMediaSessions.Any(s => s.Id == x.MediaSessionId && s.MatchId == matchId))
@@ -57,29 +58,21 @@ public sealed class LiveSoloProgramReader(NoCtfDbContext db, ICompetitionModerat
         if (!await AllowedAsync(competitionId, matchId, actorId, ct)
             || !LiveSoloProgramPolicy.MayReadSegment(segment.PublicAt, segment.RemoveAfter, clock.GetUtcNow()))
         { await stream.DisposeAsync(); return null; }
-        try { await MarkExposureAsync(competitionId, matchId, segment.FrameId, ct); }
+        try { await MarkExposureAsync(competitionId, ct); }
         catch { await stream.DisposeAsync(); throw; }
         return new(stream, file.ContentType);
     }
-    private async Task MarkExposureAsync(Guid competitionId, Guid matchId, Guid frameId, CancellationToken ct)
+    private async Task MarkExposureAsync(Guid competitionId, CancellationToken ct)
     {
         for (var attempt = 0; ; attempt++)
         {
             try
             {
                 await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-                var questionIds = await db.Set<LiveSoloProgramFrameQuestion>().Where(x => x.FrameId == frameId).Select(x => x.CompetitionChallengeId).ToArrayAsync(ct);
-                var templates = await db.CompetitionChallenges.Where(x => questionIds.Contains(x.Id)
-                    && db.ChallengeFlags.Any(flag => (flag.Type == ChallengeFlagType.Template && flag.ChallengeId == x.ChallengeId
-                        || flag.Type == ChallengeFlagType.Competition && flag.CompetitionChallengeId == x.Id) && flag.DeletedAt == null))
-                    .Select(x => x.ChallengeId).Distinct().ToArrayAsync(ct);
-                var canonical = await db.LiveSoloChallengeSources.Where(x => templates.Contains(x.ChallengeId)).ToDictionaryAsync(x => x.ChallengeId, x => x.CanonicalChallengeId, ct);
-                foreach (var id in templates.Select(id => canonical.GetValueOrDefault(id, id)).Distinct())
-                    if (!await db.LiveSoloQuestionExposures.AnyAsync(x => x.CompetitionId == competitionId && x.CanonicalChallengeId == id, ct))
-                        db.LiveSoloQuestionExposures.Add(new() { CompetitionId = competitionId, CanonicalChallengeId = id, MatchId = matchId, PublicAt = clock.GetUtcNow() });
+                await NoCTF.Infrastructure.LiveSolo.Questions.LiveSoloPublicExposure.RememberAsync(db, competitionId, clock.GetUtcNow(), ct);
                 await db.SaveChangesAsync(ct); await tx.CommitAsync(ct); return;
             }
-            catch (Exception exception) when (attempt < 2 && (exception is DbUpdateConcurrencyException || TransactionFailureClassifier.IsRetryable(exception)))
+            catch (Exception exception) when (attempt < 2 && (exception is DbUpdateException || TransactionFailureClassifier.IsRetryable(exception)))
             { db.ChangeTracker.Clear(); }
         }
     }

@@ -69,6 +69,7 @@ public sealed partial class LiveSoloMatchStore
             .ToDictionaryAsync(x => x.ChallengeId, x => x.CanonicalChallengeId, ct);
         Guid Canonical(Guid template) => provenance.GetValueOrDefault(template, template);
         var priorCanonical = directory.Where(x => previousEntries.Contains(x.Id)).Select(x => Canonical(x.ChallengeId)).ToHashSet();
+        if (match.StartedAt is null) await NoCTF.Infrastructure.LiveSolo.Questions.LiveSoloPublicExposure.RememberAsync(db, match.CompetitionId, now, ct);
         var publicCanonical = match.StartedAt is null ? await db.LiveSoloQuestionExposures.AsNoTracking()
             .Where(x => x.CompetitionId == match.CompetitionId && x.PublicAt <= now).Select(x => x.CanonicalChallengeId).ToArrayAsync(ct) : [];
         var usedGroups = await db.LiveSoloRounds.Where(x => x.MatchId == match.Id).Select(x => x.QuestionGroupId).ToArrayAsync(ct);
@@ -142,6 +143,7 @@ public sealed partial class LiveSoloMatchStore
 
     private async Task<bool> NoNewPublicExposureAsync(LiveSoloMatch match, LiveSoloRound round, CancellationToken ct)
     {
+        await NoCTF.Infrastructure.LiveSolo.Questions.LiveSoloPublicExposure.RememberAsync(db, match.CompetitionId, (clock ?? TimeProvider.System).GetUtcNow(), ct);
         var templates = await db.CompetitionChallenges.Where(x => round.Questions.Select(q => q.CompetitionChallengeId).Contains(x.Id)).Select(x => x.ChallengeId).ToArrayAsync(ct);
         var canonical = await db.LiveSoloChallengeSources.Where(x => templates.Contains(x.ChallengeId)).ToDictionaryAsync(x => x.ChallengeId, x => x.CanonicalChallengeId, ct);
         var ids = templates.Select(id => canonical.GetValueOrDefault(id, id)).ToArray();
