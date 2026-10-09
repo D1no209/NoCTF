@@ -1263,6 +1263,10 @@ export type NoCtfapiEndpointsLiveSoloPrepareLiveSoloRoundRequest = {
     questionGroupId?: string | null;
 };
 
+export type NoCtfapiEndpointsLiveSoloSaveLiveSoloConfigurationRequest = {
+    configuration: NoCtfapiEndpointsLiveSoloLiveSoloConfigurationContract;
+};
+
 export type NoCtfapiEndpointsLiveSoloSaveLiveSoloQuestionGroupRequest = {
     id?: string | null;
     expectedStamp?: string | null;
@@ -6700,6 +6704,47 @@ export type GetLiveSoloConfigurationResponses = {
 };
 
 export type GetLiveSoloConfigurationResponse = GetLiveSoloConfigurationResponses[keyof GetLiveSoloConfigurationResponses];
+
+export type SaveLiveSoloConfigurationData = {
+    body: NoCtfapiEndpointsLiveSoloSaveLiveSoloConfigurationRequest;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/configuration';
+};
+
+export type SaveLiveSoloConfigurationErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsLiveSoloLiveSoloFailureResponse;
+    422: NoCtfapiEndpointsLiveSoloLiveSoloFailureResponse;
+};
+
+export type SaveLiveSoloConfigurationError = SaveLiveSoloConfigurationErrors[keyof SaveLiveSoloConfigurationErrors];
+
+export type SaveLiveSoloConfigurationResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsLiveSoloLiveSoloConfigurationContract;
+};
+
+export type SaveLiveSoloConfigurationResponse = SaveLiveSoloConfigurationResponses[keyof SaveLiveSoloConfigurationResponses];
 
 export type GetLiveSoloMatchData = {
     body?: never;

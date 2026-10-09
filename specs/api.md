@@ -752,6 +752,7 @@ PUT /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/wri
 
 ```text
 GET /api/v1/competitions/{competitionId}/live-solo/configuration
+PUT /api/v1/competitions/{competitionId}/live-solo/configuration
 GET /api/v1/competitions/{competitionId}/live-solo/player-policy
 GET /api/v1/competitions/{competitionId}/live-solo/matches
 POST /api/v1/competitions/{competitionId}/live-solo/matches

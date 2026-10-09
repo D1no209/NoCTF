@@ -310,9 +310,38 @@ public sealed class LiveSoloEndpointTests
         await Assert.That(body.RootElement.TryGetProperty("stageRules", out _)).IsFalse();
         await policies.Received(1).ReadAsync(competition, Actor, Arg.Any<CancellationToken>());
     }
+    [Test]
+    public async Task Settings_save_authenticates_and_maps_only_the_route_competition_and_principal_actor()
+    {
+        var competition = Guid.NewGuid(); var now = DateTimeOffset.UtcNow;
+        var storage = Substitute.For<NoCTF.Application.Competitions.Configuration.ICompetitionConfigurationStore>();
+        var policy = new LiveSoloCompetitionModeConfiguration { CompetitionId = competition, Enabled = true };
+        var view = new NoCTF.Application.Competitions.Configuration.CompetitionConfigurationView(competition, NoCTF.Domain.Competitions.GameMode.LiveSolo,
+            policy, NoCTF.Domain.Competitions.CompetitionStatus.Running, 2, [], now);
+        storage.FindAsync(competition, Arg.Any<CancellationToken>()).Returns(view);
+        storage.TryUpdateAsync(competition, Arg.Any<NoCTF.Domain.Competitions.CompetitionModeConfiguration>(), true, Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns(new NoCTF.Application.Competitions.Configuration.CompetitionConfigurationUpdateResult(view));
+        var validator = Substitute.For<NoCTF.Application.Competitions.Configuration.ICompetitionConfigurationValidator>();
+        validator.Validate(Arg.Any<NoCTF.Domain.Competitions.GameMode>(), Arg.Any<NoCTF.Domain.Competitions.CompetitionModeConfiguration>(), 2,
+            Arg.Any<IReadOnlyList<NoCTF.Domain.Challenges.CompetitionChallengeRules>>()).Returns(Array.Empty<string>());
+        var authorizer = Substitute.For<NoCTF.Application.Teams.Moderation.ICompetitionModerationAuthorizer>();
+        authorizer.CanModerateAsync(Actor, competition, Arg.Any<CancellationToken>()).Returns(true);
+        var settings = new ManageLiveSoloConfiguration(new(storage), new(storage, validator), authorizer);
+        await using var app = await HostAsync(Substitute.For<ILiveSoloMatchStore>(), Substitute.For<ILiveSoloAttachmentStore>(), Substitute.For<IStore>(), settings: settings);
+        using var client = app.GetTestClient(); var path = $"/api/v1/competitions/{competition}/live-solo/configuration";
+        var body = new { configuration = LiveSoloConfigurationMapping.ToContract(policy), actorId = Guid.NewGuid(), competitionId = Guid.NewGuid() };
+        using var anonymous = await client.PutAsJsonAsync(path, body); await Assert.That(anonymous.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
+        client.DefaultRequestHeaders.Authorization = new("Bearer", "verified-test");
+        using var accepted = await client.PutAsJsonAsync(path, body); await Assert.That(accepted.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await authorizer.Received(1).CanModerateAsync(Actor, competition, Arg.Any<CancellationToken>());
+        await storage.Received(1).TryUpdateAsync(competition, Arg.Is<NoCTF.Domain.Competitions.CompetitionModeConfiguration>(x => x != null && x.CompetitionId == competition),
+            true, Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>());
+        authorizer.CanModerateAsync(Actor, competition, Arg.Any<CancellationToken>()).Returns(false);
+        using var forbidden = await client.PutAsJsonAsync(path, body); await Assert.That(forbidden.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
+    }
     private static async Task<WebApplication> HostAsync(ILiveSoloMatchStore store, ILiveSoloAttachmentStore attachmentStore, IStore objects,
         ILiveSoloAdjudicationStore? decisions = null, ILiveSoloRuntimeStore? runtimes = null, ILiveSoloMediaStore? media = null, ILiveSoloProgramReader? programs = null,
-        ILiveSoloRecordingStore? recordings = null, ILiveSoloPlayerPolicyReader? policies = null)
+        ILiveSoloRecordingStore? recordings = null, ILiveSoloPlayerPolicyReader? policies = null, ManageLiveSoloConfiguration? settings = null)
     {
         var builder = WebApplication.CreateBuilder(); builder.WebHost.UseTestServer();
         builder.Services.AddFastEndpoints(options => { options.DisableAutoDiscovery = true; options.Assemblies = [typeof(GetLiveSoloMatchEndpoint).Assembly];
@@ -323,7 +352,7 @@ public sealed class LiveSoloEndpointTests
                 || x == typeof(GetLiveSoloMediaEndpoint) || x == typeof(PrepareLiveSoloMediaEndpoint) || x == typeof(JoinLiveSoloMediaEndpoint)
                 || x == typeof(GetLiveSoloProgramEndpoint) || x == typeof(GetLiveSoloProgramPlaylistEndpoint) || x == typeof(GetLiveSoloProgramSegmentEndpoint)
                 || x == typeof(ListLiveSoloRecordingsEndpoint) || x == typeof(ChangeLiveSoloRecordingEndpoint) || x == typeof(GetLiveSoloRecordingEndpoint)
-                || x == typeof(GetLiveSoloPlayerPolicyEndpoint); });
+                || x == typeof(GetLiveSoloPlayerPolicyEndpoint) || settings is not null && x == typeof(SaveLiveSoloConfigurationEndpoint); });
         builder.Services.AddAuthentication("Bearer").AddScheme<AuthenticationSchemeOptions, TestAuthentication>("Bearer", _ => { });
         builder.Services.AddAuthorization(); builder.Services.AddSingleton(store); builder.Services.AddSingleton<ManageLiveSoloMatches>();
         builder.Services.AddSingleton(attachmentStore); builder.Services.AddSingleton(objects); builder.Services.AddSingleton<AccessLiveSoloAttachments>();
@@ -333,6 +362,7 @@ public sealed class LiveSoloEndpointTests
         builder.Services.AddSingleton(programs ?? Substitute.For<ILiveSoloProgramReader>());
         builder.Services.AddSingleton(recordings ?? Substitute.For<ILiveSoloRecordingStore>()); builder.Services.AddSingleton<ManageLiveSoloRecordings>();
         builder.Services.AddSingleton(policies ?? Substitute.For<ILiveSoloPlayerPolicyReader>());
+        if (settings is not null) builder.Services.AddSingleton(settings);
         builder.Services.AddSingleton<IUserContext>(new TestUser()); builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton<IRequestAdmission>(new Admission());
         var source = Substitute.For<IRequestSourceAddress>(); source.Address.Returns("192.0.2.10");
