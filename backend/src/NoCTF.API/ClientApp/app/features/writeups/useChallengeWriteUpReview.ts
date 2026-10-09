@@ -9,8 +9,10 @@ import type { UiMessage } from '~/utils/i18n'
 import { toast } from '~/utils/message-toast'
 import SingleWriteUpSettingsComponent from './SingleWriteUpSettings.vue'
 import ChallengeWriteUpEditorComponent from './ChallengeWriteUpEditor.vue'
-import { writeUpStatusKey } from './writeup-state'
+import { latestWriteUpVersion, writeUpPublicationVersion, writeUpPublicationLabel, writeUpStatusKey } from './writeup-state'
 import type { WriteUp, WriteUpContent } from './writeup-state'
+import { matchesWriteUpTarget, publishWriteUpVersion, writeUpActionTarget } from './writeup-publication'
+import type { WriteUpActionTarget } from './writeup-publication'
 
 export function useChallengeWriteUpReview(props: Readonly<{ competitionId: string }>) {
   const route = useRoute(), router = useRouter()
@@ -28,6 +30,7 @@ export function useChallengeWriteUpReview(props: Readonly<{ competitionId: strin
   const submittedContent = ref<WriteUpContent | null>(null), publishedContent = ref<WriteUpContent | null>(null)
   const submittedPdf = ref<string | null>(null), publishedPdf = ref<string | null>(null)
   const reason = ref(''), confirmation = ref<NoCtfDomainChallengesWriteUpsWriteUpReviewAction | null>(null)
+  const confirmationTarget = ref<WriteUpActionTarget | null>(null), publicationNotice = ref(false)
   const competitionStatus = ref<NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol | null>(null)
   const settingsOpen = ref(false), officialOpen = ref(false), officialChallengeId = ref('')
   const settings = ref<NoCtfApplicationChallengesWriteUpsWriteUpSettingsView | null>(null), confirmationSettings = ref<NoCtfApplicationChallengesWriteUpsWriteUpSettingsView | null>(null)
@@ -35,17 +38,23 @@ export function useChallengeWriteUpReview(props: Readonly<{ competitionId: strin
   const challengeOptions = ref<{ value: string; label: string }[]>([])
   const pageCount = computed(() => Math.max(1, Math.ceil(total.value / limit.value)))
   const selectedId = computed(() => selected.value?.id ?? null)
-  const selectedVersion = computed(() => selected.value?.submitted?.state === 'Submitted' ? selected.value.submitted
-    : selected.value?.draft ?? selected.value?.submitted ?? selected.value?.published)
+  const selectedVersion = computed(() => latestWriteUpVersion(selected.value))
   const publishedVersion = computed(() => selected.value?.published)
-  const publishVersion = computed(() => selected.value?.submitted?.state === 'Submitted' ? selected.value.submitted
-    : !selected.value?.publishedVersionId ? selected.value?.versions?.find(x => x.state === 'Approved') : null)
+  const publishVersion = computed(() => display.value === 'published' ? null : writeUpPublicationVersion(selected.value, selectedVersion.value))
+  const publicationLabel = computed(() => writeUpPublicationLabel(publishVersion.value))
   const enabled = computed(() => settings.value?.enabled === true)
+  const canPublish = computed(() => canManage.value && enabled.value && !!publishVersion.value && !pending.value && !loading.value && !previewLoading.value && !previewError.value)
+  const canReject = computed(() => canJudge.value && enabled.value && display.value !== 'published' && selectedVersion.value?.state === 'Submitted' && !pending.value)
+  const publicationBlocked = computed(() => !enabled.value ? 'challengeWriteUp.disabled'
+    : display.value === 'published' ? 'challengeWriteUp.selectCurrentVersion'
+      : selectedVersion.value?.state === 'Draft' && selected.value?.source !== 'Official' ? 'challengeWriteUp.teamDraftNotPublishable'
+        : !publishVersion.value ? 'challengeWriteUp.notPublishable' : null)
   const statusKey = computed(() => writeUpStatusKey(selected.value))
   const options = computed(() => rows.value.map(row => ({ value: row.id ?? '', label: `${row.challengeTitle ?? ''} · ${row.source === 'Official' ? translate('challengeWriteUp.official') : row.authorName ?? ''}`,
     row, statusKey: writeUpStatusKey(row) })))
   let loadSequence = 0, previewSequence = 0, unwatch: (() => void) | undefined, searchTimer: ReturnType<typeof setTimeout> | undefined
   async function load() {
+    if (pending.value) return
     const request = ++loadSequence; loading.value = rows.value.length === 0; error.value = null
     const [result, policy] = await Promise.all([adminListChallengeWriteUpReviews({ path: { competitionId: props.competitionId }, query: { filter: filter.value,
       source: source.value === 'All' ? undefined : source.value as NoCtfDomainChallengesWriteUpsWriteUpSource,
@@ -97,9 +106,10 @@ export function useChallengeWriteUpReview(props: Readonly<{ competitionId: strin
     finally { if (request === previewSequence) previewLoading.value = false }
   }
   async function select(id: string, advance = true) {
+    if (pending.value) return
     const row = rows.value.find(item => item.id === id)
     if (!row) return
-    selected.value = row; reason.value = ''; display.value = 'submitted'
+    selected.value = row; reason.value = ''; display.value = 'submitted'; publicationNotice.value = false
     if (narrow.value && advance) panel.value = 'preview'
     void router.replace({ query: { ...route.query, review: id } })
     await preview()
@@ -107,6 +117,7 @@ export function useChallengeWriteUpReview(props: Readonly<{ competitionId: strin
   function setDisplay(value: unknown) { if (value === 'submitted' || value === 'published' || value === 'compare') display.value = value }
   function setPanel(value: unknown) { if (value === 'list' || selected.value && (value === 'preview' || value === 'actions')) panel.value = value }
   function resetFilter() {
+    if (pending.value) return
     page.value = 1; selected.value = null
     void router.replace({ query: { ...route.query, review: undefined, reviewSearch: search.value || undefined,
       reviewStatus: filter.value, reviewSource: source.value, reviewPage: '1' } })
@@ -120,25 +131,53 @@ export function useChallengeWriteUpReview(props: Readonly<{ competitionId: strin
   async function review(action: NoCtfDomainChallengesWriteUpsWriteUpReviewAction) {
     if (action === 'Reject' ? !canJudge.value : !canManage.value) return
     const row = selected.value
-    const versionId = action === 'Withdraw' ? row?.publishedVersionId : action === 'Publish' ? publishVersion.value?.id : row?.submitted?.id
-    if (!row?.id || !row.competitionChallengeId || !row.concurrencyStamp || !versionId || pending.value) return
+    const version = action === 'Withdraw' ? publishedVersion.value : action === 'Publish' ? publishVersion.value : row?.submitted
+    const target = action === 'Reject' ? writeUpActionTarget(row, version) : confirmationTarget.value
+    if (!row || !target || pending.value) return
+    if (!matchesWriteUpTarget(row, version, target) || (action === 'Publish' && !canPublish.value) || (action === 'Reject' && !canReject.value)) {
+      confirmation.value = null; error.value = message('challengeWriteUp.publicationChanged'); return
+    }
     if (action === 'Reject' && !reason.value.trim()) { error.value = message('challengeWriteUp.error.InvalidContent'); return }
-    pending.value = true; error.value = null
-    const result = await reviewChallengeWriteUp({ path: { competitionId: props.competitionId, competitionChallengeId: row.competitionChallengeId, writeUpId: row.id },
-      body: { versionId, expectedStamp: row.concurrencyStamp, action, reason: action === 'Reject' ? reason.value.trim() : undefined } })
-    pending.value = false; confirmation.value = null
-    if (result.error || !result.data) { error.value = parseApiError(result.error, message('challengeWriteUp.reviewFailed')).displayMessage; return }
-    selected.value = { ...result.data, viewedTeamCount: row.viewedTeamCount }; toast.success(message('challengeWriteUp.reviewSaved'))
+    pending.value = true; error.value = null; publicationNotice.value = false; loadSequence++
+    try {
+      if (action === 'Publish') selected.value = await publishWriteUpVersion(props.competitionId, target, submitted => {
+        selected.value = { ...submitted, viewedTeamCount: row.viewedTeamCount }; publicationNotice.value = true
+      })
+      else {
+        const result = await reviewChallengeWriteUp({ path: { competitionId: props.competitionId, competitionChallengeId: target.challengeId, writeUpId: target.writeUpId },
+          body: { versionId: target.versionId, expectedStamp: target.expectedStamp, action, reason: action === 'Reject' ? reason.value.trim() : undefined } })
+        if (result.error || !result.data) throw result.error
+        selected.value = result.data
+      }
+      selected.value = { ...selected.value, viewedTeamCount: row.viewedTeamCount }; publicationNotice.value = false
+      toast.success(message('challengeWriteUp.reviewSaved'))
+    }
+    catch (cause) { error.value = parseApiError(cause, message('challengeWriteUp.reviewFailed')).displayMessage; return }
+    finally { pending.value = false; confirmation.value = null }
     await load(); await preview()
   }
   async function requestPublish() {
-    if (!canManage.value || !publishVersion.value?.id || !selected.value?.competitionChallengeId) return
-    const [result, competition] = await Promise.all([getChallengeWriteUpSettings({ path: { competitionId: props.competitionId }, query: { competitionChallengeId: selected.value.competitionChallengeId } }), getCompetitionEndpoint({ path: { competitionId: props.competitionId } })])
-    if (result.error || !result.data?.settings) { error.value = parseApiError(result.error, message('challengeWriteUp.settingsFailed')).displayMessage; return }
-    competitionStatus.value = competition.data?.status ?? null
-    confirmationSettings.value = result.data.settings; confirmation.value = 'Publish'
+    if (!canPublish.value) return
+    const target = writeUpActionTarget(selected.value, publishVersion.value)
+    if (!target) return
+    pending.value = true; loadSequence++
+    try {
+      const [result, competition] = await Promise.all([getChallengeWriteUpSettings({ path: { competitionId: props.competitionId }, query: { competitionChallengeId: target.challengeId } }), getCompetitionEndpoint({ path: { competitionId: props.competitionId } })])
+      if (result.error || !result.data?.settings) { error.value = parseApiError(result.error, message('challengeWriteUp.settingsFailed')).displayMessage; return }
+      if (competition.error || !competition.data) { error.value = parseApiError(competition.error, message('challengeWriteUp.loadFailed')).displayMessage; return }
+      if (!result.data.settings.enabled) { error.value = message('challengeWriteUp.disabled'); return }
+      if (!matchesWriteUpTarget(selected.value, publishVersion.value, target)) { error.value = message('challengeWriteUp.publicationChanged'); return }
+      competitionStatus.value = competition.data.status ?? null
+      confirmationSettings.value = result.data.settings; confirmationTarget.value = target; confirmation.value = 'Publish'
+    }
+    catch (cause) { error.value = parseApiError(cause, message('challengeWriteUp.loadFailed')).displayMessage }
+    finally { pending.value = false }
   }
-  function requestWithdraw() { if (canManage.value && selected.value?.publishedVersionId) confirmation.value = 'Withdraw' }
+  function requestWithdraw() {
+    if (!canManage.value || pending.value || !selected.value?.publishedVersionId) return
+    confirmationTarget.value = writeUpActionTarget(selected.value, publishedVersion.value)
+    if (confirmationTarget.value) confirmation.value = 'Withdraw'
+  }
   function setConfirmationOpen(open: boolean) { if (!open && !pending.value) confirmation.value = null }
   function confirmReview() { if (confirmation.value) void review(confirmation.value) }
   function reject() { void review('Reject') }
@@ -179,7 +218,7 @@ export function useChallengeWriteUpReview(props: Readonly<{ competitionId: strin
     canManage, canJudge, display, submittedContent, publishedContent, submittedPdf, publishedPdf, reason, confirmation,
     settingsOpen, officialOpen, officialChallengeId, challengeOptions, selectedId, selectedVersion, publishedVersion, statusKey,
     pageCount, options, load, select, changePage, changeLimit, requestPublish, requestWithdraw, setConfirmationOpen, confirmReview, reject,
-    setDisplay, setPanel, narrow, panel, enabled, publishVersion, confirmationSettings, competitionStatus, bindOfficialEditor, setOfficialOpen, changeOfficialChallenge,
+    setDisplay, setPanel, narrow, panel, enabled, publishVersion, canPublish, canReject, publicationLabel, publicationBlocked, publicationNotice, confirmationTarget, confirmationSettings, competitionStatus, bindOfficialEditor, setOfficialOpen, changeOfficialChallenge,
     openOfficial, consultation, competitionId: computed(() => props.competitionId),
     Settings: markRaw(SingleWriteUpSettingsComponent), Editor: markRaw(ChallengeWriteUpEditorComponent) }
 }

@@ -26,6 +26,16 @@ export function writeUpStatusKey(value?: WriteUp | null): MessageKey {
 export function latestWriteUpVersion(value?: WriteUp | null): WriteUpVersion | null {
   return value?.draft ?? value?.submitted ?? value?.published ?? value?.versions?.[0] ?? null
 }
+export function writeUpPublicationVersion(value?: WriteUp | null, preview = latestWriteUpVersion(value)): WriteUpVersion | null {
+  if (!preview?.id || preview.id === value?.publishedVersionId) return null
+  if (preview.state === 'Draft') return value?.source === 'Official' && value.draft?.id === preview.id ? preview : null
+  if (preview.state === 'Submitted') return value?.submitted?.id === preview.id ? preview : null
+  return preview.state === 'Approved' ? preview : null
+}
+export function writeUpPublicationLabel(version?: WriteUpVersion | null): MessageKey {
+  return version?.state === 'Draft' ? 'challengeWriteUp.publishDraft'
+    : version?.state === 'Approved' ? 'challengeWriteUp.republishVersion' : 'challengeWriteUp.publishSubmitted'
+}
 export function needsWriteUpConfirmation(quote?: WriteUpQuote | null): boolean {
   return !!quote && !quote.isFree && !quote.isUnlocked
 }
