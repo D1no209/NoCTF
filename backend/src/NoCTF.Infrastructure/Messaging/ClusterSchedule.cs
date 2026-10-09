@@ -192,6 +192,9 @@ internal static class ClusterScheduleMessageClock
         NoCTF.Application.Messaging.DispatchPendingGameplayFacts =>
             new NoCTF.Application.Messaging.DispatchPendingGameplayFacts(dueAt),
         NoCTF.Application.LiveSolo.Rounds.AdvanceLiveSoloRound value => value with { At = dueAt },
+        NoCTF.Application.LiveSolo.Media.RefreshLiveSoloMedia value => value,
+        NoCTF.Application.LiveSolo.Media.AdvanceLiveSoloCapture value => value,
+        NoCTF.Application.LiveSolo.Media.PruneLiveSoloCapture value => value,
         _ => throw new ArgumentOutOfRangeException(
             nameof(message),
             message.GetType().FullName,
