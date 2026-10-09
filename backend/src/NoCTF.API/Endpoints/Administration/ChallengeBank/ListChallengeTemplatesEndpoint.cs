@@ -40,6 +40,9 @@ public sealed class ListChallengeTemplatesRequest : SearchRequest
     public bool IncludeDeleted { get; set; }
 
     [QueryParam]
+    public bool OnlyMine { get; set; }
+
+    [QueryParam]
     public string? Direction { get; set; }
 }
 
@@ -65,7 +68,7 @@ public sealed class ListChallengeTemplatesEndpoint(
         Summary(summary =>
         {
             summary.Summary = "Lists visible challenge templates.";
-            summary.Description = "Returns owned, managed, shared, or platform-administrator-visible templates.";
+            summary.Description = "Returns owned, managed, shared, or platform-administrator-visible templates. OnlyMine restricts the results to templates owned by the authenticated user.";
         });
     }
 
@@ -81,7 +84,8 @@ public sealed class ListChallengeTemplatesEndpoint(
                 PaginationRules.Normalize(request.Direction),
                 request.Offset,
                 request.Limit,
-                request.Desc), ct)));
+                request.Desc,
+                request.OnlyMine), ct)));
 
     private static ChallengeTemplateListResponse ToListResponse(ChallengeTemplateListPage page) =>
         new(page.Items.Select(item => new ChallengeTemplateSummaryResponse(

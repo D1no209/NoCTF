@@ -552,9 +552,10 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
         value = { deliveryPolicy: 'All', items: state.attachments.filter(item => item.challengeId === challenge!.challengeId && !item.deletedAt) }
       }
       else if (route === '/admin/challenges') {
-        const page = list(state.templates, url)
+        const templates = state.templates.filter(template => url.searchParams.get('onlyMine') !== 'true' || template.ownerId === user?.userId)
+        const page = list(templates, url)
         const includeDeleted = url.searchParams.get('includeDeleted') === 'true'
-        const directions = [...new Set(state.templates
+        const directions = [...new Set(templates
           .filter(template => includeDeleted || !template.deletedAt)
           .map(template => String(template.direction ?? '').trim())
           .filter(Boolean))]

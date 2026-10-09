@@ -1,4 +1,5 @@
 {
+  "challengeLibrary.onlyMine": "只显示本人题目",
   "challengeTags.label": "标签",
   "challengeTags.filter": "按标签筛选",
   "challengeTags.edit": "选择或添加标签",

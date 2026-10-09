@@ -17938,11 +17938,19 @@
           "Admin"
         ],
         "summary": "Lists visible challenge templates.",
-        "description": "Returns owned, managed, shared, or platform-administrator-visible templates.",
+        "description": "Returns owned, managed, shared, or platform-administrator-visible templates. OnlyMine restricts the results to templates owned by the authenticated user.",
         "operationId": "AdminChallengeBankListTemplates",
         "parameters": [
           {
             "name": "includeDeleted",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "onlyMine",
             "in": "query",
             "required": true,
             "schema": {

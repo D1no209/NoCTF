@@ -4766,7 +4766,7 @@ export const adminChallengeBankCreateFlag = <ThrowOnError extends boolean = fals
 /**
  * Lists visible challenge templates.
  *
- * Returns owned, managed, shared, or platform-administrator-visible templates.
+ * Returns owned, managed, shared, or platform-administrator-visible templates. OnlyMine restricts the results to templates owned by the authenticated user.
  */
 export const adminChallengeBankListTemplates = <ThrowOnError extends boolean = false>(options: Options<AdminChallengeBankListTemplatesData, ThrowOnError>): RequestResult<AdminChallengeBankListTemplatesResponses, AdminChallengeBankListTemplatesErrors, ThrowOnError> => (options.client ?? client).get<AdminChallengeBankListTemplatesResponses, AdminChallengeBankListTemplatesErrors, ThrowOnError>({
     security: [{

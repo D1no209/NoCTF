@@ -88,6 +88,8 @@ public sealed class ChallengeBankStore(
         var source = db.Challenges.IgnoreQueryFilters().AsNoTracking().IgnoreAutoIncludes();
         if (!query.IncludeDeleted)
             source = source.Where(challenge => challenge.DeletedAt == null);
+        if (query.OnlyMine)
+            source = source.Where(challenge => challenge.OwnerId == query.ActorId);
 
         var authorized = Authorized(source, query.ActorId, query.IsAdministrator);
         var keyword = string.IsNullOrWhiteSpace(query.Keyword) ? null : query.Keyword.Trim();

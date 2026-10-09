@@ -474,6 +474,21 @@ describe('isolated Mock API', () => {
     expect(result.directions).toEqual(expect.arrayContaining(['Web', 'Crypto', 'Pwn']))
   })
 
+  test('filters owned challenge templates before counting and paging', async () => {
+    const { api, send } = await setup()
+    const originalCount = api.state.templates.length
+    const other = api.state.templates[0]!
+    other.ownerId = id(1, 2)
+    other.direction = 'Other owner only'
+
+    const result = await (await send('/api/v1/admin/challenges?onlyMine=true&offset=1&limit=2')).json()
+    expect(result.total).toBe(originalCount - 1)
+    expect(result.items).toHaveLength(2)
+    expect(result.items.some((item: Data) => item.id === other.id)).toBe(false)
+    expect(result.directions).not.toContain('Other owner only')
+    expect((await (await send('/api/v1/admin/challenges?offset=0&limit=2')).json()).total).toBe(originalCount)
+  })
+
   test('profile cover upload remains independent from the site wallpaper', async () => {
     const { api, accessToken, send } = await setup()
     const form = new FormData()

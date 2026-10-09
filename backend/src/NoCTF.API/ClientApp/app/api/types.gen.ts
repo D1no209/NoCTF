@@ -13983,6 +13983,7 @@ export type AdminChallengeBankListTemplatesData = {
     path?: never;
     query: {
         includeDeleted: boolean;
+        onlyMine: boolean;
         direction?: string | null;
         keyword?: string | null;
         offset: number;
