@@ -4,7 +4,8 @@ import { bindViewState } from '~/features/shared/view-state'
 import { useAdminCompetitionsByIdTeamsPage } from './useAdminCompetitionsByIdTeamsPage'
 import View from '~/components/views/page/admin/competitions/[id]/AdminCompetitionsByIdTeamsPageView.vue'
 
-const state = bindViewState(useAdminCompetitionsByIdTeamsPage())
+const props = defineProps<{ appealsOnly?: boolean }>()
+const state = bindViewState(useAdminCompetitionsByIdTeamsPage({ appealsOnly: props.appealsOnly }))
 
 </script>
 

@@ -3,12 +3,12 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdTeamsPageViewState } from '~/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdTeamsPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdTeamsPageViewState }>()
-const { adminUserPath, teamDetailOpen, teamLoading, teamDetailError, competitionId, canJudge, canWrite, teams, search, loading, pageLoading, error, page, pageCount, total, pageLimit, loadPage, setPageSize, pendingId, tracks, tracksEnabled, registrationStatusOptions, selectedTeam, teamMembers, teamDetailLoading, teamInvitationToken, teamInvitationLoading, teamInvitationError, reloadTeamInvitation, copyTeamInvitation, expandedMemberId, setExpandedMember, teamDisplayNames, displayTeamName, scoreAdjustmentTeam, scoreAdjustmentChallenges, scoreAdjustmentChallengeId, scoreAdjustmentDelta, scoreAdjustmentLoading, scoreAdjustmentPending, scoreAdjustmentError, scoreAdjustmentValid, openScoreAdjustment, closeScoreAdjustment, submitScoreAdjustment, openTeamDetail, assignTrackValue, setRegistrationStatusValue, banDialog, banReason, banAnnouncePublicly, banPending, banReasonValid, openBan, submitBan, appeals, appealsLoading, appealsError, appealDialog, appealReason, appealPending, openAppeal, submitAppeal, PrivateAccountPanel, onUpdateOpenOpen, onClickScoreAdjustmentTeam, onUpdateOpenBanDialog, onClickBanDialog, onUpdateOpenAppealDialog, onClickAppealDialog } = toRefs(viewProps.state)
+const { appealsOnly, adminUserPath, teamDetailOpen, teamLoading, teamDetailError, competitionId, canJudge, canWrite, teams, search, loading, pageLoading, error, page, pageCount, total, pageLimit, loadPage, setPageSize, pendingId, tracks, tracksEnabled, registrationStatusOptions, selectedTeam, teamMembers, teamDetailLoading, teamInvitationToken, teamInvitationLoading, teamInvitationError, reloadTeamInvitation, copyTeamInvitation, expandedMemberId, setExpandedMember, teamDisplayNames, displayTeamName, scoreAdjustmentTeam, scoreAdjustmentChallenges, scoreAdjustmentChallengeId, scoreAdjustmentDelta, scoreAdjustmentLoading, scoreAdjustmentPending, scoreAdjustmentError, scoreAdjustmentValid, openScoreAdjustment, closeScoreAdjustment, submitScoreAdjustment, openTeamDetail, assignTrackValue, setRegistrationStatusValue, banDialog, banReason, banAnnouncePublicly, banPending, banReasonValid, openBan, submitBan, appeals, appealsLoading, appealsError, appealDialog, appealReason, appealPending, openAppeal, submitAppeal, PrivateAccountPanel, onUpdateOpenOpen, onClickScoreAdjustmentTeam, onUpdateOpenBanDialog, onClickBanDialog, onUpdateOpenAppealDialog, onClickAppealDialog } = toRefs(viewProps.state)
 </script>
 
 <template>
   <div class="flex flex-col gap-8">
-    <div id="ban-appeals" class="flex scroll-mt-24 flex-col gap-4">
+    <div v-if="!appealsOnly" class="flex flex-col gap-4">
       <h2 class="text-lg font-semibold">{{ $t('administration.label.teamManagement') }}</h2>
       <Input v-model="search" :placeholder="$t('common.label.searchTeam')" :aria-label="$t('common.label.searchTeam')" />
       <Alert v-if="error" variant="destructive">
@@ -245,9 +245,9 @@ const { adminUserPath, teamDetailOpen, teamLoading, teamDetailError, competition
       </DialogContent>
     </Dialog>
 
-    <Separator />
+    <Separator v-if="!appealsOnly" />
 
-    <div class="flex flex-col gap-4">
+    <div id="ban-appeals" class="flex scroll-mt-24 flex-col gap-4">
       <h2 class="text-lg font-semibold">{{ $t('common.label.banAppeal') }}</h2>
       <Alert v-if="appealsError" variant="destructive">
         <AlertDescription>{{ $message(appealsError) }}</AlertDescription>

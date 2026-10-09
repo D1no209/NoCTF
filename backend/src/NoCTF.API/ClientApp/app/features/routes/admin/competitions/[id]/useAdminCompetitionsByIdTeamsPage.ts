@@ -15,7 +15,8 @@ import PrivateAccountPanelComponent from '../../../../account/PrivateAccountPane
 import { useOffsetPagination } from '../../../../../composables/useOffsetPagination'
 
 /** Owns state, effects and commands for AdminCompetitionsByIdTeamsPage. */
-export function useAdminCompetitionsByIdTeamsPage() {
+export function useAdminCompetitionsByIdTeamsPage(options: { appealsOnly?: boolean } = {}) {
+  const appealsOnly = options.appealsOnly === true
   const { competitionId, canJudge, canWrite } = useCompetitionAdmin()
 
   const route = useRoute()
@@ -241,6 +242,7 @@ export function useAdminCompetitionsByIdTeamsPage() {
   }, { flush: 'sync' })
 
   async function load() {
+    if (appealsOnly) return
     loading.value = true
     error.value = null
     const trackResult = await adminGetCompetition({ path: { competitionId } })
@@ -438,6 +440,7 @@ export function useAdminCompetitionsByIdTeamsPage() {
   const PrivateAccountPanel = markRaw(PrivateAccountPanelComponent)
 
   const viewBindings = {
+      appealsOnly,
       adminUserPath, teamDetailOpen, teamLoading, teamDetailError,
       competitionId,
       canJudge,
