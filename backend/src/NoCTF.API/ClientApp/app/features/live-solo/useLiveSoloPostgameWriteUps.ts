@@ -1,4 +1,4 @@
-import { computed, inject, onMounted, onScopeDispose, ref } from 'vue'
+import { computed, inject, onMounted, onScopeDispose, ref, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { useNow } from '@vueuse/core'
 import { listLiveSoloPostgameQuestions, listLiveSoloWriteUps, getLiveSoloWriteUpContent, saveLiveSoloWriteUpDraft, saveLiveSoloWriteUpPdfDraft,
@@ -18,6 +18,7 @@ import { PostgamePreviewLease } from './postgame-preview-lease'
 
 export function useLiveSoloPostgameWriteUps() {
   const route=useRoute(),router=useRouter(),context=inject(competitionContextKey)
+  const {user}=useAuth()
   const {t}=useLocale()
   const competitionId=computed(()=>route.params.id as string),matchId=computed(()=>route.params.matchId as string)
   const questionId=computed(()=>typeof route.params.questionId==='string'?route.params.questionId:null)
@@ -128,9 +129,10 @@ export function useLiveSoloPostgameWriteUps() {
     const result=await reviewLiveSoloWriteUp({path:{...path(),writeUpId:target.writeUpId},body:{versionId:target.versionId,expectedStamp:target.expectedStamp,action:reviewAction.value,reason:reason.value||null}})
     if(result.error||!result.data)throw parseApiError(result.error,message('challengeWriteUp.saveFailed'));reviewOpen.value=false;error.value=null
   }catch(cause){error.value=parseApiError(cause,message('challengeWriteUp.saveFailed')).displayMessage}finally{busy.value=false;if(!reviewOpen.value)await load()}}
-  async function download(){if(!version.value?.id||busy.value)return;busy.value=true;try{
+  async function download(){if(!version.value?.id||busy.value)return;const actor=user.value?.userId;busy.value=true;try{
     const result=await prepareLiveSoloWriteUpBrowserAccess({path:{...path(),versionId:version.value.id},body:{staff:official.value||mode.value==='Review'}})
-    if(result.error||!result.data?.downloadUrl)throw parseApiError(result.error,message('challengeWriteUp.loadFailed'));startLiveSoloBrowserDownload(result.data.downloadUrl)
+    if(result.error||!result.data?.downloadUrl)throw parseApiError(result.error,message('challengeWriteUp.loadFailed'));
+    if(!disposed&&actor===user.value?.userId)startLiveSoloBrowserDownload(result.data.downloadUrl)
   }catch(cause){error.value=parseApiError(cause,message('challengeWriteUp.loadFailed')).displayMessage}finally{busy.value=false}}
   async function reload(){if(!dirty.value&&!busy.value)await load()}
   async function enable(){if(!manager.value||!settingStamp.value||busy.value)return;busy.value=true;try{
@@ -143,6 +145,11 @@ export function useLiveSoloPostgameWriteUps() {
   function beforeUnload(event:BeforeUnloadEvent){if(dirty.value){event.preventDefault();event.returnValue=''}}
   onBeforeRouteLeave(to=>{if(allowLeave)return true;if(busy.value)return false;if(!dirty.value)return true;leaveTo=to.fullPath;leaveOpen.value=true;return false})
   onMounted(()=>{void load();window.addEventListener('beforeunload',beforeUnload)})
+  watch(()=>user.value?.userId,()=>{
+    request++;bodyRequest++;previewLease.close();content.value=null;listing.value=null;questions.value=[];selected.value=null
+    markdown.value='';file.value=null;original.value='';reviewOpen.value=false;reviewTarget.value=null;reason.value=''
+    settingStamp.value=null;settingEnabled.value=false;initialized=false;mode.value='Public';loading.value=false
+  },{flush:'sync'})
   onScopeDispose(()=>{disposed=true;request++;bodyRequest++;previewLease.close();window.removeEventListener('beforeunload',beforeUnload)})
   return {questionOptions,questionId,selectQuestion,mode,tab,staff,manager,loading,busy,error,listing,items,selected,select,root,version,stateKey,content,pdf,
     editor,official,format,chooseFormat,markdown,chooseFile,uploadKey,dirty,canSave,canSubmit,save,submit,reviewable,reviewOpen,setReview,reviewAction,reviewCaption,reason,openReview,review,

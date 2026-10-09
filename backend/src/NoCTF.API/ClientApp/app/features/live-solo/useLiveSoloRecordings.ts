@@ -10,6 +10,7 @@ import { playableRecording, recordingActions, recordingActionKey, recordingFailu
 
 export function useLiveSoloRecordings() {
   const route = useRoute(), router = useRouter()
+  const { user } = useAuth()
   const competitionId = computed(() => route.params.id as string), matchId = computed(() => route.params.matchId as string)
   const selectedId = computed(() => typeof route.params.recordingId === 'string' ? route.params.recordingId : null)
   const staff = computed(() => route.query.staff === '1')
@@ -18,7 +19,9 @@ export function useLiveSoloRecordings() {
   const decision = ref<{ row: Recording; action: Action } | null>(null)
   let disposed = false, selectedRequest = 0, renewAt = 0, timer: ReturnType<typeof setTimeout> | undefined
   const pagination = useOffsetPagination<Recording>(async ({ offset, limit }) => {
+    const actor = user.value?.userId
     const result = await listLiveSoloRecordings({ path: { competitionId: competitionId.value, matchId: matchId.value }, query: { staff: staff.value, offset, limit } })
+    if (disposed || actor !== user.value?.userId) return { items: [], total: 0 }
     if (result.error || !result.data) { source.value = null; throw parseLiveSoloError(result.error, message('liveSolo.recording.loadFailed')) }
     if (disposed) return { items: [], total: 0 }
     canJudge.value = result.data.canJudge ?? false; canPublish.value = result.data.canPublish ?? false
@@ -66,12 +69,13 @@ export function useLiveSoloRecordings() {
   }
   async function download() {
     if (!current.value?.id || busy.value || !playable.value) return
+    const actor = user.value?.userId
     busy.value = true
     try {
       if (staff.value) {
         const result = await prepareLiveSoloRecordingDownload({ path: { competitionId: competitionId.value, matchId: matchId.value, recordingId: current.value.id } })
         if (result.error || !result.data?.downloadUrl) throw parseLiveSoloError(result.error, message('liveSolo.error.operation'))
-        if (!disposed) startLiveSoloBrowserDownload(result.data.downloadUrl)
+        if (!disposed && actor === user.value?.userId) startLiveSoloBrowserDownload(result.data.downloadUrl)
       }
       else if (current.value.fileUrl) startLiveSoloBrowserDownload(current.value.fileUrl + '?download=true')
     }
@@ -103,6 +107,11 @@ export function useLiveSoloRecordings() {
   async function pageSize(value: number) { source.value = null; await pagination.setPageSize(value); if (options.value[0]) await select(options.value[0].value) }
   async function back() { await router.push({ path: `/competitions/${competitionId.value}/live-solo`, query: { match: matchId.value } }) }
   watch(() => [current.value?.id, current.value?.state, staff.value], () => { void readSelected() })
+  watch(() => user.value?.userId, () => {
+    selectedRequest++; source.value = null; history.value = []; canJudge.value = false; canPublish.value = false
+    dialog.value = false; decision.value = null; reason.value = ''; renewAt = 0
+    pagination.reset()
+  }, { flush: 'sync' })
   async function tick() { await load(); if (!disposed) timer = setTimeout(tick, 15_000) }
   onMounted(() => { void tick() })
   onScopeDispose(() => { disposed = true; selectedRequest++; source.value = null; if (timer) clearTimeout(timer) })
