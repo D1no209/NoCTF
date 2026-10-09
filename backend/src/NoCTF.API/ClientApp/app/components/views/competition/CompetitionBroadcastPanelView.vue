@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { CompetitionBroadcastPanelViewState } from '~/features/competition/useCompetitionBroadcastPanel'
 
 const viewProps = defineProps<{ state: CompetitionBroadcastPanelViewState }>()
-const { Megaphone, items, loading, error, broadcastMotionAttributes, refreshLatest, fill } = toRefs(viewProps.state)
+const { Megaphone, items, loading, error, broadcastMotionAttributes, refreshLatest, fill, emptyDescriptionKey } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -31,7 +31,7 @@ const { Megaphone, items, loading, error, broadcastMotionAttributes, refreshLate
     </CardContent>
     <CardContent v-else-if="!items.length" class="px-4 pb-8 pt-5 text-center">
       <p class="text-sm text-muted-foreground">{{ $t('competitions.competitionBroadcast.description.thereMatchReportYet') }}</p>
-      <p class="mt-1 text-xs text-muted-foreground/80">{{ $t('competitions.competitionBroadcast.description.bloodListQuestionsDiscipline') }}</p>
+      <p class="mt-1 text-xs text-muted-foreground/80">{{ $t(emptyDescriptionKey) }}</p>
     </CardContent>
     <ol v-scroll-surface data-scroll-surface
       v-else

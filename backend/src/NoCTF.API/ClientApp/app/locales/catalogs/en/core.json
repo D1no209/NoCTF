@@ -1,4 +1,5 @@
 {
+  "staffWebhook.workbench": "Staff workspace",
   "capacity.title": "Runner capacity",
   "capacity.units": "Resource amounts: CPU cores / MiB / PIDs. Usage: host CPU % / MiB / PIDs.",
   "capacity.unavailable": "Capacity diagnostics are unavailable.",

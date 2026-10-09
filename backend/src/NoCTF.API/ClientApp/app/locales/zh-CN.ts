@@ -11,6 +11,7 @@ import WriteupsMessages from './catalogs/zh-CN/writeups.json'
 import PasskeyMessages from './catalogs/zh-CN/passkeys.json'
 import MfaMessages from './catalogs/zh-CN/mfa.json'
 import ApiMessages from './catalogs/zh-CN/api.json'
+import LiveSoloMessages from './catalogs/zh-CN/live-solo.json'
 
 const translatedMessages = {
   ...CoreMessages,
@@ -25,6 +26,7 @@ const translatedMessages = {
   ...ApiMessages,
   ...MfaMessages,
   ...PasskeyMessages,
+  ...LiveSoloMessages,
 }
 export const chineseMessages = {
   ...englishMessages,

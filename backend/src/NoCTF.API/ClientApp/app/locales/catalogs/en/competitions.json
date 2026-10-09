@@ -1,4 +1,5 @@
 {
+  "competitions.competitionBroadcast.description.liveSolo": "Competition notices appear here",
   "competitions.label.backToAdministration": "Back to administration",
   "progression.title": "Progression & badges",
   "progression.description": "Import competition challenges and badges, then connect prerequisites.",
