@@ -2,6 +2,8 @@
 
 Approved scope: an independent fifth game mode with Team-based participants, parallel Matches, first valid Flag by durable Round admission sequence, and no ordinary challenge points or blood awards. Existing CTF, AWD, AWDP and KoH behavior must remain unchanged.
 
+Current requirement-by-requirement completion and acceptance gaps are tracked in [LiveSolo status](live-solo-status.md). Every stage report includes completion, business correctness, architecture, frontend usability, deployment and verification gaps. Contracts/models/SDK, old frontend regressions and mocked media never substitute for completed capabilities or real media acceptance.
+
 Baseline: `a84a281f` on main, confirmed pushed to origin/main. Baseline solution build, 1411 non-integration tests, 43 writeup tests, 746 frontend tests, typecheck and architecture audit passed. One isolated-cluster capacity test was configured to skip. Work proceeds on `codex/livesolo`; validated stages receive local atomic commits.
 
 ## Product rules
