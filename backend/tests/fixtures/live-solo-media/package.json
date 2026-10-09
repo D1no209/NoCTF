@@ -1,0 +1,6 @@
+{
+  "name": "noctf-livesolo-media-test-source",
+  "private": true,
+  "type": "module",
+  "dependencies": { "@livekit/rtc-node": "1.1.0" }
+}

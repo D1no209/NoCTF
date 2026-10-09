@@ -25283,6 +25283,13 @@
             "items": {
               "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloMediaMemberResponse"
             }
+          },
+          "publicDelaySeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "recordingEnabled": {
+            "type": "boolean"
           }
         }
       },

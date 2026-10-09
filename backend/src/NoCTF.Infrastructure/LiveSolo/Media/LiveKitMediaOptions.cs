@@ -11,4 +11,5 @@ public sealed class LiveKitMediaOptions
     public Uri? EgressHealthUrl { get; set; }
     public int RequestTimeoutSeconds { get; set; } = 10;
     public int MaximumParticipants { get; set; } = 16;
+    public string EgressOutputRoot { get; set; } = "/out";
 }

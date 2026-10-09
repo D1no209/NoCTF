@@ -226,7 +226,7 @@ public sealed class LiveSoloEndpointTests
     {
         var media = Substitute.For<ILiveSoloMediaStore>(); var competition = Guid.NewGuid(); var match = Guid.NewGuid(); var generation = Guid.NewGuid();
         media.JoinAsync(Arg.Any<JoinLiveSoloMedia>(), Arg.Any<CancellationToken>()).Returns(new LiveSoloMediaResult(
-            new(Guid.NewGuid(), match, generation, LiveSoloMediaState.Ready, false, []), new("wss://media.invalid", "private-token", DateTimeOffset.UtcNow.AddMinutes(1))));
+            new(Guid.NewGuid(), match, generation, LiveSoloMediaState.Ready, false, [], 60, false), new("wss://media.invalid", "private-token", DateTimeOffset.UtcNow.AddMinutes(1))));
         await using var app = await HostAsync(Substitute.For<ILiveSoloMatchStore>(), Substitute.For<ILiveSoloAttachmentStore>(), Substitute.For<IStore>(), media: media);
         using var client = app.GetTestClient();
         var path = $"/api/v1/competitions/{competition}/live-solo/matches/{match}/media/token";

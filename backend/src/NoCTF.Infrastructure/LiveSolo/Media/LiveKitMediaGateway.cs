@@ -13,7 +13,7 @@ using NoCTF.Domain.LiveSolo;
 
 namespace NoCTF.Infrastructure.LiveSolo.Media;
 
-public sealed class LiveKitMediaGateway(IHttpClientFactory clients, LiveKitMediaOptions options, TimeProvider clock) : ILiveSoloMediaGateway
+public sealed partial class LiveKitMediaGateway(IHttpClientFactory clients, LiveKitMediaOptions options, TimeProvider clock) : ILiveSoloMediaGateway
 {
     public const string ClientName = "live-solo-livekit";
     private readonly SemaphoreSlim policyGate = new(1, 1);
@@ -137,7 +137,7 @@ public sealed class LiveKitMediaGateway(IHttpClientFactory clients, LiveKitMedia
             return new LiveSoloObservedScreen(participant.Identity,
                 participant.State != LiveKitParticipantState.ACTIVE ? LiveSoloScreenState.Disconnected
                     : track is null ? LiveSoloScreenState.Connected : LiveSoloScreenState.Sharing,
-                track?.Sid, clock.GetUtcNow());
+                track?.Sid, clock.GetUtcNow(), participant.Kind == LiveKitParticipantKind.EGRESS);
         }).ToArray());
     }
     public async Task StopRoomAsync(string roomIdentity, CancellationToken ct)

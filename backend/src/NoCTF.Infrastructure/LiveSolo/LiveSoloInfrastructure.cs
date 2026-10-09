@@ -48,13 +48,22 @@ public static class LiveSoloInfrastructure
         if (media.Enabled && (media.ApiUrl?.Scheme is not ("http" or "https") || media.ClientUrl?.Scheme is not ("ws" or "wss")
             || media.ClientUrl.Scheme == "ws" && !media.ClientUrl.IsLoopback || string.IsNullOrWhiteSpace(media.ApiKey)
             || System.Text.Encoding.UTF8.GetByteCount(media.ApiSecret) < 32 || media.RequestTimeoutSeconds is < 1 or > 60
-            || media.MaximumParticipants is < 4 or > 64))
+            || media.MaximumParticipants is < 4 or > 64 || !media.EgressOutputRoot.StartsWith('/')
+            || media.EgressOutputRoot.Contains("..", StringComparison.Ordinal)))
             throw new InvalidOperationException("LiveSolo media configuration is invalid.");
         services.AddSingleton(media);
         services.AddHttpClient(LiveKitMediaGateway.ClientName, client => client.Timeout = TimeSpan.FromSeconds(media.RequestTimeoutSeconds))
             .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
-        if (media.Enabled) services.AddSingleton<ILiveSoloMediaGateway, LiveKitMediaGateway>();
-        else services.TryAddSingleton<ILiveSoloMediaGateway, UnconfiguredLiveSoloMediaGateway>();
+        if (media.Enabled)
+        {
+            services.AddSingleton<ILiveSoloMediaGateway, LiveKitMediaGateway>();
+            services.AddSingleton<ILiveSoloEgressGateway, LiveKitMediaGateway>();
+        }
+        else
+        {
+            services.TryAddSingleton<ILiveSoloMediaGateway, UnconfiguredLiveSoloMediaGateway>();
+            services.TryAddSingleton<ILiveSoloEgressGateway, UnconfiguredLiveSoloMediaGateway>();
+        }
         return services;
     }
 }

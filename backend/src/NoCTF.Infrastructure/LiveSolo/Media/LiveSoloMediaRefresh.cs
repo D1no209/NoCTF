@@ -98,7 +98,7 @@ public sealed partial class LiveSoloMediaStore
             session.ConcurrencyStamp = Guid.NewGuid(); await db.SaveChangesAsync(ct); await tx.CommitAsync(ct);
         }
         var allowed = session.Participants.Select(x => x.Identity).Concat(grants.Select(x => x.Identity)).ToHashSet(StringComparer.Ordinal);
-        foreach (var stranger in observed.Screens.Where(x => !allowed.Contains(x.Identity)))
+        foreach (var stranger in observed.Screens.Where(x => !x.IsRecorder && !allowed.Contains(x.Identity)))
             await gateway.DisconnectAsync(session.RoomIdentity, stranger.Identity, ct);
     }
     private async Task StopSessionAsync(LiveSoloMediaSession session, CancellationToken ct)

@@ -144,9 +144,11 @@ public sealed class LiveSoloMediaPersistenceTests
             await Assert.That((await store.PrepareAsync(command, ct)).Failure).IsEqualTo(LiveSoloMediaFailure.InvalidGeneration);
             var session = await fixture.Db.LiveSoloMediaSessions.SingleAsync(x => x.Id == prepared.Session!.Id, ct);
             fixture.media.ObserveAsync(session.RoomIdentity, ct).Returns(new LiveSoloRoomObservation([
-                new("unknown", LiveSoloScreenState.Sharing, "not-a-roster-track", fixture.Now)]));
+                new("unknown", LiveSoloScreenState.Sharing, "not-a-roster-track", fixture.Now),
+                new("trusted-recorder", LiveSoloScreenState.Connected, null, fixture.Now, IsRecorder: true)]));
             await store.RefreshAsync(new(session.Id, session.RoomIdentity), ct);
             await fixture.media.Received(1).DisconnectAsync(session.RoomIdentity, "unknown", ct);
+            await fixture.media.DidNotReceive().DisconnectAsync(session.RoomIdentity, "trusted-recorder", ct);
             await fixture.media.Received(1).CreateRoomAsync(session.RoomIdentity, ct);
         });
     }

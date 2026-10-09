@@ -953,6 +953,8 @@ export type NoCtfapiEndpointsLiveSoloLiveSoloMediaResponse = {
     state?: NoCtfDomainLiveSoloLiveSoloMediaState;
     participantsMayViewOpponents?: boolean;
     members?: Array<NoCtfapiEndpointsLiveSoloLiveSoloMediaMemberResponse>;
+    publicDelaySeconds?: number;
+    recordingEnabled?: boolean;
 };
 
 export type NoCtfDomainLiveSoloLiveSoloMediaState = 'Preparing' | 'Ready' | 'Rotating' | 'Stopping' | 'Stopped' | 'Failed';

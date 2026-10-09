@@ -7,7 +7,7 @@ public enum LiveSoloMediaFailure : short { Unconfigured, Unavailable, Unauthoriz
 public sealed record LiveSoloMediaAuthorization(Guid SessionId, Guid Generation, string RoomIdentity,
     string ParticipantIdentity, LiveSoloMediaRole Role, bool MaySubscribe, DateTimeOffset ExpiresAt);
 public sealed record LiveSoloMediaToken(string ServerUrl, string Token, DateTimeOffset ExpiresAt);
-public sealed record LiveSoloObservedScreen(string Identity, LiveSoloScreenState State, string? TrackId, DateTimeOffset ObservedAt);
+public sealed record LiveSoloObservedScreen(string Identity, LiveSoloScreenState State, string? TrackId, DateTimeOffset ObservedAt, bool IsRecorder = false);
 public sealed record LiveSoloRoomObservation(IReadOnlyList<LiveSoloObservedScreen> Screens, bool Exists = true);
 public sealed record LiveSoloMediaReadiness(bool Configured, bool Available, bool EgressAvailable);
 

@@ -10,5 +10,6 @@ public static class LiveSoloMediaPolicy
         or LiveSoloMatchState.Running or LiveSoloMatchState.Paused or LiveSoloMatchState.AwaitingAdjudication;
     public static LiveSoloMediaView View(LiveSoloMediaSession session, IReadOnlyDictionary<Guid, string> names) => new(session.Id, session.MatchId, session.Generation, session.State,
         session.ParticipantsMayViewOpponents, session.Participants.OrderBy(x => x.Side).ThenBy(x => x.UserId)
-            .Select(x => new LiveSoloMediaMemberView(x.UserId, x.TeamId, x.Side, x.ScreenState, x.Identity, names.GetValueOrDefault(x.UserId) ?? string.Empty)).ToArray());
+            .Select(x => new LiveSoloMediaMemberView(x.UserId, x.TeamId, x.Side, x.ScreenState, x.Identity, names.GetValueOrDefault(x.UserId) ?? string.Empty)).ToArray(),
+        session.PublicDelaySeconds, session.RecordingEnabled);
 }

@@ -9,6 +9,8 @@ internal enum LiveKitParticipantState { JOINING, JOINED, ACTIVE, DISCONNECTED }
 internal enum LiveKitTrackType { AUDIO, VIDEO, DATA }
 [JsonConverter(typeof(JsonStringEnumConverter<LiveKitTrackSource>))]
 internal enum LiveKitTrackSource { UNKNOWN, CAMERA, MICROPHONE, SCREEN_SHARE, SCREEN_SHARE_AUDIO }
+[JsonConverter(typeof(JsonStringEnumConverter<LiveKitParticipantKind>))]
+internal enum LiveKitParticipantKind { STANDARD = 0, INGRESS = 1, EGRESS = 2, SIP = 3, AGENT = 4, CONNECTOR = 7, BRIDGE = 8 }
 internal sealed record LiveKitRoomIdentity(string Room);
 internal sealed record LiveKitParticipantIdentity(string Room, string Identity);
 internal sealed record LiveKitCreateRoom(string Name, int EmptyTimeout, int DepartureTimeout, int MaxParticipants);
@@ -16,7 +18,7 @@ internal sealed record LiveKitListRooms(string[] Names);
 internal sealed record LiveKitRooms(LiveKitRoom[]? Rooms);
 internal sealed record LiveKitRoom(string Name);
 internal sealed record LiveKitParticipants(LiveKitParticipant[]? Participants);
-internal sealed record LiveKitParticipant(string Identity, LiveKitParticipantState State, LiveKitTrack[]? Tracks);
+internal sealed record LiveKitParticipant(string Identity, LiveKitParticipantState State, LiveKitTrack[]? Tracks, LiveKitParticipantKind Kind);
 internal sealed record LiveKitTrack(string Sid, LiveKitTrackType Type, LiveKitTrackSource Source, bool Muted);
 internal sealed record LiveKitVideoGrant(
     [property: JsonPropertyName("room")] string Room,
@@ -24,6 +26,7 @@ internal sealed record LiveKitVideoGrant(
     [property: JsonPropertyName("roomCreate")] bool RoomCreate = false,
     [property: JsonPropertyName("roomList")] bool RoomList = false,
     [property: JsonPropertyName("roomAdmin")] bool RoomAdmin = false,
+    [property: JsonPropertyName("roomRecord")] bool RoomRecord = false,
     [property: JsonPropertyName("canPublish")] bool CanPublish = false,
     [property: JsonPropertyName("canSubscribe")] bool CanSubscribe = false,
     [property: JsonPropertyName("canPublishData")] bool CanPublishData = false,
