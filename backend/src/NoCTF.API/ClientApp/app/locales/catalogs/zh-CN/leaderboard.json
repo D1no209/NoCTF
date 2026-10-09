@@ -7,6 +7,7 @@
   "leaderboard.scoreboardTeam.description.snapshotSolverAttributionYet": "此快照尚无解题者记录，请等待排行榜刷新。",
   "leaderboard.scoreboardTeam.description.teamSolvedChallengesYet": "该队伍暂无已解出的题目",
   "leaderboard.label.status": "当前状态",
+  "leaderboard.label.viewScoreboard": "查看计分板",
   "leaderboard.competitionsBy.description.freezeRetainsSnapshotLast": "冻结保留最后排名快照;遮蔽对选手完全隐藏记分板。可设置定时生效。",
   "leaderboard.label.scoreCategory": "题目方向得分雷达",
   "leaderboard.label.settledScore": "已结算得分",
