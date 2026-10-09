@@ -42,6 +42,9 @@ public sealed partial class LiveSoloMatchStore(NoCtfDbContext db, ICompetitionMo
 
     private async Task<bool> ActiveAsync(Guid actor, CancellationToken ct) => actor != Guid.Empty
         && await db.Users.AnyAsync(x => x.Id == actor && x.AccountStatus == UserAccountStatus.Active, ct);
+    private async Task<bool> HasMatchCapacityAsync(LiveSoloMatch match, int maximumMatches, CancellationToken ct) =>
+        LiveSoloMatchCapacityPolicy.CanEnter(await db.LiveSoloMatches.Where(x => x.CompetitionId == match.CompetitionId && x.Id != match.Id)
+            .Where(LiveSoloMatchCapacityPolicy.OccupiesSlot).CountAsync(ct), maximumMatches);
     private async Task<Guid?> TeamAsync(Guid competition, Guid actor, CancellationToken ct) => await db.Teams.AsNoTracking()
         .Where(x => x.CompetitionId == competition && !x.IsBanned && x.RegistrationStatus == TeamRegistrationStatus.Approved
             && x.Members.Any(m => m.UserId == actor)).Select(x => (Guid?)x.Id).SingleOrDefaultAsync(ct);

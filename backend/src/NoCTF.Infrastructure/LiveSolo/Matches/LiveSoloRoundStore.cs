@@ -105,9 +105,7 @@ public sealed partial class LiveSoloMatchStore
             var config = (LiveSoloCompetitionModeConfiguration)competition.ModeConfiguration!;
             if (!config.Enabled) return new(null, LiveSoloFailure.Disabled);
             if (!await RosterEligibleAsync(match, ct)) return new(null, LiveSoloFailure.NotReady);
-            if (await db.LiveSoloMatches.CountAsync(x => x.CompetitionId == match.CompetitionId && x.Id != match.Id
-                && (x.State == LiveSoloMatchState.Countdown || x.StartedAt != null
-                    && x.State != LiveSoloMatchState.Completed && x.State != LiveSoloMatchState.Canceled), ct) >= config.MaximumConcurrentMatches)
+            if (!await HasMatchCapacityAsync(match, config.MaximumConcurrentMatches, ct))
                 return new(null, LiveSoloFailure.NotReady);
             if (match.Roster.Any(member => !session.Participants.Any(p => p.UserId == member.UserId
                 && observed.Screens.Any(screen => screen.Identity == p.Identity && screen.State == LiveSoloScreenState.Sharing)))) return new(null, LiveSoloFailure.NotReady);

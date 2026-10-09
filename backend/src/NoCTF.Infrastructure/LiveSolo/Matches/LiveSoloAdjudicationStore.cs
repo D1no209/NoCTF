@@ -21,6 +21,12 @@ public sealed partial class LiveSoloMatchStore
             var round = match.CurrentRoundId is Guid id
                 ? await db.LiveSoloRounds.Include(x => x.Pauses).Include(x => x.Questions).SingleAsync(x => x.Id == id, ct) : null;
             if (LiveSoloAdjudicationPolicy.CanApply(match, round, command) is { } failure) return new(null, null, null, failure);
+            if (command.Action == LiveSoloJudgeAction.Resume)
+            {
+                var maximum = await db.Set<LiveSoloCompetitionModeConfiguration>().AsNoTracking().Where(x => x.CompetitionId == match.CompetitionId)
+                    .Select(x => x.MaximumConcurrentMatches).SingleAsync(ct);
+                if (!await HasMatchCapacityAsync(match, maximum, ct)) return new(null, null, null, LiveSoloFailure.NotReady);
+            }
             var persistedPauseIds = round?.Pauses.Select(x => x.Id).ToHashSet() ?? [];
             var effectiveAt = (clock ?? TimeProvider.System).GetUtcNow();
             var decision = LiveSoloAdjudicationPolicy.Apply(match, round, command, effectiveAt);
