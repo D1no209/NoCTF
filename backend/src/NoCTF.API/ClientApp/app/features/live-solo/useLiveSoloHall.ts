@@ -56,13 +56,14 @@ export function useLiveSoloHall() {
   }
   async function settings() { await router.push(`/competitions/${competitionId.value}/live-solo/settings`) }
   async function bracket() { await router.push(`/competitions/${competitionId.value}/live-solo/bracket`) }
+  async function groups() { await router.push(`/competitions/${competitionId.value}/live-solo/groups`) }
   async function tick() {
     await load()
     if (!disposed) timer = setTimeout(tick, 5000)
   }
   onMounted(() => { void tick() })
   onScopeDispose(() => { disposed = true; request++; if (timer) clearTimeout(timer) })
-  return { competitionId, options, selected, current, configuration, loading, error, select, enter, recordings, settings, bracket, load,
+  return { competitionId, options, selected, current, configuration, loading, error, select, enter, recordings, settings, bracket, groups, load,
     staff: computed(() => ctx?.competition.value?.administrationRole != null),
     stateKey: computed(() => matchStateKey(current.value?.state)), Workspace: markRaw(CompetitionParticipantWorkspace) }
 }

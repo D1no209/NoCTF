@@ -26,7 +26,7 @@ export function useCompetitionsByIdPage() {
   const isControlScreen = computed(() => [
     `/competitions/${competitionId.value}/live`,
     `/competitions/${competitionId.value}/awdp-live`,
-  ].includes(route.path) || route.path.includes('/live-solo/program/') || route.path.includes('/live-solo/recordings/') || route.path.endsWith('/live-solo/settings') || route.path.endsWith('/live-solo/bracket'))
+  ].includes(route.path) || route.path.includes('/live-solo/program/') || route.path.includes('/live-solo/recordings/') || route.path.endsWith('/live-solo/settings') || route.path.endsWith('/live-solo/bracket') || route.path.includes('/live-solo/groups'))
 
   const isWriteUpReview = computed(() =>
     route.path === `/competitions/${competitionId.value}/writeups`,
