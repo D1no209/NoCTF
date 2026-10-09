@@ -98,6 +98,10 @@ public sealed class LiveSoloMediaPersistenceTests
             var first = await store.PrepareAsync(await Prepare(fixture, ct), ct);
             var session = await fixture.Db.LiveSoloMediaSessions.SingleAsync(x => x.Id == first.Session!.Id, ct);
             fixture.media.ObserveAsync(session.RoomIdentity, ct).Returns(new LiveSoloRoomObservation([], false));
+            var denied=await store.JoinAsync(new(fixture.Competition.Id,fixture.Match.Id,fixture.Left.Id,session.Generation,LiveSoloMediaRole.Publisher,
+                fixture.Left.TokenVersion,new(AuthenticationMethod.Password,fixture.Now)),ct);
+            await Assert.That(denied.Failure).IsEqualTo(LiveSoloMediaFailure.InvalidGeneration);
+            await fixture.media.DidNotReceive().AuthorizeAsync(Arg.Any<LiveSoloMediaAuthorization>(),ct);
             await store.RefreshAsync(new(session.Id, session.RoomIdentity), ct);
             await Assert.That(session.State).IsEqualTo(LiveSoloMediaState.Stopped);
             await Assert.That((await fixture.Db.LiveSoloMatches.SingleAsync(ct)).CurrentMediaSessionId).IsNull();
@@ -184,6 +188,27 @@ public sealed class LiveSoloMediaPersistenceTests
         (await fixture.Db.LiveSoloMatches.SingleAsync(ct)).CurrentMediaSessionId = null;
         foreach (var session in await fixture.Db.LiveSoloMediaSessions.ToArrayAsync(ct)) session.State = LiveSoloMediaState.Stopped;
         await fixture.Db.SaveChangesAsync(ct);
+    }
+    [Test,Timeout(300_000)]
+    public async Task Serialization_conflicts_retry_without_retiring_a_qualified_room_even_when_the_retry_budget_is_exhausted(CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async()=>{
+            await using var fixture=await LiveSoloMatchPersistenceTests.Fixture.CreateAsync(ct);await fixture.PrepareAsync(ct);await ClearFixtureRoom(fixture,ct);
+            var messages=Substitute.For<NoCTF.Application.Messaging.IPostCommitMessagePublisher>();
+            var store=new LiveSoloMediaStore(fixture.Db,new CompetitionModerationAuthorizer(fixture.Db),Authentication(),fixture.media,messages,fixture.Clock);
+            var prepared=await store.PrepareAsync(await Prepare(fixture,ct),ct);
+            var session=await fixture.Db.LiveSoloMediaSessions.SingleAsync(x=>x.Id==prepared.Session!.Id,ct);
+            var attempts=0;EventHandler<SavingChangesEventArgs> once=(_,_)=>{attempts++;if(attempts==1)throw new Npgsql.PostgresException("serialization","ERROR","ERROR","40001");};
+            fixture.Db.SavingChanges+=once;await store.RefreshAsync(new(session.Id,session.RoomIdentity),ct);fixture.Db.SavingChanges-=once;
+            await Assert.That(attempts).IsEqualTo(2);await fixture.media.DidNotReceive().StopRoomAsync(session.RoomIdentity,Arg.Any<CancellationToken>());
+            await fixture.media.Received(1).ObserveAsync(session.RoomIdentity,ct);
+            attempts=0;EventHandler<SavingChangesEventArgs> always=(_,_)=>{attempts++;throw new Npgsql.PostgresException("serialization","ERROR","ERROR","40001");};
+            fixture.Db.SavingChanges+=always;
+            await Assert.That(async()=>await store.RefreshAsync(new(session.Id,session.RoomIdentity),ct)).Throws<Npgsql.PostgresException>();
+            fixture.Db.SavingChanges-=always;
+            await Assert.That(attempts).IsEqualTo(3);await fixture.media.DidNotReceive().StopRoomAsync(session.RoomIdentity,Arg.Any<CancellationToken>());
+            await fixture.media.Received(2).ObserveAsync(session.RoomIdentity,ct);
+        });
     }
     private static async Task<PrepareLiveSoloMedia> Prepare(LiveSoloMatchPersistenceTests.Fixture fixture, CancellationToken ct) =>
         new(fixture.Competition.Id, fixture.Match.Id, fixture.Owner.Id,

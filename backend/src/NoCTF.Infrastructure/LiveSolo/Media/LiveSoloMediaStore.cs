@@ -146,6 +146,15 @@ public sealed partial class LiveSoloMediaStore(NoCtfDbContext db, ICompetitionMo
             grant.ProviderId = proof.ProviderId; grant.TrustPolicyId = proof.TrustPolicyId; grant.PrimaryCredentialId = proof.PrimaryCredentialId;
             grant.IssuedAt = clock.GetUtcNow(); await db.SaveChangesAsync(ct); await tx.CommitAsync(ct);
         }
+        LiveSoloRoomObservation room;
+        try { room=await gateway.ObserveAsync(session.RoomIdentity,ct); }
+        catch(Exception ex) when(ex is HttpRequestException or IOException or TimeoutException || ex is TaskCanceledException&&!ct.IsCancellationRequested)
+        {return new(null,Failure:LiveSoloMediaFailure.Unavailable);}
+        if(!room.Exists)
+        {
+            await StopSessionAsync(session,ct,LiveSoloMediaAlertKind.RoomUnavailable);
+            return new(null,Failure:LiveSoloMediaFailure.InvalidGeneration);
+        }
         var token = await gateway.AuthorizeAsync(new(session.Id, session.Generation, session.RoomIdentity, identity, command.Role,
             command.Role != LiveSoloMediaRole.Publisher || session.ParticipantsMayViewOpponents, clock.GetUtcNow().AddMinutes(1)), ct);
         var stillCurrent = await db.LiveSoloMatches.AsNoTracking().AnyAsync(x => x.Id == command.MatchId && x.CurrentMediaSessionId == session.Id, ct);

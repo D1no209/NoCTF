@@ -31,7 +31,8 @@ public sealed class LiveKitGatewayIntegrationTests
             await Assert.That(readiness.Configured).IsTrue(); await Assert.That(readiness.Available).IsTrue();
             await Assert.That(readiness.EgressAvailable).IsFalse();
             var room = Guid.NewGuid().ToString("N"); await gateway.CreateRoomAsync(room, ct);
-            await Assert.That((await gateway.ObserveAsync(room, ct)).Screens).IsEmpty();
+            await Assert.That((await gateway.ObserveAsync(room,ct)).Exists).IsTrue();
+            await Assert.That((await gateway.ObserveAsync(room,ct)).Screens).IsEmpty();
             var grant = new LiveSoloMediaAuthorization(Guid.NewGuid(), Guid.NewGuid(), room, Guid.NewGuid().ToString("N"),
                 LiveSoloMediaRole.Publisher, false, DateTimeOffset.UtcNow.AddMinutes(1));
             var issued = await gateway.AuthorizeAsync(grant, ct);
@@ -47,7 +48,8 @@ public sealed class LiveKitGatewayIntegrationTests
             await Assert.That(judgeVideo.RootElement.GetProperty("canPublish").GetBoolean()).IsFalse();
             await Assert.That(judgeVideo.RootElement.GetProperty("canSubscribe").GetBoolean()).IsTrue();
             await gateway.StopRoomAsync(room, ct);
-            await Assert.That((await gateway.ObserveAsync(room, ct)).Screens).IsEmpty();
+            var removed=await gateway.ObserveAsync(room,ct);
+            await Assert.That(removed.Screens).IsEmpty();await Assert.That(removed.Exists).IsFalse();
         });
     }
 }

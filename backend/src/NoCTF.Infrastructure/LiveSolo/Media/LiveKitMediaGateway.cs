@@ -125,6 +125,11 @@ public sealed partial class LiveKitMediaGateway(IHttpClientFactory clients, Live
     }
     public async Task<LiveSoloRoomObservation> ObserveAsync(string roomIdentity, CancellationToken ct)
     {
+        using var directory=await SendAsync(LiveKitRoomOperation.ListRooms,new LiveKitListRooms([roomIdentity]),LiveKitJsonContext.Default.LiveKitListRooms,
+            new("",RoomList:true),ct);
+        var rooms=await directory.Content.ReadFromJsonAsync(LiveKitJsonContext.Default.LiveKitRooms,ct)
+            ??throw new InvalidDataException("Invalid media room directory.");
+        if(!(rooms.Rooms??[]).Any(room=>room.Name==roomIdentity))return new([],false);
         using var response = await SendAsync(LiveKitRoomOperation.ListParticipants, new LiveKitRoomIdentity(roomIdentity),
             LiveKitJsonContext.Default.LiveKitRoomIdentity, new(roomIdentity, RoomAdmin: true), ct);
         if (response.StatusCode == HttpStatusCode.NotFound) return new([], false);
