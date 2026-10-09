@@ -907,7 +907,7 @@ export type NoCtfapiEndpointsLiveSoloLiveSoloRecordingResponse = {
 
 export type NoCtfDomainLiveSoloLiveSoloRecordingState = 'Pending' | 'Recording' | 'Finalizing' | 'Completed' | 'Failed' | 'Deleting' | 'Starting' | 'RequiresReview';
 
-export type NoCtfDomainLiveSoloLiveSoloRecordingFailure = 'CapacityUnavailable' | 'StartUncertain' | 'ExportFailed' | 'ExportTooLarge' | 'ArchiveCapacityUnavailable';
+export type NoCtfDomainLiveSoloLiveSoloRecordingFailure = 'CapacityUnavailable' | 'StartUncertain' | 'ExportFailed' | 'ExportTooLarge' | 'ArchiveCapacityUnavailable' | 'SourceUnavailable';
 
 export type NoCtfapiEndpointsLiveSoloChangeLiveSoloRecordingRequest = {
     expectedStamp: string;

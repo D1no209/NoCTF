@@ -23,6 +23,7 @@ describe('LiveSolo recording permissions and readiness', () => {
     const pending: Recording={state:'RequiresReview',failure:'CapacityUnavailable'}
     expect(recordingActions(pending,true,false)).toEqual(['Hold'])
     expect(recordingActions(pending,true,true)).toEqual(['Hold','RetryPendingStart'])
+    expect(recordingActions({...pending,failure:'SourceUnavailable'},true,true)).toEqual(['Hold','RetryPendingStart'])
     expect(recordingActions({...pending,failure:'StartUncertain'},true,true)).toEqual(['Hold','ReconcileExport'])
     expect(recordingActions({...pending,failure:'ArchiveCapacityUnavailable'},true,true)).toEqual(['Hold','RetryArchive'])
     expect(recordingActions({state:'Failed',failure:'ExportFailed'},true,true)).toEqual(['Hold','StartNewChunk'])

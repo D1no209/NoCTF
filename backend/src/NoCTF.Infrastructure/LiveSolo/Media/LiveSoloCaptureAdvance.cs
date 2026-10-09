@@ -128,7 +128,8 @@ public sealed partial class LiveSoloCaptureStore
             {
                 if (record.State == LiveSoloRecordingState.Starting && record.RequestedAt < clock.GetUtcNow().AddMinutes(-1))
                 { await RecordingFailureAsync(session,record,LiveSoloRecordingState.RequiresReview,LiveSoloRecordingFailure.StartUncertain,ct); }
-                else if (record.State == LiveSoloRecordingState.Pending && !stillSharing) { record.State = LiveSoloRecordingState.Failed; await db.SaveChangesAsync(ct); }
+                else if (record.State == LiveSoloRecordingState.Pending && !stillSharing)
+                { await RecordingFailureAsync(session,record,LiveSoloRecordingState.RequiresReview,LiveSoloRecordingFailure.SourceUnavailable,ct); }
                 continue;
             }
             if (current.State is LiveSoloExportState.Failed or LiveSoloExportState.Aborted or LiveSoloExportState.LimitReached)

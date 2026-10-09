@@ -145,6 +145,28 @@ public sealed class LiveSoloRecordingRecoveryPersistenceTests
             await gateway.DidNotReceiveWithAnyArgs().StartAsync(default!,default);
         });
     }
+    [Test,Timeout(300_000)]
+    public async Task Lost_source_before_start_requires_review_and_recovery_needs_the_same_live_track(CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async()=>{
+            await using var f=await LiveSoloMatchPersistenceTests.Fixture.CreateAsync(ct);await f.PrepareAsync(ct);var record=await Record(f,ct);
+            var member=await f.Db.Set<LiveSoloMediaParticipant>().SingleAsync(x=>x.MediaSessionId==record.MediaSessionId&&x.UserId==record.UserId,ct);
+            member.ScreenState=LiveSoloScreenState.Disconnected;record.State=LiveSoloRecordingState.Pending;record.Failure=null;
+            await f.Db.SaveChangesAsync(ct);var gateway=Substitute.For<ILiveSoloEgressGateway>();gateway.ListAsync(Arg.Any<string>(),ct).Returns([]);
+            var store=Store(f,gateway);await store.AdvanceAsync(record.MediaSessionId,ct);await store.AdvanceAsync(record.MediaSessionId,ct);
+            await Assert.That(record.State).IsEqualTo(LiveSoloRecordingState.RequiresReview);
+            await Assert.That(record.Failure).IsEqualTo(LiveSoloRecordingFailure.SourceUnavailable);
+            await Assert.That(record.RequestedAt).IsNull();await Assert.That(record.ReservedBytes).IsEqualTo(0);
+            await Assert.That(await f.Db.Notifications.CountAsync(x=>x.SourceId==record.Id,ct)).IsEqualTo(1);
+            await Assert.That(await store.RecoverRecordingAsync(Command(f,record,LiveSoloRecordingAction.RetryPendingStart),ct)).IsEqualTo(LiveSoloFailure.NotReady);
+            member.ScreenState=LiveSoloScreenState.Sharing;member.ScreenTrackId="different-track";await f.Db.SaveChangesAsync(ct);
+            await Assert.That(await store.RecoverRecordingAsync(Command(f,record,LiveSoloRecordingAction.RetryPendingStart),ct)).IsEqualTo(LiveSoloFailure.NotReady);
+            member.ScreenTrackId=record.VideoTrackId;await f.Db.SaveChangesAsync(ct);
+            await Assert.That(await store.RecoverRecordingAsync(Command(f,record,LiveSoloRecordingAction.RetryPendingStart),ct)).IsNull();
+            await Assert.That(record.State).IsEqualTo(LiveSoloRecordingState.Pending);
+            await gateway.DidNotReceiveWithAnyArgs().StartAsync(default!,default);
+        });
+    }
     private static async Task<LiveSoloRecording> Record(LiveSoloMatchPersistenceTests.Fixture f,CancellationToken ct)
     {
         var session=await f.Db.LiveSoloMediaSessions.Include(x=>x.Participants).SingleAsync(ct);session.RecordingEnabled=true;

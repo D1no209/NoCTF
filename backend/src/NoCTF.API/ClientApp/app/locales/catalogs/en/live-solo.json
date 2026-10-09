@@ -31,6 +31,7 @@
   "liveSolo.recording.failure.export": "The export failed. A new chunk requires confirmed termination and successful raw-file cleanup.",
   "liveSolo.recording.failure.size": "The file exceeds the configured export limit. Adjust capacity before retrying import.",
   "liveSolo.recording.failure.uncertain": "The start outcome is unknown. Verify the existing export; do not repeat its start.",
+  "liveSolo.recording.failure.source": "The screen source became unavailable before recording started. No export request was sent; retry only after this source reconnects.",
   "liveSolo.recording.newChunk": "Start a new recording chunk",
   "liveSolo.recording.reconcile": "Check existing export",
   "liveSolo.recording.retryArchive": "Retry archive import",

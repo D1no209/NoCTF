@@ -27561,14 +27561,16 @@
           "StartUncertain",
           "ExportFailed",
           "ExportTooLarge",
-          "ArchiveCapacityUnavailable"
+          "ArchiveCapacityUnavailable",
+          "SourceUnavailable"
         ],
         "enum": [
           "CapacityUnavailable",
           "StartUncertain",
           "ExportFailed",
           "ExportTooLarge",
-          "ArchiveCapacityUnavailable"
+          "ArchiveCapacityUnavailable",
+          "SourceUnavailable"
         ]
       },
       "NoCTFAPIEndpointsLiveSoloChangeLiveSoloRecordingRequest": {

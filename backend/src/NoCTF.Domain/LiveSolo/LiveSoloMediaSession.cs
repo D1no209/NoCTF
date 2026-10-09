@@ -6,7 +6,7 @@ namespace NoCTF.Domain.LiveSolo;
 public enum LiveSoloMediaState : short { Preparing, Ready, Rotating, Stopping, Stopped, Failed }
 public enum LiveSoloScreenState : short { Disconnected, Connected, Sharing }
 public enum LiveSoloRecordingState : short { Pending, Recording, Finalizing, Completed, Failed, Deleting, Starting, RequiresReview }
-public enum LiveSoloRecordingFailure : short { CapacityUnavailable, StartUncertain, ExportFailed, ExportTooLarge, ArchiveCapacityUnavailable }
+public enum LiveSoloRecordingFailure : short { CapacityUnavailable, StartUncertain, ExportFailed, ExportTooLarge, ArchiveCapacityUnavailable, SourceUnavailable }
 
 public sealed class LiveSoloMediaSession : IConcurrencyTracked
 {

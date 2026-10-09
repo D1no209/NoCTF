@@ -31,6 +31,7 @@
   "liveSolo.recording.failure.export": "导出失败。确认任务终止并清理原始文件后才能申请新分段。",
   "liveSolo.recording.failure.size": "录像超过配置的导出大小限制，请调整容量后重试归档。",
   "liveSolo.recording.failure.uncertain": "录制启动结果不确定。请核对既有任务，不能直接重复启动。",
+  "liveSolo.recording.failure.source": "录像启动前屏幕源已不可用。尚未发出导出请求；此屏幕源重新连接后才能重试。",
   "liveSolo.recording.newChunk": "申请新的录制分段",
   "liveSolo.recording.reconcile": "核对既有录制任务",
   "liveSolo.recording.retryArchive": "重试录像归档",
