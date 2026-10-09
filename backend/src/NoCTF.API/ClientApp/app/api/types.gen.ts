@@ -1127,6 +1127,21 @@ export type NoCtfapiEndpointsLiveSoloGetLiveSoloProgramRequest = {
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsLiveSoloLiveSoloProgramHealthResponse = {
+    id?: string;
+    concurrencyStamp?: string;
+    state?: NoCtfDomainLiveSoloLiveSoloCaptureState;
+    stalled?: boolean;
+    lastFragmentImportedAt?: string | null;
+    rotationRequested?: boolean;
+};
+
+export type NoCtfDomainLiveSoloLiveSoloCaptureState = 'Pending' | 'Starting' | 'Active' | 'Stopping' | 'Completed' | 'Failed' | 'RequiresReview';
+
+export type NoCtfapiEndpointsLiveSoloGetLiveSoloProgramHealthRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsLiveSoloGetLiveSoloProgramPlaylistRequest = {
     [key: string]: never;
 };
@@ -1241,6 +1256,22 @@ export type NoCtfApplicationLiveSoloResourcesLiveSoloPostgameQuestion = {
 };
 
 export type NoCtfapiEndpointsLiveSoloListLiveSoloPostgameQuestionsRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsLiveSoloLiveSoloProgramDecisionResponse = {
+    id?: string;
+    programId?: string;
+    action?: NoCtfDomainLiveSoloLiveSoloProgramAction;
+    reason?: string;
+    occurredAt?: string;
+    previousState?: NoCtfDomainLiveSoloLiveSoloCaptureState;
+    state?: NoCtfDomainLiveSoloLiveSoloCaptureState;
+};
+
+export type NoCtfDomainLiveSoloLiveSoloProgramAction = 'ReconcileExport' | 'RetryImport' | 'Rotate';
+
+export type NoCtfapiEndpointsLiveSoloListLiveSoloProgramDecisionsRequest = {
     [key: string]: never;
 };
 
@@ -1473,6 +1504,13 @@ export type NoCtfapiEndpointsLiveSoloPreviewLiveSoloResultCorrectionRequest = {
     winnerTeamId: string;
     leftWins?: number;
     rightWins?: number;
+};
+
+export type NoCtfapiEndpointsLiveSoloRecoverLiveSoloProgramRequest = {
+    programId: string;
+    expectedStamp: string;
+    action: NoCtfDomainLiveSoloLiveSoloProgramAction;
+    reason: string;
 };
 
 export type NoCtfapiEndpointsLiveSoloResolveLiveSoloResultCorrectionRequest = {
@@ -7159,6 +7197,40 @@ export type GetLiveSoloProgramResponses = {
 
 export type GetLiveSoloProgramResponse = GetLiveSoloProgramResponses[keyof GetLiveSoloProgramResponses];
 
+export type GetLiveSoloProgramHealthData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        matchId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/media/program';
+};
+
+export type GetLiveSoloProgramHealthErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetLiveSoloProgramHealthResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsLiveSoloLiveSoloProgramHealthResponse;
+};
+
+export type GetLiveSoloProgramHealthResponse = GetLiveSoloProgramHealthResponses[keyof GetLiveSoloProgramHealthResponses];
+
 export type GetLiveSoloProgramPlaylistData = {
     body?: never;
     path: {
@@ -7587,6 +7659,40 @@ export type ListLiveSoloPostgameQuestionsResponses = {
 };
 
 export type ListLiveSoloPostgameQuestionsResponse = ListLiveSoloPostgameQuestionsResponses[keyof ListLiveSoloPostgameQuestionsResponses];
+
+export type ListLiveSoloProgramDecisionsData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        matchId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/media/program/decisions';
+};
+
+export type ListLiveSoloProgramDecisionsErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type ListLiveSoloProgramDecisionsResponses = {
+    /**
+     * Success
+     */
+    200: Array<NoCtfapiEndpointsLiveSoloLiveSoloProgramDecisionResponse>;
+};
+
+export type ListLiveSoloProgramDecisionsResponse = ListLiveSoloProgramDecisionsResponses[keyof ListLiveSoloProgramDecisionsResponses];
 
 export type ListLiveSoloQuestionGroupsData = {
     body?: never;
@@ -8106,6 +8212,48 @@ export type PreviewLiveSoloResultCorrectionResponses = {
 };
 
 export type PreviewLiveSoloResultCorrectionResponse = PreviewLiveSoloResultCorrectionResponses[keyof PreviewLiveSoloResultCorrectionResponses];
+
+export type RecoverLiveSoloProgramData = {
+    body: NoCtfapiEndpointsLiveSoloRecoverLiveSoloProgramRequest;
+    path: {
+        competitionId: string;
+        matchId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/media/program/recovery';
+};
+
+export type RecoverLiveSoloProgramErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsLiveSoloLiveSoloFailureResponse;
+    422: NoCtfapiEndpointsLiveSoloLiveSoloFailureResponse;
+};
+
+export type RecoverLiveSoloProgramError = RecoverLiveSoloProgramErrors[keyof RecoverLiveSoloProgramErrors];
+
+export type RecoverLiveSoloProgramResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsLiveSoloLiveSoloProgramHealthResponse;
+};
+
+export type RecoverLiveSoloProgramResponse = RecoverLiveSoloProgramResponses[keyof RecoverLiveSoloProgramResponses];
 
 export type ResolveLiveSoloResultCorrectionData = {
     body: NoCtfapiEndpointsLiveSoloResolveLiveSoloResultCorrectionRequest;

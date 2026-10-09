@@ -13,7 +13,7 @@ namespace NoCTF.Infrastructure.LiveSolo.Media;
 
 public sealed partial class LiveSoloCaptureStore(NoCtfDbContext db, ILiveSoloEgressGateway egress, ILiveSoloCaptureFiles files,
     ManagedFileUploads uploads, LiveKitMediaOptions options, TimeProvider clock, IPostCommitMessagePublisher messages, IStore objects,
-    NoCTF.Application.Teams.Moderation.ICompetitionModerationAuthorizer authorizer) : ILiveSoloCaptureStore
+    NoCTF.Application.Teams.Moderation.ICompetitionModerationAuthorizer authorizer) : ILiveSoloCaptureStore, ILiveSoloProgramRecovery
 {
     private async Task TransactionAsync(Func<Task> work, CancellationToken ct)
     {

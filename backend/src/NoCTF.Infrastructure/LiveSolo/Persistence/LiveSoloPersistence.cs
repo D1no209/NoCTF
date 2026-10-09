@@ -10,6 +10,17 @@ using NoCTF.Domain.Storage;
 using NoCTF.Domain.Teams;
 
 namespace NoCTF.Infrastructure.LiveSolo.Persistence;
+internal sealed class LiveSoloProgramDecisionConfiguration:IEntityTypeConfiguration<LiveSoloProgramDecision>
+{
+    public void Configure(EntityTypeBuilder<LiveSoloProgramDecision> builder)
+    {
+        builder.ToTable("live_solo_program_decisions");builder.HasKey(x=>x.Id);
+        builder.HasIndex(x=>new{x.ProgramCaptureId,x.OccurredAt});
+        builder.HasOne<LiveSoloProgramCapture>().WithMany().HasForeignKey(x=>x.ProgramCaptureId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<LiveSoloMediaSession>().WithMany().HasForeignKey(x=>x.MediaSessionId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<User>().WithMany().HasForeignKey(x=>x.ActorUserId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
 
 internal sealed class LiveSoloViewerLeaseConfiguration : IEntityTypeConfiguration<LiveSoloViewerLease>
 {

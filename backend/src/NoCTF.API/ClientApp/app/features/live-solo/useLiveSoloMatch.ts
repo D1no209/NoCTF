@@ -16,6 +16,7 @@ import { useLiveSoloScreen } from './media/useLiveSoloScreen'
 import { useLiveSoloHub } from './useLiveSoloHub'
 import CompetitionParticipantWorkspace from '~/features/competition/CompetitionParticipantWorkspace.vue'
 import { canManageLiveSolo } from './settings-draft'
+import LiveSoloProgramControl from './LiveSoloProgramControl.vue'
 
 export function useLiveSoloMatch() {
   const route = useRoute(), router = useRouter(), { user } = useAuth()
@@ -177,7 +178,7 @@ export function useLiveSoloMatch() {
     staff, readOnlyMedia, judge, canCorrect, correct, screens, myScreen, clock, stateKey: computed(() => matchStateKey(match.value?.state)), back, load,
     judgeOpen, judgeAction, judgeReason, forfeitingTeam, openDecision, confirmDecision, setJudgeOpen,
     leaveOpen, setLeaveOpen, confirmLeave, Workspace: markRaw(CompetitionParticipantWorkspace),
-    Questions: markRaw(LiveSoloQuestions), canSubmit: computed(() => onRoster.value && canPlayLiveSolo(match.value, round.value)),
+    ProgramControl: markRaw(LiveSoloProgramControl), Questions: markRaw(LiveSoloQuestions), canSubmit: computed(() => onRoster.value && canPlayLiveSolo(match.value, round.value)),
     flagDock: computed(() => `live-solo-flag-${matchId.value}`),
     questionsVisible: computed(() => onRoster.value && !!round.value?.startedAt && ['Running', 'ConfirmingResult'].includes(round.value.state ?? '')),
     ...screen, mediaError: screen.error, error }

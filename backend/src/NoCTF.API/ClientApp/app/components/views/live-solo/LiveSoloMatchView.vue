@@ -7,7 +7,7 @@ const { competitionId, match, round, configuration, loading, busy, error, myRost
   staff, readOnlyMedia, judge, canCorrect, correct, screens, myScreen, clock, stateKey, back, load, judgeOpen, judgeAction, judgeReason, forfeitingTeam,
   openDecision, confirmDecision, setJudgeOpen, leaveOpen, setLeaveOpen, confirmLeave, Workspace, connected, connecting,
   publishing, capturePending, eligible, connect, share, stopSharing, disconnect, mediaError, media,
-  Questions, canSubmit, questionsVisible, matchId, flagDock } = toRefs(props.state)
+  ProgramControl, Questions, canSubmit, questionsVisible, matchId, flagDock } = toRefs(props.state)
 </script>
 <template>
   <component :is="Workspace" :competition-id="competitionId" :show-challenge-navigator="false" :content-scroll="false">
@@ -31,6 +31,7 @@ const { competitionId, match, round, configuration, loading, busy, error, myRost
             <div class="grid gap-4 md:grid-cols-2"><div v-for="member in screens" :key="member.key" class="flex min-w-0 flex-col gap-2"><div class="flex flex-wrap items-center justify-between gap-2"><span class="truncate font-medium">{{ member.teamName }} · {{ member.name }}</span><span class="text-xs text-muted-foreground">{{ $t(member.stateKey) }}</span></div><MediaStreamPreview v-if="member.mayView" :stream="member.stream" :label="member.name" :empty-label="$t('liveSolo.screen.waiting')" /></div></div>
           </section>
           <template v-if="judge"><Separator /><section class="flex flex-col gap-3"><h2 class="font-semibold">{{ $t('liveSolo.judge') }}</h2><p class="max-w-[70ch] text-sm text-muted-foreground">{{ $t('liveSolo.judge.screensRequired') }}</p><div class="flex flex-wrap gap-2"><Button v-if="!round || ['Won', 'TimedOut', 'Canceled'].includes(round.state ?? '')" :disabled="busy || !allLocked || !['Preparing', 'AwaitingAdjudication'].includes(match?.state ?? '')" variant="outline" @click="prepareRound">{{ $t('liveSolo.judge.prepare') }}</Button><Button v-if="round?.state === 'Preparing'" :disabled="busy" @click="start">{{ $t('liveSolo.judge.start') }}</Button><Button v-if="match?.state === 'Running' || match?.state === 'Countdown'" :disabled="busy" variant="outline" @click="openDecision('Pause')">{{ $t('liveSolo.judge.pause') }}</Button><Button v-if="match?.state === 'Paused'" :disabled="busy" variant="outline" @click="openDecision('Resume')">{{ $t('liveSolo.judge.resume') }}</Button><Button v-if="round && ['Preparing', 'Countdown', 'Running', 'ConfirmingResult'].includes(round.state ?? '')" :disabled="busy" variant="outline" @click="openDecision('VoidRound')">{{ $t('liveSolo.judge.void') }}</Button><Button v-if="match && !['Completed', 'Canceled', 'AwaitingOpponents'].includes(match.state ?? '')" :disabled="busy" variant="destructive" @click="openDecision('ForfeitMatch')">{{ $t('liveSolo.judge.forfeit') }}</Button></div></section></template>
+          <component :is="ProgramControl" v-if="staff" />
           <p v-if="!staff && match?.state === 'Preparing'" class="text-sm text-muted-foreground">{{ $t('liveSolo.waitingJudge') }}</p>
         </CardContent></ScrollSurface><div v-if="questionsVisible" :id="flagDock" class="shrink-0 px-3 pb-3" />
       </Card>

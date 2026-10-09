@@ -3682,6 +3682,62 @@
         }
       }
     },
+    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/media/program": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Get Live Solo Program Health",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/media/program.",
+        "operationId": "GetLiveSoloProgramHealth",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloProgramHealthResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/program/playlist": {
       "get": {
         "tags": [
@@ -4625,6 +4681,65 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloPostgameQuestionsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/media/program/decisions": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "List Live Solo Program Decisions",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/media/program/decisions.",
+        "operationId": "ListLiveSoloProgramDecisions",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloProgramDecisionResponse"
+                  }
                 }
               }
             }
@@ -5712,6 +5827,105 @@
           },
           "404": {
             "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/media/program/recovery": {
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Recover Live Solo Program",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/media/program/recovery.",
+        "operationId": "RecoverLiveSoloProgram",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "RecoverLiveSoloProgramRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloRecoverLiveSoloProgramRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloProgramHealthResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized"
@@ -28125,6 +28339,60 @@
         "type": "object",
         "additionalProperties": false
       },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloProgramHealthResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "concurrencyStamp": {
+            "type": "string",
+            "format": "guid"
+          },
+          "state": {
+            "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloCaptureState"
+          },
+          "stalled": {
+            "type": "boolean"
+          },
+          "lastFragmentImportedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "rotationRequested": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFDomainLiveSoloLiveSoloCaptureState": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Pending",
+          "Starting",
+          "Active",
+          "Stopping",
+          "Completed",
+          "Failed",
+          "RequiresReview"
+        ],
+        "enum": [
+          "Pending",
+          "Starting",
+          "Active",
+          "Stopping",
+          "Completed",
+          "Failed",
+          "RequiresReview"
+        ]
+      },
+      "NoCTFAPIEndpointsLiveSoloGetLiveSoloProgramHealthRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
       "NoCTFAPIEndpointsLiveSoloGetLiveSoloProgramPlaylistRequest": {
         "type": "object",
         "additionalProperties": false
@@ -28392,6 +28660,54 @@
         }
       },
       "NoCTFAPIEndpointsLiveSoloListLiveSoloPostgameQuestionsRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloProgramDecisionResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "programId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "action": {
+            "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloProgramAction"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "previousState": {
+            "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloCaptureState"
+          },
+          "state": {
+            "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloCaptureState"
+          }
+        }
+      },
+      "NoCTFDomainLiveSoloLiveSoloProgramAction": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "ReconcileExport",
+          "RetryImport",
+          "Rotate"
+        ],
+        "enum": [
+          "ReconcileExport",
+          "RetryImport",
+          "Rotate"
+        ]
+      },
+      "NoCTFAPIEndpointsLiveSoloListLiveSoloProgramDecisionsRequest": {
         "type": "object",
         "additionalProperties": false
       },
@@ -29124,6 +29440,39 @@
             "format": "int32",
             "maximum": 1024.0,
             "minimum": 0.0
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloRecoverLiveSoloProgramRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "action",
+          "programId",
+          "expectedStamp",
+          "reason"
+        ],
+        "properties": {
+          "programId": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          },
+          "expectedStamp": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          },
+          "action": {
+            "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloProgramAction"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 0,
+            "nullable": false
           }
         }
       },

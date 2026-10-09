@@ -21,7 +21,7 @@ public sealed class LiveSoloCaptureScheduleSource(NoCtfDbContext db) : IClusterS
                 || x.State == LiveSoloRecordingState.RequiresReview && x.EgressId == null && x.RequestedAt != null).Select(x => x.MediaSessionId))
             .Union(db.LiveSoloMediaSessions.Where(x => x.State == LiveSoloMediaState.Ready).Select(x => x.Id)).ToArrayAsync(ct);
         var pruning = await db.LiveSoloProgramSegments.AsNoTracking().Where(x => x.RemoveAfter <= now).Select(x => x.MediaSessionId)
-            .Union(db.LiveSoloProgramCaptures.AsNoTracking().Where(x => x.ImportedAt != null && x.RawRemovedAt == null
+            .Union(db.LiveSoloProgramCaptures.AsNoTracking().Where(x => (x.ImportedAt != null || x.RawCleanupAuthorizedAt != null) && x.RawRemovedAt == null
                 && (x.State == LiveSoloCaptureState.Completed || x.State == LiveSoloCaptureState.Failed)).Select(x => x.MediaSessionId))
             .Union(db.LiveSoloRecordings.AsNoTracking().Where(x => !x.DisputeHold && x.KeepUntil <= now).Select(x => x.MediaSessionId)).ToArrayAsync(ct);
         pruning=pruning.Concat(await db.LiveSoloRecordings.AsNoTracking().Where(x=>x.RawRemovedAt==null

@@ -65,8 +65,8 @@ public sealed partial class LiveSoloCaptureStore
                 }
             }
             if(active && current.State==LiveSoloExportState.Active)await CheckProgramProgressAsync(session,program,ct);
-            if(active && current.State==LiveSoloExportState.Active && program.StartedAt is { } programStart
-                && clock.GetUtcNow()-programStart>=TimeSpan.FromSeconds(options.ProgramChunkSeconds))
+            if(active && current.State==LiveSoloExportState.Active && (program.RotationRequested || program.StartedAt is { } programStart
+                && clock.GetUtcNow()-programStart>=TimeSpan.FromSeconds(options.ProgramChunkSeconds)))
             {
                 await TransactionAsync(async()=>{
                     await db.Entry(program).ReloadAsync(ct);
@@ -75,6 +75,8 @@ public sealed partial class LiveSoloCaptureStore
                 },ct);
                 await egress.StopAsync(current.Id,ct);
             }
+            else if(active && program.RotationRequested && current.State==LiveSoloExportState.Starting)
+                await egress.StopAsync(current.Id,ct);
             if(active && current.State==LiveSoloExportState.Complete && program.ImportedAt!=null && program.RotationRequested)
                 await TransactionAsync(async()=>{
                     var latest=await db.LiveSoloMediaSessions.SingleAsync(x=>x.Id==session.Id,ct);

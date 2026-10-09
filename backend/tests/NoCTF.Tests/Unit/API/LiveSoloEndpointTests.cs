@@ -152,6 +152,23 @@ public sealed class LiveSoloEndpointTests
         await Assert.That(body.RootElement.GetProperty("messageKey").GetString()).IsEqualTo("api.challenges.material.activeExecutionScope");
         await Assert.That(body.RootElement.GetProperty("detail").GetString()).IsNotEmpty();
     }
+    [Test]
+    public async Task Programme_control_is_authenticated_and_binds_recovery_to_the_principal_and_exact_capture_revision()
+    {
+        var store=Substitute.For<ILiveSoloProgramRecovery>();var competition=Guid.NewGuid();var match=Guid.NewGuid();var capture=Guid.NewGuid();var stamp=Guid.NewGuid();
+        var health=new LiveSoloProgramHealth(capture,stamp,LiveSoloCaptureState.Active,true,DateTimeOffset.UtcNow.AddMinutes(-1),false);
+        store.HealthAsync(competition,match,Actor,Arg.Any<CancellationToken>()).Returns(health);
+        store.RecoverAsync(Arg.Any<RecoverLiveSoloProgram>(),Arg.Any<CancellationToken>()).Returns(new LiveSoloProgramRecoveryResult(health with {RotationRequested=true}));
+        await using var app=await HostAsync(Substitute.For<ILiveSoloMatchStore>(),Substitute.For<ILiveSoloAttachmentStore>(),Substitute.For<IStore>(),programRecovery:store);
+        using var client=app.GetTestClient();var path=$"/api/v1/competitions/{competition}/live-solo/matches/{match}/media/program";
+        using var anonymous=await client.GetAsync(path);await Assert.That(anonymous.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
+        client.DefaultRequestHeaders.Authorization=new("Bearer","verified-test");
+        using var read=await client.GetAsync(path);await Assert.That(read.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        var json=await read.Content.ReadAsStringAsync();await Assert.That(json).Contains("\"stalled\":true");await Assert.That(json).DoesNotContain("egressId");
+        using var recovery=await client.PostAsJsonAsync(path+"/recovery",new{programId=capture,expectedStamp=stamp,action="Rotate",reason="stalled programme",actorId=Guid.NewGuid()});
+        await Assert.That(recovery.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await store.Received(1).RecoverAsync(Arg.Is<RecoverLiveSoloProgram>(x=>x!=null&&x.ActorId==Actor&&x.ProgramId==capture&&x.ExpectedStamp==stamp&&x.Action==LiveSoloProgramAction.Rotate),Arg.Any<CancellationToken>());
+    }
 
     [Test]
     public async Task Scoped_attachment_get_never_records_evidence_if_authorization_or_object_open_fails()
@@ -436,7 +453,7 @@ public sealed class LiveSoloEndpointTests
         ILiveSoloAdjudicationStore? decisions = null, ILiveSoloRuntimeStore? runtimes = null, ILiveSoloMediaStore? media = null, ILiveSoloProgramReader? programs = null,
         ILiveSoloRecordingStore? recordings = null, ILiveSoloPlayerPolicyReader? policies = null, ManageLiveSoloConfiguration? settings = null, ILiveSoloHintReader? hints = null,
         ManageLiveSoloWriteUps? postgame = null, ILiveSoloViewerStore? viewers = null, ILiveSoloResultCorrectionStore? corrections = null,
-        ILiveSoloRecordingRecovery? recordingRecovery = null)
+        ILiveSoloRecordingRecovery? recordingRecovery = null, ILiveSoloProgramRecovery? programRecovery = null)
     {
         var builder = WebApplication.CreateBuilder(); builder.WebHost.UseTestServer();
         builder.Services.AddFastEndpoints(options => { options.DisableAutoDiscovery = true; options.Assemblies = [typeof(GetLiveSoloMatchEndpoint).Assembly];
@@ -444,7 +461,7 @@ public sealed class LiveSoloEndpointTests
                 || x == typeof(StartLiveSoloCountdownEndpoint) || x == typeof(DownloadLiveSoloAttachmentEndpoint)
                 || x == typeof(AdjudicateLiveSoloMatchEndpoint) || x == typeof(ListLiveSoloAdjudicationsEndpoint)
                 || x == typeof(GetLiveSoloRuntimeEndpoint) || x == typeof(MutateLiveSoloRuntimeEndpoint)
-                || x == typeof(GetLiveSoloMediaEndpoint) || x == typeof(PrepareLiveSoloMediaEndpoint) || x == typeof(JoinLiveSoloMediaEndpoint)
+                || x == typeof(GetLiveSoloProgramHealthEndpoint) || x == typeof(RecoverLiveSoloProgramEndpoint) || x == typeof(ListLiveSoloProgramDecisionsEndpoint) || x == typeof(GetLiveSoloMediaEndpoint) || x == typeof(PrepareLiveSoloMediaEndpoint) || x == typeof(JoinLiveSoloMediaEndpoint)
                 || x == typeof(PreviewLiveSoloResultCorrectionEndpoint) || x == typeof(BeginLiveSoloResultCorrectionEndpoint) || x == typeof(ResolveLiveSoloResultCorrectionEndpoint) || x == typeof(GetLiveSoloResultCorrectionEndpoint) || x == typeof(ListLiveSoloResultCorrectionsEndpoint) || x == typeof(ManageLiveSoloViewerEndpoint) || x == typeof(GetLiveSoloProgramEndpoint) || x == typeof(GetLiveSoloProgramPlaylistEndpoint) || x == typeof(GetLiveSoloProgramSegmentEndpoint)
                 || x == typeof(ListLiveSoloRecordingsEndpoint) || x == typeof(ChangeLiveSoloRecordingEndpoint) || x == typeof(GetLiveSoloRecordingEndpoint)
                 || x == typeof(GetLiveSoloPlayerPolicyEndpoint) || x == typeof(ListLiveSoloHintsEndpoint) || settings is not null && x == typeof(SaveLiveSoloConfigurationEndpoint)
@@ -454,6 +471,7 @@ public sealed class LiveSoloEndpointTests
         builder.Services.AddSingleton(attachmentStore); builder.Services.AddSingleton(objects); builder.Services.AddSingleton<AccessLiveSoloAttachments>();
         builder.Services.AddSingleton(decisions ?? Substitute.For<ILiveSoloAdjudicationStore>()); builder.Services.AddSingleton<ManageLiveSoloAdjudication>();
         builder.Services.AddSingleton(runtimes ?? Substitute.For<ILiveSoloRuntimeStore>()); builder.Services.AddSingleton<ManageLiveSoloRuntimes>();
+        builder.Services.AddSingleton(programRecovery ?? Substitute.For<ILiveSoloProgramRecovery>());builder.Services.AddSingleton<ManageLiveSoloProgram>();
         builder.Services.AddSingleton(media ?? Substitute.For<ILiveSoloMediaStore>()); builder.Services.AddSingleton<ManageLiveSoloMedia>();
         builder.Services.AddSingleton<LiveSoloViewerBrowserAccess>();
         builder.Services.AddSingleton(viewers ?? Substitute.For<ILiveSoloViewerStore>()); builder.Services.Configure<NoCTF.API.Endpoints.Authentication.RefreshHttpOptions>(_ => {});

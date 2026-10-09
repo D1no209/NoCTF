@@ -774,6 +774,9 @@ GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/recordings/
 POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/recordings/{recordingId}/preview
 POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/recordings/{recordingId}/browser-download
 POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/media
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/media/program
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/media/program/decisions
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/media/program/recovery
 POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/media/token
 GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/adjudications
 POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/adjudications

@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NoCTF.Infrastructure.Persistence;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace NoCTF.Persistence.PostgreSql.Migrations
 {
     [DbContext(typeof(NoCtfDbContext))]
-    partial class NoCtfDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261009205524_LiveSoloProgramRecovery")]
+    partial class LiveSoloProgramRecovery
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -3739,10 +3742,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Property<long>("NextSegmentSequence")
                         .HasColumnType("bigint")
                         .HasColumnName("next_segment_sequence");
-
-                    b.Property<long?>("RawCleanupAuthorizedAt")
-                        .HasColumnType("bigint")
-                        .HasColumnName("raw_cleanup_authorized_at");
 
                     b.Property<long?>("RawRemovedAt")
                         .HasColumnType("bigint")

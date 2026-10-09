@@ -40,7 +40,7 @@ public sealed partial class LiveSoloCaptureStore
                     || x.State == LiveSoloRecordingState.Deleting)).ToArrayAsync(ct);
             foreach (var record in records)
             { raw.Add(record.Id); record.State = LiveSoloRecordingState.Deleting; }
-            foreach (var program in await db.LiveSoloProgramCaptures.Where(x => x.MediaSessionId == sessionId && x.ImportedAt != null && x.RawRemovedAt == null
+            foreach (var program in await db.LiveSoloProgramCaptures.Where(x => x.MediaSessionId == sessionId && (x.ImportedAt != null || x.RawCleanupAuthorizedAt != null) && x.RawRemovedAt == null
                 && (x.State == LiveSoloCaptureState.Completed || x.State == LiveSoloCaptureState.Failed)).Select(x => x.Id).ToArrayAsync(ct)) raw.Add(program);
             foreach (var id in raw) await messages.PublishAsync(new NoCTF.Application.LiveSolo.Media.RemoveLiveSoloCaptureFiles(id));
             foreach(var id in await db.LiveSoloRecordings.Where(x=>x.MediaSessionId==sessionId&&x.RawRemovedAt==null
@@ -64,7 +64,7 @@ public sealed partial class LiveSoloCaptureStore
             var record = await db.LiveSoloRecordings.SingleOrDefaultAsync(x => x.Id == id && x.State == LiveSoloRecordingState.Deleting && !x.DisputeHold, ct);
             if (record is null)
             {
-                var program = await db.LiveSoloProgramCaptures.SingleOrDefaultAsync(x => x.Id == id && x.ImportedAt != null, ct);
+                var program = await db.LiveSoloProgramCaptures.SingleOrDefaultAsync(x => x.Id == id && (x.ImportedAt != null || x.RawCleanupAuthorizedAt != null), ct);
                 if (program is not null) program.RawRemovedAt = clock.GetUtcNow();
                 return;
             }

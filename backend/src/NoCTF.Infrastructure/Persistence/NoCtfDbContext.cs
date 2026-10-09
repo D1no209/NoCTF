@@ -226,6 +226,7 @@ public sealed class NoCtfDbContext(
             || ChangeTracker.Entries<LiveSoloAttachmentAssignment>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
             throw new InvalidOperationException("Execution-scoped gameplay associations are immutable.");
         if (ChangeTracker.Entries<LiveSoloAdjudication>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted)
+            || ChangeTracker.Entries<LiveSoloProgramDecision>().Any(entry=>entry.State is EntityState.Modified or EntityState.Deleted)
             || ChangeTracker.Entries<LiveSoloRecordingDecision>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
             throw new InvalidOperationException("LiveSolo staff decisions are immutable.");
         foreach (var entry in ChangeTracker.Entries<LiveSoloResultCorrection>())
