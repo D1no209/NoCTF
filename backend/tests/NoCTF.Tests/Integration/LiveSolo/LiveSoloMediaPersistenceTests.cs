@@ -20,7 +20,7 @@ public sealed class LiveSoloMediaPersistenceTests
         {
             await using var fixture = await LiveSoloMatchPersistenceTests.Fixture.CreateAsync(ct);
             await fixture.PrepareAsync(ct); await ClearFixtureRoom(fixture, ct);
-            var auth = Authentication(); var store = new LiveSoloMediaStore(fixture.Db, new CompetitionModerationAuthorizer(fixture.Db), auth, fixture.media, fixture.Clock);
+            var auth = Authentication(); var store = new LiveSoloMediaStore(fixture.Db, new CompetitionModerationAuthorizer(fixture.Db), auth, fixture.media, Substitute.For<NoCTF.Application.Messaging.IPostCommitMessagePublisher>(), fixture.Clock);
             var prepared = await store.PrepareAsync(await Prepare(fixture, ct), ct);
             await Assert.That(prepared.Failure).IsNull();
             var session = await fixture.Db.LiveSoloMediaSessions.Include(x => x.Participants).SingleAsync(x => x.Id == prepared.Session!.Id, ct);
@@ -51,7 +51,7 @@ public sealed class LiveSoloMediaPersistenceTests
         {
             await using var fixture = await LiveSoloMatchPersistenceTests.Fixture.CreateAsync(ct);
             await fixture.PrepareAsync(ct); await ClearFixtureRoom(fixture, ct);
-            var auth = Authentication(); var store = new LiveSoloMediaStore(fixture.Db, new CompetitionModerationAuthorizer(fixture.Db), auth, fixture.media, fixture.Clock);
+            var auth = Authentication(); var store = new LiveSoloMediaStore(fixture.Db, new CompetitionModerationAuthorizer(fixture.Db), auth, fixture.media, Substitute.For<NoCTF.Application.Messaging.IPostCommitMessagePublisher>(), fixture.Clock);
             var first = await store.PrepareAsync(await Prepare(fixture, ct), ct); var generation = first.Session!.Generation;
             fixture.media.AuthorizeAsync(Arg.Any<LiveSoloMediaAuthorization>(), ct).Returns(new LiveSoloMediaToken("ws://localhost", "test-token", fixture.Now.AddMinutes(1)));
             var join = new JoinLiveSoloMedia(fixture.Competition.Id, fixture.Match.Id, fixture.Left.Id, generation, LiveSoloMediaRole.Publisher,
@@ -78,7 +78,7 @@ public sealed class LiveSoloMediaPersistenceTests
             await using var fixture = await LiveSoloMatchPersistenceTests.Fixture.CreateAsync(ct);
             await fixture.PrepareAsync(ct); await ClearFixtureRoom(fixture, ct); var auth = Authentication();
             fixture.media.CreateRoomAsync(Arg.Any<string>(), ct).Returns(Task.FromException(new HttpRequestException("Unavailable")));
-            var store = new LiveSoloMediaStore(fixture.Db, new CompetitionModerationAuthorizer(fixture.Db), auth, fixture.media, fixture.Clock);
+            var store = new LiveSoloMediaStore(fixture.Db, new CompetitionModerationAuthorizer(fixture.Db), auth, fixture.media, Substitute.For<NoCTF.Application.Messaging.IPostCommitMessagePublisher>(), fixture.Clock);
             await Assert.That(async () => await store.PrepareAsync(await Prepare(fixture, ct), ct)).Throws<HttpRequestException>();
             var id = (await fixture.Db.LiveSoloMatches.SingleAsync(ct)).CurrentMediaSessionId!.Value;
             await Assert.That((await fixture.Db.LiveSoloMediaSessions.SingleAsync(x => x.Id == id, ct)).State).IsEqualTo(LiveSoloMediaState.Preparing);
@@ -94,7 +94,7 @@ public sealed class LiveSoloMediaPersistenceTests
         {
             await using var fixture = await LiveSoloMatchPersistenceTests.Fixture.CreateAsync(ct);
             await fixture.PrepareAsync(ct); await ClearFixtureRoom(fixture, ct);
-            var store = new LiveSoloMediaStore(fixture.Db, new CompetitionModerationAuthorizer(fixture.Db), Authentication(), fixture.media, fixture.Clock);
+            var store = new LiveSoloMediaStore(fixture.Db, new CompetitionModerationAuthorizer(fixture.Db), Authentication(), fixture.media, Substitute.For<NoCTF.Application.Messaging.IPostCommitMessagePublisher>(), fixture.Clock);
             var first = await store.PrepareAsync(await Prepare(fixture, ct), ct);
             var session = await fixture.Db.LiveSoloMediaSessions.SingleAsync(x => x.Id == first.Session!.Id, ct);
             fixture.media.ObserveAsync(session.RoomIdentity, ct).Returns(new LiveSoloRoomObservation([], false));
@@ -115,7 +115,7 @@ public sealed class LiveSoloMediaPersistenceTests
         {
             await using var fixture = await LiveSoloMatchPersistenceTests.Fixture.CreateAsync(ct);
             await fixture.PrepareAsync(ct); await ClearFixtureRoom(fixture, ct);
-            var store = new LiveSoloMediaStore(fixture.Db, new CompetitionModerationAuthorizer(fixture.Db), Authentication(), fixture.media, fixture.Clock);
+            var store = new LiveSoloMediaStore(fixture.Db, new CompetitionModerationAuthorizer(fixture.Db), Authentication(), fixture.media, Substitute.For<NoCTF.Application.Messaging.IPostCommitMessagePublisher>(), fixture.Clock);
             var first = await store.PrepareAsync(await Prepare(fixture, ct), ct);
             var join = new JoinLiveSoloMedia(fixture.Competition.Id, fixture.Match.Id, fixture.Left.Id, first.Session!.Generation,
                 LiveSoloMediaRole.Publisher, fixture.Left.TokenVersion, new(AuthenticationMethod.Password, fixture.Now));
@@ -139,7 +139,7 @@ public sealed class LiveSoloMediaPersistenceTests
         {
             await using var fixture = await LiveSoloMatchPersistenceTests.Fixture.CreateAsync(ct);
             await fixture.PrepareAsync(ct); await ClearFixtureRoom(fixture, ct);
-            var store = new LiveSoloMediaStore(fixture.Db, new CompetitionModerationAuthorizer(fixture.Db), Authentication(), fixture.media, fixture.Clock);
+            var store = new LiveSoloMediaStore(fixture.Db, new CompetitionModerationAuthorizer(fixture.Db), Authentication(), fixture.media, Substitute.For<NoCTF.Application.Messaging.IPostCommitMessagePublisher>(), fixture.Clock);
             var command = await Prepare(fixture, ct); var prepared = await store.PrepareAsync(command, ct);
             await Assert.That((await store.PrepareAsync(command, ct)).Failure).IsEqualTo(LiveSoloMediaFailure.InvalidGeneration);
             var session = await fixture.Db.LiveSoloMediaSessions.SingleAsync(x => x.Id == prepared.Session!.Id, ct);
@@ -159,7 +159,7 @@ public sealed class LiveSoloMediaPersistenceTests
         {
             await using var fixture = await LiveSoloMatchPersistenceTests.Fixture.CreateAsync(ct);
             await fixture.PrepareAsync(ct); await ClearFixtureRoom(fixture, ct);
-            var store = new LiveSoloMediaStore(fixture.Db, new CompetitionModerationAuthorizer(fixture.Db), Authentication(), fixture.media, fixture.Clock);
+            var store = new LiveSoloMediaStore(fixture.Db, new CompetitionModerationAuthorizer(fixture.Db), Authentication(), fixture.media, Substitute.For<NoCTF.Application.Messaging.IPostCommitMessagePublisher>(), fixture.Clock);
             var prepared = await store.PrepareAsync(await Prepare(fixture, ct), ct);
             var session = await fixture.Db.LiveSoloMediaSessions.SingleAsync(x => x.Id == prepared.Session!.Id, ct);
             var command = new RefreshLiveSoloMedia(session.Id, session.RoomIdentity);

@@ -249,6 +249,7 @@ interface NotificationTargetContext {
   questionId: string | null
   gameplayFactId: string | null
   appealEventId: string | null
+  matchId: string | null
 }
 
 type NotificationTargetResolver = (context: NotificationTargetContext) => string
@@ -291,6 +292,8 @@ const notificationTargetResolvers = {
     : context.detailPath,
   StartGateFailed: context => context.detailPath,
   ManagementFailure: context => context.detailPath,
+  LiveSoloMediaInterrupted: context => context.competitionId && context.matchId
+    ? `/competitions/${context.competitionId}/live-solo/matches/${context.matchId}` : context.detailPath,
   BloodAwarded: context => context.competitionId && context.challengeId
     ? competitionChallengePath(context.competitionId, context.challengeId)
     : context.detailPath,
@@ -338,6 +341,7 @@ export function notificationTargetPath(
       ?? (kind === 'QuestionOpened' ? notification.id ?? null : null),
     gameplayFactId: notificationContentId(notification, 'gameplayFactId'),
     appealEventId: notificationContentId(notification, 'appealEventId'),
+    matchId: notificationContentId(notification, 'matchId'),
   }
   return notificationTargetResolvers[kind]?.(context) ?? detailPath
 }
@@ -357,6 +361,12 @@ export function notificationBody(
   notification: NoCtfapiEndpointsNotificationsNotificationResponse,
 ): string | null {
   const payload = notificationContent(notification)
+  if (notification.kind === 'LiveSoloMediaInterrupted') {
+    const user = typeof payload.userName === 'string' ? payload.userName : translate('common.label.unknownUser')
+    const reasons = { ScreenInterrupted: 'liveSolo.notice.screenInterrupted', RoomUnavailable: 'liveSolo.notice.roomUnavailable', AuthorizationChanged: 'liveSolo.notice.authorizationChanged' } as const
+    const reason = typeof payload.reason === 'string' && Object.hasOwn(reasons, payload.reason) ? payload.reason as keyof typeof reasons : 'RoomUnavailable'
+    return `${translate(reasons[reason], { user })} ${translate('liveSolo.notice.noAutomaticDecision')}`
+  }
   if (notification.kind === 'UserAccountLifecycleChanged') {
     const user = typeof payload.targetUserName === 'string' && payload.targetUserName.trim().length > 0
       ? payload.targetUserName
@@ -395,6 +405,7 @@ export function notificationActionLabel(
     RuntimeStateChanged: "administration.label.viewQuestions",
     StartGateFailed: "common.label.viewNotificationDetails",
     ManagementFailure: "common.label.viewNotificationDetails",
+    LiveSoloMediaInterrupted: "liveSolo.notice.viewMatch",
     BloodAwarded: "administration.label.viewQuestions",
     ChallengePublished: "administration.label.viewQuestions",
     HintPublished: "administration.label.viewQuestions",
@@ -414,6 +425,7 @@ export function notificationText(
   notification: NoCtfapiEndpointsNotificationsNotificationResponse,
 ): string {
   const payload = notificationContent(notification)
+  if (notification.kind === 'LiveSoloMediaInterrupted') return translate('liveSolo.notice.title')
   const title = typeof payload.competitionTitle === 'string' ? `「${payload.competitionTitle}」` : ''
   const team = typeof payload.teamName === 'string' ? `「${payload.teamName}」` : ''
   const challenge = typeof payload.challengeTitle === 'string' ? `「${payload.challengeTitle}」` : ''

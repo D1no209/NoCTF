@@ -13,7 +13,8 @@ using NoCTF.Infrastructure.Persistence;
 namespace NoCTF.Infrastructure.LiveSolo.Media;
 
 public sealed partial class LiveSoloMediaStore(NoCtfDbContext db, ICompetitionModerationAuthorizer authorizer,
-    IMfaAuthenticationStore authentication, ILiveSoloMediaGateway gateway, TimeProvider clock, ILiveSoloCaptureStore? captures = null) : ILiveSoloMediaStore
+    IMfaAuthenticationStore authentication, ILiveSoloMediaGateway gateway, NoCTF.Application.Messaging.IPostCommitMessagePublisher messages,
+    TimeProvider clock, ILiveSoloCaptureStore? captures = null) : ILiveSoloMediaStore
 {
     private async Task<LiveSoloMediaView> ViewAsync(LiveSoloMediaSession session, CancellationToken ct)
     {

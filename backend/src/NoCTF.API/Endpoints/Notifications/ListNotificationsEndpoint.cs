@@ -35,7 +35,8 @@ public enum NotificationKindProtocol
     TeamBanAppealSubmitted,
     PlatformAuditExported,
     UserAccountLifecycleChanged,
-    CompetitionForceDeleted
+    CompetitionForceDeleted,
+    LiveSoloMediaInterrupted
 }
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<NotificationFailureCode>))]

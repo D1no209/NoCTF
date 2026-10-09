@@ -1326,5 +1326,11 @@
   "writeUp.submittedEvent": "队伍题解已提交",
   "writeUp.myWriteUp": "我的题解",
   "writeUp.review": "题解审核",
-  "writeUp.deadlinePassedShort": "题解提交期限已结束，无法提交或替换。"
+  "writeUp.deadlinePassedShort": "题解提交期限已结束，无法提交或替换。",
+  "liveSolo.notice.title": "LiveSolo 屏幕服务中断",
+  "liveSolo.notice.screenInterrupted": "{user} 的屏幕共享已中断。",
+  "liveSolo.notice.roomUnavailable": "屏幕房间已不可用。",
+  "liveSolo.notice.authorizationChanged": "当前授权不再满足要求，屏幕房间已退役。",
+  "liveSolo.notice.noAutomaticDecision": "此提醒不会自动暂停、判负或修改结果，请裁判核查后处理。",
+  "liveSolo.notice.viewMatch": "查看对局"
 }

@@ -507,7 +507,7 @@ export type NoCtfDomainNotificationsNotificationSourceType = 0 | 1 | 2 | 3 | 4;
 
 export type NoCtfDomainNotificationsNotificationTargetType = 0 | 1 | 2 | 3 | 4;
 
-export type NoCtfapiEndpointsNotificationsNotificationKindProtocol = 'Message' | 'CompetitionAnnouncement' | 'QuestionOpened' | 'QuestionStatusChanged' | 'CompetitionLifecycleChanged' | 'TeamRegistrationChanged' | 'GameplayFactAdjudicated' | 'RuntimeStateChanged' | 'StartGateFailed' | 'ManagementFailure' | 'BloodAwarded' | 'ChallengePublished' | 'HintPublished' | 'TeamBanned' | 'CheatIncidentDetected' | 'TeamBanCorrected' | 'TeamBanAppealSubmitted' | 'PlatformAuditExported' | 'UserAccountLifecycleChanged' | 'CompetitionForceDeleted';
+export type NoCtfapiEndpointsNotificationsNotificationKindProtocol = 'Message' | 'CompetitionAnnouncement' | 'QuestionOpened' | 'QuestionStatusChanged' | 'CompetitionLifecycleChanged' | 'TeamRegistrationChanged' | 'GameplayFactAdjudicated' | 'RuntimeStateChanged' | 'StartGateFailed' | 'ManagementFailure' | 'BloodAwarded' | 'ChallengePublished' | 'HintPublished' | 'TeamBanned' | 'CheatIncidentDetected' | 'TeamBanCorrected' | 'TeamBanAppealSubmitted' | 'PlatformAuditExported' | 'UserAccountLifecycleChanged' | 'CompetitionForceDeleted' | 'LiveSoloMediaInterrupted';
 
 export type NoCtfApplicationNotificationsNotificationContent = {
     type: string;
@@ -711,6 +711,22 @@ export type NoCtfApplicationNotificationsCompetitionForceDeletedReference = {
     kind?: number;
     count?: number;
 };
+
+export type NoCtfApplicationNotificationsLiveSoloMediaInterruptedNotificationContent = Omit<NoCtfApplicationNotificationsNotificationContent, 'type'> & {
+    competitionId?: string | null;
+    matchId?: string | null;
+    userId?: string | null;
+    userName?: string | null;
+    teamId?: string | null;
+    teamName?: string | null;
+    reason?: NoCtfDomainLiveSoloLiveSoloMediaAlertKind | null;
+    state?: NoCtfDomainLiveSoloLiveSoloScreenState | null;
+    type: 'live-solo-media-interrupted';
+};
+
+export type NoCtfDomainLiveSoloLiveSoloMediaAlertKind = 'ScreenInterrupted' | 'RoomUnavailable' | 'AuthorizationChanged';
+
+export type NoCtfDomainLiveSoloLiveSoloScreenState = 'Disconnected' | 'Connected' | 'Sharing';
 
 export type NoCtfDomainSharedEntityReferenceKind = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
 
@@ -997,8 +1013,6 @@ export type NoCtfapiEndpointsLiveSoloLiveSoloMediaMemberResponse = {
     identity?: string;
     userName?: string;
 };
-
-export type NoCtfDomainLiveSoloLiveSoloScreenState = 'Disconnected' | 'Connected' | 'Sharing';
 
 export type NoCtfapiEndpointsLiveSoloGetLiveSoloMediaRequest = {
     [key: string]: never;

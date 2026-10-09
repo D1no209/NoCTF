@@ -56,6 +56,8 @@ internal static class NotificationContentProjection
             item.CompetitionChallengeId,
             item.RuntimeInstanceId,
             item.GameplayFactId),
+        NotificationKind.LiveSoloMediaInterrupted => new LiveSoloMediaInterruptedNotificationContent(item.CompetitionId, item.LiveSoloMatchId, item.UserId,
+            item.UserName, item.TeamId, item.TeamName, item.LiveSoloMediaAlertKind, item.LiveSoloScreenState),
         NotificationKind.BloodAwarded => new BloodAwardedNotificationContent(
             item.CompetitionId,
             item.CompetitionChallengeId,

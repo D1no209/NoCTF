@@ -23785,7 +23785,8 @@
           "TeamBanAppealSubmitted",
           "PlatformAuditExported",
           "UserAccountLifecycleChanged",
-          "CompetitionForceDeleted"
+          "CompetitionForceDeleted",
+          "LiveSoloMediaInterrupted"
         ],
         "enum": [
           "Message",
@@ -23807,7 +23808,8 @@
           "TeamBanAppealSubmitted",
           "PlatformAuditExported",
           "UserAccountLifecycleChanged",
-          "CompetitionForceDeleted"
+          "CompetitionForceDeleted",
+          "LiveSoloMediaInterrupted"
         ]
       },
       "NoCTFApplicationNotificationsNotificationContent": {
@@ -23834,7 +23836,8 @@
             "team-ban-appeal-submitted": "#/components/schemas/NoCTFApplicationNotificationsTeamBanAppealSubmittedNotificationContent",
             "platform-audit-exported": "#/components/schemas/NoCTFApplicationNotificationsPlatformAuditExportedNotificationContent",
             "user-account-lifecycle-changed": "#/components/schemas/NoCTFApplicationNotificationsUserAccountLifecycleChangedNotificationContent",
-            "competition-force-deleted": "#/components/schemas/NoCTFApplicationNotificationsCompetitionForceDeletedNotificationContent"
+            "competition-force-deleted": "#/components/schemas/NoCTFApplicationNotificationsCompetitionForceDeletedNotificationContent",
+            "live-solo-media-interrupted": "#/components/schemas/NoCTFApplicationNotificationsLiveSoloMediaInterruptedNotificationContent"
           }
         },
         "x-abstract": true,
@@ -24869,6 +24872,91 @@
             "format": "int32"
           }
         }
+      },
+      "NoCTFApplicationNotificationsLiveSoloMediaInterruptedNotificationContent": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFApplicationNotificationsNotificationContent"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "competitionId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "matchId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "userId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "userName": {
+                "type": "string",
+                "nullable": true
+              },
+              "teamId": {
+                "type": "string",
+                "format": "guid",
+                "nullable": true
+              },
+              "teamName": {
+                "type": "string",
+                "nullable": true
+              },
+              "reason": {
+                "nullable": true,
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloMediaAlertKind"
+                  }
+                ]
+              },
+              "state": {
+                "nullable": true,
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloScreenState"
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "NoCTFDomainLiveSoloLiveSoloMediaAlertKind": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "ScreenInterrupted",
+          "RoomUnavailable",
+          "AuthorizationChanged"
+        ],
+        "enum": [
+          "ScreenInterrupted",
+          "RoomUnavailable",
+          "AuthorizationChanged"
+        ]
+      },
+      "NoCTFDomainLiveSoloLiveSoloScreenState": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Disconnected",
+          "Connected",
+          "Sharing"
+        ],
+        "enum": [
+          "Disconnected",
+          "Connected",
+          "Sharing"
+        ]
       },
       "NoCTFDomainSharedEntityReferenceKind": {
         "type": "integer",
@@ -26036,20 +26124,6 @@
             "type": "string"
           }
         }
-      },
-      "NoCTFDomainLiveSoloLiveSoloScreenState": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "Disconnected",
-          "Connected",
-          "Sharing"
-        ],
-        "enum": [
-          "Disconnected",
-          "Connected",
-          "Sharing"
-        ]
       },
       "NoCTFAPIEndpointsLiveSoloGetLiveSoloMediaRequest": {
         "type": "object",

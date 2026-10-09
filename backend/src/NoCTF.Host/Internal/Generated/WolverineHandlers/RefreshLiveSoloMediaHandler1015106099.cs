@@ -72,7 +72,7 @@ namespace Internal.Generated.WolverineHandlers
             var liveSoloCaptureStore = new NoCTF.Infrastructure.LiveSolo.Media.LiveSoloCaptureStore(noCtfDbContext, _liveSoloEgressGateway, liveSoloCaptureFiles, managedFileUploads, _liveKitMediaOptions2, _timeProvider4, wolverinePostCommitMessagePublisher, _store2);
             var mfaAuthenticationStore = new NoCTF.Infrastructure.Authentication.Mfa.MfaAuthenticationStore(noCtfDbContext, _mfaCryptography, _platformSecretProtector, _timeProvider2, requestSourceAddress, wolverinePostCommitMessagePublisher);
             var competitionModerationAuthorizer = new NoCTF.Infrastructure.Teams.Moderation.CompetitionModerationAuthorizer(noCtfDbContext);
-            var liveSoloMediaStore = new NoCTF.Infrastructure.LiveSolo.Media.LiveSoloMediaStore(noCtfDbContext, competitionModerationAuthorizer, mfaAuthenticationStore, _liveSoloMediaGateway, _timeProvider3, liveSoloCaptureStore);
+            var liveSoloMediaStore = new NoCTF.Infrastructure.LiveSolo.Media.LiveSoloMediaStore(noCtfDbContext, competitionModerationAuthorizer, mfaAuthenticationStore, _liveSoloMediaGateway, wolverinePostCommitMessagePublisher, _timeProvider3, liveSoloCaptureStore);
             // The actual message body
             var refreshLiveSoloMedia = (NoCTF.Application.LiveSolo.Media.RefreshLiveSoloMedia)context.Envelope.Message;
 

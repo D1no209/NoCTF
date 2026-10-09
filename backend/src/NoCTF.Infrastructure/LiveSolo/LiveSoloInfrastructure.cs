@@ -42,6 +42,8 @@ public static class LiveSoloInfrastructure
         services.AddScoped<ManageLiveSoloRuntimes>();
         services.AddScoped<ILiveSoloMediaStore, LiveSoloMediaStore>();
         services.AddScoped<ManageLiveSoloMedia>();
+        services.AddScoped<ILiveSoloMediaAlertReader, LiveSoloMediaAlertReader>();
+        services.AddScoped<PublishLiveSoloMediaAlert>();
         services.AddScoped<ILiveSoloCaptureStore, LiveSoloCaptureStore>();
         services.AddScoped<ILiveSoloCaptureFiles, LiveSoloCaptureFiles>();
         services.AddScoped<ILiveSoloProgramReader, LiveSoloProgramReader>();
