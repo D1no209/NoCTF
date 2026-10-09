@@ -26,6 +26,9 @@ public sealed partial class LiveSoloMatchStore
             if (group is null) return new(null, LiveSoloFailure.NoSuitableQuestionGroup);
             var entryIds = group.Items.Select(x => x.CompetitionChallengeId).ToArray();
             var templateIds = await db.CompetitionChallenges.Where(x => entryIds.Contains(x.Id)).Select(x => x.ChallengeId).ToArrayAsync(ct);
+            var runtimeCount = await db.Challenges.CountAsync(x => templateIds.Contains(x.Id) && x.Definition!.Runtime != null, ct);
+            var runtimeQuota = await db.Competitions.Where(x => x.Id == command.CompetitionId).Select(x => x.MaxConcurrentRuntimeInstancesPerTeam).SingleAsync(ct);
+            if (!LiveSoloRoundSchedulePolicy.FitsRuntimeQuota(runtimeCount, runtimeQuota)) return new(null, LiveSoloFailure.InvalidConfiguration);
             _ = await db.Challenges.Where(x => templateIds.Contains(x.Id)).Select(x => new { x.Id, x.ConcurrencyStamp }).ToArrayAsync(ct);
             var last = rounds.LastOrDefault();
             var replay = last?.State is LiveSoloRoundState.TimedOut or LiveSoloRoundState.Canceled;
@@ -41,7 +44,7 @@ public sealed partial class LiveSoloMatchStore
             await db.SaveChangesAsync(ct); return new(Round(round, command.Now));
         }, () => new(null, LiveSoloFailure.Conflict), ct);
         if (result.Round is { } prepared)
-            foreach (var question in await db.LiveSoloRoundQuestions.Where(x => x.RoundId == prepared.Id).Select(x => x.Id).ToArrayAsync(ct))
+            foreach (var question in await db.LiveSoloRoundQuestions.Where(x => x.RoundId == prepared.Id && x.Position == 0).Select(x => x.Id).ToArrayAsync(ct))
                 await runtimePreparation.PrepareAsync(question, command.Now, ct);
         return result;
     }
@@ -109,20 +112,24 @@ public sealed partial class LiveSoloMatchStore
             if (match.Roster.Any(member => !session.Participants.Any(p => p.UserId == member.UserId
                 && observed.Screens.Any(screen => screen.Identity == p.Identity && screen.State == LiveSoloScreenState.Sharing)))) return new(null, LiveSoloFailure.NotReady);
             // Exposure can change while both sides are preparing. Recheck before a new Match starts.
-            if (match.StartedAt is null && !await NoNewPublicExposureAsync(match, round, command.Now, ct)) return new(null, LiveSoloFailure.NoSuitableQuestionGroup);
-            match.State = LiveSoloMatchState.Countdown; round.State = LiveSoloRoundState.Countdown; round.CountdownAt = command.Now; round.TimelineRevision++;
+            if (match.StartedAt is null && !await NoNewPublicExposureAsync(match, round, ct)) return new(null, LiveSoloFailure.NoSuitableQuestionGroup);
+            var effectiveAt = (clock ?? TimeProvider.System).GetUtcNow();
+            match.State = LiveSoloMatchState.Countdown; round.State = LiveSoloRoundState.Countdown; round.CountdownAt = effectiveAt; round.TimelineRevision++;
             await messages.ScheduleAsync(new NoCTF.Application.LiveSolo.Rounds.AdvanceLiveSoloRound(round.Id, round.TimelineRevision,
-                command.Now.AddSeconds(round.CountdownSeconds)), command.Now.AddSeconds(round.CountdownSeconds));
-            await db.SaveChangesAsync(ct); return new(Round(round, command.Now));
+                effectiveAt.AddSeconds(round.CountdownSeconds)), effectiveAt.AddSeconds(round.CountdownSeconds));
+            await db.SaveChangesAsync(ct); return new(Round(round, effectiveAt));
         }, () => new(null, LiveSoloFailure.Conflict), ct);
     }
 
-    private async Task<bool> NoNewPublicExposureAsync(LiveSoloMatch match, LiveSoloRound round, DateTimeOffset now, CancellationToken ct)
+    private async Task<bool> NoNewPublicExposureAsync(LiveSoloMatch match, LiveSoloRound round, CancellationToken ct)
     {
         var templates = await db.CompetitionChallenges.Where(x => round.Questions.Select(q => q.CompetitionChallengeId).Contains(x.Id)).Select(x => x.ChallengeId).ToArrayAsync(ct);
         var canonical = await db.LiveSoloChallengeSources.Where(x => templates.Contains(x.ChallengeId)).ToDictionaryAsync(x => x.ChallengeId, x => x.CanonicalChallengeId, ct);
         var ids = templates.Select(id => canonical.GetValueOrDefault(id, id)).ToArray();
-        return !await db.LiveSoloQuestionExposures.AnyAsync(x => x.CompetitionId == match.CompetitionId && ids.Contains(x.CanonicalChallengeId) && x.PublicAt <= now, ct);
+        var publicTimes = await db.LiveSoloQuestionExposures.Where(x => x.CompetitionId == match.CompetitionId && ids.Contains(x.CanonicalChallengeId))
+            .Select(x => x.PublicAt).ToArrayAsync(ct);
+        var actualNow = (clock ?? TimeProvider.System).GetUtcNow();
+        return !publicTimes.Any(x => x <= actualNow);
     }
     private async Task<bool> RosterEligibleAsync(LiveSoloMatch match, CancellationToken ct)
     {

@@ -379,7 +379,8 @@ public sealed class LiveSoloMatchPersistenceTests
     {
         public DbContextOptions<NoCtfDbContext> Options { get; } = options;
         public NoCtfDbContext Db { get; } = db;
-        public DateTimeOffset Now { get; set; } = DateTimeOffset.UtcNow;
+        public FakeTimeProvider Clock { get; } = new(DateTimeOffset.UtcNow);
+        public DateTimeOffset Now { get => Clock.GetUtcNow(); set => Clock.SetUtcNow(value); }
         public User Owner { get; private set; } = null!;
         public User Left { get; private set; } = null!;
         public User Right { get; private set; } = null!;
@@ -432,12 +433,12 @@ public sealed class LiveSoloMatchPersistenceTests
             var messages = Substitute.For<IPostCommitMessagePublisher>();
             var runtime = new ScopedRuntimeControl(context, new ChallengeRuntimeTemplateCatalog(), Substitute.For<IRuntimePlacementPolicy>(),
                 Substitute.For<IPerTeamRuntimeFlagStore>(), messages);
-            var clock = new FakeTimeProvider(Now);
+            var clock = Clock;
             return new(context, new CompetitionModerationAuthorizer(context), media, new LiveSoloRuntimePreparation(context, runtime), messages,
                 new TransactionalRequestReplay(context, new CommandKey(requestKey, actorId), clock), clock);
         }
 
-        public async Task PrepareAsync(CancellationToken ct, Guid? existingMatch = null)
+        public async Task PrepareAsync(CancellationToken ct, Guid? existingMatch = null, LiveSoloFailure? expectedPreparationFailure = null)
         {
             var store = Store(Db);
             var group = await store.SaveGroupAsync(Competition.Id, Owner.Id, new(null, "Round group", false, null,
@@ -454,7 +455,8 @@ public sealed class LiveSoloMatchPersistenceTests
             var right = await store.LockRosterAsync(new(Competition.Id, Match.Id, Right.Id, RightTeam.Id, Match.ConcurrencyStamp, [Right.Id], Now), ct);
             await Assert.That(right.Failure).IsNull(); Match = right.Match!;
             var prepared = await store.PrepareRoundAsync(new(Competition.Id, Match.Id, Owner.Id, Match.ConcurrencyStamp, group.Group!.Id, Now), ct);
-            await Assert.That(prepared.Failure).IsNull();
+            await Assert.That(prepared.Failure).IsEqualTo(expectedPreparationFailure);
+            if (expectedPreparationFailure is not null) return;
             Round = await Db.LiveSoloRounds.Include(x => x.Questions).SingleAsync(x => x.Id == prepared.Round!.Id, ct);
             Match = (await store.FindAsync(Competition.Id, Match.Id, Owner.Id, true, Now, ct))!;
             var participants = Match.Rosters.SelectMany(roster => roster.UserIds.Select(id => new LiveSoloMediaParticipant {

@@ -21,10 +21,19 @@ public sealed class LiveSoloRuntimePreparation(NoCtfDbContext db, IScopedRuntime
         var ready = true;
         foreach (var slot in scope.Match.Slots)
         {
-            if (slot.TeamId is not Guid team) return LiveSoloFailure.NotReady;
-            var result = await runtimes.EnsureAsync(new(scope.Match.CompetitionId, scope.Question.CompetitionChallengeId, questionId, team, now), ct);
-            if (!result.IsolationAvailable) return LiveSoloFailure.IsolationUnavailable;
-            if (result.Failure is not null) return LiveSoloFailure.DependencyUnavailable;
+            if (slot.TeamId is not Guid team) return await RevokeReadinessAsync(questionId, LiveSoloFailure.NotReady, ct);
+            ScopedRuntimeResult result;
+            try
+            {
+                result = await runtimes.EnsureAsync(new(scope.Match.CompetitionId, scope.Question.CompetitionChallengeId, questionId, team, now), ct);
+            }
+            catch (Exception) when (!ct.IsCancellationRequested)
+            {
+                await RevokeReadinessAsync(questionId, LiveSoloFailure.DependencyUnavailable, ct);
+                throw;
+            }
+            if (!result.IsolationAvailable) return await RevokeReadinessAsync(questionId, LiveSoloFailure.IsolationUnavailable, ct);
+            if (result.Failure is not null) return await RevokeReadinessAsync(questionId, LiveSoloFailure.DependencyUnavailable, ct);
             if (result.RuntimeInstanceId is Guid runtime) bindings.Add(new() { RoundQuestionId = questionId, Side = slot.Side, RuntimeInstanceId = runtime });
             if (result.RuntimeInstanceId is not null && result.State != RuntimeState.Running) ready = false;
         }
@@ -38,6 +47,15 @@ public sealed class LiveSoloRuntimePreparation(NoCtfDbContext db, IScopedRuntime
         question.Readiness = ready ? LiveSoloQuestionReadiness.Ready : LiveSoloQuestionReadiness.Preparing;
         await db.SaveChangesAsync(ct);
         return ready ? null : LiveSoloFailure.NotReady;
+    }
+
+    private async Task<LiveSoloFailure> RevokeReadinessAsync(Guid questionId, LiveSoloFailure failure, CancellationToken ct)
+    {
+        var question = await db.LiveSoloRoundQuestions.SingleAsync(x => x.Id == questionId, ct);
+        question.Readiness = LiveSoloQuestionReadiness.Failed;
+        question.ConcurrencyStamp = Guid.NewGuid();
+        await db.SaveChangesAsync(ct);
+        return failure;
     }
 
     public async Task StopRoundAsync(Guid roundId, DateTimeOffset now, CancellationToken ct)

@@ -1,8 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using NoCTF.Application.Competitions.Lifecycle;
 using NoCTF.Application.LiveSolo.Rounds;
-using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.LiveSolo;
+using NoCTF.Infrastructure.LiveSolo.Rounds;
 
 namespace NoCTF.Infrastructure.LiveSolo.Matches;
 
@@ -10,12 +9,9 @@ public sealed partial class LiveSoloMatchStore
 {
     private async Task SynchronizeCompetitionPausesAsync(LiveSoloRound round, Guid competitionId, DateTimeOffset now, bool persist, CancellationToken ct)
     {
-        var transitions = await db.CompetitionEvents.AsNoTracking().Where(x => x.CompetitionId == competitionId
-            && x.Kind == CompetitionEventKind.CompetitionLifecycleChanged && x.OccurredAt <= now)
-            .Select(x => new { x.Id, x.OccurredAt, x.PreviousCompetitionStatus, x.CompetitionStatus }).ToArrayAsync(ct);
-        var intervals = LiveSoloCompetitionPausePolicy.Project(round.Id, round.CreatedAt, now, transitions.Select(x =>
-            new CompetitionLifecycleMoment(x.Id, x.OccurredAt, x.PreviousCompetitionStatus ?? throw new InvalidOperationException("Incomplete lifecycle event."),
-                x.CompetitionStatus ?? throw new InvalidOperationException("Incomplete lifecycle event."))));
+        var transitions = await LiveSoloCompetitionPauseReader.ReadAsync(db, [competitionId], now, ct);
+        var intervals = LiveSoloCompetitionPausePolicy.Project(round.Id, round.CreatedAt, now,
+            transitions.GetValueOrDefault(competitionId, []));
         if (!persist)
         {
             round.Pauses = round.Pauses.Where(x => x.Source != LiveSoloPauseSource.Competition).Concat(intervals).ToList();

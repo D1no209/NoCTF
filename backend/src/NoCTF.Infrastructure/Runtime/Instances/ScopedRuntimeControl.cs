@@ -4,6 +4,7 @@ using NoCTF.Application.Challenges.Flags;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Provisioning;
+using NoCTF.Application.Runtime.Access;
 using NoCTF.Domain.Runtime;
 using NoCTF.Infrastructure.Persistence;
 
@@ -11,7 +12,8 @@ namespace NoCTF.Infrastructure.Runtime.Instances;
 
 /// <summary>Execution-neutral provisioning. The caller owns roster/round authorization and never manipulates a provider.</summary>
 public sealed class ScopedRuntimeControl(NoCtfDbContext db, IChallengeRuntimeTemplateCatalog templates,
-    IRuntimePlacementPolicy placement, IPerTeamRuntimeFlagStore flags, IPostCommitMessagePublisher messages) : IScopedRuntimeControl
+    IRuntimePlacementPolicy placement, IPerTeamRuntimeFlagStore flags, IPostCommitMessagePublisher messages,
+    IExecutionRuntimeIsolation? isolation = null) : IScopedRuntimeControl
 {
     public async Task<ScopedRuntimeResult> EnsureAsync(ScopedRuntimeRequest request, CancellationToken ct)
     {
@@ -29,14 +31,18 @@ public sealed class ScopedRuntimeControl(NoCtfDbContext db, IChallengeRuntimeTem
                     return new(null, null, false, RuntimeMutationFailure.NotFound);
                 var template = templates.Get(scope.Template.Definition);
                 if (template is null) return new(null, null, true);
-                // Only the provider's existing controlled container ingress is currently qualified.
-                // VM definitions remain supported catalog material but formal isolation must be verified before provisioning.
                 if (template.RuntimeKind != RuntimeKind.Container || template.Allocation != RuntimeAllocation.PerTeam)
                     return new(null, null, false, RuntimeMutationFailure.Unsupported);
                 var current = await db.RuntimeInstances.Where(x => x.ExecutionScopeId == request.ExecutionScopeId && x.TeamId == request.TeamId
                         && x.State != RuntimeState.Stopped && x.State != RuntimeState.Failed)
                     .OrderByDescending(x => x.CreatedAt).ThenByDescending(x => x.Id).FirstOrDefaultAsync(ct);
-                if (current is not null && !request.Reset) return new(current.Id, current.State, current.AccessMode == RuntimeAccessMode.WsrxOnly);
+                if (isolation is null) return new(current?.Id, current?.State, false, RuntimeMutationFailure.Unsupported);
+                var provider = current?.RuntimeProvider ?? placement.Resolve(template.RuntimeKind).Provider;
+                var qualification = (await isolation.AssessAsync(
+                    new(template.RuntimeKind, provider, request.ExecutionScopeId, request.TeamId, current?.Id), ct)).Status;
+                if (qualification != ExecutionIsolationStatus.Verified || current is not null && current.AccessMode != RuntimeAccessMode.WsrxOnly)
+                    return new(current?.Id, current?.State, false, RuntimeMutationFailure.Unsupported);
+                if (current is not null && !request.Reset) return new(current.Id, current.State, true);
                 var activeCount = await db.RuntimeInstances.CountAsync(x => x.CompetitionId == request.CompetitionId && x.TeamId == request.TeamId
                     && x.ActiveSlot != null && (x.State == RuntimeState.Queued || x.State == RuntimeState.Provisioning || x.State == RuntimeState.Running || x.State == RuntimeState.Stopping), ct);
                 if (scope.Competition.MaxConcurrentRuntimeInstancesPerTeam > 0 && activeCount - (current is not null && request.Reset ? 1 : 0) >= scope.Competition.MaxConcurrentRuntimeInstancesPerTeam)
@@ -49,7 +55,7 @@ public sealed class ScopedRuntimeControl(NoCtfDbContext db, IChallengeRuntimeTem
                 }
                 var runtime = new PlayerRuntimeInstance { Id = Guid.CreateVersion7(request.Now), CompetitionId = request.CompetitionId,
                     CompetitionChallengeId = request.CompetitionChallengeId, TeamId = request.TeamId, ExecutionScopeId = request.ExecutionScopeId,
-                    RuntimeKind = template.RuntimeKind, RuntimeProvider = placement.Resolve(template.RuntimeKind).Provider,
+                    RuntimeKind = template.RuntimeKind, RuntimeProvider = provider,
                     AccessMode = RuntimeAccessMode.WsrxOnly, State = RuntimeState.Queued, CreatedAt = request.Now,
                     TrafficCaptureEnabled = scope.Competition.TrafficCaptureEnabled, TrafficCaptureLimitBytes = scope.Competition.TrafficCaptureLimitBytes };
                 if (template.FlagSource == RuntimeFlagSource.PerTeam)
