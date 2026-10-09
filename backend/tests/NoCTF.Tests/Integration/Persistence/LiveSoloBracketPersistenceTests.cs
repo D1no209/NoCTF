@@ -9,6 +9,24 @@ namespace NoCTF.Tests.Integration.Persistence;
 public sealed class LiveSoloBracketPersistenceTests
 {
     [Test, Timeout(300_000)]
+    public async Task A_two_team_seeded_bracket_rejects_direct_matches_and_a_manual_win_is_not_a_tournament_champion(CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var fixture = await LiveSoloMatchPersistenceTests.Fixture.CreateAsync(ct);
+            var store = fixture.Store(fixture.Db);
+            var seeded = await store.GenerateAsync(new(fixture.Competition.Id, fixture.Owner.Id, fixture.Competition.ConcurrencyStamp,
+                [fixture.LeftTeam.Id, fixture.RightTeam.Id], fixture.Now), ct);
+            await Assert.That(seeded.Failure).IsNull();
+            await Assert.That((await store.CreateAsync(new(fixture.Competition.Id, fixture.Owner.Id, fixture.LeftTeam.Id, fixture.RightTeam.Id, 1, fixture.Now), ct)).Failure)
+                .IsEqualTo(LiveSoloFailure.Conflict);
+            await using var manual = await LiveSoloMatchPersistenceTests.Fixture.CreateAsync(ct);
+            await manual.PrepareAsync(ct); var match = await manual.Db.LiveSoloMatches.SingleAsync(ct);
+            match.State = LiveSoloMatchState.Completed; match.WinnerTeamId = manual.LeftTeam.Id; await manual.Db.SaveChangesAsync(ct);
+            await Assert.That((await manual.Store(manual.Db).ReadAsync(manual.Competition.Id, manual.Owner.Id, ct))!.ChampionTeamId).IsNull();
+        });
+    }
+    [Test, Timeout(300_000)]
     public async Task A_durable_match_win_advances_opponents_and_moves_exclusive_team_slots_in_the_same_transaction(CancellationToken ct)
     {
         await DockerIntegrationTest.RunAsync(async () =>

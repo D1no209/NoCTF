@@ -55,13 +55,14 @@ export function useLiveSoloHall() {
       query: { ...route.query, staff: ctx?.competition.value?.administrationRole != null ? '1' : undefined } })
   }
   async function settings() { await router.push(`/competitions/${competitionId.value}/live-solo/settings`) }
+  async function bracket() { await router.push(`/competitions/${competitionId.value}/live-solo/bracket`) }
   async function tick() {
     await load()
     if (!disposed) timer = setTimeout(tick, 5000)
   }
   onMounted(() => { void tick() })
   onScopeDispose(() => { disposed = true; request++; if (timer) clearTimeout(timer) })
-  return { competitionId, options, selected, current, configuration, loading, error, select, enter, recordings, settings, load,
+  return { competitionId, options, selected, current, configuration, loading, error, select, enter, recordings, settings, bracket, load,
     staff: computed(() => ctx?.competition.value?.administrationRole != null),
     stateKey: computed(() => matchStateKey(current.value?.state)), Workspace: markRaw(CompetitionParticipantWorkspace) }
 }

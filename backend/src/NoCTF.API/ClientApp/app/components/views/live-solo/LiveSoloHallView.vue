@@ -2,12 +2,12 @@
 import { toRefs } from 'vue'
 import type { LiveSoloHallState } from '~/features/live-solo/useLiveSoloHall'
 const props = defineProps<{ state: LiveSoloHallState }>()
-const { competitionId, options, selected, current, configuration, loading, error, select, enter, recordings, settings, staff, load, stateKey, Workspace } = toRefs(props.state)
+const { competitionId, options, selected, current, configuration, loading, error, select, enter, recordings, settings, bracket, staff, load, stateKey, Workspace } = toRefs(props.state)
 </script>
 <template>
   <component :is="Workspace" :competition-id="competitionId" :show-challenge-navigator="false" :content-scroll="false">
     <div class="flex h-full min-h-0 flex-col gap-4">
-      <header class="flex flex-wrap items-center justify-between gap-3"><h1 class="text-display text-2xl">{{ $t('liveSolo.hall') }}</h1><div class="flex gap-3"><Button v-if="staff" variant="outline" @click="settings">{{ $t('liveSolo.settings.title') }}</Button><Button variant="ghost" :disabled="loading" @click="load">{{ $t('common.label.refresh') }}</Button></div></header>
+      <header class="flex flex-wrap items-center justify-between gap-3"><h1 class="text-display text-2xl">{{ $t('liveSolo.hall') }}</h1><div class="flex flex-wrap gap-3"><Button v-if="staff" variant="outline" @click="bracket">{{ $t('liveSolo.bracket.title') }}</Button><Button v-if="staff" variant="outline" @click="settings">{{ $t('liveSolo.settings.title') }}</Button><Button variant="ghost" :disabled="loading" @click="load">{{ $t('common.label.refresh') }}</Button></div></header>
       <Alert v-if="error" variant="destructive"><AlertDescription>{{ $message(error) }}</AlertDescription></Alert>
       <Card v-if="configuration?.enabled === false"><CardContent><Empty><EmptyHeader><EmptyTitle>{{ $t('liveSolo.disabled') }}</EmptyTitle></EmptyHeader></Empty></CardContent></Card>
       <div v-else class="grid min-h-0 flex-1 gap-6 lg:grid-cols-[14rem_minmax(0,1fr)]">

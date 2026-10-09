@@ -50,7 +50,7 @@ public sealed partial class LiveSoloMatchStore
         }
         return new(competitionId, stamp, format, matches.Select(x => new LiveSoloBracketMatchView(Map(x, names), x.Lane, x.Stage, x.Position, x.Conditional,
             x.Slots.Select(s => new LiveSoloBracketSourceView(s.Side, s.Source, s.Seed, s.SourceMatchId, s.Resolved, s.TeamId)).ToArray())).ToArray(),
-            final?.State == LiveSoloMatchState.Completed ? final.WinnerTeamId : null);
+            matches.Any(x => x.Slots.Any(s => s.Seed != null)) && final?.State == LiveSoloMatchState.Completed ? final.WinnerTeamId : null);
     }
     private async Task AdvanceBracketAsync(LiveSoloMatch completed, DateTimeOffset now, CancellationToken ct)
     {

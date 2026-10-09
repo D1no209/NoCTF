@@ -1,10 +1,17 @@
 import { describe, expect, test } from 'bun:test'
 import { sourceFile } from './support/feature-source'
-import { canPlayLiveSolo, canJudgeLiveSolo, retainQuestionSelection, questionFromWorkspaceRoute,
+import { canPlayLiveSolo, canJudgeLiveSolo, canLockLiveSoloRoster, retainQuestionSelection, questionFromWorkspaceRoute,
   roundRemainingSeconds, formatRoundClock } from '../app/features/live-solo/live-solo-state'
 import { canEnterCompetition } from '../app/lib/competition-participation'
 
 describe('LiveSolo participant state', () => {
+  test('a staff member who captains another team cannot edit this match roster', () => {
+    const match = { state: 'Preparing' as const, leftTeamId: 'left', rightTeamId: 'right' }
+    expect(canLockLiveSoloRoster(match, 'another-team', true, false)).toBe(false)
+    expect(canLockLiveSoloRoster(match, 'left', true, false)).toBe(true)
+    expect(canLockLiveSoloRoster(match, 'left', false, false)).toBe(false)
+    expect(canLockLiveSoloRoster(match, 'left', true, true)).toBe(false)
+  })
   test('new releases preserve the member selection, including an earlier opened question', () => {
     expect(retainQuestionSelection('first', [{ id: 'first' }, { id: 'second' }])).toBe('first')
     expect(retainQuestionSelection(null, [])).toBeNull()

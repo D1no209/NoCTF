@@ -10,7 +10,7 @@ import type { NoCtfapiEndpointsLiveSoloLiveSoloMatchResponse as Match, NoCtfapiE
 import { competitionContextKey } from '~/utils/labels'
 import { message, type UiMessage } from '~/utils/i18n'
 import { parseLiveSoloError } from './live-solo-errors'
-import { matchStateKey, canJudgeLiveSolo, roundRemainingSeconds, formatRoundClock, canPlayLiveSolo } from './live-solo-state'
+import { matchStateKey, canJudgeLiveSolo, canLockLiveSoloRoster, roundRemainingSeconds, formatRoundClock, canPlayLiveSolo } from './live-solo-state'
 import LiveSoloQuestions from './LiveSoloQuestions.vue'
 import { useLiveSoloScreen } from './media/useLiveSoloScreen'
 import { useLiveSoloHub } from './useLiveSoloHub'
@@ -30,7 +30,7 @@ export function useLiveSoloMatch() {
   const myRoster = computed(() => match.value?.rosters?.find(x => x.teamId === team.value?.id) ?? null)
   const captain = computed(() => user.value?.userId != null && team.value?.captainId === user.value.userId)
   const onRoster = computed(() => !!user.value?.userId && myRoster.value?.userIds?.includes(user.value.userId) === true)
-  const canLock = computed(() => captain.value && match.value?.state === 'Preparing' && !myRoster.value?.locked)
+  const canLock = computed(() => canLockLiveSoloRoster(match.value, team.value?.id, captain.value, myRoster.value?.locked))
   const allLocked = computed(() => match.value?.rosters?.length === 2 && match.value.rosters.every(x => x.locked))
   const readOnlyMedia = computed(() => staff.value && !onRoster.value)
   const screen = useLiveSoloScreen(competitionId, matchId, media, readOnlyMedia)

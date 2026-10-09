@@ -19,6 +19,9 @@ export function matchStateKey(state: Match['state']): MessageKey {
 export function canJudgeLiveSolo(role: string | null | undefined): boolean {
   return ['Administrator', 'Owner', 'Manager', 'Judge'].includes(role ?? '')
 }
+export function canLockLiveSoloRoster(match: Match | null, teamId: string | null | undefined, captain: boolean, locked: boolean | null | undefined): boolean {
+  return captain && !!teamId && [match?.leftTeamId, match?.rightTeamId].includes(teamId) && match?.state === 'Preparing' && !locked
+}
 
 export function canPlayLiveSolo(match: Match | null, round: Round | null): boolean {
   return match?.state === 'Running' && round?.state === 'Running' && !round.paused
