@@ -3175,6 +3175,130 @@
         ]
       }
     },
+    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/program": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Reads only published delayed video segments and their immutable matching state frames.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/program.",
+        "operationId": "GetLiveSoloProgram",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloProgramResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/program/playlist": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Builds HLS exclusively from server-published segments without exposing the capture spool or raw SFU.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/program/playlist.",
+        "operationId": "GetLiveSoloProgramPlaylist",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/program/segments/{segmentId}": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Streams a delayed video segment after rechecking publication time and competition access.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/program/segments/{segmentId}.",
+        "operationId": "GetLiveSoloProgramSegment",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "segmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
     "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}": {
       "get": {
         "tags": [
@@ -25354,6 +25478,174 @@
         ]
       },
       "NoCTFAPIEndpointsLiveSoloGetLiveSoloMediaRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloProgramResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "programCaptureId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "delaySeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "segments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloProgramSegmentResponse"
+            }
+          },
+          "ended": {
+            "type": "boolean"
+          },
+          "playlistUrl": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloProgramSegmentResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "sequence": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "durationSeconds": {
+            "type": "number",
+            "format": "double"
+          },
+          "state": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloProgramStateResponse"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloProgramStateResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "asOf": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "matchState": {
+            "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloMatchState"
+          },
+          "requiredWins": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "leftWins": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rightWins": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "leftTeamId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "rightTeamId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "leftTeamName": {
+            "type": "string",
+            "nullable": true
+          },
+          "rightTeamName": {
+            "type": "string",
+            "nullable": true
+          },
+          "roundId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "roundNumber": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "roundState": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloRoundState"
+              }
+            ]
+          },
+          "timelineRevision": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "activeElapsedMilliseconds": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "limitSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "paused": {
+            "type": "boolean"
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloProgramQuestionResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloProgramQuestionResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "competitionChallengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "position": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "title": {
+            "type": "string"
+          },
+          "openedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloGetLiveSoloProgramRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsLiveSoloGetLiveSoloProgramPlaylistRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsLiveSoloGetLiveSoloProgramSegmentRequest": {
         "type": "object",
         "additionalProperties": false
       },

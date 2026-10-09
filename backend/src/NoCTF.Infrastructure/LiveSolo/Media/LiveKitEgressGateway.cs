@@ -74,6 +74,12 @@ public sealed partial class LiveKitMediaGateway : ILiveSoloEgressGateway
         _ => LiveSoloExportState.Failed,
     }, NanoTime(info.StartedAt), NanoTime(info.EndedAt),
         info.Egress?.Outputs.Select(x => x.File?.Filepath ?? x.Segments?.FilenamePrefix).FirstOrDefault(x => x is not null),
-        (info.FileResults ?? []).Select(x => new LiveSoloExportFile(x.Filename, x.Size)).ToArray());
+        (info.FileResults ?? []).Select(x => new LiveSoloExportFile(x.Filename, x.Size)).ToArray(), RequestId(info));
+    private static Guid? RequestId(LiveKitEgressInfo info)
+    {
+        var path = info.Egress?.Outputs.Select(x => x.File?.Filepath ?? x.Segments?.FilenamePrefix).FirstOrDefault(x => x is not null);
+        var parts = path?.Split('/');
+        return parts is { Length: >= 3 } && parts[^3] == "live-solo" && Guid.TryParseExact(parts[^2], "N", out var id) ? id : null;
+    }
     private static DateTimeOffset? NanoTime(long value) => value <= 0 ? null : DateTimeOffset.FromUnixTimeMilliseconds(value / 1_000_000);
 }

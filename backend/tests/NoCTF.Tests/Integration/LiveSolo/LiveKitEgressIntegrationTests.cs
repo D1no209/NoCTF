@@ -77,6 +77,39 @@ public sealed class LiveKitEgressIntegrationTests
             var segments = await egress.ExecAsync(["find", "live-solo/" + capture.Id.ToString("N"), "-type", "f", "-name", "*.ts"], ct);
             await Assert.That(segments.ExitCode).IsEqualTo(0);
             await Assert.That(segments.Stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries).Length).IsGreaterThanOrEqualTo(2);
+            var playlist = await egress.ExecAsync(["cat", "live-solo/" + capture.Id.ToString("N") + "/program.m3u8"], ct);
+            var evidence = Environment.GetEnvironmentVariable("NOCTF_MEDIA_EVIDENCE_DIRECTORY");
+            if (!string.IsNullOrWhiteSpace(evidence))
+            {
+                var resolved = Path.GetFullPath(evidence);
+                var allowed = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../artifacts"));
+                if (!resolved.StartsWith(allowed.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException("Media evidence must remain inside backend artifacts.");
+                Directory.CreateDirectory(resolved);
+                foreach (var path in segments.Stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var encoded = await egress.ExecAsync(["base64", "-w", "0", path.Trim()], ct);
+                    await File.WriteAllBytesAsync(Path.Combine(resolved, Path.GetFileName(path.Trim())), Convert.FromBase64String(encoded.Stdout.Trim()), ct);
+                }
+                await File.WriteAllTextAsync(Path.Combine(resolved, "program.m3u8"), playlist.Stdout, ct);
+            }
+            var tempRoot = Path.Combine(Path.GetTempPath(), "noctf-egress-playlist-" + Guid.NewGuid().ToString("N"));
+            var tempFolder = Path.Combine(tempRoot, "live-solo", capture.Id.ToString("N")); Directory.CreateDirectory(tempFolder);
+            try
+            {
+                await File.WriteAllTextAsync(Path.Combine(tempFolder, "program.m3u8"), playlist.Stdout, ct);
+                foreach (var path in segments.Stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+                    await File.WriteAllBytesAsync(Path.Combine(tempFolder, Path.GetFileName(path.Trim())), [0x47], ct);
+                var parser = new LiveSoloCaptureFiles(new() { CaptureSpoolPath = tempRoot });
+                var parsed = await parser.SegmentsAsync(capture.Id, ct);
+                await Assert.That(parsed.Count).IsGreaterThanOrEqualTo(2);
+                await Assert.That(parsed.All(x => x.Duration > TimeSpan.Zero)).IsTrue();
+            }
+            finally
+            {
+                foreach (var file in Directory.EnumerateFiles(tempFolder)) File.Delete(file);
+                Directory.Delete(tempFolder); Directory.Delete(Path.Combine(tempRoot, "live-solo")); Directory.Delete(tempRoot);
+            }
             await gateway.StopRoomAsync(room, ct);
             await Assert.That(await gateway.ListAsync(Guid.NewGuid().ToString("N"), ct)).IsEmpty();
         });

@@ -974,6 +974,61 @@ export type NoCtfapiEndpointsLiveSoloGetLiveSoloMediaRequest = {
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsLiveSoloLiveSoloProgramResponse = {
+    programCaptureId?: string;
+    delaySeconds?: number;
+    segments?: Array<NoCtfapiEndpointsLiveSoloLiveSoloProgramSegmentResponse>;
+    ended?: boolean;
+    playlistUrl?: string;
+};
+
+export type NoCtfapiEndpointsLiveSoloLiveSoloProgramSegmentResponse = {
+    id?: string;
+    sequence?: number;
+    durationSeconds?: number;
+    state?: NoCtfapiEndpointsLiveSoloLiveSoloProgramStateResponse;
+};
+
+export type NoCtfapiEndpointsLiveSoloLiveSoloProgramStateResponse = {
+    asOf?: string;
+    matchState?: NoCtfDomainLiveSoloLiveSoloMatchState;
+    requiredWins?: number;
+    leftWins?: number;
+    rightWins?: number;
+    leftTeamId?: string | null;
+    rightTeamId?: string | null;
+    leftTeamName?: string | null;
+    rightTeamName?: string | null;
+    roundId?: string | null;
+    roundNumber?: number | null;
+    roundState?: NoCtfDomainLiveSoloLiveSoloRoundState | null;
+    timelineRevision?: number | null;
+    activeElapsedMilliseconds?: number;
+    limitSeconds?: number | null;
+    paused?: boolean;
+    questions?: Array<NoCtfapiEndpointsLiveSoloLiveSoloProgramQuestionResponse>;
+};
+
+export type NoCtfapiEndpointsLiveSoloLiveSoloProgramQuestionResponse = {
+    id?: string;
+    competitionChallengeId?: string;
+    position?: number;
+    title?: string;
+    openedAt?: string;
+};
+
+export type NoCtfapiEndpointsLiveSoloGetLiveSoloProgramRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsLiveSoloGetLiveSoloProgramPlaylistRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsLiveSoloGetLiveSoloProgramSegmentRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsLiveSoloGetLiveSoloRoundRequest = {
     [key: string]: never;
 };
@@ -6568,6 +6623,67 @@ export type PrepareLiveSoloMediaResponses = {
 };
 
 export type PrepareLiveSoloMediaResponse = PrepareLiveSoloMediaResponses[keyof PrepareLiveSoloMediaResponses];
+
+export type GetLiveSoloProgramData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        matchId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/program';
+};
+
+export type GetLiveSoloProgramErrors = {
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetLiveSoloProgramResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsLiveSoloLiveSoloProgramResponse;
+};
+
+export type GetLiveSoloProgramResponse = GetLiveSoloProgramResponses[keyof GetLiveSoloProgramResponses];
+
+export type GetLiveSoloProgramPlaylistData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        matchId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/program/playlist';
+};
+
+export type GetLiveSoloProgramPlaylistErrors = {
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetLiveSoloProgramSegmentData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        matchId: string;
+        segmentId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/program/segments/{segmentId}';
+};
+
+export type GetLiveSoloProgramSegmentErrors = {
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
 
 export type GetLiveSoloRoundData = {
     body?: never;

@@ -93,6 +93,7 @@ public sealed partial class LiveSoloMatchStore
                 && db.LiveSoloMatches.Any(match => match.Id == command.MatchId && match.CurrentMediaSessionId == x.Id))
             .OrderByDescending(x => x.CreatedAt).FirstOrDefaultAsync(ct);
         if (session is null) return new(null, LiveSoloFailure.MediaUnavailable);
+        if (!await ProgramReadyAsync(session.Id, ct)) return new(null, LiveSoloFailure.MediaUnavailable);
         var observed = await media.ObserveAsync(session.RoomIdentity, ct);
         return await TransactionAsync(async () =>
         {
@@ -108,6 +109,7 @@ public sealed partial class LiveSoloMatchStore
             if (!config.Enabled) return new(null, LiveSoloFailure.Disabled);
             if (match.CurrentMediaSessionId != session.Id || !await db.LiveSoloMediaSessions.AnyAsync(x => x.Id == session.Id
                 && x.State == LiveSoloMediaState.Ready, ct)) return new(null, LiveSoloFailure.MediaUnavailable);
+            if (!await ProgramReadyAsync(session.Id, ct)) return new(null, LiveSoloFailure.MediaUnavailable);
             if (!await RosterEligibleAsync(match, ct)) return new(null, LiveSoloFailure.NotReady);
             if (!await HasMatchCapacityAsync(match, config.MaximumConcurrentMatches, ct))
                 return new(null, LiveSoloFailure.NotReady);
@@ -133,6 +135,11 @@ public sealed partial class LiveSoloMatchStore
         var actualNow = (clock ?? TimeProvider.System).GetUtcNow();
         return !publicTimes.Any(x => x <= actualNow);
     }
+    private Task<bool> ProgramReadyAsync(Guid sessionId, CancellationToken ct) => db.LiveSoloProgramCaptures.AnyAsync(x => x.MediaSessionId == sessionId
+        && x.State == LiveSoloCaptureState.Active && db.LiveSoloMediaSessions.Any(s => s.Id == sessionId && s.CurrentProgramCaptureId == x.Id)
+        && db.LiveSoloProgramSegments.Any(segment => segment.ProgramCaptureId == x.Id
+            && db.Files.Any(file => file.Id == segment.FileId && file.ByteLength > 0)), ct);
+
     private async Task<bool> RosterEligibleAsync(LiveSoloMatch match, CancellationToken ct)
     {
         var teamIds = match.Slots.Where(x => x.TeamId != null).Select(x => x.TeamId!.Value).ToArray();

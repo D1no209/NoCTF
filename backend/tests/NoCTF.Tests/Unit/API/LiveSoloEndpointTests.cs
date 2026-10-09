@@ -245,8 +245,31 @@ public sealed class LiveSoloEndpointTests
             && x.MatchId == match && x.TokenVersion == 3 && x.Authentication!.Method == AuthenticationMethod.Password), Arg.Any<CancellationToken>());
     }
 
+    [Test]
+    public async Task Public_program_contract_uses_only_delayed_fragment_frames_and_never_returns_raw_room_credentials()
+    {
+        var reader = Substitute.For<ILiveSoloProgramReader>(); var competition = Guid.NewGuid(); var match = Guid.NewGuid(); var segment = Guid.NewGuid();
+        var state = new LiveSoloProgramStateView(DateTimeOffset.UtcNow.AddMinutes(-1), LiveSoloMatchState.Running, 2, 0, 1,
+            Guid.NewGuid(), Guid.NewGuid(), "left", "right", Guid.NewGuid(), 1, LiveSoloRoundState.Running, 2, 10000, 900, false, []);
+        reader.ReadAsync(competition, match, Actor, Arg.Any<CancellationToken>()).Returns(new LiveSoloProgramView(Guid.NewGuid(), 60, state,
+            [new(segment, 8, TimeSpan.FromSeconds(2), state)], false));
+        await using var app = await HostAsync(Substitute.For<ILiveSoloMatchStore>(), Substitute.For<ILiveSoloAttachmentStore>(), Substitute.For<IStore>(), programs: reader);
+        using var client = app.GetTestClient();
+        var path = $"/api/v1/competitions/{competition}/live-solo/matches/{match}/program";
+        using var metadata = await client.GetAsync(path);
+        await Assert.That(metadata.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        var json = await metadata.Content.ReadAsStringAsync();
+        await Assert.That(json).DoesNotContain("token"); await Assert.That(json).DoesNotContain("roomIdentity");
+        using var body = JsonDocument.Parse(json);
+        await Assert.That(body.RootElement.GetProperty("segments")[0].GetProperty("state").GetProperty("rightWins").GetInt32()).IsEqualTo(1);
+        using var playlist = await client.GetAsync(path + "/playlist");
+        await Assert.That(await playlist.Content.ReadAsStringAsync()).Contains("#EXT-X-MEDIA-SEQUENCE:8");
+        await Assert.That(await playlist.Content.ReadAsStringAsync()).Contains("segments/" + segment);
+        using var hidden = await client.GetAsync(path + "/segments/" + segment);
+        await Assert.That(hidden.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+    }
     private static async Task<WebApplication> HostAsync(ILiveSoloMatchStore store, ILiveSoloAttachmentStore attachmentStore, IStore objects,
-        ILiveSoloAdjudicationStore? decisions = null, ILiveSoloRuntimeStore? runtimes = null, ILiveSoloMediaStore? media = null)
+        ILiveSoloAdjudicationStore? decisions = null, ILiveSoloRuntimeStore? runtimes = null, ILiveSoloMediaStore? media = null, ILiveSoloProgramReader? programs = null)
     {
         var builder = WebApplication.CreateBuilder(); builder.WebHost.UseTestServer();
         builder.Services.AddFastEndpoints(options => { options.DisableAutoDiscovery = true; options.Assemblies = [typeof(GetLiveSoloMatchEndpoint).Assembly];
@@ -254,13 +277,15 @@ public sealed class LiveSoloEndpointTests
                 || x == typeof(StartLiveSoloCountdownEndpoint) || x == typeof(DownloadLiveSoloAttachmentEndpoint)
                 || x == typeof(AdjudicateLiveSoloMatchEndpoint) || x == typeof(ListLiveSoloAdjudicationsEndpoint)
                 || x == typeof(GetLiveSoloRuntimeEndpoint) || x == typeof(MutateLiveSoloRuntimeEndpoint)
-                || x == typeof(GetLiveSoloMediaEndpoint) || x == typeof(PrepareLiveSoloMediaEndpoint) || x == typeof(JoinLiveSoloMediaEndpoint); });
+                || x == typeof(GetLiveSoloMediaEndpoint) || x == typeof(PrepareLiveSoloMediaEndpoint) || x == typeof(JoinLiveSoloMediaEndpoint)
+                || x == typeof(GetLiveSoloProgramEndpoint) || x == typeof(GetLiveSoloProgramPlaylistEndpoint) || x == typeof(GetLiveSoloProgramSegmentEndpoint); });
         builder.Services.AddAuthentication("Bearer").AddScheme<AuthenticationSchemeOptions, TestAuthentication>("Bearer", _ => { });
         builder.Services.AddAuthorization(); builder.Services.AddSingleton(store); builder.Services.AddSingleton<ManageLiveSoloMatches>();
         builder.Services.AddSingleton(attachmentStore); builder.Services.AddSingleton(objects); builder.Services.AddSingleton<AccessLiveSoloAttachments>();
         builder.Services.AddSingleton(decisions ?? Substitute.For<ILiveSoloAdjudicationStore>()); builder.Services.AddSingleton<ManageLiveSoloAdjudication>();
         builder.Services.AddSingleton(runtimes ?? Substitute.For<ILiveSoloRuntimeStore>()); builder.Services.AddSingleton<ManageLiveSoloRuntimes>();
         builder.Services.AddSingleton(media ?? Substitute.For<ILiveSoloMediaStore>()); builder.Services.AddSingleton<ManageLiveSoloMedia>();
+        builder.Services.AddSingleton(programs ?? Substitute.For<ILiveSoloProgramReader>());
         builder.Services.AddSingleton<IUserContext>(new TestUser()); builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton<IRequestAdmission>(new Admission());
         var source = Substitute.For<IRequestSourceAddress>(); source.Address.Returns("192.0.2.10");

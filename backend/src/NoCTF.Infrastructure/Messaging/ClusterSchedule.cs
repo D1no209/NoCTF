@@ -12,7 +12,8 @@ public enum ClusterScheduleKind
     RuntimeDispatch,
     GameplayFactRecovery,
     LiveSoloRound,
-    LiveSoloMedia
+    LiveSoloMedia,
+    LiveSoloCapture
 }
 
 public sealed record ClusterScheduleEntry(

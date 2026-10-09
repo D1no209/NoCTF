@@ -5,7 +5,7 @@ public enum LiveSoloExportState : short { Starting, Active, Ending, Complete, Fa
 public sealed record LiveSoloExportRequest(Guid Id, string RoomIdentity, LiveSoloExportKind Kind, string? VideoTrackId = null);
 public sealed record LiveSoloExportFile(string ObjectKey, long ByteLength);
 public sealed record LiveSoloExportObservation(string Id, string RoomIdentity, LiveSoloExportState State,
-    DateTimeOffset? StartedAt, DateTimeOffset? EndedAt, string? OutputPrefix, IReadOnlyList<LiveSoloExportFile> Files);
+    DateTimeOffset? StartedAt, DateTimeOffset? EndedAt, string? OutputPrefix, IReadOnlyList<LiveSoloExportFile> Files, Guid? RequestId);
 
 public interface ILiveSoloEgressGateway
 {

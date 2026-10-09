@@ -472,7 +472,22 @@ public sealed class LiveSoloMatchPersistenceTests
             media.ObserveAsync(Arg.Any<string>(), ct).Returns(new LiveSoloRoomObservation(participants.Select(x =>
                 new LiveSoloObservedScreen(x.Identity, LiveSoloScreenState.Sharing, "track-" + x.Identity, Now)).ToArray()));
             await Db.SaveChangesAsync(ct);
+            await PrepareProgramAsync(mediaSession, ct);
             Match = (await store.FindAsync(Competition.Id, Match.Id, Owner.Id, true, Now, ct))!;
+        }
+
+        // Kernel tests use an explicit simulated media qualification, not a claim of real video acceptance.
+        public async Task PrepareProgramAsync(LiveSoloMediaSession session, CancellationToken ct)
+        {
+            var capture = new LiveSoloProgramCapture { Id = Guid.NewGuid(), MediaSessionId = session.Id, State = LiveSoloCaptureState.Active, CreatedAt = Now, StartedAt = Now };
+            var frame = new LiveSoloProgramFrame { Id = Guid.NewGuid(), MediaSessionId = session.Id, OccurredAt = Now, RequiredWins = 2 };
+            var file = new NoCTF.Domain.Storage.StoredFile { Id = Guid.NewGuid(), ObjectKey = Guid.NewGuid().ToString("N"), FileName = "fixture.ts", ContentType = "video/mp2t",
+                ByteLength = 4, Sha256 = new byte[32], CreatedAt = Now };
+            Db.LiveSoloProgramCaptures.Add(capture); Db.LiveSoloProgramFrames.Add(frame); Db.Files.Add(file); await Db.SaveChangesAsync(ct);
+            session.CurrentProgramCaptureId = capture.Id;
+            Db.LiveSoloProgramSegments.Add(new() { Id = Guid.NewGuid(), MediaSessionId = session.Id, ProgramCaptureId = capture.Id, FrameId = frame.Id, FileId = file.Id,
+                Sequence = 0, StartedAt = Now, EndedAt = Now, PublicAt = Now.AddSeconds(60), RemoveAfter = Now.AddMinutes(10) });
+            await Db.SaveChangesAsync(ct);
         }
 
         public async Task StartAsync(CancellationToken ct)

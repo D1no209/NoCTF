@@ -59,6 +59,8 @@ internal static partial class BackendMessageOperations
             || await db.Set<ChallengeAttachment>().AnyAsync(item => item.FileId == file.Id, cancellationToken)
             || await db.PatchUploads.AnyAsync(item => item.FileId == file.Id, cancellationToken)
             || await db.ChallengeWriteUpVersions.AnyAsync(item => item.FileId == file.Id, cancellationToken)
+            || await db.LiveSoloProgramSegments.AnyAsync(item => item.FileId == file.Id, cancellationToken)
+            || await db.LiveSoloRecordings.AnyAsync(item => item.FileId == file.Id, cancellationToken)
             || await db.CompetitionEvents.AnyAsync(capture =>
                 capture.Kind == CompetitionEventKind.RuntimeTrafficCaptureStored
                 && capture.RelatedType == EntityReferenceKind.File

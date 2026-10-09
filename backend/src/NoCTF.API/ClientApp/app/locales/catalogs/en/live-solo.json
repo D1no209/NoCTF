@@ -1,4 +1,11 @@
 {
+  "liveSolo.program.title": "LiveSolo program",
+  "liveSolo.program.play": "Play program",
+  "liveSolo.program.delay": "{seconds}-second delay",
+  "liveSolo.program.waiting": "Waiting for a published video segment",
+  "liveSolo.program.failed": "Program playback failed. Retry to recheck access.",
+  "liveSolo.program.stateWaiting": "Scores and round state appear when the matching video segment starts playing",
+  "liveSolo.program.asOf": "Video state at {time}",
   "liveSolo.hall": "LiveSolo lobby",
   "liveSolo.matches": "Matches",
   "liveSolo.disabled": "LiveSolo is disabled for this competition",

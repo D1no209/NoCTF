@@ -61,6 +61,8 @@ public sealed class NoCtfDbContext(
     public DbSet<LiveSoloMediaGrant> LiveSoloMediaGrants => Set<LiveSoloMediaGrant>();
     public DbSet<LiveSoloMediaParticipant> LiveSoloMediaParticipants => Set<LiveSoloMediaParticipant>();
     public DbSet<LiveSoloProgramSegment> LiveSoloProgramSegments => Set<LiveSoloProgramSegment>();
+    public DbSet<LiveSoloProgramCapture> LiveSoloProgramCaptures => Set<LiveSoloProgramCapture>();
+    public DbSet<LiveSoloProgramFrame> LiveSoloProgramFrames => Set<LiveSoloProgramFrame>();
     public DbSet<LiveSoloRecording> LiveSoloRecordings => Set<LiveSoloRecording>();
     public DbSet<User> Users => Set<User>();
     public DbSet<Competition> Competitions => Set<Competition>();
@@ -224,6 +226,11 @@ public sealed class NoCtfDbContext(
             throw new InvalidOperationException("Execution-scoped gameplay associations are immutable.");
         if (ChangeTracker.Entries<LiveSoloAdjudication>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
             throw new InvalidOperationException("LiveSolo staff decisions are immutable.");
+        if (ChangeTracker.Entries<LiveSoloProgramFrame>().Any(entry => entry.State == EntityState.Modified)
+            || ChangeTracker.Entries<LiveSoloProgramFrameQuestion>().Any(entry => entry.State == EntityState.Modified
+                || entry.State == EntityState.Added && !ChangeTracker.Entries<LiveSoloProgramFrame>().Any(frame => frame.Entity.Id == entry.Entity.FrameId && frame.State == EntityState.Added)
+                || entry.State == EntityState.Deleted && !ChangeTracker.Entries<LiveSoloProgramFrame>().Any(frame => frame.Entity.Id == entry.Entity.FrameId && frame.State == EntityState.Deleted)))
+            throw new InvalidOperationException("LiveSolo program state frames are immutable.");
         if (ChangeTracker.Entries<NoCTF.Domain.Challenges.WriteUps.WriteUpUnlockReceipt>().Any(entry =>
                 entry.State is EntityState.Modified or EntityState.Deleted))
             throw new InvalidOperationException("WriteUp unlock receipts are immutable.");

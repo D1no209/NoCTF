@@ -1,4 +1,11 @@
 {
+  "liveSolo.program.title": "LiveSolo 节目",
+  "liveSolo.program.play": "播放节目",
+  "liveSolo.program.delay": "延迟 {seconds} 秒",
+  "liveSolo.program.waiting": "等待已发布的视频分段",
+  "liveSolo.program.failed": "节目播放失败，请重试以重新检查访问资格。",
+  "liveSolo.program.stateWaiting": "对应视频分段开始播放后显示比分与对局状态",
+  "liveSolo.program.asOf": "视频状态时间：{time}",
   "liveSolo.hall": "LiveSolo 大厅",
   "liveSolo.matches": "对局",
   "liveSolo.disabled": "本场比赛尚未开启 LiveSolo",

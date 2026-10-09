@@ -5,7 +5,7 @@ namespace NoCTF.Domain.LiveSolo;
 
 public enum LiveSoloMediaState : short { Preparing, Ready, Rotating, Stopping, Stopped, Failed }
 public enum LiveSoloScreenState : short { Disconnected, Connected, Sharing }
-public enum LiveSoloRecordingState : short { Pending, Recording, Finalizing, Completed, Failed, Deleting }
+public enum LiveSoloRecordingState : short { Pending, Recording, Finalizing, Completed, Failed, Deleting, Starting, RequiresReview }
 
 public sealed class LiveSoloMediaSession : IConcurrencyTracked
 {
@@ -18,6 +18,8 @@ public sealed class LiveSoloMediaSession : IConcurrencyTracked
     public bool ParticipantsMayViewOpponents { get; set; }
     public bool RecordingEnabled { get; set; }
     public int PublicDelaySeconds { get; set; }
+    public int RecordingRetentionDays { get; set; } = 30;
+    public Guid? CurrentProgramCaptureId { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? StoppedAt { get; set; }
     public List<LiveSoloMediaParticipant> Participants { get; set; } = [];
@@ -40,6 +42,8 @@ public sealed class LiveSoloProgramSegment
     public Guid Id { get; set; }
     public Guid MediaSessionId { get; set; }
     public long Sequence { get; set; }
+    public Guid ProgramCaptureId { get; set; }
+    public Guid FrameId { get; set; }
     public Guid FileId { get; set; }
     public DateTimeOffset StartedAt { get; set; }
     public DateTimeOffset EndedAt { get; set; }
@@ -56,6 +60,8 @@ public sealed class LiveSoloRecording : IConcurrencyTracked
     public Guid ConcurrencyStamp { get; set; } = Guid.NewGuid();
     [MaxLength(256)] public string? EgressId { get; set; }
     public LiveSoloRecordingState State { get; set; }
+    [MaxLength(128)] public string VideoTrackId { get; set; } = string.Empty;
+    public DateTimeOffset? RequestedAt { get; set; }
     public Guid? FileId { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? StartedAt { get; set; }

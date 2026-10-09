@@ -183,6 +183,8 @@ internal sealed class LiveSoloMediaSessionConfiguration : IEntityTypeConfigurati
     {
         builder.ToTable("live_solo_media_sessions"); builder.HasKey(x => x.Id);
         builder.HasIndex(x => new { x.MatchId, x.Generation }).IsUnique(); builder.HasIndex(x => x.RoomIdentity).IsUnique();
+        builder.HasOne<LiveSoloProgramCapture>().WithMany().HasForeignKey(x => new { x.CurrentProgramCaptureId, x.Id })
+            .HasPrincipalKey(x => new { x.Id, x.MediaSessionId }).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<LiveSoloMatch>().WithMany().HasForeignKey(x => x.MatchId).OnDelete(DeleteBehavior.Restrict);
         builder.HasMany(x => x.Participants).WithOne().HasForeignKey(x => x.MediaSessionId).OnDelete(DeleteBehavior.Cascade);
     }
@@ -202,7 +204,11 @@ internal sealed class LiveSoloProgramSegmentConfiguration : IEntityTypeConfigura
     public void Configure(EntityTypeBuilder<LiveSoloProgramSegment> builder)
     {
         builder.ToTable("live_solo_program_segments"); builder.HasKey(x => x.Id);
-        builder.HasIndex(x => new { x.MediaSessionId, x.Sequence }).IsUnique(); builder.HasIndex(x => x.RemoveAfter);
+        builder.HasIndex(x => new { x.ProgramCaptureId, x.Sequence }).IsUnique(); builder.HasIndex(x => x.RemoveAfter);
+        builder.HasOne<LiveSoloProgramCapture>().WithMany().HasForeignKey(x => new { x.ProgramCaptureId, x.MediaSessionId })
+            .HasPrincipalKey(x => new { x.Id, x.MediaSessionId }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<LiveSoloProgramFrame>().WithMany().HasForeignKey(x => new { x.FrameId, x.MediaSessionId })
+            .HasPrincipalKey(x => new { x.Id, x.MediaSessionId }).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<LiveSoloMediaSession>().WithMany().HasForeignKey(x => x.MediaSessionId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<StoredFile>().WithMany().HasForeignKey(x => x.FileId).OnDelete(DeleteBehavior.Restrict);
     }
@@ -213,6 +219,7 @@ internal sealed class LiveSoloRecordingConfiguration : IEntityTypeConfiguration<
     {
         builder.ToTable("live_solo_recordings"); builder.HasKey(x => x.Id);
         builder.HasIndex(x => new { x.State, x.KeepUntil });
+        builder.HasIndex(x => new { x.MediaSessionId, x.UserId, x.VideoTrackId }).IsUnique();
         builder.HasOne<LiveSoloMediaSession>().WithMany().HasForeignKey(x => x.MediaSessionId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<LiveSoloRound>().WithMany().HasForeignKey(x => x.RoundId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<StoredFile>().WithMany().HasForeignKey(x => x.FileId).OnDelete(DeleteBehavior.Restrict);

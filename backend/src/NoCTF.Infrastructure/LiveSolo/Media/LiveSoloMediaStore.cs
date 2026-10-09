@@ -13,7 +13,7 @@ using NoCTF.Infrastructure.Persistence;
 namespace NoCTF.Infrastructure.LiveSolo.Media;
 
 public sealed partial class LiveSoloMediaStore(NoCtfDbContext db, ICompetitionModerationAuthorizer authorizer,
-    IMfaAuthenticationStore authentication, ILiveSoloMediaGateway gateway, TimeProvider clock) : ILiveSoloMediaStore
+    IMfaAuthenticationStore authentication, ILiveSoloMediaGateway gateway, TimeProvider clock, ILiveSoloCaptureStore? captures = null) : ILiveSoloMediaStore
 {
     private async Task<LiveSoloMediaView> ViewAsync(LiveSoloMediaSession session, CancellationToken ct)
     {
@@ -96,6 +96,7 @@ public sealed partial class LiveSoloMediaStore(NoCtfDbContext db, ICompetitionMo
                 session = new() { Id = Guid.CreateVersion7(clock.GetUtcNow()), MatchId = match.Id, Generation = Guid.NewGuid(),
                     RoomIdentity = Guid.NewGuid().ToString("N"), State = LiveSoloMediaState.Preparing, CreatedAt = clock.GetUtcNow(),
                     ParticipantsMayViewOpponents = config.ParticipantsMayViewOpponents, RecordingEnabled = config.RecordingEnabled,
+                    RecordingRetentionDays = config.RecordingRetentionDays,
                     PublicDelaySeconds = config.PublicDelaySeconds, Participants = match.Roster.Select(member => new LiveSoloMediaParticipant
                     { UserId = member.UserId, TeamId = member.TeamId, Side = match.Slots.Single(x => x.TeamId == member.TeamId).Side,
                         Identity = Guid.NewGuid().ToString("N"), ObservedAt = clock.GetUtcNow() }).ToList() };

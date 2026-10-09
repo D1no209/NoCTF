@@ -3536,7 +3536,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
             modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloMediaSession", b =>
                 {
                     b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
@@ -3548,6 +3547,10 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Property<long>("CreatedAt")
                         .HasColumnType("bigint")
                         .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CurrentProgramCaptureId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("current_program_capture_id");
 
                     b.Property<Guid>("Generation")
                         .HasColumnType("uuid")
@@ -3569,6 +3572,10 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("recording_enabled");
 
+                    b.Property<int>("RecordingRetentionDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("recording_retention_days");
+
                     b.Property<string>("RoomIdentity")
                         .IsRequired()
                         .HasMaxLength(128)
@@ -3589,6 +3596,9 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.HasIndex("RoomIdentity")
                         .IsUnique()
                         .HasDatabaseName("ix_live_solo_media_sessions_room_identity");
+
+                    b.HasIndex("CurrentProgramCaptureId", "Id")
+                        .HasDatabaseName("ix_live_solo_media_sessions_current_program_capture_id_id");
 
                     b.HasIndex("MatchId", "Generation")
                         .IsUnique()
@@ -3629,6 +3639,197 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.ToTable("live_solo_pause_intervals", (string)null);
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloProgramCapture", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("EgressId")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("egress_id");
+
+                    b.Property<long?>("EndedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("ended_at");
+
+                    b.Property<long?>("ImportedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("imported_at");
+
+                    b.Property<Guid>("MediaSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("media_session_id");
+
+                    b.Property<long?>("RawRemovedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("raw_removed_at");
+
+                    b.Property<long?>("RequestedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("requested_at");
+
+                    b.Property<long?>("StartedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("started_at");
+
+                    b.Property<short>("State")
+                        .HasColumnType("smallint")
+                        .HasColumnName("state");
+
+                    b.HasKey("Id")
+                        .HasName("pk_live_solo_program_captures");
+
+                    b.HasAlternateKey("Id", "MediaSessionId")
+                        .HasName("ak_live_solo_program_captures_id_media_session_id");
+
+                    b.HasIndex("MediaSessionId")
+                        .HasDatabaseName("ix_live_solo_program_captures_media_session_id");
+
+                    b.HasIndex("State", "RequestedAt")
+                        .HasDatabaseName("ix_live_solo_program_captures_state_requested_at");
+
+                    b.ToTable("live_solo_program_captures", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloProgramFrame", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("ActiveElapsedMilliseconds")
+                        .HasColumnType("bigint")
+                        .HasColumnName("active_elapsed_milliseconds");
+
+                    b.Property<Guid?>("LeftTeamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("left_team_id");
+
+                    b.Property<string>("LeftTeamName")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("left_team_name");
+
+                    b.Property<int>("LeftWins")
+                        .HasColumnType("integer")
+                        .HasColumnName("left_wins");
+
+                    b.Property<int?>("LimitSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("limit_seconds");
+
+                    b.Property<short>("MatchState")
+                        .HasColumnType("smallint")
+                        .HasColumnName("match_state");
+
+                    b.Property<Guid>("MediaSessionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("media_session_id");
+
+                    b.Property<long>("OccurredAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<bool>("Paused")
+                        .HasColumnType("boolean")
+                        .HasColumnName("paused");
+
+                    b.Property<int>("RequiredWins")
+                        .HasColumnType("integer")
+                        .HasColumnName("required_wins");
+
+                    b.Property<Guid?>("RightTeamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("right_team_id");
+
+                    b.Property<string>("RightTeamName")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("right_team_name");
+
+                    b.Property<int>("RightWins")
+                        .HasColumnType("integer")
+                        .HasColumnName("right_wins");
+
+                    b.Property<Guid?>("RoundId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("round_id");
+
+                    b.Property<int?>("RoundNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("round_number");
+
+                    b.Property<short?>("RoundState")
+                        .HasColumnType("smallint")
+                        .HasColumnName("round_state");
+
+                    b.Property<long?>("TimelineRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("timeline_revision");
+
+                    b.HasKey("Id")
+                        .HasName("pk_live_solo_program_frames");
+
+                    b.HasAlternateKey("Id", "MediaSessionId")
+                        .HasName("ak_live_solo_program_frames_id_media_session_id");
+
+                    b.HasIndex("MediaSessionId", "OccurredAt")
+                        .IsUnique()
+                        .HasDatabaseName("ix_live_solo_program_frames_media_session_id_occurred_at");
+
+                    b.ToTable("live_solo_program_frames", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloProgramFrameQuestion", b =>
+                {
+                    b.Property<Guid>("FrameId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("frame_id");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<Guid>("CompetitionChallengeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_challenge_id");
+
+                    b.Property<long>("OpenedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("opened_at");
+
+                    b.Property<Guid>("RoundQuestionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("round_question_id");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("title");
+
+                    b.HasKey("FrameId", "Position")
+                        .HasName("pk_live_solo_program_frame_questions");
+
+                    b.HasIndex("RoundQuestionId")
+                        .HasDatabaseName("ix_live_solo_program_frame_questions_round_question_id");
+
+                    b.ToTable("live_solo_program_frame_questions", (string)null);
+                });
+
             modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloProgramSegment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3644,9 +3845,17 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("file_id");
 
+                    b.Property<Guid>("FrameId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("frame_id");
+
                     b.Property<Guid>("MediaSessionId")
                         .HasColumnType("uuid")
                         .HasColumnName("media_session_id");
+
+                    b.Property<Guid>("ProgramCaptureId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("program_capture_id");
 
                     b.Property<long>("PublicAt")
                         .HasColumnType("bigint")
@@ -3670,12 +3879,21 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.HasIndex("FileId")
                         .HasDatabaseName("ix_live_solo_program_segments_file_id");
 
+                    b.HasIndex("MediaSessionId")
+                        .HasDatabaseName("ix_live_solo_program_segments_media_session_id");
+
                     b.HasIndex("RemoveAfter")
                         .HasDatabaseName("ix_live_solo_program_segments_remove_after");
 
-                    b.HasIndex("MediaSessionId", "Sequence")
+                    b.HasIndex("FrameId", "MediaSessionId")
+                        .HasDatabaseName("ix_live_solo_program_segments_frame_id_media_session_id");
+
+                    b.HasIndex("ProgramCaptureId", "MediaSessionId")
+                        .HasDatabaseName("ix_live_solo_program_segments_program_capture_id_media_session");
+
+                    b.HasIndex("ProgramCaptureId", "Sequence")
                         .IsUnique()
-                        .HasDatabaseName("ix_live_solo_program_segments_media_session_id_sequence");
+                        .HasDatabaseName("ix_live_solo_program_segments_program_capture_id_sequence");
 
                     b.ToTable("live_solo_program_segments", (string)null);
                 });
@@ -3827,6 +4045,10 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("published");
 
+                    b.Property<long?>("RequestedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("requested_at");
+
                     b.Property<Guid?>("RoundId")
                         .HasColumnType("uuid")
                         .HasColumnName("round_id");
@@ -3843,14 +4065,17 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("user_id");
 
+                    b.Property<string>("VideoTrackId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("video_track_id");
+
                     b.HasKey("Id")
                         .HasName("pk_live_solo_recordings");
 
                     b.HasIndex("FileId")
                         .HasDatabaseName("ix_live_solo_recordings_file_id");
-
-                    b.HasIndex("MediaSessionId")
-                        .HasDatabaseName("ix_live_solo_recordings_media_session_id");
 
                     b.HasIndex("RoundId")
                         .HasDatabaseName("ix_live_solo_recordings_round_id");
@@ -3860,6 +4085,10 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
 
                     b.HasIndex("State", "KeepUntil")
                         .HasDatabaseName("ix_live_solo_recordings_state_keep_until");
+
+                    b.HasIndex("MediaSessionId", "UserId", "VideoTrackId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_live_solo_recordings_media_session_id_user_id_video_track_id");
 
                     b.ToTable("live_solo_recordings", (string)null);
                 });
@@ -9080,6 +9309,13 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_live_solo_media_sessions_live_solo_matches_match_id");
+
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloProgramCapture", null)
+                        .WithMany()
+                        .HasForeignKey("CurrentProgramCaptureId", "Id")
+                        .HasPrincipalKey("Id", "MediaSessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_live_solo_media_sessions_live_solo_program_captures_current");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloPauseInterval", b =>
@@ -9090,6 +9326,43 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_live_solo_pause_intervals_live_solo_rounds_round_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloProgramCapture", b =>
+                {
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloMediaSession", null)
+                        .WithMany()
+                        .HasForeignKey("MediaSessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_program_captures_live_solo_media_sessions_media_s");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloProgramFrame", b =>
+                {
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloMediaSession", null)
+                        .WithMany()
+                        .HasForeignKey("MediaSessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_program_frames_live_solo_media_sessions_media_ses");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloProgramFrameQuestion", b =>
+                {
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloProgramFrame", null)
+                        .WithMany("Questions")
+                        .HasForeignKey("FrameId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_program_frame_questions_live_solo_program_frames_");
+
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloRoundQuestion", null)
+                        .WithMany()
+                        .HasForeignKey("RoundQuestionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_program_frame_questions_live_solo_round_questions");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloProgramSegment", b =>
@@ -9107,6 +9380,22 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_live_solo_program_segments_live_solo_media_sessions_media_s");
+
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloProgramFrame", null)
+                        .WithMany()
+                        .HasForeignKey("FrameId", "MediaSessionId")
+                        .HasPrincipalKey("Id", "MediaSessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_program_segments_live_solo_program_frames_frame_i");
+
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloProgramCapture", null)
+                        .WithMany()
+                        .HasForeignKey("ProgramCaptureId", "MediaSessionId")
+                        .HasPrincipalKey("Id", "MediaSessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_program_segments_live_solo_program_captures_progr");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloQuestionExposure", b =>
@@ -10232,6 +10521,11 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
             modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloMediaSession", b =>
                 {
                     b.Navigation("Participants");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloProgramFrame", b =>
+                {
+                    b.Navigation("Questions");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloQuestionGroup", b =>

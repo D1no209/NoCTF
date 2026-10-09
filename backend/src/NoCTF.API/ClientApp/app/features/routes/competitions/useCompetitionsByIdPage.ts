@@ -26,7 +26,7 @@ export function useCompetitionsByIdPage() {
   const isControlScreen = computed(() => [
     `/competitions/${competitionId.value}/live`,
     `/competitions/${competitionId.value}/awdp-live`,
-  ].includes(route.path))
+  ].includes(route.path) || route.path.includes('/live-solo/program/'))
 
   const isWriteUpReview = computed(() =>
     route.path === `/competitions/${competitionId.value}/writeups`,

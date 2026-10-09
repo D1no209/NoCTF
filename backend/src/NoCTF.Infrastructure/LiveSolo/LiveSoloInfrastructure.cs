@@ -42,6 +42,10 @@ public static class LiveSoloInfrastructure
         services.AddScoped<ManageLiveSoloRuntimes>();
         services.AddScoped<ILiveSoloMediaStore, LiveSoloMediaStore>();
         services.AddScoped<ManageLiveSoloMedia>();
+        services.AddScoped<ILiveSoloCaptureStore, LiveSoloCaptureStore>();
+        services.AddScoped<ILiveSoloCaptureFiles, LiveSoloCaptureFiles>();
+        services.AddScoped<ILiveSoloProgramReader, LiveSoloProgramReader>();
+        services.AddScoped<IClusterScheduleContributor, LiveSoloCaptureScheduleSource>();
         services.AddScoped<IClusterScheduleContributor, LiveSoloMediaScheduleSource>();
         services.AddScoped<IClusterScheduleContributor, LiveSoloScheduleSource>();
         var media = configuration?.GetSection(LiveKitMediaOptions.Section).Get<LiveKitMediaOptions>() ?? new();

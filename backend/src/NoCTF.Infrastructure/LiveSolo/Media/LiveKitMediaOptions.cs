@@ -12,4 +12,6 @@ public sealed class LiveKitMediaOptions
     public int RequestTimeoutSeconds { get; set; } = 10;
     public int MaximumParticipants { get; set; } = 16;
     public string EgressOutputRoot { get; set; } = "/out";
+    public string CaptureSpoolPath { get; set; } = "/out";
+    public long RecordingQuotaBytes { get; set; } = 100L * 1024 * 1024 * 1024;
 }

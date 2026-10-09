@@ -135,6 +135,7 @@ public sealed class LiveSoloMatchCapacityPersistenceTests
         fixture.Db.LiveSoloMediaSessions.Add(mediaSession);
         (await fixture.Db.LiveSoloMatches.SingleAsync(x => x.Id == match.Id, ct)).CurrentMediaSessionId = mediaSession.Id;
         await fixture.Db.SaveChangesAsync(ct);
+        await fixture.PrepareProgramAsync(mediaSession, ct);
         var identities = await fixture.Db.LiveSoloMediaParticipants.Select(x => x.Identity).ToArrayAsync(ct);
         fixture.media.ObserveAsync(Arg.Any<string>(), ct).Returns(new LiveSoloRoomObservation(identities.Select(id =>
             new LiveSoloObservedScreen(id, LiveSoloScreenState.Sharing, "track-" + id, fixture.Now)).ToArray()));
