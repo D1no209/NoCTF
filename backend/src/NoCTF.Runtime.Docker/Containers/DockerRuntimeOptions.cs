@@ -16,4 +16,7 @@ public sealed record DockerRuntimeOptions(
     string ProxyContainerLabelKey = "noctf.io/runtime-proxy-gateway",
     string ProxyContainerLabelValue = "true",
     string? RegistryConfigDirectory = null,
-    string CallbackNetworkName = "noctf-runtime-callback");
+    string CallbackNetworkName = "noctf-runtime-callback",
+    string ExecutionNetworkName = "",
+    string ExecutionProxyContainerName = "",
+    string ExecutionProbeImage = "nginx@sha256:df221db836e1754089190208cee7eeda94f233197056426eda74a43ab1abeac2");

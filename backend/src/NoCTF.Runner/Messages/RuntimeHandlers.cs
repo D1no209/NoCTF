@@ -667,7 +667,10 @@ internal static class RuntimeWriteBackOperations
             || instance.RuntimeProvider != message.Provider)
             return;
 
-        if (!TryReplaceAccessEndpoints(instance, message.AccessEndpoints))
+        if (!TryReplaceAccessEndpoints(instance, message.AccessEndpoints)
+            || instance.ExecutionScopeId is Guid executionScope && (message.ProviderReceipt is not ContainerRuntimeReceiptData controlled
+                || controlled.ExecutionScopeId != executionScope || controlled.IsolationState != RuntimeIsolationState.Verified
+                || controlled.OperationId != instance.Id || controlled.Services.Any(x => x.PublishedPorts.Count != 0)))
         {
             AttachProviderReceipt(db, instance, message.ProviderReceipt);
             instance.State = RuntimeState.Stopping;

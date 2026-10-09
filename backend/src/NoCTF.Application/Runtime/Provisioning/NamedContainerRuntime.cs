@@ -15,6 +15,9 @@ public abstract class NamedContainerRuntime(
     protected abstract string Namespace { get; }
     protected abstract Task<RuntimeNetworkAttachment> PrepareNetworkAsync(ContainerRuntimeRequest request, CancellationToken cancellationToken);
     protected abstract Task RemoveNetworkAsync(ContainerDeploymentReceipt receipt, CancellationToken cancellationToken);
+    protected virtual Task VerifyExecutionIsolationAsync(ContainerRuntimeRequest request, ContainerDeploymentReceipt receipt, CancellationToken ct) =>
+        request.ExecutionScopeId is null ? Task.CompletedTask
+            : Task.FromException(new RuntimeConfigurationException("The provider has no verified controlled execution network."));
 
     public async Task<ContainerDeploymentReceipt> UpAsync(ContainerRuntimeRequest request, CancellationToken cancellationToken)
     {
@@ -27,7 +30,7 @@ public abstract class NamedContainerRuntime(
         var cleanupReceipt = new ContainerDeploymentReceipt(request.OperationId, Provider, request.ProjectName, Namespace,
             PublicHost, Clock.GetUtcNow(), request.Services.Select(service => new ContainerServiceStatus(service.Name,
                 ResourceName(request.OperationId, service.Name), RuntimeStatus.Pending, new Dictionary<int, int>(), null)).ToArray(),
-            null, null);
+            null, null, request.ExecutionScopeId);
         try
         {
             var network = await PrepareNetworkAsync(request, cancellationToken);
@@ -58,12 +61,15 @@ public abstract class NamedContainerRuntime(
                     OperationTimeout: request.OperationTimeout, InternalPorts: internalPorts, AllowInternalCallback: request.AllowInternalCallback,
                     RuntimeInstanceId: request.OperationId, ControlCheckUrlBinding: request.ControlCheckUrlBinding?.ServiceName == service.Name ? request.ControlCheckUrlBinding : null, EgressPolicy: request.EgressPolicy, NetworkPurpose: request.Purpose,
                     AccessMode: request.AccessMode, Arguments: service.Arguments, ServiceName: service.Name,
-                    RegisterServiceAlias: request.Services.Count > 1, DiscoveryServiceName: network.DiscoveryServiceName), timeout.Token);
+                    RegisterServiceAlias: request.Services.Count > 1, DiscoveryServiceName: network.DiscoveryServiceName,
+                    ExecutionScopeId: request.ExecutionScopeId), timeout.Token);
                 return new ContainerServiceStatus(service.Name, receipt.ResourceId, receipt.Status, receipt.PortMappings, receipt.InternalHost);
             }));
             if (services.Any(service => service.Status != RuntimeStatus.Running))
                 throw new InvalidOperationException("Every Runtime service must be running before publication.");
-            return cleanupReceipt with { Services = services };
+            var receipt = cleanupReceipt with { Services = services };
+            await VerifyExecutionIsolationAsync(request, receipt, timeout.Token);
+            return receipt with { IsolationState = request.ExecutionScopeId is null ? RuntimeIsolationState.Unverified : RuntimeIsolationState.Verified };
         }
         catch (Exception provisionFailure)
         {

@@ -24,7 +24,8 @@ internal static class RuntimeInfrastructure
         IConfiguration configuration,
         bool development)
     {
-        services.TryAddSingleton<IExecutionRuntimeIsolation, UnverifiedExecutionRuntimeIsolation>();
+        services.TryAddSingleton<NatsRunnerAvailabilityRegistry>();
+        services.AddScoped<IExecutionRuntimeIsolation, RunnerExecutionRuntimeIsolation>();
         services.AddOptions<RuntimeExecutionOptions>().Bind(configuration.GetSection("Runtime:Execution"))
             .Validate(options => options.ProcessesPerService > 0, "ProcessesPerService must be positive.").ValidateOnStart();
         services.AddSingleton(provider => provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<RuntimeExecutionOptions>>().Value);

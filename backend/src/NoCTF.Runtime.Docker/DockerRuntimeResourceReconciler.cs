@@ -10,7 +10,7 @@ using NoCTF.Runtime.Docker.Containers;
 namespace NoCTF.Runtime.Docker;
 
 public sealed class DockerRuntimeResourceReconciler(
-    DockerRuntimeOptions options) : IRuntimeManagedResourceReconciler,
+    DockerRuntimeOptions options, DockerContainerLifecycle? executionLifecycle = null) : IRuntimeManagedResourceReconciler,
     IRuntimeProviderAvailabilityProbe, IRuntimeProxyNetworkReconciler, IDisposable
 {
     private readonly DockerClient client = new DockerClientBuilder()
@@ -30,6 +30,13 @@ public sealed class DockerRuntimeResourceReconciler(
         if (runtimeKind != RuntimeKind.Container) throw new InvalidOperationException("Docker proxy reconciliation supports container runtimes.");
         var receipt = (providerReceipt as ContainerRuntimeReceiptData)?.ToReceipt() ?? throw new InvalidOperationException("Invalid container receipt.");
         if (receipt.OperationId != runtimeInstanceId) throw new InvalidOperationException("Runtime receipt has another owner.");
+        if (receipt.ExecutionScopeId is not null)
+        {
+            if (receipt.IsolationState != RuntimeIsolationState.Verified) throw new InvalidOperationException("Execution isolation is unverified.");
+            if (executionLifecycle is null) throw new InvalidOperationException("The execution lifecycle is not configured.");
+            await executionLifecycle.EnsureExecutionNetworkAsync(cancellationToken);
+            return;
+        }
         await ConnectRuntimeProxyGatewaysAsync(receipt.OwnedNetworkId ?? options.NetworkName, cancellationToken);
     }
 

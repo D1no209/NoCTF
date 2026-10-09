@@ -21,7 +21,8 @@ public sealed class RunnerAvailabilityPublisher(
     IEnumerable<IRuntimeManagedResourceReconciler> reconcilers,
     RunnerResourceObserver observer,
     RunnerProviderHealthState? providerHealth = null,
-    RuntimeExecutionOptions? executionOptions = null) : BackgroundService
+    RuntimeExecutionOptions? executionOptions = null,
+    IEnumerable<NoCTF.Application.Runtime.Access.IRuntimeExecutionIsolationProbe>? executionIsolationProbes = null) : BackgroundService
 {
     private static readonly string Version =
         typeof(RunnerProgramMarker).Assembly
@@ -121,6 +122,13 @@ public sealed class RunnerAvailabilityPublisher(
                             && instance.ProviderReceipt != null)),
                 cancellationToken);
 
+        var isolationProbe = executionIsolationProbes?.SingleOrDefault(x => x.Provider == options.Provider);
+        var isolationState = RuntimeIsolationState.Unverified;
+        if (isolationProbe is not null && observer.ResourceDomainFencingToken != 0)
+        {
+            using var mutation = await mutations.EnterAsync(cancellationToken);
+            isolationState = await isolationProbe.CheckAsync(cancellationToken);
+        }
         var registration = new RunnerAvailabilityRegistration(
                 options.Pool,
                 options.Id,
@@ -132,7 +140,7 @@ public sealed class RunnerAvailabilityPublisher(
                 admission,
                 options.Admission,
                 initialReconciliationComplete,
-                observer.ResourceDomainFencingToken, executionOptions?.ProcessesPerService ?? 256);
+                observer.ResourceDomainFencingToken, executionOptions?.ProcessesPerService ?? 256, isolationState);
         var result = await registry.RegisterAsync(registration, cancellationToken);
         if (result == RunnerAvailabilityRegistrationOutcome.OfflineCapacityUntrusted
             && admission.Capacity is not null)

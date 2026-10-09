@@ -34,7 +34,8 @@ public sealed record RunnerAvailabilityRegistration(
     RunnerAdmissionOptions AdmissionOptions,
     bool Reconciled = false,
     ulong ResourceDomainFencingToken = 0,
-    long ProcessesPerService = 256);
+    long ProcessesPerService = 256,
+    RuntimeIsolationState ExecutionIsolation = RuntimeIsolationState.Unverified);
 
 public sealed class NatsRunnerAvailabilityRegistry(
     INatsConnection connection, TimeProvider clock)

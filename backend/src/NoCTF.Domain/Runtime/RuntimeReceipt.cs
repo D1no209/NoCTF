@@ -23,6 +23,8 @@ public sealed class ContainerRuntimeReceipt : RuntimeReceipt
     [MaxLength(512)] public string? OwnedNetworkId { get; set; }
     [MaxLength(255)] public string? DiscoveryServiceName { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
+    public Guid? ExecutionScopeId { get; set; }
+    public RuntimeIsolationState IsolationState { get; set; }
 }
 
 public sealed class ContainerRuntimeReceiptService

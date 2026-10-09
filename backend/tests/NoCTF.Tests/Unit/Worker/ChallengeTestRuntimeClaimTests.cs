@@ -9,6 +9,32 @@ namespace NoCTF.Tests.Unit.Worker;
 public sealed class ChallengeTestRuntimeClaimTests
 {
     [Test]
+    public async Task Opaque_execution_scope_and_per_team_flag_are_forwarded_to_the_provider_plan()
+    {
+        var scope = Guid.NewGuid();
+        var instance = new PlayerRuntimeInstance { Id = Guid.NewGuid(), ExecutionScopeId = scope, TeamId = Guid.NewGuid(),
+            RuntimeKind = RuntimeKind.Container, RuntimeProvider = RuntimeProvider.Docker, AccessMode = RuntimeAccessMode.WsrxOnly };
+        var template = new ChallengeRuntimeTemplate(RuntimeAllocation.PerTeam,
+            new ContainerRuntimeDefinition([new("web", "challenge:test", FlagEnvironmentVariableName: "FLAG")]),
+            new(536_870_912, 500, 256), FlagSource: RuntimeFlagSource.PerTeam);
+        var message = (ProvisionContainerRuntime)RuntimeClaimFactory.Create(instance, "runner", GameMode.LiveSolo, template, null, "flag{scoped}");
+        await Assert.That(message.Definition.ExecutionScopeId).IsEqualTo(scope);
+        await Assert.That(message.Definition.Services[0].Environment!["FLAG"]).IsEqualTo("flag{scoped}");
+        await Assert.That(message.Definition.AccessMode).IsEqualTo(RuntimeAccessMode.WsrxOnly);
+    }
+    [Test]
+    public async Task Provider_isolation_evidence_and_scope_survive_relational_receipt_mapping()
+    {
+        var scope = Guid.NewGuid(); var runtime = Guid.NewGuid();
+        var receipt = new ContainerDeploymentReceipt(runtime, RuntimeProvider.Docker, $"noctf-rt-{runtime:N}", "", "localhost",
+            DateTimeOffset.UtcNow, [new("web", "resource", RuntimeStatus.Running, new Dictionary<int, int>(), "172.18.0.2")],
+            ExecutionScopeId: scope, IsolationState: RuntimeIsolationState.Verified);
+        var entity = ContainerRuntimeReceiptData.From(receipt).ToEntity(runtime);
+        var restored = ((ContainerRuntimeReceiptData)entity.ToData()).ToReceipt();
+        await Assert.That(restored.ExecutionScopeId).IsEqualTo(scope);
+        await Assert.That(restored.IsolationState).IsEqualTo(RuntimeIsolationState.Verified);
+    }
+    [Test]
     public async Task Create_TemplateTest_UsesNormalIsolationFlagAndCacheFriendlyLabels()
     {
         var runtimeId = Guid.CreateVersion7();

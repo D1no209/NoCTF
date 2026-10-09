@@ -183,6 +183,8 @@ public sealed class PersistedRunnerCapacityGate(
                     Failure: RunnerAdmissionFailure.NoEligibleRunner);
 
             var identity = request.Workload ?? PrimaryIdentity(runtime);
+            if (runtime.ExecutionScopeId is not null)
+                eligible = eligible.Where(candidate => candidate.ExecutionIsolation == RuntimeIsolationState.Verified).ToArray();
             identity.Validate();
             if (identity.RuntimeInstanceId != runtime.Id)
                 throw new InvalidOperationException(
