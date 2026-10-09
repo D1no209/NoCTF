@@ -47,13 +47,18 @@ export function useLiveSoloHall() {
   async function enter() {
     if (current.value?.id) await router.push(`/competitions/${competitionId.value}/live-solo/matches/${current.value.id}`)
   }
+  async function recordings() {
+    if (current.value?.id) await router.push({ path: `/competitions/${competitionId.value}/live-solo/recordings/${current.value.id}`,
+      query: { ...route.query, staff: ctx?.competition.value?.administrationRole != null ? '1' : undefined } })
+  }
   async function tick() {
     await load()
     if (!disposed) timer = setTimeout(tick, 5000)
   }
   onMounted(() => { void tick() })
   onScopeDispose(() => { disposed = true; request++; if (timer) clearTimeout(timer) })
-  return { competitionId, options, selected, current, configuration, loading, error, select, enter, load,
+  return { competitionId, options, selected, current, configuration, loading, error, select, enter, recordings, load,
+    staff: computed(() => ctx?.competition.value?.administrationRole != null),
     stateKey: computed(() => matchStateKey(current.value?.state)), Workspace: markRaw(CompetitionParticipantWorkspace) }
 }
 export type LiveSoloHallState = import('vue').ShallowUnwrapRef<ReturnType<typeof useLiveSoloHall>>

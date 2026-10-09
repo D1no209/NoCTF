@@ -2320,6 +2320,177 @@
         ]
       }
     },
+    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/recordings/{recordingId}/decisions": {
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Records a reasoned and revision-fenced hold or replay publication decision; publishing requires the entire event to have ended.",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/recordings/{recordingId}/decisions.",
+        "operationId": "ChangeLiveSoloRecording",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "recordingId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "ChangeLiveSoloRecordingRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloChangeLiveSoloRecordingRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloRecordingResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Reads immutable staff decisions, including records retained after recording cleanup.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/recordings/{recordingId}/decisions.",
+        "operationId": "ListLiveSoloRecordingDecisions",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "recordingId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloRecordingDecisionsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/ready": {
       "post": {
         "tags": [
@@ -3299,6 +3470,58 @@
         }
       }
     },
+    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/recordings/{recordingId}/file": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Streams an authorized recording with Range support after rechecking its current publication, hold and retention state.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/recordings/{recordingId}/file.",
+        "operationId": "GetLiveSoloRecording",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "recordingId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "download",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
     "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}": {
       "get": {
         "tags": [
@@ -3957,6 +4180,87 @@
         ]
       }
     },
+    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/recordings": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Lists authorized staff recordings or explicitly published post-event replays; never exposes storage keys or media grants.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/recordings.",
+        "operationId": "ListLiveSoloRecordings",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "staff",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloRecordingsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/roster": {
       "post": {
         "tags": [
@@ -4192,6 +4496,136 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesAttachmentBrowserDownloadResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/recordings/{recordingId}/browser-download": {
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Authorizes native browser streaming without buffering the recording in the SPA.",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/recordings/{recordingId}/browser-download.",
+        "operationId": "PrepareLiveSoloRecordingDownload",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "recordingId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesAttachmentBrowserDownloadResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/recordings/{recordingId}/preview": {
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Issues a short-lived file-bound browser grant; preview ranges revalidate current JWT, MFA and recording authorization.",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/recordings/{recordingId}/preview.",
+        "operationId": "PrepareLiveSoloRecordingPreview",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "recordingId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloRecordingPreviewResponse"
                 }
               }
             }
@@ -24940,6 +25374,146 @@
           }
         }
       },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloRecordingResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "mediaSessionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "roundId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "userId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "userName": {
+            "type": "string"
+          },
+          "teamId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "teamName": {
+            "type": "string",
+            "nullable": true
+          },
+          "state": {
+            "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloRecordingState"
+          },
+          "concurrencyStamp": {
+            "type": "string",
+            "format": "guid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "endedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "keepUntil": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "disputeHold": {
+            "type": "boolean"
+          },
+          "published": {
+            "type": "boolean"
+          },
+          "byteLength": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "fileUrl": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFDomainLiveSoloLiveSoloRecordingState": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Pending",
+          "Recording",
+          "Finalizing",
+          "Completed",
+          "Failed",
+          "Deleting",
+          "Starting",
+          "RequiresReview"
+        ],
+        "enum": [
+          "Pending",
+          "Recording",
+          "Finalizing",
+          "Completed",
+          "Failed",
+          "Deleting",
+          "Starting",
+          "RequiresReview"
+        ]
+      },
+      "NoCTFAPIEndpointsLiveSoloChangeLiveSoloRecordingRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "action",
+          "expectedStamp",
+          "reason"
+        ],
+        "properties": {
+          "expectedStamp": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          },
+          "action": {
+            "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloRecordingAction"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 0,
+            "nullable": false
+          }
+        }
+      },
+      "NoCTFDomainLiveSoloLiveSoloRecordingAction": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Hold",
+          "ReleaseHold",
+          "Publish",
+          "Withdraw"
+        ],
+        "enum": [
+          "Hold",
+          "ReleaseHold",
+          "Publish",
+          "Withdraw"
+        ]
+      },
       "NoCTFAPIEndpointsLiveSoloConfirmLiveSoloReadyRequest": {
         "type": "object",
         "additionalProperties": false,
@@ -25649,6 +26223,10 @@
         "type": "object",
         "additionalProperties": false
       },
+      "NoCTFAPIEndpointsLiveSoloGetLiveSoloRecordingRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
       "NoCTFAPIEndpointsLiveSoloGetLiveSoloRoundRequest": {
         "type": "object",
         "additionalProperties": false
@@ -25901,6 +26479,88 @@
         "type": "object",
         "additionalProperties": false
       },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloRecordingDecisionsResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloRecordingDecisionResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloRecordingDecisionResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "recordingId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "actorUserId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "action": {
+            "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloRecordingAction"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "previousHold": {
+            "type": "boolean"
+          },
+          "hold": {
+            "type": "boolean"
+          },
+          "previousPublished": {
+            "type": "boolean"
+          },
+          "published": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloListLiveSoloRecordingDecisionsRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloRecordingsResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloRecordingResponse"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "canJudge": {
+            "type": "boolean"
+          },
+          "canPublish": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloListLiveSoloRecordingsRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
       "NoCTFAPIEndpointsLiveSoloLockLiveSoloRosterRequest": {
         "type": "object",
         "additionalProperties": false,
@@ -25993,6 +26653,27 @@
         }
       },
       "NoCTFAPIEndpointsLiveSoloPrepareLiveSoloRandomAttachmentDownloadRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsLiveSoloPrepareLiveSoloRecordingDownloadRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloRecordingPreviewResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "previewUrl": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloPrepareLiveSoloRecordingPreviewRequest": {
         "type": "object",
         "additionalProperties": false
       },

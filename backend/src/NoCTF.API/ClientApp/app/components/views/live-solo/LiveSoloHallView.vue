@@ -2,7 +2,7 @@
 import { toRefs } from 'vue'
 import type { LiveSoloHallState } from '~/features/live-solo/useLiveSoloHall'
 const props = defineProps<{ state: LiveSoloHallState }>()
-const { competitionId, options, selected, current, configuration, loading, error, select, enter, load, stateKey, Workspace } = toRefs(props.state)
+const { competitionId, options, selected, current, configuration, loading, error, select, enter, recordings, staff, load, stateKey, Workspace } = toRefs(props.state)
 </script>
 <template>
   <component :is="Workspace" :competition-id="competitionId" :show-challenge-navigator="false" :content-scroll="false">
@@ -18,7 +18,7 @@ const { competitionId, options, selected, current, configuration, loading, error
           <Skeleton v-if="loading && !current" class="h-48" />
           <template v-else-if="current"><div class="flex flex-wrap items-center justify-center gap-3"><Badge>{{ $t(stateKey) }}</Badge><span class="text-sm text-muted-foreground">{{ $t('liveSolo.firstTo', { wins: current.requiredWins ?? 2 }) }}</span></div>
             <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-center"><h2 class="min-w-0 break-words text-xl font-semibold">{{ current.leftTeamName || '—' }}</h2><div class="font-mono text-4xl font-bold tabular-nums text-primary">{{ current.leftWins ?? 0 }} : {{ current.rightWins ?? 0 }}</div><h2 class="min-w-0 break-words text-xl font-semibold">{{ current.rightTeamName || '—' }}</h2></div>
-            <div class="flex justify-center"><Button @click="enter">{{ $t('liveSolo.enterMatch') }}</Button></div>
+            <div class="flex flex-wrap justify-center gap-3"><Button @click="enter">{{ $t('liveSolo.enterMatch') }}</Button><Button v-if="staff || current.state === 'Completed'" variant="outline" @click="recordings">{{ $t(staff ? 'liveSolo.recording.staffTitle' : 'liveSolo.recording.replays') }}</Button></div>
           </template>
           <Empty v-else><EmptyHeader><EmptyTitle>{{ $t('liveSolo.noMatches') }}</EmptyTitle><EmptyDescription>{{ $t('liveSolo.noMatchesDescription') }}</EmptyDescription></EmptyHeader></Empty>
         </CardContent></Card>

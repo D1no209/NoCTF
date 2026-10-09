@@ -759,6 +759,12 @@ GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/media
 GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/program
 GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/program/playlist
 GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/program/segments/{segmentId}
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/recordings
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/recordings/{recordingId}/decisions
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/recordings/{recordingId}/decisions
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/recordings/{recordingId}/file
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/recordings/{recordingId}/preview
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/recordings/{recordingId}/browser-download
 POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/media
 POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/media/token
 GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/adjudications

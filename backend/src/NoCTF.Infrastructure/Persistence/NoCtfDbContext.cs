@@ -64,6 +64,7 @@ public sealed class NoCtfDbContext(
     public DbSet<LiveSoloProgramCapture> LiveSoloProgramCaptures => Set<LiveSoloProgramCapture>();
     public DbSet<LiveSoloProgramFrame> LiveSoloProgramFrames => Set<LiveSoloProgramFrame>();
     public DbSet<LiveSoloRecording> LiveSoloRecordings => Set<LiveSoloRecording>();
+    public DbSet<LiveSoloRecordingDecision> LiveSoloRecordingDecisions => Set<LiveSoloRecordingDecision>();
     public DbSet<User> Users => Set<User>();
     public DbSet<Competition> Competitions => Set<Competition>();
     public DbSet<CompetitionProgression> CompetitionProgressions => Set<CompetitionProgression>();
@@ -224,7 +225,8 @@ public sealed class NoCtfDbContext(
             || ChangeTracker.Entries<LiveSoloDownloadEvidence>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted)
             || ChangeTracker.Entries<LiveSoloAttachmentAssignment>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
             throw new InvalidOperationException("Execution-scoped gameplay associations are immutable.");
-        if (ChangeTracker.Entries<LiveSoloAdjudication>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
+        if (ChangeTracker.Entries<LiveSoloAdjudication>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted)
+            || ChangeTracker.Entries<LiveSoloRecordingDecision>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
             throw new InvalidOperationException("LiveSolo staff decisions are immutable.");
         if (ChangeTracker.Entries<LiveSoloProgramFrame>().Any(entry => entry.State == EntityState.Modified)
             || ChangeTracker.Entries<LiveSoloProgramFrameQuestion>().Any(entry => entry.State == EntityState.Modified

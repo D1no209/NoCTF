@@ -268,8 +268,36 @@ public sealed class LiveSoloEndpointTests
         using var hidden = await client.GetAsync(path + "/segments/" + segment);
         await Assert.That(hidden.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
     }
+    [Test]
+    public async Task Recording_contract_authenticates_decisions_and_streams_ranges_without_storage_metadata()
+    {
+        var store = Substitute.For<ILiveSoloRecordingStore>(); var competition = Guid.NewGuid(); var match = Guid.NewGuid(); var record = Guid.NewGuid();
+        var stamp = Guid.NewGuid();
+        store.ListAsync(competition, match, Actor, true, 0, 20, Arg.Any<CancellationToken>()).Returns(new LiveSoloRecordingPage([
+            new(record, Guid.NewGuid(), null, Actor, "player", null, null, LiveSoloRecordingState.Completed, stamp,
+                DateTimeOffset.UtcNow, null, null, DateTimeOffset.UtcNow.AddDays(30), false, false, 4)], 1, true, true));
+        store.OpenAsync(competition, match, record, Actor, Arg.Any<CancellationToken>()).Returns(_ => Task.FromResult<LiveSoloRecordingContent?>(
+            new(Guid.NewGuid(), new MemoryStream([1, 2, 3, 4]), "video/mp4", "recording.mp4")));
+        store.ChangeAsync(Arg.Any<ChangeLiveSoloRecording>(), Arg.Any<CancellationToken>()).Returns(new LiveSoloRecordingChangeResult(null, LiveSoloFailure.Conflict));
+        await using var app = await HostAsync(Substitute.For<ILiveSoloMatchStore>(), Substitute.For<ILiveSoloAttachmentStore>(), Substitute.For<IStore>(), recordings: store);
+        using var client = app.GetTestClient(); var path = $"/api/v1/competitions/{competition}/live-solo/matches/{match}/recordings";
+        using var denied = await client.PostAsJsonAsync(path + $"/{record}/decisions", new { expectedStamp = stamp, action = "Hold", reason = "review" });
+        await Assert.That(denied.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
+        client.DefaultRequestHeaders.Authorization = new("Bearer", "verified-test");
+        using var list = await client.GetAsync(path + "?staff=true"); await Assert.That(list.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        var body = await list.Content.ReadAsStringAsync(); await Assert.That(body).DoesNotContain("objectKey"); await Assert.That(body).DoesNotContain("egressId");
+        using var conflict = await client.PostAsJsonAsync(path + $"/{record}/decisions", new { competitionId = Guid.NewGuid(), matchId = Guid.NewGuid(),
+            actorId = Guid.NewGuid(), expectedStamp = stamp, action = "Hold", reason = "review" });
+        await Assert.That(conflict.StatusCode).IsEqualTo(HttpStatusCode.Conflict);
+        await store.Received(1).ChangeAsync(Arg.Is<ChangeLiveSoloRecording>(x => x != null && x.ActorId == Actor && x.CompetitionId == competition && x.MatchId == match), Arg.Any<CancellationToken>());
+        using var request = new HttpRequestMessage(HttpMethod.Get, path + $"/{record}/file"); request.Headers.Range = new(1, 2);
+        using var range = await client.SendAsync(request); await Assert.That(range.StatusCode).IsEqualTo(HttpStatusCode.PartialContent);
+        await Assert.That((await range.Content.ReadAsByteArrayAsync()).SequenceEqual(new byte[] { 2, 3 })).IsTrue();
+        await Assert.That(range.Headers.CacheControl!.NoStore).IsTrue();
+    }
     private static async Task<WebApplication> HostAsync(ILiveSoloMatchStore store, ILiveSoloAttachmentStore attachmentStore, IStore objects,
-        ILiveSoloAdjudicationStore? decisions = null, ILiveSoloRuntimeStore? runtimes = null, ILiveSoloMediaStore? media = null, ILiveSoloProgramReader? programs = null)
+        ILiveSoloAdjudicationStore? decisions = null, ILiveSoloRuntimeStore? runtimes = null, ILiveSoloMediaStore? media = null, ILiveSoloProgramReader? programs = null,
+        ILiveSoloRecordingStore? recordings = null)
     {
         var builder = WebApplication.CreateBuilder(); builder.WebHost.UseTestServer();
         builder.Services.AddFastEndpoints(options => { options.DisableAutoDiscovery = true; options.Assemblies = [typeof(GetLiveSoloMatchEndpoint).Assembly];
@@ -278,7 +306,8 @@ public sealed class LiveSoloEndpointTests
                 || x == typeof(AdjudicateLiveSoloMatchEndpoint) || x == typeof(ListLiveSoloAdjudicationsEndpoint)
                 || x == typeof(GetLiveSoloRuntimeEndpoint) || x == typeof(MutateLiveSoloRuntimeEndpoint)
                 || x == typeof(GetLiveSoloMediaEndpoint) || x == typeof(PrepareLiveSoloMediaEndpoint) || x == typeof(JoinLiveSoloMediaEndpoint)
-                || x == typeof(GetLiveSoloProgramEndpoint) || x == typeof(GetLiveSoloProgramPlaylistEndpoint) || x == typeof(GetLiveSoloProgramSegmentEndpoint); });
+                || x == typeof(GetLiveSoloProgramEndpoint) || x == typeof(GetLiveSoloProgramPlaylistEndpoint) || x == typeof(GetLiveSoloProgramSegmentEndpoint)
+                || x == typeof(ListLiveSoloRecordingsEndpoint) || x == typeof(ChangeLiveSoloRecordingEndpoint) || x == typeof(GetLiveSoloRecordingEndpoint); });
         builder.Services.AddAuthentication("Bearer").AddScheme<AuthenticationSchemeOptions, TestAuthentication>("Bearer", _ => { });
         builder.Services.AddAuthorization(); builder.Services.AddSingleton(store); builder.Services.AddSingleton<ManageLiveSoloMatches>();
         builder.Services.AddSingleton(attachmentStore); builder.Services.AddSingleton(objects); builder.Services.AddSingleton<AccessLiveSoloAttachments>();
@@ -286,6 +315,7 @@ public sealed class LiveSoloEndpointTests
         builder.Services.AddSingleton(runtimes ?? Substitute.For<ILiveSoloRuntimeStore>()); builder.Services.AddSingleton<ManageLiveSoloRuntimes>();
         builder.Services.AddSingleton(media ?? Substitute.For<ILiveSoloMediaStore>()); builder.Services.AddSingleton<ManageLiveSoloMedia>();
         builder.Services.AddSingleton(programs ?? Substitute.For<ILiveSoloProgramReader>());
+        builder.Services.AddSingleton(recordings ?? Substitute.For<ILiveSoloRecordingStore>()); builder.Services.AddSingleton<ManageLiveSoloRecordings>();
         builder.Services.AddSingleton<IUserContext>(new TestUser()); builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton<IRequestAdmission>(new Admission());
         var source = Substitute.For<IRequestSourceAddress>(); source.Address.Returns("192.0.2.10");
