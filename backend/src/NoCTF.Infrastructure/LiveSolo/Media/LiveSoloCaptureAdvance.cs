@@ -109,7 +109,7 @@ public sealed partial class LiveSoloCaptureStore
                         && db.LiveSoloMatches.Any(m=>m.Id==x.MatchId&&m.CurrentMediaSessionId==x.Id), ct)
                         || !await db.Set<LiveSoloMediaParticipant>().AnyAsync(p=>p.MediaSessionId==session.Id&&p.UserId==record.UserId
                             &&p.ScreenTrackId==record.VideoTrackId&&p.ScreenState==LiveSoloScreenState.Sharing,ct)) return;
-                    var used=await RecordingCapacityUsedAsync(ct);var reservation=checked(options.RecordingExportLimitBytes*2);
+                    var used=await RecordingCapacityUsedAsync(ct);var reservation=checked(options.RecordingExportLimitBytes*3);
                     if (reservation>options.RecordingQuotaBytes-used) {
                         record.State=LiveSoloRecordingState.RequiresReview;record.Failure=LiveSoloRecordingFailure.CapacityUnavailable;
                         await CaptureAlertAsync(session,record.Id,record.ConcurrencyStamp,LiveSoloMediaAlertKind.RecordingFailed,ct);return;}
@@ -142,7 +142,7 @@ public sealed partial class LiveSoloCaptureStore
             record.EgressId = current.Id; record.StartedAt ??= current.StartedAt; record.EndedAt = current.EndedAt;
             record.State = RecordingState(current.State); await db.SaveChangesAsync(ct);
             if (current.State == LiveSoloExportState.Complete) await ImportRecordingAsync(session, record, current, ct);
-            var limitReached=current.State==LiveSoloExportState.Active && await files.RecordingLengthAsync(record.Id,ct)
+            var limitReached=current.State==LiveSoloExportState.Active && await files.RecordingLengthAsync(record.Id,current.Id,ct)
                 >= options.RecordingExportLimitBytes-4L*1024*1024;
             if ((!stillSharing || limitReached) && current.State is LiveSoloExportState.Starting or LiveSoloExportState.Active)
             { await egress.StopAsync(current.Id, ct); record.State = LiveSoloRecordingState.Finalizing; await db.SaveChangesAsync(ct); }
@@ -151,7 +151,7 @@ public sealed partial class LiveSoloCaptureStore
     }
     private async Task<long> RecordingCapacityUsedAsync(CancellationToken ct)
     {
-        var retained=await db.LiveSoloRecordings.Where(x=>x.FileId!=null).Join(db.Files,r=>r.FileId,f=>(Guid?)f.Id,(r,f)=>f.ByteLength*(r.RawRemovedAt==null?2:1)).SumAsync(ct);
+        var retained=await db.LiveSoloRecordings.Where(x=>x.FileId!=null).Join(db.Files,r=>r.FileId,f=>(Guid?)f.Id,(r,f)=>f.ByteLength*(r.RawRemovedAt==null?3:1)).SumAsync(ct);
         var reserved=await db.LiveSoloRecordings.Where(x=>x.FileId==null).SumAsync(x=>x.ReservedBytes,ct);
         return checked(retained+reserved);
     }

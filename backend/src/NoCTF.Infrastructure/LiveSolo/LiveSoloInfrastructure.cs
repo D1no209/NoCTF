@@ -71,7 +71,7 @@ public static class LiveSoloInfrastructure
             || System.Text.Encoding.UTF8.GetByteCount(media.ApiSecret) < 32 || media.RequestTimeoutSeconds is < 1 or > 60
             || media.MaximumParticipants is < 4 or > 64 || !media.EgressOutputRoot.StartsWith('/')
             || media.EgressStartTimeoutSeconds is < 5 or > 120
-            || media.RecordingQuotaBytes < 1 || media.RecordingExportLimitBytes < 16L*1024*1024 || media.RecordingExportLimitBytes > long.MaxValue/2
+            || media.RecordingQuotaBytes < 1 || media.RecordingExportLimitBytes < 16L*1024*1024 || media.RecordingExportLimitBytes > long.MaxValue/3
             || media.RecordingExportLimitBytes > media.RecordingQuotaBytes
             || media.ProgramChunkSeconds is < 30 or > 3600
             || media.ProgramStallSeconds is < 5 or > 60

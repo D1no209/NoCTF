@@ -24,6 +24,11 @@ python3 deploy/docker/live-solo/prepare.py \
 生成的 config/live-solo 和 env/live-solo 不可提交；密钥与平台 JWT/Runner/上传密钥独立。
 spool 供 Egress 的非 root 用户写入，运维应按容器实际 UID/GID 设置专用组权限；
 脚本不扩大宿主目录权限。不要把它映射给无关容器。
+准备脚本还在同一固定容量文件系统创建私有 `.egress-tmp`，映射到 Egress 的 `/home/egress/tmp`。
+只限制 `/out` 不够：固定版本会先在暂存目录写录制文件。Host 读取该目录中的当前录像大小，
+并在确认终态／归档后清理对应导出；遇到未知文件拒绝扩大删除范围，保留预留等待检查。
+供应商文件大小上限默认 512 MiB；修改应用分段上限时一并更新 Egress 上限，固定挂载仍是最后的磁盘边界。
+启动预留覆盖暂存、最终输出及托管归档三份副本；原始两份都清理成功后才按一份归档计算。
 
 把 [nginx.conf](nginx.conf) 加到独立媒体域名的 HTTPS server，使用安全访问日志，
 不得记录查询字符串或公开 Twirp。配置合法 TLS 证书，开放 RTC TCP 7881/UDP 7882。
@@ -52,3 +57,5 @@ Egress 启动使用独立的 `LiveSolo__Media__EgressStartTimeoutSeconds`（默�
 参考：[Egress 部署](https://docs.livekit.io/transport/self-hosting/egress/)、
 [固定版本 Egress 配置](https://github.com/livekit/egress/blob/v1.15.0/README.md)、
 [固定版本 SFU 配置](https://github.com/livekit/livekit/blob/v1.13.9/config-sample.yaml)。
+暂存位置及大小限制依据：[固定版本文件输出](https://github.com/livekit/egress/blob/v1.15.0/pkg/config/output_file.go)、
+[固定版本配置](https://github.com/livekit/egress/blob/v1.15.0/pkg/config/base.go)。

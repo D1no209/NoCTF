@@ -78,7 +78,7 @@ public sealed partial class LiveSoloCaptureStore
                 attached = false; await db.Entry(record).ReloadAsync(ct);
                 if (record.FileId is not null) return;
                 var used=await RecordingCapacityUsedAsync(ct);
-                if (upload.ByteLength>options.RecordingExportLimitBytes || checked(upload.ByteLength*2)>options.RecordingQuotaBytes-used+record.ReservedBytes)
+                if (upload.ByteLength>options.RecordingExportLimitBytes || checked(upload.ByteLength*3)>options.RecordingQuotaBytes-used+record.ReservedBytes)
                 { record.State = LiveSoloRecordingState.RequiresReview;record.Failure=upload.ByteLength>options.RecordingExportLimitBytes
                     ? LiveSoloRecordingFailure.ExportTooLarge : LiveSoloRecordingFailure.ArchiveCapacityUnavailable;
                     await CaptureAlertAsync(session,record.Id,record.ConcurrencyStamp,LiveSoloMediaAlertKind.RecordingFailed,ct);return; }

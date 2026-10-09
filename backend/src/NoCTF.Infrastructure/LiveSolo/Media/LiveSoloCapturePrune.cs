@@ -11,6 +11,8 @@ public sealed partial class LiveSoloCaptureStore
         if(!await db.LiveSoloRecordings.AsNoTracking().AnyAsync(x=>x.Id==recordingId&&x.RawRemovedAt==null
             && (x.State==LiveSoloRecordingState.Completed&&x.FileId!=null || x.State==LiveSoloRecordingState.Failed),ct))return;
         await files.RemoveAsync(recordingId,ct);
+        var exportId=await db.LiveSoloRecordings.Where(x=>x.Id==recordingId).Select(x=>x.EgressId).SingleOrDefaultAsync(ct);
+        if(exportId is not null)await files.RemoveRecordingStagingAsync(exportId,ct);
         await TransactionAsync(async()=>{
             var record=await db.LiveSoloRecordings.SingleOrDefaultAsync(x=>x.Id==recordingId
                 && (x.State==LiveSoloRecordingState.Completed&&x.FileId!=null || x.State==LiveSoloRecordingState.Failed),ct);
@@ -54,6 +56,7 @@ public sealed partial class LiveSoloCaptureStore
         var existing = await db.LiveSoloRecordings.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct);
         if (existing is { DisputeHold: true } || existing is not null && existing.State != LiveSoloRecordingState.Deleting) return;
         await files.RemoveAsync(id, ct);
+        if(existing?.EgressId is { } exportId)await files.RemoveRecordingStagingAsync(exportId,ct);
         if (existing?.FileId is Guid existingFileId)
         {
             var file = await db.Files.AsNoTracking().SingleAsync(x => x.Id == existingFileId, ct);

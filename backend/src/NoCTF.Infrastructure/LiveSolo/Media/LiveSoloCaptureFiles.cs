@@ -22,10 +22,35 @@ public sealed partial class LiveSoloCaptureFiles(LiveKitMediaOptions options) : 
         if (file.LinkTarget is not null) throw new InvalidDataException("Capture files cannot be symbolic links.");
         return file.Exists;
     }
-    public Task<long?> RecordingLengthAsync(Guid id,CancellationToken ct)
+    private string StagingDirectoryFor(string providerExportId)
+    {
+        if(!ProviderExportId().IsMatch(providerExportId))throw new InvalidDataException("Invalid provider export identity.");
+        var root=Path.GetFullPath(options.CaptureSpoolPath);var parent=Path.Combine(root,".egress-tmp");
+        var directory=Path.Combine(parent,providerExportId);
+        foreach(var path in new[]{root,parent,directory})
+            if(new DirectoryInfo(path).LinkTarget is not null)throw new InvalidDataException("Capture staging directories cannot be symbolic links.");
+        return directory;
+    }
+    public Task<long?> RecordingLengthAsync(Guid id,string? providerExportId,CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();var path=Path.Combine(DirectoryFor(id),"recording.mp4");
-        return Task.FromResult<long?>(RegularFileExists(path)?new FileInfo(path).Length:null);
+        long? length=RegularFileExists(path)?new FileInfo(path).Length:null;
+        if(providerExportId is not null)
+        {
+            var staging=Path.Combine(StagingDirectoryFor(providerExportId),"recording.mp4");
+            if(RegularFileExists(staging))length=Math.Max(length??0,new FileInfo(staging).Length);
+        }
+        return Task.FromResult(length);
+    }
+    public Task RemoveRecordingStagingAsync(string providerExportId,CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();var directory=StagingDirectoryFor(providerExportId);
+        if(!Directory.Exists(directory))return Task.CompletedTask;
+        var recording=Path.Combine(directory,"recording.mp4");
+        if(RegularFileExists(recording))File.Delete(recording);
+        if(Directory.EnumerateFileSystemEntries(directory).Any())
+            throw new IOException("Unexpected provider staging files require inspection.");
+        Directory.Delete(directory,recursive:false);return Task.CompletedTask;
     }
     public async Task<IReadOnlyList<LiveSoloCapturedSegment>> SegmentsAsync(Guid id, CancellationToken ct)
     {
@@ -85,4 +110,6 @@ public sealed partial class LiveSoloCaptureFiles(LiveKitMediaOptions options) : 
     }
     [GeneratedRegex(@"^program_(\d+)\.ts$", RegexOptions.CultureInvariant)]
     private static partial Regex SegmentName();
+    [GeneratedRegex(@"^EG_[A-Za-z0-9_-]{1,64}$", RegexOptions.CultureInvariant)]
+    private static partial Regex ProviderExportId();
 }

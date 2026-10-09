@@ -65,6 +65,11 @@ services:
     depends_on: [media-sfu, media-redis]
     volumes:
       - type: bind
+        source: ${LIVE_SOLO_SPOOL_PATH:?Prepare a dedicated bounded media spool}/.egress-tmp
+        target: /home/egress/tmp
+        bind:
+          create_host_path: false
+      - type: bind
         source: ./config/live-solo/egress.yaml
         target: /etc/live-solo/egress.yaml
         read_only: true

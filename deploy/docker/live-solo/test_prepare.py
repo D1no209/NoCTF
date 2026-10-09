@@ -43,6 +43,10 @@ class MediaPreparationTests(unittest.TestCase):
         self.assertIn('maxmemory-policy noeviction',(config/'redis.conf').read_text())
         self.assertIn('wss://media.example.test',(self.installation/'env/live-solo/noctf.env').read_text())
         self.assertEqual(self.spool.stat().st_mode&0o777,0o770)
+        staging=self.spool/'.egress-tmp'
+        self.assertEqual(staging.stat().st_mode&0o7777,0o2770)
+        self.assertEqual(staging.stat().st_gid,2001)
+        self.assertIn('file_output_max_size: 536870912',(config/'egress.yaml').read_text())
     @unittest.skipUnless(os.name == 'posix' and hasattr(os, 'geteuid') and os.geteuid() == 0, 'Linux group validation')
     def test_capacity_above_the_explicit_bound_is_rejected(self):
         os.chown(self.spool,-1,2001);os.chmod(self.spool,0o770)
@@ -57,6 +61,17 @@ class MediaPreparationTests(unittest.TestCase):
         with patch.object(module.os.path,'ismount',return_value=True),patch.object(module.subprocess,'run',return_value=module.subprocess.CompletedProcess([],0,'tmpfs\n','')):
             with self.assertRaises(ValueError):
                 module.prepare(self.installation,self.spool,'media.example.test','192.0.2.10',256*1024*1024,2001)
+        self.assertFalse((self.installation/'config/live-solo').exists())
+    @unittest.skipUnless(os.name == 'posix' and hasattr(os, 'geteuid') and os.geteuid() == 0, 'Linux staging validation')
+    def test_existing_or_linked_staging_is_rejected_before_private_configuration(self):
+        os.chown(self.spool,-1,2001);os.chmod(self.spool,0o770)
+        staging=self.spool/'.egress-tmp'
+        staging.symlink_to(self.root/'missing-target',target_is_directory=True)
+        usage=shutil._ntuple_diskusage(128*1024*1024,0,128*1024*1024)
+        with patch.object(module.os.path,'ismount',return_value=True),patch.object(module.shutil,'disk_usage',return_value=usage),patch.object(module.subprocess,'run',return_value=module.subprocess.CompletedProcess([],0,'ext4\n','')):
+            with self.assertRaises(ValueError):
+                module.prepare(self.installation,self.spool,'media.example.test','192.0.2.10',256*1024*1024,2001)
+        self.assertTrue(staging.is_symlink())
         self.assertFalse((self.installation/'config/live-solo').exists())
 
 if __name__=='__main__': unittest.main()

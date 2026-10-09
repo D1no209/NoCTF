@@ -41,6 +41,9 @@ public sealed class LiveSoloMediaDeploymentTests
             var egress=services.GetProperty("media-egress");
             await Assert.That(egress.GetProperty("volumes").EnumerateArray().Single(x=>x.GetProperty("target").GetString()=="/out").GetProperty("source").GetString()).IsEqualTo("/bounded/media");
             await Assert.That(egress.GetProperty("group_add")[0].GetString()).IsEqualTo("2001");
+            var staging=egress.GetProperty("volumes").EnumerateArray().Single(x=>x.GetProperty("target").GetString()=="/home/egress/tmp");
+            await Assert.That(staging.GetProperty("source").GetString()).IsEqualTo("/bounded/media/.egress-tmp");
+            await Assert.That(staging.GetProperty("bind").GetProperty("create_host_path").GetBoolean()).IsFalse();
             var proxy=await File.ReadAllTextAsync(Path.Combine(source,"live-solo","nginx.conf"));
             await Assert.That(proxy).Contains("location = /rtc");await Assert.That(proxy).Contains("return 404;");await Assert.That(proxy).DoesNotContain("$request_uri");
             await Assert.That(await File.ReadAllTextAsync(Path.Combine(source,"docker-compose.yml"))).DoesNotContain("media-sfu");

@@ -12,11 +12,11 @@ public sealed class LiveSoloCaptureFilesTests
         var path=Path.Combine(folder,"recording.mp4");var files=new LiveSoloCaptureFiles(new() {CaptureSpoolPath=root});
         try
         {
-            await Assert.That(await files.RecordingLengthAsync(id,CancellationToken.None)).IsNull();
+            await Assert.That(await files.RecordingLengthAsync(id,null,CancellationToken.None)).IsNull();
             await File.WriteAllBytesAsync(path,[1,2,3,4]);
-            await Assert.That(await files.RecordingLengthAsync(id,CancellationToken.None)).IsEqualTo(4L);
+            await Assert.That(await files.RecordingLengthAsync(id,null,CancellationToken.None)).IsEqualTo(4L);
             await File.WriteAllBytesAsync(path,[1,2,3,4,5,6]);
-            await Assert.That(await files.RecordingLengthAsync(id,CancellationToken.None)).IsEqualTo(6L);
+            await Assert.That(await files.RecordingLengthAsync(id,null,CancellationToken.None)).IsEqualTo(6L);
             await files.RemoveAsync(id,CancellationToken.None);
             await Assert.That(Directory.Exists(folder)).IsFalse();
             await Assert.That(Directory.Exists(root)).IsTrue();
@@ -50,6 +50,35 @@ public sealed class LiveSoloCaptureFilesTests
         finally
         {
             File.Delete(playlist); File.Delete(segment); Directory.Delete(folder); Directory.Delete(Path.Combine(root, "live-solo")); Directory.Delete(root);
+        }
+    }
+    [Test]
+    public async Task Active_recording_size_reads_provider_staging_and_cleanup_cannot_touch_a_sibling_or_unexpected_file()
+    {
+        var root=Path.Combine(Path.GetTempPath(),"noctf-capture-test-"+Guid.NewGuid().ToString("N"));
+        var parent=Path.Combine(root,".egress-tmp");var current=Path.Combine(parent,"EG_current");var sibling=Path.Combine(parent,"EG_sibling");
+        Directory.CreateDirectory(current);Directory.CreateDirectory(sibling);
+        var path=Path.Combine(current,"recording.mp4");var other=Path.Combine(sibling,"recording.mp4");var unexpected=Path.Combine(current,"inspect.txt");
+        var files=new LiveSoloCaptureFiles(new(){CaptureSpoolPath=root});var id=Guid.NewGuid();
+        try
+        {
+            await Assert.That(await files.RecordingLengthAsync(id,"EG_current",CancellationToken.None)).IsNull();
+            await File.WriteAllBytesAsync(path,[1,2,3,4]);await File.WriteAllBytesAsync(other,[5,6]);
+            await Assert.That(await files.RecordingLengthAsync(id,"EG_current",CancellationToken.None)).IsEqualTo(4L);
+            await File.WriteAllBytesAsync(path,[1,2,3,4,5,6]);
+            await Assert.That(await files.RecordingLengthAsync(id,"EG_current",CancellationToken.None)).IsEqualTo(6L);
+            await Assert.That(async()=>await files.RecordingLengthAsync(id,"../EG_sibling",CancellationToken.None)).Throws<InvalidDataException>();
+            await Assert.That(async()=>await files.RemoveRecordingStagingAsync("EG_current/..",CancellationToken.None)).Throws<InvalidDataException>();
+            await File.WriteAllTextAsync(unexpected,"requires inspection");
+            await Assert.That(async()=>await files.RemoveRecordingStagingAsync("EG_current",CancellationToken.None)).Throws<IOException>();
+            await Assert.That(File.Exists(unexpected)).IsTrue();await Assert.That(File.Exists(other)).IsTrue();
+            File.Delete(unexpected);await files.RemoveRecordingStagingAsync("EG_current",CancellationToken.None);
+            await Assert.That(Directory.Exists(current)).IsFalse();await Assert.That(File.Exists(other)).IsTrue();
+        }
+        finally
+        {
+            if(File.Exists(path))File.Delete(path);if(File.Exists(unexpected))File.Delete(unexpected);File.Delete(other);
+            if(Directory.Exists(current))Directory.Delete(current);Directory.Delete(sibling);Directory.Delete(parent);Directory.Delete(root);
         }
     }
 }

@@ -48,7 +48,7 @@ public sealed partial class LiveSoloCaptureStore
                 case LiveSoloRecordingAction.RetryPendingStart:
                     if(!active || record.State!=LiveSoloRecordingState.RequiresReview || record.RequestedAt!=null || record.EgressId!=null
                         || record.ReservedBytes!=0 || record.FileId!=null){failure=LiveSoloFailure.NotReady;return;}
-                    if(checked(options.RecordingExportLimitBytes*2)>options.RecordingQuotaBytes-await RecordingCapacityUsedAsync(ct))
+                    if(checked(options.RecordingExportLimitBytes*3)>options.RecordingQuotaBytes-await RecordingCapacityUsedAsync(ct))
                     {failure=LiveSoloFailure.NotReady;return;}
                     record.State=LiveSoloRecordingState.Pending;record.Failure=null;
                     break;
@@ -62,7 +62,7 @@ public sealed partial class LiveSoloCaptureStore
                     {
                         var output=observed.Files.SingleOrDefault(x=>x.ObjectKey.EndsWith("/recording.mp4",StringComparison.Ordinal));
                         if(output is null || output.ByteLength<=0 || output.ByteLength>options.RecordingExportLimitBytes
-                            || checked(output.ByteLength*2)>options.RecordingQuotaBytes-await RecordingCapacityUsedAsync(ct)+record.ReservedBytes)
+                            || checked(output.ByteLength*3)>options.RecordingQuotaBytes-await RecordingCapacityUsedAsync(ct)+record.ReservedBytes)
                         {failure=LiveSoloFailure.NotReady;return;}
                     }
                     record.EgressId=observed.Id;record.StartedAt??=observed.StartedAt;record.EndedAt=observed.EndedAt;
@@ -76,7 +76,7 @@ public sealed partial class LiveSoloCaptureStore
                         || !LiveSoloMediaPolicy.FreshStartProof(proofAt,clock.GetUtcNow())
                         || await db.LiveSoloRecordings.AnyAsync(x=>x.MediaSessionId==record.MediaSessionId&&x.UserId==record.UserId
                             &&x.VideoTrackId==record.VideoTrackId&&x.Chunk>record.Chunk,ct)){failure=LiveSoloFailure.NotReady;return;}
-                    if(checked(options.RecordingExportLimitBytes*2)>options.RecordingQuotaBytes-await RecordingCapacityUsedAsync(ct))
+                    if(checked(options.RecordingExportLimitBytes*3)>options.RecordingQuotaBytes-await RecordingCapacityUsedAsync(ct))
                     {failure=LiveSoloFailure.NotReady;return;}
                     var replacement=new LiveSoloRecording {Id=Guid.CreateVersion7(clock.GetUtcNow()),MediaSessionId=record.MediaSessionId,
                         UserId=record.UserId,VideoTrackId=record.VideoTrackId,Chunk=checked(record.Chunk+1),State=LiveSoloRecordingState.Pending,

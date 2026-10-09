@@ -18,7 +18,8 @@ public interface ILiveSoloCaptureFiles
     Task<IReadOnlyList<LiveSoloCapturedSegment>> SegmentsAsync(Guid captureId, CancellationToken cancellationToken);
     Task<Stream?> OpenAsync(Guid captureId, string fileName, CancellationToken cancellationToken);
     Task RemoveAsync(Guid captureId, CancellationToken cancellationToken);
-    Task<long?> RecordingLengthAsync(Guid captureId,CancellationToken cancellationToken);
+    Task<long?> RecordingLengthAsync(Guid captureId,string? providerExportId,CancellationToken cancellationToken);
+    Task RemoveRecordingStagingAsync(string providerExportId,CancellationToken cancellationToken);
     Task RemoveSegmentAsync(Guid captureId,string fileName,CancellationToken cancellationToken);
 }
 public sealed record PruneLiveSoloCapture(Guid MediaSessionId);

@@ -29,13 +29,13 @@ public sealed class LiveSoloRecordingRecoveryPersistenceTests
             await Assert.That(record.State).IsEqualTo(LiveSoloRecordingState.Pending);
             await gateway.DidNotReceiveWithAnyArgs().StartAsync(default!,default);
             await Assert.That(await f.Db.LiveSoloRecordingDecisions.CountAsync(ct)).IsEqualTo(1);
-            record.State=LiveSoloRecordingState.RequiresReview;record.RequestedAt=f.Now;record.ReservedBytes=32L*1024*1024;
+            record.State=LiveSoloRecordingState.RequiresReview;record.RequestedAt=f.Now;record.ReservedBytes=48L*1024*1024;
             record.Failure=LiveSoloRecordingFailure.StartUncertain;await f.Db.SaveChangesAsync(ct);
             command=Command(f,record,LiveSoloRecordingAction.RetryPendingStart);
             await Assert.That(await store.RecoverRecordingAsync(command,ct)).IsEqualTo(LiveSoloFailure.NotReady);
             gateway.ListAsync(Arg.Any<string>(),ct).Returns([]);
             await Assert.That(await store.RecoverRecordingAsync(command with {Action=LiveSoloRecordingAction.ReconcileExport},ct)).IsEqualTo(LiveSoloFailure.NotReady);
-            await Assert.That(record.ReservedBytes).IsEqualTo(32L*1024*1024);
+            await Assert.That(record.ReservedBytes).IsEqualTo(48L*1024*1024);
             await Assert.That(await f.Db.LiveSoloRecordingDecisions.CountAsync(ct)).IsEqualTo(1);
         });
     }
@@ -45,7 +45,7 @@ public sealed class LiveSoloRecordingRecoveryPersistenceTests
         await DockerIntegrationTest.RunAsync(async () =>
         {
             await using var f=await LiveSoloMatchPersistenceTests.Fixture.CreateAsync(ct);await f.PrepareAsync(ct);
-            var record=await Record(f,ct);record.RequestedAt=f.Now;record.ReservedBytes=32L*1024*1024;
+            var record=await Record(f,ct);record.RequestedAt=f.Now;record.ReservedBytes=48L*1024*1024;
             await f.Db.SaveChangesAsync(ct);var room=(await f.Db.LiveSoloMediaSessions.SingleAsync(ct)).RoomIdentity;
             var gateway=Substitute.For<ILiveSoloEgressGateway>();var observation=new LiveSoloExportObservation("real-job",room,LiveSoloExportState.Active,f.Now,null,null,[],record.Id);
             gateway.ListAsync(room,ct).Returns([observation]);var store=Store(f,gateway);
@@ -93,7 +93,7 @@ public sealed class LiveSoloRecordingRecoveryPersistenceTests
             gateway.StartAsync(Arg.Any<LiveSoloExportRequest>(),ct).Returns(Task.FromException<LiveSoloExportObservation>(new TaskCanceledException("provider start timeout")));
             var store=Store(f,gateway);await store.AdvanceAsync(record.MediaSessionId,ct);await store.AdvanceAsync(record.MediaSessionId,ct);
             await Assert.That(record.State).IsEqualTo(LiveSoloRecordingState.RequiresReview);await Assert.That(record.Failure).IsEqualTo(LiveSoloRecordingFailure.StartUncertain);
-            await Assert.That(record.ReservedBytes).IsEqualTo(32L*1024*1024);
+            await Assert.That(record.ReservedBytes).IsEqualTo(48L*1024*1024);
             await gateway.Received(1).StartAsync(Arg.Is<LiveSoloExportRequest>(x=>x!=null&&x.Id==record.Id),ct);
         });
     }
@@ -103,7 +103,7 @@ public sealed class LiveSoloRecordingRecoveryPersistenceTests
         await DockerIntegrationTest.RunAsync(async () =>
         {
             await using var f=await LiveSoloMatchPersistenceTests.Fixture.CreateAsync(ct);await f.PrepareAsync(ct);var record=await Record(f,ct);
-            record.RequestedAt=f.Now;record.ReservedBytes=32L*1024*1024;record.EgressId="archive-job";record.Failure=LiveSoloRecordingFailure.ArchiveCapacityUnavailable;
+            record.RequestedAt=f.Now;record.ReservedBytes=48L*1024*1024;record.EgressId="archive-job";record.Failure=LiveSoloRecordingFailure.ArchiveCapacityUnavailable;
             await f.Db.SaveChangesAsync(ct);var room=(await f.Db.LiveSoloMediaSessions.SingleAsync(ct)).RoomIdentity;
             var gateway=Substitute.For<ILiveSoloEgressGateway>();var job=new LiveSoloExportObservation("archive-job",room,LiveSoloExportState.Complete,f.Now,f.Now,null,
                 [new("/out/live-solo/"+record.Id.ToString("N")+"/recording.mp4",17L*1024*1024)],record.Id);
@@ -112,7 +112,7 @@ public sealed class LiveSoloRecordingRecoveryPersistenceTests
             gateway.ListAsync(room,ct).Returns([job with {Files=[new("/out/live-solo/"+record.Id.ToString("N")+"/recording.mp4",4)]}]);
             await Assert.That(await store.RecoverRecordingAsync(command,ct)).IsNull();
             await Assert.That(record.State).IsEqualTo(LiveSoloRecordingState.Finalizing);await Assert.That(record.EgressId).IsEqualTo("archive-job");
-            await Assert.That(record.FileId).IsNull();await Assert.That(record.ReservedBytes).IsEqualTo(32L*1024*1024);
+            await Assert.That(record.FileId).IsNull();await Assert.That(record.ReservedBytes).IsEqualTo(48L*1024*1024);
             await gateway.DidNotReceiveWithAnyArgs().StartAsync(default!,default);
         });
     }
@@ -121,7 +121,7 @@ public sealed class LiveSoloRecordingRecoveryPersistenceTests
     {
         await DockerIntegrationTest.RunAsync(async()=>{
             await using var f=await LiveSoloMatchPersistenceTests.Fixture.CreateAsync(ct);await f.PrepareAsync(ct);var record=await Record(f,ct);
-            record.State=LiveSoloRecordingState.Starting;record.RequestedAt=f.Now;record.ReservedBytes=32L*1024*1024;
+            record.State=LiveSoloRecordingState.Starting;record.RequestedAt=f.Now;record.ReservedBytes=48L*1024*1024;
             await f.Db.SaveChangesAsync(ct);var room=(await f.Db.LiveSoloMediaSessions.SingleAsync(ct)).RoomIdentity;
             var gateway=Substitute.For<ILiveSoloEgressGateway>();gateway.ListAsync(room,ct).Returns([
                 new("failed-job",room,LiveSoloExportState.Failed,null,f.Now,null,[],record.Id)]);
@@ -134,7 +134,7 @@ public sealed class LiveSoloRecordingRecoveryPersistenceTests
             f.Db.SavingChanges-=fail;f.Db.ChangeTracker.Clear();
             var persisted=await f.Db.LiveSoloRecordings.SingleAsync(x=>x.Id==record.Id,ct);
             await Assert.That(persisted.State).IsEqualTo(LiveSoloRecordingState.Starting);
-            await Assert.That(persisted.EgressId).IsNull();await Assert.That(persisted.ReservedBytes).IsEqualTo(32L*1024*1024);
+            await Assert.That(persisted.EgressId).IsNull();await Assert.That(persisted.ReservedBytes).IsEqualTo(48L*1024*1024);
             await Assert.That(await f.Db.Notifications.CountAsync(x=>x.SourceId==record.Id,ct)).IsEqualTo(0);
             await store.AdvanceAsync(record.MediaSessionId,ct);await store.AdvanceAsync(record.MediaSessionId,ct);
             await Assert.That(persisted.State).IsEqualTo(LiveSoloRecordingState.Failed);

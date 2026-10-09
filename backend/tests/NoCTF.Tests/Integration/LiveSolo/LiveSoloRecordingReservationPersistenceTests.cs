@@ -28,7 +28,7 @@ public sealed class LiveSoloRecordingReservationPersistenceTests
             await Assert.That((await store.StartCountdownAsync(command,ct)).Failure).IsEqualTo(NoCTF.Application.LiveSolo.Rounds.LiveSoloFailure.MediaUnavailable);
             var program=await f.Db.LiveSoloProgramCaptures.SingleAsync(ct);var jobs=new List<LiveSoloExportObservation>{new(program.EgressId!,session.RoomIdentity,LiveSoloExportState.Active,f.Now,null,null,[],program.Id)};
             foreach(var member in session.Participants){var record=new LiveSoloRecording {Id=Guid.NewGuid(),MediaSessionId=session.Id,UserId=member.UserId,VideoTrackId=member.ScreenTrackId!,
-                State=LiveSoloRecordingState.Recording,ReservedBytes=32L*1024*1024,EgressId="record-"+member.Identity,CreatedAt=f.Now,KeepUntil=f.Now.AddDays(30)};f.Db.LiveSoloRecordings.Add(record);
+                State=LiveSoloRecordingState.Recording,ReservedBytes=48L*1024*1024,EgressId="record-"+member.Identity,CreatedAt=f.Now,KeepUntil=f.Now.AddDays(30)};f.Db.LiveSoloRecordings.Add(record);
                 jobs.Add(new(record.EgressId,session.RoomIdentity,LiveSoloExportState.Active,f.Now,null,null,[],record.Id));}
             await f.Db.SaveChangesAsync(ct);f.egress.ListAsync(session.RoomIdentity,ct).Returns(_=>jobs.ToArray());
             jobs[1]=jobs[1] with {State=LiveSoloExportState.Failed};await Assert.That((await store.StartCountdownAsync(command,ct)).Failure).IsEqualTo(NoCTF.Application.LiveSolo.Rounds.LiveSoloFailure.MediaUnavailable);
@@ -48,7 +48,7 @@ public sealed class LiveSoloRecordingReservationPersistenceTests
             var files=Files();
             async Task Advance(){await using var db=new NoCtfDbContext(f.Options);await Store(db,f,gateway,files,options).AdvanceAsync(session.Id,ct);}
             await Task.WhenAll(Advance(),Advance());
-            await Assert.That(await f.Db.LiveSoloRecordings.SumAsync(x=>x.ReservedBytes,ct)).IsEqualTo(32L*1024*1024);
+            await Assert.That(await f.Db.LiveSoloRecordings.SumAsync(x=>x.ReservedBytes,ct)).IsEqualTo(48L*1024*1024);
             await Assert.That(await f.Db.LiveSoloRecordings.CountAsync(x=>x.State==LiveSoloRecordingState.RequiresReview,ct)).IsEqualTo(1);
             await gateway.Received(1).StartAsync(Arg.Is<LiveSoloExportRequest>(x=>x!=null&&x.Kind==LiveSoloExportKind.ScreenRecording),Arg.Any<CancellationToken>());
             await Store(f.Db,f,gateway,files,options).EnsureAsync(session.Id,ct);
@@ -67,7 +67,7 @@ public sealed class LiveSoloRecordingReservationPersistenceTests
             gateway.ListAsync(session.RoomIdentity,ct).Returns(_=>jobs.ToArray());
             gateway.StartAsync(Arg.Any<LiveSoloExportRequest>(),ct).Returns(call=>{
                 var req=call.Arg<LiveSoloExportRequest>()!;var job=new LiveSoloExportObservation("chunk-"+req.Id,session.RoomIdentity,LiveSoloExportState.Active,f.Now,null,null,[],req.Id);jobs.Add(job);return job;});
-            var files=Files();files.RecordingLengthAsync(Arg.Any<Guid>(),ct).Returns(13L*1024*1024);
+            var files=Files();files.RecordingLengthAsync(Arg.Any<Guid>(),Arg.Any<string>(),ct).Returns(13L*1024*1024);
             var store=Store(f.Db,f,gateway,files,options);await store.AdvanceAsync(session.Id,ct);
             var record=await f.Db.LiveSoloRecordings.SingleAsync(ct);await Assert.That(record.State).IsEqualTo(LiveSoloRecordingState.Finalizing);
             await gateway.Received(1).StopAsync(record.EgressId!,ct);
@@ -75,6 +75,7 @@ public sealed class LiveSoloRecordingReservationPersistenceTests
             files.OpenAsync(record.Id,"recording.mp4",ct).Returns(_=>Task.FromResult<Stream?>(new MemoryStream([1,2,3,4])));
             await store.AdvanceAsync(session.Id,ct);await Assert.That(record.State).IsEqualTo(LiveSoloRecordingState.Completed);await Assert.That(record.ReservedBytes).IsEqualTo(0);
             await store.RemoveRecordingRawAsync(record.Id,ct);await Assert.That(record.RawRemovedAt).IsNotNull();
+            await files.Received(1).RemoveRecordingStagingAsync(record.EgressId!,ct);
             f.Now=f.Now.AddSeconds(2);await store.EnsureAsync(session.Id,ct);
             var next=await f.Db.LiveSoloRecordings.SingleAsync(x=>x.Chunk==1,ct);
             await Assert.That(next.Id).IsNotEqualTo(record.Id);await Assert.That(next.VideoTrackId).IsEqualTo(firstMember.ScreenTrackId);
@@ -90,16 +91,20 @@ public sealed class LiveSoloRecordingReservationPersistenceTests
             await using var f=await LiveSoloMatchPersistenceTests.Fixture.CreateAsync(ct);await f.PrepareAsync(ct);var session=await Sharing(f,ct);
             var member=session.Participants[0];
             var record=new LiveSoloRecording { Id=Guid.NewGuid(), MediaSessionId=session.Id, UserId=member.UserId,
-                VideoTrackId=member.ScreenTrackId!, State=LiveSoloRecordingState.Failed, ReservedBytes=32L*1024*1024,
+                VideoTrackId=member.ScreenTrackId!, State=LiveSoloRecordingState.Failed, ReservedBytes=48L*1024*1024,EgressId="EG_failed",
                 CreatedAt=f.Now, KeepUntil=f.Now.AddDays(30) };
             f.Db.LiveSoloRecordings.Add(record);await f.Db.SaveChangesAsync(ct);
             var files=Files();files.RemoveAsync(record.Id,ct).Returns(Task.FromException(new IOException("Spool unavailable")));
             var store=Store(f.Db,f,Substitute.For<ILiveSoloEgressGateway>(),files,new());
             await Assert.That(async()=>await store.RemoveRecordingRawAsync(record.Id,ct)).Throws<IOException>();
-            await Assert.That((await f.Db.LiveSoloRecordings.AsNoTracking().SingleAsync(ct)).ReservedBytes).IsEqualTo(32L*1024*1024);
+            await Assert.That((await f.Db.LiveSoloRecordings.AsNoTracking().SingleAsync(ct)).ReservedBytes).IsEqualTo(48L*1024*1024);
             var schedules=await new LiveSoloCaptureScheduleSource(f.Db).RebuildAsync(f.Now,ct);
             await Assert.That(schedules.Any(x=>x.Message is PruneLiveSoloCapture)).IsTrue();
             files.RemoveAsync(record.Id,ct).Returns(Task.CompletedTask);
+            files.RemoveRecordingStagingAsync(record.EgressId!,ct).Returns(Task.FromException(new IOException("Staging unavailable")));
+            await Assert.That(async()=>await store.RemoveRecordingRawAsync(record.Id,ct)).Throws<IOException>();
+            await Assert.That((await f.Db.LiveSoloRecordings.AsNoTracking().SingleAsync(ct)).ReservedBytes).IsEqualTo(48L*1024*1024);
+            files.RemoveRecordingStagingAsync(record.EgressId!,ct).Returns(Task.CompletedTask);
             await store.RemoveRecordingRawAsync(record.Id,ct);
             await Assert.That(record.ReservedBytes).IsEqualTo(0);await Assert.That(record.RawRemovedAt).IsNotNull();
             await Assert.That(record.State).IsEqualTo(LiveSoloRecordingState.Failed);

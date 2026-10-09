@@ -28,7 +28,8 @@ public sealed class LiveKitEgressIntegrationTests
             await using var egress = new ContainerBuilder("livekit/egress:v1.15.0@sha256:ac244a40268ce1dd1510fbff6eb529609ec68aceff1602343f79be8ca08c355b")
                 .WithNetwork(network).WithEnvironment("EGRESS_CONFIG_BODY", egressConfig).WithPortBinding(8080, true)
                 .WithWorkingDirectory("/out").WithCreateParameterModifier(p =>
-                { var host = p.HostConfig ??= new(); host.CapAdd = ["SYS_ADMIN"]; host.Tmpfs = new Dictionary<string, string> { ["/out"] = "rw,size=256m,mode=1777" }; })
+                { var host = p.HostConfig ??= new(); host.CapAdd = ["SYS_ADMIN"]; host.Tmpfs = new Dictionary<string, string> {
+                    ["/out"] = "rw,size=256m,mode=1777",["/home/egress/tmp"]="rw,size=256m,mode=1777" }; })
                 .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(8080)).Build();
             await egress.StartAsync(ct);
             using var services = new ServiceCollection().AddHttpClient(LiveKitMediaGateway.ClientName).Services
@@ -71,6 +72,8 @@ public sealed class LiveKitEgressIntegrationTests
             var recordJob = await gateway.StartAsync(recording, ct);
             await WaitFor(gateway, room, recordJob.Id, LiveSoloExportState.Active, ct);
             await Task.Delay(TimeSpan.FromSeconds(8), ct);
+            var staging=await egress.ExecAsync(["test","-s","/home/egress/tmp/"+recordJob.Id+"/recording.mp4"],ct);
+            await Assert.That(staging.ExitCode).IsEqualTo(0);
             await gateway.StopAsync(recordJob.Id, ct); await gateway.StopAsync(job.Id, ct);
             var completed = await WaitFor(gateway, room, recordJob.Id, LiveSoloExportState.Complete, ct);
             await WaitFor(gateway, room, job.Id, LiveSoloExportState.Complete, ct);

@@ -37,6 +37,12 @@ def prepare(installation: Path, spool: Path, domain: str, rtc_ip: str, maximum_b
         raise ValueError('Media configuration already exists; inspect and update it explicitly.')
     if (installation / 'compose.live-solo.yml').exists():
         raise ValueError('The media overlay already exists; inspect it explicitly rather than overwriting it.')
+    staging = spool / '.egress-tmp'
+    if staging.exists() or staging.is_symlink():
+        raise ValueError('The Egress staging directory already exists; inspect it explicitly.')
+    staging.mkdir(mode=0o2770)
+    os.chown(staging, -1, media_gid)
+    os.chmod(staging, 0o2770)
     config.mkdir(parents=True, mode=0o700)
     environment.mkdir(parents=True, mode=0o700)
     os.chown(config, -1, media_gid)
@@ -51,7 +57,7 @@ def prepare(installation: Path, spool: Path, domain: str, rtc_ip: str, maximum_b
             os.chmod(path, 0o640)
     write(config / 'redis.conf', 'bind 0.0.0.0\nprotected-mode yes\nrequirepass ' + redis_secret + '\nmaxmemory 512mb\nmaxmemory-policy noeviction\nappendonly no\nsave ""\n')
     write(config / 'livekit.yaml', f'port: 7880\nrtc:\n  tcp_port: 7881\n  udp_port: 7882\n  use_external_ip: false\n  node_ip: {rtc_ip}\nredis:\n  address: media-redis:6379\n  password: {redis_secret}\nkeys:\n  {key}: {secret}\nroom:\n  auto_create: false\n  max_participants: 64\nlogging:\n  level: error\n')
-    write(config / 'egress.yaml', f'api_key: {key}\napi_secret: {secret}\nws_url: ws://media-sfu:7880\ninsecure: true\nredis:\n  address: media-redis:6379\n  password: {redis_secret}\nhealth_port: 8080\nlogging:\n  level: error\nsession_limits:\n  file_output_max_duration: 30m\n  segment_output_max_duration: 30m\n')
+    write(config / 'egress.yaml', f'api_key: {key}\napi_secret: {secret}\nws_url: ws://media-sfu:7880\ninsecure: true\nredis:\n  address: media-redis:6379\n  password: {redis_secret}\nhealth_port: 8080\nlogging:\n  level: error\nsession_limits:\n  file_output_max_duration: 30m\n  file_output_max_size: 536870912\n  segment_output_max_duration: 30m\n')
     write(environment / 'noctf.env', f'LiveSolo__Media__Enabled=true\nLiveSolo__Media__ApiUrl=http://media-sfu:7880\nLiveSolo__Media__ClientUrl=wss://{domain}\nLiveSolo__Media__ApiKey={key}\nLiveSolo__Media__ApiSecret={secret}\nLiveSolo__Media__EgressHealthUrl=http://media-egress:8080\nLiveSolo__Media__EgressOutputRoot=/out\nLiveSolo__Media__CaptureSpoolPath=/out\nLiveSolo__Media__ProgramChunkSeconds=300\nLiveSolo__Media__RecordingExportLimitBytes=536870912\n')
     write(environment / 'compose.env', f'LIVE_SOLO_SPOOL_PATH={spool}\nLIVE_SOLO_MEDIA_GID={media_gid}\n')
     source = Path(__file__).resolve().parent.parent
