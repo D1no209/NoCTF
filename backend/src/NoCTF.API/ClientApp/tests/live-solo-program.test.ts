@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { segmentIdFromUrl, stateForPlayingSegment } from '../app/features/live-solo/program-state'
+import { segmentIdFromUrl, stateForPlayingSegment, rememberPublishedStates } from '../app/features/live-solo/program-state'
 import { fragmentAtPlaybackTime } from '../app/components/ui/media-preview/media-timeline'
 
 test('program state is bound to the played fragment and never substitutes a newer latest score', () => {
@@ -24,4 +24,12 @@ test('preloaded fragments cannot advance the state ahead of video playback', () 
   expect(fragmentAtPlaybackTime(ranges, 2, true)).toBe('second')
   expect(fragmentAtPlaybackTime(ranges, 5, true)).toBe('latest')
   expect(fragmentAtPlaybackTime(ranges, 20, true)).toBeNull()
+})
+test('already authorized buffered video keeps its immutable frame when the server window shrinks', () => {
+  const first=rememberPublishedStates(new Map(),[{id:'playing',state:{leftWins:0}},{id:'newer',state:{leftWins:1}}],null)
+  const shrunk=rememberPublishedStates(first,[{id:'newer',state:{leftWins:9}},{id:'latest',state:{leftWins:2}}],'playing',2)
+  expect(shrunk.get('playing')).toEqual({leftWins:0})
+  expect(shrunk.get('latest')).toEqual({leftWins:2})
+  expect(shrunk.size).toBe(2)
+  expect(shrunk.get('absent')).toBeUndefined()
 })

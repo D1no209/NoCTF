@@ -3,7 +3,7 @@ import { getLiveSoloProgram, manageLiveSoloViewer } from '~/api'
 import type { NoCtfapiEndpointsLiveSoloLiveSoloProgramResponse as Program } from '~/api'
 import { getAccessToken } from '~/lib/session'
 import { parseLiveSoloError } from './live-solo-errors'
-import { segmentIdFromUrl, stateForPlayingSegment } from './program-state'
+import { segmentIdFromUrl, rememberPublishedStates } from './program-state'
 import { message, type UiMessage } from '~/utils/i18n'
 import { matchStateKey, formatRoundClock } from './live-solo-state'
 import { ProgramViewerLease } from './program-viewer-lease'
@@ -14,7 +14,8 @@ export function useLiveSoloProgram() {
   const competitionId = computed(() => route.params.id as string), matchId = computed(() => route.params.matchId as string)
   const program = ref<Program | null>(null), playingId = ref<string | null>(null), error = ref<UiMessage | null>(null), loading = ref(false)
   const admitted = ref(false), entering = ref(false)
-  const state = computed(() => stateForPlayingSegment(program.value?.segments ?? [], playingId.value))
+  const publishedStates = ref<ReadonlyMap<string, NonNullable<NonNullable<Program['segments']>[number]['state']>>>(new Map())
+  const state = computed(() => playingId.value ? publishedStates.value.get(playingId.value) ?? null : null)
   const source = computed(() => program.value?.programCaptureId ? program.value.playlistUrl ?? null : null)
   const stateKey = computed(() => matchStateKey(state.value?.matchState))
   const clock = computed(() => formatRoundClock(state.value?.limitSeconds == null ? null
@@ -40,7 +41,7 @@ export function useLiveSoloProgram() {
       return !result.error && !!result.data
     }, active => {
       admitted.value = active
-      if (!active) { request++; program.value = null; playingId.value = null }
+      if (!active) { request++; program.value = null; playingId.value = null; publishedStates.value = new Map() }
     })
   }
   let lease = viewer()
@@ -67,6 +68,7 @@ export function useLiveSoloProgram() {
       if (result.response?.status === 404) { program.value = null; playingId.value = null; error.value = null; return }
       if (result.error || !result.data) throw parseLiveSoloError(result.error, message('liveSolo.error.load'))
       if (result.data.programCaptureId !== program.value?.programCaptureId) playingId.value = null
+      publishedStates.value = rememberPublishedStates(publishedStates.value, result.data.segments ?? [], playingId.value)
       program.value = result.data; error.value = null
     }
     catch (cause) { if (!disposed && id === request) { program.value = null; playingId.value = null; error.value = parseLiveSoloError(cause, message('liveSolo.error.load')).displayMessage } }
