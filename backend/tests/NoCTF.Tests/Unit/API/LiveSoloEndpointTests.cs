@@ -23,6 +23,8 @@ using NoCTF.Application.LiveSolo.Rounds;
 using NoCTF.Application.Messaging;
 using NSubstitute;
 using NoCTF.Application.LiveSolo.Resources;
+using NoCTF.Application.LiveSolo.Adjudication;
+using NoCTF.Domain.LiveSolo;
 using FluentStorage.Storage;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -133,15 +135,73 @@ public sealed class LiveSoloEndpointTests
         await Assert.That(await unavailable.Content.ReadAsStringAsync()).DoesNotContain("private-object");
     }
 
-    private static async Task<WebApplication> HostAsync(ILiveSoloMatchStore store, ILiveSoloAttachmentStore attachmentStore, IStore objects)
+    [Test]
+    public async Task Judge_action_requires_identity_reason_and_current_context_and_preserves_typed_failures()
+    {
+        var decisions = Substitute.For<ILiveSoloAdjudicationStore>();
+        decisions.ApplyAsync(Arg.Any<AdjudicateLiveSoloMatch>(), Arg.Any<CancellationToken>())
+            .Returns(new LiveSoloAdjudicationResult(null, null, null, LiveSoloFailure.Forbidden));
+        await using var app = await HostAsync(Substitute.For<ILiveSoloMatchStore>(), Substitute.For<ILiveSoloAttachmentStore>(), Substitute.For<IStore>(), decisions);
+        using var client = app.GetTestClient();
+        var competition = Guid.NewGuid(); var match = Guid.NewGuid(); var round = Guid.NewGuid();
+        var path = $"/api/v1/competitions/{competition}/live-solo/matches/{match}/adjudications";
+        var input = new { action = "Pause", reason = "裁判暂停", expectedMatchStamp = Guid.NewGuid(), expectedRoundId = round,
+            expectedRoundStamp = Guid.NewGuid(), expectedTimelineRevision = 2, competitionId = Guid.NewGuid(), matchId = Guid.NewGuid() };
+        using var anonymous = await client.PostAsJsonAsync(path, input);
+        await Assert.That(anonymous.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "verified-test");
+        using var invalid = await client.PostAsJsonAsync(path, new { action = "Pause", reason = " ", expectedMatchStamp = Guid.NewGuid() });
+        await Assert.That(invalid.StatusCode).IsEqualTo(HttpStatusCode.UnprocessableEntity);
+        await decisions.DidNotReceive().ApplyAsync(Arg.Any<AdjudicateLiveSoloMatch>(), Arg.Any<CancellationToken>());
+        using var forbidden = await client.PostAsJsonAsync(path, input);
+        await Assert.That(forbidden.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
+        await decisions.Received(1).ApplyAsync(Arg.Is<AdjudicateLiveSoloMatch>(x => x != null && x.CompetitionId == competition
+            && x.MatchId == match && x.ActorId == Actor && x.ExpectedRoundId == round), Arg.Any<CancellationToken>());
+        decisions.ApplyAsync(Arg.Any<AdjudicateLiveSoloMatch>(), Arg.Any<CancellationToken>())
+            .Returns(new LiveSoloAdjudicationResult(null, null, null, LiveSoloFailure.Conflict));
+        using var stale = await client.PostAsJsonAsync(path, input);
+        await Assert.That(stale.StatusCode).IsEqualTo(HttpStatusCode.Conflict);
+        using var body = JsonDocument.Parse(await stale.Content.ReadAsStringAsync());
+        await Assert.That(body.RootElement.GetProperty("code").GetString()).IsEqualTo("Conflict");
+    }
+
+    [Test]
+    public async Task Decision_response_serializes_bounded_states_and_history_does_not_leak_to_a_participant()
+    {
+        var decisions = Substitute.For<ILiveSoloAdjudicationStore>(); var competition = Guid.NewGuid(); var match = Guid.NewGuid(); var round = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow; var stamp = Guid.NewGuid();
+        decisions.ApplyAsync(Arg.Any<AdjudicateLiveSoloMatch>(), Arg.Any<CancellationToken>()).Returns(new LiveSoloAdjudicationResult(
+            new(match, competition, LiveSoloMatchState.Paused, stamp, 2, 0, 0, Guid.NewGuid(), "left", Guid.NewGuid(), "right", round, null, []),
+            new(round, match, 1, 0, LiveSoloRoundState.Running, stamp, 3, null, now, 900, 5000, true, null, null),
+            new(Guid.NewGuid(), match, round, Actor, null, LiveSoloJudgeAction.Pause, "裁判暂停", now, LiveSoloMatchState.Running,
+                LiveSoloMatchState.Paused, LiveSoloRoundState.Running, LiveSoloRoundState.Running, 0, 0, 0, 0, 2, 3)));
+        decisions.ReadAsync(competition, match, Actor, Arg.Any<CancellationToken>()).Returns((IReadOnlyList<LiveSoloAdjudicationView>?)null);
+        await using var app = await HostAsync(Substitute.For<ILiveSoloMatchStore>(), Substitute.For<ILiveSoloAttachmentStore>(), Substitute.For<IStore>(), decisions);
+        using var client = app.GetTestClient(); client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "verified-test");
+        var path = $"/api/v1/competitions/{competition}/live-solo/matches/{match}/adjudications";
+        using var response = await client.PostAsJsonAsync(path, new { action = "Pause", reason = "裁判暂停", expectedMatchStamp = stamp,
+            expectedRoundId = round, expectedRoundStamp = stamp, expectedTimelineRevision = 2 });
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        await Assert.That(body.RootElement.GetProperty("decision").GetProperty("action").GetString()).IsEqualTo("Pause");
+        await Assert.That(body.RootElement.GetProperty("decision").GetProperty("roundState").GetString()).IsEqualTo("Running");
+        using var history = await client.GetAsync(path);
+        await Assert.That(history.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+        await Assert.That(history.Headers.CacheControl!.NoStore).IsTrue();
+    }
+
+    private static async Task<WebApplication> HostAsync(ILiveSoloMatchStore store, ILiveSoloAttachmentStore attachmentStore, IStore objects,
+        ILiveSoloAdjudicationStore? decisions = null)
     {
         var builder = WebApplication.CreateBuilder(); builder.WebHost.UseTestServer();
         builder.Services.AddFastEndpoints(options => { options.DisableAutoDiscovery = true; options.Assemblies = [typeof(GetLiveSoloMatchEndpoint).Assembly];
             options.Filter = x => x == typeof(ListLiveSoloQuestionsEndpoint) || x == typeof(SubmitLiveSoloFlagEndpoint)
-                || x == typeof(StartLiveSoloCountdownEndpoint) || x == typeof(DownloadLiveSoloAttachmentEndpoint); });
+                || x == typeof(StartLiveSoloCountdownEndpoint) || x == typeof(DownloadLiveSoloAttachmentEndpoint)
+                || x == typeof(AdjudicateLiveSoloMatchEndpoint) || x == typeof(ListLiveSoloAdjudicationsEndpoint); });
         builder.Services.AddAuthentication("Bearer").AddScheme<AuthenticationSchemeOptions, TestAuthentication>("Bearer", _ => { });
         builder.Services.AddAuthorization(); builder.Services.AddSingleton(store); builder.Services.AddSingleton<ManageLiveSoloMatches>();
         builder.Services.AddSingleton(attachmentStore); builder.Services.AddSingleton(objects); builder.Services.AddSingleton<AccessLiveSoloAttachments>();
+        builder.Services.AddSingleton(decisions ?? Substitute.For<ILiveSoloAdjudicationStore>()); builder.Services.AddSingleton<ManageLiveSoloAdjudication>();
         builder.Services.AddSingleton<IUserContext>(new TestUser()); builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton<IRequestAdmission>(new Admission());
         var source = Substitute.For<IRequestSourceAddress>(); source.Address.Returns("192.0.2.10");

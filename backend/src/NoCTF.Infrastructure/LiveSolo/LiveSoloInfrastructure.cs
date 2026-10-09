@@ -25,6 +25,8 @@ public static class LiveSoloInfrastructure
         services.AddScoped<ILiveSoloMatchStore, LiveSoloMatchStore>();
         services.AddScoped<ILiveSoloBracketStore, LiveSoloMatchStore>();
         services.AddScoped<ManageLiveSoloBracket>();
+        services.AddScoped<NoCTF.Application.LiveSolo.Adjudication.ILiveSoloAdjudicationStore, LiveSoloMatchStore>();
+        services.AddScoped<NoCTF.Application.LiveSolo.Adjudication.ManageLiveSoloAdjudication>();
         services.AddScoped<ManageLiveSoloMatches>();
         services.AddScoped<ILiveSoloTemplateCopyStore, LiveSoloTemplateCopyStore>();
         services.AddScoped<CopyLiveSoloTemplate>();

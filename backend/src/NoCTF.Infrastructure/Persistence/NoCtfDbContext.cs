@@ -47,6 +47,7 @@ public sealed class NoCtfDbContext(
             notificationChangeTracker.Transactions);
     }
     public DbSet<LiveSoloMatch> LiveSoloMatches => Set<LiveSoloMatch>();
+    public DbSet<LiveSoloAdjudication> LiveSoloAdjudications => Set<LiveSoloAdjudication>();
     public DbSet<LiveSoloRound> LiveSoloRounds => Set<LiveSoloRound>();
     public DbSet<LiveSoloRoundQuestion> LiveSoloRoundQuestions => Set<LiveSoloRoundQuestion>();
     public DbSet<LiveSoloActiveTeamSlot> LiveSoloActiveTeamSlots => Set<LiveSoloActiveTeamSlot>();
@@ -220,6 +221,8 @@ public sealed class NoCtfDbContext(
             || ChangeTracker.Entries<LiveSoloDownloadEvidence>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted)
             || ChangeTracker.Entries<LiveSoloAttachmentAssignment>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
             throw new InvalidOperationException("Execution-scoped gameplay associations are immutable.");
+        if (ChangeTracker.Entries<LiveSoloAdjudication>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("LiveSolo staff decisions are immutable.");
         if (ChangeTracker.Entries<NoCTF.Domain.Challenges.WriteUps.WriteUpUnlockReceipt>().Any(entry =>
                 entry.State is EntityState.Modified or EntityState.Deleted))
             throw new InvalidOperationException("WriteUp unlock receipts are immutable.");

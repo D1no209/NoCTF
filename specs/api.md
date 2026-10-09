@@ -744,6 +744,10 @@ PUT /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/wri
 
 ## LiveSolo
 
+裁判操作：`POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/adjudications`。请求提供 `ExpectedMatchStamp`、当前 `ExpectedRoundId`／`ExpectedRoundStamp`／`ExpectedTimelineRevision`、`Action` 和必填 `Reason`。没有当前 Round 时三个 Round 字段均为 null。操作为 `Pause`、`Resume`、`VoidRound`、`ForfeitMatch`；弃权还需 `ForfeitingTeamId`。Administrator、所有者、Manager、Judge 可操作，Observer 只读。旧版本返回 typed Conflict。暂停与比赛暂停按区间并集合并；作废不计胜，弃权结束 Match 并原子晋级，不生成 Flag 或虚构 Round 胜场。既有完成结果需通过后续专门纠正流程处理。
+
+`GET` 同路径返回工作人员可读的不可修改裁定记录，包含操作前后状态、胜场、时间线版本、执行者、原因和时间。选手请求返回 NotFound，响应禁止缓存。
+
 独立对局与媒体业务不使用普通题目计分投影；配置、上场名单、Round 与执行作用域分别鉴权。
 
 ```text
@@ -751,6 +755,8 @@ GET /api/v1/competitions/{competitionId}/live-solo/configuration
 GET /api/v1/competitions/{competitionId}/live-solo/matches
 POST /api/v1/competitions/{competitionId}/live-solo/matches
 GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/adjudications
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/adjudications
 POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/roster
 POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/ready
 POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds

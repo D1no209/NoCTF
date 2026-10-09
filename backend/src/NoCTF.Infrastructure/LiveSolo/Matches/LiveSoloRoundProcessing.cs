@@ -85,9 +85,7 @@ public sealed partial class LiveSoloMatchStore
             }
             if (match.State == LiveSoloMatchState.Completed)
             {
-                await db.LiveSoloActiveTeamSlots.Where(x => x.MatchId == match.Id).ExecuteDeleteAsync(ct);
-                foreach (var slot in db.ChangeTracker.Entries<LiveSoloActiveTeamSlot>().Where(x => x.Entity.MatchId == match.Id).ToArray())
-                    slot.State = EntityState.Detached;
+                await ReleaseActiveTeamSlotsAsync(match.Id, ct);
                 await AdvanceBracketAsync(match, now, ct);
             }
             await db.SaveChangesAsync(ct);

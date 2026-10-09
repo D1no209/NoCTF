@@ -727,6 +727,12 @@ export type NoCtfapiEndpointsNotificationsReadNotificationFeedRequest = {
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsLiveSoloAdjudicateLiveSoloMatchResponse = {
+    match?: NoCtfapiEndpointsLiveSoloLiveSoloMatchResponse;
+    round?: NoCtfapiEndpointsLiveSoloLiveSoloRoundResponse | null;
+    decision?: NoCtfapiEndpointsLiveSoloLiveSoloAdjudicationResponse;
+};
+
 export type NoCtfapiEndpointsLiveSoloLiveSoloMatchResponse = {
     id?: string;
     competitionId?: string;
@@ -753,6 +759,48 @@ export type NoCtfapiEndpointsLiveSoloLiveSoloRosterResponse = {
     ready?: boolean;
 };
 
+export type NoCtfapiEndpointsLiveSoloLiveSoloRoundResponse = {
+    id?: string;
+    matchId?: string;
+    number?: number;
+    replay?: number;
+    state?: NoCtfDomainLiveSoloLiveSoloRoundState;
+    concurrencyStamp?: string;
+    timelineRevision?: number;
+    countdownAt?: string | null;
+    startedAt?: string | null;
+    limitSeconds?: number;
+    activeElapsedMilliseconds?: number;
+    paused?: boolean;
+    winnerTeamId?: string | null;
+    winningGameplayFactId?: string | null;
+};
+
+export type NoCtfDomainLiveSoloLiveSoloRoundState = 'Preparing' | 'Countdown' | 'Running' | 'ConfirmingResult' | 'Won' | 'TimedOut' | 'Canceled';
+
+export type NoCtfapiEndpointsLiveSoloLiveSoloAdjudicationResponse = {
+    id?: string;
+    matchId?: string;
+    roundId?: string | null;
+    actorUserId?: string;
+    forfeitingTeamId?: string | null;
+    action?: NoCtfDomainLiveSoloLiveSoloJudgeAction;
+    reason?: string;
+    occurredAt?: string;
+    previousMatchState?: NoCtfDomainLiveSoloLiveSoloMatchState;
+    matchState?: NoCtfDomainLiveSoloLiveSoloMatchState;
+    previousRoundState?: NoCtfDomainLiveSoloLiveSoloRoundState | null;
+    roundState?: NoCtfDomainLiveSoloLiveSoloRoundState | null;
+    previousLeftWins?: number;
+    previousRightWins?: number;
+    leftWins?: number;
+    rightWins?: number;
+    previousTimelineRevision?: number | null;
+    timelineRevision?: number | null;
+};
+
+export type NoCtfDomainLiveSoloLiveSoloJudgeAction = 'Pause' | 'Resume' | 'VoidRound' | 'ForfeitMatch';
+
 export type NoCtfapiEndpointsLiveSoloLiveSoloFailureResponse = {
     code?: NoCtfApplicationLiveSoloRoundsLiveSoloFailure;
     detail?: string;
@@ -763,6 +811,16 @@ export type NoCtfapiEndpointsLiveSoloLiveSoloFailureResponse = {
 };
 
 export type NoCtfApplicationLiveSoloRoundsLiveSoloFailure = 'NotFound' | 'Forbidden' | 'Disabled' | 'InvalidConfiguration' | 'Conflict' | 'RosterLocked' | 'NotReady' | 'MediaUnavailable' | 'IsolationUnavailable' | 'RoundNotRunning' | 'RoundPaused' | 'QuestionNotOpen' | 'DeadlinePassed' | 'AlreadyEnded' | 'NoSuitableQuestionGroup' | 'DependencyUnavailable' | 'IdempotencyConflict';
+
+export type NoCtfapiEndpointsLiveSoloAdjudicateLiveSoloMatchRequest = {
+    expectedMatchStamp: string;
+    expectedRoundId?: string | null;
+    expectedRoundStamp?: string | null;
+    expectedTimelineRevision?: number | null;
+    action: NoCtfDomainLiveSoloLiveSoloJudgeAction;
+    forfeitingTeamId?: string | null;
+    reason: string;
+};
 
 export type NoCtfapiEndpointsLiveSoloConfirmLiveSoloReadyRequest = {
     expectedStamp: string;
@@ -888,26 +946,11 @@ export type NoCtfapiEndpointsLiveSoloGetLiveSoloMatchRequest = {
     [key: string]: never;
 };
 
-export type NoCtfapiEndpointsLiveSoloLiveSoloRoundResponse = {
-    id?: string;
-    matchId?: string;
-    number?: number;
-    replay?: number;
-    state?: NoCtfDomainLiveSoloLiveSoloRoundState;
-    concurrencyStamp?: string;
-    timelineRevision?: number;
-    countdownAt?: string | null;
-    startedAt?: string | null;
-    limitSeconds?: number;
-    activeElapsedMilliseconds?: number;
-    paused?: boolean;
-    winnerTeamId?: string | null;
-    winningGameplayFactId?: string | null;
+export type NoCtfapiEndpointsLiveSoloGetLiveSoloRoundRequest = {
+    [key: string]: never;
 };
 
-export type NoCtfDomainLiveSoloLiveSoloRoundState = 'Preparing' | 'Countdown' | 'Running' | 'ConfirmingResult' | 'Won' | 'TimedOut' | 'Canceled';
-
-export type NoCtfapiEndpointsLiveSoloGetLiveSoloRoundRequest = {
+export type NoCtfapiEndpointsLiveSoloListLiveSoloAdjudicationsRequest = {
     [key: string]: never;
 };
 
@@ -5964,6 +6007,82 @@ export type ReadNotificationThreadEndpointResponses = {
 };
 
 export type ReadNotificationThreadEndpointResponse = ReadNotificationThreadEndpointResponses[keyof ReadNotificationThreadEndpointResponses];
+
+export type ListLiveSoloAdjudicationsData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        matchId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/adjudications';
+};
+
+export type ListLiveSoloAdjudicationsErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type ListLiveSoloAdjudicationsResponses = {
+    /**
+     * Success
+     */
+    200: Array<NoCtfapiEndpointsLiveSoloLiveSoloAdjudicationResponse>;
+};
+
+export type ListLiveSoloAdjudicationsResponse = ListLiveSoloAdjudicationsResponses[keyof ListLiveSoloAdjudicationsResponses];
+
+export type AdjudicateLiveSoloMatchData = {
+    body: NoCtfapiEndpointsLiveSoloAdjudicateLiveSoloMatchRequest;
+    path: {
+        competitionId: string;
+        matchId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/adjudications';
+};
+
+export type AdjudicateLiveSoloMatchErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsLiveSoloLiveSoloFailureResponse;
+    422: NoCtfapiEndpointsLiveSoloLiveSoloFailureResponse;
+};
+
+export type AdjudicateLiveSoloMatchError = AdjudicateLiveSoloMatchErrors[keyof AdjudicateLiveSoloMatchErrors];
+
+export type AdjudicateLiveSoloMatchResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsLiveSoloAdjudicateLiveSoloMatchResponse;
+};
+
+export type AdjudicateLiveSoloMatchResponse = AdjudicateLiveSoloMatchResponses[keyof AdjudicateLiveSoloMatchResponses];
 
 export type ConfirmLiveSoloReadyData = {
     body: NoCtfapiEndpointsLiveSoloConfirmLiveSoloReadyRequest;
