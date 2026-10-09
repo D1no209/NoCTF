@@ -15,6 +15,7 @@ import LiveSoloQuestions from './LiveSoloQuestions.vue'
 import { useLiveSoloScreen } from './media/useLiveSoloScreen'
 import { useLiveSoloHub } from './useLiveSoloHub'
 import CompetitionParticipantWorkspace from '~/features/competition/CompetitionParticipantWorkspace.vue'
+import { canManageLiveSolo } from './settings-draft'
 
 export function useLiveSoloMatch() {
   const route = useRoute(), router = useRouter(), { user } = useAuth()
@@ -26,11 +27,18 @@ export function useLiveSoloMatch() {
   const selectedRoster = ref<string[]>([]), memberNames = ref<ReadonlyMap<string, string>>(new Map())
   const staff = computed(() => ctx?.competition.value?.administrationRole != null)
   useLiveSoloHub(competitionId, matchId, staff, load)
-  const judge = computed(() => canJudgeLiveSolo(ctx?.competition.value?.administrationRole))
+  const judge = computed(() => canJudgeLiveSolo(ctx?.competition.value?.administrationRole) && !match.value?.pendingCorrectionId)
+  const canCorrect = computed(() => canManageLiveSolo(ctx?.competition.value?.administrationRole)
+    && (match.value?.state === 'Completed' || !!match.value?.pendingCorrectionId))
+  async function correct() {
+    const source = match.value?.pendingCorrectionMatchId ?? matchId.value
+    const suffix = match.value?.pendingCorrectionId ? '/' + match.value.pendingCorrectionId : ''
+    await router.push('/competitions/' + competitionId.value + '/live-solo/corrections/' + source + suffix)
+  }
   const myRoster = computed(() => match.value?.rosters?.find(x => x.teamId === team.value?.id) ?? null)
   const captain = computed(() => user.value?.userId != null && team.value?.captainId === user.value.userId)
   const onRoster = computed(() => !!user.value?.userId && myRoster.value?.userIds?.includes(user.value.userId) === true)
-  const canLock = computed(() => canLockLiveSoloRoster(match.value, team.value?.id, captain.value, myRoster.value?.locked))
+  const canLock = computed(() => !match.value?.pendingCorrectionId && canLockLiveSoloRoster(match.value, team.value?.id, captain.value, myRoster.value?.locked))
   const allLocked = computed(() => match.value?.rosters?.length === 2 && match.value.rosters.every(x => x.locked))
   const readOnlyMedia = computed(() => staff.value && !onRoster.value)
   const screen = useLiveSoloScreen(competitionId, matchId, media, readOnlyMedia)
@@ -166,7 +174,7 @@ export function useLiveSoloMatch() {
   })
   return { competitionId, matchId, match, round, media, configuration, loading, busy, team, myRoster, captain, onRoster,
     canLock, allLocked, rosterOptions, selectedRoster, toggleRoster, lockRoster, ready, prepareMedia, prepareRound, start,
-    staff, readOnlyMedia, judge, screens, myScreen, clock, stateKey: computed(() => matchStateKey(match.value?.state)), back, load,
+    staff, readOnlyMedia, judge, canCorrect, correct, screens, myScreen, clock, stateKey: computed(() => matchStateKey(match.value?.state)), back, load,
     judgeOpen, judgeAction, judgeReason, forfeitingTeam, openDecision, confirmDecision, setJudgeOpen,
     leaveOpen, setLeaveOpen, confirmLeave, Workspace: markRaw(CompetitionParticipantWorkspace),
     Questions: markRaw(LiveSoloQuestions), canSubmit: computed(() => onRoster.value && canPlayLiveSolo(match.value, round.value)),

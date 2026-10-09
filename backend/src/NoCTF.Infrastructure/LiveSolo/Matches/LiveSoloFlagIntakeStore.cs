@@ -36,6 +36,7 @@ public sealed partial class LiveSoloMatchStore
         if (match is null || !match.Roster.Any(x => x.TeamId == teamId && x.UserId == command.ActorId)
             || !match.Slots.Any(x => x.TeamId == teamId && x.RosterLockedAt != null)) return new(null, null, null, LiveSoloFailure.Forbidden);
         if (match.State == LiveSoloMatchState.Paused) return new(null, null, null, LiveSoloFailure.RoundPaused);
+        if (match.PendingCorrectionId is not null || match.SupersededAt is not null) return new(null, null, null, LiveSoloFailure.RoundNotRunning);
         if (match.State != LiveSoloMatchState.Running || match.CurrentRoundId != command.RoundId) return new(null, null, null, LiveSoloFailure.RoundNotRunning);
         var competition = await db.Competitions.AsNoTracking().SingleAsync(x => x.Id == command.CompetitionId, ct);
         if (competition.ModeConfiguration is not LiveSoloCompetitionModeConfiguration { Enabled: true }) return new(null, null, null, LiveSoloFailure.Disabled);

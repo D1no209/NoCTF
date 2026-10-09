@@ -28,7 +28,9 @@ internal sealed class LiveSoloMatchConfiguration : IEntityTypeConfiguration<Live
     public void Configure(EntityTypeBuilder<LiveSoloMatch> builder)
     {
         builder.ToTable("live_solo_matches"); builder.HasKey(x => x.Id);
-        builder.HasIndex(x => new { x.CompetitionId, x.Lane, x.Stage, x.Position }).IsUnique();
+        builder.HasIndex(x => new { x.CompetitionId, x.Lane, x.Stage, x.Position, x.BracketGeneration }).IsUnique();
+        builder.HasOne<LiveSoloResultCorrection>().WithMany().HasForeignKey(x => x.PendingCorrectionId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<LiveSoloMatch>().WithMany().HasForeignKey(x => x.ReplacementMatchId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Competition>().WithMany().HasForeignKey(x => x.CompetitionId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Team>().WithMany().HasForeignKey(x => x.WinnerTeamId).OnDelete(DeleteBehavior.Restrict);
         builder.HasMany(x => x.Slots).WithOne().HasForeignKey(x => x.MatchId).OnDelete(DeleteBehavior.Cascade);
@@ -125,6 +127,28 @@ internal sealed class LiveSoloDownloadEvidenceConfiguration : IEntityTypeConfigu
         builder.ToTable("live_solo_download_evidence"); builder.HasKey(x => x.GameplayFactId);
         builder.HasOne<GameplayFact>().WithOne().HasForeignKey<LiveSoloDownloadEvidence>(x => x.GameplayFactId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<LiveSoloRoundQuestion>().WithMany().HasForeignKey(x => x.RoundQuestionId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+internal sealed class LiveSoloResultCorrectionConfiguration : IEntityTypeConfiguration<LiveSoloResultCorrection>
+{
+    public void Configure(EntityTypeBuilder<LiveSoloResultCorrection> builder)
+    {
+        builder.ToTable("live_solo_result_corrections"); builder.HasKey(x => x.Id);
+        builder.HasIndex(x => new { x.MatchId, x.CreatedAt });
+        builder.HasOne<Competition>().WithMany().HasForeignKey(x => x.CompetitionId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<LiveSoloMatch>().WithMany().HasForeignKey(x => x.MatchId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<User>().WithMany().HasForeignKey(x => x.ActorUserId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<User>().WithMany().HasForeignKey(x => x.ResolvedByUserId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasMany(x => x.Matches).WithOne().HasForeignKey(x => x.CorrectionId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+internal sealed class LiveSoloCorrectionMatchConfiguration : IEntityTypeConfiguration<LiveSoloCorrectionMatch>
+{
+    public void Configure(EntityTypeBuilder<LiveSoloCorrectionMatch> builder)
+    {
+        builder.ToTable("live_solo_correction_matches"); builder.HasKey(x => new { x.CorrectionId, x.MatchId });
+        builder.HasOne<LiveSoloMatch>().WithMany().HasForeignKey(x => x.MatchId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<LiveSoloMatch>().WithMany().HasForeignKey(x => x.ReplacementMatchId).OnDelete(DeleteBehavior.Restrict);
     }
 }
 internal sealed class LiveSoloAttachmentAssignmentConfiguration : IEntityTypeConfiguration<LiveSoloAttachmentAssignment>

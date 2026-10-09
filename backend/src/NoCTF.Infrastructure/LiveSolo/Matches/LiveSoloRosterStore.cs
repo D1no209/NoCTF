@@ -12,6 +12,7 @@ public sealed partial class LiveSoloMatchStore
     {
         var match = await MatchAsync(command.CompetitionId, command.MatchId, ct);
         if (match is null) return new LiveSoloMatchResult(null, LiveSoloFailure.NotFound);
+        if (match.PendingCorrectionId is not null) return new(null, LiveSoloFailure.NotReady);
         if (match.ConcurrencyStamp != command.ExpectedStamp) return new(null, LiveSoloFailure.Conflict);
         var slot = match.Slots.SingleOrDefault(x => x.TeamId == command.TeamId);
         if (slot is null || match.State != LiveSoloMatchState.Preparing || match.StartedAt is not null) return new(null, LiveSoloFailure.RosterLocked);
@@ -35,6 +36,7 @@ public sealed partial class LiveSoloMatchStore
         {
             var match = await MatchAsync(competitionId, matchId, ct); var team = await TeamAsync(competitionId, actorId, ct);
             if (match is null) return new LiveSoloMatchResult(null, LiveSoloFailure.NotFound);
+            if (match.PendingCorrectionId is not null) return new(null, LiveSoloFailure.NotReady);
             if (match.ConcurrencyStamp != expectedStamp) return new(null, LiveSoloFailure.Conflict);
             var slot = match.Slots.SingleOrDefault(x => x.TeamId == team && team is not null);
             if (!await ActiveAsync(actorId, ct) || slot is null || slot.RosterLockedAt is null || !match.Roster.Any(x => x.UserId == actorId)) return new(null, LiveSoloFailure.Forbidden);

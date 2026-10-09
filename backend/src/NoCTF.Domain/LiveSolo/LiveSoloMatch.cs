@@ -23,6 +23,10 @@ public sealed class LiveSoloMatch : IConcurrencyTracked
     public Guid? WinnerTeamId { get; set; }
     public Guid? CurrentRoundId { get; set; }
     public Guid? CurrentMediaSessionId { get; set; }
+    public Guid? PendingCorrectionId { get; set; }
+    public int BracketGeneration { get; set; }
+    public DateTimeOffset? SupersededAt { get; set; }
+    public Guid? ReplacementMatchId { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? StartedAt { get; set; }
     public DateTimeOffset? CompletedAt { get; set; }

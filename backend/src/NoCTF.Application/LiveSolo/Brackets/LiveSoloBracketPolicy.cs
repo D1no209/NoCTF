@@ -67,7 +67,7 @@ public static class LiveSoloBracketPolicy
         while (again)
         {
             again = false;
-            foreach (var match in matches.Where(x => x.State == LiveSoloMatchState.AwaitingOpponents))
+            foreach (var match in matches.Where(x => x.State == LiveSoloMatchState.AwaitingOpponents && x.PendingCorrectionId is null && x.SupersededAt is null))
             {
                 if (match.Conditional && match.Lane == LiveSoloBracketLane.ResetFinal)
                 {
@@ -79,7 +79,7 @@ public static class LiveSoloBracketPolicy
                 foreach (var slot in match.Slots.Where(x => !x.Resolved && x.SourceMatchId != null))
                 {
                     var source = directory[slot.SourceMatchId!.Value];
-                    if (source.State != LiveSoloMatchState.Completed) continue;
+                    if (source.State != LiveSoloMatchState.Completed || source.PendingCorrectionId is not null) continue;
                     slot.TeamId = slot.Source == LiveSoloSlotSource.Winner ? source.WinnerTeamId : Loser(source);
                     slot.Resolved = true; changed.Add(match.Id); again = true;
                 }

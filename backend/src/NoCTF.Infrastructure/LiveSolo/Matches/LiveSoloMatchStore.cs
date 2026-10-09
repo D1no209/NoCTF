@@ -19,7 +19,8 @@ public sealed partial class LiveSoloMatchStore(NoCtfDbContext db, ICompetitionMo
     ILiveSoloMediaGateway media, ILiveSoloEgressGateway egress, ILiveSoloRuntimePreparation runtimePreparation, IPostCommitMessagePublisher messages,
     IRequestReplay? replay = null, TimeProvider? clock = null)
     : ILiveSoloMatchStore, NoCTF.Application.LiveSolo.Brackets.ILiveSoloBracketStore,
-        NoCTF.Application.LiveSolo.Adjudication.ILiveSoloAdjudicationStore
+        NoCTF.Application.LiveSolo.Adjudication.ILiveSoloAdjudicationStore,
+        NoCTF.Application.LiveSolo.Adjudication.ILiveSoloResultCorrectionStore
 {
     private async Task<T> TransactionAsync<T>(Func<Task<T>> work, Func<T> conflict, CancellationToken ct)
     {
@@ -82,16 +83,17 @@ public sealed partial class LiveSoloMatchStore(NoCtfDbContext db, ICompetitionMo
     {
         var ids = match.Slots.Where(x => x.TeamId is not null).Select(x => x.TeamId!.Value).ToArray();
         var names = await db.Teams.IgnoreQueryFilters().Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, ct);
-        return Map(match, names);
+        return Map(match, names, await CorrectionSourcesAsync([match], ct));
     }
-    private static LiveSoloMatchView Map(LiveSoloMatch match, IReadOnlyDictionary<Guid, string> names)
+    private static LiveSoloMatchView Map(LiveSoloMatch match, IReadOnlyDictionary<Guid, string> names, IReadOnlyDictionary<Guid, Guid>? corrections = null)
     {
         var left = match.Slots.Single(x => x.Side == LiveSoloSide.Left); var right = match.Slots.Single(x => x.Side == LiveSoloSide.Right);
         return new(match.Id, match.CompetitionId, match.State, match.ConcurrencyStamp, match.RequiredWins, match.LeftWins, match.RightWins,
             left.TeamId, left.TeamId is Guid l ? names.GetValueOrDefault(l) : null,
             right.TeamId, right.TeamId is Guid r ? names.GetValueOrDefault(r) : null, match.CurrentRoundId, match.WinnerTeamId,
             match.Slots.Where(x => x.TeamId is not null).Select(x => new LiveSoloRosterView(x.TeamId!.Value,
-                match.Roster.Where(r => r.TeamId == x.TeamId).Select(r => r.UserId).Order().ToArray(), x.RosterLockedAt is not null, x.ReadyConfirmedAt is not null)).ToArray());
+                match.Roster.Where(r => r.TeamId == x.TeamId).Select(r => r.UserId).Order().ToArray(), x.RosterLockedAt is not null, x.ReadyConfirmedAt is not null)).ToArray(),
+            match.PendingCorrectionId, match.ReplacementMatchId, match.PendingCorrectionId is Guid correction ? corrections?.GetValueOrDefault(correction) : null);
     }
 
     public async Task<LiveSoloMatchResult> CreateAsync(CreateLiveSoloMatch command, CancellationToken ct) =>
@@ -134,11 +136,17 @@ public sealed partial class LiveSoloMatchStore(NoCtfDbContext db, ICompetitionMo
         var team = await TeamAsync(competitionId, actorId, ct);
         if (!staff && team is null) return null;
         var matches = await db.LiveSoloMatches.AsNoTracking().Include(x => x.Slots).Include(x => x.Roster)
-            .Where(x => x.CompetitionId == competitionId && (staff || x.Slots.Any(s => s.TeamId == team)))
+            .Where(x => x.CompetitionId == competitionId && x.SupersededAt == null && (staff || x.Slots.Any(s => s.TeamId == team)))
             .OrderBy(x => x.Lane).ThenBy(x => x.Stage).ThenBy(x => x.Position).ToArrayAsync(ct);
         var teamIds = matches.SelectMany(x => x.Slots).Where(x => x.TeamId != null).Select(x => x.TeamId!.Value).Distinct().ToArray();
         var names = await db.Teams.IgnoreQueryFilters().Where(x => teamIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, ct);
-        return matches.Select(x => Map(x, names)).ToArray();
+        var corrections = await CorrectionSourcesAsync(matches, ct);
+        return matches.Select(x => Map(x, names, corrections)).ToArray();
+    }
+    private Task<Dictionary<Guid,Guid>> CorrectionSourcesAsync(IEnumerable<LiveSoloMatch> matches,CancellationToken ct)
+    {
+        var ids=matches.Where(x=>x.PendingCorrectionId!=null).Select(x=>x.PendingCorrectionId!.Value).Distinct().ToArray();
+        return db.Set<LiveSoloResultCorrection>().Where(x=>ids.Contains(x.Id)).ToDictionaryAsync(x=>x.Id,x=>x.MatchId,ct);
     }
 
     public async Task<LiveSoloQuestionGroupResult> SaveGroupAsync(Guid competitionId, Guid actorId, LiveSoloQuestionGroupInput input, DateTimeOffset now, CancellationToken ct) =>

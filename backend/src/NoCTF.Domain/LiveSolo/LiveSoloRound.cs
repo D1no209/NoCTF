@@ -5,7 +5,7 @@ namespace NoCTF.Domain.LiveSolo;
 
 public enum LiveSoloRoundState : short { Preparing, Countdown, Running, ConfirmingResult, Won, TimedOut, Canceled }
 public enum LiveSoloQuestionReadiness : short { Waiting, Preparing, Ready, Failed }
-public enum LiveSoloPauseSource : short { Match, Competition }
+public enum LiveSoloPauseSource : short { Match, Competition, ResultCorrection }
 
 public sealed class LiveSoloRound : IConcurrencyTracked
 {

@@ -7,7 +7,8 @@ public sealed record LiveSoloActor(Guid Id, bool Staff = false);
 public sealed record LiveSoloRosterView(Guid TeamId, IReadOnlyList<Guid> UserIds, bool Locked, bool Ready);
 public sealed record LiveSoloMatchView(Guid Id, Guid CompetitionId, LiveSoloMatchState State, Guid ConcurrencyStamp,
     int RequiredWins, int LeftWins, int RightWins, Guid? LeftTeamId, string? LeftTeamName, Guid? RightTeamId, string? RightTeamName,
-    Guid? CurrentRoundId, Guid? WinnerTeamId, IReadOnlyList<LiveSoloRosterView> Rosters);
+    Guid? CurrentRoundId, Guid? WinnerTeamId, IReadOnlyList<LiveSoloRosterView> Rosters, Guid? PendingCorrectionId = null,
+    Guid? ReplacementMatchId = null, Guid? PendingCorrectionMatchId = null);
 public sealed record LiveSoloMatchResult(LiveSoloMatchView? Match, LiveSoloFailure? Failure = null);
 public sealed record LiveSoloRoundView(Guid Id, Guid MatchId, int Number, int Replay, LiveSoloRoundState State,
     Guid ConcurrencyStamp, long TimelineRevision, DateTimeOffset? CountdownAt, DateTimeOffset? StartedAt,

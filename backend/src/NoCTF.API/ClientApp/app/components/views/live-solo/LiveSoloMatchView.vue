@@ -4,7 +4,7 @@ import type { LiveSoloMatchState } from '~/features/live-solo/useLiveSoloMatch'
 const props = defineProps<{ state: LiveSoloMatchState }>()
 const { competitionId, match, round, configuration, loading, busy, error, myRoster, captain, onRoster,
   canLock, allLocked, rosterOptions, selectedRoster, toggleRoster, lockRoster, ready, prepareMedia, prepareRound, start,
-  staff, readOnlyMedia, judge, screens, myScreen, clock, stateKey, back, load, judgeOpen, judgeAction, judgeReason, forfeitingTeam,
+  staff, readOnlyMedia, judge, canCorrect, correct, screens, myScreen, clock, stateKey, back, load, judgeOpen, judgeAction, judgeReason, forfeitingTeam,
   openDecision, confirmDecision, setJudgeOpen, leaveOpen, setLeaveOpen, confirmLeave, Workspace, connected, connecting,
   publishing, capturePending, eligible, connect, share, stopSharing, disconnect, mediaError, media,
   Questions, canSubmit, questionsVisible, matchId, flagDock } = toRefs(props.state)
@@ -14,6 +14,7 @@ const { competitionId, match, round, configuration, loading, busy, error, myRost
     <div class="flex h-full min-h-0 flex-col gap-4">
       <header class="flex flex-wrap items-center gap-3"><Button variant="ghost" size="sm" @click="back">{{ $t('liveSolo.back') }}</Button><Badge>{{ $t(stateKey) }}</Badge><span v-if="round" class="text-sm">{{ $t('liveSolo.round', { number: round.number ?? 1 }) }}</span><span class="ml-auto font-mono text-xl tabular-nums" :aria-label="$t('liveSolo.clockEstimate')">{{ clock }}</span><Button variant="ghost" size="sm" :disabled="loading" @click="load">{{ $t('common.label.refresh') }}</Button></header>
       <Alert v-if="error || mediaError" variant="destructive"><AlertDescription>{{ $message(error || mediaError) }}</AlertDescription></Alert>
+      <div v-if="match?.pendingCorrectionId || canCorrect" class="flex flex-wrap items-center gap-3"><Badge v-if="match?.pendingCorrectionId" variant="secondary">{{ $t('liveSolo.correction.pending') }}</Badge><Button v-if="canCorrect" variant="outline" size="sm" @click="correct">{{ $t('liveSolo.correction.title') }}</Button></div>
       <Card class="flex min-h-0 flex-1 flex-col">
         <CardHeader><Skeleton v-if="loading && !match" class="h-20" /><div v-else-if="match" class="grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-center"><h1 class="min-w-0 break-words text-lg font-semibold">{{ match.leftTeamName || '—' }}</h1><div class="flex flex-col gap-1"><span class="font-mono text-3xl font-bold tabular-nums text-primary">{{ match.leftWins ?? 0 }} : {{ match.rightWins ?? 0 }}</span><span class="text-xs text-muted-foreground">{{ $t('liveSolo.firstTo', { wins: match.requiredWins ?? 2 }) }}</span></div><h2 class="min-w-0 break-words text-lg font-semibold">{{ match.rightTeamName || '—' }}</h2></div></CardHeader>
         <ScrollSurface axis="y" class="min-h-0 flex-1" :aria-label="$t('liveSolo.matches')"><CardContent class="flex flex-col gap-6">

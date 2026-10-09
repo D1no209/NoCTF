@@ -16,6 +16,7 @@ public sealed partial class LiveSoloMatchStore
             if (!await ActiveAsync(command.ActorId, ct) || !await authorizer.CanJudgeAsync(command.ActorId, command.CompetitionId, ct)) return new LiveSoloRoundResult(null, LiveSoloFailure.Forbidden);
             var match = await MatchAsync(command.CompetitionId, command.MatchId, ct);
             if (match is null) return new(null, LiveSoloFailure.NotFound);
+            if (match.PendingCorrectionId is not null) return new(null, LiveSoloFailure.NotReady);
             if (match.ConcurrencyStamp != command.ExpectedStamp) return new(null, LiveSoloFailure.Conflict);
             if (match.State != LiveSoloMatchState.Preparing || match.Slots.Any(x => x.TeamId is null || x.RosterLockedAt is null)) return new(null, LiveSoloFailure.NotReady);
             var config = await db.Set<LiveSoloCompetitionModeConfiguration>().AsNoTracking().SingleAsync(x => x.CompetitionId == command.CompetitionId, ct);
@@ -126,6 +127,7 @@ public sealed partial class LiveSoloMatchStore
             var competition = await db.Competitions.AsNoTracking().SingleOrDefaultAsync(x => x.Id == command.CompetitionId, ct);
             var round = await db.LiveSoloRounds.Include(x => x.Questions).Include(x => x.Pauses).SingleOrDefaultAsync(x => x.Id == command.RoundId && x.MatchId == command.MatchId, ct);
             if (match is null || round is null || match.CurrentRoundId != round.Id) return new LiveSoloRoundResult(null, LiveSoloFailure.NotFound);
+            if (match.PendingCorrectionId is not null) return new(null, LiveSoloFailure.NotReady);
             if (round.ConcurrencyStamp != command.ExpectedStamp) return new(null, LiveSoloFailure.Conflict);
             if (match.State != LiveSoloMatchState.Preparing || round.State != LiveSoloRoundState.Preparing
                 || competition?.Status != CompetitionStatus.Running || match.Slots.Any(x => x.ReadyConfirmedAt is null)

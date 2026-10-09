@@ -20,7 +20,7 @@ public sealed partial class LiveSoloMatchStore
             // A durable outcome is immutable here; corrections require the dedicated adjudication flow.
             if (round.State == LiveSoloRoundState.Won) return true;
             var match = await MatchAsync((await db.LiveSoloMatches.AsNoTracking().Where(x => x.Id == round.MatchId).Select(x => x.CompetitionId).SingleAsync(ct)), round.MatchId, ct);
-            if (match is null || match.CurrentRoundId != round.Id) return false;
+            if (match is null || match.CurrentRoundId != round.Id || match.PendingCorrectionId is not null || match.SupersededAt is not null) return false;
             await SynchronizeCompetitionPausesAsync(round, match.CompetitionId, now, true, ct);
             var associations = await db.LiveSoloSubmissions.AsNoTracking().Where(x => x.RoundId == round.Id).OrderBy(x => x.AdmissionSequence).ToArrayAsync(ct);
             var facts = await db.GameplayFacts.Include(x => x.AcquisitionEvidence).Where(x => associations.Select(a => a.GameplayFactId).Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
@@ -100,6 +100,7 @@ public sealed partial class LiveSoloMatchStore
         if (roundInfo is null || roundInfo.TimelineRevision != timelineRevision) return;
         if (roundInfo.State is LiveSoloRoundState.Won or LiveSoloRoundState.TimedOut or LiveSoloRoundState.Canceled)
         { await runtimePreparation.StopRoundAsync(roundId, now, ct); return; }
+        if (await db.LiveSoloMatches.AnyAsync(x => x.Id == roundInfo.MatchId && (x.PendingCorrectionId != null || x.SupersededAt != null), ct)) return;
         var competitionId = await db.LiveSoloMatches.AsNoTracking().Where(x => x.Id == roundInfo.MatchId).Select(x => x.CompetitionId).SingleAsync(ct);
         await SynchronizeCompetitionPausesAsync(roundInfo, competitionId, (clock ?? TimeProvider.System).GetUtcNow(), false, ct);
         var verifiedQuestions = new HashSet<Guid>();
@@ -111,7 +112,7 @@ public sealed partial class LiveSoloMatchStore
             var effectiveAt = (clock ?? TimeProvider.System).GetUtcNow();
             var round = await db.LiveSoloRounds.Include(x => x.Pauses).Include(x => x.Questions).SingleAsync(x => x.Id == roundId, ct);
             var match = await db.LiveSoloMatches.Include(x => x.Slots).Include(x => x.Roster).SingleAsync(x => x.Id == round.MatchId, ct);
-            if (round.TimelineRevision != timelineRevision || match.CurrentRoundId != round.Id) return false;
+            if (round.TimelineRevision != timelineRevision || match.CurrentRoundId != round.Id || match.PendingCorrectionId is not null || match.SupersededAt is not null) return false;
             await SynchronizeCompetitionPausesAsync(round, match.CompetitionId, effectiveAt, true, ct);
             var competition = await db.Competitions.AsNoTracking().SingleAsync(x => x.Id == match.CompetitionId, ct);
             effectiveAt = (clock ?? TimeProvider.System).GetUtcNow();

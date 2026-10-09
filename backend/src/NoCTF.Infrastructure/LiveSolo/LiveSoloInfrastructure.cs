@@ -28,6 +28,8 @@ public static class LiveSoloInfrastructure
         services.AddScoped<ManageLiveSoloBracket>();
         services.AddScoped<NoCTF.Application.LiveSolo.Adjudication.ILiveSoloAdjudicationStore, LiveSoloMatchStore>();
         services.AddScoped<NoCTF.Application.LiveSolo.Adjudication.ManageLiveSoloAdjudication>();
+        services.AddScoped<NoCTF.Application.LiveSolo.Adjudication.ILiveSoloResultCorrectionStore, LiveSoloMatchStore>();
+        services.AddScoped<NoCTF.Application.LiveSolo.Adjudication.ManageLiveSoloResultCorrections>();
         services.AddScoped<ManageLiveSoloMatches>();
         services.AddScoped<ManageLiveSoloConfiguration>();
         services.AddScoped<ILiveSoloPlayerPolicyReader, LiveSoloPlayerPolicyReader>();

@@ -228,6 +228,24 @@ public sealed class NoCtfDbContext(
         if (ChangeTracker.Entries<LiveSoloAdjudication>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted)
             || ChangeTracker.Entries<LiveSoloRecordingDecision>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
             throw new InvalidOperationException("LiveSolo staff decisions are immutable.");
+        foreach (var entry in ChangeTracker.Entries<LiveSoloResultCorrection>())
+        {
+            if (entry.State == EntityState.Deleted || entry.State == EntityState.Modified
+                && (entry.OriginalValues.GetValue<LiveSoloCorrectionState>(nameof(LiveSoloResultCorrection.State)) != LiveSoloCorrectionState.Pending
+                    || entry.Properties.Any(p => p.IsModified && new[] { nameof(LiveSoloResultCorrection.CompetitionId), nameof(LiveSoloResultCorrection.MatchId),
+                        nameof(LiveSoloResultCorrection.ActorUserId), nameof(LiveSoloResultCorrection.WinnerTeamId), nameof(LiveSoloResultCorrection.LeftWins),
+                        nameof(LiveSoloResultCorrection.RightWins), nameof(LiveSoloResultCorrection.PreviousWinnerTeamId),
+                        nameof(LiveSoloResultCorrection.PreviousLeftWins), nameof(LiveSoloResultCorrection.PreviousRightWins),
+                        nameof(LiveSoloResultCorrection.Reason), nameof(LiveSoloResultCorrection.CreatedAt) }.Contains(p.Metadata.Name))))
+                throw new InvalidOperationException("LiveSolo correction proposals and completed decisions are immutable.");
+        }
+        if (ChangeTracker.Entries<LiveSoloCorrectionMatch>().Any(entry => entry.State == EntityState.Deleted
+            || entry.State == EntityState.Modified && (entry.Properties.Any(p => p.IsModified && p.Metadata.Name != nameof(LiveSoloCorrectionMatch.ReplacementMatchId))
+                || entry.OriginalValues.GetValue<Guid?>(nameof(LiveSoloCorrectionMatch.ReplacementMatchId)) != null
+                || !ChangeTracker.Entries<LiveSoloResultCorrection>().Any(root => root.Entity.Id == entry.Entity.CorrectionId
+                    && root.OriginalValues.GetValue<LiveSoloCorrectionState>(nameof(LiveSoloResultCorrection.State)) == LiveSoloCorrectionState.Pending
+                    && root.Entity.State == LiveSoloCorrectionState.Applied))))
+            throw new InvalidOperationException("LiveSolo correction impact records are immutable.");
         if (ChangeTracker.Entries<LiveSoloProgramFrame>().Any(entry => entry.State == EntityState.Modified)
             || ChangeTracker.Entries<LiveSoloProgramFrameQuestion>().Any(entry => entry.State == EntityState.Modified
                 || entry.State == EntityState.Added && !ChangeTracker.Entries<LiveSoloProgramFrame>().Any(frame => frame.Entity.Id == entry.Entity.FrameId && frame.State == EntityState.Added)

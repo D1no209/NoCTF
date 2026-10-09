@@ -38,7 +38,7 @@ public sealed partial class LiveSoloMatchStore
     private async Task<LiveSoloBracketView> BracketAsync(Guid competitionId, Guid stamp, LiveSoloBracketFormat format, CancellationToken ct)
     {
         var matches = await db.LiveSoloMatches.AsNoTracking().Include(x => x.Slots).Include(x => x.Roster)
-            .Where(x => x.CompetitionId == competitionId).OrderBy(x => x.Lane).ThenBy(x => x.Stage).ThenBy(x => x.Position).ToArrayAsync(ct);
+            .Where(x => x.CompetitionId == competitionId && x.SupersededAt == null).OrderBy(x => x.Lane).ThenBy(x => x.Stage).ThenBy(x => x.Position).ToArrayAsync(ct);
         var teamIds = matches.SelectMany(x => x.Slots).Where(x => x.TeamId != null).Select(x => x.TeamId!.Value).Distinct().ToArray();
         var names = await db.Teams.IgnoreQueryFilters().Where(x => teamIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, ct);
         var final = matches.Where(x => x.Lane == LiveSoloBracketLane.Winners).MaxBy(x => x.Stage);
@@ -48,13 +48,14 @@ public sealed partial class LiveSoloMatchStore
             final = reset?.State == LiveSoloMatchState.Completed ? reset : reset?.State == LiveSoloMatchState.Canceled
                 ? matches.FirstOrDefault(x => x.Lane == LiveSoloBracketLane.GrandFinal) : null;
         }
-        return new(competitionId, stamp, format, matches.Select(x => new LiveSoloBracketMatchView(Map(x, names), x.Lane, x.Stage, x.Position, x.Conditional,
+        var corrections = await CorrectionSourcesAsync(matches, ct);
+        return new(competitionId, stamp, format, matches.Select(x => new LiveSoloBracketMatchView(Map(x, names, corrections), x.Lane, x.Stage, x.Position, x.Conditional,
             x.Slots.Select(s => new LiveSoloBracketSourceView(s.Side, s.Source, s.Seed, s.SourceMatchId, s.Resolved, s.TeamId)).ToArray())).ToArray(),
             matches.Any(x => x.Slots.Any(s => s.Seed != null)) && final?.State == LiveSoloMatchState.Completed ? final.WinnerTeamId : null);
     }
     private async Task AdvanceBracketAsync(LiveSoloMatch completed, DateTimeOffset now, CancellationToken ct)
     {
-        var matches = await db.LiveSoloMatches.Include(x => x.Slots).Where(x => x.CompetitionId == completed.CompetitionId).ToArrayAsync(ct);
+        var matches = await db.LiveSoloMatches.Include(x => x.Slots).Where(x => x.CompetitionId == completed.CompetitionId && x.SupersededAt == null).ToArrayAsync(ct);
         if (!matches.Any(x => x.Slots.Any(s => s.SourceMatchId != null))) return;
         var changed = LiveSoloBracketPolicy.Resolve(matches, now);
         if (changed.Count != 0)

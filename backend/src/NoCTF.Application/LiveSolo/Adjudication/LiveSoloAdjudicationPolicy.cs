@@ -7,6 +7,7 @@ public static class LiveSoloAdjudicationPolicy
 {
     public static LiveSoloFailure? CanApply(LiveSoloMatch match, LiveSoloRound? round, AdjudicateLiveSoloMatch command)
     {
+        if (match.PendingCorrectionId is not null) return LiveSoloFailure.NotReady;
         if (match.ConcurrencyStamp != command.ExpectedMatchStamp || match.CurrentRoundId != command.ExpectedRoundId
             || round?.Id != command.ExpectedRoundId || round is not null && round.MatchId != match.Id
             || round?.ConcurrencyStamp != command.ExpectedRoundStamp || round?.TimelineRevision != command.ExpectedTimelineRevision)

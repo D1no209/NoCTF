@@ -97,6 +97,36 @@ public sealed class LiveSoloEndpointTests
         await Assert.That(body.RootElement.TryGetProperty("startedAt", out _)).IsFalse();
     }
 
+    [Test]
+    public async Task Correction_routes_require_authentication_bind_the_actor_and_return_typed_freeze_and_replay_metadata()
+    {
+        var store=Substitute.For<ILiveSoloResultCorrectionStore>();var competition=Guid.NewGuid();var match=Guid.NewGuid();var winner=Guid.NewGuid();var id=Guid.NewGuid();var stamp=Guid.NewGuid();
+        var impact=new LiveSoloCorrectionImpact(Guid.NewGuid(),Guid.NewGuid(),LiveSoloMatchState.Paused,true,Guid.NewGuid(),"left",Guid.NewGuid(),"right",null);
+        var view=new LiveSoloCorrectionView(id,match,stamp,LiveSoloCorrectionState.Pending,winner,0,2,"review",DateTimeOffset.UtcNow,null,null,[impact],
+            Guid.NewGuid(),2,1,"manager",null);
+        store.PreviewAsync(Arg.Any<LiveSoloCorrectionProposal>(),Arg.Any<CancellationToken>()).Returns(new LiveSoloCorrectionPreview(Guid.NewGuid(),Guid.NewGuid(),view.PreviousWinnerTeamId,2,1,[impact]));
+        store.BeginCorrectionAsync(Arg.Any<BeginLiveSoloCorrection>(),Arg.Any<CancellationToken>()).Returns(new LiveSoloCorrectionResult(view));
+        store.ReadCorrectionAsync(competition,match,id,Actor,Arg.Any<CancellationToken>()).Returns(view);
+        store.ResolveCorrectionAsync(Arg.Any<ResolveLiveSoloCorrection>(),Arg.Any<CancellationToken>()).Returns(new LiveSoloCorrectionResult(view with {State=LiveSoloCorrectionState.Applied}));
+        await using var app=await HostAsync(Substitute.For<ILiveSoloMatchStore>(),Substitute.For<ILiveSoloAttachmentStore>(),Substitute.For<IStore>(),corrections:store);
+        using var client=app.GetTestClient();var path=$"/api/v1/competitions/{competition}/live-solo/matches/{match}/corrections";
+        using var anonymous=await client.PostAsJsonAsync(path+"/preview",new {winnerTeamId=winner,leftWins=0,rightWins=2});
+        await Assert.That(anonymous.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
+        client.DefaultRequestHeaders.Authorization=new("Bearer","verified-test");
+        using var preview=await client.PostAsJsonAsync(path+"/preview",new {winnerTeamId=winner,leftWins=0,rightWins=2,actorId=Guid.NewGuid()});
+        await Assert.That(preview.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await store.Received(1).PreviewAsync(Arg.Is<LiveSoloCorrectionProposal>(x=>x!=null&&x.ActorId==Actor&&x.CompetitionId==competition&&x.MatchId==match),Arg.Any<CancellationToken>());
+        using var begun=await client.PostAsJsonAsync(path,new {winnerTeamId=winner,leftWins=0,rightWins=2,previewId=Guid.NewGuid(),reason="review"});
+        await Assert.That(begun.StatusCode).IsEqualTo(HttpStatusCode.OK);var json=await begun.Content.ReadAsStringAsync();
+        await Assert.That(json).Contains("\"Pending\"");await Assert.That(json).Contains("\"requiresReplay\":true");
+        using var read=await client.GetAsync(path+"/"+id);await Assert.That(read.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using var resolve=await client.PostAsJsonAsync(path+"/"+id+"/resolve",new {expectedStamp=stamp,apply=true,reason="void and replay",
+            replays=new[]{new{matchId=impact.MatchId,concurrencyStamp=impact.ConcurrencyStamp}}});
+        await Assert.That(resolve.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await store.Received(1).ResolveCorrectionAsync(Arg.Is<ResolveLiveSoloCorrection>(x=>x!=null&&x.ActorId==Actor&&x.CorrectionId==id&&x.Apply&&x.Replays.Count==1),Arg.Any<CancellationToken>());
+        using var omittedAction=await client.PostAsJsonAsync(path+"/"+id+"/resolve",new {expectedStamp=stamp,reason="missing action",replays=Array.Empty<object>()});
+        await Assert.That(omittedAction.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+    }
     private static ILiveSoloViewerStore Viewer()
     {
         var store=Substitute.For<ILiveSoloViewerStore>();
@@ -397,7 +427,7 @@ public sealed class LiveSoloEndpointTests
     private static async Task<WebApplication> HostAsync(ILiveSoloMatchStore store, ILiveSoloAttachmentStore attachmentStore, IStore objects,
         ILiveSoloAdjudicationStore? decisions = null, ILiveSoloRuntimeStore? runtimes = null, ILiveSoloMediaStore? media = null, ILiveSoloProgramReader? programs = null,
         ILiveSoloRecordingStore? recordings = null, ILiveSoloPlayerPolicyReader? policies = null, ManageLiveSoloConfiguration? settings = null, ILiveSoloHintReader? hints = null,
-        ManageLiveSoloWriteUps? postgame = null, ILiveSoloViewerStore? viewers = null)
+        ManageLiveSoloWriteUps? postgame = null, ILiveSoloViewerStore? viewers = null, ILiveSoloResultCorrectionStore? corrections = null)
     {
         var builder = WebApplication.CreateBuilder(); builder.WebHost.UseTestServer();
         builder.Services.AddFastEndpoints(options => { options.DisableAutoDiscovery = true; options.Assemblies = [typeof(GetLiveSoloMatchEndpoint).Assembly];
@@ -406,7 +436,7 @@ public sealed class LiveSoloEndpointTests
                 || x == typeof(AdjudicateLiveSoloMatchEndpoint) || x == typeof(ListLiveSoloAdjudicationsEndpoint)
                 || x == typeof(GetLiveSoloRuntimeEndpoint) || x == typeof(MutateLiveSoloRuntimeEndpoint)
                 || x == typeof(GetLiveSoloMediaEndpoint) || x == typeof(PrepareLiveSoloMediaEndpoint) || x == typeof(JoinLiveSoloMediaEndpoint)
-                || x == typeof(ManageLiveSoloViewerEndpoint) || x == typeof(GetLiveSoloProgramEndpoint) || x == typeof(GetLiveSoloProgramPlaylistEndpoint) || x == typeof(GetLiveSoloProgramSegmentEndpoint)
+                || x == typeof(PreviewLiveSoloResultCorrectionEndpoint) || x == typeof(BeginLiveSoloResultCorrectionEndpoint) || x == typeof(ResolveLiveSoloResultCorrectionEndpoint) || x == typeof(GetLiveSoloResultCorrectionEndpoint) || x == typeof(ListLiveSoloResultCorrectionsEndpoint) || x == typeof(ManageLiveSoloViewerEndpoint) || x == typeof(GetLiveSoloProgramEndpoint) || x == typeof(GetLiveSoloProgramPlaylistEndpoint) || x == typeof(GetLiveSoloProgramSegmentEndpoint)
                 || x == typeof(ListLiveSoloRecordingsEndpoint) || x == typeof(ChangeLiveSoloRecordingEndpoint) || x == typeof(GetLiveSoloRecordingEndpoint)
                 || x == typeof(GetLiveSoloPlayerPolicyEndpoint) || x == typeof(ListLiveSoloHintsEndpoint) || settings is not null && x == typeof(SaveLiveSoloConfigurationEndpoint)
                 || postgame is not null && x == typeof(SaveLiveSoloWriteUpDraftEndpoint); });
@@ -418,6 +448,7 @@ public sealed class LiveSoloEndpointTests
         builder.Services.AddSingleton(media ?? Substitute.For<ILiveSoloMediaStore>()); builder.Services.AddSingleton<ManageLiveSoloMedia>();
         builder.Services.AddSingleton<LiveSoloViewerBrowserAccess>();
         builder.Services.AddSingleton(viewers ?? Substitute.For<ILiveSoloViewerStore>()); builder.Services.Configure<NoCTF.API.Endpoints.Authentication.RefreshHttpOptions>(_ => {});
+        builder.Services.AddSingleton(corrections ?? Substitute.For<ILiveSoloResultCorrectionStore>()); builder.Services.AddSingleton<ManageLiveSoloResultCorrections>();
         builder.Services.AddSingleton(programs ?? Substitute.For<ILiveSoloProgramReader>());
         builder.Services.AddSingleton(recordings ?? Substitute.For<ILiveSoloRecordingStore>()); builder.Services.AddSingleton<ManageLiveSoloRecordings>();
         builder.Services.AddSingleton(policies ?? Substitute.For<ILiveSoloPlayerPolicyReader>());
