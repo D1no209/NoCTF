@@ -26,13 +26,13 @@ public static class MessageRouting
             .ToNatsSubject(NatsSubjects.RealtimeEvents).UseJetStream(NatsSubjects.EventsStream);
         options.ConfigureNoCtfInfrastructureRetriesFor<NoCTF.Application.LiveSolo.Realtime.LiveSoloMatchChanged>(
             WorkerQueue.Background,CompetitionEventFanoutQueueNames.Realtime);
-        Route<NoCTF.Application.LiveSolo.Media.LiveSoloMediaAlertCreated>(options, WorkerQueue.Control);
-        Route<NoCTF.Application.LiveSolo.Media.RefreshLiveSoloMedia>(options, WorkerQueue.Control);
-        Route<NoCTF.Application.LiveSolo.Media.AdvanceLiveSoloCapture>(options, WorkerQueue.Control);
-        Route<NoCTF.Application.LiveSolo.Media.SnapshotLiveSoloResult>(options, WorkerQueue.Control);
-        Route<NoCTF.Application.LiveSolo.Media.PruneLiveSoloCapture>(options, WorkerQueue.Control);
-        Route<NoCTF.Application.LiveSolo.Media.RemoveLiveSoloCaptureFiles>(options, WorkerQueue.Control);
-        Route<NoCTF.Application.LiveSolo.Media.RemoveLiveSoloRecordingRaw>(options, WorkerQueue.Control);
+        Route<NoCTF.Application.LiveSolo.Media.LiveSoloMediaAlertCreated>(options, WorkerQueue.LiveSoloMedia);
+        Route<NoCTF.Application.LiveSolo.Media.RefreshLiveSoloMedia>(options, WorkerQueue.LiveSoloMedia);
+        Route<NoCTF.Application.LiveSolo.Media.AdvanceLiveSoloCapture>(options, WorkerQueue.LiveSoloMedia);
+        Route<NoCTF.Application.LiveSolo.Media.SnapshotLiveSoloResult>(options, WorkerQueue.LiveSoloMedia);
+        Route<NoCTF.Application.LiveSolo.Media.PruneLiveSoloCapture>(options, WorkerQueue.LiveSoloMedia);
+        Route<NoCTF.Application.LiveSolo.Media.RemoveLiveSoloCaptureFiles>(options, WorkerQueue.LiveSoloMedia);
+        Route<NoCTF.Application.LiveSolo.Media.RemoveLiveSoloRecordingRaw>(options, WorkerQueue.LiveSoloMedia);
         Route<GameplayFactStateChanged>(options, WorkerQueue.Gameplay);
         Route<ProjectLeaderboard>(options, WorkerQueue.Projection);
         Route<ApplyCompetitionVisibility>(options, WorkerQueue.Control);

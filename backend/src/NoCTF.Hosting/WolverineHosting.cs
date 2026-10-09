@@ -50,6 +50,11 @@ public static class WolverineHosting
                     NatsSubjects.ScheduledSubject(WorkerQueue.Gameplay)).EnableScheduledDelivery(),
                 NatsSubjects.Subject(WorkerQueue.Gameplay))
             .DefineWorkQueueStream(
+                NatsSubjects.LiveSoloMediaStream,
+                stream=>stream.WithSubjects(NatsSubjects.Subject(WorkerQueue.LiveSoloMedia),
+                    NatsSubjects.ScheduledSubject(WorkerQueue.LiveSoloMedia)).EnableScheduledDelivery(),
+                NatsSubjects.Subject(WorkerQueue.LiveSoloMedia))
+            .DefineWorkQueueStream(
                 NatsSubjects.ProjectionStream,
                 stream => stream.WithSubjects(NatsSubjects.Subject(WorkerQueue.Projection)),
                 NatsSubjects.Subject(WorkerQueue.Projection))

@@ -18,6 +18,7 @@ public static class WorkerQueues
     public const string Projection = WorkerQueueNames.Projection;
     public const string Background = WorkerQueueNames.Background;
     public const string Webhook = WorkerQueueNames.Webhook;
+    public const string LiveSoloMedia = WorkerQueueNames.LiveSoloMedia;
 
     public static IReadOnlyList<WorkerQueue> All => WorkerQueueNames.All;
 
@@ -47,7 +48,7 @@ public static class WorkerQueues
             if (!TryParse(value, out var queue))
             {
                 throw new InvalidOperationException(
-                    $"Unknown Worker queue '{value}'. Allowed values: control, gameplay, projection, background, webhook, all.");
+                    $"Unknown Worker queue '{value}'. Allowed values: control, gameplay, projection, background, webhook, livesolo-media, all.");
             }
 
             if (!queues.Contains(queue))
@@ -68,6 +69,7 @@ public static class WorkerQueues
             WorkerQueue.Projection => 2,
             WorkerQueue.Background => 2,
             WorkerQueue.Webhook => 32,
+            WorkerQueue.LiveSoloMedia => 4,
             _ => throw new ArgumentOutOfRangeException(nameof(queue), queue, null)
         };
         var configured = configuration[$"Worker:Concurrency:{queue}"];
@@ -119,6 +121,8 @@ public static class WorkerQueues
             return true;
         }
 
+        if(value.Equals("livesolo-media",StringComparison.OrdinalIgnoreCase)||value.Equals(LiveSoloMedia,StringComparison.OrdinalIgnoreCase))
+        {queue=WorkerQueue.LiveSoloMedia;return true;}
         queue = default;
         return false;
     }

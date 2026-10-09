@@ -73,6 +73,7 @@ public static class NoCtfMessagingRetryPolicies
             WorkerQueue.Projection => ProjectionRetryDelays,
             WorkerQueue.Background => BackgroundRetryDelays,
             WorkerQueue.Webhook => WebhookRetryDelays,
+            WorkerQueue.LiveSoloMedia => ControlRetryDelays,
             _ => throw new ArgumentOutOfRangeException(nameof(queue), queue, null)
         };
 

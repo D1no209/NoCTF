@@ -46,6 +46,9 @@ docker compose --project-directory /opt/noctf \
 首版仍以比赛功能关闭发布，待真实媒体、恢复和容量验收后再由管理者启用。
 默认录制关闭，录像保留默认 30 天，managed archive 仍使用现有 File 存储。
 同一 spool 必须对所有接入的 API/Worker 可用；此 overlay 是单机方案，多节点需专门的共享存储部署。
+媒体控制、导出及清理通过独立 `NOCTF_V2_LIVESOLO_MEDIA` JetStream 工作队列处理，
+与比赛时钟控制及私有状态事件隔离。默认 Worker 的 `all` 已包含它；显式选择队列的部署
+必须另有 Worker 选择 `livesolo-media`。并发使用 `Worker__Concurrency__LiveSoloMedia`（默认 4）。
 
 Egress 每实例至少 4 CPU/4 GiB 是供应商建议，不能当成 4 场/16 屏幕容量承诺。
 Egress 启动使用独立的 `LiveSolo__Media__EgressStartTimeoutSeconds`（默认 30 秒，允许 5–120 秒）；
