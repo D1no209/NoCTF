@@ -35,9 +35,11 @@ public sealed partial class LiveSoloCaptureStore
         },ct);
     }
     private Task RecordingFailureAsync(LiveSoloMediaSession session,LiveSoloRecording record,LiveSoloRecordingState state,
-        LiveSoloRecordingFailure failure,CancellationToken ct)=>TransactionAsync(async()=>{
+        LiveSoloRecordingFailure failure,CancellationToken ct,LiveSoloExportObservation? observation=null)=>TransactionAsync(async()=>{
             await db.Entry(record).ReloadAsync(ct);
             if(record.State==state&&record.Failure==failure)return;
+            if(observation is not null)
+            {record.EgressId=observation.Id;record.StartedAt??=observation.StartedAt;record.EndedAt=observation.EndedAt;}
             record.State=state;record.Failure=failure;
             await CaptureAlertAsync(session,record.Id,record.ConcurrencyStamp,LiveSoloMediaAlertKind.RecordingFailed,ct);
         },ct);

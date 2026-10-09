@@ -116,6 +116,35 @@ public sealed class LiveSoloRecordingRecoveryPersistenceTests
             await gateway.DidNotReceiveWithAnyArgs().StartAsync(default!,default);
         });
     }
+    [Test,Timeout(300_000)]
+    public async Task Provider_failure_and_staff_notice_commit_together_and_rollback_remains_retryable(CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async()=>{
+            await using var f=await LiveSoloMatchPersistenceTests.Fixture.CreateAsync(ct);await f.PrepareAsync(ct);var record=await Record(f,ct);
+            record.State=LiveSoloRecordingState.Starting;record.RequestedAt=f.Now;record.ReservedBytes=32L*1024*1024;
+            await f.Db.SaveChangesAsync(ct);var room=(await f.Db.LiveSoloMediaSessions.SingleAsync(ct)).RoomIdentity;
+            var gateway=Substitute.For<ILiveSoloEgressGateway>();gateway.ListAsync(room,ct).Returns([
+                new("failed-job",room,LiveSoloExportState.Failed,null,f.Now,null,[],record.Id)]);
+            var store=Store(f,gateway);
+            EventHandler<SavingChangesEventArgs> fail=(_,_)=>{
+                if(f.Db.ChangeTracker.Entries<LiveSoloRecording>().Any(x=>x.Entity.Id==record.Id&&x.Entity.State==LiveSoloRecordingState.Failed))
+                    throw new InvalidOperationException("terminal transaction rollback");};
+            f.Db.SavingChanges+=fail;
+            await Assert.That(async()=>await store.AdvanceAsync(record.MediaSessionId,ct)).Throws<InvalidOperationException>();
+            f.Db.SavingChanges-=fail;f.Db.ChangeTracker.Clear();
+            var persisted=await f.Db.LiveSoloRecordings.SingleAsync(x=>x.Id==record.Id,ct);
+            await Assert.That(persisted.State).IsEqualTo(LiveSoloRecordingState.Starting);
+            await Assert.That(persisted.EgressId).IsNull();await Assert.That(persisted.ReservedBytes).IsEqualTo(32L*1024*1024);
+            await Assert.That(await f.Db.Notifications.CountAsync(x=>x.SourceId==record.Id,ct)).IsEqualTo(0);
+            await store.AdvanceAsync(record.MediaSessionId,ct);await store.AdvanceAsync(record.MediaSessionId,ct);
+            await Assert.That(persisted.State).IsEqualTo(LiveSoloRecordingState.Failed);
+            await Assert.That(persisted.Failure).IsEqualTo(LiveSoloRecordingFailure.ExportFailed);
+            await Assert.That(persisted.EgressId).IsEqualTo("failed-job");
+            await Assert.That(persisted.RawRemovedAt).IsNotNull();await Assert.That(persisted.ReservedBytes).IsEqualTo(0);
+            await Assert.That(await f.Db.Notifications.CountAsync(x=>x.SourceId==record.Id,ct)).IsEqualTo(1);
+            await gateway.DidNotReceiveWithAnyArgs().StartAsync(default!,default);
+        });
+    }
     private static async Task<LiveSoloRecording> Record(LiveSoloMatchPersistenceTests.Fixture f,CancellationToken ct)
     {
         var session=await f.Db.LiveSoloMediaSessions.Include(x=>x.Participants).SingleAsync(ct);session.RecordingEnabled=true;

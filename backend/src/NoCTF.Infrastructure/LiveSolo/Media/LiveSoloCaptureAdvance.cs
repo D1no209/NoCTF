@@ -131,14 +131,16 @@ public sealed partial class LiveSoloCaptureStore
                 else if (record.State == LiveSoloRecordingState.Pending && !stillSharing) { record.State = LiveSoloRecordingState.Failed; await db.SaveChangesAsync(ct); }
                 continue;
             }
+            if (current.State is LiveSoloExportState.Failed or LiveSoloExportState.Aborted or LiveSoloExportState.LimitReached)
+            {
+                await RecordingFailureAsync(session,record,LiveSoloRecordingState.Failed,LiveSoloRecordingFailure.ExportFailed,ct,current);
+                await messages.FlushCommittedMessagesAsync();
+                await RemoveRecordingRawAsync(record.Id, ct);
+                continue;
+            }
             record.EgressId = current.Id; record.StartedAt ??= current.StartedAt; record.EndedAt = current.EndedAt;
             record.State = RecordingState(current.State); await db.SaveChangesAsync(ct);
             if (current.State == LiveSoloExportState.Complete) await ImportRecordingAsync(session, record, current, ct);
-            if (current.State is LiveSoloExportState.Failed or LiveSoloExportState.Aborted or LiveSoloExportState.LimitReached)
-            {
-                await RecordingFailureAsync(session,record,LiveSoloRecordingState.Failed,LiveSoloRecordingFailure.ExportFailed,ct);
-                await RemoveRecordingRawAsync(record.Id, ct);
-            }
             var limitReached=current.State==LiveSoloExportState.Active && await files.RecordingLengthAsync(record.Id,ct)
                 >= options.RecordingExportLimitBytes-4L*1024*1024;
             if ((!stillSharing || limitReached) && current.State is LiveSoloExportState.Starting or LiveSoloExportState.Active)
