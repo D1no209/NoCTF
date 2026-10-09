@@ -1098,6 +1098,23 @@ export type NoCtfapiEndpointsLiveSoloGetLiveSoloRuntimeRequest = {
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpContentResponse = {
+    versionId?: string;
+    format?: NoCtfDomainChallengesWriteUpsWriteUpFormat;
+    markdown?: string | null;
+    fileName?: string | null;
+};
+
+export type NoCtfDomainChallengesWriteUpsWriteUpFormat = 'Markdown' | 'Pdf';
+
+export type NoCtfapiEndpointsLiveSoloGetLiveSoloWriteUpContentRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsLiveSoloGetLiveSoloWriteUpFileRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsLiveSoloJoinLiveSoloMediaResponse = {
     session?: NoCtfapiEndpointsLiveSoloLiveSoloMediaResponse;
     serverUrl?: string;
@@ -1153,6 +1170,24 @@ export type NoCtfapiEndpointsLiveSoloLiveSoloMatchesResponse = {
 };
 
 export type NoCtfapiEndpointsLiveSoloListLiveSoloMatchesRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsLiveSoloLiveSoloPostgameQuestionsResponse = {
+    items?: Array<NoCtfApplicationLiveSoloResourcesLiveSoloPostgameQuestion>;
+};
+
+export type NoCtfApplicationLiveSoloResourcesLiveSoloPostgameQuestion = {
+    id?: string;
+    roundId?: string;
+    competitionChallengeId?: string;
+    roundNumber?: number;
+    position?: number;
+    title?: string;
+    openedAt?: string;
+};
+
+export type NoCtfapiEndpointsLiveSoloListLiveSoloPostgameQuestionsRequest = {
     [key: string]: never;
 };
 
@@ -1230,6 +1265,73 @@ export type NoCtfapiEndpointsLiveSoloListLiveSoloRecordingsRequest = {
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpListResponse = {
+    access?: NoCtfApplicationChallengesWriteUpsWriteUpAccessView;
+    items?: Array<NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpResponse>;
+};
+
+export type NoCtfApplicationChallengesWriteUpsWriteUpAccessView = {
+    canManage?: boolean;
+    canJudge?: boolean;
+    canSubmit?: boolean;
+    isFree?: boolean;
+    isUnlocked?: boolean;
+    deductionPercent?: number;
+    unlockedAt?: string | null;
+    canUnlock?: boolean;
+    settings?: NoCtfApplicationChallengesWriteUpsWriteUpSettingsView;
+    teamId?: string | null;
+    canShowCurrentScore?: boolean;
+};
+
+export type NoCtfApplicationChallengesWriteUpsWriteUpSettingsView = {
+    enabled?: boolean;
+    deductionPercent?: number;
+    deadlineHours?: number;
+    deadlineAt?: string;
+    challengeDeductionPercent?: number | null;
+    policyStamp?: string;
+};
+
+export type NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpResponse = {
+    id?: string;
+    competitionChallengeId?: string;
+    challengeTitle?: string;
+    source?: NoCtfDomainChallengesWriteUpsWriteUpSource;
+    teamId?: string | null;
+    authorName?: string;
+    concurrencyStamp?: string;
+    publishedVersionId?: string | null;
+    updatedAt?: string;
+    draft?: NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpVersionResponse | null;
+    submitted?: NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpVersionResponse | null;
+    published?: NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpVersionResponse | null;
+    versions?: Array<NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpVersionResponse>;
+    viewedTeamCount?: number;
+};
+
+export type NoCtfDomainChallengesWriteUpsWriteUpSource = 'Team' | 'Official';
+
+export type NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpVersionResponse = {
+    id?: string;
+    number?: number;
+    format?: NoCtfDomainChallengesWriteUpsWriteUpFormat;
+    state?: NoCtfDomainChallengesWriteUpsWriteUpVersionState;
+    concurrencyStamp?: string;
+    actorUserId?: string;
+    updatedAt?: string;
+    submittedAt?: string | null;
+    reviewReason?: string | null;
+    actorDisplayName?: string | null;
+    publishedAt?: string | null;
+};
+
+export type NoCtfDomainChallengesWriteUpsWriteUpVersionState = 'Draft' | 'Submitted' | 'Rejected' | 'Approved';
+
+export type NoCtfapiEndpointsLiveSoloListLiveSoloWriteUpsRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsLiveSoloLockLiveSoloRosterRequest = {
     teamId: string;
     expectedStamp: string;
@@ -1277,6 +1379,32 @@ export type NoCtfapiEndpointsLiveSoloPrepareLiveSoloRoundRequest = {
     questionGroupId?: string | null;
 };
 
+export type NoCtfapiEndpointsChallengesWriteUpsWriteUpBrowserAccessResponse = {
+    previewUrl?: string;
+    downloadUrl?: string;
+};
+
+export type NoCtfapiEndpointsLiveSoloPrepareLiveSoloWriteUpBrowserAccessRequest = {
+    staff?: boolean;
+};
+
+export type NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpFailureResponse = {
+    code?: NoCtfApplicationChallengesWriteUpsChallengeWriteUpFailure;
+    messageKey?: string;
+    message?: string;
+};
+
+export type NoCtfApplicationChallengesWriteUpsChallengeWriteUpFailure = 'NotFound' | 'Forbidden' | 'Disabled' | 'DeadlinePassed' | 'InvalidContent' | 'Conflict' | 'NotPublished' | 'ConfirmationChanged' | 'CompetitionNotRunning' | 'ContentUnavailable';
+
+export type NoCtfapiEndpointsLiveSoloReviewLiveSoloWriteUpRequest = {
+    versionId: string;
+    expectedStamp: string;
+    action: NoCtfDomainChallengesWriteUpsWriteUpReviewAction;
+    reason?: string | null;
+};
+
+export type NoCtfDomainChallengesWriteUpsWriteUpReviewAction = 'Publish' | 'Reject' | 'Withdraw';
+
 export type NoCtfapiEndpointsLiveSoloSaveLiveSoloConfigurationRequest = {
     configuration: NoCtfapiEndpointsLiveSoloLiveSoloConfigurationContract;
 };
@@ -1288,6 +1416,18 @@ export type NoCtfapiEndpointsLiveSoloSaveLiveSoloQuestionGroupRequest = {
     reserve?: boolean;
     limitSeconds?: number | null;
     questions: Array<NoCtfapiEndpointsLiveSoloLiveSoloQuestionGroupEntryContract>;
+};
+
+export type NoCtfapiEndpointsLiveSoloSaveLiveSoloWriteUpDraftRequest = {
+    official?: boolean;
+    expectedStamp?: string | null;
+    markdown: string;
+};
+
+export type NoCtfapiEndpointsLiveSoloSaveLiveSoloWriteUpPdfDraftRequest = {
+    official?: boolean;
+    expectedStamp?: string | null;
+    file: Blob | File;
 };
 
 export type NoCtfapiEndpointsLiveSoloStartLiveSoloCountdownRequest = {
@@ -1303,6 +1443,11 @@ export type NoCtfapiEndpointsLiveSoloLiveSoloFlagAcceptedResponse = {
 
 export type NoCtfapiEndpointsLiveSoloSubmitLiveSoloFlagRequest = {
     flag: string;
+};
+
+export type NoCtfapiEndpointsLiveSoloSubmitLiveSoloWriteUpRequest = {
+    official?: boolean;
+    expectedStamp: string;
 };
 
 export type NoCtfapiEndpointsInternalInternalResultResponse = {
@@ -2208,15 +2353,6 @@ export type NoCtfapiEndpointsChallengesWriteUpsDownloadChallengeWriteUpRequest =
     [key: string]: never;
 };
 
-export type NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpContentResponse = {
-    versionId?: string;
-    format?: NoCtfDomainChallengesWriteUpsWriteUpFormat;
-    markdown?: string | null;
-    fileName?: string | null;
-};
-
-export type NoCtfDomainChallengesWriteUpsWriteUpFormat = 'Markdown' | 'Pdf';
-
 export type NoCtfapiEndpointsChallengesWriteUpsGetChallengeWriteUpContentRequest = {
     [key: string]: never;
 };
@@ -2241,15 +2377,6 @@ export type NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpSettingsResponse 
     concurrencyStamp?: string;
 };
 
-export type NoCtfApplicationChallengesWriteUpsWriteUpSettingsView = {
-    enabled?: boolean;
-    deductionPercent?: number;
-    deadlineHours?: number;
-    deadlineAt?: string;
-    challengeDeductionPercent?: number | null;
-    policyStamp?: string;
-};
-
 export type NoCtfapiEndpointsChallengesWriteUpsGetChallengeWriteUpSettingsRequest = {
     [key: string]: never;
 };
@@ -2261,41 +2388,6 @@ export type NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpReviewPageRespons
     canJudge?: boolean;
 };
 
-export type NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpResponse = {
-    id?: string;
-    competitionChallengeId?: string;
-    challengeTitle?: string;
-    source?: NoCtfDomainChallengesWriteUpsWriteUpSource;
-    teamId?: string | null;
-    authorName?: string;
-    concurrencyStamp?: string;
-    publishedVersionId?: string | null;
-    updatedAt?: string;
-    draft?: NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpVersionResponse | null;
-    submitted?: NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpVersionResponse | null;
-    published?: NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpVersionResponse | null;
-    versions?: Array<NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpVersionResponse>;
-    viewedTeamCount?: number;
-};
-
-export type NoCtfDomainChallengesWriteUpsWriteUpSource = 'Team' | 'Official';
-
-export type NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpVersionResponse = {
-    id?: string;
-    number?: number;
-    format?: NoCtfDomainChallengesWriteUpsWriteUpFormat;
-    state?: NoCtfDomainChallengesWriteUpsWriteUpVersionState;
-    concurrencyStamp?: string;
-    actorUserId?: string;
-    updatedAt?: string;
-    submittedAt?: string | null;
-    reviewReason?: string | null;
-    actorDisplayName?: string | null;
-    publishedAt?: string | null;
-};
-
-export type NoCtfDomainChallengesWriteUpsWriteUpVersionState = 'Draft' | 'Submitted' | 'Rejected' | 'Approved';
-
 export type NoCtfapiEndpointsChallengesWriteUpsListChallengeWriteUpReviewsRequest = {
     [key: string]: never;
 };
@@ -2303,25 +2395,6 @@ export type NoCtfapiEndpointsChallengesWriteUpsListChallengeWriteUpReviewsReques
 export type NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpReviewSourceProtocol = 'Team' | 'Official';
 
 export type NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpReviewFilterProtocol = 'All' | 'Submitted' | 'Published' | 'Rejected' | 'Draft';
-
-export type NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpListResponse = {
-    access?: NoCtfApplicationChallengesWriteUpsWriteUpAccessView;
-    items?: Array<NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpResponse>;
-};
-
-export type NoCtfApplicationChallengesWriteUpsWriteUpAccessView = {
-    canManage?: boolean;
-    canJudge?: boolean;
-    canSubmit?: boolean;
-    isFree?: boolean;
-    isUnlocked?: boolean;
-    deductionPercent?: number;
-    unlockedAt?: string | null;
-    canUnlock?: boolean;
-    settings?: NoCtfApplicationChallengesWriteUpsWriteUpSettingsView;
-    teamId?: string | null;
-    canShowCurrentScore?: boolean;
-};
 
 export type NoCtfapiEndpointsChallengesWriteUpsListChallengeWriteUpsRequest = {
     [key: string]: never;
@@ -2331,22 +2404,9 @@ export type NoCtfapiEndpointsChallengesWriteUpsListMyChallengeWriteUpsRequest = 
     [key: string]: never;
 };
 
-export type NoCtfapiEndpointsChallengesWriteUpsWriteUpBrowserAccessResponse = {
-    previewUrl?: string;
-    downloadUrl?: string;
-};
-
 export type NoCtfapiEndpointsChallengesWriteUpsPrepareChallengeWriteUpBrowserAccessRequest = {
     staff?: boolean;
 };
-
-export type NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpFailureResponse = {
-    code?: NoCtfApplicationChallengesWriteUpsChallengeWriteUpFailure;
-    messageKey?: string;
-    message?: string;
-};
-
-export type NoCtfApplicationChallengesWriteUpsChallengeWriteUpFailure = 'NotFound' | 'Forbidden' | 'Disabled' | 'DeadlinePassed' | 'InvalidContent' | 'Conflict' | 'NotPublished' | 'ConfirmationChanged' | 'CompetitionNotRunning' | 'ContentUnavailable';
 
 export type NoCtfapiEndpointsChallengesWriteUpsReviewChallengeWriteUpRequest = {
     versionId: string;
@@ -2354,8 +2414,6 @@ export type NoCtfapiEndpointsChallengesWriteUpsReviewChallengeWriteUpRequest = {
     action?: NoCtfDomainChallengesWriteUpsWriteUpReviewAction;
     reason?: string | null;
 };
-
-export type NoCtfDomainChallengesWriteUpsWriteUpReviewAction = 'Publish' | 'Reject' | 'Withdraw';
 
 export type NoCtfapiEndpointsChallengesWriteUpsSaveChallengeWriteUpDraftRequest = {
     official?: boolean;
@@ -7107,6 +7165,76 @@ export type MutateLiveSoloRuntimeResponses = {
 
 export type MutateLiveSoloRuntimeResponse = MutateLiveSoloRuntimeResponses[keyof MutateLiveSoloRuntimeResponses];
 
+export type GetLiveSoloWriteUpContentData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        matchId: string;
+        roundId: string;
+        questionId: string;
+        versionId: string;
+    };
+    query: {
+        staff: boolean;
+    };
+    url: '/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/writeups/versions/{versionId}';
+};
+
+export type GetLiveSoloWriteUpContentErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetLiveSoloWriteUpContentResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpContentResponse;
+};
+
+export type GetLiveSoloWriteUpContentResponse = GetLiveSoloWriteUpContentResponses[keyof GetLiveSoloWriteUpContentResponses];
+
+export type GetLiveSoloWriteUpFileData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        matchId: string;
+        roundId: string;
+        questionId: string;
+        versionId: string;
+    };
+    query: {
+        staff: boolean;
+        download: boolean;
+    };
+    url: '/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/writeups/versions/{versionId}/file';
+};
+
+export type GetLiveSoloWriteUpFileErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
 export type JoinLiveSoloMediaData = {
     body: NoCtfapiEndpointsLiveSoloJoinLiveSoloMediaRequest;
     path: {
@@ -7215,6 +7343,40 @@ export type ListLiveSoloHintsResponses = {
 };
 
 export type ListLiveSoloHintsResponse = ListLiveSoloHintsResponses[keyof ListLiveSoloHintsResponses];
+
+export type ListLiveSoloPostgameQuestionsData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        matchId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/postgame-questions';
+};
+
+export type ListLiveSoloPostgameQuestionsErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type ListLiveSoloPostgameQuestionsResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsLiveSoloLiveSoloPostgameQuestionsResponse;
+};
+
+export type ListLiveSoloPostgameQuestionsResponse = ListLiveSoloPostgameQuestionsResponses[keyof ListLiveSoloPostgameQuestionsResponses];
 
 export type ListLiveSoloQuestionGroupsData = {
     body?: never;
@@ -7360,6 +7522,44 @@ export type ListLiveSoloRecordingsResponses = {
 };
 
 export type ListLiveSoloRecordingsResponse = ListLiveSoloRecordingsResponses[keyof ListLiveSoloRecordingsResponses];
+
+export type ListLiveSoloWriteUpsData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        matchId: string;
+        roundId: string;
+        questionId: string;
+    };
+    query: {
+        staff: boolean;
+    };
+    url: '/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/writeups';
+};
+
+export type ListLiveSoloWriteUpsErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type ListLiveSoloWriteUpsResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpListResponse;
+};
+
+export type ListLiveSoloWriteUpsResponse = ListLiveSoloWriteUpsResponses[keyof ListLiveSoloWriteUpsResponses];
 
 export type LockLiveSoloRosterData = {
     body: NoCtfapiEndpointsLiveSoloLockLiveSoloRosterRequest;
@@ -7588,6 +7788,176 @@ export type PrepareLiveSoloRoundResponses = {
 
 export type PrepareLiveSoloRoundResponse = PrepareLiveSoloRoundResponses[keyof PrepareLiveSoloRoundResponses];
 
+export type PrepareLiveSoloWriteUpBrowserAccessData = {
+    body: NoCtfapiEndpointsLiveSoloPrepareLiveSoloWriteUpBrowserAccessRequest;
+    path: {
+        competitionId: string;
+        matchId: string;
+        roundId: string;
+        questionId: string;
+        versionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/writeups/versions/{versionId}/browser-access';
+};
+
+export type PrepareLiveSoloWriteUpBrowserAccessErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type PrepareLiveSoloWriteUpBrowserAccessResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsChallengesWriteUpsWriteUpBrowserAccessResponse;
+};
+
+export type PrepareLiveSoloWriteUpBrowserAccessResponse = PrepareLiveSoloWriteUpBrowserAccessResponses[keyof PrepareLiveSoloWriteUpBrowserAccessResponses];
+
+export type ReviewLiveSoloWriteUpData = {
+    body: NoCtfapiEndpointsLiveSoloReviewLiveSoloWriteUpRequest;
+    path: {
+        competitionId: string;
+        matchId: string;
+        roundId: string;
+        questionId: string;
+        writeUpId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/writeups/{writeUpId}/review';
+};
+
+export type ReviewLiveSoloWriteUpErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpFailureResponse;
+    422: NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpFailureResponse;
+};
+
+export type ReviewLiveSoloWriteUpError = ReviewLiveSoloWriteUpErrors[keyof ReviewLiveSoloWriteUpErrors];
+
+export type ReviewLiveSoloWriteUpResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpResponse;
+};
+
+export type ReviewLiveSoloWriteUpResponse = ReviewLiveSoloWriteUpResponses[keyof ReviewLiveSoloWriteUpResponses];
+
+export type SaveLiveSoloWriteUpDraftData = {
+    body: NoCtfapiEndpointsLiveSoloSaveLiveSoloWriteUpDraftRequest;
+    path: {
+        competitionId: string;
+        matchId: string;
+        roundId: string;
+        questionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/writeups/draft';
+};
+
+export type SaveLiveSoloWriteUpDraftErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpFailureResponse;
+    422: NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpFailureResponse;
+};
+
+export type SaveLiveSoloWriteUpDraftError = SaveLiveSoloWriteUpDraftErrors[keyof SaveLiveSoloWriteUpDraftErrors];
+
+export type SaveLiveSoloWriteUpDraftResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpResponse;
+};
+
+export type SaveLiveSoloWriteUpDraftResponse = SaveLiveSoloWriteUpDraftResponses[keyof SaveLiveSoloWriteUpDraftResponses];
+
+export type SaveLiveSoloWriteUpPdfDraftData = {
+    body: NoCtfapiEndpointsLiveSoloSaveLiveSoloWriteUpPdfDraftRequest;
+    path: {
+        competitionId: string;
+        matchId: string;
+        roundId: string;
+        questionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/writeups/draft/pdf';
+};
+
+export type SaveLiveSoloWriteUpPdfDraftErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpFailureResponse;
+    422: NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpFailureResponse;
+};
+
+export type SaveLiveSoloWriteUpPdfDraftError = SaveLiveSoloWriteUpPdfDraftErrors[keyof SaveLiveSoloWriteUpPdfDraftErrors];
+
+export type SaveLiveSoloWriteUpPdfDraftResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpResponse;
+};
+
+export type SaveLiveSoloWriteUpPdfDraftResponse = SaveLiveSoloWriteUpPdfDraftResponses[keyof SaveLiveSoloWriteUpPdfDraftResponses];
+
 export type StartLiveSoloCountdownData = {
     body: NoCtfapiEndpointsLiveSoloStartLiveSoloCountdownRequest;
     path: {
@@ -7684,6 +8054,50 @@ export type SubmitLiveSoloFlagResponses = {
 };
 
 export type SubmitLiveSoloFlagResponse = SubmitLiveSoloFlagResponses[keyof SubmitLiveSoloFlagResponses];
+
+export type SubmitLiveSoloWriteUpData = {
+    body: NoCtfapiEndpointsLiveSoloSubmitLiveSoloWriteUpRequest;
+    path: {
+        competitionId: string;
+        matchId: string;
+        roundId: string;
+        questionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/writeups/submit';
+};
+
+export type SubmitLiveSoloWriteUpErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpFailureResponse;
+    422: NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpFailureResponse;
+};
+
+export type SubmitLiveSoloWriteUpError = SubmitLiveSoloWriteUpErrors[keyof SubmitLiveSoloWriteUpErrors];
+
+export type SubmitLiveSoloWriteUpResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpResponse;
+};
+
+export type SubmitLiveSoloWriteUpResponse = SubmitLiveSoloWriteUpResponses[keyof SubmitLiveSoloWriteUpResponses];
 
 export type DownloadFixArchiveEndpointData = {
     body?: never;

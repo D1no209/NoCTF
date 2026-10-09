@@ -41,6 +41,8 @@ public static class LiveSoloInfrastructure
         services.AddScoped<ILiveSoloAttachmentStore, LiveSoloAttachmentStore>();
         services.AddScoped<AccessLiveSoloAttachments>();
         services.AddScoped<ILiveSoloHintReader, LiveSoloHintReader>();
+        services.AddScoped<ILiveSoloPostgameQuestionAccess, LiveSoloPostgameQuestionAccess>();
+        services.AddScoped<ManageLiveSoloWriteUps>();
         services.AddScoped<ILiveSoloRuntimeStore, LiveSoloRuntimeStore>();
         services.AddScoped<ManageLiveSoloRuntimes>();
         services.AddScoped<ILiveSoloMediaStore, LiveSoloMediaStore>();

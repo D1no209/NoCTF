@@ -28,7 +28,7 @@ public sealed partial class ChallengeWriteUpStore(NoCtfDbContext db, ICompetitio
         Guid? TeamId, bool CanObserve, bool CanJudge, bool CanManage);
 
     private async Task<Context?> ContextAsync(Guid competitionId, Guid challengeId, Guid actorId,
-        bool staff, DateTimeOffset now, CancellationToken ct)
+        bool staff, DateTimeOffset now, CancellationToken ct, Guid? executionScopeId = null)
     {
         if (!await db.Users.AsNoTracking().AnyAsync(x => x.Id == actorId && x.AccountStatus == UserAccountStatus.Active, ct)) return null;
         var competition = await db.Competitions.AsNoTracking().SingleOrDefaultAsync(x => x.Id == competitionId, ct);
@@ -38,6 +38,21 @@ public sealed partial class ChallengeWriteUpStore(NoCtfDbContext db, ICompetitio
         var observe = await authorizer.CanObserveAsync(actorId, competitionId, ct);
         var manage = observe && await authorizer.CanModerateAsync(actorId, competitionId, ct);
         var judge = observe && await authorizer.CanJudgeAsync(actorId, competitionId, ct);
+        if (competition.Mode == GameMode.LiveSolo)
+        {
+            if (executionScopeId is not Guid scopeId || competition.Status != CompetitionStatus.Finished
+                || !await db.Set<NoCTF.Domain.LiveSolo.LiveSoloCompetitionModeConfiguration>().AnyAsync(x => x.CompetitionId == competitionId && x.Enabled, ct)) return null;
+            var scope = await db.LiveSoloRoundQuestions.AsNoTracking().Where(x => x.Id == scopeId && x.CompetitionChallengeId == challengeId && x.OpenedAt != null)
+                .Join(db.LiveSoloRounds.AsNoTracking(), q => q.RoundId, r => r.Id, (q,r) => r)
+                .Join(db.LiveSoloMatches.AsNoTracking(), r => r.MatchId, m => m.Id, (_,m) => m)
+                .SingleOrDefaultAsync(x=>x.CompetitionId==competitionId,ct);
+            if (scope is null) return null;
+            if (staff) return observe ? new(competition,challenge,null,observe,judge,manage) : null;
+            if (!competition.SingleWriteUpsEnabled) return null;
+            var team = await db.Teams.AsNoTracking().Where(x=>x.CompetitionId==competitionId&&x.RegistrationStatus==TeamRegistrationStatus.Approved
+                &&!x.IsBanned&&x.Members.Any(m=>m.UserId==actorId)).Select(x=>(Guid?)x.Id).SingleOrDefaultAsync(ct);
+            return team is Guid id ? new(competition,challenge,id,observe,judge,manage) : null;
+        }
         if (staff) return observe ? new(competition, challenge, null, observe, judge, manage) : null;
         if (!competition.SingleWriteUpsEnabled || !challenge.IsPublished || challenge.DeletedAt is not null
             || !ParticipantChallengeVisibilityPolicy.CanView(competition.Status)) return null;
@@ -49,9 +64,9 @@ public sealed partial class ChallengeWriteUpStore(NoCtfDbContext db, ICompetitio
     }
 
     public async Task<WriteUpListView?> ListAsync(Guid competitionId, Guid challengeId, Guid actorId,
-        bool staff, DateTimeOffset now, CancellationToken ct)
+        bool staff, DateTimeOffset now, CancellationToken ct, Guid? executionScopeId = null)
     {
-        var context = await ContextAsync(competitionId, challengeId, actorId, staff, now, ct);
+        var context = await ContextAsync(competitionId, challengeId, actorId, staff, now, ct, executionScopeId);
         if (context is null) return null;
         var roots = await db.ChallengeWriteUps.AsNoTracking()
             .Where(x => x.CompetitionId == competitionId && x.CompetitionChallengeId == challengeId
@@ -76,7 +91,7 @@ public sealed partial class ChallengeWriteUpStore(NoCtfDbContext db, ICompetitio
     private static WriteUpAccessView Access(Context context, WriteUpUnlockReceipt? receipt, DateTimeOffset now)
     {
         var competition = context.Competition;
-        var percent = context.Challenge.WriteUpDeductionPercent ?? competition.SingleWriteUpDeductionPercent;
+        var percent = competition.Mode == GameMode.LiveSolo ? 0 : context.Challenge.WriteUpDeductionPercent ?? competition.SingleWriteUpDeductionPercent;
         var stampBytes = SHA256.HashData(Encoding.UTF8.GetBytes(
             $"{competition.ConcurrencyStamp:N}:{context.Challenge.ConcurrencyStamp:N}:{percent}"));
         var settings = new WriteUpSettingsView(competition.SingleWriteUpsEnabled, percent,
@@ -87,7 +102,7 @@ public sealed partial class ChallengeWriteUpStore(NoCtfDbContext db, ICompetitio
                 competition.EndAt, competition.SingleWriteUpDeadlineHours, now),
             competition.Status == CompetitionStatus.Finished, receipt is not null,
             receipt?.DeductionPercent ?? percent, receipt?.UnlockedAt,
-            context.TeamId is not null && competition.Status == CompetitionStatus.Running, settings, context.TeamId,
+            context.TeamId is not null && competition.Mode != GameMode.LiveSolo && competition.Status == CompetitionStatus.Running, settings, context.TeamId,
             context.TeamId is null || CompetitionLeaderboardVisibilityPolicy.EffectiveAt(competition.FrozenStartAt,
                 competition.HiddenStartAt, now) == CompetitionLeaderboardVisibility.Normal);
     }
@@ -98,7 +113,7 @@ public sealed partial class ChallengeWriteUpStore(NoCtfDbContext db, ICompetitio
     {
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         var context = await ContextAsync(command.CompetitionId, command.CompetitionChallengeId, command.ActorId,
-            command.Official, command.Now, ct);
+            command.Official, command.Now, ct, command.ExecutionScopeId);
         if (context is null || (command.Official ? !context.CanManage : context.TeamId is null)) return new(Failure: ChallengeWriteUpFailure.Forbidden);
         if (!context.Competition.SingleWriteUpsEnabled) return new(Failure: ChallengeWriteUpFailure.Disabled);
         if (!command.Official && !Access(context, null, command.Now).CanSubmit) return new(Failure: ChallengeWriteUpFailure.DeadlinePassed);
@@ -141,7 +156,7 @@ public sealed partial class ChallengeWriteUpStore(NoCtfDbContext db, ICompetitio
     private async Task<WriteUpMutationResult> SubmitCoreAsync(SubmitWriteUp command, CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-        var context = await ContextAsync(command.CompetitionId, command.CompetitionChallengeId, command.ActorId, command.Official, command.Now, ct);
+        var context = await ContextAsync(command.CompetitionId, command.CompetitionChallengeId, command.ActorId, command.Official, command.Now, ct, command.ExecutionScopeId);
         if (context is null || (command.Official ? !context.CanManage : context.TeamId is null)) return new(Failure: ChallengeWriteUpFailure.Forbidden);
         if (!context.Competition.SingleWriteUpsEnabled) return new(Failure: ChallengeWriteUpFailure.Disabled);
         if (!command.Official && !Access(context, null, command.Now).CanSubmit) return new(Failure: ChallengeWriteUpFailure.DeadlinePassed);
@@ -165,7 +180,7 @@ public sealed partial class ChallengeWriteUpStore(NoCtfDbContext db, ICompetitio
     private async Task<WriteUpMutationResult> ReviewCoreAsync(ReviewWriteUp command, CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-        var context = await ContextAsync(command.CompetitionId, command.CompetitionChallengeId, command.ActorId, true, command.Now, ct);
+        var context = await ContextAsync(command.CompetitionId, command.CompetitionChallengeId, command.ActorId, true, command.Now, ct, command.ExecutionScopeId);
         if (context is null || (command.Action == WriteUpReviewAction.Reject ? !context.CanJudge : !context.CanManage)) return new(Failure: ChallengeWriteUpFailure.Forbidden);
         if (!context.Competition.SingleWriteUpsEnabled && command.Action != WriteUpReviewAction.Withdraw) return new(Failure: ChallengeWriteUpFailure.Disabled);
         var root = await db.ChallengeWriteUps.Include(x => x.Versions).SingleOrDefaultAsync(x => x.Id == command.WriteUpId
@@ -193,6 +208,18 @@ public sealed partial class ChallengeWriteUpStore(NoCtfDbContext db, ICompetitio
             if (command.Action == WriteUpReviewAction.Publish) root.PublishedVersionId = version.Id;
         }
         root.UpdatedAt = command.Now;
+        if (command.Action == WriteUpReviewAction.Publish && context.Competition.Mode == GameMode.LiveSolo && command.ExecutionScopeId is Guid scopeId)
+        {
+            var canonical = await db.Set<NoCTF.Domain.LiveSolo.LiveSoloProgramFrameQuestion>().Where(x=>x.RoundQuestionId==scopeId&&x.HasStaticAnswer&&x.CanonicalChallengeId!=Guid.Empty)
+                .Select(x=>x.CanonicalChallengeId).Distinct().ToArrayAsync(ct);
+            if (canonical.Length==0 && await db.ChallengeFlags.AnyAsync(flag=>flag.DeletedAt==null&&(flag.Type==ChallengeFlagType.Template&&flag.ChallengeId==context.Challenge.ChallengeId
+                || flag.Type==ChallengeFlagType.Competition&&flag.CompetitionChallengeId==context.Challenge.Id
+                || flag.Type==ChallengeFlagType.Team&&flag.CompetitionChallengeId==context.Challenge.Id&&flag.SpecificationKind==SpecificationKind.Attachment),ct))
+                canonical=[await db.LiveSoloChallengeSources.Where(x=>x.ChallengeId==context.Challenge.ChallengeId).Select(x=>(Guid?)x.CanonicalChallengeId).SingleOrDefaultAsync(ct)??context.Challenge.ChallengeId];
+            var matchId=await db.LiveSoloRoundQuestions.Where(x=>x.Id==scopeId).Join(db.LiveSoloRounds,q=>q.RoundId,r=>r.Id,(q,r)=>r.MatchId).SingleAsync(ct);
+            foreach(var id in canonical) if(!await db.LiveSoloQuestionExposures.AnyAsync(x=>x.CompetitionId==command.CompetitionId&&x.CanonicalChallengeId==id,ct))
+                db.LiveSoloQuestionExposures.Add(new(){CompetitionId=command.CompetitionId,CanonicalChallengeId=id,MatchId=matchId,PublicAt=command.Now});
+        }
         var kind = command.Action switch { WriteUpReviewAction.Publish => CompetitionEventKind.ChallengeWriteUpPublished,
             WriteUpReviewAction.Reject => CompetitionEventKind.ChallengeWriteUpRejected, _ => CompetitionEventKind.ChallengeWriteUpWithdrawn };
         await RecordAsync(context, root, command.ActorId, kind, command.Now, ct);
@@ -201,9 +228,9 @@ public sealed partial class ChallengeWriteUpStore(NoCtfDbContext db, ICompetitio
     }
 
     public async Task<WriteUpContentView> ReadContentAsync(Guid competitionId, Guid challengeId, Guid versionId,
-        Guid actorId, bool staff, DateTimeOffset now, CancellationToken ct)
+        Guid actorId, bool staff, DateTimeOffset now, CancellationToken ct, Guid? executionScopeId = null)
     {
-        var context = await ContextAsync(competitionId, challengeId, actorId, staff, now, ct);
+        var context = await ContextAsync(competitionId, challengeId, actorId, staff, now, ct, executionScopeId);
         if (context is null) return new(versionId, default, null, null, ChallengeWriteUpFailure.Forbidden);
         var root = await db.ChallengeWriteUps.AsNoTracking().Include(x => x.Versions).SingleOrDefaultAsync(x =>
             x.CompetitionId == competitionId && x.CompetitionChallengeId == challengeId && x.Versions.Any(v => v.Id == versionId), ct);
