@@ -70,6 +70,7 @@ public static class LiveSoloInfrastructure
             || media.MaximumParticipants is < 4 or > 64 || !media.EgressOutputRoot.StartsWith('/')
             || media.RecordingQuotaBytes < 1 || media.RecordingExportLimitBytes < 16L*1024*1024 || media.RecordingExportLimitBytes > long.MaxValue/2
             || media.RecordingExportLimitBytes > media.RecordingQuotaBytes
+            || media.ProgramChunkSeconds is < 30 or > 3600
             || media.EgressOutputRoot.Contains("..", StringComparison.Ordinal)))
             throw new InvalidOperationException("LiveSolo media configuration is invalid.");
         services.AddSingleton(media);

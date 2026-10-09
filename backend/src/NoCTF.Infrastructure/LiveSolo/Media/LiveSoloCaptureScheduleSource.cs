@@ -13,6 +13,8 @@ public sealed class LiveSoloCaptureScheduleSource(NoCtfDbContext db) : IClusterS
         var ids = await db.LiveSoloProgramCaptures.AsNoTracking().Where(x => x.State == LiveSoloCaptureState.Pending
             || x.State == LiveSoloCaptureState.Starting || x.State == LiveSoloCaptureState.Active || x.State == LiveSoloCaptureState.Stopping
             || x.State == LiveSoloCaptureState.Completed && x.ImportedAt == null
+            || x.State == LiveSoloCaptureState.Completed && x.RotationRequested
+                && db.LiveSoloMediaSessions.Any(s=>s.Id==x.MediaSessionId&&s.CurrentProgramCaptureId==x.Id&&s.State==LiveSoloMediaState.Ready)
             || x.State == LiveSoloCaptureState.RequiresReview && x.EgressId == null).Select(x => x.MediaSessionId)
             .Union(db.LiveSoloRecordings.AsNoTracking().Where(x => x.State == LiveSoloRecordingState.Pending || x.State == LiveSoloRecordingState.Starting
                 || x.State == LiveSoloRecordingState.Recording || x.State == LiveSoloRecordingState.Finalizing
