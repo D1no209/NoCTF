@@ -1,3 +1,5 @@
 /data/
 /config/docker/
 /config/registry/auth/
+/docker/config/live-solo/
+/docker/env/live-solo/
