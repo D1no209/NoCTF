@@ -65,6 +65,8 @@ public sealed class TransactionalRequestReplay(
             ReplayFingerprintJsonContext.Default.EmptyReplayFingerprint),
         RuntimeReplayFingerprint value => JsonSerializer.SerializeToUtf8Bytes(value,
             ReplayFingerprintJsonContext.Default.RuntimeReplayFingerprint),
+        ScopedRuntimeReplayFingerprint value => JsonSerializer.SerializeToUtf8Bytes(value,
+            ReplayFingerprintJsonContext.Default.ScopedRuntimeReplayFingerprint),
         FlagReplayFingerprint value => JsonSerializer.SerializeToUtf8Bytes(value,
             ReplayFingerprintJsonContext.Default.FlagReplayFingerprint),
         ManualAdjustmentReplayFingerprint value => JsonSerializer.SerializeToUtf8Bytes(value,

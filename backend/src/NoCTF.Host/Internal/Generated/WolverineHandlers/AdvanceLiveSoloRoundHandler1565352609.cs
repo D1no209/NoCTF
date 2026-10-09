@@ -47,13 +47,14 @@ namespace Internal.Generated.WolverineHandlers
         public override async System.Threading.Tasks.Task HandleAsync(Wolverine.Runtime.MessageContext context, System.Threading.CancellationToken cancellation)
         {
             await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider, _notificationChangePublisher, _loggerOfNoCtfDbContext);
+            var liveSoloExecutionAccess = new NoCTF.Infrastructure.LiveSolo.Resources.LiveSoloExecutionAccess(noCtfDbContext);
             var runnerExecutionRuntimeIsolation = new NoCTF.Infrastructure.Runtime.Access.RunnerExecutionRuntimeIsolation(noCtfDbContext, _natsRunnerAvailabilityRegistry, _runtimePlacementPolicy2);
             var perTeamRuntimeFlagStore = new NoCTF.Infrastructure.Challenges.Flags.PerTeamRuntimeFlagStore(noCtfDbContext);
             var requestCommandKey = new NoCTF.API.Security.RequestCommandKey(_httpContextAccessor);
             var postCommitDispatchStatus = new NoCTF.Application.Messaging.PostCommitDispatchStatus();
             var wolverinePostCommitMessagePublisher = new NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher(context, noCtfDbContext, _loggerOfWolverinePostCommitMessagePublisher, postCommitDispatchStatus);
-            var scopedRuntimeControl = new NoCTF.Infrastructure.Runtime.Instances.ScopedRuntimeControl(noCtfDbContext, _challengeRuntimeTemplateCatalog, _runtimePlacementPolicy1, perTeamRuntimeFlagStore, wolverinePostCommitMessagePublisher, runnerExecutionRuntimeIsolation);
             var transactionalRequestReplay = new NoCTF.Infrastructure.Commands.Idempotency.TransactionalRequestReplay(noCtfDbContext, requestCommandKey, _timeProvider);
+            var scopedRuntimeControl = new NoCTF.Infrastructure.Runtime.Instances.ScopedRuntimeControl(noCtfDbContext, _challengeRuntimeTemplateCatalog, _runtimePlacementPolicy1, perTeamRuntimeFlagStore, wolverinePostCommitMessagePublisher, runnerExecutionRuntimeIsolation, liveSoloExecutionAccess, _timeProvider, transactionalRequestReplay);
             var liveSoloRuntimePreparation = new NoCTF.Infrastructure.LiveSolo.Resources.LiveSoloRuntimePreparation(noCtfDbContext, scopedRuntimeControl);
             var competitionModerationAuthorizer = new NoCTF.Infrastructure.Teams.Moderation.CompetitionModerationAuthorizer(noCtfDbContext);
             var liveSoloMatchStore = new NoCTF.Infrastructure.LiveSolo.Matches.LiveSoloMatchStore(noCtfDbContext, competitionModerationAuthorizer, _liveSoloMediaGateway, liveSoloRuntimePreparation, wolverinePostCommitMessagePublisher, transactionalRequestReplay, _timeProvider);

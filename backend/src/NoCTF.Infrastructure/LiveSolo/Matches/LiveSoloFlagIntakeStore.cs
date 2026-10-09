@@ -97,11 +97,15 @@ public sealed partial class LiveSoloMatchStore
             .Where(x => x.RoundId == roundId && x.OpenedAt != null && x.OpenedAt <= now).OrderBy(x => x.Position).ToArrayAsync(ct);
         var directory = await db.CompetitionChallenges.AsNoTracking().Where(x => questions.Select(q => q.CompetitionChallengeId).Contains(x.Id))
             .Join(db.Challenges.AsNoTracking(), x => x.ChallengeId, x => x.Id, (entry, template) => new { Entry = entry, Template = template }).ToDictionaryAsync(x => x.Entry.Id, ct);
-        var side = match.Slots.Single(x => x.TeamId == teamId).Side;
+        var questionIds = questions.Select(x => x.Id).ToArray();
+        var runtimes = await db.RuntimeInstances.AsNoTracking().Where(x => x.TeamId == teamId && x.ExecutionScopeId != null
+            && questionIds.Contains(x.ExecutionScopeId.Value)).OrderByDescending(x => x.CreatedAt).ThenByDescending(x => x.Id)
+            .Select(x => new { x.ExecutionScopeId, x.Id }).ToArrayAsync(ct);
+        var current = runtimes.GroupBy(x => x.ExecutionScopeId!.Value).ToDictionary(x => x.Key, x => (Guid?)x.First().Id);
         return questions.Select(x => new LiveSoloQuestionView(x.Id, x.CompetitionChallengeId, x.Position,
             directory[x.CompetitionChallengeId].Entry.CustomTitle ?? directory[x.CompetitionChallengeId].Template.Title,
             directory[x.CompetitionChallengeId].Template.Description,
             directory[x.CompetitionChallengeId].Template.Direction, directory[x.CompetitionChallengeId].Entry.Tags.OrderBy(t => t.Position).Select(t => t.Name).ToArray(),
-            x.OpenedAt!.Value, x.Runtimes.SingleOrDefault(r => r.Side == side)?.RuntimeInstanceId)).ToArray();
+            x.OpenedAt!.Value, current.GetValueOrDefault(x.Id))).ToArray();
     }
 }

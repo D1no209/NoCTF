@@ -3108,6 +3108,231 @@
         ]
       }
     },
+    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/runtime": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Reads the current team's opened execution environment and its verified proxy accesses.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/runtime.",
+        "operationId": "GetLiveSoloRuntime",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "roundId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "questionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Starts, replaces or stops the current team's execution environment with revision and request replay checks.",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/runtime.",
+        "operationId": "MutateLiveSoloRuntime",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "roundId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "questionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "X-NoCTF-Human-Verification",
+            "in": "header",
+            "description": "One-time token from the provider selected by public platform configuration. Omit only when that provider is None.",
+            "schema": {
+              "type": "string",
+              "maxLength": 4096
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "MutateLiveSoloRuntimeRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloMutateLiveSoloRuntimeRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeAcceptedResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Human verification is required or was rejected.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "messageKey": {
+                      "type": "string",
+                      "description": "Stable semantic message identity. Translate with messageArguments; never infer identity from detail text."
+                    },
+                    "messageArguments": {
+                      "type": "object",
+                      "description": "Named interpolation arguments."
+                    }
+                  },
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The selected human verification provider is unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "properties": {
+                    "messageKey": {
+                      "type": "string",
+                      "description": "Stable semantic message identity. Translate with messageArguments; never infer identity from detail text."
+                    },
+                    "messageArguments": {
+                      "type": "object",
+                      "description": "Named interpolation arguments."
+                    }
+                  },
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/attachments": {
       "get": {
         "tags": [
@@ -24809,6 +25034,10 @@
         "type": "object",
         "additionalProperties": false
       },
+      "NoCTFAPIEndpointsLiveSoloGetLiveSoloRuntimeRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
       "NoCTFAPIEndpointsLiveSoloListLiveSoloAdjudicationsRequest": {
         "type": "object",
         "additionalProperties": false
@@ -25032,6 +25261,37 @@
             }
           }
         }
+      },
+      "NoCTFAPIEndpointsLiveSoloMutateLiveSoloRuntimeRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "action"
+        ],
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloRuntimeActionProtocol"
+          },
+          "expectedRuntimeInstanceId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloRuntimeActionProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Start",
+          "Reset",
+          "Stop"
+        ],
+        "enum": [
+          "Start",
+          "Reset",
+          "Stop"
+        ]
       },
       "NoCTFAPIEndpointsChallengesAttachmentBrowserDownloadResponse": {
         "type": "object",

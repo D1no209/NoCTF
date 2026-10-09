@@ -950,6 +950,10 @@ export type NoCtfapiEndpointsLiveSoloGetLiveSoloRoundRequest = {
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsLiveSoloGetLiveSoloRuntimeRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsLiveSoloListLiveSoloAdjudicationsRequest = {
     [key: string]: never;
 };
@@ -1027,6 +1031,13 @@ export type NoCtfapiEndpointsLiveSoloLockLiveSoloRosterRequest = {
     expectedStamp: string;
     userIds: Array<string>;
 };
+
+export type NoCtfapiEndpointsLiveSoloMutateLiveSoloRuntimeRequest = {
+    action: NoCtfapiEndpointsLiveSoloLiveSoloRuntimeActionProtocol;
+    expectedRuntimeInstanceId?: string | null;
+};
+
+export type NoCtfapiEndpointsLiveSoloLiveSoloRuntimeActionProtocol = 'Start' | 'Reset' | 'Stop';
 
 export type NoCtfapiEndpointsChallengesAttachmentBrowserDownloadResponse = {
     downloadUrl?: string;
@@ -6477,6 +6488,95 @@ export type GetLiveSoloRoundResponses = {
 };
 
 export type GetLiveSoloRoundResponse = GetLiveSoloRoundResponses[keyof GetLiveSoloRoundResponses];
+
+export type GetLiveSoloRuntimeData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        matchId: string;
+        roundId: string;
+        questionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/runtime';
+};
+
+export type GetLiveSoloRuntimeErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetLiveSoloRuntimeResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsRuntimeRuntimeResponse;
+};
+
+export type GetLiveSoloRuntimeResponse = GetLiveSoloRuntimeResponses[keyof GetLiveSoloRuntimeResponses];
+
+export type MutateLiveSoloRuntimeData = {
+    body: NoCtfapiEndpointsLiveSoloMutateLiveSoloRuntimeRequest;
+    headers?: {
+        /**
+         * One-time token from the provider selected by public platform configuration. Omit only when that provider is None.
+         */
+        'X-NoCTF-Human-Verification'?: string;
+    };
+    path: {
+        competitionId: string;
+        matchId: string;
+        roundId: string;
+        questionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/runtime';
+};
+
+export type MutateLiveSoloRuntimeErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Human verification is required or was rejected.
+     */
+    403: MicrosoftAspNetCoreMvcProblemDetails;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsLiveSoloLiveSoloFailureResponse;
+    /**
+     * The selected human verification provider is unavailable.
+     */
+    503: MicrosoftAspNetCoreMvcProblemDetails;
+};
+
+export type MutateLiveSoloRuntimeError = MutateLiveSoloRuntimeErrors[keyof MutateLiveSoloRuntimeErrors];
+
+export type MutateLiveSoloRuntimeResponses = {
+    /**
+     * Accepted
+     */
+    202: NoCtfapiEndpointsRuntimeRuntimeAcceptedResponse;
+};
+
+export type MutateLiveSoloRuntimeResponse = MutateLiveSoloRuntimeResponses[keyof MutateLiveSoloRuntimeResponses];
 
 export type ListLiveSoloAttachmentsData = {
     body?: never;

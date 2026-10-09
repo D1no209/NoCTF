@@ -3,7 +3,7 @@ using NoCTF.Domain.Runtime;
 namespace NoCTF.Application.Runtime.Instances;
 
 public sealed record ScopedRuntimeRequest(Guid CompetitionId, Guid CompetitionChallengeId, Guid ExecutionScopeId,
-    Guid TeamId, DateTimeOffset Now, bool Reset = false);
+    Guid TeamId, DateTimeOffset Now, bool Reset = false, Guid? ActorId = null, Guid? ExpectedRuntimeInstanceId = null);
 public sealed record ScopedRuntimeResult(Guid? RuntimeInstanceId, RuntimeState? State,
     bool IsolationAvailable, RuntimeMutationFailure? Failure = null);
 
@@ -12,4 +12,5 @@ public interface IScopedRuntimeControl
 {
     Task<ScopedRuntimeResult> EnsureAsync(ScopedRuntimeRequest request, CancellationToken ct);
     Task StopExecutionAsync(Guid executionScopeId, DateTimeOffset now, CancellationToken ct);
+    Task<ScopedRuntimeResult> StopAsync(ScopedRuntimeRequest request, Guid expectedRuntimeInstanceId, CancellationToken ct);
 }

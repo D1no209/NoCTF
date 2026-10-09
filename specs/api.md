@@ -763,6 +763,8 @@ POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds
 GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}
 POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/countdown
 GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/runtime
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/runtime
 POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/flag-submissions
 GET /api/v1/competitions/{competitionId}/live-solo/question-groups
 POST /api/v1/competitions/{competitionId}/live-solo/question-groups
@@ -777,3 +779,5 @@ POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{ro
 ```
 
 以上是本队和工作人员即时投影，不作为观众节目接口。题目正文仅在实际开放后返回，并重查当前 Round、锁定名单、队伍及账号资格。Flag 提交要求 UUID `Idempotency-Key`，响应的 `AdmissionSequence` 是整个 Round 两方、多成员、多题共享的持久化顺序，202 不代表评测结果。准备和开赛失败以 `LiveSoloFailure` 返回；媒体服务未就绪时不得开始正式倒计时。普通题目重判不能修改独立对局结果。
+
+对局 Runtime 的 GET／POST 使用完整 Match／Round／Question 路径，仅可访问本队已开放环境。POST 的强类型 `Action` 为 Start、Reset、Stop；Reset／Stop 必须提供 `ExpectedRuntimeInstanceId`，并携带 UUID `Idempotency-Key`。202 返回当前作用域的 `StatusUrl`，多人重置与同请求重放保持原子语义。变更在事务内重查账号、名单、队伍、当前 Round 与有效时间；旧代或其他队伍 UUID 不能停止新环境。受控环境由 Round 生命周期回收，题库 TTL 不提前终止它，因此不提供独立延长动作。未验证的隔离资格不能返回代理访问入口。

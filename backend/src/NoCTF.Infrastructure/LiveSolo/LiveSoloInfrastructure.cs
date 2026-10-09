@@ -31,11 +31,14 @@ public static class LiveSoloInfrastructure
         services.AddScoped<ILiveSoloTemplateCopyStore, LiveSoloTemplateCopyStore>();
         services.AddScoped<CopyLiveSoloTemplate>();
         services.AddScoped<IChallengeMaterialMutationGate, LiveSoloMaterialMutationGate>();
+        services.RemoveAll<IExecutionScopeAccess>();
         services.AddScoped<IExecutionScopeAccess, LiveSoloExecutionAccess>();
         services.AddScoped<IScopedRuntimeControl, ScopedRuntimeControl>();
         services.AddScoped<ILiveSoloRuntimePreparation, LiveSoloRuntimePreparation>();
         services.AddScoped<ILiveSoloAttachmentStore, LiveSoloAttachmentStore>();
         services.AddScoped<AccessLiveSoloAttachments>();
+        services.AddScoped<ILiveSoloRuntimeStore, LiveSoloRuntimeStore>();
+        services.AddScoped<ManageLiveSoloRuntimes>();
         services.AddScoped<IClusterScheduleContributor, LiveSoloScheduleSource>();
         services.TryAddSingleton<ILiveSoloMediaGateway, UnconfiguredLiveSoloMediaGateway>();
         return services;

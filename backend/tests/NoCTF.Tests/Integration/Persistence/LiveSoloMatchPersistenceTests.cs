@@ -334,6 +334,9 @@ public sealed class LiveSoloMatchPersistenceTests
                 services.AddSingleton(Substitute.For<IRuntimePlacementPolicy>());
                 services.AddSingleton(Substitute.For<IPerTeamRuntimeFlagStore>());
                 services.AddSingleton(Substitute.For<IPostCommitMessagePublisher>());
+                services.AddSingleton<IRequestCommandKey>(new CommandKey(null, null));
+                services.AddScoped<IRequestReplay, TransactionalRequestReplay>();
+                services.AddScoped<IExecutionScopeAccess, LiveSoloExecutionAccess>();
                 services.AddScoped<IScopedRuntimeControl, ScopedRuntimeControl>();
                 services.AddScoped<ILiveSoloRuntimePreparation, LiveSoloRuntimePreparation>();
                 services.AddScoped<ICompetitionModerationAuthorizer, CompetitionModerationAuthorizer>();

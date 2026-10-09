@@ -136,6 +136,34 @@ public sealed class LiveSoloEndpointTests
     }
 
     [Test]
+    public async Task Runtime_commands_require_request_keys_and_return_a_scope_bound_status_route()
+    {
+        var runtimes = Substitute.For<ILiveSoloRuntimeStore>(); var id = Guid.NewGuid(); var competition = Guid.NewGuid();
+        var match = Guid.NewGuid(); var round = Guid.NewGuid(); var question = Guid.NewGuid(); var now = DateTimeOffset.UtcNow;
+        runtimes.MutateAsync(Arg.Any<LiveSoloRuntimeCommand>(), Arg.Any<CancellationToken>()).Returns(new NoCTF.Application.Runtime.Instances.RuntimeMutationResult(
+            new(id, competition, Guid.NewGuid(), null, Guid.NewGuid(), NoCTF.Domain.Runtime.RuntimePurpose.Player,
+                NoCTF.Domain.Runtime.RuntimeKind.Container, NoCTF.Domain.Runtime.RuntimeProvider.Docker, NoCTF.Domain.Runtime.RuntimeState.Queued,
+                null, now, null, null, null)));
+        await using var app = await HostAsync(Substitute.For<ILiveSoloMatchStore>(), Substitute.For<ILiveSoloAttachmentStore>(),
+            Substitute.For<IStore>(), runtimes: runtimes);
+        using var client = app.GetTestClient(); client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "verified-test");
+        var path = $"/api/v1/competitions/{competition}/live-solo/matches/{match}/rounds/{round}/questions/{question}/runtime";
+        using var missing = await client.PostAsJsonAsync(path, new { action = "Start" });
+        await Assert.That(missing.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+        await runtimes.DidNotReceive().MutateAsync(Arg.Any<LiveSoloRuntimeCommand>(), Arg.Any<CancellationToken>());
+        client.DefaultRequestHeaders.Add("Idempotency-Key", Guid.NewGuid().ToString());
+        using var accepted = await client.PostAsJsonAsync(path, new { action = "Start", matchId = Guid.NewGuid() });
+        await Assert.That(accepted.StatusCode).IsEqualTo(HttpStatusCode.Accepted);
+        using var body = JsonDocument.Parse(await accepted.Content.ReadAsStringAsync());
+        await Assert.That(body.RootElement.GetProperty("runtimeInstanceId").GetGuid()).IsEqualTo(id);
+        await Assert.That(body.RootElement.GetProperty("statusUrl").GetString()).IsEqualTo(path);
+        await runtimes.Received(1).MutateAsync(Arg.Is<LiveSoloRuntimeCommand>(x => x != null && x.Scope.MatchId == match
+            && x.Scope.RoundId == round && x.Scope.QuestionId == question && x.Scope.ActorId == Actor), Arg.Any<CancellationToken>());
+        using var hidden = await client.GetAsync(path);
+        await Assert.That(hidden.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+        await Assert.That(hidden.Headers.CacheControl!.NoStore).IsTrue();
+    }
+    [Test]
     public async Task Judge_action_requires_identity_reason_and_current_context_and_preserves_typed_failures()
     {
         var decisions = Substitute.For<ILiveSoloAdjudicationStore>();
@@ -191,17 +219,19 @@ public sealed class LiveSoloEndpointTests
     }
 
     private static async Task<WebApplication> HostAsync(ILiveSoloMatchStore store, ILiveSoloAttachmentStore attachmentStore, IStore objects,
-        ILiveSoloAdjudicationStore? decisions = null)
+        ILiveSoloAdjudicationStore? decisions = null, ILiveSoloRuntimeStore? runtimes = null)
     {
         var builder = WebApplication.CreateBuilder(); builder.WebHost.UseTestServer();
         builder.Services.AddFastEndpoints(options => { options.DisableAutoDiscovery = true; options.Assemblies = [typeof(GetLiveSoloMatchEndpoint).Assembly];
             options.Filter = x => x == typeof(ListLiveSoloQuestionsEndpoint) || x == typeof(SubmitLiveSoloFlagEndpoint)
                 || x == typeof(StartLiveSoloCountdownEndpoint) || x == typeof(DownloadLiveSoloAttachmentEndpoint)
-                || x == typeof(AdjudicateLiveSoloMatchEndpoint) || x == typeof(ListLiveSoloAdjudicationsEndpoint); });
+                || x == typeof(AdjudicateLiveSoloMatchEndpoint) || x == typeof(ListLiveSoloAdjudicationsEndpoint)
+                || x == typeof(GetLiveSoloRuntimeEndpoint) || x == typeof(MutateLiveSoloRuntimeEndpoint); });
         builder.Services.AddAuthentication("Bearer").AddScheme<AuthenticationSchemeOptions, TestAuthentication>("Bearer", _ => { });
         builder.Services.AddAuthorization(); builder.Services.AddSingleton(store); builder.Services.AddSingleton<ManageLiveSoloMatches>();
         builder.Services.AddSingleton(attachmentStore); builder.Services.AddSingleton(objects); builder.Services.AddSingleton<AccessLiveSoloAttachments>();
         builder.Services.AddSingleton(decisions ?? Substitute.For<ILiveSoloAdjudicationStore>()); builder.Services.AddSingleton<ManageLiveSoloAdjudication>();
+        builder.Services.AddSingleton(runtimes ?? Substitute.For<ILiveSoloRuntimeStore>()); builder.Services.AddSingleton<ManageLiveSoloRuntimes>();
         builder.Services.AddSingleton<IUserContext>(new TestUser()); builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton<IRequestAdmission>(new Admission());
         var source = Substitute.For<IRequestSourceAddress>(); source.Address.Returns("192.0.2.10");
