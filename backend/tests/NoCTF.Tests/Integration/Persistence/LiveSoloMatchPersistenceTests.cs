@@ -489,6 +489,7 @@ public sealed class LiveSoloMatchPersistenceTests
             await Assert.That(Round.State).IsEqualTo(LiveSoloRoundState.Running);
         }
 
+        public Task StopDatabaseAsync(CancellationToken ct) => postgres.StopAsync(ct);
         public async ValueTask DisposeAsync() { await Db.DisposeAsync(); await postgres.DisposeAsync(); }
     }
 }

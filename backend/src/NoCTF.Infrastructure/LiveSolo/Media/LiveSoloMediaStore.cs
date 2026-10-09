@@ -67,6 +67,11 @@ public sealed partial class LiveSoloMediaStore(NoCtfDbContext db, ICompetitionMo
         WithConflictAsync(() => PrepareCoreAsync(command, ct));
     private async Task<LiveSoloMediaResult> PrepareCoreAsync(PrepareLiveSoloMedia command, CancellationToken ct)
     {
+        var candidate = await db.LiveSoloMatches.AsNoTracking().Include(x => x.Slots).Include(x => x.Roster)
+            .SingleOrDefaultAsync(x => x.Id == command.MatchId && x.CompetitionId == command.CompetitionId, ct);
+        if (candidate is null || !await EligibleAsync(candidate, command.ActorId, false, ct)
+            && (!await EligibleAsync(candidate, command.ActorId, true, ct) || !await authorizer.CanJudgeAsync(command.ActorId, command.CompetitionId, ct)))
+            return new(null, Failure: LiveSoloMediaFailure.Unauthorized);
         var readiness = await gateway.CheckAsync(ct);
         if (!readiness.Configured) return new(null, Failure: LiveSoloMediaFailure.Unconfigured);
         if (!readiness.Available) return new(null, Failure: LiveSoloMediaFailure.Unavailable);
@@ -75,7 +80,8 @@ public sealed partial class LiveSoloMediaStore(NoCtfDbContext db, ICompetitionMo
         {
             var match = await db.LiveSoloMatches.Include(x => x.Slots).Include(x => x.Roster).SingleOrDefaultAsync(
                 x => x.Id == command.MatchId && x.CompetitionId == command.CompetitionId, ct);
-            if (match is null || !await EligibleAsync(match, command.ActorId, false, ct) && !await EligibleAsync(match, command.ActorId, true, ct))
+            if (match is null || !await EligibleAsync(match, command.ActorId, false, ct)
+                && (!await EligibleAsync(match, command.ActorId, true, ct) || !await authorizer.CanJudgeAsync(command.ActorId, command.CompetitionId, ct)))
                 return new(null, Failure: LiveSoloMediaFailure.Unauthorized);
             if (match.ConcurrencyStamp != command.ExpectedMatchStamp || !LiveSoloMediaPolicy.MayPrepare(match))
                 return new(null, Failure: LiveSoloMediaFailure.InvalidGeneration);
@@ -98,7 +104,7 @@ public sealed partial class LiveSoloMediaStore(NoCtfDbContext db, ICompetitionMo
             await db.SaveChangesAsync(ct); await tx.CommitAsync(ct);
         }
         // No external operation is retried with a database transaction. Preparing is recoverable after a lost wakeup.
-        await RefreshAsync(session.Id, ct);
+        await RefreshAsync(new(session.Id, session.RoomIdentity), ct);
         await db.Entry(session).ReloadAsync(ct);
         return session.State == LiveSoloMediaState.Ready ? new(await ViewAsync(session, ct))
             : new(null, Failure: LiveSoloMediaFailure.InvalidGeneration);

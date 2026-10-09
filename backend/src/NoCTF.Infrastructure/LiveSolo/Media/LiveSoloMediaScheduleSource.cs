@@ -9,7 +9,8 @@ namespace NoCTF.Infrastructure.LiveSolo.Media;
 public sealed class LiveSoloMediaScheduleSource(NoCtfDbContext db) : IClusterScheduleContributor
 {
     public async Task<IReadOnlyList<ClusterScheduleEntry>> RebuildAsync(DateTimeOffset now, CancellationToken ct) =>
-        (await db.LiveSoloMediaSessions.AsNoTracking().Where(x => x.State != LiveSoloMediaState.Stopped).Select(x => x.Id).ToArrayAsync(ct))
-            .Select(id => new ClusterScheduleEntry($"live-solo-media:{id:N}", ClusterScheduleKind.LiveSoloMedia, now, TimeSpan.FromSeconds(5),
-                new RefreshLiveSoloMedia(id))).ToArray();
+        (await db.LiveSoloMediaSessions.AsNoTracking().Where(x => x.State != LiveSoloMediaState.Stopped)
+            .Select(x => new { x.Id, x.RoomIdentity }).ToArrayAsync(ct))
+            .Select(x => new ClusterScheduleEntry($"live-solo-media:{x.Id:N}", ClusterScheduleKind.LiveSoloMedia, now, TimeSpan.FromSeconds(5),
+                new RefreshLiveSoloMedia(x.Id, x.RoomIdentity))).ToArray();
 }

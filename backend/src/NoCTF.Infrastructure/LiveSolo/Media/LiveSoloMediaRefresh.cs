@@ -3,15 +3,29 @@ using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Authentication.Mfa;
 using NoCTF.Application.LiveSolo.Media;
 using NoCTF.Domain.LiveSolo;
+using NoCTF.Infrastructure.Persistence;
 
 namespace NoCTF.Infrastructure.LiveSolo.Media;
 
 public sealed partial class LiveSoloMediaStore
 {
-    public async Task RefreshAsync(Guid sessionId, CancellationToken ct)
+    public async Task RefreshAsync(RefreshLiveSoloMedia command, CancellationToken ct)
     {
-        var session = await db.LiveSoloMediaSessions.Include(x => x.Participants).SingleOrDefaultAsync(x => x.Id == sessionId, ct);
-        if (session is null || session.State == LiveSoloMediaState.Stopped) return;
+        if (!Guid.TryParseExact(command.RoomIdentity, "N", out _)) throw new InvalidOperationException("Invalid media room identity.");
+        try { await RefreshCoreAsync(command, ct); }
+        catch (Exception exception) when (!ct.IsCancellationRequested && TransactionFailureClassifier.IsRetryable(exception))
+        {
+            // The durable scheduler carries an opaque immutable room binding. DB loss must not leave an existing raw room authorized.
+            using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            await gateway.StopRoomAsync(command.RoomIdentity, cleanup.Token);
+            throw;
+        }
+    }
+    private async Task RefreshCoreAsync(RefreshLiveSoloMedia command, CancellationToken ct)
+    {
+        var session = await db.LiveSoloMediaSessions.Include(x => x.Participants).SingleOrDefaultAsync(x => x.Id == command.SessionId, ct);
+        if (session?.RoomIdentity != command.RoomIdentity) { await gateway.StopRoomAsync(command.RoomIdentity, ct); return; }
+        if (session.State == LiveSoloMediaState.Stopped) return;
         if (session.State is LiveSoloMediaState.Stopping or LiveSoloMediaState.Rotating)
         { await StopSessionAsync(session, ct); return; }
         var match = await db.LiveSoloMatches.Include(x => x.Slots).Include(x => x.Roster).SingleOrDefaultAsync(x => x.Id == session.MatchId, ct);

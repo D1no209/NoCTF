@@ -10,13 +10,13 @@ public sealed record LiveSoloMediaResult(LiveSoloMediaView? Session, LiveSoloMed
 public sealed record PrepareLiveSoloMedia(Guid CompetitionId, Guid MatchId, Guid ActorId, Guid ExpectedMatchStamp);
 public sealed record JoinLiveSoloMedia(Guid CompetitionId, Guid MatchId, Guid ActorId, Guid Generation, LiveSoloMediaRole Role,
     int TokenVersion, AuthenticationContext? Authentication);
-public sealed record RefreshLiveSoloMedia(Guid SessionId);
+public sealed record RefreshLiveSoloMedia(Guid SessionId, string RoomIdentity);
 public interface ILiveSoloMediaStore
 {
     Task<LiveSoloMediaView?> ReadAsync(Guid competitionId, Guid matchId, Guid actorId, CancellationToken ct);
     Task<LiveSoloMediaResult> PrepareAsync(PrepareLiveSoloMedia command, CancellationToken ct);
     Task<LiveSoloMediaResult> JoinAsync(JoinLiveSoloMedia command, CancellationToken ct);
-    Task RefreshAsync(Guid sessionId, CancellationToken ct);
+    Task RefreshAsync(RefreshLiveSoloMedia command, CancellationToken ct);
 }
 public sealed class ManageLiveSoloMedia(ILiveSoloMediaStore store)
 {

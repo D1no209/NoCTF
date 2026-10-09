@@ -35,10 +35,10 @@ public sealed class LiveSoloMediaPersistenceTests
             await Assert.That((await store.JoinAsync(join with { Role = LiveSoloMediaRole.Judge }, ct)).Failure).IsEqualTo(LiveSoloMediaFailure.Unauthorized);
             fixture.media.ObserveAsync(session.RoomIdentity, ct).Returns(new LiveSoloRoomObservation(session.Participants.Select(x =>
                 new LiveSoloObservedScreen(x.Identity, LiveSoloScreenState.Sharing, "screen-" + x.Identity, fixture.Now)).ToArray()));
-            await store.RefreshAsync(session.Id, ct);
+            await store.RefreshAsync(new(session.Id, session.RoomIdentity), ct);
             await Assert.That(session.Participants.All(x => x.ScreenState == LiveSoloScreenState.Sharing)).IsTrue();
             fixture.media.ObserveAsync(session.RoomIdentity, ct).Returns(new LiveSoloRoomObservation([]));
-            await store.RefreshAsync(session.Id, ct);
+            await store.RefreshAsync(new(session.Id, session.RoomIdentity), ct);
             await Assert.That(session.Participants.All(x => x.ScreenState == LiveSoloScreenState.Disconnected)).IsTrue();
             await Assert.That((await fixture.Db.LiveSoloMatches.SingleAsync(ct)).State).IsEqualTo(LiveSoloMatchState.Preparing);
         });
@@ -59,7 +59,7 @@ public sealed class LiveSoloMediaPersistenceTests
             await Assert.That((await store.JoinAsync(join, ct)).Failure).IsNull();
             auth.ValidateContextsAsync(Arg.Any<IReadOnlyList<MfaContextValidationRequest>>(), ct).Returns(call =>
                 call.ArgAt<IReadOnlyList<MfaContextValidationRequest>>(0).ToDictionary(x => x.Key, _ => (MfaFailure?)MfaFailure.AccountUnavailable));
-            await store.RefreshAsync(first.Session.Id, ct);
+            await store.RefreshAsync(new(first.Session.Id, (await fixture.Db.LiveSoloMediaSessions.SingleAsync(x => x.Id == first.Session.Id, ct)).RoomIdentity), ct);
             await Assert.That((await fixture.Db.LiveSoloMediaSessions.SingleAsync(x => x.Id == first.Session.Id, ct)).State).IsEqualTo(LiveSoloMediaState.Stopped);
             await Assert.That((await fixture.Db.LiveSoloMediaGrants.SingleAsync(ct)).RevokedAt).IsNotNull();
             await fixture.media.Received(1).StopRoomAsync(Arg.Any<string>(), ct);
@@ -83,7 +83,7 @@ public sealed class LiveSoloMediaPersistenceTests
             var id = (await fixture.Db.LiveSoloMatches.SingleAsync(ct)).CurrentMediaSessionId!.Value;
             await Assert.That((await fixture.Db.LiveSoloMediaSessions.SingleAsync(x => x.Id == id, ct)).State).IsEqualTo(LiveSoloMediaState.Preparing);
             fixture.media.CreateRoomAsync(Arg.Any<string>(), ct).Returns(Task.CompletedTask);
-            await store.RefreshAsync(id, ct);
+            await store.RefreshAsync(new(id, (await fixture.Db.LiveSoloMediaSessions.SingleAsync(x => x.Id == id, ct)).RoomIdentity), ct);
             await Assert.That((await fixture.Db.LiveSoloMediaSessions.SingleAsync(x => x.Id == id, ct)).State).IsEqualTo(LiveSoloMediaState.Ready);
         });
     }
@@ -98,7 +98,7 @@ public sealed class LiveSoloMediaPersistenceTests
             var first = await store.PrepareAsync(await Prepare(fixture, ct), ct);
             var session = await fixture.Db.LiveSoloMediaSessions.SingleAsync(x => x.Id == first.Session!.Id, ct);
             fixture.media.ObserveAsync(session.RoomIdentity, ct).Returns(new LiveSoloRoomObservation([], false));
-            await store.RefreshAsync(session.Id, ct);
+            await store.RefreshAsync(new(session.Id, session.RoomIdentity), ct);
             await Assert.That(session.State).IsEqualTo(LiveSoloMediaState.Stopped);
             await Assert.That((await fixture.Db.LiveSoloMatches.SingleAsync(ct)).CurrentMediaSessionId).IsNull();
             var next = await store.PrepareAsync(await Prepare(fixture, ct), ct);
@@ -127,7 +127,7 @@ public sealed class LiveSoloMediaPersistenceTests
             await fixture.Db.SaveChangesAsync(ct);
             await Assert.That((await store.JoinAsync(join, ct)).Failure).IsEqualTo(LiveSoloMediaFailure.Unauthorized);
             await fixture.media.DidNotReceive().AuthorizeAsync(Arg.Any<LiveSoloMediaAuthorization>(), ct);
-            await store.RefreshAsync(first.Session.Id, ct);
+            await store.RefreshAsync(new(first.Session.Id, (await fixture.Db.LiveSoloMediaSessions.SingleAsync(x => x.Id == first.Session.Id, ct)).RoomIdentity), ct);
             await Assert.That((await fixture.Db.LiveSoloMediaSessions.SingleAsync(x => x.Id == first.Session.Id, ct)).State).IsEqualTo(LiveSoloMediaState.Stopped);
         });
     }
@@ -145,9 +145,29 @@ public sealed class LiveSoloMediaPersistenceTests
             var session = await fixture.Db.LiveSoloMediaSessions.SingleAsync(x => x.Id == prepared.Session!.Id, ct);
             fixture.media.ObserveAsync(session.RoomIdentity, ct).Returns(new LiveSoloRoomObservation([
                 new("unknown", LiveSoloScreenState.Sharing, "not-a-roster-track", fixture.Now)]));
-            await store.RefreshAsync(session.Id, ct);
+            await store.RefreshAsync(new(session.Id, session.RoomIdentity), ct);
             await fixture.media.Received(1).DisconnectAsync(session.RoomIdentity, "unknown", ct);
             await fixture.media.Received(1).CreateRoomAsync(session.RoomIdentity, ct);
+        });
+    }
+    [Test, Timeout(300_000)]
+    public async Task Database_outage_retires_the_scheduler_bound_room_even_when_the_session_can_no_longer_be_read(CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var fixture = await LiveSoloMatchPersistenceTests.Fixture.CreateAsync(ct);
+            await fixture.PrepareAsync(ct); await ClearFixtureRoom(fixture, ct);
+            var store = new LiveSoloMediaStore(fixture.Db, new CompetitionModerationAuthorizer(fixture.Db), Authentication(), fixture.media, fixture.Clock);
+            var prepared = await store.PrepareAsync(await Prepare(fixture, ct), ct);
+            var session = await fixture.Db.LiveSoloMediaSessions.SingleAsync(x => x.Id == prepared.Session!.Id, ct);
+            var command = new RefreshLiveSoloMedia(session.Id, session.RoomIdentity);
+            fixture.media.ClearReceivedCalls();
+            await fixture.StopDatabaseAsync(ct);
+            Exception? failure = null;
+            try { await store.RefreshAsync(command, ct); } catch (Exception exception) { failure = exception; }
+            await Assert.That(failure).IsNotNull();
+            await fixture.media.Received(1).StopRoomAsync(session.RoomIdentity, Arg.Any<CancellationToken>());
+            await fixture.media.DidNotReceive().CreateRoomAsync(session.RoomIdentity, Arg.Any<CancellationToken>());
         });
     }
     private static IMfaAuthenticationStore Authentication()
