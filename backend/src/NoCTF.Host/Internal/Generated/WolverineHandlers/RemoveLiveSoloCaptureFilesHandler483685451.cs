@@ -51,9 +51,10 @@ namespace Internal.Generated.WolverineHandlers
             await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider1, _notificationChangePublisher, _loggerOfNoCtfDbContext);
             var wolverinePostCommitMessagePublisher = new NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher(context, noCtfDbContext, _loggerOfWolverinePostCommitMessagePublisher, postCommitDispatchStatus);
             var managedFileUploadRegistry = new NoCTF.Infrastructure.Storage.ManagedFileUploadRegistry(noCtfDbContext, wolverinePostCommitMessagePublisher, _loggerOfManagedFileUploadRegistry);
+            var competitionModerationAuthorizer = new NoCTF.Infrastructure.Teams.Moderation.CompetitionModerationAuthorizer(noCtfDbContext);
             var managedFileUploads = new NoCTF.Application.Storage.ManagedFileUploads(managedFileUploadRegistry, _store1);
             var liveSoloCaptureFiles = new NoCTF.Infrastructure.LiveSolo.Media.LiveSoloCaptureFiles(_liveKitMediaOptions1);
-            var liveSoloCaptureStore = new NoCTF.Infrastructure.LiveSolo.Media.LiveSoloCaptureStore(noCtfDbContext, _liveSoloEgressGateway, liveSoloCaptureFiles, managedFileUploads, _liveKitMediaOptions2, _timeProvider2, wolverinePostCommitMessagePublisher, _store2);
+            var liveSoloCaptureStore = new NoCTF.Infrastructure.LiveSolo.Media.LiveSoloCaptureStore(noCtfDbContext, _liveSoloEgressGateway, liveSoloCaptureFiles, managedFileUploads, _liveKitMediaOptions2, _timeProvider2, wolverinePostCommitMessagePublisher, _store2, competitionModerationAuthorizer);
             // The actual message body
             var removeLiveSoloCaptureFiles = (NoCTF.Application.LiveSolo.Media.RemoveLiveSoloCaptureFiles)context.Envelope.Message;
 

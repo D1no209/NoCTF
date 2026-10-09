@@ -47,7 +47,7 @@ public sealed partial class LiveSoloCaptureStore
         if (record.FileId is not null) { record.State = LiveSoloRecordingState.Completed; await db.SaveChangesAsync(ct); return; }
         var file = observation.Files.SingleOrDefault(x => x.ObjectKey.EndsWith("/recording.mp4", StringComparison.Ordinal));
         if (file is null || file.ByteLength <= 0) return;
-        if(file.ByteLength>options.RecordingExportLimitBytes) {record.State=LiveSoloRecordingState.RequiresReview;await db.SaveChangesAsync(ct);return;}
+        if(file.ByteLength>options.RecordingExportLimitBytes) {record.State=LiveSoloRecordingState.RequiresReview;record.Failure=LiveSoloRecordingFailure.ExportTooLarge;await db.SaveChangesAsync(ct);return;}
         await using var content = await files.OpenAsync(record.Id, "recording.mp4", ct);
         if (content is null) return;
         var id = Guid.CreateVersion7(clock.GetUtcNow());
@@ -61,9 +61,11 @@ public sealed partial class LiveSoloCaptureStore
                 if (record.FileId is not null) return;
                 var used=await RecordingCapacityUsedAsync(ct);
                 if (upload.ByteLength>options.RecordingExportLimitBytes || checked(upload.ByteLength*2)>options.RecordingQuotaBytes-used+record.ReservedBytes)
-                { record.State = LiveSoloRecordingState.RequiresReview; return; }
+                { record.State = LiveSoloRecordingState.RequiresReview;record.Failure=upload.ByteLength>options.RecordingExportLimitBytes
+                    ? LiveSoloRecordingFailure.ExportTooLarge : LiveSoloRecordingFailure.ArchiveCapacityUnavailable; return; }
                 record.FileId = upload.FileId; record.State = LiveSoloRecordingState.Completed;
                 record.ReservedBytes=0;
+                record.Failure=null;
                 record.KeepUntil = (record.EndedAt ?? clock.GetUtcNow()).AddDays(session.RecordingRetentionDays); attached = true;
                 await messages.PublishAsync(new NoCTF.Application.LiveSolo.Media.RemoveLiveSoloRecordingRaw(record.Id));
             }, ct);

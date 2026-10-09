@@ -150,6 +150,6 @@ public sealed class LiveSoloCapturePersistenceTests
         var registry = new ManagedFileUploadRegistry(fixture.Db, publisher, NullLogger<ManagedFileUploadRegistry>.Instance);
         var files = captureFiles ?? Substitute.For<ILiveSoloCaptureFiles>();
         if (captureFiles is null) files.SegmentsAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns([]);
-        return new(fixture.Db, gateway, files, new ManagedFileUploads(registry, objects), new LiveKitMediaOptions(), fixture.Clock, publisher, objects);
+        return new(fixture.Db, gateway, files, new ManagedFileUploads(registry, objects), new LiveKitMediaOptions(), fixture.Clock, publisher, objects, new NoCTF.Infrastructure.Teams.Moderation.CompetitionModerationAuthorizer(fixture.Db));
     }
 }

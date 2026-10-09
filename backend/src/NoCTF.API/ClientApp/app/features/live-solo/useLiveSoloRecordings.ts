@@ -5,7 +5,8 @@ import { message, type UiMessage } from '~/utils/i18n'
 import { startAttachmentBrowserDownload } from '~/utils/download'
 import { parseLiveSoloError } from './live-solo-errors'
 import { ApiError } from '~/utils/api-error'
-import { playableRecording, recordingActions, recordingActionKey } from './recording-policy'
+import type { MessageKey } from '~/locales/en'
+import { playableRecording, recordingActions, recordingActionKey, recordingFailureKey } from './recording-policy'
 
 export function useLiveSoloRecordings() {
   const route = useRoute(), router = useRouter()
@@ -27,8 +28,11 @@ export function useLiveSoloRecordings() {
   const options = computed(() => pagination.items.value.filter(x => x.id).map(row => ({ value: row.id!, label: row.userName ?? '—', row })))
   const actions = computed(() => recordingActions(current.value, canJudge.value, canPublish.value).map(action => ({ action, key: recordingActionKey[action] })))
   const playable = computed(() => playableRecording(current.value))
+  const failureKey = computed(() => current.value?.failure ? recordingFailureKey[current.value.failure] : null)
+  const historyRows = computed(() => history.value.map(entry => ({ entry, actionKey: (entry.action ? recordingActionKey[entry.action] : 'liveSolo.recording.decision') as MessageKey })))
   const actionKey = computed(() => decision.value ? recordingActionKey[decision.value.action] : 'liveSolo.recording.decision')
   async function select(id: string) { await router.replace({ path: `/competitions/${competitionId.value}/live-solo/recordings/${matchId.value}/${id}`, query: { ...route.query } }) }
+  async function openReplacement(id: string) { source.value = null; await pagination.loadPage(1); if (!disposed) await select(id) }
   async function readSelected(renew = false) {
     const row = current.value; const sequence = ++selectedRequest
     if (!renew) { source.value = null; history.value = []; mediaError.value = null; renewAt = 0 }
@@ -102,8 +106,8 @@ export function useLiveSoloRecordings() {
   async function tick() { await load(); if (!disposed) timer = setTimeout(tick, 15_000) }
   onMounted(() => { void tick() })
   onScopeDispose(() => { disposed = true; selectedRequest++; source.value = null; if (timer) clearTimeout(timer) })
-  return { options, selectedId, current, source, history, actions, playable, staff, error, mediaError, busy, dialog, reason, actionKey, decision,
+  return { options, selectedId, current, source, history, historyRows, actions, failureKey, playable, staff, error, mediaError, busy, dialog, reason, actionKey, decision,
     loading: pagination.loading, listError: pagination.error, pageNumber: pagination.page, pageCount: pagination.pageCount, total: pagination.total, limit: pagination.limit,
-    select, load, download, begin, setDialog, confirm, retry, failed, page, pageSize, back }
+    select, openReplacement, load, download, begin, setDialog, confirm, retry, failed, page, pageSize, back }
 }
 export type LiveSoloRecordingsState = import('vue').ShallowUnwrapRef<ReturnType<typeof useLiveSoloRecordings>>

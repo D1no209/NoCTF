@@ -901,9 +901,13 @@ export type NoCtfapiEndpointsLiveSoloLiveSoloRecordingResponse = {
     published?: boolean;
     byteLength?: number | null;
     fileUrl?: string;
+    failure?: NoCtfDomainLiveSoloLiveSoloRecordingFailure | null;
+    chunk?: number;
 };
 
 export type NoCtfDomainLiveSoloLiveSoloRecordingState = 'Pending' | 'Recording' | 'Finalizing' | 'Completed' | 'Failed' | 'Deleting' | 'Starting' | 'RequiresReview';
+
+export type NoCtfDomainLiveSoloLiveSoloRecordingFailure = 'CapacityUnavailable' | 'StartUncertain' | 'ExportFailed' | 'ExportTooLarge' | 'ArchiveCapacityUnavailable';
 
 export type NoCtfapiEndpointsLiveSoloChangeLiveSoloRecordingRequest = {
     expectedStamp: string;
@@ -911,7 +915,7 @@ export type NoCtfapiEndpointsLiveSoloChangeLiveSoloRecordingRequest = {
     reason: string;
 };
 
-export type NoCtfDomainLiveSoloLiveSoloRecordingAction = 'Hold' | 'ReleaseHold' | 'Publish' | 'Withdraw';
+export type NoCtfDomainLiveSoloLiveSoloRecordingAction = 'Hold' | 'ReleaseHold' | 'Publish' | 'Withdraw' | 'RetryPendingStart' | 'ReconcileExport' | 'RetryArchive' | 'StartNewChunk';
 
 export type NoCtfapiEndpointsLiveSoloConfirmLiveSoloReadyRequest = {
     expectedStamp: string;
@@ -1297,6 +1301,9 @@ export type NoCtfapiEndpointsLiveSoloLiveSoloRecordingDecisionResponse = {
     hold?: boolean;
     previousPublished?: boolean;
     published?: boolean;
+    previousState?: NoCtfDomainLiveSoloLiveSoloRecordingState | null;
+    state?: NoCtfDomainLiveSoloLiveSoloRecordingState | null;
+    replacementRecordingId?: string | null;
 };
 
 export type NoCtfapiEndpointsLiveSoloListLiveSoloRecordingDecisionsRequest = {

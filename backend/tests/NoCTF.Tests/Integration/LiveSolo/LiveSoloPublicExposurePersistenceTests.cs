@@ -147,7 +147,7 @@ public sealed class LiveSoloPublicExposurePersistenceTests
     {
         var objects = Substitute.For<IStore>(); var messages = Substitute.For<IPostCommitMessagePublisher>();
         return new(f.Db, Substitute.For<ILiveSoloEgressGateway>(), Substitute.For<ILiveSoloCaptureFiles>(),
-            new ManagedFileUploads(new ManagedFileUploadRegistry(f.Db, messages, NullLogger<ManagedFileUploadRegistry>.Instance), objects), new(), f.Clock, messages, objects);
+            new ManagedFileUploads(new ManagedFileUploadRegistry(f.Db, messages, NullLogger<ManagedFileUploadRegistry>.Instance), objects), new(), f.Clock, messages, objects, new CompetitionModerationAuthorizer(f.Db));
     }
     private static async Task<LiveSoloProgramSegment> Segment(LiveSoloMatchPersistenceTests.Fixture f, CancellationToken ct)
     {

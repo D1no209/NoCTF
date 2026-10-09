@@ -16,7 +16,10 @@ public sealed class ListLiveSoloRecordingDecisionsRequest
 }
 public sealed record LiveSoloRecordingDecisionResponse(Guid Id, Guid RecordingId, Guid ActorUserId,
     [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<LiveSoloRecordingAction>))] LiveSoloRecordingAction Action,
-    string Reason, DateTimeOffset OccurredAt, bool PreviousHold, bool Hold, bool PreviousPublished, bool Published);
+    string Reason, DateTimeOffset OccurredAt, bool PreviousHold, bool Hold, bool PreviousPublished, bool Published,
+    [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<LiveSoloRecordingState>))] LiveSoloRecordingState? PreviousState = null,
+    [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<LiveSoloRecordingState>))] LiveSoloRecordingState? State = null,
+    Guid? ReplacementRecordingId = null);
 public sealed record LiveSoloRecordingDecisionsResponse(IReadOnlyList<LiveSoloRecordingDecisionResponse> Items);
 public sealed class ListLiveSoloRecordingDecisionsEndpoint(ILiveSoloRecordingStore recordings, IUserContext user)
     : Endpoint<ListLiveSoloRecordingDecisionsRequest, Results<Ok<LiveSoloRecordingDecisionsResponse>, NotFound>>
@@ -33,6 +36,6 @@ public sealed class ListLiveSoloRecordingDecisionsEndpoint(ILiveSoloRecordingSto
         var result = await recordings.DecisionsAsync(req.CompetitionId, req.MatchId, req.RecordingId, user.UserId, ct);
         return result is null ? TypedResults.NotFound() : TypedResults.Ok(new LiveSoloRecordingDecisionsResponse(result.Select(x =>
             new LiveSoloRecordingDecisionResponse(x.Id, x.RecordingId, x.ActorUserId, x.Action, x.Reason, x.OccurredAt,
-                x.PreviousHold, x.Hold, x.PreviousPublished, x.Published)).ToArray()));
+                x.PreviousHold, x.Hold, x.PreviousPublished, x.Published, x.PreviousState, x.State, x.ReplacementRecordingId)).ToArray()));
     }
 }

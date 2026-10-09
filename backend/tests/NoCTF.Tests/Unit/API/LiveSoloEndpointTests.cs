@@ -327,7 +327,11 @@ public sealed class LiveSoloEndpointTests
         store.OpenAsync(competition, match, record, Actor, Arg.Any<CancellationToken>()).Returns(_ => Task.FromResult<LiveSoloRecordingContent?>(
             new(Guid.NewGuid(), new MemoryStream([1, 2, 3, 4]), "video/mp4", "recording.mp4")));
         store.ChangeAsync(Arg.Any<ChangeLiveSoloRecording>(), Arg.Any<CancellationToken>()).Returns(new LiveSoloRecordingChangeResult(null, LiveSoloFailure.Conflict));
-        await using var app = await HostAsync(Substitute.For<ILiveSoloMatchStore>(), Substitute.For<ILiveSoloAttachmentStore>(), Substitute.For<IStore>(), recordings: store);
+        var recovery=Substitute.For<ILiveSoloRecordingRecovery>();
+        recovery.RecoverAsync(Arg.Any<ChangeLiveSoloRecording>(),Arg.Any<CancellationToken>()).Returns(new LiveSoloRecordingChangeResult(
+            new(record,Guid.NewGuid(),null,Actor,"player",null,null,LiveSoloRecordingState.RequiresReview,Guid.NewGuid(),DateTimeOffset.UtcNow,
+                null,null,DateTimeOffset.UtcNow.AddDays(30),false,false,null,LiveSoloRecordingFailure.StartUncertain,2)));
+        await using var app = await HostAsync(Substitute.For<ILiveSoloMatchStore>(), Substitute.For<ILiveSoloAttachmentStore>(), Substitute.For<IStore>(), recordings: store,recordingRecovery:recovery);
         using var client = app.GetTestClient(); var path = $"/api/v1/competitions/{competition}/live-solo/matches/{match}/recordings";
         using var denied = await client.PostAsJsonAsync(path + $"/{record}/decisions", new { expectedStamp = stamp, action = "Hold", reason = "review" });
         await Assert.That(denied.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
@@ -338,6 +342,10 @@ public sealed class LiveSoloEndpointTests
             actorId = Guid.NewGuid(), expectedStamp = stamp, action = "Hold", reason = "review" });
         await Assert.That(conflict.StatusCode).IsEqualTo(HttpStatusCode.Conflict);
         await store.Received(1).ChangeAsync(Arg.Is<ChangeLiveSoloRecording>(x => x != null && x.ActorId == Actor && x.CompetitionId == competition && x.MatchId == match), Arg.Any<CancellationToken>());
+        using var reconciled=await client.PostAsJsonAsync(path+$"/{record}/decisions",new {expectedStamp=stamp,action="ReconcileExport",reason="verify original task",actorId=Guid.NewGuid()});
+        await Assert.That(reconciled.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(await reconciled.Content.ReadAsStringAsync()).Contains("\"failure\":\"StartUncertain\"");
+        await recovery.Received(1).RecoverAsync(Arg.Is<ChangeLiveSoloRecording>(x=>x!=null&&x.ActorId==Actor&&x.Action==LiveSoloRecordingAction.ReconcileExport),Arg.Any<CancellationToken>());
         using var request = new HttpRequestMessage(HttpMethod.Get, path + $"/{record}/file"); request.Headers.Range = new(1, 2);
         using var range = await client.SendAsync(request); await Assert.That(range.StatusCode).IsEqualTo(HttpStatusCode.PartialContent);
         await Assert.That((await range.Content.ReadAsByteArrayAsync()).SequenceEqual(new byte[] { 2, 3 })).IsTrue();
@@ -427,7 +435,8 @@ public sealed class LiveSoloEndpointTests
     private static async Task<WebApplication> HostAsync(ILiveSoloMatchStore store, ILiveSoloAttachmentStore attachmentStore, IStore objects,
         ILiveSoloAdjudicationStore? decisions = null, ILiveSoloRuntimeStore? runtimes = null, ILiveSoloMediaStore? media = null, ILiveSoloProgramReader? programs = null,
         ILiveSoloRecordingStore? recordings = null, ILiveSoloPlayerPolicyReader? policies = null, ManageLiveSoloConfiguration? settings = null, ILiveSoloHintReader? hints = null,
-        ManageLiveSoloWriteUps? postgame = null, ILiveSoloViewerStore? viewers = null, ILiveSoloResultCorrectionStore? corrections = null)
+        ManageLiveSoloWriteUps? postgame = null, ILiveSoloViewerStore? viewers = null, ILiveSoloResultCorrectionStore? corrections = null,
+        ILiveSoloRecordingRecovery? recordingRecovery = null)
     {
         var builder = WebApplication.CreateBuilder(); builder.WebHost.UseTestServer();
         builder.Services.AddFastEndpoints(options => { options.DisableAutoDiscovery = true; options.Assemblies = [typeof(GetLiveSoloMatchEndpoint).Assembly];
@@ -450,6 +459,7 @@ public sealed class LiveSoloEndpointTests
         builder.Services.AddSingleton(viewers ?? Substitute.For<ILiveSoloViewerStore>()); builder.Services.Configure<NoCTF.API.Endpoints.Authentication.RefreshHttpOptions>(_ => {});
         builder.Services.AddSingleton(corrections ?? Substitute.For<ILiveSoloResultCorrectionStore>()); builder.Services.AddSingleton<ManageLiveSoloResultCorrections>();
         builder.Services.AddSingleton(programs ?? Substitute.For<ILiveSoloProgramReader>());
+        builder.Services.AddSingleton(recordingRecovery ?? Substitute.For<ILiveSoloRecordingRecovery>());
         builder.Services.AddSingleton(recordings ?? Substitute.For<ILiveSoloRecordingStore>()); builder.Services.AddSingleton<ManageLiveSoloRecordings>();
         builder.Services.AddSingleton(policies ?? Substitute.For<ILiveSoloPlayerPolicyReader>());
         builder.Services.AddSingleton(hints ?? Substitute.For<ILiveSoloHintReader>());

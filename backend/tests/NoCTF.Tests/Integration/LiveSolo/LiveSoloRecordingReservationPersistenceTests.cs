@@ -108,5 +108,5 @@ public sealed class LiveSoloRecordingReservationPersistenceTests
     private static async Task<LiveSoloMediaSession> Sharing(LiveSoloMatchPersistenceTests.Fixture f,CancellationToken ct){var session=await f.Db.LiveSoloMediaSessions.Include(x=>x.Participants).SingleAsync(ct);session.RecordingEnabled=true;
         foreach(var member in session.Participants){member.ScreenState=LiveSoloScreenState.Sharing;member.ScreenTrackId="track-"+member.Identity;}await f.Db.SaveChangesAsync(ct);return session;}
     private static LiveSoloCaptureStore Store(NoCtfDbContext db,LiveSoloMatchPersistenceTests.Fixture f,ILiveSoloEgressGateway gateway,ILiveSoloCaptureFiles files,LiveKitMediaOptions options){var objects=Substitute.For<IStore>();var messages=Substitute.For<IPostCommitMessagePublisher>();
-        return new(db,gateway,files,new ManagedFileUploads(new ManagedFileUploadRegistry(db,messages,NullLogger<ManagedFileUploadRegistry>.Instance),objects),options,f.Clock,messages,objects);}
+        return new(db,gateway,files,new ManagedFileUploads(new ManagedFileUploadRegistry(db,messages,NullLogger<ManagedFileUploadRegistry>.Instance),objects),options,f.Clock,messages,objects,new NoCTF.Infrastructure.Teams.Moderation.CompetitionModerationAuthorizer(db));}
 }

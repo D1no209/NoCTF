@@ -37,7 +37,7 @@ public sealed class LiveSoloRecordingStore(NoCtfDbContext db, ICompetitionModera
         db.Set<LiveSoloMediaParticipant>().Where(p => p.MediaSessionId == x.MediaSessionId && p.UserId == x.UserId)
             .Join(db.Teams.IgnoreQueryFilters(), p => p.TeamId, t => t.Id, (p, t) => t.Name).FirstOrDefault(),
         x.State, x.ConcurrencyStamp, x.CreatedAt, x.StartedAt, x.EndedAt, x.KeepUntil, x.DisputeHold, x.Published,
-        db.Files.Where(f => f.Id == x.FileId).Select(f => (long?)f.ByteLength).FirstOrDefault()));
+        db.Files.Where(f => f.Id == x.FileId).Select(f => (long?)f.ByteLength).FirstOrDefault(), x.Failure, x.Chunk));
     public async Task<LiveSoloRecordingPage?> ListAsync(Guid competitionId, Guid matchId, Guid actorId, bool staff, int offset, int limit, CancellationToken ct)
     {
         if (!await MatchAsync(competitionId, matchId, ct)) return null;
@@ -52,6 +52,9 @@ public sealed class LiveSoloRecordingStore(NoCtfDbContext db, ICompetitionModera
         return new(items, total, isStaff && await authorizer.CanJudgeAsync(actorId, competitionId, ct),
             isStaff && await authorizer.CanModerateAsync(actorId, competitionId, ct));
     }
+    public async Task<LiveSoloRecordingView?> ReadRecordingAsync(Guid competitionId,Guid matchId,Guid recordingId,Guid actorId,CancellationToken ct) =>
+        await MatchAsync(competitionId,matchId,ct) && await StaffAsync(competitionId,actorId,ct)
+            ? await Views(Records(matchId).AsNoTracking().Where(x=>x.Id==recordingId)).SingleOrDefaultAsync(ct) : null;
     public async Task<LiveSoloRecordingChangeResult> ChangeAsync(ChangeLiveSoloRecording command, CancellationToken ct)
     {
         for (var attempt = 0; ; attempt++)
@@ -136,6 +139,6 @@ public sealed class LiveSoloRecordingStore(NoCtfDbContext db, ICompetitionModera
             && db.LiveSoloMediaSessions.Any(s => s.Id == x.MediaSessionId && s.MatchId == matchId))
             .OrderByDescending(x => x.OccurredAt).ThenByDescending(x => x.Id)
             .Select(x => new LiveSoloRecordingDecisionView(x.Id, x.RecordingId, x.ActorUserId, x.Action, x.Reason, x.OccurredAt,
-                x.PreviousHold, x.Hold, x.PreviousPublished, x.Published)).ToArrayAsync(ct);
+                x.PreviousHold, x.Hold, x.PreviousPublished, x.Published, x.PreviousState, x.State, x.ReplacementRecordingId)).ToArrayAsync(ct);
     }
 }

@@ -12,19 +12,23 @@ using FluentStorage.Storage;
 namespace NoCTF.Infrastructure.LiveSolo.Media;
 
 public sealed partial class LiveSoloCaptureStore(NoCtfDbContext db, ILiveSoloEgressGateway egress, ILiveSoloCaptureFiles files,
-    ManagedFileUploads uploads, LiveKitMediaOptions options, TimeProvider clock, IPostCommitMessagePublisher messages, IStore objects) : ILiveSoloCaptureStore
+    ManagedFileUploads uploads, LiveKitMediaOptions options, TimeProvider clock, IPostCommitMessagePublisher messages, IStore objects,
+    NoCTF.Application.Teams.Moderation.ICompetitionModerationAuthorizer authorizer) : ILiveSoloCaptureStore
 {
     private async Task TransactionAsync(Func<Task> work, CancellationToken ct)
     {
         for (var attempt = 0; ; attempt++)
         {
+            var committed=false;
             try
             {
                 await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-                await work(); await db.SaveChangesAsync(ct); await tx.CommitAsync(ct); return;
+                await work(); await db.SaveChangesAsync(ct); await tx.CommitAsync(ct);committed=true; return;
             }
             catch (Exception exception) when (attempt < 2 && (exception is DbUpdateConcurrencyException || TransactionFailureClassifier.IsRetryable(exception)))
-            { db.ChangeTracker.Clear(); }
+            { db.ChangeTracker.Clear();messages.DiscardPendingMessages(); }
+            catch
+            { if(!committed)messages.DiscardPendingMessages();throw; }
         }
     }
     public async Task EnsureAsync(Guid sessionId, CancellationToken ct)

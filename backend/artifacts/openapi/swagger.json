@@ -27296,6 +27296,18 @@
           },
           "fileUrl": {
             "type": "string"
+          },
+          "failure": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloRecordingFailure"
+              }
+            ]
+          },
+          "chunk": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -27321,6 +27333,24 @@
           "Deleting",
           "Starting",
           "RequiresReview"
+        ]
+      },
+      "NoCTFDomainLiveSoloLiveSoloRecordingFailure": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "CapacityUnavailable",
+          "StartUncertain",
+          "ExportFailed",
+          "ExportTooLarge",
+          "ArchiveCapacityUnavailable"
+        ],
+        "enum": [
+          "CapacityUnavailable",
+          "StartUncertain",
+          "ExportFailed",
+          "ExportTooLarge",
+          "ArchiveCapacityUnavailable"
         ]
       },
       "NoCTFAPIEndpointsLiveSoloChangeLiveSoloRecordingRequest": {
@@ -27356,13 +27386,21 @@
           "Hold",
           "ReleaseHold",
           "Publish",
-          "Withdraw"
+          "Withdraw",
+          "RetryPendingStart",
+          "ReconcileExport",
+          "RetryArchive",
+          "StartNewChunk"
         ],
         "enum": [
           "Hold",
           "ReleaseHold",
           "Publish",
-          "Withdraw"
+          "Withdraw",
+          "RetryPendingStart",
+          "ReconcileExport",
+          "RetryArchive",
+          "StartNewChunk"
         ]
       },
       "NoCTFAPIEndpointsLiveSoloConfirmLiveSoloReadyRequest": {
@@ -28523,6 +28561,27 @@
           },
           "published": {
             "type": "boolean"
+          },
+          "previousState": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloRecordingState"
+              }
+            ]
+          },
+          "state": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloRecordingState"
+              }
+            ]
+          },
+          "replacementRecordingId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
           }
         }
       },

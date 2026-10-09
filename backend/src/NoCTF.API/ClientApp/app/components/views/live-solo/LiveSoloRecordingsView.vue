@@ -2,8 +2,8 @@
 import { toRefs } from 'vue'
 import type { LiveSoloRecordingsState } from '~/features/live-solo/useLiveSoloRecordings'
 const props = defineProps<{ state: LiveSoloRecordingsState }>()
-const { options, selectedId, current, source, history, actions, playable, staff, error, mediaError, busy, dialog, reason, actionKey, decision,
-  loading, listError, pageNumber, pageCount, total, limit, select, load, download, begin, setDialog, confirm, retry, failed, page, pageSize, back } = toRefs(props.state)
+const { options, selectedId, current, source, historyRows, actions, failureKey, playable, staff, error, mediaError, busy, dialog, reason, actionKey, decision,
+  loading, listError, pageNumber, pageCount, total, limit, select, openReplacement, load, download, begin, setDialog, confirm, retry, failed, page, pageSize, back } = toRefs(props.state)
 </script>
 <template>
   <div data-contained-workspace-page class="flex h-full min-h-0 flex-col gap-4 px-4 pb-6 pt-3 md:px-8">
@@ -17,9 +17,11 @@ const { options, selectedId, current, source, history, actions, playable, staff,
       <Card class="flex min-h-0 flex-col"><ScrollSurface axis="y" class="h-full" :aria-label="$t('liveSolo.recording.staffTitle')"><CardContent class="flex flex-col gap-5 py-5">
         <template v-if="current"><div class="flex flex-wrap items-center gap-3"><h2 class="min-w-0 break-words text-xl font-semibold">{{ current.teamName }} · {{ current.userName }}</h2><Badge v-if="current.published">{{ $t('liveSolo.recording.published') }}</Badge><Badge v-if="current.disputeHold" variant="secondary">{{ $t('liveSolo.recording.onHold') }}</Badge><Badge v-if="!playable" variant="secondary">{{ $t('liveSolo.recording.processing') }}</Badge></div>
           <div class="flex flex-wrap gap-4 text-sm text-muted-foreground"><span>{{ formatDateTime(current.startedAt || current.createdAt) }} — {{ formatDateTime(current.endedAt) }}</span><span v-if="staff">{{ $t('liveSolo.recording.keepUntil', { time: formatDateTime(current.keepUntil) }) }}</span></div>
+          <p v-if="failureKey" role="status" class="text-sm text-destructive">{{ $t(failureKey) }}</p>
+          <p class="text-sm text-muted-foreground">{{ $t('liveSolo.recording.chunk', { number: (current.chunk ?? 0) + 1 }) }}</p>
           <VideoFilePlayer :key="current.id" :source="source" :label="$t('liveSolo.recording.preview')" :empty-label="$t('liveSolo.recording.unavailable')" :failed-label="$t('liveSolo.program.failed')" :retry-label="$t('common.label.retry')" @retry="retry" @failed="failed" />
           <div class="flex flex-wrap gap-3"><Button :disabled="!playable || busy" @click="download">{{ $t('liveSolo.recording.download') }}</Button><Button v-for="item in actions" :key="item.action" variant="outline" :disabled="busy" @click="begin(item.action)">{{ $t(item.key) }}</Button></div>
-          <template v-if="staff"><Separator /><h3 class="font-semibold">{{ $t('liveSolo.recording.history') }}</h3><div v-for="entry in history" :key="entry.id" class="flex flex-col gap-1 py-2"><span class="text-sm text-muted-foreground">{{ formatDateTime(entry.occurredAt) }}</span><p class="whitespace-pre-wrap break-words">{{ entry.reason }}</p></div></template>
+          <template v-if="staff"><Separator /><h3 class="font-semibold">{{ $t('liveSolo.recording.history') }}</h3><div v-for="row in historyRows" :key="row.entry.id" class="flex flex-col gap-1 py-2"><span class="text-sm text-muted-foreground">{{ formatDateTime(row.entry.occurredAt) }} · {{ $t(row.actionKey) }}</span><p class="whitespace-pre-wrap break-words">{{ row.entry.reason }}</p><Button v-if="row.entry.replacementRecordingId" variant="link" class="self-start p-0" @click="openReplacement(row.entry.replacementRecordingId)">{{ $t('liveSolo.recording.openReplacement') }}</Button></div></template>
         </template><Empty v-else><EmptyHeader><EmptyTitle>{{ $t('liveSolo.recording.empty') }}</EmptyTitle></EmptyHeader></Empty>
       </CardContent></ScrollSurface></Card>
     </div>

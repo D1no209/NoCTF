@@ -6,6 +6,7 @@ namespace NoCTF.Domain.LiveSolo;
 public enum LiveSoloMediaState : short { Preparing, Ready, Rotating, Stopping, Stopped, Failed }
 public enum LiveSoloScreenState : short { Disconnected, Connected, Sharing }
 public enum LiveSoloRecordingState : short { Pending, Recording, Finalizing, Completed, Failed, Deleting, Starting, RequiresReview }
+public enum LiveSoloRecordingFailure : short { CapacityUnavailable, StartUncertain, ExportFailed, ExportTooLarge, ArchiveCapacityUnavailable }
 
 public sealed class LiveSoloMediaSession : IConcurrencyTracked
 {
@@ -60,6 +61,7 @@ public sealed class LiveSoloRecording : IConcurrencyTracked
     public Guid ConcurrencyStamp { get; set; } = Guid.NewGuid();
     [MaxLength(256)] public string? EgressId { get; set; }
     public LiveSoloRecordingState State { get; set; }
+    public LiveSoloRecordingFailure? Failure { get; set; }
     [MaxLength(128)] public string VideoTrackId { get; set; } = string.Empty;
     public int Chunk { get; set; }
     public long ReservedBytes { get; set; }

@@ -19,4 +19,13 @@ describe('LiveSolo recording permissions and readiness', () => {
     expect(playableRecording({ ...ready, byteLength: 0 })).toBe(false)
     expect(playableRecording(null)).toBe(false)
   })
+  test('recovery is manager-only and selects actions from explicit failures', () => {
+    const pending: Recording={state:'RequiresReview',failure:'CapacityUnavailable'}
+    expect(recordingActions(pending,true,false)).toEqual(['Hold'])
+    expect(recordingActions(pending,true,true)).toEqual(['Hold','RetryPendingStart'])
+    expect(recordingActions({...pending,failure:'StartUncertain'},true,true)).toEqual(['Hold','ReconcileExport'])
+    expect(recordingActions({...pending,failure:'ArchiveCapacityUnavailable'},true,true)).toEqual(['Hold','RetryArchive'])
+    expect(recordingActions({state:'Failed',failure:'ExportFailed'},true,true)).toEqual(['Hold','StartNewChunk'])
+    expect(playableRecording({...ready,state:'Failed',failure:'ExportFailed'})).toBe(false)
+  })
 })

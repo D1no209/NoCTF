@@ -69,9 +69,9 @@ namespace Internal.Generated.WolverineHandlers
             var managedFileUploads = new NoCTF.Application.Storage.ManagedFileUploads(managedFileUploadRegistry, _store1);
             var liveSoloCaptureFiles = new NoCTF.Infrastructure.LiveSolo.Media.LiveSoloCaptureFiles(_liveKitMediaOptions1);
             var requestSourceAddress = new NoCTF.API.Security.RequestSourceAddress(_httpContextAccessor);
-            var liveSoloCaptureStore = new NoCTF.Infrastructure.LiveSolo.Media.LiveSoloCaptureStore(noCtfDbContext, _liveSoloEgressGateway, liveSoloCaptureFiles, managedFileUploads, _liveKitMediaOptions2, _timeProvider4, wolverinePostCommitMessagePublisher, _store2);
-            var mfaAuthenticationStore = new NoCTF.Infrastructure.Authentication.Mfa.MfaAuthenticationStore(noCtfDbContext, _mfaCryptography, _platformSecretProtector, _timeProvider2, requestSourceAddress, wolverinePostCommitMessagePublisher);
             var competitionModerationAuthorizer = new NoCTF.Infrastructure.Teams.Moderation.CompetitionModerationAuthorizer(noCtfDbContext);
+            var liveSoloCaptureStore = new NoCTF.Infrastructure.LiveSolo.Media.LiveSoloCaptureStore(noCtfDbContext, _liveSoloEgressGateway, liveSoloCaptureFiles, managedFileUploads, _liveKitMediaOptions2, _timeProvider4, wolverinePostCommitMessagePublisher, _store2, competitionModerationAuthorizer);
+            var mfaAuthenticationStore = new NoCTF.Infrastructure.Authentication.Mfa.MfaAuthenticationStore(noCtfDbContext, _mfaCryptography, _platformSecretProtector, _timeProvider2, requestSourceAddress, wolverinePostCommitMessagePublisher);
             var liveSoloMediaStore = new NoCTF.Infrastructure.LiveSolo.Media.LiveSoloMediaStore(noCtfDbContext, competitionModerationAuthorizer, mfaAuthenticationStore, _liveSoloMediaGateway, wolverinePostCommitMessagePublisher, _timeProvider3, liveSoloCaptureStore);
             // The actual message body
             var refreshLiveSoloMedia = (NoCTF.Application.LiveSolo.Media.RefreshLiveSoloMedia)context.Envelope.Message;

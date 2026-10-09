@@ -29,12 +29,14 @@ public sealed record LiveSoloRecordingResponse(Guid Id, Guid MediaSessionId, Gui
     Guid? TeamId, string? TeamName,
     [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<LiveSoloRecordingState>))] LiveSoloRecordingState State,
     Guid ConcurrencyStamp, DateTimeOffset CreatedAt, DateTimeOffset? StartedAt, DateTimeOffset? EndedAt,
-    DateTimeOffset KeepUntil, bool DisputeHold, bool Published, long? ByteLength, string FileUrl)
+    DateTimeOffset KeepUntil, bool DisputeHold, bool Published, long? ByteLength, string FileUrl,
+    [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<LiveSoloRecordingFailure>))] LiveSoloRecordingFailure? Failure = null,
+    int Chunk = 0)
 {
     internal static LiveSoloRecordingResponse From(LiveSoloRecordingView x, Guid competitionId, Guid matchId) => new(x.Id, x.MediaSessionId, x.RoundId, x.UserId,
         x.UserName, x.TeamId, x.TeamName, x.State, x.ConcurrencyStamp, x.CreatedAt, x.StartedAt, x.EndedAt, x.KeepUntil,
         x.DisputeHold, x.Published, x.ByteLength,
-        $"/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/recordings/{x.Id}/file");
+        $"/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/recordings/{x.Id}/file", x.Failure, x.Chunk);
 }
 public sealed record LiveSoloRecordingsResponse(IReadOnlyList<LiveSoloRecordingResponse> Items, int Total, bool CanJudge, bool CanPublish);
 public sealed class ListLiveSoloRecordingsEndpoint(ManageLiveSoloRecordings recordings, IUserContext user)
