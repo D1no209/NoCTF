@@ -77,6 +77,21 @@ public sealed class LiveSoloViewerPersistenceTests
     }
     private static LiveSoloViewerStore Store(NoCtfDbContext db,LiveSoloMatchPersistenceTests.Fixture f)=>new(db,new CompetitionModerationAuthorizer(db),f.Clock);
     [Test,Timeout(300_000)]
+    public async Task Fifty_independent_renewals_do_not_contend_on_the_global_admission_budget_or_create_extra_slots(CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async()=>{
+            await using var f=await LiveSoloMatchPersistenceTests.Fixture.CreateAsync(ct);await f.PrepareAsync(ct);await f.StartAsync(ct);
+            var leases=new List<Guid>();
+            for(var index=0;index<50;index++)leases.Add((await Store(f.Db,f).EnterAsync(f.Competition.Id,f.Match.Id,Guid.Empty,null,ct)).Admission!.Id);
+            async Task<NoCTF.Application.LiveSolo.Media.LiveSoloViewerResult> Renew(Guid id){await using var db=new NoCtfDbContext(f.Options);return await Store(db,f).RenewAsync(f.Competition.Id,f.Match.Id,Guid.Empty,id,ct);}
+            var results=await Task.WhenAll(leases.Select(Renew));
+            await Assert.That(results.All(x=>x.Failure is null)).IsTrue();
+            await Assert.That(await f.Db.Set<LiveSoloViewerLease>().CountAsync(ct)).IsEqualTo(50);
+            await Assert.That((await Store(f.Db,f).EnterAsync(f.Competition.Id,f.Match.Id,Guid.Empty,null,ct)).Failure)
+                .IsEqualTo(NoCTF.Application.LiveSolo.Media.LiveSoloViewerFailure.CapacityReached);
+        });
+    }
+    [Test,Timeout(300_000)]
     public async Task Lowering_capacity_requalifies_existing_leases_and_transaction_failure_cannot_create_a_slot(CancellationToken ct)
     {
         await DockerIntegrationTest.RunAsync(async () =>

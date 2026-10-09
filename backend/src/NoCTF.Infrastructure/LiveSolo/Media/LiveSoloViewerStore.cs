@@ -46,7 +46,7 @@ public sealed class LiveSoloViewerStore(NoCtfDbContext db, ICompetitionModeratio
             if (!await LiveSoloViewerEligibility.WithinCapacityAsync(db, competitionId, leaseId, clock.GetUtcNow(), ct))
             { db.Remove(lease); return new(null, LiveSoloViewerFailure.CapacityReached); }
             lease.ExpiresAt = clock.GetUtcNow() + Lifetime; return new(new(lease.Id, lease.ExpiresAt));
-        }, ct);
+        }, ct,IsolationLevel.ReadCommitted);
     public async Task LeaveAsync(Guid competitionId, Guid matchId, Guid actorId, Guid leaseId, CancellationToken ct)
     {
         await TransactionAsync(async () =>
@@ -56,15 +56,15 @@ public sealed class LiveSoloViewerStore(NoCtfDbContext db, ICompetitionModeratio
                 && x.MatchId == matchId && x.UserId == userId, ct);
             if (lease is not null) db.Remove(lease);
             return new(null);
-        }, ct);
+        }, ct,IsolationLevel.ReadCommitted);
     }
-    private async Task<LiveSoloViewerResult> TransactionAsync(Func<Task<LiveSoloViewerResult>> action, CancellationToken ct)
+    private async Task<LiveSoloViewerResult> TransactionAsync(Func<Task<LiveSoloViewerResult>> action, CancellationToken ct,IsolationLevel isolation=IsolationLevel.Serializable)
     {
         for (var attempt = 0; ; attempt++)
         {
             try
             {
-                await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+                await using var tx = await db.Database.BeginTransactionAsync(isolation, ct);
                 var result = await action(); await db.SaveChangesAsync(ct); await tx.CommitAsync(ct); return result;
             }
             catch (Exception ex) when (ex is DbUpdateException || TransactionFailureClassifier.IsRetryable(ex))
