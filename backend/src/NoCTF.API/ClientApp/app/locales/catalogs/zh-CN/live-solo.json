@@ -1,4 +1,5 @@
 {
+  "liveSolo.supportedModes": "ctf awd awdp koh livesolo",
   "liveSolo.notice.programStalled": "节目未继续产生新视频，请工作人员检查。",
   "liveSolo.notice.recordingFailed": "屏幕录像未能继续，请工作人员检查。",
   "liveSolo.recording.openReplacement": "查看新的录制分段",

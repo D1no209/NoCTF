@@ -47,7 +47,7 @@ export function useIndexPage() {
   const unknownTerminalCommand = ref('')
 
   const statusRows = computed(() => [
-    { label: translate('common.label.modes'), value: translate('common.label.ctfAwdAwdpKoh') },
+    { label: translate('common.label.modes'), value: translate('liveSolo.supportedModes') },
     { label: translate('common.label.live'), value: competitionsLoading.value ? translate('common.label.loading') : competitionsError.value ? '—' : translate('common.label.running.useIndexPage', { count: liveCount.value }) },
     { label: translate('common.label.upcoming.useIndexPage'), value: competitionsLoading.value ? translate('common.label.loading') : competitionsError.value ? '—' : translate('common.label.upcoming', { count: upcomingCount.value }) },
   ])

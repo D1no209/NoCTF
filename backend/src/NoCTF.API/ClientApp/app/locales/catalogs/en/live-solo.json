@@ -1,4 +1,5 @@
 {
+  "liveSolo.supportedModes": "ctf awd awdp koh livesolo",
   "liveSolo.notice.programStalled": "The programme stopped producing new video. Staff review is required.",
   "liveSolo.notice.recordingFailed": "A screen recording could not continue. Staff review is required.",
   "liveSolo.recording.openReplacement": "Open the new recording chunk",

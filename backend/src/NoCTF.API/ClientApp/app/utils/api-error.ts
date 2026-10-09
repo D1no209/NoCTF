@@ -80,7 +80,9 @@ export function parseApiError(error: unknown, fallback: UiMessage = describeMess
   if (error instanceof ApiError) return error
   if (!error || typeof error !== 'object') return new ApiError(fallback)
   const problem = error as ProblemDetailsLike
-  const status = problem.status ?? problem.statusCode
+  const suppliedStatus = problem.status ?? problem.statusCode
+  const status = typeof suppliedStatus === 'number' && Number.isFinite(suppliedStatus) ? suppliedStatus : undefined
+  const code = typeof problem.code === 'string' ? problem.code : undefined
   const fieldErrors = problem.errors ? Object.fromEntries(Object.entries(problem.errors).map(([field, entries]) => [field, Array.isArray(entries) ? entries : [entries]])) : undefined
   const fields = new Set([...Object.keys(fieldErrors ?? {}), ...Object.keys(problem.errorMessages ?? {})])
   const fieldMessages = Object.fromEntries([...fields].map((field) => {
@@ -95,13 +97,14 @@ export function parseApiError(error: unknown, fallback: UiMessage = describeMess
   const validation = [...unique.values()]
   const statusFallback = status === undefined ? fallback
     : (status === 400 || status === 422) && localizeMessage(fallback) !== translate('common.error.requestFailed') ? fallback : statusErrorDescriptor(status)
-  const structured = descriptor(problem.messageKey, problem.messageArguments) ?? stableCodeMessage(problem.code)
-  const raw = problem.detail ?? problem.message ?? problem.title
+  const structured = descriptor(typeof problem.messageKey === 'string' ? problem.messageKey : undefined, problem.messageArguments) ?? stableCodeMessage(code)
+  const suppliedMessage = problem.detail ?? problem.message ?? problem.title
+  const raw = typeof suppliedMessage === 'string' ? suppliedMessage : undefined
   const display: UiMessage = validation.length
     ? { messages: validation, separator: 'common.validation.separator' }
-    : structured ?? (userFacingErrorMessage(raw, statusFallback, status === 409 || status === 422 || (status === 400 && Boolean(problem.code))) === localizeMessage(statusFallback)
+    : structured ?? (userFacingErrorMessage(raw, statusFallback, status === 409 || status === 422 || (status === 400 && Boolean(code))) === localizeMessage(statusFallback)
       ? statusFallback : raw?.trim() || statusFallback)
-  return new ApiError(display, { status, code: problem.code, fieldErrors, fieldMessages })
+  return new ApiError(display, { status, code, fieldErrors, fieldMessages })
 }
 
 export function statusErrorDescriptor(status: number | undefined, authenticatedRequest = false): MessageDescriptor {
