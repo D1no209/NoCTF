@@ -22,7 +22,10 @@ public static class MessageRouting
         Route<EvaluateGameplayFact>(options, WorkerQueue.Gameplay);
         Route<DispatchPendingGameplayFacts>(options, WorkerQueue.Control);
         Route<NoCTF.Application.LiveSolo.Rounds.AdvanceLiveSoloRound>(options, WorkerQueue.Control);
-        Route<NoCTF.Application.LiveSolo.Realtime.LiveSoloMatchChanged>(options, WorkerQueue.Control);
+        options.PublishMessage<NoCTF.Application.LiveSolo.Realtime.LiveSoloMatchChanged>()
+            .ToNatsSubject(NatsSubjects.RealtimeEvents).UseJetStream(NatsSubjects.EventsStream);
+        options.ConfigureNoCtfInfrastructureRetriesFor<NoCTF.Application.LiveSolo.Realtime.LiveSoloMatchChanged>(
+            WorkerQueue.Background,CompetitionEventFanoutQueueNames.Realtime);
         Route<NoCTF.Application.LiveSolo.Media.LiveSoloMediaAlertCreated>(options, WorkerQueue.Control);
         Route<NoCTF.Application.LiveSolo.Media.RefreshLiveSoloMedia>(options, WorkerQueue.Control);
         Route<NoCTF.Application.LiveSolo.Media.AdvanceLiveSoloCapture>(options, WorkerQueue.Control);

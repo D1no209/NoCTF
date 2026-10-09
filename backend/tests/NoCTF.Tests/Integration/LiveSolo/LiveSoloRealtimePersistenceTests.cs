@@ -67,6 +67,22 @@ public sealed class LiveSoloRealtimePersistenceTests
             messages.Received(1).DiscardPendingMessages(); await messages.DidNotReceive().FlushCommittedMessagesAsync();
         });
     }
+    [Test,Timeout(300_000)]
+    public async Task Terminal_result_snapshot_is_queued_separately_from_private_realtime_invalidation(CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async()=>
+        {
+            await using var f=await LiveSoloMatchPersistenceTests.Fixture.CreateAsync(ct);await f.PrepareAsync(ct);
+            var messages=Substitute.For<IPostCommitMessagePublisher>();
+            var store=new LiveSoloMatchStore(f.Db,new CompetitionModerationAuthorizer(f.Db),f.media,f.egress,Substitute.For<ILiveSoloRuntimePreparation>(),messages,clock:f.Clock);
+            var match=await f.Db.LiveSoloMatches.SingleAsync(ct);
+            var result=await store.ApplyAsync(new NoCTF.Application.LiveSolo.Adjudication.AdjudicateLiveSoloMatch(f.Competition.Id,f.Match.Id,f.Owner.Id,
+                match.ConcurrencyStamp,match.CurrentRoundId,f.Round.ConcurrencyStamp,f.Round.TimelineRevision,LiveSoloJudgeAction.ForfeitMatch,f.RightTeam.Id,"terminal snapshot dispatch"),ct);
+            await Assert.That(result.Failure).IsNull();
+            await messages.Received(1).PublishAsync(Arg.Is<NoCTF.Application.LiveSolo.Media.SnapshotLiveSoloResult>(x=>x!=null&&x.MatchId==f.Match.Id));
+            await messages.Received(1).PublishAsync(Arg.Is<LiveSoloMatchChanged>(x=>x!=null&&x.MatchId==f.Match.Id));
+        });
+    }
     private sealed class RejectCommit : DbTransactionInterceptor
     {
         public override ValueTask<InterceptionResult> TransactionCommittingAsync(DbTransaction transaction, TransactionEventData eventData,

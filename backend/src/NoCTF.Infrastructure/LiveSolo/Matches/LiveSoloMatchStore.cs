@@ -64,9 +64,14 @@ public sealed partial class LiveSoloMatchStore(NoCtfDbContext db, ICompetitionMo
         foreach (var id in await db.LiveSoloRounds.Where(x => roundIds.Contains(x.Id)).Select(x => x.MatchId).ToArrayAsync(ct)) ids.Add(id);
         var matchIds = ids.ToArray();
         var competitions = await db.LiveSoloMatches.AsNoTracking().Where(x => matchIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.CompetitionId, ct);
+        var terminal=(await db.LiveSoloMatches.AsNoTracking().Where(x=>matchIds.Contains(x.Id)
+            &&(x.State==LiveSoloMatchState.Completed||x.State==LiveSoloMatchState.Canceled)).Select(x=>x.Id).ToArrayAsync(ct)).ToHashSet();
         foreach (var match in db.ChangeTracker.Entries<LiveSoloMatch>().Select(x => x.Entity).Where(x => ids.Contains(x.Id))) competitions[match.Id] = match.CompetitionId;
+        foreach(var match in db.ChangeTracker.Entries<LiveSoloMatch>().Select(x=>x.Entity).Where(x=>ids.Contains(x.Id)))
+            if(match.State is LiveSoloMatchState.Completed or LiveSoloMatchState.Canceled)terminal.Add(match.Id);else terminal.Remove(match.Id);
         foreach (var match in competitions)
             await messages.PublishAsync(new NoCTF.Application.LiveSolo.Realtime.LiveSoloMatchChanged(match.Value, match.Key, (clock ?? TimeProvider.System).GetUtcNow()));
+        foreach(var id in terminal)await messages.PublishAsync(new NoCTF.Application.LiveSolo.Media.SnapshotLiveSoloResult(id));
     }
 
     private async Task<bool> ActiveAsync(Guid actor, CancellationToken ct) => actor != Guid.Empty
