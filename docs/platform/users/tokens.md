@@ -18,6 +18,8 @@
 
 令牌使用目标账号普通角色和 TokenVersion，不是额外管理员绕过令牌，不给目标签发 Refresh JWT。记录期满负责人，Bot 无法自行通过 refresh 延期。
 
+人类账号还受当前 MFA 和真实认证上下文约束。要求 MFA 的目标不能由管理员或 Bot 代签完整登录来绕过第二步，代签 token 也不能执行需要真实主认证/本地因素的通行密钥与验证器管理，见 [MFA](../security/mfa.md)和 [Passkey](../security/passkeys.md)。
+
 ## 全量撤销
 
 “撤销全部令牌”递增目标 TokenVersion，使该账号既有 Access/Refresh 失效。确认影响全部服务和浏览器，再提交并验证旧令牌被拒绝。

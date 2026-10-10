@@ -71,6 +71,7 @@ Docker 不加题目 HAProxy；Kubernetes 检查实例间与平台数据网络隔
 | AWDP | Break Flag、合法 Fix、坏包/失败包、判题调度、轮次结果 |
 | KoH | 共享 Hill、各队自己的 Control Flag、轮询计分、无控制与超时处理 |
 | CTF 闯关 | 前驱解锁、重锁、勋章授予/撤销与分数保留 |
+| LiveSolo | 名单/媒体/隔离、共同受理顺序、延迟节目、录像、纠正及恢复，使用 [独立验收清单](../live-solo/readiness.md) |
 
 只准备 CTF 比赛时不必运行不使用的模式，但报告不能把未运行项写为通过。
 

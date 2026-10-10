@@ -43,6 +43,7 @@ docs/
   installation/           # 环境、Docker/K8s、代理、配置、验收
   player/                 # 账号、队伍、题目、模式、榜单、题解
   challenge-bank/         # 可复用模板、附件/Flag、定义、测试、权限与引用
+  live-solo/              # 独立第五赛制：配置、题组、赛程、场内、媒体、纠正、验收
   competition/            # 单场比赛管理，按任务子目录组织
     settings/             # 创建概览、基本设置、计分、方向
     content/              # 比赛题目、提示/Flag、闯关与勋章

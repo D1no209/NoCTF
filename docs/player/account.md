@@ -25,6 +25,8 @@ SSO 不自动注册或按邮箱合并账号。首次使用需要先注册/本地
 
 ## 会话恢复与退出
 
+支持配置就绪时的 [通行密钥登录](../platform/security/passkeys.md)。通行密钥属于主认证，需要 MFA 的账号仍进行第二步；密码找回不移除已绑定验证器。验证器、恢复码、强制策略与邮箱恢复见 [双重验证](../platform/security/mfa.md)。
+
 普通 Human 登录的 Access Token 生命周期为 15 分钟，Refresh Cookie 固定 30 天。网页在适当时机刷新会话；Cookie 是 HttpOnly、Secure，生产必须通过 HTTPS。
 
 “退出”清除当前浏览器的刷新 Cookie。平台没有设备会话列表或逐设备撤销模型；改密码或管理员全量撤销通过 TokenVersion 使旧访问和刷新令牌失效。

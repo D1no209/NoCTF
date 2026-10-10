@@ -1,6 +1,8 @@
-# 实验功能：CTF 修复验证
+# 实验功能与 LiveSolo 视频策略
 
-入口：平台设置 → 实验功能，`/admin/platform/experiments`。当前页面控制 CTF Patch Verification 平台能力开关，不是任意功能/插件列表。
+入口：平台设置 → 实验功能，`/admin/platform/experiments`。当前提供 CTF Patch Verification 开关及独立 LiveSolo 视频资源策略，两个分区各自保存。
+
+LiveSolo 视频宽高、FPS、码率的默认/范围、生效时机和实际验收见 [平台视频策略](./video-policy.md)。修改它不重启 Match，不扩大普通四赛制的媒体依赖。
 
 ## 开关的意义
 

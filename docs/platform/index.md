@@ -10,7 +10,7 @@
 | 用户 | [账号管理](./users/accounts.md)、[令牌与模拟](./users/tokens.md)、[删除与匿名化](./users/deletion.md) | 角色、状态、邮箱、Bot、SSO 和账号生命周期 |
 | 邮件与人机验证 | [邮件](./security/email.md)、[人机验证](./security/human-verification.md) | SMTP、验证/找回期限、Provider secret 与策略 |
 | 认证 | [SSO](./security/authentication.md) | 全局开关、OIDC/CAS、Provider 和两类测试 |
-| 实验功能 | [CTF 修复验证](./experiments.md) | 平台实验开关与使用边界 |
+| 实验功能 | [CTF 修复验证](./experiments.md)、[LiveSolo 视频策略](./video-policy.md) | 独立实验开关、视频宽高/FPS/码率与使用边界 |
 | 运行容器 | [跨比赛 Runtime](./maintenance/runtimes.md) | 筛选、关联资源、终止与强制终止 |
 | 日志 | [日志查询与导出](./maintenance/logs.md) | 级别、来源、窗口、实时读取与 JSONL |
 | 审计 | [审计与归档](./maintenance/audit.md) | 操作者、比赛、动作与关联证据 |
