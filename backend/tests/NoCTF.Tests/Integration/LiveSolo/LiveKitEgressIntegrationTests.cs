@@ -61,14 +61,14 @@ public sealed class LiveKitEgressIntegrationTests
             var trackId = Regex.Match(logs.Stdout, @"TRACK_READY:(\S+)").Groups[1].Value;
             await Assert.That(trackId).IsNotEmpty();
             await Assert.That((await gateway.ObserveAsync(room, ct)).Screens.Any(x => x.TrackId == trackId && x.State == NoCTF.Domain.LiveSolo.LiveSoloScreenState.Sharing)).IsTrue();
-            var capture = new LiveSoloExportRequest(Guid.NewGuid(), room, LiveSoloExportKind.Program);
+            var capture = new LiveSoloExportRequest(Guid.NewGuid(), room, LiveSoloExportKind.Program,LiveSoloVideoPolicy.Default);
             var job = await gateway.StartAsync(capture, ct);
             await Assert.That(job.RoomIdentity).IsEqualTo(room); await Assert.That(job.Id).IsNotEmpty();
             await Assert.That(job.State is LiveSoloExportState.Starting or LiveSoloExportState.Active).IsTrue();
             var jobs = await gateway.ListAsync(room, ct);
             await Assert.That(jobs.Any(x => x.Id == job.Id && x.OutputPrefix == "/out/live-solo/" + capture.Id.ToString("N") + "/program")).IsTrue();
             await WaitFor(gateway, room, job.Id, LiveSoloExportState.Active, ct);
-            var recording = new LiveSoloExportRequest(Guid.NewGuid(), room, LiveSoloExportKind.ScreenRecording, trackId);
+            var recording = new LiveSoloExportRequest(Guid.NewGuid(), room, LiveSoloExportKind.ScreenRecording,LiveSoloVideoPolicy.Default, trackId);
             var recordJob = await gateway.StartAsync(recording, ct);
             await WaitFor(gateway, room, recordJob.Id, LiveSoloExportState.Active, ct);
             await Task.Delay(TimeSpan.FromSeconds(8), ct);

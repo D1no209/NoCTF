@@ -27,6 +27,7 @@ export function useLiveSoloMatch() {
   const loading = ref(true), busy = ref(false), error = ref<UiMessage | null>(null)
   const selectedRoster = ref<string[]>([]), memberNames = ref<ReadonlyMap<string, string>>(new Map())
   const staff = computed(() => ctx?.competition.value?.administrationRole != null)
+  const staffOnlyMedia = computed(() => ctx?.competition.value?.accessMode === 'StaffOnly')
   useLiveSoloHub(competitionId, matchId, staff, load)
   const judge = computed(() => canJudgeLiveSolo(ctx?.competition.value?.administrationRole) && !match.value?.pendingCorrectionId)
   const canCorrect = computed(() => canManageLiveSolo(ctx?.competition.value?.administrationRole)
@@ -173,7 +174,7 @@ export function useLiveSoloMatch() {
     disposed = true; request++; if (timer) clearTimeout(timer); if (clockTimer) clearInterval(clockTimer)
     window.removeEventListener('beforeunload', beforeUnload)
   })
-  return { competitionId, matchId, match, round, media, configuration, loading, busy, team, myRoster, captain, onRoster,
+  return { competitionId, matchId, match, round, media, configuration, loading, busy, team, myRoster, captain, onRoster, staffOnlyMedia,
     canLock, allLocked, rosterOptions, selectedRoster, toggleRoster, lockRoster, ready, prepareMedia, prepareRound, start,
     staff, readOnlyMedia, judge, canCorrect, correct, screens, myScreen, clock, stateKey: computed(() => matchStateKey(match.value?.state)), back, load,
     judgeOpen, judgeAction, judgeReason, forfeitingTeam, openDecision, confirmDecision, setJudgeOpen,

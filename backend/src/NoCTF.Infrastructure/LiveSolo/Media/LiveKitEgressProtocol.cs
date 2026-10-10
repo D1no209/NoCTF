@@ -6,9 +6,11 @@ internal enum LiveKitEgressOperation { StartEgress, ListEgress, StopEgress }
 [JsonConverter(typeof(JsonStringEnumConverter<LiveKitEgressStatus>))]
 internal enum LiveKitEgressStatus { EGRESS_STARTING, EGRESS_ACTIVE, EGRESS_ENDING, EGRESS_COMPLETE, EGRESS_FAILED, EGRESS_ABORTED, EGRESS_LIMIT_REACHED }
 [JsonConverter(typeof(JsonStringEnumConverter<LiveKitFileType>))]
-internal enum LiveKitFileType { MP4 = 1 }
+internal enum LiveKitFileType { DEFAULT_FILETYPE = 0, MP4 = 1 }
+[JsonConverter(typeof(JsonStringEnumConverter<LiveKitEncodingPreset>))]
+internal enum LiveKitEncodingPreset { PASSTHROUGH }
 internal sealed record LiveKitStartEgress(string RoomName, LiveKitTemplateSource? Template, LiveKitMediaSource? Media,
-    LiveKitEncoding Advanced, LiveKitOutput[] Outputs);
+    LiveKitEncoding? Advanced, LiveKitOutput[] Outputs,LiveKitEncodingPreset? Preset=null);
 internal sealed record LiveKitTemplateSource(string Layout, bool VideoOnly);
 internal sealed record LiveKitMediaSource(string VideoTrackId);
 internal sealed record LiveKitEncoding(int Width, int Height, int Framerate, int VideoBitrate, double KeyFrameInterval);

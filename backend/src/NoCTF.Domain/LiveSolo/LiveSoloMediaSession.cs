@@ -65,6 +65,11 @@ public sealed class LiveSoloRecording : IConcurrencyTracked
     [MaxLength(128)] public string VideoTrackId { get; set; } = string.Empty;
     public int Chunk { get; set; }
     public long ReservedBytes { get; set; }
+    public Guid? VideoPolicyStamp {get;set;}
+    public int? VideoMaximumWidth {get;set;}
+    public int? VideoMaximumHeight {get;set;}
+    public int? VideoMaximumFramesPerSecond {get;set;}
+    public int? VideoBitrateBitsPerSecond {get;set;}
     public DateTimeOffset? RawRemovedAt { get; set; }
     public DateTimeOffset? RequestedAt { get; set; }
     public Guid? FileId { get; set; }

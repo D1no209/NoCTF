@@ -14,7 +14,7 @@ public sealed record PlatformConfigurationView(
     string? Description,
     Guid? LogoFileId,
     DateTimeOffset UpdatedAt,
-    bool CtfPatchVerificationEnabled = false);
+    bool CtfPatchVerificationEnabled = false,NoCTF.Application.LiveSolo.Media.LiveSoloVideoPolicy? LiveSoloVideo=null);
 
 public sealed record PlatformLogoReplacement(
     PlatformConfigurationView Configuration,
@@ -41,6 +41,7 @@ public interface IPlatformConfigurationStore
         CancellationToken cancellationToken);
 
     Task<BusinessFileReference?> GetLogoFileAsync(CancellationToken cancellationToken);
+    Task<PlatformConfigurationView> UpdateLiveSoloVideoAsync(int width,int height,int framesPerSecond,int bitrateBitsPerSecond,DateTimeOffset now,CancellationToken cancellationToken);
 }
 
 public enum PlatformConfigurationUpdateState
@@ -164,6 +165,12 @@ public sealed class ManagePlatformConfiguration(
         }
 
         return new(PlatformLogoUpdateState.Updated, replacement.Configuration);
+    }
+
+    public async Task<PlatformConfigurationUpdateResult> UpdateLiveSoloVideoAsync(int width,int height,int framesPerSecond,int bitrateBitsPerSecond,DateTimeOffset now,CancellationToken ct=default)
+    {
+        if(!NoCTF.Domain.LiveSolo.LiveSoloVideoLimits.Valid(width,height,framesPerSecond,bitrateBitsPerSecond))return new(PlatformConfigurationUpdateState.InvalidInput);
+        return new(PlatformConfigurationUpdateState.Updated,await settings.UpdateLiveSoloVideoAsync(width,height,framesPerSecond,bitrateBitsPerSecond,now,ct));
     }
 
     public async Task<PlatformLogoContent?> GetLogoAsync(CancellationToken ct = default)

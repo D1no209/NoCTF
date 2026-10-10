@@ -27,10 +27,14 @@ public sealed partial class LiveKitMediaGateway : ILiveSoloEgressGateway
             throw new InvalidOperationException("Invalid media export request.");
         var prefix = options.EgressOutputRoot.TrimEnd('/') + "/live-solo/" + request.Id.ToString("N");
         var program = request.Kind == LiveSoloExportKind.Program;
+        var policy=request.VideoPolicy;
+        if(!NoCTF.Domain.LiveSolo.LiveSoloVideoLimits.Valid(policy.MaximumWidth,policy.MaximumHeight,policy.MaximumFramesPerSecond,policy.MaximumBitrateBitsPerSecond))
+            throw new InvalidOperationException("Invalid effective video policy.");
         var input = new LiveKitStartEgress(request.RoomIdentity, program ? new("grid", true) : null,
-            program ? null : new(request.VideoTrackId!), new(1280, 720, 15, 1800, 2),
+            program ? null : new(request.VideoTrackId!),program?new(policy.MaximumWidth,policy.MaximumHeight,policy.MaximumFramesPerSecond,policy.ProgrammeBitrateKilobitsPerSecond,2):null,
             program ? [new(Segments: new(prefix + "/program", prefix + "/program.m3u8", 2, true))]
-                : [new(File: new(LiveKitFileType.MP4, prefix + "/recording.mp4", true))]);
+                : [new(File: new(LiveKitFileType.DEFAULT_FILETYPE, prefix + "/recording.mp4", true))],
+            program?null:LiveKitEncodingPreset.PASSTHROUGH);
         var result = await EgressAsync(LiveKitEgressOperation.StartEgress, input, LiveKitEgressJsonContext.Default.LiveKitStartEgress,
             LiveKitEgressJsonContext.Default.LiveKitEgressInfo, request.RoomIdentity, ct);
         if (result.RoomName != request.RoomIdentity || string.IsNullOrWhiteSpace(result.EgressId)) throw new InvalidDataException("Export scope mismatch.");

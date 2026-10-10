@@ -20,7 +20,7 @@ public sealed partial class LiveSoloMediaStore(NoCtfDbContext db, ICompetitionMo
     {
         var ids = session.Participants.Select(x => x.UserId).ToArray();
         var names = await db.Users.Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.UserName, ct);
-        return LiveSoloMediaPolicy.View(session, names);
+        return LiveSoloMediaPolicy.View(session, names) with {VideoPolicy=await LiveSoloVideoConfigurationReader.ReadAsync(db,ct)};
     }
     private async Task<bool> AvailableAsync(Guid competitionId, CancellationToken ct) =>
         await db.Set<LiveSoloCompetitionModeConfiguration>().AnyAsync(x => x.CompetitionId == competitionId && x.Enabled, ct)

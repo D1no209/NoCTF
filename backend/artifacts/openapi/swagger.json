@@ -28097,6 +28097,14 @@
           },
           "recordingEnabled": {
             "type": "boolean"
+          },
+          "videoPolicy": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloPublisherVideoPolicyResponse"
+              }
+            ]
           }
         }
       },
@@ -28143,6 +28151,32 @@
           },
           "userName": {
             "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloPublisherVideoPolicyResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "maximumWidth": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maximumHeight": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maximumFramesPerSecond": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maximumBitrateBitsPerSecond": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "policyStamp": {
+            "type": "string",
+            "format": "guid"
           }
         }
       },
@@ -37516,6 +37550,17 @@
           },
           "experimentalFeatures": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformExperimentalFeaturesResponse"
+          },
+          "liveSoloVideo": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFApplicationLiveSoloMediaLiveSoloVideoPolicy"
+              }
+            ]
+          },
+          "liveSoloVideoRules": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformLiveSoloVideoConfigurationRulesResponse"
           }
         }
       },
@@ -37668,6 +37713,78 @@
         "properties": {
           "ctfPatchVerificationEnabled": {
             "type": "boolean"
+          }
+        }
+      },
+      "NoCTFApplicationLiveSoloMediaLiveSoloVideoPolicy": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "maximumWidth": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maximumHeight": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maximumFramesPerSecond": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maximumBitrateBitsPerSecond": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "programmeBitrateBitsPerSecond": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "policyStamp": {
+            "type": "string",
+            "format": "guid"
+          },
+          "programmeBitrateKilobitsPerSecond": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformLiveSoloVideoConfigurationRulesResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "minimumWidth": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maximumWidth": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "minimumHeight": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maximumHeight": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "minimumFramesPerSecond": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maximumFramesPerSecond": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "minimumBitrateBitsPerSecond": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maximumBitrateBitsPerSecond": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -38370,6 +38487,14 @@
                 "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformExperimentalFeaturesPatchRequest"
               }
             ]
+          },
+          "liveSoloVideo": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformLiveSoloVideoPatchRequest"
+              }
+            ]
           }
         }
       },
@@ -38529,6 +38654,34 @@
         "properties": {
           "ctfPatchVerificationEnabled": {
             "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformPlatformLiveSoloVideoPatchRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "maximumWidth",
+          "maximumHeight",
+          "maximumFramesPerSecond",
+          "maximumBitrateBitsPerSecond"
+        ],
+        "properties": {
+          "maximumWidth": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maximumHeight": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maximumFramesPerSecond": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maximumBitrateBitsPerSecond": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },

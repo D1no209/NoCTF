@@ -18,6 +18,7 @@ public sealed class LiveSoloCaptureScheduleSource(NoCtfDbContext db) : IClusterS
             || x.State == LiveSoloCaptureState.RequiresReview && x.EgressId == null).Select(x => x.MediaSessionId)
             .Union(db.LiveSoloRecordings.AsNoTracking().Where(x => x.State == LiveSoloRecordingState.Pending || x.State == LiveSoloRecordingState.Starting
                 || x.State == LiveSoloRecordingState.Recording || x.State == LiveSoloRecordingState.Finalizing
+                || x.State == LiveSoloRecordingState.Completed && x.EndedAt == null && x.EgressId != null
                 || x.State == LiveSoloRecordingState.RequiresReview && x.EgressId == null && x.RequestedAt != null).Select(x => x.MediaSessionId))
             .Union(db.LiveSoloMediaSessions.Where(x => x.State == LiveSoloMediaState.Ready).Select(x => x.Id)).ToArrayAsync(ct);
         var pruning = await db.LiveSoloProgramSegments.AsNoTracking().Where(x => x.RemoveAfter <= now).Select(x => x.MediaSessionId)

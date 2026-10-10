@@ -5,7 +5,7 @@ namespace NoCTF.Application.LiveSolo.Media;
 
 public sealed record LiveSoloMediaMemberView(Guid UserId, Guid TeamId, LiveSoloSide Side, LiveSoloScreenState State, string Identity, string UserName);
 public sealed record LiveSoloMediaView(Guid Id, Guid MatchId, Guid Generation, LiveSoloMediaState State,
-    bool ParticipantsMayViewOpponents, IReadOnlyList<LiveSoloMediaMemberView> Members, int PublicDelaySeconds, bool RecordingEnabled);
+    bool ParticipantsMayViewOpponents, IReadOnlyList<LiveSoloMediaMemberView> Members, int PublicDelaySeconds, bool RecordingEnabled,LiveSoloVideoPolicy? VideoPolicy=null);
 public sealed record LiveSoloMediaResult(LiveSoloMediaView? Session, LiveSoloMediaToken? Token = null, LiveSoloMediaFailure? Failure = null);
 public sealed record PrepareLiveSoloMedia(Guid CompetitionId, Guid MatchId, Guid ActorId, Guid ExpectedMatchStamp);
 public sealed record JoinLiveSoloMedia(Guid CompetitionId, Guid MatchId, Guid ActorId, Guid Generation, LiveSoloMediaRole Role,

@@ -83,6 +83,33 @@ public sealed class LiveSoloRecordingRecoveryPersistenceTests
     }
     private static ChangeLiveSoloRecording Command(LiveSoloMatchPersistenceTests.Fixture f,LiveSoloRecording r,LiveSoloRecordingAction action)=>
         new(f.Competition.Id,f.Match.Id,r.Id,f.Owner.Id,r.ConcurrencyStamp,action,"reviewed capture recovery");
+    [Test, Timeout(300_000)]
+    public async Task Completed_archives_reconcile_late_provider_end_time_without_restarting_the_export(CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var f = await LiveSoloMatchPersistenceTests.Fixture.CreateAsync(ct);
+            await f.PrepareAsync(ct);
+            var record = await Record(f, ct);
+            record.State = LiveSoloRecordingState.Completed;
+            record.EgressId = "late-end-job";
+            record.Failure = null;
+            record.StartedAt = f.Now;
+            record.EndedAt = null;
+            var session = await f.Db.LiveSoloMediaSessions.SingleAsync(ct);
+            session.State = LiveSoloMediaState.Stopped;
+            await f.Db.SaveChangesAsync(ct);
+            var schedules = await new LiveSoloCaptureScheduleSource(f.Db).RebuildAsync(f.Now, ct);
+            await Assert.That(schedules.Any(x => x.Message is AdvanceLiveSoloCapture capture && capture.MediaSessionId == session.Id)).IsTrue();
+            var gateway = Substitute.For<ILiveSoloEgressGateway>();
+            gateway.ListAsync(session.RoomIdentity, ct).Returns([new("late-end-job", session.RoomIdentity,
+                LiveSoloExportState.Complete, f.Now, f.Now.AddSeconds(30), null, [], record.Id)]);
+            await Store(f, gateway).AdvanceAsync(session.Id, ct);
+            await f.Db.Entry(record).ReloadAsync(ct);
+            await Assert.That(record.EndedAt).IsEqualTo(f.Now.AddSeconds(30));
+            await gateway.DidNotReceiveWithAnyArgs().StartAsync(default!, default);
+        });
+    }
     [Test,Timeout(300_000)]
     public async Task Startup_timeout_persists_uncertainty_and_reservation_without_reissuing_the_export(CancellationToken ct)
     {

@@ -1050,6 +1050,7 @@ export type NoCtfapiEndpointsLiveSoloLiveSoloMediaResponse = {
     members?: Array<NoCtfapiEndpointsLiveSoloLiveSoloMediaMemberResponse>;
     publicDelaySeconds?: number;
     recordingEnabled?: boolean;
+    videoPolicy?: NoCtfapiEndpointsLiveSoloLiveSoloPublisherVideoPolicyResponse | null;
 };
 
 export type NoCtfDomainLiveSoloLiveSoloMediaState = 'Preparing' | 'Ready' | 'Rotating' | 'Stopping' | 'Stopped' | 'Failed';
@@ -1061,6 +1062,14 @@ export type NoCtfapiEndpointsLiveSoloLiveSoloMediaMemberResponse = {
     state?: NoCtfDomainLiveSoloLiveSoloScreenState;
     identity?: string;
     userName?: string;
+};
+
+export type NoCtfapiEndpointsLiveSoloLiveSoloPublisherVideoPolicyResponse = {
+    maximumWidth?: number;
+    maximumHeight?: number;
+    maximumFramesPerSecond?: number;
+    maximumBitrateBitsPerSecond?: number;
+    policyStamp?: string;
 };
 
 export type NoCtfapiEndpointsLiveSoloGetLiveSoloMediaRequest = {
@@ -3637,6 +3646,8 @@ export type NoCtfapiEndpointsAdministrationPlatformAdminPlatformConfigurationRes
     humanVerification?: NoCtfapiEndpointsAdministrationPlatformAdminHumanVerificationConfigurationResponse;
     emailVerification?: NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfigurationResponse;
     experimentalFeatures?: NoCtfapiEndpointsAdministrationPlatformPlatformExperimentalFeaturesResponse;
+    liveSoloVideo?: NoCtfApplicationLiveSoloMediaLiveSoloVideoPolicy | null;
+    liveSoloVideoRules?: NoCtfapiEndpointsAdministrationPlatformLiveSoloVideoConfigurationRulesResponse;
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformBrandingResponse = {
@@ -3684,6 +3695,27 @@ export type NoCtfapiEndpointsAdministrationPlatformSmtpSecurityModeProtocol = 'N
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformExperimentalFeaturesResponse = {
     ctfPatchVerificationEnabled?: boolean;
+};
+
+export type NoCtfApplicationLiveSoloMediaLiveSoloVideoPolicy = {
+    maximumWidth?: number;
+    maximumHeight?: number;
+    maximumFramesPerSecond?: number;
+    maximumBitrateBitsPerSecond?: number;
+    programmeBitrateBitsPerSecond?: number;
+    policyStamp?: string;
+    programmeBitrateKilobitsPerSecond?: number;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformLiveSoloVideoConfigurationRulesResponse = {
+    minimumWidth?: number;
+    maximumWidth?: number;
+    minimumHeight?: number;
+    maximumHeight?: number;
+    minimumFramesPerSecond?: number;
+    maximumFramesPerSecond?: number;
+    minimumBitrateBitsPerSecond?: number;
+    maximumBitrateBitsPerSecond?: number;
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformInformationResponse = {
@@ -3856,6 +3888,7 @@ export type NoCtfapiEndpointsAdministrationPlatformPatchPlatformConfigurationReq
     humanVerification?: NoCtfapiEndpointsAdministrationPlatformPlatformHumanVerificationPatchRequest | null;
     emailVerification?: NoCtfapiEndpointsAdministrationPlatformPlatformEmailVerificationPatchRequest | null;
     experimentalFeatures?: NoCtfapiEndpointsAdministrationPlatformPlatformExperimentalFeaturesPatchRequest | null;
+    liveSoloVideo?: NoCtfapiEndpointsAdministrationPlatformPlatformLiveSoloVideoPatchRequest | null;
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformBrandingPatchRequest = {
@@ -3893,6 +3926,13 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformEmailVerificationPatc
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformExperimentalFeaturesPatchRequest = {
     ctfPatchVerificationEnabled: boolean;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformPlatformLiveSoloVideoPatchRequest = {
+    maximumWidth: number;
+    maximumHeight: number;
+    maximumFramesPerSecond: number;
+    maximumBitrateBitsPerSecond: number;
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformPatchPlatformUserRequest = {

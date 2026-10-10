@@ -27,6 +27,7 @@ public sealed partial class LiveSoloCaptureStore
             if (program.State == LiveSoloCaptureState.Pending && active && session.Participants.Any(x => x.ScreenState == LiveSoloScreenState.Sharing))
             {
                 var claimed = false;
+                LiveSoloVideoPolicy? videoPolicy=null;
                 await TransactionAsync(async () =>
                 {
                     claimed = false;
@@ -35,10 +36,13 @@ public sealed partial class LiveSoloCaptureStore
                     if (!await db.LiveSoloMediaSessions.AnyAsync(x => x.Id == session.Id && x.State == LiveSoloMediaState.Ready
                         && x.CurrentProgramCaptureId == program.Id, ct)) return;
                     program.State = LiveSoloCaptureState.Starting; program.RequestedAt = clock.GetUtcNow();
+                    videoPolicy=await LiveSoloVideoConfigurationReader.ReadAsync(db,ct);
+                    program.VideoPolicyStamp=videoPolicy.PolicyStamp;program.VideoMaximumWidth=videoPolicy.MaximumWidth;program.VideoMaximumHeight=videoPolicy.MaximumHeight;
+                    program.VideoMaximumFramesPerSecond=videoPolicy.MaximumFramesPerSecond;program.VideoBitrateBitsPerSecond=videoPolicy.ProgrammeBitrateBitsPerSecond;
                     claimed = true;
                 }, ct);
                 if (!claimed) continue;
-                try { current = await egress.StartAsync(new(program.Id, session.RoomIdentity, LiveSoloExportKind.Program), ct); }
+                try { current = await egress.StartAsync(new(program.Id, session.RoomIdentity, LiveSoloExportKind.Program,videoPolicy!), ct); }
                 catch(Exception ex) when(ex is HttpRequestException or TimeoutException || ex is TaskCanceledException&&!ct.IsCancellationRequested)
                 { program.State = LiveSoloCaptureState.RequiresReview; await db.SaveChangesAsync(ct); continue; }
             }
@@ -92,7 +96,8 @@ public sealed partial class LiveSoloCaptureStore
             if (!active && current.State is LiveSoloExportState.Starting or LiveSoloExportState.Active)
             { await egress.StopAsync(current.Id, ct); program.State = LiveSoloCaptureState.Stopping; await db.SaveChangesAsync(ct); }
         }
-        foreach (var record in await db.LiveSoloRecordings.Where(x => x.MediaSessionId == sessionId && x.State != LiveSoloRecordingState.Completed
+        foreach (var record in await db.LiveSoloRecordings.Where(x => x.MediaSessionId == sessionId
+            && (x.State != LiveSoloRecordingState.Completed || x.EndedAt == null && x.EgressId != null)
             && x.State != LiveSoloRecordingState.Failed && (x.State != LiveSoloRecordingState.RequiresReview || x.EgressId == null && x.RequestedAt != null) && x.State != LiveSoloRecordingState.Deleting).ToArrayAsync(ct))
         {
             var current = jobs.SingleOrDefault(x => x.Id == record.EgressId || x.RequestId == record.Id);
@@ -100,6 +105,7 @@ public sealed partial class LiveSoloCaptureStore
             if (record.State == LiveSoloRecordingState.Pending && stillSharing)
             {
                 var claimed = false;
+                LiveSoloVideoPolicy? videoPolicy=null;
                 await TransactionAsync(async () =>
                 {
                     claimed = false;
@@ -115,11 +121,14 @@ public sealed partial class LiveSoloCaptureStore
                         await CaptureAlertAsync(session,record.Id,record.ConcurrencyStamp,LiveSoloMediaAlertKind.RecordingFailed,ct);return;}
                     record.ReservedBytes=reservation;
                     record.State = LiveSoloRecordingState.Starting; record.RequestedAt = clock.GetUtcNow();
+                    videoPolicy=await LiveSoloVideoConfigurationReader.ReadAsync(db,ct);
+                    record.VideoPolicyStamp=videoPolicy.PolicyStamp;record.VideoMaximumWidth=videoPolicy.MaximumWidth;record.VideoMaximumHeight=videoPolicy.MaximumHeight;
+                    record.VideoMaximumFramesPerSecond=videoPolicy.MaximumFramesPerSecond;record.VideoBitrateBitsPerSecond=videoPolicy.MaximumBitrateBitsPerSecond;
                     record.Failure=null;
                     claimed = true;
                 }, ct);
                 if (!claimed) continue;
-                try { current = await egress.StartAsync(new(record.Id, session.RoomIdentity, LiveSoloExportKind.ScreenRecording, record.VideoTrackId), ct); }
+                try { current = await egress.StartAsync(new(record.Id, session.RoomIdentity, LiveSoloExportKind.ScreenRecording,videoPolicy!,record.VideoTrackId), ct); }
                 catch(Exception ex) when(ex is HttpRequestException or TimeoutException || ex is TaskCanceledException&&!ct.IsCancellationRequested)
                 { await RecordingFailureAsync(session,record,LiveSoloRecordingState.RequiresReview,LiveSoloRecordingFailure.StartUncertain,ct);
                     await messages.FlushCommittedMessagesAsync();continue; }
@@ -139,7 +148,7 @@ public sealed partial class LiveSoloCaptureStore
                 await RemoveRecordingRawAsync(record.Id, ct);
                 continue;
             }
-            record.EgressId = current.Id; record.StartedAt ??= current.StartedAt; record.EndedAt = current.EndedAt;
+            record.EgressId = current.Id; record.StartedAt ??= current.StartedAt; record.EndedAt = current.EndedAt ?? record.EndedAt;
             record.State = RecordingState(current.State); await db.SaveChangesAsync(ct);
             if (current.State == LiveSoloExportState.Complete) await ImportRecordingAsync(session, record, current, ct);
             var limitReached=current.State==LiveSoloExportState.Active && await files.RecordingLengthAsync(record.Id,current.Id,ct)

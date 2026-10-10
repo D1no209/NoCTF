@@ -13,6 +13,11 @@ public sealed class LiveSoloProgramCapture : IConcurrencyTracked
     [MaxLength(256)] public string? EgressId { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? RequestedAt { get; set; }
+    public Guid? VideoPolicyStamp {get;set;}
+    public int? VideoMaximumWidth {get;set;}
+    public int? VideoMaximumHeight {get;set;}
+    public int? VideoMaximumFramesPerSecond {get;set;}
+    public int? VideoBitrateBitsPerSecond {get;set;}
     public DateTimeOffset? StartedAt { get; set; }
     public DateTimeOffset? EndedAt { get; set; }
     public DateTimeOffset? ImportedAt { get; set; }
