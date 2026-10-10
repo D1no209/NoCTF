@@ -40,23 +40,23 @@
 
 ## LiveSolo 独立工作区
 
-LiveSolo 的操作不放在普通积分排行榜或旧题目工作区。草稿读取和写入按实际工作人员角色授权，尚未完成的正式验收见 [能力边界](../live-solo/readiness.md)。
+LiveSolo 的操作不放在普通积分排行榜或旧题目工作区。草稿读取和写入按实际工作人员角色授权，尚未完成的正式验收见 [能力边界](../operations/live-solo-readiness.md)。
 
 | 路由 | 手册 |
 | --- | --- |
-| `/competitions/:id/live-solo` | [导读](../live-solo/index.md) |
-| `/competitions/:id/live-solo/settings` | [操作说明](../live-solo/settings.md) |
-| `/competitions/:id/live-solo/groups` | [操作说明](../live-solo/question-groups.md) |
-| `/competitions/:id/live-solo/groups/:groupId` | [操作说明](../live-solo/question-groups.md) |
-| `/competitions/:id/live-solo/bracket` | [操作说明](../live-solo/bracket.md) |
-| `/competitions/:id/live-solo/matches/:matchId/:workspace*` | [操作说明](../live-solo/preparation.md) |
-| `/competitions/:id/live-solo/program/:matchId` | [操作说明](../live-solo/program.md) |
-| `/competitions/:id/live-solo/recordings/:matchId` | [操作说明](../live-solo/recordings.md) |
-| `/competitions/:id/live-solo/recordings/:matchId/:recordingId` | [操作说明](../live-solo/recordings.md) |
-| `/competitions/:id/live-solo/corrections/:matchId` | [操作说明](../live-solo/corrections.md) |
-| `/competitions/:id/live-solo/corrections/:matchId/:correctionId` | [操作说明](../live-solo/corrections.md) |
-| `/competitions/:id/live-solo/postgame/:matchId` | [操作说明](../live-solo/postgame.md) |
-| `/competitions/:id/live-solo/postgame/:matchId/:roundId/:questionId` | [操作说明](../live-solo/postgame.md) |
+| `/competitions/:id/live-solo` | [导读](../competition/modes/live-solo/index.md) |
+| `/competitions/:id/live-solo/settings` | [操作说明](../competition/modes/live-solo/settings.md) |
+| `/competitions/:id/live-solo/groups` | [操作说明](../competition/modes/live-solo/question-groups.md) |
+| `/competitions/:id/live-solo/groups/:groupId` | [操作说明](../competition/modes/live-solo/question-groups.md) |
+| `/competitions/:id/live-solo/bracket` | [操作说明](../competition/modes/live-solo/bracket.md) |
+| `/competitions/:id/live-solo/matches/:matchId/:workspace*` | [操作说明](../player/modes/live-solo/preparation.md) |
+| `/competitions/:id/live-solo/program/:matchId` | [操作说明](../player/modes/live-solo/program.md) |
+| `/competitions/:id/live-solo/recordings/:matchId` | [操作说明](../competition/modes/live-solo/recordings.md) |
+| `/competitions/:id/live-solo/recordings/:matchId/:recordingId` | [操作说明](../competition/modes/live-solo/recordings.md) |
+| `/competitions/:id/live-solo/corrections/:matchId` | [操作说明](../competition/modes/live-solo/corrections.md) |
+| `/competitions/:id/live-solo/corrections/:matchId/:correctionId` | [操作说明](../competition/modes/live-solo/corrections.md) |
+| `/competitions/:id/live-solo/postgame/:matchId` | [操作说明](../player/modes/live-solo/postgame.md) |
+| `/competitions/:id/live-solo/postgame/:matchId/:roundId/:questionId` | [操作说明](../player/modes/live-solo/postgame.md) |
 
 ## 页面内操作补充
 

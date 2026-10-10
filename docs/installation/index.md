@@ -12,7 +12,7 @@
 
 首次生产安装可以从 Linux Docker 单机开始；Docker、Kubernetes 和本地 kind 都可以直接使用 CI 完整镜像。
 
-LiveSolo 媒体是独立可选部署，不包含在普通平台安装的能力保证中；当前单机媒体 overlay 与正式启用条件见 [媒体部署](../live-solo/media-deployment.md)及 [验收](../live-solo/readiness.md)。
+LiveSolo 媒体是独立可选部署，不包含在普通平台安装的能力保证中；当前单机媒体 overlay 与正式启用条件见 [媒体部署](./live-solo-media.md)及 [验收](../operations/live-solo-readiness.md)。
 
 ## 安装顺序
 

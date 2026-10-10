@@ -60,11 +60,11 @@ SeedAdmin 只初始化，已有管理员不会被 seed 重置。通过正常修�
 
 ### LiveSolo 使用普通题目积分和血奖吗？
 
-不使用。它以同 Round 共同受理顺序中的第一有效 Flag 赢局，按 Match 胜局和赛程推进；详见 [LiveSolo](../live-solo/index.md)。
+不使用。它以同 Round 共同受理顺序中的第一有效 Flag 赢局，按 Match 胜局和赛程推进；详见 [LiveSolo](../competition/modes/live-solo/index.md)。
 
 ### 配好 LiveSolo 并创建 Match 后就能正式比赛吗？
 
-还需要双方名单/准备、全员实际共享、真实媒体输出、受控隔离、容量和恢复验收。合成轨道及 HTTP 观众测试不能替代全员真人采集和实际解码浏览器，见 [验收清单](../live-solo/readiness.md)。
+还需要双方名单/准备、全员实际共享、真实媒体输出、受控隔离、容量和恢复验收。合成轨道及 HTTP 观众测试不能替代全员真人采集和实际解码浏览器，见 [验收清单](../operations/live-solo-readiness.md)。
 
 ### 题目计分结束和提交截止是同一个时间吗？
 

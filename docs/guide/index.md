@@ -2,7 +2,7 @@
 
 NoCTF 是以队伍为参赛单位的竞赛平台，支持 CTF、AWD、AWDP、KoH 和 LiveSolo。本手册围绕“如何完成一次操作”组织内容，适合部署人员、选手、出题人、赛事组织者和平台管理员。
 
-LiveSolo 是独立的 Match/Round 赛制，配置、判胜和媒体都不同于前四种模式。使用 [LiveSolo 操作手册](../live-solo/index.md)和 [启用验收](../live-solo/readiness.md)，不要直接套用普通积分榜或容器题的开赛流程。
+LiveSolo 是独立的 Match/Round 赛制，配置、判胜和媒体都不同于前四种模式。使用 [LiveSolo 操作手册](../competition/modes/live-solo/index.md)和 [启用验收](../operations/live-solo-readiness.md)，不要直接套用普通积分榜或容器题的开赛流程。
 
 ## 选择阅读路线
 

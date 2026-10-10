@@ -29,7 +29,7 @@
 
 比赛创建和海报上传是两次操作。比赛已创建但海报失败时，界面可重试海报上传或完成创建；不要重新创建另一场同名比赛。后续可在概览更换海报。
 
-LiveSolo 创建后从独立 [设置](../../live-solo/settings.md)、[题组](../../live-solo/question-groups.md)和 [赛程](../../live-solo/bracket.md)配置；创建不会启动共享或录像，不携带 CTF Practice 语义。
+LiveSolo 创建后从独立 [设置](../modes/live-solo/settings.md)、[题组](../modes/live-solo/question-groups.md)和 [赛程](../modes/live-solo/bracket.md)配置；创建不会启动共享或录像，不携带 CTF Practice 语义。
 
 ## 概览提供的操作
 

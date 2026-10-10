@@ -38,7 +38,7 @@
 
 咨询入口在比赛选手工作区，并由线程授权区分管理操作，见 [咨询处理](./communication/questions.md)。删除/恢复/永久删除在概览，见 [比赛删除](./operations/deletion.md)。
 
-LiveSolo 管理菜单增加独立大厅、设置、题组、赛程，见 [第五赛制手册](../live-solo/index.md)。不显示普通积分榜、CTF 闯关及其他赛制的大屏。Judge/Observer 保留各自读取/裁定范围，运营配置不因能进入工作区而全部开放。
+LiveSolo 管理菜单增加独立大厅、设置、题组、赛程，见 [第五赛制手册](./modes/live-solo/index.md)。不显示普通积分榜、CTF 闯关及其他赛制的大屏。Judge/Observer 保留各自读取/裁定范围，运营配置不因能进入工作区而全部开放。
 
 ## 推荐工作流
 

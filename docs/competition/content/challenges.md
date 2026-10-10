@@ -32,7 +32,7 @@
 
 基本信息和规则各自保存，确认没有只保存了标题却漏保存曲线。Nullable 继承与显式 0 不同；各配置可独立覆盖，见 [计分规则](../settings/scoring.md)。
 
-前四赛制的时间区单独 [先预览再确认](./timing.md)，不把“计分结束”和“提交截止”合成一个日期。LiveSolo 不使用此绝对时间编辑器，题目由 [Round 题组](../../live-solo/question-groups.md)安排。
+前四赛制的时间区单独 [先预览再确认](./timing.md)，不把“计分结束”和“提交截止”合成一个日期。LiveSolo 不使用此绝对时间编辑器，题目由 [Round 题组](../modes/live-solo/question-groups.md)安排。
 
 ## 发布与下架
 
