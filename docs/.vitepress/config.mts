@@ -79,7 +79,7 @@ const groups: DefaultTheme.SidebarItem[] = [
         "link": "/player/challenges"
       },
       {
-        "text": "四种模式参赛",
+        "text": "五种模式参赛",
         "link": "/player/modes"
       },
       {
@@ -155,6 +155,10 @@ const groups: DefaultTheme.SidebarItem[] = [
           {
             "text": "比赛题目实例",
             "link": "/competition/content/challenges"
+          },
+          {
+            "text": "开题、计分和提交时间",
+            "link": "/competition/content/timing"
           },
           {
             "text": "提示与 Flag",
@@ -247,10 +251,10 @@ const groups: DefaultTheme.SidebarItem[] = [
           {
             "text": "Webhook 与自动化",
             "link": "/competition/integrations/webhooks"
-            },
-            {
-              "text": "工作人员 Webhook",
-              "link": "/competition/integrations/staff-webhooks"
+          },
+          {
+            "text": "工作人员 Webhook",
+            "link": "/competition/integrations/staff-webhooks"
           },
           {
             "text": "赛事导出",
@@ -337,6 +341,10 @@ const groups: DefaultTheme.SidebarItem[] = [
             "link": "/platform/maintenance/audit"
           }
         ]
+      },
+      {
+        "text": "LiveSolo 视频资源策略",
+        "link": "/platform/video-policy"
       }
     ]
   },
@@ -365,6 +373,10 @@ const groups: DefaultTheme.SidebarItem[] = [
     "text": "参考与维护",
     "items": [
       {
+        "text": "手册更新说明",
+        "link": "/reference/updates"
+      },
+      {
         "text": "管理页面覆盖索引",
         "link": "/reference/management-map"
       },
@@ -383,6 +395,63 @@ const groups: DefaultTheme.SidebarItem[] = [
       {
         "text": "开发者源码构建",
         "link": "/development/local"
+      }
+    ]
+  },
+  {
+    "text": "LiveSolo 第五赛制",
+    "items": [
+      {
+        "text": "赛制导读与权限",
+        "link": "/live-solo/"
+      },
+      {
+        "text": "设置与阶段规则",
+        "link": "/live-solo/settings"
+      },
+      {
+        "text": "题目、题组与备用组",
+        "link": "/live-solo/question-groups"
+      },
+      {
+        "text": "种子与赛程",
+        "link": "/live-solo/bracket"
+      },
+      {
+        "text": "名单、准备与共享",
+        "link": "/live-solo/preparation"
+      },
+      {
+        "text": "场内解题与受理判胜",
+        "link": "/live-solo/playing"
+      },
+      {
+        "text": "裁判操作",
+        "link": "/live-solo/judging"
+      },
+      {
+        "text": "结果纠正与下游重赛",
+        "link": "/live-solo/corrections"
+      },
+      {
+        "text": "延迟观赛与节目控制",
+        "link": "/live-solo/program"
+      },
+      {
+        "text": "录像保留、公开与恢复",
+        "link": "/live-solo/recordings"
+      },
+      {
+        "text": "作用域赛后题解",
+        "link": "/live-solo/postgame"
+      },
+      {
+        "text": "可选媒体部署",
+        "link": "/live-solo/media-deployment"
+      },
+      {
+        "text": "启用与验收",
+        "link": "/live-solo/readiness"
       }
     ]
   }
@@ -410,6 +479,7 @@ export default defineConfig({
       { text: '选手指南', link: '/player/account', activeMatch: '/player/' },
       { text: '题库管理', link: '/challenge-bank/', activeMatch: '/challenge-bank/' },
       { text: '比赛管理', link: '/competition/', activeMatch: '/competition/' },
+      { text: 'LiveSolo', link: '/live-solo/', activeMatch: '/live-solo/' },
       { text: '平台与运维', items: [
         { text: '平台管理', link: '/platform/' },
         { text: '运维与排障', link: '/operations/troubleshooting' }
@@ -420,6 +490,7 @@ export default defineConfig({
       '/player/': [groups[0]!, groups[2]!],
       '/challenge-bank/': [groups[0]!, groups[3]!],
       '/competition/': [groups[0]!, groups[4]!],
+      '/live-solo/': [groups[0]!, groups[8]!],
       '/platform/': [groups[0]!, groups[5]!],
       '/operations/': [groups[0]!, groups[6]!],
       '/reference/': [groups[0]!, groups[7]!],
@@ -458,6 +529,6 @@ export default defineConfig({
     darkModeSwitchTitle: '切换为深色模式', sidebarMenuLabel: '目录',
     returnToTopLabel: '返回顶部',
     socialLinks: [{ icon: 'github', link: 'https://github.com/D1no209/NoCTF' }],
-    footer: { message: 'NoCTF · CTF / AWD / AWDP / KoH 平台使用手册' }
+    footer: { message: 'NoCTF · CTF / AWD / AWDP / KoH / LiveSolo 平台使用手册' }
   }
 })

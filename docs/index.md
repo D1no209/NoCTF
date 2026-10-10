@@ -27,6 +27,9 @@ features:
   - title: 平台管理与运维
     details: 管理账号、邮件、SSO 和人机验证，诊断 Runtime、评测与日志，执行升级和一致备份恢复。
     link: /platform/
+  - title: LiveSolo 第五赛制
+    details: 独立 Match/Round、名单与屏幕、受理顺序判胜、延迟节目、录像和结果纠正，附真实启用验收边界。
+    link: /live-solo/
 ---
 
 ## 从你的任务开始
@@ -39,6 +42,10 @@ features:
 | 确认平台已经可以正式使用 | [首次启动与验收](./installation/verify.md) |
 | 报名参加比赛 | [建队、邀请与报名](./player/teams.md) |
 | 从零配置一场比赛 | [举办第一场比赛](./competition/quick-start.md) |
+| 配置和参加 LiveSolo 对局 | [LiveSolo 操作手册](./live-solo/index.md) |
+| 设置单题自动开放和提交截止 | [题目时间](./competition/content/timing.md) |
 | 定位登录、题目环境或评测故障 | [常见故障排查](./operations/troubleshooting.md) |
 
 本手册面向仓库当前版本。安装步骤以 `deploy/` 中的模板和脚本为依据，界面入口以当前 ClientApp 为依据；安装旧版本时，应读取对应 Git revision 的手册。开发者领域契约仍由仓库 `specs/` 维护。
+
+最近内容核对：2026-10-11。新增及修正见 [更新说明](./reference/updates.md)；LiveSolo 的局部验证不代表完整生产投产验收。
