@@ -53,6 +53,8 @@ export function useCompetitionsByIdPage() {
   const error = ref<UiMessage | null>(null)
 
   const { user, isAdministrator } = useAuth()
+  const competitionActorId = ref<string | null>(null)
+  let competitionRequestId = 0
 
   const showCompetitionReturn = computed(() => {
     const base = competitionPath(competitionId.value)
@@ -85,6 +87,11 @@ export function useCompetitionsByIdPage() {
   const hasParticipantChallengeAccess = computed(() =>
     myTeam.value?.registrationStatus === 'Approved' && !myTeam.value.isBanned,
   )
+
+  const canReadBroadcasts = computed(() => !!user.value
+    && competitionActorId.value === user.value.userId
+    && (hasCompetitionStaffAccess.value
+      || !teamLoading.value && !teamLoadError.value && hasParticipantChallengeAccess.value))
 
   const progressionEnabled = ref(false)
 
@@ -172,17 +179,22 @@ export function useCompetitionsByIdPage() {
   const refreshStandingLatest = createTrailingRefresh(refreshMyStanding)
 
   async function refresh(): Promise<'loaded' | 'not-found' | 'failed'> {
+    const requestId = ++competitionRequestId
+    const actorId = user.value?.userId ?? null
     const { data, error: err, response } = await getCompetitionEndpoint({
       path: { competitionId: competitionId.value },
     })
+    if (requestId !== competitionRequestId || (user.value?.userId ?? null) !== actorId) return 'failed'
     loading.value = false
     if (err || !data) {
+      competitionActorId.value = null
       error.value = parseApiError(err, describeMessage("common.error.loadingCompetitionFailed")).displayMessage
       progressionEnabled.value = false
       return response?.status === 404 ? 'not-found' : 'failed'
     }
     error.value = null
     competition.value = data
+    competitionActorId.value = actorId
     return 'loaded'
   }
 
@@ -200,6 +212,11 @@ export function useCompetitionsByIdPage() {
     () => user.value?.userId,
     () => {
       if (isOverview.value) return
+      competitionActorId.value = null
+      competition.value = null
+      myTeam.value = null
+      myStanding.value = null
+      void refresh()
       if (!isWriteUpReview.value) void refreshMyTeam()
       void refreshMissedAnnouncements()
     },
@@ -215,12 +232,16 @@ export function useCompetitionsByIdPage() {
         if (!isWriteUpReview.value) void refreshStandingLatest()
       },
       competitionEventChanged: event => {
-        if (event.kind === 'TeamBanned' || event.kind === 'TeamUnbanned' || event.kind === 'TeamBanCorrectionPublished' || event.kind === 'TeamMemberRemoved')
+        if (event.kind === 'TeamBanned' || event.kind === 'TeamUnbanned' || event.kind === 'TeamBanCorrectionPublished'
+          || event.kind === 'TeamRegistered' || event.kind === 'TeamRegistrationChanged' || event.kind === 'TeamDeleted'
+          || event.kind === 'TeamMemberJoined' || event.kind === 'TeamMemberRemoved')
           void refreshMyTeam()
         if (event.kind === 'CompetitionAudienceChanged')
           void handleAudienceChanged()
-        if (event.kind === 'CompetitionUpdated')
+        if (event.kind === 'CompetitionUpdated') {
+          void refresh()
           void refreshProgressionEnabled()
+        }
         if (event.kind === 'AnnouncementPublished')
           void refreshMissedAnnouncements()
       },
@@ -237,6 +258,7 @@ export function useCompetitionsByIdPage() {
   })
 
   onUnmounted(() => {
+    competitionRequestId++
     progressionRequestId++
     teamRequestId++
     unwatch?.()
@@ -249,6 +271,7 @@ export function useCompetitionsByIdPage() {
     refresh: async () => { await refresh() },
     standing: myStanding,
     refreshStanding: refreshMyStanding,
+    canReadBroadcasts,
   })
 
   const navGroups = computed<WorkspaceNavGroup[]>(() => {

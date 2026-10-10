@@ -181,6 +181,7 @@ describe('competition broadcast projection', () => {
 
     expect(challengePage).toContain("<component :is=\"CompetitionParticipantWorkspace\"")
     expect(participantWorkspace).toContain("<component :is=\"CompetitionBroadcastPanel\"")
+    expect(participantWorkspace).toContain('v-if="state.canReadBroadcasts"')
     expect(participantWorkspace).toContain('challenge-workspace')
     expect(participantWorkspace).toContain("<component :is=\"CompetitionWorkspaceNavigation\"")
     expect(participantWorkspace).not.toContain('<ScrollSurface axis="y" class="col-span-full h-full"')
