@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { CompetitionBroadcastPanelViewState } from '~/features/competition/useCompetitionBroadcastPanel'
 
 const viewProps = defineProps<{ state: CompetitionBroadcastPanelViewState }>()
-const { Megaphone, items, loading, error, broadcastMotionAttributes, refreshLatest, fill } = toRefs(viewProps.state)
+const { Megaphone, items, loading, loadingMore, hasMore, historyError, error, broadcastMotionAttributes, refreshLatest, loadMore, fill } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -29,15 +29,18 @@ const { Megaphone, items, loading, error, broadcastMotionAttributes, refreshLate
       <p class="text-xs leading-5 text-destructive">{{ $message(error) }}</p>
       <Button variant="ghost" size="sm" class="mt-2 px-0" @click="refreshLatest">{{ $t('common.label.reload') }}</Button>
     </CardContent>
-    <CardContent v-else-if="!items.length" class="px-4 pb-8 pt-5 text-center">
+    <CardContent v-else-if="!items.length && !hasMore" class="px-4 pb-8 pt-5 text-center">
       <p class="text-sm text-muted-foreground">{{ $t('competitions.competitionBroadcast.description.thereMatchReportYet') }}</p>
       <p class="mt-1 text-xs text-muted-foreground/80">{{ $t('competitions.competitionBroadcast.description.bloodListQuestionsDiscipline') }}</p>
     </CardContent>
-    <ol v-scroll-surface data-scroll-surface
+    <ScrollSurface axis="y"
       v-else
-      class="divide-y overflow-y-auto"
+      class="overflow-y-auto"
       :class="fill ? 'min-h-0 flex-1' : 'max-h-[50dvh]'"
+      :aria-label="$t('competitions.label.competitionFeed')"
+      :aria-busy="loadingMore"
     >
+      <ol class="divide-y">
       <li
         v-for="event in items"
         :key="competitionBroadcastIdentity(event)"
@@ -62,6 +65,15 @@ const { Megaphone, items, loading, error, broadcastMotionAttributes, refreshLate
           </time>
         </div>
       </li>
-    </ol>
+      </ol>
+      <ScrollLoadTrigger :enabled="hasMore && !historyError" :loading="loadingMore" @load="loadMore" class="px-4 py-3 text-center">
+        <p v-if="historyError" class="text-xs text-destructive" role="status">{{ $message(historyError) }}</p>
+        <Button v-if="hasMore" variant="ghost" size="sm" :disabled="loadingMore" @click="loadMore">
+          <Spinner v-if="loadingMore" data-icon="inline-start" />
+          {{ historyError ? $t('common.label.retry') : loadingMore ? $t('common.label.loading') : $t('competitions.competitionBroadcast.label.loadOlder') }}
+        </Button>
+        <p v-else class="text-xs text-muted-foreground" role="status">{{ $t('competitions.competitionBroadcast.label.historyComplete') }}</p>
+      </ScrollLoadTrigger>
+    </ScrollSurface>
   </Card>
 </template>

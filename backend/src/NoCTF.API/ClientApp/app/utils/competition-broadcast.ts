@@ -47,6 +47,19 @@ export function competitionBroadcastQueryWindow(
   }
 }
 
+/** Adjacent inclusive windows preserve sub-millisecond server timestamps at the boundary. */
+export function previousCompetitionBroadcastWindow(
+  window: CompetitionBroadcastQueryWindow,
+  startAt: number,
+): CompetitionBroadcastQueryWindow | null {
+  const to = Date.parse(window.from)
+  if (!Number.isFinite(startAt) || !Number.isFinite(to) || to <= startAt) return null
+  return {
+    from: new Date(Math.max(startAt, to - competitionBroadcastLookbackMs)).toISOString(),
+    to: window.from,
+  }
+}
+
 const competitionBroadcastKindSet: ReadonlySet<NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol>
   = new Set(competitionBroadcastKinds)
 
@@ -87,8 +100,9 @@ export function mergeCompetitionBroadcasts(
     competitionBroadcastIdentity(event),
     event,
   ]))
-  return deduplicateCompetitionBroadcasts(incoming).map(event =>
-    currentByIdentity.get(competitionBroadcastIdentity(event)) ?? event)
+  return deduplicateCompetitionBroadcasts([...incoming, ...current])
+    .map(event => currentByIdentity.get(competitionBroadcastIdentity(event)) ?? event)
+    .sort((left, right) => Date.parse(right.occurredAt ?? '') - Date.parse(left.occurredAt ?? ''))
 }
 
 export function competitionBroadcastText(

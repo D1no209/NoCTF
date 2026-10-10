@@ -6,6 +6,7 @@ import { leaderboardRead } from './leaderboard'
 import { questionActorRole, questionView } from './questions'
 import { mockAttachmentResponse } from './attachments'
 import { mockRuntimeEndpoint } from './runtime'
+import { createMockBroadcastHistory } from './broadcast-history'
 import { uniqueTags, validChallengeTags } from '../app/lib/challenge-tags'
 import { validateAppealStatement } from '../app/lib/participant-form-validation'
 
@@ -50,6 +51,7 @@ function mockWriteUpPdf(teamName: string): Blob {
 
 export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'ManualModeration'; mfa?: boolean } = {}) {
   const state = createFixtures()
+  const broadcastHistory = createMockBroadcastHistory(state)
   const teamBanCases = new Map<string, Data>()
   function recordTeamBan(team: Data, source: 'CheatIncident' | 'ManualModeration') {
     team.isBanned = true
@@ -508,6 +510,7 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
         competitionStatus: competition!.status,
         rules: state.settings.get(`challenge-rules:${p.competitionChallengeId}`) ?? mockRules(String(competition!.mode)),
       }
+      else if (cleanRoute === '/competitions/{competitionId}/events') value = broadcastHistory(p.competitionId!, url)
       else if (cleanRoute === '/competitions') {
         const visibleCompetitions = route.startsWith('/admin') || competitionStaff
           ? state.competitions
