@@ -53,7 +53,8 @@ export function useLiveSoloScreen(competitionId: Ref<string>, matchId: Ref<strin
         throw parseLiveSoloError(authorization.error, message('liveSolo.error.media'))
       const policy=media.value?.videoPolicy;if(!policy)throw new Error('Missing video policy')
       const options=screenVideoOptions(policy)
-      next = new sdk.Room({ adaptiveStream: true, dynacast: true,publishDefaults:options.publish })
+      // Defer peer creation until server ICE configuration is known, instead of mutating an initial offer's configuration.
+      next = new sdk.Room({ adaptiveStream: true, dynacast: true, singlePeerConnection: false, publishDefaults:options.publish })
       sdkModule=sdk
       const current = next
       current.on(sdk.RoomEvent.TrackSubscribed, (track, publication, participant) => {

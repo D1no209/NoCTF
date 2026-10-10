@@ -36,6 +36,11 @@ SFU 对自定义恶意发布器的硬码率／尺寸限制尚未验收，不能�
 仅 StaffOnly 的比赛会明确提示屏幕与延迟节目不对外公开。采集仅由选手主动点击触发，
 连接房间不会申请屏幕、摄像头或麦克风权限；录像开关与临时节目片段用途分别说明。
 
+浏览器使用 SDK 明确提供的发布／订阅分离连接配置
+（[RoomOptions.singlePeerConnection](https://docs.livekit.io/reference/client-sdk-js/interfaces/RoomOptions.html#singlePeerConnection) = false）。
+本地浏览器默认单连接握手在 `RTCPeerConnection.setConfiguration` 失败；显式配置后
+同一真实房间连接成功。它只选择传输方式，不增加视频编码层，也不增加自动重试适配器。
+
 ## 验证记录
 
 EF 工具生成增量迁移，旧平台设置得到上述默认值；OpenAPI 和 SDK 已重新生成。

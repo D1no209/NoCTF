@@ -47,6 +47,10 @@ describe('LiveSolo manual screen lifecycle', () => {
     try {
       await f.screen.connect()
       expect(f.screen.connected.value).toBe(true)
+      expect(f.actions.find(action => action[0] === 'room')).toMatchObject(['room', {
+        singlePeerConnection: false,
+        publishDefaults: { simulcast: false, backupCodec: false },
+      }])
       expect(f.screen.publishing.value).toBe(false)
       expect(f.actions.some(action => action[0] === 'capture')).toBe(false)
       expect(f.actions[0]?.[1]).toMatchObject({ body: { generation: 'generation-one', role: 'Publisher' } })
