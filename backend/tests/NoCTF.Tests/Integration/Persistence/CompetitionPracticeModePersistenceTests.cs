@@ -236,7 +236,7 @@ public sealed class CompetitionPracticeModePersistenceTests
             await Assert.That(practiceFacts.Select(fact => fact.Result))
                 .IsEquivalentTo([
                     (GameplayFactResult?)GameplayFactResult.Wrong,
-                    GameplayFactResult.Correct
+                    GameplayFactResult.RightButDue
                 ]);
             var progress = await new GetFlagAttemptState(
                     new FlagAttemptStateReader(db))

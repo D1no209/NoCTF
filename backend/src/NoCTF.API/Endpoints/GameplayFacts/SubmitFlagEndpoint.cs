@@ -133,7 +133,9 @@ public sealed record AdminGameplayFactStatusResponse(
     DateTimeOffset UpdatedAt,
     NoCTF.API.Endpoints.Administration.GameplayFacts.AdminPatchMetadataResponse? Patch = null,
     NoCTF.API.Endpoints.Administration.GameplayFacts.AdminPatchFailureCode? PatchFailure = null,
-    bool CanDownloadPatch = false);
+    bool CanDownloadPatch = false,
+    [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<NoCTF.Domain.Challenges.GameplayFactTimeEligibility>))]
+    NoCTF.Domain.Challenges.GameplayFactTimeEligibility TimeEligibility = NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid);
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<GameplayFactAdmissionFailureCodeProtocol>))]
 public enum GameplayFactAdmissionFailureCodeProtocol

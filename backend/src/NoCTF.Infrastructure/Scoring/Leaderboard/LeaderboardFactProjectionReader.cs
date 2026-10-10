@@ -37,6 +37,14 @@ internal static class LeaderboardFactProjectionReader
     {
         var query = db.GameplayFacts.AsNoTracking()
             .Where(fact => fact.CompetitionId == competitionId && fact.OccurredAt <= projectedAt);
+        var displayQuery = query;
+        query = query.Where(fact => fact.Kind == GameplayFactKind.ManualAdjustment || fact.Kind == GameplayFactKind.HintUnlock
+            || fact.Kind == GameplayFactKind.AwdServiceTransition
+            || db.CompetitionChallenges.Any(challenge => challenge.Id == fact.CompetitionChallengeId
+                && (challenge.AutoOpenAt == null || fact.OccurredAt >= challenge.AutoOpenAt)
+                && (challenge.ScoringEndsAt == null || fact.OccurredAt < challenge.ScoringEndsAt)
+                && (fact.Kind == GameplayFactKind.KohControlObservation || challenge.SubmissionDeadlineAt == null
+                    || fact.OccurredAt < challenge.SubmissionDeadlineAt)));
         if (mode == GameMode.Awdp)
         {
             var window = BuildAwdpWindow(
@@ -52,7 +60,7 @@ internal static class LeaderboardFactProjectionReader
                 window.IncludePenaltyCutoff,
                 ct);
             var windowRows = await ReadAwdpWindowAsync(
-                query.Where(fact => fact.OccurredAt >= window.StartAt
+                displayQuery.Where(fact => fact.OccurredAt >= window.StartAt
                     && fact.OccurredAt < window.EndAt),
                 BuildRoundSelector(competitionStart, lifecycle, window),
                 ct);
@@ -77,7 +85,7 @@ internal static class LeaderboardFactProjectionReader
                 projectedAt,
                 ct);
             var aggregateRows = await ReadAwdManualAdjustmentsAsync(query, ct);
-            var windowRows = await ReadAwdWindowAsync(query, awdWindowRounds ?? [], ct);
+            var windowRows = await ReadAwdWindowAsync(displayQuery, awdWindowRounds ?? [], ct);
             if (awdWindowRounds is { Count: > 0 } && await db.WriteUpUnlockReceipts.AsNoTracking()
                 .AnyAsync(x => x.CompetitionId == competitionId && x.UnlockedAt <= projectedAt, ct))
             {
@@ -105,6 +113,12 @@ internal static class LeaderboardFactProjectionReader
             _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, null)
         };
         var mapped = Map(rows, hintCosts);
+        if (mode == GameMode.Ctf)
+        {
+            var displayed = await ReadCtfAsync(displayQuery,
+                CompetitionOfficialWindow.Resolve(competitionStart!.Value, competitionEnd!.Value, lifecycle), ct);
+            return new(mapped, Map(displayed, hintCosts), null);
+        }
         return new(mapped, mapped, null);
     }
 
@@ -262,6 +276,10 @@ internal static class LeaderboardFactProjectionReader
                 && fact.VictimTeamId != fact.TeamId
                 && fact.Kind == GameplayFactKind.FlagAttempt
                 && fact.Result == GameplayFactResult.Correct
+                && db.CompetitionChallenges.Any(challenge => challenge.Id == fact.CompetitionChallengeId
+                    && (challenge.AutoOpenAt == null || fact.OccurredAt >= challenge.AutoOpenAt)
+                    && (challenge.ScoringEndsAt == null || fact.OccurredAt < challenge.ScoringEndsAt)
+                    && (challenge.SubmissionDeadlineAt == null || fact.OccurredAt < challenge.SubmissionDeadlineAt))
                 && fact.ReferenceKind == GameplayFactReferenceKind.AwdRound
                 && fact.ReferenceId != null);
         var attackGroups = attackFacts
@@ -344,7 +362,10 @@ internal static class LeaderboardFactProjectionReader
                 && flag.SpecificationId != null
                 && flag.ValidStart != null
                 && flag.ValidUntil != null
-                && flag.ValidUntil <= projectedAt)
+                && flag.ValidUntil <= projectedAt
+                && db.CompetitionChallenges.Any(challenge => challenge.Id == flag.CompetitionChallengeId
+                    && (challenge.AutoOpenAt == null || flag.ValidStart >= challenge.AutoOpenAt)
+                    && (challenge.ScoringEndsAt == null || flag.ValidUntil <= challenge.ScoringEndsAt)))
             .Select(flag => new
             {
                 CompetitionChallengeId = flag.CompetitionChallengeId!.Value,

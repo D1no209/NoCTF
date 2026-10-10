@@ -111,6 +111,12 @@ internal static class AwdpDynamicLeaderboardProjection
                      : challenges.Keys)
         {
             var settings = SettingsFor(challengeId);
+            var challengeSettledThrough = settledThroughRound;
+            if (challenges.GetValueOrDefault(challengeId)?.Timing?.ScoringEndsAt is { } scoringEnd)
+                challengeSettledThrough = Math.Min(challengeSettledThrough,
+                    competition.RoundDurationSeconds > 0
+                        ? (int)(Math.Max(0, EffectiveElapsed(scoringEnd, runningTimeline, input.CompetitionStartTime).TotalSeconds) / competition.RoundDurationSeconds)
+                        : 0);
             ProjectTrack(
                 challengeId,
                 settings.Break,
@@ -119,7 +125,7 @@ internal static class AwdpDynamicLeaderboardProjection
                 scoringTeamIds,
                 competitiveTeams,
                 currentRound,
-                settledThroughRound,
+                challengeSettledThrough,
                 awards,
                 breakScores);
             ProjectTrack(
@@ -130,7 +136,7 @@ internal static class AwdpDynamicLeaderboardProjection
                 scoringTeamIds,
                 competitiveTeams,
                 currentRound,
-                settledThroughRound,
+                challengeSettledThrough,
                 awards,
                 fixScores);
         }

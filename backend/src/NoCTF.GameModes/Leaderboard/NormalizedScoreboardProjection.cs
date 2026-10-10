@@ -22,7 +22,7 @@ internal static class NormalizedScoreboardProjection
         // All-history bounded summaries retain the first success outside the visible round window.
         var facts = input.GameplayFacts.Where(fact => fact.TeamId is not null
                 && fact.CompetitionChallengeId is Guid challengeId && challenges.ContainsKey(challengeId)
-                && fact.State == GameplayFactState.Completed && fact.Result == GameplayFactResult.Correct
+                && fact.State == GameplayFactState.Completed && fact.Result == GameplayFactResult.Correct && ChallengeTimingProjection.CanScore(input, fact)
                 && fact.OccurredAt <= input.ProjectedAt
                 && (input.Mode == GameMode.Ctf
                     ? IsCtfInteractionFact(fact, challenges[challengeId])
@@ -524,7 +524,7 @@ internal static class NormalizedScoreboardProjection
             var solvePoints = checked((aggregateCell?.Score ?? 0) - manualTotal);
             var firstCorrect = group
                 .Where(fact => fact.Kind == expectedKind
-                    && fact.Result == GameplayFactResult.Correct)
+                    && fact.Result == GameplayFactResult.Correct && ChallengeTimingProjection.CanScore(input, fact))
                 .OrderBy(fact => fact.OccurredAt)
                 .ThenBy(fact => fact.GameplayFactId)
                 .FirstOrDefault();
@@ -537,7 +537,7 @@ internal static class NormalizedScoreboardProjection
                     case GameplayFactKind.FixAttempt when expectedKind == GameplayFactKind.FixAttempt:
                         {
                             var isAwardedSolve = firstCorrect?.GameplayFactId == fact.GameplayFactId;
-                            var deduction = fact.Result == GameplayFactResult.Wrong
+                            var deduction = fact.Result == GameplayFactResult.Wrong && ChallengeTimingProjection.CanScore(input, fact)
                                 ? checked(wrongPenalty * fact.Multiplicity)
                                 : 0L;
                             var earned = isAwardedSolve ? Math.Max(0, solvePoints) : 0L;
@@ -555,7 +555,7 @@ internal static class NormalizedScoreboardProjection
                                 award,
                                 awardPoints,
                                 Math.Max(0, earned - awardPoints),
-                                deductedPointsPerOccurrence: fact.Result == GameplayFactResult.Wrong
+                                deductedPointsPerOccurrence: fact.Result == GameplayFactResult.Wrong && ChallengeTimingProjection.CanScore(input, fact)
                                     ? wrongPenalty
                                     : 0,
                                 countSuccess: isAwardedSolve);
@@ -606,7 +606,7 @@ internal static class NormalizedScoreboardProjection
             .Where(fact => fact.TeamId is Guid teamId
                 && competitiveTeams.Contains(teamId)
                 && fact.Kind == GameplayFactKind.FlagAttempt
-                && fact.Result == GameplayFactResult.Correct
+                && fact.Result == GameplayFactResult.Correct && ChallengeTimingProjection.CanScore(input, fact)
                 && fact.ReferenceKind == GameplayFactReferenceKind.AwdRound
                 && fact.ReferenceId is Guid roundId
                 && rounds.ContainsKey(roundId)
@@ -688,6 +688,7 @@ internal static class NormalizedScoreboardProjection
             if (!rounds.TryGetValue(roundFact.RoundId, out var round)
                 || round.State != ScoreboardRoundState.Settled)
                 continue;
+            if (!ChallengeTimingProjection.CanScoreInterval(input, roundFact.CompetitionChallengeId, roundFact.StartsAt, roundFact.EndsAt)) continue;
             var settings = settingsByChallenge[roundFact.CompetitionChallengeId];
             var latest = serviceStates.TryGetValue(
                 (roundFact.TeamId, roundFact.CompetitionChallengeId),
@@ -766,7 +767,7 @@ internal static class NormalizedScoreboardProjection
                 && fact.CompetitionChallengeId is Guid challengeId
                 && challenges.ContainsKey(challengeId)
                 && fact.Kind is GameplayFactKind.BreakAttempt or GameplayFactKind.FixAttempt
-                && fact.Result == GameplayFactResult.Correct
+                && fact.Result == GameplayFactResult.Correct && ChallengeTimingProjection.CanScore(input, fact)
                 && (fact.Kind != GameplayFactKind.BreakAttempt
                     || competitiveTeams.Contains(teamId)
                     && (fact.VictimTeamId is null || competitiveTeams.Contains(fact.VictimTeamId.Value))))
@@ -840,6 +841,7 @@ internal static class NormalizedScoreboardProjection
                 var activeScoring = new List<AwdpActivation>(trackActivations.Length);
                 foreach (var round in settledRounds)
                 {
+                    if (!ChallengeTimingProjection.CanScoreInterval(input, challenge.Id, round.StartAt, round.EndAt)) continue;
                     while (nextActivation < trackActivations.Length
                            && trackActivations[nextActivation].Round <= round.Number)
                     {
@@ -899,13 +901,13 @@ internal static class NormalizedScoreboardProjection
             var breakdown = fact.Kind == GameplayFactKind.BreakAttempt
                 ? ScoreboardBreakdownKind.Attack
                 : ScoreboardBreakdownKind.Defense;
-            var penalty = AwdpPenalty(
+            var penalty = ChallengeTimingProjection.CanScore(input, fact) ? AwdpPenalty(
                 fact,
-                settingsByChallenge[fact.CompetitionChallengeId!.Value]);
+                settingsByChallenge[fact.CompetitionChallengeId!.Value]) : 0;
             GetSlot(
                     slots,
                     fact.TeamId!.Value,
-                    columns[(fact.CompetitionChallengeId.Value, round.Id)],
+                    columns[(fact.CompetitionChallengeId!.Value, round.Id)],
                     round)
                 .AddFact(
                     fact,
@@ -1151,7 +1153,7 @@ internal static class NormalizedScoreboardProjection
             return ScoreboardEntryOutcome.Pending;
         return fact.Result switch
         {
-            GameplayFactResult.Correct or GameplayFactResult.Unlocked or GameplayFactResult.Applied
+            GameplayFactResult.Correct or GameplayFactResult.RightButDue or GameplayFactResult.Unlocked or GameplayFactResult.Applied
                 or GameplayFactResult.ServiceUp or GameplayFactResult.Controlled
                 => ScoreboardEntryOutcome.Succeeded,
             GameplayFactResult.Wrong or GameplayFactResult.AttemptsExhausted

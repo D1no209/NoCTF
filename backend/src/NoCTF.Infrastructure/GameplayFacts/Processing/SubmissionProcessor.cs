@@ -553,10 +553,11 @@ public sealed class GameplayFactProcessor(
         submission.VictimTeamId = evaluation.Decision.VictimTeamId;
         if (submission.Kind is GameplayFactKind.FlagAttempt or GameplayFactKind.BreakAttempt or GameplayFactKind.FixAttempt)
         {
-            var timingChallenge = await db.CompetitionChallenges.AsNoTracking().SingleAsync(x => x.Id == submission.CompetitionChallengeId, cancellationToken);
+            var timingChallenge = await db.CompetitionChallenges.AsNoTracking().Where(x => x.Id == submission.CompetitionChallengeId)
+                .Select(x => new { x.Mode, x.AutoOpenAt, x.ScoringEndsAt, x.SubmissionDeadlineAt, x.TimingRevision }).SingleAsync(cancellationToken);
             if (timingChallenge.Mode != GameMode.LiveSolo)
             {
-                var timing = NoCTF.Domain.Challenges.ChallengeTiming.From(timingChallenge);
+                var timing = new NoCTF.Domain.Challenges.ChallengeTiming(timingChallenge.AutoOpenAt, timingChallenge.ScoringEndsAt, timingChallenge.SubmissionDeadlineAt);
                 var practice = timingChallenge.Mode == GameMode.Ctf && submission.Kind == GameplayFactKind.FlagAttempt
                     && evaluation.OfficialWindow is { } official && submission.OccurredAt >= official.EndAt;
                 submission.TimeEligibility = timing.Eligibility(submission.OccurredAt, practice);
@@ -754,7 +755,7 @@ public sealed class GameplayFactProcessor(
         DateTimeOffset occurredAt,
         CancellationToken ct)
     {
-        if (evaluatedFact.Result != GameplayFactResult.Correct)
+        if (!NoCTF.Domain.Challenges.GameplayFactCompletion.IsSuccessful(evaluatedFact.Result, evaluatedFact.TimeEligibility))
             return;
 
         var competitionMode = await db.Competitions.AsNoTracking()

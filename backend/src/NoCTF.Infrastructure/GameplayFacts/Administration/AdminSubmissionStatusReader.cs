@@ -25,6 +25,6 @@ public sealed class AdminGameplayFactStatusReader(NoCtfDbContext db) : IAdminGam
                 fact.Result,
                 fact.FailureCode,
                 fact.OccurredAt,
-                fact.UpdatedAt))
+                fact.UpdatedAt, fact.TimeEligibility))
             .SingleOrDefaultAsync(cancellationToken);
 }

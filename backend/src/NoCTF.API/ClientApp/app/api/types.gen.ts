@@ -1763,6 +1763,7 @@ export type NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse = {
     value?: string | null;
     occurredAt?: string;
     updatedAt?: string;
+    timeEligibility?: NoCtfDomainChallengesGameplayFactTimeEligibility;
 };
 
 export type NoCtfDomainGameplayGameplayFactReferenceKind = 0 | 1 | 2 | 3 | 4;
@@ -4033,6 +4034,7 @@ export type NoCtfapiEndpointsGameplayFactsAdminGameplayFactStatusResponse = {
     patch?: NoCtfapiEndpointsAdministrationGameplayFactsAdminPatchMetadataResponse | null;
     patchFailure?: NoCtfapiEndpointsAdministrationGameplayFactsAdminPatchFailureCode | null;
     canDownloadPatch?: boolean;
+    timeEligibility?: NoCtfDomainChallengesGameplayFactTimeEligibility;
 };
 
 export type NoCtfapiEndpointsAdministrationGameplayFactsAdminPatchMetadataResponse = {

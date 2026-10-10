@@ -241,7 +241,7 @@ public sealed class FusionLeaderboardCache(
                 templates[instance.ChallengeId].Definition is CtfChallengeDefinition ctf
                     ? ctf.InteractionKind
                     : CtfInteractionKind.FlagSubmission,
-                instance.Direction?.Icon))
+                instance.Direction?.Icon, ChallengeTiming.From(instance)))
             .ToList();
 
         var hintCosts = challengeEntities

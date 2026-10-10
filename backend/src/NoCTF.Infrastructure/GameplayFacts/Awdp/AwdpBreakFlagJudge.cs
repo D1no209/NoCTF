@@ -54,7 +54,8 @@ public sealed class AwdpBreakFlagJudge(NoCtfDbContext db) : IAwdpBreakFlagJudge
                 && fact.TeamId == teamId
                 && fact.Kind == GameplayFactKind.BreakAttempt
                 && fact.State == GameplayFactState.Completed
-                && fact.Result == GameplayFactResult.Correct
+                && fact.TimeEligibility == NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid
+                && (fact.Result == GameplayFactResult.Correct || fact.Result == GameplayFactResult.RightButDue)
                 && fact.ValueSha256 != null)
             .OrderBy(fact => fact.OccurredAt)
             .ThenBy(fact => fact.Id)

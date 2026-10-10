@@ -30658,6 +30658,9 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "timeEligibility": {
+            "$ref": "#/components/schemas/NoCTFDomainChallengesGameplayFactTimeEligibility"
           }
         }
       },
@@ -39118,6 +39121,9 @@
           },
           "canDownloadPatch": {
             "type": "boolean"
+          },
+          "timeEligibility": {
+            "$ref": "#/components/schemas/NoCTFDomainChallengesGameplayFactTimeEligibility"
           }
         }
       },

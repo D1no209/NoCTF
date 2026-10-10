@@ -273,5 +273,5 @@ public sealed class GameplayFactManagementStore(
             submission.ReferenceId,
             submission.Value,
             submission.OccurredAt,
-            submission.UpdatedAt));
+            submission.UpdatedAt, submission.TimeEligibility));
 }

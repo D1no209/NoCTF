@@ -17,7 +17,7 @@ public sealed class CtfLeaderboardProjector : IGameModeLeaderboardProjector
     public GameMode Mode => GameMode.Ctf;
 
     public GameModeLeaderboardProjection Project(LeaderboardProjectionInput input) =>
-        CtfLeaderboardProjection.Project(input);
+        CtfLeaderboardProjection.Project(ChallengeTimingProjection.ForScoring(input));
 }
 
 internal static class CtfLeaderboardProjection
@@ -266,6 +266,7 @@ public sealed class AwdLeaderboardProjector : IGameModeLeaderboardProjector
     // Score timeline series are only implemented for CTF; other modes return an empty list.
     public GameModeLeaderboardProjection Project(LeaderboardProjectionInput input)
     {
+        input = ChallengeTimingProjection.ForScoring(input);
         var projection = AwdLeaderboardProjection.Project(input);
         return new(projection.Entries, projection.Cells)
         {
@@ -621,7 +622,7 @@ public sealed class AwdpLeaderboardProjector : IGameModeLeaderboardProjector
 
     // Score timeline series are only implemented for CTF; other modes return an empty list.
     public GameModeLeaderboardProjection Project(LeaderboardProjectionInput input)
-        => AwdpDynamicLeaderboardProjection.Project(input);
+        => AwdpDynamicLeaderboardProjection.Project(ChallengeTimingProjection.ForScoring(input));
 }
 
 public sealed class KohLeaderboardProjector : IGameModeLeaderboardProjector
@@ -631,6 +632,7 @@ public sealed class KohLeaderboardProjector : IGameModeLeaderboardProjector
     // Score timeline series are only implemented for CTF; other modes return an empty list.
     public GameModeLeaderboardProjection Project(LeaderboardProjectionInput input)
     {
+        input = ChallengeTimingProjection.ForScoring(input);
         var projection = KohLeaderboardProjection.Project(input);
         return new(projection.Entries, projection.Cells)
         {
