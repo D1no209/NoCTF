@@ -2,7 +2,7 @@ import { markRaw } from 'vue'
 import ChallengeWriteUpReviewComponent from '~/features/writeups/ChallengeWriteUpReview.vue'
 import { message as describeMessage } from '../../../../utils/i18n'
 import type { UiMessage } from '../../../../utils/i18n'
-import { ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, RefreshCw, Scale } from '@lucide/vue'
+import { Download, FileSearch, MessageCircleQuestion, MinusCircle, RefreshCw, Scale } from '@lucide/vue'
 import { toast } from '../../../../utils/message-toast'
 
 import { adminCreateManualAdjustment, createTeamWriteUpConsultation, downloadTeamWriteUp, issueTeamWriteUpPreview, listTeamWriteUps } from '../../../../api'
@@ -341,7 +341,6 @@ export function useCompetitionsByIdWriteUpsPage(options: { management?: boolean 
 
   const viewBindings = {
     activeTab, ChallengeWriteUpReview,
-    ArrowLeft,
     Download,
     FileSearch,
     MessageCircleQuestion,

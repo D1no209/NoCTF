@@ -1,5 +1,6 @@
 import type { NoCtfapiEndpointsChallengesChallengeSummaryResponse, NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsCompetitionsGameModeProtocol } from '../../api'
 import { adminCompetitionPath } from '../../utils/app-routes'
+import { nextCompetitionChallengeOrder } from '../../lib/competition-challenge-order'
 
 export type ManagedPlacementCompetition = NoCtfapiEndpointsCompetitionsCompetitionResponse & { id: string }
 export interface ChallengeCompetitionPlacement {
@@ -22,7 +23,7 @@ export function projectChallengePlacements(
   return {
     competition,
     instances: active.filter(challenge => challenge.challengeId === challengeId),
-    nextOrder: active.reduce((order, challenge) => Math.max(order, challenge.order ?? 0), 0) + 1,
+    nextOrder: nextCompetitionChallengeOrder(challenges),
   }
 }
 

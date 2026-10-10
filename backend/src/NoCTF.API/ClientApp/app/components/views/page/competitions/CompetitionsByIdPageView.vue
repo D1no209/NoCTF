@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { CompetitionsByIdPageViewState } from '~/features/routes/competitions/useCompetitionsByIdPage'
 
 const viewProps = defineProps<{ state: CompetitionsByIdPageViewState }>()
-const { isOverview, isControlScreen, isWriteUpReview, isProgression, competitionId, myTeam, teamBanned, teamLoading, CompetitionTeamBanScreen, competition, myStanding, standingLoading, teamLoadError, standingError, error, refreshMyTeam, refreshMyStanding, CompetitionCountdown, LifecycleBadge } = toRefs(viewProps.state)
+const { isOverview, isControlScreen, isWriteUpReview, isProgression, showCompetitionReturn, competitionReturnPath, competitionReturnLabel, ArrowLeft, competitionId, myTeam, teamBanned, teamLoading, CompetitionTeamBanScreen, competition, myStanding, standingLoading, teamLoadError, standingError, error, refreshMyTeam, refreshMyStanding, CompetitionCountdown, LifecycleBadge } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -16,8 +16,8 @@ const { isOverview, isControlScreen, isWriteUpReview, isProgression, competition
     v-else-if="competition && !teamLoading"
     data-contained-workspace-page
     :data-progression-route="isProgression"
-    class="mx-auto flex w-full max-w-[120rem] flex-col"
-    :class="isWriteUpReview ? 'p-0' : 'gap-4 px-3 py-4 md:px-5'"
+    class="mx-auto flex w-full max-w-[120rem] flex-col gap-4"
+    :class="isWriteUpReview ? 'p-0' : 'px-3 py-4 md:px-5'"
   >
     <div v-if="!isWriteUpReview" class="flex flex-col justify-between gap-3 border-b pb-4 sm:flex-row sm:items-start">
       <div class="relative isolate flex min-w-0 flex-1 flex-col gap-1">
@@ -55,6 +55,14 @@ const { isOverview, isControlScreen, isWriteUpReview, isProgression, competition
         </div>
       </dl>
     </div>
+    <div v-if="showCompetitionReturn" class="flex shrink-0">
+      <Button variant="ghost" size="sm" as-child>
+        <NuxtLink :to="competitionReturnPath">
+          <component :is="ArrowLeft" data-icon="inline-start" />
+          {{ $t(competitionReturnLabel) }}
+        </NuxtLink>
+      </Button>
+    </div>
     <Alert v-if="!isWriteUpReview && teamLoadError" variant="destructive">
       <AlertDescription class="flex flex-wrap items-center justify-between gap-3">
         <span>{{ $message(teamLoadError) }}</span>
@@ -71,6 +79,14 @@ const { isOverview, isControlScreen, isWriteUpReview, isProgression, competition
   </div>
 
   <div v-else data-contained-workspace-page class="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8">
+    <div v-if="showCompetitionReturn" class="flex shrink-0">
+      <Button variant="ghost" size="sm" as-child>
+        <NuxtLink :to="competitionReturnPath">
+          <component :is="ArrowLeft" data-icon="inline-start" />
+          {{ $t(competitionReturnLabel) }}
+        </NuxtLink>
+      </Button>
+    </div>
     <Alert v-if="error" variant="destructive">
       <AlertDescription>{{ $message(error) }}</AlertDescription>
     </Alert>

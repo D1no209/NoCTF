@@ -3,7 +3,7 @@ import { message as describeMessage } from '../../../utils/i18n'
 import type { UiMessage } from '../../../utils/i18n'
 import { markRaw } from 'vue'
 
-import { ClipboardCheck, FileText, GitBranch, LayoutDashboard, MessageCircleQuestion, Puzzle, Trophy, UserRound } from '@lucide/vue'
+import { ArrowLeft, ClipboardCheck, FileText, GitBranch, LayoutDashboard, MessageCircleQuestion, Puzzle, Trophy, UserRound } from '@lucide/vue'
 import { getCompetitionEndpoint, getLeaderboardEndpoint, getMyTeamEndpoint, getPlayerCompetitionProgression } from '../../../api'
 import type { NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsCompetitionsScoreboardTeamResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../api'
 import { competitionWorkspaceNavigationKey } from '../../app/workspace-nav'
@@ -12,7 +12,7 @@ import { createTrailingRefresh } from '../../../lib/latest-page-refresh'
 import CompetitionCountdownComponent from '../../competitions/CompetitionCountdown.vue'
 import LifecycleBadgeComponent from '../../competitions/LifecycleBadge.vue'
 import { useCompetitionAnnouncementCatchUp } from '../../competition/useCompetitionAnnouncementCatchUp'
-import { competitionPath, isCompetitionOverviewPath } from '../../../utils/app-routes'
+import { adminCompetitionPath, competitionPath, isCompetitionOverviewPath } from '../../../utils/app-routes'
 
 /** Owns state, effects and commands for CompetitionsByIdPage. */
 export function useCompetitionsByIdPage() {
@@ -52,7 +52,27 @@ export function useCompetitionsByIdPage() {
 
   const error = ref<UiMessage | null>(null)
 
-  const { user } = useAuth()
+  const { user, isAdministrator } = useAuth()
+
+  const showCompetitionReturn = computed(() => {
+    const base = competitionPath(competitionId.value)
+    return [
+      `${base}/progression`,
+      `${base}/my/team`,
+      `${base}/my/writeup`,
+      `${base}/writeups`,
+      `${base}/staff`,
+    ].includes(route.path)
+  })
+
+  const returnsToAdministration = computed(() => isAdministrator.value
+    && (isWriteUpReview.value || route.path === `${competitionPath(competitionId.value)}/staff`))
+  const competitionReturnPath = computed(() => returnsToAdministration.value
+    ? adminCompetitionPath(competitionId.value)
+    : competitionPath(competitionId.value))
+  const competitionReturnLabel = computed(() => returnsToAdministration.value
+    ? 'competitions.label.backToAdministration' as const
+    : 'common.label.backCompetition' as const)
 
   const { refreshMissedAnnouncements } = useCompetitionAnnouncementCatchUp(competitionId)
 
@@ -295,6 +315,10 @@ export function useCompetitionsByIdPage() {
       isControlScreen,
       isWriteUpReview,
       isProgression,
+      showCompetitionReturn,
+      competitionReturnPath,
+      competitionReturnLabel,
+      ArrowLeft: markRaw(ArrowLeft),
       competition,
       competitionId, myTeam, teamBanned, teamLoading, CompetitionTeamBanScreen,
       myStanding,

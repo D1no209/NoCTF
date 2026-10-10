@@ -3,7 +3,7 @@ import type { UiMessage } from '../../../../utils/i18n'
 import { adminWorkspacePath } from '~/features/admin/admin-navigation'
 import { markRaw } from 'vue'
 
-import { Activity, ClipboardCheck, Container, Download, FileCheck, GitBranch, KeyRound, LayoutDashboard, Mail, Network, Orbit, Puzzle, Settings, ShieldAlert, Trophy, Users, Webhook } from '@lucide/vue'
+import { Activity, ChartNoAxesCombined, ClipboardCheck, Container, Download, FileCheck, GitBranch, KeyRound, LayoutDashboard, Mail, Network, Orbit, Puzzle, Settings, ShieldAlert, Trophy, Users, Webhook } from '@lucide/vue'
 import { adminGetCompetition } from '../../../../api'
 import type { NoCtfapiEndpointsCompetitionsCompetitionResponse } from '../../../../api'
 import type { WorkspaceNavGroup } from '../../../app/workspace-nav'
@@ -110,6 +110,7 @@ export function useAdminCompetitionsByIdPage() {
         { to: `${base}/traffic-captures`, label: translate("runtime.trafficCaptures"), icon: Network },
         { to: `${base}/cheats`, label: translate("administration.label.cheating"), icon: ShieldAlert },
         { to: `${base}/leaderboard`, label: translate("common.label.leaderboard"), icon: Trophy },
+        { to: `/competitions/${competitionId}/leaderboard`, label: translate('leaderboard.label.viewScoreboard'), icon: ChartNoAxesCombined },
       ],
     },
     {

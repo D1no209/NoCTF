@@ -30,7 +30,7 @@ export function useLiveSoloGroups() {
   const questions = computed(() => draft.value.questions.map((row,index) => ({ ...row, index, effectiveOffset: offsets.value[index]!,
     title: challenges.value.find(question => question.id === row.competitionChallengeId)?.title ?? '—' })))
   const templates = useOffsetPagination<Template>(async ({ offset, limit }) => {
-    const result = await adminChallengeBankListTemplates({ query: { offset, limit, desc: false, keyword: keyword.value || undefined, includeDeleted: false } })
+    const result = await adminChallengeBankListTemplates({ query: { offset, limit, desc: false, keyword: keyword.value || undefined, includeDeleted: false, onlyMine: false } })
     if (result.error || !result.data) throw parseLiveSoloError(result.error, message('liveSolo.error.load'))
     return result.data
   }, { initialPageSize: 20 })

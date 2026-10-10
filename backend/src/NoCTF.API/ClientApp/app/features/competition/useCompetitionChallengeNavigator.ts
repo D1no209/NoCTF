@@ -17,9 +17,9 @@ type BloodRank = 'First' | 'Second' | 'Third'
 const bloodOrder: Record<BloodRank, number> = { First: 0, Second: 1, Third: 2 }
 
 /** Null denotes an invalid expression; an empty string matches all challenge names. */
-export function compileChallengeTitleSearch(search: string, regex: boolean): string | RegExp | null {
+export function compileChallengeTitleSearch(search: string): string | RegExp | null {
   const query = search.trim()
-  if (!regex || !query) return query.toLocaleLowerCase()
+  if (!query) return ''
   try {
     return new RegExp(query, 'i')
   } catch {
@@ -105,7 +105,6 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
   const hidesLockedChallenges = computed(() => isCtf.value && hideLocked.value)
 
   const search = ref('')
-  const regexSearch = ref(false)
   const route = useRoute()
   const router = useRouter()
   const selectedTags = computed(() => tagsFromQuery(route.query.tag))
@@ -294,7 +293,7 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
   })
 
   const normalizedSearch = computed(() => search.value.trim())
-  const titleSearch = computed(() => compileChallengeTitleSearch(search.value, regexSearch.value))
+  const titleSearch = computed(() => compileChallengeTitleSearch(search.value))
   const searchError = computed<UiMessage | null>(() => titleSearch.value === null
     ? describeMessage('challengeNavigator.invalidRegex') : null)
 
@@ -355,7 +354,6 @@ emit: { (event: "ready", ...args: [challengeId: string | null]): void; (event: "
       hideSolved,
       hideLocked,
       search,
-      regexSearch,
       searchError,
       selectedTags, tagOptions, updateSelectedTags,
       board,

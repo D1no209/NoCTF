@@ -1,4 +1,5 @@
 {
+  "challengeLibrary.onlyMine": "Only my challenges",
   "challengeTags.label": "Tags",
   "challengeTags.filter": "Filter by tags",
   "challengeTags.edit": "Choose or add tags",
@@ -11,10 +12,7 @@
   "challengeNavigator.noMatches": "No matching challenges",
   "challengeNavigator.hideLocked": "Hide locked",
   "challengeNavigator.noUnlockedChallenges": "No unlocked challenges",
-  "challengeNavigator.searchPlaceholder": "Search challenge names",
-  "challengeNavigator.regexSearch": "Regex search",
-  "challengeNavigator.regexPlaceholder": "Enter a regular expression",
-  "challengeNavigator.regexHelp": "Case-insensitive regular expression, for example: ^\\[day1\\].*(fmt|nc)$",
+  "challengeNavigator.searchPlaceholder": "Search names (regex)",
   "challengeNavigator.invalidRegex": "Invalid regular expression. Check the search syntax.",
   "terminal.challengeSolved": "Challenge is Solved ！",
   "terminal.flagPlaceholder": "Type Your Flag ~~",

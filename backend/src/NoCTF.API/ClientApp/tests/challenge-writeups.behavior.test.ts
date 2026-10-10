@@ -1,16 +1,22 @@
 import { describe, expect, test } from 'bun:test'
 import { computed, effectScope, markRaw, nextTick, reactive, ref, watch } from 'vue'
-import { challengeWriteUpPath, latestWriteUpVersion, needsWriteUpConfirmation, writeUpStatusKey } from '../app/features/writeups/writeup-state'
+import { challengeWriteUpPath, latestWriteUpVersion, needsWriteUpConfirmation, writeUpPublicationVersion, writeUpPublicationLabel, writeUpStatusKey } from '../app/features/writeups/writeup-state'
 
 async function compile(path: string, name: string) {
   const compiled = new Bun.Transpiler({ loader: 'ts' }).transformSync(await Bun.file(new URL(path, import.meta.url)).text())
     .replace(/^import[\s\S]*?from ["'][^"']+["'];?\s*$/gm, '')
-    .replace(/export function /g, 'function ')
+    .replace(/export (async )?function /g, '$1function ')
   return (deps: Record<string, unknown>) => new Function('deps', `const { ${Object.keys(deps).join(', ')} } = deps; ${compiled}; return ${name};`)(deps)
 }
 const readerFactory = await compile('../app/features/writeups/useChallengeWriteUpPage.ts', 'useChallengeWriteUpPage')
-const editorFactory = await compile('../app/features/writeups/useChallengeWriteUpEditor.ts', 'useChallengeWriteUpEditor')
-const reviewFactory = await compile('../app/features/writeups/useChallengeWriteUpReview.ts', 'useChallengeWriteUpReview')
+const rawEditorFactory = await compile('../app/features/writeups/useChallengeWriteUpEditor.ts', 'useChallengeWriteUpEditor')
+const rawReviewFactory = await compile('../app/features/writeups/useChallengeWriteUpReview.ts', 'useChallengeWriteUpReview')
+const publicationFactory = await compile('../app/features/writeups/writeup-publication.ts', '({ matchesWriteUpTarget, publishWriteUpVersion, writeUpActionTarget })')
+function publicationDeps(deps: Record<string, unknown>) {
+  return { ...deps, latestWriteUpVersion, writeUpPublicationVersion, writeUpPublicationLabel, ...publicationFactory(deps) }
+}
+const editorFactory = (deps: Record<string, unknown>) => rawEditorFactory(publicationDeps(deps))
+const reviewFactory = (deps: Record<string, unknown>) => rawReviewFactory(publicationDeps(deps))
 const drain = async () => { await nextTick(); await new Promise(resolve => setTimeout(resolve, 0)) }
 const baseDeps = { getCompetitionEndpoint: async () => ({ data: { status: 'Running' } }), ref, computed, watch, markRaw, nextTick, onMounted: () => {}, onBeforeUnmount: () => {},
   translate: (key: string) => key, message: (key: string) => ({ key }),
@@ -139,7 +145,7 @@ test('saved draft, separate submission, conflict preservation and read-only hist
 test('review restores URL filters, preserves selection during new arrivals, and guards official editor dismissal', async () => {
   const scope = effectScope(), moves: unknown[] = []
   const route = reactive({ query: { reviewStatus: 'Published', reviewSource: 'Official', reviewPage: '2', tag: ['Web'] } })
-  const row = { id: 'root', competitionChallengeId: 'challenge', publishedVersionId: 'old', published: { id: 'old' }, submitted: { id: 'new', state: 'Submitted' } }
+  const row = { id: 'root', concurrencyStamp: 'stamp', competitionChallengeId: 'challenge', publishedVersionId: 'old', published: { id: 'old' }, submitted: { id: 'new', state: 'Submitted' } }
   const state = scope.run(() => reviewFactory({ ...baseDeps, useRoute: () => route, useRouter: () => ({ replace: async (next: unknown) => moves.push(next) }),
     useMediaQuery: () => ref(true), SingleWriteUpSettingsComponent: {}, ChallengeWriteUpEditorComponent: {}, writeUpStatusKey,
     adminListChallengeWriteUpReviews: async () => ({ data: { items: [row], totalCount: 30, canManage: true, canJudge: true } }),
@@ -162,7 +168,7 @@ test('review restores URL filters, preserves selection during new arrivals, and 
 test('official saved drafts can publish directly while the server still seals a submitted version first', async () => {
   const scope = effectScope(), calls: string[] = []
   const draft = { id: 'draft', number: 2, format: 'Markdown', state: 'Draft' }
-  const root = { id: 'official', source: 'Official', concurrencyStamp: 'saved', draft, submitted: null, versions: [draft] }
+  const root = { id: 'official', competitionChallengeId: 'challenge', source: 'Official', concurrencyStamp: 'saved', draft, submitted: null, versions: [draft] }
   const state = scope.run(() => editorFactory({ ...baseDeps, latestWriteUpVersion, writeUpStatusKey,
     useNow: () => ref(new Date()), onBeforeRouteLeave: () => {}, onBeforeRouteUpdate: () => {},
     listChallengeWriteUps: async () => ({ data: { items: [root], access: { canManage: true, settings: { enabled: true } } } }),
@@ -178,4 +184,133 @@ test('official saved drafts can publish directly while the server still seals a 
     await state.requestPublish(); expect(state.publishOpen.value).toBeTrue(); await state.publish()
     expect(calls).toEqual(['seal', 'publish']); expect(state.root.value.publishedVersionId).toBe('draft')
   } finally { scope.stop() }
+})
+
+function publicationApp(entry: 'editor' | 'review', format = 'Markdown', source = 'Official', canManage = true) {
+  const scope = effectScope(), calls: Array<{ action: string; body: any }> = []
+  const old = { id: 'old', number: 1, state: 'Approved', format, concurrencyStamp: 'old-stamp' }
+  const draft = { id: 'draft', number: 2, state: 'Draft', format, concurrencyStamp: 'draft-stamp' }
+  let root: any = { id: 'official', competitionChallengeId: 'challenge', challengeTitle: 'Challenge', source,
+    concurrencyStamp: 'saved', draft, submitted: old, published: old, publishedVersionId: 'old', versions: [draft, old] }
+  let failPublication = false, failSubmission = false, changedSubmission = false, hold: (() => Promise<void>) | undefined
+  const deps = { ...baseDeps, useNow: () => ref(new Date()), onBeforeRouteLeave: () => {}, onBeforeRouteUpdate: () => {},
+    useRoute: () => ({ query: {} }), useRouter: () => ({ replace: async () => {} }), useMediaQuery: () => ref(false),
+    SingleWriteUpSettingsComponent: {}, ChallengeWriteUpEditorComponent: {},
+    listChallengeWriteUps: async () => ({ data: { items: [structuredClone(root)], access: { canManage, canSubmit: source === 'Team', settings: { enabled: true } } } }),
+    adminListChallengeWriteUpReviews: async () => ({ data: { items: [structuredClone(root)], totalCount: 1, canManage, canJudge: true } }),
+    getChallengeWriteUpSettings: async () => ({ data: { settings: { enabled: true, deductionPercent: 20 } } }),
+    getChallengeWriteUpContent: async ({ path }: any) => ({ data: { versionId: path.versionId, format, markdown: '# Answer', fileName: 'answer.pdf' } }),
+    prepareChallengeWriteUpBrowserAccess: async () => ({ data: { previewUrl: '/pdf' } }),
+    submitChallengeWriteUp: async ({ body }: any) => {
+      calls.push({ action: 'submit', body }); await hold?.()
+      if (failSubmission) return { error: { code: 'Conflict' } }
+      root = { ...root, concurrencyStamp: 'sealed', draft: null, submitted: { ...draft, id: changedSubmission ? 'unexpected' : draft.id, state: 'Submitted' } }
+      return { data: structuredClone(root) }
+    },
+    reviewChallengeWriteUp: async ({ body }: any) => {
+      calls.push({ action: body.action, body })
+      if (failPublication) return { error: { code: 'Conflict' } }
+      root = { ...root, concurrencyStamp: 'published-stamp', publishedVersionId: body.versionId, published: { ...root.submitted, state: 'Approved' } }
+      return { data: structuredClone(root) }
+    },
+  }
+  const state = scope.run(() => entry === 'editor' ? editorFactory(deps)({ competitionId: 'competition', competitionChallengeId: 'challenge', official: true }, () => {})
+    : reviewFactory(deps)({ competitionId: 'competition' }))!
+  const start = () => entry === 'editor' ? state.reload() : state.load()
+  const publish = async () => { if (entry === 'editor') await state.publish(); else { state.confirmReview(); await drain() } }
+  return { state, calls, start, publish, stop: () => scope.stop(), root: () => root,
+    fail: (value: boolean) => { failPublication = value }, failSubmission: () => { failSubmission = true },
+    changedSubmission: () => { changedSubmission = true }, hold: (fn: () => Promise<void>) => { hold = fn } }
+}
+
+describe.each(['editor', 'review'] as const)('publication from %s', entry => {
+  test.each(['Markdown', 'Pdf'])('an official %s draft publishes the displayed version, keeping the old version until success', async format => {
+    const app = publicationApp(entry, format)
+    try {
+      await app.start(); expect(app.state.canPublish.value).toBeTrue()
+      const displayed = entry === 'editor' ? app.state.currentVersion.value : app.state.selectedVersion.value
+      expect(displayed.id).toBe('draft')
+      await app.state.requestPublish()
+      const target = entry === 'editor' ? app.state.publicationTarget.value : app.state.confirmationTarget.value
+      expect(target.versionId).toBe(displayed.id); expect(target.number).toBe(2)
+      await app.publish()
+      expect(app.calls.map(x => x.action)).toEqual(['submit', 'Publish'])
+      expect(app.calls[1]!.body).toEqual({ action: 'Publish', versionId: 'draft', expectedStamp: 'sealed' })
+      expect(app.root().publishedVersionId).toBe('draft')
+    } finally { app.stop() }
+  })
+  test('a publication failure retains the sealed version and old publication; retry never submits again', async () => {
+    const app = publicationApp(entry)
+    try {
+      await app.start(); await app.state.requestPublish(); app.fail(true); await app.publish()
+      expect(app.state.publicationNotice.value).toBeTrue(); expect(app.root().publishedVersionId).toBe('old')
+      expect(app.state.canPublish.value).toBeTrue()
+      app.fail(false); await app.state.requestPublish(); await app.publish()
+      expect(app.calls.map(x => x.action)).toEqual(['submit', 'Publish', 'Publish'])
+      expect(app.root().publishedVersionId).toBe('draft'); expect(app.state.publicationNotice.value).toBeFalse()
+    } finally { app.stop() }
+  })
+  test('a submission conflict retains the draft and old publication without claiming submission succeeded', async () => {
+    const app = publicationApp(entry)
+    try {
+      await app.start(); await app.state.requestPublish(); app.failSubmission(); await app.publish()
+      expect(app.calls.map(x => x.action)).toEqual(['submit'])
+      expect(app.root().draft.id).toBe('draft'); expect(app.root().publishedVersionId).toBe('old')
+      expect(app.state.publicationNotice.value).toBeFalse(); expect(app.state.pending.value).toBeFalse()
+    } finally { app.stop() }
+  })
+  test('a changed confirmation never publishes a replacement version', async () => {
+    const app = publicationApp(entry)
+    try {
+      await app.start(); await app.state.requestPublish()
+      const row = entry === 'editor' ? app.state.root.value : app.state.selected.value
+      row.concurrencyStamp = 'another-editor'; row.draft.id = 'replacement'
+      await app.publish(); expect(app.calls).toHaveLength(0)
+      expect(app.state.error.value.key).toBe('challengeWriteUp.publicationChanged')
+    } finally { app.stop() }
+  })
+  test('an unexpected submitted version never becomes the publish target', async () => {
+    const app = publicationApp(entry)
+    try {
+      await app.start(); await app.state.requestPublish(); app.changedSubmission(); await app.publish()
+      expect(app.calls.map(x => x.action)).toEqual(['submit'])
+      expect(app.root().publishedVersionId).toBe('old')
+      const displayed = entry === 'editor' ? app.state.currentVersion.value : app.state.selectedVersion.value
+      expect(displayed.id).toBe('draft'); expect(app.state.publicationNotice.value).toBeFalse()
+    } finally { app.stop() }
+  })
+  test('judges and observers cannot publish official drafts', async () => {
+    const app = publicationApp(entry, 'Markdown', 'Official', false)
+    try { await app.start(); expect(app.state.canPublish.value).toBeFalse(); await app.state.requestPublish(); await app.publish(); expect(app.calls).toHaveLength(0) }
+    finally { app.stop() }
+  })
+})
+
+test('review never publishes team drafts or silently substitutes historical approved versions', async () => {
+  const app = publicationApp('review', 'Markdown', 'Team')
+  try {
+    await app.start(); expect(app.state.canPublish.value).toBeFalse()
+    expect(app.state.publicationBlocked.value).toBe('challengeWriteUp.teamDraftNotPublishable')
+    await app.state.requestPublish(); await app.publish(); expect(app.calls).toHaveLength(0)
+    const row = app.state.selected.value
+    row.source = 'Official'; row.publishedVersionId = null; row.published = null
+    expect(app.state.publishVersion.value.id).toBe('draft')
+    row.draft = null; row.submitted = null; row.versions = [app.root().published]
+    expect(app.state.publishVersion.value.id).toBe('old')
+    expect(app.state.publicationLabel.value).toBe('challengeWriteUp.republishVersion')
+    app.state.setDisplay('published'); expect(app.state.canPublish.value).toBeFalse()
+  } finally { app.stop() }
+})
+
+test.each(['editor', 'review'] as const)('duplicate publication clicks from %s produce one submission and one publication', async entry => {
+  const app = publicationApp(entry)
+  try {
+    let finish!: () => void
+    app.hold(() => new Promise<void>(resolve => { finish = resolve }))
+    await app.start(); await app.state.requestPublish()
+    const first = app.publish(); await drain(); await app.publish()
+    expect(app.calls).toHaveLength(1); expect(app.state.pending.value).toBeTrue()
+    if (entry === 'editor') expect(await app.state.confirmDiscard()).toBeFalse()
+    finish(); await first; await drain(); expect(app.calls.map(x => x.action)).toEqual(['submit', 'Publish'])
+  } finally { app.stop() }
 })

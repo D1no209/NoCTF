@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { CompetitionsByIdWriteUpsPageViewState } from '~/features/routes/competitions/[id]/useCompetitionsByIdWriteUpsPage'
 
 const viewProps = defineProps<{ state: CompetitionsByIdWriteUpsPageViewState }>()
-const { activeTab, ChallengeWriteUpReview, ArrowLeft, Download, FileSearch, MessageCircleQuestion, MinusCircle, RefreshCw, Scale, competitionId, management, review, loading, loadError, teamOptions, selectedTeamId, selected, canJudge, previewUrl, previewLoading, previewError, downloadPending, load, selectTeam, download, selectedChallengeId, adjustmentDelta, adjustmentPending, adjustmentRefreshing, adjustmentBusy, adjustmentError, submitAdjustment, clearAdjustmentError, selectChallenge, deduction, openDeduction, setDeductionOpen, confirmDeduction, consultationOpen, consultationChallengeId, consultationTitle, consultationBody, consultationPending, consultationError, openConsultation, submitConsultation, setConsultationOpen, clearConsultationError } = toRefs(viewProps.state)
+const { activeTab, ChallengeWriteUpReview, Download, FileSearch, MessageCircleQuestion, MinusCircle, RefreshCw, Scale, competitionId, review, loading, loadError, teamOptions, selectedTeamId, selected, canJudge, previewUrl, previewLoading, previewError, downloadPending, load, selectTeam, download, selectedChallengeId, adjustmentDelta, adjustmentPending, adjustmentRefreshing, adjustmentBusy, adjustmentError, submitAdjustment, clearAdjustmentError, selectChallenge, deduction, openDeduction, setDeductionOpen, confirmDeduction, consultationOpen, consultationChallengeId, consultationTitle, consultationBody, consultationPending, consultationError, openConsultation, submitConsultation, setConsultationOpen, clearConsultationError } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -25,11 +25,6 @@ const { activeTab, ChallengeWriteUpReview, ArrowLeft, Download, FileSearch, Mess
         <template #header>
           <header class="flex flex-col gap-2 pr-10">
             <div class="flex items-center gap-2">
-              <Button v-if="!management" variant="ghost" size="icon-sm" as-child>
-                <NuxtLink :to="competitionPath(competitionId)" :aria-label="$t('common.label.backCompetition')">
-                  <ArrowLeft />
-                </NuxtLink>
-              </Button>
               <FileSearch class="size-5 shrink-0 text-primary" />
               <h2 class="min-w-0 flex-1 truncate text-sm font-semibold">{{ $t('writeUp.review') }}</h2>
               <Button variant="ghost" size="icon-sm" :disabled="loading" :aria-label="$t('common.label.refresh')" @click="load">

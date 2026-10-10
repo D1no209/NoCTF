@@ -31,6 +31,7 @@ test('staff review combines the shared sidebar and built-in PDF renderer with au
   const preview = await sourceFile(
     '../app/components/ui/pdf-preview/PdfPreview.vue',
   ).text()
+  const renderer = await sourceFile('../app/components/ui/pdf-preview/usePdfPreview.ts').text()
   const competitionShell = await sourceFile(
     '../app/components/views/page/competitions/CompetitionsByIdPageView.vue',
   ).text()
@@ -77,15 +78,15 @@ test('staff review combines the shared sidebar and built-in PDF renderer with au
   expect(view).not.toContain('min-h-[42rem]')
   expect(controller).not.toContain('CompetitionParticipantWorkspace')
   expect(preview).not.toContain('<iframe')
-  expect(preview).toContain("import('pdfjs-dist')")
-  expect(preview).toContain("pdf.worker.min.mjs?url")
-  expect(preview).toContain('GlobalWorkerOptions.workerSrc')
-  expect(preview).toContain('library.getDocument')
-  expect(preview).toContain('page.render')
-  expect(preview).toContain('<canvas ref="canvas"')
+  expect(renderer).toContain("import('pdfjs-dist')")
+  expect(renderer).toContain("pdf.worker.min.mjs?url")
+  expect(renderer).toContain('GlobalWorkerOptions.workerSrc')
+  expect(renderer).toContain('library.getDocument')
+  expect(renderer).toContain('page.render')
+  expect(preview).toContain('<canvas :ref="element => setCanvas(page.number, element)"')
   expect(preview).toContain('<ScrollSurface axis="both"')
-  expect(preview).toContain('renderTask?.cancel()')
-  expect(preview).toContain('await task.destroy()')
+  expect(renderer).toContain('state.task?.cancel()')
+  expect(renderer).toContain('await task.destroy()')
   expect(preview).toContain("fill ? 'min-h-0' : 'min-h-[32rem]'")
   expect(preview).toContain('data-slot="pdf-preview"')
   expect(preview).toContain(':aria-busy="busy || undefined"')

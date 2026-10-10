@@ -15,14 +15,14 @@ test('placements fail closed for absent permissions, read-only roles and deleted
   expect(writable.map(item => item.id)).toEqual(['owner', 'manager'])
 })
 
-test('active placements match template identity and append after the last active challenge', () => {
+test('active placements match template identity and reserve deleted challenge order numbers', () => {
   const placement = projectChallengePlacements({ id: 'competition', mode: 'Ctf' }, [
     { id: 'same-title', challengeId: 'other', title: 'Shared title', order: 5 },
     { id: 'correct', challengeId: 'template', order: 2 },
     { id: 'deleted', challengeId: 'template', deletedAt: '2026-09-30', order: 99 },
   ], 'template')
   expect(placement.instances.map(item => item.id)).toEqual(['correct'])
-  expect(placement.nextOrder).toBe(6)
+  expect(placement.nextOrder).toBe(100)
   expect(placementManagementPath(placement)).toBe('/admin/competitions/competition/challenges/correct')
 })
 

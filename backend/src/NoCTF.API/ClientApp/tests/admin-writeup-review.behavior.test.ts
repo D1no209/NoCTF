@@ -16,7 +16,7 @@ const drain = async () => { await nextTick(); await new Promise(resolve => setTi
 
 test('management review remains discoverable for finished competitions and uses the contained wide workspace', () => {
   const route = reactive({ path: '/admin/competitions/competition/writeups', params: { id: 'competition' } })
-  const icons = Object.fromEntries('Activity ClipboardCheck Container Download FileCheck GitBranch KeyRound LayoutDashboard Mail Network Orbit Puzzle Settings ShieldAlert Trophy Users Webhook'.split(' ').map(name => [name, {}]))
+  const icons = Object.fromEntries('Activity ChartNoAxesCombined ClipboardCheck Container Download FileCheck GitBranch KeyRound LayoutDashboard Mail Network Orbit Puzzle Settings ShieldAlert Trophy Users Webhook'.split(' ').map(name => [name, {}]))
   const deps = { ...icons, computed, ref, proxyRefs, markRaw, useRoute: () => route,
     useAuth: () => ({ user: ref(null), isAdministrator: ref(true) }),
     translate: (key: string) => key, provide: () => {}, onMounted: () => {},

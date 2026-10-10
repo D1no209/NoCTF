@@ -76,7 +76,7 @@ describe('challenge template list navigation', () => {
     expect(source).toContain('useOffsetPagination<ChallengeTemplate>')
     expect(source).toContain('offset,')
     expect(source).toContain('keyword: search.value.trim() || null')
-    expect(source).toContain('setTimeout(() => { void load() }, 250)')
+    expect(source).toContain('searchTimer = setTimeout(')
     expect(source).toContain('v-if="loading && templates.length === 0"')
   })
 
@@ -119,7 +119,7 @@ describe('challenge template list navigation', () => {
     expect(index).toContain("const search = ref(typeof route.query.q === 'string'")
     expect(index).toContain('templates: [...templates.value]')
     expect(index).toContain('directions: [...directions.value]')
-    expect(index).toContain('directionCatalogs.set(includeDeleted.value, catalog)')
+    expect(index).toContain('directionCatalogs.set(catalogKey, catalog)')
     expect(index).toContain('if (!pagination.error.value) rememberSnapshot()')
     expect(index).toContain('function syncFiltersToRoute(): void')
     expect(index).toContain("query.direction = directionFilter.value")

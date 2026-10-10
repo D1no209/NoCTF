@@ -44,7 +44,8 @@ public sealed record ChallengeTemplateListQuery(
     string? Direction,
     int Offset,
     int Limit,
-    bool Desc);
+    bool Desc,
+    bool OnlyMine = false);
 
 public sealed record ChallengeTemplateListPage(
     IReadOnlyList<ChallengeTemplateSummaryView> Items,

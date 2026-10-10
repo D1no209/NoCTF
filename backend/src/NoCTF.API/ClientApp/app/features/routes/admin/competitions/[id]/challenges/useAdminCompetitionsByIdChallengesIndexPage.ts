@@ -9,6 +9,7 @@ import { adminChallengeBankListTemplates, adminCreateCompetitionChallenge, admin
 import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateSummaryResponse, NoCtfapiEndpointsChallengesChallengeSummaryResponse } from '../../../../../../api'
 import { useCompetitionAdmin } from '../../../../../../lib/admin-competition'
 import { competitionChallengeConflictMessage } from '../../../../../../lib/competition-challenge-conflict'
+import { nextCompetitionChallengeOrder } from '../../../../../../lib/competition-challenge-order'
 
 type ChallengeStatusFilter = 'all' | 'published' | 'unpublished' | 'deleted'
 
@@ -163,15 +164,26 @@ export function useAdminCompetitionsByIdChallengesIndexPage() {
     hideAddedTemplates.value = false
     newCustomTitle.value = ''
     newTags.value = []
-    newOrder.value = (items.value.filter(i => !i.deletedAt).map(i => i.order ?? 0).reduce((m, o) => Math.max(m, o), 0) || 0) + 1
+    templates.value = []
     templatesLoading.value = true
-    const { data, error: e } = await adminChallengeBankListTemplates({ query: { includeDeleted: false, direction: null, keyword: null, offset: 0, limit: 200, desc: false } })
-    if (e) addError.value = parseApiError(e).displayMessage
-    else templates.value = data?.items ?? []
-    templatesLoading.value = false
+    try {
+      const [templateResult, challengeResult] = await Promise.all([
+        adminChallengeBankListTemplates({ query: { includeDeleted: false, onlyMine: false, direction: null, keyword: null, offset: 0, limit: 200, desc: false } }),
+        adminListCompetitionChallenges({ path: { competitionId }, query: { includeDeleted: true } }),
+      ])
+      const failure = templateResult.error ?? challengeResult.error
+      if (failure) addError.value = parseApiError(failure).displayMessage
+      else {
+        templates.value = templateResult.data?.items ?? []
+        newOrder.value = nextCompetitionChallengeOrder(challengeResult.data?.items ?? [])
+      }
+    } catch (failure) {
+      addError.value = parseApiError(failure).displayMessage
+    } finally { templatesLoading.value = false }
   }
 
   async function addChallenge() {
+    if (templatesLoading.value || adding.value) return
     if (!selectedTemplateId.value) {
       addError.value = describeMessage("administration.competitionsBy.description.selectQuestionBankTemplate")
       return

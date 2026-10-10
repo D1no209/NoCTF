@@ -7,6 +7,7 @@
   "leaderboard.scoreboardTeam.description.snapshotSolverAttributionYet": "This snapshot has no solver attribution yet. Please wait for the leaderboard to refresh.",
   "leaderboard.scoreboardTeam.description.teamSolvedChallengesYet": "This team has not solved any challenges yet",
   "leaderboard.label.status": "Current status",
+  "leaderboard.label.viewScoreboard": "View scoreboard",
   "leaderboard.competitionsBy.description.freezeRetainsSnapshotLast": "Freeze retains a snapshot of the last standings; Mask completely hides the scoreboard from players. Timing can be set to take effect.",
   "leaderboard.label.scoreCategory": "Score by category",
   "leaderboard.label.settledScore": "Settled score",

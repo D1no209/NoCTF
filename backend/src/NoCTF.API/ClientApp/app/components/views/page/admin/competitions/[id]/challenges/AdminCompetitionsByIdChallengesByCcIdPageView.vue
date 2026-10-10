@@ -39,7 +39,7 @@ const { ccId, SingleWriteUpSettings, adminTeamPath, adminTemplatePath, Plus, com
         />
 
         <div id="competition-challenge-editor-content" data-challenge-editor-content class="min-w-0">
-        <section v-if="activeSection === 'general'">
+        <section v-show="activeSection === 'general'">
           <Card>
             <CardHeader>
               <CardTitle>{{ $t('administration.label.basicSettings') }}</CardTitle>
@@ -85,10 +85,14 @@ const { ccId, SingleWriteUpSettings, adminTeamPath, adminTemplatePath, Plus, com
                 </FieldGroup>
               </UiForm>
             </CardContent>
+            <Separator />
+            <CardContent class="py-5">
+              <component :is="SingleWriteUpSettings" :competition-id="competitionId" :competition-challenge-id="ccId" :can-write="canWrite" />
+            </CardContent>
           </Card>
         </section>
 
-        <section v-else-if="activeSection === 'config'">
+        <section v-if="activeSection === 'config'">
           <Card>
             <CardHeader>
               <CardTitle>{{ $t('administration.label.questionRules') }}</CardTitle>
@@ -305,6 +309,5 @@ const { ccId, SingleWriteUpSettings, adminTeamPath, adminTemplatePath, Plus, com
         </DialogContent>
       </Dialog>
     </template>
-    <Card v-if="challenge"><CardContent><component :is="SingleWriteUpSettings" :competition-id="competitionId" :competition-challenge-id="ccId" :can-write="canWrite" /></CardContent></Card>
   </div>
 </template>
