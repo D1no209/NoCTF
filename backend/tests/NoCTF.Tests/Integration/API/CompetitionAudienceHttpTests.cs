@@ -131,6 +131,37 @@ public sealed class CompetitionAudienceHttpTests
                 using var actorJson = JsonDocument.Parse(await actorDetail.Content.ReadAsStreamAsync(cancellationToken));
                 await Assert.That(actorJson.RootElement.GetProperty("administrationRole").GetString()).IsEqualTo(role);
             }
+            using var managedDetail = await actor.GetAsync($"/api/v1/admin/competitions/{competitionId}", cancellationToken);
+            await Assert.That(managedDetail.StatusCode).IsEqualTo(role == "Participant" ? HttpStatusCode.NotFound : HttpStatusCode.OK);
+            if (role != "Participant")
+            {
+                using var managedJson = JsonDocument.Parse(await managedDetail.Content.ReadAsStreamAsync(cancellationToken));
+                await Assert.That(managedJson.RootElement.GetProperty("competition").GetProperty("administrationRole").GetString()).IsEqualTo(role);
+            }
+            using var managedList = await actor.GetAsync("/api/v1/admin/competitions?includeDeleted=false", cancellationToken);
+            await Assert.That(managedList.StatusCode).IsEqualTo(HttpStatusCode.OK);
+            using var listJson = JsonDocument.Parse(await managedList.Content.ReadAsStreamAsync(cancellationToken));
+            await Assert.That(listJson.RootElement.GetProperty("items").EnumerateArray()
+                .Any(x => x.GetProperty("id").GetGuid() == competitionId)).IsEqualTo(role != "Participant");
+
+            using var update = await actor.PatchAsJsonAsync($"/api/v1/admin/competitions/{competitionId}", new
+            {
+                metadata = new
+                {
+                    title = $"Updated by {role}", description = (string?)null,
+                    startTime = now.AddMinutes(10), endTime = now.AddHours(2),
+                    teamRegistrationAutoApprove = true, allowTeamRegistrationWhileRunning = false,
+                    maxTeamMembers = 5, maxConcurrentRuntimeInstancesPerTeam = 1,
+                    maxActiveQuestionsPerTeam = 5, maxParticipantMessagesBeforeHandlerReply = 3,
+                    allowChallengeOwnersToHandleQuestions = true, practiceModeEnabled = false,
+                    writeUpSubmissionRequired = false, writeUpSubmissionDeadlineHours = 0, accessMode = "Public"
+                }
+            }, cancellationToken);
+            await Assert.That(update.StatusCode).IsEqualTo(role switch
+            {
+                "Owner" or "Manager" => HttpStatusCode.OK,
+                _ => HttpStatusCode.Forbidden
+            });
         }
 
         using var stillForbidden = await anonymous.GetAsync(path, cancellationToken);

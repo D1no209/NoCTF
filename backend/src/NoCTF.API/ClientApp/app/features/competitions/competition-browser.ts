@@ -6,7 +6,7 @@ export const competitionGroups: CompetitionGroup[] = ['running', 'upcoming', 'fi
 
 export function competitionGroup(competition: Competition, includeManagement = false): CompetitionGroup | null {
   if (competition.deletedAt) return includeManagement ? 'deleted' : null
-  if (competition.status === 'Draft') return includeManagement ? 'upcoming' : null
+  if (competition.status === 'Draft') return includeManagement || competition.administrationRole != null ? 'upcoming' : null
   if (competition.status === 'Running' || competition.status === 'Paused') return 'running'
   if (competition.status === 'Published' || competition.status === 'Visible') return 'upcoming'
   return competition.status === 'Finished' ? 'finished' : null

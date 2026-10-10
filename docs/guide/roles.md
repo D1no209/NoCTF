@@ -12,7 +12,7 @@
 
 公开注册只创建普通 Human/User。Organizer 和 Administrator 由平台管理员授予。Bot 是账号种类，和角色独立；Bot 使用管理员签发的访问令牌，不通过密码登录或 Refresh Cookie 登录。
 
-此表说明后台能力。当前 SPA 的比赛管理路由和入口仅对 Administrator 开放；Organizer 或比赛协作者后台授权不等于当前浏览器工作区可进入。比赛创建位于竞赛浏览页弹窗，没有独立管理列表页，详见 [管理入口](../competition/index.md)。
+比赛管理入口向平台 Administrator 及本比赛的 Owner、Manager、Judge、Observer 展示，路由按比赛资源权限检查。仅有 Organizer 平台角色不代表可进入其他比赛的工作区。比赛创建位于竞赛浏览页弹窗，没有独立管理列表页，详见 [管理入口](../competition/index.md)。
 
 ## 比赛协作者
 
@@ -23,6 +23,8 @@
 | Judge | 评测查询、重判和运行诊断等裁判操作 | 不修改比赛配置、团队或生命周期 |
 | Observer | 管理读取 | 没有写权限；内部赛道有额外可见性限制 |
 | Player | 公开内容与本队私有内容 | 无法读取其他队的 Flag 和内部诊断 |
+
+管理菜单按职责区分：Owner 和 Manager 可见配置、赛道、方向、公告、导出、Webhook 和闯关编排；所有权及协作者权限仅 Owner／平台管理员可见。Judge 保留提交、作弊、题解审核和运行诊断菜单，不显示赛事配置菜单。Observer 保留题目、队伍、提交、运行状态、题解查看和计分板查看，不显示裁定与运营菜单。Judge／Observer 在可进入的页面仍沿用裁定／只读限制；直接访问其他地址也必须通过后端逐项授权。
 
 Owner/Manager 需要 Organizer 或 Administrator 平台角色；Judge/Observer 需要完成邮箱验证。同一个账号在一场比赛只担任一个协作者角色。所有权转让后，旧 Owner 成为 Manager。
 

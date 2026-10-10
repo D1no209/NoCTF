@@ -23,6 +23,7 @@ test('management review remains discoverable for finished competitions and uses 
     adminWorkspacePath: (path: string) => path, CompetitionAdminKey: Symbol(),
     CompetitionStatusBadgeComponent: {}, GameModeBadgeComponent: {}, AppWorkspaceNavComponent: {} }
   const state = shellFactory(deps)()
+  state.role.value = 'Owner'
   for (const status of ['Draft', 'Running', 'Finished']) {
     state.competition.value = { id: 'competition', title: 'Competition', mode: 'Ctf', status }
     const link = state.navGroups.value.flatMap((group: { items: Array<{ to: string; label: string }> }) => group.items)
@@ -117,12 +118,12 @@ describe('management WriteUp review', () => {
   })
 })
 
-test('the platform-admin management route composes the existing PDF review and fills its transition frame', async () => {
+test('the competition staff management route composes the existing PDF review and fills its transition frame', async () => {
   const page = await Bun.file(new URL('../app/pages/admin/competitions/[id]/writeups.vue', import.meta.url)).text()
   const feature = await Bun.file(new URL('../app/features/routes/admin/competitions/[id]/AdminCompetitionsByIdWriteUpsPage.vue', import.meta.url)).text()
   const shell = await Bun.file(new URL('../app/components/views/page/admin/competitions/AdminCompetitionsByIdPageView.vue', import.meta.url)).text()
   const css = await Bun.file(new URL('../app/components/views/app/settings-workspace.css', import.meta.url)).text()
-  expect(page).toContain("middleware: 'platform-admin'")
+  expect(page).toContain("middleware: 'competition-admin'")
   expect(feature).toContain('useCompetitionsByIdWriteUpsPage({ management: true })')
   expect(feature).toContain('CompetitionsByIdWriteUpsPageView.vue')
   expect(shell).toContain("isProgressionPage || isWriteUpReview ? 'max-w-none'")

@@ -19,7 +19,9 @@ export function useCompetitionOverview(
   const competitionId = props.competition.id!
   const { user, isLoggedIn, isAdministrator } = useAuth()
   const competition = ref(props.competition)
-  const managementOnly = computed(() => isAdministrator.value && (competition.value.status === 'Draft' || Boolean(competition.value.deletedAt)))
+  const canManageCompetition = computed(() => isLoggedIn.value
+    && (isAdministrator.value || competition.value.administrationRole != null))
+  const managementOnly = computed(() => canManageCompetition.value && (competition.value.status === 'Draft' || Boolean(competition.value.deletedAt)))
   const detailError = ref<UiMessage | null>(null)
   const reads = new AbortController()
   onUnmounted(() => reads.abort())
@@ -431,6 +433,7 @@ export function useCompetitionOverview(
       competitionId,
       isLoggedIn,
       isAdministrator,
+      canManageCompetition,
       managementOnly,
       competition,
       myTeam,

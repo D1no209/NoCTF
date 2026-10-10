@@ -27,7 +27,7 @@ describe('participant competition workspace layout', () => {
     expect(adminParent).toContain("label: translate(\"leaderboard.ctf.liveTitle\")")
     expect(adminParent).toContain("label: translate(\"common.label.teamManagement\")")
     expect(adminParent).toContain("label: translate(\"administration.label.activity\")")
-    expect(adminParent).toContain("middleware: 'platform-admin'")
+    expect(adminParent).toContain("middleware: 'competition-admin'")
   })
 
   test('only enables the challenge navigator when explicitly requested', async () => {

@@ -47,7 +47,7 @@ Nuxt 4 SPA(`ssr: false`),Bun 管理依赖,TypeScript strict,Vue 用 `<script set
 - 使用嵌套 NuxtPage 或多层组件根的路由必须在 pages 入口提供可接收 transition class 的真实 DOM 根节点。平台管理使用 `data-slot="platform-admin-page"`，离场期间必须保留侧栏和当前设置内容直至 leave 完成。
 - 需要固定视口高度和纵向裁切的竞赛页面根节点必须声明 `data-contained-workspace-page`。DefaultLayout 使用稳定的 `data-slot="default-layout"`，其 `100dvh` / overflow 规则只能通过当前 main 子页面标记生效；禁止用 route 派生 class 控制高度，避免离场卡片提前解除约束或进入中的普通页面被截断。
 - 公开竞赛介绍只使用实体路由 `/competitions/<id>`：左侧选择、右侧介绍与报名入口，窄屏上下排列。题目详情只使用 `/competitions/<id>/challenges/<competitionChallengeId>`；实体标识不得回退到查询参数，筛选、弹窗等非实体状态继续使用查询参数。
-- 独立竞赛管理列表和新建页已移除；平台管理员只在竞赛页右上角通过 CreateCompetitionDialog 新建竞赛，成功后关闭弹窗、写入现有列表并选中新竞赛。当前竞赛管理入口仍位于“我的队伍”右侧；管理员列表包含草稿和已删除竞赛，已删除项使用专属分类。全部 `/admin/competitions/<id>` 管理路由使用 `platform-admin` 中间件，普通用户和 Organizer 不显示入口。
+- 独立竞赛管理列表和新建页已移除；平台管理员只在竞赛页右上角通过 CreateCompetitionDialog 新建竞赛，成功后关闭弹窗、写入现有列表并选中新竞赛。当前竞赛管理入口仍位于“我的队伍”右侧，向平台管理员及本比赛的 Owner、Manager、Judge、Observer 展示；普通用户和 Organizer 须具备本比赛协作权限。平台管理员列表包含草稿和已删除竞赛，已删除项使用专属分类；其他工作人员列表合并公开比赛及本人的未删除管理比赛。全部 `/admin/competitions/<id>` 管理路由使用 `competition-admin` 中间件，按服务端资源权限放行；各角色写入／裁定／权限管理分别沿用 canWrite、canJudge、canManagePermissions。平台设置仍使用 `platform-admin`。
 - 题库管理列表按 includeDeleted 筛选保留最近成功快照；重新进入页面先显示快照并后台刷新，刷新失败保留现有行。筛选切换和组件卸载必须使旧请求失效，禁止过期响应覆盖当前列表。
 - 竞赛列表通过 CompetitionSidebar 功能组件组合 FloatingSidebar / WaveSelectionList 原语，直接固定在背景上，不使用卡片外框。波浪形悬停与选中外凸由 `app/motion/useWaveMotion.ts` 管理，悬停不更改竞赛选择；当前以桌面端为准。
 - 竞赛与题目列表共用 ChoiceSidebar 组合原语；题目页按视口限制高度，采用组件内部 ScrollSurface，不做页面级滚动。题目侧栏提供按名称搜索并与隐藏已解出组合过滤；方向抽屉默认收起，仅当前选中题目所在方向自动展开。默认题目条目固定为 40px，仅显示题名、必要状态与分数。未选中项持续悬停 50ms 后才开始 800ms 展开，离开立即开始 800ms 收缩；键盘聚焦不等待。当前选中题目始终保持 112px 展开。题目卡片不增加选中或已解外圈光晕；展开态默认显示方向水印，并允许 StatusIcon 与三枚 BloodMark 自身光晕越过裁切边界，其中选中分组单独保留底部光晕安全区。展开态保持透明，不增加白色覆盖层、背景模糊或阴影。默认布局不显示站点页脚。

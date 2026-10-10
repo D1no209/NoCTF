@@ -65,7 +65,7 @@ export function useCompetitionsByIdPage() {
     ].includes(route.path)
   })
 
-  const returnsToAdministration = computed(() => isAdministrator.value
+  const returnsToAdministration = computed(() => (isAdministrator.value || competition.value?.administrationRole != null)
     && (isWriteUpReview.value || route.path === `${competitionPath(competitionId.value)}/staff`))
   const competitionReturnPath = computed(() => returnsToAdministration.value
     ? adminCompetitionPath(competitionId.value)
@@ -285,6 +285,7 @@ export function useCompetitionsByIdPage() {
         ? [{
             label: translate("common.label.management"),
             items: [
+              { to: adminCompetitionPath(competitionId.value), label: translate('competitions.label.manageCompetition'), icon: LayoutDashboard },
               { to: `${base}/writeups`, label: translate("writeUp.review"), icon: ClipboardCheck },
               { to: `${base}/staff`, label: translate('staffWebhook.workbench'), icon: ClipboardCheck },
             ],

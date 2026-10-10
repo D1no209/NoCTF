@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { CompetitionOverviewViewState } from '~/features/competitions/useCompetitionOverview'
 
 const viewProps = defineProps<{ state: CompetitionOverviewViewState }>()
-const { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn, Settings, ShieldCheck, Trophy, UserPlus, Users, posterUrl, detailError, refreshCompetition, competitionId, isLoggedIn, isAdministrator, managementOnly, competition, myTeam, teamLoaded, teamLoadError, loadMyTeam, approvedTeamCount, selectableTracks, tracksLoaded, trackLoadError, loadRegistrationOptions, countdown, practiceOpen, canParticipate, entryPath, teamRegistrationOpen, tracksEnabled, createOpen, createName, createTrackKey, createPending, createValidationError, selectedCreateTrack, submitCreate, joinOpen, joinToken, joinPending, joinValidationError, submitJoin, isCaptain, requiresManualReview, registrationOpen, registrationInvitationCode, registrationPending, registrationError, registrationTrack, canSubmitRegistration, registrationValid, openRegistration, setRegistrationOpen, submitRegistration, LifecycleBadge } = toRefs(viewProps.state)
+const { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn, Settings, ShieldCheck, Trophy, UserPlus, Users, posterUrl, detailError, refreshCompetition, competitionId, isLoggedIn, canManageCompetition, managementOnly, competition, myTeam, teamLoaded, teamLoadError, loadMyTeam, approvedTeamCount, selectableTracks, tracksLoaded, trackLoadError, loadRegistrationOptions, countdown, practiceOpen, canParticipate, entryPath, teamRegistrationOpen, tracksEnabled, createOpen, createName, createTrackKey, createPending, createValidationError, selectedCreateTrack, submitCreate, joinOpen, joinToken, joinPending, joinValidationError, submitJoin, isCaptain, requiresManualReview, registrationOpen, registrationInvitationCode, registrationPending, registrationError, registrationTrack, canSubmitRegistration, registrationValid, openRegistration, setRegistrationOpen, submitRegistration, LifecycleBadge } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -259,7 +259,7 @@ const { ArrowRight, Box, CalendarRange, Clock, EyeOff, FileText, KeyRound, LogIn
               </Button>
             </template>
             </template>
-            <Button v-if="isAdministrator" as-child variant="outline">
+            <Button v-if="canManageCompetition" as-child variant="outline">
               <NuxtLink :to="`/admin/competitions/${competitionId}`"><Settings data-icon="inline-start" />{{ $t('competitions.label.manageCompetition') }}</NuxtLink>
             </Button>
           </div>
