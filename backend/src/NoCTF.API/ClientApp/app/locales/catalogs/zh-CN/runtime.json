@@ -49,7 +49,7 @@
   "runtime.trafficCaptures": "流量捕获",
   "runtime.trafficCapturesDescription": "检查经 Runtime WebSocket 代理记录的 PCAPNG 流量。",
   "runtime.exportSelectedCaptures": "导出所选抓包",
-  "runtime.runtimeId": "Runtime ID",
+  "runtime.runtimeId": "运行环境 ID",
   "runtime.captureState": "抓包状态",
   "runtime.captureComplete": "完整",
   "runtime.captureTruncated": "已截断",
@@ -171,5 +171,5 @@
   "runtime.defaults.checkerTimeoutSeconds": "60",
   "runtime.label.compose": "Compose",
   "runtime.terminate.reasonLimitSuffix": "/512",
-  "runtime.label.service": "service"
+  "runtime.label.service": "服务"
 }

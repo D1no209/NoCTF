@@ -57,7 +57,7 @@
   "writeUp.startConsultation": "创建并进入咨询",
   "writeUp.teamWriteUpFiles": "队伍题解文件",
   "writeups.label.sha": "SHA-256 校验值",
-  "writeUp.points": "{score} pts",
+  "writeUp.points": "{score} 分",
   "writeUp.reviewMetadata": "由 {user} 提交于 {time}",
   "writeUp.originalRank": "原始排名",
   "writeUp.originalScore": "原始总分",
