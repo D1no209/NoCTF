@@ -83,7 +83,7 @@
   "leaderboard.label.teamSystem": "团队/系统",
   "leaderboard.scoreboardTeam.label.memberAttributedScoreYet": "暂无可归属的队员得分",
   "leaderboard.scoreboardTeam.description.automatedSettlementHistoricalWindows": "自动结算、历史窗口及其他无法归属个人的分值归入“团队/系统”。",
-  "leaderboard.label.pts": "pts，",
+  "leaderboard.label.pts": "分",
   "leaderboard.filters.searchChallenges": "搜索题目",
   "leaderboard.filters.allDirections": "所有方向",
   "leaderboard.filters.allChallenges": "所有题目",

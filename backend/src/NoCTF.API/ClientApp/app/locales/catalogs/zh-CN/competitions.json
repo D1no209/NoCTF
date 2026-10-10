@@ -365,7 +365,7 @@
   "competitions.label.attackDefensePatchSettlement": "攻击 · 防御 · 补丁 · 结算",
   "competitions.registration.teamPrefix": "队伍「",
   "competitions.registration.rejectedSuffix": "」报名被拒绝",
-  "competitions.label.pts": "PTS",
+  "competitions.label.pts": "分",
   "competitions.registration.rejected": "报名被拒绝。",
   "teams.ban.occurredAtPrefix": "封禁时间:",
   "teams.ban.sourcePrefix": "· 来源:",
