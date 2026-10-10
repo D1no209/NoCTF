@@ -9,6 +9,21 @@ namespace NoCTF.Tests.Unit.GameModes;
 public sealed class ChallengeTimingScoringTests
 {
     private static readonly DateTimeOffset Start = new(2026, 10, 10, 0, 0, 0, TimeSpan.Zero);
+    [Test, Arguments(60, 100L), Arguments(90, 100L), Arguments(120, 50L)]
+    public async Task Awd_rewards_and_penalties_settle_only_complete_rounds(int cutoff, long score)
+    {
+        var team = Guid.NewGuid(); var question = Guid.NewGuid();
+        var input = Input(GameMode.Awd, team, question,
+            [Fact(team, question, GameplayFactKind.AwdServiceTransition, GameplayFactResult.ServiceUp, 0),
+             Fact(team, question, GameplayFactKind.AwdServiceTransition, GameplayFactResult.ServiceDown, 70)],
+            new(null, Start.AddSeconds(cutoff))) with { AwdRounds = [
+                new(question, team, Guid.NewGuid(), Start, Start.AddSeconds(60)),
+                new(question, team, Guid.NewGuid(), Start.AddSeconds(60), Start.AddSeconds(120))] };
+        var projection = new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()).Project(input);
+        await Assert.That(projection.Snapshot.Teams.Single().TotalScore).IsEqualTo(score);
+        var row = projection.Snapshot.Teams.Single();
+        await Assert.That(row.Slots.Sum(x => x.NetPoints.GetValueOrDefault()) + row.ScoreOutsideWindow).IsEqualTo(score);
+    }
     [Test]
     [Arguments(60, 180, 2)]
     [Arguments(61, 180, 1)]

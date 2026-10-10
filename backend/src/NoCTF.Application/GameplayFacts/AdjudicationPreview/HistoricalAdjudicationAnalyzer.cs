@@ -29,13 +29,16 @@ public static class HistoricalAdjudicationAnalyzer
             AdjudicationFindingSeverity severity, AdjudicationFindingClassification classification) =>
             issues.Add(new(kind, certainty, severity, classification));
 
-        if (latestTrusted && evidence.CurrentResult != latest!.Result)
+        var latestCurrentResult = latest?.Result is { } recorded
+            ? evidence.Timing?.Classify(recorded, evidence.OccurredAt, evidence.Practice) ?? recorded : (GameplayFactResult?)null;
+        if (latestTrusted && evidence.CurrentResult != latestCurrentResult)
         {
-            expectedResult = latest.Result;
+            expectedResult = latestCurrentResult;
             Add(AdjudicationDifferenceKind.HistoricalResultChanged, AdjudicationDifferenceCertainty.Deterministic,
                 AdjudicationFindingSeverity.Error, AdjudicationFindingClassification.CurrentResultMismatch);
         }
-        else if (decisions.Length > 1 && !hasConflicts && unknown.Length == 0)
+        else if (latestTrusted && latestCurrentResult != latest!.Result
+            || decisions.Length > 1 && !hasConflicts && unknown.Length == 0)
             Add(AdjudicationDifferenceKind.HistoricalResultChanged, AdjudicationDifferenceCertainty.Deterministic,
                 AdjudicationFindingSeverity.Information, AdjudicationFindingClassification.LegalHistoryChange);
 
@@ -56,9 +59,9 @@ public static class HistoricalAdjudicationAnalyzer
         LeaderboardBloodRank? currentRank = null;
         if (evidence.GameMode == GameMode.Ctf)
         {
-            var historicalAdjustment = evidence.HasEligibilityChanges || changes > 0;
+            var historicalAdjustment = evidence.HasEligibilityChanges || evidence.HasTimingChanges || changes > 0;
             var comparisonSeverity = historicalAdjustment ? AdjudicationFindingSeverity.Information : AdjudicationFindingSeverity.Warning;
-            var comparisonClass = evidence.HasEligibilityChanges ? AdjudicationFindingClassification.EligibilityAdjustment
+            var comparisonClass = evidence.HasEligibilityChanges || evidence.HasTimingChanges ? AdjudicationFindingClassification.EligibilityAdjustment
                 : changes > 0 ? AdjudicationFindingClassification.LegalHistoryChange : AdjudicationFindingClassification.InsufficientEvidence;
             if (evidence.CurrentBloodEligible && evidence.MatchesCurrentInteraction
                 && evidence.CurrentResult == GameplayFactResult.Correct && !evidence.HasEarlierCorrect
