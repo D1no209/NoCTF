@@ -11,12 +11,12 @@ export function useDefinitionRuntime(props: Readonly<{
   const singleServiceOnly = computed(() => props.mode === 'Awdp' || isPatchVerification.value)
   const hasServices = computed(() => props.runtime.definition.kind === 'container')
   const serviceNames = computed(() => props.runtime.definition.kind === 'container' ? props.runtime.definition.services.map(service => service.name) : [])
-  const showDynamicFlagInjection = computed(() => props.mode === 'Ctf' && !isPatchVerification.value)
+  const showDynamicFlagInjection = computed(() => (props.mode === 'Ctf' || props.mode === 'LiveSolo') && !isPatchVerification.value)
   const dynamicFlagInjection = computed(() => props.runtime.flagSource === FlagSource.PerTeam)
   const kindOptions = computed(() => singleServiceOnly.value
     ? [{ value: 'container', label: translate('runtime.label.runtimeServices') }]
     : [{ value: 'container', label: translate('runtime.label.runtimeServices') }, { value: 'ova', label: translate('runtime.label.virtualMachine') }])
-  const exposureOptions = computed(() => props.mode === 'Ctf' || props.mode === 'Awdp'
+  const exposureOptions = computed(() => props.mode === 'Ctf' || props.mode === 'Awdp' || props.mode === 'LiveSolo'
     ? [{ value: UrlExposure.OwnerOnly, label: 'runtime.urlBinding.description.visibleTeamItself' }]
     : [{ value: UrlExposure.OwnerOnly, label: 'runtime.urlBinding.description.visibleTeamItself' }, { value: UrlExposure.Participants, label: 'runtime.label.visibleContestants' }])
   const flagSourceOptions = computed(() => [

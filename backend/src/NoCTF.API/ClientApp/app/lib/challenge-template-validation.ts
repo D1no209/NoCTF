@@ -127,6 +127,13 @@ export function validateChallengeTemplateDraft(draft: ChallengeTemplateDraft): s
   else if (direction.length > 96) addIssue(issues, translate("challenges.validation.directionLength"))
 
   const model = draft.definition
+  if (draft.mode === 'LiveSolo') {
+    if (model.runtime && model.runtime.allocation !== RuntimeAllocation.PerTeam)
+      addIssue(issues, translate('liveSolo.templates.independentRuntime'))
+    if (model.checker || model.checkerJob || model.patchEntrypoint || model.patchCommand.length
+      || model.patchTimeoutSeconds !== null || model.maximumPatchUploadBytes !== null || model.checkerFixInput)
+      addIssue(issues, translate('liveSolo.templates.flagSubmissionOnly'))
+  }
   if (draft.mode === 'Awdp' && model.checkerFixInput && !model.checkerJob)
     addIssue(issues, translate("challenges.challengeTemplate.description.enableCheckerFixPackage"))
   const runtime = model.runtime

@@ -68,7 +68,7 @@ const { bytesToMib, cpuMillicoresToCores, RuntimeAllocation, UrlExposure, hasSer
     </DefinitionSection>
 
     <DefinitionSection :title="$t('runtime.label.accessEntrance')" :collapsible="false" accent-title>
-      <Field v-if="mode !== 'Ctf' && mode !== 'Awdp'">
+      <Field v-if="mode !== 'Ctf' && mode !== 'Awdp' && mode !== 'LiveSolo'">
         <FieldLabel>{{ $t('runtime.label.flagSource') }}</FieldLabel>
         <Select
           :model-value="String(runtime.flagSource)"

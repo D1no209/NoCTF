@@ -98,19 +98,30 @@ export function useAdminCompetitionsByIdPage() {
         { to: `${base}/teams`, label: translate("common.label.teamManagement"), icon: Users },
       ],
     },
+    ...(competition.value?.mode === 'LiveSolo' ? [{
+      label: gameModeLabel('LiveSolo'),
+      items: [
+        { to: `/competitions/${competitionId}/live-solo`, label: translate('liveSolo.hall'), icon: GitBranch },
+        { to: `/competitions/${competitionId}/live-solo/settings`, label: translate('liveSolo.settings.title'), icon: Settings },
+        { to: `/competitions/${competitionId}/live-solo/groups`, label: translate('liveSolo.groups.title'), icon: Puzzle },
+        { to: `/competitions/${competitionId}/live-solo/bracket`, label: translate('liveSolo.bracket.title'), icon: GitBranch },
+      ],
+    }] : []),
     {
       label: translate("administration.label.monitoring"),
       items: [
         ...(competition.value?.mode === 'Awdp'
           ? [{ to: `/competitions/${competitionId}/awdp-live`, label: translate("administration.label.controlScreen"), icon: Orbit }]
-          : [{ to: `/competitions/${competitionId}/live`, label: translate("leaderboard.ctf.liveTitle"), icon: Orbit }]),
+          : competition.value?.mode === 'Ctf' ? [{ to: `/competitions/${competitionId}/live`, label: translate("leaderboard.ctf.liveTitle"), icon: Orbit }] : []),
         { to: `/competitions/${competitionId}/events`, label: translate("administration.label.activity"), icon: Activity },
         { to: `${base}/submissions`, label: translate("common.label.submissions"), icon: FileCheck },
         { to: `${base}/runtimes`, label: translate("administration.label.runtime"), icon: Container },
         { to: `${base}/traffic-captures`, label: translate("runtime.trafficCaptures"), icon: Network },
         { to: `${base}/cheats`, label: translate("administration.label.cheating"), icon: ShieldAlert },
-        { to: `${base}/leaderboard`, label: translate("common.label.leaderboard"), icon: Trophy },
-        { to: `/competitions/${competitionId}/leaderboard`, label: translate('leaderboard.label.viewScoreboard'), icon: ChartNoAxesCombined },
+        ...(competition.value?.mode === 'LiveSolo' ? [] : [
+          { to: `${base}/leaderboard`, label: translate("common.label.leaderboard"), icon: Trophy },
+          { to: `/competitions/${competitionId}/leaderboard`, label: translate('leaderboard.label.viewScoreboard'), icon: ChartNoAxesCombined },
+        ]),
       ],
     },
     {

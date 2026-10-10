@@ -33,6 +33,7 @@ const { model, parseFailed, DefinitionCheckerSection, DefinitionFlagInjectionSec
     </Field>
 
     <component :is="DefinitionRuntimeSection" :model="model" :mode="mode" :disabled="disabled" />
+    <component v-if="mode === 'LiveSolo'" :is="state.DefinitionFlagTemplateSection" :model="model" :mode="mode" :disabled="disabled" />
 
     <template v-if="mode === 'Awd'">
       <component :is="DefinitionFlagInjectionSection" :model="model" :disabled="disabled" />

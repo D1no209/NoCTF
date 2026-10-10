@@ -173,7 +173,11 @@ const { competitionId, SingleWriteUpSettings, refreshCompetition, competition, c
         </CardDescription>
       </CardHeader>
       <CardContent>
+        <Button v-if="competition?.mode === 'LiveSolo'" as-child variant="outline">
+          <NuxtLink :to="`/competitions/${competitionId}/live-solo/settings`">{{ $t('liveSolo.settings.title') }}</NuxtLink>
+        </Button>
         <component :is="CompetitionModeConfigEditor"
+          v-else
           :mode="(config?.mode ?? competition?.mode ?? 'Ctf') as GameModeValue"
           :configuration="config?.configuration"
           :readonly="!canWrite"

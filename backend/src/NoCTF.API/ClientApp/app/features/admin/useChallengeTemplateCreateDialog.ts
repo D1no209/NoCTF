@@ -8,6 +8,7 @@ import { challengeTemplateWriteErrorMessages } from '../../lib/challenge-templat
 import { validateChallengeTemplateDraft } from '../../lib/challenge-template-validation'
 import { challengeDirectionOptions, directionLabel } from '../../utils/directions'
 import { defaultDefinition, definitionContractToModel } from '../../utils/game-config'
+import { gameModeOptions, isGameMode } from '../../utils/game-modes'
 import DefinitionEditorComponent from './DefinitionEditor.vue'
 
 type Events = {
@@ -54,7 +55,7 @@ export function useChallengeTemplateCreateDialog(
   }
 
   function changeMode(value: unknown): void {
-    if (value !== 'Ctf' && value !== 'Awd' && value !== 'Awdp' && value !== 'Koh') return
+    if (!isGameMode(value)) return
     definition.value = defaultDefinition(value)
     mode.value = value
   }
@@ -111,6 +112,7 @@ export function useChallengeTemplateCreateDialog(
     ...toRefs(props),
     title,
     mode,
+    modeOptions: gameModeOptions,
     visibility,
     direction,
     description,

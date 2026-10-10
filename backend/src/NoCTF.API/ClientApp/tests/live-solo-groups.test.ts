@@ -21,6 +21,7 @@ describe('LiveSolo group editing', () => {
   })
   test('copy picker excludes deleted, patch and other modes', () => {
     expect(copyCandidates([{ id:'good', mode:'Ctf', interactionKind:'FlagSubmission' }, { id:'patch', mode:'Ctf', interactionKind:'PatchVerification' },
-      { id:'awd', mode:'Awd', interactionKind:'FlagSubmission' }, { id:'deleted', mode:'Ctf', interactionKind:'FlagSubmission', deletedAt:'now' }]).map(row=>row.id)).toEqual(['good'])
+      { id:'solo', mode:'LiveSolo' }, { id:'deleted-solo', mode:'LiveSolo', deletedAt:'now' },
+      { id:'awd', mode:'Awd', interactionKind:'FlagSubmission' }, { id:'deleted', mode:'Ctf', interactionKind:'FlagSubmission', deletedAt:'now' }]).map(row=>row.id)).toEqual(['good','solo'])
   })
 })

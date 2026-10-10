@@ -1,6 +1,7 @@
 import { message as describeMessage } from '../../utils/i18n'
 import type { UiMessage } from '../../utils/i18n'
 import { toRefs } from 'vue'
+import { gameModeOptions } from '../../utils/game-modes'
 import { toast } from '../../utils/message-toast'
 import { adminCompetitionPosterReplace, adminCreateCompetition } from '../../api'
 import type { NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsCompetitionsGameModeProtocol } from '../../api'
@@ -186,6 +187,7 @@ export function useCreateCompetitionDialog(
     title,
     description,
     mode,
+    modeOptions: gameModeOptions,
     startTime,
     endTime,
     teamRegistrationAutoApprove,

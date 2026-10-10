@@ -16,6 +16,9 @@ export function useAdminGameModeBadge(props: Readonly<{ mode?: number | string |
       case 3:
       case 'Koh':
         return 'KoH'
+      case 4:
+      case 'LiveSolo':
+        return 'LiveSolo'
       default:
         return '—'
     }
