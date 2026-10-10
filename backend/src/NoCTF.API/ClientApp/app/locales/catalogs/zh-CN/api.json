@@ -738,5 +738,8 @@
   "api.uploadPlatform.title.logoSizeInvalid": "Logo 尺寸不合法。",
   "api.uploadPlatform.title.logoFormatInvalid": "Logo 格式不合法。",
   "api.forceTermination.title.forceTerminationReasonInvalid": "强制终结原因不合法。",
-  "api.runtimeTraffic.validation.selectBetweenDistinctRuntime": "请选择 1 至 100 个不同的运行环境流量抓取记录。"
+  "api.runtimeTraffic.validation.selectBetweenDistinctRuntime": "请选择 1 至 100 个不同的运行环境流量抓取记录。",
+  "api.liveSolo.pool.sourceChanged": "来源内容已变化，请重新加载后再复制或编辑。",
+  "api.liveSolo.pool.protectedMaterialsForbidden": "缺少来源附件或 Flag 的复制权限。",
+  "api.liveSolo.pool.alreadyInQuestionBank": "此题目仍关联题库模板，无需保存到题库。"
 }

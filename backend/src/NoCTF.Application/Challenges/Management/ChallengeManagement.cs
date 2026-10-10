@@ -13,7 +13,8 @@ public sealed record CreateCompetitionChallengeCommand(
     DateTimeOffset CreatedAt,
     string? CustomTitle = null,
     IReadOnlyList<string>? Tags = null,
-    ChallengeTiming? Timing = null);
+    ChallengeTiming? Timing = null,
+    ChallengeCatalogScope MaterialScope = ChallengeCatalogScope.QuestionBank);
 
 public sealed record UpdateCompetitionChallengeCommand(
     Guid CompetitionId,

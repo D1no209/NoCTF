@@ -738,5 +738,8 @@
   "api.gameplayFacts.gameplayFactAdmission.challengeNotOpened": "The challenge has not opened.",
   "api.gameplayFacts.gameplayFactAdmission.challengeSubmissionClosed": "The challenge submission deadline has passed.",
   "api.challenges.challengeMutation.invalidTiming": "Opening, scoring end and submission deadline must be in order.",
-  "api.challenges.challengeMutation.timingUnsupported": "LiveSolo uses its own Round timing."
+  "api.challenges.challengeMutation.timingUnsupported": "LiveSolo uses its own Round timing.",
+  "api.liveSolo.pool.sourceChanged": "The source material changed. Reload it before copying or editing.",
+  "api.liveSolo.pool.protectedMaterialsForbidden": "Copy permission for the source attachments or Flags is required.",
+  "api.liveSolo.pool.alreadyInQuestionBank": "This question still follows a question-bank template."
 }

@@ -18,7 +18,10 @@ public sealed record ChallengeTemplateSummaryResponse(
     DateTimeOffset? DeletedAt,
     int ActiveCompetitionReferenceCount,
     DateTimeOffset UpdatedAt,
-    CtfInteractionKindProtocol InteractionKind);
+    CtfInteractionKindProtocol InteractionKind)
+{
+    public Guid ConcurrencyStamp { get; init; }
+}
 
 public sealed class ChallengeTemplateListResponse : ArrayResult<ChallengeTemplateSummaryResponse>
 {
@@ -43,6 +46,9 @@ public sealed class ListChallengeTemplatesRequest : SearchRequest
     public bool OnlyMine { get; set; }
 
     [QueryParam]
+    public GameModeProtocol? Mode { get; set; }
+
+    [QueryParam]
     public string? Direction { get; set; }
 }
 
@@ -51,6 +57,7 @@ public sealed class ListChallengeTemplatesValidator : Validator<ListChallengeTem
     public ListChallengeTemplatesValidator()
     {
         PaginationRules.AddSearch(this);
+        RuleFor(request => request.Mode).IsInEnum();
         RuleFor(request => request.Direction).MaximumLength(96);
     }
 }
@@ -85,7 +92,8 @@ public sealed class ListChallengeTemplatesEndpoint(
                 request.Offset,
                 request.Limit,
                 request.Desc,
-                request.OnlyMine), ct)));
+                request.OnlyMine,
+                request.Mode is { } mode ? CompetitionProtocolMapper.ToDomain(mode) : null), ct)));
 
     private static ChallengeTemplateListResponse ToListResponse(ChallengeTemplateListPage page) =>
         new(page.Items.Select(item => new ChallengeTemplateSummaryResponse(
@@ -97,7 +105,7 @@ public sealed class ListChallengeTemplatesEndpoint(
             item.DeletedAt,
             item.ActiveCompetitionReferenceCount,
             item.UpdatedAt,
-            ChallengeMapper.ToProtocol(item.InteractionKind))).ToArray(),
+            ChallengeMapper.ToProtocol(item.InteractionKind)) { ConcurrencyStamp = item.ConcurrencyStamp }).ToArray(),
             page.Total,
             page.Directions);
 }

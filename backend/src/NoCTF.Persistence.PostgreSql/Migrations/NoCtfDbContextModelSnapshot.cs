@@ -55,6 +55,10 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<short>("CatalogScope")
+                        .HasColumnType("smallint")
+                        .HasColumnName("catalog_scope");
+
                     b.Property<Guid>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .HasColumnType("uuid")
@@ -4214,6 +4218,61 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasDatabaseName("ix_live_solo_question_group_items_question_group_id_competitio");
 
                     b.ToTable("live_solo_question_group_items", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloQuestionMaterial", b =>
+                {
+                    b.Property<Guid>("CompetitionChallengeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_challenge_id");
+
+                    b.Property<Guid>("ChallengeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("challenge_id");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<Guid?>("SourceTemplateId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_template_id");
+
+                    b.Property<Guid?>("SourceTemplateStamp")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_template_stamp");
+
+                    b.HasKey("CompetitionChallengeId")
+                        .HasName("pk_live_solo_question_materials");
+
+                    b.HasIndex("ChallengeId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_live_solo_question_materials_challenge_id");
+
+                    b.HasIndex("CreatedByUserId")
+                        .HasDatabaseName("ix_live_solo_question_materials_created_by_user_id");
+
+                    b.HasIndex("SourceTemplateId")
+                        .HasDatabaseName("ix_live_solo_question_materials_source_template_id");
+
+                    b.HasIndex("CompetitionId", "SourceTemplateId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_live_solo_question_materials_competition_id_source_template");
+
+                    b.ToTable("live_solo_question_materials", (string)null);
                 });
 
             modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloRecording", b =>
@@ -10035,6 +10094,43 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_live_solo_question_group_items_live_solo_question_groups_qu");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloQuestionMaterial", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Challenges.Challenge", null)
+                        .WithMany()
+                        .HasForeignKey("ChallengeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_question_materials_challenges_challenge_id");
+
+                    b.HasOne("NoCTF.Domain.Challenges.CompetitionChallenge", null)
+                        .WithOne()
+                        .HasForeignKey("NoCTF.Domain.LiveSolo.LiveSoloQuestionMaterial", "CompetitionChallengeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_question_materials_competition_challenges_competi");
+
+                    b.HasOne("NoCTF.Domain.Competitions.Competition", null)
+                        .WithMany()
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_question_materials_competitions_competition_id");
+
+                    b.HasOne("NoCTF.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_question_materials_users_created_by_user_id");
+
+                    b.HasOne("NoCTF.Domain.Challenges.Challenge", null)
+                        .WithMany()
+                        .HasForeignKey("SourceTemplateId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_live_solo_question_materials_challenges_source_template_id");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloRecording", b =>

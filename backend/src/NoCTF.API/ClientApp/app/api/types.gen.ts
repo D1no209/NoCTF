@@ -923,38 +923,206 @@ export type NoCtfapiEndpointsLiveSoloConfirmLiveSoloReadyRequest = {
     expectedStamp: string;
 };
 
-export type NoCtfapiEndpointsLiveSoloLiveSoloTemplateCopyResponse = {
-    challengeId?: string;
-    competitionChallengeId?: string;
-    canonicalChallengeId?: string;
-    title?: string;
-    attachmentCount?: number;
-    flagCount?: number;
-    allocationChanged?: boolean;
-};
-
-export type NoCtfapiEndpointsLiveSoloLiveSoloTemplateCopyFailureResponse = {
-    code?: NoCtfApplicationLiveSoloTemplatesLiveSoloTemplateCopyFailure;
-    detail?: string;
-    messageKey?: string;
-    messageArguments?: {
-        [key: string]: unknown;
-    };
-};
-
-export type NoCtfApplicationLiveSoloTemplatesLiveSoloTemplateCopyFailure = 'NotFound' | 'Forbidden' | 'UnsupportedSource' | 'AttachmentsForbidden' | 'FlagsForbidden' | 'Conflict' | 'AttachmentsRequired' | 'InvalidTags';
-
-export type NoCtfapiEndpointsLiveSoloCopyLiveSoloTemplateRequest = {
-    sourceChallengeId: string;
-    copyAttachments?: boolean;
-    copyFlags?: boolean;
-    tags?: Array<string> | null;
-};
-
 export type NoCtfapiEndpointsLiveSoloCreateLiveSoloMatchRequest = {
     leftTeamId: string;
     rightTeamId: string;
     requiredWins?: number | null;
+};
+
+export type NoCtfapiEndpointsLiveSoloLiveSoloPoolQuestionResponse = {
+    id?: string;
+    challengeId?: string;
+    title?: string;
+    description?: string | null;
+    direction?: string;
+    concurrencyStamp?: string;
+    materialStamp?: string;
+    ownership?: NoCtfDomainLiveSoloLiveSoloMaterialOwnership;
+    sourceTemplateId?: string | null;
+    definition?: NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract | null;
+    questionGroupIds?: Array<string>;
+    attachments?: Array<NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse>;
+    flags?: Array<NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse>;
+};
+
+export type NoCtfDomainLiveSoloLiveSoloMaterialOwnership = 'FollowingQuestionBank' | 'CompetitionOwned';
+
+export type NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract = {
+    mode: NoCtfapiEndpointsCompetitionsGameModeProtocol;
+    flagTemplate?: NoCtfapiEndpointsAdministrationCompetitionsFlagTemplateContract | null;
+    runtime?: NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeContract | null;
+    checker?: NoCtfapiEndpointsAdministrationChallengeBankRunnerJobContract | null;
+    patchEntrypoint?: string | null;
+    patchCommand?: Array<string>;
+    patchTimeoutSeconds?: number | null;
+    readyTimeoutSeconds?: number | null;
+    maximumPatchUploadBytes?: number | null;
+    checkerFixInput?: boolean;
+    ctf?: NoCtfapiEndpointsAdministrationChallengeBankCtfChallengeDefinitionContract | null;
+    awd?: NoCtfapiEndpointsAdministrationChallengeBankAwdChallengeDefinitionContract | null;
+    awdp?: NoCtfapiEndpointsAdministrationChallengeBankAwdpChallengeDefinitionContract | null;
+    koh?: NoCtfapiEndpointsAdministrationChallengeBankKohChallengeDefinitionContract | null;
+    liveSolo?: NoCtfapiEndpointsAdministrationChallengeBankLiveSoloChallengeDefinitionContract | null;
+};
+
+export type NoCtfapiEndpointsCompetitionsGameModeProtocol = 'Ctf' | 'Awd' | 'Awdp' | 'Koh' | 'LiveSolo';
+
+export type NoCtfapiEndpointsAdministrationCompetitionsFlagTemplateContract = {
+    header?: string;
+    bodyTemplate?: string;
+    leetLiteralText?: boolean;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeContract = {
+    kind: NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeKindProtocol;
+    allocation?: NoCtfapiEndpointsAdministrationChallengeBankRuntimeAllocationProtocol;
+    limits?: NoCtfapiEndpointsAdministrationChallengeBankRuntimeResourceLimitsContract | null;
+    ttlSeconds?: number | null;
+    operationTimeoutSeconds?: number | null;
+    flagSource?: NoCtfapiEndpointsAdministrationChallengeBankRuntimeFlagSourceProtocol;
+    egressPolicy?: NoCtfapiEndpointsAdministrationChallengeBankRuntimeEgressPolicyProtocol;
+    urlBindings?: Array<NoCtfapiEndpointsAdministrationChallengeBankRuntimeUrlBindingContract>;
+    container?: NoCtfapiEndpointsAdministrationChallengeBankContainerChallengeRuntimeContract | null;
+    ova?: NoCtfapiEndpointsAdministrationChallengeBankOvaChallengeRuntimeContract | null;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeKindProtocol = 'Container' | 'Ova';
+
+export type NoCtfapiEndpointsAdministrationChallengeBankRuntimeAllocationProtocol = 'Shared' | 'PerTeam';
+
+export type NoCtfapiEndpointsAdministrationChallengeBankRuntimeResourceLimitsContract = {
+    memoryBytes?: number;
+    cpuMillicores?: number;
+    pidsLimit?: number;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankRuntimeFlagSourceProtocol = 'Static' | 'PerTeam' | 'AwdRotation';
+
+export type NoCtfapiEndpointsAdministrationChallengeBankRuntimeEgressPolicyProtocol = 'Isolated' | 'InternetOnly';
+
+export type NoCtfapiEndpointsAdministrationChallengeBankRuntimeUrlBindingContract = {
+    urlTemplate?: string;
+    exposure?: NoCtfapiEndpointsAdministrationChallengeBankRuntimeExposureProtocol;
+    containerPort?: number | null;
+    serviceName?: string | null;
+    vmId?: string | null;
+    guestPort?: number | null;
+    isControlCheck?: boolean;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankRuntimeExposureProtocol = 'OwnerOnly' | 'Participants';
+
+export type NoCtfapiEndpointsAdministrationChallengeBankContainerChallengeRuntimeContract = {
+    services: Array<NoCtfapiEndpointsAdministrationChallengeBankRuntimeServiceContract>;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankRuntimeServiceContract = {
+    name: string;
+    image: string;
+    cpuCores?: number;
+    memoryMiB?: number;
+    command?: Array<string>;
+    arguments?: Array<string>;
+    environment?: {
+        [key: string]: string;
+    };
+    flagEnvironmentVariableName?: string | null;
+    internalPorts?: Array<number>;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankOvaChallengeRuntimeContract = {
+    sourceUrl: string;
+    sha256: string;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankRunnerJobContract = {
+    image?: string;
+    command?: Array<string>;
+    environment?: {
+        [key: string]: string;
+    };
+    timeoutSeconds?: number;
+    targetServiceName?: string | null;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankCtfChallengeDefinitionContract = {
+    interactionKind: NoCtfapiEndpointsChallengesCtfInteractionKindProtocol;
+};
+
+export type NoCtfapiEndpointsChallengesCtfInteractionKindProtocol = 'FlagSubmission' | 'PatchVerification';
+
+export type NoCtfapiEndpointsAdministrationChallengeBankAwdChallengeDefinitionContract = {
+    flagInjection: NoCtfapiEndpointsAdministrationChallengeBankFlagInjectionContract | null;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankFlagInjectionContract = {
+    command?: string;
+    timeoutSeconds?: number;
+    serviceName?: string | null;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankAwdpChallengeDefinitionContract = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankKohChallengeDefinitionContract = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankLiveSoloChallengeDefinitionContract = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse = {
+    id?: string;
+    challengeId?: string;
+    fileName?: string;
+    contentType?: string;
+    byteLength?: number;
+    sha256?: string;
+    exactFlag?: string | null;
+    deletedAt?: string | null;
+    createdAt?: string;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse = {
+    id?: string;
+    challengeId?: string | null;
+    competitionChallengeId?: string | null;
+    teamId?: string | null;
+    flag?: string;
+    matchKind?: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol;
+    specificationKind?: NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol | null;
+    specificationId?: string | null;
+    validStart?: string | null;
+    validUntil?: string | null;
+    deletedAt?: string | null;
+    createdAt?: string;
+    systemManaged?: boolean;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol = 'Exact' | 'RegularExpression';
+
+export type NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol = 'Attachment' | 'AwdRound' | 'RuntimeDefinition' | 'Hint' | 'RuntimeInstance';
+
+export type NoCtfapiEndpointsLiveSoloLiveSoloPoolFailureResponse = {
+    code?: NoCtfApplicationLiveSoloTemplatesLiveSoloPoolFailure;
+    messageKey?: string;
+    detail?: string;
+};
+
+export type NoCtfApplicationLiveSoloTemplatesLiveSoloPoolFailure = 'NotFound' | 'Forbidden' | 'Conflict' | 'UnsupportedDefinition' | 'ActiveRound' | 'SourceChanged' | 'ProtectedMaterialsForbidden' | 'InvalidContent' | 'AlreadyInQuestionBank';
+
+export type NoCtfapiEndpointsLiveSoloCreateLiveSoloPoolQuestionRequest = {
+    title: string;
+    description?: string | null;
+    direction: string;
+    definition: NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract;
+};
+
+export type NoCtfapiEndpointsLiveSoloDeployLiveSoloPoolQuestionRequest = {
+    sourceTemplateId: string;
+    expectedSourceStamp: string;
 };
 
 export type NoCtfapiEndpointsLiveSoloDownloadLiveSoloAttachmentRequest = {
@@ -963,6 +1131,32 @@ export type NoCtfapiEndpointsLiveSoloDownloadLiveSoloAttachmentRequest = {
 
 export type NoCtfapiEndpointsLiveSoloDownloadLiveSoloRandomAttachmentRequest = {
     [key: string]: never;
+};
+
+export type NoCtfapiEndpointsLiveSoloEditLiveSoloPoolQuestionRequest = {
+    expectedStamp: string;
+    expectedMaterialStamp: string;
+    title: string;
+    description?: string | null;
+    direction: string;
+    flags?: Array<NoCtfapiEndpointsAdministrationChallengeBankSaveChallengeFlagRequest> | null;
+    removedAttachmentIds?: Array<string> | null;
+    definition: NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankSaveChallengeFlagRequest = {
+    id?: string | null;
+    flag: string;
+    matchKind?: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol;
+};
+
+export type NoCtfapiEndpointsLiveSoloLiveSoloPoolExportResponse = {
+    challengeId?: string;
+};
+
+export type NoCtfapiEndpointsLiveSoloExportLiveSoloPoolQuestionRequest = {
+    expectedStamp: string;
+    expectedMaterialStamp: string;
 };
 
 export type NoCtfapiEndpointsLiveSoloLiveSoloBracketResponse = {
@@ -1322,6 +1516,15 @@ export type NoCtfapiEndpointsLiveSoloListLiveSoloQuestionGroupsRequest = {
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsLiveSoloLiveSoloQuestionPoolResponse = {
+    items?: Array<NoCtfapiEndpointsLiveSoloLiveSoloPoolQuestionResponse>;
+    canManage?: boolean;
+};
+
+export type NoCtfapiEndpointsLiveSoloListLiveSoloQuestionPoolRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsLiveSoloLiveSoloQuestionsResponse = {
     items?: Array<NoCtfapiEndpointsLiveSoloLiveSoloQuestionResponse>;
 };
@@ -1611,6 +1814,16 @@ export type NoCtfapiEndpointsLiveSoloSubmitLiveSoloWriteUpRequest = {
     official?: boolean;
     expectedStamp: string;
 };
+
+export type NoCtfapiEndpointsLiveSoloUploadLiveSoloPoolAttachmentsRequest = {
+    expectedStamp: string;
+    expectedMaterialStamp: string;
+    deliveryPolicy?: NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol;
+    downloadFileName?: string | null;
+    files: Array<Blob | File>;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol = 'All' | 'RandomOnePerTeam';
 
 export type NoCtfapiEndpointsInternalInternalResultResponse = {
     disposition?: NoCtfapiEndpointsInternalInternalResultDispositionProtocol;
@@ -1915,8 +2128,6 @@ export type NoCtfapiEndpointsCompetitionsCompetitionResponse = {
     singleWriteUpDeadlineHours?: number;
     singleWriteUpDeadlineAt?: string | null;
 };
-
-export type NoCtfapiEndpointsCompetitionsGameModeProtocol = 'Ctf' | 'Awd' | 'Awdp' | 'Koh' | 'LiveSolo';
 
 export type NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol = 'Draft' | 'Visible' | 'Published' | 'Running' | 'Paused' | 'Finished';
 
@@ -2423,8 +2634,6 @@ export type NoCtfapiEndpointsChallengesParticipantChallengeHintResponse = {
     canUnlock?: boolean;
 };
 
-export type NoCtfapiEndpointsChallengesCtfInteractionKindProtocol = 'FlagSubmission' | 'PatchVerification';
-
 export type NoCtfapiEndpointsChallengesCompetitionChallengeTimingResponse = {
     autoOpenAt?: string | null;
     scoringEndsAt?: string | null;
@@ -2446,20 +2655,6 @@ export type NoCtfapiEndpointsChallengesGetChallengeRequest = {
 export type NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentListResponse = {
     deliveryPolicy?: NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol;
     items?: Array<NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse>;
-};
-
-export type NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol = 'All' | 'RandomOnePerTeam';
-
-export type NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse = {
-    id?: string;
-    challengeId?: string;
-    fileName?: string;
-    contentType?: string;
-    byteLength?: number;
-    sha256?: string;
-    exactFlag?: string | null;
-    deletedAt?: string | null;
-    createdAt?: string;
 };
 
 export type NoCtfapiEndpointsChallengesChallengeListResponse = {
@@ -3429,26 +3624,6 @@ export type NoCtfapiEndpointsAdministrationRuntimeRuntimeFlagResponse = {
     state?: NoCtfapiEndpointsAdministrationRuntimeRuntimeFlagStateProtocol;
 };
 
-export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse = {
-    id?: string;
-    challengeId?: string | null;
-    competitionChallengeId?: string | null;
-    teamId?: string | null;
-    flag?: string;
-    matchKind?: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol;
-    specificationKind?: NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol | null;
-    specificationId?: string | null;
-    validStart?: string | null;
-    validUntil?: string | null;
-    deletedAt?: string | null;
-    createdAt?: string;
-    systemManaged?: boolean;
-};
-
-export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol = 'Exact' | 'RegularExpression';
-
-export type NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol = 'Attachment' | 'AwdRound' | 'RuntimeDefinition' | 'Hint' | 'RuntimeInstance';
-
 export type NoCtfapiEndpointsAdministrationRuntimeRuntimeFlagSourceProtocol = 'Instance' | 'Team' | 'Static' | 'AwdRound';
 
 export type NoCtfapiEndpointsAdministrationRuntimeRuntimeFlagStateProtocol = 'Active' | 'Scheduled' | 'Expired' | 'Deleted';
@@ -4355,12 +4530,6 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurat
     liveSolo?: NoCtfapiEndpointsLiveSoloLiveSoloConfigurationContract | null;
 };
 
-export type NoCtfapiEndpointsAdministrationCompetitionsFlagTemplateContract = {
-    header?: string;
-    bodyTemplate?: string;
-    leetLiteralText?: boolean;
-};
-
 export type NoCtfapiEndpointsAdministrationCompetitionsCtfCompetitionModeConfigurationContract = {
     defaultScoreCurve?: NoCtfapiEndpointsAdministrationCompetitionsScoreCurveContract;
     bloodRewards?: Array<NoCtfapiEndpointsAdministrationCompetitionsBloodRewardContract>;
@@ -5055,6 +5224,33 @@ export type NoCtfapiEndpointsAdministrationChallengesRestoreChallengeRequest = {
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsAdministrationChallengeBankLiveSoloTemplateCopyResponse = {
+    challengeId?: string;
+    canonicalChallengeId?: string;
+    title?: string;
+    attachmentCount?: number;
+    flagCount?: number;
+    allocationChanged?: boolean;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankLiveSoloTemplateCopyFailureResponse = {
+    code?: NoCtfApplicationLiveSoloTemplatesLiveSoloTemplateCopyFailure;
+    detail?: string;
+    messageKey?: string;
+    messageArguments?: {
+        [key: string]: unknown;
+    };
+};
+
+export type NoCtfApplicationLiveSoloTemplatesLiveSoloTemplateCopyFailure = 'NotFound' | 'Forbidden' | 'UnsupportedSource' | 'AttachmentsForbidden' | 'FlagsForbidden' | 'Conflict' | 'AttachmentsRequired' | 'InvalidTags' | 'SourceChanged';
+
+export type NoCtfapiEndpointsAdministrationChallengeBankCopyLiveSoloTemplateRequest = {
+    sourceChallengeId: string;
+    copyAttachments?: boolean;
+    copyFlags?: boolean;
+    expectedSourceStamp: string;
+};
+
 export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse = {
     code?: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureCodeProtocol;
     message?: string;
@@ -5065,12 +5261,6 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResp
 };
 
 export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureCodeProtocol = 'InvalidFlag' | 'InvalidRegularExpression' | 'RegularExpressionNotSupported' | 'InvalidSpecification' | 'InvalidValidityWindow' | 'InvalidTemplateFlagScope' | 'ResourceIdConflict' | 'ManualFlagNotSupported' | 'SystemManagedFlag' | 'DeliveryModeConflict';
-
-export type NoCtfapiEndpointsAdministrationChallengeBankSaveChallengeFlagRequest = {
-    id?: string | null;
-    flag: string;
-    matchKind?: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol;
-};
 
 export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse = {
     id?: string;
@@ -5087,125 +5277,10 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateRespons
     createdAt?: string;
     updatedAt?: string;
     interactionKind?: NoCtfapiEndpointsChallengesCtfInteractionKindProtocol;
+    concurrencyStamp?: string;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol = 'Private' | 'Shared';
-
-export type NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract = {
-    mode: NoCtfapiEndpointsCompetitionsGameModeProtocol;
-    flagTemplate?: NoCtfapiEndpointsAdministrationCompetitionsFlagTemplateContract | null;
-    runtime?: NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeContract | null;
-    checker?: NoCtfapiEndpointsAdministrationChallengeBankRunnerJobContract | null;
-    patchEntrypoint?: string | null;
-    patchCommand?: Array<string>;
-    patchTimeoutSeconds?: number | null;
-    readyTimeoutSeconds?: number | null;
-    maximumPatchUploadBytes?: number | null;
-    checkerFixInput?: boolean;
-    ctf?: NoCtfapiEndpointsAdministrationChallengeBankCtfChallengeDefinitionContract | null;
-    awd?: NoCtfapiEndpointsAdministrationChallengeBankAwdChallengeDefinitionContract | null;
-    awdp?: NoCtfapiEndpointsAdministrationChallengeBankAwdpChallengeDefinitionContract | null;
-    koh?: NoCtfapiEndpointsAdministrationChallengeBankKohChallengeDefinitionContract | null;
-    liveSolo?: NoCtfapiEndpointsAdministrationChallengeBankLiveSoloChallengeDefinitionContract | null;
-};
-
-export type NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeContract = {
-    kind: NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeKindProtocol;
-    allocation?: NoCtfapiEndpointsAdministrationChallengeBankRuntimeAllocationProtocol;
-    limits?: NoCtfapiEndpointsAdministrationChallengeBankRuntimeResourceLimitsContract | null;
-    ttlSeconds?: number | null;
-    operationTimeoutSeconds?: number | null;
-    flagSource?: NoCtfapiEndpointsAdministrationChallengeBankRuntimeFlagSourceProtocol;
-    egressPolicy?: NoCtfapiEndpointsAdministrationChallengeBankRuntimeEgressPolicyProtocol;
-    urlBindings?: Array<NoCtfapiEndpointsAdministrationChallengeBankRuntimeUrlBindingContract>;
-    container?: NoCtfapiEndpointsAdministrationChallengeBankContainerChallengeRuntimeContract | null;
-    ova?: NoCtfapiEndpointsAdministrationChallengeBankOvaChallengeRuntimeContract | null;
-};
-
-export type NoCtfapiEndpointsAdministrationChallengeBankChallengeRuntimeKindProtocol = 'Container' | 'Ova';
-
-export type NoCtfapiEndpointsAdministrationChallengeBankRuntimeAllocationProtocol = 'Shared' | 'PerTeam';
-
-export type NoCtfapiEndpointsAdministrationChallengeBankRuntimeResourceLimitsContract = {
-    memoryBytes?: number;
-    cpuMillicores?: number;
-    pidsLimit?: number;
-};
-
-export type NoCtfapiEndpointsAdministrationChallengeBankRuntimeFlagSourceProtocol = 'Static' | 'PerTeam' | 'AwdRotation';
-
-export type NoCtfapiEndpointsAdministrationChallengeBankRuntimeEgressPolicyProtocol = 'Isolated' | 'InternetOnly';
-
-export type NoCtfapiEndpointsAdministrationChallengeBankRuntimeUrlBindingContract = {
-    urlTemplate?: string;
-    exposure?: NoCtfapiEndpointsAdministrationChallengeBankRuntimeExposureProtocol;
-    containerPort?: number | null;
-    serviceName?: string | null;
-    vmId?: string | null;
-    guestPort?: number | null;
-    isControlCheck?: boolean;
-};
-
-export type NoCtfapiEndpointsAdministrationChallengeBankRuntimeExposureProtocol = 'OwnerOnly' | 'Participants';
-
-export type NoCtfapiEndpointsAdministrationChallengeBankContainerChallengeRuntimeContract = {
-    services: Array<NoCtfapiEndpointsAdministrationChallengeBankRuntimeServiceContract>;
-};
-
-export type NoCtfapiEndpointsAdministrationChallengeBankRuntimeServiceContract = {
-    name: string;
-    image: string;
-    cpuCores?: number;
-    memoryMiB?: number;
-    command?: Array<string>;
-    arguments?: Array<string>;
-    environment?: {
-        [key: string]: string;
-    };
-    flagEnvironmentVariableName?: string | null;
-    internalPorts?: Array<number>;
-};
-
-export type NoCtfapiEndpointsAdministrationChallengeBankOvaChallengeRuntimeContract = {
-    sourceUrl: string;
-    sha256: string;
-};
-
-export type NoCtfapiEndpointsAdministrationChallengeBankRunnerJobContract = {
-    image?: string;
-    command?: Array<string>;
-    environment?: {
-        [key: string]: string;
-    };
-    timeoutSeconds?: number;
-    targetServiceName?: string | null;
-};
-
-export type NoCtfapiEndpointsAdministrationChallengeBankCtfChallengeDefinitionContract = {
-    interactionKind: NoCtfapiEndpointsChallengesCtfInteractionKindProtocol;
-};
-
-export type NoCtfapiEndpointsAdministrationChallengeBankAwdChallengeDefinitionContract = {
-    flagInjection: NoCtfapiEndpointsAdministrationChallengeBankFlagInjectionContract | null;
-};
-
-export type NoCtfapiEndpointsAdministrationChallengeBankFlagInjectionContract = {
-    command?: string;
-    timeoutSeconds?: number;
-    serviceName?: string | null;
-};
-
-export type NoCtfapiEndpointsAdministrationChallengeBankAwdpChallengeDefinitionContract = {
-    [key: string]: never;
-};
-
-export type NoCtfapiEndpointsAdministrationChallengeBankKohChallengeDefinitionContract = {
-    [key: string]: never;
-};
-
-export type NoCtfapiEndpointsAdministrationChallengeBankLiveSoloChallengeDefinitionContract = {
-    [key: string]: never;
-};
 
 export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictResponse = {
     code: NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictCode;
@@ -5295,6 +5370,7 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateSummary
     activeCompetitionReferenceCount?: number;
     updatedAt?: string;
     interactionKind?: NoCtfapiEndpointsChallengesCtfInteractionKindProtocol;
+    concurrencyStamp?: string;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengeBankListChallengeTemplatesRequest = NoCtfapiPaginationSearchRequest & {};
@@ -6820,47 +6896,6 @@ export type ConfirmLiveSoloReadyResponses = {
 
 export type ConfirmLiveSoloReadyResponse = ConfirmLiveSoloReadyResponses[keyof ConfirmLiveSoloReadyResponses];
 
-export type CopyLiveSoloTemplateData = {
-    body: NoCtfapiEndpointsLiveSoloCopyLiveSoloTemplateRequest;
-    path: {
-        competitionId: string;
-    };
-    query?: never;
-    url: '/api/v1/competitions/{competitionId}/live-solo/templates/copies';
-};
-
-export type CopyLiveSoloTemplateErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-    409: NoCtfapiEndpointsLiveSoloLiveSoloTemplateCopyFailureResponse;
-    422: NoCtfapiEndpointsLiveSoloLiveSoloTemplateCopyFailureResponse;
-};
-
-export type CopyLiveSoloTemplateError = CopyLiveSoloTemplateErrors[keyof CopyLiveSoloTemplateErrors];
-
-export type CopyLiveSoloTemplateResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfapiEndpointsLiveSoloLiveSoloTemplateCopyResponse;
-};
-
-export type CopyLiveSoloTemplateResponse = CopyLiveSoloTemplateResponses[keyof CopyLiveSoloTemplateResponses];
-
 export type ListLiveSoloMatchesData = {
     body?: never;
     path: {
@@ -6937,6 +6972,121 @@ export type CreateLiveSoloMatchResponses = {
 
 export type CreateLiveSoloMatchResponse = CreateLiveSoloMatchResponses[keyof CreateLiveSoloMatchResponses];
 
+export type ListLiveSoloQuestionPoolData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/question-pool';
+};
+
+export type ListLiveSoloQuestionPoolErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type ListLiveSoloQuestionPoolResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsLiveSoloLiveSoloQuestionPoolResponse;
+};
+
+export type ListLiveSoloQuestionPoolResponse = ListLiveSoloQuestionPoolResponses[keyof ListLiveSoloQuestionPoolResponses];
+
+export type CreateLiveSoloPoolQuestionData = {
+    body: NoCtfapiEndpointsLiveSoloCreateLiveSoloPoolQuestionRequest;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/question-pool';
+};
+
+export type CreateLiveSoloPoolQuestionErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsLiveSoloLiveSoloPoolFailureResponse;
+    422: NoCtfapiEndpointsLiveSoloLiveSoloPoolFailureResponse;
+};
+
+export type CreateLiveSoloPoolQuestionError = CreateLiveSoloPoolQuestionErrors[keyof CreateLiveSoloPoolQuestionErrors];
+
+export type CreateLiveSoloPoolQuestionResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsLiveSoloLiveSoloPoolQuestionResponse;
+};
+
+export type CreateLiveSoloPoolQuestionResponse = CreateLiveSoloPoolQuestionResponses[keyof CreateLiveSoloPoolQuestionResponses];
+
+export type DeployLiveSoloPoolQuestionData = {
+    body: NoCtfapiEndpointsLiveSoloDeployLiveSoloPoolQuestionRequest;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/question-pool/deploy';
+};
+
+export type DeployLiveSoloPoolQuestionErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsLiveSoloLiveSoloPoolFailureResponse;
+    422: NoCtfapiEndpointsLiveSoloLiveSoloPoolFailureResponse;
+};
+
+export type DeployLiveSoloPoolQuestionError = DeployLiveSoloPoolQuestionErrors[keyof DeployLiveSoloPoolQuestionErrors];
+
+export type DeployLiveSoloPoolQuestionResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsLiveSoloLiveSoloPoolQuestionResponse;
+};
+
+export type DeployLiveSoloPoolQuestionResponse = DeployLiveSoloPoolQuestionResponses[keyof DeployLiveSoloPoolQuestionResponses];
+
 export type DownloadLiveSoloAttachmentData = {
     body?: never;
     path: {
@@ -6991,6 +7141,90 @@ export type DownloadLiveSoloRandomAttachmentErrors = {
      */
     404: unknown;
 };
+
+export type EditLiveSoloPoolQuestionData = {
+    body: NoCtfapiEndpointsLiveSoloEditLiveSoloPoolQuestionRequest;
+    path: {
+        competitionId: string;
+        competitionChallengeId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/question-pool/{competitionChallengeId}';
+};
+
+export type EditLiveSoloPoolQuestionErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsLiveSoloLiveSoloPoolFailureResponse;
+    422: NoCtfapiEndpointsLiveSoloLiveSoloPoolFailureResponse;
+};
+
+export type EditLiveSoloPoolQuestionError = EditLiveSoloPoolQuestionErrors[keyof EditLiveSoloPoolQuestionErrors];
+
+export type EditLiveSoloPoolQuestionResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsLiveSoloLiveSoloPoolQuestionResponse;
+};
+
+export type EditLiveSoloPoolQuestionResponse = EditLiveSoloPoolQuestionResponses[keyof EditLiveSoloPoolQuestionResponses];
+
+export type ExportLiveSoloPoolQuestionData = {
+    body: NoCtfapiEndpointsLiveSoloExportLiveSoloPoolQuestionRequest;
+    path: {
+        competitionId: string;
+        competitionChallengeId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/question-pool/{competitionChallengeId}/save-to-bank';
+};
+
+export type ExportLiveSoloPoolQuestionErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsLiveSoloLiveSoloPoolFailureResponse;
+    422: NoCtfapiEndpointsLiveSoloLiveSoloPoolFailureResponse;
+};
+
+export type ExportLiveSoloPoolQuestionError = ExportLiveSoloPoolQuestionErrors[keyof ExportLiveSoloPoolQuestionErrors];
+
+export type ExportLiveSoloPoolQuestionResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsLiveSoloLiveSoloPoolExportResponse;
+};
+
+export type ExportLiveSoloPoolQuestionResponse = ExportLiveSoloPoolQuestionResponses[keyof ExportLiveSoloPoolQuestionResponses];
 
 export type GetLiveSoloBracketData = {
     body?: never;
@@ -8680,6 +8914,48 @@ export type SubmitLiveSoloWriteUpResponses = {
 };
 
 export type SubmitLiveSoloWriteUpResponse = SubmitLiveSoloWriteUpResponses[keyof SubmitLiveSoloWriteUpResponses];
+
+export type UploadLiveSoloPoolAttachmentsData = {
+    body: NoCtfapiEndpointsLiveSoloUploadLiveSoloPoolAttachmentsRequest;
+    path: {
+        competitionId: string;
+        competitionChallengeId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/question-pool/{competitionChallengeId}/attachments';
+};
+
+export type UploadLiveSoloPoolAttachmentsErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsLiveSoloLiveSoloPoolFailureResponse;
+    422: NoCtfapiEndpointsLiveSoloLiveSoloPoolFailureResponse;
+};
+
+export type UploadLiveSoloPoolAttachmentsError = UploadLiveSoloPoolAttachmentsErrors[keyof UploadLiveSoloPoolAttachmentsErrors];
+
+export type UploadLiveSoloPoolAttachmentsResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsLiveSoloLiveSoloPoolQuestionResponse;
+};
+
+export type UploadLiveSoloPoolAttachmentsResponse = UploadLiveSoloPoolAttachmentsResponses[keyof UploadLiveSoloPoolAttachmentsResponses];
 
 export type DownloadFixArchiveEndpointData = {
     body?: never;
@@ -16959,6 +17235,45 @@ export type AdminRestoreCompetitionChallengeHintResponses = {
 
 export type AdminRestoreCompetitionChallengeHintResponse = AdminRestoreCompetitionChallengeHintResponses[keyof AdminRestoreCompetitionChallengeHintResponses];
 
+export type CopyLiveSoloTemplateData = {
+    body: NoCtfapiEndpointsAdministrationChallengeBankCopyLiveSoloTemplateRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/challenges/live-solo/copies';
+};
+
+export type CopyLiveSoloTemplateErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsAdministrationChallengeBankLiveSoloTemplateCopyFailureResponse;
+    422: NoCtfapiEndpointsAdministrationChallengeBankLiveSoloTemplateCopyFailureResponse;
+};
+
+export type CopyLiveSoloTemplateError = CopyLiveSoloTemplateErrors[keyof CopyLiveSoloTemplateErrors];
+
+export type CopyLiveSoloTemplateResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationChallengeBankLiveSoloTemplateCopyResponse;
+};
+
+export type CopyLiveSoloTemplateResponse = CopyLiveSoloTemplateResponses[keyof CopyLiveSoloTemplateResponses];
+
 export type AdminChallengeBankListFlagsData = {
     body?: never;
     path: {
@@ -17040,6 +17355,7 @@ export type AdminChallengeBankListTemplatesData = {
     query: {
         includeDeleted: boolean;
         onlyMine: boolean;
+        mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol | null;
         direction?: string | null;
         keyword?: string | null;
         offset: number;

@@ -26,6 +26,8 @@ public static class LiveSoloConfigurationValidator
 
     public static IReadOnlyList<string> ValidateDefinition(LiveSoloChallengeDefinition value)
     {
+        if (value.Runtime is not null and not ContainerChallengeRuntimeTemplate)
+            return ["LiveSolo supports independent container environments only."];
         if (value.Runtime is { Allocation: not PersistedRuntimeAllocation.PerTeam })
             return ["LiveSolo Runtime resources must be independent per team."];
         if (value.Checker is not null || value.PatchEntrypoint is not null || value.PatchTimeoutSeconds is not null

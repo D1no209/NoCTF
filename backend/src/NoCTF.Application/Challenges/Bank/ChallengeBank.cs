@@ -20,6 +20,7 @@ public sealed record ChallengeTemplateView(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt)
 {
+    public Guid ConcurrencyStamp { get; init; }
     public CtfInteractionKind InteractionKind => Definition is CtfChallengeDefinition ctf
         ? ctf.InteractionKind
         : CtfInteractionKind.FlagSubmission;
@@ -34,7 +35,10 @@ public sealed record ChallengeTemplateSummaryView(
     DateTimeOffset? DeletedAt,
     int ActiveCompetitionReferenceCount,
     DateTimeOffset UpdatedAt,
-    CtfInteractionKind InteractionKind);
+    CtfInteractionKind InteractionKind)
+{
+    public Guid ConcurrencyStamp { get; init; }
+}
 
 public sealed record ChallengeTemplateListQuery(
     Guid ActorId,
@@ -45,7 +49,8 @@ public sealed record ChallengeTemplateListQuery(
     int Offset,
     int Limit,
     bool Desc,
-    bool OnlyMine = false);
+    bool OnlyMine = false,
+    GameMode? Mode = null);
 
 public sealed record ChallengeTemplateListPage(
     IReadOnlyList<ChallengeTemplateSummaryView> Items,

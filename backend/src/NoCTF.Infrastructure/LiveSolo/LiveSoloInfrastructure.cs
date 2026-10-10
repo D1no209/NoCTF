@@ -35,6 +35,10 @@ public static class LiveSoloInfrastructure
         services.AddScoped<ILiveSoloPlayerPolicyReader, LiveSoloPlayerPolicyReader>();
         services.AddScoped<ILiveSoloTemplateCopyStore, LiveSoloTemplateCopyStore>();
         services.AddScoped<CopyLiveSoloTemplate>();
+        services.AddScoped<LiveSoloMaterialCloner>();
+        services.AddScoped<ILiveSoloQuestionPoolStore, LiveSoloQuestionPoolStore>();
+        services.AddScoped<ManageLiveSoloQuestionPool>();
+        services.AddScoped<UploadLiveSoloPoolAttachments>();
         services.AddScoped<IChallengeMaterialMutationGate, LiveSoloMaterialMutationGate>();
         services.RemoveAll<IExecutionScopeAccess>();
         services.AddScoped<IExecutionScopeAccess, LiveSoloExecutionAccess>();

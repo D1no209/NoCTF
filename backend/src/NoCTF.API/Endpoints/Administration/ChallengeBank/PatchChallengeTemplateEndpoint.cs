@@ -94,6 +94,7 @@ public static partial class ChallengeTemplatePatchMapper
     [MapperIgnoreTarget(nameof(Challenge.Attachments))]
     [MapperIgnoreTarget(nameof(Challenge.Definition))]
     [MapperIgnoreTarget(nameof(Challenge.Mode))]
+    [MapperIgnoreTarget(nameof(Challenge.CatalogScope))]
     public static void ApplyContentAsTemplateManager(
         ChallengeTemplateContentPatchRequest request,
         [MappingTarget] Challenge target)
@@ -105,6 +106,7 @@ public static partial class ChallengeTemplatePatchMapper
     }
 
     [MapperIgnoreTarget(nameof(Challenge.Mode))]
+    [MapperIgnoreTarget(nameof(Challenge.CatalogScope))]
     [MapperIgnoreTarget(nameof(Challenge.Visibility))]
     [MapperIgnoreTarget(nameof(Challenge.Title))]
     [MapperIgnoreTarget(nameof(Challenge.Description))]

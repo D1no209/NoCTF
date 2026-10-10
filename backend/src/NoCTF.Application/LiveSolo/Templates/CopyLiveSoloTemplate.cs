@@ -3,10 +3,10 @@ using NoCTF.Domain.LiveSolo;
 
 namespace NoCTF.Application.LiveSolo.Templates;
 
-public enum LiveSoloTemplateCopyFailure : short { NotFound, Forbidden, UnsupportedSource, AttachmentsForbidden, FlagsForbidden, Conflict, AttachmentsRequired, InvalidTags }
-public sealed record CopyLiveSoloTemplateCommand(Guid CompetitionId, Guid SourceChallengeId, Guid ActorId,
-    bool CopyAttachments, bool CopyFlags, IReadOnlyList<string>? Tags, DateTimeOffset Now);
-public sealed record LiveSoloTemplateCopyView(Guid ChallengeId, Guid CompetitionChallengeId, Guid CanonicalChallengeId,
+public enum LiveSoloTemplateCopyFailure : short { NotFound, Forbidden, UnsupportedSource, AttachmentsForbidden, FlagsForbidden, Conflict, AttachmentsRequired, InvalidTags, SourceChanged }
+public sealed record CopyLiveSoloTemplateCommand(Guid SourceChallengeId, Guid ActorId, Guid ExpectedSourceStamp,
+    bool CopyAttachments, bool CopyFlags, DateTimeOffset Now);
+public sealed record LiveSoloTemplateCopyView(Guid ChallengeId, Guid CanonicalChallengeId,
     string Title, int AttachmentCount, int FlagCount, bool AllocationChanged);
 public sealed record LiveSoloTemplateCopyResult(LiveSoloTemplateCopyView? Copy, LiveSoloTemplateCopyFailure? Failure = null);
 public interface ILiveSoloTemplateCopyStore
@@ -18,9 +18,7 @@ public sealed class CopyLiveSoloTemplate(ILiveSoloTemplateCopyStore store)
     public Task<LiveSoloTemplateCopyResult> ExecuteAsync(CopyLiveSoloTemplateCommand command, CancellationToken ct)
     {
         if (command.SourceChallengeId == Guid.Empty) return Task.FromResult(new LiveSoloTemplateCopyResult(null, LiveSoloTemplateCopyFailure.UnsupportedSource));
-        if (!CompetitionChallengeTags.TryNormalize(command.Tags, out var tags))
-            return Task.FromResult(new LiveSoloTemplateCopyResult(null, LiveSoloTemplateCopyFailure.InvalidTags));
-        return store.CopyAsync(command with { Tags = tags }, ct);
+        return store.CopyAsync(command, ct);
     }
 }
 
@@ -30,7 +28,8 @@ public static class LiveSoloTemplateCopyPolicy
     public static bool Supports(ChallengeDefinition? definition) => definition is CtfChallengeDefinition { InteractionKind: CtfInteractionKind.FlagSubmission }
         or LiveSoloChallengeDefinition && definition.Checker is null && definition.PatchEntrypoint is null
         && definition.PatchTimeoutSeconds is null && definition.MaximumPatchUploadBytes is null && !definition.CheckerFixInput
-        && definition.StringItems.Count == 0 && definition.Runtime?.FlagSource != PersistedRuntimeFlagSource.AwdRotation;
+        && definition.StringItems.Count == 0 && definition.Runtime?.FlagSource != PersistedRuntimeFlagSource.AwdRotation
+        && definition.Runtime is null or ContainerChallengeRuntimeTemplate;
 
     public static LiveSoloChallengeDefinition Copy(ChallengeDefinition source, Guid id)
     {

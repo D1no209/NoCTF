@@ -1,15 +1,15 @@
 import { computed, inject, onMounted, onScopeDispose, ref } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
-import { adminChallengeBankListTemplates, adminListCompetitionChallenges, copyLiveSoloTemplate, getLiveSoloConfiguration,
+import { listLiveSoloQuestionPool, getLiveSoloConfiguration,
   listLiveSoloQuestionGroups, saveLiveSoloQuestionGroup } from '~/api'
-import type { NoCtfapiEndpointsChallengesChallengeSummaryResponse as Challenge, NoCtfapiEndpointsLiveSoloLiveSoloQuestionGroupResponse as Group,
-  NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateSummaryResponse as Template, NoCtfapiEndpointsLiveSoloLiveSoloTemplateCopyResponse as Copy } from '~/api'
+import type { NoCtfapiEndpointsLiveSoloLiveSoloPoolQuestionResponse as Challenge, NoCtfapiEndpointsLiveSoloLiveSoloQuestionGroupResponse as Group } from '~/api'
 import { competitionContextKey } from '~/utils/labels'
 import { message, type UiMessage } from '~/utils/i18n'
 import { parseLiveSoloError } from './live-solo-errors'
+import { takeGroupDraft, keepGroupDraft } from './group-handoff'
 import { ApiError } from '~/utils/api-error'
 import { canManageLiveSolo } from './settings-draft'
-import { groupDraft, validGroup, groupOffsets, moveGroupQuestion, copyCandidates } from './group-draft'
+import { groupDraft, validGroup, groupOffsets, moveGroupQuestion } from './group-draft'
 
 export function useLiveSoloGroups() {
   const route = useRoute(), router = useRouter(), context = inject(competitionContextKey)
@@ -17,9 +17,9 @@ export function useLiveSoloGroups() {
   const writable = computed(() => canManageLiveSolo(context?.competition.value?.administrationRole))
   const groups = ref<Group[]>([]), challenges = ref<Challenge[]>([]), interval = ref(180), limit = ref(900)
   const draft = ref(groupDraft()), original = ref(''), loading = ref(true), busy = ref(false), error = ref<UiMessage | null>(null), saved = ref(false)
-  const selectedQuestion = ref<string | null>(null), copyId = ref<string | null>(null), copyAttachments = ref(true), copyFlags = ref(false)
-  const copyDialog = ref(false), copyTarget = ref<string | null>(null), keyword = ref('')
-  const copied = ref<Copy | null>(null)
+  const selectedQuestion = ref<string | null>(null)
+  const { user } = useAuth()
+  const handoffKey = computed(() => `${user.value?.userId}:${competitionId.value}:${groupId.value ?? 'new'}`)
   const leaveOpen = ref(false)
   let disposed = false, request = 0, allowLeave = false, leaveTo: string | null = null, reloadPending = false, newPending = false
   const dirty = computed(() => original.value !== '' && JSON.stringify(draft.value) !== original.value)
@@ -29,20 +29,13 @@ export function useLiveSoloGroups() {
   const offsets = computed(() => groupOffsets(draft.value, interval.value))
   const questions = computed(() => draft.value.questions.map((row,index) => ({ ...row, index, effectiveOffset: offsets.value[index]!,
     title: challenges.value.find(question => question.id === row.competitionChallengeId)?.title ?? '—' })))
-  const templates = useOffsetPagination<Template>(async ({ offset, limit }) => {
-    const result = await adminChallengeBankListTemplates({ query: { offset, limit, desc: false, keyword: keyword.value || undefined, includeDeleted: false, onlyMine: false } })
-    if (result.error || !result.data) throw parseLiveSoloError(result.error, message('liveSolo.error.load'))
-    return result.data
-  }, { initialPageSize: 20 })
-  const templateOptions = computed(() => copyCandidates(templates.items.value).map(row => ({ value: row.id!, label: row.title ?? '—' })))
-  const copyName = computed(() => templates.items.value.find(row => row.id === copyTarget.value)?.title ?? '—')
   async function load() {
     if (busy.value || disposed) return
     const generation = ++request; loading.value = true
     try {
       if (!context?.competition.value) await context?.refresh()
       const path = { competitionId: competitionId.value }
-      const [pool, entries, settings] = await Promise.all([listLiveSoloQuestionGroups({ path }), adminListCompetitionChallenges({ path, query: { includeDeleted: false } }), getLiveSoloConfiguration({ path })])
+      const [pool, entries, settings] = await Promise.all([listLiveSoloQuestionGroups({ path }), listLiveSoloQuestionPool({ path }), getLiveSoloConfiguration({ path })])
       if (disposed || generation !== request) return
       if (pool.error || entries.error || settings.error || !pool.data || !entries.data || !settings.data) throw parseLiveSoloError(pool.error ?? entries.error ?? settings.error, message('liveSolo.error.load'))
       groups.value = pool.data.items ?? []; challenges.value = entries.data.items ?? []
@@ -52,6 +45,8 @@ export function useLiveSoloGroups() {
         if (groupId.value && !selected) throw new ApiError(message('liveSolo.error.notFound'))
         draft.value = groupDraft(selected); original.value = JSON.stringify(draft.value)
       }
+      const added = typeof route.query.added === 'string' ? route.query.added : null
+      if (added && questionOptions.value.some(x => x.value === added) && writable.value) { selectedQuestion.value = added; add(); await router.replace({ query: { ...route.query, added: undefined } }) }
       error.value = null
     }
     catch (cause) { if (!disposed && generation === request) error.value = parseLiveSoloError(cause, message('liveSolo.error.load')).displayMessage }
@@ -88,20 +83,11 @@ export function useLiveSoloGroups() {
     catch (cause) { if (!disposed) error.value = parseLiveSoloError(cause,message('liveSolo.error.operation')).displayMessage }
     finally { busy.value = false }
   }
-  async function searchTemplates() { templates.reset(); copyId.value = null; await templates.loadPage() }
-  function openCopy() { if (writable.value && copyId.value && templateOptions.value.some(row => row.value === copyId.value)) { copyTarget.value = copyId.value; copyDialog.value = true } }
-  function setCopyDialog(value: boolean) { if (!busy.value) copyDialog.value = value }
-  async function confirmCopy() {
-    if (!writable.value || !copyTarget.value || busy.value) return
-    busy.value = true
-    try {
-      const result = await copyLiveSoloTemplate({ path: { competitionId: competitionId.value }, body: { sourceChallengeId: copyTarget.value, copyAttachments: copyAttachments.value, copyFlags: copyFlags.value } })
-      if (result.error || !result.data) throw parseLiveSoloError(result.error, message('liveSolo.error.operation'))
-      if (disposed) return
-      copied.value = result.data; copyDialog.value = false; copyId.value = null; copyTarget.value = null; error.value = null
-    }
-    catch (cause) { if (!disposed) error.value = parseLiveSoloError(cause, message('liveSolo.error.operation')).displayMessage }
-    finally { busy.value = false; if (!disposed && !copyDialog.value) await load() }
+  async function pool() {
+    if (busy.value) return
+    keepGroupDraft(handoffKey.value, draft.value, original.value)
+    allowLeave = true
+    await router.push({ path: `/competitions/${competitionId.value}/live-solo/question-pool`, query: { group: groupId.value ?? 'new' } })
   }
   function setLeave(value: boolean) { if (!busy.value) { leaveOpen.value = value; if (!value) { reloadPending = false; newPending = false } } }
   async function reload() { if (busy.value) return; if (dirty.value) { reloadPending = true; newPending = false; leaveOpen.value = true } else await load() }
@@ -115,13 +101,10 @@ export function useLiveSoloGroups() {
   async function back() { await router.push(`/competitions/${competitionId.value}/live-solo`) }
   function beforeUnload(event: BeforeUnloadEvent) { if (dirty.value) { event.preventDefault(); event.returnValue = '' } }
   onBeforeRouteLeave(to => { if (allowLeave) return true; if (busy.value) return false; if (!dirty.value) return true; reloadPending = false; newPending = false; leaveTo = to.fullPath; leaveOpen.value = true; return false })
-  onMounted(() => { void load(); window.addEventListener('beforeunload',beforeUnload) })
+  onMounted(() => { const restored = takeGroupDraft(handoffKey.value); if (restored) { draft.value = restored.draft; original.value = restored.original } void load(); window.addEventListener('beforeunload',beforeUnload) })
   onScopeDispose(() => { disposed = true; request++; window.removeEventListener('beforeunload',beforeUnload) })
   return { options, groupId, draft, loading, busy, error, saved, dirty, writable, questionOptions, questions, selectedQuestion, interval, limit, reload,
     select, create, add, remove, move, offset, setLimit, reserve, save, back, leaveOpen, setLeave, leave,
-    keyword, copyId, copyAttachments, copyFlags, copyDialog, setCopyDialog, copyName, copied, templateOptions,
-    templatePage: templates.page, templatePageCount: templates.pageCount, templateLimit: templates.limit, templateTotal: templates.total,
-    templateLoading: templates.loading, templateError: templates.error, searchTemplates, templatePageChange: templates.loadPage,
-    templateLimitChange: templates.setPageSize, openCopy, confirmCopy }
+    pool }
 }
 export type LiveSoloGroupsState = import('vue').ShallowUnwrapRef<ReturnType<typeof useLiveSoloGroups>>

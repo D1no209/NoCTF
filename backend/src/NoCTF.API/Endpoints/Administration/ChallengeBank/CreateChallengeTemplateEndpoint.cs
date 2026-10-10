@@ -157,7 +157,10 @@ public sealed record ChallengeTemplateResponse(
     int ActiveCompetitionReferenceCount,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    NoCTF.API.Endpoints.Challenges.CtfInteractionKindProtocol InteractionKind);
+    NoCTF.API.Endpoints.Challenges.CtfInteractionKindProtocol InteractionKind)
+{
+    public Guid ConcurrencyStamp { get; init; }
+}
 
 [JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<ChallengeTemplateConflictCode>))]
 public enum ChallengeTemplateConflictCode
@@ -285,7 +288,7 @@ internal static partial class ChallengeTemplateMapper
         source.ActiveCompetitionReferenceCount,
         source.CreatedAt,
         source.UpdatedAt,
-        ToProtocol(source.InteractionKind));
+        ToProtocol(source.InteractionKind)) { ConcurrencyStamp = source.ConcurrencyStamp };
 
     [MapEnum(EnumMappingStrategy.ByName)]
     public static partial ChallengeVisibility ToDomain(ChallengeVisibilityProtocol value);

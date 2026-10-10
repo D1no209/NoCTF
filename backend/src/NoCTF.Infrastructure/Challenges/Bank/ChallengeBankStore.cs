@@ -86,9 +86,10 @@ public sealed class ChallengeBankStore(
         ChallengeTemplateListQuery query,
         CancellationToken ct)
     {
-        var source = db.Challenges.IgnoreQueryFilters().AsNoTracking().IgnoreAutoIncludes();
+        var source = db.Challenges.IgnoreQueryFilters().AsNoTracking().IgnoreAutoIncludes().Where(x => x.CatalogScope == ChallengeCatalogScope.QuestionBank);
         if (!query.IncludeDeleted)
             source = source.Where(challenge => challenge.DeletedAt == null);
+        if (query.Mode is { } mode) source = source.Where(challenge => challenge.Mode == mode);
         if (query.OnlyMine)
             source = source.Where(challenge => challenge.OwnerId == query.ActorId);
 
@@ -130,7 +131,7 @@ public sealed class ChallengeBankStore(
         bool includeDeleted,
         CancellationToken ct)
     {
-        var source = db.Challenges.IgnoreQueryFilters().AsNoTracking();
+        var source = db.Challenges.IgnoreQueryFilters().AsNoTracking().Where(x => x.CatalogScope == ChallengeCatalogScope.QuestionBank);
         if (!includeDeleted)
             source = source.Where(challenge => challenge.DeletedAt == null);
 
@@ -150,6 +151,7 @@ public sealed class ChallengeBankStore(
             ct);
         if (entity is null
             || entity.DeletedAt is not null
+            || entity.CatalogScope != ChallengeCatalogScope.QuestionBank
             || !CanWrite(entity, command.ActorId, command.IsAdministrator))
             return new(ChallengeTemplateWriteState.NotFoundOrForbidden);
         if (HasSameEditableContent(entity, command))
@@ -324,6 +326,7 @@ public sealed class ChallengeBankStore(
         var entity = await ChallengeTemplateCriticalSection.AcquireAsync(db, challengeId, ct);
         if (entity is null
             || entity.DeletedAt is not null
+            || entity.CatalogScope != ChallengeCatalogScope.QuestionBank
             || !CanWrite(entity, actorId, isAdministrator))
             return ChallengeTemplateDeleteFailure.NotFound;
         if (await db.CompetitionChallenges.IgnoreQueryFilters().AsNoTracking().AnyAsync(
@@ -359,6 +362,7 @@ public sealed class ChallengeBankStore(
         var entity = await ChallengeTemplateCriticalSection.AcquireAsync(db, challengeId, ct);
         if (entity is null
             || entity.DeletedAt is null
+            || entity.CatalogScope != ChallengeCatalogScope.QuestionBank
             || !CanWrite(entity, actorId, isAdministrator))
             return new(ChallengeTemplateWriteState.NotFoundOrForbidden);
         var eligibility = await ResourceManagerRoleGuard.AcquireAndCheckAsync(
@@ -400,6 +404,7 @@ public sealed class ChallengeBankStore(
         var entity = await ChallengeTemplateCriticalSection.AcquireAsync(db, challengeId, ct);
         if (entity is null
             || entity.DeletedAt is not null
+            || entity.CatalogScope != ChallengeCatalogScope.QuestionBank
             || !(isAdministrator || entity.OwnerId == actorId))
             return new(ChallengeTemplateWriteState.NotFoundOrForbidden);
         if (normalized.Contains(entity.OwnerId))
@@ -474,6 +479,7 @@ public sealed class ChallengeBankStore(
         var entity = await ChallengeTemplateCriticalSection.AcquireAsync(db, challengeId, ct);
         if (entity is null
             || entity.DeletedAt is not null
+            || entity.CatalogScope != ChallengeCatalogScope.QuestionBank
             || !(isAdministrator || entity.OwnerId == actorId))
             return new(ChallengeTemplateWriteState.NotFoundOrForbidden);
         var previousOwnerId = entity.OwnerId;
@@ -569,7 +575,7 @@ public sealed class ChallengeBankStore(
             db.CompetitionChallenges.IgnoreQueryFilters().Count(item =>
                 item.ChallengeId == challenge.Id && item.DeletedAt == null),
             challenge.CreatedAt,
-            challenge.UpdatedAt)).AsSplitQuery();
+            challenge.UpdatedAt) { ConcurrencyStamp = challenge.ConcurrencyStamp }).AsSplitQuery();
 
     private IQueryable<ChallengeTemplateSummaryView> ProjectSummary(IQueryable<Challenge> source) =>
         source.Select(challenge => new ChallengeTemplateSummaryView(
@@ -585,7 +591,7 @@ public sealed class ChallengeBankStore(
             db.Set<CtfChallengeDefinition>().AsNoTracking()
                 .Where(definition => definition.ChallengeId == challenge.Id)
                 .Select(definition => definition.InteractionKind)
-                .FirstOrDefault()));
+                .FirstOrDefault()) { ConcurrencyStamp = challenge.ConcurrencyStamp });
 
     private sealed record PublishedChallengeReference(
         Guid CompetitionId,

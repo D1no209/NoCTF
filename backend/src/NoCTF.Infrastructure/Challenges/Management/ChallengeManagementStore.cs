@@ -75,7 +75,7 @@ public sealed class ChallengeManagementStore(
             db,
             command.ChallengeId,
             ct);
-        if (template is null || template.DeletedAt is not null)
+        if (template is null || template.DeletedAt is not null || template.CatalogScope != command.MaterialScope)
             return new(null, ChallengeMutationFailure.TemplateNotFound);
         if (template.Mode != competitionMode)
             return new(null, ChallengeMutationFailure.TemplateModeMismatch);

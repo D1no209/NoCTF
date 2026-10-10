@@ -1,4 +1,4 @@
-import type { NoCtfapiEndpointsLiveSoloLiveSoloQuestionGroupResponse as Group, NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateSummaryResponse as Template } from '../../api'
+import type { NoCtfapiEndpointsLiveSoloLiveSoloQuestionGroupResponse as Group } from '../../api'
 export interface GroupDraft { id?: string; expectedStamp?: string; name: string; reserve: boolean; limitSeconds: number | null;
   questions: { competitionChallengeId: string; openOffsetSeconds: number | null }[] }
 export function groupDraft(group?: Group): GroupDraft {
@@ -13,8 +13,6 @@ export function validGroup(draft: GroupDraft, interval: number, limit: number): 
     && draft.questions.every(row => !!row.competitionChallengeId) && Number.isInteger(effectiveLimit) && effectiveLimit >= 1 && effectiveLimit <= 86400
     && offsets.every((value,index) => Number.isInteger(value) && value >= 0 && value < effectiveLimit && (index === 0 ? value === 0 : value > offsets[index-1]!))
 }
-export function copyCandidates(rows: Template[]) { return rows.filter(row => row.id && !row.deletedAt
-  && (row.mode === 'LiveSolo' || row.mode === 'Ctf' && row.interactionKind === 'FlagSubmission')) }
 export function moveGroupQuestion(draft: GroupDraft, index: number, direction: -1 | 1) {
   const target = index + direction; if (target < 0 || target >= draft.questions.length) return draft.questions
   const questions = [...draft.questions]; [questions[index], questions[target]] = [questions[target]!, questions[index]!]; return questions

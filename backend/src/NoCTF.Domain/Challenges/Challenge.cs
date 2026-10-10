@@ -5,7 +5,7 @@ using NoCTF.Domain.Shared;
 
 namespace NoCTF.Domain.Challenges;
 
-/// <summary>Represents a reusable challenge template for exactly one game mode.</summary>
+/// <summary>Typed question material for exactly one game mode; catalog scope separates reusable templates from competition-owned LiveSolo content.</summary>
 [PersistentHierarchy]
 [GeneratePersistentLeaves(typeof(GameMode), "Challenge")]
 public abstract class Challenge : IConcurrencyTracked
@@ -29,6 +29,7 @@ public abstract class Challenge : IConcurrencyTracked
         }
     }
     public GameMode Mode { get; private set; }
+    public ChallengeCatalogScope CatalogScope { get; set; }
     public ChallengeVisibility Visibility { get; set; }
     [MaxLength(160)]
     public string Title { get; set; } = string.Empty;
@@ -56,3 +57,5 @@ public enum ChallengeVisibility : short
     Private,
     Shared
 }
+
+public enum ChallengeCatalogScope : short { QuestionBank, CompetitionOwned }
