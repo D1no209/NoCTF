@@ -1,3 +1,4 @@
+import { useId } from 'vue'
 import { getChallengeWriteUpSettings, adminUpdateChallengeWriteUpSettings } from '~/api'
 import type { NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpSettingsResponse } from '~/api'
 import { message } from '~/utils/i18n'
@@ -5,6 +6,7 @@ import type { UiMessage } from '~/utils/i18n'
 import { toast } from '~/utils/message-toast'
 
 export function useSingleWriteUpSettings(props: Readonly<{ competitionId: string; competitionChallengeId?: string; canWrite: boolean }>, saved: () => void) {
+  const formId = useId()
   const data = ref<NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpSettingsResponse | null>(null)
   const loading = ref(false), pending = ref(false)
   const error = ref<UiMessage | null>(null)
@@ -51,7 +53,7 @@ export function useSingleWriteUpSettings(props: Readonly<{ competitionId: string
   }
   watch(() => [props.competitionId, props.competitionChallengeId], load, { immediate: true })
   onBeforeUnmount(() => sequence++)
-  return { loading, pending, error, enabled, inherit, percent, deadlineHours, perChallenge, retainedExample, deadlineAt,
+  return { formId, loading, pending, error, enabled, inherit, percent, deadlineHours, perChallenge, retainedExample, deadlineAt,
     canWrite: computed(() => props.canWrite), save, load }
 }
 export type SingleWriteUpSettingsState = import('vue').ShallowUnwrapRef<ReturnType<typeof useSingleWriteUpSettings>>
