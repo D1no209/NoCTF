@@ -113,17 +113,47 @@ export function createScrollbars(
   let pinFrame = 0
   let pinObserver: ResizeObserver | undefined
   let pinIntersectionObserver: IntersectionObserver | undefined
+  let pinGeometryDirty = true
+  let pinGeometry: {
+    target: ScrollbarPinRect
+    root: ScrollbarPinRect
+    host: ScrollbarPinRect
+    scrollTop: number
+    scrollLeft: number
+    size: number
+  } | undefined
   const updatePinnedScrollbar = () => {
     if (!pinnedRoot || !pinnedHost || !pinnedScrollbar) return
+    // Ordinary scrolling only changes the table's offset in this owned viewport.
+    // Measure layout after a resize/content change, never on each scroll frame.
+    if (pinGeometryDirty || !pinGeometry) {
+      pinGeometry = {
+        target: target.getBoundingClientRect(),
+        root: pinnedRoot.getBoundingClientRect(),
+        host: pinnedHost.getBoundingClientRect(),
+        scrollTop: pinnedRoot.scrollTop,
+        scrollLeft: pinnedRoot.scrollLeft,
+        size: Math.max(pinnedScrollbar.offsetHeight, 8),
+      }
+      pinGeometryDirty = false
+    }
+    const deltaY = pinnedRoot.scrollTop - pinGeometry.scrollTop
+    const deltaX = pinnedRoot.scrollLeft - pinGeometry.scrollLeft
     const position = horizontalScrollbarPinPosition(
-      target.getBoundingClientRect(),
-      pinnedRoot.getBoundingClientRect(),
-      pinnedHost.getBoundingClientRect(),
-      Math.max(pinnedScrollbar.offsetHeight, 8),
+      {
+        top: pinGeometry.target.top - deltaY,
+        bottom: pinGeometry.target.bottom - deltaY,
+        left: pinGeometry.target.left - deltaX,
+        right: pinGeometry.target.right - deltaX,
+      },
+      pinGeometry.root,
+      pinGeometry.host,
+      pinGeometry.size,
       pinnedHost.scrollTop,
       pinnedHost.scrollLeft,
     )
-    pinnedScrollbar.hidden = position === null
+    if (pinnedScrollbar.hidden !== (position === null))
+      pinnedScrollbar.hidden = position === null
     if (!position) return
     if (position.top !== previousPinPosition?.top)
       pinnedScrollbar.style.setProperty('top', `${position.top}px`)
@@ -140,8 +170,12 @@ export function createScrollbars(
       updatePinnedScrollbar()
     })
   }
+  const invalidatePinGeometry = () => {
+    pinGeometryDirty = true
+    schedulePinnedScrollbarUpdate()
+  }
   const updateAfterTransition = (event: TransitionEvent) => {
-    if (event.propertyName === 'transform') schedulePinnedScrollbarUpdate()
+    if (event.propertyName === 'transform') invalidatePinGeometry()
   }
   if (pinnedRoot && pinnedHost && pinnedScrollbar) {
     pinnedScrollbar.classList.add('os-scrollbar-pinned-horizontal')
@@ -149,12 +183,15 @@ export function createScrollbars(
     pinnedScrollbar.style.setProperty('bottom', 'auto')
     pinnedRoot.addEventListener('scroll', schedulePinnedScrollbarUpdate, { passive: true })
     pinnedRoot.addEventListener('transitionend', updateAfterTransition)
-    window.addEventListener('resize', schedulePinnedScrollbarUpdate, { passive: true })
-    pinObserver = new ResizeObserver(schedulePinnedScrollbarUpdate)
+    window.addEventListener('resize', invalidatePinGeometry, { passive: true })
+    pinObserver = new ResizeObserver(invalidatePinGeometry)
     pinObserver.observe(target)
     pinObserver.observe(pinnedRoot)
     pinObserver.observe(pinnedHost)
-    pinIntersectionObserver = new IntersectionObserver(schedulePinnedScrollbarUpdate, { root: pinnedRoot })
+    // A preceding chart/filter can move the table without resizing the table itself.
+    for (let ancestor = target.parentElement; ancestor && ancestor !== pinnedRoot; ancestor = ancestor.parentElement)
+      pinObserver.observe(ancestor)
+    pinIntersectionObserver = new IntersectionObserver(invalidatePinGeometry, { root: pinnedRoot })
     pinIntersectionObserver.observe(target)
     schedulePinnedScrollbarUpdate()
   }
@@ -163,6 +200,7 @@ export function createScrollbars(
     instance,
     update(nextAxis) {
       instance.options({ overflow: overflowOptions(nextAxis) })
+      if (pinnedScrollbar) invalidatePinGeometry()
     },
     dispose() {
       if (pinFrame) cancelAnimationFrame(pinFrame)
@@ -171,7 +209,7 @@ export function createScrollbars(
       pinnedRoot?.removeEventListener('scroll', schedulePinnedScrollbarUpdate)
       pinnedRoot?.removeEventListener('transitionend', updateAfterTransition)
       if (pinnedRoot)
-        window.removeEventListener('resize', schedulePinnedScrollbarUpdate)
+        window.removeEventListener('resize', invalidatePinGeometry)
       target.removeEventListener('focusin', focus)
       target.removeEventListener('focusout', blur)
       instance.destroy()

@@ -71,8 +71,8 @@ test('pinned control stays outside vertical scrolling content and releases its h
   const element = (rect: { top: number, right: number, bottom: number, left: number }) => {
     const listeners = new Map<string, (event?: { propertyName: string }) => void>()
     return {
-      rect, listeners, style: style(), scrollTop: 0, scrollLeft: 0,
-      getBoundingClientRect() { return this.rect },
+      rect, listeners, style: style(), scrollTop: 0, scrollLeft: 0, geometryReads: 0,
+      getBoundingClientRect() { this.geometryReads++; return { ...this.rect } },
       matches: () => false,
       querySelector: () => null,
       addEventListener(name: string, listener: (event?: { propertyName: string }) => void) { listeners.set(name, listener) },
@@ -81,8 +81,15 @@ test('pinned control stays outside vertical scrolling content and releases its h
   }
   const host = element({ top: 180, right: 1920, bottom: 1050, left: 20 })
   const root = { ...element({ top: 290, right: 1900, bottom: 1010, left: 40 }), parentElement: host }
-  const table = element({ top: 420, right: 1880, bottom: 1600, left: 60 })
-  const bar = { style: style(), hidden: false, offsetHeight: 8, classList: { add() {} } }
+  const content = { ...element({ top: 290, right: 1900, bottom: 1800, left: 40 }), parentElement: root }
+  const table = { ...element({ top: 420, right: 1880, bottom: 1600, left: 60 }), parentElement: content }
+  let hidden = false
+  let visibilityWrites = 0
+  const bar = {
+    style: style(), offsetHeight: 8, classList: { add() {} },
+    get hidden() { return hidden },
+    set hidden(value: boolean) { visibilityWrites++; hidden = value },
+  }
   const frames = new Map<number, () => void>()
   const observed: unknown[] = []
   let resize: () => void = () => {}
@@ -126,10 +133,12 @@ test('pinned control stays outside vertical scrolling content and releases its h
   const binding = create(table, 'x', { pinHorizontalTo: root })
   expect(slot).toBe(host)
   expect(host.style.getPropertyValue('position')).toBe('relative')
-  expect(observed).toEqual([table, root, host])
+  expect(observed).toEqual([table, root, host, content])
   flush()
   expect(bar.style.getPropertyValue('top')).toBe('822px')
   const initialWrites = bar.style.writes.length
+  const geometryReads = () => table.geometryReads + root.geometryReads + host.geometryReads
+  expect(geometryReads()).toBe(3)
 
   // The table moves but the control stays at the same viewport coordinate.
   root.scrollTop = 300
@@ -140,29 +149,48 @@ test('pinned control stays outside vertical scrolling content and releases its h
   flush()
   expect(bar.style.getPropertyValue('top')).toBe('822px')
   expect(bar.style.writes).toHaveLength(initialWrites)
+  expect(geometryReads()).toBe(3)
+  expect(visibilityWrites).toBe(0)
 
   // At the end of the table it follows the table edge, not the load-more area.
+  root.scrollTop = 650
+  table.rect.top = -230
   table.rect.bottom = 950
   root.listeners.get('scroll')!()
   flush()
   expect(bar.style.getPropertyValue('top')).toBe('762px')
+  expect(geometryReads()).toBe(3)
+  table.rect.top -= 4
   table.rect.bottom = 946
   root.listeners.get('transitionend')!({ propertyName: 'transform' })
   flush()
   expect(bar.style.getPropertyValue('top')).toBe('758px')
+  expect(geometryReads()).toBe(6)
 
   root.rect.right = 1300
   resize()
   flush()
   expect(bar.style.getPropertyValue('width')).toBe('1240px')
-  table.rect = { ...table.rect, top: 1100, bottom: 2280 }
+  expect(geometryReads()).toBe(9)
+  root.scrollTop = 1600
   root.listeners.get('scroll')!()
   flush()
   expect(bar.hidden).toBe(true)
-  table.rect = { ...table.rect, top: 120, bottom: 946 }
+  root.scrollTop = 650
   root.listeners.get('scroll')!()
   flush()
   expect(bar.hidden).toBe(false)
+  expect(visibilityWrites).toBe(2)
+  expect(geometryReads()).toBe(9)
+
+  // A chart above the table can grow without changing the table's own size.
+  table.rect.top += 80
+  table.rect.bottom += 80
+  content.rect.bottom += 80
+  resize()
+  flush()
+  expect(bar.style.getPropertyValue('top')).toBe('822px')
+  expect(geometryReads()).toBe(12)
 
   resize()
   binding.dispose()
