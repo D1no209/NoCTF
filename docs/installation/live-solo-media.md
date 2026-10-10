@@ -2,6 +2,8 @@
 
 该功能是普通平台安装之外的**可选单机 Linux 媒体 overlay**。平台应用仍用 Action 完整镜像，不要求用户源码编译 NoCTF。从同版本部署配置包的 `deploy/docker/live-solo` 准备媒体。
 
+比赛未开启“通过平台直播”时无需部署此 overlay，也不要求选手共享屏幕。名单、题组、Runtime、倒计时和提交判胜仍正常运行。只有需要平台屏幕共享、延迟节目或录像时才启用并完成下述媒体验收。
+
 ## 前置条件
 
 独立 LiveKit SFU、Egress 和其专用 Redis，媒体密钥与平台 JWT/Runner key 分开。媒体 Redis 不用作 NoCTF 业务协调，媒体服务不加入题目、callback 或 PostgreSQL 网络。

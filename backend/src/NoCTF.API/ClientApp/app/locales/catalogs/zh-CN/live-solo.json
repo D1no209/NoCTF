@@ -342,5 +342,9 @@
   "liveSolo.groups.schedule": "开题编排",
   "liveSolo.media.title": "屏幕共享",
   "liveSolo.templates.independentRuntime": "LiveSolo 运行环境必须按队伍独立分配。",
-  "liveSolo.templates.flagSubmissionOnly": "LiveSolo 模板支持 Flag 提交，不能使用补丁验证或 Checker。"
+  "liveSolo.templates.flagSubmissionOnly": "LiveSolo 模板支持 Flag 提交，不能使用补丁验证或 Checker。",
+  "liveSolo.settings.streaming": "通过平台直播",
+  "liveSolo.settings.streamingHelp": "关闭后不要求选手共享屏幕，未部署媒体服务也能正常对局。修改对后续准备的轮次生效；历史录像保留原有访问权限。",
+  "liveSolo.media.disabled": "本轮未开启平台直播，无需共享屏幕。",
+  "liveSolo.judge.noStreaming": "双方锁定名单并确认准备、题目环境就绪后，即可开始对局。"
 }

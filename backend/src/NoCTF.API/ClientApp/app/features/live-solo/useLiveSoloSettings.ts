@@ -16,9 +16,9 @@ export function useLiveSoloSettings() {
   const formatOptions = [{ value: 'SingleElimination', key: 'liveSolo.settings.single' }, { value: 'DoubleElimination', key: 'liveSolo.settings.double' }] as const
   const laneOptions = [{ value: 'Winners', key: 'liveSolo.settings.winners' }, { value: 'Losers', key: 'liveSolo.settings.losers' },
     { value: 'GrandFinal', key: 'liveSolo.settings.grandFinal' }, { value: 'ResetFinal', key: 'liveSolo.settings.resetFinal' }] as const
-  const sections = [{ key: 'match', title: 'liveSolo.settings.match', fields: settingFields.filter(x => x.section === 'match') },
+  const sections = computed(() => [{ key: 'match', title: 'liveSolo.settings.match', fields: settingFields.filter(x => x.section === 'match') },
     { key: 'timing', title: 'liveSolo.settings.timing', fields: settingFields.filter(x => x.section === 'timing') },
-    { key: 'media', title: 'liveSolo.settings.media', fields: settingFields.filter(x => x.section === 'media') }] as const
+    { key: 'media', title: 'liveSolo.settings.media', fields: draft.value?.platformStreamingEnabled ? settingFields.filter(x => x.section === 'media') : [] }] as const)
   let disposed = false, request = 0, allowLeave = false, leaveTo: string | null = null
   async function load() {
     if (busy.value || disposed) return
@@ -42,6 +42,9 @@ export function useLiveSoloSettings() {
   function stageNumber(index: number, key: 'stage' | 'requiredWins', value: string | number) { const row = draft.value?.stageRules[index]; if (row && writable.value) row[key] = Number(value) }
   function stageLane(index: number, value: unknown) { const row = draft.value?.stageRules[index]; if (row && writable.value && laneOptions.some(x => x.value === value)) row.lane = value as typeof row.lane }
   function enabled(value: boolean | 'indeterminate') { if (draft.value && writable.value) draft.value.enabled = value === true }
+  function streaming(value: boolean | 'indeterminate') {
+    if (draft.value && writable.value) { draft.value.platformStreamingEnabled = value === true; saved.value = false }
+  }
   function recording(value: boolean | 'indeterminate') { if (draft.value && writable.value) draft.value.recordingEnabled = value === true }
   function opponents(value: boolean | 'indeterminate') { if (draft.value && writable.value) draft.value.participantsMayViewOpponents = value === true }
   async function save() {
@@ -66,6 +69,6 @@ export function useLiveSoloSettings() {
   onMounted(() => { void load(); window.addEventListener('beforeunload', beforeUnload) })
   onScopeDispose(() => { disposed = true; request++; window.removeEventListener('beforeunload', beforeUnload) })
   return { draft, loading, busy, dirty, writable, hasMatches, error, saved, formatOptions, laneOptions, sections, load, number, format,
-    addStage, removeStage, stageNumber, stageLane, enabled, recording, opponents, save, back, leaveOpen, setLeave, leave }
+    addStage, removeStage, stageNumber, stageLane, enabled, streaming, recording, opponents, save, back, leaveOpen, setLeave, leave }
 }
 export type LiveSoloSettingsState = import('vue').ShallowUnwrapRef<ReturnType<typeof useLiveSoloSettings>>

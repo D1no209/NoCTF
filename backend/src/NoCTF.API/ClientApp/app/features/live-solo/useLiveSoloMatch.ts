@@ -42,6 +42,7 @@ export function useLiveSoloMatch() {
   const onRoster = computed(() => !!user.value?.userId && myRoster.value?.userIds?.includes(user.value.userId) === true)
   const canLock = computed(() => !match.value?.pendingCorrectionId && canLockLiveSoloRoster(match.value, team.value?.id, captain.value, myRoster.value?.locked))
   const allLocked = computed(() => match.value?.rosters?.length === 2 && match.value.rosters.every(x => x.locked))
+  const platformStreaming = computed(() => round.value?.platformStreamingEnabled ?? configuration.value?.platformStreamingEnabled ?? false)
   const readOnlyMedia = computed(() => staff.value && !onRoster.value)
   const screen = useLiveSoloScreen(competitionId, matchId, media, readOnlyMedia)
   const myScreen = computed(() => media.value?.members?.find(x => x.userId === user.value?.userId))
@@ -70,15 +71,12 @@ export function useLiveSoloMatch() {
     try {
       if (!ctx?.competition.value) await ctx?.refresh()
       const path = { competitionId: competitionId.value, matchId: matchId.value }
-      const [result, config, mine, room] = await Promise.all([getLiveSoloMatch({ path, query: { staff: staff.value } }),
+      const [result, config, mine] = await Promise.all([getLiveSoloMatch({ path, query: { staff: staff.value } }),
         getLiveSoloPlayerPolicy({ path: { competitionId: path.competitionId } }),
-        getMyTeamEndpoint({ path: { competitionId: path.competitionId } }), getLiveSoloMedia({ path })])
+        getMyTeamEndpoint({ path: { competitionId: path.competitionId } })])
       if (disposed || id !== request) return
       if (result.error || !result.data || config.error || !config.data) throw parseLiveSoloError(result.error ?? config.error, message('liveSolo.error.load'))
       match.value = result.data; configuration.value = config.data; team.value = mine.data ?? null
-      if (room.response?.status === 404) media.value = null
-      else if (room.error) throw parseLiveSoloError(room.error, message('liveSolo.error.media'))
-      else media.value = room.data ?? null
       if (result.data.currentRoundId) {
         const current = await getLiveSoloRound({ path: { ...path, roundId: result.data.currentRoundId }, query: { staff: staff.value } })
         if (disposed || id !== request) return
@@ -86,6 +84,14 @@ export function useLiveSoloMatch() {
         round.value = current.data; observedAt = performance.now(); elapsedSinceSnapshot.value = 0
       }
       else round.value = null
+      if (platformStreaming.value) {
+        const room = await getLiveSoloMedia({ path })
+        if (disposed || id !== request) return
+        if (room.response?.status === 404) media.value = null
+        else if (room.error) throw parseLiveSoloError(room.error, message('liveSolo.error.media'))
+        else media.value = room.data ?? null
+      }
+      else { media.value = null; await screen.disconnect() }
       const names = new Map(memberNames.value)
       if (user.value?.userId) names.set(user.value.userId, user.value.userName ?? '—')
       const missing = (mine.data?.memberIds ?? []).filter(member => !names.has(member))
@@ -126,7 +132,7 @@ export function useLiveSoloMatch() {
     await operation(() => confirmLiveSoloReady({ path: { competitionId: competitionId.value, matchId: matchId.value }, body: { expectedStamp: match.value!.concurrencyStamp! } }))
   }
   async function prepareMedia() {
-    if (!allLocked.value || (!judge.value && !onRoster.value) || !match.value?.concurrencyStamp) return
+    if (!platformStreaming.value || !allLocked.value || (!judge.value && !onRoster.value) || !match.value?.concurrencyStamp) return
     await operation(() => prepareLiveSoloMedia({ path: { competitionId: competitionId.value, matchId: matchId.value }, body: { expectedMatchStamp: match.value!.concurrencyStamp! } }))
   }
   async function prepareRound() {
@@ -174,7 +180,7 @@ export function useLiveSoloMatch() {
     disposed = true; request++; if (timer) clearTimeout(timer); if (clockTimer) clearInterval(clockTimer)
     window.removeEventListener('beforeunload', beforeUnload)
   })
-  return { competitionId, matchId, match, round, media, configuration, loading, busy, team, myRoster, captain, onRoster, staffOnlyMedia,
+  return { competitionId, matchId, match, round, media, platformStreaming, configuration, loading, busy, team, myRoster, captain, onRoster, staffOnlyMedia,
     canLock, allLocked, rosterOptions, selectedRoster, toggleRoster, lockRoster, ready, prepareMedia, prepareRound, start,
     staff, readOnlyMedia, judge, canCorrect, correct, screens, myScreen, clock, stateKey: computed(() => matchStateKey(match.value?.state)), back, load,
     judgeOpen, judgeAction, judgeReason, forfeitingTeam, openDecision, confirmDecision, setJudgeOpen,
@@ -182,6 +188,6 @@ export function useLiveSoloMatch() {
     ProgramControl: markRaw(LiveSoloProgramControl), Questions: markRaw(LiveSoloQuestions), canSubmit: computed(() => onRoster.value && canPlayLiveSolo(match.value, round.value)),
     flagDock: computed(() => `live-solo-flag-${matchId.value}`),
     questionsVisible: computed(() => onRoster.value && !!round.value?.startedAt && ['Running', 'ConfirmingResult'].includes(round.value.state ?? '')),
-    ...screen, mediaError: screen.error, error }
+    ...screen, mediaError: computed(() => platformStreaming.value ? screen.error.value : null), error }
 }
 export type LiveSoloMatchState = import('vue').ShallowUnwrapRef<ReturnType<typeof useLiveSoloMatch>>

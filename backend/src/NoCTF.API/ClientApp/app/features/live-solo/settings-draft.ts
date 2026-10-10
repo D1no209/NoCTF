@@ -15,7 +15,7 @@ export const settingFields: { key: NumberSetting; label: MessageKey; min: number
   { key: 'maximumViewers', label: 'liveSolo.settings.viewers', min: 1, max: 100000, section: 'media' },
 ]
 export function settingsDraft(value: Configuration): LiveSoloSettingsDraft {
-  return { enabled: value.enabled ?? false, bracketFormat: value.bracketFormat ?? 'SingleElimination', requiredWins: value.requiredWins ?? 2,
+  return { enabled: value.enabled ?? false, platformStreamingEnabled: value.platformStreamingEnabled ?? false, bracketFormat: value.bracketFormat ?? 'SingleElimination', requiredWins: value.requiredWins ?? 2,
     countdownSeconds: value.countdownSeconds ?? 5, questionIntervalSeconds: value.questionIntervalSeconds ?? 180, roundLimitSeconds: value.roundLimitSeconds ?? 900,
     publicDelaySeconds: value.publicDelaySeconds ?? 60, participantsMayViewOpponents: value.participantsMayViewOpponents ?? false,
     recordingEnabled: value.recordingEnabled ?? false, recordingRetentionDays: value.recordingRetentionDays ?? 30,

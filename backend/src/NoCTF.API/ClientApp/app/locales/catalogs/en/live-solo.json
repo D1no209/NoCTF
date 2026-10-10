@@ -342,5 +342,9 @@
   "liveSolo.groups.schedule": "Question schedule",
   "liveSolo.media.title": "Screen sharing",
   "liveSolo.templates.independentRuntime": "LiveSolo environments must be independent per team.",
-  "liveSolo.templates.flagSubmissionOnly": "LiveSolo templates support Flag submission; patch verification and Checkers are unavailable."
+  "liveSolo.templates.flagSubmissionOnly": "LiveSolo templates support Flag submission; patch verification and Checkers are unavailable.",
+  "liveSolo.settings.streaming": "Stream through the platform",
+  "liveSolo.settings.streamingHelp": "When off, players do not share screens and matches need no media service. Changes apply to subsequently prepared rounds; existing recordings retain their access rules.",
+  "liveSolo.media.disabled": "Platform streaming is off for this round. Screen sharing is not required.",
+  "liveSolo.judge.noStreaming": "Start after both teams lock their rosters, confirm readiness, and the challenge environment is ready."
 }
