@@ -13,6 +13,7 @@ import PasskeyMessages from './catalogs/zh-CN/passkeys.json'
 import MfaMessages from './catalogs/zh-CN/mfa.json'
 import ApiMessages from './catalogs/zh-CN/api.json'
 import LiveSoloMessages from './catalogs/zh-CN/live-solo.json'
+import ErrorMessages from './catalogs/zh-CN/errors.json'
 
 const translatedMessages = {
   ...CoreMessages,
@@ -29,6 +30,7 @@ const translatedMessages = {
   ...MfaMessages,
   ...PasskeyMessages,
   ...LiveSoloMessages,
+  ...ErrorMessages,
 }
 export const chineseMessages = {
   ...englishMessages,

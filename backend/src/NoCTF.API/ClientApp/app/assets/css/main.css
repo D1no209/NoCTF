@@ -279,6 +279,13 @@
   [data-slot='topbar-capsule'][data-position='left'] { padding-inline: 0.75rem; }
 }
 
+[data-slot='application-error-code'] {
+  font-size: clamp(6rem, 16vw, 11rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.065em;
+}
+
 [data-page-wallpaper='true'] {
   --page-wallpaper-blur: var(--user-page-wallpaper-blur-light, 0px);
   --page-wallpaper-image: url('../images/backgrounds/light-pages-wallpaper.jpg');

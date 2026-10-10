@@ -12,6 +12,7 @@ import PasskeyMessages from './catalogs/en/passkeys.json'
 import MfaMessages from './catalogs/en/mfa.json'
 import ApiMessages from './catalogs/en/api.json'
 import LiveSoloMessages from './catalogs/en/live-solo.json'
+import ErrorMessages from './catalogs/en/errors.json'
 
 export const englishMessages = {
   ...CoreMessages,
@@ -28,5 +29,6 @@ export const englishMessages = {
   ...MfaMessages,
   ...PasskeyMessages,
   ...LiveSoloMessages,
+  ...ErrorMessages,
 }
 export type MessageKey = keyof typeof englishMessages

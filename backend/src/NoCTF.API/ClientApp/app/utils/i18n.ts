@@ -6,6 +6,7 @@ export type AppLocale = typeof supportedLocales[number]
 
 export const localeDomains = [
   'core',
+  'errors',
   'competitions',
   'challenges',
   'leaderboard',
@@ -34,7 +35,7 @@ const catalogRevision = shallowRef(0)
 const catalogs: Record<AppLocale, LocaleCatalog> = { 'zh-CN': {}, en: {} }
 const loadedDomains: Record<AppLocale, Set<LocaleDomain>> = { 'zh-CN': new Set(), en: new Set() }
 const pendingDomains = new Map<string, Promise<void>>()
-const activeDomains = new Set<LocaleDomain>(['core', 'api', 'mfa', 'passkeys'])
+const activeDomains = new Set<LocaleDomain>(['core', 'errors', 'api', 'mfa', 'passkeys'])
 
 export function mergeLocaleCatalog(english: LocaleCatalog, translated: LocaleCatalog): LocaleCatalog {
   return { ...english, ...Object.fromEntries(Object.entries(translated).filter(([, value]) => value?.trim())) }
@@ -43,6 +44,7 @@ export function mergeLocaleCatalog(english: LocaleCatalog, translated: LocaleCat
 const catalogLoaders: Record<AppLocale, Record<LocaleDomain, () => Promise<LocaleCatalog>>> = {
   'zh-CN': {
     core: () => import('../locales/catalogs/zh-CN/core.json').then(chunk => chunk.default),
+    errors: () => import('../locales/catalogs/zh-CN/errors.json').then(chunk => chunk.default),
     competitions: () => import('../locales/catalogs/zh-CN/competitions.json').then(chunk => chunk.default),
     challenges: () => Promise.all([import('../locales/catalogs/zh-CN/challenges.json'), import('../locales/catalogs/zh-CN/challenge-timing.json')])
       .then(([challenges, timing]) => ({ ...challenges.default, ...timing.default })),
@@ -59,6 +61,7 @@ const catalogLoaders: Record<AppLocale, Record<LocaleDomain, () => Promise<Local
   },
   'en': {
     core: () => import('../locales/catalogs/en/core.json').then(chunk => chunk.default),
+    errors: () => import('../locales/catalogs/en/errors.json').then(chunk => chunk.default),
     competitions: () => import('../locales/catalogs/en/competitions.json').then(chunk => chunk.default),
     challenges: () => Promise.all([import('../locales/catalogs/en/challenges.json'), import('../locales/catalogs/en/challenge-timing.json')])
       .then(([challenges, timing]) => ({ ...challenges.default, ...timing.default })),
@@ -119,7 +122,7 @@ async function loadLocaleDomain(locale: AppLocale, domain: LocaleDomain): Promis
 /** Loads the core catalog before Nuxt mounts, preventing a mixed-language first frame. */
 export async function initializeLocale(): Promise<AppLocale> {
   const locale = detectLocale()
-  await Promise.all(['core', 'api', 'mfa', 'passkeys'].map(domain => loadLocaleDomain(locale, domain as LocaleDomain)))
+  await Promise.all(['core', 'errors', 'api', 'mfa', 'passkeys'].map(domain => loadLocaleDomain(locale, domain as LocaleDomain)))
   activeLocale.value = locale
   if (import.meta.client)
     document.documentElement.lang = locale
