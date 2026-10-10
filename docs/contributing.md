@@ -41,11 +41,12 @@ docs/
   index.md                # 手册首页
   guide/                  # 导读、概念、权限
   installation/           # 环境、Docker/K8s、代理、配置、验收
-  player/                 # 账号、队伍、题目、模式、榜单、题解
+  player/                 # 账号、队伍、题目、榜单、题解
+    modes/                # 五种赛制同级参赛入口，复杂流程保留子页
   challenge-bank/         # 可复用模板、附件/Flag、定义、测试、权限与引用
-  live-solo/              # 独立第五赛制：配置、题组、赛程、场内、媒体、纠正、验收
   competition/            # 单场比赛管理，按任务子目录组织
     settings/             # 创建概览、基本设置、计分、方向
+    modes/                # 赛制管理；LiveSolo 设置、赛程、裁判和录像
     content/              # 比赛题目、提示/Flag、闯关与勋章
     participants/         # 队伍、赛道、协作者与所有权
     judging/              # 评测、调分、作弊/申诉、题解
@@ -59,11 +60,14 @@ docs/
   operations/             # 升级、恢复、观测、排障
   reference/              # FAQ、术语
   development/            # 仅开发者：本地开发与源码构建
+  live-solo/              # 旧公开链接兼容页，不是顶层手册分类
   contributing.md         # 本页
   README.md               # 仓库阅读入口，不生成站点路由
 ```
 
 页面文件名使用简短英文 kebab-case，标题和正文使用中文。目录 `index.md` 是对应章节入口。新增章节同步修改 `.vitepress/config.mts` 的 sidebar/nav，并为上下文添加站内链接。
+
+目录按用户任务组织，不按实现模块机械复制。赛制在选手/管理导航中保持同级；部署放 installation，启用与恢复验收放 operations。迁移公开路径时更新站内链接，保留不参与搜索的兼容页，由 base-aware redirect 引导旧 URL。
 
 ## 写作要求
 

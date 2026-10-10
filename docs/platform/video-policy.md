@@ -29,4 +29,4 @@ Programme 整路合成用一份相应输出预算，不按屏幕路数相乘；�
 
 目标编码码率不是网络硬上限，RTP 重传与协议开销另计。浏览器约束也不等于已经验证了针对恶意自定义发布器的 SFU 硬限制。
 
-媒体部署、录像和容量分别见 [媒体部署](../live-solo/media-deployment.md)、[录像](../live-solo/recordings.md)、[就绪验收](../live-solo/readiness.md)。
+媒体部署、录像和容量分别见 [媒体部署](../installation/live-solo-media.md)、[录像](../competition/modes/live-solo/recordings.md)、[就绪验收](../operations/live-solo-readiness.md)。

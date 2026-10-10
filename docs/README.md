@@ -21,6 +21,6 @@ bun run docs:preview
 
 管理手册入口：[比赛管理](./competition/index.md)、[题库管理](./challenge-bank/index.md)、[平台管理](./platform/index.md)。[覆盖索引](./reference/management-map.md)将当前所有管理路由对应到详细操作说明。
 
-第五赛制见 [LiveSolo](./live-solo/index.md)。最近核对 2026-10-11，更新内容和能力边界见 [更新说明](./reference/updates.md)。
+各赛制从 [选手指南](./player/modes.md)进入；LiveSolo [参赛](./player/modes/live-solo/index.md)与 [管理](./competition/modes/live-solo/index.md)按任务分开，媒体与验收归入安装运维。最近核对 2026-10-11，更新内容和能力边界见 [更新说明](./reference/updates.md)。
 
 GitHub Pages 使用 `.github/workflows/docs-pages.yml`：main 文档变更自动发布，PR 仅验证，支持手工执行；生产 base 从 Pages 配置读取。首次需要 Settings → Pages → Source 选择 GitHub Actions，且目标仓库套餐支持 Pages。详细步骤和启用条件见 [发布说明](./contributing.md#github-pages-自动发布)。

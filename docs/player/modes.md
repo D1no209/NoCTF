@@ -2,6 +2,14 @@
 
 比赛选择 CTF、AWD、AWDP、KoH 或 LiveSolo。同样的页面动作在不同模式中的目标和计分方式不同，先阅读赛事规则。
 
+| 赛制 | 参赛指南 |
+| --- | --- |
+| CTF | [解题与提交](./modes/ctf.md) |
+| AWD | [攻击与防守](./modes/awd.md) |
+| AWDP | [Break 与 Fix](./modes/awdp.md) |
+| KoH | [共享目标控制](./modes/koh.md) |
+| LiveSolo | [名单、场内解题与观赛](./modes/live-solo/index.md) |
+
 ## CTF：解题与提交
 
 1. 报名获批，等待比赛和题目开放。
@@ -47,7 +55,7 @@ KoH 不通过普通 Flag 提交按钮申报控制权，也不为每队创建一�
 
 当前 Round 所有题目、双方和成员共用受理顺序，第一条有效正确 Flag 赢局，不按评测返回速度判胜。时限先处理截止前已受理记录，再得出结果。没有普通积分、血奖、付费提示或题解折扣。
 
-详细 [准备](../live-solo/preparation.md)、[场内操作](../live-solo/playing.md)、[观赛](../live-solo/program.md)与 [赛后题解](../live-solo/postgame.md)独立阅读。真实媒体和完整生产验收边界见 [就绪清单](../live-solo/readiness.md)。
+详细 [准备](./modes/live-solo/preparation.md)、[场内操作](./modes/live-solo/playing.md)、[观赛](./modes/live-solo/program.md)与 [赛后题解](./modes/live-solo/postgame.md)独立阅读。真实媒体和完整生产验收边界见 [就绪清单](../operations/live-solo-readiness.md)。
 
 ## 各模式共同规则
 
