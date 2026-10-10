@@ -87,6 +87,11 @@ public sealed class ChallengeManagementStore(
         var entityId = command.CompetitionChallengeId ?? Guid.CreateVersion7(command.CreatedAt);
         if (rules.Mode != template.Mode)
             return new(null, ChallengeMutationFailure.TemplateModeMismatch);
+        var conflict = await FindCompetitionChallengeConflictAsync(
+            entityId, command.CompetitionId, command.ChallengeId, command.Order,
+            includeIdConflict: false, ct);
+        if (conflict is not null)
+            return new(null, conflict.Value);
         rules.CompetitionChallengeId = entityId;
         var entity = CompetitionChallengeGeneratedCatalog.Create(template.Mode);
         entity.Id = entityId;
@@ -204,6 +209,11 @@ public sealed class ChallengeManagementStore(
                 item.CompetitionId == command.CompetitionId, ct);
         if (entity is null)
             return new(null, ChallengeMutationFailure.ChallengeNotFound);
+        var conflict = await FindCompetitionChallengeConflictAsync(
+            entity.Id, entity.CompetitionId, entity.ChallengeId, command.Order,
+            includeIdConflict: false, ct);
+        if (conflict is not null)
+            return new(null, conflict.Value);
         if (command.DirectionId is Guid directionId)
         {
             var direction = await db.Set<NoCTF.Domain.Competitions.Directions.CompetitionDirection>()
@@ -533,12 +543,12 @@ public sealed class ChallengeManagementStore(
         if (includeIdConflict && await db.CompetitionChallenges.IgnoreQueryFilters().AsNoTracking()
                 .AnyAsync(item => item.Id == id, ct))
             return ChallengeMutationFailure.ResourceIdConflict;
-        if (await db.CompetitionChallenges.AsNoTracking().AnyAsync(item =>
+        if (await db.CompetitionChallenges.IgnoreQueryFilters().AsNoTracking().AnyAsync(item =>
                 item.Id != id
                 && item.CompetitionId == competitionId
                 && item.ChallengeId == challengeId, ct))
             return ChallengeMutationFailure.ChallengeTemplateConflict;
-        if (await db.CompetitionChallenges.AsNoTracking().AnyAsync(item =>
+        if (await db.CompetitionChallenges.IgnoreQueryFilters().AsNoTracking().AnyAsync(item =>
                 item.Id != id
                 && item.CompetitionId == competitionId
                 && item.Order == order, ct))

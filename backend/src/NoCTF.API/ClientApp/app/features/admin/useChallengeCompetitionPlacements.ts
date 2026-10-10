@@ -72,7 +72,7 @@ export function useChallengeCompetitionPlacements(props: Readonly<{ challengeId:
         while (cursor < competitions.length && !signal.aborted) {
           const competition = competitions[cursor++]!
           const { data, error: failure } = await adminListCompetitionChallenges({
-            path: { competitionId: competition.id }, query: { includeDeleted: false }, signal,
+            path: { competitionId: competition.id }, query: { includeDeleted: true }, signal,
           })
           if (signal.aborted) return
           if (failure || !data) failures.push(competition.title ?? '')
