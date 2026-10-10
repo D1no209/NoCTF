@@ -126,7 +126,7 @@ describe('participant challenge progress', () => {
     expect(submit).not.toContain("$t('common.label.submissionsRemaining'")
     expect(submit).toContain("emit('remainingChanged', remainingAttempts.value)")
     expect(submit).toContain(':pending="submitting" :disabled="inputDisabled"')
-    expect(submit).toContain(":placeholder=\"solved ? $t('terminal.challengeSolved') : $t('terminal.flagPlaceholder')\"")
+    expect(submit).toContain(":placeholder=\"submissionsClosed ? $t('challengeTiming.stageClosed') : solved && !judgementOnly ? $t('terminal.challengeSolved') : $t('terminal.flagPlaceholder')\"")
     expect(submit).toContain("showResult(true, translate('terminal.challengeSolved'))")
     expect(submit).toContain('solved.value = true')
     expect(submit).toContain('solvedChallengeKeys.add(challengeKey())')

@@ -65,9 +65,13 @@ public sealed class ChallengeTimingPreviewReader(NoCtfDbContext db, ILeaderboard
         var graph = await db.CompetitionProgressions.AsNoTracking().Include(x => x.Nodes).Include(x => x.Edges).AsSplitQuery()
             .SingleOrDefaultAsync(x => x.CompetitionId == candidate.CompetitionId, ct);
         var existingCompletion = graph is { Enabled: true } ? await db.GameplayFacts.AsNoTracking()
-            .Where(x => x.CompetitionId == candidate.CompetitionId && x.TeamId != null && x.TimeEligibility == GameplayFactTimeEligibility.Valid
+            .Where(x => x.CompetitionId == candidate.CompetitionId && x.TeamId != null
                 && (x.Kind == GameplayFactKind.FlagAttempt || x.Kind == GameplayFactKind.FixAttempt)
-                && (x.Result == GameplayFactResult.Correct || x.Result == GameplayFactResult.RightButDue))
+                && (x.Result == GameplayFactResult.Correct || x.Result == GameplayFactResult.RightButDue)
+                && db.CompetitionChallenges.Any(challenge => challenge.Id == x.CompetitionChallengeId
+                    && (challenge.AutoOpenAt == null || x.OccurredAt >= challenge.AutoOpenAt)
+                    && (challenge.SubmissionDeadlineAt == null || x.OccurredAt < challenge.SubmissionDeadlineAt
+                        || x.Kind == GameplayFactKind.FlagAttempt && x.OccurredAt >= official.EndAt)))
             .Select(x => new { Team = x.TeamId!.Value, x.CompetitionChallengeId }).Distinct().ToArrayAsync(ct) : [];
         int Progression(Guid team)
         {

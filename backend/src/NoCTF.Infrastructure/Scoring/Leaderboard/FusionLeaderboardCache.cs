@@ -408,7 +408,10 @@ public sealed class FusionLeaderboardCache(
                 && competitionStatusAtProjection == CompetitionStatus.Running
                 ? scoreboard.Schema.Rounds.SingleOrDefault(round => round.State == ScoreboardRoundState.Running)?.EndAt
                 : null,
-            sourceEventSequenceThrough);
+            sourceEventSequenceThrough)
+        {
+            TimingRevisions = challengeEntities.ToDictionary(x => x.Id, x => x.TimingRevision)
+        };
     }
 
     private async Task<AwdScoreboardWindow> ReadAwdScoreboardWindowAsync(
@@ -513,6 +516,8 @@ public sealed class FusionLeaderboardCache(
                 response.Scoreboard.Snapshot.Teams.Count);
             await transaction.CommitAsync(ct);
             publicationPhase = true;
+            if (!await HasCurrentTimingAsync(competitionId, response, ct))
+                return;
 
             if (publicationFence is null)
             {
@@ -548,6 +553,8 @@ public sealed class FusionLeaderboardCache(
                 return;
             }
 
+            if (!await HasCurrentTimingAsync(competitionId, response, ct))
+                return;
             await publisher.PublishAsync(response.Scoreboard, ct);
             await cache.RemoveAsync(FailureKey(competitionId), token: ct);
         }
@@ -640,7 +647,7 @@ public sealed class FusionLeaderboardCache(
         {
             var unfenced = await cache.GetOrDefaultAsync<CachedScoreboardProjection?>(
                 ProjectionKey(competitionId), null, token: ct);
-            return IsExpired(unfenced) ? null : unfenced;
+            return IsExpired(unfenced) || unfenced is not null && !await HasCurrentTimingAsync(competitionId, unfenced, ct) ? null : unfenced;
         }
 
         var published = await publicationFence.GetAsync(competitionId, ct);
@@ -650,10 +657,18 @@ public sealed class FusionLeaderboardCache(
             CachedScoreboardJsonContext.Default.CachedScoreboardProjection);
         if (bundle is null || bundle.Scoreboard.Snapshot.Version != published.Fence)
             throw new InvalidOperationException("The fenced leaderboard payload is invalid.");
-        if (IsExpired(bundle))
+        if (IsExpired(bundle) || !await HasCurrentTimingAsync(competitionId, bundle, ct))
             return null;
 
         return bundle;
+    }
+
+    private async Task<bool> HasCurrentTimingAsync(Guid competitionId, CachedScoreboardProjection bundle, CancellationToken ct)
+    {
+        var current = await db.CompetitionChallenges.AsNoTracking().Where(x => x.CompetitionId == competitionId)
+            .Select(x => new { x.Id, x.TimingRevision }).ToArrayAsync(ct);
+        return current.Length == bundle.TimingRevisions.Count
+            && current.All(x => bundle.TimingRevisions.TryGetValue(x.Id, out var revision) && revision == x.TimingRevision);
     }
 
     private bool IsExpired(CachedScoreboardProjection? bundle) =>
@@ -714,7 +729,10 @@ public sealed class FusionLeaderboardCache(
 internal sealed record CachedScoreboardProjection(
     ScoreboardProjection Scoreboard,
     DateTimeOffset? ValidUntil = null,
-    long SourceEventSequenceThrough = 0);
+    long SourceEventSequenceThrough = 0)
+{
+    public IReadOnlyDictionary<Guid, Guid> TimingRevisions { get; init; } = new Dictionary<Guid, Guid>();
+}
 
 [JsonSourceGenerationOptions(JsonSerializerDefaults.Web)]
 [JsonSerializable(typeof(CachedScoreboardProjection))]

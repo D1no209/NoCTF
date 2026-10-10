@@ -1,3 +1,7 @@
+using NoCTF.Domain.Competitions.Progression;
+using NoCTF.API.Endpoints.GameplayFacts;
+using NoCTF.Infrastructure.GameplayFacts.Intake;
+using NoCTF.Application.GameplayFacts.Intake;
 using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
@@ -50,6 +54,110 @@ namespace NoCTF.Tests.Integration.Persistence;
 public sealed class ChallengeTimingPersistenceTests
 {
     [Test, Timeout(300_000)]
+    public Task Preview_progression_uses_latest_other_challenge_times_before_their_batch_runs(CancellationToken ct) => DockerIntegrationTest.RunAsync(async () =>
+    {
+        await using var f = await Fixture.CreateAsync(ct);
+        var others = new List<Guid>();
+        for (var index = 1; index <= 2; index++)
+        {
+            var template = new CtfChallenge { Id = Guid.NewGuid(), OwnerId = f.Competition.OwnerId, Title = "Other " + index,
+                NormalizedTitle = "OTHER " + index, Direction = "Web", Definition = TestConfigurations.Definition(GameMode.Ctf), CreatedAt = f.Now, UpdatedAt = f.Now };
+            f.Db.Add(template); await f.Db.SaveChangesAsync(ct);
+            var created = await f.Management.CreateAsync(new(null, f.Competition.Id, template.Id, index, f.Now), TestConfigurations.Rules(GameMode.Ctf), ct);
+            others.Add(created.Challenge!.Id);
+        }
+        var team = new Team { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id, Name = "Graph team", CaptainId = f.Competition.OwnerId,
+            MemberIds = [f.Competition.OwnerId], InvitationToken = new string('e', 32), RegistrationStatus = TeamRegistrationStatus.Approved, RegisteredAt = f.Now };
+        f.Db.Add(team);
+        foreach (var question in new[] { f.Challenge.Id, others[0] })
+            f.Db.Add(new FlagAttemptGameplayFact { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id, CompetitionChallengeId = question,
+                TeamId = team.Id, Value = "synthetic", Result = GameplayFactResult.Correct, State = GameplayFactState.Completed,
+                OccurredAt = f.Now.AddMinutes(-10), UpdatedAt = f.Now });
+        var a = new ChallengeProgressionNode { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id, CompetitionChallengeId = f.Challenge.Id };
+        var b = new ChallengeProgressionNode { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id, CompetitionChallengeId = others[0] };
+        var c = new ChallengeProgressionNode { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id, CompetitionChallengeId = others[1] };
+        f.Db.Add(new CompetitionProgression { CompetitionId = f.Competition.Id, Enabled = true, Nodes = [a, b, c], Edges = [
+            new() { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id, SourceNodeId = a.Id, TargetNodeId = c.Id },
+            new() { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id, SourceNodeId = b.Id, TargetNodeId = c.Id }] });
+        await f.Db.SaveChangesAsync(ct);
+        await f.Store.ChangeAsync(new(f.Competition.Id, others[0], new(f.Now.AddMinutes(-5)), f.Now), ct);
+        using var services = new ServiceCollection().AddFusionCache(NoCtfCacheNames.Leaderboards).Services.BuildServiceProvider();
+        var cache = new FusionLeaderboardCache(f.Db, new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()),
+            Substitute.For<ILeaderboardRefreshPublisher>(), services.GetRequiredService<IFusionCacheProvider>());
+        var preview = new ChallengeTimingPreviewReader(f.Db, cache, new PlatformSecretProtector(Options.Create(
+            new EmailVerificationProtectionOptions { EncryptionKey = Convert.ToBase64String(new byte[32]) })));
+        var impact = await preview.PreviewAsync(new(f.Competition.Id, f.Challenge.Id, new(f.Now.AddMinutes(-5)), f.Now), f.Competition.OwnerId, ct);
+        await Assert.That(impact!.Teams.Single().ProgressionNodesChanged).IsEqualTo(1);
+    });
+
+    [Test, Timeout(300_000)]
+    public Task Interrupted_batches_and_late_jobs_converge_to_the_latest_saved_revision(CancellationToken ct) => DockerIntegrationTest.RunAsync(async () =>
+    {
+        await using var f = await Fixture.CreateAsync(ct); var at = f.Now.AddMinutes(-10);
+        f.Db.AddRange(Enumerable.Range(0, 205).Select(_ => new FlagAttemptGameplayFact { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id,
+            CompetitionChallengeId = f.Challenge.Id, Value = "synthetic", State = GameplayFactState.Completed,
+            Result = GameplayFactResult.Correct, OccurredAt = at, UpdatedAt = at })); await f.Db.SaveChangesAsync(ct);
+        await f.Store.ChangeAsync(new(f.Competition.Id, f.Challenge.Id, new(null, at.AddSeconds(-1)), f.Now), ct);
+        var oldRevision = f.Challenge.TimingRevision;
+        await using (var transaction = await f.Db.Database.BeginTransactionAsync(ct))
+        { await f.Store.RecalculateAsync(new(f.Challenge.Id, oldRevision), f.Now, ct); await transaction.RollbackAsync(ct); }
+        f.Db.ChangeTracker.Clear();
+        await Assert.That(await f.Db.GameplayFacts.CountAsync(x => x.Result == GameplayFactResult.RightButDue, ct)).IsEqualTo(0);
+        await f.Store.RecalculateAsync(new(f.Challenge.Id, oldRevision), f.Now, ct);
+        await Assert.That(await f.Db.GameplayFacts.CountAsync(x => x.Result == GameplayFactResult.RightButDue, ct)).IsEqualTo(200);
+        await f.Store.ChangeAsync(new(f.Competition.Id, f.Challenge.Id, new(null, at.AddSeconds(1)), f.Now), ct);
+        var latestRevision = await f.Db.CompetitionChallenges.Where(x => x.Id == f.Challenge.Id).Select(x => x.TimingRevision).SingleAsync(ct);
+        await f.Store.RecalculateAsync(new(f.Challenge.Id, oldRevision), f.Now, ct);
+        await Assert.That(await f.Db.GameplayFacts.CountAsync(x => x.Result == GameplayFactResult.RightButDue, ct)).IsEqualTo(200);
+        await f.Store.RecalculateAsync(new(f.Challenge.Id, latestRevision), f.Now, ct);
+        await f.Store.RecalculateAsync(new(f.Challenge.Id, latestRevision), f.Now, ct);
+        await Assert.That(await f.Db.GameplayFacts.CountAsync(x => x.Result == GameplayFactResult.Correct && x.AppliedTimingRevision == latestRevision, ct)).IsEqualTo(205);
+        await Assert.That(await f.Db.CompetitionChallenges.Where(x => x.Id == f.Challenge.Id).Select(x => x.AppliedTimingRevision).SingleAsync(ct)).IsEqualTo(latestRevision);
+        await Assert.That(await f.Db.GameplayFacts.CountAsync(ct)).IsEqualTo(205);
+    });
+
+    [Test, Timeout(300_000)]
+    [Arguments(GameMode.Ctf)] [Arguments(GameMode.Awd)] [Arguments(GameMode.Awdp)] [Arguments(GameMode.Koh)]
+    public Task PostgreSql_latest_cutoff_preserves_manual_points_and_restores_correctness_for_each_mode(GameMode mode, CancellationToken ct) => DockerIntegrationTest.RunAsync(async () =>
+    {
+        await using var f = await Fixture.CreateAsync(ct, mode);
+        var team = new Team { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id, Name = "Timing team", CaptainId = f.Competition.OwnerId,
+            MemberIds = [f.Competition.OwnerId], InvitationToken = new string('b', 32), RegistrationStatus = TeamRegistrationStatus.Approved, RegisteredAt = f.Now };
+        f.Db.Add(team); var at = f.Now.AddMinutes(-10);
+        GameplayFact correct = mode == GameMode.Awdp ? new BreakAttemptGameplayFact() : mode == GameMode.Koh ? new KohControlObservationGameplayFact() : new FlagAttemptGameplayFact();
+        correct.Id = Guid.NewGuid(); correct.CompetitionId = f.Competition.Id; correct.CompetitionChallengeId = f.Challenge.Id;
+        correct.TeamId = team.Id; correct.OccurredAt = at; correct.UpdatedAt = at; correct.State = GameplayFactState.Completed;
+        correct.Result = mode == GameMode.Koh ? GameplayFactResult.Controlled : GameplayFactResult.Correct; correct.Value = "synthetic";
+        Guid? victimId = null;
+        if (mode == GameMode.Awd)
+        {
+            var victimUser = Guid.NewGuid(); victimId = Guid.NewGuid();
+            f.Db.Add(new User { Id = victimUser, UserName = "victim", NormalizedUserName = "VICTIM", Email = "victim@test.invalid", NormalizedEmail = "VICTIM@TEST.INVALID", PasswordHash = "synthetic", CreatedAt = f.Now, UpdatedAt = f.Now });
+            f.Db.Add(new Team { Id = victimId.Value, CompetitionId = f.Competition.Id, Name = "Victim", NormalizedName = "VICTIM", CaptainId = victimUser,
+                MemberIds = [victimUser], InvitationToken = new string('d', 32), RegistrationStatus = TeamRegistrationStatus.Approved, RegisteredAt = f.Now });
+            correct.VictimTeamId = victimId; correct.ReferenceKind = GameplayFactReferenceKind.AwdRound; correct.ReferenceId = Guid.NewGuid();
+        }
+        f.Db.Add(correct); f.Db.Add(new ManualAdjustmentGameplayFact { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id,
+            CompetitionChallengeId = f.Challenge.Id, TeamId = team.Id, OccurredAt = at, UpdatedAt = at,
+            State = GameplayFactState.Completed, Result = GameplayFactResult.Applied, Value = "25" }); await f.Db.SaveChangesAsync(ct);
+        using var services = new ServiceCollection().AddFusionCache(NoCtfCacheNames.Leaderboards).Services.BuildServiceProvider();
+        var cache = new FusionLeaderboardCache(f.Db, new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()),
+            Substitute.For<ILeaderboardRefreshPublisher>(), services.GetRequiredService<IFusionCacheProvider>());
+        await f.Store.ChangeAsync(new(f.Competition.Id, f.Challenge.Id, new(null, at.AddSeconds(-1)), f.Now), ct);
+        await f.Store.RecalculateAsync(new(f.Challenge.Id, f.Challenge.TimingRevision), f.Now, ct);
+        var stopped = await cache.CreateScoreboardAsync(f.Competition.Id, f.Now, ct);
+        await Assert.That(stopped!.Snapshot.Teams.Single(x => x.TeamId == team.Id).TotalScore).IsEqualTo(25);
+        if (victimId is { } victim) await Assert.That(stopped.Snapshot.Teams.Single(x => x.TeamId == victim).TotalScore).IsEqualTo(0);
+        await Assert.That(correct.Result).IsEqualTo(mode == GameMode.Koh ? GameplayFactResult.Controlled : GameplayFactResult.RightButDue);
+        await f.Store.ChangeAsync(new(f.Competition.Id, f.Challenge.Id, new(null, f.Now.AddMinutes(1)), f.Now), ct);
+        await f.Store.RecalculateAsync(new(f.Challenge.Id, f.Challenge.TimingRevision), f.Now, ct);
+        var restored = await cache.CreateScoreboardAsync(f.Competition.Id, f.Now, ct);
+        await Assert.That(correct.Result).IsEqualTo(mode == GameMode.Koh ? GameplayFactResult.Controlled : GameplayFactResult.Correct);
+        await Assert.That(restored!.Snapshot.Teams.Single(x => x.TeamId == team.Id).TotalScore).IsGreaterThan(25);
+        await Assert.That(await f.Db.GameplayFacts.CountAsync(ct)).IsEqualTo(2);
+    });
+
+    [Test, Timeout(300_000)]
     public Task Http_timing_preview_requires_management_and_patch_preserves_omitted_and_clears_null(CancellationToken ct) => DockerIntegrationTest.RunAsync(async () =>
     {
         await using var f = await Fixture.CreateAsync(ct);
@@ -60,7 +168,7 @@ public sealed class ChallengeTimingPersistenceTests
         builder.Services.AddFastEndpoints(options => {
             options.DisableAutoDiscovery = true;
             options.Assemblies = [typeof(PreviewChallengeTimingEndpoint).Assembly];
-            options.Filter = type => type == typeof(PreviewChallengeTimingEndpoint) || type == typeof(PatchCompetitionChallengeEndpoint);
+            options.Filter = type => type == typeof(PreviewChallengeTimingEndpoint) || type == typeof(PatchCompetitionChallengeEndpoint) || type == typeof(SubmitFlagEndpoint);
         });
         builder.Services.AddAuthentication("Bearer").AddScheme<AuthenticationSchemeOptions, TestBearerHandler>("Bearer", _ => { });
         builder.Services.AddAuthorization();
@@ -83,6 +191,7 @@ public sealed class ChallengeTimingPersistenceTests
         builder.Services.AddSingleton<IChallengeTimingPreviewReader, ChallengeTimingPreviewReader>();
         builder.Services.AddSingleton<IChallengeTimingStore>(f.Store);
         builder.Services.AddSingleton<ManageChallengeTiming>();
+        builder.Services.AddSingleton(new SubmitFlag(new GameplayFactIntakeStore(f.Db, messages, new GameplayFactAttemptCriticalSection()), new GameModeGameplayFactAdmissionPolicy()));
         await using var app = builder.Build(); app.UseAuthentication(); app.UseAuthorization(); app.UseNoCtfEndpoints(); await app.StartAsync(ct);
         using var client = app.GetTestClient();
         var uri = $"/api/v1/admin/competitions/{f.Competition.Id}/challenges/{f.Challenge.Id}";
@@ -116,6 +225,26 @@ public sealed class ChallengeTimingPersistenceTests
         await Assert.That(refreshed.SubmissionDeadlineAt).IsEqualTo(f.Now.AddMinutes(30));
         using var mixed = await client.PatchAsJsonAsync(uri, new { timing = new { }, presentation = new { order = 0, isPublished = false } }, ct);
         await Assert.That(mixed.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+        f.Db.ChangeTracker.Clear();
+        var question = await f.Db.CompetitionChallenges.SingleAsync(x => x.Id == f.Challenge.Id, ct);
+        question.IsPublished = true; question.ScoringEndsAt = f.Now.AddMinutes(-5); question.SubmissionDeadlineAt = f.Now.AddMinutes(-1);
+        f.Db.Add(new Team { Id = Guid.NewGuid(), CompetitionId = f.Competition.Id, Name = "HTTP team", CaptainId = f.Competition.OwnerId,
+            MemberIds = [f.Competition.OwnerId], InvitationToken = new string('c', 32), RegistrationStatus = TeamRegistrationStatus.Approved, RegisteredAt = f.Now });
+        await f.Db.SaveChangesAsync(ct);
+        var count = await f.Db.GameplayFacts.CountAsync(ct);
+        var submissionUri = $"/api/v1/competitions/{f.Competition.Id}/challenges/{f.Challenge.Id}/flag-submissions";
+        using var closed = await client.PostAsJsonAsync(submissionUri, new { flag = "synthetic" }, ct);
+        await Assert.That(closed.StatusCode).IsEqualTo(HttpStatusCode.Conflict);
+        using var closedJson = JsonDocument.Parse(await closed.Content.ReadAsStringAsync(ct));
+        await Assert.That(closedJson.RootElement.GetProperty("code").GetString()).IsEqualTo("ChallengeSubmissionClosed");
+        question.AutoOpenAt = f.Now.AddMinutes(1); question.ScoringEndsAt = f.Now.AddMinutes(2); question.SubmissionDeadlineAt = f.Now.AddMinutes(3);
+        await f.Db.SaveChangesAsync(ct);
+        using var notOpen = await client.PostAsJsonAsync(submissionUri, new { flag = "synthetic" }, ct);
+        await Assert.That(notOpen.StatusCode).IsEqualTo(HttpStatusCode.Conflict);
+        using var notOpenJson = JsonDocument.Parse(await notOpen.Content.ReadAsStringAsync(ct));
+        await Assert.That(notOpenJson.RootElement.GetProperty("code").GetString()).IsEqualTo("ChallengeNotOpened");
+        await Assert.That(await f.Db.GameplayFacts.CountAsync(ct)).IsEqualTo(count);
+
     });
 
     private sealed class TestUserContext(Guid userId) : IUserContext { public Guid UserId => userId; public bool IsAdministrator => true; }
@@ -155,7 +284,12 @@ public sealed class ChallengeTimingPersistenceTests
         await Assert.That(await previewReader.ValidateAsync(candidate, Guid.NewGuid(), preview.Token, ct)).IsFalse();
         fact.UpdatedAt = f.Now.AddSeconds(1); await f.Db.SaveChangesAsync(ct);
         await Assert.That(await previewReader.ValidateAsync(candidate, f.Competition.OwnerId, preview.Token, ct)).IsFalse();
+        await cache.RefreshAsync(f.Competition.Id, ct);
+        await Assert.That((await cache.GetScoreboardAsync(f.Competition.Id, ct))!.Snapshot.Teams.Single().TotalScore).IsGreaterThan(0);
         await f.Store.ChangeAsync(candidate, ct);
+        // No invalidation event is delivered in this fixture. A cached old-policy
+        // projection must still be rejected before the background batch runs.
+        await Assert.That((await cache.GetScoreboardAsync(f.Competition.Id, ct))!.Snapshot.Teams.Single().TotalScore).IsEqualTo(0);
         await f.Store.RecalculateAsync(new(f.Challenge.Id, f.Challenge.TimingRevision), f.Now, ct);
         var restore = candidate with { Timing = new(), Now = f.Now.AddSeconds(2) };
         var restorePreview = await previewReader.PreviewAsync(restore, f.Competition.OwnerId, ct);
@@ -234,16 +368,16 @@ public sealed class ChallengeTimingPersistenceTests
         await Assert.That(f.Challenge.OpeningState).IsEqualTo(ChallengeOpeningState.Pending);
     });
 
-    private sealed class Fixture(PostgreSqlContainer postgres, NoCtfDbContext db, CtfCompetition competition,
+    private sealed class Fixture(PostgreSqlContainer postgres, NoCtfDbContext db, Competition competition,
         CompetitionChallenge challenge, DateTimeOffset now) : IAsyncDisposable
     {
         public NoCtfDbContext Db { get; } = db;
-        public CtfCompetition Competition { get; } = competition;
+        public Competition Competition { get; } = competition;
         public CompetitionChallenge Challenge { get; } = challenge;
         public DateTimeOffset Now { get; } = now;
         public ChallengeManagementStore Management { get; } = new(db, Substitute.For<IPostCommitMessagePublisher>(), Substitute.For<IChallengeRuntimeTemplateCatalog>());
         public ChallengeTimingStore Store => new(Db, Substitute.For<IPostCommitMessagePublisher>(), Management, NullCompetitionEventRecorder.Instance);
-        public static async Task<Fixture> CreateAsync(CancellationToken ct)
+        public static async Task<Fixture> CreateAsync(CancellationToken ct, GameMode mode = GameMode.Ctf)
         {
             var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193").Build();
             await postgres.StartAsync(ct);
@@ -253,15 +387,16 @@ public sealed class ChallengeTimingPersistenceTests
             var now = DateTimeOffset.FromUnixTimeSeconds(DateTimeOffset.UtcNow.ToUnixTimeSeconds()); var owner = Guid.NewGuid();
             db.Users.Add(new User { Id = owner, UserName = "timing-owner", Email = "timing@test.invalid", PasswordHash = "test",
                 AccountStatus = UserAccountStatus.Active, CreatedAt = now, UpdatedAt = now });
-            var competition = new CtfCompetition { Id = Guid.NewGuid(), OwnerId = owner, Title = "Timing",
-                Status = CompetitionStatus.Running, StartAt = now.AddHours(-1), EndAt = now.AddHours(1),
-                ModeConfiguration = TestConfigurations.Competition(GameMode.Ctf), FlagDerivationSecret = new byte[32], CreatedAt = now, UpdatedAt = now };
+            var competition = CompetitionGeneratedCatalog.Create(mode);
+            competition.Id = Guid.NewGuid(); competition.OwnerId = owner; competition.Title = "Timing";
+            competition.Status = CompetitionStatus.Running; competition.StartAt = now.AddHours(-1); competition.EndAt = now.AddHours(1);
+            competition.ModeConfiguration = TestConfigurations.Competition(mode); competition.FlagDerivationSecret = new byte[32]; competition.CreatedAt = now; competition.UpdatedAt = now;
             db.Add(competition);
-            var template = new CtfChallenge { Id = Guid.NewGuid(), OwnerId = owner, Title = "Timing template", Direction = "Web",
-                Definition = TestConfigurations.Definition(GameMode.Ctf), CreatedAt = now, UpdatedAt = now };
+            var template = ChallengeGeneratedCatalog.Create(mode); template.Id = Guid.NewGuid(); template.OwnerId = owner;
+            template.Title = "Timing template"; template.Direction = "Web"; template.Definition = TestConfigurations.Definition(mode); template.CreatedAt = now; template.UpdatedAt = now;
             db.Add(template); await db.SaveChangesAsync(ct);
             var management = new ChallengeManagementStore(db, Substitute.For<IPostCommitMessagePublisher>(), Substitute.For<IChallengeRuntimeTemplateCatalog>());
-            var created = await management.CreateAsync(new(null, competition.Id, template.Id, 0, now), TestConfigurations.Rules(GameMode.Ctf), ct);
+            var created = await management.CreateAsync(new(null, competition.Id, template.Id, 0, now), TestConfigurations.Rules(mode), ct);
             var challenge = await db.CompetitionChallenges.SingleAsync(x => x.Id == created.Challenge!.Id, ct);
             return new(postgres, db, competition, challenge, now);
         }

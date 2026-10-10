@@ -822,3 +822,13 @@ POST /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallenge
 ```
 
 时间 PATCH 必须单独提交，省略字段保留、null 清除。有历史行为时先调用上述预览，确认后携带 `timingPreviewToken` 保存；预览绑定当前用户、候选时间及数据版本，2 分钟有效。资料改变或到期返回 `PreviewExpired`，需重新预览。
+
+
+### 时间与结果语义
+
+- 创建请求的 `timing` 及独立时间 PATCH 支持 `autoOpenAt`、`scoringEndsAt`、`submissionDeadlineAt`。时间采用包含时区偏移的绝对时间；省略保留，显式 `null` 清除。
+- 配置的时间必须满足开放 ≤ 停止计分 ≤ 提交截止；开放边界包含，提交及计分结束边界不包含。完整 AWD／AWDP 轮次的结束时间可以等于停止计分时间。
+- 列表、详情的 `timing` 返回原始时间、自动开放状态、回算是否仍在执行；选手列表及详情另返回 `serverTime` 和 `phase`（`NotOpened`／`Scoring`／`JudgementOnly`／`SubmissionClosed`）。
+- 正确而不计分返回 `RightButDue`。`timeEligibility=Valid` 时算完成及闯关，正式解题人数和血榜不受益；`NotOpened` 或 `SubmissionClosed` 表示历史记录按最新时间无效，不计分、不算完成、不占有效次数。错误记录仍保留 `Wrong`。
+- 首次受理、迟到评测与历史回算都比较原 `OccurredAt` 和最新配置。回算不运行 Checker，不新增尝试，也不冻结旧时间规则。队伍提示费用和人工调分不受计分结束时间影响。
+- 开放任务在暂停时挂起，恢复补执行；重启后从关系数据重建。LiveSolo 不使用这些字段控制 Round。

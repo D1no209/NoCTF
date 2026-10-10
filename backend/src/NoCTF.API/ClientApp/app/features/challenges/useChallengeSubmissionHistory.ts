@@ -71,6 +71,7 @@ export function useChallengeSubmissionHistory(props: Readonly<Omit<{
     submission.result = status.result
     submission.failureCode = status.failureCode
     submission.updatedAt = status.updatedAt
+    submission.timeEligibility = status.timeEligibility
     return true
   }
 

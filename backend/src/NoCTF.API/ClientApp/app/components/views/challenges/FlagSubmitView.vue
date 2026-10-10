@@ -47,7 +47,7 @@ const { PartyPopper, input, submitting, celebrating, persistentResult, solved, c
         <AlertTitle>{{ $t('challenges.label.flagCorrect') }}</AlertTitle>
         <AlertDescription>{{ $message(persistentResult.message) }}</AlertDescription>
       </Alert>
-      <TerminalCommand :id="`flag-input-${competitionChallengeId}`" v-model="input" :label="multiple ? $t('challenges.flagSubmit.label.flagListOneLine') : $t('common.label.flag.flagSubmitView')" :multiple="multiple" :pending="submitting" :disabled="inputDisabled" :placeholder="solved ? $t('terminal.challengeSolved') : $t('terminal.flagPlaceholder')" :hint="multiple ? $t('terminal.multipleHint') : $t('terminal.submitHint')" @submit="submit" />
+      <TerminalCommand :id="`flag-input-${competitionChallengeId}`" v-model="input" :label="multiple ? $t('challenges.flagSubmit.label.flagListOneLine') : $t('common.label.flag.flagSubmitView')" :multiple="multiple" :pending="submitting" :disabled="inputDisabled" :placeholder="submissionsClosed ? $t('challengeTiming.stageClosed') : solved && !judgementOnly ? $t('terminal.challengeSolved') : $t('terminal.flagPlaceholder')" :hint="multiple ? $t('terminal.multipleHint') : $t('terminal.submitHint')" @submit="submit" />
 
       <Alert v-if="persistentResult && persistentResult.correct !== true" class="mt-4" variant="destructive" role="status"><AlertTitle>{{ persistentResult.correct === null ? $t('challenges.label.judgementReceived') : $t('challenges.label.latestJudgement') }}</AlertTitle><AlertDescription>{{ $message(persistentResult.message) }}</AlertDescription></Alert>
       <Alert v-if="timedOut" class="mt-4">

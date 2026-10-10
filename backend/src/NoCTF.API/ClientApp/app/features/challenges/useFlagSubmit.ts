@@ -332,6 +332,7 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
 
   const viewBindings = {
       ...toRefs(props),
+      title: computed(() => props.title || translate('challenges.label.submitFlag')),
       PartyPopper,
       input,
       submitting,
