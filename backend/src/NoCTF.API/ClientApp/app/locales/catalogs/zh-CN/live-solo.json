@@ -337,5 +337,7 @@
   "liveSolo.postgame.reviewHelp": "此操作针对当前显示的赛后题解版本，服务端将再次核对公开及退回权限。",
   "liveSolo.postgame.unsaved": "未保存的题解会被放弃，取消可继续编辑。",
   "liveSolo.postgame.enable": "开启赛后题解",
-  "liveSolo.postgame.download": "下载 PDF"
+  "liveSolo.postgame.download": "下载 PDF",
+  "liveSolo.groups.details": "题组信息",
+  "liveSolo.groups.schedule": "开题编排"
 }

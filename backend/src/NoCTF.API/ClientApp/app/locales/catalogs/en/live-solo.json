@@ -337,5 +337,7 @@
   "liveSolo.postgame.reviewHelp": "This decision applies to the displayed post-event solution version. Publication and return permissions are checked again by the server.",
   "liveSolo.postgame.unsaved": "Your unsaved solution will be discarded. Cancel to continue editing.",
   "liveSolo.postgame.enable": "Enable post-event solutions",
-  "liveSolo.postgame.download": "Download PDF"
+  "liveSolo.postgame.download": "Download PDF",
+  "liveSolo.groups.details": "Group details",
+  "liveSolo.groups.schedule": "Question schedule"
 }
