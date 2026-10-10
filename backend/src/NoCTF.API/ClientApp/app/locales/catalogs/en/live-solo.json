@@ -339,5 +339,6 @@
   "liveSolo.postgame.enable": "Enable post-event solutions",
   "liveSolo.postgame.download": "Download PDF",
   "liveSolo.groups.details": "Group details",
-  "liveSolo.groups.schedule": "Question schedule"
+  "liveSolo.groups.schedule": "Question schedule",
+  "liveSolo.media.title": "Screen sharing"
 }

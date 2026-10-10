@@ -5,8 +5,8 @@ const props=defineProps<{state:LiveSoloProgramControlState}>()
 const {program,historyRows,error,busy,reason,decision,actionKey,stateKey,actions,load,open,setOpen,confirm}=toRefs(props.state)
 </script>
 <template>
-  <section class="flex flex-col gap-3" :aria-label="$t('liveSolo.programControl.title')">
-    <div class="flex flex-wrap items-center gap-3"><h2 class="font-semibold">{{ $t('liveSolo.programControl.title') }}</h2><Badge v-if="program?.stalled" variant="destructive">{{ $t('liveSolo.programControl.stalled') }}</Badge><Badge v-else-if="program" variant="secondary">{{ $t(stateKey) }}</Badge><Button variant="ghost" size="sm" :disabled="busy || decision !== null" @click="load">{{ $t('common.label.refresh') }}</Button></div>
+  <section class="flex min-w-0 flex-col gap-4" :aria-label="$t('liveSolo.programControl.title')">
+    <div class="flex flex-wrap items-center gap-3"><h2 class="text-display">{{ $t('liveSolo.programControl.title') }}</h2><Badge v-if="program?.stalled" variant="destructive">{{ $t('liveSolo.programControl.stalled') }}</Badge><Badge v-else-if="program" variant="secondary">{{ $t(stateKey) }}</Badge><Button variant="ghost" size="sm" :disabled="busy || decision !== null" @click="load">{{ $t('common.label.refresh') }}</Button></div>
     <Alert v-if="error" variant="destructive"><AlertDescription>{{ $message(error) }}</AlertDescription></Alert>
     <p v-if="program" class="text-sm text-muted-foreground">{{ $t('liveSolo.programControl.lastVideo',{time:formatDateTime(program.lastFragmentImportedAt)}) }}</p>
     <div class="flex flex-wrap gap-2"><Button v-for="item in actions" :key="item.action" size="sm" variant="outline" :disabled="busy || decision !== null" @click="open(item.action)">{{ $t(item.key) }}</Button></div>

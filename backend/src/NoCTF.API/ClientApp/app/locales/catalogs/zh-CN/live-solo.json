@@ -339,5 +339,6 @@
   "liveSolo.postgame.enable": "开启赛后题解",
   "liveSolo.postgame.download": "下载 PDF",
   "liveSolo.groups.details": "题组信息",
-  "liveSolo.groups.schedule": "开题编排"
+  "liveSolo.groups.schedule": "开题编排",
+  "liveSolo.media.title": "屏幕共享"
 }
