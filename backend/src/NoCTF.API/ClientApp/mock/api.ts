@@ -8,6 +8,7 @@ import { mockAttachmentResponse } from './attachments'
 import { mockRuntimeEndpoint } from './runtime'
 import { createMockBroadcastHistory } from './broadcast-history'
 import { createMockPlatformLogHistory } from './platform-log-history'
+import { createMockLiveSolo } from './live-solo'
 import { uniqueTags, validChallengeTags } from '../app/lib/challenge-tags'
 import { validateAppealStatement } from '../app/lib/participant-form-validation'
 
@@ -52,6 +53,7 @@ function mockWriteUpPdf(teamName: string): Blob {
 
 export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'ManualModeration'; mfa?: boolean } = {}) {
   const state = createFixtures()
+  const liveSolo = createMockLiveSolo(state)
   const broadcastHistory = createMockBroadcastHistory(state)
   const platformLogHistory = createMockPlatformLogHistory()
   const teamBanCases = new Map<string, Data>()
@@ -291,6 +293,8 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
     const team = state.teams.find(t => t.id === p.teamId && t.competitionId === p.competitionId)
     const myTeam = state.teams.find(t => t.competitionId === p.competitionId && t.memberIds.includes(user?.userId))
     const cleanRoute = route.replace('/admin/competitions', '/competitions')
+    const liveSoloRead = request.method === 'GET' ? liveSolo.read(cleanRoute, p) : undefined
+    if (liveSoloRead !== undefined) return json(shape(responseSchema(operation), liveSoloRead))
     if (route.startsWith('/admin/competitions/{competitionId}/announcements') && !competitionStaff)
       return problem(403, 'Mock announcement management requires staff permissions')
     let value: any

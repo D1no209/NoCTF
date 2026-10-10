@@ -12,14 +12,16 @@ export function useCompetitionParticipantWorkspace(props: Readonly<Omit<{
   selectedChallengeId?: string | null
   challengeSelectionMode?: 'inline' | 'navigate'
   showChallengeNavigator?: boolean
+  showSupportingPanels?: boolean
   contentScroll?: boolean
-}, "selectedChallengeId" | "challengeSelectionMode" | "showChallengeNavigator" | "contentScroll"> & Required<Pick<{
+}, "selectedChallengeId" | "challengeSelectionMode" | "showChallengeNavigator" | "contentScroll" | "showSupportingPanels"> & Required<Pick<{
   competitionId: string
   selectedChallengeId?: string | null
   challengeSelectionMode?: 'inline' | 'navigate'
   showChallengeNavigator?: boolean
+  showSupportingPanels?: boolean
   contentScroll?: boolean
-}, "selectedChallengeId" | "challengeSelectionMode" | "showChallengeNavigator" | "contentScroll">>>,
+}, "selectedChallengeId" | "challengeSelectionMode" | "showChallengeNavigator" | "contentScroll" | "showSupportingPanels">>>,
 emit: { (event: "selectChallenge", ...args: [challengeId: string]): void }) {
   const router = useRouter()
 

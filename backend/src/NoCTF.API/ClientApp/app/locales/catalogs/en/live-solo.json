@@ -338,6 +338,9 @@
   "liveSolo.postgame.unsaved": "Your unsaved solution will be discarded. Cancel to continue editing.",
   "liveSolo.postgame.enable": "Enable post-event solutions",
   "liveSolo.postgame.download": "Download PDF",
+  "liveSolo.groups.details": "Group details",
+  "liveSolo.groups.schedule": "Question schedule",
+  "liveSolo.media.title": "Screen sharing",
   "liveSolo.templates.independentRuntime": "LiveSolo environments must be independent per team.",
   "liveSolo.templates.flagSubmissionOnly": "LiveSolo templates support Flag submission; patch verification and Checkers are unavailable."
 }

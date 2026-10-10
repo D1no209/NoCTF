@@ -931,6 +931,7 @@ body:has([data-modal-scroll-lock]) {
 }
 [data-slot='default-layout-foreground']:has(> main [data-contained-workspace-page]) .competition-participant-workspace { flex: 1; min-height: 0; }
 [data-slot='default-layout-foreground']:has(> main [data-contained-workspace-page]) .competition-participant-workspace:not(.question-participant-workspace) { grid-template-rows: minmax(0, 2fr) minmax(0, 1fr); }
+[data-slot='default-layout-foreground']:has(> main [data-contained-workspace-page]) .competition-participant-workspace[data-supporting-panels='false'] { grid-template-rows: minmax(0, 1fr); }
 [data-slot='default-layout-foreground']:has(> main [data-contained-workspace-page]) .competition-participant-workspace > main { min-height: 0; overflow: hidden; }
 [data-slot='default-layout-foreground']:has(> main [data-contained-workspace-page]) .competition-participant-workspace > aside { min-height: 0; overflow: hidden; }
 @media (min-width: 1280px) {

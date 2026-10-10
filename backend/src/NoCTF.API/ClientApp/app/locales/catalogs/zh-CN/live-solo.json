@@ -338,6 +338,9 @@
   "liveSolo.postgame.unsaved": "未保存的题解会被放弃，取消可继续编辑。",
   "liveSolo.postgame.enable": "开启赛后题解",
   "liveSolo.postgame.download": "下载 PDF",
+  "liveSolo.groups.details": "题组信息",
+  "liveSolo.groups.schedule": "开题编排",
+  "liveSolo.media.title": "屏幕共享",
   "liveSolo.templates.independentRuntime": "LiveSolo 运行环境必须按队伍独立分配。",
   "liveSolo.templates.flagSubmissionOnly": "LiveSolo 模板支持 Flag 提交，不能使用补丁验证或 Checker。"
 }
