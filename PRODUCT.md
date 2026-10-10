@@ -14,9 +14,12 @@ Organizers and administrators use it before and during events to create competit
 
 The product has a mixed surface model: the default design context is the product workbench, but public competition-facing screens can lean into brand and event energy when a task calls for it.
 
+LiveSolo has an independent match/round and media workflow under development; its
+[acceptance status](specs/live-solo-status.md) defines the currently validated scope.
+
 ## Product Purpose
 
-NoCTF is a modern competition platform for running Jeopardy CTF, AWD, AWDP, and KoH events with real-time scoring, plugin-driven game modes, and container-backed challenge orchestration.
+NoCTF is a modern competition platform for running Jeopardy CTF, AWD, AWDP, KoH, and LiveSolo events with real-time scoring, built-in game modes, and container-backed challenge orchestration.
 
 Success means participants can compete without friction, organizers can operate the event with confidence, and the system makes fairness, status, and auditability visible. The interface should make complex live competition mechanics feel controlled rather than chaotic.
 

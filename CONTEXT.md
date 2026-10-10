@@ -30,7 +30,7 @@ an independent source of requirements.
 - **Fix attempt** is consumed only by a team-controlled failed validation. Platform, Runner, storage,
   and checker failures do not consume an attempt.
 - **Runtime instance** is the durable scheduling and lifecycle fact for one concrete generation. Its
-  provider receipt is a typed Container, Compose, or OVA receipt persisted through a TPH one-to-one.
+  provider receipt is a typed Container or OVA receipt persisted through a TPH one-to-one.
 - **Checker** is a trusted, administrator-controlled one-shot workload with a minimum-permission
   internal JWT. Challenge service input and network traffic remain untrusted.
 - **Bot user** is a non-interactive platform user. Organizer Bots use ordinary access JWTs and the

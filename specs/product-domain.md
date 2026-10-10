@@ -2,12 +2,15 @@
 
 ## 产品范围
 
-NoCTF 是面向团队的竞赛平台，正式支持四种且仅四种模式：
+NoCTF 是面向团队的竞赛平台，定义五种模式：
 
 - `Ctf`：Jeopardy/普通 CTF；可包含静态题和按队 Runtime。
 - `Awd`：按轮换 Flag、持续服务状态和队间攻击计分。
 - `Awdp`：Break Flag 与独立 Fix archive 判定。
 - `Koh`：共享 Hill Runtime，通过平台轮询返回的队伍 Control Flag 判定控制权。
+- `LiveSolo`：独立的 Match/Round、受理顺序结果与媒体/节目投影；见[模式规范](live-solo.md)和[验收状态](live-solo-status.md)。
+
+以下常规生命周期、计分与题目时间规则的适用范围应结合各模式规范；LiveSolo Round 不套用原四模式的题目时间协议。
 
 Penetration 是普通 CTF 内容，不是模式。平台不实现多阶段题、插件拥有的模式或静态容器群题型；进程拓扑不改变产品领域模型。
 
@@ -61,7 +64,7 @@ Competition 以普通列 `TracksEnabled` 显式启停赛道，并以带 `Positio
 
 `Challenge` 是且只属于一个 GameMode 的全局可复用题库模板，拥有题面、方向、模板 Attachment、明文模板静态 Flag，以及 provider-neutral 的 Runtime、Checker、动态 Flag 生成/注入定义。它不包含比赛排序、发布状态、分数、Hint、RuntimeProvider 或 RunnerPool。
 
-`CompetitionChallenge` 是比赛内实例，链接 CompetitionId 与 ChallengeId，拥有可选的比赛内展示名称、Order、IsPublished、typed mode-specific rules TPH 和关系化 Hint。题目分值完全由 Rules leaf 与其关系子项决定，不保存独立基础分。展示名称为空时实时回退到 Challenge.Title；比赛内改名不修改全局题库模板。引用时 Challenge.Mode 必须等于 Competition.Mode。模板定义修改不改动正在运行的 Runtime；下一次 Start 或新 UUID Reset 读取最新定义，不保存题目定义版本，也不自动更新存量 Runtime。
+`CompetitionChallenge` 是比赛内实例，链接 CompetitionId 与 ChallengeId，拥有可选的比赛内展示名称、Order、IsPublished、typed mode-specific rules TPH 和关系化 Hint。CTF/AWD/AWDP/KoH 还可配置开放、计分结束与提交截止时间；当前实现与验证见[题目时间配置](challenge-timing-status.md)。题目分值完全由 Rules leaf 与其关系子项决定，不保存独立基础分。展示名称为空时实时回退到 Challenge.Title；比赛内改名不修改全局题库模板。引用时 Challenge.Mode 必须等于 Competition.Mode。模板定义修改不改动正在运行的 Runtime；下一次 Start 或新 UUID Reset 读取最新定义，不保存题目定义版本，也不自动更新存量 Runtime。
 
 ### GameplayFact
 
@@ -70,7 +73,7 @@ GameplayFact 是玩家、管理员或系统在比赛中的客观行为及其当�
 ### RuntimeInstance
 
 RuntimeInstance 表示一个具体 UUID 标识的外部 Runtime。Reset 会停止旧实例并创建全新 Runtime UUID。
-结构化 AccessEndpoint、PublishedPort、capacity allocation 使用关系行；Container、Compose、OVA receipt
+结构化 AccessEndpoint、PublishedPort、capacity allocation 使用关系行；Container、OVA receipt
 使用一对一 RuntimeReceipt TPH。异步状态保存在 RuntimeInstance/GameplayFact/ChallengeFlag 自身，
 JetStream 保存至少一次投递状态；不存在 RuntimeOperation 或 provider receipt JSON。
 
@@ -91,7 +94,7 @@ Visible | Published | Running | Paused -> Finished
 - Paused 冻结 `EffectiveRunningTime`，因此 AWD 加固期、AWD/AWDP 轮次延后；CTF Runtime TTL 使用真实 UTC，不冻结。
 - Start Gate 返回结构化失败列表：稳定错误码、CompetitionChallengeId、TeamId、配置路径与说明。自动启动失败保持原状态并通知管理者。
 - CTF 可显式开启赛后练习模式。已审核且未封禁的原参赛队与赛后自动审核的新队均可为已发布的
-  Container/Compose 题目启动独立 `Practice` Runtime；练习实例沿用正式 Runtime 的容量、TTL、随机端口
+  Container 题目启动独立 `Practice` Runtime；练习实例沿用正式 Runtime 的容量、TTL、随机端口
   和回收规则，但不复用正式实例。练习 Flag 复用正式提交接口并创建普通 GameplayFact；其时间位于
   正式窗口外，因此不产生正式分数、血奖或排行榜变化。赛后新队由 RegisteredAt 推导，不存队伍类型标记，
   且不能进入正式榜。Finished 阶段不再允许修改队伍组织资料或追加成员。
@@ -109,7 +112,7 @@ Competition 聚合与必要的 Serializable 事务内：
 3. 校验每个已发布题的 leaf mode、typed Definition/Rules、Flag/Attachment/Runtime/Checker/逻辑 URL 组合；
 4. 校验所有 Approved Team 未删除/未 Ban 且 TeamMember/Captain 关系有效；
 5. CTF：Static 题至少有一个可用通用 Flag或合法 RandomOne 候选；PerTeam 只验证模板，Flag 仍在各队 Runtime Start 前按需确认/生成；
-6. AWD：仅 Container/Compose，平台部署的 Runtime provider/runner pool 可用，按队 Runtime 额度足以覆盖全部 AWD 题，注入与 Checker 定义有效；此时只建启动任务，不提前生成 Round Flag；
+6. AWD：仅 Container，平台部署的 Runtime provider/runner pool 可用，按队 Runtime 额度足以覆盖全部 AWD 题，注入与 Checker 定义有效；此时只建启动任务，不提前生成 Round Flag；
 7. AWDP：Container target/Checker/Patch 定义完整，ObjectStorage 与平台 Runtime placement 可用；
 8. KoH：共享 Runtime/Control URL 有效，为所有队生成缺失 Control Flag；
 9. 无错误时设置 Running/RunningSince、追加 typed lifecycle event；提交成功后发布 Runtime/调度消息。Pending 状态可重建未发布任务；有任一错误则零状态变更、零启动消息。

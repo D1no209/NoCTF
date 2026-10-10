@@ -75,8 +75,8 @@ PostgreSQL behavior.
 
 Cross-repository GitOps tests use `NOCTF_GITOPS_TEMPLATE_ROOT` and a compatible
 challenge-template checkout. They are separate from the core Docker integration
-gate. The currently pinned external CLI uses the legacy Compose contract; keep
-that compatibility gap explicit until the template repository is upgraded.
+gate. Check that the selected external revision emits the current named-service
+Container contract; legacy Compose challenge definitions are unsupported.
 
 Run frontend checks from `backend/src/NoCTF.API/ClientApp`:
 

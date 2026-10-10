@@ -391,7 +391,7 @@ PATCH /api/v1/admin/challenges/{challengeId}/test-runtimes/{runtimeInstanceId}
 DELETE /api/v1/admin/challenges/{challengeId}/test-runtimes/{runtimeInstanceId}
 ```
 
-题库模板负责人、协作者和平台管理员可为包含 Container/Compose 定义的模板创建一个活动测试
+题库模板负责人、协作者和平台管理员可为包含 Container 命名服务定义的模板创建一个活动测试
 Runtime。测试实例沿用正式 Runner 的镜像拉取、资源限制、安全策略、隔离网络、动态端口和访问地址
 展开；CTF/AWDP 使用环境变量注入本次测试 Flag，AWD 在实例启动后执行题目定义中的 Flag 注入命令。
 测试 Flag 只由该资源的测试 Runtime 接口返回，不进入普通模板 Flag 列表。停止实例会清理容器与网络，
@@ -529,8 +529,8 @@ POST /api/v1/admin/platform/sso/providers/{providerId}/authentication-tests
 支持正常、封禁和停用的人类账户，清空全部绑定字段并递增目标用户 `TokenVersion`；审计不记录
 Subject。管理员解除自己的绑定后，管理前端会清除当前会话并返回登录页。
 
-平台 Runtime 清单只投影当前处于 Queued、Provisioning、Running 或 Stopping 状态的 Container 与
-Compose 实例，包含比赛 Runtime 与题库模板测试 Runtime，并使用 `offset/limit/total` 页码
+平台 Runtime 清单只投影当前处于 Queued、Provisioning、Running 或 Stopping 状态的 Container
+实例，包含比赛 Runtime 与题库模板测试 Runtime，并使用 `offset/limit/total` 页码
 分页。响应带作用域、赛事或模板题目、来源队伍、Provider、Runner、端口及生命周期时间；平台级停止
 与强制终结按 RuntimeInstanceId 操作两种作用域，复用同一 durable cleanup 链路。比赛 Runtime 继续写入
 比赛审计事件，题库测试 Runtime 不伪造 CompetitionEvent。

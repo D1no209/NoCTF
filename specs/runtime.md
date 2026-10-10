@@ -5,7 +5,7 @@
 
 ## 题目定义与平台放置
 
-题库 `Challenge` 只声明 provider-neutral 的技术定义：镜像或 Compose 内容、命令、环境、
+题库 `Challenge` 只声明 provider-neutral 的技术定义：容器命名服务或 OVA 定义、命令、环境、
 逻辑端点、资源需求、Checker 与 Flag 注入位置。题目和比赛均不选择 Provider、RunnerPool
 或具体 Runner。
 
@@ -28,7 +28,7 @@ HAProxy 或入口代理。
 - Runtime kind、purpose、provider、`RunnerId`；
 - 状态、稳定失败码、类型化 provider receipt；
 - 关系化访问端点与已发布端口；
-- 创建、开始、到期、停止和更新时间。
+- `CreatedAt`、`RunningAt`、`ExpiresAt`、`StoppedAt` 生命周期时间。
 
 以下内容不得持久化：
 
@@ -96,7 +96,7 @@ Provider。接管者从当前事实重建调度；不保存业务 next-run 或�
 | AWD | Player | Team | 比赛生命周期自动创建；选手按规则 Reset |
 | AWDP | Player/AwdpAttack | Team | 长期攻击实例，可 Start/Stop/Reset/Extend |
 | AWDP | AwdpTarget | Team；上传后 + GameplayFact | 一次性 Fix 验证，完成/失败/超时即清理 |
-| KoH | Shared | CompetitionChallenge | 工作人员控制，参赛者共享 |
+| KoH | Player（Shared allocation） | CompetitionChallenge | 工作人员控制，参赛者共享 |
 | 题库测试 | TemplateTest | Challenge | Owner/Manager/Admin 验证真实 Runtime、动态 Flag 与访问入口；停止后保留节点镜像缓存 |
 
 只有真正的 Shared allocation 才显示“共享”。AWDP Player 必须绑定真实 Team；AwdpTarget 在
@@ -104,9 +104,8 @@ Provider。接管者从当前事实重建调度；不保存业务 next-run 或�
 GameplayFact/PatchUpload 展示评测来源。TemplateTest 不绑定 Competition、CompetitionChallenge、
 Team 或 GameplayFact。
 
-KoH Worker 的 Control 检查通过该 Runtime 自身的 Docker 随机发布端口访问，
-因此部署的 `Runtime:Docker:PublicHost` 必须同时能从 Worker 容器解析和连接；
-它不依赖 Worker 加入 Runner 创建的隔离网络，也不新增入口代理。
+KoH 的 Control 检查入口由命名服务和 provider receipt 解析内部目标，
+不因控制检查额外公开端口；连接与服务发现遵循[容器命名服务契约](runtime-services.md)。
 
 ## CTF 与 TTL
 
@@ -120,11 +119,14 @@ CTF 队伍 Runtime 不预创建。首次 Start 创建新的 UUID，团队成员�
 
 ## 动态 Flag
 
-动态 Flag 绑定具体 Runtime UUID。创建 Runtime 时，在关系数据库事务中幂等创建或绑定对应
-`ChallengeFlag`，Worker 在 provider 请求中注入题目声明的环境变量或文件位置。只有 Runtime
-Running 后 Flag 才有效；Stop、Reset、失败或到期使旧 Runtime UUID 的 Flag 失效。
+Flag 的作用域由模式决定，不能统一按 Runtime UUID 轮换：
 
-Runtime Reset 生成新 UUID 和新动态 Flag。明文 Flag 不得进入 URL、普通响应、事件、通知、
+- CTF Container PerTeam：同队同题/RuntimeDefinition 固定一条 Flag，Start 前幂等生成；Stop 或 Reset 后的新 UUID 复用已有 Flag。
+- AWDP 攻击 Runtime：按 Runtime UUID 生成；Running 且注入成功后生效，Stop、Reset、失败或到期使旧实例 Flag 失效。
+- AWD：按逻辑轮次生成与注入，重试复用该轮 Flag。
+- KoH：每队每题固定 Control Flag。
+
+详细窗口见 [Flag 规范](flags.md)。明文 Flag 不得进入 URL、普通响应、事件、通知、
 Prometheus 标签或结构化日志。
 
 TemplateTest 使用独立测试 Flag，不是比赛 Flag。它只可由题目 Owner/Manager 或平台管理员通过
@@ -170,5 +172,5 @@ Start/Stop/Reset/Extend 使用强类型 FastEndpoints，并返回 `202 Accepted`
 - receipt 为空的失联实例先由 Runner 对账，再收敛终态；
 - Provider/Worker/Runner 中断后可从关系化业务事实、receipt 和 JetStream 重投恢复；
 - AWDP Target 完成、失败和超时后全部资源释放；
-- 动态 Flag 随 Runtime UUID 轮换，旧 UUID Flag 失效；
+- CTF PerTeam Flag 在 Reset 后复用；AWDP 攻击 Flag 随 Runtime UUID 轮换，旧 UUID Flag 失效；
 - API、事件、日志和指标不泄露 Flag 或内部调度状态。

@@ -8,11 +8,14 @@
 同一 NATS JetStream。JetStream 保存持久 stream、durable consumer、ack/retry 和 DLQ；业务任务不得走进程内 Channel、fire-and-forget
 Task 或临时 local queue。
 
-业务写入与 NATS 发布不提供跨系统原子事务；只允许数据库提交成功后由
+业务写入与 NATS 发布不提供跨系统原子事务；除 Competition Webhook 的专用事务 Outbox/投递账本外，数据库提交成功后由
 `IPostCommitMessagePublisher` 发布。关键流程必须保留可扫描的 Pending 状态并能重新派发。
 消费端使用状态、唯一键和业务幂等键收敛；稳定业务键同时写入 `Nats-Msg-Id`，但不得只依赖
 JetStream duplicate window。所有消费 endpoint 使用 JetStream durable consumer；同一业务键重投只产生一次业务效果。重试策略按 queue
 和强类型失败类别配置，确定性业务失败不得无限重试。
+
+Competition Webhook 的事件与 Outbox 同事务保存，Worker 恢复扫描可补发丢失的唤醒。
+这不启用 Wolverine Database Message Store 或 Inbox。
 
 ## 消费语义
 
@@ -32,7 +35,7 @@ Wolverine 在 `[StickyHandler("name")]` 未配置同名 endpoint 时会静默生
 
 ## 队列
 
-单消费者工作使用四类命名持久队列：
+竞争消费的业务工作使用六类命名持久队列；事件广播另有独立 fan-out 队列：
 
 | Queue | 工作负载 | 并发策略 |
 |---|---|---|
@@ -40,6 +43,8 @@ Wolverine 在 `[StickyHandler("name")]` 未配置同名 endpoint 时会静默生
 | `noctf-gameplay` | Flag、Fix、Runtime 状态收敛、作弊事实 | 有上限的中高并发 |
 | `noctf-projection` | 排行榜和比赛投影 | 每实例 1–2 并发 |
 | `noctf-background` | 邮件、通知、同步导出以外的文件清理 | 低并发 |
+| `noctf-webhook` | 赛事 Webhook 投递 | 独立队列及重试策略 |
+| `noctf-livesolo-media` | LiveSolo 媒体与录像处理 | 独立队列，隔离业务评测 |
 
 使用 NATS 2.12 原生定时投递的 Control、Gameplay、Background stream 必须同时覆盖正式
 subject 与 `<subject>.scheduled`；consumer 只监听正式 subject。Runner stream 的
@@ -63,8 +68,9 @@ Leader 每 5 秒从关系事实重新派发滞留的 Runtime 和纯 GameplayFact
 - AWD Round；
 - AWD Checker；
 - KoH Poll；
-- Competition lifecycle tick；
-- 排行榜 500 ms debounce 集合。
+- Competition lifecycle tick、题目时间任务及 LiveSolo 对局调度。
+
+排行榜 500 ms 合并由每个收到失效事件的 Worker 维护，随后派发持久化投影工作，不依赖唯一调度 Leader。
 
 Agent 只创建稳定业务键/FactId 并发送 durable 消息，不直接创建 Runtime、执行 Checker、计分或投影。
 启动和 failover 从当前时间读取事实，计算第一个 `>= now` 的后续 tick；停机窗口不补跑。不得用业务

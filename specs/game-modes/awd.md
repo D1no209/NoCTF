@@ -2,7 +2,7 @@
 
 ## 配置契约
 
-Competition 必须配置 `HardeningDurationSeconds >= 0`、`RoundDurationSeconds > 0`，并提供以下比赛默认规则；CompetitionChallenge 的 `RulesJson` 可用 nullable 字段逐项覆盖：
+Competition 必须配置 `HardeningDurationSeconds >= 0`、`RoundDurationSeconds > 0`，并提供以下比赛默认规则；CompetitionChallenge 的 `Rules` 可用 nullable 字段逐项覆盖：
 
 ```text
 AttackRewardMode: FixedPerAttack | SplitVictimDefensePool
@@ -13,31 +13,31 @@ ServiceHealthyPoints: bigint >= 0
 ServiceUnhealthyPenalty: bigint >= 0
 ```
 
-`Challenge.DefinitionJson` 管理 Runtime、Checker 与 Flag 注入位置：
+`Challenge.Definition` 管理 Runtime、Checker 与 Flag 注入位置：
 
 ```text
-Runtime: Container | Compose
+Runtime: Container（1–64 个命名服务）
   Allocation: PerTeam
   FlagSource: AwdRotation
   UrlBindings: 至少一个 Participants 入口
 Checker:
   Job: RunnerJobConfiguration
-  TargetServiceName: 仅 Compose 必填
+  TargetServiceName: 必须引用一个已定义服务
 FlagInjection:
   Command: 包含 ${FLAG} 的非空模板
   TimeoutSeconds: 1..300
-  ServiceName: 仅 Compose 必填
+  ServiceName: 必须引用一个已定义服务
 ```
 
 FixedPerAttack 使用 AttackPoints；SplitVictimDefensePool 忽略 AttackPoints。两者都使用 VictimDefensePoolPoints。覆盖值 0 是显式 0，只有 null 继承。AWD 不使用 EvaluationDispatchMode/最大提交次数；Flag 接入总是 Automatic。
 
-Competition 的可选 `FlagTemplate` 是动态轮换 Flag 的竞赛默认；CompetitionChallenge.RulesJson
-的可选 `FlagTemplate` 优先覆盖，未配置时使用平台默认 `flag{[TEAMHASH]}`。Challenge.DefinitionJson
-中的历史 `FlagTemplate` 不参与生成。模板变更只影响后续尚未生成的
+Competition 的可选 `FlagTemplate` 是动态轮换 Flag 的竞赛默认；CompetitionChallenge.Rules
+的可选 `FlagTemplate` 优先覆盖，未配置时使用平台默认 `flag{[TEAMHASH]}`。Challenge.Definition
+只保存 Runtime/Checker/注入位置，不保存比赛的 `FlagTemplate`。模板变更只影响后续尚未生成的
 “队伍×题目×轮次”Flag；已经持久化的当轮事实保持原值并继续有效。静态和管理员手工 Flag 不读取
 该模板。
 
-Challenge 当前 schemaVersion 为 4，不提供旧 schema 兼容层。Challenge 不声明 Docker/Kubernetes Provider 或 RunnerPool。Checker 与长期 Runtime 由平台放入同一内部网络；平台只注入 `NOCTF_TARGET_HOST`。Container 使用固定 `target` DNS，Compose 使用 `TargetServiceName` 对应的服务 DNS。Checker 自己知道服务端口，不配置 Target URL 或 TargetPort，也不复用仅属于 KoH 的 `ControlCheckUrlBinding`。
+Challenge 使用强类型 Definition 与关系化命名服务，不保存 schema-version JSON。Challenge 不声明 Docker/Kubernetes Provider 或 RunnerPool。Checker 与长期 Runtime 由平台放入同一内部网络；平台只注入 `NOCTF_TARGET_HOST`。目标由 `TargetServiceName` 与当前 provider receipt 解析。Checker 自己知道服务端口，不配置 Target URL 或 TargetPort，也不复用仅属于 KoH 的 `ControlCheckUrlBinding`。
 
 ## 时钟与加固期
 
@@ -62,9 +62,9 @@ Round 不建表。Round 1 生成后，ChallengeFlag 的 AwdRound Specification �
 
 ## Runtime 与 Flag
 
-系统为每个有效 Team/已发布 AWD 题自动保持一个 Container 或 Compose RuntimeInstance；OVA 因只允许固定 Flag 而禁止用于 AWD。Ban 回收，Unban 重新配置。加固期只隐藏对手地址，不停止实例。
+系统为每个有效 Team/已发布 AWD 题自动保持一个 Container RuntimeInstance；OVA 因只允许固定 Flag 而禁止用于 AWD。Ban 回收，Unban 重新配置。加固期只隐藏对手地址，不停止实例。
 
-每个 RoundStart 后，持 Competition advisory lock 的 Worker 在事务中：
+每个 RoundStart 后，Worker 在受唯一约束和并发校验保护的关系事务中：
 
 1. 为全部 Team/题生成缺失的当轮 Flag；
 2. SpecificationKind=AwdRound，窗口严格 RoundStart..RoundEnd；
@@ -115,9 +115,9 @@ victim -= VictimDefensePoolPoints once
 
 每题配置 CheckerIntervalSeconds（Competition 默认、题覆盖，正整数）。Running 时持续检查，加固期也检查；Paused 停止且不补，Resume 立即一次；同队同题最多一个在执行，前次未结束则跳过 interval。
 
-Checker 是附着到特定 Runtime UUID 的可信一次性 Container，与目标处在同一内部网络。单 Container 目标以 `target` 作为稳定 DNS，Compose 目标使用 service name；Checker 镜像自己知道目标端口，平台不向 Checker传递端口配置。后续 Runtime/Checker 定义变化只影响下一次 Start 或新 UUID Reset。
+Checker 是附着到特定 Runtime UUID 的可信一次性 Container，与目标处在同一内部网络。目标由当前命名服务及 receipt 定位；Checker 镜像自己知道目标端口，平台不向 Checker传递端口配置。后续 Runtime/Checker 定义变化只影响下一次 Start 或新 UUID Reset。
 
-Docker Provider 从持久 receipt 与 ownership labels 解析该 Runtime 的实际 Container/Compose 网络，不假设 Compose `_default` 网络；Checker 同时加入目标内部网络和隔离 callback 网络，结束时只清理自身与 callback 网络。Kubernetes Provider 复用同一 Runtime identity 与 NetworkPolicy，并只为带 `awd-checker` purpose 的 Pod 增加 callback egress，不把平台访问能力授予题目业务 Pod。
+Docker Provider 从持久 receipt 与 ownership labels 解析该 Runtime 的实际 Container 网络；单服务使用部署拥有的 challenge bridge，多服务使用该 Runtime 拥有的 bridge；Checker 同时加入目标内部网络和隔离 callback 网络，结束时只清理自身与 callback 网络。Kubernetes Provider 复用同一 Runtime identity 与 NetworkPolicy，并只为带 `awd-checker` purpose 的 Pod 增加 callback egress，不把平台访问能力授予题目业务 Pod。
 
 Checker 通过 JWT callback：
 

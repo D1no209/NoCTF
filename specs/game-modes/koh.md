@@ -2,13 +2,13 @@
 
 ## 配置契约
 
-Competition 提供 `PollIntervalSeconds > 0` 与 `ControlPointsPerInterval >= 0` 默认值；CompetitionChallenge 可分别 nullable 覆盖，0 Points 是显式 0。每题必须有一个 Container/Compose/OvaVm Hill RuntimeDefinition 和一个 `ControlCheckUrlBinding`。KoH 没有 Submission、EvaluationDispatchMode、最大尝试次数或 RoundDuration。
+Competition 提供 `PollIntervalSeconds > 0` 与 `ControlPointsPerInterval >= 0` 默认值；CompetitionChallenge 可分别 nullable 覆盖，0 Points 是显式 0。每题必须有一个 Container/OvaVm Hill RuntimeDefinition 和一个 `ControlCheckUrlBinding`。KoH 没有 Submission、EvaluationDispatchMode、最大尝试次数或 RoundDuration。
 
 ## 共享 Hill
 
 每个已发布 CompetitionChallenge 有一个平台管理的共享 Hill Runtime，所有队攻击同一目标；不建 PerTeam Runtime、不接受 Submission。Running 自动启动，Paused 保持资源但停轮询，Finished 回收。
 
-Hill 可使用 Container/Compose/OVA Runtime。公开 URL 与专用 `ControlCheckUrlBinding` 分开；Runner 在执行 Checker 时从 Provider Receipt 与最新题目定义解析受保护 Control URL，不把 URL 或数组下标持久化到 RuntimeInstance，也不向玩家返回。
+Hill 可使用 Container/OVA Runtime。公开 URL 与专用 `ControlCheckUrlBinding` 分开；Runner 在执行 Checker 时从 Provider Receipt 与最新题目定义解析受保护 Control URL，不把 URL 或数组下标持久化到 RuntimeInstance，也不向玩家返回。
 
 ## Control Flag
 
