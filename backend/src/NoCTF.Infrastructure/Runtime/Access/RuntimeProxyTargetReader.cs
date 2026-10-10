@@ -6,7 +6,7 @@ using NoCTF.Infrastructure.Persistence;
 namespace NoCTF.Infrastructure.Runtime.Access;
 
 public sealed class RuntimeProxyTargetReader(
-    NoCtfDbContext db) : IRuntimeProxyTargetReader
+    NoCtfDbContext db, IExecutionRuntimeIsolation? isolation = null) : IRuntimeProxyTargetReader
 {
     public async Task<RuntimeProxyTarget?> FindAsync(
         Guid runtimeInstanceId,
@@ -19,6 +19,9 @@ public sealed class RuntimeProxyTargetReader(
                 && (runtime.AccessMode == RuntimeAccessMode.DirectAndWsrx
                     || runtime.AccessMode == RuntimeAccessMode.WsrxOnly))
             .SingleOrDefaultAsync(cancellationToken);
+        if (runtime?.ExecutionScopeId is Guid scope && (runtime.TeamId is not Guid team || isolation is null
+            || (await isolation.AssessAsync(new(runtime.RuntimeKind, runtime.RuntimeProvider, scope, team, runtime.Id), cancellationToken)).Status
+                != ExecutionIsolationStatus.Verified)) return null;
         var endpoint = runtime?.AccessEndpoints.SingleOrDefault(candidate =>
             candidate.BindingIndex == bindingIndex
             && !string.IsNullOrWhiteSpace(candidate.TargetHost)
@@ -34,6 +37,6 @@ public sealed class RuntimeProxyTargetReader(
                 runtime.CompetitionChallengeId,
                 runtime.TeamId,
                 runtime.TrafficCaptureEnabled,
-                runtime.TrafficCaptureLimitBytes);
+                runtime.TrafficCaptureLimitBytes) { ExecutionScopeId = runtime.ExecutionScopeId };
     }
 }

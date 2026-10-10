@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { effectScope, nextTick, reactive, ref, toRefs, watch } from 'vue'
+import { computed, effectScope, nextTick, reactive, ref, toRefs, watch } from 'vue'
 import { createTrailingRefresh } from '../app/lib/latest-page-refresh'
 import { parseApiError } from '../app/utils/api-error'
 import * as broadcast from '../app/utils/competition-broadcast'
@@ -25,7 +25,7 @@ async function harness(count = 65, startDays = 2) {
   let handlers: any
   const scope = effectScope()
   const state = scope.run(() => factory({
-    ...broadcast, ref, watch, toRefs, createTrailingRefresh, parseApiError, Megaphone: {},
+    ...broadcast, computed, ref, watch, toRefs, createTrailingRefresh, parseApiError, Megaphone: {},
     competitionContextKey: {}, inject: () => ({ competition }),
     describeMessage: (key: string) => ({ key }), motionAttributes: () => ({}),
     onMounted: (fn: () => void) => { mounted = fn }, onUnmounted: (fn: () => void) => { unmounted = fn },

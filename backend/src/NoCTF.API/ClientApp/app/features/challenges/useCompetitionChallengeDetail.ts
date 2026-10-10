@@ -1,3 +1,4 @@
+import { adminFormatDateTime } from '~/utils/admin-format'
 import { message as describeMessage } from '../../utils/i18n'
 import type { UiMessage } from '../../utils/i18n'
 import { markRaw, provide, toRefs } from 'vue'
@@ -218,6 +219,7 @@ export function useCompetitionChallengeDetail(props: Readonly<{
 
   return {
       ...toRefs(props),
+      formatTimingDate: adminFormatDateTime,
       BookOpen, singleWriteUpsEnabled, openWriteUps, writeUpBenefit,
       Dice5,
       FileDown,

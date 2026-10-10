@@ -17,7 +17,8 @@ namespace NoCTF.Infrastructure.Challenges.Bank;
 public sealed class ChallengeBankStore(
     NoCtfDbContext db,
     IPostCommitMessagePublisher? messageOutbox = null,
-    ICompetitionEventRecorder? eventRecorder = null) : IChallengeBankStore
+    ICompetitionEventRecorder? eventRecorder = null,
+    NoCTF.Application.Challenges.Configuration.IChallengeMaterialMutationGate? material = null) : IChallengeBankStore
 {
     private static readonly IChallengeRuntimeTemplateCatalog RuntimeTemplates =
         new ChallengeRuntimeTemplateCatalog();
@@ -142,7 +143,7 @@ public sealed class ChallengeBankStore(
         UpdateChallengeTemplateCommand command,
         CancellationToken ct)
     {
-        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, System.Data.IsolationLevel.Serializable, ct);
         var entity = await ChallengeTemplateCriticalSection.AcquireAsync(
             db,
             command.ChallengeId,
@@ -159,6 +160,7 @@ public sealed class ChallengeBankStore(
             await transaction.CommitAsync(ct);
             return new(ChallengeTemplateWriteState.Succeeded, unchanged);
         }
+        if (material is not null) await material.RequireMutableAsync(new(command.ChallengeId, null), ct);
         if (entity.Mode != command.Mode)
             return new(ChallengeTemplateWriteState.ActiveCompetitionModeConflict);
         var currentInteraction = GetInteractionKind(entity.Definition);
@@ -212,9 +214,7 @@ public sealed class ChallengeBankStore(
                 Detail:
                     "Stop every active Runtime created from this template before changing its technical definition.");
         }
-        var supportsRegularExpression = command.Mode == GameMode.Ctf
-            && RuntimeTemplates.Get(command.Definition)?.FlagSource
-                is null or RuntimeFlagSource.Static;
+        var supportsRegularExpression = StaticFlagConfiguration.SupportsRegularExpression(command.Definition, RuntimeTemplates);
         if (!supportsRegularExpression)
         {
             var competitionChallengeIds = db.CompetitionChallenges.IgnoreQueryFilters()

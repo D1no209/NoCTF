@@ -117,6 +117,7 @@ public sealed class ChallengeDefinitionContract
     public AwdChallengeDefinitionContract? Awd { get; set; }
     public AwdpChallengeDefinitionContract? Awdp { get; set; }
     public KohChallengeDefinitionContract? Koh { get; set; }
+    public LiveSoloChallengeDefinitionContract? LiveSolo { get; set; }
 }
 
 public sealed class CtfChallengeDefinitionContract
@@ -129,6 +130,7 @@ public sealed class AwdChallengeDefinitionContract
 }
 public sealed class AwdpChallengeDefinitionContract;
 public sealed class KohChallengeDefinitionContract;
+public sealed class LiveSoloChallengeDefinitionContract;
 
 public sealed class CreateChallengeTemplateRequest
 {
@@ -317,7 +319,8 @@ public static class ChallengeDefinitionContractMapper
         var count = (contract.Ctf is not null ? 1 : 0)
             + (contract.Awd is not null ? 1 : 0)
             + (contract.Awdp is not null ? 1 : 0)
-            + (contract.Koh is not null ? 1 : 0);
+            + (contract.Koh is not null ? 1 : 0)
+            + (contract.LiveSolo is not null ? 1 : 0);
         return count == 1
             && (contract.Mode switch
             {
@@ -325,6 +328,7 @@ public static class ChallengeDefinitionContractMapper
                 GameModeProtocol.Awd => contract.Awd is not null,
                 GameModeProtocol.Awdp => contract.Awdp is not null,
                 GameModeProtocol.Koh => contract.Koh is not null,
+                GameModeProtocol.LiveSolo => contract.LiveSolo is not null,
                 _ => false
             })
             && (contract.Runtime is null || HasValidRuntimeShape(contract.Runtime));
@@ -394,6 +398,8 @@ public static class ChallengeDefinitionContractMapper
                 Mode = GameModeProtocol.Koh,
                 Koh = new KohChallengeDefinitionContract()
             },
+            NoCTF.Domain.LiveSolo.LiveSoloChallengeDefinition => new ChallengeDefinitionContract
+            { Mode = GameModeProtocol.LiveSolo, LiveSolo = new LiveSoloChallengeDefinitionContract() },
             _ => throw new InvalidOperationException(
                 $"Unsupported challenge definition {value.GetType().Name}.")
         };
@@ -437,6 +443,7 @@ public static class ChallengeDefinitionContractMapper
             },
             GameModeProtocol.Awdp => new AwdpChallengeDefinition(),
             GameModeProtocol.Koh => new KohChallengeDefinition(),
+            GameModeProtocol.LiveSolo => new NoCTF.Domain.LiveSolo.LiveSoloChallengeDefinition(),
             _ => throw new InvalidOperationException(
                 $"Unsupported challenge definition contract {value.GetType().Name}.")
         };

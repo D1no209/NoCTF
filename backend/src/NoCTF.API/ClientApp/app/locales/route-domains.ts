@@ -9,6 +9,7 @@ const administrationDomains: readonly LocaleDomain[] = [
   'notifications',
   'runtime',
   'writeups',
+  'live-solo',
 ]
 
 /** Maps routes to feature catalogs without coupling individual views to loading. */
@@ -23,6 +24,7 @@ export function localeDomainsForPath(path: string): readonly LocaleDomain[] {
     domains.add('competitions')
     domains.add('writeups')
   }
+  if (path.includes('/live-solo')) domains.add('live-solo')
   if (path.includes('/challenges')) {
     domains.add('challenges')
     domains.add('runtime')

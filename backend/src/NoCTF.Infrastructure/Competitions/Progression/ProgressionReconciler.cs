@@ -38,7 +38,8 @@ public sealed class ProgressionReconciler(NoCtfDbContext db)
                 && (fact.Kind == GameplayFactKind.FlagAttempt
                     || fact.Kind == GameplayFactKind.FixAttempt)
                 && fact.State == GameplayFactState.Completed
-                && fact.Result == GameplayFactResult.Correct)
+                && fact.TimeEligibility == NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid
+                        && (fact.Result == GameplayFactResult.Correct || fact.Result == GameplayFactResult.RightButDue))
             .Select(fact => new { fact.TeamId, fact.CompetitionChallengeId })
             .Distinct().ToArrayAsync(ct);
         var nodeStates = await db.TeamProgressionNodeStates
@@ -142,7 +143,8 @@ public sealed class ProgressionReconciler(NoCtfDbContext db)
                         && (fact.Kind == GameplayFactKind.FlagAttempt
                             || fact.Kind == GameplayFactKind.FixAttempt)
                         && fact.State == GameplayFactState.Completed
-                        && fact.Result == GameplayFactResult.Correct)
+                        && fact.TimeEligibility == NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid
+                        && (fact.Result == GameplayFactResult.Correct || fact.Result == GameplayFactResult.RightButDue))
                     .Select(fact => fact.CompetitionChallengeId)
                     .Distinct()
                     .ToArrayAsync(ct))
@@ -150,7 +152,8 @@ public sealed class ProgressionReconciler(NoCtfDbContext db)
             if (changingFact is
                 {
                     State: GameplayFactState.Completed,
-                    Result: GameplayFactResult.Correct,
+                    Result: GameplayFactResult.Correct or GameplayFactResult.RightButDue,
+                    TimeEligibility: NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid,
                     Kind: GameplayFactKind.FlagAttempt or GameplayFactKind.FixAttempt
                 } && changingFact.CompetitionId == competitionId
                     && changingFact.TeamId == teamId)

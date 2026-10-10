@@ -16,6 +16,13 @@ public sealed class DockerContainerRuntime(DockerContainerLifecycle containers, 
     {
         if (request.EgressPolicy != RuntimeEgressPolicy.Isolated)
             throw new RuntimeConfigurationException("Docker does not support InternetOnly egress.");
+        if (request.ExecutionScopeId is not null)
+        {
+            if (request.ExecutionScopeId == Guid.Empty || request.AccessMode != RuntimeAccessMode.WsrxOnly || request.AllowInternalCallback)
+                throw new RuntimeConfigurationException("Controlled execution requires an opaque scope and WSRX-only access without callbacks.");
+            var executionNetwork = await containers.EnsureExecutionNetworkAsync(cancellationToken);
+            if (request.Services.Count == 1) return new(executionNetwork);
+        }
         if (request.Services.Count == 1)
         {
             await containers.EnsureSharedRuntimeNetworkAsync(request.ControlCheckUrlBinding is null ? request.AccessMode : RuntimeAccessMode.DirectAndWsrx, cancellationToken);
@@ -26,6 +33,9 @@ public sealed class DockerContainerRuntime(DockerContainerLifecycle containers, 
                 ? request.Services.Single().InternalPorts!.Single() : null), cancellationToken);
         return new(network, network);
     }
+
+    protected override Task VerifyExecutionIsolationAsync(ContainerRuntimeRequest request, ContainerDeploymentReceipt receipt, CancellationToken ct) =>
+        request.ExecutionScopeId is null ? Task.CompletedTask : containers.VerifyExecutionDeploymentAsync(request, receipt, ct);
 
     protected override async Task RemoveNetworkAsync(ContainerDeploymentReceipt receipt, CancellationToken cancellationToken)
     {

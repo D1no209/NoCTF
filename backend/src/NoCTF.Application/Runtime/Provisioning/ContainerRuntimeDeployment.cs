@@ -36,7 +36,8 @@ public sealed record ContainerRuntimeRequest(
     RuntimeEgressPolicy EgressPolicy = RuntimeEgressPolicy.Isolated,
     RuntimeAccessMode AccessMode = RuntimeAccessMode.Direct,
     ContainerNetworkPurpose Purpose = ContainerNetworkPurpose.PersistentRuntime,
-    bool AllowInternalCallback = false)
+    bool AllowInternalCallback = false,
+    Guid? ExecutionScopeId = null)
 {
     public string ProjectName => $"noctf-rt-{OperationId:N}";
     public IReadOnlyDictionary<string, RuntimeResourceLimits> ServiceResources =>
@@ -61,7 +62,9 @@ public sealed record ContainerDeploymentReceipt(
     DateTimeOffset CreatedAt,
     IReadOnlyList<ContainerServiceStatus> Services,
     string? OwnedNetworkId = null,
-    string? DiscoveryServiceName = null);
+    string? DiscoveryServiceName = null,
+    Guid? ExecutionScopeId = null,
+    RuntimeIsolationState IsolationState = RuntimeIsolationState.Unverified);
 
 public sealed record ContainerRuntimeStatus(string ProjectName, RuntimeStatus Status, IReadOnlyList<ContainerServiceStatus> Services);
 

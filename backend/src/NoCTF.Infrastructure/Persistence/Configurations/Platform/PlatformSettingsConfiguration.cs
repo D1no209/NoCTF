@@ -10,6 +10,11 @@ internal sealed class PlatformSettingsConfiguration
     public void Configure(EntityTypeBuilder<PlatformSettings> builder)
     {
         builder.ToTable("platform_settings");
+        builder.Property(x=>x.LiveSoloVideoMaximumWidth).HasDefaultValue(NoCTF.Domain.LiveSolo.LiveSoloVideoLimits.DefaultWidth);
+        builder.Property(x=>x.LiveSoloVideoMaximumHeight).HasDefaultValue(NoCTF.Domain.LiveSolo.LiveSoloVideoLimits.DefaultHeight);
+        builder.Property(x=>x.LiveSoloVideoMaximumFramesPerSecond).HasDefaultValue(NoCTF.Domain.LiveSolo.LiveSoloVideoLimits.DefaultFramesPerSecond);
+        builder.Property(x=>x.LiveSoloVideoMaximumBitrateBitsPerSecond).HasDefaultValue(NoCTF.Domain.LiveSolo.LiveSoloVideoLimits.DefaultBitrateBitsPerSecond);
+        builder.Property(x=>x.LiveSoloVideoPolicyStamp).HasDefaultValue(Guid.Parse("00000000-0000-0000-0000-000000000005"));
 
         // Data annotations cannot seed the singleton platform configuration row.
         builder.HasData(new PlatformSettings

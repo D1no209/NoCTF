@@ -7,13 +7,14 @@ public abstract record RuntimeReceiptData(Guid OperationId, RuntimeProvider Prov
 public sealed record ContainerRuntimeReceiptData(
     Guid OperationId, RuntimeProvider Provider, string ProjectName, string Namespace, string PublicHost,
     DateTimeOffset CreatedAt, IReadOnlyList<ContainerServiceStatus> Services,
-    string? OwnedNetworkId = null, string? DiscoveryServiceName = null) : RuntimeReceiptData(OperationId, Provider)
+    string? OwnedNetworkId = null, string? DiscoveryServiceName = null,
+    Guid? ExecutionScopeId = null, RuntimeIsolationState IsolationState = RuntimeIsolationState.Unverified) : RuntimeReceiptData(OperationId, Provider)
 {
     public static ContainerRuntimeReceiptData From(ContainerDeploymentReceipt receipt) => new(
         receipt.OperationId, receipt.Provider, receipt.ProjectName, receipt.Namespace, receipt.PublicHost,
-        receipt.CreatedAt, receipt.Services, receipt.OwnedNetworkId, receipt.DiscoveryServiceName);
+        receipt.CreatedAt, receipt.Services, receipt.OwnedNetworkId, receipt.DiscoveryServiceName, receipt.ExecutionScopeId, receipt.IsolationState);
     public ContainerDeploymentReceipt ToReceipt() => new(OperationId, Provider, ProjectName, Namespace, PublicHost,
-        CreatedAt, Services, OwnedNetworkId, DiscoveryServiceName);
+        CreatedAt, Services, OwnedNetworkId, DiscoveryServiceName, ExecutionScopeId, IsolationState);
     public ContainerReceipt ServiceReceipt(string serviceName)
     {
         var service = Services.SingleOrDefault(service => service.Name == serviceName)
@@ -47,6 +48,7 @@ public static class RuntimeReceiptDataMapping
             RuntimeInstanceId = runtimeInstanceId, OperationId = receipt.OperationId, Provider = receipt.Provider,
             ProjectName = receipt.ProjectName, Namespace = receipt.Namespace, PublicHost = receipt.PublicHost,
             CreatedAt = receipt.CreatedAt, OwnedNetworkId = receipt.OwnedNetworkId, DiscoveryServiceName = receipt.DiscoveryServiceName,
+            ExecutionScopeId = receipt.ExecutionScopeId, IsolationState = receipt.IsolationState,
             Services = receipt.Services.Select(service => new ContainerRuntimeReceiptService
             {
                 Id = Guid.CreateVersion7(), Name = service.Name, ResourceId = service.ResourceId, Status = service.Status, InternalHost = service.InternalHost,
@@ -79,7 +81,7 @@ public static class RuntimeReceiptDataMapping
             receipt.OperationId, receipt.Provider, receipt.ProjectName, receipt.Namespace, receipt.PublicHost, receipt.CreatedAt,
             receipt.Services.Select(service => new ContainerServiceStatus(service.Name, service.ResourceId, service.Status,
                 service.PublishedPorts.ToDictionary(port => port.ContainerPort, port => port.HostPort), service.InternalHost)).ToArray(),
-            receipt.OwnedNetworkId, receipt.DiscoveryServiceName),
+            receipt.OwnedNetworkId, receipt.DiscoveryServiceName, receipt.ExecutionScopeId, receipt.IsolationState),
         OvaRuntimeReceiptEntity receipt => new OvaRuntimeReceiptData(
             receipt.OperationId, receipt.Provider, receipt.NetworkId, receipt.NetworkCidr,
             receipt.VirtualMachines.Select(machine => new OvaVirtualMachineReceipt(

@@ -16,7 +16,8 @@ public enum PlatformSecretPurpose
     PendingTotpSecret,
     MfaRecoveryGrant,
     PasskeyCeremonyState,
-    StaffWebhookSecret
+    StaffWebhookSecret,
+    ChallengeTimingPreview
 }
 
 public sealed class PlatformSecretProtector
@@ -204,6 +205,7 @@ public sealed class PlatformSecretProtector
             PlatformSecretPurpose.MfaRecoveryGrant => "NoCTF.Authentication.MfaRecoveryGrant.v1",
             PlatformSecretPurpose.PasskeyCeremonyState => "NoCTF.Authentication.PasskeyCeremony.v1",
             PlatformSecretPurpose.StaffWebhookSecret => "NoCTF.Competition.StaffWebhookSecret.v1",
+            PlatformSecretPurpose.ChallengeTimingPreview => "NoCTF.Challenge.TimingPreview.v1",
             _ => throw new ArgumentOutOfRangeException(nameof(purpose), purpose, null)
         };
         return Encoding.UTF8.GetBytes(scopeId is null

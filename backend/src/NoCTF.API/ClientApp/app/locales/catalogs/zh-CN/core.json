@@ -2,6 +2,7 @@
   "pagination.cursor.navigation": "分页导航",
   "pagination.cursor.showing": "当前显示 {count} 条",
   "pagination.cursor.page": "第 {page} 页",
+  "staffWebhook.workbench": "工作人员工作台",
   "capacity.title": "运行节点容量",
   "capacity.units": "资源数额：CPU 核 / MiB / PID；实际使用：宿主机 CPU % / MiB / PID。",
   "capacity.unavailable": "暂时无法读取容量诊断。",
@@ -1328,5 +1329,11 @@
   "writeUp.submittedEvent": "队伍题解已提交",
   "writeUp.myWriteUp": "我的题解",
   "writeUp.review": "题解审核",
-  "writeUp.deadlinePassedShort": "题解提交期限已结束，无法提交或替换。"
+  "writeUp.deadlinePassedShort": "题解提交期限已结束，无法提交或替换。",
+  "liveSolo.notice.title": "LiveSolo 屏幕服务中断",
+  "liveSolo.notice.screenInterrupted": "{user} 的屏幕共享已中断。",
+  "liveSolo.notice.roomUnavailable": "屏幕房间已不可用。",
+  "liveSolo.notice.authorizationChanged": "当前授权不再满足要求，屏幕房间已退役。",
+  "liveSolo.notice.noAutomaticDecision": "此提醒不会自动暂停、判负或修改结果，请裁判核查后处理。",
+  "liveSolo.notice.viewMatch": "查看对局"
 }

@@ -193,6 +193,10 @@ public sealed class InternalResultStore(
         var decision = context.Competition.Mode == GameMode.Ctf
             ? CtfPatchVerificationOutcomeMapper.Map(result.Outcome)
             : MapAwdpOutcome(result.Outcome);
+        var timing = NoCTF.Domain.Challenges.ChallengeTiming.From(context.Challenge);
+        fact.TimeEligibility = timing.Eligibility(fact.OccurredAt);
+        fact.AppliedTimingRevision = context.Challenge.TimingRevision;
+        decision = decision with { Result = timing.Classify(decision.Result, fact.OccurredAt) };
         fact.Result = decision.Result;
         fact.State = GameplayFactState.Completed;
         fact.FailureCode = decision.FailureCode;
@@ -218,7 +222,7 @@ public sealed class InternalResultStore(
         if (announceBlood && bloodAward is not null)
             await outbox.PublishAsync(bloodAward);
         if (context.Competition.Mode == GameMode.Ctf
-            && decision.Result == GameplayFactResult.Correct)
+            && NoCTF.Domain.Challenges.GameplayFactCompletion.IsSuccessful(decision.Result, fact.TimeEligibility))
         {
             var playerRuntimeIds = await db.RuntimeInstances
                 .Where(instance => instance.CompetitionId == fact.CompetitionId
@@ -412,6 +416,9 @@ public sealed class InternalResultStore(
         var bloodTrackKeys = tracks.Tracks.Where(track => track.EarnsBlood)
             .Select(track => track.Key.ToLowerInvariant())
             .ToArray();
+        var timing = await db.CompetitionChallenges.AsNoTracking()
+            .Where(x => x.Id == fact.CompetitionChallengeId)
+            .Select(x => new { x.AutoOpenAt, x.ScoringEndsAt, x.SubmissionDeadlineAt }).SingleAsync(ct);
         var solvedTeamIds = await db.GameplayFacts.AsNoTracking()
             .Where(CtfCompletionEligibility.Before(fact.OccurredAt, fact.Id))
             .Where(candidate => !db.WriteUpUnlockReceipts.Any(x => x.TeamId == candidate.TeamId
@@ -419,7 +426,10 @@ public sealed class InternalResultStore(
             .Where(candidate => candidate.CompetitionId == fact.CompetitionId
                 && candidate.CompetitionChallengeId == fact.CompetitionChallengeId
                 && candidate.Kind == GameplayFactKind.FixAttempt
-                && candidate.Result == GameplayFactResult.Correct
+                && (candidate.Result == GameplayFactResult.Correct || candidate.Result == GameplayFactResult.RightButDue)
+                && (timing.AutoOpenAt == null || candidate.OccurredAt >= timing.AutoOpenAt)
+                && (timing.ScoringEndsAt == null || candidate.OccurredAt < timing.ScoringEndsAt)
+                && (timing.SubmissionDeadlineAt == null || candidate.OccurredAt < timing.SubmissionDeadlineAt)
                 && candidate.OccurredAt >= officialWindow.StartAt
                 && candidate.OccurredAt < officialWindow.EndAt
                 && candidate.Id != fact.Id)

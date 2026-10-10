@@ -12,7 +12,8 @@ public sealed record CreateCompetitionChallengeCommand(
     int Order,
     DateTimeOffset CreatedAt,
     string? CustomTitle = null,
-    IReadOnlyList<string>? Tags = null);
+    IReadOnlyList<string>? Tags = null,
+    ChallengeTiming? Timing = null);
 
 public sealed record UpdateCompetitionChallengeCommand(
     Guid CompetitionId,
@@ -39,6 +40,9 @@ public sealed record ChallengeView(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt)
 {
+    public ChallengeTiming Timing { get; init; } = new();
+    public ChallengeOpeningState OpeningState { get; init; }
+    public bool TimingRecalculationPending { get; init; }
     public Guid? DirectionId { get; init; }
     public IReadOnlyList<string> Tags { get; init; } = [];
     public string? DirectionIcon { get; init; }
@@ -60,6 +64,7 @@ public sealed record CompetitionChallengeSummaryView(
     Guid? DirectionId = null,
     string? DirectionIcon = null)
 {
+    public ChallengeTiming Timing { get; init; } = new();
     public IReadOnlyList<string> Tags { get; init; } = [];
 }
 
@@ -78,7 +83,9 @@ public enum ChallengeMutationFailure
     ChallengeOrderConflict,
     ChallengeTemplateConflict,
     LifecycleStateConflict,
-    ExperimentalFeatureDisabled
+    ExperimentalFeatureDisabled,
+    InvalidTiming,
+    TimingUnsupported
 }
 
 public sealed record ChallengeMutationResult(
@@ -162,6 +169,9 @@ public sealed class CreateChallenge(
         var competition = await store.GetCompetitionAsync(command.CompetitionId, ct);
         if (competition is null)
             return new(null, ChallengeMutationFailure.CompetitionNotFound);
+        if (command.Timing is { IsValid: false }) return new(null, ChallengeMutationFailure.InvalidTiming);
+        if (competition.Mode == GameMode.LiveSolo && command.Timing is { IsEmpty: false })
+            return new(null, ChallengeMutationFailure.TimingUnsupported);
 
         return await store.CreateAsync(
             command with { CustomTitle = customTitle, Tags = tags },

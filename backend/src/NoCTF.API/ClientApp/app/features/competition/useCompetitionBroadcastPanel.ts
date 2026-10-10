@@ -256,6 +256,9 @@ export function useCompetitionBroadcastPanel(props: Readonly<Omit<{
       hasMore,
       historyError,
       error,
+      emptyDescriptionKey: computed(() => ctx.competition.value?.mode === 'LiveSolo'
+        ? 'competitions.competitionBroadcast.description.liveSolo' as const
+        : 'competitions.competitionBroadcast.description.bloodListQuestionsDiscipline' as const),
       broadcastMotionAttributes,
       refreshLatest,
       loadMore,

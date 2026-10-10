@@ -111,6 +111,17 @@ internal static class AwdpDynamicLeaderboardProjection
                      : challenges.Keys)
         {
             var settings = SettingsFor(challengeId);
+            var challengeSettledThrough = settledThroughRound;
+            var challengeFirstRound = 1;
+            if (challenges.GetValueOrDefault(challengeId)?.Timing?.AutoOpenAt is { } opening)
+                challengeFirstRound = competition.RoundDurationSeconds > 0
+                    ? checked((int)Math.Ceiling(Math.Max(0, EffectiveElapsed(opening, runningTimeline, input.CompetitionStartTime).TotalSeconds)
+                        / competition.RoundDurationSeconds) + 1) : 1;
+            if (challenges.GetValueOrDefault(challengeId)?.Timing?.ScoringEndsAt is { } scoringEnd)
+                challengeSettledThrough = Math.Min(challengeSettledThrough,
+                    competition.RoundDurationSeconds > 0
+                        ? (int)(Math.Max(0, EffectiveElapsed(scoringEnd, runningTimeline, input.CompetitionStartTime).TotalSeconds) / competition.RoundDurationSeconds)
+                        : 0);
             ProjectTrack(
                 challengeId,
                 settings.Break,
@@ -119,7 +130,8 @@ internal static class AwdpDynamicLeaderboardProjection
                 scoringTeamIds,
                 competitiveTeams,
                 currentRound,
-                settledThroughRound,
+                challengeFirstRound,
+                challengeSettledThrough,
                 awards,
                 breakScores);
             ProjectTrack(
@@ -130,7 +142,8 @@ internal static class AwdpDynamicLeaderboardProjection
                 scoringTeamIds,
                 competitiveTeams,
                 currentRound,
-                settledThroughRound,
+                challengeFirstRound,
+                challengeSettledThrough,
                 awards,
                 fixScores);
         }
@@ -268,6 +281,7 @@ internal static class AwdpDynamicLeaderboardProjection
         IReadOnlySet<Guid> scoringTeamIds,
         IReadOnlySet<Guid> competitiveTeamIds,
         int currentRound,
+        int firstScoringRound,
         int settledThroughRound,
         ICollection<Award> awards,
         IDictionary<Guid, long> currentScores)
@@ -293,7 +307,7 @@ internal static class AwdpDynamicLeaderboardProjection
             var lastRound = index + 1 < changeRounds.Length
                 ? changeRounds[index + 1] - 1
                 : settledThroughRound;
-            var roundCount = checked(lastRound - firstRound + 1);
+            var roundCount = Math.Max(0, checked(lastRound - Math.Max(firstScoringRound, firstRound) + 1));
             while (activationIndex < activations.Count
                    && activations[activationIndex].Round <= firstRound)
             {

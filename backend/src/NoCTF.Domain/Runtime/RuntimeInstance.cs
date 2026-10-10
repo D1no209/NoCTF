@@ -145,6 +145,8 @@ public abstract class RuntimeInstance : IConcurrencyTracked
     public Guid? CompetitionChallengeId { get; set; }
     public Guid? ChallengeId { get; set; }
     public Guid? TeamId { get; set; }
+    /// <summary>Opaque execution identity; ordinary competition/practice/template Runtime scopes leave it null.</summary>
+    public Guid? ExecutionScopeId { get; set; }
     public RuntimePurpose Purpose { get; private set; }
     public RuntimeAccessMode AccessMode { get; set; }
     public bool TrafficCaptureEnabled { get; set; }

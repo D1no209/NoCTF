@@ -31,6 +31,7 @@ public sealed class GameModeGameplayFactAdmissionPolicy : IGameplayFactAdmission
                     rules.RequireBreakBeforeFix ?? awdp.RequireBreakBeforeFix),
             GameMode.Koh when challengeRules is KohCompetitionChallengeRules =>
                 new(false, false, null, null),
+            GameMode.LiveSolo => new(false, false, null, null),
             _ => throw new InvalidOperationException(
                 "GameplayFact admission configuration types do not match the game mode.")
         };

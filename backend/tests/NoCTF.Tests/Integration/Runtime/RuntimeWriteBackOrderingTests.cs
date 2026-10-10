@@ -16,6 +16,29 @@ namespace NoCTF.Tests.Integration.Runtime;
 [Category("Integration")]
 public sealed class RuntimeWriteBackOrderingTests
 {
+    [Test, Arguments(RuntimeIsolationState.Unverified), Arguments(RuntimeIsolationState.Verified), Timeout(300_000)]
+    public async Task Execution_success_requires_provider_bound_isolation_before_marking_running(RuntimeIsolationState isolation, CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var fixture = await LiveSoloMatchPersistenceTests.Fixture.CreateAsync(ct);
+            var scope = Guid.NewGuid();
+            var runtime = new PlayerRuntimeInstance { Id = Guid.NewGuid(), CompetitionId = fixture.Competition.Id, CompetitionChallengeId = fixture.Entries[0].Id,
+                TeamId = fixture.LeftTeam.Id, ExecutionScopeId = scope, RunnerId = "runner", RuntimeProvider = RuntimeProvider.Docker, RuntimeKind = RuntimeKind.Container,
+                State = RuntimeState.Provisioning, AccessMode = RuntimeAccessMode.WsrxOnly, CreatedAt = fixture.Now };
+            fixture.Db.RuntimeInstances.Add(runtime); await fixture.Db.SaveChangesAsync(ct);
+            var handler = new RuntimeProvisionWriteBackMessageHandler(fixture.Db, new NoOpPostCommitMessagePublisher(),
+                NullCompetitionEventRecorder.Instance, TimeProvider.System, Substitute.For<IRunnerCapacityGate>());
+            var receipt = RuntimeReceiptTestData.ContainerData(runtime.Id) with { ExecutionScopeId = scope, IsolationState = isolation,
+                Services = [new("web", "test-resource", RuntimeStatus.Running, new Dictionary<int, int>(), "172.18.0.2")] };
+            await handler.Handle(new RuntimeProvisioned(runtime.Id, "runner", RuntimeProvider.Docker, receipt,
+                [new(0, null, "172.18.0.2", 80)], null, []), ct);
+            fixture.Db.ChangeTracker.Clear();
+            var saved = await fixture.Db.RuntimeInstances.Include(x => x.ProviderReceipt).SingleAsync(x => x.Id == runtime.Id, ct);
+            await Assert.That(saved.State).IsEqualTo(isolation == RuntimeIsolationState.Verified ? RuntimeState.Running : RuntimeState.Stopping);
+            await Assert.That(((ContainerRuntimeReceipt)saved.ProviderReceipt!).IsolationState).IsEqualTo(isolation);
+        });
+    }
     [Test]
     [Timeout(300_000)]
     public async Task Provision_success_inserts_receipt_ports_as_new_relational_rows(

@@ -102,7 +102,10 @@ public sealed record HistoricalAdjudicationEvidence(
     bool HasEligibilityChanges = false,
     bool CurrentBloodEligible = true,
     bool MatchesCurrentInteraction = true,
-    IReadOnlyList<AdjudicationEventEvidence>? EligibilityEvents = null);
+    IReadOnlyList<AdjudicationEventEvidence>? EligibilityEvents = null,
+    NoCTF.Domain.Challenges.ChallengeTiming? Timing = null,
+    bool Practice = false,
+    bool HasTimingChanges = false);
 
 public sealed record HistoricalAdjudicationEvidencePage(
     HistoricalAdjudicationPreviewReadState State,

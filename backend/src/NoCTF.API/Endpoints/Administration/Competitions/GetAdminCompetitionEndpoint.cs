@@ -13,6 +13,8 @@ using NoCTF.Application.Authentication.Sso;
 using NoCTF.API.Endpoints.Authentication;
 using NoCTF.Domain.Competitions;
 using System.Text.Json.Serialization;
+using NoCTF.API.Endpoints.LiveSolo;
+using NoCTF.Domain.LiveSolo;
 
 namespace NoCTF.API.Endpoints.Administration.Competitions;
 
@@ -44,6 +46,7 @@ public sealed class CompetitionModeConfigurationContract
     public AwdCompetitionModeConfigurationContract? Awd { get; set; }
     public AwdpCompetitionModeConfigurationContract? Awdp { get; set; }
     public KohCompetitionModeConfigurationContract? Koh { get; set; }
+    public LiveSoloConfigurationContract? LiveSolo { get; set; }
 }
 public sealed record CtfCompetitionModeConfigurationContract(
     ScoreCurveContract DefaultScoreCurve,
@@ -102,7 +105,8 @@ public static class CompetitionModeConfigurationContractMapper
         var count = (contract.Ctf is not null ? 1 : 0)
             + (contract.Awd is not null ? 1 : 0)
             + (contract.Awdp is not null ? 1 : 0)
-            + (contract.Koh is not null ? 1 : 0);
+            + (contract.Koh is not null ? 1 : 0)
+            + (contract.LiveSolo is not null ? 1 : 0);
         return count == 1 && (contract.Mode switch
         {
             GameModeProtocol.Ctf => contract.Ctf is
@@ -113,6 +117,7 @@ public static class CompetitionModeConfigurationContractMapper
             GameModeProtocol.Awdp => contract.Awdp is
                 { BreakScoreCurve: not null, FixScoreCurve: not null },
             GameModeProtocol.Koh => contract.Koh is not null,
+            GameModeProtocol.LiveSolo => contract.LiveSolo is { StageRules: not null } && contract.LiveSolo.StageRules.All(x => x is not null),
             _ => false
         });
     }
@@ -168,6 +173,9 @@ public static class CompetitionModeConfigurationContractMapper
                 break;
             case KohCompetitionModeConfiguration koh:
                 result.Koh = new(koh.PollIntervalSeconds, koh.ControlPointsPerInterval);
+                break;
+            case LiveSoloCompetitionModeConfiguration liveSolo:
+                result.LiveSolo = LiveSoloConfigurationMapping.ToContract(liveSolo);
                 break;
             default:
                 throw new InvalidOperationException(
@@ -225,6 +233,7 @@ public static class CompetitionModeConfigurationContractMapper
                 PollIntervalSeconds = value.Koh!.PollIntervalSeconds,
                 ControlPointsPerInterval = value.Koh.ControlPointsPerInterval
             },
+            GameModeProtocol.LiveSolo => LiveSoloConfigurationMapping.ToDomain(competitionId, value.LiveSolo!),
             _ => throw new InvalidOperationException(
                 $"Unsupported competition configuration contract {value.GetType().Name}.")
         };

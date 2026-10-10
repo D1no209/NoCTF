@@ -207,7 +207,7 @@ public sealed class AwdpGameplayFactEvaluator(IGameplayFactEvaluator inner) : IG
             return inner.Evaluate(context);
         if (context.PriorFacts.Any(fact =>
                 fact.Kind == GameplayFactKind.BreakAttempt
-                && fact.Result == GameplayFactResult.Correct))
+                && NoCTF.Domain.Challenges.GameplayFactCompletion.IsSuccessful(fact.Result, fact.TimeEligibility)))
         {
             return new(
                 GameplayFactResult.Duplicate,

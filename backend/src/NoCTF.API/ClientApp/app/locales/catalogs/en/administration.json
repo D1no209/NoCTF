@@ -1142,7 +1142,6 @@
   "staffWebhook.delete": "Delete staff subscription",
   "staffWebhook.deleteNotice": "Pending staff summaries will stop. A content-free stop event will be sent where possible.",
   "staffWebhook.testTimedOut": "Still pending. Review the delivery records and receiver status.",
-  "staffWebhook.workbench": "Staff workspace",
   "staffWebhook.pending": "Awaiting staff action",
   "staffWebhook.noPending": "No pending work",
   "staffWebhook.platform": "Platform consultation",

@@ -86,6 +86,12 @@ public sealed class AwdpParticipantStateReader(NoCtfDbContext db) : IAwdpPartici
             .OrderBy(fact => fact.OccurredAt)
             .ThenBy(fact => fact.Id)
             .ToListAsync(cancellationToken);
+        var timing = NoCTF.Domain.Challenges.ChallengeTiming.From(scope.Challenge);
+        foreach (var fact in facts)
+        {
+            fact.TimeEligibility = timing.Eligibility(fact.OccurredAt);
+            if (fact.Result is { } result) fact.Result = timing.Classify(result, fact.OccurredAt);
+        }
 
         var attackRuntime = await db.RuntimeInstances.AsNoTracking()
             .Where(runtime => runtime.CompetitionId == competitionId
@@ -188,12 +194,14 @@ public sealed class AwdpParticipantStateReader(NoCtfDbContext db) : IAwdpPartici
         var firstBreak = facts.FirstOrDefault(fact => fact is
         {
             Kind: GameplayFactKind.BreakAttempt,
-            Result: GameplayFactResult.Correct
+            Result: GameplayFactResult.Correct or GameplayFactResult.RightButDue,
+            TimeEligibility: NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid
         });
-        var firstFix = facts.FirstOrDefault(fact => fact is
+        var firstFix = facts.FirstOrDefault(fact => (!configuration.RequireBreakBeforeFix || firstBreak is not null && firstBreak.OccurredAt <= fact.OccurredAt) && fact is
         {
             Kind: GameplayFactKind.FixAttempt,
-            Result: GameplayFactResult.Correct
+            Result: GameplayFactResult.Correct or GameplayFactResult.RightButDue,
+            TimeEligibility: NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid
         });
         var latestBreak = facts
             .Where(fact => fact.Kind == GameplayFactKind.BreakAttempt)
@@ -202,6 +210,7 @@ public sealed class AwdpParticipantStateReader(NoCtfDbContext db) : IAwdpPartici
             .FirstOrDefault();
         var acceptedFixAttempts = facts.Count(fact =>
             fact.Kind == GameplayFactKind.FixAttempt
+            && fact.TimeEligibility == NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid
             && fact.State != GameplayFactState.PlatformFailed);
         var maximumFixAttempts = configuration.MaxFixSubmissions > 0
             ? configuration.MaxFixSubmissions
@@ -245,7 +254,7 @@ public sealed class AwdpParticipantStateReader(NoCtfDbContext db) : IAwdpPartici
             GameplayFactResultDisclosure.PlayerResult(fact.Result, fact.FailureCode),
             GameplayFactResultDisclosure.PlayerFailureCode(fact.FailureCode),
             fact.OccurredAt,
-            fact.UpdatedAt);
+            fact.UpdatedAt, fact.TimeEligibility);
 
     private static AwdpAchievementActivationView? Activation(
         GameplayFact? fact,

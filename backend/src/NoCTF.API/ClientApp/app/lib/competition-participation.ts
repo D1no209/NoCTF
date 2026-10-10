@@ -11,7 +11,8 @@ export function isCtfPracticeOpen(competition: Competition | null | undefined): 
 
 export function canEnterCompetition(competition: Competition | null | undefined, team: Team | null | undefined): boolean {
   return team?.registrationStatus === 'Approved' && !team.isBanned
-    && (competition?.status === 'Running' || isCtfPracticeOpen(competition))
+    && (competition?.status === 'Running' || isCtfPracticeOpen(competition)
+      || competition?.mode === 'LiveSolo' && ['Visible', 'Published', 'Paused', 'Finished'].includes(competition.status ?? ''))
 }
 
 export function canRegisterForCompetition(competition: Competition | null | undefined): boolean {

@@ -14,6 +14,9 @@ public sealed class LeaderboardProjectionEngine(
     public ScoreboardProjection Project(LeaderboardProjectionInput input)
     {
         input = input with { ProjectedAt = input.ProjectedAt ?? timeProvider.GetUtcNow() };
+        input = ChallengeTimingProjection.WithCurrentResults(input);
+        var original = input;
+        input = ChallengeTimingProjection.ForScoring(input) with { ScoreboardGameplayFacts = original.ScoreboardGameplayFacts ?? original.GameplayFacts };
         var projection = projectors.Get(input.Mode).Project(input);
         var aggregate = ProjectAggregate(input, projection);
         var normalized = NormalizedScoreboardProjection.Project(input, aggregate);

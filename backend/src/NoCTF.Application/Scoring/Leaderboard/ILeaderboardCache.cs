@@ -55,6 +55,9 @@ public interface ILeaderboardCache
 
 public interface ILeaderboardSnapshotFactory
 {
+    Task<ScoreboardProjection?> CreateTimingPreviewAsync(Guid competitionId, DateTimeOffset projectedAt,
+        NoCTF.Application.Challenges.Timing.ChallengeTimingProjectionOverride candidate, CancellationToken ct) =>
+        Task.FromResult<ScoreboardProjection?>(null);
     Task<ScoreboardProjection?> CreateScoreboardAsync(
         Guid competitionId,
         DateTimeOffset projectedAt,

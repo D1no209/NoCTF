@@ -35,6 +35,9 @@ public sealed class ScoreboardDetailReader(NoCtfDbContext db) : IScoreboardDetai
                 cancellationToken);
         }
         var ctfWindow = officialWindow.GetValueOrDefault();
+        var timing = await db.CompetitionChallenges.AsNoTracking().Where(x => x.Id == query.CompetitionChallengeId)
+            .Select(x => new NoCTF.Domain.Challenges.ChallengeTiming(x.AutoOpenAt, x.ScoringEndsAt, x.SubmissionDeadlineAt))
+            .SingleAsync(cancellationToken);
         var facts = db.GameplayFacts.AsNoTracking()
             .Where(fact => fact.CompetitionId == query.CompetitionId
                 && fact.TeamId == query.TeamId
@@ -117,6 +120,8 @@ public sealed class ScoreboardDetailReader(NoCtfDbContext db) : IScoreboardDetai
             var factResult = adjudication is not null
                 ? adjudication.GameplayFactResult
                 : useCurrent ? row.Result : null;
+            if (factResult is { } knownResult)
+                factResult = timing.Classify(knownResult, row.OccurredAt);
             return new ScoreboardSlotDetailFact(
                 row.Id,
                 row.Kind,

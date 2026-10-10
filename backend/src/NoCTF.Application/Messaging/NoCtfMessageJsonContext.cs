@@ -9,4 +9,5 @@ namespace NoCTF.Application.Messaging;
 [JsonSerializable(typeof(ScoreboardUpdated))]
 [JsonSerializable(typeof(NotificationChanged))]
 [JsonSerializable(typeof(MfaAuthenticationChanged))]
+[JsonSerializable(typeof(NoCTF.Application.LiveSolo.Realtime.LiveSoloMatchChanged))]
 public partial class NoCtfMessageJsonContext : JsonSerializerContext;

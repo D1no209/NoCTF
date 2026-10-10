@@ -22,7 +22,7 @@ import { localeTag, translate } from './i18n'
 /** Protocol enum label maps. HTTP enums are PascalCase strings. */
 
 export const GameModeLabel = {
-  Ctf: 'CTF', Awd: 'AWD', Awdp: 'AWDP', Koh: 'KoH',
+  Ctf: 'CTF', Awd: 'AWD', Awdp: 'AWDP', Koh: 'KoH', LiveSolo: 'LiveSolo',
 } satisfies Record<NoCtfapiEndpointsCompetitionsGameModeProtocol, string>
 
 export const CompetitionStatusLabel = {
@@ -51,6 +51,7 @@ export const GameplayFactStateLabel = {
 } satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol, string>
 
 export const GameplayFactResultLabel = {
+  RightButDue: "challenges.flagSubmit.correctWithoutScore",
   Correct: "common.label.correct", Wrong: "common.label.wrong", Duplicate: "common.label.repeat", AttemptsExhausted: "common.label.exhausted", Rejected: "common.label.rejected",
   Unlocked: "common.label.unlocked", Applied: "common.label.applied", ServiceUp: "common.label.serviceNormal", ServiceDown: "common.label.serviceException", Controlled: "common.label.controlled", Uncontrolled: "common.label.uncontrolled",
 } satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol, string>

@@ -13,7 +13,8 @@ public sealed record AdminGameplayFactStatusView(
     GameplayFactResult? Result,
     GameplayFactFailureCode? FailureCode,
     DateTimeOffset OccurredAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    NoCTF.Domain.Challenges.GameplayFactTimeEligibility TimeEligibility = NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid);
 
 public interface IAdminGameplayFactStatusReader
 {

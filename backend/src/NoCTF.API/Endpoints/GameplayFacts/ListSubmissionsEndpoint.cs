@@ -37,7 +37,9 @@ public sealed record GameplayFactListItemResponse(
     Guid? ReferenceId,
     string? Value,
     DateTimeOffset OccurredAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    [property: System.Text.Json.Serialization.JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<NoCTF.Domain.Challenges.GameplayFactTimeEligibility>))]
+    NoCTF.Domain.Challenges.GameplayFactTimeEligibility TimeEligibility = NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid);
 
 public sealed class GameplayFactListResponse : ArrayResult<GameplayFactListItemResponse>
 {
@@ -63,7 +65,7 @@ internal static class GameplayFactListMapping
             GameplayFactMapper.ToProtocol(item.State),
             item.Result is null ? null : GameplayFactMapper.ToProtocol(item.Result.Value),
             item.FailureCode is null ? null : GameplayFactMapper.ToProtocol(item.FailureCode.Value),
-            item.ReferenceKind, item.ReferenceId, value, item.OccurredAt, item.UpdatedAt);
+            item.ReferenceKind, item.ReferenceId, value, item.OccurredAt, item.UpdatedAt, item.TimeEligibility);
 }
 
 public sealed class ListGameplayFactsEndpoint(

@@ -17,6 +17,7 @@ export const localeDomains = [
   'api',
   'mfa',
   'passkeys',
+  'live-solo',
 ] as const
 export type LocaleDomain = typeof localeDomains[number]
 
@@ -43,7 +44,8 @@ const catalogLoaders: Record<AppLocale, Record<LocaleDomain, () => Promise<Local
   'zh-CN': {
     core: () => import('../locales/catalogs/zh-CN/core.json').then(chunk => chunk.default),
     competitions: () => import('../locales/catalogs/zh-CN/competitions.json').then(chunk => chunk.default),
-    challenges: () => import('../locales/catalogs/zh-CN/challenges.json').then(chunk => chunk.default),
+    challenges: () => Promise.all([import('../locales/catalogs/zh-CN/challenges.json'), import('../locales/catalogs/zh-CN/challenge-timing.json')])
+      .then(([challenges, timing]) => ({ ...challenges.default, ...timing.default })),
     leaderboard: () => import('../locales/catalogs/zh-CN/leaderboard.json').then(chunk => chunk.default),
     administration: () => import('../locales/catalogs/zh-CN/administration.json').then(chunk => chunk.default),
     account: () => import('../locales/catalogs/zh-CN/account.json').then(chunk => chunk.default),
@@ -53,11 +55,13 @@ const catalogLoaders: Record<AppLocale, Record<LocaleDomain, () => Promise<Local
     api: () => import('../locales/catalogs/zh-CN/api.json').then(chunk => chunk.default),
     mfa: () => import('../locales/catalogs/zh-CN/mfa.json').then(chunk => chunk.default),
     passkeys: () => import('../locales/catalogs/zh-CN/passkeys.json').then(chunk => chunk.default),
+    'live-solo': () => import('../locales/catalogs/zh-CN/live-solo.json').then(chunk => chunk.default),
   },
   'en': {
     core: () => import('../locales/catalogs/en/core.json').then(chunk => chunk.default),
     competitions: () => import('../locales/catalogs/en/competitions.json').then(chunk => chunk.default),
-    challenges: () => import('../locales/catalogs/en/challenges.json').then(chunk => chunk.default),
+    challenges: () => Promise.all([import('../locales/catalogs/en/challenges.json'), import('../locales/catalogs/en/challenge-timing.json')])
+      .then(([challenges, timing]) => ({ ...challenges.default, ...timing.default })),
     leaderboard: () => import('../locales/catalogs/en/leaderboard.json').then(chunk => chunk.default),
     administration: () => import('../locales/catalogs/en/administration.json').then(chunk => chunk.default),
     account: () => import('../locales/catalogs/en/account.json').then(chunk => chunk.default),
@@ -67,6 +71,7 @@ const catalogLoaders: Record<AppLocale, Record<LocaleDomain, () => Promise<Local
     api: () => import('../locales/catalogs/en/api.json').then(chunk => chunk.default),
     mfa: () => import('../locales/catalogs/en/mfa.json').then(chunk => chunk.default),
     passkeys: () => import('../locales/catalogs/en/passkeys.json').then(chunk => chunk.default),
+    'live-solo': () => import('../locales/catalogs/en/live-solo.json').then(chunk => chunk.default),
   },
 }
 

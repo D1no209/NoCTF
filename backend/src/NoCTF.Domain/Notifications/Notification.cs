@@ -49,6 +49,10 @@ public abstract class Notification
     public Guid? OwnerTeamId { get; set; }
     public Guid? SsoProviderId { get; set; }
     public Guid? JwtId { get; set; }
+    public Guid? LiveSoloMatchId { get; set; }
+    public Guid? LiveSoloMediaSessionId { get; set; }
+    public NoCTF.Domain.LiveSolo.LiveSoloMediaAlertKind? LiveSoloMediaAlertKind { get; set; }
+    public NoCTF.Domain.LiveSolo.LiveSoloScreenState? LiveSoloScreenState { get; set; }
     public long? Value { get; set; }
     public int? Count { get; set; }
     public int? ActionValue { get; set; }
@@ -122,7 +126,8 @@ public enum NotificationKind : short
     PlatformUserAccessTokenRevoked,
     PlatformUserTokensInvalidated,
     SsoProviderConfigurationChanged,
-    SsoExternalIdentityBindingChanged
+    SsoExternalIdentityBindingChanged,
+    LiveSoloMediaInterrupted
 }
 
 public sealed class NotificationReferenceCount

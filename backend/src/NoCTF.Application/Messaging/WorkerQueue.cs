@@ -6,7 +6,8 @@ public enum WorkerQueue
     Gameplay,
     Projection,
     Background,
-    Webhook
+    Webhook,
+    LiveSoloMedia
 }
 
 public static class WorkerQueueNames
@@ -16,6 +17,7 @@ public static class WorkerQueueNames
     public const string Projection = "noctf-projection";
     public const string Background = "noctf-background";
     public const string Webhook = "noctf-webhook";
+    public const string LiveSoloMedia = "noctf-livesolo-media";
 
     public static readonly IReadOnlyList<WorkerQueue> All =
     [
@@ -23,7 +25,8 @@ public static class WorkerQueueNames
         WorkerQueue.Gameplay,
         WorkerQueue.Projection,
         WorkerQueue.Background,
-        WorkerQueue.Webhook
+        WorkerQueue.Webhook,
+        WorkerQueue.LiveSoloMedia
     ];
 
     public static string GetName(WorkerQueue queue) => queue switch
@@ -33,6 +36,7 @@ public static class WorkerQueueNames
         WorkerQueue.Projection => Projection,
         WorkerQueue.Background => Background,
         WorkerQueue.Webhook => Webhook,
+        WorkerQueue.LiveSoloMedia => LiveSoloMedia,
         _ => throw new ArgumentOutOfRangeException(nameof(queue), queue, null)
     };
 }

@@ -1,10 +1,19 @@
 import { afterEach, describe, expect, test } from 'bun:test'
 import { parseApiError } from '../app/utils/api-error'
 import { ensureLocaleDomains, setLocale } from '../app/utils/i18n'
+import { message } from '../app/utils/i18n'
 
 const apiPlugin = await Bun.file(new URL('../app/plugins/api.client.ts', import.meta.url)).text()
 
 describe('api error localization', () => {
+  test('external SDK numeric codes cannot be treated as application failure names', () => {
+    setLocale('zh-CN')
+    const failure = Object.assign(new Error('could not establish signal connection'), { code: 1 })
+    const parsed = parseApiError(failure, message('liveSolo.error.media'))
+    expect(parsed.code).toBeUndefined()
+    expect(parsed.displayMessage).toEqual(message('liveSolo.error.media'))
+    expect(parseApiError({ code: 1, detail: 27 }).code).toBeUndefined()
+  })
   afterEach(() => setLocale('zh-CN'))
 
   test('explains competition deletion guards without suggesting that pausing is enough', () => {

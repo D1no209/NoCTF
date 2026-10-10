@@ -9,6 +9,18 @@ namespace NoCTF.Tests.Unit.GameModes;
 public sealed class HistoricalAdjudicationAnalyzerTests
 {
     private static readonly DateTimeOffset At = new(2026, 9, 18, 0, 0, 0, TimeSpan.Zero);
+    [Test, Arguments(false), Arguments(true)]
+    public async Task Latest_timing_classification_is_a_legal_change_without_rewriting_original_judgement(bool restore)
+    {
+        var original = restore ? GameplayFactResult.RightButDue : GameplayFactResult.Correct;
+        var current = restore ? GameplayFactResult.Correct : GameplayFactResult.RightButDue;
+        var evidence = Evidence(Decision(1, original)) with { CurrentResult = current,
+            Timing = new NoCTF.Domain.Challenges.ChallengeTiming(null, restore ? At.AddSeconds(1) : At), HasTimingChanges = true };
+        var analysis = HistoricalAdjudicationAnalyzer.Analyze(evidence);
+        await Assert.That(analysis.DeterministicExpectedResult).IsNull();
+        await Assert.That(analysis.Differences.Single().Classification).IsEqualTo(AdjudicationFindingClassification.LegalHistoryChange);
+        await Assert.That(analysis.LatestEffectiveAdjudication!.Result).IsEqualTo(original);
+    }
     private static AdjudicationEventEvidence Decision(int seconds, GameplayFactResult result,
         GameplayFactState? state = GameplayFactState.Completed) =>
         new(Guid.NewGuid(), At.AddSeconds(seconds), CompetitionEventKind.GameplayFactAdjudicated, state, result);

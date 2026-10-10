@@ -36,6 +36,7 @@ public static class CompetitionModeConfigurationDefaults
                 PollIntervalSeconds = 5,
                 ControlPointsPerInterval = 10
             },
+            GameMode.LiveSolo => new NoCTF.Domain.LiveSolo.LiveSoloCompetitionModeConfiguration(),
             _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, null)
         };
         configuration.CompetitionId = competitionId;

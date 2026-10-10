@@ -16,6 +16,7 @@ public sealed class CreateChallengeRequest
     public string? CustomTitle { get; set; }
     public int Order { get; set; }
     public IReadOnlyList<string>? Tags { get; set; }
+    public CompetitionChallengeTimingPatchRequest? Timing { get; set; }
 }
 
 public sealed class CreateChallengeValidator : Validator<CreateChallengeRequest>
@@ -78,7 +79,7 @@ public sealed class CreateChallengeEndpoint(
             request.ChallengeId,
             request.Order,
             timeProvider.GetUtcNow(),
-            request.CustomTitle, request.Tags), ct);
+            request.CustomTitle, request.Tags, request.Timing?.Apply(new())), ct);
         if (result.Challenge is not null)
         {
             var response = ChallengeMapper.ToResponse(result.Challenge);
@@ -101,6 +102,8 @@ public sealed class CreateChallengeEndpoint(
             ChallengeMutationFailure.InvalidChallengeId
                 or ChallengeMutationFailure.InvalidTitle
                 or ChallengeMutationFailure.InvalidTags
+                or ChallengeMutationFailure.InvalidTiming
+                or ChallengeMutationFailure.TimingUnsupported
                 or ChallengeMutationFailure.InvalidOrder
                 or ChallengeMutationFailure.TemplateModeMismatch =>
                 ApiProblems.Problem(

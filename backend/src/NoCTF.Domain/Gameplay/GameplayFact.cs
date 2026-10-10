@@ -27,6 +27,8 @@ public abstract class GameplayFact : IConcurrencyTracked
     public byte[]? ValueSha256 { get; set; }
     public GameplayFactState State { get; set; }
     public GameplayFactResult? Result { get; set; }
+    public NoCTF.Domain.Challenges.GameplayFactTimeEligibility TimeEligibility { get; set; }
+    public Guid AppliedTimingRevision { get; set; }
     public GameplayFactFailureCode? FailureCode { get; set; }
     public FlagAcquisitionEvidence? AcquisitionEvidence { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
@@ -81,7 +83,8 @@ public enum GameplayFactResult : short
     ServiceUp,
     ServiceDown,
     Controlled,
-    Uncontrolled
+    Uncontrolled,
+    RightButDue
 }
 
 public enum GameplayFactFailureCode : short

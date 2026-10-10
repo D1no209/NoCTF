@@ -24,6 +24,12 @@ public abstract class CompetitionChallenge : IConcurrencyTracked
     public string? NormalizedCustomTitle { get; set; }
     public int Order { get; set; }
     public bool IsPublished { get; set; }
+    public DateTimeOffset? AutoOpenAt { get; set; }
+    public DateTimeOffset? ScoringEndsAt { get; set; }
+    public DateTimeOffset? SubmissionDeadlineAt { get; set; }
+    public ChallengeOpeningState OpeningState { get; set; }
+    public Guid TimingRevision { get; set; }
+    public Guid AppliedTimingRevision { get; set; }
     public int? WriteUpDeductionPercent { get; set; }
     public CompetitionChallengeRules? Rules { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }

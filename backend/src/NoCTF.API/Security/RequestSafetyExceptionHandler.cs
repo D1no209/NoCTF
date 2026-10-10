@@ -18,6 +18,12 @@ public sealed class RequestSafetyExceptionHandler(ILogger<RequestSafetyException
                 extensions: new Dictionary<string, object?> { ["code"] = "IdempotencyPayloadMismatch" }).ExecuteAsync(context);
             return true;
         }
+        if (exception is NoCTF.Application.Challenges.Configuration.ChallengeMaterialMutationException material)
+        {
+            await ApiProblems.Problem(statusCode: 409, detail: ApiMessages.For(material.Failure),
+                extensions: new Dictionary<string, object?> { ["code"] = material.Failure.ToString() }).ExecuteAsync(context);
+            return true;
+        }
         var cause = exception;
         while (cause.InnerException is not null) cause = cause.InnerException;
         if (!TransactionFailureClassifier.IsRetryable(exception))

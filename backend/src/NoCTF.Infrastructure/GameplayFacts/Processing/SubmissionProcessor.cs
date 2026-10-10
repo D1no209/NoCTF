@@ -242,6 +242,7 @@ public sealed class GameplayFactProcessor(
             : (CompetitionOfficialWindow?)null;
         var practiceFact = officialWindow is { } ctfWindow
             && submission.OccurredAt >= ctfWindow.EndAt;
+        var currentTiming = ChallengeTiming.From(configuration.CompetitionChallenge);
         if (submission.Kind is GameplayFactKind.HintUnlock or GameplayFactKind.ManualAdjustment)
         {
             var special = await EvaluateSpecialAsync(
@@ -266,6 +267,8 @@ public sealed class GameplayFactProcessor(
                     && candidate.CompetitionChallengeId == submission.CompetitionChallengeId
                     && candidate.Kind == submission.Kind
                     && candidate.State != GameplayFactState.PlatformFailed
+                    && (currentTiming.AutoOpenAt == null || candidate.OccurredAt >= currentTiming.AutoOpenAt)
+                    && (practiceFact || currentTiming.SubmissionDeadlineAt == null || candidate.OccurredAt < currentTiming.SubmissionDeadlineAt)
                     && (candidate.OccurredAt < submission.OccurredAt
                         || candidate.OccurredAt == submission.OccurredAt
                         && candidate.Id.CompareTo(submission.Id) <= 0));
@@ -288,7 +291,9 @@ public sealed class GameplayFactProcessor(
                 item.CompetitionId == submission.CompetitionId
                 && item.CompetitionChallengeId == submission.CompetitionChallengeId
                 && item.TeamId == submission.TeamId
-                && (item.Result == GameplayFactResult.Correct
+                && ((item.Result == GameplayFactResult.Correct || item.Result == GameplayFactResult.RightButDue)
+                    && (currentTiming.AutoOpenAt == null || item.OccurredAt >= currentTiming.AutoOpenAt)
+                    && (practiceFact || currentTiming.SubmissionDeadlineAt == null || item.OccurredAt < currentTiming.SubmissionDeadlineAt)
                     || item.FailureCode != null && CheatIncidentFailures.All.Contains(item.FailureCode.Value))
                 && (item.OccurredAt < submission.OccurredAt
                     || item.OccurredAt == submission.OccurredAt
@@ -301,6 +306,11 @@ public sealed class GameplayFactProcessor(
                     && item.OccurredAt < priorWindow.EndAt);
         }
         var priorSubmissions = await priorQuery.ToListAsync(cancellationToken);
+        foreach (var prior in priorSubmissions)
+        {
+            prior.TimeEligibility = currentTiming.Eligibility(prior.OccurredAt, practiceFact);
+            if (prior.Result is { } result) prior.Result = currentTiming.Classify(result, prior.OccurredAt, practiceFact);
+        }
         var flags = await db.ChallengeFlags.AsNoTracking()
             .Where(flag =>
                 flag.CompetitionChallengeId == submission.CompetitionChallengeId
@@ -551,6 +561,21 @@ public sealed class GameplayFactProcessor(
             }
         }
         submission.VictimTeamId = evaluation.Decision.VictimTeamId;
+        if (submission.Kind is GameplayFactKind.FlagAttempt or GameplayFactKind.BreakAttempt or GameplayFactKind.FixAttempt)
+        {
+            var timingChallenge = await db.CompetitionChallenges.AsNoTracking().Where(x => x.Id == submission.CompetitionChallengeId)
+                .Select(x => new { x.Mode, x.AutoOpenAt, x.ScoringEndsAt, x.SubmissionDeadlineAt, x.TimingRevision }).SingleAsync(cancellationToken);
+            if (timingChallenge.Mode != GameMode.LiveSolo)
+            {
+                var timing = new NoCTF.Domain.Challenges.ChallengeTiming(timingChallenge.AutoOpenAt, timingChallenge.ScoringEndsAt, timingChallenge.SubmissionDeadlineAt);
+                var practice = timingChallenge.Mode == GameMode.Ctf && submission.Kind == GameplayFactKind.FlagAttempt
+                    && evaluation.OfficialWindow is { } official && submission.OccurredAt >= official.EndAt;
+                submission.TimeEligibility = timing.Eligibility(submission.OccurredAt, practice);
+                submission.AppliedTimingRevision = timingChallenge.TimingRevision;
+                evaluation = evaluation with { Decision = evaluation.Decision with
+                    { Result = timing.Classify(evaluation.Decision.Result!.Value, submission.OccurredAt, practice) } };
+            }
+        }
         submission.Result = evaluation.Decision.Result;
         submission.FailureCode = evaluation.Decision.FailureCode;
         submission.ReferenceKind = evaluation.Decision.ReferenceKind ?? submission.ReferenceKind;
@@ -740,7 +765,7 @@ public sealed class GameplayFactProcessor(
         DateTimeOffset occurredAt,
         CancellationToken ct)
     {
-        if (evaluatedFact.Result != GameplayFactResult.Correct)
+        if (!NoCTF.Domain.Challenges.GameplayFactCompletion.IsSuccessful(evaluatedFact.Result, evaluatedFact.TimeEligibility))
             return;
 
         var competitionMode = await db.Competitions.AsNoTracking()
@@ -882,7 +907,8 @@ public sealed class GameplayFactProcessor(
         CancellationToken ct)
     {
         if (submission.Kind != GameplayFactKind.FlagAttempt
-            || evaluation.Decision.Result != GameplayFactResult.Correct)
+            || submission.Result != GameplayFactResult.Correct
+            || submission.TimeEligibility != NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid)
             return null;
         if (evaluation.OfficialWindow is not { } officialWindow
             || !officialWindow.Contains(submission.OccurredAt))
@@ -917,6 +943,9 @@ public sealed class GameplayFactProcessor(
         var bloodTrackKeys = tracks.Tracks.Where(track => track.EarnsBlood)
             .Select(track => track.Key.ToLowerInvariant())
             .ToArray();
+        var timing = await db.CompetitionChallenges.AsNoTracking()
+            .Where(x => x.Id == submission.CompetitionChallengeId)
+            .Select(x => new { x.AutoOpenAt, x.ScoringEndsAt, x.SubmissionDeadlineAt }).SingleAsync(ct);
 
         var solvedTeamIds = await db.GameplayFacts.AsNoTracking()
             .Where(CtfCompletionEligibility.Before(submission.OccurredAt, submission.Id))
@@ -926,7 +955,10 @@ public sealed class GameplayFactProcessor(
                 candidate.CompetitionId == submission.CompetitionId
                 && candidate.CompetitionChallengeId == submission.CompetitionChallengeId
                 && candidate.Kind == GameplayFactKind.FlagAttempt
-                && candidate.Result == GameplayFactResult.Correct
+                && (candidate.Result == GameplayFactResult.Correct || candidate.Result == GameplayFactResult.RightButDue)
+                && (timing.AutoOpenAt == null || candidate.OccurredAt >= timing.AutoOpenAt)
+                && (timing.ScoringEndsAt == null || candidate.OccurredAt < timing.ScoringEndsAt)
+                && (timing.SubmissionDeadlineAt == null || candidate.OccurredAt < timing.SubmissionDeadlineAt)
                 && candidate.OccurredAt >= officialWindow.StartAt
                 && candidate.OccurredAt < officialWindow.EndAt
                 && candidate.Id != submission.Id)

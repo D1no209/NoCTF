@@ -55,6 +55,7 @@ public static class ChallengeDefinitionStructuralComparer
                 && a.FlagInjectionServiceName == b.FlagInjectionServiceName,
             (AwdpChallengeDefinition, AwdpChallengeDefinition) => true,
             (KohChallengeDefinition, KohChallengeDefinition) => true,
+            (NoCTF.Domain.LiveSolo.LiveSoloChallengeDefinition, NoCTF.Domain.LiveSolo.LiveSoloChallengeDefinition) => true,
             _ => false
         };
     }

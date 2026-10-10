@@ -60,11 +60,22 @@ internal static class AdminHumanVerificationConfigurationMapping
             configuration.UpdatedAt);
 }
 
+public sealed record LiveSoloVideoConfigurationRulesResponse(int MinimumWidth,int MaximumWidth,int MinimumHeight,int MaximumHeight,
+    int MinimumFramesPerSecond,int MaximumFramesPerSecond,int MinimumBitrateBitsPerSecond,int MaximumBitrateBitsPerSecond)
+{
+    public static LiveSoloVideoConfigurationRulesResponse Current {get;}=new(NoCTF.Domain.LiveSolo.LiveSoloVideoLimits.MinimumWidth,NoCTF.Domain.LiveSolo.LiveSoloVideoLimits.MaximumWidth,
+        NoCTF.Domain.LiveSolo.LiveSoloVideoLimits.MinimumHeight,NoCTF.Domain.LiveSolo.LiveSoloVideoLimits.MaximumHeight,
+        NoCTF.Domain.LiveSolo.LiveSoloVideoLimits.MinimumFramesPerSecond,NoCTF.Domain.LiveSolo.LiveSoloVideoLimits.MaximumFramesPerSecond,
+        NoCTF.Domain.LiveSolo.LiveSoloVideoLimits.MinimumBitrateBitsPerSecond,NoCTF.Domain.LiveSolo.LiveSoloVideoLimits.MaximumBitrateBitsPerSecond);
+}
 public sealed record AdminPlatformConfigurationResponse(
     PlatformBrandingResponse Branding,
     AdminHumanVerificationConfigurationResponse HumanVerification,
     EmailVerificationConfigurationResponse EmailVerification,
-    PlatformExperimentalFeaturesResponse ExperimentalFeatures);
+    PlatformExperimentalFeaturesResponse ExperimentalFeatures,NoCTF.Application.LiveSolo.Media.LiveSoloVideoPolicy? LiveSoloVideo=null)
+{
+    public LiveSoloVideoConfigurationRulesResponse LiveSoloVideoRules=>LiveSoloVideoConfigurationRulesResponse.Current;
+}
 
 public sealed record PlatformExperimentalFeaturesResponse(
     bool CtfPatchVerificationEnabled);
@@ -99,6 +110,6 @@ public sealed class GetPlatformConfigurationEndpoint(
             PlatformConfigurationMapping.ToResponse(current, links, HttpContext),
             AdminHumanVerificationConfigurationMapping.ToResponse(verification),
             EmailVerificationConfigurationMapping.ToResponse(email),
-            new(current.CtfPatchVerificationEnabled)));
+            new(current.CtfPatchVerificationEnabled),current.LiveSoloVideo));
     }
 }

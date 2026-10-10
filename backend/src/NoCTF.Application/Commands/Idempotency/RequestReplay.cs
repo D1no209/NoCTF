@@ -24,6 +24,7 @@ public abstract record ReplayFingerprintInput;
 public sealed record EmptyReplayFingerprint : ReplayFingerprintInput;
 public sealed record RuntimeReplayFingerprint(RuntimeAction Action, TimeSpan? Extension)
     : ReplayFingerprintInput;
+public sealed record ScopedRuntimeReplayFingerprint(RuntimeAction Action, Guid TeamId, Guid? ExpectedRuntimeInstanceId) : ReplayFingerprintInput;
 public sealed record FlagReplayFingerprint(IReadOnlyList<string> Flags)
     : ReplayFingerprintInput;
 public sealed record ManualAdjustmentReplayFingerprint(Guid TeamId, int Delta)
@@ -43,6 +44,7 @@ public sealed record PatchUploadReplayFingerprint(
 
 [JsonSerializable(typeof(EmptyReplayFingerprint))]
 [JsonSerializable(typeof(RuntimeReplayFingerprint))]
+[JsonSerializable(typeof(ScopedRuntimeReplayFingerprint))]
 [JsonSerializable(typeof(FlagReplayFingerprint))]
 [JsonSerializable(typeof(ManualAdjustmentReplayFingerprint))]
 [JsonSerializable(typeof(AdminRuntimeReplayFingerprint))]

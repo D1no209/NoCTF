@@ -11,6 +11,7 @@ public static class NatsSubjects
     public const string WebhookStream = "NOCTF_V2_WEBHOOK";
     public const string EventsStream = "NOCTF_V2_EVENTS";
     public const string RunnerStream = "NOCTF_V2_RUNNER";
+    public const string LiveSoloMediaStream = "NOCTF_V2_LIVESOLO_MEDIA";
     public const string RealtimeEvents = "noctf.v2.events.realtime";
     public const string LeaderboardEvents = "noctf.v2.events.leaderboard";
     public const string WebhookEvents = "noctf.v2.events.webhook";
@@ -22,6 +23,7 @@ public static class NatsSubjects
         WorkerQueue.Projection => "noctf.v2.projection",
         WorkerQueue.Background => "noctf.v2.background",
         WorkerQueue.Webhook => "noctf.v2.webhook",
+        WorkerQueue.LiveSoloMedia => "noctf.v2.livesolo-media",
         _ => throw new ArgumentOutOfRangeException(nameof(queue), queue, null)
     };
 
@@ -32,6 +34,7 @@ public static class NatsSubjects
         WorkerQueue.Projection => ProjectionStream,
         WorkerQueue.Background => BackgroundStream,
         WorkerQueue.Webhook => WebhookStream,
+        WorkerQueue.LiveSoloMedia => LiveSoloMediaStream,
         _ => throw new ArgumentOutOfRangeException(nameof(queue), queue, null)
     };
 

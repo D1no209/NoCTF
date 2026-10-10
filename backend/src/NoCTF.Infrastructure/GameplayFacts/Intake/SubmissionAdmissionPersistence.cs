@@ -69,6 +69,9 @@ internal static class GameplayFactAdmissionPersistence
                     CompetitionChallengeId = item.CompetitionChallenge.Id,
                     ChallengeRules = item.CompetitionChallenge.Rules,
                     ChallengePublished = item.CompetitionChallenge.IsPublished,
+                    item.CompetitionChallenge.AutoOpenAt,
+                    item.CompetitionChallenge.ScoringEndsAt,
+                    item.CompetitionChallenge.SubmissionDeadlineAt,
                     ChallengeDeleted = item.Challenge.DeletedAt != null
                         || item.CompetitionChallenge.DeletedAt != null,
                     ChallengeDefinition = item.Challenge.Definition,
@@ -113,12 +116,14 @@ internal static class GameplayFactAdmissionPersistence
                     && submission.OccurredAt < officialWindow.EndAt);
         }
         var attempts = await attemptQuery
+            .Where(fact => (scope.AutoOpenAt == null || fact.OccurredAt >= scope.AutoOpenAt)
+                && (practicePhase || scope.SubmissionDeadlineAt == null || fact.OccurredAt < scope.SubmissionDeadlineAt))
             .GroupBy(submission => submission.Kind)
             .Select(group => new
             {
                 Kind = group.Key,
                 Count = group.Count(),
-                HasCorrect = group.Any(fact => fact.Result == GameplayFactResult.Correct)
+                HasCorrect = group.Any(fact => fact.Result == GameplayFactResult.Correct || fact.Result == GameplayFactResult.RightButDue)
             })
             .ToDictionaryAsync(item => item.Kind, cancellationToken);
         var flagAttempts = attempts.GetValueOrDefault(GameplayFactKind.FlagAttempt);
@@ -178,7 +183,8 @@ internal static class GameplayFactAdmissionPersistence
             officialWindow.EndAt,
             scope.PracticeModeEnabled,
             practiceRuntimeState,
-            scope.ChallengeDefinition);
+            scope.ChallengeDefinition,
+            new ChallengeTiming(scope.AutoOpenAt, scope.ScoringEndsAt, scope.SubmissionDeadlineAt));
     }
 
     public static bool Matches(
@@ -201,6 +207,7 @@ internal static class GameplayFactAdmissionPersistence
         && current.CompetitionDeleted == expected.CompetitionDeleted
         && current.ChallengeDeleted == expected.ChallengeDeleted
         && current.ChallengePublished == expected.ChallengePublished
+        && current.Timing == expected.Timing
         && current.TeamDeleted == expected.TeamDeleted
         && current.TeamBanned == expected.TeamBanned
         && current.TeamApproved == expected.TeamApproved

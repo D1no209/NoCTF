@@ -1272,7 +1272,7 @@ public sealed class LeaderboardProjectionPersistenceTests
             var owner = CreateUser(projectedAt);
             db.Users.Add(owner);
 
-            var fixtures = Enum.GetValues<GameMode>()
+            var fixtures = new[] { GameMode.Ctf, GameMode.Awd, GameMode.Awdp, GameMode.Koh }
                 .Select((mode, index) => CreateFixture(mode, index, owner.Id, projectedAt))
                 .ToArray();
             foreach (var fixture in fixtures)

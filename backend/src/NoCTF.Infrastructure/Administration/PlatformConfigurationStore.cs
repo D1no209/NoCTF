@@ -27,13 +27,17 @@ public sealed class PlatformConfigurationStore(
         messageOutbox ?? new NoOpPostCommitMessagePublisher();
     private readonly FileReferenceLock fileLock = fileReferenceLock ?? new FileReferenceLock();
 
-    public Task<PlatformConfigurationView> GetAsync(CancellationToken ct) =>
-        cache is null
+    public async Task<PlatformConfigurationView> GetAsync(CancellationToken ct)
+    {
+        var view=await (cache is null
             ? LoadAsync(ct)
             : cache.GetOrSetAsync<PlatformConfigurationView>(
                 CacheKey,
                 (_, token) => LoadAsync(token),
-                token: ct).AsTask();
+                token: ct).AsTask());
+        // Video admission and its revision are authoritative; never expose a rolled-back cached policy.
+        return view with {LiveSoloVideo=await NoCTF.Infrastructure.LiveSolo.Media.LiveSoloVideoConfigurationReader.ReadAsync(db,ct)};
+    }
 
     public async Task<bool> IsCtfPatchVerificationEnabledAsync(CancellationToken ct) =>
         (await GetAsync(ct)).CtfPatchVerificationEnabled;
@@ -99,6 +103,17 @@ public sealed class PlatformConfigurationStore(
                     file.Id, file.ObjectKey, file.FileName, file.ContentType))
             .SingleOrDefaultAsync(ct);
 
+    public async Task<PlatformConfigurationView> UpdateLiveSoloVideoAsync(int width,int height,int framesPerSecond,int bitrateBitsPerSecond,DateTimeOffset now,CancellationToken ct)
+    {
+        var settings=await db.PlatformSettings.SingleAsync(x=>x.Id==SettingsId,ct);
+        if(settings.LiveSoloVideoMaximumWidth!=width||settings.LiveSoloVideoMaximumHeight!=height
+            ||settings.LiveSoloVideoMaximumFramesPerSecond!=framesPerSecond||settings.LiveSoloVideoMaximumBitrateBitsPerSecond!=bitrateBitsPerSecond)
+            settings.LiveSoloVideoPolicyStamp=Guid.NewGuid();
+        settings.LiveSoloVideoMaximumWidth=width;settings.LiveSoloVideoMaximumHeight=height;
+        settings.LiveSoloVideoMaximumFramesPerSecond=framesPerSecond;settings.LiveSoloVideoMaximumBitrateBitsPerSecond=bitrateBitsPerSecond;
+        settings.UpdatedAt=now;return await SaveAsync(settings,ct,updateCache:false);
+    }
+
     private async Task<PlatformConfigurationView> SaveAsync(
         PlatformSettings settings,
         CancellationToken ct,
@@ -122,7 +137,9 @@ public sealed class PlatformConfigurationStore(
             settings.Description,
             settings.LogoFileId,
             settings.UpdatedAt,
-            settings.CtfPatchVerificationEnabled);
+            settings.CtfPatchVerificationEnabled,new(settings.LiveSoloVideoMaximumWidth,settings.LiveSoloVideoMaximumHeight,
+                settings.LiveSoloVideoMaximumFramesPerSecond,settings.LiveSoloVideoMaximumBitrateBitsPerSecond,
+                settings.LiveSoloVideoMaximumBitrateBitsPerSecond,settings.LiveSoloVideoPolicyStamp));
 }
 
 public sealed class NoOpPlatformConfigurationStore
@@ -136,6 +153,8 @@ public sealed class NoOpPlatformConfigurationStore
 
     public Task<bool> IsCtfPatchVerificationEnabledAsync(CancellationToken cancellationToken) =>
         Task.FromResult(false);
+    public Task<PlatformConfigurationView> UpdateLiveSoloVideoAsync(int width,int height,int framesPerSecond,int bitrateBitsPerSecond,DateTimeOffset now,CancellationToken ct)=>
+        Task.FromResult(Default with {LiveSoloVideo=new(width,height,framesPerSecond,bitrateBitsPerSecond,bitrateBitsPerSecond,Guid.NewGuid()),UpdatedAt=now});
 
     public Task<PlatformConfigurationView> UpdateAsync(
         string name,

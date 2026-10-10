@@ -196,6 +196,7 @@ export function useCompetitionOverview(
   const practiceOpen = computed(() => isCtfPracticeOpen(competition.value))
 
   const canParticipate = computed(() => canEnterCompetition(competition.value, myTeam.value))
+  const entryPath = computed(() => `/competitions/${competitionId}/${competition.value.mode === 'LiveSolo' ? 'live-solo' : 'challenges'}`)
 
   const teamRegistrationOpen = computed(() => canRegisterForCompetition(competition.value))
 
@@ -444,6 +445,7 @@ export function useCompetitionOverview(
       countdown,
       practiceOpen,
       canParticipate,
+      entryPath,
       teamRegistrationOpen,
       tracksEnabled,
       createOpen,

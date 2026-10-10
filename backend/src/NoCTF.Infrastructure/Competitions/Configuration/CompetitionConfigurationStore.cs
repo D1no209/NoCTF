@@ -6,6 +6,7 @@ using NoCTF.Domain.Teams;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
+using NoCTF.Domain.LiveSolo;
 
 namespace NoCTF.Infrastructure.Competitions.Configuration;
 
@@ -64,13 +65,21 @@ public sealed class CompetitionConfigurationStore(
             || tracked.ModeConfiguration.GetType() != configuration.GetType())
             throw new InvalidOperationException("Competition configuration type does not match its mode.");
         configuration.CompetitionId = competitionId;
+        if (tracked.ModeConfiguration is LiveSoloCompetitionModeConfiguration existingLive
+            && configuration is LiveSoloCompetitionModeConfiguration nextLive && existingLive.BracketFormat != nextLive.BracketFormat
+            && await db.LiveSoloMatches.AnyAsync(x => x.CompetitionId == competitionId, ct))
+            return new(null, CompetitionConfigurationUpdateFailure.ConfigurationLocked);
+        var stagesChanged = tracked.ModeConfiguration is LiveSoloCompetitionModeConfiguration beforeLive
+            && configuration is LiveSoloCompetitionModeConfiguration afterLive
+            && !beforeLive.StageRules.OrderBy(x => x.Lane).ThenBy(x => x.Stage).Select(x => (x.Lane, x.Stage, x.RequiredWins))
+                .SequenceEqual(afterLive.StageRules.OrderBy(x => x.Lane).ThenBy(x => x.Stage).Select(x => (x.Lane, x.Stage, x.RequiredWins)));
         var bloodChanged = tracked.ModeConfiguration is CtfCompetitionModeConfiguration beforeCtf
             && configuration is CtfCompetitionModeConfiguration afterCtf
             && !beforeCtf.BloodRewards.OrderBy(item => item.Position).Select(item => (item.Policy, item.Value))
                 .SequenceEqual(afterCtf.BloodRewards.OrderBy(item => item.Position).Select(item => (item.Policy, item.Value)));
         db.Entry(tracked.ModeConfiguration).CurrentValues.SetValues(configuration);
         db.ChangeTracker.DetectChanges();
-        if (db.Entry(tracked.ModeConfiguration).State == EntityState.Unchanged && !bloodChanged)
+        if (db.Entry(tracked.ModeConfiguration).State == EntityState.Unchanged && !bloodChanged && !stagesChanged)
         {
             var unchanged = await FindAsync(competitionId, ct);
             await transaction.CommitAsync(ct);
@@ -88,6 +97,15 @@ public sealed class CompetitionConfigurationStore(
                     Policy = reward.Policy,
                     Value = reward.Value
                 }).ToList();
+        }
+        if (tracked.ModeConfiguration is LiveSoloCompetitionModeConfiguration currentLive
+            && configuration is LiveSoloCompetitionModeConfiguration requestedLive && stagesChanged)
+        {
+            db.Set<LiveSoloStageRule>().RemoveRange(currentLive.StageRules);
+            currentLive.StageRules.Clear();
+            await db.SaveChangesAsync(ct);
+            currentLive.StageRules = requestedLive.StageRules.Select(x => new LiveSoloStageRule {
+                CompetitionId = competitionId, Lane = x.Lane, Stage = x.Stage, RequiredWins = x.RequiredWins }).ToList();
         }
         tracked.UpdatedAt = now;
         if (tracked.Mode == GameMode.Awd && status == CompetitionStatus.Running)

@@ -741,3 +741,94 @@ POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/wr
 PUT /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/writeups/draft
 PUT /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/writeups/draft/pdf
 ```
+
+## LiveSolo
+
+裁判操作：`POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/adjudications`。请求提供 `ExpectedMatchStamp`、当前 `ExpectedRoundId`／`ExpectedRoundStamp`／`ExpectedTimelineRevision`、`Action` 和必填 `Reason`。没有当前 Round 时三个 Round 字段均为 null。操作为 `Pause`、`Resume`、`VoidRound`、`ForfeitMatch`；弃权还需 `ForfeitingTeamId`。Administrator、所有者、Manager、Judge 可操作，Observer 只读。旧版本返回 typed Conflict。暂停与比赛暂停按区间并集合并；作废不计胜，弃权结束 Match 并原子晋级，不生成 Flag 或虚构 Round 胜场。既有完成结果需通过后续专门纠正流程处理。
+
+`GET` 同路径返回工作人员可读的不可修改裁定记录，包含操作前后状态、胜场、时间线版本、执行者、原因和时间。选手请求返回 NotFound，响应禁止缓存。
+
+独立对局与媒体业务不使用普通题目计分投影；配置、上场名单、Round 与执行作用域分别鉴权。
+
+```text
+GET /api/v1/competitions/{competitionId}/live-solo/configuration
+PUT /api/v1/competitions/{competitionId}/live-solo/configuration
+GET /api/v1/competitions/{competitionId}/live-solo/player-policy
+GET /api/v1/competitions/{competitionId}/live-solo/matches
+POST /api/v1/competitions/{competitionId}/live-solo/matches
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/media
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/program
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/program/viewer
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/corrections
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/corrections/{correctionId}
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/corrections/preview
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/corrections
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/corrections/{correctionId}/resolve
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/program/playlist
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/program/segments/{segmentId}
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/recordings
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/recordings/{recordingId}/decisions
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/recordings/{recordingId}/decisions
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/recordings/{recordingId}/file
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/recordings/{recordingId}/preview
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/recordings/{recordingId}/browser-download
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/media
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/media/program
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/media/program/decisions
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/media/program/recovery
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/media/token
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/adjudications
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/adjudications
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/roster
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/ready
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/countdown
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/runtime
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/runtime
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/flag-submissions
+GET /api/v1/competitions/{competitionId}/live-solo/question-groups
+POST /api/v1/competitions/{competitionId}/live-solo/question-groups
+POST /api/v1/competitions/{competitionId}/live-solo/templates/copies
+GET /api/v1/competitions/{competitionId}/live-solo/bracket
+POST /api/v1/competitions/{competitionId}/live-solo/bracket
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/attachments
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/hints
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/postgame-questions
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/writeups
+PUT /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/writeups/draft
+PUT /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/writeups/draft/pdf
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/writeups/submit
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/writeups/{writeUpId}/review
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/writeups/versions/{versionId}
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/writeups/versions/{versionId}/file
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/writeups/versions/{versionId}/browser-access
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/attachments/{attachmentId}
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/attachments/{attachmentId}/browser-download
+GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/attachment
+POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/attachment/browser-download
+```
+
+以上是本队和工作人员即时投影，不作为观众节目接口。题目正文仅在实际开放后返回，并重查当前 Round、锁定名单、队伍及账号资格。Flag 提交要求 UUID `Idempotency-Key`，响应的 `AdmissionSequence` 是整个 Round 两方、多成员、多题共享的持久化顺序，202 不代表评测结果。准备和开赛失败以 `LiveSoloFailure` 返回；媒体服务未就绪时不得开始正式倒计时。普通题目重判不能修改独立对局结果。
+
+对局 Runtime 的 GET／POST 使用完整 Match／Round／Question 路径，仅可访问本队已开放环境。POST 的强类型 `Action` 为 Start、Reset、Stop；Reset／Stop 必须提供 `ExpectedRuntimeInstanceId`，并携带 UUID `Idempotency-Key`。202 返回当前作用域的 `StatusUrl`，多人重置与同请求重放保持原子语义。变更在事务内重查账号、名单、队伍、当前 Round 与有效时间；旧代或其他队伍 UUID 不能停止新环境。受控环境由 Round 生命周期回收，题库 TTL 不提前终止它，因此不提供独立延长动作。未验证的隔离资格不能返回代理访问入口。
+
+## 题目时间影响预览
+
+```http
+POST /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/timing-preview
+```
+
+时间 PATCH 必须单独提交，省略字段保留、null 清除。有历史行为时先调用上述预览，确认后携带 `timingPreviewToken` 保存；预览绑定当前用户、候选时间及数据版本，2 分钟有效。资料改变或到期返回 `PreviewExpired`，需重新预览。
+
+
+### 时间与结果语义
+
+- 创建请求的 `timing` 及独立时间 PATCH 支持 `autoOpenAt`、`scoringEndsAt`、`submissionDeadlineAt`。时间采用包含时区偏移的绝对时间；省略保留，显式 `null` 清除。
+- 配置的时间必须满足开放 ≤ 停止计分 ≤ 提交截止；开放边界包含，提交及计分结束边界不包含。完整 AWD／AWDP 轮次的结束时间可以等于停止计分时间。
+- 列表、详情的 `timing` 返回原始时间、自动开放状态、回算是否仍在执行；选手列表及详情另返回 `serverTime` 和 `phase`（`NotOpened`／`Scoring`／`JudgementOnly`／`SubmissionClosed`）。
+- 正确而不计分返回 `RightButDue`。`timeEligibility=Valid` 时算完成及闯关，正式解题人数和血榜不受益；`NotOpened` 或 `SubmissionClosed` 表示历史记录按最新时间无效，不计分、不算完成、不占有效次数。错误记录仍保留 `Wrong`。
+- 首次受理、迟到评测与历史回算都比较原 `OccurredAt` 和最新配置。回算不运行 Checker，不新增尝试，也不冻结旧时间规则。队伍提示费用和人工调分不受计分结束时间影响。
+- 开放任务在暂停时挂起，恢复补执行；重启后从关系数据重建。LiveSolo 不使用这些字段控制 Round。

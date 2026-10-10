@@ -27,7 +27,9 @@ internal static class DockerRuntimeProviderRegistration
             configuration["Runtime:Docker:ProxyContainerLabelKey"]
                 ?? "noctf.io/runtime-proxy-gateway",
             configuration["Runtime:Docker:ProxyContainerLabelValue"] ?? "true",
-            CallbackNetworkName: configuration["Runtime:Docker:CallbackNetwork"] ?? "noctf-runtime-callback");
+            CallbackNetworkName: configuration["Runtime:Docker:CallbackNetwork"] ?? "noctf-runtime-callback",
+            ExecutionNetworkName: configuration["Runtime:Docker:ExecutionNetwork"] ?? "",
+            ExecutionProxyContainerName: configuration["Runtime:Docker:ExecutionProxyContainer"] ?? "");
         if (options.RuntimeLogMaxSizeBytes <= 0
             || options.RuntimeLogMaxFiles <= 0
             || options.OneShotOutputLimitBytesPerStream <= 0
@@ -40,6 +42,7 @@ internal static class DockerRuntimeProviderRegistration
 
         services.AddSingleton(options);
         services.AddSingleton<DockerContainerLifecycle>();
+        services.AddSingleton<NoCTF.Application.Runtime.Access.IRuntimeExecutionIsolationProbe, DockerExecutionIsolationProbe>();
         services.AddSingleton<DockerContainerRuntime>();
         services.AddSingleton<DockerRuntimeResourceReconciler>();
         services.AddSingleton<IRuntimeProviderAvailabilityProbe>(provider =>

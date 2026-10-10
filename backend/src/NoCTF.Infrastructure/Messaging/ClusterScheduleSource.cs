@@ -17,12 +17,16 @@ public sealed class ClusterScheduleSource(
     NoCtfDbContext db,
     IAwdRoundConfigurationCatalog awdConfigurations,
     IKohProducerConfigurationCatalog kohConfigurations,
-    ILogger<ClusterScheduleSource> logger) : IClusterScheduleSource
+    ILogger<ClusterScheduleSource> logger,
+    IEnumerable<IClusterScheduleContributor> contributors) : IClusterScheduleSource
 {
     public async Task<IReadOnlyList<ClusterScheduleEntry>> RebuildAsync(
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
+        var entries = new List<ClusterScheduleEntry>();
+        foreach (var contributor in contributors)
+            entries.AddRange(await contributor.RebuildAsync(now, cancellationToken));
         var competitions = await db.Competitions.AsNoTracking()
             .Where(competition => competition.Status == CompetitionStatus.Running
                 && competition.DeletedAt == null
@@ -41,7 +45,7 @@ public sealed class ClusterScheduleSource(
             .AsSplitQuery()
             .ToArrayAsync(cancellationToken);
         if (competitions.Length == 0)
-            return [];
+            return entries;
 
         var competitionIds = competitions.Select(competition => competition.Id).ToArray();
         var challenges = await db.CompetitionChallenges.AsNoTracking()
@@ -84,7 +88,6 @@ public sealed class ClusterScheduleSource(
         var latestObservations = observations
             .GroupBy(observation => observation.CompetitionChallengeId)
             .ToDictionary(group => group.Key, group => group.Max(item => item.OccurredAt));
-        var entries = new List<ClusterScheduleEntry>(challenges.Length);
         var awdCompetitionIds = competitions
             .Where(competition => competition.Mode == GameMode.Awd)
             .Select(competition => competition.Id)

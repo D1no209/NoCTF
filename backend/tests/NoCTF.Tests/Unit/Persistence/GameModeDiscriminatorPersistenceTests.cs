@@ -28,7 +28,8 @@ public sealed class GameModeDiscriminatorPersistenceTests
             [GameMode.Ctf] = "ctf",
             [GameMode.Awd] = "awd",
             [GameMode.Awdp] = "awdp",
-            [GameMode.Koh] = "koh"
+            [GameMode.Koh] = "koh",
+            [GameMode.LiveSolo] = "livesolo"
         };
 
         foreach (var rootType in roots)
@@ -38,7 +39,7 @@ public sealed class GameModeDiscriminatorPersistenceTests
             var property = entity.FindDiscriminatorProperty()
                 ?? throw new InvalidOperationException($"Missing discriminator for {rootType.Name}.");
             await Assert.That(property.Name).IsEqualTo(nameof(Competition.Mode));
-            await Assert.That(property.GetMaxLength()).IsEqualTo(4);
+            await Assert.That(property.GetMaxLength()).IsEqualTo(8);
             var converter = property.GetValueConverter()
                 ?? throw new InvalidOperationException($"Missing mode converter for {rootType.Name}.");
             foreach (var (mode, value) in expected)

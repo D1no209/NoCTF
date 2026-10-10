@@ -27,6 +27,18 @@ public enum CtfInteractionKindProtocol
     PatchVerification
 }
 
+public sealed record CompetitionChallengeTimingResponse(DateTimeOffset? AutoOpenAt, DateTimeOffset? ScoringEndsAt,
+    DateTimeOffset? SubmissionDeadlineAt,
+    [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<ChallengeOpeningState>))] ChallengeOpeningState OpeningState,
+    bool RecalculationPending)
+{
+    public DateTimeOffset? ServerTime { get; init; }
+    [JsonConverter(typeof(StrictPascalCaseEnumConverter<ChallengeTimingPhase>))]
+    public ChallengeTimingPhase? Phase { get; init; }
+    internal static CompetitionChallengeTimingResponse From(ChallengeTiming timing, ChallengeOpeningState openingState = ChallengeOpeningState.None,
+        bool pending = false) => new(timing.AutoOpenAt, timing.ScoringEndsAt, timing.SubmissionDeadlineAt, openingState, pending);
+}
+
 public sealed record ChallengeResponse(
     Guid Id,
     Guid CompetitionId,
@@ -64,6 +76,7 @@ public sealed record ChallengeResponse(
     Guid? DirectionId = null,
     string? DirectionIcon = null)
 {
+    public CompetitionChallengeTimingResponse? Timing { get; init; }
     public IReadOnlyList<string> Tags { get; init; } = [];
 }
 
@@ -97,6 +110,7 @@ public sealed record ChallengeSummaryResponse(
     Guid? DirectionId = null,
     string? DirectionIcon = null)
 {
+    public CompetitionChallengeTimingResponse? Timing { get; init; }
     public IReadOnlyList<string> Tags { get; init; } = [];
 }
 
@@ -162,7 +176,7 @@ internal static class ChallengeMapper
                 ? RuntimeProtocolMapper.ToProtocol(patchRuntimeState)
                 : null,
             view.DirectionId,
-            view.DirectionIcon) { Tags = view.Tags };
+            view.DirectionIcon) { Tags = view.Tags, Timing = CompetitionChallengeTimingResponse.From(view.Timing, view.OpeningState, view.TimingRecalculationPending) };
 
     public static CtfInteractionKindProtocol ToProtocol(CtfInteractionKind kind) => kind switch
     {
@@ -186,7 +200,7 @@ internal static class ChallengeMapper
                 view.Order,
                 view.IsPublished,
                 view.DeletedAt,
-                ToProtocol(view.InteractionKind), DirectionId: view.DirectionId, DirectionIcon: view.DirectionIcon) { Tags = view.Tags }).ToArray(),
+                ToProtocol(view.InteractionKind), DirectionId: view.DirectionId, DirectionIcon: view.DirectionIcon) { Tags = view.Tags, Timing = CompetitionChallengeTimingResponse.From(view.Timing) }).ToArray(),
             CompetitionProtocolMapper.ToProtocol(visibility),
             ScoreboardProtocolMapper.ToProtocol(dataScope));
 }
@@ -291,6 +305,10 @@ public sealed class GetChallengeEndpoint(
                 decision.TeamId, timeProvider.GetUtcNow(), ct),
             patchVerification,
             HttpContext.Request);
+        var timingNow = timeProvider.GetUtcNow();
+        response = response with { Timing = response.Timing is null ? null : response.Timing with {
+            ServerTime = timingNow, Phase = item.Timing.Phase(timingNow,
+                visibility.GameMode == GameMode.Ctf && visibility.CompetitionStatus == CompetitionStatus.Finished) } };
         return TypedResults.Ok(response);
     }
 

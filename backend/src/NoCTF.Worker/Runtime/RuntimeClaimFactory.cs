@@ -28,7 +28,7 @@ public static class RuntimeClaimFactory
         if (template.Definition is ContainerRuntimeDefinition container
             && instance.RuntimeProvider is RuntimeProvider.Docker or RuntimeProvider.Kubernetes)
         {
-            var needsFlag = mode is GameMode.Ctf or GameMode.Awdp && template.FlagSource == RuntimeFlagSource.PerTeam;
+            var needsFlag = mode is GameMode.Ctf or GameMode.Awdp or GameMode.LiveSolo && template.FlagSource == RuntimeFlagSource.PerTeam;
             if (needsFlag && string.IsNullOrEmpty(perTeamFlag)) throw new RuntimeConfigurationException("PerTeam Runtime requires its fixed team Flag.");
             var services = container.Services.Select(service =>
             {
@@ -38,9 +38,9 @@ public static class RuntimeClaimFactory
             }).ToArray();
             return new ProvisionContainerRuntime(instance.Id, runnerId, new ContainerRuntimeRequest(instance.Id,
                 instance.RuntimeProvider, services, labels, RuntimeResourceBudgetPolicy.Sum(services.Select(service => service.Resources(processLimit))),
-                ttl, timeout, template.UrlBindings, mode == GameMode.Koh ? template.ControlCheckUrlBinding : null,
+                instance.ExecutionScopeId is null ? ttl : null, timeout, template.UrlBindings, mode == GameMode.Koh ? template.ControlCheckUrlBinding : null,
                 mode == GameMode.Awd && challengeDefinition?.Checker is { } checker ? new(checker.TargetServiceName) : null,
-                container.EgressPolicy, instance.AccessMode));
+                container.EgressPolicy, instance.AccessMode, ExecutionScopeId: instance.ExecutionScopeId));
         }
         if (template.Definition is OvaRuntimeDefinition ova && instance.RuntimeProvider == RuntimeProvider.Libvirt)
             return new ProvisionOvaRuntime(instance.Id, runnerId, new OvaRuntimeRequest(instance.Id,

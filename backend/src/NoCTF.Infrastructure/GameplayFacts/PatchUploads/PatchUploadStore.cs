@@ -109,7 +109,8 @@ public sealed class PatchUploadStore(
             && fact.CompetitionChallengeId == competitionChallengeId
             && fact.TeamId == team.Id
             && fact.Kind == GameplayFactKind.FixAttempt
-            && fact.Result == GameplayFactResult.Correct,
+            && fact.TimeEligibility == NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid
+            && (fact.Result == GameplayFactResult.Correct || fact.Result == GameplayFactResult.RightButDue),
             ct);
         if (defenseAlreadySucceeded)
             return null;
@@ -215,6 +216,9 @@ public sealed class PatchUploadStore(
                 && admission.CompetitionStatus is not (CompetitionStatus.Running
                     or CompetitionStatus.Paused))
             return new(PatchUploadSaveState.DefenseTargetNotReady);
+        var eligibility = admission.Timing?.Eligibility(uploadedAt) ?? NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid;
+        if (eligibility == NoCTF.Domain.Challenges.GameplayFactTimeEligibility.NotOpened) return new(PatchUploadSaveState.ChallengeNotOpened);
+        if (eligibility == NoCTF.Domain.Challenges.GameplayFactTimeEligibility.SubmissionClosed) return new(PatchUploadSaveState.ChallengeSubmissionClosed);
         if (admission.HasCorrectFix)
             return new(PatchUploadSaveState.AchievementAlreadySucceeded);
         var context = await db.CompetitionChallenges.AsNoTracking()

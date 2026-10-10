@@ -195,7 +195,7 @@ public sealed partial class TargetArchitectureRulesTests
     public async Task Runtime_provider_and_game_mode_catalogs_are_closed_enums()
     {
         await Assert.That(Enum.GetValues<GameMode>())
-            .IsEquivalentTo([GameMode.Ctf, GameMode.Awd, GameMode.Awdp, GameMode.Koh]);
+            .IsEquivalentTo([GameMode.Ctf, GameMode.Awd, GameMode.Awdp, GameMode.Koh, GameMode.LiveSolo]);
         await Assert.That(Enum.GetValues<RuntimeProvider>())
             .IsEquivalentTo([
                 RuntimeProvider.Docker,

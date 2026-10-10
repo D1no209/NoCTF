@@ -136,7 +136,8 @@ public sealed record ContainerRequest(
     IReadOnlyList<string>? Arguments = null,
     string? ServiceName = null,
     bool RegisterServiceAlias = false,
-    string? DiscoveryServiceName = null)
+    string? DiscoveryServiceName = null,
+    Guid? ExecutionScopeId = null)
 {
     public IReadOnlyList<int> ContainerPorts =>
         [.. PortMappings.Keys.Concat(InternalPorts ?? []).Distinct().Order()];

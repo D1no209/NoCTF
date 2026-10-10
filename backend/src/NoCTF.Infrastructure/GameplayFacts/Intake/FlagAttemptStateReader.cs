@@ -26,7 +26,9 @@ public sealed class FlagAttemptStateReader(NoCtfDbContext db) : IFlagAttemptStat
         {
             var rules = await db.Set<CompetitionChallengeRules>().AsNoTracking()
                 .Where(item => item.CompetitionChallengeId == competitionChallengeId)
-                .Select(item => new { item.MaxFlagAttempts, item.MaxBreakSubmissions })
+                .Select(item => new { item.MaxFlagAttempts, item.MaxBreakSubmissions,
+                    Timing = db.CompetitionChallenges.Where(challenge => challenge.Id == item.CompetitionChallengeId)
+                        .Select(challenge => new { challenge.AutoOpenAt, challenge.SubmissionDeadlineAt }).First() })
                 .SingleOrDefaultAsync(cancellationToken);
             if (rules is null)
                 throw new InvalidOperationException("Challenge rules are required for attempt state.");
@@ -50,6 +52,9 @@ public sealed class FlagAttemptStateReader(NoCtfDbContext db) : IFlagAttemptStat
                     && item.CompetitionChallengeId == competitionChallengeId
                     && item.TeamId == teamId
                     && item.State != GameplayFactState.PlatformFailed);
+            var timing = rules.Timing;
+            attempts = attempts.Where(item => (timing.AutoOpenAt == null || item.OccurredAt >= timing.AutoOpenAt)
+                && (practice || timing.SubmissionDeadlineAt == null || item.OccurredAt < timing.SubmissionDeadlineAt));
             if (mode == GameMode.Ctf)
             {
                 var window = await db.Competitions.AsNoTracking()
@@ -74,7 +79,7 @@ public sealed class FlagAttemptStateReader(NoCtfDbContext db) : IFlagAttemptStat
                 {
                     Kind = group.Key,
                     Count = group.Count(),
-                    HasCorrect = group.Any(item => item.Result == GameplayFactResult.Correct)
+                    HasCorrect = group.Any(item => item.Result == GameplayFactResult.Correct || item.Result == GameplayFactResult.RightButDue)
                 })
                 .ToArrayAsync(cancellationToken);
             var accepted = totals.Sum(item => item.Count);

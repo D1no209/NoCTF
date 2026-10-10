@@ -46,7 +46,7 @@ public sealed class GameplayFactStatusReader(NoCtfDbContext db) : IGameplayFactS
                 GameplayFactResultDisclosure.PlayerResult(fact.Result, fact.FailureCode),
                 GameplayFactResultDisclosure.PlayerFailureCode(fact.FailureCode),
                 fact.OccurredAt,
-                fact.UpdatedAt))
+                fact.UpdatedAt, fact.TimeEligibility))
             .SingleOrDefaultAsync(cancellationToken);
     }
 }

@@ -41,6 +41,11 @@ public static class WorkerRole
         services.AddTransient<Authentication.MfaMailHandler>();
         services.AddTransient<Authentication.MfaAuthenticationChangedHandler>();
         services.AddTransient<GameplayFactMessageHandler>();
+        services.AddTransient<LiveSolo.LiveSoloRoundMessageHandler>();
+        services.AddTransient<LiveSolo.LiveSoloRealtimeMessageHandler>();
+        services.AddTransient<LiveSolo.LiveSoloMediaAlertMessageHandler>();
+        services.AddTransient<LiveSolo.LiveSoloMediaMessageHandler>();
+        services.AddTransient<LiveSolo.LiveSoloCaptureMessageHandler>();
         services.AddTransient<LeaderboardMessageHandler>();
         services.AddTransient<FileCleanupMessageHandler>();
         services.AddTransient<Competitions.CompetitionDeletionMessageHandler>();
@@ -102,6 +107,7 @@ public static class WorkerRole
         options.Discovery.IncludeType(typeof(KohPollingHandler));
         options.Discovery.IncludeType(typeof(KohObservationHandler));
         options.Discovery.IncludeType(typeof(CompetitionLifecycleMessageHandler));
+        options.Discovery.IncludeType(typeof(Challenges.Timing.ChallengeTimingMessageHandler));
         options.Discovery.IncludeType(typeof(AwdpMessageHandler));
         options.Discovery.IncludeType(typeof(RuntimeDispatchMessageHandler));
         options.Discovery.IncludeType(typeof(QueuedRuntimeDispatchHandler));
@@ -111,6 +117,11 @@ public static class WorkerRole
         options.Discovery.IncludeType(typeof(GameplayFactDrainMessageHandler));
         options.Discovery.IncludeType(typeof(AccountNotificationMessageHandler));
         options.Discovery.IncludeType(typeof(GameplayFactMessageHandler));
+        options.Discovery.IncludeType(typeof(LiveSolo.LiveSoloRoundMessageHandler));
+        options.Discovery.IncludeType(typeof(LiveSolo.LiveSoloRealtimeMessageHandler));
+        options.Discovery.IncludeType(typeof(LiveSolo.LiveSoloMediaAlertMessageHandler));
+        options.Discovery.IncludeType(typeof(LiveSolo.LiveSoloMediaMessageHandler));
+        options.Discovery.IncludeType(typeof(LiveSolo.LiveSoloCaptureMessageHandler));
         options.Discovery.IncludeType(typeof(LeaderboardMessageHandler));
         options.Discovery.IncludeType(typeof(CompetitionWebhookMessageHandler));
         options.Discovery.IncludeType(typeof(Competitions.StaffWebhooks.StaffWebhookMessageHandler));

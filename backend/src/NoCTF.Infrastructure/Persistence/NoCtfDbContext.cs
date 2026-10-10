@@ -9,6 +9,7 @@ using NoCTF.Domain.Competitions.Progression;
 using NoCTF.Infrastructure.Competitions.Webhooks;
 using NoCTF.Infrastructure.Competitions.StaffWebhooks;
 using NoCTF.Domain.Teams;
+using NoCTF.Domain.LiveSolo;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Platform;
 using NoCTF.Domain.Challenges.Questions;
@@ -45,6 +46,25 @@ public sealed class NoCtfDbContext(
             notificationChangeTracker.Saves,
             notificationChangeTracker.Transactions);
     }
+    public DbSet<LiveSoloMatch> LiveSoloMatches => Set<LiveSoloMatch>();
+    public DbSet<LiveSoloAdjudication> LiveSoloAdjudications => Set<LiveSoloAdjudication>();
+    public DbSet<LiveSoloRound> LiveSoloRounds => Set<LiveSoloRound>();
+    public DbSet<LiveSoloRoundQuestion> LiveSoloRoundQuestions => Set<LiveSoloRoundQuestion>();
+    public DbSet<LiveSoloActiveTeamSlot> LiveSoloActiveTeamSlots => Set<LiveSoloActiveTeamSlot>();
+    public DbSet<LiveSoloSubmission> LiveSoloSubmissions => Set<LiveSoloSubmission>();
+    public DbSet<LiveSoloDownloadEvidence> LiveSoloDownloadEvidences => Set<LiveSoloDownloadEvidence>();
+    public DbSet<LiveSoloAttachmentAssignment> LiveSoloAttachmentAssignments => Set<LiveSoloAttachmentAssignment>();
+    public DbSet<LiveSoloQuestionGroup> LiveSoloQuestionGroups => Set<LiveSoloQuestionGroup>();
+    public DbSet<LiveSoloChallengeSource> LiveSoloChallengeSources => Set<LiveSoloChallengeSource>();
+    public DbSet<LiveSoloQuestionExposure> LiveSoloQuestionExposures => Set<LiveSoloQuestionExposure>();
+    public DbSet<LiveSoloMediaSession> LiveSoloMediaSessions => Set<LiveSoloMediaSession>();
+    public DbSet<LiveSoloMediaGrant> LiveSoloMediaGrants => Set<LiveSoloMediaGrant>();
+    public DbSet<LiveSoloMediaParticipant> LiveSoloMediaParticipants => Set<LiveSoloMediaParticipant>();
+    public DbSet<LiveSoloProgramSegment> LiveSoloProgramSegments => Set<LiveSoloProgramSegment>();
+    public DbSet<LiveSoloProgramCapture> LiveSoloProgramCaptures => Set<LiveSoloProgramCapture>();
+    public DbSet<LiveSoloProgramFrame> LiveSoloProgramFrames => Set<LiveSoloProgramFrame>();
+    public DbSet<LiveSoloRecording> LiveSoloRecordings => Set<LiveSoloRecording>();
+    public DbSet<LiveSoloRecordingDecision> LiveSoloRecordingDecisions => Set<LiveSoloRecordingDecision>();
     public DbSet<User> Users => Set<User>();
     public DbSet<Competition> Competitions => Set<Competition>();
     public DbSet<CompetitionProgression> CompetitionProgressions => Set<CompetitionProgression>();
@@ -201,6 +221,37 @@ public sealed class NoCtfDbContext(
 
         if (ChangeTracker.Entries<StoredFile>().Any(entry => entry.State == EntityState.Modified))
             throw new InvalidOperationException("Stored file metadata is immutable.");
+        if (ChangeTracker.Entries<LiveSoloSubmission>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted)
+            || ChangeTracker.Entries<LiveSoloDownloadEvidence>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted)
+            || ChangeTracker.Entries<LiveSoloAttachmentAssignment>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("Execution-scoped gameplay associations are immutable.");
+        if (ChangeTracker.Entries<LiveSoloAdjudication>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted)
+            || ChangeTracker.Entries<LiveSoloProgramDecision>().Any(entry=>entry.State is EntityState.Modified or EntityState.Deleted)
+            || ChangeTracker.Entries<LiveSoloRecordingDecision>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("LiveSolo staff decisions are immutable.");
+        foreach (var entry in ChangeTracker.Entries<LiveSoloResultCorrection>())
+        {
+            if (entry.State == EntityState.Deleted || entry.State == EntityState.Modified
+                && (entry.OriginalValues.GetValue<LiveSoloCorrectionState>(nameof(LiveSoloResultCorrection.State)) != LiveSoloCorrectionState.Pending
+                    || entry.Properties.Any(p => p.IsModified && new[] { nameof(LiveSoloResultCorrection.CompetitionId), nameof(LiveSoloResultCorrection.MatchId),
+                        nameof(LiveSoloResultCorrection.ActorUserId), nameof(LiveSoloResultCorrection.WinnerTeamId), nameof(LiveSoloResultCorrection.LeftWins),
+                        nameof(LiveSoloResultCorrection.RightWins), nameof(LiveSoloResultCorrection.PreviousWinnerTeamId),
+                        nameof(LiveSoloResultCorrection.PreviousLeftWins), nameof(LiveSoloResultCorrection.PreviousRightWins),
+                        nameof(LiveSoloResultCorrection.Reason), nameof(LiveSoloResultCorrection.CreatedAt) }.Contains(p.Metadata.Name))))
+                throw new InvalidOperationException("LiveSolo correction proposals and completed decisions are immutable.");
+        }
+        if (ChangeTracker.Entries<LiveSoloCorrectionMatch>().Any(entry => entry.State == EntityState.Deleted
+            || entry.State == EntityState.Modified && (entry.Properties.Any(p => p.IsModified && p.Metadata.Name != nameof(LiveSoloCorrectionMatch.ReplacementMatchId))
+                || entry.OriginalValues.GetValue<Guid?>(nameof(LiveSoloCorrectionMatch.ReplacementMatchId)) != null
+                || !ChangeTracker.Entries<LiveSoloResultCorrection>().Any(root => root.Entity.Id == entry.Entity.CorrectionId
+                    && root.OriginalValues.GetValue<LiveSoloCorrectionState>(nameof(LiveSoloResultCorrection.State)) == LiveSoloCorrectionState.Pending
+                    && root.Entity.State == LiveSoloCorrectionState.Applied))))
+            throw new InvalidOperationException("LiveSolo correction impact records are immutable.");
+        if (ChangeTracker.Entries<LiveSoloProgramFrame>().Any(entry => entry.State == EntityState.Modified)
+            || ChangeTracker.Entries<LiveSoloProgramFrameQuestion>().Any(entry => entry.State == EntityState.Modified
+                || entry.State == EntityState.Added && !ChangeTracker.Entries<LiveSoloProgramFrame>().Any(frame => frame.Entity.Id == entry.Entity.FrameId && frame.State == EntityState.Added)
+                || entry.State == EntityState.Deleted && !ChangeTracker.Entries<LiveSoloProgramFrame>().Any(frame => frame.Entity.Id == entry.Entity.FrameId && frame.State == EntityState.Deleted)))
+            throw new InvalidOperationException("LiveSolo program state frames are immutable.");
         if (ChangeTracker.Entries<NoCTF.Domain.Challenges.WriteUps.WriteUpUnlockReceipt>().Any(entry =>
                 entry.State is EntityState.Modified or EntityState.Deleted))
             throw new InvalidOperationException("WriteUp unlock receipts are immutable.");

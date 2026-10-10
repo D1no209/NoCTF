@@ -17,6 +17,7 @@ internal sealed class GameModeStringConverter : ValueConverter<GameMode, string>
         GameMode.Awd => "awd",
         GameMode.Awdp => "awdp",
         GameMode.Koh => "koh",
+        GameMode.LiveSolo => "livesolo",
         _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, null)
     };
 
@@ -26,6 +27,7 @@ internal sealed class GameModeStringConverter : ValueConverter<GameMode, string>
         "awd" => GameMode.Awd,
         "awdp" => GameMode.Awdp,
         "koh" => GameMode.Koh,
+        "livesolo" => GameMode.LiveSolo,
         _ => throw new ArgumentOutOfRangeException(nameof(value), value, null)
     };
 }

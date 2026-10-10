@@ -4,12 +4,14 @@ import type { FlagSubmitViewState } from '~/features/challenges/useFlagSubmit'
 
 defineOptions({ inheritAttrs: false })
 const viewProps = defineProps<{ state: FlagSubmitViewState }>()
-const { PartyPopper, input, submitting, celebrating, persistentResult, solved, celebrationParticles, inputDisabled, timedOut, pollingErrorMessage, submit, competitionChallengeId, multiple, title, description, practice, dockTarget } = toRefs(viewProps.state)
+const { PartyPopper, input, submitting, celebrating, persistentResult, solved, celebrationParticles, inputDisabled, submissionsClosed, judgementOnly, timedOut, pollingErrorMessage, submit, competitionChallengeId, multiple, title, description, practice, dockTarget } = toRefs(viewProps.state)
 </script>
 
 <template>
   <Teleport :to="dockTarget || 'body'" :disabled="!dockTarget">
   <section v-bind="$attrs" data-slot="flag-submit" class="relative isolate flex flex-col gap-4 overflow-visible" aria-labelledby="flag-submit-title">
+    <p v-if="submissionsClosed" class="text-sm text-muted-foreground" role="status">{{ $t('challengeTiming.stageClosed') }}</p>
+    <p v-else-if="judgementOnly" class="text-sm text-muted-foreground" role="status">{{ $t('challengeTiming.stageJudgement') }}</p>
     <Transition name="flag-celebration">
       <div
         v-if="celebrating"
@@ -45,7 +47,7 @@ const { PartyPopper, input, submitting, celebrating, persistentResult, solved, c
         <AlertTitle>{{ $t('challenges.label.flagCorrect') }}</AlertTitle>
         <AlertDescription>{{ $message(persistentResult.message) }}</AlertDescription>
       </Alert>
-      <TerminalCommand :id="`flag-input-${competitionChallengeId}`" v-model="input" :label="multiple ? $t('challenges.flagSubmit.label.flagListOneLine') : $t('common.label.flag.flagSubmitView')" :multiple="multiple" :pending="submitting" :disabled="inputDisabled" :placeholder="solved ? $t('terminal.challengeSolved') : $t('terminal.flagPlaceholder')" :hint="multiple ? $t('terminal.multipleHint') : $t('terminal.submitHint')" @submit="submit" />
+      <TerminalCommand :id="`flag-input-${competitionChallengeId}`" v-model="input" :label="multiple ? $t('challenges.flagSubmit.label.flagListOneLine') : $t('common.label.flag.flagSubmitView')" :multiple="multiple" :pending="submitting" :disabled="inputDisabled" :placeholder="submissionsClosed ? $t('challengeTiming.stageClosed') : solved && !judgementOnly ? $t('terminal.challengeSolved') : $t('terminal.flagPlaceholder')" :hint="multiple ? $t('terminal.multipleHint') : $t('terminal.submitHint')" @submit="submit" />
 
       <Alert v-if="persistentResult && persistentResult.correct !== true" class="mt-4" variant="destructive" role="status"><AlertTitle>{{ persistentResult.correct === null ? $t('challenges.label.judgementReceived') : $t('challenges.label.latestJudgement') }}</AlertTitle><AlertDescription>{{ $message(persistentResult.message) }}</AlertDescription></Alert>
       <Alert v-if="timedOut" class="mt-4">

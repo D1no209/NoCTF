@@ -93,6 +93,14 @@ public sealed class PatchPlatformConfigurationRequest
     public PlatformHumanVerificationPatchRequest? HumanVerification { get; set; }
     public PlatformEmailVerificationPatchRequest? EmailVerification { get; set; }
     public PlatformExperimentalFeaturesPatchRequest? ExperimentalFeatures { get; set; }
+    public PlatformLiveSoloVideoPatchRequest? LiveSoloVideo {get;set;}
+}
+public sealed class PlatformLiveSoloVideoPatchRequest
+{
+    public required int MaximumWidth {get;set;}
+    public required int MaximumHeight {get;set;}
+    public required int MaximumFramesPerSecond {get;set;}
+    public required int MaximumBitrateBitsPerSecond {get;set;}
 }
 
 [Flags]
@@ -102,7 +110,8 @@ internal enum PlatformConfigurationPatchSection
     Branding = 1 << 0,
     HumanVerification = 1 << 1,
     EmailVerification = 1 << 2,
-    ExperimentalFeatures = 1 << 3
+    ExperimentalFeatures = 1 << 3,
+    LiveSoloVideo=1<<4
 }
 
 public sealed class PatchPlatformConfigurationValidator
@@ -113,11 +122,13 @@ public sealed class PatchPlatformConfigurationValidator
         RuleFor(request => request).Must(request => request.Branding is not null
             || request.HumanVerification is not null
             || request.EmailVerification is not null
-            || request.ExperimentalFeatures is not null)
+            || request.ExperimentalFeatures is not null||request.LiveSoloVideo is not null)
             .WithMessage(_ => ApiMessages.Text(ApiMessageId.PatchPlatformConfigurationValidationLeastOnePlatformConfiguration)).WithErrorCode(ApiMessages.Key(ApiMessageId.PatchPlatformConfigurationValidationLeastOnePlatformConfiguration));
         RuleFor(request => request.Branding!.Name).NotEmpty()
             .MaximumLength(PlatformConfigurationRules.MaximumNameLength)
             .When(request => request.Branding is not null);
+        RuleFor(request=>request.LiveSoloVideo).Must(value=>value is not null&&NoCTF.Domain.LiveSolo.LiveSoloVideoLimits.Valid(value.MaximumWidth,value.MaximumHeight,value.MaximumFramesPerSecond,value.MaximumBitrateBitsPerSecond))
+            .When(request=>request.LiveSoloVideo is not null);
         RuleFor(request => request.Branding!.Description)
             .MaximumLength(PlatformConfigurationRules.MaximumDescriptionLength)
             .When(request => request.Branding is not null);
@@ -159,6 +170,11 @@ public sealed class PatchPlatformConfigurationValidator
 public static partial class PlatformSettingsPatchMapper
 {
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationEnabled))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.LiveSoloVideoMaximumWidth))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.LiveSoloVideoMaximumHeight))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.LiveSoloVideoMaximumFramesPerSecond))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.LiveSoloVideoMaximumBitrateBitsPerSecond))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.LiveSoloVideoPolicyStamp))]
     [MapperIgnoreTarget(nameof(PlatformSettings.CtfPatchVerificationEnabled))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationRuntimeEnabled))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationEvaluationEnabled))]
@@ -217,6 +233,11 @@ public static partial class PlatformSettingsPatchMapper
     [MapperIgnoreTarget(nameof(PlatformSettings.Name))]
     [MapperIgnoreTarget(nameof(PlatformSettings.Description))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationEnabled))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.LiveSoloVideoMaximumWidth))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.LiveSoloVideoMaximumHeight))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.LiveSoloVideoMaximumFramesPerSecond))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.LiveSoloVideoMaximumBitrateBitsPerSecond))]
+    [MapperIgnoreTarget(nameof(PlatformSettings.LiveSoloVideoPolicyStamp))]
     [MapperIgnoreTarget(nameof(PlatformSettings.CtfPatchVerificationEnabled))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationRuntimeEnabled))]
     [MapperIgnoreTarget(nameof(PlatformSettings.HumanVerificationEvaluationEnabled))]
@@ -379,6 +400,14 @@ public sealed class PatchPlatformConfigurationEndpoint(
             }
 
             var response = await LoadResponseAsync(transactionCt);
+            if((sections&PlatformConfigurationPatchSection.LiveSoloVideo)!=0)
+            {
+                var video=request.LiveSoloVideo!;
+                var result=await configuration.UpdateLiveSoloVideoAsync(video.MaximumWidth,video.MaximumHeight,video.MaximumFramesPerSecond,video.MaximumBitrateBitsPerSecond,timeProvider.GetUtcNow(),transactionCt);
+                if(result.State!=PlatformConfigurationUpdateState.Updated)
+                    return AtomicAggregatePatchDecision<Results<Ok<AdminPlatformConfigurationResponse>,ProblemHttpResult>>.Rollback(Invalid("Invalid video policy."));
+                response=await LoadResponseAsync(transactionCt);
+            }
             Results<Ok<AdminPlatformConfigurationResponse>, ProblemHttpResult> outcome =
                 TypedResults.Ok(response);
             return AtomicAggregatePatchDecision<Results<Ok<AdminPlatformConfigurationResponse>,
@@ -395,7 +424,7 @@ public sealed class PatchPlatformConfigurationEndpoint(
             AdminHumanVerificationConfigurationMapping.ToResponse(verification),
             EmailVerificationConfigurationMapping.ToResponse(
                 await emailVerification.GetAsync(ct)),
-            new(current.CtfPatchVerificationEnabled));
+            new(current.CtfPatchVerificationEnabled),current.LiveSoloVideo);
     }
 
     private static PlatformConfigurationPatchSection ResolveSections(
@@ -407,7 +436,8 @@ public sealed class PatchPlatformConfigurationEndpoint(
         | (request.EmailVerification is null ? PlatformConfigurationPatchSection.None
             : PlatformConfigurationPatchSection.EmailVerification)
         | (request.ExperimentalFeatures is null ? PlatformConfigurationPatchSection.None
-            : PlatformConfigurationPatchSection.ExperimentalFeatures);
+            : PlatformConfigurationPatchSection.ExperimentalFeatures)
+        |(request.LiveSoloVideo is null?PlatformConfigurationPatchSection.None:PlatformConfigurationPatchSection.LiveSoloVideo);
 
     private static ProblemHttpResult Invalid(string detail) => ApiProblems.Problem(
         statusCode: StatusCodes.Status400BadRequest,

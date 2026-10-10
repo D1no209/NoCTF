@@ -39,12 +39,12 @@ public sealed record WriteUpMutationResult(ChallengeWriteUpView? WriteUp = null,
     ChallengeWriteUpFailure? Failure = null);
 public sealed record SaveWriteUpDraft(Guid CompetitionId, Guid CompetitionChallengeId, Guid ActorId,
     bool Official, WriteUpFormat Format, string? Markdown, Guid? FileId,
-    Guid? ExpectedStamp, DateTimeOffset Now);
+    Guid? ExpectedStamp, DateTimeOffset Now, Guid? ExecutionScopeId = null);
 public sealed record SubmitWriteUp(Guid CompetitionId, Guid CompetitionChallengeId, Guid ActorId,
-    bool Official, Guid ExpectedStamp, DateTimeOffset Now);
+    bool Official, Guid ExpectedStamp, DateTimeOffset Now, Guid? ExecutionScopeId = null);
 public sealed record ReviewWriteUp(Guid CompetitionId, Guid CompetitionChallengeId, Guid WriteUpId,
     Guid VersionId, Guid ActorId, Guid ExpectedStamp, WriteUpReviewAction Action,
-    string? Reason, DateTimeOffset Now);
+    string? Reason, DateTimeOffset Now, Guid? ExecutionScopeId = null);
 public sealed record WriteUpFileReference(Guid VersionId, string ObjectKey, string FileName, string ContentType)
 {
     public Guid FileId { get; init; }
@@ -65,11 +65,11 @@ public sealed record ChallengeWriteUpQuote(Guid VersionId, Guid PolicyStamp, boo
 
 public interface IChallengeWriteUpStore
 {
-    Task<WriteUpListView?> ListAsync(Guid competitionId, Guid challengeId, Guid actorId, bool staff, DateTimeOffset now, CancellationToken ct);
+    Task<WriteUpListView?> ListAsync(Guid competitionId, Guid challengeId, Guid actorId, bool staff, DateTimeOffset now, CancellationToken ct, Guid? executionScopeId = null);
     Task<WriteUpMutationResult> SaveDraftAsync(SaveWriteUpDraft command, CancellationToken ct);
     Task<WriteUpMutationResult> SubmitAsync(SubmitWriteUp command, CancellationToken ct);
     Task<WriteUpMutationResult> ReviewAsync(ReviewWriteUp command, CancellationToken ct);
-    Task<WriteUpContentView> ReadContentAsync(Guid competitionId, Guid challengeId, Guid versionId, Guid actorId, bool staff, DateTimeOffset now, CancellationToken ct);
+    Task<WriteUpContentView> ReadContentAsync(Guid competitionId, Guid challengeId, Guid versionId, Guid actorId, bool staff, DateTimeOffset now, CancellationToken ct, Guid? executionScopeId = null);
     Task<WriteUpContentView> ReadUnlockCandidateAsync(UnlockWriteUp command, CancellationToken ct);
     Task<WriteUpUnlockResult> UnlockAsync(UnlockWriteUp command, CancellationToken ct);
     Task<WriteUpSettingsResult> GetSettingsAsync(Guid competitionId, Guid? challengeId, Guid actorId, DateTimeOffset now, CancellationToken ct);
@@ -82,7 +82,7 @@ public sealed class ManageChallengeWriteUps(IChallengeWriteUpStore store, Manage
     ILeaderboardSnapshotFactory? snapshots = null)
 {
     public Task<WriteUpListView?> ListAsync(Guid competitionId, Guid challengeId, Guid actorId,
-        bool staff, DateTimeOffset now, CancellationToken ct) => store.ListAsync(competitionId, challengeId, actorId, staff, now, ct);
+        bool staff, DateTimeOffset now, CancellationToken ct, Guid? executionScopeId = null) => store.ListAsync(competitionId, challengeId, actorId, staff, now, ct, executionScopeId);
 
     public Task<WriteUpMutationResult> SaveMarkdownAsync(SaveWriteUpDraft command, CancellationToken ct) =>
         ChallengeWriteUpPolicy.ValidContent(command.Format, command.Markdown, command.FileId)
@@ -93,7 +93,7 @@ public sealed class ManageChallengeWriteUps(IChallengeWriteUpStore store, Manage
         string contentType, long byteLength, Stream content, CancellationToken ct)
     {
         var access = await store.ListAsync(command.CompetitionId, command.CompetitionChallengeId,
-            command.ActorId, command.Official, command.Now, ct);
+            command.ActorId, command.Official, command.Now, ct, command.ExecutionScopeId);
         if (access is null || (command.Official ? !access.Access.CanManage : !access.Access.CanSubmit))
             return new(Failure: ChallengeWriteUpFailure.Forbidden);
         if (byteLength is <= 0 or > TeamWriteUpRules.MaximumFileBytes
@@ -124,8 +124,8 @@ public sealed class ManageChallengeWriteUps(IChallengeWriteUpStore store, Manage
             ? Task.FromResult(new WriteUpMutationResult(Failure: ChallengeWriteUpFailure.InvalidContent))
             : store.ReviewAsync(command, ct);
     public Task<WriteUpContentView> ReadContentAsync(Guid competitionId, Guid challengeId, Guid versionId,
-        Guid actorId, bool staff, DateTimeOffset now, CancellationToken ct) =>
-        store.ReadContentAsync(competitionId, challengeId, versionId, actorId, staff, now, ct);
+        Guid actorId, bool staff, DateTimeOffset now, CancellationToken ct, Guid? executionScopeId = null) =>
+        store.ReadContentAsync(competitionId, challengeId, versionId, actorId, staff, now, ct, executionScopeId);
 
     public async Task<WriteUpUnlockResult> UnlockAsync(UnlockWriteUp command, CancellationToken ct)
     {
@@ -151,11 +151,19 @@ public sealed class ManageChallengeWriteUps(IChallengeWriteUpStore store, Manage
             ? Task.FromResult(new WriteUpSettingsResult(null, null, ChallengeWriteUpFailure.InvalidContent))
             : store.UpdateSettingsAsync(command, ct);
     public async Task<WriteUpPdfContent?> OpenPdfAsync(Guid competitionId, Guid challengeId, Guid versionId, Guid actorId,
-        bool staff, DateTimeOffset now, CancellationToken ct)
+        bool staff, DateTimeOffset now, CancellationToken ct, Guid? executionScopeId = null)
     {
-        var content = await ReadContentAsync(competitionId, challengeId, versionId, actorId, staff, now, ct);
+        var content = await ReadContentAsync(competitionId, challengeId, versionId, actorId, staff, now, ct, executionScopeId);
         if (content.Failure is not null || content.Format != WriteUpFormat.Pdf || content.File is null) return null;
         var stream = await objects.OpenRead(content.File.ObjectKey, ct);
+        if (stream is not null && executionScopeId is not null)
+        {
+            try {
+                var rechecked = await ReadContentAsync(competitionId, challengeId, versionId, actorId, staff, now, ct, executionScopeId);
+                if (rechecked.Failure is not null || rechecked.File?.FileId != content.File.FileId) { await stream.DisposeAsync(); return null; }
+            }
+            catch { await stream.DisposeAsync(); throw; }
+        }
         return stream is null ? null : new(content.File.FileName, stream, content.File.FileId);
     }
     public async Task<ChallengeWriteUpQuote?> QuoteAsync(Guid competitionId, Guid challengeId, Guid versionId, Guid actorId,

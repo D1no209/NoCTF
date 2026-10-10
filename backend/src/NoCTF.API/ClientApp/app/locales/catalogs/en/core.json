@@ -2,6 +2,7 @@
   "pagination.cursor.navigation": "Pagination",
   "pagination.cursor.showing": "Showing {count} records",
   "pagination.cursor.page": "Page {page}",
+  "staffWebhook.workbench": "Staff workspace",
   "capacity.title": "Runner capacity",
   "capacity.units": "Resource amounts: CPU cores / MiB / PIDs. Usage: host CPU % / MiB / PIDs.",
   "capacity.unavailable": "Capacity diagnostics are unavailable.",
@@ -1328,5 +1329,11 @@
   "writeUp.submittedEvent": "Team WriteUp submitted",
   "writeUp.myWriteUp": "My WriteUp",
   "writeUp.review": "WriteUp review",
-  "writeUp.deadlinePassedShort": "The WriteUp submission deadline has passed; submission and replacement are unavailable."
+  "writeUp.deadlinePassedShort": "The WriteUp submission deadline has passed; submission and replacement are unavailable.",
+  "liveSolo.notice.title": "LiveSolo screen service interrupted",
+  "liveSolo.notice.screenInterrupted": "{user}'s screen share was interrupted.",
+  "liveSolo.notice.roomUnavailable": "The screen room became unavailable.",
+  "liveSolo.notice.authorizationChanged": "The room was retired because its current authorization no longer qualified.",
+  "liveSolo.notice.noAutomaticDecision": "This alert does not automatically pause the match, record a forfeit or change results. A judge must review it.",
+  "liveSolo.notice.viewMatch": "View match"
 }

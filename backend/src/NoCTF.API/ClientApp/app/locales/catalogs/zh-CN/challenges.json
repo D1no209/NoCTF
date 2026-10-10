@@ -189,5 +189,6 @@
   "challenges.label.confirmUnlock": "确认解锁",
   "terminal.submitHint": "回车提交 Flag",
   "terminal.multipleHint": "回车提交，Shift+Enter 换行；支持粘贴多条 Flag",
-  "challenges.checker.label": "Checker"
+  "challenges.checker.label": "Checker",
+  "challenges.flagSubmit.correctWithoutScore": "答案正确，本次不计分。"
 }

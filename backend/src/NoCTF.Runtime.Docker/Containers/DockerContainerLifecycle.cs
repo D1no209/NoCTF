@@ -13,7 +13,7 @@ using NoCTF.Domain.Runtime;
 namespace NoCTF.Runtime.Docker.Containers;
 
 /// <summary>Runs single-container challenge instances through Docker's native client.</summary>
-public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobRunner,
+public sealed partial class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobRunner,
     IAttachedOneShotJobRunner, IContainerSandboxLifecycle, IDisposable
 {
     private const string NetworkPurposeAwdpCallback = "awdp-callback";
@@ -101,7 +101,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                     Memory = request.Limits.MemoryBytes,
                     NanoCPUs = checked(request.Limits.CpuMillicores * 1_000_000),
                     PidsLimit = request.Limits.PidsLimit,
-                    CapDrop = request.NetworkPurpose == ContainerNetworkPurpose.PersistentRuntime ? null! : ["ALL"],
+                    CapDrop = request.ExecutionScopeId is not null ? ["NET_RAW"] : request.NetworkPurpose == ContainerNetworkPurpose.PersistentRuntime ? null! : ["ALL"],
                     SecurityOpt = request.NetworkPurpose == ContainerNetworkPurpose.PersistentRuntime ? null! : ["no-new-privileges:true"],
                     LogConfig = new LogConfig
                     {
@@ -121,9 +121,8 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                 if (string.IsNullOrWhiteSpace(request.NetworkName))
                     throw new InvalidOperationException(
                         "A Docker WSRX Runtime requires an owned Runtime network.");
-                await ConnectRuntimeProxyGatewaysAsync(
-                    request.NetworkName,
-                    cancellationToken);
+                if (request.ExecutionScopeId is not null) await ValidateExecutionContainerNetworkAsync(request, cancellationToken);
+                else await ConnectRuntimeProxyGatewaysAsync(request.NetworkName, cancellationToken);
             }
             if (request.AllowInternalCallback)
                 await ConnectInternalCallbackAsync(request, response.ID, cancellationToken);
@@ -274,9 +273,8 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             if (string.IsNullOrWhiteSpace(request.NetworkName))
                 throw new InvalidOperationException(
                     "A Docker WSRX Runtime requires an owned Runtime network.");
-            await ConnectRuntimeProxyGatewaysAsync(
-                request.NetworkName,
-                cancellationToken);
+            if (request.ExecutionScopeId is not null) await ValidateExecutionContainerNetworkAsync(request, cancellationToken);
+            else await ConnectRuntimeProxyGatewaysAsync(request.NetworkName, cancellationToken);
             internalHost = ResolveInternalAddress(existing, request.NetworkName);
         }
 
@@ -759,7 +757,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         try
         {
             var network = await client.Networks.InspectNetworkAsync(networkId, cancellationToken);
-            if (network.Name == options.NetworkName || network.Name == options.CallbackNetworkName)
+            if (network.Name == options.NetworkName || network.Name == options.CallbackNetworkName || network.Name == options.ExecutionNetworkName)
                 throw new InvalidOperationException("Deployment-owned networks cannot be deleted by Runtime cleanup.");
             await client.Networks.DeleteNetworkAsync(networkId, cancellationToken);
         }
@@ -1070,6 +1068,9 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             || !HasPublishedPortBindings(container.NetworkSettings?.Ports, request.PortMappings))
             throw new InvalidOperationException(
                 $"Docker Container '{resourceName}' has a different ownership identity, purpose, or published port contract.");
+        if (request.ExecutionScopeId is Guid scope && (!MatchesMetadata(container.Config?.Labels, "noctf.io/execution-scope-id", scope.ToString("D"))
+            || !DropsRawNetworking(container.HostConfig?.CapDrop)))
+            throw new InvalidOperationException("The Docker execution isolation contract does not match.");
     }
 
     private static bool HasPublishedPortBindings(
@@ -1170,6 +1171,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         labels["noctf.io/job-kind"] = JobKind(request.NetworkPurpose);
         labels["noctf.io/runtime-instance-id"] = (request.RuntimeInstanceId
             ?? request.OperationId).ToString("D");
+        if (request.ExecutionScopeId is Guid scope) labels["noctf.io/execution-scope-id"] = scope.ToString("D");
         return labels;
     }
 
@@ -1277,7 +1279,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         {
             return;
         }
-        if (network.Name == options.NetworkName || network.Name == options.CallbackNetworkName) return;
+        if (network.Name == options.NetworkName || network.Name == options.CallbackNetworkName || network.Name == options.ExecutionNetworkName) return;
         var gateways = await ResolveRuntimeProxyContainersAsync(cancellationToken, requireAny: false);
         foreach (var gateway in gateways)
         {

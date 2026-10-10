@@ -25,6 +25,15 @@ public sealed class PlatformSettings : NoCTF.Domain.Shared.IConcurrencyTracked
     public bool HumanVerificationEvaluationEnabled { get; set; } = true;
 
     public bool CtfPatchVerificationEnabled { get; set; }
+    [Range(NoCTF.Domain.LiveSolo.LiveSoloVideoLimits.MinimumWidth,NoCTF.Domain.LiveSolo.LiveSoloVideoLimits.MaximumWidth)]
+    public int LiveSoloVideoMaximumWidth {get;set;}=NoCTF.Domain.LiveSolo.LiveSoloVideoLimits.DefaultWidth;
+    [Range(NoCTF.Domain.LiveSolo.LiveSoloVideoLimits.MinimumHeight,NoCTF.Domain.LiveSolo.LiveSoloVideoLimits.MaximumHeight)]
+    public int LiveSoloVideoMaximumHeight {get;set;}=NoCTF.Domain.LiveSolo.LiveSoloVideoLimits.DefaultHeight;
+    [Range(1,NoCTF.Domain.LiveSolo.LiveSoloVideoLimits.MaximumFramesPerSecond)]
+    public int LiveSoloVideoMaximumFramesPerSecond {get;set;}=NoCTF.Domain.LiveSolo.LiveSoloVideoLimits.DefaultFramesPerSecond;
+    [Range(NoCTF.Domain.LiveSolo.LiveSoloVideoLimits.MinimumBitrateBitsPerSecond,NoCTF.Domain.LiveSolo.LiveSoloVideoLimits.MaximumBitrateBitsPerSecond)]
+    public int LiveSoloVideoMaximumBitrateBitsPerSecond {get;set;}=NoCTF.Domain.LiveSolo.LiveSoloVideoLimits.DefaultBitrateBitsPerSecond;
+    public Guid LiveSoloVideoPolicyStamp {get;set;}=Guid.Parse("00000000-0000-0000-0000-000000000005");
 
     public HumanVerificationProvider? HumanVerificationProvider { get; set; }
 

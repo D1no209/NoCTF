@@ -71,6 +71,7 @@ export function useChallengeSubmissionHistory(props: Readonly<Omit<{
     submission.result = status.result
     submission.failureCode = status.failureCode
     submission.updatedAt = status.updatedAt
+    submission.timeEligibility = status.timeEligibility
     return true
   }
 
@@ -139,6 +140,7 @@ export function useChallengeSubmissionHistory(props: Readonly<Omit<{
 
   function resultVariant(submission: Submission) {
     if (isGameplayFactPending(submission.state)) return 'secondary' as const
+    if (submission.result === 'RightButDue') return 'secondary' as const
     return ['Correct', 'Applied', 'Unlocked', 'Controlled', 'ServiceUp'].includes(submission.result ?? '')
       ? ('default' as const)
       : ('destructive' as const)
@@ -147,6 +149,8 @@ export function useChallengeSubmissionHistory(props: Readonly<Omit<{
   function resultText(submission: Submission): string {
     if (isGameplayFactPending(submission.state)) return gameplayFactStateLabel(submission.state)
     const result = gameplayFactResultLabel(submission.result)
+    if (submission.timeEligibility === 'NotOpened' || submission.timeEligibility === 'SubmissionClosed')
+      return `${result} · ${translate('challengeTiming.historyInvalid')}`
     return submission.failureCode
       ? `${result} · ${gameplayFactFailureCodeLabel(submission.failureCode)}`
       : result

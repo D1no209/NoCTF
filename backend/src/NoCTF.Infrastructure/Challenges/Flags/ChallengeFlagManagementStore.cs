@@ -11,7 +11,8 @@ namespace NoCTF.Infrastructure.Challenges.Flags;
 
 public sealed class ChallengeFlagManagementStore(
     NoCtfDbContext db,
-    IChallengeRuntimeTemplateCatalog runtimeTemplates) : IChallengeFlagStore
+    IChallengeRuntimeTemplateCatalog runtimeTemplates,
+    NoCTF.Application.Challenges.Configuration.IChallengeMaterialMutationGate? material = null) : IChallengeFlagStore
 {
     public ChallengeFlagManagementStore(NoCtfDbContext db)
         : this(db, new NoCTF.GameModes.Registration.ChallengeRuntimeTemplateCatalog()) { }
@@ -25,13 +26,7 @@ public sealed class ChallengeFlagManagementStore(
         var challenge = await LoadChallengeAsync(scope, actorId, isAdministrator, ct);
         if (challenge is null)
             return null;
-        if (challenge.Mode == GameMode.Awdp)
-            return true;
-        return challenge.Mode == GameMode.Ctf
-            && challenge.Definition is CtfChallengeDefinition
-                { InteractionKind: CtfInteractionKind.FlagSubmission }
-            && runtimeTemplates.Get(challenge.Definition)?.FlagSource
-                is null or RuntimeFlagSource.Static;
+        return StaticFlagConfiguration.SupportsManualFlags(challenge.Definition, runtimeTemplates);
     }
 
     public async Task<bool?> SupportsRegularExpressionAsync(
@@ -43,11 +38,7 @@ public sealed class ChallengeFlagManagementStore(
         var challenge = await LoadChallengeAsync(scope, actorId, isAdministrator, ct);
         if (challenge is null)
             return null;
-        return challenge.Mode == GameMode.Ctf
-            && challenge.Definition is CtfChallengeDefinition
-                { InteractionKind: CtfInteractionKind.FlagSubmission }
-            && runtimeTemplates.Get(challenge.Definition)?.FlagSource
-                is null or RuntimeFlagSource.Static;
+        return StaticFlagConfiguration.SupportsRegularExpression(challenge.Definition, runtimeTemplates);
     }
 
     public async Task<IReadOnlyList<ChallengeFlagView>?> ListAsync(
@@ -94,8 +85,10 @@ public sealed class ChallengeFlagManagementStore(
         bool isAdministrator,
         CancellationToken ct)
     {
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, System.Data.IsolationLevel.Serializable, ct);
         if (!await ScopeExistsAsync(command.Scope, actorId, isAdministrator, ct))
             return new(null, ChallengeFlagSaveFailure.ScopeNotFound);
+        if (material is not null) await material.RequireMutableAsync(new(command.Scope.ChallengeId, command.Scope.CompetitionChallengeId), ct);
         ChallengeFlag entity;
         if (!command.IsCreate && command.FlagId is Guid flagId)
         {
@@ -146,6 +139,7 @@ public sealed class ChallengeFlagManagementStore(
         try
         {
             await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
             return new(Map(entity));
         }
         catch (DbUpdateException) when (command.IsCreate)
@@ -162,8 +156,10 @@ public sealed class ChallengeFlagManagementStore(
         DateTimeOffset now,
         CancellationToken ct)
     {
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, System.Data.IsolationLevel.Serializable, ct);
         if (!await ScopeExistsAsync(scope, actorId, isAdministrator, ct))
             return ChallengeFlagMutationState.NotFound;
+        if (material is not null) await material.RequireMutableAsync(new(scope.ChallengeId, scope.CompetitionChallengeId), ct);
         var entity = await Scoped(scope).SingleOrDefaultAsync(flag => flag.Id == flagId, ct);
         if (entity is null)
             return ChallengeFlagMutationState.NotFound;
@@ -171,6 +167,7 @@ public sealed class ChallengeFlagManagementStore(
             return ChallengeFlagMutationState.SystemManagedFlag;
         entity.DeletedAt = now;
         await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
         return ChallengeFlagMutationState.Updated;
     }
 
@@ -182,8 +179,10 @@ public sealed class ChallengeFlagManagementStore(
         DateTimeOffset now,
         CancellationToken ct)
     {
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, System.Data.IsolationLevel.Serializable, ct);
         if (!await ScopeExistsAsync(scope, actorId, isAdministrator, ct))
             return ChallengeFlagMutationState.NotFound;
+        if (material is not null) await material.RequireMutableAsync(new(scope.ChallengeId, scope.CompetitionChallengeId), ct);
         var entity = await Scoped(scope, includeDeleted: true)
             .SingleOrDefaultAsync(flag => flag.Id == flagId && flag.DeletedAt != null, ct);
         if (entity is null)
@@ -195,6 +194,7 @@ public sealed class ChallengeFlagManagementStore(
             return ChallengeFlagMutationState.NotFound;
         entity.DeletedAt = null;
         await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
         return ChallengeFlagMutationState.Updated;
     }
 

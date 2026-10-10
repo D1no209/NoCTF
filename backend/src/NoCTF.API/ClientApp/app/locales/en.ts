@@ -1,3 +1,4 @@
+import ChallengeTimingMessages from './catalogs/en/challenge-timing.json'
 import CoreMessages from './catalogs/en/core.json'
 import CompetitionsMessages from './catalogs/en/competitions.json'
 import ChallengesMessages from './catalogs/en/challenges.json'
@@ -10,9 +11,11 @@ import WriteupsMessages from './catalogs/en/writeups.json'
 import PasskeyMessages from './catalogs/en/passkeys.json'
 import MfaMessages from './catalogs/en/mfa.json'
 import ApiMessages from './catalogs/en/api.json'
+import LiveSoloMessages from './catalogs/en/live-solo.json'
 
 export const englishMessages = {
   ...CoreMessages,
+  ...ChallengeTimingMessages,
   ...CompetitionsMessages,
   ...ChallengesMessages,
   ...LeaderboardMessages,
@@ -24,5 +27,6 @@ export const englishMessages = {
   ...ApiMessages,
   ...MfaMessages,
   ...PasskeyMessages,
+  ...LiveSoloMessages,
 }
 export type MessageKey = keyof typeof englishMessages

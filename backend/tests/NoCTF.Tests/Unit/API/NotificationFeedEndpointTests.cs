@@ -100,6 +100,30 @@ public sealed class NotificationFeedEndpointTests
         await Assert.That(reader.ReadCalls).IsEqualTo(0);
     }
 
+    [Test]
+    public async Task LiveSolo_alert_contract_has_typed_cause_and_exact_match_without_raw_media_credentials()
+    {
+        var now = DateTimeOffset.UtcNow; var competition = Guid.NewGuid(); var match = Guid.NewGuid();
+        var reader = new RecordingReader(new(now, Guid.Empty));
+        await using var app = await CreateApplicationAsync(reader); using var client = app.GetTestClient();
+        var initial = await client.GetFromJsonAsync<NotificationFeedResponse>("/api/v1/notifications/feed");
+        reader.Items = [new(Guid.NewGuid(), NotificationSourceType.System, Guid.NewGuid(), NotificationTargetType.CompetitionCollaborators,
+            competition, NotificationKind.LiveSoloMediaInterrupted,
+            new LiveSoloMediaInterruptedNotificationContent(competition, match, ActorId, "player", Guid.NewGuid(), "team",
+                NoCTF.Domain.LiveSolo.LiveSoloMediaAlertKind.ScreenInterrupted, NoCTF.Domain.LiveSolo.LiveSoloScreenState.Disconnected),
+            NoCTF.Domain.Shared.EntityReferenceKind.Competition, competition, null, null, now.AddSeconds(1))];
+        using var response = await client.GetAsync($"/api/v1/notifications/feed?cursor={Uri.EscapeDataString(initial!.NextCursor!)}");
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        var text = await response.Content.ReadAsStringAsync(); using var document = JsonDocument.Parse(text);
+        var item = document.RootElement.GetProperty("items")[0];
+        await Assert.That(item.GetProperty("kind").GetString()).IsEqualTo("LiveSoloMediaInterrupted");
+        var content = item.GetProperty("content");
+        await Assert.That(content.GetProperty("type").GetString()).IsEqualTo("live-solo-media-interrupted");
+        await Assert.That(content.GetProperty("reason").GetString()).IsEqualTo("ScreenInterrupted");
+        await Assert.That(content.GetProperty("matchId").GetGuid()).IsEqualTo(match);
+        await Assert.That(content.GetProperty("competitionId").GetGuid()).IsEqualTo(competition);
+        await Assert.That(text).DoesNotContain("roomIdentity"); await Assert.That(text).DoesNotContain("token");
+    }
     private static async Task<WebApplication> CreateApplicationAsync(
         RecordingReader reader)
     {

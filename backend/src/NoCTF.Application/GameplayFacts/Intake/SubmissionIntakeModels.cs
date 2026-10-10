@@ -29,7 +29,8 @@ public sealed record GameplayFactAdmissionSnapshot(
     DateTimeOffset? OfficialEndAt = null,
     bool PracticeModeEnabled = false,
     PracticeRuntimeAdmissionState PracticeRuntimeState = PracticeRuntimeAdmissionState.NotRequired,
-    ChallengeDefinition? ChallengeDefinition = null);
+    ChallengeDefinition? ChallengeDefinition = null,
+    ChallengeTiming? Timing = null);
 
 public enum PracticeRuntimeAdmissionState
 {

@@ -25,6 +25,31 @@ namespace NoCTF.Tests.Integration.Persistence;
 [Category("Integration")]
 public sealed class HistoricalAdjudicationPreviewPersistenceTests
 {
+    [Test, Timeout(300_000)]
+    public async Task Latest_timing_changes_are_legal_in_preview_before_recalculation_and_do_not_rewrite_evidence(CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = await StartPostgresAsync(ct); var options = Options(postgres); var fixture = await SeedAsync(options, ct);
+            await using var db = new NoCtfDbContext(options);
+            var question = await db.CompetitionChallenges.AsSplitQuery().SingleAsync(x => x.Id == fixture.CompetitionChallengeId, ct);
+            var fact = await db.GameplayFacts.IgnoreAutoIncludes().AsSplitQuery().SingleAsync(x => x.Id == fixture.LaterFactId, ct);
+            question.ScoringEndsAt = fact.OccurredAt; question.TimingRevision = Guid.NewGuid(); await db.SaveChangesAsync(ct);
+            var before = await CountsAsync(db, ct); var reader = new HistoricalAdjudicationPreviewStore(db);
+            var due = (await reader.ReadAsync(fixture.CompetitionId, question.Id, null, null, 50, ct)).Items.Single();
+            await Assert.That(due.CurrentResult).IsEqualTo(GameplayFactResult.RightButDue);
+            var analysis = HistoricalAdjudicationAnalyzer.Analyze(due);
+            await Assert.That(analysis.Differences.All(x => x.Severity != AdjudicationFindingSeverity.Error)).IsTrue();
+            await Assert.That(analysis.CurrentProjectedBloodRank).IsNull();
+            await Assert.That(fact.Result).IsEqualTo(GameplayFactResult.Correct);
+            question.ScoringEndsAt = fact.OccurredAt.AddSeconds(1); question.TimingRevision = Guid.NewGuid(); await db.SaveChangesAsync(ct);
+            var restored = (await reader.ReadAsync(fixture.CompetitionId, question.Id, null, null, 50, ct)).Items.Single();
+            await Assert.That(restored.CurrentResult).IsEqualTo(GameplayFactResult.Correct);
+            await Assert.That(HistoricalAdjudicationAnalyzer.Analyze(restored).CurrentProjectedBloodRank).IsNotNull();
+            await Assert.That(await CountsAsync(db, ct)).IsEqualTo(before);
+        });
+    }
+
     [Test, Arguments(false), Arguments(true), Timeout(300_000)]
     public async Task Blood_parent_must_be_an_adjudication_in_the_same_fact_scope(bool wrongKind, CancellationToken ct)
     {

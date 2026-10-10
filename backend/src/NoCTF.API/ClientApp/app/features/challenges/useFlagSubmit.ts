@@ -1,3 +1,4 @@
+import { useSubmissionTiming } from './timing/useSubmissionTiming'
 import { message as describeMessage } from '../../utils/i18n'
 import type { UiMessage } from '../../utils/i18n'
 import { inject, toRefs } from 'vue'
@@ -31,6 +32,7 @@ export function useFlagSubmit(props: Readonly<Omit<{
     dockTarget?: string
     maximumAttempts?: number | null
     remainingAttempts?: number | null
+    timing?: import("~/api").NoCtfapiEndpointsChallengesCompetitionChallengeTimingResponse | null
     initiallySolved?: boolean
   }, "multiple" | "title" | "description" | "practice" | "readOnlyJudgement" | "dockTarget" | "initiallySolved"> & Required<Pick<{
     competitionId: string
@@ -44,6 +46,7 @@ export function useFlagSubmit(props: Readonly<Omit<{
     dockTarget?: string
     maximumAttempts?: number | null
     remainingAttempts?: number | null
+    timing?: import("~/api").NoCtfapiEndpointsChallengesCompetitionChallengeTimingResponse | null
     initiallySolved?: boolean
   }, "multiple" | "title" | "description" | "practice" | "readOnlyJudgement" | "dockTarget" | "initiallySolved">>>,
 emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): void; (event: "submitted", ...args: [gameplayFactIds: string[]]): void; (event: "remainingChanged", ...args: [remaining: number | null]): void }) {
@@ -93,7 +96,7 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
   })
 
   watch(() => props.initiallySolved, value => {
-    if (!value) return
+    if (!value) { solvedChallengeKeys.delete(challengeKey()); solved.value = false; return }
     solvedChallengeKeys.add(challengeKey())
     solved.value = true
     input.value = ''
@@ -103,7 +106,8 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
   const attemptsExhausted = computed(() =>
     !props.practice && !props.readOnlyJudgement && remainingAttempts.value === 0)
 
-  const inputDisabled = computed(() => solved.value || attemptsExhausted.value)
+  const { submissionsClosed, judgementOnly } = useSubmissionTiming(() => props.timing, () => props.practice)
+  const inputDisabled = computed(() => solved.value && !judgementOnly.value || attemptsExhausted.value || submissionsClosed.value)
 
   function showResult(correct: boolean, message: UiMessage): void {
     persistentResult.value = { correct, message }
@@ -166,10 +170,12 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
     }
     if (wasPending && !isGameplayFactPending(data.state) && !toasted.has(id)) {
       toasted.add(id)
-      if (data.result === 'Correct') {
+      if ((data.result === 'Correct' || data.result === 'RightButDue') && data.timeEligibility !== 'NotOpened' && data.timeEligibility !== 'SubmissionClosed') {
         solvedChallengeKeys.add(challengeKey())
         solved.value = true
-        if (props.practice)
+        if (data.result === 'RightButDue')
+          showResult(true, translate('challenges.flagSubmit.correctWithoutScore'))
+        else if (props.practice)
           showResult(true, translate("challenges.flagSubmit.description.correctFlagPracticeAttempts"))
         else
           showResult(true, translate('terminal.challengeSolved'))
@@ -177,7 +183,8 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
       }
       else {
         const result = gameplayFactResultLabel(data.result)
-        const reason = data.failureCode ? gameplayFactFailureCodeLabel(data.failureCode) : null
+        const reason = data.timeEligibility === 'NotOpened' || data.timeEligibility === 'SubmissionClosed'
+          ? translate('challengeTiming.historyInvalid') : data.failureCode ? gameplayFactFailureCodeLabel(data.failureCode) : null
         showResult(false, reason
           ? translate("challenges.label.submissionJudgingCompleted.useFlagSubmit", { result, reason })
           : translate("challenges.label.submissionJudgingCompleted", { result }))
@@ -325,6 +332,7 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
 
   const viewBindings = {
       ...toRefs(props),
+      title: computed(() => props.title || translate('challenges.label.submitFlag')),
       PartyPopper,
       input,
       submitting,
@@ -335,7 +343,7 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
       remainingAttempts,
       celebrationParticles,
       attemptsExhausted,
-      inputDisabled,
+      inputDisabled, submissionsClosed, judgementOnly,
 
       timedOut,
       pollingErrorMessage,

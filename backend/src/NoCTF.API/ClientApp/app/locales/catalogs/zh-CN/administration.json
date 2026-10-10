@@ -1142,7 +1142,6 @@
   "staffWebhook.delete": "删除工作人员订阅",
   "staffWebhook.deleteNotice": "待发送的工作人员摘要将停止。系统会尽可能发送不含事项内容的停用事件。",
   "staffWebhook.testTimedOut": "投递尚未完成，请检查投递记录和接收端状态。",
-  "staffWebhook.workbench": "工作人员工作台",
   "staffWebhook.pending": "待工作人员处理",
   "staffWebhook.noPending": "暂无待办事项",
   "staffWebhook.platform": "平台咨询",

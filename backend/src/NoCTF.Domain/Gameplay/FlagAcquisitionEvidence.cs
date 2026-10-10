@@ -11,7 +11,8 @@ public enum FlagAcquisitionResource : short
 public enum FlagAcquisitionScope : short
 {
     NotApplicable,
-    FormalStaticCtf
+    FormalStaticCtf,
+    FormalStaticExecution
 }
 
 public enum FlagAcquisitionEvidenceSource : short
@@ -35,7 +36,7 @@ public sealed class FlagAcquisitionEvidence
 
     public FlagAcquisitionEvidence Copy() => (FlagAcquisitionEvidence)MemberwiseClone();
 
-    public GameplayFactFailureCode? MissingEvidence => Scope != FlagAcquisitionScope.FormalStaticCtf
+    public GameplayFactFailureCode? MissingEvidence => Scope is not (FlagAcquisitionScope.FormalStaticCtf or FlagAcquisitionScope.FormalStaticExecution)
         ? null
         : (Required & ~Acquired) switch
         {

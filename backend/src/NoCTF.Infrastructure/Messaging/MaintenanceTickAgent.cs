@@ -25,7 +25,10 @@ public sealed class MaintenanceTickAgent(
     [
         ClusterScheduleKind.AwdRound,
         ClusterScheduleKind.AwdChecker,
-        ClusterScheduleKind.KohPoll
+        ClusterScheduleKind.KohPoll,
+        ClusterScheduleKind.LiveSoloRound,
+        ClusterScheduleKind.LiveSoloMedia,
+        ClusterScheduleKind.LiveSoloCapture
     ];
 
     private readonly Dictionary<string, ClusterScheduleEntry> entries =
@@ -293,7 +296,9 @@ public sealed class MaintenanceTickAgent(
         cancellationToken.ThrowIfCancellationRequested();
         await using var scope = scopeFactory.CreateAsyncScope();
         var bus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
-        await (message switch
+        await PublishMessageAsync(bus,message);
+    }
+    internal static ValueTask PublishMessageAsync(IMessageBus bus,object message)=>message switch
         {
             AdvanceAwdRound value => bus.PublishAsync(value),
             DispatchAwdCheckers value => bus.PublishAsync(value),
@@ -302,12 +307,18 @@ public sealed class MaintenanceTickAgent(
             ExpireAccountSourceAddresses value => bus.PublishAsync(value),
             DispatchQueuedRuntimes value => bus.PublishAsync(value),
             DispatchPendingGameplayFacts value => bus.PublishAsync(value),
+            NoCTF.Application.LiveSolo.Rounds.AdvanceLiveSoloRound value => bus.PublishAsync(value),
+            NoCTF.Application.LiveSolo.Media.RefreshLiveSoloMedia value => bus.PublishAsync(value),
+            NoCTF.Application.LiveSolo.Media.AdvanceLiveSoloCapture value => bus.PublishAsync(value),
+            NoCTF.Application.LiveSolo.Media.PruneLiveSoloCapture value => bus.PublishAsync(value),
+            NoCTF.Application.LiveSolo.Media.SnapshotLiveSoloResult value => bus.PublishAsync(value),
+            NoCTF.Application.Challenges.Timing.AdvanceChallengeOpening value => bus.PublishAsync(value),
+            NoCTF.Application.Challenges.Timing.RecalculateChallengeTiming value => bus.PublishAsync(value),
             _ => throw new ArgumentOutOfRangeException(
                 nameof(message),
                 message.GetType().FullName,
                 "Unsupported cluster schedule message type.")
-        });
-    }
+        };
 
     private void AddFixedSchedules(DateTimeOffset now)
     {
@@ -338,7 +349,7 @@ public sealed class MaintenanceTickAgent(
             queue.Enqueue(entry, entry.DueAt.UtcTicks);
     }
 
-    private static string ScheduleKind(ClusterScheduleKind kind) => kind switch
+    internal static string ScheduleKind(ClusterScheduleKind kind) => kind switch
     {
         ClusterScheduleKind.AwdRound => "awd_round",
         ClusterScheduleKind.AwdChecker => "awd_checker",
@@ -347,6 +358,10 @@ public sealed class MaintenanceTickAgent(
         ClusterScheduleKind.AccountPrivacyRetention => "account_privacy_retention",
         ClusterScheduleKind.RuntimeDispatch => "runtime_dispatch",
         ClusterScheduleKind.GameplayFactRecovery => "gameplay_fact_recovery",
+        ClusterScheduleKind.LiveSoloRound => "live_solo_round",
+        ClusterScheduleKind.LiveSoloMedia => "live_solo_media",
+        ClusterScheduleKind.LiveSoloCapture => "live_solo_capture",
+        ClusterScheduleKind.ChallengeTiming => "challenge_timing",
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
     };
 }

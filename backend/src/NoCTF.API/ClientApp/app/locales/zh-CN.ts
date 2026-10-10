@@ -1,3 +1,4 @@
+import ChallengeTimingMessages from './catalogs/zh-CN/challenge-timing.json'
 import { englishMessages } from './en'
 import CoreMessages from './catalogs/zh-CN/core.json'
 import CompetitionsMessages from './catalogs/zh-CN/competitions.json'
@@ -11,9 +12,11 @@ import WriteupsMessages from './catalogs/zh-CN/writeups.json'
 import PasskeyMessages from './catalogs/zh-CN/passkeys.json'
 import MfaMessages from './catalogs/zh-CN/mfa.json'
 import ApiMessages from './catalogs/zh-CN/api.json'
+import LiveSoloMessages from './catalogs/zh-CN/live-solo.json'
 
 const translatedMessages = {
   ...CoreMessages,
+  ...ChallengeTimingMessages,
   ...CompetitionsMessages,
   ...ChallengesMessages,
   ...LeaderboardMessages,
@@ -25,6 +28,7 @@ const translatedMessages = {
   ...ApiMessages,
   ...MfaMessages,
   ...PasskeyMessages,
+  ...LiveSoloMessages,
 }
 export const chineseMessages = {
   ...englishMessages,

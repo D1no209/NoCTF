@@ -58,6 +58,16 @@ public sealed class ListChallengesEndpoint(
         }
         var response = ChallengeMapper.ToListResponse(
             items, visibility.Visibility, visibility.DataScope);
+        var now = timeProvider.GetUtcNow();
+        response = response with { Items = response.Items.Select(item => item.Timing is null ? item : item with
+        {
+            Timing = item.Timing with
+            {
+                ServerTime = now,
+                Phase = new ChallengeTiming(item.Timing.AutoOpenAt, item.Timing.ScoringEndsAt, item.Timing.SubmissionDeadlineAt)
+                    .Phase(now, visibility.GameMode == GameMode.Ctf && visibility.CompetitionStatus == CompetitionStatus.Finished)
+            }
+        }).ToArray() };
         if (visibility.GameMode != GameMode.Ctf)
             return TypedResults.Ok(response);
         var statuses = await progressionAccess.ReadStatusesAsync(

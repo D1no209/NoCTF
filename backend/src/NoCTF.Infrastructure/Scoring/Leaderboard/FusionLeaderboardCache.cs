@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Notifications;
 using NoCTF.Application.Observability;
 using NoCTF.Application.Scoring.Leaderboard;
+using NoCTF.Application.Competitions.Modes;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
@@ -126,6 +127,10 @@ public sealed class FusionLeaderboardCache(
         CancellationToken ct) =>
         (await ProjectBundleAsync(competitionId, null, projectedAt, null, ct))?.Scoreboard;
 
+    public async Task<ScoreboardProjection?> CreateTimingPreviewAsync(Guid competitionId, DateTimeOffset projectedAt,
+        NoCTF.Application.Challenges.Timing.ChallengeTimingProjectionOverride candidate, CancellationToken ct) =>
+        (await ProjectBundleAsync(competitionId, null, projectedAt, null, ct, candidate))?.Scoreboard;
+
     public async Task<ScoreboardProjection?> CreateScoreboardWindowAsync(
         Guid competitionId,
         int endingRound,
@@ -150,11 +155,14 @@ public sealed class FusionLeaderboardCache(
         CompetitionModeConfiguration? competitionConfiguration,
         DateTimeOffset projectedAt,
         int? scoreboardRoundWindowEnd,
-        CancellationToken ct)
+        CancellationToken ct,
+        NoCTF.Application.Challenges.Timing.ChallengeTimingProjectionOverride? timingOverride = null)
     {
         var competition = await db.Competitions.AsNoTracking().AsSplitQuery()
             .SingleOrDefaultAsync(candidate => candidate.Id == competitionId, ct);
         if (competition is null)
+            return null;
+        if (!CompetitionModeCapabilities.For(competition.Mode).OrdinaryScoreboard)
             return null;
         // Capture the checkpoint before reading projection inputs. A later
         // checkpoint could acknowledge a newly committed event whose facts
@@ -238,7 +246,8 @@ public sealed class FusionLeaderboardCache(
                 templates[instance.ChallengeId].Definition is CtfChallengeDefinition ctf
                     ? ctf.InteractionKind
                     : CtfInteractionKind.FlagSubmission,
-                instance.Direction?.Icon))
+                instance.Direction?.Icon, timingOverride != null && instance.Id == timingOverride.CompetitionChallengeId
+                    ? timingOverride.Timing : ChallengeTiming.From(instance)))
             .ToList();
 
         var hintCosts = challengeEntities
@@ -292,7 +301,7 @@ public sealed class FusionLeaderboardCache(
             scoreboardRoundWindowEnd,
             awdWindow.Rounds,
             challenges,
-            ct);
+            ct, timingOverride);
         var actorIds = factRows.Aggregate
             .Concat(factRows.Scoreboard)
             .Where(fact => fact.ActorUserId is not null)
@@ -399,7 +408,10 @@ public sealed class FusionLeaderboardCache(
                 && competitionStatusAtProjection == CompetitionStatus.Running
                 ? scoreboard.Schema.Rounds.SingleOrDefault(round => round.State == ScoreboardRoundState.Running)?.EndAt
                 : null,
-            sourceEventSequenceThrough);
+            sourceEventSequenceThrough)
+        {
+            TimingRevisions = challengeEntities.ToDictionary(x => x.Id, x => x.TimingRevision)
+        };
     }
 
     private async Task<AwdScoreboardWindow> ReadAwdScoreboardWindowAsync(
@@ -504,6 +516,8 @@ public sealed class FusionLeaderboardCache(
                 response.Scoreboard.Snapshot.Teams.Count);
             await transaction.CommitAsync(ct);
             publicationPhase = true;
+            if (!await HasCurrentTimingAsync(competitionId, response, ct))
+                return;
 
             if (publicationFence is null)
             {
@@ -539,6 +553,8 @@ public sealed class FusionLeaderboardCache(
                 return;
             }
 
+            if (!await HasCurrentTimingAsync(competitionId, response, ct))
+                return;
             await publisher.PublishAsync(response.Scoreboard, ct);
             await cache.RemoveAsync(FailureKey(competitionId), token: ct);
         }
@@ -631,7 +647,7 @@ public sealed class FusionLeaderboardCache(
         {
             var unfenced = await cache.GetOrDefaultAsync<CachedScoreboardProjection?>(
                 ProjectionKey(competitionId), null, token: ct);
-            return IsExpired(unfenced) ? null : unfenced;
+            return IsExpired(unfenced) || unfenced is not null && !await HasCurrentTimingAsync(competitionId, unfenced, ct) ? null : unfenced;
         }
 
         var published = await publicationFence.GetAsync(competitionId, ct);
@@ -641,10 +657,21 @@ public sealed class FusionLeaderboardCache(
             CachedScoreboardJsonContext.Default.CachedScoreboardProjection);
         if (bundle is null || bundle.Scoreboard.Snapshot.Version != published.Fence)
             throw new InvalidOperationException("The fenced leaderboard payload is invalid.");
-        if (IsExpired(bundle))
+        if (IsExpired(bundle) || !await HasCurrentTimingAsync(competitionId, bundle, ct))
             return null;
 
         return bundle;
+    }
+
+    private async Task<bool> HasCurrentTimingAsync(Guid competitionId, CachedScoreboardProjection bundle, CancellationToken ct)
+    {
+        // Missing revision metadata makes a cached projection invalid.
+        // Rebuild it from current relational facts before serving any score.
+        if (bundle.TimingRevisions is null) return false;
+        var current = await db.CompetitionChallenges.AsNoTracking().Where(x => x.CompetitionId == competitionId)
+            .Select(x => new { x.Id, x.TimingRevision }).ToArrayAsync(ct);
+        return current.Length == bundle.TimingRevisions.Count
+            && current.All(x => bundle.TimingRevisions.TryGetValue(x.Id, out var revision) && revision == x.TimingRevision);
     }
 
     private bool IsExpired(CachedScoreboardProjection? bundle) =>
@@ -705,7 +732,10 @@ public sealed class FusionLeaderboardCache(
 internal sealed record CachedScoreboardProjection(
     ScoreboardProjection Scoreboard,
     DateTimeOffset? ValidUntil = null,
-    long SourceEventSequenceThrough = 0);
+    long SourceEventSequenceThrough = 0)
+{
+    public IReadOnlyDictionary<Guid, Guid> TimingRevisions { get; init; } = new Dictionary<Guid, Guid>();
+}
 
 [JsonSourceGenerationOptions(JsonSerializerDefaults.Web)]
 [JsonSerializable(typeof(CachedScoreboardProjection))]

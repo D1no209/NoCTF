@@ -1,3 +1,4 @@
+using NoCTF.Application.Scoring.Leaderboard;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Notifications;
@@ -13,11 +14,15 @@ namespace NoCTF.Worker;
 
 public static class CompetitionNotificationMessageHandlers
 {
-    public static Task Handle(
+    public static async Task Handle(
         BloodAwarded message,
         CompetitionNotificationDelivery delivery,
-        CancellationToken ct) =>
-        delivery.DeliverAsync(
+        ILeaderboardSnapshotFactory projections,
+        TimeProvider clock,
+        CancellationToken ct)
+    {
+        if (!await new ConfirmCurrentBloodAward(projections, clock).ExecuteAsync(message, ct)) return;
+        await delivery.DeliverAsync(
             message.CompetitionId,
             message.CompetitionChallengeId,
             NotificationKind.BloodAwarded,
@@ -32,6 +37,7 @@ public static class CompetitionNotificationMessageHandlers
                 message.OccurredAt),
             requiredTeamId: null,
             ct);
+    }
 
     public static Task Handle(
         ChallengePublished message,

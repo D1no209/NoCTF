@@ -26,7 +26,7 @@ export function useCompetitionsByIdPage() {
   const isControlScreen = computed(() => [
     `/competitions/${competitionId.value}/live`,
     `/competitions/${competitionId.value}/awdp-live`,
-  ].includes(route.path))
+  ].includes(route.path) || route.path.includes('/live-solo/program/') || route.path.includes('/live-solo/recordings/') || route.path.endsWith('/live-solo/settings') || route.path.endsWith('/live-solo/bracket') || route.path.includes('/live-solo/groups') || route.path.includes('/live-solo/postgame/'))
 
   const isWriteUpReview = computed(() =>
     route.path === `/competitions/${competitionId.value}/writeups`,
@@ -140,6 +140,10 @@ export function useCompetitionsByIdPage() {
   }
 
   async function refreshMyStanding(): Promise<void> {
+    if (competition.value?.mode === 'LiveSolo') {
+      myStanding.value = null; standingError.value = null; standingLoading.value = false
+      return
+    }
     if (myTeam.value?.registrationStatus !== 'Approved' || myTeam.value.isBanned || !myTeam.value.id) {
       myStanding.value = null
       standingLoading.value = false
@@ -249,20 +253,22 @@ export function useCompetitionsByIdPage() {
 
   const navGroups = computed<WorkspaceNavGroup[]>(() => {
     const base = `/competitions/${competitionId.value}`
-    const challengesVisible = competition.value?.status === 'Running'
+    const challengesVisible = competition.value?.mode !== 'LiveSolo' && (competition.value?.status === 'Running'
       || competition.value?.status === 'Paused'
-      || competition.value?.status === 'Finished'
+      || competition.value?.status === 'Finished')
     const canReadChallenges = hasCompetitionStaffAccess.value || hasParticipantChallengeAccess.value
     return [
       {
         label: translate("common.label.competitions"),
         items: [
           { to: competitionPath(competitionId.value), label: translate("common.label.overview"), icon: LayoutDashboard, exact: true },
+          ...(competition.value?.mode === 'LiveSolo' && canReadChallenges
+            ? [{ to: `${base}/live-solo`, label: gameModeLabel('LiveSolo'), icon: GitBranch }] : []),
           ...(challengesVisible && canReadChallenges ? [{ to: `${base}/challenges`, label: translate("common.label.challenge.pageTitle"), icon: Puzzle }] : []),
           ...(competition.value?.mode === 'Ctf' && canReadChallenges && progressionEnabled.value
             ? [{ to: `${base}/progression`, label: translate('progression.title'), icon: GitBranch }]
             : []),
-          { to: `${base}/leaderboard`, label: translate("common.label.leaderboard"), icon: Trophy },
+          ...(competition.value?.mode === 'LiveSolo' ? [] : [{ to: `${base}/leaderboard`, label: translate("common.label.leaderboard"), icon: Trophy }]),
           { to: `${base}/questions`, label: translate("common.label.questions"), icon: MessageCircleQuestion },
         ],
       },

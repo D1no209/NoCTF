@@ -29,7 +29,12 @@ namespace NoCTF.Application.Notifications;
 [JsonDerivedType(typeof(PlatformAuditExportedNotificationContent), "platform-audit-exported")]
 [JsonDerivedType(typeof(UserAccountLifecycleChangedNotificationContent), "user-account-lifecycle-changed")]
 [JsonDerivedType(typeof(CompetitionForceDeletedNotificationContent), "competition-force-deleted")]
+[JsonDerivedType(typeof(LiveSoloMediaInterruptedNotificationContent), "live-solo-media-interrupted")]
 public abstract record NotificationContent;
+
+public sealed record LiveSoloMediaInterruptedNotificationContent(Guid? CompetitionId, Guid? MatchId, Guid? UserId, string? UserName, Guid? TeamId, string? TeamName,
+    [property: JsonConverter(typeof(JsonStringEnumConverter<NoCTF.Domain.LiveSolo.LiveSoloMediaAlertKind>))] NoCTF.Domain.LiveSolo.LiveSoloMediaAlertKind? Reason,
+    [property: JsonConverter(typeof(JsonStringEnumConverter<NoCTF.Domain.LiveSolo.LiveSoloScreenState>))] NoCTF.Domain.LiveSolo.LiveSoloScreenState? State) : NotificationContent;
 
 public sealed record MessageNotificationContent(
     string? Body,

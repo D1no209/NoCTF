@@ -17,7 +17,7 @@ const { practiceOpen, isPatchVerification, actionsAvailable, patchVerification, 
       controls="full"
       :dock-target="runtimeDockTarget"
     />
-    <component :is="FlagSubmit"
+    <component :is="FlagSubmit" :timing="challenge.timing"
       v-if="actionsAvailable && !isPatchVerification"
       :dock-target="flagDockTarget"
       :competition-id="competition.id!"

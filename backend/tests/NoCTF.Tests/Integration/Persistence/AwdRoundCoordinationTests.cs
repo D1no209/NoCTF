@@ -51,7 +51,7 @@ public sealed class AwdRoundCoordinationTests
                 db,
                 new AwdRoundConfigurationCatalog(),
                 new KohProducerConfigurationCatalog(),
-                Microsoft.Extensions.Logging.Abstractions.NullLogger<ClusterScheduleSource>.Instance);
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<ClusterScheduleSource>.Instance, []);
             var rebuilt = await source.RebuildAsync(resumedAt, cancellationToken);
 
             await Assert.That(rebuilt.Any(item => item.Kind == ClusterScheduleKind.AwdChecker))

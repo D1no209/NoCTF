@@ -81,7 +81,7 @@ export function useNotificationCenter() {
       return translate("common.label.team")
     if (notification.kind === 'GameplayFactAdjudicated') return translate("notifications.label.review")
     if (notification.kind === 'RuntimeStateChanged') return translate("notifications.label.environment")
-    if (notification.kind === 'CheatIncidentDetected' || notification.kind === 'ManagementFailure' || notification.kind === 'StartGateFailed')
+    if (notification.kind === 'CheatIncidentDetected' || notification.kind === 'ManagementFailure' || notification.kind === 'StartGateFailed' || notification.kind === 'LiveSoloMediaInterrupted')
       return translate("common.label.management")
     if (notification.kind === 'UserAccountLifecycleChanged') return translate("notifications.label.accountNumber")
     if (notification.kind === 'CompetitionForceDeleted') return translate("common.label.management")
