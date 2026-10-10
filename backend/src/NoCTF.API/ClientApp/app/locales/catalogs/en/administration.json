@@ -1,4 +1,5 @@
 {
+  "administration.platformLogs.newLogs": "{count} new logs · View latest",
   "challengeLibrary.filterDirection": "Filter by direction",
   "announcements.title": "Notifications",
   "announcements.history": "Previous notifications",

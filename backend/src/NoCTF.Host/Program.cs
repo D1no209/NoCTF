@@ -119,7 +119,8 @@ builder.Services.AddNoCtfRoleHealthChecks(
 if (!exportOpenApi)
     builder.Services.AddNoCtfObservability(
         builder.Configuration,
-        $"noctf-host-{string.Join('-', roles.Values).ToLowerInvariant()}");
+        $"noctf-host-{string.Join('-', roles.Values).ToLowerInvariant()}",
+        roles);
 
 var app = builder.Build();
 if (mfaRecoveryOnly)

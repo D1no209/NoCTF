@@ -171,7 +171,7 @@ describe('LiveSolo authoring entry points', () => {
         const modeLinks = admin.state.navGroups.value.flatMap((x: any) => x.items.map((item: any) => item.to))
         expect(modeLinks.includes('/competitions/contest/live')).toBe(mode === 'Ctf')
         expect(modeLinks.includes('/competitions/contest/awdp-live')).toBe(mode === 'Awdp')
-        expect(modeLinks).toContain('/competitions/contest/leaderboard')
+        expect(modeLinks).toContain('/admin/competitions/contest/leaderboard')
         expect(modeLinks).not.toContain('/competitions/contest/live-solo')
       }
     } finally { badge.stop(); admin.stop() }

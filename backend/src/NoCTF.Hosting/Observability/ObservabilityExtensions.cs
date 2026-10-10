@@ -27,7 +27,8 @@ public static class ObservabilityExtensions
     public static IServiceCollection AddNoCtfObservability(
         this IServiceCollection services,
         IConfiguration configuration,
-        string serviceName)
+        string serviceName,
+        HostRoles? roles = null)
     {
         if (!configuration.GetValue("Observability:Enabled", true))
             return services;
@@ -85,12 +86,7 @@ public static class ObservabilityExtensions
             || loki.Fragment.Length > 0 || loki.AbsolutePath != "/")
             throw new InvalidOperationException("Observability:LokiBaseUrl must be a private HTTP origin.");
 
-        var defaultService = serviceName.EndsWith("-api", StringComparison.Ordinal)
-            ? PlatformLogService.Api
-            : serviceName.EndsWith("-worker", StringComparison.Ordinal)
-                ? PlatformLogService.Worker
-                : serviceName.EndsWith("-runner", StringComparison.Ordinal)
-                    ? PlatformLogService.Runner : PlatformLogService.Host;
+        var defaultService = ResolveDefaultService(roles);
         services.AddSingleton<PlatformLogBroadcastQueue>();
         services.TryAddSingleton<PlatformLogUserIdProtector>();
         services.AddHostedService<PlatformLogBroadcastAgent>();
@@ -117,6 +113,17 @@ public static class ObservabilityExtensions
 
         return services;
     }
+
+    internal static PlatformLogService ResolveDefaultService(HostRoles? roles) =>
+        roles?.Values is { Count: 1 } single
+            ? single[0] switch
+            {
+                HostRole.Api => PlatformLogService.Api,
+                HostRole.Worker => PlatformLogService.Worker,
+                HostRole.Runner => PlatformLogService.Runner,
+                _ => PlatformLogService.Host
+            }
+            : PlatformLogService.Host;
 
     internal static bool ShouldExportPlatformLog(string? category, LogLevel level) =>
         category == "Microsoft.Extensions.Diagnostics.HealthChecks.DefaultHealthCheckService"

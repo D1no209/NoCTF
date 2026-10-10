@@ -1,7 +1,7 @@
 import type { UiMessage } from '../../../../utils/i18n'
 import { markRaw } from 'vue'
 
-import { Filter, Plus, UserRound } from '@lucide/vue'
+import { Filter, Plus } from '@lucide/vue'
 import { adminChallengeBankListTemplates } from '../../../../api'
 import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateSummaryResponse } from '../../../../api'
 import AdminDateTimeComponent from '../../../admin/AdminDateTime.vue'
@@ -224,7 +224,6 @@ export function useAdminChallengesIndexPage() {
   return {
       Filter,
       Plus,
-      UserRound,
       canOrganize,
       templates,
       filteredTemplates,

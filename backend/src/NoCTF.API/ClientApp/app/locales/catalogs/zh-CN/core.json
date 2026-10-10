@@ -1,4 +1,7 @@
 {
+  "pagination.cursor.navigation": "分页导航",
+  "pagination.cursor.showing": "当前显示 {count} 条",
+  "pagination.cursor.page": "第 {page} 页",
   "staffWebhook.workbench": "工作人员工作台",
   "capacity.title": "运行节点容量",
   "capacity.units": "资源数额：CPU 核 / MiB / PID；实际使用：宿主机 CPU % / MiB / PID。",

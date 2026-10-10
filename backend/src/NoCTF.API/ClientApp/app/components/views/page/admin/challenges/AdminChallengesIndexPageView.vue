@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminChallengesIndexPageViewState } from '~/features/routes/admin/challenges/useAdminChallengesIndexPage'
 
 const viewProps = defineProps<{ state: AdminChallengesIndexPageViewState }>()
-const { Filter, Plus, UserRound, canOrganize, templates, filteredTemplates, search, directionFilter, directionOptions, loading, loadError, includeDeleted, onlyMine, toggleOnlyMine, createOpen, setCreateOpen, templateCreated, visibilityLabel, AdminDateTime, AdminGameModeBadge, ChallengeTemplateCreateDialog, page, pageCount, total, pageLimit, pageLoading, loadPage, setPageSize } = toRefs(viewProps.state)
+const { Filter, Plus, canOrganize, templates, filteredTemplates, search, directionFilter, directionOptions, loading, loadError, includeDeleted, onlyMine, createOpen, setCreateOpen, templateCreated, visibilityLabel, AdminDateTime, AdminGameModeBadge, ChallengeTemplateCreateDialog, page, pageCount, total, pageLimit, pageLoading, loadPage, setPageSize } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -22,9 +22,10 @@ const { Filter, Plus, UserRound, canOrganize, templates, filteredTemplates, sear
     <template v-else>
       <div class="flex flex-wrap items-center gap-3">
         <Input v-model="search" class="w-full min-w-0 sm:min-w-80 sm:max-w-2xl sm:flex-1" :placeholder="$t('administration.label.searchQuestionBankTemplates')" :aria-label="$t('administration.label.searchQuestionBankTemplates')" />
-        <Button type="button" :variant="onlyMine ? 'secondary' : 'outline'" :aria-pressed="onlyMine" @click="toggleOnlyMine">
-          <UserRound data-icon="inline-start" />{{ $t('challengeLibrary.onlyMine') }}
-        </Button>
+        <div class="flex h-10 items-center gap-2">
+          <Switch id="only-my-challenges" v-model="onlyMine" />
+          <Label for="only-my-challenges">{{ $t('challengeLibrary.onlyMine') }}</Label>
+        </div>
         <div class="flex h-10 items-center gap-2">
           <Switch id="include-deleted" v-model="includeDeleted" />
           <Label for="include-deleted">{{ $t('administration.label.showDeletedTemplates') }}</Label>

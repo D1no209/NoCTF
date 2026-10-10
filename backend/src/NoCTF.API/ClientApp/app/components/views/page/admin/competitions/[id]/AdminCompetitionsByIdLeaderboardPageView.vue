@@ -3,11 +3,18 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdLeaderboardPageViewState } from '~/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdLeaderboardPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdLeaderboardPageViewState }>()
-const { canWrite, current, loading, error, frozenStartAt, hiddenStartAt, reason, saving, save } = toRefs(viewProps.state)
+const { ChartNoAxesCombined, scoreboardPath, canWrite, current, loading, error, frozenStartAt, hiddenStartAt, reason, saving, save } = toRefs(viewProps.state)
 </script>
 
 <template>
   <div class="flex flex-col gap-6">
+    <div class="flex justify-end">
+      <Button as-child variant="outline">
+        <NuxtLink :to="scoreboardPath" prefetch-on="interaction">
+          <ChartNoAxesCombined data-icon="inline-start" />{{ $t('leaderboard.label.viewScoreboard') }}
+        </NuxtLink>
+      </Button>
+    </div>
     <Alert v-if="error" variant="destructive">
       <AlertDescription>{{ $message(error) }}</AlertDescription>
     </Alert>

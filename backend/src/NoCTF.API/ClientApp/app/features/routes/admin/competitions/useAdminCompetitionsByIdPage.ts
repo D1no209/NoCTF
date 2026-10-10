@@ -129,7 +129,7 @@ export function useAdminCompetitionsByIdPage() {
         ] : []),
         ...(competition.value?.mode === 'LiveSolo' ? [] : [
           ...(canWrite.value ? [{ to: `${base}/leaderboard`, label: translate("common.label.leaderboard"), icon: Trophy }] : []),
-          { to: `/competitions/${competitionId}/leaderboard`, label: translate('leaderboard.label.viewScoreboard'), icon: ChartNoAxesCombined },
+          ...(!canWrite.value ? [{ to: `/competitions/${competitionId}/leaderboard`, label: translate('leaderboard.label.viewScoreboard'), icon: ChartNoAxesCombined }] : []),
         ]),
       ],
     },

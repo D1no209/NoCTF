@@ -1,4 +1,7 @@
 {
+  "pagination.cursor.navigation": "Pagination",
+  "pagination.cursor.showing": "Showing {count} records",
+  "pagination.cursor.page": "Page {page}",
   "staffWebhook.workbench": "Staff workspace",
   "capacity.title": "Runner capacity",
   "capacity.units": "Resource amounts: CPU cores / MiB / PIDs. Usage: host CPU % / MiB / PIDs.",

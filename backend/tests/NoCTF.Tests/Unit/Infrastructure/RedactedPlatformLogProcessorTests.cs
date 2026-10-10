@@ -14,6 +14,23 @@ namespace NoCTF.Tests.Unit.Infrastructure;
 public sealed class RedactedPlatformLogProcessorTests
 {
     [Test]
+    public async Task Framework_request_failures_are_classified_as_api_in_a_combined_host()
+    {
+        var exporter = new CaptureExporter();
+        using var factory = LoggerFactory.Create(builder => builder.AddOpenTelemetry(options =>
+        {
+            options.IncludeFormattedMessage = true;
+            options.AddProcessor(new RedactedPlatformLogProcessor(
+                new PlatformLogBroadcastQueue(), PlatformLogService.Host, NewProtector()));
+            options.AddProcessor(new SimpleLogRecordExportProcessor(exporter));
+        }));
+        factory.CreateLogger("Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddleware")
+            .LogError(new EventId(1), "Unhandled request failure.");
+        var stored = JsonSerializer.Deserialize(exporter.Body!, StoredPlatformLogJsonContext.Default.StoredPlatformLog);
+        await Assert.That(stored!.View.Service).IsEqualTo(PlatformLogService.Api);
+    }
+
+    [Test]
     public async Task Multiple_collection_warning_includes_only_the_bounded_query_source()
     {
         var queue = new PlatformLogBroadcastQueue();

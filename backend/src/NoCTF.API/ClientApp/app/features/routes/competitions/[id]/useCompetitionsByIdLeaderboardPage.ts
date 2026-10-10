@@ -13,13 +13,6 @@ import { competitionChallengesPath } from '../../../../utils/app-routes'
 import ScoreboardSlotStatusComponent from '../../../leaderboard/ScoreboardSlotStatus.vue'
 import { useLeaderboardMatrixFilters } from '../../../leaderboard/useLeaderboardMatrixFilters'
 
-export const leaderboardWheelDamping = 0.55
-
-export function dampenedLeaderboardWheelDelta(event: Pick<WheelEvent, 'deltaMode' | 'deltaY'>, viewportHeight: number, lineHeight = 16): number {
-  const unit = event.deltaMode === 1 ? lineHeight : event.deltaMode === 2 ? viewportHeight : 1
-  return event.deltaY * unit * leaderboardWheelDamping
-}
-
 /** Owns state, effects and commands for CompetitionsByIdLeaderboardPage. */
 export function useCompetitionsByIdLeaderboardPage() {
   const route = useRoute()
@@ -111,24 +104,6 @@ export function useCompetitionsByIdLeaderboardPage() {
 
   function showMoreTeams(): void {
     visibleTeamCount.value += 50
-  }
-
-  function dampenLeaderboardWheel(event: WheelEvent): void {
-    if (event.ctrlKey || event.shiftKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return
-    const surface = event.currentTarget as HTMLElement | null
-    if (!surface) return
-    const viewportHeight = surface.clientHeight
-    const maximumScrollTop = surface.scrollHeight - viewportHeight
-    if (maximumScrollTop <= 0) return
-    const scrollTop = surface.scrollTop
-    const lineHeight = event.deltaMode === 1
-      ? Number.parseFloat(getComputedStyle(surface).lineHeight) || 16
-      : 16
-    const delta = dampenedLeaderboardWheelDelta(event, viewportHeight, lineHeight)
-    const next = Math.min(maximumScrollTop, Math.max(0, scrollTop + delta))
-    if (next === scrollTop) return
-    event.preventDefault()
-    surface.scrollTop = next
   }
 
   const teamDisplayNames = computed(() => buildTeamDisplayNames(teams.value))
@@ -553,7 +528,6 @@ export function useCompetitionsByIdLeaderboardPage() {
       scoreboardSlot,
       competitionId,
       competitionReturnPath,
-      dampenLeaderboardWheel,
       board,
       allTracksKey,
       selectedTrackKey,

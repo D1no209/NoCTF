@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminPlatformLogsPageViewState } from '~/features/routes/admin/platform/useAdminPlatformLogsPage'
 
 const viewProps = defineProps<{ state: AdminPlatformLogsPageViewState }>()
-const { Download, Radio, LEVEL_LABELS, SERVICE_LABELS, levelOrdinal, minimumLevel, service, search, from, to, exporting, items, loading, listError, hasMore, initialized, loadMore, applyFilters, live, hubStateBadge, exportLogs, AdminDateTime } = toRefs(viewProps.state)
+const { Download, Radio, LEVEL_LABELS, SERVICE_LABELS, levelOrdinal, minimumLevel, service, search, from, to, exporting, items, loading, listError, page, pageLimit, hasPrevious, hasNext, initialized, loadPage, setPageSize, newLogs, viewLatest, applyFilters, live, hubStateBadge, exportLogs, AdminDateTime } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -64,11 +64,14 @@ const { Download, Radio, LEVEL_LABELS, SERVICE_LABELS, levelOrdinal, minimumLeve
       </div>
     </div>
 
-    <div class="flex items-center gap-3">
+    <div class="flex flex-wrap items-center gap-3">
       <Switch id="live-stream" v-model="live" />
       <Label for="live-stream" class="inline-flex items-center gap-1">
         <Radio class="size-4" /> {{ $t('administration.platformLogs.description.receiveNewLogsReal') }} </Label>
       <Badge :variant="hubStateBadge.variant">{{ hubStateBadge.label }}</Badge>
+      <Button v-if="newLogs > 0" variant="outline" size="sm" :disabled="loading" @click="viewLatest">
+        {{ $t('administration.platformLogs.newLogs', { count: newLogs }) }}
+      </Button>
     </div>
 
     <Alert v-if="listError" variant="destructive">
@@ -124,6 +127,7 @@ const { Download, Radio, LEVEL_LABELS, SERVICE_LABELS, levelOrdinal, minimumLeve
       </Table>
     </Card>
 
-    <AdminLoadMore :loading="loading" :has-more="hasMore" @load="loadMore" />
+    <CursorPagination :page="page" :count="items.length" :limit="pageLimit" :loading="loading"
+      :has-previous="hasPrevious" :has-next="hasNext" @update:page="loadPage" @update:limit="setPageSize" />
   </div>
 </template>

@@ -2,12 +2,12 @@ import { describe, expect, test } from 'bun:test'
 import { computed, effectScope, markRaw, nextTick, reactive, ref, toRefs, watch } from 'vue'
 import { createTrailingRefresh } from '../app/lib/latest-page-refresh'
 import { adminCompetitionPath, competitionPath, isCompetitionOverviewPath } from '../app/utils/app-routes'
-import { competitionBroadcastIdentity, competitionBroadcastQueryWindow, competitionBroadcastKinds, isCompetitionBroadcastKind, mergeCompetitionBroadcasts } from '../app/utils/competition-broadcast'
+import { competitionBroadcastIdentity, competitionBroadcastQueryWindow, competitionBroadcastKinds, isCompetitionBroadcastKind, mergeCompetitionBroadcasts, previousCompetitionBroadcastWindow } from '../app/utils/competition-broadcast'
 
 async function factory(path: string, name: string, additional: Record<string, unknown>) {
   const input = await Bun.file(new URL(`../app/${path}`, import.meta.url)).text()
   const code = new Bun.Transpiler({ loader: 'ts' }).transformSync(input)
-    .replace(/^import[\s\S]*?from ["'][^"']+["'];?\s*$/gm, '').replace(/export function /g, 'function ')
+    .replace(/^import[\s\S]*?from ["'][^"']+["'];?\s*$/gm, '').replace(/export /g, '')
   const deps: Record<string, unknown> = { ref, computed, watch, markRaw, toRefs, createTrailingRefresh,
     translate: (key: string) => key, describeMessage: (key: string) => key, parseApiError: () => ({ displayMessage: 'failed' }), ...additional }
   for (const match of input.matchAll(/import (\w+) from '[^']+\.vue'/g)) deps[match[1]!] = {}
@@ -49,7 +49,7 @@ async function panel(allowed: boolean, fetcher: (request: any) => Promise<any> =
   let subscriptions = 0, unsubscribe = 0, handlers: any
   const build = await factory('features/competition/useCompetitionBroadcastPanel.ts', 'useCompetitionBroadcastPanel', {
     inject: () => ({ competition: ref(competition), canReadBroadcasts }), competitionContextKey: Symbol(),
-    competitionBroadcastIdentity, competitionBroadcastQueryWindow, competitionBroadcastKinds, isCompetitionBroadcastKind, mergeCompetitionBroadcasts,
+    competitionBroadcastIdentity, competitionBroadcastQueryWindow, competitionBroadcastKinds, isCompetitionBroadcastKind, mergeCompetitionBroadcasts, previousCompetitionBroadcastWindow,
     motionAttributes: () => ({}), listCompetitionEvents: (request: any) => { requests.push(request); return fetcher(request) },
     onMounted: (fn: () => void) => mounted.push(fn), onUnmounted: (fn: () => void) => unmounted.push(fn),
     watchCompetition: (_id: string, callbacks: unknown) => { subscriptions++; handlers = callbacks; return () => { unsubscribe++ } },
