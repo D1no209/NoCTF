@@ -5,6 +5,7 @@ import { Download, Radio } from '@lucide/vue'
 import { toast } from '../../../../utils/message-toast'
 import { adminPlatformExportLogs, adminPlatformListLogs } from '../../../../api'
 import { downloadSdkFile } from '../../../../utils/download'
+import { useCursorPagePagination } from '../../../../composables/useCursorPagePagination'
 import type { NoCtfapiEndpointsAdministrationPlatformPlatformLogResponse, NoCtfapiEndpointsAdministrationPlatformPlatformLogLevelProtocol, NoCtfapiEndpointsAdministrationPlatformPlatformLogServiceProtocol } from '../../../../api'
 import AdminDateTimeComponent from '../../../admin/AdminDateTime.vue'
 
@@ -24,8 +25,6 @@ export function useAdminPlatformLogsPage() {
 
   const levelOrdinal = (level?: string | number) => typeof level === 'number' ? level : LEVEL_ORDER.indexOf(level as typeof LEVEL_ORDER[number])
 
-  const LIVE_LIMIT = 200
-
   const minimumLevel = ref<NoCtfapiEndpointsAdministrationPlatformPlatformLogLevelProtocol>('Warning')
 
   const service = ref<'all' | NoCtfapiEndpointsAdministrationPlatformPlatformLogServiceProtocol>('all')
@@ -44,42 +43,76 @@ export function useAdminPlatformLogsPage() {
     return Number.isNaN(date.getTime()) ? null : date.toISOString()
   }
 
-  const { items, loading, error: listError, hasMore, initialized, loadMore, reset } = useCursorPagination<PlatformLog>(async (cursor) => {
+  function captureFilters() {
+    const end = toIso(to.value) ?? new Date().toISOString()
+    return {
+      minimumLevel: minimumLevel.value,
+      service: service.value === 'all' ? null : service.value,
+      from: toIso(from.value) ?? new Date(Date.parse(end) - 14 * 24 * 60 * 60 * 1000).toISOString(),
+      to: end,
+      search: search.value.trim() || null,
+    }
+  }
+  // Keep the filter set and time window stable for every signed cursor in this query.
+  let appliedFilters = captureFilters()
+  let liveFrom = toIso(from.value)
+  let liveTo = toIso(to.value)
+  const newLogs = ref(0)
+  const seenLiveCursors = new Set<string>()
+  const pagination = useCursorPagePagination<PlatformLog>(async (cursor, limit) => {
     const { data, error } = await adminPlatformListLogs({
-      query: {
-        minimumLevel: minimumLevel.value,
-        service: service.value === 'all'
-          ? null
-          : service.value as NoCtfapiEndpointsAdministrationPlatformPlatformLogServiceProtocol,
-        from: toIso(from.value),
-        to: toIso(to.value),
-        search: search.value.trim() || null,
-        cursor,
-        limit: 50,
-      },
+      query: { ...appliedFilters, cursor, limit },
     })
     if (error || !data) throw parseApiError(error)
     return { items: data.items ?? [], nextCursor: data.nextCursor ?? null }
   })
+  const { items, page, limit: pageLimit, loading, error: listError, hasPrevious, hasNext, initialized, loadPage, reset } = pagination
 
   function applyFilters(): void {
+    appliedFilters = captureFilters()
+    liveFrom = toIso(from.value)
+    liveTo = toIso(to.value)
+    newLogs.value = 0
+    seenLiveCursors.clear()
     reset({ preserveItems: true })
-    void loadMore()
+    void loadPage(1)
+  }
+
+  function setPageSize(value: number): void {
+    if (![20, 50, 100, 200].includes(value) || value === pageLimit.value) return
+    pageLimit.value = value
+    applyFilters()
+  }
+
+  function viewLatest(): void {
+    newLogs.value = 0
+    seenLiveCursors.clear()
+    if (!liveTo) appliedFilters = { ...appliedFilters, to: new Date().toISOString() }
+    if (!liveFrom) appliedFilters = { ...appliedFilters, from: new Date(Date.parse(appliedFilters.to) - 14 * 24 * 60 * 60 * 1000).toISOString() }
+    reset({ preserveItems: true })
+    void loadPage(1)
   }
 
   const live = ref(true)
 
   const { state: hubState, start, stop } = usePlatformLogHub((log) => {
-    if (!matchesLiveFilters(log)) return
+    if (!live.value || !log.cursor || !matchesLiveFilters(log)) return
     if (items.value.some(existing => existing.cursor === log.cursor)) return
-    items.value.unshift(log)
-    if (items.value.length > LIVE_LIMIT) items.value.length = LIVE_LIMIT
+    if (seenLiveCursors.has(log.cursor)) return
+    seenLiveCursors.add(log.cursor)
+    if (seenLiveCursors.size > 200) seenLiveCursors.delete(seenLiveCursors.values().next().value!)
+    // History is a snapshot. A live arrival must not evict an unread row or move a page boundary.
+    newLogs.value += 1
   })
 
   function matchesLiveFilters(log: PlatformLog): boolean {
-    if (levelOrdinal(log.level) < levelOrdinal(minimumLevel.value)) return false
-    if (service.value !== 'all' && log.service !== service.value) return false
-    const keyword = search.value.trim().toLowerCase()
+    if (levelOrdinal(log.level) < levelOrdinal(appliedFilters.minimumLevel)) return false
+    if (appliedFilters.service && log.service !== appliedFilters.service) return false
+    const timestamp = Date.parse(log.timestamp ?? '')
+    if (!Number.isFinite(timestamp)) return false
+    if (liveFrom && timestamp < Date.parse(liveFrom)) return false
+    if (liveTo && timestamp > Date.parse(liveTo)) return false
+    const keyword = (appliedFilters.search ?? '').toLowerCase()
     if (keyword) {
       const haystack = `${log.message ?? ''} ${log.category ?? ''}`.toLowerCase()
       if (!haystack.includes(keyword)) return false
@@ -138,9 +171,10 @@ export function useAdminPlatformLogsPage() {
   }
 
   onMounted(() => {
-    void loadMore()
+    void loadPage(1)
     void start()
   })
+  onUnmounted(() => reset())
 
   const AdminDateTime = markRaw(AdminDateTimeComponent)
 
@@ -159,9 +193,15 @@ export function useAdminPlatformLogsPage() {
       items,
       loading,
       listError,
-      hasMore,
+      page,
+      pageLimit,
+      hasPrevious,
+      hasNext,
       initialized,
-      loadMore,
+      loadPage,
+      setPageSize,
+      newLogs,
+      viewLatest,
       applyFilters,
       live,
       start,
