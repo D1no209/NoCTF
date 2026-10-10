@@ -34,6 +34,7 @@ public sealed class PrepareLiveSoloMediaEndpoint(ManageLiveSoloMedia media, IUse
         var result = await media.PrepareAsync(new(req.CompetitionId, req.MatchId, user.UserId, req.ExpectedMatchStamp), ct);
         return result.Session is not null && result.Failure is null ? TypedResults.Ok(LiveSoloMediaResponse.From(result.Session))
             : result.Failure == LiveSoloMediaFailure.Unauthorized ? TypedResults.Forbid()
-            : TypedResults.Conflict(new LiveSoloFailureResponse(result.Failure == LiveSoloMediaFailure.InvalidGeneration ? LiveSoloFailure.Conflict : LiveSoloFailure.MediaUnavailable));
+            : TypedResults.Conflict(new LiveSoloFailureResponse(result.Failure == LiveSoloMediaFailure.InvalidGeneration ? LiveSoloFailure.Conflict
+                : result.Failure == LiveSoloMediaFailure.Disabled ? LiveSoloFailure.Disabled : LiveSoloFailure.MediaUnavailable));
     }
 }

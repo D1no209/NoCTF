@@ -6,7 +6,7 @@ using NoCTF.Application.LiveSolo.Matches;
 namespace NoCTF.API.Endpoints.LiveSolo;
 
 public sealed class GetLiveSoloPlayerPolicyRequest { public Guid CompetitionId { get; set; } }
-public sealed record LiveSoloPlayerPolicyResponse(bool Enabled, int RequiredWins, int MaximumRosterMembers,
+public sealed record LiveSoloPlayerPolicyResponse(bool Enabled, bool PlatformStreamingEnabled, int RequiredWins, int MaximumRosterMembers,
     int PublicDelaySeconds, bool ParticipantsMayViewOpponents, bool RecordingEnabled);
 public sealed class GetLiveSoloPlayerPolicyEndpoint(ILiveSoloPlayerPolicyReader policies, IUserContext user)
     : Endpoint<GetLiveSoloPlayerPolicyRequest, Results<Ok<LiveSoloPlayerPolicyResponse>, NotFound>>
@@ -22,6 +22,6 @@ public sealed class GetLiveSoloPlayerPolicyEndpoint(ILiveSoloPlayerPolicyReader 
         HttpContext.Response.Headers.CacheControl = "private, no-store";
         var policy = await policies.ReadAsync(req.CompetitionId, user.UserId, ct);
         return policy is null ? TypedResults.NotFound() : TypedResults.Ok(new LiveSoloPlayerPolicyResponse(policy.Enabled,
-            policy.RequiredWins, policy.MaximumRosterMembers, policy.PublicDelaySeconds, policy.ParticipantsMayViewOpponents, policy.RecordingEnabled));
+            policy.PlatformStreamingEnabled, policy.RequiredWins, policy.MaximumRosterMembers, policy.PublicDelaySeconds, policy.ParticipantsMayViewOpponents, policy.RecordingEnabled));
     }
 }

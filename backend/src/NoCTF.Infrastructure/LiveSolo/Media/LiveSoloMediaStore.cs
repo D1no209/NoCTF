@@ -22,9 +22,11 @@ public sealed partial class LiveSoloMediaStore(NoCtfDbContext db, ICompetitionMo
         var names = await db.Users.Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.UserName, ct);
         return LiveSoloMediaPolicy.View(session, names) with {VideoPolicy=await LiveSoloVideoConfigurationReader.ReadAsync(db,ct)};
     }
-    private async Task<bool> AvailableAsync(Guid competitionId, CancellationToken ct) =>
-        await db.Set<LiveSoloCompetitionModeConfiguration>().AnyAsync(x => x.CompetitionId == competitionId && x.Enabled, ct)
-        && await db.Competitions.AnyAsync(x => x.Id == competitionId && (x.Status == CompetitionStatus.Running
+    private async Task<bool> AvailableAsync(LiveSoloMatch match, CancellationToken ct) =>
+        await db.Set<LiveSoloCompetitionModeConfiguration>().AnyAsync(x => x.CompetitionId == match.CompetitionId && x.Enabled
+            && (match.CurrentRoundId == null ? x.PlatformStreamingEnabled
+                : db.LiveSoloRounds.Any(r => r.Id == match.CurrentRoundId && r.MatchId == match.Id && r.PlatformStreamingEnabled)), ct)
+        && await db.Competitions.AnyAsync(x => x.Id == match.CompetitionId && (x.Status == CompetitionStatus.Running
             || x.Status == CompetitionStatus.Paused || x.Status == CompetitionStatus.Published || x.Status == CompetitionStatus.Visible), ct);
 
     private async Task<bool> RosterEligibleAsync(LiveSoloMatch match, CancellationToken ct)
@@ -59,7 +61,7 @@ public sealed partial class LiveSoloMediaStore(NoCtfDbContext db, ICompetitionMo
     {
         var match = await db.LiveSoloMatches.AsNoTracking().Include(x => x.Slots).Include(x => x.Roster)
             .SingleOrDefaultAsync(x => x.Id == matchId && x.CompetitionId == competitionId, ct);
-        if (match is null || !await EligibleAsync(match, actorId, false, ct) && !await EligibleAsync(match, actorId, true, ct)) return null;
+        if (match is null || !await AvailableAsync(match, ct) || !await EligibleAsync(match, actorId, false, ct) && !await EligibleAsync(match, actorId, true, ct)) return null;
         var session = await db.LiveSoloMediaSessions.AsNoTracking().Include(x => x.Participants)
             .SingleOrDefaultAsync(x => x.Id == match.CurrentMediaSessionId, ct);
         return session is null ? null : await ViewAsync(session, ct);
@@ -73,6 +75,7 @@ public sealed partial class LiveSoloMediaStore(NoCtfDbContext db, ICompetitionMo
         if (candidate is null || !await EligibleAsync(candidate, command.ActorId, false, ct)
             && (!await EligibleAsync(candidate, command.ActorId, true, ct) || !await authorizer.CanJudgeAsync(command.ActorId, command.CompetitionId, ct)))
             return new(null, Failure: LiveSoloMediaFailure.Unauthorized);
+        if (!await AvailableAsync(candidate, ct)) return new(null, Failure: LiveSoloMediaFailure.Disabled);
         var readiness = await gateway.CheckAsync(ct);
         if (!readiness.Configured) return new(null, Failure: LiveSoloMediaFailure.Unconfigured);
         if (!readiness.Available) return new(null, Failure: LiveSoloMediaFailure.Unavailable);
@@ -87,7 +90,7 @@ public sealed partial class LiveSoloMediaStore(NoCtfDbContext db, ICompetitionMo
             if (match.ConcurrencyStamp != command.ExpectedMatchStamp || !LiveSoloMediaPolicy.MayPrepare(match))
                 return new(null, Failure: LiveSoloMediaFailure.InvalidGeneration);
             var config = await db.Set<LiveSoloCompetitionModeConfiguration>().AsNoTracking().SingleAsync(x => x.CompetitionId == command.CompetitionId, ct);
-            if (!await AvailableAsync(command.CompetitionId, ct) || !await RosterEligibleAsync(match, ct))
+            if (!await AvailableAsync(match, ct) || !await RosterEligibleAsync(match, ct))
                 return new(null, Failure: LiveSoloMediaFailure.Unauthorized);
             var current = match.CurrentMediaSessionId is Guid id ? await db.LiveSoloMediaSessions.Include(x => x.Participants).SingleAsync(x => x.Id == id, ct) : null;
             if (current is { State: LiveSoloMediaState.Ready }) return new(await ViewAsync(current, ct));
@@ -124,7 +127,7 @@ public sealed partial class LiveSoloMediaStore(NoCtfDbContext db, ICompetitionMo
             var match = await db.LiveSoloMatches.Include(x => x.Slots).Include(x => x.Roster).SingleOrDefaultAsync(
                 x => x.Id == command.MatchId && x.CompetitionId == command.CompetitionId, ct);
             if (match is null || !LiveSoloMediaPolicy.Active(match.State)
-                || !await AvailableAsync(command.CompetitionId, ct) || !await RosterEligibleAsync(match, ct)
+                || !await AvailableAsync(match, ct) || !await RosterEligibleAsync(match, ct)
                 || !await EligibleAsync(match, command.ActorId, command.Role != LiveSoloMediaRole.Publisher, ct)
                 || command.Role == LiveSoloMediaRole.Director && !await authorizer.CanModerateAsync(command.ActorId, command.CompetitionId, ct))
                 return new(null, Failure: LiveSoloMediaFailure.Unauthorized);
@@ -161,7 +164,7 @@ public sealed partial class LiveSoloMediaStore(NoCtfDbContext db, ICompetitionMo
         if (!stillCurrent || !await db.LiveSoloMediaSessions.AsNoTracking().AnyAsync(x => x.Id == session.Id && x.State == LiveSoloMediaState.Ready, ct))
             return new(null, Failure: LiveSoloMediaFailure.InvalidGeneration);
         var latestMatch = await db.LiveSoloMatches.AsNoTracking().Include(x => x.Slots).Include(x => x.Roster).SingleAsync(x => x.Id == command.MatchId, ct);
-        if (!LiveSoloMediaPolicy.Active(latestMatch.State) || !await AvailableAsync(command.CompetitionId, ct)
+        if (!LiveSoloMediaPolicy.Active(latestMatch.State) || !await AvailableAsync(latestMatch, ct)
             || !await RosterEligibleAsync(latestMatch, ct) || !await EligibleAsync(latestMatch, command.ActorId, command.Role != LiveSoloMediaRole.Publisher, ct)
             || command.Role == LiveSoloMediaRole.Director && !await authorizer.CanModerateAsync(command.ActorId, command.CompetitionId, ct)
             || await authentication.ValidateContextAsync(command.ActorId, command.TokenVersion, command.Authentication, ct) is not null)

@@ -257,7 +257,7 @@ public sealed class LiveSoloEndpointTests
         var now = DateTimeOffset.UtcNow; var stamp = Guid.NewGuid();
         decisions.ApplyAsync(Arg.Any<AdjudicateLiveSoloMatch>(), Arg.Any<CancellationToken>()).Returns(new LiveSoloAdjudicationResult(
             new(match, competition, LiveSoloMatchState.Paused, stamp, 2, 0, 0, Guid.NewGuid(), "left", Guid.NewGuid(), "right", round, null, []),
-            new(round, match, 1, 0, LiveSoloRoundState.Running, stamp, 3, null, now, 900, 5000, true, null, null),
+            new(round, match, 1, 0, LiveSoloRoundState.Running, stamp, 3, null, now, 900, 5000, true, null, null, true),
             new(Guid.NewGuid(), match, round, Actor, null, LiveSoloJudgeAction.Pause, "裁判暂停", now, LiveSoloMatchState.Running,
                 LiveSoloMatchState.Paused, LiveSoloRoundState.Running, LiveSoloRoundState.Running, 0, 0, 0, 0, 2, 3)));
         decisions.ReadAsync(competition, match, Actor, Arg.Any<CancellationToken>()).Returns((IReadOnlyList<LiveSoloAdjudicationView>?)null);
@@ -373,14 +373,15 @@ public sealed class LiveSoloEndpointTests
     public async Task Participant_policy_is_authenticated_minimal_and_uses_only_the_principal_actor()
     {
         var policies = Substitute.For<ILiveSoloPlayerPolicyReader>(); var competition = Guid.NewGuid();
-        policies.ReadAsync(competition, Actor, Arg.Any<CancellationToken>()).Returns(new LiveSoloPlayerPolicy(true, 2, 2, 60, false, false));
+        policies.ReadAsync(competition, Actor, Arg.Any<CancellationToken>()).Returns(new LiveSoloPlayerPolicy(true, true, 2, 2, 60, false, false));
         await using var app = await HostAsync(Substitute.For<ILiveSoloMatchStore>(), Substitute.For<ILiveSoloAttachmentStore>(), Substitute.For<IStore>(), policies: policies);
         using var client = app.GetTestClient(); var path = $"/api/v1/competitions/{competition}/live-solo/player-policy";
         using var anonymous = await client.GetAsync(path); await Assert.That(anonymous.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
         client.DefaultRequestHeaders.Authorization = new("Bearer", "verified-test");
         using var allowed = await client.GetAsync(path + "?actorId=" + Guid.NewGuid()); await Assert.That(allowed.StatusCode).IsEqualTo(HttpStatusCode.OK);
         using var body = JsonDocument.Parse(await allowed.Content.ReadAsStringAsync());
-        await Assert.That(body.RootElement.EnumerateObject().Count()).IsEqualTo(6);
+        await Assert.That(body.RootElement.EnumerateObject().Count()).IsEqualTo(7);
+        await Assert.That(body.RootElement.GetProperty("platformStreamingEnabled").GetBoolean()).IsTrue();
         await Assert.That(body.RootElement.TryGetProperty("stageRules", out _)).IsFalse();
         await policies.Received(1).ReadAsync(competition, Actor, Arg.Any<CancellationToken>());
     }

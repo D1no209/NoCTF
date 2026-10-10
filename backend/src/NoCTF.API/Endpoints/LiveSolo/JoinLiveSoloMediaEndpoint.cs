@@ -43,6 +43,7 @@ public sealed class JoinLiveSoloMediaEndpoint(ManageLiveSoloMedia media, IUserCo
         return result.Session is not null && result.Token is not null && result.Failure is null
             ? TypedResults.Ok(new JoinLiveSoloMediaResponse(LiveSoloMediaResponse.From(result.Session), result.Token.ServerUrl, result.Token.Token, result.Token.ExpiresAt))
             : result.Failure == LiveSoloMediaFailure.Unauthorized ? TypedResults.Forbid()
-            : TypedResults.Conflict(new LiveSoloFailureResponse(result.Failure == LiveSoloMediaFailure.InvalidGeneration ? LiveSoloFailure.Conflict : LiveSoloFailure.MediaUnavailable));
+            : TypedResults.Conflict(new LiveSoloFailureResponse(result.Failure == LiveSoloMediaFailure.InvalidGeneration ? LiveSoloFailure.Conflict
+                : result.Failure == LiveSoloMediaFailure.Disabled ? LiveSoloFailure.Disabled : LiveSoloFailure.MediaUnavailable));
     }
 }

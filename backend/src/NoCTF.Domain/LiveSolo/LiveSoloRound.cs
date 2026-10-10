@@ -9,6 +9,7 @@ public enum LiveSoloPauseSource : short { Match, Competition, ResultCorrection }
 
 public sealed class LiveSoloRound : IConcurrencyTracked
 {
+    public bool PlatformStreamingEnabled { get; set; } = true;
     public Guid Id { get; set; }
     public Guid MatchId { get; set; }
     public Guid ConcurrencyStamp { get; set; } = Guid.NewGuid();

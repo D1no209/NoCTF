@@ -11,12 +11,12 @@ namespace NoCTF.API.Endpoints.LiveSolo;
 public sealed record LiveSoloRoundResponse(Guid Id, Guid MatchId, int Number, int Replay,
     [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<LiveSoloRoundState>))] LiveSoloRoundState State,
     Guid ConcurrencyStamp, long TimelineRevision, DateTimeOffset? CountdownAt, DateTimeOffset? StartedAt,
-    int LimitSeconds, long ActiveElapsedMilliseconds, bool Paused, Guid? WinnerTeamId, Guid? WinningGameplayFactId);
+    int LimitSeconds, long ActiveElapsedMilliseconds, bool Paused, Guid? WinnerTeamId, Guid? WinningGameplayFactId, bool PlatformStreamingEnabled);
 internal static class LiveSoloRoundProtocol
 {
     public static LiveSoloRoundResponse Round(LiveSoloRoundView value) => new(value.Id, value.MatchId, value.Number, value.Replay, value.State,
         value.ConcurrencyStamp, value.TimelineRevision, value.CountdownAt, value.StartedAt, value.LimitSeconds,
-        value.ActiveElapsedMilliseconds, value.Paused, value.WinnerTeamId, value.WinningGameplayFactId);
+        value.ActiveElapsedMilliseconds, value.Paused, value.WinnerTeamId, value.WinningGameplayFactId, value.PlatformStreamingEnabled);
 }
 public sealed class GetLiveSoloRoundRequest
 {

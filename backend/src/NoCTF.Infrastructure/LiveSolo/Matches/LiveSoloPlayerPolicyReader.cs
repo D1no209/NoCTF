@@ -21,7 +21,7 @@ public sealed class LiveSoloPlayerPolicyReader(NoCtfDbContext db, ICompetitionMo
                 || !await db.Teams.AnyAsync(x => x.CompetitionId == competitionId && x.RegistrationStatus == TeamRegistrationStatus.Approved
                     && !x.IsBanned && x.Members.Any(m => m.UserId == actorId), ct))) return null;
         return await db.Set<LiveSoloCompetitionModeConfiguration>().AsNoTracking().Where(x => x.CompetitionId == competitionId)
-            .Select(x => new LiveSoloPlayerPolicy(x.Enabled, x.RequiredWins, x.MaximumRosterMembers, x.PublicDelaySeconds,
+            .Select(x => new LiveSoloPlayerPolicy(x.Enabled, x.PlatformStreamingEnabled, x.RequiredWins, x.MaximumRosterMembers, x.PublicDelaySeconds,
                 x.ParticipantsMayViewOpponents, x.RecordingEnabled)).SingleOrDefaultAsync(ct);
     }
 }
