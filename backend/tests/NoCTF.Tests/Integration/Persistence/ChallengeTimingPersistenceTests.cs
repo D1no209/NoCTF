@@ -59,7 +59,9 @@ namespace NoCTF.Tests.Integration.Persistence;
 public sealed class ChallengeTimingPersistenceTests
 {
     [Test, Timeout(300_000)]
-    public Task A_cached_payload_without_timing_metadata_is_invalidated_and_rebuilt(CancellationToken ct) => DockerIntegrationTest.RunAsync(async () =>
+    [Arguments(false)]
+    [Arguments(true)]
+    public Task A_cached_payload_without_timing_metadata_is_invalidated_and_rebuilt(bool explicitNull, CancellationToken ct) => DockerIntegrationTest.RunAsync(async () =>
     {
         await using var f = await Fixture.CreateAsync(ct);
         using var services = new ServiceCollection().AddFusionCache(NoCtfCacheNames.Leaderboards).Services.BuildServiceProvider();
@@ -68,7 +70,8 @@ public sealed class ChallengeTimingPersistenceTests
             Substitute.For<ILeaderboardRefreshPublisher>(), provider);
         var projection = await cache.CreateScoreboardAsync(f.Competition.Id, f.Now, ct);
         var json = System.Text.Json.Nodes.JsonNode.Parse(JsonSerializer.Serialize(new CachedScoreboardProjection(projection!), CachedScoreboardJsonContext.Default.CachedScoreboardProjection))!.AsObject();
-        json.Remove("timingRevisions");
+        if (explicitNull) json["timingRevisions"] = null;
+        else json.Remove("timingRevisions");
         var incomplete = JsonSerializer.Deserialize(json.ToJsonString(), CachedScoreboardJsonContext.Default.CachedScoreboardProjection)!;
         await provider.GetCache(NoCtfCacheNames.Leaderboards).SetAsync($"scoreboard:v3:{f.Competition.Id:N}", incomplete, token: ct);
         var current = await cache.GetScoreboardAsync(f.Competition.Id, ct);

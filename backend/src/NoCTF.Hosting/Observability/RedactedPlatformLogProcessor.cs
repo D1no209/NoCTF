@@ -66,6 +66,7 @@ public sealed class RedactedPlatformLogProcessor(
         // details. Preserve the type for diagnostics without exporting that payload.
         string? exceptionMessage = null;
         var service = category.StartsWith("NoCTF.API", StringComparison.Ordinal)
+            || category == "Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddleware"
             ? PlatformLogService.Api
             : category.StartsWith("NoCTF.Worker", StringComparison.Ordinal)
                 ? PlatformLogService.Worker
