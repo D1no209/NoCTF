@@ -55,6 +55,9 @@ the full rules. Update the user manual when a change affects a user or operator 
 
 ## Validate your change
 
+NuGet audit remains enabled. Review the version-scoped exceptions and image-processing
+boundaries in [backend/DEPENDENCY_AUDIT.md](backend/DEPENDENCY_AUDIT.md) when changing dependencies.
+
 Run backend checks from `backend`:
 
 ```sh
