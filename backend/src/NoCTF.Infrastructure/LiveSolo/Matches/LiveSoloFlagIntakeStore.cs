@@ -100,7 +100,8 @@ public sealed partial class LiveSoloMatchStore
             .Join(db.Challenges.AsNoTracking(), x => x.ChallengeId, x => x.Id, (entry, template) => new { Entry = entry, Template = template }).ToDictionaryAsync(x => x.Entry.Id, ct);
         var questionIds = questions.Select(x => x.Id).ToArray();
         var runtimes = await db.RuntimeInstances.AsNoTracking().Where(x => x.TeamId == teamId && x.ExecutionScopeId != null
-            && questionIds.Contains(x.ExecutionScopeId.Value)).OrderByDescending(x => x.CreatedAt).ThenByDescending(x => x.Id)
+            && questionIds.Contains(x.ExecutionScopeId.Value)).OrderByDescending(x => x.ActiveSlot != null)
+            .ThenByDescending(x => x.CreatedAt).ThenByDescending(x => x.Id)
             .Select(x => new { x.ExecutionScopeId, x.Id }).ToArrayAsync(ct);
         var current = runtimes.GroupBy(x => x.ExecutionScopeId!.Value).ToDictionary(x => x.Key, x => (Guid?)x.First().Id);
         return questions.Select(x => new LiveSoloQuestionView(x.Id, x.CompetitionChallengeId, x.Position,

@@ -41,6 +41,8 @@ public sealed class LiveSoloRuntimeControlPersistenceTests
             await Assert.That(await retryDb.RuntimeInstances.CountAsync(ct)).IsEqualTo(2);
             await Assert.That((await retryDb.RuntimeInstances.SingleAsync(x => x.Id == original.Id, ct)).State).IsEqualTo(RuntimeState.Stopping);
             await Assert.That(await retryDb.RuntimeInstances.CountAsync(x => x.ActiveSlot != null, ct)).IsEqualTo(1);
+            await Assert.That((await retryDb.RuntimeInstances.SingleAsync(x => x.Id == replaced.Runtime.Id, ct)).CreatedAt).IsEqualTo(original.CreatedAt);
+            await Assert.That((await Store(fixture, retryDb, Guid.NewGuid()).ReadAsync(request, ct))!.Id).IsEqualTo(replaced.Runtime.Id);
             var questions = await fixture.Store(retryDb).QuestionsAsync(fixture.Competition.Id, fixture.Match.Id, fixture.Round.Id, fixture.Left.Id, fixture.Now, ct);
             await Assert.That(questions!.Single().RuntimeInstanceId).IsEqualTo(replaced.Runtime.Id);
             await using var foreign = new NoCtfDbContext(fixture.Options);

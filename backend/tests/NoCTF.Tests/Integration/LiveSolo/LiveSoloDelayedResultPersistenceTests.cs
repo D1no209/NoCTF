@@ -52,7 +52,7 @@ public sealed class LiveSoloDelayedResultPersistenceTests
             (await f.Db.LiveSoloMediaSessions.SingleAsync(ct)).PublicDelaySeconds=60;
             var match=await f.Db.LiveSoloMatches.SingleAsync(ct);match.State=LiveSoloMatchState.Completed;match.LeftWins=1;match.WinnerTeamId=f.LeftTeam.Id;await f.Db.SaveChangesAsync(ct);
             async Task Snapshot(){await using var db=new NoCTF.Infrastructure.Persistence.NoCtfDbContext(f.Options);await Store(db,f).SnapshotResultAsync(match.Id,ct);}
-            await Task.WhenAll(Snapshot(),Snapshot());
+            await Task.WhenAll(Snapshot(), Snapshot(), Snapshot(), Snapshot());
             await Assert.That(await f.Db.LiveSoloProgramFrames.CountAsync(x=>x.Kind==LiveSoloProgramFrameKind.DelayedResult,ct)).IsEqualTo(1);
             f.Now=f.Now.AddSeconds(70);match.LeftWins=0;match.RightWins=1;match.WinnerTeamId=f.RightTeam.Id;await f.Db.SaveChangesAsync(ct);
             await Snapshot();var rows=await f.Db.LiveSoloProgramFrames.Where(x=>x.Kind==LiveSoloProgramFrameKind.DelayedResult).OrderBy(x=>x.OccurredAt).ToArrayAsync(ct);

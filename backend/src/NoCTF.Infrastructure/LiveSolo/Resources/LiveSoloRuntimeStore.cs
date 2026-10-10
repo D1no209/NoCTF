@@ -34,7 +34,7 @@ public sealed class LiveSoloRuntimeStore(NoCtfDbContext db, IExecutionScopeAcces
         var runtime = await db.RuntimeInstances.AsNoTracking().Include(x => x.AccessEndpoints)
             .Where(x => x.ExecutionScopeId == request.QuestionId && x.CompetitionId == request.CompetitionId
                 && x.CompetitionChallengeId == scope.CompetitionChallengeId && x.TeamId == scope.TeamId && (id == null || x.Id == id))
-            .OrderByDescending(x => x.CreatedAt).ThenByDescending(x => x.Id).FirstOrDefaultAsync(ct);
+            .OrderByDescending(x => x.ActiveSlot != null).ThenByDescending(x => x.CreatedAt).ThenByDescending(x => x.Id).FirstOrDefaultAsync(ct);
         if (runtime is null) return null;
         var expose = runtime.State == RuntimeState.Running && (await isolation.AssessAsync(new(runtime.RuntimeKind, runtime.RuntimeProvider,
             request.QuestionId, scope.TeamId, runtime.Id), ct)).Status == ExecutionIsolationStatus.Verified;
