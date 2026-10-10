@@ -51,7 +51,7 @@ public sealed partial class LiveSoloMatchStore
         var fact = new FlagAttemptGameplayFact { Id = Guid.CreateVersion7(admittedAt), CompetitionId = command.CompetitionId,
             CompetitionChallengeId = question.CompetitionChallengeId, TeamId = teamId, ActorUserId = command.ActorId,
             State = GameplayFactState.Queued, Value = command.Flag, ValueSha256 = ManageChallengeFlags.Hash(command.Flag), OccurredAt = admittedAt, UpdatedAt = admittedAt,
-            AcquisitionEvidence = await CaptureEvidenceAsync(question, teamId, admittedAt, ct) };
+            AcquisitionEvidence = await CaptureEvidenceAsync(question, round.StaticFlagEvidenceRequired, teamId, admittedAt, ct) };
         var sequence = checked(round.LastAdmissionSequence + 1); round.LastAdmissionSequence = sequence;
         db.GameplayFacts.Add(fact); db.LiveSoloSubmissions.Add(new() { GameplayFactId = fact.Id, RoundId = round.Id,
             RoundQuestionId = question.Id, AdmissionSequence = sequence });
@@ -60,8 +60,9 @@ public sealed partial class LiveSoloMatchStore
         await db.SaveChangesAsync(ct); return new(fact.Id, sequence, admittedAt);
     }, () => new(null, null, null, LiveSoloFailure.Conflict), ct);
 
-    private async Task<FlagAcquisitionEvidence> CaptureEvidenceAsync(LiveSoloRoundQuestion question, Guid teamId, DateTimeOffset at, CancellationToken ct)
+    private async Task<FlagAcquisitionEvidence> CaptureEvidenceAsync(LiveSoloRoundQuestion question, bool required, Guid teamId, DateTimeOffset at, CancellationToken ct)
     {
+        if (!required) return new FlagAcquisitionEvidence { CapturedAt = at, Source = FlagAcquisitionEvidenceSource.Recorded };
         var templateId = await db.CompetitionChallenges.Where(x => x.Id == question.CompetitionChallengeId).Select(x => x.ChallengeId).SingleAsync(ct);
         var definition = await db.Set<LiveSoloChallengeDefinition>().Include(x => x.Runtime).SingleAsync(x => x.ChallengeId == templateId, ct);
         var evidence = new FlagAcquisitionEvidence { CapturedAt = at, Source = FlagAcquisitionEvidenceSource.Recorded };

@@ -27,6 +27,8 @@ public sealed class LiveSoloAttachmentPersistenceTests
         await DockerIntegrationTest.RunAsync(async () =>
         {
             await using var fixture = await LiveSoloMatchPersistenceTests.Fixture.CreateAsync(ct);
+            ((NoCTF.Domain.LiveSolo.LiveSoloCompetitionModeConfiguration)fixture.Competition.ModeConfiguration!).StaticFlagEvidenceRequired = true;
+            await fixture.Db.SaveChangesAsync(ct);
             var attachment = Attachment(fixture.Templates[0].Id, fixture.Now, "ordinary", "attachment.bin");
             fixture.Db.Add(attachment); await fixture.Db.SaveChangesAsync(ct);
             await fixture.PrepareAsync(ct);

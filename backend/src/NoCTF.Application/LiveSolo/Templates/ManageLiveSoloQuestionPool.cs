@@ -15,6 +15,7 @@ public sealed record LiveSoloPoolQuestion(Guid Id, Guid ChallengeId, string Titl
     Guid ConcurrencyStamp, Guid MaterialStamp, LiveSoloMaterialOwnership Ownership, Guid? SourceTemplateId,
     LiveSoloChallengeDefinition Definition, IReadOnlyList<Guid> QuestionGroupIds)
 {
+    public bool CanEditContent { get; init; } = true;
     public IReadOnlyList<ChallengeAttachmentView> Attachments { get; init; } = [];
     public IReadOnlyList<ChallengeFlagView> Flags { get; init; } = [];
 }

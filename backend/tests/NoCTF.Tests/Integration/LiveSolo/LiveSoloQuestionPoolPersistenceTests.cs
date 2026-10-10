@@ -237,6 +237,25 @@ public sealed class LiveSoloQuestionPoolPersistenceTests
         });
     }
 
+    [Test, Timeout(300_000)]
+    public async Task Shared_template_deployment_does_not_expose_protected_source_flags_to_a_competition_manager(CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var f = await LiveSoloMatchPersistenceTests.Fixture.CreateAsync(ct, false);
+            var sourceOwner = new User { Id = Guid.NewGuid(), UserName = "pool-source-owner", NormalizedUserName = "POOL-SOURCE-OWNER", Email = "pool-source@example.test", PasswordHash = "unused", Role = UserRole.Organizer, AccountStatus = UserAccountStatus.Active, CreatedAt = f.Now };
+            f.Db.Add(sourceOwner); f.Templates[0].OwnerId = sourceOwner.Id; f.Templates[0].Visibility = ChallengeVisibility.Shared; await f.Db.SaveChangesAsync(ct);
+            var pool = Pool(f.Db); var source = f.Templates[0];
+            var deployed = await pool.DeployAsync(new(f.Competition.Id, f.Owner.Id, source.Id, source.ConcurrencyStamp, f.Now), ct);
+            await Assert.That(deployed.Failure).IsNull(); await Assert.That(deployed.Question!.Flags.Count).IsEqualTo(0);
+            await Assert.That(deployed.Question.CanEditContent).IsFalse();
+            var listed = (await pool.ListAsync(f.Competition.Id, f.Owner.Id, ct))!.Single(x => x.Id == deployed.Question.Id);
+            await Assert.That(listed.Flags.Count).IsEqualTo(0);
+            await Assert.That((await pool.EditAsync(new(f.Competition.Id, listed.Id, f.Owner.Id, listed.ConcurrencyStamp, listed.MaterialStamp,
+                listed.Title, "protected copy", listed.Direction, new(), f.Now), ct)).Failure).IsEqualTo(LiveSoloPoolFailure.ProtectedMaterialsForbidden);
+        });
+    }
+
     private sealed class FailCommit : DbTransactionInterceptor
     {
         public bool Armed { get; set; }

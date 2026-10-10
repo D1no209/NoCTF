@@ -50,7 +50,9 @@ public sealed class UploadLiveSoloPoolAttachmentsEndpoint(UploadLiveSoloPoolAtta
             {
                 null when result.Question is not null => TypedResults.Ok(LiveSoloPoolProtocol.Question(result.Question)),
                 LiveSoloPoolFailure.NotFound => TypedResults.NotFound(),
-                LiveSoloPoolFailure.Forbidden or LiveSoloPoolFailure.ProtectedMaterialsForbidden => TypedResults.Forbid(),
+                LiveSoloPoolFailure.Forbidden => TypedResults.Forbid(),
+                LiveSoloPoolFailure.ProtectedMaterialsForbidden => ApiProblems.Problem(statusCode: StatusCodes.Status403Forbidden,
+                    detail: ApiMessages.For(LiveSoloPoolFailure.ProtectedMaterialsForbidden), extensions: new Dictionary<string, object?> { ["code"] = LiveSoloPoolFailure.ProtectedMaterialsForbidden.ToString() }),
                 LiveSoloPoolFailure.Conflict or LiveSoloPoolFailure.SourceChanged or LiveSoloPoolFailure.ActiveRound => TypedResults.Conflict(new LiveSoloPoolFailureResponse(result.Failure.Value)),
                 _ => TypedResults.UnprocessableEntity(new LiveSoloPoolFailureResponse(result.Failure ?? LiveSoloPoolFailure.InvalidContent))
             };

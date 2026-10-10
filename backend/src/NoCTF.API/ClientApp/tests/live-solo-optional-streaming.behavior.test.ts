@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
 import { computed, effectScope, markRaw, ref, shallowRef, watch } from 'vue'
 import { settingsDraft, settingFields, validSettings } from '../app/features/live-solo/settings-draft'
-import { message } from '../app/utils/i18n'
+import { message, translate } from '../app/utils/i18n'
 import { canJudgeLiveSolo, canLockLiveSoloRoster, canPlayLiveSolo, formatRoundClock, matchStateKey, roundRemainingSeconds } from '../app/features/live-solo/live-solo-state'
 import { canManageLiveSolo } from '../app/features/live-solo/settings-draft'
 
@@ -9,8 +9,10 @@ const source = await Bun.file(new URL('../app/features/live-solo/useLiveSoloMatc
 const compiled = new Bun.Transpiler({ loader: 'ts' }).transformSync(source)
   .replace(/^import[\s\S]*?from ["'][^"']+["'];?\s*$/gm, '').replace(/export function /g, 'function ')
 
-function fixture(policy: boolean, prepared?: boolean) {
-  let mediaReads = 0, mediaPreparations = 0, disconnected = 0
+function fixture(policy: boolean, prepared?: boolean, captainId = 'player') {
+  let mediaReads = 0, mediaPreparations = 0, disconnected = 0, readyCalls = 0
+  const preparationWrites: any[] = []
+  const candidates: any[] = [{ id: 'question-list', name: 'Synthetic list', available: true, concurrencyStamp: 'group-stamp', selectionRevision: 'selection-stamp', risks: [] }]
   const config = { platformStreamingEnabled: policy }
   const round = { id: 'round', state: 'Preparing', platformStreamingEnabled: prepared }
   const match = { id: 'match', state: 'Preparing', concurrencyStamp: 'match-stamp', currentRoundId: prepared === undefined ? null : 'round',
@@ -18,15 +20,18 @@ function fixture(policy: boolean, prepared?: boolean) {
   const screen = { connected: ref(false), connecting: ref(false), publishing: ref(false), capturePending: ref(false),
     error: ref(null), localStream: ref(null), remoteStreams: ref(new Map()),
     disconnect: async () => { disconnected++ } }
-  const deps = { computed, markRaw, ref, shallowRef, watch, message, canJudgeLiveSolo, canLockLiveSoloRoster,
+  const deps = { translate, computed, markRaw, ref, shallowRef, watch, message, canJudgeLiveSolo, canLockLiveSoloRoster,
     canPlayLiveSolo, formatRoundClock, matchStateKey, roundRemainingSeconds, canManageLiveSolo,
-    competitionContextKey: Symbol(), inject: () => ({ competition: ref({ administrationRole: 'Owner' }) }),
+    competitionContextKey: Symbol(), inject: () => ({ competition: ref({ administrationRole: 'Owner', status: 'Running' }) }),
     useRoute: () => ({ params: { id: 'contest', matchId: 'match' } }), useRouter: () => ({ push: async () => {} }),
     useAuth: () => ({ user: ref({ userId: 'player', userName: 'Synthetic player' }) }),
     useLiveSoloHub: () => {}, onMounted: () => {}, onBeforeRouteLeave: () => {}, onScopeDispose: () => {},
     useLiveSoloScreen: () => screen, parseLiveSoloError: () => ({ displayMessage: message('liveSolo.error.load') }),
     getLiveSoloMatch: async () => ({ data: match }), getLiveSoloPlayerPolicy: async () => ({ data: config }),
-    getMyTeamEndpoint: async () => ({ data: { id: 'left', captainId: 'player', memberIds: ['player'] } }),
+    getMyTeamEndpoint: async () => ({ data: { id: 'left', captainId, memberIds: ['player'] } }),
+    listLiveSoloQuestionGroupCandidates: async () => ({ data: { items: candidates } }),
+    prepareLiveSoloRound: async (options: any) => { preparationWrites.push(options.body); return {} },
+    confirmLiveSoloReady: async () => { readyCalls++; return {} },
     getLiveSoloRound: async () => ({ data: { ...round } }), userProfileGet: async () => ({ data: null }),
     getLiveSoloMedia: async () => { mediaReads++; return { data: { state: 'Ready', generation: 'generation', members: [] } } },
     prepareLiveSoloMedia: async () => { mediaPreparations++; return {} },
@@ -35,7 +40,7 @@ function fixture(policy: boolean, prepared?: boolean) {
   const factory = new Function('deps', `const { ${Object.keys(deps).join(',')} } = deps; ${compiled}; return useLiveSoloMatch;`)(deps)
   const scope = effectScope(), state = scope.run(() => factory())!
   return { state, config, round, match, mediaReads: () => mediaReads, mediaPreparations: () => mediaPreparations,
-    disconnected: () => disconnected, stop: () => scope.stop() }
+    candidates, preparationWrites, readyCalls: () => readyCalls, disconnected: () => disconnected, stop: () => scope.stop() }
 }
 
 test('non-streaming preparation skips media APIs and cannot prepare a room', async () => {
@@ -47,6 +52,22 @@ test('non-streaming preparation skips media APIs and cannot prepare a room', asy
     expect(f.state.media.value).toBeNull()
     expect(f.mediaReads()).toBe(0); expect(f.mediaPreparations()).toBe(0)
   } finally { f.stop() }
+})
+
+test('staff-selected lists submit both concurrency and selection revisions without silently choosing another list', async () => {
+  const f = fixture(false)
+  try {
+    await f.state.load(); f.state.chooseGroup('question-list'); await f.state.prepareRound()
+    expect(f.preparationWrites[0]).toMatchObject({ questionGroupId: 'question-list', expectedGroupStamp: 'group-stamp', selectionRevision: 'selection-stamp' })
+    f.candidates.splice(0); await f.state.load()
+    expect(f.state.groupChoice.value).toBe('question-list')
+  } finally { f.stop() }
+})
+
+test('a locked roster member can confirm readiness without being the captain', async () => {
+  const f = fixture(false, false, 'another-captain')
+  try { await f.state.load(); expect(f.state.captain.value).toBe(false); expect(f.state.onRoster.value).toBe(true); await f.state.ready(); expect(f.readyCalls()).toBe(1) }
+  finally { f.stop() }
 })
 
 test('prepared round policy wins over subsequent competition changes in both directions', async () => {
@@ -90,7 +111,7 @@ test('settings save both switch directions and reset previous save feedback', as
   const writes: boolean[] = []
   const deps = { ref, computed, effectScope, message, settingsDraft, settingFields, validSettings, canManageLiveSolo,
     useRoute: () => ({ params: { id: 'contest' } }), useRouter: () => ({ push: async () => {} }),
-    competitionContextKey: Symbol(), inject: () => ({ competition: ref({ administrationRole: 'Owner' }), refresh: async () => {} }),
+    competitionContextKey: Symbol(), inject: () => ({ competition: ref({ administrationRole: 'Owner', status: 'Running' }), refresh: async () => {} }),
     onMounted: () => {}, onScopeDispose: () => {}, onBeforeRouteLeave: () => {},
     parseLiveSoloError: () => ({ displayMessage: message('liveSolo.error.load') }),
     getLiveSoloConfiguration: async () => ({ data: configuration }), getLiveSoloBracket: async () => ({ data: { matches: [] } }),

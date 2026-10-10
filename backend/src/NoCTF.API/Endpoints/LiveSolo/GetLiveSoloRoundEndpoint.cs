@@ -11,12 +11,16 @@ namespace NoCTF.API.Endpoints.LiveSolo;
 public sealed record LiveSoloRoundResponse(Guid Id, Guid MatchId, int Number, int Replay,
     [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<LiveSoloRoundState>))] LiveSoloRoundState State,
     Guid ConcurrencyStamp, long TimelineRevision, DateTimeOffset? CountdownAt, DateTimeOffset? StartedAt,
-    int LimitSeconds, long ActiveElapsedMilliseconds, bool Paused, Guid? WinnerTeamId, Guid? WinningGameplayFactId, bool PlatformStreamingEnabled);
+    int LimitSeconds, long ActiveElapsedMilliseconds, bool Paused, Guid? WinnerTeamId, Guid? WinningGameplayFactId, bool PlatformStreamingEnabled,
+    [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<LiveSoloQuestionReadiness>))] LiveSoloQuestionReadiness ResourceReadiness,
+    [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<LiveSoloResourceFailure>))] LiveSoloResourceFailure PreparationFailure,
+    bool? EnvironmentRequired, bool StaticFlagEvidenceRequired, Guid? QuestionGroupId,
+    [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<LiveSoloQuestionSelectionKind>))] LiveSoloQuestionSelectionKind? SelectionKind);
 internal static class LiveSoloRoundProtocol
 {
-    public static LiveSoloRoundResponse Round(LiveSoloRoundView value) => new(value.Id, value.MatchId, value.Number, value.Replay, value.State,
+    public static LiveSoloRoundResponse Round(LiveSoloRoundView value, bool staff = false) => new(value.Id, value.MatchId, value.Number, value.Replay, value.State,
         value.ConcurrencyStamp, value.TimelineRevision, value.CountdownAt, value.StartedAt, value.LimitSeconds,
-        value.ActiveElapsedMilliseconds, value.Paused, value.WinnerTeamId, value.WinningGameplayFactId, value.PlatformStreamingEnabled);
+        value.ActiveElapsedMilliseconds, value.Paused, value.WinnerTeamId, value.WinningGameplayFactId, value.PlatformStreamingEnabled, value.ResourceReadiness, value.PreparationFailure, value.EnvironmentRequired, value.StaticFlagEvidenceRequired, staff ? value.QuestionGroupId : null, staff ? value.SelectionKind : null);
 }
 public sealed class GetLiveSoloRoundRequest
 {
@@ -38,6 +42,6 @@ public sealed class GetLiveSoloRoundEndpoint(ILiveSoloMatchStore matches, IUserC
     {
         HttpContext.Response.Headers.CacheControl = "private, no-store";
         var result = await matches.FindRoundAsync(req.CompetitionId, req.MatchId, req.RoundId, user.UserId, req.Staff, clock.GetUtcNow(), ct);
-        return result is null ? TypedResults.NotFound() : TypedResults.Ok(LiveSoloRoundProtocol.Round(result));
+        return result is null ? TypedResults.NotFound() : TypedResults.Ok(LiveSoloRoundProtocol.Round(result, req.Staff));
     }
 }

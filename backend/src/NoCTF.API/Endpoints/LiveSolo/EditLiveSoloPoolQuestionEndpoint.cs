@@ -33,7 +33,7 @@ public sealed class EditLiveSoloPoolQuestionValidator : Validator<EditLiveSoloPo
     }
 }
 public sealed class EditLiveSoloPoolQuestionEndpoint(ManageLiveSoloQuestionPool pool, IUserContext user, TimeProvider clock)
-    : Endpoint<EditLiveSoloPoolQuestionRequest, Results<Ok<LiveSoloPoolQuestionResponse>, NotFound, ForbidHttpResult, Conflict<LiveSoloPoolFailureResponse>, UnprocessableEntity<LiveSoloPoolFailureResponse>>>
+    : Endpoint<EditLiveSoloPoolQuestionRequest, Results<Ok<LiveSoloPoolQuestionResponse>, NotFound, ForbidHttpResult, Conflict<LiveSoloPoolFailureResponse>, UnprocessableEntity<LiveSoloPoolFailureResponse>, ProblemHttpResult>>
 {
     public override void Configure()
     {
@@ -41,7 +41,7 @@ public sealed class EditLiveSoloPoolQuestionEndpoint(ManageLiveSoloQuestionPool 
         Description(x => x.WithName("EditLiveSoloPoolQuestion"));
         Summary(x => x.Summary = "Atomically detaches on the first material edit while retaining the competition question identity.");
     }
-    public override async Task<Results<Ok<LiveSoloPoolQuestionResponse>, NotFound, ForbidHttpResult, Conflict<LiveSoloPoolFailureResponse>, UnprocessableEntity<LiveSoloPoolFailureResponse>>> ExecuteAsync(EditLiveSoloPoolQuestionRequest req, CancellationToken ct)
+    public override async Task<Results<Ok<LiveSoloPoolQuestionResponse>, NotFound, ForbidHttpResult, Conflict<LiveSoloPoolFailureResponse>, UnprocessableEntity<LiveSoloPoolFailureResponse>, ProblemHttpResult>> ExecuteAsync(EditLiveSoloPoolQuestionRequest req, CancellationToken ct)
     {
         if (req.Definition.Mode != NoCTF.API.Endpoints.Competitions.GameModeProtocol.LiveSolo)
             return TypedResults.UnprocessableEntity(new LiveSoloPoolFailureResponse(LiveSoloPoolFailure.UnsupportedDefinition));

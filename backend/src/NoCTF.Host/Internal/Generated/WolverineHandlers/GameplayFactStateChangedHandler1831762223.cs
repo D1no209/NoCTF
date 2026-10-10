@@ -92,7 +92,7 @@ namespace Internal.Generated.WolverineHandlers
             var wolverinePostCommitMessagePublisher = new NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher(context, noCtfDbContext, _loggerOfWolverinePostCommitMessagePublisher, postCommitDispatchStatus);
             var transactionalRequestReplay = new NoCTF.Infrastructure.Commands.Idempotency.TransactionalRequestReplay(noCtfDbContext, requestCommandKey, _timeProvider5);
             var scopedRuntimeControl = new NoCTF.Infrastructure.Runtime.Instances.ScopedRuntimeControl(noCtfDbContext, _challengeRuntimeTemplateCatalog, _runtimePlacementPolicy1, perTeamRuntimeFlagStore, wolverinePostCommitMessagePublisher, runnerExecutionRuntimeIsolation, liveSoloExecutionAccess, _timeProvider4, transactionalRequestReplay);
-            var liveSoloRuntimePreparation = new NoCTF.Infrastructure.LiveSolo.Resources.LiveSoloRuntimePreparation(noCtfDbContext, scopedRuntimeControl);
+            var liveSoloRuntimePreparation = new NoCTF.Infrastructure.LiveSolo.Resources.LiveSoloRuntimePreparation(noCtfDbContext, scopedRuntimeControl, wolverinePostCommitMessagePublisher);
             var competitionModerationAuthorizer = new NoCTF.Infrastructure.Teams.Moderation.CompetitionModerationAuthorizer(noCtfDbContext);
             var competitionEventStore = new NoCTF.Infrastructure.Competitions.Events.CompetitionEventStore(noCtfDbContext, wolverinePostCommitMessagePublisher, _timeProvider3);
             var fusionLeaderboardCache = new NoCTF.Infrastructure.Scoring.Leaderboard.FusionLeaderboardCache(noCtfDbContext, _leaderboardProjectionEngine, _leaderboardRefreshPublisher, _fusionCacheProvider, _leaderboardPublicationFence, _leaderboardProjectionKeyedLock, _timeProvider2);

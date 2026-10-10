@@ -86,6 +86,9 @@ internal sealed class LiveSoloRoundConfiguration : IEntityTypeConfiguration<Live
         builder.ToTable("live_solo_rounds"); builder.HasKey(x => x.Id);
         builder.Property(x => x.PlatformStreamingEnabled).HasDefaultValue(true).HasSentinel(true);
         builder.HasIndex(x => new { x.MatchId, x.Number, x.Replay }).IsUnique();
+        builder.HasMany(x => x.SelectionAudits).WithOne().HasForeignKey(x => x.RoundId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasMany(x => x.SelectionRisks).WithOne().HasForeignKey(x => x.RoundId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne<User>().WithMany().HasForeignKey(x => x.SelectedByUserId).OnDelete(DeleteBehavior.Restrict);
         builder.HasMany(x => x.Questions).WithOne().HasForeignKey(x => x.RoundId).OnDelete(DeleteBehavior.Cascade);
         builder.HasMany(x => x.Pauses).WithOne().HasForeignKey(x => x.RoundId).OnDelete(DeleteBehavior.Cascade);
         builder.HasOne<LiveSoloQuestionGroup>().WithMany().HasForeignKey(x => x.QuestionGroupId).OnDelete(DeleteBehavior.Restrict);
@@ -214,6 +217,7 @@ internal sealed class LiveSoloCompetitionConfiguration : IEntityTypeConfiguratio
 {
     public void Configure(EntityTypeBuilder<LiveSoloCompetitionModeConfiguration> builder)
     {
+        builder.Property(x => x.StaticFlagEvidenceRequired).HasDefaultValue(false);
         builder.Property(x => x.PlatformStreamingEnabled).HasDefaultValue(true).HasSentinel(true);
         builder.HasMany(x => x.StageRules).WithOne().HasForeignKey(x => x.CompetitionId).OnDelete(DeleteBehavior.Cascade);
         builder.Navigation(x => x.StageRules).AutoInclude();
@@ -273,5 +277,23 @@ internal sealed class LiveSoloRecordingConfiguration : IEntityTypeConfiguration<
         builder.HasOne<LiveSoloRound>().WithMany().HasForeignKey(x => x.RoundId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<StoredFile>().WithMany().HasForeignKey(x => x.FileId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<User>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class LiveSoloRoundSelectionRiskConfiguration : IEntityTypeConfiguration<LiveSoloRoundSelectionRisk>
+{
+    public void Configure(EntityTypeBuilder<LiveSoloRoundSelectionRisk> builder)
+    {
+        builder.ToTable("live_solo_round_selection_risks"); builder.HasKey(x => new { x.RoundId, x.Position });
+        builder.HasOne<LiveSoloRoundSelectionAudit>().WithMany().HasForeignKey(x => new { x.RoundId, x.SelectionPosition }).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+internal sealed class LiveSoloRoundSelectionAuditConfiguration : IEntityTypeConfiguration<LiveSoloRoundSelectionAudit>
+{
+    public void Configure(EntityTypeBuilder<LiveSoloRoundSelectionAudit> builder)
+    {
+        builder.ToTable("live_solo_round_selection_audits"); builder.HasKey(x => new { x.RoundId, x.Position });
+        builder.HasOne<User>().WithMany().HasForeignKey(x => x.ActorUserId).OnDelete(DeleteBehavior.Restrict);
     }
 }

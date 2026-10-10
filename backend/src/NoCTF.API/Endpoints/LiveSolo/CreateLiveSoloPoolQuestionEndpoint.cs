@@ -23,7 +23,7 @@ public sealed class CreateLiveSoloPoolQuestionValidator : Validator<CreateLiveSo
     { RuleFor(x => x.CompetitionId).NotEmpty(); RuleFor(x => x.Title).NotEmpty().MaximumLength(160); RuleFor(x => x.Direction).NotEmpty().MaximumLength(96); }
 }
 public sealed class CreateLiveSoloPoolQuestionEndpoint(ManageLiveSoloQuestionPool pool, IUserContext user, TimeProvider clock)
-    : Endpoint<CreateLiveSoloPoolQuestionRequest, Results<Ok<LiveSoloPoolQuestionResponse>, NotFound, ForbidHttpResult, Conflict<LiveSoloPoolFailureResponse>, UnprocessableEntity<LiveSoloPoolFailureResponse>>>
+    : Endpoint<CreateLiveSoloPoolQuestionRequest, Results<Ok<LiveSoloPoolQuestionResponse>, NotFound, ForbidHttpResult, Conflict<LiveSoloPoolFailureResponse>, UnprocessableEntity<LiveSoloPoolFailureResponse>, ProblemHttpResult>>
 {
     public override void Configure()
     {
@@ -31,7 +31,7 @@ public sealed class CreateLiveSoloPoolQuestionEndpoint(ManageLiveSoloQuestionPoo
         Description(x => x.WithName("CreateLiveSoloPoolQuestion"));
         Summary(x => x.Summary = "Creates material exclusively owned by this competition, outside the question bank.");
     }
-    public override async Task<Results<Ok<LiveSoloPoolQuestionResponse>, NotFound, ForbidHttpResult, Conflict<LiveSoloPoolFailureResponse>, UnprocessableEntity<LiveSoloPoolFailureResponse>>> ExecuteAsync(CreateLiveSoloPoolQuestionRequest req, CancellationToken ct)
+    public override async Task<Results<Ok<LiveSoloPoolQuestionResponse>, NotFound, ForbidHttpResult, Conflict<LiveSoloPoolFailureResponse>, UnprocessableEntity<LiveSoloPoolFailureResponse>, ProblemHttpResult>> ExecuteAsync(CreateLiveSoloPoolQuestionRequest req, CancellationToken ct)
     {
         if (req.Definition.Mode != NoCTF.API.Endpoints.Competitions.GameModeProtocol.LiveSolo)
             return TypedResults.UnprocessableEntity(new LiveSoloPoolFailureResponse(LiveSoloPoolFailure.UnsupportedDefinition));

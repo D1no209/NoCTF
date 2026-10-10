@@ -125,7 +125,7 @@ public sealed partial class LiveSoloMatchStore
                 if (competition.ModeConfiguration is not LiveSoloCompetitionModeConfiguration { Enabled: true }
                     || !await RosterEligibleAsync(match, ct))
                 { round.State = LiveSoloRoundState.Canceled; match.State = LiveSoloMatchState.AwaitingAdjudication; round.TimelineRevision++; return true; }
-                if (match.StartedAt is null && !await NoNewPublicExposureAsync(match, round, ct))
+                if (round.SelectionKind != LiveSoloQuestionSelectionKind.StaffSpecified && !await NoNewPublicExposureAsync(match, round, ct))
                 { round.State = LiveSoloRoundState.Canceled; match.State = LiveSoloMatchState.Preparing; round.TimelineRevision++; return true; }
                 effectiveAt = (clock ?? TimeProvider.System).GetUtcNow();
                 round.State = LiveSoloRoundState.Running; round.StartedAt = effectiveAt; match.State = LiveSoloMatchState.Running;

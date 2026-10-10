@@ -45,7 +45,7 @@ internal static class LiveSoloProtocol
     public static Results<Ok<LiveSoloRoundResponse>, NotFound, ForbidHttpResult, Conflict<LiveSoloFailureResponse>,
         UnprocessableEntity<LiveSoloFailureResponse>, ProblemHttpResult> RoundMutation(LiveSoloRoundResult result) => result.Failure switch
     {
-        null when result.Round is not null => TypedResults.Ok(LiveSoloRoundProtocol.Round(result.Round)),
+        null when result.Round is not null => TypedResults.Ok(LiveSoloRoundProtocol.Round(result.Round, true)),
         LiveSoloFailure.NotFound => TypedResults.NotFound(),
         LiveSoloFailure.Forbidden => TypedResults.Forbid(),
         LiveSoloFailure.InvalidConfiguration => TypedResults.UnprocessableEntity(new LiveSoloFailureResponse(result.Failure.Value)),

@@ -795,9 +795,21 @@ export type NoCtfapiEndpointsLiveSoloLiveSoloRoundResponse = {
     winnerTeamId?: string | null;
     winningGameplayFactId?: string | null;
     platformStreamingEnabled?: boolean;
+    resourceReadiness?: NoCtfDomainLiveSoloLiveSoloQuestionReadiness;
+    preparationFailure?: NoCtfDomainLiveSoloLiveSoloResourceFailure;
+    environmentRequired?: boolean | null;
+    staticFlagEvidenceRequired?: boolean;
+    questionGroupId?: string | null;
+    selectionKind?: NoCtfDomainLiveSoloLiveSoloQuestionSelectionKind | null;
 };
 
 export type NoCtfDomainLiveSoloLiveSoloRoundState = 'Preparing' | 'Countdown' | 'Running' | 'ConfirmingResult' | 'Won' | 'TimedOut' | 'Canceled';
+
+export type NoCtfDomainLiveSoloLiveSoloQuestionReadiness = 'Waiting' | 'Preparing' | 'Ready' | 'Failed';
+
+export type NoCtfDomainLiveSoloLiveSoloResourceFailure = 'None' | 'NotFound' | 'ResourceCapacityExceeded' | 'UnsupportedEnvironment' | 'IsolationNotConfigured' | 'IsolationVerificationFailed' | 'DependencyUnavailable';
+
+export type NoCtfDomainLiveSoloLiveSoloQuestionSelectionKind = 'Automatic' | 'StaffSpecified';
 
 export type NoCtfapiEndpointsLiveSoloLiveSoloAdjudicationResponse = {
     id?: string;
@@ -831,7 +843,7 @@ export type NoCtfapiEndpointsLiveSoloLiveSoloFailureResponse = {
     };
 };
 
-export type NoCtfApplicationLiveSoloRoundsLiveSoloFailure = 'NotFound' | 'Forbidden' | 'Disabled' | 'InvalidConfiguration' | 'Conflict' | 'RosterLocked' | 'NotReady' | 'MediaUnavailable' | 'IsolationUnavailable' | 'RoundNotRunning' | 'RoundPaused' | 'QuestionNotOpen' | 'DeadlinePassed' | 'AlreadyEnded' | 'NoSuitableQuestionGroup' | 'DependencyUnavailable' | 'IdempotencyConflict';
+export type NoCtfApplicationLiveSoloRoundsLiveSoloFailure = 'NotFound' | 'Forbidden' | 'Disabled' | 'InvalidConfiguration' | 'Conflict' | 'RosterLocked' | 'NotReady' | 'MediaUnavailable' | 'IsolationUnavailable' | 'RoundNotRunning' | 'RoundPaused' | 'QuestionNotOpen' | 'DeadlinePassed' | 'AlreadyEnded' | 'NoSuitableQuestionGroup' | 'DependencyUnavailable' | 'IdempotencyConflict' | 'CompetitionNotStarted' | 'ResourceCapacityExceeded' | 'UnsupportedEnvironment' | 'IsolationNotConfigured' | 'IsolationVerificationFailed' | 'QuestionGroupNotFound' | 'SelectionChanged' | 'ActiveQuestionConflict';
 
 export type NoCtfapiEndpointsLiveSoloAdjudicateLiveSoloMatchRequest = {
     expectedMatchStamp: string;
@@ -943,6 +955,7 @@ export type NoCtfapiEndpointsLiveSoloLiveSoloPoolQuestionResponse = {
     questionGroupIds?: Array<string>;
     attachments?: Array<NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse>;
     flags?: Array<NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse>;
+    canEditContent?: boolean;
 };
 
 export type NoCtfDomainLiveSoloLiveSoloMaterialOwnership = 'FollowingQuestionBank' | 'CompetitionOwned';
@@ -1218,6 +1231,7 @@ export type NoCtfapiEndpointsLiveSoloLiveSoloConfigurationContract = {
     maximumRosterMembers?: number;
     maximumViewers?: number;
     stageRules?: Array<NoCtfapiEndpointsLiveSoloLiveSoloStageRuleContract>;
+    staticFlagEvidenceRequired?: boolean;
 };
 
 export type NoCtfapiEndpointsLiveSoloLiveSoloBracketFormatProtocol = 'SingleElimination' | 'DoubleElimination';
@@ -1494,6 +1508,36 @@ export type NoCtfapiEndpointsLiveSoloListLiveSoloProgramDecisionsRequest = {
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsLiveSoloLiveSoloQuestionCandidateListResponse = {
+    items?: Array<NoCtfapiEndpointsLiveSoloLiveSoloQuestionCandidateResponse>;
+};
+
+export type NoCtfapiEndpointsLiveSoloLiveSoloQuestionCandidateResponse = {
+    id?: string;
+    name?: string;
+    reserve?: boolean;
+    concurrencyStamp?: string;
+    selectionRevision?: string;
+    available?: boolean;
+    automaticEligible?: boolean;
+    exclusions?: Array<NoCtfapiEndpointsLiveSoloLiveSoloQuestionExclusionProtocol>;
+    risks?: Array<NoCtfapiEndpointsLiveSoloLiveSoloQuestionCandidateRiskResponse>;
+};
+
+export type NoCtfapiEndpointsLiveSoloLiveSoloQuestionExclusionProtocol = 'Empty' | 'MissingQuestion' | 'DeletedQuestion' | 'DuplicateQuestion' | 'InvalidSchedule' | 'UnsupportedDefinition' | 'ActiveRoundConflict';
+
+export type NoCtfapiEndpointsLiveSoloLiveSoloQuestionCandidateRiskResponse = {
+    kind?: NoCtfDomainLiveSoloLiveSoloSelectionRiskKind;
+    competitionChallengeId?: string | null;
+    canonicalChallengeId?: string | null;
+};
+
+export type NoCtfDomainLiveSoloLiveSoloSelectionRiskKind = 'SeenByTeam' | 'SeenByRosterMember' | 'SameSource' | 'PreviouslyUsed' | 'PublicExposure';
+
+export type NoCtfapiEndpointsLiveSoloListLiveSoloQuestionGroupCandidatesRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsLiveSoloLiveSoloQuestionGroupsResponse = {
     items?: Array<NoCtfapiEndpointsLiveSoloLiveSoloQuestionGroupResponse>;
 };
@@ -1707,6 +1751,8 @@ export type NoCtfapiEndpointsLiveSoloPrepareLiveSoloRecordingPreviewRequest = {
 
 export type NoCtfapiEndpointsLiveSoloPrepareLiveSoloRoundRequest = {
     expectedStamp: string;
+    expectedGroupStamp?: string | null;
+    selectionRevision?: string | null;
     questionGroupId?: string | null;
 };
 
@@ -1753,6 +1799,10 @@ export type NoCtfapiEndpointsLiveSoloLiveSoloReplayConsentRequest = {
     concurrencyStamp?: string;
 };
 
+export type NoCtfapiEndpointsLiveSoloRetryLiveSoloPreparationRequest = {
+    expectedStamp: string;
+};
+
 export type NoCtfapiEndpointsChallengesWriteUpsChallengeWriteUpFailureResponse = {
     code?: NoCtfApplicationChallengesWriteUpsChallengeWriteUpFailure;
     messageKey?: string;
@@ -1793,6 +1843,13 @@ export type NoCtfapiEndpointsLiveSoloSaveLiveSoloWriteUpPdfDraftRequest = {
     official?: boolean;
     expectedStamp?: string | null;
     file: Blob | File;
+};
+
+export type NoCtfapiEndpointsLiveSoloSpecifyPreparedLiveSoloGroupRequest = {
+    questionGroupId: string;
+    expectedStamp: string;
+    expectedGroupStamp: string;
+    selectionRevision: string;
 };
 
 export type NoCtfapiEndpointsLiveSoloStartLiveSoloCountdownRequest = {
@@ -5189,7 +5246,7 @@ export type NoCtfapiEndpointsAdministrationChallengesPatchCompetitionChallengeRe
 export type NoCtfapiEndpointsAdministrationChallengesCompetitionChallengePresentationPatchRequest = {
     customTitle: string | null;
     order: number;
-    isPublished: boolean;
+    isPublished?: boolean | null;
     directionId?: string | null;
     tags?: Array<string> | null;
 };
@@ -8037,6 +8094,40 @@ export type ListLiveSoloProgramDecisionsResponses = {
 
 export type ListLiveSoloProgramDecisionsResponse = ListLiveSoloProgramDecisionsResponses[keyof ListLiveSoloProgramDecisionsResponses];
 
+export type ListLiveSoloQuestionGroupCandidatesData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        matchId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/question-groups';
+};
+
+export type ListLiveSoloQuestionGroupCandidatesErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type ListLiveSoloQuestionGroupCandidatesResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsLiveSoloLiveSoloQuestionCandidateListResponse;
+};
+
+export type ListLiveSoloQuestionGroupCandidatesResponse = ListLiveSoloQuestionGroupCandidatesResponses[keyof ListLiveSoloQuestionGroupCandidatesResponses];
+
 export type ListLiveSoloQuestionGroupsData = {
     body?: never;
     path: {
@@ -8641,6 +8732,49 @@ export type ResolveLiveSoloResultCorrectionResponses = {
 
 export type ResolveLiveSoloResultCorrectionResponse = ResolveLiveSoloResultCorrectionResponses[keyof ResolveLiveSoloResultCorrectionResponses];
 
+export type RetryLiveSoloPreparationData = {
+    body: NoCtfapiEndpointsLiveSoloRetryLiveSoloPreparationRequest;
+    path: {
+        competitionId: string;
+        matchId: string;
+        roundId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/preparation';
+};
+
+export type RetryLiveSoloPreparationErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsLiveSoloLiveSoloFailureResponse;
+    422: NoCtfapiEndpointsLiveSoloLiveSoloFailureResponse;
+};
+
+export type RetryLiveSoloPreparationError = RetryLiveSoloPreparationErrors[keyof RetryLiveSoloPreparationErrors];
+
+export type RetryLiveSoloPreparationResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsLiveSoloLiveSoloRoundResponse;
+};
+
+export type RetryLiveSoloPreparationResponse = RetryLiveSoloPreparationResponses[keyof RetryLiveSoloPreparationResponses];
+
 export type ReviewLiveSoloWriteUpData = {
     body: NoCtfapiEndpointsLiveSoloReviewLiveSoloWriteUpRequest;
     path: {
@@ -8773,6 +8907,49 @@ export type SaveLiveSoloWriteUpPdfDraftResponses = {
 };
 
 export type SaveLiveSoloWriteUpPdfDraftResponse = SaveLiveSoloWriteUpPdfDraftResponses[keyof SaveLiveSoloWriteUpPdfDraftResponses];
+
+export type SpecifyPreparedLiveSoloGroupData = {
+    body: NoCtfapiEndpointsLiveSoloSpecifyPreparedLiveSoloGroupRequest;
+    path: {
+        competitionId: string;
+        matchId: string;
+        roundId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/selection';
+};
+
+export type SpecifyPreparedLiveSoloGroupErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsLiveSoloLiveSoloFailureResponse;
+    422: NoCtfapiEndpointsLiveSoloLiveSoloFailureResponse;
+};
+
+export type SpecifyPreparedLiveSoloGroupError = SpecifyPreparedLiveSoloGroupErrors[keyof SpecifyPreparedLiveSoloGroupErrors];
+
+export type SpecifyPreparedLiveSoloGroupResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsLiveSoloLiveSoloRoundResponse;
+};
+
+export type SpecifyPreparedLiveSoloGroupResponse = SpecifyPreparedLiveSoloGroupResponses[keyof SpecifyPreparedLiveSoloGroupResponses];
 
 export type StartLiveSoloCountdownData = {
     body: NoCtfapiEndpointsLiveSoloStartLiveSoloCountdownRequest;

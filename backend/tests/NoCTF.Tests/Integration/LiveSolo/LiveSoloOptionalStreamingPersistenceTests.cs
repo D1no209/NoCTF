@@ -110,8 +110,9 @@ public sealed class LiveSoloOptionalStreamingPersistenceTests
             await f.Db.SaveChangesAsync(ct);
             var group = await store.SaveGroupAsync(f.Competition.Id, f.Owner.Id, new(null, "Next group", true, null,
                 f.Entries.Select(x => new LiveSoloQuestionGroupEntry(x.Id, null)).ToArray(), null), f.Now, ct);
+            var candidate = (await store.CandidatesAsync(f.Competition.Id, f.Match.Id, f.Owner.Id, f.Now, ct))!.Single(x => x.Id == group.Group!.Id);
             var prepared = await store.PrepareRoundAsync(new(f.Competition.Id, f.Match.Id, f.Owner.Id, voided.Match!.ConcurrencyStamp,
-                group.Group!.Id, f.Now), ct);
+                group.Group!.Id, f.Now, candidate.ConcurrencyStamp, candidate.SelectionRevision), ct);
             await Assert.That(prepared.Failure).IsNull();
             await Assert.That(prepared.Round!.PlatformStreamingEnabled).IsFalse();
             var session = await f.Db.LiveSoloMediaSessions.SingleAsync(ct);

@@ -24,7 +24,8 @@ public sealed record UpdateCompetitionChallengeCommand(
     DateTimeOffset UpdatedAt,
     string? CustomTitle = null,
     Guid? DirectionId = null,
-    IReadOnlyList<string>? Tags = null);
+    IReadOnlyList<string>? Tags = null,
+    bool HasPublicationChange = true);
 
 public sealed record ChallengeView(
     Guid Id,
@@ -86,7 +87,7 @@ public enum ChallengeMutationFailure
     LifecycleStateConflict,
     ExperimentalFeatureDisabled,
     InvalidTiming,
-    TimingUnsupported
+    TimingUnsupported, PublicationUnsupported, MaterialEditRequired
 }
 
 public sealed record ChallengeMutationResult(

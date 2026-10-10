@@ -26,7 +26,7 @@
   "api.liveSolo.questionNotOpen": "This question has not opened in the current Round.",
   "api.liveSolo.deadlinePassed": "The Round admission deadline has passed.",
   "api.liveSolo.alreadyEnded": "This Round has already ended or another Round is active.",
-  "api.liveSolo.noSuitableQuestionGroup": "No unused and unexposed question group is available. A judge must prepare a reserve group.",
+  "api.liveSolo.noSuitableQuestionGroup": "No low-risk question list is available for automatic selection. Staff may specify an available list and review its risks.",
   "api.liveSolo.dependencyUnavailable": "The required service is unavailable. Retry after it recovers.",
   "api.liveSolo.idempotencyConflict": "This Idempotency-Key was used with a different submission.",
   "api.liveSolo.independentAdjudicationRequired": "LiveSolo results require the dedicated Match adjudication flow.",
@@ -741,5 +741,16 @@
   "api.challenges.challengeMutation.timingUnsupported": "LiveSolo uses its own Round timing.",
   "api.liveSolo.pool.sourceChanged": "The source material changed. Reload it before copying or editing.",
   "api.liveSolo.pool.protectedMaterialsForbidden": "Copy permission for the source attachments or Flags is required.",
-  "api.liveSolo.pool.alreadyInQuestionBank": "This question still follows a question-bank template."
+  "api.liveSolo.pool.alreadyInQuestionBank": "This question still follows a question-bank template.",
+  "api.liveSolo.competitionNotStarted": "The competition has not started. Preparation is allowed, but the countdown requires a running competition.",
+  "api.liveSolo.resourceCapacityExceeded": "The required environment exceeds the available resource quota.",
+  "api.liveSolo.unsupportedEnvironment": "This environment is not supported by LiveSolo. Use no environment or independent containers.",
+  "api.liveSolo.isolationNotConfigured": "Environment isolation is not configured for this deployment.",
+  "api.liveSolo.isolationVerificationFailed": "Environment isolation verification failed.",
+  "api.liveSolo.questionGroupNotFound": "The selected question list no longer exists in this competition.",
+  "api.liveSolo.selectionChanged": "The selected question list or its eligibility changed. Refresh its conditions and select again.",
+  "api.liveSolo.activeQuestionConflict": "This question is in use by another active round.",
+  "api.challenges.challengeMutation.publicationUnsupported": "LiveSolo questions are released by the round; a publication field is not applicable.",
+  "api.challenges.challengeMutation.materialEditRequired": "Edit LiveSolo question content in the competition question pool to preserve material ownership.",
+  "api.challenges.hints.paidHintUnsupported": "LiveSolo only supports free hints."
 }

@@ -2,7 +2,7 @@ import { computed, inject, markRaw, onMounted, onScopeDispose, ref, shallowRef, 
 import { onBeforeRouteLeave } from 'vue-router'
 import { getLiveSoloMatch, getLiveSoloMedia, getLiveSoloRound, getLiveSoloPlayerPolicy, getMyTeamEndpoint,
   prepareLiveSoloMedia, lockLiveSoloRoster, confirmLiveSoloReady, prepareLiveSoloRound, startLiveSoloCountdown,
-  adjudicateLiveSoloMatch, userProfileGet } from '~/api'
+  adjudicateLiveSoloMatch, listLiveSoloQuestionGroupCandidates, retryLiveSoloPreparation, specifyPreparedLiveSoloGroup, userProfileGet } from '~/api'
 import type { NoCtfapiEndpointsLiveSoloLiveSoloMatchResponse as Match, NoCtfapiEndpointsLiveSoloLiveSoloRoundResponse as Round,
   NoCtfapiEndpointsLiveSoloLiveSoloMediaResponse as Media, NoCtfapiEndpointsLiveSoloLiveSoloPlayerPolicyResponse as Configuration,
   NoCtfapiEndpointsTeamsTeamResponse as Team, NoCtfDomainLiveSoloLiveSoloJudgeAction as JudgeAction,
@@ -25,6 +25,23 @@ export function useLiveSoloMatch() {
   const match = ref<Match | null>(null), round = ref<Round | null>(null), media = ref<Media | null>(null)
   const configuration = ref<Configuration | null>(null), team = ref<Team | null>(null)
   const loading = ref(true), busy = ref(false), error = ref<UiMessage | null>(null)
+  const candidates = ref<import('~/api').NoCtfapiEndpointsLiveSoloLiveSoloQuestionCandidateResponse[]>([]), selectedGroupId = ref<string | null>(null)
+  const selectedCandidate = computed(() => candidates.value.find(x => x.id === selectedGroupId.value) ?? null)
+  const currentCandidate = computed(() => candidates.value.find(x => x.id === round.value?.questionGroupId) ?? null)
+  const groupOptions = computed(() => [{ value: 'Automatic', label: translate('liveSolo.selection.automatic') }, ...candidates.value.filter(x => x.available && x.id).map(x => ({ value: x.id!, label: x.name ?? '—' }))])
+  const groupChoice = computed(() => selectedGroupId.value ?? 'Automatic')
+  const riskKeys = { SeenByTeam: 'liveSolo.selection.risk.SeenByTeam', SeenByRosterMember: 'liveSolo.selection.risk.SeenByRosterMember',
+    SameSource: 'liveSolo.selection.risk.SameSource', PreviouslyUsed: 'liveSolo.selection.risk.PreviouslyUsed', PublicExposure: 'liveSolo.selection.risk.PublicExposure' } as const
+  const selectionRisks = computed(() => (selectedCandidate.value?.risks ?? currentCandidate.value?.risks ?? []).map((risk, index) => ({ ...risk,
+    key: `${risk.kind}:${risk.competitionChallengeId ?? index}`, label: riskKeys[risk.kind ?? 'PreviouslyUsed'] })))
+  const startAllowed = computed(() => judge.value && ctx?.competition.value?.status === 'Running' && match.value?.rosters?.every(x => x.ready)
+    && round.value?.resourceReadiness === 'Ready' && round.value?.state === 'Preparing')
+  const preparationKey = computed(() => round.value?.resourceReadiness === 'Failed' ? 'liveSolo.preparation.failed' : round.value?.resourceReadiness === 'Ready'
+    ? round.value.environmentRequired === false ? 'liveSolo.preparation.notRequired' : 'liveSolo.preparation.ready' : 'liveSolo.preparation.pending')
+  const preparationFailures = { None: null, NotFound: 'api.liveSolo.notFound', ResourceCapacityExceeded: 'api.liveSolo.resourceCapacityExceeded',
+    UnsupportedEnvironment: 'api.liveSolo.unsupportedEnvironment', IsolationNotConfigured: 'api.liveSolo.isolationNotConfigured',
+    IsolationVerificationFailed: 'api.liveSolo.isolationVerificationFailed', DependencyUnavailable: 'api.liveSolo.dependencyUnavailable' } as const
+  const preparationFailure = computed(() => { const key = preparationFailures[round.value?.preparationFailure ?? 'None']; return key ? message(key) : null })
   const selectedRoster = ref<string[]>([]), memberNames = ref<ReadonlyMap<string, string>>(new Map())
   const staff = computed(() => ctx?.competition.value?.administrationRole != null)
   const staffOnlyMedia = computed(() => ctx?.competition.value?.accessMode === 'StaffOnly')
@@ -101,6 +118,12 @@ export function useLiveSoloMatch() {
       memberNames.value = names
       if (myRoster.value?.locked) selectedRoster.value = [...(myRoster.value.userIds ?? [])]
       else selectedRoster.value = selectedRoster.value.filter(member => mine.data?.memberIds?.includes(member))
+      if (staff.value) {
+        const lists = await listLiveSoloQuestionGroupCandidates({ path })
+        if (disposed || id !== request) return
+        if (lists.error || !lists.data) throw parseLiveSoloError(lists.error, message('liveSolo.error.load'))
+        candidates.value = lists.data.items ?? []
+      } else candidates.value = []
       error.value = null
     }
     catch (cause) {
@@ -128,16 +151,27 @@ export function useLiveSoloMatch() {
       body: { teamId: team.value!.id!, expectedStamp: match.value!.concurrencyStamp!, userIds: [...selectedRoster.value] } }))
   }
   async function ready() {
-    if (!captain.value || !myRoster.value?.locked || !match.value?.concurrencyStamp) return
+    if (!onRoster.value || !myRoster.value?.locked || !match.value?.concurrencyStamp) return
     await operation(() => confirmLiveSoloReady({ path: { competitionId: competitionId.value, matchId: matchId.value }, body: { expectedStamp: match.value!.concurrencyStamp! } }))
   }
   async function prepareMedia() {
     if (!platformStreaming.value || !allLocked.value || (!judge.value && !onRoster.value) || !match.value?.concurrencyStamp) return
     await operation(() => prepareLiveSoloMedia({ path: { competitionId: competitionId.value, matchId: matchId.value }, body: { expectedMatchStamp: match.value!.concurrencyStamp! } }))
   }
+  function chooseGroup(id: string) { if (!busy.value && judge.value) selectedGroupId.value = id === 'Automatic' ? null : id }
+  async function retryPreparation() {
+    if (!judge.value || !round.value?.id || !round.value.concurrencyStamp) return
+    await operation(() => retryLiveSoloPreparation({ path: { competitionId: competitionId.value, matchId: matchId.value, roundId: round.value!.id! }, body: { expectedStamp: round.value!.concurrencyStamp! } }))
+  }
+  async function specifyCurrent() {
+    const candidate = currentCandidate.value
+    if (!judge.value || !round.value?.id || !round.value.concurrencyStamp || !candidate?.id || !candidate.concurrencyStamp || !candidate.selectionRevision) return
+    await operation(() => specifyPreparedLiveSoloGroup({ path: { competitionId: competitionId.value, matchId: matchId.value, roundId: round.value!.id! }, body: { expectedStamp: round.value!.concurrencyStamp!, questionGroupId: candidate.id!, expectedGroupStamp: candidate.concurrencyStamp!, selectionRevision: candidate.selectionRevision! } }))
+  }
   async function prepareRound() {
     if (!judge.value || !match.value?.concurrencyStamp) return
-    await operation(() => prepareLiveSoloRound({ path: { competitionId: competitionId.value, matchId: matchId.value }, body: { expectedStamp: match.value!.concurrencyStamp! } }))
+    await operation(() => prepareLiveSoloRound({ path: { competitionId: competitionId.value, matchId: matchId.value }, body: { expectedStamp: match.value!.concurrencyStamp!, questionGroupId: selectedGroupId.value,
+        expectedGroupStamp: selectedCandidate.value?.concurrencyStamp ?? null, selectionRevision: selectedCandidate.value?.selectionRevision ?? null } }))
   }
   async function start() {
     if (!judge.value || !round.value?.id || !round.value.concurrencyStamp) return
@@ -182,6 +216,7 @@ export function useLiveSoloMatch() {
   })
   return { competitionId, matchId, match, round, media, platformStreaming, configuration, loading, busy, team, myRoster, captain, onRoster, staffOnlyMedia,
     canLock, allLocked, rosterOptions, selectedRoster, toggleRoster, lockRoster, ready, prepareMedia, prepareRound, start,
+    candidates, groupOptions, groupChoice, chooseGroup, currentCandidate, selectionRisks, startAllowed, preparationKey, preparationFailure, retryPreparation, specifyCurrent,
     staff, readOnlyMedia, judge, canCorrect, correct, screens, myScreen, clock, stateKey: computed(() => matchStateKey(match.value?.state)), back, load,
     judgeOpen, judgeAction, judgeReason, forfeitingTeam, openDecision, confirmDecision, setJudgeOpen,
     leaveOpen, setLeaveOpen, confirmLeave, Workspace: markRaw(CompetitionParticipantWorkspace),

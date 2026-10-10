@@ -125,8 +125,18 @@ public sealed class LiveSoloMatchCapacityPersistenceTests
                 match.ConcurrencyStamp, [users[i].Id], fixture.Now), ct);
             await Assert.That(roster.Failure).IsNull(); match = roster.Match!;
         }
+        // Capacity assertions use independent material; sharing an active question is now a separate hard exclusion.
+        var templateId = Guid.NewGuid(); var entryId = Guid.NewGuid();
+        var template = new NoCTF.Domain.Challenges.LiveSoloChallenge { Id = templateId, OwnerId = fixture.Owner.Id, Title = "Capacity question", Direction = "Web",
+            CreatedAt = fixture.Now, UpdatedAt = fixture.Now, Definition = new LiveSoloChallengeDefinition { ChallengeId = templateId } };
+        var entry = new NoCTF.Domain.Challenges.LiveSoloCompetitionChallenge { Id = entryId, CompetitionId = fixture.Competition.Id, ChallengeId = templateId,
+            DirectionId = fixture.Entries[0].DirectionId, Order = await fixture.Db.CompetitionChallenges.MaxAsync(x => x.Order, ct) + 1, UpdatedAt = fixture.Now,
+            Rules = new LiveSoloCompetitionChallengeRules { CompetitionChallengeId = entryId } };
+        fixture.Db.AddRange(template, entry); await fixture.Db.SaveChangesAsync(ct);
+        var group = await store.SaveGroupAsync(fixture.Competition.Id, fixture.Owner.Id, new(null, "Capacity list", false, null, [new(entryId, 0)], null), fixture.Now, ct);
+        var candidate = (await store.CandidatesAsync(fixture.Competition.Id, match.Id, fixture.Owner.Id, fixture.Now, ct))!.Single(x => x.Id == group.Group!.Id);
         var prepared = await store.PrepareRoundAsync(new(fixture.Competition.Id, match.Id, fixture.Owner.Id, match.ConcurrencyStamp,
-            fixture.Round.QuestionGroupId, fixture.Now), ct);
+            candidate.Id, fixture.Now, candidate.ConcurrencyStamp, candidate.SelectionRevision), ct);
         await Assert.That(prepared.Failure).IsNull();
         var mediaSession = new LiveSoloMediaSession { Id = Guid.NewGuid(), MatchId = match.Id, Generation = Guid.NewGuid(),
             RoomIdentity = Guid.NewGuid().ToString("N"), State = LiveSoloMediaState.Ready, CreatedAt = fixture.Now,

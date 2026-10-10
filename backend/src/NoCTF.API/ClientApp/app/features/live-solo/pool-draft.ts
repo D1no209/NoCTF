@@ -6,7 +6,7 @@ import { validateChallengeTemplateDraft } from '../../lib/challenge-template-val
 export function poolDraft(question?: Question) {
   return { title: question?.title ?? '', direction: question?.direction ?? 'Misc', description: question?.description ?? '',
     removedAttachmentIds: [] as string[],
-    flags: question && !question.flags?.some(x => x.specificationKind != null) && question.definition?.runtime?.flagSource !== 'PerTeam'
+    flags: question && question.canEditContent !== false && !question.flags?.some(x => x.specificationKind != null) && question.definition?.runtime?.flagSource !== 'PerTeam'
       ? (question.flags ?? []).map(x => ({ flag: x.flag ?? '', matchKind: x.matchKind ?? 'Exact' })) : null,
     definition: question?.definition ? JSON.parse(JSON.stringify(question.definition)) as NonNullable<Question['definition']> : defaultDefinition('LiveSolo') }
 }

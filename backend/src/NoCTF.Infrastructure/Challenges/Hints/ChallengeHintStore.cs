@@ -74,6 +74,8 @@ public sealed class ChallengeHintStore(
                 item.CompetitionId == command.CompetitionId, ct);
         if (challenge is null)
             return new(null, ChallengeHintSaveFailure.ScopeNotFound);
+        if (command.Cost != 0 && !NoCTF.Application.Competitions.Modes.CompetitionModeCapabilities.For(challenge.Mode).PaidHints)
+            return new(null, ChallengeHintSaveFailure.PaidHintUnsupported);
         CompetitionChallengeHint hint;
         if (!command.IsCreate && command.HintId is Guid hintId)
         {
@@ -163,7 +165,7 @@ public sealed class ChallengeHintStore(
                 item.CompetitionId == competitionId, ct);
         var hint = challenge?.Hints.SingleOrDefault(item =>
             item.Id == hintId && item.HiddenAt != null);
-        if (hint is null)
+        if (hint is null || hint.Cost != 0 && !NoCTF.Application.Competitions.Modes.CompetitionModeCapabilities.For(challenge!.Mode).PaidHints)
             return false;
         hint.HiddenAt = null;
         challenge!.UpdatedAt = now;
@@ -190,6 +192,9 @@ public sealed class ChallengeHintStore(
     {
         await using var transaction = await db.Database.BeginTransactionAsync(
             System.Data.IsolationLevel.Serializable, ct);
+        var mode = await db.Competitions.AsNoTracking().Where(x => x.Id == competitionId).Select(x => (GameMode?)x.Mode).SingleOrDefaultAsync(ct);
+        if (mode is null || !NoCTF.Application.Competitions.Modes.CompetitionModeCapabilities.For(mode.Value).PaidHints)
+            return HintUnlockAttempt.Failed(HintUnlockFailure.NotFound);
         var competitionIsRunning = await db.Competitions.AsNoTracking().AnyAsync(
             competition => competition.Id == competitionId
                 && competition.Status == CompetitionStatus.Running,

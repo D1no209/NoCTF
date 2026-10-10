@@ -193,6 +193,8 @@ public sealed class LiveSoloMatchPersistenceTests
         await DockerIntegrationTest.RunAsync(async () =>
         {
             await using var fixture = await Fixture.CreateAsync(ct);
+            ((LiveSoloCompetitionModeConfiguration)fixture.Competition.ModeConfiguration!).StaticFlagEvidenceRequired = true;
+            await fixture.Db.SaveChangesAsync(ct);
             var file = new StoredFile { Id = Guid.NewGuid(), ObjectKey = "livesolo-test.pdf", FileName = "test.pdf",
                 ContentType = "application/pdf", ByteLength = 4, Sha256 = new byte[32], CreatedAt = fixture.Now };
             var attachment = new ChallengeAttachment { Id = Guid.NewGuid(), ChallengeId = fixture.Templates[0].Id, File = file, CreatedAt = fixture.Now };
@@ -458,7 +460,9 @@ public sealed class LiveSoloMatchPersistenceTests
             await Assert.That(left.Failure).IsNull(); Match = left.Match!;
             var right = await store.LockRosterAsync(new(Competition.Id, Match.Id, Right.Id, RightTeam.Id, Match.ConcurrencyStamp, [Right.Id], Now), ct);
             await Assert.That(right.Failure).IsNull(); Match = right.Match!;
-            var prepared = await store.PrepareRoundAsync(new(Competition.Id, Match.Id, Owner.Id, Match.ConcurrencyStamp, group.Group!.Id, Now), ct);
+            var candidate = (await store.CandidatesAsync(Competition.Id, Match.Id, Owner.Id, Now, ct))!.Single(x => x.Id == group.Group!.Id);
+            var prepared = await store.PrepareRoundAsync(new(Competition.Id, Match.Id, Owner.Id, Match.ConcurrencyStamp, group.Group!.Id, Now,
+                candidate.ConcurrencyStamp, candidate.SelectionRevision), ct);
             await Assert.That(prepared.Failure).IsEqualTo(expectedPreparationFailure);
             if (expectedPreparationFailure is not null) return;
             Round = await Db.LiveSoloRounds.Include(x => x.Questions).SingleAsync(x => x.Id == prepared.Round!.Id, ct);

@@ -61,7 +61,7 @@ public enum GameplayFactAcceptanceState
     Created,
     AchievementAlreadySucceeded,
     AttemptsExhausted,
-    AdmissionRejected
+    AdmissionRejected, UnsupportedMode
 }
 
 public sealed record GameplayFactAcceptanceResult(

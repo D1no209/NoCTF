@@ -225,7 +225,7 @@ public sealed class GameplayFactManagementStore(
     {
         var mode = await db.Competitions.AsNoTracking().Where(x => x.Id == competitionId).Select(x => (NoCTF.Domain.Competitions.GameMode?)x.Mode).SingleOrDefaultAsync(ct);
         if (mode is null) return GameplayFactWorkQueueState.NotFound;
-        if (rejudge && CompetitionModeCapabilities.For(mode.Value).ScopedExecution)
+        if (rejudge && !CompetitionModeCapabilities.For(mode.Value).GenericRejudgement)
             return GameplayFactWorkQueueState.IndependentAdjudicationRequired;
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         if (rejudge)

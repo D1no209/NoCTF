@@ -62,13 +62,17 @@ public sealed class LiveSoloQuestionPoolStore(NoCtfDbContext db, ICompetitionMod
             || !await authorizer.CanObserveAsync(actorId, competitionId, ct)) return null;
         var entries = await db.CompetitionChallenges.AsNoTracking().Where(x => x.CompetitionId == competitionId).OrderBy(x => x.Order).ToArrayAsync(ct);
         var ids = entries.Select(x => x.ChallengeId).ToArray();
-        var templates = await db.Challenges.AsNoTracking().Include(x => x.Attachments).ThenInclude(x => x.File).Where(x => ids.Contains(x.Id)).AsSplitQuery().ToDictionaryAsync(x => x.Id, ct);
+        var templates = await db.Challenges.AsNoTracking().Include(x => x.Attachments).ThenInclude(x => x.File).Include(x => x.Managers).Where(x => ids.Contains(x.Id)).AsSplitQuery().ToDictionaryAsync(x => x.Id, ct);
         var owners = await db.Set<LiveSoloQuestionMaterial>().AsNoTracking().Where(x => x.CompetitionId == competitionId).ToDictionaryAsync(x => x.CompetitionChallengeId, ct);
         var groups = await db.Set<LiveSoloQuestionGroupItem>().AsNoTracking().Where(x => entries.Select(e => e.Id).Contains(x.CompetitionChallengeId))
             .ToArrayAsync(ct);
         var flags = await db.ChallengeFlags.AsNoTracking().Where(x => ids.Contains(x.ChallengeId!.Value) && x.TeamId == null).ToArrayAsync(ct);
+        var actor = await db.Users.AsNoTracking().SingleAsync(x => x.Id == actorId, ct);
+        bool CanEdit(CompetitionChallenge entry) => owners.ContainsKey(entry.Id) || actor.Role == UserRole.Administrator
+            || templates[entry.ChallengeId].OwnerId == actorId || templates[entry.ChallengeId].Managers.Any(x => x.UserId == actorId)
+            || !templates[entry.ChallengeId].Attachments.Any() && !flags.Any(x => x.ChallengeId == entry.ChallengeId);
         return entries.Where(x => templates.ContainsKey(x.ChallengeId)).Select(entry => Project(entry, templates[entry.ChallengeId],
-            owners.GetValueOrDefault(entry.Id), groups.Where(x => x.CompetitionChallengeId == entry.Id).Select(x => x.QuestionGroupId).Distinct().ToArray()) with { Attachments = MapAttachments(templates[entry.ChallengeId]), Flags = flags.Where(x => x.ChallengeId == entry.ChallengeId).Select(MapFlag).ToArray() }).ToArray();
+            owners.GetValueOrDefault(entry.Id), groups.Where(x => x.CompetitionChallengeId == entry.Id).Select(x => x.QuestionGroupId).Distinct().ToArray()) with { CanEditContent = CanEdit(entry), Attachments = MapAttachments(templates[entry.ChallengeId]), Flags = CanEdit(entry) ? flags.Where(x => x.ChallengeId == entry.ChallengeId).Select(MapFlag).ToArray() : [] }).ToArray();
     }
 
     private static LiveSoloPoolQuestion Project(CompetitionChallenge entry, Challenge template, LiveSoloQuestionMaterial? owner, IReadOnlyList<Guid> groups) =>
@@ -78,12 +82,18 @@ public sealed class LiveSoloQuestionPoolStore(NoCtfDbContext db, ICompetitionMod
     private static IReadOnlyList<ChallengeAttachmentView> MapAttachments(Challenge template) => template.Attachments.Where(x => x.DeletedAt == null).OrderBy(x => x.CreatedAt).ThenBy(x => x.Id)
         .Select(x => new ChallengeAttachmentView(x.Id, template.Id, x.File.FileName, x.File.ContentType, x.File.ByteLength, Convert.ToHexString(x.File.Sha256), null, x.DeletedAt, x.CreatedAt)).ToArray();
     private static ChallengeFlagView MapFlag(ChallengeFlag x) => new(x.Id, x.ChallengeId, x.CompetitionChallengeId, x.TeamId, x.Flag, x.MatchKind, x.SpecificationKind, x.SpecificationId, x.ValidStart, x.ValidUntil, x.DeletedAt, x.CreatedAt);
-    private async Task<LiveSoloPoolQuestion> ProjectAsync(CompetitionChallenge entry, Challenge template, CancellationToken ct)
+    private async Task<LiveSoloPoolQuestion> ProjectAsync(CompetitionChallenge entry, Challenge template, Guid actorId, CancellationToken ct)
     {
         await db.Entry(template).Collection(x => x.Attachments).Query().Include(x => x.File).LoadAsync(ct);
-        return Project(entry, template, await db.Set<LiveSoloQuestionMaterial>().SingleOrDefaultAsync(x => x.CompetitionChallengeId == entry.Id, ct),
+        await db.Entry(template).Collection(x => x.Managers).LoadAsync(ct);
+        var ownership = await db.Set<LiveSoloQuestionMaterial>().SingleOrDefaultAsync(x => x.CompetitionChallengeId == entry.Id, ct);
+        var flags = (await db.ChallengeFlags.Where(x => x.ChallengeId == template.Id && x.TeamId == null).ToArrayAsync(ct)).Select(MapFlag).ToArray();
+        var role = await db.Users.Where(x => x.Id == actorId).Select(x => x.Role).SingleAsync(ct);
+        var canEdit = ownership is not null || role == UserRole.Administrator || template.OwnerId == actorId
+            || template.Managers.Any(x => x.UserId == actorId) || !template.Attachments.Any() && flags.Length == 0;
+        return Project(entry, template, ownership,
             await db.Set<LiveSoloQuestionGroupItem>().Where(x => x.CompetitionChallengeId == entry.Id).Select(x => x.QuestionGroupId).Distinct().ToArrayAsync(ct))
-            with { Attachments = MapAttachments(template), Flags = (await db.ChallengeFlags.Where(x => x.ChallengeId == template.Id && x.TeamId == null).ToArrayAsync(ct)).Select(MapFlag).ToArray() };
+            with { CanEditContent = canEdit, Attachments = MapAttachments(template), Flags = canEdit ? flags : [] };
     }
     public async Task<LiveSoloPoolFailure?> CheckEditAsync(Guid competitionId, Guid entryId, Guid actorId, Guid expectedStamp, Guid materialStamp, CancellationToken ct)
     {
@@ -113,7 +123,7 @@ public sealed class LiveSoloQuestionPoolStore(NoCtfDbContext db, ICompetitionMod
         var entry = await db.CompetitionChallenges.SingleAsync(x => x.Id == added.Challenge.Id, ct);
         db.Add(new LiveSoloQuestionMaterial { CompetitionChallengeId = entry.Id, CompetitionId = entry.CompetitionId, ChallengeId = template.Id,
             CreatedByUserId = command.ActorId, CreatedAt = command.Now }); await db.SaveChangesAsync(ct);
-        return new(await ProjectAsync(entry, template, ct));
+        return new(await ProjectAsync(entry, template, command.ActorId, ct));
     }, () => new(null, LiveSoloPoolFailure.Conflict), ct);
 
     public Task<LiveSoloPoolResult> DeployAsync(DeployLiveSoloPoolQuestion command, CancellationToken ct) => TransactionAsync(async () =>
@@ -132,12 +142,12 @@ public sealed class LiveSoloQuestionPoolStore(NoCtfDbContext db, ICompetitionMod
         if (existing is not null)
         {
             var material = existing.ChallengeId == source.Id ? source : await db.Challenges.SingleAsync(x => x.Id == existing.ChallengeId, ct);
-            return new(await ProjectAsync(existing, material, ct));
+            return new(await ProjectAsync(existing, material, command.ActorId, ct));
         }
         if (source.ConcurrencyStamp != command.ExpectedSourceStamp) return new(null, LiveSoloPoolFailure.SourceChanged);
         var added = await challenges.CreateAsync(new(null, command.CompetitionId, source.Id, await NextOrderAsync(command.CompetitionId, ct), command.Now), new LiveSoloCompetitionChallengeRules(), ct);
         if (added.Challenge is null) return new(null, LiveSoloPoolFailure.Conflict);
-        return new(await ProjectAsync(await db.CompetitionChallenges.SingleAsync(x => x.Id == added.Challenge.Id, ct), source, ct));
+        return new(await ProjectAsync(await db.CompetitionChallenges.SingleAsync(x => x.Id == added.Challenge.Id, ct), source, command.ActorId, ct));
     }, () => new(null, LiveSoloPoolFailure.Conflict), ct);
 
     public Task<LiveSoloPoolResult> EditAsync(EditLiveSoloPoolQuestion command, CancellationToken ct) => TransactionAsync(async () =>
@@ -163,7 +173,7 @@ public sealed class LiveSoloQuestionPoolStore(NoCtfDbContext db, ICompetitionMod
             || added[0].ExactFlag != null && (source.Attachments.Any(x => !removed.Contains(x.Id)) || sourceFlags.Any(x => x.SpecificationKind == null))
             || added[0].ExactFlag == null && existingRandom)) return new(null, LiveSoloPoolFailure.InvalidContent);
         if (!flagsChanged && removed.Length == 0 && added.Count == 0 && (entry.CustomTitle ?? source.Title) == command.Title.Trim() && source.Description == command.Description && source.Direction == command.Direction.Trim()
-            && ChallengeDefinitionStructuralComparer.Equals(source.Definition, command.Definition)) return new(await ProjectAsync(entry, source, ct));
+            && ChallengeDefinitionStructuralComparer.Equals(source.Definition, command.Definition)) return new(await ProjectAsync(entry, source, command.ActorId, ct));
         if (await ActiveRoundAsync(entry.Id, ct)) return new(null, LiveSoloPoolFailure.ActiveRound);
         IReadOnlyDictionary<Guid, Guid>? copiedAttachmentIds = null;
         var ownership = await db.Set<LiveSoloQuestionMaterial>().SingleOrDefaultAsync(x => x.CompetitionChallengeId == entry.Id, ct);
@@ -212,7 +222,7 @@ public sealed class LiveSoloQuestionPoolStore(NoCtfDbContext db, ICompetitionMod
             ChallengeDefinitionGraph.AssignChallengeId(command.Definition, source.Id); source.Definition = command.Definition; db.Add(command.Definition);
         }
         entry.CustomTitle = null; entry.UpdatedAt = command.Now;
-        await db.SaveChangesAsync(ct); return new(await ProjectAsync(entry, source, ct));
+        await db.SaveChangesAsync(ct); return new(await ProjectAsync(entry, source, command.ActorId, ct));
     }, () => new(null, LiveSoloPoolFailure.Conflict), ct);
 
     public Task<LiveSoloPoolExport> ExportAsync(ExportLiveSoloPoolQuestion command, CancellationToken ct) => TransactionAsync(async () =>

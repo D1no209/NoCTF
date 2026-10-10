@@ -18,7 +18,7 @@ public sealed class DeployLiveSoloPoolQuestionValidator : Validator<DeployLiveSo
     { RuleFor(x => x.CompetitionId).NotEmpty(); RuleFor(x => x.SourceTemplateId).NotEmpty(); RuleFor(x => x.ExpectedSourceStamp).NotEmpty(); }
 }
 public sealed class DeployLiveSoloPoolQuestionEndpoint(ManageLiveSoloQuestionPool pool, IUserContext user, TimeProvider clock)
-    : Endpoint<DeployLiveSoloPoolQuestionRequest, Results<Ok<LiveSoloPoolQuestionResponse>, NotFound, ForbidHttpResult, Conflict<LiveSoloPoolFailureResponse>, UnprocessableEntity<LiveSoloPoolFailureResponse>>>
+    : Endpoint<DeployLiveSoloPoolQuestionRequest, Results<Ok<LiveSoloPoolQuestionResponse>, NotFound, ForbidHttpResult, Conflict<LiveSoloPoolFailureResponse>, UnprocessableEntity<LiveSoloPoolFailureResponse>, ProblemHttpResult>>
 {
     public override void Configure()
     {
@@ -26,6 +26,6 @@ public sealed class DeployLiveSoloPoolQuestionEndpoint(ManageLiveSoloQuestionPoo
         Description(x => x.WithName("DeployLiveSoloPoolQuestion"));
         Summary(x => x.Summary = "Adds an applicable LiveSolo template once, following the bank until competition content is edited.");
     }
-    public override async Task<Results<Ok<LiveSoloPoolQuestionResponse>, NotFound, ForbidHttpResult, Conflict<LiveSoloPoolFailureResponse>, UnprocessableEntity<LiveSoloPoolFailureResponse>>> ExecuteAsync(DeployLiveSoloPoolQuestionRequest req, CancellationToken ct) =>
+    public override async Task<Results<Ok<LiveSoloPoolQuestionResponse>, NotFound, ForbidHttpResult, Conflict<LiveSoloPoolFailureResponse>, UnprocessableEntity<LiveSoloPoolFailureResponse>, ProblemHttpResult>> ExecuteAsync(DeployLiveSoloPoolQuestionRequest req, CancellationToken ct) =>
         LiveSoloPoolProtocol.Mutation(await pool.DeployAsync(new(req.CompetitionId, user.UserId, req.SourceTemplateId, req.ExpectedSourceStamp, clock.GetUtcNow()), ct));
 }

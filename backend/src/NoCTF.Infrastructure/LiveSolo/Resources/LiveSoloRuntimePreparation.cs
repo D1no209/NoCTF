@@ -8,7 +8,7 @@ using NoCTF.Infrastructure.Persistence;
 
 namespace NoCTF.Infrastructure.LiveSolo.Resources;
 
-public sealed class LiveSoloRuntimePreparation(NoCtfDbContext db, IScopedRuntimeControl runtimes) : ILiveSoloRuntimePreparation
+public sealed class LiveSoloRuntimePreparation(NoCtfDbContext db, IScopedRuntimeControl runtimes, NoCTF.Application.Messaging.IPostCommitMessagePublisher? messages = null) : ILiveSoloRuntimePreparation
 {
     public async Task<LiveSoloFailure?> PrepareAsync(Guid questionId, DateTimeOffset now, CancellationToken ct)
     {
@@ -29,32 +29,54 @@ public sealed class LiveSoloRuntimePreparation(NoCtfDbContext db, IScopedRuntime
             }
             catch (Exception) when (!ct.IsCancellationRequested)
             {
-                await RevokeReadinessAsync(questionId, LiveSoloFailure.DependencyUnavailable, ct);
-                throw;
+                return await RevokeReadinessAsync(questionId, LiveSoloFailure.DependencyUnavailable, ct);
             }
-            if (!result.IsolationAvailable) return await RevokeReadinessAsync(questionId, LiveSoloFailure.IsolationUnavailable, ct);
-            if (result.Failure is not null) return await RevokeReadinessAsync(questionId, LiveSoloFailure.DependencyUnavailable, ct);
+            if (LiveSoloPreparationPolicy.Failure(result) is { } failure) return await RevokeReadinessAsync(questionId, failure, ct);
             if (result.RuntimeInstanceId is Guid runtime) bindings.Add(new() { RoundQuestionId = questionId, Side = slot.Side, RuntimeInstanceId = runtime });
             if (result.RuntimeInstanceId is not null && result.State != RuntimeState.Running) ready = false;
         }
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, System.Data.IsolationLevel.Serializable, ct);
+        var currentRound = await db.LiveSoloRounds.SingleAsync(x => x.Id == scope.Round.Id, ct);
+        if (currentRound.State is not (LiveSoloRoundState.Preparing or LiveSoloRoundState.Countdown or LiveSoloRoundState.Running)
+            || !await db.LiveSoloMatches.AnyAsync(x => x.Id == scope.Match.Id && x.CurrentRoundId == currentRound.Id && x.PendingCorrectionId == null, ct)) return LiveSoloFailure.AlreadyEnded;
         var question = await db.LiveSoloRoundQuestions.Include(x => x.Runtimes).SingleAsync(x => x.Id == questionId, ct);
+        var changed = question.Readiness != (ready ? LiveSoloQuestionReadiness.Ready : LiveSoloQuestionReadiness.Preparing)
+            || question.PreparationFailure != LiveSoloResourceFailure.None || question.EnvironmentRequired != (bindings.Count > 0);
         foreach (var binding in bindings)
         {
             var existing = question.Runtimes.SingleOrDefault(x => x.Side == binding.Side);
-            if (existing is null) { question.Runtimes.Add(binding); db.Set<LiveSoloRuntimeBinding>().Add(binding); }
-            else existing.RuntimeInstanceId = binding.RuntimeInstanceId;
+            if (existing is null) { question.Runtimes.Add(binding); db.Set<LiveSoloRuntimeBinding>().Add(binding); changed = true; }
+            else if (existing.RuntimeInstanceId != binding.RuntimeInstanceId) { existing.RuntimeInstanceId = binding.RuntimeInstanceId; changed = true; }
         }
+        question.PreparationFailure = LiveSoloResourceFailure.None;
+        question.EnvironmentRequired = bindings.Count > 0;
         question.Readiness = ready ? LiveSoloQuestionReadiness.Ready : LiveSoloQuestionReadiness.Preparing;
-        await db.SaveChangesAsync(ct);
+        if (changed) currentRound.ConcurrencyStamp = Guid.NewGuid();
+        await db.SaveChangesAsync(ct); await transaction.CommitAsync(ct);
+        if (changed && messages is not null)
+        {
+            await messages.PublishAsync(new NoCTF.Application.LiveSolo.Realtime.LiveSoloMatchChanged(scope.Match.CompetitionId, scope.Match.Id, now));
+            await messages.FlushCommittedMessagesAsync();
+        }
         return ready ? null : LiveSoloFailure.NotReady;
     }
 
     private async Task<LiveSoloFailure> RevokeReadinessAsync(Guid questionId, LiveSoloFailure failure, CancellationToken ct)
     {
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, System.Data.IsolationLevel.Serializable, ct);
         var question = await db.LiveSoloRoundQuestions.SingleAsync(x => x.Id == questionId, ct);
+        var round = await db.LiveSoloRounds.SingleAsync(x => x.Id == question.RoundId, ct);
+        if (round.State is not (LiveSoloRoundState.Preparing or LiveSoloRoundState.Countdown or LiveSoloRoundState.Running)) return LiveSoloFailure.AlreadyEnded;
         question.Readiness = LiveSoloQuestionReadiness.Failed;
-        question.ConcurrencyStamp = Guid.NewGuid();
-        await db.SaveChangesAsync(ct);
+        question.PreparationFailure = LiveSoloPreparationPolicy.Persisted(failure);
+        question.ConcurrencyStamp = Guid.NewGuid(); round.ConcurrencyStamp = Guid.NewGuid();
+        await db.SaveChangesAsync(ct); await transaction.CommitAsync(ct);
+        if (messages is not null)
+        {
+            var match = await db.LiveSoloMatches.AsNoTracking().SingleAsync(x => x.Id == round.MatchId, ct);
+            await messages.PublishAsync(new NoCTF.Application.LiveSolo.Realtime.LiveSoloMatchChanged(match.CompetitionId, match.Id, TimeProvider.System.GetUtcNow()));
+            await messages.FlushCommittedMessagesAsync();
+        }
         return failure;
     }
 
