@@ -580,7 +580,7 @@ export type NoCtfApplicationNotificationsGameplayFactAdjudicatedNotificationCont
 
 export type NoCtfDomainGameplayGameplayFactState = 0 | 1 | 2 | 3 | 4;
 
-export type NoCtfDomainGameplayGameplayFactResult = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+export type NoCtfDomainGameplayGameplayFactResult = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
 
 export type NoCtfDomainGameplayGameplayFactFailureCode = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23 | 24 | 25 | 26 | 27 | 28 | 29 | 30 | 31 | 32 | 33 | 34 | 35 | 36 | 37 | 38;
 
@@ -1656,15 +1656,18 @@ export type NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse = {
     failureCode?: NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol | null;
     occurredAt?: string;
     updatedAt?: string;
+    timeEligibility?: NoCtfDomainChallengesGameplayFactTimeEligibility;
 };
 
 export type NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol = 'FlagAttempt' | 'BreakAttempt' | 'FixAttempt' | 'HintUnlock' | 'ManualAdjustment' | 'AwdServiceTransition' | 'KohControlObservation' | 'AttachmentDownload' | 'WriteUpUnlock';
 
 export type NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol = 'Pending' | 'Queued' | 'Processing' | 'Completed' | 'PlatformFailed';
 
-export type NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol = 'Correct' | 'Wrong' | 'Duplicate' | 'AttemptsExhausted' | 'Rejected' | 'Unlocked' | 'Applied' | 'ServiceUp' | 'ServiceDown' | 'Controlled' | 'Uncontrolled';
+export type NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol = 'Correct' | 'Wrong' | 'Duplicate' | 'AttemptsExhausted' | 'Rejected' | 'Unlocked' | 'Applied' | 'ServiceUp' | 'ServiceDown' | 'Controlled' | 'Uncontrolled' | 'RightButDue';
 
 export type NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol = 'FlagNotSupported' | 'FixNotSupported' | 'BreakAttemptsExhausted' | 'FixAttemptsExhausted' | 'BreakRequired' | 'ArchiveValidationUnavailable' | 'FixArchiveMissing' | 'FixArchiveLengthMismatch' | 'FixArchiveContentTypeMismatch' | 'FixArchiveHashMismatch' | 'StorageTimeout' | 'StorageUnavailable' | 'CheckerPlatformError' | 'SelfAttackRejected' | 'DuplicateAttack' | 'DuplicateAchievement' | 'UnknownTeamIdentifier' | 'InvalidObservation' | 'ProducerTimeout' | 'ProducerUnavailable' | 'AmbiguousFlagMatch' | 'FlagExpired' | 'RoundOutOfRange' | 'HardeningActive' | 'AwdpExploitSucceeded' | 'AwdpPatchFailed' | 'AwdpPatchTimeout' | 'AwdpServiceAbnormal' | 'AwdpPlatformFailed' | 'ForeignTeamFlagDetected' | 'InsufficientScore' | 'HintUnavailable' | 'PatchStillExploitable' | 'PatchExecutionFailed' | 'PatchServiceAbnormal' | 'PatchVerificationPlatformFailed' | 'StaticFlagWithoutContainer' | 'StaticFlagWithoutAttachment' | 'StaticFlagWithoutContainerAndAttachment';
+
+export type NoCtfDomainChallengesGameplayFactTimeEligibility = 'Valid' | 'NotOpened' | 'SubmissionClosed';
 
 export type NoCtfapiEndpointsGameplayFactsAwdpAchievementActivationResponse = {
     gameplayFactId?: string;
@@ -1824,7 +1827,7 @@ export type NoCtfapiEndpointsGameplayFactsGameplayFactAdmissionFailureResponse =
     };
 };
 
-export type NoCtfapiEndpointsGameplayFactsGameplayFactAdmissionFailureCodeProtocol = 'ResourceDeleted' | 'ChallengeUnavailable' | 'TeamForbidden' | 'TeamBanned' | 'GameplayFactKindUnsupported' | 'CompetitionPaused' | 'CompetitionNotPublished' | 'CompetitionNotStarted' | 'CompetitionFinished' | 'CompetitionUnavailable' | 'RuntimeNotRunning' | 'BreakRequired' | 'AchievementAlreadySucceeded' | 'AttemptsExhausted' | 'FlagInvalid' | 'FlagBatchNotSupported' | 'GameplayFactScopeNotFound' | 'GameplayFactConcurrency' | 'PatchUploadNotFound';
+export type NoCtfapiEndpointsGameplayFactsGameplayFactAdmissionFailureCodeProtocol = 'ResourceDeleted' | 'ChallengeUnavailable' | 'TeamForbidden' | 'TeamBanned' | 'GameplayFactKindUnsupported' | 'CompetitionPaused' | 'CompetitionNotPublished' | 'CompetitionNotStarted' | 'CompetitionFinished' | 'CompetitionUnavailable' | 'RuntimeNotRunning' | 'BreakRequired' | 'AchievementAlreadySucceeded' | 'AttemptsExhausted' | 'FlagInvalid' | 'FlagBatchNotSupported' | 'GameplayFactScopeNotFound' | 'GameplayFactConcurrency' | 'PatchUploadNotFound' | 'ChallengeNotOpened' | 'ChallengeSubmissionClosed';
 
 export type NoCtfapiEndpointsGameplayFactsSubmitFlagRequest = {
     flag?: string | null;
@@ -2401,6 +2404,7 @@ export type NoCtfapiEndpointsChallengesChallengeResponse = {
     patchVerificationRuntimeState?: NoCtfapiEndpointsRuntimeRuntimeStateProtocol | null;
     directionId?: string | null;
     directionIcon?: string | null;
+    timing?: NoCtfapiEndpointsChallengesCompetitionChallengeTimingResponse | null;
     tags?: Array<string>;
 };
 
@@ -2414,6 +2418,16 @@ export type NoCtfapiEndpointsChallengesParticipantChallengeHintResponse = {
 };
 
 export type NoCtfapiEndpointsChallengesCtfInteractionKindProtocol = 'FlagSubmission' | 'PatchVerification';
+
+export type NoCtfapiEndpointsChallengesCompetitionChallengeTimingResponse = {
+    autoOpenAt?: string | null;
+    scoringEndsAt?: string | null;
+    submissionDeadlineAt?: string | null;
+    openingState?: NoCtfDomainChallengesChallengeOpeningState;
+    recalculationPending?: boolean;
+};
+
+export type NoCtfDomainChallengesChallengeOpeningState = 'None' | 'Pending' | 'Applied' | 'Canceled';
 
 export type NoCtfapiEndpointsChallengesGetChallengeRequest = {
     [key: string]: never;
@@ -2460,6 +2474,7 @@ export type NoCtfapiEndpointsChallengesChallengeSummaryResponse = {
     prerequisitesTotal?: number;
     directionId?: string | null;
     directionIcon?: string | null;
+    timing?: NoCtfapiEndpointsChallengesCompetitionChallengeTimingResponse | null;
     tags?: Array<string>;
 };
 
@@ -4862,6 +4877,13 @@ export type NoCtfapiEndpointsAdministrationChallengesCreateChallengeRequest = {
     customTitle?: string | null;
     order?: number;
     tags?: Array<string> | null;
+    timing?: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeTimingPatchRequest | null;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeTimingPatchRequest = {
+    autoOpenAt?: string | null;
+    scoringEndsAt?: string | null;
+    submissionDeadlineAt?: string | null;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengesChallengeHintResponse = {
@@ -4980,6 +5002,7 @@ export type NoCtfapiEndpointsAdministrationChallengesListChallengeHintsRequest =
 export type NoCtfapiEndpointsAdministrationChallengesPatchCompetitionChallengeRequest = {
     presentation?: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengePresentationPatchRequest | null;
     rules?: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesPatchRequest | null;
+    timing?: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeTimingPatchRequest | null;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengesCompetitionChallengePresentationPatchRequest = {

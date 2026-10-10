@@ -193,6 +193,10 @@ public sealed class InternalResultStore(
         var decision = context.Competition.Mode == GameMode.Ctf
             ? CtfPatchVerificationOutcomeMapper.Map(result.Outcome)
             : MapAwdpOutcome(result.Outcome);
+        var timing = NoCTF.Domain.Challenges.ChallengeTiming.From(context.Challenge);
+        fact.TimeEligibility = timing.Eligibility(fact.OccurredAt);
+        fact.AppliedTimingRevision = context.Challenge.TimingRevision;
+        decision = decision with { Result = timing.Classify(decision.Result, fact.OccurredAt) };
         fact.Result = decision.Result;
         fact.State = GameplayFactState.Completed;
         fact.FailureCode = decision.FailureCode;

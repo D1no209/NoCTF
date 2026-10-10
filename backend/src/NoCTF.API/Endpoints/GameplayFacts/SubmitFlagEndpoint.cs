@@ -52,7 +52,8 @@ public enum GameplayFactResultProtocol
     ServiceUp,
     ServiceDown,
     Controlled,
-    Uncontrolled
+    Uncontrolled,
+    RightButDue
 }
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<GameplayFactFailureCodeProtocol>))]
@@ -114,7 +115,9 @@ public sealed record GameplayFactStatusResponse(
     GameplayFactResultProtocol? Result,
     GameplayFactFailureCodeProtocol? FailureCode,
     DateTimeOffset OccurredAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<NoCTF.Domain.Challenges.GameplayFactTimeEligibility>))]
+    NoCTF.Domain.Challenges.GameplayFactTimeEligibility TimeEligibility = NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid);
 
 public sealed record AdminGameplayFactStatusResponse(
     Guid GameplayFactId,
@@ -153,7 +156,9 @@ public enum GameplayFactAdmissionFailureCodeProtocol
     FlagBatchNotSupported,
     GameplayFactScopeNotFound,
     GameplayFactConcurrency,
-    PatchUploadNotFound
+    PatchUploadNotFound,
+    ChallengeNotOpened,
+    ChallengeSubmissionClosed
 }
 
 public sealed record GameplayFactAdmissionFailureResponse(
@@ -215,7 +220,9 @@ internal static class GameplayFactProblemDetails
         AdmissionFailureCode.CompetitionFinished or AdmissionFailureCode.CompetitionNotStarted
             or AdmissionFailureCode.BreakRequired
             or AdmissionFailureCode.AchievementAlreadySucceeded
-            or AdmissionFailureCode.RuntimeNotRunning =>
+            or AdmissionFailureCode.RuntimeNotRunning
+            or AdmissionFailureCode.ChallengeNotOpened
+            or AdmissionFailureCode.ChallengeSubmissionClosed =>
             StatusCodes.Status409Conflict,
         _ => StatusCodes.Status400BadRequest
     };

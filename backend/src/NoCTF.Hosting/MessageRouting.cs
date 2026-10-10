@@ -22,6 +22,8 @@ public static class MessageRouting
         Route<EvaluateGameplayFact>(options, WorkerQueue.Gameplay);
         Route<DispatchPendingGameplayFacts>(options, WorkerQueue.Control);
         Route<NoCTF.Application.LiveSolo.Rounds.AdvanceLiveSoloRound>(options, WorkerQueue.Control);
+        Route<NoCTF.Application.Challenges.Timing.AdvanceChallengeOpening>(options, WorkerQueue.Control);
+        Route<NoCTF.Application.Challenges.Timing.RecalculateChallengeTiming>(options, WorkerQueue.Control);
         options.PublishMessage<NoCTF.Application.LiveSolo.Realtime.LiveSoloMatchChanged>()
             .ToNatsSubject(NatsSubjects.RealtimeEvents).UseJetStream(NatsSubjects.EventsStream);
         options.ConfigureNoCtfInfrastructureRetriesFor<NoCTF.Application.LiveSolo.Realtime.LiveSoloMatchChanged>(

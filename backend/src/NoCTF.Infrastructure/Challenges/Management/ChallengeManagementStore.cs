@@ -104,6 +104,19 @@ public sealed class ChallengeManagementStore(
         entity.CustomTitle = command.CustomTitle;
         entity.Order = command.Order;
         entity.Rules = rules;
+        if (command.Timing is { IsEmpty: false } timing)
+        {
+            if (!timing.IsValid) return new(null, ChallengeMutationFailure.InvalidTiming);
+            if (entity.Mode == GameMode.LiveSolo) return new(null, ChallengeMutationFailure.TimingUnsupported);
+            entity.AutoOpenAt = timing.AutoOpenAt;
+            entity.ScoringEndsAt = timing.ScoringEndsAt;
+            entity.SubmissionDeadlineAt = timing.SubmissionDeadlineAt;
+            entity.OpeningState = timing.AutoOpenAt is null ? ChallengeOpeningState.None : ChallengeOpeningState.Pending;
+            entity.TimingRevision = Guid.NewGuid();
+            await outbox.PublishAsync(new NoCTF.Application.Challenges.Timing.RecalculateChallengeTiming(entity.Id, entity.TimingRevision));
+            if (entity.OpeningState == ChallengeOpeningState.Pending)
+                await outbox.PublishAsync(new NoCTF.Application.Challenges.Timing.AdvanceChallengeOpening(entity.Id, entity.TimingRevision));
+        }
         entity.UpdatedAt = command.CreatedAt;
         db.CompetitionChallenges.Add(entity);
         await events.RecordAsync(new(
@@ -190,7 +203,8 @@ public sealed class ChallengeManagementStore(
                 item.Instance.DirectionId,
                 item.Instance.Direction != null ? item.Instance.Direction.Icon : null)
             {
-                Tags = item.Instance.Tags.OrderBy(tag => tag.Position).Select(tag => tag.Name).ToArray()
+                Tags = item.Instance.Tags.OrderBy(tag => tag.Position).Select(tag => tag.Name).ToArray(),
+                Timing = new(item.Instance.AutoOpenAt, item.Instance.ScoringEndsAt, item.Instance.SubmissionDeadlineAt)
             })
             .ToArrayAsync(ct);
     }
@@ -243,6 +257,14 @@ public sealed class ChallengeManagementStore(
         if (command.Tags is not null) CompetitionChallengeTags.Replace(entity.Tags, command.Tags);
         entity.CustomTitle = command.CustomTitle;
         entity.Order = command.Order;
+        if (becamePublished && entity.AutoOpenAt > command.UpdatedAt)
+        {
+            entity.AutoOpenAt = command.UpdatedAt;
+            entity.TimingRevision = Guid.NewGuid();
+            await outbox.PublishAsync(new NoCTF.Application.Challenges.Timing.RecalculateChallengeTiming(entity.Id, entity.TimingRevision));
+        }
+        if (wasPublished != command.IsPublished || becamePublished)
+            entity.OpeningState = command.IsPublished ? ChallengeOpeningState.Applied : ChallengeOpeningState.Canceled;
         entity.IsPublished = command.IsPublished;
         entity.UpdatedAt = command.UpdatedAt;
         var eventKind = (wasPublished, command.IsPublished) switch
@@ -438,7 +460,9 @@ public sealed class ChallengeManagementStore(
                 item.Instance.UpdatedAt,
                 item.Instance.DirectionId,
                 item.Instance.Direction != null ? item.Instance.Direction.Icon : null,
-                item.Instance.Tags.OrderBy(tag => tag.Position).Select(tag => tag.Name).ToArray()))
+                item.Instance.Tags.OrderBy(tag => tag.Position).Select(tag => tag.Name).ToArray(),
+                item.Instance.AutoOpenAt, item.Instance.ScoringEndsAt, item.Instance.SubmissionDeadlineAt,
+                item.Instance.OpeningState, item.Instance.TimingRevision != item.Instance.AppliedTimingRevision))
             .AsSplitQuery();
     }
 
@@ -461,6 +485,8 @@ public sealed class ChallengeManagementStore(
             instance.UpdatedAt)
         {
             Tags = instance.Tags.OrderBy(tag => tag.Position).Select(tag => tag.Name).ToArray(),
+            Timing = ChallengeTiming.From(instance), OpeningState = instance.OpeningState,
+            TimingRecalculationPending = instance.TimingRevision != instance.AppliedTimingRevision,
             DirectionId = instance.DirectionId,
             DirectionIcon = instance.Direction?.Icon,
             UsesDynamicFlag = runtime is { FlagSource: not RuntimeFlagSource.Static },
@@ -487,6 +513,8 @@ public sealed class ChallengeManagementStore(
             projection.UpdatedAt)
         {
             Tags = projection.Tags,
+            Timing = new(projection.AutoOpenAt, projection.ScoringEndsAt, projection.SubmissionDeadlineAt),
+            OpeningState = projection.OpeningState, TimingRecalculationPending = projection.TimingRecalculationPending,
             DirectionId = projection.DirectionId,
             DirectionIcon = projection.DirectionIcon,
             UsesDynamicFlag = runtime is { FlagSource: not RuntimeFlagSource.Static },
@@ -533,7 +561,8 @@ public sealed class ChallengeManagementStore(
         DateTimeOffset UpdatedAt,
         Guid? DirectionId,
         string? DirectionIcon,
-        IReadOnlyList<string> Tags);
+        IReadOnlyList<string> Tags, DateTimeOffset? AutoOpenAt, DateTimeOffset? ScoringEndsAt,
+        DateTimeOffset? SubmissionDeadlineAt, ChallengeOpeningState OpeningState, bool TimingRecalculationPending);
 
     private async Task<ChallengeMutationFailure?> FindCompetitionChallengeConflictAsync(
         Guid id,

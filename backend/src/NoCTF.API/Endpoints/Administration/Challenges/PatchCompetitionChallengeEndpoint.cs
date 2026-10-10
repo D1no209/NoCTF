@@ -75,6 +75,21 @@ public sealed class PatchCompetitionChallengeRequest
 {
     public CompetitionChallengePresentationPatchRequest? Presentation { get; set; }
     public CompetitionChallengeRulesPatchRequest? Rules { get; set; }
+    public CompetitionChallengeTimingPatchRequest? Timing { get; set; }
+}
+
+public sealed class CompetitionChallengeTimingPatchRequest
+{
+    private DateTimeOffset? autoOpenAt, scoringEndsAt, submissionDeadlineAt;
+    public DateTimeOffset? AutoOpenAt { get => autoOpenAt; set { autoOpenAt = value; HasAutoOpenAt = true; } }
+    public DateTimeOffset? ScoringEndsAt { get => scoringEndsAt; set { scoringEndsAt = value; HasScoringEndsAt = true; } }
+    public DateTimeOffset? SubmissionDeadlineAt { get => submissionDeadlineAt; set { submissionDeadlineAt = value; HasSubmissionDeadlineAt = true; } }
+    [JsonIgnore] public bool HasAutoOpenAt { get; private set; }
+    [JsonIgnore] public bool HasScoringEndsAt { get; private set; }
+    [JsonIgnore] public bool HasSubmissionDeadlineAt { get; private set; }
+    internal ChallengeTiming Apply(ChallengeTiming current) => new(HasAutoOpenAt ? AutoOpenAt : current.AutoOpenAt,
+        HasScoringEndsAt ? ScoringEndsAt : current.ScoringEndsAt,
+        HasSubmissionDeadlineAt ? SubmissionDeadlineAt : current.SubmissionDeadlineAt);
 }
 
 [Flags]
@@ -82,7 +97,8 @@ internal enum CompetitionChallengePatchSection
 {
     None = 0,
     Presentation = 1 << 0,
-    Rules = 1 << 1
+    Rules = 1 << 1,
+    Timing = 1 << 2
 }
 
 public sealed class PatchCompetitionChallengeValidator
@@ -91,7 +107,7 @@ public sealed class PatchCompetitionChallengeValidator
     public PatchCompetitionChallengeValidator()
     {
         RuleFor(request => request)
-            .Must(request => request.Presentation is not null || request.Rules is not null)
+            .Must(request => request.Presentation is not null || request.Rules is not null || request.Timing is not null)
             .WithMessage(_ => ApiMessages.Text(ApiMessageId.PatchCompetitionChallengeValidationLeastOneCompetitionChallenge)).WithErrorCode(ApiMessages.Key(ApiMessageId.PatchCompetitionChallengeValidationLeastOneCompetitionChallenge));
         RuleFor(request => request.Presentation!.CustomTitle).MaximumLength(160)
             .When(request => request.Presentation is not null);
@@ -117,6 +133,12 @@ public static partial class CompetitionChallengePatchMapper
 {
     [MapperIgnoreTarget(nameof(CompetitionChallenge.Id))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.ConcurrencyStamp))]
+    [MapperIgnoreTarget(nameof(CompetitionChallenge.AutoOpenAt))]
+    [MapperIgnoreTarget(nameof(CompetitionChallenge.ScoringEndsAt))]
+    [MapperIgnoreTarget(nameof(CompetitionChallenge.SubmissionDeadlineAt))]
+    [MapperIgnoreTarget(nameof(CompetitionChallenge.OpeningState))]
+    [MapperIgnoreTarget(nameof(CompetitionChallenge.TimingRevision))]
+    [MapperIgnoreTarget(nameof(CompetitionChallenge.AppliedTimingRevision))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.WriteUpDeductionPercent))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.CompetitionId))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.ChallengeId))]
@@ -140,6 +162,12 @@ public static partial class CompetitionChallengePatchMapper
     [MapperIgnoreTarget(nameof(CompetitionChallenge.Mode))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.Id))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.ConcurrencyStamp))]
+    [MapperIgnoreTarget(nameof(CompetitionChallenge.AutoOpenAt))]
+    [MapperIgnoreTarget(nameof(CompetitionChallenge.ScoringEndsAt))]
+    [MapperIgnoreTarget(nameof(CompetitionChallenge.SubmissionDeadlineAt))]
+    [MapperIgnoreTarget(nameof(CompetitionChallenge.OpeningState))]
+    [MapperIgnoreTarget(nameof(CompetitionChallenge.TimingRevision))]
+    [MapperIgnoreTarget(nameof(CompetitionChallenge.AppliedTimingRevision))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.WriteUpDeductionPercent))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.CompetitionId))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.ChallengeId))]
@@ -164,7 +192,8 @@ public sealed class PatchCompetitionChallengeEndpoint(
     IAtomicAggregatePatch atomicPatch,
     ICompetitionModerationAuthorizer authorizer,
     IUserContext user,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    NoCTF.Application.Challenges.Timing.IChallengeTimingStore? timingStore = null)
     : Endpoint<PatchCompetitionChallengeRequest,
         Results<Ok<AdminCompetitionChallengeResponse>, NotFound,
             ForbidHttpResult, Conflict<CompetitionChallengeConflictResponse>, ProblemHttpResult>>
@@ -302,6 +331,19 @@ public sealed class PatchCompetitionChallengeEndpoint(
                 }
             }
 
+            if ((sections & CompetitionChallengePatchSection.Timing) != 0)
+            {
+                var failure = await (timingStore ?? throw new InvalidOperationException("Challenge timing store is required."))
+                    .ChangeAsync(new(competitionId, competitionChallengeId, request.Timing!.Apply((await get.ExecuteAsync(competitionId, competitionChallengeId, true, false, transactionCt))!.Timing), timeProvider.GetUtcNow()), transactionCt);
+                if (failure is not null)
+                {
+                    Results<Ok<AdminCompetitionChallengeResponse>, NotFound, ForbidHttpResult, Conflict<CompetitionChallengeConflictResponse>, ProblemHttpResult> timingResponse =
+                        failure == NoCTF.Application.Challenges.Timing.ChallengeTimingFailure.NotFound ? TypedResults.NotFound()
+                        : TypedResults.Problem(statusCode: 400, detail: failure.ToString(), extensions: new Dictionary<string, object?> { ["code"] = failure.ToString() });
+                    return AtomicAggregatePatchDecision<Results<Ok<AdminCompetitionChallengeResponse>, NotFound, ForbidHttpResult,
+                        Conflict<CompetitionChallengeConflictResponse>, ProblemHttpResult>>.Rollback(timingResponse);
+                }
+            }
             var refreshed = await get.ExecuteAsync(
                 competitionId,
                 competitionChallengeId,
@@ -334,5 +376,6 @@ public sealed class PatchCompetitionChallengeEndpoint(
         (request.Presentation is null ? CompetitionChallengePatchSection.None
             : CompetitionChallengePatchSection.Presentation)
         | (request.Rules is null ? CompetitionChallengePatchSection.None
-            : CompetitionChallengePatchSection.Rules);
+            : CompetitionChallengePatchSection.Rules)
+        | (request.Timing is null ? CompetitionChallengePatchSection.None : CompetitionChallengePatchSection.Timing);
 }

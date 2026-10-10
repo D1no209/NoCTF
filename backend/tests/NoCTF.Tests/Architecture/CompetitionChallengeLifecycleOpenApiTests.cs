@@ -80,7 +80,7 @@ public sealed class CompetitionChallengeLifecycleOpenApiTests
                 .GetProperty("schema"));
 
         await Assert.That(PropertyNames(request))
-            .IsEquivalentTo(["presentation", "rules"]);
+            .IsEquivalentTo(["presentation", "rules", "timing"]);
         var presentationProperty = request.GetProperty("properties").GetProperty("presentation");
         var presentation = ResolveSchema(root,
             presentationProperty.GetProperty("oneOf").EnumerateArray().First());

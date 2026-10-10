@@ -76,7 +76,7 @@ export function gameplayFactStateLabel(state?: NoCtfapiEndpointsGameplayFactsGam
 
 export function gameplayFactResultLabel(result?: NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol | null): string {
   if (result === null || result === undefined) return translate("common.label.underEvaluation")
-  const labels = { Correct: translate("common.label.correct"), Wrong: translate("common.label.wrong"), Duplicate: translate("common.label.repeat"), AttemptsExhausted: translate("common.label.exhausted"), Rejected: translate("common.label.rejected"), Unlocked: translate("common.label.unlocked"), Applied: translate("common.label.applied"), ServiceUp: translate("common.label.serviceNormal"), ServiceDown: translate("common.label.serviceException"), Controlled: translate("common.label.controlled"), Uncontrolled: translate("common.label.uncontrolled") } satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol, string>
+  const labels = { RightButDue: translate("challenges.flagSubmit.correctWithoutScore"), Correct: translate("common.label.correct"), Wrong: translate("common.label.wrong"), Duplicate: translate("common.label.repeat"), AttemptsExhausted: translate("common.label.exhausted"), Rejected: translate("common.label.rejected"), Unlocked: translate("common.label.unlocked"), Applied: translate("common.label.applied"), ServiceUp: translate("common.label.serviceNormal"), ServiceDown: translate("common.label.serviceException"), Controlled: translate("common.label.controlled"), Uncontrolled: translate("common.label.uncontrolled") } satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol, string>
   return labels[result]
 }
 

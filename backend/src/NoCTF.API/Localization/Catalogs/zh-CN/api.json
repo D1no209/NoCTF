@@ -137,5 +137,9 @@
   "api.endpoints.register.emailConflict": "该邮箱地址已被注册。",
   "api.authentication.registerUser.emailConflict": "该邮箱地址已被注册。",
   "api.endpoints.competitionQuestion.teamActiveQuestionLimitReached": "队伍已达到 {limit} 个进行中咨询的上限。",
-  "api.endpoints.competitionQuestion.participantMessageLimitReached": "工作人员回复前，参赛者消息已达到 {limit} 条的上限。"
+  "api.endpoints.competitionQuestion.participantMessageLimitReached": "工作人员回复前，参赛者消息已达到 {limit} 条的上限。",
+  "api.gameplayFacts.gameplayFactAdmission.challengeNotOpened": "题目尚未开放。",
+  "api.gameplayFacts.gameplayFactAdmission.challengeSubmissionClosed": "本题提交已截止。",
+  "api.challenges.challengeMutation.invalidTiming": "开放、计分结束和提交截止时间必须依次排列。",
+  "api.challenges.challengeMutation.timingUnsupported": "LiveSolo 使用独立的对局时间规则。"
 }

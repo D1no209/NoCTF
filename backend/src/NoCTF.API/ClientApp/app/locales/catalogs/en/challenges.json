@@ -189,5 +189,6 @@
   "challenges.label.confirmUnlock": "Confirm unlock",
   "terminal.submitHint": "Press Enter to submit the flag",
   "terminal.multipleHint": "Enter to submit; Shift+Enter for a new line. Multiple flags can be pasted.",
-  "challenges.checker.label": "Checker"
+  "challenges.checker.label": "Checker",
+  "challenges.flagSubmit.correctWithoutScore": "Correct answer; this submission earns no score."
 }

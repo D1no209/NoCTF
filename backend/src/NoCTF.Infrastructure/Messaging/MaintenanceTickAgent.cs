@@ -312,6 +312,8 @@ public sealed class MaintenanceTickAgent(
             NoCTF.Application.LiveSolo.Media.AdvanceLiveSoloCapture value => bus.PublishAsync(value),
             NoCTF.Application.LiveSolo.Media.PruneLiveSoloCapture value => bus.PublishAsync(value),
             NoCTF.Application.LiveSolo.Media.SnapshotLiveSoloResult value => bus.PublishAsync(value),
+            NoCTF.Application.Challenges.Timing.AdvanceChallengeOpening value => bus.PublishAsync(value),
+            NoCTF.Application.Challenges.Timing.RecalculateChallengeTiming value => bus.PublishAsync(value),
             _ => throw new ArgumentOutOfRangeException(
                 nameof(message),
                 message.GetType().FullName,

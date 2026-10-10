@@ -39,7 +39,8 @@ public sealed class ProgressionChallengeAccess(
                     && (fact.Kind == GameplayFactKind.FlagAttempt
                         || fact.Kind == GameplayFactKind.FixAttempt)
                     && fact.State == GameplayFactState.Completed
-                    && fact.Result == GameplayFactResult.Correct)
+                    && fact.TimeEligibility == NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid
+                        && (fact.Result == GameplayFactResult.Correct || fact.Result == GameplayFactResult.RightButDue))
                 .Select(fact => fact.CompetitionChallengeId)
                 .Distinct().ToArrayAsync(ct)).ToHashSet();
         var evaluation = ProgressionGraphRules.Evaluate(

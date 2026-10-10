@@ -24,7 +24,9 @@ public enum GameplayFactAdmissionFailureCode
     FlagBatchNotSupported,
     GameplayFactScopeNotFound,
     GameplayFactConcurrency,
-    PatchUploadNotFound
+    PatchUploadNotFound,
+    ChallengeNotOpened,
+    ChallengeSubmissionClosed
 }
 
 /// <summary>Applies transport-independent admission rules using the trusted receive time.</summary>
@@ -58,6 +60,11 @@ public static class GameplayFactAdmissionPolicy
             || kind == GameplayFactKind.FixAttempt && !rules.AllowsFix)
             return OperationResult<GameplayFactAdmissionFailureCode>.Failure(GameplayFactAdmissionFailureCode.GameplayFactKindUnsupported, "This game mode does not accept this gameplay fact kind.");
         var practice = IsPracticeFlagAttempt(snapshot, kind, receivedAt);
+        var timeEligibility = snapshot.Timing?.Eligibility(receivedAt, practice) ?? NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid;
+        if (timeEligibility == NoCTF.Domain.Challenges.GameplayFactTimeEligibility.NotOpened)
+            return OperationResult<GameplayFactAdmissionFailureCode>.Failure(GameplayFactAdmissionFailureCode.ChallengeNotOpened, "The challenge has not opened.");
+        if (timeEligibility == NoCTF.Domain.Challenges.GameplayFactTimeEligibility.SubmissionClosed)
+            return OperationResult<GameplayFactAdmissionFailureCode>.Failure(GameplayFactAdmissionFailureCode.ChallengeSubmissionClosed, "The challenge submission deadline has passed.");
         if (!practice && snapshot.CompetitionStatus != CompetitionStatus.Running)
             return snapshot.CompetitionStatus switch
             {

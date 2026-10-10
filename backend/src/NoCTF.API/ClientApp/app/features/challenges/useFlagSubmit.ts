@@ -166,10 +166,12 @@ emit: { (event: "evaluated", ...args: [result: TrackedSubmission['result']]): vo
     }
     if (wasPending && !isGameplayFactPending(data.state) && !toasted.has(id)) {
       toasted.add(id)
-      if (data.result === 'Correct') {
+      if ((data.result === 'Correct' || data.result === 'RightButDue') && data.timeEligibility !== 'NotOpened' && data.timeEligibility !== 'SubmissionClosed') {
         solvedChallengeKeys.add(challengeKey())
         solved.value = true
-        if (props.practice)
+        if (data.result === 'RightButDue')
+          showResult(true, translate('challenges.flagSubmit.correctWithoutScore'))
+        else if (props.practice)
           showResult(true, translate("challenges.flagSubmit.description.correctFlagPracticeAttempts"))
         else
           showResult(true, translate('terminal.challengeSolved'))

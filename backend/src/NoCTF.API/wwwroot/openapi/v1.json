@@ -26010,7 +26010,8 @@
           "ServiceUp",
           "ServiceDown",
           "Controlled",
-          "Uncontrolled"
+          "Uncontrolled",
+          "RightButDue"
         ],
         "enum": [
           0,
@@ -26023,7 +26024,8 @@
           7,
           8,
           9,
-          10
+          10,
+          11
         ]
       },
       "NoCTFDomainGameplayGameplayFactFailureCode": {
@@ -30086,6 +30088,9 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "timeEligibility": {
+            "$ref": "#/components/schemas/NoCTFDomainChallengesGameplayFactTimeEligibility"
           }
         }
       },
@@ -30147,7 +30152,8 @@
           "ServiceUp",
           "ServiceDown",
           "Controlled",
-          "Uncontrolled"
+          "Uncontrolled",
+          "RightButDue"
         ],
         "enum": [
           "Correct",
@@ -30160,7 +30166,8 @@
           "ServiceUp",
           "ServiceDown",
           "Controlled",
-          "Uncontrolled"
+          "Uncontrolled",
+          "RightButDue"
         ]
       },
       "NoCTFAPIEndpointsGameplayFactsGameplayFactFailureCodeProtocol": {
@@ -30247,6 +30254,20 @@
           "StaticFlagWithoutContainer",
           "StaticFlagWithoutAttachment",
           "StaticFlagWithoutContainerAndAttachment"
+        ]
+      },
+      "NoCTFDomainChallengesGameplayFactTimeEligibility": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Valid",
+          "NotOpened",
+          "SubmissionClosed"
+        ],
+        "enum": [
+          "Valid",
+          "NotOpened",
+          "SubmissionClosed"
         ]
       },
       "NoCTFAPIEndpointsGameplayFactsAwdpAchievementActivationResponse": {
@@ -30852,7 +30873,9 @@
           "FlagBatchNotSupported",
           "GameplayFactScopeNotFound",
           "GameplayFactConcurrency",
-          "PatchUploadNotFound"
+          "PatchUploadNotFound",
+          "ChallengeNotOpened",
+          "ChallengeSubmissionClosed"
         ],
         "enum": [
           "ResourceDeleted",
@@ -30873,7 +30896,9 @@
           "FlagBatchNotSupported",
           "GameplayFactScopeNotFound",
           "GameplayFactConcurrency",
-          "PatchUploadNotFound"
+          "PatchUploadNotFound",
+          "ChallengeNotOpened",
+          "ChallengeSubmissionClosed"
         ]
       },
       "NoCTFAPIEndpointsGameplayFactsSubmitFlagRequest": {
@@ -33222,6 +33247,14 @@
             "type": "string",
             "nullable": true
           },
+          "timing": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesCompetitionChallengeTimingResponse"
+              }
+            ]
+          },
           "tags": {
             "type": "array",
             "items": {
@@ -33268,6 +33301,49 @@
         "enum": [
           "FlagSubmission",
           "PatchVerification"
+        ]
+      },
+      "NoCTFAPIEndpointsChallengesCompetitionChallengeTimingResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "autoOpenAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "scoringEndsAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "submissionDeadlineAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "openingState": {
+            "$ref": "#/components/schemas/NoCTFDomainChallengesChallengeOpeningState"
+          },
+          "recalculationPending": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFDomainChallengesChallengeOpeningState": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "None",
+          "Pending",
+          "Applied",
+          "Canceled"
+        ],
+        "enum": [
+          "None",
+          "Pending",
+          "Applied",
+          "Canceled"
         ]
       },
       "NoCTFAPIEndpointsChallengesGetChallengeRequest": {
@@ -33419,6 +33495,14 @@
           "directionIcon": {
             "type": "string",
             "nullable": true
+          },
+          "timing": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesCompetitionChallengeTimingResponse"
+              }
+            ]
           },
           "tags": {
             "type": "array",
@@ -42180,6 +42264,35 @@
             "items": {
               "type": "string"
             }
+          },
+          "timing": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeTimingPatchRequest"
+              }
+            ]
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeTimingPatchRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "autoOpenAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "scoringEndsAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "submissionDeadlineAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         }
       },
@@ -42579,6 +42692,14 @@
             "oneOf": [
               {
                 "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeRulesPatchRequest"
+              }
+            ]
+          },
+          "timing": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeTimingPatchRequest"
               }
             ]
           }

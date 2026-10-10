@@ -727,5 +727,9 @@
   "api.upload.maximumSize": "Uploads cannot exceed {maximumBytes} bytes.",
   "api.authentication.botRoleInvalid": "Bot role must be a defined platform role.",
   "api.authentication.botUserNameInvalid": "Bot UserName must contain 3..64 ASCII letters, digits, '_' or '-'.",
-  "api.competitions.badge.concurrencyConflict": "Badge was updated concurrently."
+  "api.competitions.badge.concurrencyConflict": "Badge was updated concurrently.",
+  "api.gameplayFacts.gameplayFactAdmission.challengeNotOpened": "The challenge has not opened.",
+  "api.gameplayFacts.gameplayFactAdmission.challengeSubmissionClosed": "The challenge submission deadline has passed.",
+  "api.challenges.challengeMutation.invalidTiming": "Opening, scoring end and submission deadline must be in order.",
+  "api.challenges.challengeMutation.timingUnsupported": "LiveSolo uses its own Round timing."
 }

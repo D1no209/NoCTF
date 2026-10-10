@@ -551,6 +551,20 @@ public sealed class GameplayFactProcessor(
             }
         }
         submission.VictimTeamId = evaluation.Decision.VictimTeamId;
+        if (submission.Kind is GameplayFactKind.FlagAttempt or GameplayFactKind.BreakAttempt or GameplayFactKind.FixAttempt)
+        {
+            var timingChallenge = await db.CompetitionChallenges.AsNoTracking().SingleAsync(x => x.Id == submission.CompetitionChallengeId, cancellationToken);
+            if (timingChallenge.Mode != GameMode.LiveSolo)
+            {
+                var timing = NoCTF.Domain.Challenges.ChallengeTiming.From(timingChallenge);
+                var practice = timingChallenge.Mode == GameMode.Ctf && submission.Kind == GameplayFactKind.FlagAttempt
+                    && evaluation.OfficialWindow is { } official && submission.OccurredAt >= official.EndAt;
+                submission.TimeEligibility = timing.Eligibility(submission.OccurredAt, practice);
+                submission.AppliedTimingRevision = timingChallenge.TimingRevision;
+                evaluation = evaluation with { Decision = evaluation.Decision with
+                    { Result = timing.Classify(evaluation.Decision.Result!.Value, submission.OccurredAt, practice) } };
+            }
+        }
         submission.Result = evaluation.Decision.Result;
         submission.FailureCode = evaluation.Decision.FailureCode;
         submission.ReferenceKind = evaluation.Decision.ReferenceKind ?? submission.ReferenceKind;

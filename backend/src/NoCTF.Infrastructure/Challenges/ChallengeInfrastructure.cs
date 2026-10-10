@@ -33,6 +33,8 @@ internal static class ChallengeInfrastructure
         services.AddScoped<IPerTeamRuntimeFlagStore, PerTeamRuntimeFlagStore>();
         services.AddScoped<ICompetitionChallengeReadAccess, CompetitionChallengeReadAccess>();
         services.AddScoped<IChallengeManagementStore, ChallengeManagementStore>();
+        services.AddScoped<NoCTF.Application.Challenges.Timing.IChallengeTimingStore, NoCTF.Infrastructure.Challenges.Timing.ChallengeTimingStore>();
+        services.AddScoped<NoCTF.Infrastructure.Messaging.IClusterScheduleContributor, NoCTF.Infrastructure.Challenges.Timing.ChallengeTimingScheduleSource>();
         services.AddScoped<IChallengeBankStore, ChallengeBankStore>();
         services.AddScoped<CreateChallengeTemplate>();
         services.AddScoped<ListChallengeTemplates>();
