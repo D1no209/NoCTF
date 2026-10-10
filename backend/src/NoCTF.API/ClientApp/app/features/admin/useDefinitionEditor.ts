@@ -5,6 +5,7 @@ import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionCon
 import { applyCtfInteraction, CtfInteraction } from '../../utils/game-config'
 import DefinitionCheckerSectionComponent from './DefinitionCheckerSection.vue'
 import DefinitionFlagInjectionSectionComponent from './DefinitionFlagInjectionSection.vue'
+import DefinitionFlagTemplateSectionComponent from './DefinitionFlagTemplateSection.vue'
 import DefinitionPatchSectionComponent from './DefinitionPatchSection.vue'
 import DefinitionRuntimeSectionComponent from './DefinitionRuntimeSection.vue'
 
@@ -28,6 +29,7 @@ emit: { (event: "update:modelValue", ...args: [definition: NoCtfapiEndpointsAdmi
   const DefinitionCheckerSection = markRaw(DefinitionCheckerSectionComponent)
 
   const DefinitionFlagInjectionSection = markRaw(DefinitionFlagInjectionSectionComponent)
+  const DefinitionFlagTemplateSection = markRaw(DefinitionFlagTemplateSectionComponent)
 
   const DefinitionPatchSection = markRaw(DefinitionPatchSectionComponent)
 
@@ -60,6 +62,7 @@ emit: { (event: "update:modelValue", ...args: [definition: NoCtfapiEndpointsAdmi
       parseFailed,
       DefinitionCheckerSection,
       DefinitionFlagInjectionSection,
+      DefinitionFlagTemplateSection,
       DefinitionPatchSection,
       DefinitionRuntimeSection,
       CtfInteraction,

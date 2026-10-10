@@ -216,11 +216,20 @@ public sealed class GetCompetitionEndpoint(
 
     public override async Task<Results<Ok<CompetitionResponse>, NotFound>> ExecuteAsync(GetCompetitionRequest request, CancellationToken ct)
     {
-        var view = await get.ExecuteAsync(Route<Guid>("competitionId"), false, ct);
+        var competitionId = Route<Guid>("competitionId");
+        var staffAccess = user.UserId != Guid.Empty
+            && await authorizer.CanObserveAsync(user.UserId, competitionId, ct);
+        var view = await get.ExecuteAsync(competitionId, staffAccess, ct);
         if (view is null)
             return TypedResults.NotFound();
 
-        var role = await CompetitionAdministrationRoleResolver.ResolveAsync(view, user, authorizer, ct);
+        if (staffAccess)
+        {
+            HttpContext.Response.Headers.CacheControl = "private,no-store";
+            HttpContext.Response.Headers.Vary = "Authorization";
+        }
+        var role = await CompetitionAdministrationRoleResolver.ResolveAsync(
+            view, user, authorizer, ct, accessAlreadyEstablished: staffAccess);
         return TypedResults.Ok(CompetitionMapper.ToResponse(
             view,
             timeProvider.GetUtcNow()) with { AdministrationRole = role });

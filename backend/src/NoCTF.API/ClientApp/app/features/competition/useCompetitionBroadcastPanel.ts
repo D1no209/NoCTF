@@ -30,6 +30,7 @@ export function useCompetitionBroadcastPanel(props: Readonly<Omit<{
   fill?: boolean
 }, "fill">>>) {
   const ctx = inject(competitionContextKey)!
+  const canReadBroadcasts = computed(() => ctx.canReadBroadcasts.value)
 
   const items = ref<CompetitionEvent[]>([])
 
@@ -51,6 +52,9 @@ export function useCompetitionBroadcastPanel(props: Readonly<Omit<{
   let historyPage: BroadcastPage | null = null
   const newerPages: BroadcastPage[] = []
   let clearEnteringTimer: ReturnType<typeof setTimeout> | undefined
+  const requests = new Set<AbortController>()
+  let unwatch: (() => void) | undefined
+  let mounted = false
 
   function nextPage(page: BroadcastPage, cursor?: string | null): BroadcastPage | null {
     if (cursor) return { ...page, cursor }
@@ -64,6 +68,8 @@ export function useCompetitionBroadcastPanel(props: Readonly<Omit<{
 
   function reset(): void {
     generation += 1
+    for (const request of requests) request.abort()
+    requests.clear()
     items.value = []
     loading.value = true
     loadingMore.value = false
@@ -74,23 +80,34 @@ export function useCompetitionBroadcastPanel(props: Readonly<Omit<{
     historyPage = null
     newerPages.length = 0
     enteringIdentities.value = new Set()
+    if (clearEnteringTimer) clearTimeout(clearEnteringTimer)
+    clearEnteringTimer = undefined
     updateHasMore()
+  }
+
+  function clearBroadcasts(): void {
+    reset()
+    loading.value = false
+    latestNotifiedAt = 0
   }
 
   async function loadMore(): Promise<void> {
     const page = newerPages[0] ?? historyPage
-    if (!page || loadingMore.value || disposed) return
+    if (!page || loadingMore.value || disposed || !canReadBroadcasts.value) return
     const requestGeneration = generation
     const competitionId = props.competitionId
     loadingMore.value = true
     historyError.value = null
+    const request = new AbortController()
+    requests.add(request)
     try {
       const { data, error: requestError } = await listCompetitionEvents({
         path: { competitionId },
+        signal: request.signal,
         query: { ...page.window, kinds: competitionBroadcastKinds,
           offset: 0, limit: competitionBroadcastPageSize, desc: true, cursor: page.cursor ?? undefined },
       })
-      if (disposed || requestGeneration !== generation) return
+      if (disposed || requestGeneration !== generation || !canReadBroadcasts.value) return
       if (requestError || !data) throw requestError
       // Merge into the current list: a simultaneous live refresh may have prepended rows.
       items.value = mergeCompetitionBroadcasts(items.value, data.items ?? [])
@@ -105,6 +122,7 @@ export function useCompetitionBroadcastPanel(props: Readonly<Omit<{
         historyError.value = parseApiError(requestError, describeMessage('competitions.competitionBroadcast.error.loadHistoryFailed')).displayMessage
     }
     finally {
+      requests.delete(request)
       if (!disposed && requestGeneration === generation) loadingMore.value = false
     }
   }
@@ -136,7 +154,7 @@ export function useCompetitionBroadcastPanel(props: Readonly<Omit<{
   }
 
   async function load(): Promise<void> {
-    if (disposed) return
+    if (disposed || !canReadBroadcasts.value) return
     const competition = ctx.competition.value
     if (!competition) return
     const status = competition.status ?? null
@@ -162,13 +180,16 @@ export function useCompetitionBroadcastPanel(props: Readonly<Omit<{
     const newestAt = Date.parse(items.value[0]?.occurredAt ?? '')
     if (feedStarted && Number.isFinite(newestAt))
       queryWindow.from = new Date(Math.max(Date.parse(queryWindow.from), newestAt)).toISOString()
+    const request = new AbortController()
+    requests.add(request)
     try {
       const { data, error: requestError } = await listCompetitionEvents({
         path: { competitionId: props.competitionId },
+        signal: request.signal,
         query: { ...queryWindow, kinds: competitionBroadcastKinds,
           offset: 0, limit: competitionBroadcastPageSize, desc: true },
       })
-      if (disposed || requestGeneration !== generation) return
+      if (disposed || requestGeneration !== generation || !canReadBroadcasts.value) return
       if (requestError || !data) throw requestError
       const incoming = data.items ?? []
       const merged = mergeCompetitionBroadcasts(items.value, incoming)
@@ -198,6 +219,7 @@ export function useCompetitionBroadcastPanel(props: Readonly<Omit<{
         error.value = parseApiError(requestError, describeMessage('competitions.competitionBroadcast.error.loadEventReportFailed')).displayMessage
     }
     finally {
+      requests.delete(request)
       if (!disposed && requestGeneration === generation) loading.value = false
     }
   }
@@ -205,19 +227,22 @@ export function useCompetitionBroadcastPanel(props: Readonly<Omit<{
   const refreshLatest = createTrailingRefresh(load)
 
   watch(
-    () => ctx.competition.value,
-    competition => {
+    [() => ctx.competition.value, canReadBroadcasts],
+    ([competition, allowed]) => {
+      synchronizeSubscription()
+      if (!allowed) { clearBroadcasts(); return }
       if (competition) void refreshLatest()
     },
     { immediate: true },
   )
 
-  let unwatch: (() => void) | undefined
-  let mounted = false
-
-  function subscribe(): void {
-    unwatch?.()
-    unwatch = watchCompetition(props.competitionId, {
+  function synchronizeSubscription(): void {
+    if (!mounted || disposed || !canReadBroadcasts.value) {
+      unwatch?.()
+      unwatch = undefined
+      return
+    }
+    unwatch ??= watchCompetition(props.competitionId, {
       competitionEventChanged: notification => {
         if (!isCompetitionBroadcastKind(notification.kind)) return
         const notifiedAt = Date.parse(notification.occurredAt)
@@ -231,18 +256,20 @@ export function useCompetitionBroadcastPanel(props: Readonly<Omit<{
   watch(() => props.competitionId, () => {
     latestNotifiedAt = 0
     reset()
-    if (mounted) subscribe()
+    unwatch?.()
+    unwatch = undefined
+    synchronizeSubscription()
     void refreshLatest()
   })
 
   onMounted(() => {
     mounted = true
-    subscribe()
+    synchronizeSubscription()
   })
 
   onUnmounted(() => {
     disposed = true
-    generation += 1
+    clearBroadcasts()
     unwatch?.()
     if (clearEnteringTimer) clearTimeout(clearEnteringTimer)
   })
@@ -251,6 +278,7 @@ export function useCompetitionBroadcastPanel(props: Readonly<Omit<{
       ...toRefs(props),
       Megaphone,
       items,
+      canReadBroadcasts,
       loading,
       loadingMore,
       hasMore,

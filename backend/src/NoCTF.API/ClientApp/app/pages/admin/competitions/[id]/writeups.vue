@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import Feature from '~/features/routes/admin/competitions/[id]/AdminCompetitionsByIdWriteUpsPage.vue'
 
-definePageMeta({ middleware: 'platform-admin' })
+definePageMeta({ middleware: 'competition-admin' })
 </script>
 
 <template>

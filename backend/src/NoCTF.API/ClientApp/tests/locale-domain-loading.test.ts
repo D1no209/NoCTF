@@ -4,7 +4,7 @@ import { sourceFile } from './support/feature-source'
 
 describe('locale feature catalogs', () => {
   test('loads only the feature domains required by public routes', () => {
-    expect(localeDomainsForPath('/')).toEqual(['account'])
+    expect(localeDomainsForPath('/')).toEqual(['account', 'live-solo'])
     expect(localeDomainsForPath('/competitions')).toEqual(['account', 'competitions', 'writeups'])
     expect(localeDomainsForPath('/competitions/c1/my/team')).toEqual([
       'account', 'competitions', 'writeups', 'runtime',

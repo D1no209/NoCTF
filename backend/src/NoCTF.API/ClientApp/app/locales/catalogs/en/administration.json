@@ -1152,5 +1152,6 @@
   "staffWebhook.errors.invalidEndpoint": "Configure an HTTPS platform origin and enter a valid HTTPS receiver URL.",
   "staffWebhook.errors.invalidCategories": "Select at least one distinct staff category.",
   "staffWebhook.errors.duplicateEndpoint": "A staff subscription already uses this receiver URL.",
-  "staffWebhook.errors.conflict": "The subscription changed concurrently. Reload and try again."
+  "staffWebhook.errors.conflict": "The subscription changed concurrently. Reload and try again.",
+  "administration.navigation.viewWriteups": "View writeups"
 }

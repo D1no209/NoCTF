@@ -34,6 +34,7 @@ export interface CompetitionContext {
   refresh: () => Promise<void>
   standing: Ref<NoCtfapiEndpointsCompetitionsScoreboardTeamResponse | null>
   refreshStanding: () => Promise<void>
+  canReadBroadcasts: Ref<boolean>
 }
 
 export const competitionContextKey: InjectionKey<CompetitionContext> = Symbol('competition-context')

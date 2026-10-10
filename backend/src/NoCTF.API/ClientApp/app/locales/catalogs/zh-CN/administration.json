@@ -1152,5 +1152,6 @@
   "staffWebhook.errors.invalidEndpoint": "请配置平台 HTTPS 来源，并输入有效的 HTTPS 接收端地址。",
   "staffWebhook.errors.invalidCategories": "请选择至少一个不重复的工作人员类别。",
   "staffWebhook.errors.duplicateEndpoint": "已有工作人员订阅使用此接收端地址。",
-  "staffWebhook.errors.conflict": "订阅同时被修改，请重新加载后再试。"
+  "staffWebhook.errors.conflict": "订阅同时被修改，请重新加载后再试。",
+  "administration.navigation.viewWriteups": "题解查看"
 }

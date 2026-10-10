@@ -34,15 +34,15 @@ describe('typed game configuration contracts', () => {
     expect('security' in emptyContainerDefinition()).toBeFalse()
   })
 
-  test.each(['Ctf', 'Awd', 'Awdp', 'Koh'] as const)('%s defaults select one typed branch without a schema version', (mode) => {
+  test.each(['Ctf', 'Awd', 'Awdp', 'Koh', 'LiveSolo'] as const)('%s defaults select one typed branch without a schema version', (mode) => {
     const definition = defaultDefinition(mode) as unknown as Record<string, unknown>
     expect(definition.mode).toBe(mode)
-    expect(definition[mode.toLowerCase()]).toBeDefined()
-    expect(['ctf', 'awd', 'awdp', 'koh'].filter(key => definition[key] != null)).toHaveLength(1)
+    expect(definition[mode === 'LiveSolo' ? 'liveSolo' : mode.toLowerCase()]).toBeDefined()
+    expect(['ctf', 'awd', 'awdp', 'koh', 'liveSolo'].filter(key => definition[key] != null)).toHaveLength(1)
     expect('schemaVersion' in definition).toBeFalse()
   })
 
-  test.each(['Ctf', 'Awd', 'Awdp', 'Koh'] as const)('%s serialized runtime selects a typed branch', (mode) => {
+  test.each(['Ctf', 'Awd', 'Awdp', 'Koh', 'LiveSolo'] as const)('%s serialized runtime selects a typed branch', (mode) => {
     const model = emptyDefinition(mode)
     model.runtime = emptyRuntimeTemplate(mode)
     const payload = JSON.parse(JSON.stringify(definitionModelToContract(mode, model))) as {

@@ -44,10 +44,7 @@ const { open, title, mode, visibility, direction, description, definition, saveE
                     <Select :model-value="mode" @update:model-value="changeMode">
                       <SelectTrigger id="create-template-mode" class="w-full"><SelectValue :placeholder="$t('common.label.selectMode')" /></SelectTrigger>
                       <SelectContent><SelectGroup>
-                        <SelectItem value="Ctf">{{ $t('common.label.ctf') }}</SelectItem>
-                        <SelectItem value="Awd">{{ $t('common.label.awd') }}</SelectItem>
-                        <SelectItem value="Awdp">{{ $t('common.label.awdp.createDialogView') }}</SelectItem>
-                        <SelectItem value="Koh">{{ $t('common.label.koh') }}</SelectItem>
+                        <SelectItem v-for="option in state.modeOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
                       </SelectGroup></SelectContent>
                     </Select>
                   </Field>

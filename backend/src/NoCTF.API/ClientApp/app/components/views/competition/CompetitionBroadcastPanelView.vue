@@ -8,6 +8,7 @@ const { Megaphone, items, loading, loadingMore, hasMore, historyError, error, br
 
 <template>
   <Card
+    v-if="state.canReadBroadcasts"
     as="aside"
     size="sm"
     class="gap-0 py-0"

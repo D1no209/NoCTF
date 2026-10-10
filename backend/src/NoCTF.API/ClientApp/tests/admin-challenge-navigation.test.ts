@@ -65,7 +65,7 @@ describe('challenge template list navigation', () => {
       expect(route).toContain("middleware: 'organizer'")
     expect(middleware).toContain('canOrganize')
     expect(middleware).toContain("path: '/auth/login'")
-    expect(trafficCaptures).toContain("middleware: 'platform-admin'")
+    expect(trafficCaptures).toContain("middleware: 'competition-admin'")
   })
 
   test('uses server-side offset pagination and debounced filters', async () => {

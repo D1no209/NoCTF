@@ -249,10 +249,7 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
                       </SelectTrigger>
                       <SelectContent>
                         <SelectGroup>
-                          <SelectItem value="Ctf">{{ $t('common.label.ctf') }}</SelectItem>
-                          <SelectItem value="Awd">{{ $t('common.label.awd') }}</SelectItem>
-                          <SelectItem value="Awdp">{{ $t('common.label.awdp.createDialogView') }}</SelectItem>
-                          <SelectItem value="Koh">{{ $t('common.label.koh') }}</SelectItem>
+                          <SelectItem v-for="option in state.modeOptions" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
                         </SelectGroup>
                       </SelectContent>
                     </Select>
@@ -284,8 +281,8 @@ const { Paperclip, RotateCcw, Trash2, Upload, challengeId, selectedSection, canO
                     <component :is="DefinitionPatchSection" :model="definitionModel" :disabled="isDeleted" />
                     <component :is="DefinitionCheckerSection" :model="definitionModel" :mode="form.mode" :disabled="isDeleted" />
                   </template>
-                  <template v-else-if="form.mode === 'Ctf'">
-                    <template v-if="definitionModel.interactionKind === CtfInteraction.PatchVerification">
+                  <template v-else-if="form.mode === 'Ctf' || form.mode === 'LiveSolo'">
+                    <template v-if="form.mode === 'Ctf' && definitionModel.interactionKind === CtfInteraction.PatchVerification">
                       <component :is="DefinitionPatchSection" :model="definitionModel" :disabled="isDeleted" />
                       <component :is="DefinitionCheckerSection" :model="definitionModel" :mode="form.mode" :disabled="isDeleted" />
                     </template>

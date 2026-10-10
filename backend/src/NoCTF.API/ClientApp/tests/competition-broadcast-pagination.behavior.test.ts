@@ -16,6 +16,7 @@ async function harness(count = 65, startDays = 2) {
   const now = Date.now()
   const events = Array.from({ length: count }, (_, i) => event(`event-${i}`, now - (i + 1) * 60_000))
   const competition = ref({ status: 'Running', startTime: new Date(now - startDays * 86400_000).toISOString() })
+  const canReadBroadcasts = ref(true)
   const props = reactive({ competitionId: 'competition', fill: true })
   const requests: any[] = []
   let fail = false
@@ -26,12 +27,12 @@ async function harness(count = 65, startDays = 2) {
   const scope = effectScope()
   const state = scope.run(() => factory({
     ...broadcast, computed, ref, watch, toRefs, createTrailingRefresh, parseApiError, Megaphone: {},
-    competitionContextKey: {}, inject: () => ({ competition }),
+    competitionContextKey: {}, inject: () => ({ competition, canReadBroadcasts }),
     describeMessage: (key: string) => ({ key }), motionAttributes: () => ({}),
     onMounted: (fn: () => void) => { mounted = fn }, onUnmounted: (fn: () => void) => { unmounted = fn },
     watchCompetition: (_: string, callbacks: any) => { handlers = callbacks; return () => {} },
-    listCompetitionEvents: async ({ path, query }: any) => {
-      requests.push({ ...query, competitionId: path.competitionId })
+    listCompetitionEvents: async ({ path, query, signal }: any) => {
+      requests.push({ ...query, competitionId: path.competitionId, signal })
       const pending = gate; gate = null
       if (pending) await pending
       if (fail) { fail = false; return { error: { status: 503 } } }
@@ -44,7 +45,7 @@ async function harness(count = 65, startDays = 2) {
   })(props))!
   mounted()
   await drain()
-  return { state, props, competition, requests, events, now,
+  return { state, props, competition, canReadBroadcasts, requests, events, now,
     reconnect: () => handlers.onReconnected(),
     failNext: () => { fail = true },
     defer: () => { let release!: () => void; gate = new Promise<void>(resolve => { release = resolve }); return release },
@@ -53,6 +54,25 @@ async function harness(count = 65, startDays = 2) {
 }
 
 describe('broadcast incremental history', () => {
+  test('permission loss clears history cursors and discards an in-flight history page', async () => {
+    const app = await harness()
+    try {
+      const release = app.defer()
+      const pending = app.state.loadMore()
+      app.canReadBroadcasts.value = false
+      await drain()
+      expect(app.requests[1].signal.aborted).toBeTrue()
+      expect(app.state.items.value).toEqual([])
+      expect(app.state.hasMore.value).toBeFalse()
+      release(); await pending; await app.state.loadMore()
+      expect(app.requests).toHaveLength(2)
+      expect(app.state.items.value).toEqual([])
+      app.canReadBroadcasts.value = true
+      await drain()
+      expect(app.requests.at(-1).cursor).toBeUndefined()
+      expect(app.state.items.value).toHaveLength(20)
+    } finally { app.stop() }
+  })
   test('fetches one bounded page per demand with a fixed cursor window', async () => {
     const app = await harness()
     expect(app.requests).toHaveLength(1)

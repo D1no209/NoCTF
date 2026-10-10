@@ -11,6 +11,7 @@ import { challengeTemplateWriteErrorMessages } from '../../../../lib/challenge-t
 import { validateChallengeTemplateDraft } from '../../../../lib/challenge-template-validation'
 import type { DefinitionModel } from '../../../../utils/game-config'
 import { applyCtfInteraction, CtfInteraction, defaultDefinition, definitionContractToModel, definitionModelToContract, FlagSource } from '../../../../utils/game-config'
+import { gameModeOptions, isGameMode } from '../../../../utils/game-modes'
 import AdminDateTimeComponent from '../../../admin/AdminDateTime.vue'
 import AdminGameModeBadgeComponent from '../../../admin/AdminGameModeBadge.vue'
 import ChallengeTestRuntimePanelComponent from '../../../admin/ChallengeTestRuntimePanel.vue'
@@ -91,7 +92,7 @@ export function useAdminChallengesByIdPage() {
 
   const hasModeDefinition = computed(() => {
     if (form.mode === 'Awd' || form.mode === 'Awdp') return true
-    if (form.mode === 'Ctf') return definitionModel.value?.interactionKind === CtfInteraction.PatchVerification
+    if (form.mode === 'Ctf' || form.mode === 'LiveSolo') return definitionModel.value?.interactionKind === CtfInteraction.PatchVerification
       || definitionModel.value?.runtime?.flagSource === FlagSource.PerTeam
     return false
   })
@@ -106,7 +107,7 @@ export function useAdminChallengesByIdPage() {
 
   const usesRuntimeFlagInjection = computed(() => {
     const value = template.value
-    return (value?.mode === 'Ctf' || value?.mode === 'Awdp')
+    return (value?.mode === 'Ctf' || value?.mode === 'Awdp' || value?.mode === 'LiveSolo')
       && persistedDefinitionModel.value?.runtime?.flagSource === FlagSource.PerTeam
   })
 
@@ -144,7 +145,7 @@ export function useAdminChallengesByIdPage() {
   }
 
   function changeMode(value: unknown): void {
-    if (value !== 'Ctf' && value !== 'Awd' && value !== 'Awdp' && value !== 'Koh') return
+    if (!isGameMode(value)) return
     form.definition = defaultDefinition(value)
     form.mode = value
   }
@@ -316,7 +317,11 @@ export function useAdminChallengesByIdPage() {
     const updated = await updateContent('runtime', contentFromTemplate(value, {
       definition: normalized,
     }), runtimeSaveErrors)
-    if (updated) syncRuntimeDefinition(updated)
+    if (updated) {
+      syncRuntimeDefinition(updated)
+      if (form.mode === updated.mode && definitionModel.value && updated.definition)
+        definitionModel.value.runtime = definitionContractToModel(updated.definition, updated.mode).runtime
+    }
   }
 
   async function saveModeDefinition(): Promise<void> {
@@ -558,7 +563,7 @@ export function useAdminChallengesByIdPage() {
   const regularExpressionCapability = ref(false)
 
   const supportsRegularExpression = computed(() => regularExpressionCapability.value
-    || template.value?.mode === 'Ctf'
+    || (template.value?.mode === 'Ctf' || template.value?.mode === 'LiveSolo')
       && persistedDefinitionModel.value?.interactionKind === CtfInteraction.FlagSubmission
       && !usesRuntimeFlagInjection.value)
 
@@ -771,6 +776,7 @@ export function useAdminChallengesByIdPage() {
   function setRandomUploadInputRef(element: Element | ComponentPublicInstance | null) { randomUploadInput.value = (element instanceof Element ? element : element?.$el ?? null) as typeof randomUploadInput.value }
 
   const viewBindings = {
+      modeOptions: gameModeOptions,
       Paperclip,
       RotateCcw,
       Trash2,

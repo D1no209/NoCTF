@@ -3,7 +3,7 @@ import type { UiMessage } from '../../../../utils/i18n'
 import { adminWorkspacePath } from '~/features/admin/admin-navigation'
 import { markRaw } from 'vue'
 
-import { Activity, ClipboardCheck, Container, Download, FileCheck, GitBranch, KeyRound, LayoutDashboard, Mail, Network, Orbit, Puzzle, Settings, ShieldAlert, Trophy, Users, Webhook } from '@lucide/vue'
+import { Activity, ChartNoAxesCombined, ClipboardCheck, Container, Download, FileCheck, GitBranch, KeyRound, LayoutDashboard, Mail, Network, Orbit, Puzzle, Settings, ShieldAlert, Trophy, Users, Webhook } from '@lucide/vue'
 import { adminGetCompetition } from '../../../../api'
 import type { NoCtfapiEndpointsCompetitionsCompetitionResponse } from '../../../../api'
 import type { WorkspaceNavGroup } from '../../../app/workspace-nav'
@@ -60,10 +60,13 @@ export function useAdminCompetitionsByIdPage() {
   async function refresh() {
     const { data, error: e } = await adminGetCompetition({ path: { competitionId } })
     if (e || !data) {
+      competition.value = null
+      role.value = 'Observer'
       error.value = parseApiError(e, describeMessage("common.error.loadingCompetitionFailed")).displayMessage
       return
     }
     competition.value = data.competition ?? null
+    await resolveRole()
     error.value = null
   }
 
@@ -91,35 +94,55 @@ export function useAdminCompetitionsByIdPage() {
       label: translate("administration.label.operations"),
       items: [
         { to: base, label: translate("common.label.overview"), icon: LayoutDashboard, exact: true },
-        { to: `${base}/configuration`, label: translate("administration.label.configuration"), icon: Settings },
-        { to: `${base}/tracks`, label: translate("common.label.tracks"), icon: GitBranch },
-        { to: `${base}/directions`, label: translate('directionSettings.title'), icon: Puzzle },
+        ...(canWrite.value ? [
+          { to: `${base}/configuration`, label: translate("administration.label.configuration"), icon: Settings },
+          { to: `${base}/tracks`, label: translate("common.label.tracks"), icon: GitBranch },
+          { to: `${base}/directions`, label: translate('directionSettings.title'), icon: Puzzle },
+        ] : []),
         { to: `${base}/challenges`, label: translate("common.label.challenge.pageTitle"), icon: Puzzle },
         { to: `${base}/teams`, label: translate("common.label.teamManagement"), icon: Users },
       ],
     },
+    ...(competition.value?.mode === 'LiveSolo' ? [{
+      label: gameModeLabel('LiveSolo'),
+      items: [
+        { to: `/competitions/${competitionId}/live-solo`, label: translate('liveSolo.hall'), icon: GitBranch },
+        ...(canWrite.value ? [
+          { to: `/competitions/${competitionId}/live-solo/settings`, label: translate('liveSolo.settings.title'), icon: Settings },
+          { to: `/competitions/${competitionId}/live-solo/groups`, label: translate('liveSolo.groups.title'), icon: Puzzle },
+          { to: `/competitions/${competitionId}/live-solo/bracket`, label: translate('liveSolo.bracket.title'), icon: GitBranch },
+        ] : []),
+      ],
+    }] : []),
     {
       label: translate("administration.label.monitoring"),
       items: [
         ...(competition.value?.mode === 'Awdp'
           ? [{ to: `/competitions/${competitionId}/awdp-live`, label: translate("administration.label.controlScreen"), icon: Orbit }]
-          : [{ to: `/competitions/${competitionId}/live`, label: translate("leaderboard.ctf.liveTitle"), icon: Orbit }]),
+          : competition.value?.mode === 'Ctf' ? [{ to: `/competitions/${competitionId}/live`, label: translate("leaderboard.ctf.liveTitle"), icon: Orbit }] : []),
         { to: `/competitions/${competitionId}/events`, label: translate("administration.label.activity"), icon: Activity },
         { to: `${base}/submissions`, label: translate("common.label.submissions"), icon: FileCheck },
         { to: `${base}/runtimes`, label: translate("administration.label.runtime"), icon: Container },
-        { to: `${base}/traffic-captures`, label: translate("runtime.trafficCaptures"), icon: Network },
-        { to: `${base}/cheats`, label: translate("administration.label.cheating"), icon: ShieldAlert },
-        { to: `${base}/leaderboard`, label: translate("common.label.leaderboard"), icon: Trophy },
+        ...(canJudge.value ? [
+          { to: `${base}/traffic-captures`, label: translate("runtime.trafficCaptures"), icon: Network },
+          { to: `${base}/cheats`, label: translate("administration.label.cheating"), icon: ShieldAlert },
+        ] : []),
+        ...(competition.value?.mode === 'LiveSolo' ? [] : [
+          ...(canWrite.value ? [{ to: `${base}/leaderboard`, label: translate("common.label.leaderboard"), icon: Trophy }] : []),
+          ...(!canWrite.value ? [{ to: `/competitions/${competitionId}/leaderboard`, label: translate('leaderboard.label.viewScoreboard'), icon: ChartNoAxesCombined }] : []),
+        ]),
       ],
     },
     {
       label: translate("common.label.management"),
       items: [
-        { to: `${base}/announcements`, label: translate('announcements.title'), icon: Mail },
-        { to: `${base}/writeups`, label: translate('writeUp.review'), icon: ClipboardCheck },
-        { to: `${base}/exports`, label: translate("administration.label.export"), icon: Download },
-        { to: `${base}/webhooks`, label: translate("webhook.title"), icon: Webhook },
-        ...(competition.value?.mode === 'Ctf'
+        ...(canWrite.value ? [{ to: `${base}/announcements`, label: translate('announcements.title'), icon: Mail }] : []),
+        { to: `${base}/writeups`, label: translate(canJudge.value ? 'writeUp.review' : 'administration.navigation.viewWriteups'), icon: ClipboardCheck },
+        ...(canWrite.value ? [
+          { to: `${base}/exports`, label: translate("administration.label.export"), icon: Download },
+          { to: `${base}/webhooks`, label: translate("webhook.title"), icon: Webhook },
+        ] : []),
+        ...(canWrite.value && competition.value?.mode === 'Ctf'
           ? [{ to: `${base}/progression`, label: translate('progression.title'), icon: GitBranch }]
           : []),
         ...(canManagePermissions.value
@@ -132,7 +155,6 @@ export function useAdminCompetitionsByIdPage() {
   onMounted(async () => {
     loading.value = true
     await refresh()
-    if (competition.value) await resolveRole()
     loading.value = false
   })
 

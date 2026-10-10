@@ -15,7 +15,7 @@ export function useCompetitionsIndexPage() {
   const route = useRoute()
   if ('competition' in route.query) throw createError({ statusCode: 404, statusMessage: 'Page not found' })
   const router = useRouter()
-  const { isAdministrator } = useAuth()
+  const { isAdministrator, isLoggedIn, user } = useAuth()
   const items = ref<NoCtfapiEndpointsCompetitionsCompetitionResponse[]>([])
   const loading = ref(true)
   const error = ref<UiMessage | null>(null)
@@ -71,12 +71,25 @@ export function useCompetitionsIndexPage() {
     loading.value = true
     error.value = null
     try {
-      const { data, error: failure } = isAdministrator.value
-        ? await adminListCompetitions({ query: { includeDeleted: true } })
-        : await listCompetitionsEndpoint()
-      if (failure || !data) throw failure
+      let competitions: NoCtfapiEndpointsCompetitionsCompetitionResponse[]
+      if (isAdministrator.value) {
+        const { data, error: failure } = await adminListCompetitions({ query: { includeDeleted: true } })
+        if (failure || !data) throw failure
+        competitions = data.items ?? []
+      } else {
+        const [catalog, managed] = await Promise.all([
+          listCompetitionsEndpoint(),
+          isLoggedIn.value ? adminListCompetitions({ query: { includeDeleted: false } }) : null,
+        ])
+        if (catalog.error || !catalog.data || managed?.error) throw catalog.error ?? managed?.error
+        const rows = new Map((catalog.data.items ?? []).map(item => [item.id, item]))
+        for (const item of managed?.data?.items ?? []) {
+          if (item.id && item.administrationRole && !item.deletedAt) rows.set(item.id, item)
+        }
+        competitions = [...rows.values()]
+      }
       if (generation !== loadGeneration) return
-      items.value = data.items ?? []
+      items.value = competitions
     } catch (failure) {
       if (generation !== loadGeneration) return
       error.value = parseApiError(failure, describeMessage('competitions.competitionsIndex.error.loadContestListFailed')).displayMessage
@@ -84,7 +97,10 @@ export function useCompetitionsIndexPage() {
       if (generation === loadGeneration) loading.value = false
     }
   }
-  watch(isAdministrator, () => void load(), { immediate: true })
+  watch([isAdministrator, isLoggedIn, () => user.value?.userId], () => {
+    items.value = []
+    void load()
+  }, { immediate: true })
   watch(() => route.query.create, value => {
     if (value === '1' && isAdministrator.value) createOpen.value = true
   })

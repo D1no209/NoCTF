@@ -23,7 +23,7 @@ const { FlagSource, toggleFlagTemplate, FlagTemplateEditor, model, mode, disable
   </FieldSet>
 
   <FieldSet
-    v-else-if="mode === 'Ctf' && model.runtime?.flagSource === FlagSource.PerTeam"
+    v-else-if="(mode === 'Ctf' || mode === 'LiveSolo') && model.runtime?.flagSource === FlagSource.PerTeam"
     class="rounded-md border p-4"
   >
     <FieldLegend class="px-1 text-sm font-medium">{{ $t('administration.label.dynamicFlagTemplateOverride') }}</FieldLegend>

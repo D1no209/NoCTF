@@ -26,6 +26,8 @@ emit: { (event: "selectChallenge", ...args: [challengeId: string]): void }) {
   const router = useRouter()
 
   const workspaceNavGroups = inject(competitionWorkspaceNavigationKey, computed(() => []))
+  const competitionContext = inject(competitionContextKey)!
+  const canReadBroadcasts = computed(() => competitionContext.canReadBroadcasts.value)
 
   async function selectChallenge(challengeId: string): Promise<void> {
     if (props.challengeSelectionMode === 'inline') {
@@ -54,6 +56,7 @@ emit: { (event: "selectChallenge", ...args: [challengeId: string]): void }) {
   return {
       ...toRefs(props),
       workspaceNavGroups,
+      canReadBroadcasts,
       selectChallenge,
       handleReady,
       CompetitionBroadcastPanel,
