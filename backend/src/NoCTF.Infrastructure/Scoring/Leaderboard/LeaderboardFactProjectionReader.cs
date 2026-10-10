@@ -33,14 +33,23 @@ internal static class LeaderboardFactProjectionReader
         int? endingRound,
         IReadOnlyList<LeaderboardAwdRoundFact>? awdWindowRounds,
         IReadOnlyList<LeaderboardChallengeFact> challenges,
-        CancellationToken ct)
+        CancellationToken ct,
+        NoCTF.Application.Challenges.Timing.ChallengeTimingProjectionOverride? timingOverride = null)
     {
         var query = db.GameplayFacts.AsNoTracking()
             .Where(fact => fact.CompetitionId == competitionId && fact.OccurredAt <= projectedAt);
         var displayQuery = query;
+        var overrideId = timingOverride?.CompetitionChallengeId;
+        var overrideOpening = timingOverride?.Timing.AutoOpenAt;
+        var overrideScoringEnd = timingOverride?.Timing.ScoringEndsAt;
+        var overrideSubmissionEnd = timingOverride?.Timing.SubmissionDeadlineAt;
         query = query.Where(fact => fact.Kind == GameplayFactKind.ManualAdjustment || fact.Kind == GameplayFactKind.HintUnlock
             || fact.Kind == GameplayFactKind.AwdServiceTransition
-            || db.CompetitionChallenges.Any(challenge => challenge.Id == fact.CompetitionChallengeId
+            || fact.CompetitionChallengeId == overrideId
+                && (overrideOpening == null || fact.OccurredAt >= overrideOpening)
+                && (overrideScoringEnd == null || fact.OccurredAt < overrideScoringEnd)
+                && (fact.Kind == GameplayFactKind.KohControlObservation || overrideSubmissionEnd == null || fact.OccurredAt < overrideSubmissionEnd)
+            || db.CompetitionChallenges.Any(challenge => challenge.Id == fact.CompetitionChallengeId && challenge.Id != overrideId
                 && (challenge.AutoOpenAt == null || fact.OccurredAt >= challenge.AutoOpenAt)
                 && (challenge.ScoringEndsAt == null || fact.OccurredAt < challenge.ScoringEndsAt)
                 && (fact.Kind == GameplayFactKind.KohControlObservation || challenge.SubmissionDeadlineAt == null
@@ -83,14 +92,14 @@ internal static class LeaderboardFactProjectionReader
                 challenges,
                 teams,
                 projectedAt,
-                ct);
+                ct, timingOverride);
             var aggregateRows = await ReadAwdManualAdjustmentsAsync(query, ct);
             var windowRows = await ReadAwdWindowAsync(displayQuery, awdWindowRounds ?? [], ct);
             if (awdWindowRounds is { Count: > 0 } && await db.WriteUpUnlockReceipts.AsNoTracking()
                 .AnyAsync(x => x.CompetitionId == competitionId && x.UnlockedAt <= projectedAt, ct))
             {
                 var carry = await ReadAwdAggregatesAsync(db, competitionId, competitionConfiguration, challenges,
-                    teams, awdWindowRounds.Min(x => x.StartsAt), ct);
+                    teams, awdWindowRounds.Min(x => x.StartsAt), ct, timingOverride);
                 var prior = carry.ToDictionary(x => (x.TeamId, x.CompetitionChallengeId), x => x.PositivePoints);
                 aggregates = aggregates.Select(x => x with { PositivePointsBeforeWindow = prior.GetValueOrDefault((x.TeamId, x.CompetitionChallengeId)) }).ToArray();
             }
@@ -233,8 +242,13 @@ internal static class LeaderboardFactProjectionReader
         IReadOnlyList<LeaderboardChallengeFact> challenges,
         IReadOnlyList<LeaderboardTeamFact> teams,
         DateTimeOffset projectedAt,
-        CancellationToken ct)
+        CancellationToken ct,
+        NoCTF.Application.Challenges.Timing.ChallengeTimingProjectionOverride? timingOverride = null)
     {
+        var overrideId = timingOverride?.CompetitionChallengeId;
+        var overrideOpening = timingOverride?.Timing.AutoOpenAt;
+        var overrideScoringEnd = timingOverride?.Timing.ScoringEndsAt;
+        var overrideSubmissionEnd = timingOverride?.Timing.SubmissionDeadlineAt;
         var activeTeamIds = teams
             .Where(team => !team.IsBanned && !team.IsDeleted && team.EarnsScore)
             .Select(team => team.Id)
@@ -275,11 +289,15 @@ internal static class LeaderboardFactProjectionReader
                 && competitiveTeamIds.Contains(fact.VictimTeamId.Value)
                 && fact.VictimTeamId != fact.TeamId
                 && fact.Kind == GameplayFactKind.FlagAttempt
-                && fact.Result == GameplayFactResult.Correct
-                && db.CompetitionChallenges.Any(challenge => challenge.Id == fact.CompetitionChallengeId
+                && (fact.Result == GameplayFactResult.Correct || fact.Result == GameplayFactResult.RightButDue)
+                && (fact.CompetitionChallengeId == overrideId
+                    && (overrideOpening == null || fact.OccurredAt >= overrideOpening)
+                    && (overrideScoringEnd == null || fact.OccurredAt < overrideScoringEnd)
+                    && (overrideSubmissionEnd == null || fact.OccurredAt < overrideSubmissionEnd)
+                    || db.CompetitionChallenges.Any(challenge => challenge.Id == fact.CompetitionChallengeId && challenge.Id != overrideId
                     && (challenge.AutoOpenAt == null || fact.OccurredAt >= challenge.AutoOpenAt)
                     && (challenge.ScoringEndsAt == null || fact.OccurredAt < challenge.ScoringEndsAt)
-                    && (challenge.SubmissionDeadlineAt == null || fact.OccurredAt < challenge.SubmissionDeadlineAt))
+                    && (challenge.SubmissionDeadlineAt == null || fact.OccurredAt < challenge.SubmissionDeadlineAt)))
                 && fact.ReferenceKind == GameplayFactReferenceKind.AwdRound
                 && fact.ReferenceId != null);
         var attackGroups = attackFacts
@@ -363,9 +381,11 @@ internal static class LeaderboardFactProjectionReader
                 && flag.ValidStart != null
                 && flag.ValidUntil != null
                 && flag.ValidUntil <= projectedAt
-                && db.CompetitionChallenges.Any(challenge => challenge.Id == flag.CompetitionChallengeId
+                && (flag.CompetitionChallengeId == overrideId && (overrideOpening == null || flag.ValidStart >= overrideOpening)
+                    && (overrideScoringEnd == null || flag.ValidUntil <= overrideScoringEnd)
+                    || db.CompetitionChallenges.Any(challenge => challenge.Id == flag.CompetitionChallengeId && challenge.Id != overrideId
                     && (challenge.AutoOpenAt == null || flag.ValidStart >= challenge.AutoOpenAt)
-                    && (challenge.ScoringEndsAt == null || flag.ValidUntil <= challenge.ScoringEndsAt)))
+                    && (challenge.ScoringEndsAt == null || flag.ValidUntil <= challenge.ScoringEndsAt))))
             .Select(flag => new
             {
                 CompetitionChallengeId = flag.CompetitionChallengeId!.Value,

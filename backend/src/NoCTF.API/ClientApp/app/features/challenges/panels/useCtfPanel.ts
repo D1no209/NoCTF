@@ -64,8 +64,12 @@ emit: { (event: "submitted", ...args: []): void; (event: "remainingChanged", ...
   const patchOutcome = computed(() => {
     if (patchVerification.value.verificationState === 'PlatformFailed')
       return { message: translate('common.error.patchVerificationPlatformFailed'), variant: 'destructive' as const }
+    if (patchVerification.value.timeEligibility && patchVerification.value.timeEligibility !== 'Valid')
+      return { message: translate('challengeTiming.historyInvalid'), variant: 'destructive' as const }
     if (patchVerification.value.verificationResult === 'Correct')
       return { message: translate('challenges.label.patchVerificationSucceeded'), variant: 'default' as const }
+    if (patchVerification.value.verificationResult === 'RightButDue')
+      return { message: translate('challenges.flagSubmit.correctWithoutScore'), variant: 'default' as const }
     if (patchVerification.value.verificationResult !== 'Wrong') return null
     const key = patchVerification.value.verificationFailureCode === 'PatchStillExploitable'
       ? 'common.label.patchStillExploitable'

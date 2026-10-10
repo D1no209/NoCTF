@@ -225,7 +225,7 @@ public sealed class PatchVerificationTargetStore(
                 && fact.Kind == GameplayFactKind.FixAttempt)
             .OrderByDescending(fact => fact.OccurredAt)
             .ThenByDescending(fact => fact.Id)
-            .Select(fact => new { fact.State, fact.Result, fact.FailureCode })
+            .Select(fact => new { fact.State, fact.Result, fact.FailureCode, fact.OccurredAt })
             .ToArrayAsync(ct);
         var target = await db.RuntimeInstances.AsNoTracking()
             .Where(instance => instance.CompetitionId == competitionId
@@ -236,7 +236,9 @@ public sealed class PatchVerificationTargetStore(
             .OrderByDescending(instance => instance.CreatedAt)
             .Select(instance => new { instance.Id, instance.State })
             .FirstOrDefaultAsync(ct);
-        var accepted = facts.Count(fact => fact.State != GameplayFactState.PlatformFailed);
+        var timing = context.Timing;
+        var accepted = facts.Count(fact => fact.State != GameplayFactState.PlatformFailed && timing.Eligibility(fact.OccurredAt) == GameplayFactTimeEligibility.Valid);
+        var latest = facts.FirstOrDefault();
         return new(
             context.Status is CompetitionStatus.Running or CompetitionStatus.Paused
                 && context.IsPublished,
@@ -244,10 +246,10 @@ public sealed class PatchVerificationTargetStore(
             accepted,
             Math.Max(0, configuration.MaximumAttempts - accepted),
             facts.FirstOrDefault()?.State,
-            facts.FirstOrDefault()?.Result,
+            latest?.Result is { } result ? timing.Classify(result, latest.OccurredAt) : null,
             facts.FirstOrDefault()?.FailureCode,
             target?.Id,
-            target?.State);
+            target?.State, TimeEligibility: latest is null ? GameplayFactTimeEligibility.Valid : timing.Eligibility(latest.OccurredAt));
     }
 
     private Task<Guid?> ResolveTeamIdAsync(Guid competitionId, Guid userId, CancellationToken ct) =>
@@ -301,7 +303,7 @@ public sealed class PatchVerificationTargetStore(
                     template.Definition!,
                     item.competition.Status,
                     item.challenge.IsPublished,
-                    item.competition.MaxConcurrentRuntimeInstancesPerTeam))
+                    item.competition.MaxConcurrentRuntimeInstancesPerTeam, new ChallengeTiming(item.challenge.AutoOpenAt, item.challenge.ScoringEndsAt, item.challenge.SubmissionDeadlineAt)))
             .AsSplitQuery()
             .SingleOrDefaultAsync(ct);
     }
@@ -312,5 +314,5 @@ public sealed class PatchVerificationTargetStore(
         ChallengeDefinition Definition,
         CompetitionStatus Status,
         bool IsPublished,
-        int MaxConcurrentRuntimeInstancesPerTeam);
+        int MaxConcurrentRuntimeInstancesPerTeam, ChallengeTiming Timing);
 }

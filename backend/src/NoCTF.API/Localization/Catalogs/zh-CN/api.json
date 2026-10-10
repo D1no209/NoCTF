@@ -1,4 +1,11 @@
 {
+  "api.challenges.timing.notFound": "比赛题目不可用。",
+  "api.challenges.timing.unsupportedMode": "LiveSolo 使用独立 Round 时序。",
+  "api.challenges.timing.invalidOrder": "开放时间不能晚于停止计分或提交截止时间，停止计分不能晚于提交截止时间。",
+  "api.challenges.timing.publishedFutureOpening": "已发布题目的开放时间不能设置在未来。",
+  "api.challenges.timing.previewExpired": "影响预览已过期或相关数据已变化，请重新预览。",
+  "api.challenges.timing.previewRequired": "修改时间前，请先确认历史记录的影响。",
+  "api.challenges.timing.separateTimingChange": "请单独保存时间配置，保证确认的影响与最终保存的设置一致。",
   "api.challenges.material.activeExecutionScope": "此题正在有效轮次中使用。请先结束或作废轮次，再修改正文、定义、Flag 或附件。",
   "api.liveSolo.templateCopy.notFound": "源题目或目标比赛不可用。",
   "api.liveSolo.templateCopy.unsupportedSource": "仅支持兼容 Flag 提交的 CTF 或 LiveSolo 题目，不能转换 Patch 或 Checker 交互。",

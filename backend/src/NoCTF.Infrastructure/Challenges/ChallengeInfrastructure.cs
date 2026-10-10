@@ -34,6 +34,8 @@ internal static class ChallengeInfrastructure
         services.AddScoped<ICompetitionChallengeReadAccess, CompetitionChallengeReadAccess>();
         services.AddScoped<IChallengeManagementStore, ChallengeManagementStore>();
         services.AddScoped<NoCTF.Application.Challenges.Timing.IChallengeTimingStore, NoCTF.Infrastructure.Challenges.Timing.ChallengeTimingStore>();
+        services.AddScoped<NoCTF.Application.Challenges.Timing.IChallengeTimingPreviewReader, NoCTF.Infrastructure.Challenges.Timing.ChallengeTimingPreviewReader>();
+        services.AddScoped<NoCTF.Application.Challenges.Timing.ManageChallengeTiming>();
         services.AddScoped<NoCTF.Infrastructure.Messaging.IClusterScheduleContributor, NoCTF.Infrastructure.Challenges.Timing.ChallengeTimingScheduleSource>();
         services.AddScoped<IChallengeBankStore, ChallengeBankStore>();
         services.AddScoped<CreateChallengeTemplate>();

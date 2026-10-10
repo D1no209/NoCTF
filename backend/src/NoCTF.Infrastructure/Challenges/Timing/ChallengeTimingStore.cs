@@ -51,7 +51,7 @@ public sealed class ChallengeTimingStore(NoCtfDbContext db, IPostCommitMessagePu
         var challenge = await db.CompetitionChallenges.SingleOrDefaultAsync(x => x.Id == command.CompetitionChallengeId, ct);
         if (challenge is null || challenge.Mode == GameMode.LiveSolo || challenge.TimingRevision != command.TimingRevision
             || challenge.OpeningState != ChallengeOpeningState.Pending || challenge.AutoOpenAt is null || challenge.AutoOpenAt > now) return;
-        var competition = await db.Competitions.AsNoTracking().SingleOrDefaultAsync(x => x.Id == challenge.CompetitionId, ct);
+        var competition = await db.Competitions.AsNoTracking().IgnoreAutoIncludes().SingleOrDefaultAsync(x => x.Id == challenge.CompetitionId, ct);
         if (competition is null || competition.DeletedAt is not null
             || !(competition.Status == CompetitionStatus.Running || competition.Mode == GameMode.Ctf
                 && competition.Status == CompetitionStatus.Finished && competition.PracticeModeEnabled)) return;
@@ -69,7 +69,7 @@ public sealed class ChallengeTimingStore(NoCtfDbContext db, IPostCommitMessagePu
         await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, IsolationLevel.Serializable, ct);
         var challenge = await db.CompetitionChallenges.SingleOrDefaultAsync(x => x.Id == command.CompetitionChallengeId, ct);
         if (challenge is null || challenge.Mode == GameMode.LiveSolo || challenge.TimingRevision != command.TimingRevision) return;
-        var competition = await db.Competitions.AsNoTracking().SingleAsync(x => x.Id == challenge.CompetitionId, ct);
+        var competition = await db.Competitions.AsNoTracking().IgnoreAutoIncludes().SingleAsync(x => x.Id == challenge.CompetitionId, ct);
         var officialWindow = await NoCTF.Infrastructure.Competitions.Lifecycle.CompetitionOfficialWindowReader.ReadAsync(
             db, competition.Id, competition.StartAt, competition.EndAt, ct);
         var timing = ChallengeTiming.From(challenge);

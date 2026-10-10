@@ -897,7 +897,8 @@ public sealed class GameplayFactProcessor(
         CancellationToken ct)
     {
         if (submission.Kind != GameplayFactKind.FlagAttempt
-            || evaluation.Decision.Result != GameplayFactResult.Correct)
+            || submission.Result != GameplayFactResult.Correct
+            || submission.TimeEligibility != NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid)
             return null;
         if (evaluation.OfficialWindow is not { } officialWindow
             || !officialWindow.Contains(submission.OccurredAt))
@@ -932,6 +933,9 @@ public sealed class GameplayFactProcessor(
         var bloodTrackKeys = tracks.Tracks.Where(track => track.EarnsBlood)
             .Select(track => track.Key.ToLowerInvariant())
             .ToArray();
+        var timing = await db.CompetitionChallenges.AsNoTracking()
+            .Where(x => x.Id == submission.CompetitionChallengeId)
+            .Select(x => new { x.AutoOpenAt, x.ScoringEndsAt, x.SubmissionDeadlineAt }).SingleAsync(ct);
 
         var solvedTeamIds = await db.GameplayFacts.AsNoTracking()
             .Where(CtfCompletionEligibility.Before(submission.OccurredAt, submission.Id))
@@ -941,7 +945,10 @@ public sealed class GameplayFactProcessor(
                 candidate.CompetitionId == submission.CompetitionId
                 && candidate.CompetitionChallengeId == submission.CompetitionChallengeId
                 && candidate.Kind == GameplayFactKind.FlagAttempt
-                && candidate.Result == GameplayFactResult.Correct
+                && (candidate.Result == GameplayFactResult.Correct || candidate.Result == GameplayFactResult.RightButDue)
+                && (timing.AutoOpenAt == null || candidate.OccurredAt >= timing.AutoOpenAt)
+                && (timing.ScoringEndsAt == null || candidate.OccurredAt < timing.ScoringEndsAt)
+                && (timing.SubmissionDeadlineAt == null || candidate.OccurredAt < timing.SubmissionDeadlineAt)
                 && candidate.OccurredAt >= officialWindow.StartAt
                 && candidate.OccurredAt < officialWindow.EndAt
                 && candidate.Id != submission.Id)

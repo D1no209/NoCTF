@@ -127,6 +127,10 @@ public sealed class FusionLeaderboardCache(
         CancellationToken ct) =>
         (await ProjectBundleAsync(competitionId, null, projectedAt, null, ct))?.Scoreboard;
 
+    public async Task<ScoreboardProjection?> CreateTimingPreviewAsync(Guid competitionId, DateTimeOffset projectedAt,
+        NoCTF.Application.Challenges.Timing.ChallengeTimingProjectionOverride candidate, CancellationToken ct) =>
+        (await ProjectBundleAsync(competitionId, null, projectedAt, null, ct, candidate))?.Scoreboard;
+
     public async Task<ScoreboardProjection?> CreateScoreboardWindowAsync(
         Guid competitionId,
         int endingRound,
@@ -151,7 +155,8 @@ public sealed class FusionLeaderboardCache(
         CompetitionModeConfiguration? competitionConfiguration,
         DateTimeOffset projectedAt,
         int? scoreboardRoundWindowEnd,
-        CancellationToken ct)
+        CancellationToken ct,
+        NoCTF.Application.Challenges.Timing.ChallengeTimingProjectionOverride? timingOverride = null)
     {
         var competition = await db.Competitions.AsNoTracking().AsSplitQuery()
             .SingleOrDefaultAsync(candidate => candidate.Id == competitionId, ct);
@@ -241,7 +246,8 @@ public sealed class FusionLeaderboardCache(
                 templates[instance.ChallengeId].Definition is CtfChallengeDefinition ctf
                     ? ctf.InteractionKind
                     : CtfInteractionKind.FlagSubmission,
-                instance.Direction?.Icon, ChallengeTiming.From(instance)))
+                instance.Direction?.Icon, timingOverride != null && instance.Id == timingOverride.CompetitionChallengeId
+                    ? timingOverride.Timing : ChallengeTiming.From(instance)))
             .ToList();
 
         var hintCosts = challengeEntities
@@ -295,7 +301,7 @@ public sealed class FusionLeaderboardCache(
             scoreboardRoundWindowEnd,
             awdWindow.Rounds,
             challenges,
-            ct);
+            ct, timingOverride);
         var actorIds = factRows.Aggregate
             .Concat(factRows.Scoreboard)
             .Where(fact => fact.ActorUserId is not null)

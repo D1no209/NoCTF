@@ -38,7 +38,9 @@ public enum PatchUploadFailureCode
     DefenseAlreadySucceeded,
     AttemptsExhausted,
     DefenseTargetConsumed,
-    PatchUploadConflict
+    PatchUploadConflict,
+    ChallengeNotOpened,
+    ChallengeSubmissionClosed
 }
 
 public enum PatchUploadSaveState
@@ -48,7 +50,9 @@ public enum PatchUploadSaveState
     AchievementAlreadySucceeded,
     DefenseTargetConsumed,
     AttemptsExhausted,
-    ConcurrencyConflict
+    ConcurrencyConflict,
+    ChallengeNotOpened,
+    ChallengeSubmissionClosed
 }
 
 public sealed record PatchUploadSaveResult(
@@ -175,6 +179,8 @@ public sealed class CreatePatchUpload(
                         id,
                         saved.GameplayFactId!.Value,
                         saved.GameplayFactState!.Value)),
+            PatchUploadSaveState.ChallengeNotOpened => OperationResult<AcceptedAwdpFix, PatchUploadFailureCode>.Failure(PatchUploadFailureCode.ChallengeNotOpened, "The challenge is not open."),
+            PatchUploadSaveState.ChallengeSubmissionClosed => OperationResult<AcceptedAwdpFix, PatchUploadFailureCode>.Failure(PatchUploadFailureCode.ChallengeSubmissionClosed, "Challenge submissions are closed."),
             PatchUploadSaveState.DefenseTargetNotReady =>
                 OperationResult<AcceptedAwdpFix, PatchUploadFailureCode>.Failure(
                     PatchUploadFailureCode.DefenseTargetNotReady,

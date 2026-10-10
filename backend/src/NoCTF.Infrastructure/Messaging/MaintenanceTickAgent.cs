@@ -349,7 +349,7 @@ public sealed class MaintenanceTickAgent(
             queue.Enqueue(entry, entry.DueAt.UtcTicks);
     }
 
-    private static string ScheduleKind(ClusterScheduleKind kind) => kind switch
+    internal static string ScheduleKind(ClusterScheduleKind kind) => kind switch
     {
         ClusterScheduleKind.AwdRound => "awd_round",
         ClusterScheduleKind.AwdChecker => "awd_checker",
@@ -361,6 +361,7 @@ public sealed class MaintenanceTickAgent(
         ClusterScheduleKind.LiveSoloRound => "live_solo_round",
         ClusterScheduleKind.LiveSoloMedia => "live_solo_media",
         ClusterScheduleKind.LiveSoloCapture => "live_solo_capture",
+        ClusterScheduleKind.ChallengeTiming => "challenge_timing",
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
     };
 }

@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { CompetitionChallengeDetailViewState } from '~/features/challenges/useCompetitionChallengeDetail'
 
 const viewProps = defineProps<{ state: CompetitionChallengeDetailViewState }>()
-const { BookOpen, singleWriteUpsEnabled, openWriteUps, writeUpBenefit, Dice5, FileDown, History, ctx, isLoggedIn, user, challenge, loading, error, attachments, attachmentDeliveryPolicy, attachmentsLoading, attachmentError, downloading, historyRefreshKey, historyOpen, refreshSubmissionHistory, updateRemainingAttempts, loadAttachments, downloadAttachment, downloadRandom, mode, ChallengeHints, ChallengeSubmissionHistory, AwdPanel, AwdpPanel, CtfPanel, KohPanel, competitionId, competitionChallengeId, flagDockTarget } = toRefs(viewProps.state)
+const { formatTimingDate, BookOpen, singleWriteUpsEnabled, openWriteUps, writeUpBenefit, Dice5, FileDown, History, ctx, isLoggedIn, user, challenge, loading, error, attachments, attachmentDeliveryPolicy, attachmentsLoading, attachmentError, downloading, historyRefreshKey, historyOpen, refreshSubmissionHistory, updateRemainingAttempts, loadAttachments, downloadAttachment, downloadRandom, mode, ChallengeHints, ChallengeSubmissionHistory, AwdPanel, AwdpPanel, CtfPanel, KohPanel, competitionId, competitionChallengeId, flagDockTarget } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -42,6 +42,10 @@ const { BookOpen, singleWriteUpsEnabled, openWriteUps, writeUpBenefit, Dice5, Fi
           </DialogContent>
         </Dialog>
         <Button v-if="singleWriteUpsEnabled" variant="ghost" size="sm" @click="openWriteUps"><BookOpen />{{ $t('challengeWriteUp.title') }}</Button>
+        <div v-if="challenge.timing?.scoringEndsAt || challenge.timing?.submissionDeadlineAt" class="flex basis-full flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          <span v-if="challenge.timing.scoringEndsAt">{{ $t('challengeTiming.scoringEnd') }} · {{ formatTimingDate(challenge.timing.scoringEndsAt) }}</span>
+          <span v-if="challenge.timing.submissionDeadlineAt">{{ $t('challengeTiming.submissionEnd') }} · {{ formatTimingDate(challenge.timing.submissionDeadlineAt) }}</span>
+        </div>
         <span class="sr-only">{{ challenge.direction || '' }}</span>
         <Badge v-if="mode === 'Awdp'" variant="secondary">{{ $t('challenges.label.scoresSettleRound') }}</Badge>
         <div v-if="challenge.tags?.length" class="relative z-10 flex min-w-0 basis-full flex-wrap gap-2" :aria-label="$t('challengeTags.label')">

@@ -112,6 +112,9 @@ public sealed class UploadPatchEndpoint(
             return TypedResults.NotFound();
         if (!result.Succeeded)
         {
+            if (result.FailureCode is PatchUploadFailureCode.ChallengeNotOpened or PatchUploadFailureCode.ChallengeSubmissionClosed)
+                return ApiProblems.Problem(statusCode: 409, detail: ApiMessages.For(result.FailureCode),
+                    extensions: new Dictionary<string, object?> { ["code"] = result.FailureCode.Value });
             if (result.FailureCode is PatchUploadFailureCode.DefenseTargetNotReady)
             {
                 return TypedResults.Conflict(new UploadPatchFailureResponse(

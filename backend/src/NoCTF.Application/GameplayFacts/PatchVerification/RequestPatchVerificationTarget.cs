@@ -44,7 +44,8 @@ public sealed record PatchVerificationParticipantState(
     GameplayFactFailureCode? VerificationFailureCode,
     Guid? RuntimeInstanceId,
     RuntimeState? RuntimeState,
-    PatchVerificationTargetFailureCode? UnavailableCode = null);
+    PatchVerificationTargetFailureCode? UnavailableCode = null,
+    NoCTF.Domain.Challenges.GameplayFactTimeEligibility TimeEligibility = NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid);
 
 public interface IPatchVerificationTargetStore
 {

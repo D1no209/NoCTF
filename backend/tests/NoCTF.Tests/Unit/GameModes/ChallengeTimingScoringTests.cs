@@ -10,6 +10,26 @@ public sealed class ChallengeTimingScoringTests
 {
     private static readonly DateTimeOffset Start = new(2026, 10, 10, 0, 0, 0, TimeSpan.Zero);
     [Test]
+    [Arguments(60, 180, 2)]
+    [Arguments(61, 180, 1)]
+    [Arguments(61, 179, 0)]
+    public async Task Awdp_aggregate_and_round_details_include_only_complete_eligible_rounds(int opening, int ending, int expectedRounds)
+    {
+        var team = Guid.NewGuid(); var challenge = Guid.NewGuid();
+        var configuration = (AwdpCompetitionModeConfiguration)CompetitionModeConfigurationDefaults.Create(GameMode.Awdp, Guid.NewGuid());
+        configuration.RoundDurationSeconds = 60;
+        var timing = new ChallengeTiming(Start.AddSeconds(opening), Start.AddSeconds(ending));
+        var input = Input(GameMode.Awdp, team, challenge,
+            [Fact(team, challenge, GameplayFactKind.BreakAttempt, GameplayFactResult.Correct, opening)], timing)
+            with { CompetitionConfiguration = configuration, ProjectedAt = Start.AddSeconds(240) };
+        var direct = new AwdpLeaderboardProjector().Project(input);
+        var result = new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()).Project(input);
+        await Assert.That(direct.Entries.Single().Score).IsEqualTo(500L * expectedRounds);
+        await Assert.That(result.Snapshot.Teams.Single().TotalScore).IsEqualTo(direct.Entries.Single().Score);
+        var details = result.Snapshot.Teams.Single();
+        await Assert.That(details.Slots.Sum(x => x.NetPoints.GetValueOrDefault()) + details.ScoreOutsideWindow).IsEqualTo(details.TotalScore);
+    }
+    [Test]
     public async Task Ctf_latest_end_removes_success_and_wrong_penalties_but_preserves_manual_adjustment()
     {
         var team = Guid.NewGuid(); var challenge = Guid.NewGuid();

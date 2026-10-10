@@ -40,6 +40,7 @@ emit: { (event: "submitted", ...args: []): void; (event: "remainingChanged", ...
     const defense = state.value?.defense
     if (!defense?.gameplayFactId || !defense.result && !defense.failureCode) return null
     if (defense.result === 'Correct') return translate("common.label.defenseSucceeded")
+    if (defense.result === 'RightButDue') return translate('challenges.flagSubmit.correctWithoutScore')
     if (defense.failureCode === 'AwdpExploitSucceeded') return translate("challenges.error.defenseExploitSucceededFailed")
     if (defense.failureCode === 'AwdpServiceAbnormal') return translate("challenges.error.defenseServiceAbnormalFailed")
     if (defense.state === 'PlatformFailed') return translate("challenges.error.defenseVerificationFailed")
@@ -75,7 +76,7 @@ emit: { (event: "submitted", ...args: []): void; (event: "remainingChanged", ...
 
   async function handleBreakEvaluation(result?: string | null): Promise<void> {
     await refreshAndPoll()
-    if (result === 'Correct') await attackRuntimeCard.value?.refreshUntilStopped()
+    if (result === 'Correct' || result === 'RightButDue') await attackRuntimeCard.value?.refreshUntilStopped()
   }
 
   async function handleFixAccepted(): Promise<void> {

@@ -22262,6 +22262,75 @@
         ]
       }
     },
+    "/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/timing-preview": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Previews a competition challenge timing change.",
+        "description": "Returns current and proposed scores, blood awards and progression impact without writing facts. The confirmation token expires after two minutes and is invalidated by related changes.",
+        "operationId": "AdminPreviewCompetitionChallengeTiming",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "competitionChallengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "PreviewChallengeTimingRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesPreviewChallengeTimingRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationChallengesTimingChallengeTimingPreview"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/restore": {
       "post": {
         "tags": [
@@ -30448,6 +30517,9 @@
                 "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsPatchVerificationTargetFailureCodeProtocol"
               }
             ]
+          },
+          "timeEligibility": {
+            "$ref": "#/components/schemas/NoCTFDomainChallengesGameplayFactTimeEligibility"
           }
         }
       },
@@ -33330,6 +33402,19 @@
           },
           "recalculationPending": {
             "type": "boolean"
+          },
+          "serverTime": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "phase": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainChallengesChallengeTimingPhase"
+              }
+            ]
           }
         }
       },
@@ -33347,6 +33432,22 @@
           "Pending",
           "Applied",
           "Canceled"
+        ]
+      },
+      "NoCTFDomainChallengesChallengeTimingPhase": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "NotOpened",
+          "Scoring",
+          "JudgementOnly",
+          "SubmissionClosed"
+        ],
+        "enum": [
+          "NotOpened",
+          "Scoring",
+          "JudgementOnly",
+          "SubmissionClosed"
         ]
       },
       "NoCTFAPIEndpointsChallengesGetChallengeRequest": {
@@ -42708,6 +42809,10 @@
                 "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeTimingPatchRequest"
               }
             ]
+          },
+          "timingPreviewToken": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -42757,6 +42862,74 @@
         "properties": {
           "configuration": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeRulesContract"
+          }
+        }
+      },
+      "NoCTFApplicationChallengesTimingChallengeTimingPreview": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "affectedAttempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "teams": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationChallengesTimingChallengeTimingImpact"
+            }
+          }
+        }
+      },
+      "NoCTFApplicationChallengesTimingChallengeTimingImpact": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "teamName": {
+            "type": "string"
+          },
+          "scoreBefore": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "scoreAfter": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "bloodChanged": {
+            "type": "boolean"
+          },
+          "completionBefore": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "completionAfter": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "progressionNodesChanged": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengesPreviewChallengeTimingRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "timing": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeTimingPatchRequest"
           }
         }
       },

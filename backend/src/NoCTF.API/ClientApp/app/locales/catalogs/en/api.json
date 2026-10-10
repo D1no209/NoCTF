@@ -1,4 +1,11 @@
 {
+  "api.challenges.timing.notFound": "The competition challenge is unavailable.",
+  "api.challenges.timing.unsupportedMode": "LiveSolo uses its own Round timing.",
+  "api.challenges.timing.invalidOrder": "Opening must not follow scoring end or submission deadline; scoring end must not follow submission deadline.",
+  "api.challenges.timing.publishedFutureOpening": "A published challenge cannot have a future opening time.",
+  "api.challenges.timing.previewExpired": "The timing preview has expired or the underlying data changed. Preview the impact again.",
+  "api.challenges.timing.previewRequired": "Review the historical impact before changing timing.",
+  "api.challenges.timing.separateTimingChange": "Save timing separately from presentation and scoring rules so the confirmed impact matches the saved settings.",
   "api.challenges.material.activeExecutionScope": "This challenge is in an active Round. Finish or void the Round before changing its text, definition, Flags or attachments.",
   "api.liveSolo.templateCopy.notFound": "The source template or destination competition is unavailable.",
   "api.liveSolo.templateCopy.unsupportedSource": "Only FlagSubmission-compatible CTF or LiveSolo definitions can be copied. Patch and checker interactions are not converted.",

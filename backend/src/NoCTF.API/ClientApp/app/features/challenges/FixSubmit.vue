@@ -9,6 +9,7 @@ const props = defineProps<{
   competitionId: string
   competitionChallengeId: string
   defense?: NoCtfapiEndpointsGameplayFactsAwdpDefenseProgressResponse | NoCtfapiEndpointsGameplayFactsPatchVerificationStateResponse
+  timing?: import("~/api").NoCtfapiEndpointsChallengesCompetitionChallengeTimingResponse | null
   ctfPatchVerification?: boolean
 }>()
 const emit = defineEmits<{ changed: [], accepted: [] }>()

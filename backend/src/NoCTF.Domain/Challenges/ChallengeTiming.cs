@@ -4,6 +4,7 @@ namespace NoCTF.Domain.Challenges;
 
 public enum ChallengeOpeningState : short { None, Pending, Applied, Canceled }
 public enum GameplayFactTimeEligibility : short { Valid, NotOpened, SubmissionClosed }
+public enum ChallengeTimingPhase : short { NotOpened, Scoring, JudgementOnly, SubmissionClosed }
 
 public sealed record ChallengeTiming(DateTimeOffset? AutoOpenAt = null,
     DateTimeOffset? ScoringEndsAt = null, DateTimeOffset? SubmissionDeadlineAt = null)
@@ -21,6 +22,12 @@ public sealed record ChallengeTiming(DateTimeOffset? AutoOpenAt = null,
     public bool CanScore(DateTimeOffset occurredAt, bool practice = false) => !practice
         && Eligibility(occurredAt) == GameplayFactTimeEligibility.Valid
         && (ScoringEndsAt is null || occurredAt < ScoringEndsAt);
+    public ChallengeTimingPhase Phase(DateTimeOffset now, bool practice = false) => Eligibility(now, practice) switch
+    {
+        GameplayFactTimeEligibility.NotOpened => ChallengeTimingPhase.NotOpened,
+        GameplayFactTimeEligibility.SubmissionClosed => ChallengeTimingPhase.SubmissionClosed,
+        _ => CanScore(now, practice) ? ChallengeTimingPhase.Scoring : ChallengeTimingPhase.JudgementOnly
+    };
 
     public bool CanScoreCheckpoint(DateTimeOffset occurredAt) =>
         (AutoOpenAt is null || occurredAt >= AutoOpenAt)

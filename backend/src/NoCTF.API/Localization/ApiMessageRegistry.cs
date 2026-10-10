@@ -2,6 +2,14 @@ namespace NoCTF.API.Localization;
 
 public enum ApiMessageId
 {
+    ChallengeTimingNotFound,
+    ChallengeTimingUnsupportedMode,
+    ChallengeTimingInvalidOrder,
+    ChallengeTimingPublishedFutureOpening,
+    ChallengeTimingPreviewExpired,
+    ChallengeTimingPreviewRequired,
+    ChallengeTimingSeparateTimingChange,
+
     ChallengeMaterialActiveExecutionScope,
     LiveSoloCopyTemplateNotFound,
     LiveSoloCopyUnsupportedSource,
@@ -741,6 +749,14 @@ public static partial class ApiMessages
 {
     public static string Key(ApiMessageId id) => id switch
     {
+        ApiMessageId.ChallengeTimingNotFound => "api.challenges.timing.notFound",
+        ApiMessageId.ChallengeTimingUnsupportedMode => "api.challenges.timing.unsupportedMode",
+        ApiMessageId.ChallengeTimingInvalidOrder => "api.challenges.timing.invalidOrder",
+        ApiMessageId.ChallengeTimingPublishedFutureOpening => "api.challenges.timing.publishedFutureOpening",
+        ApiMessageId.ChallengeTimingPreviewExpired => "api.challenges.timing.previewExpired",
+        ApiMessageId.ChallengeTimingPreviewRequired => "api.challenges.timing.previewRequired",
+        ApiMessageId.ChallengeTimingSeparateTimingChange => "api.challenges.timing.separateTimingChange",
+
         ApiMessageId.ChallengeMaterialActiveExecutionScope => "api.challenges.material.activeExecutionScope",
         ApiMessageId.LiveSoloCopyTemplateNotFound => "api.liveSolo.templateCopy.notFound",
         ApiMessageId.LiveSoloCopyUnsupportedSource => "api.liveSolo.templateCopy.unsupportedSource",
@@ -1479,6 +1495,16 @@ public static partial class ApiMessages
 
     public static ApiMessage For(Enum? code) => Get(code switch
     {
+        NoCTF.Application.GameplayFacts.PatchUploads.PatchUploadFailureCode.ChallengeNotOpened => ApiMessageId.GameplayFactAdmissionFailureCodeChallengeNotOpened,
+        NoCTF.Application.GameplayFacts.PatchUploads.PatchUploadFailureCode.ChallengeSubmissionClosed => ApiMessageId.GameplayFactAdmissionFailureCodeChallengeSubmissionClosed,
+        NoCTF.Application.Challenges.Timing.ChallengeTimingFailure.NotFound => ApiMessageId.ChallengeTimingNotFound,
+        NoCTF.Application.Challenges.Timing.ChallengeTimingFailure.UnsupportedMode => ApiMessageId.ChallengeTimingUnsupportedMode,
+        NoCTF.Application.Challenges.Timing.ChallengeTimingFailure.InvalidOrder => ApiMessageId.ChallengeTimingInvalidOrder,
+        NoCTF.Application.Challenges.Timing.ChallengeTimingFailure.PublishedFutureOpening => ApiMessageId.ChallengeTimingPublishedFutureOpening,
+        NoCTF.Application.Challenges.Timing.ChallengeTimingFailure.PreviewExpired => ApiMessageId.ChallengeTimingPreviewExpired,
+        NoCTF.Application.Challenges.Timing.ChallengeTimingFailure.PreviewRequired => ApiMessageId.ChallengeTimingPreviewRequired,
+        NoCTF.Application.Challenges.Timing.ChallengeTimingFailure.SeparateTimingChange => ApiMessageId.ChallengeTimingSeparateTimingChange,
+
         NoCTF.Application.Challenges.Configuration.ChallengeMaterialMutationFailure.ActiveExecutionScope => ApiMessageId.ChallengeMaterialActiveExecutionScope,
         NoCTF.Application.LiveSolo.Templates.LiveSoloTemplateCopyFailure.NotFound => ApiMessageId.LiveSoloCopyTemplateNotFound,
         NoCTF.Application.LiveSolo.Templates.LiveSoloTemplateCopyFailure.UnsupportedSource => ApiMessageId.LiveSoloCopyUnsupportedSource,

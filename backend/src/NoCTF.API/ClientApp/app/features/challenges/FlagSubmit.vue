@@ -25,6 +25,7 @@ const props = withDefaults(
     dockTarget?: string
     maximumAttempts?: number | null
     remainingAttempts?: number | null
+    timing?: import("~/api").NoCtfapiEndpointsChallengesCompetitionChallengeTimingResponse | null
     initiallySolved?: boolean
   }>(),
   { multiple: false, title: translate("challenges.label.submitFlag"), description: '', practice: false, readOnlyJudgement: false, dockTarget: '', initiallySolved: false },

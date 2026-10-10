@@ -121,6 +121,8 @@ public sealed class UploadPatchVerificationEndpoint(
         UnprocessableEntity<PatchVerificationUploadFailureResponse>,
         ProblemHttpResult> MapFailure(PatchUploadFailureCode code, string detail) => code switch
         {
+            PatchUploadFailureCode.ChallengeNotOpened or PatchUploadFailureCode.ChallengeSubmissionClosed => ApiProblems.Problem(
+                statusCode: 409, detail: ApiMessages.For(code), extensions: new Dictionary<string, object?> { ["code"] = code }),
             PatchUploadFailureCode.DefenseTargetNotReady => TypedResults.Conflict(
                 new PatchVerificationUploadFailureResponse(
                     PatchVerificationUploadFailureCode.TargetNotReady, detail)),

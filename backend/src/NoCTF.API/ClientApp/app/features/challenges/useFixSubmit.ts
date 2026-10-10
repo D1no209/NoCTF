@@ -1,3 +1,4 @@
+import { useSubmissionTiming } from './timing/useSubmissionTiming'
 import { message as describeMessage } from '../../utils/i18n'
 import { toRefs } from 'vue'
 
@@ -11,6 +12,7 @@ export function useFixSubmit(props: Readonly<{
   competitionId: string
   competitionChallengeId: string
   defense?: NoCtfapiEndpointsGameplayFactsAwdpDefenseProgressResponse | NoCtfapiEndpointsGameplayFactsPatchVerificationStateResponse
+  timing?: import("~/api").NoCtfapiEndpointsChallengesCompetitionChallengeTimingResponse | null
   ctfPatchVerification?: boolean
 }>,
 emit: { (event: "changed", ...args: []): void; (event: "accepted", ...args: []): void }) {
@@ -78,7 +80,8 @@ emit: { (event: "changed", ...args: []): void; (event: "accepted", ...args: []):
     return state === 'Queued' || state === 'Provisioning'
   })
 
-  const canUpload = computed(() =>
+  const { submissionsClosed } = useSubmissionTiming(() => props.timing)
+  const canUpload = computed(() => !submissionsClosed.value &&
     (props.defense?.runtimeState === 'Queued'
       || props.defense?.runtimeState === 'Provisioning'
       || props.defense?.runtimeState === 'Running')
@@ -103,7 +106,7 @@ emit: { (event: "changed", ...args: []): void; (event: "accepted", ...args: []):
     props.defense?.runtimeState === 'Stopped' && hasGameplayFact.value,
   )
 
-  const canRequest = computed(() => !runtimeActive.value
+  const canRequest = computed(() => !submissionsClosed.value && !runtimeActive.value
     && (!props.ctfPatchVerification
       || ((props.defense as NoCtfapiEndpointsGameplayFactsPatchVerificationStateResponse | undefined)?.verificationResult !== 'Correct'
         && ((props.defense as NoCtfapiEndpointsGameplayFactsPatchVerificationStateResponse | undefined)?.remainingAttempts ?? 1) > 0)))

@@ -5,6 +5,13 @@ namespace NoCTF.Tests.Unit.Application;
 
 public sealed class ChallengeTimingPolicyTests
 {
+    [Test]
+    public async Task Every_schedule_kind_has_a_telemetry_boundary_name()
+    {
+        foreach (var kind in Enum.GetValues<NoCTF.Infrastructure.Messaging.ClusterScheduleKind>())
+            await Assert.That(NoCTF.Infrastructure.Messaging.MaintenanceTickAgent.ScheduleKind(kind)).IsNotEmpty();
+    }
+
     private static readonly DateTimeOffset Opening = new(2026, 10, 10, 8, 0, 0, TimeSpan.Zero);
     [Test]
     public async Task Boundary_instants_distinguish_scoring_judgement_and_closed_submissions()

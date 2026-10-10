@@ -44,7 +44,8 @@ const catalogLoaders: Record<AppLocale, Record<LocaleDomain, () => Promise<Local
   'zh-CN': {
     core: () => import('../locales/catalogs/zh-CN/core.json').then(chunk => chunk.default),
     competitions: () => import('../locales/catalogs/zh-CN/competitions.json').then(chunk => chunk.default),
-    challenges: () => import('../locales/catalogs/zh-CN/challenges.json').then(chunk => chunk.default),
+    challenges: () => Promise.all([import('../locales/catalogs/zh-CN/challenges.json'), import('../locales/catalogs/zh-CN/challenge-timing.json')])
+      .then(([challenges, timing]) => ({ ...challenges.default, ...timing.default })),
     leaderboard: () => import('../locales/catalogs/zh-CN/leaderboard.json').then(chunk => chunk.default),
     administration: () => import('../locales/catalogs/zh-CN/administration.json').then(chunk => chunk.default),
     account: () => import('../locales/catalogs/zh-CN/account.json').then(chunk => chunk.default),
@@ -59,7 +60,8 @@ const catalogLoaders: Record<AppLocale, Record<LocaleDomain, () => Promise<Local
   'en': {
     core: () => import('../locales/catalogs/en/core.json').then(chunk => chunk.default),
     competitions: () => import('../locales/catalogs/en/competitions.json').then(chunk => chunk.default),
-    challenges: () => import('../locales/catalogs/en/challenges.json').then(chunk => chunk.default),
+    challenges: () => Promise.all([import('../locales/catalogs/en/challenges.json'), import('../locales/catalogs/en/challenge-timing.json')])
+      .then(([challenges, timing]) => ({ ...challenges.default, ...timing.default })),
     leaderboard: () => import('../locales/catalogs/en/leaderboard.json').then(chunk => chunk.default),
     administration: () => import('../locales/catalogs/en/administration.json').then(chunk => chunk.default),
     account: () => import('../locales/catalogs/en/account.json').then(chunk => chunk.default),

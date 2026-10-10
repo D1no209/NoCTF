@@ -1,3 +1,4 @@
+import ChallengeTimingSettingsComponent from '~/features/challenges/timing/ChallengeTimingSettings.vue'
 import { message as describeMessage } from '../../../../../../utils/i18n'
 import type { UiMessage } from '../../../../../../utils/i18n'
 import { challengeTagOptions, uniqueTags, validChallengeTags } from '~/lib/challenge-tags'
@@ -610,7 +611,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
     viewState.hintDialogOpen = value
   }
 
-  return { ...viewBindings, ccId, SingleWriteUpSettings: markRaw(SingleWriteUpSettingsComponent), onClickAdjustmentTarget, onClickHintDialogOpen }
+  return { ...viewBindings, ccId, SingleWriteUpSettings: markRaw(SingleWriteUpSettingsComponent), ChallengeTimingSettings: markRaw(ChallengeTimingSettingsComponent), onClickAdjustmentTarget, onClickHintDialogOpen }
 }
 
 export type AdminCompetitionsByIdChallengesByCcIdPageViewState = import('vue').ShallowUnwrapRef<Awaited<ReturnType<typeof useAdminCompetitionsByIdChallengesByCcIdPage>>>

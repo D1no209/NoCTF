@@ -1707,6 +1707,7 @@ export type NoCtfapiEndpointsGameplayFactsPatchVerificationStateResponse = {
     runtimeInstanceId?: string | null;
     runtimeState?: NoCtfapiEndpointsRuntimeRuntimeStateProtocol | null;
     unavailableCode?: NoCtfapiEndpointsGameplayFactsPatchVerificationTargetFailureCodeProtocol | null;
+    timeEligibility?: NoCtfDomainChallengesGameplayFactTimeEligibility;
 };
 
 export type NoCtfapiEndpointsGameplayFactsPatchVerificationTargetFailureCodeProtocol = 'PatchVerificationNotAvailable' | 'ExperimentalFeatureDisabled' | 'ActiveTargetExists' | 'PatchAlreadyVerified' | 'PatchAttemptsExhausted' | 'RuntimeQuotaExceeded' | 'InvalidRuntimeConfiguration' | 'TargetConcurrency';
@@ -2426,9 +2427,13 @@ export type NoCtfapiEndpointsChallengesCompetitionChallengeTimingResponse = {
     submissionDeadlineAt?: string | null;
     openingState?: NoCtfDomainChallengesChallengeOpeningState;
     recalculationPending?: boolean;
+    serverTime?: string | null;
+    phase?: NoCtfDomainChallengesChallengeTimingPhase | null;
 };
 
 export type NoCtfDomainChallengesChallengeOpeningState = 'None' | 'Pending' | 'Applied' | 'Canceled';
+
+export type NoCtfDomainChallengesChallengeTimingPhase = 'NotOpened' | 'Scoring' | 'JudgementOnly' | 'SubmissionClosed';
 
 export type NoCtfapiEndpointsChallengesGetChallengeRequest = {
     [key: string]: never;
@@ -5005,6 +5010,7 @@ export type NoCtfapiEndpointsAdministrationChallengesPatchCompetitionChallengeRe
     presentation?: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengePresentationPatchRequest | null;
     rules?: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesPatchRequest | null;
     timing?: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeTimingPatchRequest | null;
+    timingPreviewToken?: string | null;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengesCompetitionChallengePresentationPatchRequest = {
@@ -5017,6 +5023,28 @@ export type NoCtfapiEndpointsAdministrationChallengesCompetitionChallengePresent
 
 export type NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesPatchRequest = {
     configuration: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract;
+};
+
+export type NoCtfApplicationChallengesTimingChallengeTimingPreview = {
+    token?: string;
+    expiresAt?: string;
+    affectedAttempts?: number;
+    teams?: Array<NoCtfApplicationChallengesTimingChallengeTimingImpact>;
+};
+
+export type NoCtfApplicationChallengesTimingChallengeTimingImpact = {
+    teamId?: string;
+    teamName?: string;
+    scoreBefore?: number;
+    scoreAfter?: number;
+    bloodChanged?: boolean;
+    completionBefore?: number;
+    completionAfter?: number;
+    progressionNodesChanged?: number;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengesPreviewChallengeTimingRequest = {
+    timing?: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeTimingPatchRequest;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengesRestoreChallengeRequest = {
@@ -16820,6 +16848,40 @@ export type AdminListCompetitionChallengeFlagsResponses = {
 };
 
 export type AdminListCompetitionChallengeFlagsResponse = AdminListCompetitionChallengeFlagsResponses[keyof AdminListCompetitionChallengeFlagsResponses];
+
+export type AdminPreviewCompetitionChallengeTimingData = {
+    body: NoCtfapiEndpointsAdministrationChallengesPreviewChallengeTimingRequest;
+    path: {
+        competitionId: string;
+        competitionChallengeId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/timing-preview';
+};
+
+export type AdminPreviewCompetitionChallengeTimingErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminPreviewCompetitionChallengeTimingResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationChallengesTimingChallengeTimingPreview;
+};
+
+export type AdminPreviewCompetitionChallengeTimingResponse = AdminPreviewCompetitionChallengeTimingResponses[keyof AdminPreviewCompetitionChallengeTimingResponses];
 
 export type AdminRestoreCompetitionChallengeData = {
     body?: never;

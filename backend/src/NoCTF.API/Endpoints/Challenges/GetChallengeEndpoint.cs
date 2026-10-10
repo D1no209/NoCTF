@@ -32,6 +32,9 @@ public sealed record CompetitionChallengeTimingResponse(DateTimeOffset? AutoOpen
     [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<ChallengeOpeningState>))] ChallengeOpeningState OpeningState,
     bool RecalculationPending)
 {
+    public DateTimeOffset? ServerTime { get; init; }
+    [JsonConverter(typeof(StrictPascalCaseEnumConverter<ChallengeTimingPhase>))]
+    public ChallengeTimingPhase? Phase { get; init; }
     internal static CompetitionChallengeTimingResponse From(ChallengeTiming timing, ChallengeOpeningState openingState = ChallengeOpeningState.None,
         bool pending = false) => new(timing.AutoOpenAt, timing.ScoringEndsAt, timing.SubmissionDeadlineAt, openingState, pending);
 }
@@ -302,6 +305,10 @@ public sealed class GetChallengeEndpoint(
                 decision.TeamId, timeProvider.GetUtcNow(), ct),
             patchVerification,
             HttpContext.Request);
+        var timingNow = timeProvider.GetUtcNow();
+        response = response with { Timing = response.Timing is null ? null : response.Timing with {
+            ServerTime = timingNow, Phase = item.Timing.Phase(timingNow,
+                visibility.GameMode == GameMode.Ctf && visibility.CompetitionStatus == CompetitionStatus.Finished) } };
         return TypedResults.Ok(response);
     }
 

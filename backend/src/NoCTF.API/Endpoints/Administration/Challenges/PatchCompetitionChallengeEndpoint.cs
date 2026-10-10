@@ -76,6 +76,7 @@ public sealed class PatchCompetitionChallengeRequest
     public CompetitionChallengePresentationPatchRequest? Presentation { get; set; }
     public CompetitionChallengeRulesPatchRequest? Rules { get; set; }
     public CompetitionChallengeTimingPatchRequest? Timing { get; set; }
+    public string? TimingPreviewToken { get; set; }
 }
 
 public sealed class CompetitionChallengeTimingPatchRequest
@@ -193,7 +194,7 @@ public sealed class PatchCompetitionChallengeEndpoint(
     ICompetitionModerationAuthorizer authorizer,
     IUserContext user,
     TimeProvider timeProvider,
-    NoCTF.Application.Challenges.Timing.IChallengeTimingStore? timingStore = null)
+    NoCTF.Application.Challenges.Timing.ManageChallengeTiming? timingStore = null)
     : Endpoint<PatchCompetitionChallengeRequest,
         Results<Ok<AdminCompetitionChallengeResponse>, NotFound,
             ForbidHttpResult, Conflict<CompetitionChallengeConflictResponse>, ProblemHttpResult>>
@@ -216,6 +217,10 @@ public sealed class PatchCompetitionChallengeEndpoint(
         var sections = ResolveSections(request);
         if (!await authorizer.CanModerateAsync(user.UserId, competitionId, ct))
             return TypedResults.Forbid();
+        if (request.Timing is not null && (request.Presentation is not null || request.Rules is not null))
+            return ApiProblems.Problem(statusCode: 400,
+                detail: ApiMessages.For(NoCTF.Application.Challenges.Timing.ChallengeTimingFailure.SeparateTimingChange),
+                extensions: new Dictionary<string, object?> { ["code"] = NoCTF.Application.Challenges.Timing.ChallengeTimingFailure.SeparateTimingChange });
         var current = await get.ExecuteAsync(
             competitionId,
             competitionChallengeId,
@@ -261,6 +266,22 @@ public sealed class PatchCompetitionChallengeEndpoint(
             NotFound, ForbidHttpResult, Conflict<CompetitionChallengeConflictResponse>,
             ProblemHttpResult>>> ApplyAsync(CancellationToken transactionCt)
         {
+            if (request.Timing is not null)
+            {
+                var latest = await get.ExecuteAsync(competitionId, competitionChallengeId, true, false, transactionCt);
+                if (latest is null)
+                    return AtomicAggregatePatchDecision<Results<Ok<AdminCompetitionChallengeResponse>, NotFound, ForbidHttpResult,
+                        Conflict<CompetitionChallengeConflictResponse>, ProblemHttpResult>>.Rollback(TypedResults.NotFound());
+                var previewFailure = await (timingStore ?? throw new InvalidOperationException("Challenge timing store is required."))
+                    .ValidateAsync(new(competitionId, competitionChallengeId, request.Timing.Apply(latest.Timing), timeProvider.GetUtcNow()),
+                        user.UserId, request.TimingPreviewToken, transactionCt);
+                if (previewFailure is not null)
+                    return AtomicAggregatePatchDecision<Results<Ok<AdminCompetitionChallengeResponse>, NotFound, ForbidHttpResult,
+                        Conflict<CompetitionChallengeConflictResponse>, ProblemHttpResult>>.Rollback(
+                        ApiProblems.Problem(statusCode: previewFailure == NoCTF.Application.Challenges.Timing.ChallengeTimingFailure.InvalidOrder ? 400 : 409,
+                            detail: ApiMessages.For(previewFailure),
+                            extensions: new Dictionary<string, object?> { ["code"] = previewFailure.Value }));
+            }
             if ((sections & CompetitionChallengePatchSection.Presentation) != 0)
             {
                 var result = await update.ExecuteAsync(new UpdateCompetitionChallengeCommand(
@@ -334,12 +355,13 @@ public sealed class PatchCompetitionChallengeEndpoint(
             if ((sections & CompetitionChallengePatchSection.Timing) != 0)
             {
                 var failure = await (timingStore ?? throw new InvalidOperationException("Challenge timing store is required."))
-                    .ChangeAsync(new(competitionId, competitionChallengeId, request.Timing!.Apply((await get.ExecuteAsync(competitionId, competitionChallengeId, true, false, transactionCt))!.Timing), timeProvider.GetUtcNow()), transactionCt);
+                    .ApplyValidatedAsync(new(competitionId, competitionChallengeId, request.Timing!.Apply((await get.ExecuteAsync(competitionId, competitionChallengeId, true, false, transactionCt))!.Timing), timeProvider.GetUtcNow()),
+                        transactionCt);
                 if (failure is not null)
                 {
                     Results<Ok<AdminCompetitionChallengeResponse>, NotFound, ForbidHttpResult, Conflict<CompetitionChallengeConflictResponse>, ProblemHttpResult> timingResponse =
                         failure == NoCTF.Application.Challenges.Timing.ChallengeTimingFailure.NotFound ? TypedResults.NotFound()
-                        : TypedResults.Problem(statusCode: 400, detail: failure.ToString(), extensions: new Dictionary<string, object?> { ["code"] = failure.ToString() });
+                        : ApiProblems.Problem(statusCode: 400, detail: ApiMessages.For(failure), extensions: new Dictionary<string, object?> { ["code"] = failure.Value });
                     return AtomicAggregatePatchDecision<Results<Ok<AdminCompetitionChallengeResponse>, NotFound, ForbidHttpResult,
                         Conflict<CompetitionChallengeConflictResponse>, ProblemHttpResult>>.Rollback(timingResponse);
                 }

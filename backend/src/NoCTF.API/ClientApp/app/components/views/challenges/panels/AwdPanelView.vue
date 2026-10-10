@@ -51,7 +51,7 @@ const { emit, targets, targetsError, targetsLoaded, FlagSubmit, RuntimeAccessUrl
         </Table>
     </section>
 
-    <component :is="FlagSubmit"
+    <component :is="FlagSubmit" :timing="challenge.timing"
       :dock-target="flagDockTarget"
       :competition-id="competition.id!"
       :competition-challenge-id="challenge.id!"

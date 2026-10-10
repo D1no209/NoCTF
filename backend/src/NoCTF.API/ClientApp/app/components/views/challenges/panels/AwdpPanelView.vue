@@ -45,7 +45,7 @@ const { ShieldCheck, emit, state, loading, stateError, defenseOutcome, statePoll
           :dock-target="runtimeDockTarget"
         />
 
-        <component :is="FlagSubmit"
+        <component :is="FlagSubmit" :timing="challenge.timing"
           :dock-target="flagDockTarget"
           :competition-id="competition.id!"
           :competition-challenge-id="challenge.id!"
@@ -93,7 +93,7 @@ const { ShieldCheck, emit, state, loading, stateError, defenseOutcome, statePoll
           <span>{{ $t('challenges.awdpPanel.validation.defenseLockedRequired') }}</span>
         </p>
 
-        <component :is="FixSubmit"
+        <component :is="FixSubmit" :timing="challenge.timing"
           v-else
           class="border-t pt-5"
           :competition-id="competition.id!"

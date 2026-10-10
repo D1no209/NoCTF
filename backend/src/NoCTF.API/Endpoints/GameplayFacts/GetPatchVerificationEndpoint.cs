@@ -23,7 +23,9 @@ public sealed record PatchVerificationStateResponse(
     GameplayFactFailureCodeProtocol? VerificationFailureCode,
     Guid? RuntimeInstanceId,
     NoCTF.API.Endpoints.Runtime.RuntimeStateProtocol? RuntimeState,
-    PatchVerificationTargetFailureCodeProtocol? UnavailableCode);
+    PatchVerificationTargetFailureCodeProtocol? UnavailableCode,
+    [property: System.Text.Json.Serialization.JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<NoCTF.Domain.Challenges.GameplayFactTimeEligibility>))]
+    NoCTF.Domain.Challenges.GameplayFactTimeEligibility TimeEligibility = NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid);
 
 public sealed class GetPatchVerificationEndpoint(
     GetPatchVerificationState getState,
@@ -79,6 +81,6 @@ public sealed class GetPatchVerificationEndpoint(
                 : null,
             state.UnavailableCode is { } unavailableCode
                 ? PatchVerificationTargetProtocolMapping.ToProtocol(unavailableCode)
-                : null));
+                : null, state.TimeEligibility));
     }
 }

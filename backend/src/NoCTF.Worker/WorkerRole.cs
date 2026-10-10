@@ -107,6 +107,7 @@ public static class WorkerRole
         options.Discovery.IncludeType(typeof(KohPollingHandler));
         options.Discovery.IncludeType(typeof(KohObservationHandler));
         options.Discovery.IncludeType(typeof(CompetitionLifecycleMessageHandler));
+        options.Discovery.IncludeType(typeof(Challenges.Timing.ChallengeTimingMessageHandler));
         options.Discovery.IncludeType(typeof(AwdpMessageHandler));
         options.Discovery.IncludeType(typeof(RuntimeDispatchMessageHandler));
         options.Discovery.IncludeType(typeof(QueuedRuntimeDispatchHandler));
