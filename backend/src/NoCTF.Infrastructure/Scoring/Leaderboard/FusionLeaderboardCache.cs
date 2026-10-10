@@ -665,6 +665,9 @@ public sealed class FusionLeaderboardCache(
 
     private async Task<bool> HasCurrentTimingAsync(Guid competitionId, CachedScoreboardProjection bundle, CancellationToken ct)
     {
+        // Missing revision metadata makes a cached projection invalid.
+        // Rebuild it from current relational facts before serving any score.
+        if (bundle.TimingRevisions is null) return false;
         var current = await db.CompetitionChallenges.AsNoTracking().Where(x => x.CompetitionId == competitionId)
             .Select(x => new { x.Id, x.TimingRevision }).ToArrayAsync(ct);
         return current.Length == bundle.TimingRevisions.Count

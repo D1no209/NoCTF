@@ -59,6 +59,25 @@ namespace NoCTF.Tests.Integration.Persistence;
 public sealed class ChallengeTimingPersistenceTests
 {
     [Test, Timeout(300_000)]
+    public Task A_cached_payload_without_timing_metadata_is_invalidated_and_rebuilt(CancellationToken ct) => DockerIntegrationTest.RunAsync(async () =>
+    {
+        await using var f = await Fixture.CreateAsync(ct);
+        using var services = new ServiceCollection().AddFusionCache(NoCtfCacheNames.Leaderboards).Services.BuildServiceProvider();
+        var provider = services.GetRequiredService<IFusionCacheProvider>();
+        var cache = new FusionLeaderboardCache(f.Db, new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()),
+            Substitute.For<ILeaderboardRefreshPublisher>(), provider);
+        var projection = await cache.CreateScoreboardAsync(f.Competition.Id, f.Now, ct);
+        var json = System.Text.Json.Nodes.JsonNode.Parse(JsonSerializer.Serialize(new CachedScoreboardProjection(projection!), CachedScoreboardJsonContext.Default.CachedScoreboardProjection))!.AsObject();
+        json.Remove("timingRevisions");
+        var incomplete = JsonSerializer.Deserialize(json.ToJsonString(), CachedScoreboardJsonContext.Default.CachedScoreboardProjection)!;
+        await provider.GetCache(NoCtfCacheNames.Leaderboards).SetAsync($"scoreboard:v3:{f.Competition.Id:N}", incomplete, token: ct);
+        var current = await cache.GetScoreboardAsync(f.Competition.Id, ct);
+        await Assert.That(current).IsNotNull();
+        var rebuilt = await provider.GetCache(NoCtfCacheNames.Leaderboards).GetOrDefaultAsync<CachedScoreboardProjection?>($"scoreboard:v3:{f.Competition.Id:N}", null, token: ct);
+        await Assert.That(rebuilt!.TimingRevisions.Count).IsEqualTo(1);
+    });
+
+    [Test, Timeout(300_000)]
     public Task First_evaluation_excludes_time_invalid_history_from_the_attempt_budget(CancellationToken ct) => DockerIntegrationTest.RunAsync(async () =>
     {
         await using var f = await Fixture.CreateAsync(ct); f.Challenge.IsPublished = true;
