@@ -8,11 +8,11 @@ public sealed record LiveSoloRosterView(Guid TeamId, IReadOnlyList<Guid> UserIds
 public sealed record LiveSoloMatchView(Guid Id, Guid CompetitionId, LiveSoloMatchState State, Guid ConcurrencyStamp,
     int RequiredWins, int LeftWins, int RightWins, Guid? LeftTeamId, string? LeftTeamName, Guid? RightTeamId, string? RightTeamName,
     Guid? CurrentRoundId, Guid? WinnerTeamId, IReadOnlyList<LiveSoloRosterView> Rosters, Guid? PendingCorrectionId = null,
-    Guid? ReplacementMatchId = null, Guid? PendingCorrectionMatchId = null);
+    Guid? ReplacementMatchId = null, Guid? PendingCorrectionMatchId = null, bool HasMedia = false);
 public sealed record LiveSoloMatchResult(LiveSoloMatchView? Match, LiveSoloFailure? Failure = null);
 public sealed record LiveSoloRoundView(Guid Id, Guid MatchId, int Number, int Replay, LiveSoloRoundState State,
     Guid ConcurrencyStamp, long TimelineRevision, DateTimeOffset? CountdownAt, DateTimeOffset? StartedAt,
-    int LimitSeconds, long ActiveElapsedMilliseconds, bool Paused, Guid? WinnerTeamId, Guid? WinningGameplayFactId);
+    int LimitSeconds, long ActiveElapsedMilliseconds, bool Paused, Guid? WinnerTeamId, Guid? WinningGameplayFactId, bool PlatformStreamingEnabled);
 public sealed record LiveSoloRoundResult(LiveSoloRoundView? Round, LiveSoloFailure? Failure = null);
 public sealed record LiveSoloQuestionGroupInput(Guid? Id, string Name, bool Reserve, int? LimitSeconds,
     IReadOnlyList<LiveSoloQuestionGroupEntry> Questions, Guid? ExpectedStamp);

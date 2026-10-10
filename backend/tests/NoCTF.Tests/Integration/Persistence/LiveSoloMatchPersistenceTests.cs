@@ -397,7 +397,7 @@ public sealed class LiveSoloMatchPersistenceTests
         public readonly ILiveSoloMediaGateway media = Substitute.For<ILiveSoloMediaGateway>();
         public readonly ILiveSoloEgressGateway egress = Substitute.For<ILiveSoloEgressGateway>();
 
-        public static async Task<Fixture> CreateAsync(CancellationToken ct)
+        public static async Task<Fixture> CreateAsync(CancellationToken ct, bool platformStreaming = true)
         {
             var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193").Build();
             await postgres.StartAsync(ct);
@@ -410,7 +410,7 @@ public sealed class LiveSoloMatchPersistenceTests
             fixture.Competition = new() { Id = Guid.NewGuid(), OwnerId = fixture.Owner.Id, Title = "LiveSolo Round test",
                 StartAt = fixture.Now.AddHours(-1), EndAt = fixture.Now.AddHours(1), CreatedAt = fixture.Now, UpdatedAt = fixture.Now,
                 Status = CompetitionStatus.Running, FlagDerivationSecret = new byte[32], ModeConfiguration = new LiveSoloCompetitionModeConfiguration {
-                    Enabled = true, RequiredWins = 1, QuestionIntervalSeconds = 10, RoundLimitSeconds = 30 } };
+                    Enabled = true, PlatformStreamingEnabled = platformStreaming, RequiredWins = 1, QuestionIntervalSeconds = 10, RoundLimitSeconds = 30 } };
             Team Team(User user, char key) => new() { Id = Guid.NewGuid(), CompetitionId = fixture.Competition.Id, Name = user.UserName,
                 CaptainId = user.Id, MemberIds = [user.Id], InvitationToken = new string(key, 32), RegistrationStatus = TeamRegistrationStatus.Approved, RegisteredAt = fixture.Now };
             fixture.LeftTeam = Team(fixture.Left, 'l'); fixture.RightTeam = Team(fixture.Right, 'r');
@@ -463,6 +463,7 @@ public sealed class LiveSoloMatchPersistenceTests
             if (expectedPreparationFailure is not null) return;
             Round = await Db.LiveSoloRounds.Include(x => x.Questions).SingleAsync(x => x.Id == prepared.Round!.Id, ct);
             Match = (await store.FindAsync(Competition.Id, Match.Id, Owner.Id, true, Now, ct))!;
+            if (!Round.PlatformStreamingEnabled) return;
             var participants = Match.Rosters.SelectMany(roster => roster.UserIds.Select(id => new LiveSoloMediaParticipant {
                 UserId = id, TeamId = roster.TeamId, Side = roster.TeamId == LeftTeam.Id ? LiveSoloSide.Left : LiveSoloSide.Right,
                 Identity = id == Left.Id ? "left-screen" : id == Right.Id ? "right-screen" : id.ToString("N"), ObservedAt = Now })).ToList();

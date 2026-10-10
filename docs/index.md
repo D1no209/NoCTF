@@ -19,8 +19,8 @@ features:
     details: 准备 Linux 服务器，配置 Docker 或 Kubernetes，接入 HTTPS、文件存储和题目网络，完成首次验收。
     link: /installation/docker
   - title: 参赛与解题
-    details: 创建队伍、提交报名、阅读题目、使用运行环境、提交 Flag 或修复包，并查看排名和题解。
-    link: /player/teams
+    details: 创建队伍并报名，按 CTF、AWD、AWDP、KoH 或 LiveSolo 流程参赛，使用题目资源并查阅赛后内容。
+    link: /player/modes
   - title: 赛事组织
     details: 按管理菜单查阅概览、配置、题目、队伍、评测、实例、抓包、申诉、公告、权限与导出操作。
     link: /competition/
@@ -39,6 +39,11 @@ features:
 | 确认平台已经可以正式使用 | [首次启动与验收](./installation/verify.md) |
 | 报名参加比赛 | [建队、邀请与报名](./player/teams.md) |
 | 从零配置一场比赛 | [举办第一场比赛](./competition/quick-start.md) |
+| 选择赛制并参赛 | [五种赛制参赛指南](./player/modes.md) |
+| 配置 LiveSolo 对局与裁判 | [比赛管理中的 LiveSolo](./competition/modes/live-solo/index.md) |
+| 设置单题自动开放和提交截止 | [题目时间](./competition/content/timing.md) |
 | 定位登录、题目环境或评测故障 | [常见故障排查](./operations/troubleshooting.md) |
 
 本手册面向仓库当前版本。安装步骤以 `deploy/` 中的模板和脚本为依据，界面入口以当前 ClientApp 为依据；安装旧版本时，应读取对应 Git revision 的手册。开发者领域契约仍由仓库 `specs/` 维护。
+
+最近内容核对：2026-10-11。新增及修正见 [更新说明](./reference/updates.md)；LiveSolo 的局部验证不代表完整生产投产验收。

@@ -27,7 +27,9 @@
 4. 验证实际成绩变动和断线恢复，不只看动画运行。
 5. 现场展示保持普通公开读取范围，不投屏管理敏感页。
 
-CTF 3D 视图可呈现题目和解题进展；AWDP 控制屏按 Break/Fix、轮次和队伍动态组织。菜单可能对非 AWDP 使用同一 live 入口，实际支持和数据显示以当前页面为准，不承诺其他模式拥有相同的 CTF 3D 内容。
+CTF 3D 视图可呈现题目和解题进展；AWDP 控制屏按 Break/Fix、轮次和队伍动态组织。当前菜单仅向对应 CTF/AWDP 提供其大屏，AWD/KoH 不冒充 CTF 3D 内容。
+
+LiveSolo 使用独立 [大厅/赛程](../modes/live-solo/bracket.md)和 [延迟节目](../../player/modes/live-solo/program.md)，不进入普通积分排行榜或 CTF/AWDP 大屏。观众不接收裁判当前私有状态。
 
 ## 冻结与隐藏
 

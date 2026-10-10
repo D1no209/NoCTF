@@ -2,34 +2,34 @@
 
 ## 配置契约
 
-Competition 配置 schema v2 提供 `DefaultScoreCurve`、`WrongSubmissionPenalty` 和三个血位 Reward 默认值。CompetitionChallenge 配置 schema v2 可用 nullable `ScoreCurve` 整体覆盖，并另外定义：
+Competition 的强类型配置提供 `DefaultScoreCurve`、`WrongSubmissionPenalty` 和三个血位 Reward 默认值。CompetitionChallenge 的强类型规则可用 nullable `ScoreCurve` 整体覆盖，并另外定义：
 
 ```text
 MaxFlagAttempts: int?                   // null 无限；配置时必须 >0
-Runtime?                               // 按队 Runtime 配置
-Runtime.FlagSource: PerTeam
+ScoreSettlementMode?                   // null 继承比赛；DynamicRecalculation 或 AtSolve
 ```
 
-附件的 `All | RandomOnePerTeam` 由独立 `AttachmentDeliveryPolicy` 管理，不属于 `RulesJson`；CTF Flag 判定固定自动执行，不使用 `EvaluationDispatchMode`。
+附件的 `All | RandomOnePerTeam` 由独立 `AttachmentDeliveryPolicy` 管理，不属于 `Rules`；CTF Flag 判定固定自动执行，不使用 `EvaluationDispatchMode`。
 
-`ScoreCurve` 包含 `InitialPoints`、`MinimumPoints`、`DecayTeamCount`、`DecayMode` 和仅在 Custom 模式使用的 `CustomExpression`。数值约束：InitialPoints 为 1..1,000,000，MinimumPoints 为 0..InitialPoints，DecayTeamCount>1，Penalty/Reward 非负，百分比 0..100。覆盖值为 0 时就是显式 0，不表示继承；只有 null 表示继承。所有配置对象带 `schemaVersion`，未知版本拒绝保存。
+`ScoreCurve` 包含 `InitialPoints`、`MinimumPoints`、`DecayTeamCount`、`DecayMode` 和仅在 Custom 模式使用的 `CustomExpression`。数值约束：InitialPoints 为 1..1,000,000，MinimumPoints 为 0..InitialPoints，DecayTeamCount>1，Penalty/Reward 非负，百分比 0..100。覆盖值为 0 时就是显式 0，不表示继承；只有 null 表示继承。配置以强类型 TPH 聚合与关系子表持久化，不保存 schema-version JSON。Runtime 技术定义属于题库 Challenge，不属于比赛题目规则。
+
+CTF 还可在平台实验开关允许时使用独立的 [PatchVerification](../ctf-patch-verification-experiment.md)
+交互；下文 FlagAttempt 描述适用于 Flag 解题，Patch 模式以 FixAttempt 的当前结果判定完成。
 
 ## 题目形态
 
 CTF CompetitionChallenge 可为：
 
 - Static：题面、Attachment、外部链接；
-- PerTeamRuntime：Container、Compose 或 OVA；按队按需启动，没有多阶段语义。
+- PerTeamRuntime：Container 命名服务或 OVA；按队按需启动，没有多阶段语义。
 
-只要配置 Runtime，`Runtime.FlagSource` 就必须为 PerTeam。Container 使用
-`FlagEnvironmentVariableName`，Compose 使用 `FlagEnvironmentVariables[serviceName]`，平台在创建 Runtime
-时注入固定队伍 Flag。无 Runtime 的静态题才使用管理员维护的精确或正则 Flag。
+Container Runtime 使用 `FlagSource=PerTeam`，至少选择一个命名服务的 `FlagEnvironmentVariableName`，平台在创建 Runtime 时注入固定队伍 Flag。OVA 使用预置静态 Flag，不由平台注入；无 Runtime 的静态题可使用管理员维护的精确或正则 Flag。命名服务契约见 [Runtime services](../runtime-services.md)。
 
 Competition 可用 `FlagTemplate` 配置动态 Flag 的默认 Header、BodyTemplate 与字面文本 leet；
-CompetitionChallenge.RulesJson 可用同名字段为本场比赛的该题覆盖。优先级为比赛题目规则、
+CompetitionChallenge.Rules 可用同名字段为本场比赛的该题覆盖。优先级为比赛题目规则、
 竞赛默认、平台默认 `flag{[TEAMHASH]}`。该配置只在缺失的每队容器 Flag 首次生成时读取：已经持久化的
 Flag 不轮换，Reset/重启继续复用原值；静态题和管理员维护的手工 Flag 完全不受影响。
-Challenge.DefinitionJson 只保存 Runtime 与注入目标，不保存动态 Flag 前缀或正文模板。
+Challenge.Definition 只保存 Runtime 与注入目标，不保存动态 Flag 前缀或正文模板。
 
 ## Flag 与附件
 
@@ -44,13 +44,13 @@ Attachment 策略：
 
 只接受单个 `flag`，不接受 `flags`。题目可配置可空的 `MaxFlagAttempts`；null 表示无限，正整数表示接入上限。API 预检并由 Worker 二次验证。
 
-同队同题按 OccurredAt、GameplayFactId 的第一条当前 Correct FlagAttempt 是唯一计分 solve；后续 FlagAttempt 仍按当前有效 Flag 正常判定，匹配为 Correct，不匹配为 Wrong，但不会重复计分或授予血位。每条已接收的 Correct/Wrong 都消耗尝试，平台失败不消耗。重判可改变 solve 与血位。
+同队同题按 OccurredAt、GameplayFactId 的第一条当前 Correct FlagAttempt 是唯一计分 solve；后续 FlagAttempt 仍按当前有效 Flag 正常判定，匹配为 Correct，不匹配为 Wrong，但不会重复计分或授予血位。尝试计数按当前结果与时间资格计算；平台失败和时间无效事实不消耗，计分截止后的正确结果可为 RightButDue。具体回算行为见[题目时间配置](../challenge-timing-status.md)。重判可改变 solve 与血位。
 
 ## 动态题值
 
 CTF 题值完全来自有效 `ScoreCurve`。内置 Fixed、Linear、Quadratic、Exponential、Logarithmic 五种模式，也可以使用受限的 DynamicExpresso 自定义公式。变量、取整、安全与错误行为见 [计分规范](../scoring-projection.md#共享分值衰减曲线)。
 
-当前所有有效 solve 共享同一当前题值。配置变更立即失效排行榜缓存并触发事件驱动全量投影，但不重判 GameplayFact；不存在业务 Dirty 字段或定时脏扫描。
+`DynamicRecalculation` 使有效 solve 共享当前题值；`AtSolve` 按有效完成顺序计算各自题值，新增 solve 不降低先前得分。两者都从当前事实重建，配置、资格或重判仍可改变历史分数；详见[CTF 计分结算](../ctf-score-settlement.md)。配置变更立即失效排行榜缓存并触发事件驱动全量投影，但不重判 GameplayFact；不存在业务 Dirty 字段或定时脏扫描。
 
 ## 血奖
 

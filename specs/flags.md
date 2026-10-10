@@ -6,7 +6,7 @@
 
 精确匹配固定为：UTF-8、ordinal、区分大小写、固定时间比较；不 Trim、不 Unicode 归一化。合法 Flag 或匹配表达式为 1..4096 UTF-8 bytes且不含 NUL。
 
-题目 Owner/Manager 可以将无 Runtime 的 CTF 静态答案配置为正则表达式。正则匹配整段提交内容、区分大小写，并使用 .NET NonBacktracking 引擎和 100ms 超时；不支持回溯型结构（例如反向引用和环视）。CTF Container/Compose Runtime 必须使用 `FlagSource=PerTeam`：平台为每支队伍生成一条 Flag，并在创建 Runtime 时注入题目配置的环境变量。CTF Runtime、AWD、AWDP、KoH 生成的动态 Flag 始终只做精确比较，内部 `MatchKind=Exact` 只是判题实现，不是管理员维护的静态匹配规则。切换题目模式或启用 Runtime 前必须先删除或改回其所有正则 Flag。
+题目 Owner/Manager 可以将无 Runtime 的 CTF 静态答案配置为正则表达式。正则匹配整段提交内容、区分大小写，并使用 .NET NonBacktracking 引擎和 100ms 超时；不支持回溯型结构（例如反向引用和环视）。CTF Container Runtime 必须使用 `FlagSource=PerTeam`：平台为每支队伍生成一条 Flag，并在创建 Runtime 时注入题目配置的环境变量。CTF Runtime、AWD、AWDP、KoH 生成的动态 Flag 始终只做精确比较，内部 `MatchKind=Exact` 只是判题实现，不是管理员维护的静态匹配规则。切换题目模式或启用 Runtime 前必须先删除或改回其所有正则 Flag。
 
 CTF 赛后练习判题复用完全相同的 Flag scope、Team、有效时间、SHA-256 候选缩小与 ordinal 原文比较，
 并要求本队对应题目的 `Practice` Runtime 正在运行且未到期。它只返回 `Correct`/`Wrong`，不写入
@@ -67,7 +67,7 @@ leetLiteralText: bool
 
 header 非空结果为 `header{body}`；Header 不 Leet。只 Leet bodyTemplate 的字面文本，占位符展开值不 Leet。模板变更只影响以后生成。未指定或仅含空白的 header 自动使用 `flag`；未指定或仅含空白的 bodyTemplate 自动使用 `[GUID]`，即默认生成 `flag{<随机 UUIDv4>}`。
 
-题库 `Challenge.DefinitionJson` 只配置 Runtime/Checker 以及环境变量或目标文件等注入位置；不同比赛可使用不同 Flag 头，因此题目级模板覆盖只写入 `CompetitionChallenge.RulesJson`，由比赛题目管理界面维护。
+题库 `Challenge.Definition` 只配置 Runtime/Checker 以及环境变量或目标文件等注入位置；不同比赛可使用不同 Flag 头，因此题目级模板覆盖只写入 `CompetitionChallenge.Rules`，由比赛题目管理界面维护。
 
 支持：
 
@@ -135,7 +135,7 @@ m -> M,n,N        z -> Z,2
 
 ## CTF 策略
 
-`AttachmentDeliveryPolicy.All` 默认：全部附件可见，所有符合当前 scope/window 的 Flag 可正确。该策略属于附件交付，不是 CTF `RulesJson` 字段。
+`AttachmentDeliveryPolicy.All` 默认：全部附件可见，所有符合当前 scope/window 的 Flag 可正确。该策略属于附件交付，不是 CTF `Rules` 字段。
 
 `RandomOnePerTeam` 只用于多附件题：
 
@@ -155,7 +155,7 @@ All 判定使用模板中未绑定 Attachment 的 Flag和全部 Attachment-bound
 
 ## Runtime / KoH / AWD
 
-- CTF Container/Compose PerTeam：每队每题/RuntimeDefinition 固定一条，SpecificationKind=RuntimeDefinition；Start 前在 `(CompetitionChallengeId,TeamId,DefinitionId)` 锁内查询，不存在则生成；后续新 UUID Runtime 可复用。
+- CTF Container PerTeam：每队每题/RuntimeDefinition 固定一条，SpecificationKind=RuntimeDefinition；Start 前在 Serializable 事务中按 `(CompetitionChallengeId,TeamId,DefinitionId)` 查询，不存在则生成；后续新 UUID Runtime 可复用。
 - OVA：只支持 Static Flag，平台不注入。
 - KoH：Running 前为全部有效队/题生成固定 Control Flag，SpecificationKind=RuntimeDefinition；新批准队/新发布题增量生成；Team 详情仅返回本队值。
 - AWD：每个 RoundStart 后为每队/题生成一条，Specification=AwdRound，窗口严格为该逻辑轮次；失败注入重试同一条，不重新生成。
@@ -169,4 +169,4 @@ All 判定使用模板中未绑定 Attachment 的 Flag和全部 Attachment-bound
 
 ## 手动预生成
 
-Owner/Manager/Judge 可调用 generate-missing，并按 CompetitionChallengeId/TeamId 筛选；只生成缺失的 CTF PerTeam 与 KoH Control Flag，不替换已有值，不抽取 RandomOne，不预生成 AWD Round。调用在 Competition advisory lock 下同步执行，逐目标返回稳定失败原因但不返回 Flag 值/Id/数量；单个目标失败不回滚其他目标。Observer 只读。
+Owner/Manager/Judge 可调用 generate-missing，并按 CompetitionChallengeId/TeamId 筛选；只生成缺失的 CTF PerTeam 与 KoH Control Flag，不替换已有值，不抽取 RandomOne，不预生成 AWD Round。调用在关系事务和唯一约束保护下同步执行，逐目标返回稳定失败原因但不返回 Flag 值/Id/数量；单个目标失败不回滚其他目标。Observer 只读。

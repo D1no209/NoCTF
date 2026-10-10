@@ -4,7 +4,7 @@
 
 - EF Core 10 关系模型是唯一持久化定义。公共 `NoCTF.Infrastructure` 只引用 EF Core Relational；
   不引用 Npgsql，也不包含数据库方言 API。
-- PostgreSQL 是唯一运行时 provider，注册、设计时工厂和唯一 `InitialBaseline` 位于
+- PostgreSQL 是唯一运行时 provider，注册、设计时工厂、`InitialBaseline` 及后续增量迁移位于
   `NoCTF.Persistence.PostgreSql`。隔离的 SQLite 项目仅供模型测试，Host 不引用它。
 - 新增 SQL Server、MySQL 或其他关系 provider 时，必须增加独立 provider 与 migration assembly，
   不得修改领域模型来保存方言兼容分支。
@@ -18,7 +18,7 @@
 - 无身份的 ScoreCurve、资源额度、安全策略等值对象使用 EF Core Complex Types 映射为普通列，
   不使用 `ToJson()`。
 - Track、Hint、Webhook Target、Capacity Allocation、Access Endpoint、Published Port、环境变量、标签、
-  端口映射、Compose Service Resource、SSO Host/Scope、成员和权限全部使用普通或 owned 子表；有顺序
+  端口映射、Container Service Resource、SSO Host/Scope、成员和权限全部使用普通或 owned 子表；有顺序
   的集合显式保存 `Position`。
 - 公共模型禁止 JSON/数组列、provider column type、filtered index、数据库 check constraint、collation、
   `FromSql*`、`ExecuteSql*` 以及手写业务 SQL。
@@ -55,14 +55,14 @@ Redis 仅承载 FusionCache 的可丢弃 L2 与失效 backplane。请求配额�
 迁移和 snapshot 只能由 EF CLI 生成，禁止手改：
 
 ```powershell
-dotnet ef migrations add InitialBaseline `
+dotnet ef migrations add DescribeYourChange `
   --project backend/src/NoCTF.Persistence.PostgreSql/NoCTF.Persistence.PostgreSql.csproj `
   --output-dir Migrations
 dotnet ef migrations has-pending-model-changes `
   --project backend/src/NoCTF.Persistence.PostgreSql/NoCTF.Persistence.PostgreSql.csproj
 ```
 
-仓库只保留当前 PostgreSQL `InitialBaseline`。旧 schema、旧 JSON、旧数组、旧枚举编号和旧 migration
+仓库保留 PostgreSQL `InitialBaseline` 及其后续 EF 生成的增量迁移；升级使用与部署版本匹配的完整迁移链。旧 schema、旧 JSON、旧数组、旧枚举编号和旧 migration
 不属于运行时契约，也不得通过双读、fallback 或升级器重新引入。
 
-生产旧库的一次性停机导入与验收见[关系模型切换清单](one-time-relational-cutover.md)。
+升级前按[备份与恢复规范](backup-recovery.md)准备可恢复备份，并检查目标版本迁移；当前仓库不提供旧模型的一次性导入工具。

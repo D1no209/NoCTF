@@ -88,9 +88,10 @@ public sealed partial class LiveSoloMatchStore(NoCtfDbContext db, ICompetitionMo
     {
         var ids = match.Slots.Where(x => x.TeamId is not null).Select(x => x.TeamId!.Value).ToArray();
         var names = await db.Teams.IgnoreQueryFilters().Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, ct);
-        return Map(match, names, await CorrectionSourcesAsync([match], ct));
+        return Map(match, names, await CorrectionSourcesAsync([match], ct),
+            await db.LiveSoloMediaSessions.AsNoTracking().AnyAsync(x => x.MatchId == match.Id, ct));
     }
-    private static LiveSoloMatchView Map(LiveSoloMatch match, IReadOnlyDictionary<Guid, string> names, IReadOnlyDictionary<Guid, Guid>? corrections = null)
+    private static LiveSoloMatchView Map(LiveSoloMatch match, IReadOnlyDictionary<Guid, string> names, IReadOnlyDictionary<Guid, Guid>? corrections = null, bool hasMedia = false)
     {
         var left = match.Slots.Single(x => x.Side == LiveSoloSide.Left); var right = match.Slots.Single(x => x.Side == LiveSoloSide.Right);
         return new(match.Id, match.CompetitionId, match.State, match.ConcurrencyStamp, match.RequiredWins, match.LeftWins, match.RightWins,
@@ -98,7 +99,7 @@ public sealed partial class LiveSoloMatchStore(NoCtfDbContext db, ICompetitionMo
             right.TeamId, right.TeamId is Guid r ? names.GetValueOrDefault(r) : null, match.CurrentRoundId, match.WinnerTeamId,
             match.Slots.Where(x => x.TeamId is not null).Select(x => new LiveSoloRosterView(x.TeamId!.Value,
                 match.Roster.Where(r => r.TeamId == x.TeamId).Select(r => r.UserId).Order().ToArray(), x.RosterLockedAt is not null, x.ReadyConfirmedAt is not null)).ToArray(),
-            match.PendingCorrectionId, match.ReplacementMatchId, match.PendingCorrectionId is Guid correction ? corrections?.GetValueOrDefault(correction) : null);
+            match.PendingCorrectionId, match.ReplacementMatchId, match.PendingCorrectionId is Guid correction ? corrections?.GetValueOrDefault(correction) : null, hasMedia);
     }
 
     public async Task<LiveSoloMatchResult> CreateAsync(CreateLiveSoloMatch command, CancellationToken ct) =>
@@ -146,7 +147,10 @@ public sealed partial class LiveSoloMatchStore(NoCtfDbContext db, ICompetitionMo
         var teamIds = matches.SelectMany(x => x.Slots).Where(x => x.TeamId != null).Select(x => x.TeamId!.Value).Distinct().ToArray();
         var names = await db.Teams.IgnoreQueryFilters().Where(x => teamIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, ct);
         var corrections = await CorrectionSourcesAsync(matches, ct);
-        return matches.Select(x => Map(x, names, corrections)).ToArray();
+        var matchIds = matches.Select(x => x.Id).ToArray();
+        var withMedia = (await db.LiveSoloMediaSessions.AsNoTracking().Where(x => matchIds.Contains(x.MatchId))
+            .Select(x => x.MatchId).Distinct().ToArrayAsync(ct)).ToHashSet();
+        return matches.Select(x => Map(x, names, corrections, withMedia.Contains(x.Id))).ToArray();
     }
     private Task<Dictionary<Guid,Guid>> CorrectionSourcesAsync(IEnumerable<LiveSoloMatch> matches,CancellationToken ct)
     {

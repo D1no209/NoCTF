@@ -22,11 +22,11 @@ NoCTF.Host [Api]  ---- Redis (FusionCache L2/backplane only)
 唯一可执行文件 `NoCTF.Host.dll` 包含三个运行角色；下列名称表示功能类库，不是独立进程入口：
 
 - `NoCTF.API`：FastEndpoints、认证、授权、接入事务、REST、SignalR、内部 Checker callback。
-- `NoCTF.Worker`：Submission 普通判定、生命周期、轮次、Flag、排行榜投影、通知与清理。
-- `NoCTF.Runner`：Wolverine durable consumer；执行 Docker、Compose/Kompose、Kubernetes、Libvirt/OVA、Checker 和 Patch。
+- `NoCTF.Worker`：GameplayFact 普通判定、生命周期、轮次、Flag、排行榜投影、通知与清理。
+- `NoCTF.Runner`：Wolverine durable consumer；执行 Docker 命名服务、Kubernetes、Libvirt/OVA、Checker 和 Patch。
 
 外部通知统一使用赛事级 Webhook。平台不包含聊天协议、群组、消息模板或外部 Provider；Worker
-只向赛事负责人配置的目标发送带 HMAC 签名的公开 CloudEvents。浏览器继续通过 SignalR 接收
+向赛事负责人配置的目标发送带 HMAC 签名的公开 CloudEvents；工作人员 Webhook 使用独立的授权、事件和投递通道，见 [Staff Webhook](staff-webhooks.md)。浏览器继续通过 SignalR 接收
 失效提示并重读 REST。通用非交互自动化账户只负责 API 身份，不承担通知投递模型。
 
 `NoCTF.Host` 是唯一进程入口，可承载任意非空角色组合。统一宿主读取 `Hosting:Roles` 枚举数组，缺省启用
@@ -50,7 +50,7 @@ Worker、Runner 与 API 均可多副本。每个进程中的每种角色至多�
 - Redis：仅作为 FusionCache 的可重建 L2 与跨实例失效 backplane；不保存业务配额、Runner 在线状态、租约或 SignalR 广播。
 - NATS KV：短期竞争状态、Runner 在线注册和资源域租约；容量分配与请求配额的权威状态仍在 EF Core。
 - Loki：接收 Host 脱敏后的 OTLP 日志并供管理员查询；不可用时日志接口报告不可用。
-- Object Storage：Challenge Attachment 与 AWDP Patch archive；支持 S3Compatible 和开发用 LocalFileSystem。
+- Object Storage：由 File 元数据引用的附件、Patch、题解与媒体文件；支持 S3Compatible 和开发用 LocalFileSystem。
 - Runtime Provider：Docker、Kubernetes、Libvirt/QEMU/KVM。Provider 隐藏资源创建、查询、销毁与 receipt 细节。
 
 ## SPA 分享元数据
@@ -71,6 +71,7 @@ NoCTF.Worker -> signed competition Webhooks
 ```
 
 - Domain 不依赖 EF、HTTP、Redis、Wolverine 或 Provider SDK。
+- LiveSolo 使用独立的 Match/Round、判定和媒体能力；CTF/AWD/AWDP/KoH 不依赖 LiveSolo 实现或媒体 SDK。
 - Application 以功能纵切组织，用例接口与使用者就近。
 - Infrastructure 实现业务职责，名称不以 `Ef` 泛滥；只有区分 Provider 时使用 Postgres 等前缀。
 - API Endpoint 只处理协议；业务规则在 Application/Domain。
@@ -78,7 +79,7 @@ NoCTF.Worker -> signed competition Webhooks
 
 ## 一致性边界
 
-消息通过 NATS JetStream durable publish/consumer 传递；业务写入 PostgreSQL 后由状态、唯一约束和业务幂等键收敛。数据库事务与 NATS 发布之间不提供跨系统原子提交。
+消息通过 NATS JetStream durable publish/consumer 传递；业务写入 PostgreSQL 后由状态、唯一约束和业务幂等键收敛。数据库事务与 NATS 发布之间不提供跨系统原子提交。Competition Webhook 使用与事件同事务写入的专用 Outbox 和投递账本，由 Worker 恢复扫描补发；其他业务使用提交后发布与 Pending 事实恢复。
 
 分数投影不写回 GameplayFact。影响排行榜的业务提交发布 NATS 失效消息；Worker 按比赛合并 500ms 内的失效并从 PostgreSQL 全量投影到命名 FusionCache。缓存丢失时由 PostgreSQL 重建，不扫描 Dirty 业务列。
 

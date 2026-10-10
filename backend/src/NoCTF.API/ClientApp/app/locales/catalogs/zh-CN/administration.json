@@ -610,7 +610,7 @@
   "administration.label.capWorkloadConfigurationSaved": "CAP 工作量配置已生效",
   "administration.platformEmail.label.saveCapProviderWorkload": "请先保存 CAP 服务地址和 Site Key，再修改计算强度。",
   "administration.label.saveCapWorkload": "保存计算强度",
-  "administration.label.siteKey": "Site Key",
+  "administration.label.siteKey": "站点密钥",
   "administration.label.allowedHostnames": "允许的主机名",
   "administration.label.allowedHostnamesDescription": "每行一个主机名，不含协议、端口或路径。",
   "administration.label.allowedHostnamePlaceholder": "ctf.example.com",

@@ -27004,6 +27004,9 @@
             "type": "string",
             "format": "guid",
             "nullable": true
+          },
+          "hasMedia": {
+            "type": "boolean"
           }
         }
       },
@@ -27115,6 +27118,9 @@
             "type": "string",
             "format": "guid",
             "nullable": true
+          },
+          "platformStreamingEnabled": {
+            "type": "boolean"
           }
         }
       },
@@ -28036,6 +28042,9 @@
           "enabled": {
             "type": "boolean"
           },
+          "platformStreamingEnabled": {
+            "type": "boolean"
+          },
           "bracketFormat": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloBracketFormatProtocol"
           },
@@ -28268,6 +28277,9 @@
         "additionalProperties": false,
         "properties": {
           "enabled": {
+            "type": "boolean"
+          },
+          "platformStreamingEnabled": {
             "type": "boolean"
           },
           "requiredWins": {

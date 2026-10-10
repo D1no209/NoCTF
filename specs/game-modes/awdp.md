@@ -9,13 +9,13 @@ AWDP 是“队伍长期攻击实例 + 一次性 Fix 验证”的攻防模式，�
   一次 Checker，得到强类型结果后立即清理所有临时资源。
 
 攻击和防御是两条独立事实流与分值曲线。比赛可通过
-`CompetitionChallenge.RulesJson` 配置是否要求先成功 Break 才允许申请 Fix。
+`CompetitionChallenge.Rules` 配置是否要求先成功 Break 才允许申请 Fix。
 
 AWDP 不使用 AWD 的 `AwdRound`、加固期、周期健康检查、批量攻击目标或轮次 Flag 提交。
 
 ## 配置归属
 
-题库 `Challenge.DefinitionJson` 只保存可复用技术定义：
+题库 `Challenge.Definition` 只保存可复用技术定义：
 
 - Player 攻击容器镜像、命令、资源与公开端点；
 - `FlagEnvironmentVariableName` 或目标文件位置；

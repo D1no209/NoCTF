@@ -3,7 +3,7 @@ using NoCTF.Domain.LiveSolo;
 namespace NoCTF.Application.LiveSolo.Media;
 
 public enum LiveSoloMediaRole : short { Publisher, Judge, Director }
-public enum LiveSoloMediaFailure : short { Unconfigured, Unavailable, Unauthorized, InvalidGeneration }
+public enum LiveSoloMediaFailure : short { Unconfigured, Unavailable, Unauthorized, InvalidGeneration, Disabled }
 public sealed record LiveSoloMediaAuthorization(Guid SessionId, Guid Generation, string RoomIdentity,
     string ParticipantIdentity, LiveSoloMediaRole Role, bool MaySubscribe, DateTimeOffset ExpiresAt);
 public sealed record LiveSoloMediaToken(string ServerUrl, string Token, DateTimeOffset ExpiresAt);

@@ -1,6 +1,6 @@
 # 比赛协作者与所有权
 
-入口：比赛管理 → 权限，`/admin/competitions/比赛ID/permissions`。Owner 和平台管理员管理此页；普通 Manager 无权替换协作者或转让所有权。当前 SPA 入口限 Administrator，后台资源权限另行执行。
+入口：比赛管理 → 权限，`/admin/competitions/比赛ID/permissions`。Owner 和平台管理员管理此页；普通 Manager 无权替换协作者或转让所有权。比赛工作区向获授权工作人员开放，权限菜单按当前角色显示，直接输入 URL 仍要通过资源授权。
 
 ## 人员关系
 

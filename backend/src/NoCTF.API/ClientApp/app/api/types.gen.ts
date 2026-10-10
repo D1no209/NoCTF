@@ -767,6 +767,7 @@ export type NoCtfapiEndpointsLiveSoloLiveSoloMatchResponse = {
     pendingCorrectionId?: string | null;
     replacementMatchId?: string | null;
     pendingCorrectionMatchId?: string | null;
+    hasMedia?: boolean;
 };
 
 export type NoCtfDomainLiveSoloLiveSoloMatchState = 'AwaitingOpponents' | 'Preparing' | 'Countdown' | 'Running' | 'Paused' | 'AwaitingAdjudication' | 'Completed' | 'Canceled';
@@ -793,6 +794,7 @@ export type NoCtfapiEndpointsLiveSoloLiveSoloRoundResponse = {
     paused?: boolean;
     winnerTeamId?: string | null;
     winningGameplayFactId?: string | null;
+    platformStreamingEnabled?: boolean;
 };
 
 export type NoCtfDomainLiveSoloLiveSoloRoundState = 'Preparing' | 'Countdown' | 'Running' | 'ConfirmingResult' | 'Won' | 'TimedOut' | 'Canceled';
@@ -1008,6 +1010,7 @@ export type NoCtfapiEndpointsLiveSoloGetLiveSoloBracketRequest = {
 
 export type NoCtfapiEndpointsLiveSoloLiveSoloConfigurationContract = {
     enabled?: boolean;
+    platformStreamingEnabled?: boolean;
     bracketFormat?: NoCtfapiEndpointsLiveSoloLiveSoloBracketFormatProtocol;
     requiredWins?: number;
     countdownSeconds?: number;
@@ -1078,6 +1081,7 @@ export type NoCtfapiEndpointsLiveSoloGetLiveSoloMediaRequest = {
 
 export type NoCtfapiEndpointsLiveSoloLiveSoloPlayerPolicyResponse = {
     enabled?: boolean;
+    platformStreamingEnabled?: boolean;
     requiredWins?: number;
     maximumRosterMembers?: number;
     publicDelaySeconds?: number;

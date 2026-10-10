@@ -84,6 +84,7 @@ internal sealed class LiveSoloRoundConfiguration : IEntityTypeConfiguration<Live
     public void Configure(EntityTypeBuilder<LiveSoloRound> builder)
     {
         builder.ToTable("live_solo_rounds"); builder.HasKey(x => x.Id);
+        builder.Property(x => x.PlatformStreamingEnabled).HasDefaultValue(true).HasSentinel(true);
         builder.HasIndex(x => new { x.MatchId, x.Number, x.Replay }).IsUnique();
         builder.HasMany(x => x.Questions).WithOne().HasForeignKey(x => x.RoundId).OnDelete(DeleteBehavior.Cascade);
         builder.HasMany(x => x.Pauses).WithOne().HasForeignKey(x => x.RoundId).OnDelete(DeleteBehavior.Cascade);
@@ -213,6 +214,7 @@ internal sealed class LiveSoloCompetitionConfiguration : IEntityTypeConfiguratio
 {
     public void Configure(EntityTypeBuilder<LiveSoloCompetitionModeConfiguration> builder)
     {
+        builder.Property(x => x.PlatformStreamingEnabled).HasDefaultValue(true).HasSentinel(true);
         builder.HasMany(x => x.StageRules).WithOne().HasForeignKey(x => x.CompetitionId).OnDelete(DeleteBehavior.Cascade);
         builder.Navigation(x => x.StageRules).AutoInclude();
     }

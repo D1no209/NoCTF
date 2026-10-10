@@ -1,6 +1,6 @@
 # 管理页面覆盖索引
 
-本索引逐项核对当前 ClientApp `pages/admin` 路由和管理菜单。页面对应的是操作说明，读写权限最终由服务端校验；比赛工作区当前还有限 Administrator 界面门槛。
+本索引逐项核对当前 ClientApp 管理与 LiveSolo 路由。比赛工作区向本比赛获授权工作人员开放，菜单按角色区分；平台设置仍仅 Administrator，服务器最终执行资源授权。
 
 ## 当前路由与章节
 
@@ -38,6 +38,26 @@
 
 动态用户/队伍/Runtime 详情由所在列表的抽屉承载，也看对应列表章节。比赛大屏和动态、咨询属于 `/competitions/比赛ID/...`，分别见 [动态与大屏](../competition/operations/events-live.md)和 [咨询](../competition/communication/questions.md)。
 
+## LiveSolo 独立工作区
+
+LiveSolo 的操作不放在普通积分排行榜或旧题目工作区。草稿读取和写入按实际工作人员角色授权，尚未完成的正式验收见 [能力边界](../operations/live-solo-readiness.md)。
+
+| 路由 | 手册 |
+| --- | --- |
+| `/competitions/:id/live-solo` | [导读](../competition/modes/live-solo/index.md) |
+| `/competitions/:id/live-solo/settings` | [操作说明](../competition/modes/live-solo/settings.md) |
+| `/competitions/:id/live-solo/groups` | [操作说明](../competition/modes/live-solo/question-groups.md) |
+| `/competitions/:id/live-solo/groups/:groupId` | [操作说明](../competition/modes/live-solo/question-groups.md) |
+| `/competitions/:id/live-solo/bracket` | [操作说明](../competition/modes/live-solo/bracket.md) |
+| `/competitions/:id/live-solo/matches/:matchId/:workspace*` | [操作说明](../player/modes/live-solo/preparation.md) |
+| `/competitions/:id/live-solo/program/:matchId` | [操作说明](../player/modes/live-solo/program.md) |
+| `/competitions/:id/live-solo/recordings/:matchId` | [操作说明](../competition/modes/live-solo/recordings.md) |
+| `/competitions/:id/live-solo/recordings/:matchId/:recordingId` | [操作说明](../competition/modes/live-solo/recordings.md) |
+| `/competitions/:id/live-solo/corrections/:matchId` | [操作说明](../competition/modes/live-solo/corrections.md) |
+| `/competitions/:id/live-solo/corrections/:matchId/:correctionId` | [操作说明](../competition/modes/live-solo/corrections.md) |
+| `/competitions/:id/live-solo/postgame/:matchId` | [操作说明](../player/modes/live-solo/postgame.md) |
+| `/competitions/:id/live-solo/postgame/:matchId/:roundId/:questionId` | [操作说明](../player/modes/live-solo/postgame.md) |
+
 ## 页面内操作补充
 
 | 管理任务 | 说明 |
@@ -54,6 +74,8 @@
 | Bot、JWT、全量撤销、身份模拟 | [令牌](../platform/users/tokens.md) |
 | 删除引用预览、匿名化、最后管理员保护 | [账号删除](../platform/users/deletion.md) |
 | 题库附件/Flag 与删除恢复 | [题库附件](../challenge-bank/attachments-flags.md) |
+| 单题自动开题、计分结束和提交截止 | [时间设置](../competition/content/timing.md) |
+| LiveSolo 平台视频尺寸/帧率/码率 | [视频策略](../platform/video-policy.md) |
 | 模板 dirty 保存、测试与引用管理 | [模板测试](../challenge-bank/testing.md)、[引用](../challenge-bank/permissions-placement.md) |
 
 新增管理页面或命令时，在此表补充章节并同时更新相应侧边栏；页面存在而无操作说明应视为文档缺口。历史 specs 和上线报告不替代面向用户的手册。

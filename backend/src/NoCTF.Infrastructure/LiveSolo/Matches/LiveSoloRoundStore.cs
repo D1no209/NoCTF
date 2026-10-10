@@ -37,11 +37,20 @@ public sealed partial class LiveSoloMatchStore
             var round = new LiveSoloRound { Id = Guid.CreateVersion7(command.Now), MatchId = match.Id,
                 Number = replay ? last!.Number : (last?.Number ?? 0) + 1, Replay = replay ? last!.Replay + 1 : 0,
                 QuestionGroupId = group.Id, LimitSeconds = group.RoundLimitSeconds ?? config.RoundLimitSeconds,
-                CountdownSeconds = config.CountdownSeconds, CreatedAt = command.Now, State = LiveSoloRoundState.Preparing,
+                PlatformStreamingEnabled = config.PlatformStreamingEnabled, CountdownSeconds = config.CountdownSeconds, CreatedAt = command.Now, State = LiveSoloRoundState.Preparing,
                 Questions = group.Items.OrderBy(x => x.Position).Select(x => new LiveSoloRoundQuestion { Id = Guid.CreateVersion7(),
                     CompetitionChallengeId = x.CompetitionChallengeId, Position = x.Position,
                     OpenOffsetSeconds = x.OpenOffsetSeconds ?? checked(x.Position * config.QuestionIntervalSeconds) }).ToList() };
             db.LiveSoloRounds.Add(round); match.CurrentRoundId = round.Id;
+            if (!round.PlatformStreamingEnabled && match.CurrentMediaSessionId is Guid sessionId)
+            {
+                var previous = await db.LiveSoloMediaSessions.SingleAsync(x => x.Id == sessionId, ct);
+                previous.State = LiveSoloMediaState.Stopping;
+                match.CurrentMediaSessionId = null;
+                foreach (var grant in await db.LiveSoloMediaGrants.Where(x => x.MediaSessionId == sessionId && x.RevokedAt == null).ToArrayAsync(ct))
+                    grant.RevokedAt = command.Now;
+                await messages.PublishAsync(new RefreshLiveSoloMedia(previous.Id, previous.RoomIdentity));
+            }
             foreach (var slot in match.Slots) slot.ReadyConfirmedAt = null;
             await db.SaveChangesAsync(ct); return new(Round(round, command.Now));
         }, () => new(null, LiveSoloFailure.Conflict), ct);
@@ -84,43 +93,51 @@ public sealed partial class LiveSoloMatchStore
     public async Task<LiveSoloRoundResult> StartCountdownAsync(StartLiveSoloCountdown command, CancellationToken ct)
     {
         if (!await ActiveAsync(command.ActorId, ct) || !await authorizer.CanJudgeAsync(command.ActorId, command.CompetitionId, ct)) return new(null, LiveSoloFailure.Forbidden);
-        if (!await db.LiveSoloRounds.AnyAsync(x => x.Id == command.RoundId && x.MatchId == command.MatchId
-            && db.LiveSoloMatches.Any(m => m.Id == x.MatchId && m.CompetitionId == command.CompetitionId), ct)) return new(null, LiveSoloFailure.NotFound);
-        var readiness = await media.CheckAsync(ct);
-        if (!readiness.Configured || !readiness.Available || !readiness.EgressAvailable) return new(null, LiveSoloFailure.MediaUnavailable);
+        var target = await db.LiveSoloRounds.AsNoTracking().SingleOrDefaultAsync(x => x.Id == command.RoundId && x.MatchId == command.MatchId
+            && db.LiveSoloMatches.Any(m => m.Id == x.MatchId && m.CompetitionId == command.CompetitionId), ct);
+        if (target is null) return new(null, LiveSoloFailure.NotFound);
         var first = await db.LiveSoloRoundQuestions.AsNoTracking().Where(x => x.RoundId == command.RoundId && x.Position == 0).Select(x => (Guid?)x.Id).SingleOrDefaultAsync(ct);
         if (first is null) return new(null, LiveSoloFailure.NotFound);
         if (await runtimePreparation.PrepareAsync(first.Value, command.Now, ct) is { } failed) return new(null, failed);
-        var session = await db.LiveSoloMediaSessions.AsNoTracking().Include(x => x.Participants)
-            .Where(x => x.MatchId == command.MatchId && x.State == LiveSoloMediaState.Ready
-                && db.LiveSoloMatches.Any(match => match.Id == command.MatchId && match.CurrentMediaSessionId == x.Id))
-            .OrderByDescending(x => x.CreatedAt).FirstOrDefaultAsync(ct);
-        if (session is null) return new(null, LiveSoloFailure.MediaUnavailable);
-        var program = await db.LiveSoloProgramCaptures.AsNoTracking().SingleOrDefaultAsync(x => x.Id == session.CurrentProgramCaptureId
-            && x.MediaSessionId == session.Id && x.State == LiveSoloCaptureState.Active, ct);
-        if (program?.EgressId is null || !await ProgramReadyAsync(session.Id, program.Id, program.EgressId, ct)) return new(null, LiveSoloFailure.MediaUnavailable);
-        var observed = await media.ObserveAsync(session.RoomIdentity, ct);
-        LiveSoloExportObservation? export;
+        LiveSoloMediaSession? session = null;
+        LiveSoloProgramCapture? program = null;
+        LiveSoloRoomObservation? observed = null;
         LiveSoloRecording[] recordingProof = [];
-        try
+        DateTimeOffset checkedAt = default;
+        if (target.PlatformStreamingEnabled)
         {
-            var jobs = await egress.ListAsync(session.RoomIdentity, ct);
-            export = jobs.SingleOrDefault(x => x.Id == program.EgressId && x.RequestId == program.Id && x.RoomIdentity == session.RoomIdentity);
-            if(session.RecordingEnabled)
+            var readiness = await media.CheckAsync(ct);
+            if (!readiness.Configured || !readiness.Available || !readiness.EgressAvailable) return new(null, LiveSoloFailure.MediaUnavailable);
+            session = await db.LiveSoloMediaSessions.AsNoTracking().Include(x => x.Participants)
+                .Where(x => x.MatchId == command.MatchId && x.State == LiveSoloMediaState.Ready
+                    && db.LiveSoloMatches.Any(match => match.Id == command.MatchId && match.CurrentMediaSessionId == x.Id))
+                .OrderByDescending(x => x.CreatedAt).FirstOrDefaultAsync(ct);
+            if (session is null) return new(null, LiveSoloFailure.MediaUnavailable);
+            program = await db.LiveSoloProgramCaptures.AsNoTracking().SingleOrDefaultAsync(x => x.Id == session.CurrentProgramCaptureId
+                && x.MediaSessionId == session.Id && x.State == LiveSoloCaptureState.Active, ct);
+            if (program?.EgressId is null || !await ProgramReadyAsync(session.Id, program.Id, program.EgressId, ct)) return new(null, LiveSoloFailure.MediaUnavailable);
+            observed = await media.ObserveAsync(session.RoomIdentity, ct);
+            LiveSoloExportObservation? export;
+            try
             {
-                recordingProof=await db.LiveSoloRecordings.AsNoTracking().Where(x=>x.MediaSessionId==session.Id&&x.State==LiveSoloRecordingState.Recording&&x.ReservedBytes>0).ToArrayAsync(ct);
-                foreach(var member in session.Participants)
-                    if(!recordingProof.Any(record=>record.UserId==member.UserId&&record.VideoTrackId==member.ScreenTrackId
-                        &&jobs.Any(job=>job.Id==record.EgressId&&job.RequestId==record.Id&&job.RoomIdentity==session.RoomIdentity
-                            &&job.State==LiveSoloExportState.Active&&job.StartedAt!=null&&job.StartedAt<=(clock??TimeProvider.System).GetUtcNow()&&job.EndedAt==null)))
-                        return new(null,LiveSoloFailure.MediaUnavailable);
+                var jobs = await egress.ListAsync(session.RoomIdentity, ct);
+                export = jobs.SingleOrDefault(x => x.Id == program.EgressId && x.RequestId == program.Id && x.RoomIdentity == session.RoomIdentity);
+                if(session.RecordingEnabled)
+                {
+                    recordingProof=await db.LiveSoloRecordings.AsNoTracking().Where(x=>x.MediaSessionId==session.Id&&x.State==LiveSoloRecordingState.Recording&&x.ReservedBytes>0).ToArrayAsync(ct);
+                    foreach(var member in session.Participants)
+                        if(!recordingProof.Any(record=>record.UserId==member.UserId&&record.VideoTrackId==member.ScreenTrackId
+                            &&jobs.Any(job=>job.Id==record.EgressId&&job.RequestId==record.Id&&job.RoomIdentity==session.RoomIdentity
+                                &&job.State==LiveSoloExportState.Active&&job.StartedAt!=null&&job.StartedAt<=(clock??TimeProvider.System).GetUtcNow()&&job.EndedAt==null)))
+                            return new(null,LiveSoloFailure.MediaUnavailable);
+                }
             }
+            catch (Exception ex) when (ex is HttpRequestException or IOException or TimeoutException || ex is TaskCanceledException && !ct.IsCancellationRequested)
+            { return new(null, LiveSoloFailure.MediaUnavailable); }
+            checkedAt = (clock ?? TimeProvider.System).GetUtcNow();
+            if (export is not { State: LiveSoloExportState.Active, StartedAt: not null, EndedAt: null }
+                || export.StartedAt > checkedAt) return new(null, LiveSoloFailure.MediaUnavailable);
         }
-        catch (Exception ex) when (ex is HttpRequestException or IOException or TimeoutException || ex is TaskCanceledException && !ct.IsCancellationRequested)
-        { return new(null, LiveSoloFailure.MediaUnavailable); }
-        var checkedAt = (clock ?? TimeProvider.System).GetUtcNow();
-        if (export is not { State: LiveSoloExportState.Active, StartedAt: not null, EndedAt: null }
-            || export.StartedAt > checkedAt) return new(null, LiveSoloFailure.MediaUnavailable);
         return await TransactionAsync(async () =>
         {
             var match = await MatchAsync(command.CompetitionId, command.MatchId, ct);
@@ -134,28 +151,33 @@ public sealed partial class LiveSoloMatchStore
                 || round.Questions.Single(x => x.Position == 0).Readiness != LiveSoloQuestionReadiness.Ready) return new(null, LiveSoloFailure.NotReady);
             var config = (LiveSoloCompetitionModeConfiguration)competition.ModeConfiguration!;
             if (!config.Enabled) return new(null, LiveSoloFailure.Disabled);
-            if (match.CurrentMediaSessionId != session.Id || !await db.LiveSoloMediaSessions.AnyAsync(x => x.Id == session.Id
-                && x.State == LiveSoloMediaState.Ready, ct)) return new(null, LiveSoloFailure.MediaUnavailable);
-            if (!observed.Exists || !LiveSoloMediaPolicy.FreshStartProof(checkedAt, (clock ?? TimeProvider.System).GetUtcNow())
-                || !await ProgramReadyAsync(session.Id, program.Id, program.EgressId, ct)) return new(null, LiveSoloFailure.MediaUnavailable);
-            if (session.RecordingEnabled)
+            if (round.PlatformStreamingEnabled != target.PlatformStreamingEnabled) return new(null, LiveSoloFailure.Conflict);
+            if (round.PlatformStreamingEnabled)
             {
-                foreach (var member in session.Participants)
+                if (session is null || program?.EgressId is null || observed is null) return new(null, LiveSoloFailure.MediaUnavailable);
+                if (match.CurrentMediaSessionId != session.Id || !await db.LiveSoloMediaSessions.AnyAsync(x => x.Id == session.Id
+                    && x.State == LiveSoloMediaState.Ready, ct)) return new(null, LiveSoloFailure.MediaUnavailable);
+                if (!observed.Exists || !LiveSoloMediaPolicy.FreshStartProof(checkedAt, (clock ?? TimeProvider.System).GetUtcNow())
+                    || !await ProgramReadyAsync(session.Id, program.Id, program.EgressId, ct)) return new(null, LiveSoloFailure.MediaUnavailable);
+                if (session.RecordingEnabled)
                 {
-                    var proof = recordingProof.SingleOrDefault(x => x.UserId == member.UserId && x.VideoTrackId == member.ScreenTrackId);
-                    if (proof is null || !await db.LiveSoloRecordings.AnyAsync(x => x.Id == proof.Id
-                        && x.MediaSessionId == session.Id && x.State == LiveSoloRecordingState.Recording
-                        && x.ReservedBytes > 0 && x.EgressId == proof.EgressId
-                        && db.Set<LiveSoloMediaParticipant>().Any(p => p.MediaSessionId == session.Id && p.UserId == x.UserId
-                            && p.ScreenTrackId == x.VideoTrackId && p.ScreenState == LiveSoloScreenState.Sharing), ct))
-                        return new(null, LiveSoloFailure.MediaUnavailable);
+                    foreach (var member in session.Participants)
+                    {
+                        var proof = recordingProof.SingleOrDefault(x => x.UserId == member.UserId && x.VideoTrackId == member.ScreenTrackId);
+                        if (proof is null || !await db.LiveSoloRecordings.AnyAsync(x => x.Id == proof.Id
+                            && x.MediaSessionId == session.Id && x.State == LiveSoloRecordingState.Recording
+                            && x.ReservedBytes > 0 && x.EgressId == proof.EgressId
+                            && db.Set<LiveSoloMediaParticipant>().Any(p => p.MediaSessionId == session.Id && p.UserId == x.UserId
+                                && p.ScreenTrackId == x.VideoTrackId && p.ScreenState == LiveSoloScreenState.Sharing), ct))
+                            return new(null, LiveSoloFailure.MediaUnavailable);
+                    }
                 }
+                if (match.Roster.Any(member => !session.Participants.Any(p => p.UserId == member.UserId
+                    && observed.Screens.Any(screen => screen.Identity == p.Identity && screen.State == LiveSoloScreenState.Sharing)))) return new(null, LiveSoloFailure.NotReady);
             }
             if (!await RosterEligibleAsync(match, ct)) return new(null, LiveSoloFailure.NotReady);
             if (!await HasMatchCapacityAsync(match, config.MaximumConcurrentMatches, ct))
                 return new(null, LiveSoloFailure.NotReady);
-            if (match.Roster.Any(member => !session.Participants.Any(p => p.UserId == member.UserId
-                && observed.Screens.Any(screen => screen.Identity == p.Identity && screen.State == LiveSoloScreenState.Sharing)))) return new(null, LiveSoloFailure.NotReady);
             // Exposure can change while both sides are preparing. Recheck before a new Match starts.
             if (match.StartedAt is null && !await NoNewPublicExposureAsync(match, round, ct)) return new(null, LiveSoloFailure.NoSuitableQuestionGroup);
             var effectiveAt = (clock ?? TimeProvider.System).GetUtcNow();
@@ -199,7 +221,7 @@ public sealed partial class LiveSoloMatchStore
         round.State, round.ConcurrencyStamp, round.TimelineRevision, round.CountdownAt, round.StartedAt, round.LimitSeconds,
         round.StartedAt is { } started ? Math.Min(round.LimitSeconds * 1000L,
             (long)LiveSoloActiveClock.Elapsed(started, round.EndedAt is { } ended && ended < now ? ended : now, round.Pauses).TotalMilliseconds) : 0,
-        LiveSoloActiveClock.Paused(round.Pauses), round.WinnerTeamId, round.WinningGameplayFactId);
+        LiveSoloActiveClock.Paused(round.Pauses), round.WinnerTeamId, round.WinningGameplayFactId, round.PlatformStreamingEnabled);
 
     public async Task<LiveSoloRoundView?> FindRoundAsync(Guid competitionId, Guid matchId, Guid roundId, Guid actorId, bool staff, DateTimeOffset now, CancellationToken ct)
     {

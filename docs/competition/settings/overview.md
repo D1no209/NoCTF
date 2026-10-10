@@ -1,13 +1,13 @@
 # 创建比赛与管理概览
 
-入口：竞赛浏览页右上角创建按钮；已有比赛进入 `/admin/competitions/比赛ID`。当前管理界面限 Administrator，后台创建与资源管理能力见 [权限说明](../../guide/roles.md)及 [管理入口](../index.md)。
+入口：竞赛浏览页右上角创建按钮；已有比赛进入 `/admin/competitions/比赛ID`。平台管理员和本比赛获授权的 Owner、Manager、Judge、Observer 可进入；不同角色的菜单/按钮不同，见 [权限说明](../../guide/roles.md)及 [管理入口](../index.md)。
 
 ## 创建表单
 
 | 字段 | 填写方式与影响 |
 | --- | --- |
 | 标题、说明 | 明确赛事对象、规则链接、联系方式；标题用于后续危险操作确认 |
-| 模式 | CTF / AWD / AWDP / KoH；决定题库和计分分支 |
+| 模式 | CTF / AWD / AWDP / KoH / LiveSolo；决定题库和对应规则分支 |
 | 开始、结束 | 两者都填写，开始早于结束；本地时间转服务器时间，核对时区 |
 | 自动审核 | 关闭时报名进入 Pending，开启时合法报名自动获批 |
 | 赛中报名 | 是否允许 Running 中组织变更和重新报名 |
@@ -28,6 +28,8 @@
 5. 进入概览，再配置模式规则、题目与协作者。
 
 比赛创建和海报上传是两次操作。比赛已创建但海报失败时，界面可重试海报上传或完成创建；不要重新创建另一场同名比赛。后续可在概览更换海报。
+
+LiveSolo 创建后从独立 [设置](../modes/live-solo/settings.md)、[题组](../modes/live-solo/question-groups.md)和 [赛程](../modes/live-solo/bracket.md)配置；创建不会启动共享或录像，不携带 CTF Practice 语义。
 
 ## 概览提供的操作
 

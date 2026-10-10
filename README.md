@@ -1,7 +1,7 @@
 # NoCTF
 
-NoCTF is a competition platform for CTF, AWD, AWDP, and KoH, built with .NET 10
-and Nuxt 4. The current product and architecture contract lives in
+NoCTF is a competition platform for CTF, AWD, AWDP, KoH, and LiveSolo, built with
+.NET 10 and Nuxt 4. The current product and architecture contract lives in
 [the authoritative documentation index](specs/README.md).
 
 The project is licensed under [AGPL-3.0-only](LICENSE). See
@@ -13,6 +13,10 @@ The project is licensed under [AGPL-3.0-only](LICENSE). See
 NoCTF is currently in the 0.x release series. API and persistence changes may
 require migration between releases. Use the documentation and deployment package
 that match the installed revision, and review release notes before upgrading.
+
+LiveSolo is under active development. Its independent match, round, and media
+features have partial validation; see the [implementation and acceptance status](specs/live-solo-status.md)
+before planning an event around it.
 
 The Chinese platform user manual lives in [docs](docs/README.md), with detailed
 installation, player, organizer, administrator, and operations guides.
@@ -26,11 +30,11 @@ bun run docs:dev
 
 ## Capabilities
 
-- Four built-in game modes: CTF, AWD, AWDP, and KoH.
-- Reusable challenge templates with competition-specific scoring, hints, and runtime configuration.
+- Built-in CTF, AWD, AWDP, and KoH modes, plus LiveSolo under development.
+- Reusable challenge templates with shared runtime definitions and competition-specific scoring, hints, and timing.
 - Durable submission evaluation, lifecycle, runtime, notification, and leaderboard workflows through Wolverine.
 - Docker or Kubernetes for Container runtimes, and Libvirt/OVA for Virtual Machine runtimes, configured at deployment level.
-- On-demand leaderboard projection with PostgreSQL facts, Redis snapshots, and SignalR updates.
+- Event-driven leaderboard projection and cache-miss recovery with PostgreSQL facts, Redis snapshots, and SignalR updates.
 - Strongly typed FastEndpoints contracts and a generated TypeScript OpenAPI client.
 - Stable-resource GitOps workflows through ordinary Organizer Bot identities and existing management APIs.
 
@@ -72,7 +76,7 @@ not add an HAProxy or ingress-proxy layer for Docker runtimes.
 
 - Backend: .NET 10, FastEndpoints, EF Core 10, Npgsql/PostgreSQL, Wolverine, SignalR.
 - Frontend: Nuxt 4, Vue 3, TypeScript, Vite, and Bun.
-- Infrastructure: PostgreSQL, Redis, local or S3-compatible object storage.
+- Infrastructure: PostgreSQL, NATS JetStream/KV, Redis, local or S3-compatible object storage.
 - Runtime providers: Docker named-service Containers, Kubernetes service Pods, Libvirt/OVA.
 - Tests: TUnit, NSubstitute, and Testcontainers against real dependencies.
 
@@ -124,7 +128,7 @@ backend/
     NoCTF.Domain/          domain model and policies
     NoCTF.Application/     capability-oriented use cases
     NoCTF.Infrastructure/  provider-neutral relational model and infrastructure adapters
-    NoCTF.Persistence.PostgreSql/ production provider and EF-generated InitialBaseline
+    NoCTF.Persistence.PostgreSql/ production provider and EF-generated migrations
     NoCTF.Persistence.Sqlite/     isolated test-only provider
     NoCTF.Modeling.Generators/    TPH leaf/catalog compile-time generation and diagnostics
   tests/NoCTF.Tests/       unit, architecture, and integration tests
@@ -138,17 +142,18 @@ specs/                     authoritative product and engineering specifications
 - [Product and domain model](specs/product-domain.md)
 - [System architecture](specs/architecture.md)
 - [Processes, messaging, and concurrency](specs/processes-messaging.md)
-- [Runtime contract](specs/runtime.md)
+- [Runtime contract](specs/runtime.md) and [named container services](specs/runtime-services.md)
+- [CTF scoring settlement](specs/ctf-score-settlement.md)
+- [LiveSolo specification](specs/live-solo.md) and [acceptance status](specs/live-solo-status.md)
 - [API reference](specs/api.md)
 - [Deployment boundary](specs/deployment.md)
 - [Development guide](specs/development.md)
 - [Testing guide](specs/testing.md)
 - [Challenge repository GitOps](specs/challenge-repository-gitops.md)
 
-The separately maintained challenge-template repository's pinned CLI still emits
-legacy Compose definitions. Its cross-repository compatibility check needs a
-coordinated template update before that CLI can target the current named-service
-Container contract. The independent `gitops-contract.yml` check tracks this boundary.
+Cross-repository GitOps checks are opt-in tests using `NOCTF_GITOPS_TEMPLATE_ROOT`.
+Use a template checkout compatible with the current named-service Container
+contract; legacy Compose challenge definitions are not accepted.
 
 ## Development and contributions
 
@@ -158,10 +163,14 @@ The only executable backend project is `NoCTF.Host`; `NoCTF.API`, `NoCTF.Worker`
 and `NoCTF.Runner` are feature libraries.
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) and the applicable `AGENTS.md` before making
-changes. Pull requests run the backend checks in `repository-checks.yml`; frontend
-and localization changes also run `localization.yml`, and documentation changes
-run the documentation build. Image publishing invokes the same backend checks and
-validates the frontend before building a full image.
+changes. Pull requests build the complete Host image through
+[`repository-build.yml`](.github/workflows/repository-build.yml).
+[`ci.yml`](.github/workflows/ci.yml) publishes images, corresponding source, and
+deployment packages on main pushes or manual runs, including translation synchronization.
+[`backend-only.yml`](.github/workflows/backend-only.yml) is a manual backend image build.
+[`docs-pages.yml`](.github/workflows/docs-pages.yml) builds the manual and publishes
+GitHub Pages from main. Application deployment is a separate operation. These build
+workflows do not replace the test and drift checks in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

@@ -1,6 +1,6 @@
 # 举办第一场比赛
 
-本教程先创建一场单题静态 CTF，验证报名、Flag 和计分，再扩展到容器题或其他模式。按当前浏览器管理入口使用 Administrator 账号，平台已通过 [安装验收](../installation/verify.md)。后台 Organizer/协作者 API 权限与当前页面入口的区别见 [比赛管理导读](./index.md)。
+本教程先创建一场单题静态 CTF，验证报名、Flag 和计分，再扩展到容器题或其他模式。使用有创建资格的 Organizer/Administrator；进入现有比赛时需要相应协作者或平台权限，平台应先通过 [安装验收](../installation/verify.md)。入口和菜单见 [比赛管理导读](./index.md)。
 
 ## 1. 准备赛事规则
 

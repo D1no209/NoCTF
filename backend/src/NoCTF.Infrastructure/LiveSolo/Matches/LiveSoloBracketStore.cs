@@ -49,7 +49,10 @@ public sealed partial class LiveSoloMatchStore
                 ? matches.FirstOrDefault(x => x.Lane == LiveSoloBracketLane.GrandFinal) : null;
         }
         var corrections = await CorrectionSourcesAsync(matches, ct);
-        return new(competitionId, stamp, format, matches.Select(x => new LiveSoloBracketMatchView(Map(x, names, corrections), x.Lane, x.Stage, x.Position, x.Conditional,
+        var matchIds = matches.Select(x => x.Id).ToArray();
+        var withMedia = (await db.LiveSoloMediaSessions.AsNoTracking().Where(x => matchIds.Contains(x.MatchId))
+            .Select(x => x.MatchId).Distinct().ToArrayAsync(ct)).ToHashSet();
+        return new(competitionId, stamp, format, matches.Select(x => new LiveSoloBracketMatchView(Map(x, names, corrections, withMedia.Contains(x.Id)), x.Lane, x.Stage, x.Position, x.Conditional,
             x.Slots.Select(s => new LiveSoloBracketSourceView(s.Side, s.Source, s.Seed, s.SourceMatchId, s.Resolved, s.TeamId)).ToArray())).ToArray(),
             matches.Any(x => x.Slots.Any(s => s.Seed != null)) && final?.State == LiveSoloMatchState.Completed ? final.WinnerTeamId : null);
     }

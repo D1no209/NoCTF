@@ -56,6 +56,10 @@ const groups: DefaultTheme.SidebarItem[] = [
       {
         "text": "首次启动与验收",
         "link": "/installation/verify"
+      },
+      {
+        "text": "LiveSolo 可选媒体",
+        "link": "/installation/live-solo-media"
       }
     ]
   },
@@ -79,8 +83,48 @@ const groups: DefaultTheme.SidebarItem[] = [
         "link": "/player/challenges"
       },
       {
-        "text": "四种模式参赛",
-        "link": "/player/modes"
+        "text": "赛制参赛",
+        "link": "/player/modes",
+        "items": [
+          {
+            "text": "CTF",
+            "link": "/player/modes/ctf"
+          },
+          {
+            "text": "AWD",
+            "link": "/player/modes/awd"
+          },
+          {
+            "text": "AWDP",
+            "link": "/player/modes/awdp"
+          },
+          {
+            "text": "KoH",
+            "link": "/player/modes/koh"
+          },
+          {
+            "text": "LiveSolo",
+            "link": "/player/modes/live-solo/",
+            "items": [
+              {
+                "text": "名单与共享",
+                "link": "/player/modes/live-solo/preparation"
+              },
+              {
+                "text": "场内解题",
+                "link": "/player/modes/live-solo/playing"
+              },
+              {
+                "text": "延迟观赛",
+                "link": "/player/modes/live-solo/program"
+              },
+              {
+                "text": "赛后题解",
+                "link": "/player/modes/live-solo/postgame"
+              }
+            ]
+          }
+        ]
       },
       {
         "text": "排行榜与练习",
@@ -140,12 +184,60 @@ const groups: DefaultTheme.SidebarItem[] = [
             "link": "/competition/settings/basic"
           },
           {
-            "text": "模式计分规则",
-            "link": "/competition/settings/scoring"
-          },
-          {
             "text": "方向目录",
             "link": "/competition/settings/directions"
+          }
+        ]
+      },
+      {
+        "text": "赛制规则",
+        "link": "/competition/settings/scoring",
+        "items": [
+          {
+            "text": "CTF",
+            "link": "/competition/settings/scoring#ctf-默认规则"
+          },
+          {
+            "text": "AWD",
+            "link": "/competition/settings/scoring#awd-默认规则"
+          },
+          {
+            "text": "AWDP",
+            "link": "/competition/settings/scoring#awdp-默认规则"
+          },
+          {
+            "text": "KoH",
+            "link": "/competition/settings/scoring#koh-默认规则"
+          },
+          {
+            "text": "LiveSolo",
+            "link": "/competition/modes/live-solo/",
+            "items": [
+              {
+                "text": "设置与阶段",
+                "link": "/competition/modes/live-solo/settings"
+              },
+              {
+                "text": "题组与备用组",
+                "link": "/competition/modes/live-solo/question-groups"
+              },
+              {
+                "text": "种子与赛程",
+                "link": "/competition/modes/live-solo/bracket"
+              },
+              {
+                "text": "裁判操作",
+                "link": "/competition/modes/live-solo/judging"
+              },
+              {
+                "text": "结果纠正",
+                "link": "/competition/modes/live-solo/corrections"
+              },
+              {
+                "text": "录像管理",
+                "link": "/competition/modes/live-solo/recordings"
+              }
+            ]
           }
         ]
       },
@@ -155,6 +247,10 @@ const groups: DefaultTheme.SidebarItem[] = [
           {
             "text": "比赛题目实例",
             "link": "/competition/content/challenges"
+          },
+          {
+            "text": "开题、计分和提交时间",
+            "link": "/competition/content/timing"
           },
           {
             "text": "提示与 Flag",
@@ -247,10 +343,10 @@ const groups: DefaultTheme.SidebarItem[] = [
           {
             "text": "Webhook 与自动化",
             "link": "/competition/integrations/webhooks"
-            },
-            {
-              "text": "工作人员 Webhook",
-              "link": "/competition/integrations/staff-webhooks"
+          },
+          {
+            "text": "工作人员 Webhook",
+            "link": "/competition/integrations/staff-webhooks"
           },
           {
             "text": "赛事导出",
@@ -337,6 +433,10 @@ const groups: DefaultTheme.SidebarItem[] = [
             "link": "/platform/maintenance/audit"
           }
         ]
+      },
+      {
+        "text": "LiveSolo 视频资源策略",
+        "link": "/platform/video-policy"
       }
     ]
   },
@@ -358,12 +458,20 @@ const groups: DefaultTheme.SidebarItem[] = [
       {
         "text": "故障排查",
         "link": "/operations/troubleshooting"
+      },
+      {
+        "text": "LiveSolo 启用与验收",
+        "link": "/operations/live-solo-readiness"
       }
     ]
   },
   {
     "text": "参考与维护",
     "items": [
+      {
+        "text": "手册更新说明",
+        "link": "/reference/updates"
+      },
       {
         "text": "管理页面覆盖索引",
         "link": "/reference/management-map"
@@ -388,6 +496,22 @@ const groups: DefaultTheme.SidebarItem[] = [
   }
 ]
 
+const legacyRedirects: Record<string, string> = {
+  "live-solo/index.md": "competition/modes/live-solo/",
+  "live-solo/settings.md": "competition/modes/live-solo/settings.html",
+  "live-solo/question-groups.md": "competition/modes/live-solo/question-groups.html",
+  "live-solo/bracket.md": "competition/modes/live-solo/bracket.html",
+  "live-solo/judging.md": "competition/modes/live-solo/judging.html",
+  "live-solo/corrections.md": "competition/modes/live-solo/corrections.html",
+  "live-solo/recordings.md": "competition/modes/live-solo/recordings.html",
+  "live-solo/preparation.md": "player/modes/live-solo/preparation.html",
+  "live-solo/playing.md": "player/modes/live-solo/playing.html",
+  "live-solo/program.md": "player/modes/live-solo/program.html",
+  "live-solo/postgame.md": "player/modes/live-solo/postgame.html",
+  "live-solo/media-deployment.md": "installation/live-solo-media.html",
+  "live-solo/readiness.md": "operations/live-solo-readiness.html"
+}
+
 // Use /manual/ when publishing below a domain subdirectory.
 const base = process.env.DOCS_BASE ?? '/'
 if (!base.startsWith('/') || !base.endsWith('/') || base.includes('//')) {
@@ -399,6 +523,16 @@ export default defineConfig({
   title: 'NoCTF 使用手册',
   description: 'NoCTF 平台安装、参赛、赛事组织、平台管理与运维手册',
   base,
+  transformHead({ pageData }) {
+    const target = legacyRedirects[pageData.relativePath.replace(/\\/g, '/')]
+    if (!target) return []
+    const href = `${base}${target}`
+    return [
+      ['meta', { 'http-equiv': 'refresh', content: `0; url=${href}` }],
+      ['link', { rel: 'canonical', href }],
+      ['meta', { name: 'robots', content: 'noindex' }]
+    ]
+  },
   srcExclude: ['README.md'],
   lastUpdated: true,
   // Keep link validation enabled: missing pages must fail the build.
@@ -458,6 +592,6 @@ export default defineConfig({
     darkModeSwitchTitle: '切换为深色模式', sidebarMenuLabel: '目录',
     returnToTopLabel: '返回顶部',
     socialLinks: [{ icon: 'github', link: 'https://github.com/D1no209/NoCTF' }],
-    footer: { message: 'NoCTF · CTF / AWD / AWDP / KoH 平台使用手册' }
+    footer: { message: 'NoCTF · CTF / AWD / AWDP / KoH / LiveSolo 平台使用手册' }
   }
 })

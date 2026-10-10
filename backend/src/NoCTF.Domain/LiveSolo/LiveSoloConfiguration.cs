@@ -11,6 +11,7 @@ public enum LiveSoloBracketLane : short { Winners, Losers, GrandFinal, ResetFina
 public sealed class LiveSoloCompetitionModeConfiguration() : CompetitionModeConfiguration(GameMode.LiveSolo)
 {
     public bool Enabled { get; set; }
+    public bool PlatformStreamingEnabled { get; set; } = true;
     public LiveSoloBracketFormat BracketFormat { get; set; }
     public int RequiredWins { get; set; } = 2;
     public int CountdownSeconds { get; set; } = 5;

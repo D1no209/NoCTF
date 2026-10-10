@@ -40,7 +40,7 @@ public sealed partial class LiveSoloMediaStore
         { await StopSessionAsync(session, ct); return; }
         var match = await db.LiveSoloMatches.Include(x => x.Slots).Include(x => x.Roster).SingleOrDefaultAsync(x => x.Id == session.MatchId, ct);
         if (match is null || !LiveSoloMediaPolicy.Active(match.State) || match.CurrentMediaSessionId != session.Id
-            || !await AvailableAsync(match.CompetitionId, ct) || !await RosterEligibleAsync(match, ct))
+            || !await AvailableAsync(match, ct) || !await RosterEligibleAsync(match, ct))
         {
             await StopSessionAsync(session, ct); return;
         }
@@ -52,7 +52,7 @@ public sealed partial class LiveSoloMediaStore
             await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
             await db.Entry(match).ReloadAsync(ct); await db.Entry(session).ReloadAsync(ct);
             if (match.CurrentMediaSessionId == session.Id && LiveSoloMediaPolicy.Active(match.State)
-                && session.State == LiveSoloMediaState.Preparing && await AvailableAsync(match.CompetitionId, ct)
+                && session.State == LiveSoloMediaState.Preparing && await AvailableAsync(match, ct)
                 && await RosterEligibleAsync(match, ct))
             { session.State = LiveSoloMediaState.Ready; await db.SaveChangesAsync(ct); await tx.CommitAsync(ct); }
             return;

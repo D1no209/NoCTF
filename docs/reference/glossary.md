@@ -44,3 +44,9 @@
 | DeadLetter | 无法完成正常处理、需要查明原因的失败状态 |
 | TokenVersion | 账号全量 Access/Refresh 令牌失效版本 |
 | Recovery point | PG、对象、离线消息与密钥关联的同一可恢复点 |
+| LiveSolo | 独立第五赛制，按两队 Match 胜局推进 |
+| Match / Round / RoundQuestion | 对局 / 有效竞技局 / 当前局的题目与资源作用域 |
+| Admission sequence | 同一 Round 跨双方、成员和题目的持久受理顺序 |
+| Canonical source | 独立复制仍保留的规范题源身份，用于曝光/重复用题检查 |
+| Programme / viewer lease | 延迟媒体与状态节目 / 绑定浏览器的观众入场名额 |
+| Dispute hold | 录像争议保留，与公开、删除和期限独立 |

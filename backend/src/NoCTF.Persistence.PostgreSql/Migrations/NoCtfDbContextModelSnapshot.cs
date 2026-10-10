@@ -4597,6 +4597,12 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("number");
 
+                    b.Property<bool>("PlatformStreamingEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("platform_streaming_enabled");
+
                     b.Property<Guid>("QuestionGroupId")
                         .HasColumnType("uuid")
                         .HasColumnName("question_group_id");
@@ -7350,6 +7356,12 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Property<bool>("ParticipantsMayViewOpponents")
                         .HasColumnType("boolean")
                         .HasColumnName("participants_may_view_opponents");
+
+                    b.Property<bool>("PlatformStreamingEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("platform_streaming_enabled");
 
                     b.Property<int>("PublicDelaySeconds")
                         .HasColumnType("integer")

@@ -8,9 +8,11 @@
 | --- | --- | --- | --- |
 | Linux Docker 单机 | 第一套部署、小型到中型赛事、独立服务器 | Linux Docker Engine、Compose v2、HTTPS 反代、题目直连端口 | [Docker 安装](./docker.md) |
 | 已有 Kubernetes | 有集群运维能力，需要按节点调度执行资源 | Cilium、Metrics Server、Envoy Gateway、Retain 存储与节点隔离 | [Kubernetes 安装](./kubernetes.md) |
-| Windows Docker Desktop + kind | 隔离验证完整部署和四种模式 | Docker Desktop 分配至少 8 CPU / 16 GiB、PowerShell 7 | [本地 kind](./kubernetes.md#本地-kind-验证环境) |
+| Windows Docker Desktop + kind | 隔离验证平台与前四赛制，媒体能力另行验收 | Docker Desktop 分配至少 8 CPU / 16 GiB、PowerShell 7 | [本地 kind](./kubernetes.md#本地-kind-验证环境) |
 
 首次生产安装可以从 Linux Docker 单机开始；Docker、Kubernetes 和本地 kind 都可以直接使用 CI 完整镜像。
+
+LiveSolo 媒体是独立可选部署，不包含在普通平台安装的能力保证中；当前单机媒体 overlay 与正式启用条件见 [媒体部署](./live-solo-media.md)及 [验收](../operations/live-solo-readiness.md)。
 
 ## 安装顺序
 

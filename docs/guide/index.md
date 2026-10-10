@@ -1,6 +1,8 @@
 # 手册导读
 
-NoCTF 是以队伍为参赛单位的竞赛平台，支持 CTF、AWD、AWDP、KoH。本手册围绕“如何完成一次操作”组织内容，适合部署人员、选手、出题人、赛事组织者和平台管理员。
+NoCTF 是以队伍为参赛单位的竞赛平台，支持 CTF、AWD、AWDP、KoH 和 LiveSolo。本手册围绕“如何完成一次操作”组织内容，适合部署人员、选手、出题人、赛事组织者和平台管理员。
+
+LiveSolo 是独立的 Match/Round 赛制，配置、判胜和媒体都不同于前四种模式。使用 [LiveSolo 操作手册](../competition/modes/live-solo/index.md)和 [启用验收](../operations/live-solo-readiness.md)，不要直接套用普通积分榜或容器题的开赛流程。
 
 ## 选择阅读路线
 
@@ -12,6 +14,7 @@ NoCTF 是以队伍为参赛单位的竞赛平台，支持 CTF、AWD、AWDP、KoH
 | 出题人 | 平台概念 → 题库 → Runtime/Checker | 创建可复用题库模板并完成测试 |
 | 平台管理员 | 角色 → 账号 → 平台设置 → 实例与日志 | 配置身份、邮件与执行资源并维护平台 |
 | 运维人员 | 配置 → 监控 → 升级 → 备份 → 排障 | 可观测、可升级、可恢复 |
+| LiveSolo 工作人员/选手 | 独立设置 → 题组/赛程 → 名单/共享 → Round → 节目/录像/纠正 | 按独立规则完成配置和验收，不套用普通积分榜 |
 
 比赛管理从 [完整菜单手册](../competition/index.md)阅读，题库维护从 [题库手册](../challenge-bank/index.md)阅读，平台设置从 [平台管理手册](../platform/index.md)阅读。[覆盖索引](../reference/management-map.md)将实际管理路由逐项对应到操作说明。
 
