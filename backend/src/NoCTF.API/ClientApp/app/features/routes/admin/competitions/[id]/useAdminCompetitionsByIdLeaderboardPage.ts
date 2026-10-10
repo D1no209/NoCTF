@@ -1,5 +1,6 @@
 import { message as describeMessage } from '../../../../../utils/i18n'
 import type { UiMessage } from '../../../../../utils/i18n'
+import { ChartNoAxesCombined } from '@lucide/vue'
 
 
 import { toast } from '../../../../../utils/message-toast'
@@ -10,6 +11,7 @@ import { useCompetitionAdmin } from '../../../../../lib/admin-competition'
 /** Owns state, effects and commands for AdminCompetitionsByIdLeaderboardPage. */
 export function useAdminCompetitionsByIdLeaderboardPage() {
   const { competitionId, canWrite } = useCompetitionAdmin()
+  const scoreboardPath = `/competitions/${competitionId}/leaderboard`
 
   const current = ref<NoCtfapiEndpointsAdministrationCompetitionsCompetitionLeaderboardVisibilityResponse | null>(null)
 
@@ -70,6 +72,8 @@ export function useAdminCompetitionsByIdLeaderboardPage() {
   onMounted(load)
 
   return {
+      ChartNoAxesCombined,
+      scoreboardPath,
       canWrite,
       current,
       loading,
