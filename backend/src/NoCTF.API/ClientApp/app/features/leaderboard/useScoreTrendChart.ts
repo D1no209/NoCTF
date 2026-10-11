@@ -1,10 +1,10 @@
 import { toRefs } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
-import type { TooltipComponentOption } from 'echarts/components'
 import { chartTooltipTheme, echarts, trendChartPalette } from '../../utils/echarts'
 import { themeColor } from '../../utils/theme-color'
 import type { TrendSeries } from './types'
 import { scoreTrendTimeRange } from './score-trend-range'
+import { scoreTrendValueAt } from './score-trend-tooltip'
 
 export interface ScoreTrendChartProps {
   title: string
@@ -34,13 +34,17 @@ export function useScoreTrendChart(props: Readonly<ScoreTrendChartProps>) {
 
   let focusedTeamName: string | null = null
 
-  let hoveredLine: { seriesIndex: number, at: number } | null = null
+  let hoveredLine: { seriesId: string, at: number } | null = null
+
+  let formatHoveredLine: (() => string) | undefined
 
   let applyingOption = false
 
   let renderFrame = 0
 
   let lastSeriesSignature = ''
+
+  let renderedSeriesIds: string[] = []
 
   function zoomValue(value: unknown, percent: unknown, edge: 'start' | 'end'): number {
     const numeric = typeof value === 'number' ? value : Number.NaN
@@ -100,15 +104,25 @@ export function useScoreTrendChart(props: Readonly<ScoreTrendChartProps>) {
       hoveredLine = null
       return
     }
+    // Line-path events omit seriesId in ECharts; resolve through its merged order.
+    const seriesId = event.seriesId ?? renderedSeriesIds[event.seriesIndex]
     const at = chart?.convertFromPixel({ xAxisIndex: 0 }, event.event.offsetX)
-    hoveredLine = typeof at === 'number' && Number.isFinite(at)
-      ? { seriesIndex: event.seriesIndex, at }
+    hoveredLine = seriesId && typeof at === 'number' && Number.isFinite(at)
+      ? { seriesId, at }
       : null
-    // Axis tooltips otherwise reuse cached content while moving between sparse step lines.
-    chart?.dispatchAction({ type: 'hideTip' })
+    if (!hoveredLine) return
+    // Use the actual hit line, not the nearest sample on the time axis. Explicit
+    // custom tooltip also refreshes sparse step-line content on every pointer move.
+    chart?.dispatchAction({
+      type: 'showTip', x: event.event.offsetX, y: event.event.offsetY,
+      tooltip: { formatter: formatHoveredLine },
+    })
   }
 
-  function clearHoveredLine() { hoveredLine = null }
+  function clearHoveredLine() {
+    hoveredLine = null
+    chart?.dispatchAction({ type: 'hideTip' })
+  }
 
   function buildOption(): echarts.EChartsCoreOption {
     timeRange = scoreTrendTimeRange(
@@ -136,36 +150,22 @@ export function useScoreTrendChart(props: Readonly<ScoreTrendChartProps>) {
       name,
       focusedTeamName === null || focusedTeamName === name,
     ]))
-    const tooltipPoints: [number, number][][] = []
-    const tooltipFormatter: TooltipComponentOption['formatter'] = (params) => {
-      const entries = Array.isArray(params) ? params : [params]
-      const point = entries[0]?.value
-      const at = hoveredLine?.at ?? (Array.isArray(point) ? Number(point[0]) : Number.NaN)
-      const heading = Number.isFinite(at) ? echarts.format.encodeHTML(new Date(at).toLocaleString(locale.value)) : ''
-      const scoreText = (score: unknown) => echarts.format.encodeHTML(`${score} ${translate('common.label.pts.scoreTrendChart')}`)
-      if (hoveredLine) {
-        const { seriesIndex } = hoveredLine
-        const points = tooltipPoints[seriesIndex] ?? []
-        let low = 0
-        let high = points.length
-        while (low < high) {
-          const middle = Math.floor((low + high) / 2)
-          if (points[middle]![0] <= at) low = middle + 1
-          else high = middle
-        }
-        const marker = echarts.format.getTooltipMarker(palette[seriesIndex % Math.max(1, palette.length)] ?? '')
-        const name = echarts.format.encodeHTML(teamNames[seriesIndex] ?? '')
-        return `${heading}<br/>${marker}${name} <strong>${scoreText(points[Math.max(0, low - 1)]?.[1] ?? 0)}</strong>`
-      }
-      return [heading, ...entries.map(entry => {
-        const marker = typeof entry.marker === 'string' ? entry.marker : ''
-        const name = echarts.format.encodeHTML(entry.seriesName ?? '')
-        const score = Array.isArray(entry.value) ? entry.value[1] : entry.value
-        return `${marker}${name} <strong>${scoreText(score)}</strong>`
-      })].join('<br/>')
+    const tooltipTeams = new Map<string, { name: string, color: string, points: [number, number][] }>()
+    const tooltipFormatter = () => {
+      if (!hoveredLine) return ''
+      const team = tooltipTeams.get(hoveredLine.seriesId)
+      if (!team) return ''
+      const at = hoveredLine.at
+      const heading = echarts.format.encodeHTML(new Date(at).toLocaleString(locale.value))
+      const score = echarts.format.encodeHTML(`${scoreTrendValueAt(team.points, at)} ${translate('common.label.pts.scoreTrendChart')}`)
+      const marker = echarts.format.getTooltipMarker(team.color)
+      const name = echarts.format.encodeHTML(team.name)
+      return `${heading}<br/>${marker}${name} <strong>${score}</strong>`
     }
+    formatHoveredLine = tooltipFormatter
     return {
       backgroundColor: 'transparent',
+      animation: false,
       textStyle: { fontFamily },
       color: palette,
       title: props.title
@@ -178,7 +178,10 @@ export function useScoreTrendChart(props: Readonly<ScoreTrendChartProps>) {
       grid: { left: 64, right: 32, top: props.title ? 44 : 24, bottom: 88 },
       tooltip: {
         ...chartTooltipTheme(el.value),
-        trigger: 'axis',
+        trigger: 'item',
+        triggerOn: 'none',
+        transitionDuration: 0,
+        hideDelay: 0,
         appendTo: 'body',
         confine: true,
         className: 'noctf-chart-tooltip',
@@ -276,10 +279,11 @@ export function useScoreTrendChart(props: Readonly<ScoreTrendChartProps>) {
           if (raw[raw.length - 1]![0] < timeRange.end)
             data.push([timeRange.end, raw[raw.length - 1]![1]])
         }
-        tooltipPoints.push(data)
         const lineColor = palette[index % Math.max(1, palette.length)]
+        const seriesId = team.teamId || team.teamName || `team-${index}`
+        tooltipTeams.set(seriesId, { name: teamNames[index]!, color: lineColor ?? '', points: data })
         return {
-          id: team.teamId || team.teamName || `team-${index}`,
+          id: seriesId,
           type: 'line' as const,
           colorBy: 'series' as const,
           name: team.teamName ?? translate("common.label.team"),
@@ -324,6 +328,7 @@ export function useScoreTrendChart(props: Readonly<ScoreTrendChartProps>) {
         lazyUpdate: true,
         ...(replaceSeries ? { replaceMerge: ['series'] } : {}),
       })
+      renderedSeriesIds = (chart.getOption().series as Array<{ id: string }>).map(series => series.id)
     }
     finally {
       applyingOption = false
@@ -345,11 +350,12 @@ export function useScoreTrendChart(props: Readonly<ScoreTrendChartProps>) {
     chart.on('legendselectchanged', toggleTeamFocus)
     chart.on('mousemove', 'series.line', rememberHoveredLine)
     chart.on('mouseout', 'series.line', clearHoveredLine)
+    chart.getZr().on('globalout', clearHoveredLine)
     scheduleRender()
   })
 
   watch(
-    () => [props.revision, props.rangeStart, props.rangeEnd, props.title, locale.value],
+    () => [props.series, props.revision, props.rangeStart, props.rangeEnd, props.title, locale.value],
     scheduleRender,
   )
 

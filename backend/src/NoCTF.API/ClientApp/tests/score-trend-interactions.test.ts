@@ -132,15 +132,13 @@ describe('score trend interactions', () => {
     expect((chart.getOption().legend as Array<{ selected: Record<string, boolean> }>)[0]?.selected).toEqual({ Alpha: true, Beta: true })
   })
 
-  test('does not highlight another team merely because its timestamp is closest to the hovered line', () => {
-    mountChart()
+  test('does not highlight another team merely because its timestamp is closest to the hovered line', async () => {
+    const props = mountChart()
     const highlights: unknown[] = []
     chart.on('highlight', event => { highlights.push(event) })
     const [x, y] = chart.convertToPixel({ seriesIndex: 0 }, [timestamp(12) + 30 * 60_000, 10])
     chart.dispatchAction({ type: 'updateAxisPointer', x, y })
     expect(highlights).toHaveLength(0)
-    const pointer = (chart.getOption().xAxis as Array<{ axisPointer: { value: number } }>)[0]!.axisPointer
-    expect(pointer.value).toBeCloseTo(timestamp(12) + 30 * 60_000, 0)
     const target = chart.getZr().handler.findHover(x, y).target
     expect(target?.type).toBe('ec-polyline')
     chart.getZr().handler.dispatch('mousemove', { zrX: x, zrY: y })
@@ -152,8 +150,15 @@ describe('score trend interactions', () => {
     expect(content).toContain('10 common.label.pts.scoreTrendChart')
     expect(content).not.toContain('Beta')
     chart.getZr().handler.dispatch('mousemove', { zrX: x, zrY: y - 12 })
-    expect(tooltip.formatter(nearestOtherTeam)).toContain('Beta')
-    nearestOtherTeam.seriesName = '<b>Beta</b>'
-    expect(tooltip.formatter(nearestOtherTeam)).toContain('&lt;b&gt;Beta&lt;/b&gt;')
+    expect(tooltip.formatter(nearestOtherTeam)).toBe('')
+    props.series[1]!.teamName = '<b>Beta</b>'
+    props.revision++
+    await nextTick()
+    flushFrames()
+    const [bx, by] = chart.convertToPixel({ seriesIndex: 1 }, [timestamp(12) + 30 * 60_000, 70])
+    chart.getZr().handler.dispatch('mousemove', { zrX: bx, zrY: by })
+    const refreshedTooltip = (chart.getOption().tooltip as Array<{ formatter: () => string }>)[0]!
+    expect(refreshedTooltip.formatter()).toContain('&lt;b&gt;Beta&lt;/b&gt;')
+    expect(refreshedTooltip.formatter()).not.toContain('Alpha')
   })
 })
