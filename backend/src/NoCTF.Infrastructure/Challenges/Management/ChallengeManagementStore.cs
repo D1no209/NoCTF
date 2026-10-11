@@ -75,7 +75,7 @@ public sealed class ChallengeManagementStore(
             db,
             command.ChallengeId,
             ct);
-        if (template is null || template.DeletedAt is not null)
+        if (template is null || template.DeletedAt is not null || template.CatalogScope != command.MaterialScope)
             return new(null, ChallengeMutationFailure.TemplateNotFound);
         if (template.Mode != competitionMode)
             return new(null, ChallengeMutationFailure.TemplateModeMismatch);
@@ -224,7 +224,10 @@ public sealed class ChallengeManagementStore(
                 item.CompetitionId == command.CompetitionId, ct);
         if (entity is null)
             return new(null, ChallengeMutationFailure.ChallengeNotFound);
-        if (material is not null) await material.RequireMutableAsync(new(null, entity.Id), ct);
+        var capabilities = NoCTF.Application.Competitions.Modes.CompetitionModeCapabilities.For(entity.Mode);
+        if (!capabilities.ChallengePublication && command.HasPublicationChange) return new(null, ChallengeMutationFailure.PublicationUnsupported);
+        if (capabilities.ScopedExecution && command.CustomTitle != entity.CustomTitle) return new(null, ChallengeMutationFailure.MaterialEditRequired);
+        if (!capabilities.ScopedExecution && material is not null) await material.RequireMutableAsync(new(null, entity.Id), ct);
         var conflict = await FindCompetitionChallengeConflictAsync(
             entity.Id, entity.CompetitionId, entity.ChallengeId, command.Order,
             includeIdConflict: false, ct);
@@ -277,7 +280,7 @@ public sealed class ChallengeManagementStore(
             entity.CompetitionId,
             eventKind,
             CompetitionEventLevel.Information,
-            command.IsPublished
+            command.IsPublished && capabilities.ChallengePublication
                 ? CompetitionEventVisibility.Public
                 : CompetitionEventVisibility.Staff,
             command.UpdatedAt,

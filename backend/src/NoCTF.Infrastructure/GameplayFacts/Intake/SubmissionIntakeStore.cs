@@ -284,6 +284,9 @@ public sealed class GameplayFactIntakeStore(
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         using var attemptLease = await attemptCriticalSection.AcquireAsync(db, received.TeamId,
             received.CompetitionChallengeId, GameplayFactKind.ManualAdjustment, cancellationToken);
+        var mode = await db.Competitions.AsNoTracking().Where(x => x.Id == received.CompetitionId).Select(x => (NoCTF.Domain.Competitions.GameMode?)x.Mode).SingleOrDefaultAsync(cancellationToken);
+        if (mode is not null && !NoCTF.Application.Competitions.Modes.CompetitionModeCapabilities.For(mode.Value).ManualScoreAdjustment)
+            return new(GameplayFactAcceptanceState.UnsupportedMode);
         var previous = replay is null ? null : await replay.FindAsync<GameplayFactAcceptanceResult>(
             new(received.UserId, ReplayOperation.ManualAdjustment, received.CompetitionId, received.CompetitionChallengeId),
             new ManualAdjustmentReplayFingerprint(received.TeamId, received.Delta), cancellationToken);

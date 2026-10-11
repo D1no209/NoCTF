@@ -2746,96 +2746,6 @@
         ]
       }
     },
-    "/api/v1/competitions/{competitionId}/live-solo/templates/copies": {
-      "post": {
-        "tags": [
-          "Competitions"
-        ],
-        "summary": "Copies FlagSubmission-compatible material into independent LiveSolo template and competition instances with canonical provenance.",
-        "description": "Executes POST /api/v1/competitions/{competitionId}/live-solo/templates/copies.",
-        "operationId": "CopyLiveSoloTemplate",
-        "parameters": [
-          {
-            "name": "competitionId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "guid"
-            }
-          }
-        ],
-        "requestBody": {
-          "x-name": "CopyLiveSoloTemplateRequest",
-          "description": "",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloCopyLiveSoloTemplateRequest"
-              }
-            }
-          },
-          "required": true,
-          "x-position": 1
-        },
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloTemplateCopyResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found"
-          },
-          "409": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloTemplateCopyFailureResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloTemplateCopyFailureResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "Bearer": []
-          }
-        ]
-      }
-    },
     "/api/v1/competitions/{competitionId}/live-solo/matches": {
       "post": {
         "tags": [
@@ -2979,6 +2889,231 @@
         ]
       }
     },
+    "/api/v1/competitions/{competitionId}/live-solo/question-pool": {
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Creates material exclusively owned by this competition, outside the question bank.",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/live-solo/question-pool.",
+        "operationId": "CreateLiveSoloPoolQuestion",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "CreateLiveSoloPoolQuestionRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloCreateLiveSoloPoolQuestionRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloPoolQuestionResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloPoolFailureResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloPoolFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Reads the authorized competition question pool, ownership and question-list references.",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/live-solo/question-pool.",
+        "operationId": "ListLiveSoloQuestionPool",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloQuestionPoolResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/competitions/{competitionId}/live-solo/question-pool/deploy": {
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Adds an applicable LiveSolo template once, following the bank until competition content is edited.",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/live-solo/question-pool/deploy.",
+        "operationId": "DeployLiveSoloPoolQuestion",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "DeployLiveSoloPoolQuestionRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloDeployLiveSoloPoolQuestionRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloPoolQuestionResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloPoolFailureResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloPoolFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/attachments/{attachmentId}": {
       "get": {
         "tags": [
@@ -3107,6 +3242,276 @@
           },
           "403": {
             "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/review/questions/{questionId}/attachments/{attachmentId}": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Download Live Solo Review Attachment",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/review/questions/{questionId}/attachments/{attachmentId}.",
+        "operationId": "DownloadLiveSoloReviewAttachment",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "questionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "attachmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "staff",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/competitions/{competitionId}/live-solo/question-pool/{competitionChallengeId}": {
+      "patch": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Atomically detaches on the first material edit while retaining the competition question identity.",
+        "description": "Executes PATCH /api/v1/competitions/{competitionId}/live-solo/question-pool/{competitionChallengeId}.",
+        "operationId": "EditLiveSoloPoolQuestion",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "competitionChallengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "EditLiveSoloPoolQuestionRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloEditLiveSoloPoolQuestionRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloPoolQuestionResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloPoolFailureResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloPoolFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/competitions/{competitionId}/live-solo/question-pool/{competitionChallengeId}/save-to-bank": {
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Copies competition-owned material to a new independent question-bank template without relinking the competition.",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/live-solo/question-pool/{competitionChallengeId}/save-to-bank.",
+        "operationId": "ExportLiveSoloPoolQuestion",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "competitionChallengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "ExportLiveSoloPoolQuestionRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloExportLiveSoloPoolQuestionRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloPoolExportResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloPoolFailureResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloPoolFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -3934,6 +4339,79 @@
         ]
       }
     },
+    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/review/questions/{questionId}": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Get Live Solo Review Question",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/review/questions/{questionId}.",
+        "operationId": "GetLiveSoloReviewQuestion",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "questionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "staff",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloReviewContentResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}": {
       "get": {
         "tags": [
@@ -4223,6 +4701,70 @@
                 }
               }
             }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/workspace": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Get Live Solo Workspace",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/workspace.",
+        "operationId": "GetLiveSoloWorkspace",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "staff",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloWorkspaceResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
           }
         },
         "security": [
@@ -4761,6 +5303,62 @@
         ]
       }
     },
+    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/question-groups": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "List Live Solo Question Group Candidates",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/question-groups.",
+        "operationId": "ListLiveSoloQuestionGroupCandidates",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloQuestionCandidateListResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/competitions/{competitionId}/live-solo/question-groups": {
       "get": {
         "tags": [
@@ -5040,6 +5638,70 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/review/questions": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "List Live Solo Review Questions",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/review/questions.",
+        "operationId": "ListLiveSoloReviewQuestions",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "staff",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloReviewQuestionsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
       }
     },
     "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/writeups": {
@@ -5578,6 +6240,93 @@
         ]
       }
     },
+    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/review/questions/{questionId}/attachments/{attachmentId}/browser-download": {
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Prepare Live Solo Review Attachment Download",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/review/questions/{questionId}/attachments/{attachmentId}/browser-download.",
+        "operationId": "PrepareLiveSoloReviewAttachmentDownload",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "questionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "attachmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "PrepareLiveSoloReviewAttachmentDownloadRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloPrepareLiveSoloReviewAttachmentDownloadRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesAttachmentBrowserDownloadResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds": {
       "post": {
         "tags": [
@@ -6059,6 +6808,114 @@
         ]
       }
     },
+    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/preparation": {
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Retry Live Solo Preparation",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/preparation.",
+        "operationId": "RetryLiveSoloPreparation",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "roundId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "RetryLiveSoloPreparationRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloRetryLiveSoloPreparationRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloRoundResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/questions/{questionId}/writeups/{writeUpId}/review": {
       "post": {
         "tags": [
@@ -6391,6 +7248,114 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesWriteUpsChallengeWriteUpFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/selection": {
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Specify Prepared Live Solo Group",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{roundId}/selection.",
+        "operationId": "SpecifyPreparedLiveSoloGroup",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "matchId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "roundId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "SpecifyPreparedLiveSoloGroupRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloSpecifyPreparedLiveSoloGroupRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloRoundResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloFailureResponse"
                 }
               }
             }
@@ -6779,6 +7744,105 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesWriteUpsChallengeWriteUpFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/competitions/{competitionId}/live-solo/question-pool/{competitionChallengeId}/attachments": {
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Upload Live Solo Pool Attachments",
+        "description": "Executes POST /api/v1/competitions/{competitionId}/live-solo/question-pool/{competitionChallengeId}/attachments.",
+        "operationId": "UploadLiveSoloPoolAttachments",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "competitionChallengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "UploadLiveSoloPoolAttachmentsRequest",
+          "description": "",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloUploadLiveSoloPoolAttachmentsRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloPoolQuestionResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloPoolFailureResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloPoolFailureResponse"
                 }
               }
             }
@@ -20294,7 +21358,7 @@
           "Admin"
         ],
         "summary": "Permanently deletes a competition and all scoped data.",
-        "description": "Requires the exact competition title and an audit reason. Running or paused competitions and competitions with live Runtime resources are rejected.",
+        "description": "Requires the exact competition title and an audit reason. Running or paused competitions and competitions with live Runtime or uncleaned LiveSolo media resources are rejected.",
         "operationId": "AdminForceDeleteCompetition",
         "parameters": [
           {
@@ -22445,6 +23509,85 @@
         ]
       }
     },
+    "/api/v1/admin/challenges/live-solo/copies": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Copies FlagSubmission-compatible material into an independent LiveSolo question-bank template with canonical provenance.",
+        "description": "Executes POST /api/v1/admin/challenges/live-solo/copies.",
+        "operationId": "CopyLiveSoloTemplate",
+        "requestBody": {
+          "x-name": "CopyLiveSoloTemplateRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankCopyLiveSoloTemplateRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankLiveSoloTemplateCopyResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankLiveSoloTemplateCopyFailureResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankLiveSoloTemplateCopyFailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/challenges/{challengeId}/flags": {
       "post": {
         "tags": [
@@ -22667,6 +23810,18 @@
             "required": true,
             "schema": {
               "type": "boolean"
+            }
+          },
+          {
+            "name": "mode",
+            "in": "query",
+            "schema": {
+              "nullable": true,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsGameModeProtocol"
+                }
+              ]
             }
           },
           {
@@ -27007,6 +28162,46 @@
           },
           "hasMedia": {
             "type": "boolean"
+          },
+          "resultRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "endReason": {
+            "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloEndReason"
+          },
+          "resultLeftWins": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "resultRightWins": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "resultUpdatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "leftAvatarFileId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "rightAvatarFileId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "leftAvatarUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "rightAvatarUrl": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -27056,6 +28251,36 @@
             "type": "boolean"
           }
         }
+      },
+      "NoCTFDomainLiveSoloLiveSoloEndReason": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Unrecorded",
+          "CorrectAnswer",
+          "RequiredWinsReached",
+          "Forfeit",
+          "TimeLimit",
+          "Voided",
+          "EligibilityChanged",
+          "SelectionChanged",
+          "ResultCorrected",
+          "DownstreamReplaced",
+          "Bye"
+        ],
+        "enum": [
+          "Unrecorded",
+          "CorrectAnswer",
+          "RequiredWinsReached",
+          "Forfeit",
+          "TimeLimit",
+          "Voided",
+          "EligibilityChanged",
+          "SelectionChanged",
+          "ResultCorrected",
+          "DownstreamReplaced",
+          "Bye"
+        ]
       },
       "NoCTFAPIEndpointsLiveSoloLiveSoloRoundResponse": {
         "type": "object",
@@ -27121,6 +28346,54 @@
           },
           "platformStreamingEnabled": {
             "type": "boolean"
+          },
+          "resourceReadiness": {
+            "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloQuestionReadiness"
+          },
+          "preparationFailure": {
+            "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloResourceFailure"
+          },
+          "environmentRequired": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "staticFlagEvidenceRequired": {
+            "type": "boolean"
+          },
+          "questionGroupId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "selectionKind": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloQuestionSelectionKind"
+              }
+            ]
+          },
+          "resultRevision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "endReason": {
+            "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloEndReason"
+          },
+          "resultLeftWins": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "resultRightWins": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "endedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         }
       },
@@ -27144,6 +28417,56 @@
           "Won",
           "TimedOut",
           "Canceled"
+        ]
+      },
+      "NoCTFDomainLiveSoloLiveSoloQuestionReadiness": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Waiting",
+          "Preparing",
+          "Ready",
+          "Failed"
+        ],
+        "enum": [
+          "Waiting",
+          "Preparing",
+          "Ready",
+          "Failed"
+        ]
+      },
+      "NoCTFDomainLiveSoloLiveSoloResourceFailure": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "None",
+          "NotFound",
+          "ResourceCapacityExceeded",
+          "UnsupportedEnvironment",
+          "IsolationNotConfigured",
+          "IsolationVerificationFailed",
+          "DependencyUnavailable"
+        ],
+        "enum": [
+          "None",
+          "NotFound",
+          "ResourceCapacityExceeded",
+          "UnsupportedEnvironment",
+          "IsolationNotConfigured",
+          "IsolationVerificationFailed",
+          "DependencyUnavailable"
+        ]
+      },
+      "NoCTFDomainLiveSoloLiveSoloQuestionSelectionKind": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Automatic",
+          "StaffSpecified"
+        ],
+        "enum": [
+          "Automatic",
+          "StaffSpecified"
         ]
       },
       "NoCTFAPIEndpointsLiveSoloLiveSoloAdjudicationResponse": {
@@ -27287,7 +28610,15 @@
           "AlreadyEnded",
           "NoSuitableQuestionGroup",
           "DependencyUnavailable",
-          "IdempotencyConflict"
+          "IdempotencyConflict",
+          "CompetitionNotStarted",
+          "ResourceCapacityExceeded",
+          "UnsupportedEnvironment",
+          "IsolationNotConfigured",
+          "IsolationVerificationFailed",
+          "QuestionGroupNotFound",
+          "SelectionChanged",
+          "ActiveQuestionConflict"
         ],
         "enum": [
           "NotFound",
@@ -27306,7 +28637,15 @@
           "AlreadyEnded",
           "NoSuitableQuestionGroup",
           "DependencyUnavailable",
-          "IdempotencyConflict"
+          "IdempotencyConflict",
+          "CompetitionNotStarted",
+          "ResourceCapacityExceeded",
+          "UnsupportedEnvironment",
+          "IsolationNotConfigured",
+          "IsolationVerificationFailed",
+          "QuestionGroupNotFound",
+          "SelectionChanged",
+          "ActiveQuestionConflict"
         ]
       },
       "NoCTFAPIEndpointsLiveSoloAdjudicateLiveSoloMatchRequest": {
@@ -27723,109 +29062,6 @@
           }
         }
       },
-      "NoCTFAPIEndpointsLiveSoloLiveSoloTemplateCopyResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "challengeId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "competitionChallengeId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "canonicalChallengeId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "title": {
-            "type": "string"
-          },
-          "attachmentCount": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "flagCount": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "allocationChanged": {
-            "type": "boolean"
-          }
-        }
-      },
-      "NoCTFAPIEndpointsLiveSoloLiveSoloTemplateCopyFailureResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "code": {
-            "$ref": "#/components/schemas/NoCTFApplicationLiveSoloTemplatesLiveSoloTemplateCopyFailure"
-          },
-          "detail": {
-            "type": "string"
-          },
-          "messageKey": {
-            "type": "string"
-          },
-          "messageArguments": {
-            "type": "object",
-            "additionalProperties": {}
-          }
-        }
-      },
-      "NoCTFApplicationLiveSoloTemplatesLiveSoloTemplateCopyFailure": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "NotFound",
-          "Forbidden",
-          "UnsupportedSource",
-          "AttachmentsForbidden",
-          "FlagsForbidden",
-          "Conflict",
-          "AttachmentsRequired",
-          "InvalidTags"
-        ],
-        "enum": [
-          "NotFound",
-          "Forbidden",
-          "UnsupportedSource",
-          "AttachmentsForbidden",
-          "FlagsForbidden",
-          "Conflict",
-          "AttachmentsRequired",
-          "InvalidTags"
-        ]
-      },
-      "NoCTFAPIEndpointsLiveSoloCopyLiveSoloTemplateRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "sourceChallengeId"
-        ],
-        "properties": {
-          "sourceChallengeId": {
-            "type": "string",
-            "format": "guid",
-            "minLength": 1,
-            "nullable": false
-          },
-          "copyAttachments": {
-            "type": "boolean"
-          },
-          "copyFlags": {
-            "type": "boolean"
-          },
-          "tags": {
-            "type": "array",
-            "nullable": true,
-            "items": {
-              "type": "string"
-            }
-          }
-        }
-      },
       "NoCTFAPIEndpointsLiveSoloCreateLiveSoloMatchRequest": {
         "type": "object",
         "additionalProperties": false,
@@ -27855,6 +29091,811 @@
           }
         }
       },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloPoolQuestionResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "challengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "direction": {
+            "type": "string"
+          },
+          "concurrencyStamp": {
+            "type": "string",
+            "format": "guid"
+          },
+          "materialStamp": {
+            "type": "string",
+            "format": "guid"
+          },
+          "ownership": {
+            "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloMaterialOwnership"
+          },
+          "sourceTemplateId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "definition": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeDefinitionContract"
+              }
+            ]
+          },
+          "questionGroupIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeAttachmentResponse"
+            }
+          },
+          "flags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagResponse"
+            }
+          },
+          "canEditContent": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFDomainLiveSoloLiveSoloMaterialOwnership": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "FollowingQuestionBank",
+          "CompetitionOwned"
+        ],
+        "enum": [
+          "FollowingQuestionBank",
+          "CompetitionOwned"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankChallengeDefinitionContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mode"
+        ],
+        "properties": {
+          "mode": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsGameModeProtocol"
+          },
+          "flagTemplate": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsFlagTemplateContract"
+              }
+            ]
+          },
+          "runtime": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeRuntimeContract"
+              }
+            ]
+          },
+          "checker": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankRunnerJobContract"
+              }
+            ]
+          },
+          "patchEntrypoint": {
+            "type": "string",
+            "nullable": true
+          },
+          "patchCommand": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "patchTimeoutSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "readyTimeoutSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "maximumPatchUploadBytes": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "checkerFixInput": {
+            "type": "boolean"
+          },
+          "ctf": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankCtfChallengeDefinitionContract"
+              }
+            ]
+          },
+          "awd": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankAwdChallengeDefinitionContract"
+              }
+            ]
+          },
+          "awdp": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankAwdpChallengeDefinitionContract"
+              }
+            ]
+          },
+          "koh": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankKohChallengeDefinitionContract"
+              }
+            ]
+          },
+          "liveSolo": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankLiveSoloChallengeDefinitionContract"
+              }
+            ]
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsGameModeProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Ctf",
+          "Awd",
+          "Awdp",
+          "Koh",
+          "LiveSolo"
+        ],
+        "enum": [
+          "Ctf",
+          "Awd",
+          "Awdp",
+          "Koh",
+          "LiveSolo"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsFlagTemplateContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "header": {
+            "type": "string"
+          },
+          "bodyTemplate": {
+            "type": "string"
+          },
+          "leetLiteralText": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankChallengeRuntimeContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeRuntimeKindProtocol"
+          },
+          "allocation": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankRuntimeAllocationProtocol"
+          },
+          "limits": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankRuntimeResourceLimitsContract"
+              }
+            ]
+          },
+          "ttlSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "operationTimeoutSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "flagSource": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankRuntimeFlagSourceProtocol"
+          },
+          "egressPolicy": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankRuntimeEgressPolicyProtocol"
+          },
+          "urlBindings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankRuntimeUrlBindingContract"
+            }
+          },
+          "container": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankContainerChallengeRuntimeContract"
+              }
+            ]
+          },
+          "ova": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankOvaChallengeRuntimeContract"
+              }
+            ]
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankChallengeRuntimeKindProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Container",
+          "Ova"
+        ],
+        "enum": [
+          "Container",
+          "Ova"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankRuntimeAllocationProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Shared",
+          "PerTeam"
+        ],
+        "enum": [
+          "Shared",
+          "PerTeam"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankRuntimeResourceLimitsContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "memoryBytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "cpuMillicores": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "pidsLimit": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankRuntimeFlagSourceProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Static",
+          "PerTeam",
+          "AwdRotation"
+        ],
+        "enum": [
+          "Static",
+          "PerTeam",
+          "AwdRotation"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankRuntimeEgressPolicyProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Isolated",
+          "InternetOnly"
+        ],
+        "enum": [
+          "Isolated",
+          "InternetOnly"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankRuntimeUrlBindingContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "urlTemplate": {
+            "type": "string"
+          },
+          "exposure": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankRuntimeExposureProtocol"
+          },
+          "containerPort": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "serviceName": {
+            "type": "string",
+            "nullable": true
+          },
+          "vmId": {
+            "type": "string",
+            "nullable": true
+          },
+          "guestPort": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "isControlCheck": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankRuntimeExposureProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "OwnerOnly",
+          "Participants"
+        ],
+        "enum": [
+          "OwnerOnly",
+          "Participants"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankContainerChallengeRuntimeContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "services"
+        ],
+        "properties": {
+          "services": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankRuntimeServiceContract"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankRuntimeServiceContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "image"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "image": {
+            "type": "string"
+          },
+          "cpuCores": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "memoryMiB": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "command": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "arguments": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "environment": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "flagEnvironmentVariableName": {
+            "type": "string",
+            "nullable": true
+          },
+          "internalPorts": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankOvaChallengeRuntimeContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sourceUrl",
+          "sha256"
+        ],
+        "properties": {
+          "sourceUrl": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankRunnerJobContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "image": {
+            "type": "string"
+          },
+          "command": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "environment": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "timeoutSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "targetServiceName": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankCtfChallengeDefinitionContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "interactionKind"
+        ],
+        "properties": {
+          "interactionKind": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesCtfInteractionKindProtocol"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsChallengesCtfInteractionKindProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "FlagSubmission",
+          "PatchVerification"
+        ],
+        "enum": [
+          "FlagSubmission",
+          "PatchVerification"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankAwdChallengeDefinitionContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "flagInjection"
+        ],
+        "properties": {
+          "flagInjection": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankFlagInjectionContract"
+              }
+            ]
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankFlagInjectionContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "command": {
+            "type": "string"
+          },
+          "timeoutSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "serviceName": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankAwdpChallengeDefinitionContract": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankKohChallengeDefinitionContract": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankLiveSoloChallengeDefinitionContract": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankChallengeAttachmentResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "challengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "byteLength": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "exactFlag": {
+            "type": "string",
+            "nullable": true
+          },
+          "deletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "challengeId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "competitionChallengeId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "teamId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "flag": {
+            "type": "string"
+          },
+          "matchKind": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol"
+          },
+          "specificationKind": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankSpecificationKindProtocol"
+              }
+            ]
+          },
+          "specificationId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "validStart": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "deletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "systemManaged": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Exact",
+          "RegularExpression"
+        ],
+        "enum": [
+          "Exact",
+          "RegularExpression"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankSpecificationKindProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Attachment",
+          "AwdRound",
+          "RuntimeDefinition",
+          "Hint",
+          "RuntimeInstance"
+        ],
+        "enum": [
+          "Attachment",
+          "AwdRound",
+          "RuntimeDefinition",
+          "Hint",
+          "RuntimeInstance"
+        ]
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloPoolFailureResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NoCTFApplicationLiveSoloTemplatesLiveSoloPoolFailure"
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFApplicationLiveSoloTemplatesLiveSoloPoolFailure": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "NotFound",
+          "Forbidden",
+          "Conflict",
+          "UnsupportedDefinition",
+          "ActiveRound",
+          "SourceChanged",
+          "ProtectedMaterialsForbidden",
+          "InvalidContent",
+          "AlreadyInQuestionBank"
+        ],
+        "enum": [
+          "NotFound",
+          "Forbidden",
+          "Conflict",
+          "UnsupportedDefinition",
+          "ActiveRound",
+          "SourceChanged",
+          "ProtectedMaterialsForbidden",
+          "InvalidContent",
+          "AlreadyInQuestionBank"
+        ]
+      },
+      "NoCTFAPIEndpointsLiveSoloCreateLiveSoloPoolQuestionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "direction",
+          "definition"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 0,
+            "nullable": false
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "direction": {
+            "type": "string",
+            "maxLength": 96,
+            "minLength": 0,
+            "nullable": false
+          },
+          "definition": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeDefinitionContract"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloDeployLiveSoloPoolQuestionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sourceTemplateId",
+          "expectedSourceStamp"
+        ],
+        "properties": {
+          "sourceTemplateId": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          },
+          "expectedSourceStamp": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          }
+        }
+      },
       "NoCTFAPIEndpointsLiveSoloDownloadLiveSoloAttachmentRequest": {
         "type": "object",
         "additionalProperties": false
@@ -27862,6 +29903,124 @@
       "NoCTFAPIEndpointsLiveSoloDownloadLiveSoloRandomAttachmentRequest": {
         "type": "object",
         "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsLiveSoloDownloadLiveSoloReviewAttachmentRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsLiveSoloEditLiveSoloPoolQuestionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "direction",
+          "definition",
+          "expectedStamp",
+          "expectedMaterialStamp"
+        ],
+        "properties": {
+          "expectedStamp": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          },
+          "expectedMaterialStamp": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 0,
+            "nullable": false
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "direction": {
+            "type": "string",
+            "maxLength": 96,
+            "minLength": 0,
+            "nullable": false
+          },
+          "flags": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankSaveChallengeFlagRequest"
+            }
+          },
+          "removedAttachmentIds": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          "definition": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeDefinitionContract"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankSaveChallengeFlagRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "flag"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "flag": {
+            "type": "string",
+            "maxLength": 4096,
+            "minLength": 0,
+            "nullable": false
+          },
+          "matchKind": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloPoolExportResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "challengeId": {
+            "type": "string",
+            "format": "guid"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloExportLiveSoloPoolQuestionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expectedStamp",
+          "expectedMaterialStamp"
+        ],
+        "properties": {
+          "expectedStamp": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          },
+          "expectedMaterialStamp": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          }
+        }
       },
       "NoCTFAPIEndpointsLiveSoloLiveSoloBracketResponse": {
         "type": "object",
@@ -28095,6 +30254,9 @@
             "items": {
               "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloStageRuleContract"
             }
+          },
+          "staticFlagEvidenceRequired": {
+            "type": "boolean"
           }
         }
       },
@@ -28578,11 +30740,319 @@
         "type": "object",
         "additionalProperties": false
       },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloReviewContentResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "question": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloQuestionResponse"
+          },
+          "hints": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloHintResponse"
+            }
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloAttachmentResponse"
+            }
+          },
+          "historical": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloQuestionResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "competitionChallengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "position": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "direction": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "openedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "runtimeInstanceId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloHintResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "content": {
+            "type": "string"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloAttachmentResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "byteLength": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloGetLiveSoloReviewQuestionRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
       "NoCTFAPIEndpointsLiveSoloGetLiveSoloRoundRequest": {
         "type": "object",
         "additionalProperties": false
       },
       "NoCTFAPIEndpointsLiveSoloGetLiveSoloRuntimeRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloWorkspaceResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "match": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloMatchResponse"
+          },
+          "round": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloRoundResponse"
+              }
+            ]
+          },
+          "allowedOperations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloWorkspaceOperationProtocol"
+            }
+          },
+          "missingConditions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloStartConditionProtocol"
+            }
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloQuestionResponse"
+            }
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloReviewQuestionResponse"
+            }
+          },
+          "serverTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "nextQuestionOffsetSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "staff": {
+            "type": "boolean"
+          },
+          "resources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloPreparationResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloWorkspaceOperationProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "LockRoster",
+          "ConfirmReady",
+          "PrepareRound",
+          "StartCountdown",
+          "RetryPreparation",
+          "Pause",
+          "Resume",
+          "VoidRound",
+          "ForfeitMatch",
+          "CorrectResult",
+          "ManageQuestionPool",
+          "SubmitFlag"
+        ],
+        "enum": [
+          "LockRoster",
+          "ConfirmReady",
+          "PrepareRound",
+          "StartCountdown",
+          "RetryPreparation",
+          "Pause",
+          "Resume",
+          "VoidRound",
+          "ForfeitMatch",
+          "CorrectResult",
+          "ManageQuestionPool",
+          "SubmitFlag"
+        ]
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloStartConditionProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "CompetitionNotRunning",
+          "LeftRosterUnlocked",
+          "RightRosterUnlocked",
+          "LeftNotReady",
+          "RightNotReady",
+          "NoPreparedRound",
+          "EnvironmentPreparing",
+          "EnvironmentFailed",
+          "MediaRequired",
+          "SelectionChanged",
+          "CorrectionPending"
+        ],
+        "enum": [
+          "CompetitionNotRunning",
+          "LeftRosterUnlocked",
+          "RightRosterUnlocked",
+          "LeftNotReady",
+          "RightNotReady",
+          "NoPreparedRound",
+          "EnvironmentPreparing",
+          "EnvironmentFailed",
+          "MediaRequired",
+          "SelectionChanged",
+          "CorrectionPending"
+        ]
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloReviewQuestionResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "roundId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "competitionChallengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "roundNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "replay": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "position": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "openedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "contentRecorded": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloPreparationResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "questionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "position": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "openOffsetSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "openedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "readiness": {
+            "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloQuestionReadiness"
+          },
+          "failure": {
+            "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloResourceFailure"
+          },
+          "environmentRequired": {
+            "type": "boolean",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloGetLiveSoloWorkspaceRequest": {
         "type": "object",
         "additionalProperties": false
       },
@@ -28710,26 +31180,6 @@
           "RandomOnePerTeam"
         ]
       },
-      "NoCTFAPIEndpointsLiveSoloLiveSoloAttachmentResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "guid"
-          },
-          "fileName": {
-            "type": "string"
-          },
-          "contentType": {
-            "type": "string"
-          },
-          "byteLength": {
-            "type": "integer",
-            "format": "int64"
-          }
-        }
-      },
       "NoCTFAPIEndpointsLiveSoloListLiveSoloAttachmentsRequest": {
         "type": "object",
         "additionalProperties": false
@@ -28743,23 +31193,6 @@
             "items": {
               "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloHintResponse"
             }
-          }
-        }
-      },
-      "NoCTFAPIEndpointsLiveSoloLiveSoloHintResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "guid"
-          },
-          "content": {
-            "type": "string"
-          },
-          "publishedAt": {
-            "type": "string",
-            "format": "date-time"
           }
         }
       },
@@ -28884,6 +31317,163 @@
         "type": "object",
         "additionalProperties": false
       },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloQuestionCandidateListResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloQuestionCandidateResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloQuestionCandidateResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "reserve": {
+            "type": "boolean"
+          },
+          "concurrencyStamp": {
+            "type": "string",
+            "format": "guid"
+          },
+          "selectionRevision": {
+            "type": "string",
+            "format": "guid"
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "automaticEligible": {
+            "type": "boolean"
+          },
+          "exclusions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloQuestionExclusionProtocol"
+            }
+          },
+          "risks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloQuestionCandidateRiskResponse"
+            }
+          },
+          "uses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloQuestionUseResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloQuestionExclusionProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Empty",
+          "MissingQuestion",
+          "DeletedQuestion",
+          "DuplicateQuestion",
+          "InvalidSchedule",
+          "UnsupportedDefinition",
+          "ActiveRoundConflict"
+        ],
+        "enum": [
+          "Empty",
+          "MissingQuestion",
+          "DeletedQuestion",
+          "DuplicateQuestion",
+          "InvalidSchedule",
+          "UnsupportedDefinition",
+          "ActiveRoundConflict"
+        ]
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloQuestionCandidateRiskResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloSelectionRiskKind"
+          },
+          "competitionChallengeId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "canonicalChallengeId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFDomainLiveSoloLiveSoloSelectionRiskKind": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "SeenByTeam",
+          "SeenByRosterMember",
+          "SameSource",
+          "PreviouslyUsed",
+          "PublicExposure"
+        ],
+        "enum": [
+          "SeenByTeam",
+          "SeenByRosterMember",
+          "SameSource",
+          "PreviouslyUsed",
+          "PublicExposure"
+        ]
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloQuestionUseResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "matchId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "roundId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "number": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "replay": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "state": {
+            "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloRoundState"
+          },
+          "preparedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "openedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloListLiveSoloQuestionGroupCandidatesRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
       "NoCTFAPIEndpointsLiveSoloLiveSoloQuestionGroupsResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -28946,6 +31536,25 @@
         "type": "object",
         "additionalProperties": false
       },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloQuestionPoolResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloPoolQuestionResponse"
+            }
+          },
+          "canManage": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloListLiveSoloQuestionPoolRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
       "NoCTFAPIEndpointsLiveSoloLiveSoloQuestionsResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -28955,49 +31564,6 @@
             "items": {
               "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloQuestionResponse"
             }
-          }
-        }
-      },
-      "NoCTFAPIEndpointsLiveSoloLiveSoloQuestionResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "guid"
-          },
-          "competitionChallengeId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "position": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "title": {
-            "type": "string"
-          },
-          "description": {
-            "type": "string",
-            "nullable": true
-          },
-          "direction": {
-            "type": "string"
-          },
-          "tags": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "openedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "runtimeInstanceId": {
-            "type": "string",
-            "format": "guid",
-            "nullable": true
           }
         }
       },
@@ -29109,6 +31675,22 @@
         "additionalProperties": false
       },
       "NoCTFAPIEndpointsLiveSoloListLiveSoloResultCorrectionsRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloReviewQuestionsResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloReviewQuestionResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloListLiveSoloReviewQuestionsRequest": {
         "type": "object",
         "additionalProperties": false
       },
@@ -29516,6 +32098,15 @@
         "type": "object",
         "additionalProperties": false
       },
+      "NoCTFAPIEndpointsLiveSoloPrepareLiveSoloReviewAttachmentDownloadRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "staff": {
+            "type": "boolean"
+          }
+        }
+      },
       "NoCTFAPIEndpointsLiveSoloPrepareLiveSoloRoundRequest": {
         "type": "object",
         "additionalProperties": false,
@@ -29528,6 +32119,16 @@
             "format": "guid",
             "minLength": 1,
             "nullable": false
+          },
+          "expectedGroupStamp": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "selectionRevision": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
           },
           "questionGroupId": {
             "type": "string",
@@ -29694,6 +32295,26 @@
           "concurrencyStamp": {
             "type": "string",
             "format": "guid"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloRetryLiveSoloPreparationRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expectedStamp"
+        ],
+        "properties": {
+          "expectedStamp": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          },
+          "questionId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
           }
         }
       },
@@ -29888,6 +32509,42 @@
           }
         }
       },
+      "NoCTFAPIEndpointsLiveSoloSpecifyPreparedLiveSoloGroupRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "questionGroupId",
+          "expectedStamp",
+          "expectedGroupStamp",
+          "selectionRevision"
+        ],
+        "properties": {
+          "questionGroupId": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          },
+          "expectedStamp": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          },
+          "expectedGroupStamp": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          },
+          "selectionRevision": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          }
+        }
+      },
       "NoCTFAPIEndpointsLiveSoloStartLiveSoloCountdownRequest": {
         "type": "object",
         "additionalProperties": false,
@@ -29956,6 +32613,57 @@
             "nullable": false
           }
         }
+      },
+      "NoCTFAPIEndpointsLiveSoloUploadLiveSoloPoolAttachmentsRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expectedStamp",
+          "expectedMaterialStamp",
+          "files"
+        ],
+        "properties": {
+          "expectedStamp": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          },
+          "expectedMaterialStamp": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          },
+          "deliveryPolicy": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol"
+          },
+          "downloadFileName": {
+            "type": "string",
+            "nullable": true
+          },
+          "files": {
+            "type": "array",
+            "minLength": 1,
+            "nullable": false,
+            "items": {
+              "type": "string",
+              "format": "binary"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "All",
+          "RandomOnePerTeam"
+        ],
+        "enum": [
+          "All",
+          "RandomOnePerTeam"
+        ]
       },
       "NoCTFAPIEndpointsInternalInternalResultResponse": {
         "type": "object",
@@ -31266,24 +33974,6 @@
             "nullable": true
           }
         }
-      },
-      "NoCTFAPIEndpointsCompetitionsGameModeProtocol": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "Ctf",
-          "Awd",
-          "Awdp",
-          "Koh",
-          "LiveSolo"
-        ],
-        "enum": [
-          "Ctf",
-          "Awd",
-          "Awdp",
-          "Koh",
-          "LiveSolo"
-        ]
       },
       "NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol": {
         "type": "string",
@@ -33378,18 +36068,6 @@
           }
         }
       },
-      "NoCTFAPIEndpointsChallengesCtfInteractionKindProtocol": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "FlagSubmission",
-          "PatchVerification"
-        ],
-        "enum": [
-          "FlagSubmission",
-          "PatchVerification"
-        ]
-      },
       "NoCTFAPIEndpointsChallengesCompetitionChallengeTimingResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -33478,58 +36156,6 @@
             "items": {
               "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeAttachmentResponse"
             }
-          }
-        }
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "All",
-          "RandomOnePerTeam"
-        ],
-        "enum": [
-          "All",
-          "RandomOnePerTeam"
-        ]
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankChallengeAttachmentResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "guid"
-          },
-          "challengeId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "fileName": {
-            "type": "string"
-          },
-          "contentType": {
-            "type": "string"
-          },
-          "byteLength": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "sha256": {
-            "type": "string"
-          },
-          "exactFlag": {
-            "type": "string",
-            "nullable": true
-          },
-          "deletedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
           }
         }
       },
@@ -36782,102 +39408,6 @@
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationRuntimeRuntimeFlagStateProtocol"
           }
         }
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "guid"
-          },
-          "challengeId": {
-            "type": "string",
-            "format": "guid",
-            "nullable": true
-          },
-          "competitionChallengeId": {
-            "type": "string",
-            "format": "guid",
-            "nullable": true
-          },
-          "teamId": {
-            "type": "string",
-            "format": "guid",
-            "nullable": true
-          },
-          "flag": {
-            "type": "string"
-          },
-          "matchKind": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol"
-          },
-          "specificationKind": {
-            "nullable": true,
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankSpecificationKindProtocol"
-              }
-            ]
-          },
-          "specificationId": {
-            "type": "string",
-            "format": "guid",
-            "nullable": true
-          },
-          "validStart": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "validUntil": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "deletedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "systemManaged": {
-            "type": "boolean"
-          }
-        }
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "Exact",
-          "RegularExpression"
-        ],
-        "enum": [
-          "Exact",
-          "RegularExpression"
-        ]
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankSpecificationKindProtocol": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "Attachment",
-          "AwdRound",
-          "RuntimeDefinition",
-          "Hint",
-          "RuntimeInstance"
-        ],
-        "enum": [
-          "Attachment",
-          "AwdRound",
-          "RuntimeDefinition",
-          "Hint",
-          "RuntimeInstance"
-        ]
       },
       "NoCTFAPIEndpointsAdministrationRuntimeRuntimeFlagSourceProtocol": {
         "type": "string",
@@ -40137,13 +42667,15 @@
           "ActiveCompetition",
           "ActiveRuntimeResource",
           "ConfirmationMismatch",
-          "NotificationScopeConflict"
+          "NotificationScopeConflict",
+          "ActiveLiveSoloMediaResource"
         ],
         "enum": [
           "ActiveCompetition",
           "ActiveRuntimeResource",
           "ConfirmationMismatch",
-          "NotificationScopeConflict"
+          "NotificationScopeConflict",
+          "ActiveLiveSoloMediaResource"
         ]
       },
       "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionHardDeletePreviewResponse": {
@@ -40208,7 +42740,11 @@
           "ProgressionGraph",
           "Badge",
           "BadgeGrant",
-          "ChallengeWriteUp"
+          "ChallengeWriteUp",
+          "LiveSoloMatch",
+          "LiveSoloQuestionGroup",
+          "LiveSoloQuestionMaterial",
+          "ActiveLiveSoloMediaResource"
         ],
         "enum": [
           "HistoricalEvent",
@@ -40225,7 +42761,11 @@
           "ProgressionGraph",
           "Badge",
           "BadgeGrant",
-          "ChallengeWriteUp"
+          "ChallengeWriteUp",
+          "LiveSoloMatch",
+          "LiveSoloQuestionGroup",
+          "LiveSoloQuestionMaterial",
+          "ActiveLiveSoloMediaResource"
         ]
       },
       "NoCTFAPIEndpointsAdministrationCompetitionsForceDeleteCompetitionRequest": {
@@ -40414,21 +42954,6 @@
                 "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloConfigurationContract"
               }
             ]
-          }
-        }
-      },
-      "NoCTFAPIEndpointsAdministrationCompetitionsFlagTemplateContract": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "header": {
-            "type": "string"
-          },
-          "bodyTemplate": {
-            "type": "string"
-          },
-          "leetLiteralText": {
-            "type": "boolean"
           }
         }
       },
@@ -42833,8 +45358,7 @@
         "additionalProperties": false,
         "required": [
           "customTitle",
-          "order",
-          "isPublished"
+          "order"
         ],
         "properties": {
           "customTitle": {
@@ -42849,7 +45373,8 @@
             "minimum": 0.0
           },
           "isPublished": {
-            "type": "boolean"
+            "type": "boolean",
+            "nullable": true
           },
           "directionId": {
             "type": "string",
@@ -42949,6 +45474,107 @@
         "type": "object",
         "additionalProperties": false
       },
+      "NoCTFAPIEndpointsAdministrationChallengeBankLiveSoloTemplateCopyResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "challengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "canonicalChallengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "attachmentCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "flagCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "allocationChanged": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankLiveSoloTemplateCopyFailureResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NoCTFApplicationLiveSoloTemplatesLiveSoloTemplateCopyFailure"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "messageKey": {
+            "type": "string"
+          },
+          "messageArguments": {
+            "type": "object",
+            "additionalProperties": {}
+          }
+        }
+      },
+      "NoCTFApplicationLiveSoloTemplatesLiveSoloTemplateCopyFailure": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "NotFound",
+          "Forbidden",
+          "UnsupportedSource",
+          "AttachmentsForbidden",
+          "FlagsForbidden",
+          "Conflict",
+          "AttachmentsRequired",
+          "InvalidTags",
+          "SourceChanged"
+        ],
+        "enum": [
+          "NotFound",
+          "Forbidden",
+          "UnsupportedSource",
+          "AttachmentsForbidden",
+          "FlagsForbidden",
+          "Conflict",
+          "AttachmentsRequired",
+          "InvalidTags",
+          "SourceChanged"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankCopyLiveSoloTemplateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sourceChallengeId",
+          "expectedSourceStamp"
+        ],
+        "properties": {
+          "sourceChallengeId": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          },
+          "copyAttachments": {
+            "type": "boolean"
+          },
+          "copyFlags": {
+            "type": "boolean"
+          },
+          "expectedSourceStamp": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          }
+        }
+      },
       "NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagFailureResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -42995,29 +45621,6 @@
           "SystemManagedFlag",
           "DeliveryModeConflict"
         ]
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankSaveChallengeFlagRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "flag"
-        ],
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "guid",
-            "nullable": true
-          },
-          "flag": {
-            "type": "string",
-            "maxLength": 4096,
-            "minLength": 0,
-            "nullable": false
-          },
-          "matchKind": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol"
-          }
-        }
       },
       "NoCTFAPIEndpointsAdministrationChallengeBankChallengeTemplateResponse": {
         "type": "object",
@@ -43076,6 +45679,10 @@
           },
           "interactionKind": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesCtfInteractionKindProtocol"
+          },
+          "concurrencyStamp": {
+            "type": "string",
+            "format": "guid"
           }
         }
       },
@@ -43090,455 +45697,6 @@
           "Private",
           "Shared"
         ]
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankChallengeDefinitionContract": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "mode"
-        ],
-        "properties": {
-          "mode": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsGameModeProtocol"
-          },
-          "flagTemplate": {
-            "nullable": true,
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsFlagTemplateContract"
-              }
-            ]
-          },
-          "runtime": {
-            "nullable": true,
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeRuntimeContract"
-              }
-            ]
-          },
-          "checker": {
-            "nullable": true,
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankRunnerJobContract"
-              }
-            ]
-          },
-          "patchEntrypoint": {
-            "type": "string",
-            "nullable": true
-          },
-          "patchCommand": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "patchTimeoutSeconds": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "readyTimeoutSeconds": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "maximumPatchUploadBytes": {
-            "type": "integer",
-            "format": "int64",
-            "nullable": true
-          },
-          "checkerFixInput": {
-            "type": "boolean"
-          },
-          "ctf": {
-            "nullable": true,
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankCtfChallengeDefinitionContract"
-              }
-            ]
-          },
-          "awd": {
-            "nullable": true,
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankAwdChallengeDefinitionContract"
-              }
-            ]
-          },
-          "awdp": {
-            "nullable": true,
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankAwdpChallengeDefinitionContract"
-              }
-            ]
-          },
-          "koh": {
-            "nullable": true,
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankKohChallengeDefinitionContract"
-              }
-            ]
-          },
-          "liveSolo": {
-            "nullable": true,
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankLiveSoloChallengeDefinitionContract"
-              }
-            ]
-          }
-        }
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankChallengeRuntimeContract": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "kind"
-        ],
-        "properties": {
-          "kind": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeRuntimeKindProtocol"
-          },
-          "allocation": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankRuntimeAllocationProtocol"
-          },
-          "limits": {
-            "nullable": true,
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankRuntimeResourceLimitsContract"
-              }
-            ]
-          },
-          "ttlSeconds": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "operationTimeoutSeconds": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "flagSource": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankRuntimeFlagSourceProtocol"
-          },
-          "egressPolicy": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankRuntimeEgressPolicyProtocol"
-          },
-          "urlBindings": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankRuntimeUrlBindingContract"
-            }
-          },
-          "container": {
-            "nullable": true,
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankContainerChallengeRuntimeContract"
-              }
-            ]
-          },
-          "ova": {
-            "nullable": true,
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankOvaChallengeRuntimeContract"
-              }
-            ]
-          }
-        }
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankChallengeRuntimeKindProtocol": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "Container",
-          "Ova"
-        ],
-        "enum": [
-          "Container",
-          "Ova"
-        ]
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankRuntimeAllocationProtocol": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "Shared",
-          "PerTeam"
-        ],
-        "enum": [
-          "Shared",
-          "PerTeam"
-        ]
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankRuntimeResourceLimitsContract": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "memoryBytes": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "cpuMillicores": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "pidsLimit": {
-            "type": "integer",
-            "format": "int64"
-          }
-        }
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankRuntimeFlagSourceProtocol": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "Static",
-          "PerTeam",
-          "AwdRotation"
-        ],
-        "enum": [
-          "Static",
-          "PerTeam",
-          "AwdRotation"
-        ]
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankRuntimeEgressPolicyProtocol": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "Isolated",
-          "InternetOnly"
-        ],
-        "enum": [
-          "Isolated",
-          "InternetOnly"
-        ]
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankRuntimeUrlBindingContract": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "urlTemplate": {
-            "type": "string"
-          },
-          "exposure": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankRuntimeExposureProtocol"
-          },
-          "containerPort": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "serviceName": {
-            "type": "string",
-            "nullable": true
-          },
-          "vmId": {
-            "type": "string",
-            "nullable": true
-          },
-          "guestPort": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "isControlCheck": {
-            "type": "boolean"
-          }
-        }
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankRuntimeExposureProtocol": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "OwnerOnly",
-          "Participants"
-        ],
-        "enum": [
-          "OwnerOnly",
-          "Participants"
-        ]
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankContainerChallengeRuntimeContract": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "services"
-        ],
-        "properties": {
-          "services": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankRuntimeServiceContract"
-            }
-          }
-        }
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankRuntimeServiceContract": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "name",
-          "image"
-        ],
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "image": {
-            "type": "string"
-          },
-          "cpuCores": {
-            "type": "number",
-            "format": "decimal"
-          },
-          "memoryMiB": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "command": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "arguments": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "environment": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "string"
-            }
-          },
-          "flagEnvironmentVariableName": {
-            "type": "string",
-            "nullable": true
-          },
-          "internalPorts": {
-            "type": "array",
-            "items": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        }
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankOvaChallengeRuntimeContract": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "sourceUrl",
-          "sha256"
-        ],
-        "properties": {
-          "sourceUrl": {
-            "type": "string"
-          },
-          "sha256": {
-            "type": "string"
-          }
-        }
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankRunnerJobContract": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "image": {
-            "type": "string"
-          },
-          "command": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "environment": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "string"
-            }
-          },
-          "timeoutSeconds": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "targetServiceName": {
-            "type": "string",
-            "nullable": true
-          }
-        }
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankCtfChallengeDefinitionContract": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "interactionKind"
-        ],
-        "properties": {
-          "interactionKind": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesCtfInteractionKindProtocol"
-          }
-        }
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankAwdChallengeDefinitionContract": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "flagInjection"
-        ],
-        "properties": {
-          "flagInjection": {
-            "nullable": true,
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankFlagInjectionContract"
-              }
-            ]
-          }
-        }
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankFlagInjectionContract": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "command": {
-            "type": "string"
-          },
-          "timeoutSeconds": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "serviceName": {
-            "type": "string",
-            "nullable": true
-          }
-        }
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankAwdpChallengeDefinitionContract": {
-        "type": "object",
-        "additionalProperties": false
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankKohChallengeDefinitionContract": {
-        "type": "object",
-        "additionalProperties": false
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankLiveSoloChallengeDefinitionContract": {
-        "type": "object",
-        "additionalProperties": false
       },
       "NoCTFAPIEndpointsAdministrationChallengeBankChallengeTemplateConflictResponse": {
         "type": "object",
@@ -43843,6 +46001,10 @@
           },
           "interactionKind": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesCtfInteractionKindProtocol"
+          },
+          "concurrencyStamp": {
+            "type": "string",
+            "format": "guid"
           }
         }
       },

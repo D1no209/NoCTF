@@ -281,6 +281,10 @@ export function useAdminCompetitionsByIdIndexPage() {
     ProgressionGraph: 'progression.referenceGraph',
     Badge: 'progression.referenceBadge',
     BadgeGrant: 'progression.referenceBadgeGrant',
+    LiveSoloMatch: 'competitions.deletion.soloMatches',
+    LiveSoloQuestionGroup: 'competitions.deletion.soloQuestionLists',
+    LiveSoloQuestionMaterial: 'competitions.deletion.soloOwnedMaterials',
+    ActiveLiveSoloMediaResource: 'competitions.deletion.activeSoloMediaResources',
   }
 
   function hardDeleteReferenceLabel(code?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode) {

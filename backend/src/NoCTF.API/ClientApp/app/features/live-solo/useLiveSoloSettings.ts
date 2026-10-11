@@ -42,6 +42,7 @@ export function useLiveSoloSettings() {
   function stageNumber(index: number, key: 'stage' | 'requiredWins', value: string | number) { const row = draft.value?.stageRules[index]; if (row && writable.value) row[key] = Number(value) }
   function stageLane(index: number, value: unknown) { const row = draft.value?.stageRules[index]; if (row && writable.value && laneOptions.some(x => x.value === value)) row.lane = value as typeof row.lane }
   function enabled(value: boolean | 'indeterminate') { if (draft.value && writable.value) draft.value.enabled = value === true }
+  function evidence(value: boolean | 'indeterminate') { if (draft.value && writable.value) { draft.value.staticFlagEvidenceRequired = value === true; saved.value = false } }
   function streaming(value: boolean | 'indeterminate') {
     if (draft.value && writable.value) { draft.value.platformStreamingEnabled = value === true; saved.value = false }
   }
@@ -69,6 +70,6 @@ export function useLiveSoloSettings() {
   onMounted(() => { void load(); window.addEventListener('beforeunload', beforeUnload) })
   onScopeDispose(() => { disposed = true; request++; window.removeEventListener('beforeunload', beforeUnload) })
   return { draft, loading, busy, dirty, writable, hasMatches, error, saved, formatOptions, laneOptions, sections, load, number, format,
-    addStage, removeStage, stageNumber, stageLane, enabled, streaming, recording, opponents, save, back, leaveOpen, setLeave, leave }
+    addStage, removeStage, stageNumber, stageLane, enabled, evidence, streaming, recording, opponents, save, back, leaveOpen, setLeave, leave }
 }
 export type LiveSoloSettingsState = import('vue').ShallowUnwrapRef<ReturnType<typeof useLiveSoloSettings>>

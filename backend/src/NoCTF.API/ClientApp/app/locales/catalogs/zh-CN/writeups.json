@@ -100,7 +100,7 @@
   "challengeWriteUp.pastFuture": "本题已有和后续正向收益均适用此比例。",
   "challengeWriteUp.noPoints": "当前不扣除总分，后续本题正向收益保留 {retained}%。",
   "challengeWriteUp.bloodWarning": "先查阅再解题不获得血榜资格，即使比例为 0%。已取得的血榜保留。",
-  "challengeWriteUp.dynamic": "金额为当前估算，动态分值与持续收益会改变实际扣分。",
+  "challengeWriteUp.dynamic": "分值为当前估算，动态分值与持续收益会改变实际扣分。",
   "challengeWriteUp.hiddenEstimate": "封榜或隐藏榜单期间不显示实时收益估算，扣分比例仍然生效。",
   "challengeWriteUp.unlocked": "本队已查阅 · 收益保留 {percent}%",
   "challengeWriteUp.free": "赛后免费阅读",

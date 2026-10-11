@@ -365,7 +365,7 @@
   "competitions.label.attackDefensePatchSettlement": "攻击 · 防御 · 补丁 · 结算",
   "competitions.registration.teamPrefix": "队伍「",
   "competitions.registration.rejectedSuffix": "」报名被拒绝",
-  "competitions.label.pts": "PTS",
+  "competitions.label.pts": "分",
   "competitions.registration.rejected": "报名被拒绝。",
   "teams.ban.occurredAtPrefix": "封禁时间:",
   "teams.ban.sourcePrefix": "· 来源:",
@@ -413,5 +413,9 @@
   "teamBanScreen.refresh": "刷新封禁状态",
   "teamBanScreen.actions": "封禁后的可用操作",
   "teamBanScreen.loadFailed": "无法加载封禁与申诉信息，请重试。",
-  "teamBanScreen.appealFailed": "申诉提交失败，请重试。"
+  "teamBanScreen.appealFailed": "申诉提交失败，请重试。",
+  "competitions.deletion.soloMatches": "LiveSolo 对局",
+  "competitions.deletion.soloQuestionLists": "LiveSolo 题单",
+  "competitions.deletion.soloOwnedMaterials": "LiveSolo 本场独立题目",
+  "competitions.deletion.activeSoloMediaResources": "待清理的 LiveSolo 媒体资源"
 }

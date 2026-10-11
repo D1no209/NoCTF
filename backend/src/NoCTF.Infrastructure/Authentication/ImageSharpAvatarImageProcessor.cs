@@ -27,7 +27,9 @@ public sealed class ImageSharpAvatarImageProcessor : IAvatarImageProcessor
             if (HasAnimationPayload(content.Span, sourceFormat))
                 return AvatarImageProcessingResult.Rejected(AvatarImageFailure.MultipleFrames);
 
-            var metadata = Image.Identify(content.Span);
+            // Avatars do not consume EXIF or ICC profiles, including their lazy parsers.
+            var decoderOptions = new DecoderOptions { SkipMetadata = true };
+            var metadata = Image.Identify(decoderOptions, content.Span);
             if (metadata is null)
                 return AvatarImageProcessingResult.Rejected(AvatarImageFailure.MalformedImage);
 
@@ -45,7 +47,7 @@ public sealed class ImageSharpAvatarImageProcessor : IAvatarImageProcessor
                     AvatarImageFailure.PixelLimitExceeded);
             }
 
-            using var image = Image.Load<Rgba32>(content.Span);
+            using var image = Image.Load<Rgba32>(decoderOptions, content.Span);
             if (image.Frames.Count > 1)
                 return AvatarImageProcessingResult.Rejected(AvatarImageFailure.MultipleFrames);
 

@@ -8,11 +8,33 @@ public sealed record LiveSoloRosterView(Guid TeamId, IReadOnlyList<Guid> UserIds
 public sealed record LiveSoloMatchView(Guid Id, Guid CompetitionId, LiveSoloMatchState State, Guid ConcurrencyStamp,
     int RequiredWins, int LeftWins, int RightWins, Guid? LeftTeamId, string? LeftTeamName, Guid? RightTeamId, string? RightTeamName,
     Guid? CurrentRoundId, Guid? WinnerTeamId, IReadOnlyList<LiveSoloRosterView> Rosters, Guid? PendingCorrectionId = null,
-    Guid? ReplacementMatchId = null, Guid? PendingCorrectionMatchId = null, bool HasMedia = false);
+    Guid? ReplacementMatchId = null, Guid? PendingCorrectionMatchId = null, bool HasMedia = false)
+{
+    public long ResultRevision { get; init; }
+    public LiveSoloEndReason EndReason { get; init; }
+    public int? ResultLeftWins { get; init; }
+    public int? ResultRightWins { get; init; }
+    public DateTimeOffset? ResultUpdatedAt { get; init; }
+    public Guid? LeftAvatarFileId { get; init; }
+    public Guid? RightAvatarFileId { get; init; }
+}
 public sealed record LiveSoloMatchResult(LiveSoloMatchView? Match, LiveSoloFailure? Failure = null);
 public sealed record LiveSoloRoundView(Guid Id, Guid MatchId, int Number, int Replay, LiveSoloRoundState State,
     Guid ConcurrencyStamp, long TimelineRevision, DateTimeOffset? CountdownAt, DateTimeOffset? StartedAt,
-    int LimitSeconds, long ActiveElapsedMilliseconds, bool Paused, Guid? WinnerTeamId, Guid? WinningGameplayFactId, bool PlatformStreamingEnabled);
+    int LimitSeconds, long ActiveElapsedMilliseconds, bool Paused, Guid? WinnerTeamId, Guid? WinningGameplayFactId, bool PlatformStreamingEnabled)
+{
+    public long ResultRevision { get; init; }
+    public LiveSoloEndReason EndReason { get; init; }
+    public int? ResultLeftWins { get; init; }
+    public int? ResultRightWins { get; init; }
+    public DateTimeOffset? EndedAt { get; init; }
+    public Guid? QuestionGroupId { get; init; }
+    public LiveSoloQuestionSelectionKind? SelectionKind { get; init; }
+    public bool StaticFlagEvidenceRequired { get; init; }
+    public LiveSoloQuestionReadiness ResourceReadiness { get; init; }
+    public LiveSoloResourceFailure PreparationFailure { get; init; }
+    public bool? EnvironmentRequired { get; init; }
+}
 public sealed record LiveSoloRoundResult(LiveSoloRoundView? Round, LiveSoloFailure? Failure = null);
 public sealed record LiveSoloQuestionGroupInput(Guid? Id, string Name, bool Reserve, int? LimitSeconds,
     IReadOnlyList<LiveSoloQuestionGroupEntry> Questions, Guid? ExpectedStamp);
@@ -23,7 +45,9 @@ public sealed record LiveSoloQuestionGroupResult(LiveSoloQuestionGroupView? Grou
 public sealed record CreateLiveSoloMatch(Guid CompetitionId, Guid ActorId, Guid LeftTeamId, Guid RightTeamId, int? RequiredWins, DateTimeOffset Now);
 public sealed record SetLiveSoloRoster(Guid CompetitionId, Guid MatchId, Guid ActorId, Guid TeamId,
     Guid ExpectedStamp, IReadOnlyList<Guid> UserIds, DateTimeOffset Now);
-public sealed record PrepareLiveSoloRound(Guid CompetitionId, Guid MatchId, Guid ActorId, Guid ExpectedStamp, Guid? GroupId, DateTimeOffset Now);
+public sealed record PrepareLiveSoloRound(Guid CompetitionId, Guid MatchId, Guid ActorId, Guid ExpectedStamp, Guid? GroupId, DateTimeOffset Now, Guid? ExpectedGroupStamp = null, Guid? SelectionRevision = null);
+public sealed record SpecifyPreparedLiveSoloGroup(Guid CompetitionId, Guid MatchId, Guid RoundId, Guid QuestionGroupId, Guid ActorId, Guid ExpectedStamp, Guid ExpectedGroupStamp, Guid SelectionRevision, DateTimeOffset Now);
+public sealed record RetryLiveSoloPreparation(Guid CompetitionId, Guid MatchId, Guid RoundId, Guid ActorId, Guid ExpectedStamp, DateTimeOffset Now, Guid? QuestionId = null);
 public sealed record StartLiveSoloCountdown(Guid CompetitionId, Guid MatchId, Guid RoundId, Guid ActorId, Guid ExpectedStamp, DateTimeOffset Now);
 public sealed record LiveSoloAdmission(Guid CompetitionId, Guid MatchId, Guid RoundId, Guid QuestionId, Guid ActorId,
     string Flag, DateTimeOffset Now);
@@ -33,12 +57,15 @@ public sealed record LiveSoloQuestionView(Guid Id, Guid CompetitionChallengeId, 
 
 public interface ILiveSoloMatchStore
 {
+    Task<IReadOnlyList<LiveSoloQuestionCandidate>?> CandidatesAsync(Guid competitionId, Guid matchId, Guid actorId, DateTimeOffset now, CancellationToken ct);
     Task<LiveSoloMatchResult> CreateAsync(CreateLiveSoloMatch command, CancellationToken ct);
     Task<LiveSoloMatchView?> FindAsync(Guid competitionId, Guid matchId, Guid actorId, bool staff, DateTimeOffset now, CancellationToken ct);
     Task<IReadOnlyList<LiveSoloMatchView>?> ListAsync(Guid competitionId, Guid actorId, bool staff, DateTimeOffset now, CancellationToken ct);
     Task<LiveSoloMatchResult> LockRosterAsync(SetLiveSoloRoster command, CancellationToken ct);
     Task<LiveSoloMatchResult> ConfirmReadyAsync(Guid competitionId, Guid matchId, Guid actorId, Guid expectedStamp, DateTimeOffset now, CancellationToken ct);
     Task<LiveSoloRoundResult> PrepareRoundAsync(PrepareLiveSoloRound command, CancellationToken ct);
+    Task<LiveSoloRoundResult> SpecifyPreparedGroupAsync(SpecifyPreparedLiveSoloGroup command, CancellationToken ct);
+    Task<LiveSoloRoundResult> RetryPreparationAsync(RetryLiveSoloPreparation command, CancellationToken ct);
     Task<LiveSoloRoundResult> StartCountdownAsync(StartLiveSoloCountdown command, CancellationToken ct);
     Task<LiveSoloRoundView?> FindRoundAsync(Guid competitionId, Guid matchId, Guid roundId, Guid actorId, bool staff, DateTimeOffset now, CancellationToken ct);
     Task<IReadOnlyList<LiveSoloQuestionView>?> QuestionsAsync(Guid competitionId, Guid matchId, Guid roundId, Guid actorId, DateTimeOffset now, CancellationToken ct);

@@ -413,5 +413,9 @@
   "teamBanScreen.refresh": "Refresh ban status",
   "teamBanScreen.actions": "Available actions for a banned team",
   "teamBanScreen.loadFailed": "Could not load ban and appeal information. Please retry.",
-  "teamBanScreen.appealFailed": "Could not submit the appeal. Please retry."
+  "teamBanScreen.appealFailed": "Could not submit the appeal. Please retry.",
+  "competitions.deletion.soloMatches": "LiveSolo matches",
+  "competitions.deletion.soloQuestionLists": "LiveSolo question lists",
+  "competitions.deletion.soloOwnedMaterials": "LiveSolo competition-owned materials",
+  "competitions.deletion.activeSoloMediaResources": "LiveSolo media awaiting cleanup"
 }

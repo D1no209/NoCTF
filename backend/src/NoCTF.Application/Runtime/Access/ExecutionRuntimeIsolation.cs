@@ -2,7 +2,7 @@ using NoCTF.Domain.Runtime;
 
 namespace NoCTF.Application.Runtime.Access;
 
-public enum ExecutionIsolationStatus : short { Unverified, Verified, Unsupported, Unavailable }
+public enum ExecutionIsolationStatus : short { Unverified, Verified, Unsupported, Unavailable, NotConfigured }
 public sealed record ExecutionIsolationRequest(RuntimeKind Kind, RuntimeProvider Provider, Guid ExecutionScopeId,
     Guid TeamId, Guid? RuntimeInstanceId);
 public sealed record ExecutionIsolationAssessment(ExecutionIsolationStatus Status);

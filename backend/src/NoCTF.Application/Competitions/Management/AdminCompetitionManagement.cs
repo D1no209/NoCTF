@@ -37,7 +37,11 @@ public enum CompetitionHardDeleteReferenceKind
     ProgressionGraph,
     Badge,
     BadgeGrant,
-    ChallengeWriteUp
+    ChallengeWriteUp,
+    LiveSoloMatch,
+    LiveSoloQuestionGroup,
+    LiveSoloQuestionMaterial,
+    ActiveLiveSoloMediaResource
 }
 
 public sealed record CompetitionHardDeleteReference(
@@ -78,7 +82,8 @@ public enum CompetitionForceDeleteState
     ActiveRuntimeResource,
     ConfirmationMismatch,
     InvalidReason,
-    NotificationScopeConflict
+    NotificationScopeConflict,
+    ActiveLiveSoloMediaResource
 }
 
 public sealed record CompetitionForceDeleteResult(

@@ -3,7 +3,14 @@ using NoCTF.Domain.Competitions;
 namespace NoCTF.Application.Competitions.Modes;
 
 public sealed record GameModeCapabilities(bool OrdinaryPlayerChallengeAccess, bool OrdinaryScoreboard,
-    bool BloodAwards, bool PaidHints, bool WriteUpBenefitDiscount, bool ScopedExecution);
+    bool BloodAwards, bool PaidHints, bool WriteUpBenefitDiscount, bool ScopedExecution)
+{
+    public bool ChallengePublication => OrdinaryPlayerChallengeAccess;
+    public bool ManualScoreAdjustment => OrdinaryScoreboard;
+    public bool GenericRejudgement => !ScopedExecution;
+    public bool SupportsRuntime(NoCTF.Domain.Runtime.RuntimeKind kind) => !ScopedExecution
+        || kind == NoCTF.Domain.Runtime.RuntimeKind.Container;
+}
 
 /// <summary>One explicit mode boundary for capabilities that would otherwise be scattered through feature code.</summary>
 public static class CompetitionModeCapabilities

@@ -24,6 +24,7 @@ public static class LiveSoloInfrastructure
     public static IServiceCollection AddNoCtfLiveSolo(this IServiceCollection services, IConfiguration? configuration = null)
     {
         services.AddScoped<ILiveSoloMatchStore, LiveSoloMatchStore>();
+        services.AddScoped<ILiveSoloWorkspaceReader, LiveSoloMatchStore>();
         services.AddScoped<ILiveSoloBracketStore, LiveSoloMatchStore>();
         services.AddScoped<ManageLiveSoloBracket>();
         services.AddScoped<NoCTF.Application.LiveSolo.Adjudication.ILiveSoloAdjudicationStore, LiveSoloMatchStore>();
@@ -35,6 +36,12 @@ public static class LiveSoloInfrastructure
         services.AddScoped<ILiveSoloPlayerPolicyReader, LiveSoloPlayerPolicyReader>();
         services.AddScoped<ILiveSoloTemplateCopyStore, LiveSoloTemplateCopyStore>();
         services.AddScoped<CopyLiveSoloTemplate>();
+        services.AddScoped<LiveSoloMaterialCloner>();
+        services.AddScoped<ILiveSoloReviewStore, LiveSoloReviewStore>();
+        services.AddScoped<ReadLiveSoloReview>();
+        services.AddScoped<ILiveSoloQuestionPoolStore, LiveSoloQuestionPoolStore>();
+        services.AddScoped<ManageLiveSoloQuestionPool>();
+        services.AddScoped<UploadLiveSoloPoolAttachments>();
         services.AddScoped<IChallengeMaterialMutationGate, LiveSoloMaterialMutationGate>();
         services.RemoveAll<IExecutionScopeAccess>();
         services.AddScoped<IExecutionScopeAccess, LiveSoloExecutionAccess>();

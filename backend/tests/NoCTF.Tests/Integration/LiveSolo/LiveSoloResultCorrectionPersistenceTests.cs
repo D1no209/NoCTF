@@ -39,6 +39,9 @@ public sealed class LiveSoloResultCorrectionPersistenceTests
                 correction.ConcurrencyStamp,true,"void and replay after review",consents),ct);
             await Assert.That(applied.Failure).IsNull();await Assert.That(applied.Correction!.State).IsEqualTo(LiveSoloCorrectionState.Applied);
             await Assert.That(source.WinnerTeamId).IsEqualTo(f.RightTeam.Id);
+            await Assert.That(source.ResultRevision).IsEqualTo(2);
+            await Assert.That(source.EndReason).IsEqualTo(LiveSoloEndReason.ResultCorrected);
+            await Assert.That(source.ResultRightWins).IsEqualTo(1);
             await Assert.That(downstream.State).IsEqualTo(LiveSoloMatchState.Canceled);
             await Assert.That(downstream.Slots.Single(x=>x.Side==LiveSoloSide.Left).TeamId).IsEqualTo(f.LeftTeam.Id);
             await Assert.That(downstream.Roster.Count).IsEqualTo(2);

@@ -109,6 +109,7 @@ export function useAdminCompetitionsByIdPage() {
         { to: `/competitions/${competitionId}/live-solo`, label: translate('liveSolo.hall'), icon: GitBranch },
         ...(canWrite.value ? [
           { to: `/competitions/${competitionId}/live-solo/settings`, label: translate('liveSolo.settings.title'), icon: Settings },
+          { to: `/competitions/${competitionId}/live-solo/question-pool`, label: translate('liveSolo.pool.title'), icon: Puzzle },
           { to: `/competitions/${competitionId}/live-solo/groups`, label: translate('liveSolo.groups.title'), icon: Puzzle },
           { to: `/competitions/${competitionId}/live-solo/bracket`, label: translate('liveSolo.bracket.title'), icon: GitBranch },
         ] : []),

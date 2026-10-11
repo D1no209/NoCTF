@@ -108,6 +108,9 @@ public sealed partial class LiveSoloMatchStore
             {
                 source.WinnerTeamId = correction.WinnerTeamId; source.LeftWins = correction.LeftWins; source.RightWins = correction.RightWins;
                 source.AdjudicationReason = command.Reason;
+                if (correction.PreviousWinnerTeamId != correction.WinnerTeamId || correction.PreviousLeftWins != correction.LeftWins
+                    || correction.PreviousRightWins != correction.RightWins)
+                    LiveSoloResults.Confirm(source, LiveSoloEndReason.ResultCorrected, now);
                 var replacements = downstream.ToDictionary(x => x.Id, x => new LiveSoloMatch {
                     Id = Guid.CreateVersion7(now), CompetitionId = x.CompetitionId, Lane = x.Lane, Stage = x.Stage, Position = x.Position,
                     BracketGeneration = checked(x.BracketGeneration + 1), RequiredWins = x.RequiredWins, Conditional = x.Conditional,
@@ -123,7 +126,10 @@ public sealed partial class LiveSoloMatchStore
                     await ReleaseActiveTeamSlotsAsync(old.Id, ct);
                     foreach (var round in old.Rounds)
                     {
+                        // Preserve already authoritative historical Round results; only interrupted play is canceled.
+                        if (round.State is LiveSoloRoundState.Won or LiveSoloRoundState.TimedOut or LiveSoloRoundState.Canceled) continue;
                         round.State = LiveSoloRoundState.Canceled; round.EndedAt ??= now; round.AdjudicationReason = command.Reason;
+                        LiveSoloResults.Confirm(round, old, LiveSoloEndReason.DownstreamReplaced);
                         round.TimelineRevision++; round.ConcurrencyStamp = Guid.NewGuid();
                         foreach (var pause in round.Pauses.Where(x => x.EndedAt is null)) pause.EndedAt = now;
                         var pending = await db.GameplayFacts.Where(x => x.State != GameplayFactState.Completed
@@ -140,6 +146,7 @@ public sealed partial class LiveSoloMatchStore
                     }
                     old.State = LiveSoloMatchState.Canceled; old.SupersededAt = now; old.ReplacementMatchId = replacement.Id;
                     old.AdjudicationReason = command.Reason;
+                    LiveSoloResults.Confirm(old, LiveSoloEndReason.DownstreamReplaced, now);
                     old.PendingCorrectionId = null; old.ConcurrencyStamp = Guid.NewGuid();
                 }
                 // Release old unique team slots before normal graph resolution allocates new ones.

@@ -158,6 +158,7 @@ internal static class CompetitionInfrastructure
             ReadAllowList(configuration.GetSection(
                 "Webhooks:InsecureHttpHostAllowList").Get<string[]>())));
         services.AddScoped<ICompetitionWebhookDeliveryStore, CompetitionWebhookDeliveryStore>();
+        services.AddScoped<ICompetitionEventApplicabilityReader, CompetitionEventApplicabilityReader>();
         services.AddSingleton<ICompetitionWebhookSender, CompetitionWebhookSender>();
         services.AddSingleton<ICompetitionWebhookTestStatusStore,
             FusionCompetitionWebhookTestStatusStore>();

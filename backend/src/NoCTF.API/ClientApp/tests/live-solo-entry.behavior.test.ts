@@ -3,6 +3,7 @@ import { computed, effectScope, markRaw, nextTick, proxyRefs, reactive, ref, toR
 import { gameModeOptions, isGameMode } from '../app/utils/game-modes'
 import { applyCtfInteraction, CtfInteraction, defaultDefinition, definitionContractToModel, definitionModelToContract,
   emptyDefinition, emptyRuntimeTemplate, FlagSource, RuntimeAllocation, UrlExposure } from '../app/utils/game-config'
+import { useOffsetPagination } from '../app/composables/useOffsetPagination'
 import { useDefinitionModel } from '../app/composables/useDefinitionModel'
 import { validateChallengeTemplateDraft } from '../app/lib/challenge-template-validation'
 import { translate } from '../app/utils/i18n'
@@ -18,7 +19,7 @@ async function harness(path: string, name: string, props?: object) {
   const competition = ref<any>({ id: 'contest', mode: 'LiveSolo', administrationRole: 'Owner' })
   const events: any[] = []
   const deps: Record<string, any> = {
-    computed, effectScope, markRaw, proxyRefs, reactive, ref, toRefs, watch,
+    useOffsetPagination, computed, effectScope, markRaw, proxyRefs, reactive, ref, toRefs, watch,
     gameModeOptions, isGameMode, applyCtfInteraction, CtfInteraction, defaultDefinition, definitionContractToModel,
     definitionModelToContract, FlagSource, RuntimeAllocation, UrlExposure, useDefinitionModel, validateChallengeTemplateDraft,
     challengeRuntimeDefinitionsEqual, mergeChallengeModeDefinition, mergeChallengeRuntimeDefinition,
@@ -33,6 +34,9 @@ async function harness(path: string, name: string, props?: object) {
     toast: { success: () => {}, error: () => {} }, parseApiError: () => ({ displayMessage: 'error' }),
     challengeDirectionOptions: ['Misc'], directionLabel: (x: string) => x,
     adminCreateCompetition: async (options: any) => { writes.push(options.body); return { data: { id: 'new-contest', mode: options.body.mode } } },
+    adminChallengeBankListTemplates: async () => ({ data: { items: [{ id: 'ctf-source', title: 'Synthetic CTF source', interactionKind: 'FlagSubmission' }], total: 1 } }),
+    adminChallengeBankGetTemplate: async () => ({ data: { id: 'ctf-source', concurrencyStamp: 'stamp', definition: defaultDefinition('Ctf') } }),
+    copyLiveSoloTemplate: async (options: any) => { writes.push(options); return { data: { challengeId: 'independent-solo' } } },
     adminChallengeBankCreateTemplate: async (options: any) => { writes.push(options.body); return { data: { id: 'new-template' } } },
     adminChallengeBankPatchTemplate: async (options: any) => {
       writes.push(options.body)
@@ -86,6 +90,18 @@ describe('LiveSolo authoring entry points', () => {
       await app.state.submit()
       expect(app.writes).toHaveLength(1)
       expect(app.writes[0]).toMatchObject({ mode: 'LiveSolo', definition: { mode: 'LiveSolo', liveSolo: {}, checker: null } })
+    } finally { app.stop() }
+  })
+
+  test('CTF conversion belongs to question-bank creation and returns a template without competition deployment', async () => {
+    const app = await harness('features/admin/useChallengeTemplateCreateDialog.ts', 'useChallengeTemplateCreateDialog', { open: true })
+    try {
+      app.state.changeMode('LiveSolo'); await app.state.setVariant('copy'); await app.state.selectSource('ctf-source')
+      await app.state.submit()
+      expect(app.writes).toHaveLength(1)
+      expect(app.writes[0]).toMatchObject({ body: { sourceChallengeId: 'ctf-source', expectedSourceStamp: 'stamp' } })
+      expect(app.writes[0].path).toBeUndefined()
+      expect(app.events.find(x => x[0] === 'created')[1]).toBe('independent-solo')
     } finally { app.stop() }
   })
 

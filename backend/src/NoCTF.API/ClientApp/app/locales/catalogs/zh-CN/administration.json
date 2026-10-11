@@ -992,7 +992,7 @@
   "administration.label.patchDiff": "patch.diff",
   "administration.label.flag.templateEditorView": "flag",
   "administration.label.guid": "[GUID]",
-  "administration.label.pts": "(pts)",
+  "administration.label.pts": "(分)",
   "administration.runnerJob.label.registryExampleComChecker": "registry.example.com/checker:latest",
   "administration.label.flag.idPageView": "flag{...}",
   "administration.label.flags": "Flags",

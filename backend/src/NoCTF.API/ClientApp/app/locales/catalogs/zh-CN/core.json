@@ -1237,7 +1237,7 @@
   "common.patch.description.patchArchiveFileLonger": "Patch 包文件已不存在。",
   "common.patch.error.patchArchiveStorageUnavailable": "Patch 文件存储暂不可用，请稍后重试。",
   "common.patch.description.patchDownloadAuditCould": "Patch 下载审计保存失败，未下发文件，请稍后重试。",
-  "common.label.pts.scoreTrendChart": "pts",
+  "common.label.pts.scoreTrendChart": "分",
   "common.label.breadcrumb": "面包屑导航",
   "common.label.breadcrumbEllipsis": "更多",
   "common.label.close": "关闭",

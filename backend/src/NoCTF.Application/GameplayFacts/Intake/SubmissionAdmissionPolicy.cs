@@ -50,6 +50,8 @@ public static class GameplayFactAdmissionPolicy
     {
         if (snapshot.CompetitionDeleted || snapshot.ChallengeDeleted || snapshot.TeamDeleted)
             return OperationResult<GameplayFactAdmissionFailureCode>.Failure(GameplayFactAdmissionFailureCode.ResourceDeleted, "The competition, challenge, or team is deleted.");
+        if (!NoCTF.Application.Competitions.Modes.CompetitionModeCapabilities.For(snapshot.Mode).OrdinaryPlayerChallengeAccess)
+            return OperationResult<GameplayFactAdmissionFailureCode>.Failure(GameplayFactAdmissionFailureCode.GameplayFactKindUnsupported, "This mode requires its scoped gameplay interfaces.");
         if (!snapshot.ChallengePublished)
             return OperationResult<GameplayFactAdmissionFailureCode>.Failure(GameplayFactAdmissionFailureCode.ChallengeUnavailable, "The challenge is not published.");
         if (!snapshot.TeamApproved || !snapshot.UserBelongsToTeam)

@@ -39,7 +39,7 @@ public sealed class LiveSoloExecutionAccess(NoCtfDbContext db) : IExecutionScope
             scope.Pauses.RemoveAll(x => x.Source == LiveSoloPauseSource.Competition);
             scope.Pauses.AddRange(intervals);
         }
-        if (preparation) return scope is not null && scope.CompetitionState is CompetitionStatus.Running or CompetitionStatus.Paused
+        if (preparation) return scope is not null && scope.CompetitionState is CompetitionStatus.Draft or CompetitionStatus.Visible or CompetitionStatus.Published or CompetitionStatus.Running or CompetitionStatus.Paused
             && scope.RoundState is LiveSoloRoundState.Preparing or LiveSoloRoundState.Countdown or LiveSoloRoundState.Running
             && scope.MatchState is LiveSoloMatchState.Preparing or LiveSoloMatchState.Countdown or LiveSoloMatchState.Running or LiveSoloMatchState.Paused
             && (scope.StartedAt is null || LiveSoloActiveClock.Elapsed(scope.StartedAt.Value, request.Now, scope.Pauses) < TimeSpan.FromSeconds(scope.LimitSeconds));

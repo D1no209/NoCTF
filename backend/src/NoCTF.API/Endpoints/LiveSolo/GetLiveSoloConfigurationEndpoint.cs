@@ -17,7 +17,7 @@ public sealed record LiveSoloStageRuleContract(LiveSoloBracketLaneProtocol Lane,
 public sealed record LiveSoloConfigurationContract(bool Enabled, bool PlatformStreamingEnabled, LiveSoloBracketFormatProtocol BracketFormat,
     int RequiredWins, int CountdownSeconds, int QuestionIntervalSeconds, int RoundLimitSeconds,
     int PublicDelaySeconds, bool ParticipantsMayViewOpponents, bool RecordingEnabled, int RecordingRetentionDays,
-    int MaximumConcurrentMatches, int MaximumRosterMembers, int MaximumViewers, IReadOnlyList<LiveSoloStageRuleContract> StageRules);
+    int MaximumConcurrentMatches, int MaximumRosterMembers, int MaximumViewers, IReadOnlyList<LiveSoloStageRuleContract> StageRules, bool StaticFlagEvidenceRequired = false);
 
 public static class LiveSoloConfigurationMapping
 {
@@ -26,10 +26,10 @@ public static class LiveSoloConfigurationMapping
         value.QuestionIntervalSeconds, value.RoundLimitSeconds, value.PublicDelaySeconds, value.ParticipantsMayViewOpponents,
         value.RecordingEnabled, value.RecordingRetentionDays, value.MaximumConcurrentMatches, value.MaximumRosterMembers,
         value.MaximumViewers, value.StageRules.OrderBy(x => x.Lane).ThenBy(x => x.Stage)
-            .Select(x => new LiveSoloStageRuleContract((LiveSoloBracketLaneProtocol)x.Lane, x.Stage, x.RequiredWins)).ToArray());
+            .Select(x => new LiveSoloStageRuleContract((LiveSoloBracketLaneProtocol)x.Lane, x.Stage, x.RequiredWins)).ToArray(), value.StaticFlagEvidenceRequired);
     public static LiveSoloCompetitionModeConfiguration ToDomain(Guid competitionId, LiveSoloConfigurationContract value) => new()
     {
-        CompetitionId = competitionId, Enabled = value.Enabled, PlatformStreamingEnabled = value.PlatformStreamingEnabled, BracketFormat = (LiveSoloBracketFormat)value.BracketFormat,
+        CompetitionId = competitionId, StaticFlagEvidenceRequired = value.StaticFlagEvidenceRequired, Enabled = value.Enabled, PlatformStreamingEnabled = value.PlatformStreamingEnabled, BracketFormat = (LiveSoloBracketFormat)value.BracketFormat,
         RequiredWins = value.RequiredWins, CountdownSeconds = value.CountdownSeconds, QuestionIntervalSeconds = value.QuestionIntervalSeconds,
         RoundLimitSeconds = value.RoundLimitSeconds, PublicDelaySeconds = value.PublicDelaySeconds,
         ParticipantsMayViewOpponents = value.ParticipantsMayViewOpponents, RecordingEnabled = value.RecordingEnabled,

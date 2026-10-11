@@ -27,7 +27,7 @@ public enum ChallengeHintSaveFailure
 {
     ScopeNotFound,
     HintNotFound,
-    ResourceIdConflict
+    ResourceIdConflict, PaidHintUnsupported
 }
 
 public sealed record ChallengeHintSaveResult(
@@ -48,7 +48,7 @@ public enum ChallengeHintFailureCode
     InvalidHintCost,
     ResourceIdConflict,
     HintNotFound,
-    InsufficientScore
+    InsufficientScore, PaidHintUnsupported
 }
 
 public sealed record HintUnlockAttempt(
@@ -132,6 +132,8 @@ public sealed class ManageChallengeHints(IChallengeHintStore store)
         var result = await store.SaveAsync(command with { Content = command.Content.Trim() }, ct);
         return result.Failure switch
         {
+            ChallengeHintSaveFailure.PaidHintUnsupported =>
+                OperationResult<ChallengeHintView, ChallengeHintFailureCode>.Failure(ChallengeHintFailureCode.PaidHintUnsupported, "This mode only supports free hints."),
             ChallengeHintSaveFailure.ResourceIdConflict =>
                 OperationResult<ChallengeHintView, ChallengeHintFailureCode>.Failure(
                     ChallengeHintFailureCode.ResourceIdConflict,

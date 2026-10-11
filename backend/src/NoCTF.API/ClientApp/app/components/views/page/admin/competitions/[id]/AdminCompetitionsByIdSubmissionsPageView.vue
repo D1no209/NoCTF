@@ -3,12 +3,13 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdSubmissionsPageViewState } from '~/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdSubmissionsPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdSubmissionsPageViewState }>()
-const { adminUserPath, adminTeamPath, adminChallengePath, competitionId, previewIncludeInformational, previewScanned, previewCounts, evidenceOpen, evidenceTarget, evidenceRows, evidenceCursor, evidenceLoading, evidenceError, openEvidence, loadEvidence, adjudicationSeverity, adjudicationSeverityLabel, adjudicationClassificationLabel, adjudicationCompletenessLabel, adjudicationEventLabel, adjudicationVariant, Download, canWrite, canJudge, isAdministrator, canDownloadPatch, patchDownloading, patchErrors, downloadPatch, gameplayFactKindOptions, gameplayFactStateOptions, gameplayFactResultOptions, challengeOptions, teamOptions, teamName, challengeTitle, filterChallenge, filterTeam, filterKind, filterState, filterResult, filterFlag, previewItems, previewCursor, previewLoading, previewError, previewInitialized, differenceLabels, bloodRankLabel, loadPreview, items, loading, listError, page, pageCount, total, pageLimit, loadPage, setPageSize, initialized, applyFilters, detail, detailOpen, detailLoading, detailError, openDetail, actionPending, rejudgeOne, batchTarget, rejudgeBatch, queueEvaluation, flagDialog, flagResult, flagError, flagPending, openFlagAccess, closeFlagAccess, accessFlag, onClickFilterChallenge, onUpdateOpenChange } = toRefs(viewProps.state)
+const { isSolo, canRejudge, soloResults, adminUserPath, adminTeamPath, adminChallengePath, competitionId, previewIncludeInformational, previewScanned, previewCounts, evidenceOpen, evidenceTarget, evidenceRows, evidenceCursor, evidenceLoading, evidenceError, openEvidence, loadEvidence, adjudicationSeverity, adjudicationSeverityLabel, adjudicationClassificationLabel, adjudicationCompletenessLabel, adjudicationEventLabel, adjudicationVariant, Download, canJudge, isAdministrator, canDownloadPatch, patchDownloading, patchErrors, downloadPatch, gameplayFactKindOptions, gameplayFactStateOptions, gameplayFactResultOptions, challengeOptions, teamOptions, teamName, challengeTitle, filterChallenge, filterTeam, filterKind, filterState, filterResult, filterFlag, previewItems, previewCursor, previewLoading, previewError, previewInitialized, differenceLabels, bloodRankLabel, loadPreview, items, loading, listError, page, pageCount, total, pageLimit, loadPage, setPageSize, initialized, applyFilters, detail, detailOpen, detailLoading, detailError, openDetail, actionPending, rejudgeOne, batchTarget, rejudgeBatch, queueEvaluation, flagDialog, flagResult, flagError, flagPending, openFlagAccess, closeFlagAccess, accessFlag, onClickFilterChallenge, onUpdateOpenChange } = toRefs(viewProps.state)
 </script>
 
 <template>
   <div class="flex flex-col gap-4">
-    <Card>
+    <div v-if="isSolo" class="flex flex-wrap items-center gap-3"><p class="text-sm text-muted-foreground">{{ $t('liveSolo.correction.genericEntry') }}</p><Button variant="outline" @click="soloResults">{{ $t('liveSolo.correction.title') }}</Button></div>
+    <Card v-if="!isSolo">
       <CardHeader class="flex flex-row items-start justify-between gap-4">
         <div class="flex flex-col gap-1">
           <CardTitle>{{ $t('administration.label.historicalAdjudicationDifferencePreview') }}</CardTitle>
@@ -170,7 +171,7 @@ const { adminUserPath, adminTeamPath, adminChallengePath, competitionId, preview
             size="sm"
             @click="onClickFilterChallenge"
           > {{ $t('common.label.clear') }} </Button>
-          <template v-if="canWrite">
+          <template v-if="canRejudge">
             <Separator orientation="vertical" class="h-6" />
             <Select v-model="batchTarget">
               <SelectTrigger class="w-48">
@@ -243,7 +244,7 @@ const { adminUserPath, adminTeamPath, adminChallengePath, competitionId, preview
                   <Spinner v-if="patchDownloading.has(s.id ?? '')" data-icon="inline-start" />
                   <Download v-else data-icon="inline-start" />{{ $t('administration.label.downloadPatch') }}
                 </Button>
-                <Button v-if="canWrite" variant="ghost" size="sm" :disabled="actionPending === s.id" @click="rejudgeOne(s.id)">
+                <Button v-if="canRejudge" variant="ghost" size="sm" :disabled="actionPending === s.id" @click="rejudgeOne(s.id)">
                   <Spinner v-if="actionPending === s.id" data-icon="inline-start" /> {{ $t('administration.label.heavySentence') }} </Button>
               </div>
               <Alert v-if="patchErrors[s.id ?? '']" variant="destructive" class="mt-2 text-left">

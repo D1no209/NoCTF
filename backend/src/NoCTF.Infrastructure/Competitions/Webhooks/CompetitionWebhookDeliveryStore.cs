@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using NoCTF.Application.Challenges.Management;
 using NoCTF.Application.Competitions.Webhooks;
+using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.Competitions.Tracks;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Application.Observability;
@@ -353,12 +354,21 @@ public sealed class CompetitionWebhookDeliveryStore(
             .Select(item => new
             {
                 item.WebhookConfiguration,
+                item.Mode,
                 item.FrozenStartAt,
                 item.HiddenStartAt
             })
             .SingleOrDefaultAsync(cancellationToken);
         if (configuration is null)
             return new([]);
+        if (!CompetitionEventApplicability.PubliclyApplicable(configuration.Mode, source.Kind))
+        {
+            await db.CompetitionWebhookDeliveries.Where(x => x.EventId == command.EventId
+                    && x.State != CompetitionWebhookDeliveryState.Delivered && x.State != CompetitionWebhookDeliveryState.Suppressed)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.State, CompetitionWebhookDeliveryState.Suppressed)
+                    .SetProperty(x => x.CompletedAt, timeProvider.GetUtcNow()), cancellationToken);
+            return new([]);
+        }
         if (CompetitionWebhookEventTypes.IsBloodAward(source.Kind)
             && (source.LeaderboardVisibility == CompetitionLeaderboardVisibility.Blackout
                 || !CompetitionLeaderboardVisibilityPolicy.CanAnnounceBlood(
@@ -479,7 +489,7 @@ public sealed class CompetitionWebhookDeliveryStore(
         }
         var eventType = CompetitionWebhookEventTypes.From(competitionEvent.Kind);
         if (competitionEvent.Visibility != CompetitionEventVisibility.Public
-            || eventType is null)
+            || eventType is null || !CompetitionEventApplicability.PubliclyApplicable(competition.Mode, competitionEvent.Kind))
         {
             await MarkSuppressedAsync(command, cancellationToken);
             return Suppressed(command);

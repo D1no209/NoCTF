@@ -61,7 +61,9 @@ public sealed class CompetitionChallengePresentationPatchRequest
 {
     public required string? CustomTitle { get; set; }
     public required int Order { get; set; }
-    public required bool IsPublished { get; set; }
+    private bool? isPublished;
+    public bool? IsPublished { get => isPublished; set { isPublished = value; HasIsPublished = true; } }
+    [JsonIgnore] public bool HasIsPublished { get; private set; }
     public Guid? DirectionId { get; set; }
     public IReadOnlyList<string>? Tags { get; set; }
 }
@@ -151,6 +153,9 @@ public static partial class CompetitionChallengePatchMapper
     [MapperIgnoreTarget(nameof(CompetitionChallenge.Tags))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.Hints))]
     [MapperIgnoreTarget(nameof(CompetitionChallenge.NormalizedCustomTitle))]
+    [MapperIgnoreTarget(nameof(CompetitionChallenge.IsPublished))]
+    [MapperIgnoreSource(nameof(CompetitionChallengePresentationPatchRequest.IsPublished))]
+    [MapperIgnoreSource(nameof(CompetitionChallengePresentationPatchRequest.HasIsPublished))]
     [MapperIgnoreSource(nameof(CompetitionChallengePresentationPatchRequest.Tags))]
     public static partial void ApplyPresentationAsCompetitionModerator(
         CompetitionChallengePresentationPatchRequest request,
@@ -254,6 +259,7 @@ public sealed class PatchCompetitionChallengeEndpoint(
         if ((sections & CompetitionChallengePatchSection.Presentation) != 0)
             CompetitionChallengePatchMapper.ApplyPresentationAsCompetitionModerator(
                 request.Presentation!, target);
+        if (request.Presentation?.IsPublished is bool requestedPublication) target.IsPublished = requestedPublication;
         if ((sections & CompetitionChallengePatchSection.Rules) != 0)
             target.Rules = CompetitionChallengeRulesContractMapper.ToDomain(
                 competitionChallengeId,
@@ -292,7 +298,8 @@ public sealed class PatchCompetitionChallengeEndpoint(
                     timeProvider.GetUtcNow(),
                     target.CustomTitle,
                     request.Presentation!.DirectionId,
-                    request.Presentation.Tags), transactionCt);
+                    request.Presentation.Tags,
+                    request.Presentation.HasIsPublished), transactionCt);
                 if (result.Challenge is null)
                 {
                     Results<Ok<AdminCompetitionChallengeResponse>, NotFound,
@@ -308,7 +315,8 @@ public sealed class PatchCompetitionChallengeEndpoint(
                             _ => ApiProblems.Problem(
                                 statusCode: StatusCodes.Status400BadRequest,
                                 title: ApiMessages.Get(ApiMessageId.PatchCompetitionChallengeTitleCompetitionChallengeWasUpdated),
-                                detail: ApiMessages.For(result.Failure))
+                                detail: ApiMessages.For(result.Failure),
+                                extensions: new Dictionary<string, object?> { ["code"] = result.Failure!.Value.ToString() })
                         };
                     return AtomicAggregatePatchDecision<Results<Ok<AdminCompetitionChallengeResponse>,
                         NotFound, ForbidHttpResult, Conflict<CompetitionChallengeConflictResponse>,

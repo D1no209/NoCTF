@@ -114,7 +114,7 @@ public sealed class LiveSoloResumeAndReadinessPersistenceTests
             runtimes.EnsureAsync(Arg.Any<ScopedRuntimeRequest>(), ct).Returns(new ScopedRuntimeResult(null, null, dependencyFailure,
                 dependencyFailure ? RuntimeMutationFailure.ConfigurationInvalid : null));
             var result = await new LiveSoloRuntimePreparation(fixture.Db, runtimes).PrepareAsync(question.Id, fixture.Now, ct);
-            await Assert.That(result).IsEqualTo(dependencyFailure ? LiveSoloFailure.DependencyUnavailable : LiveSoloFailure.IsolationUnavailable);
+            await Assert.That(result).IsEqualTo(dependencyFailure ? LiveSoloFailure.InvalidConfiguration : LiveSoloFailure.IsolationVerificationFailed);
             await using var read = new NoCtfDbContext(fixture.Options);
             var saved = await read.LiveSoloRoundQuestions.SingleAsync(x => x.Id == question.Id, ct);
             await Assert.That(saved.Readiness).IsEqualTo(LiveSoloQuestionReadiness.Failed);
@@ -123,7 +123,7 @@ public sealed class LiveSoloResumeAndReadinessPersistenceTests
     }
 
     [Test, Timeout(300_000)]
-    public async Task A_dependency_exception_revokes_ready_before_propagating_the_failure(CancellationToken ct)
+    public async Task A_dependency_exception_revokes_ready_and_returns_a_typed_failure(CancellationToken ct)
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
@@ -133,7 +133,7 @@ public sealed class LiveSoloResumeAndReadinessPersistenceTests
             var runtimes = Substitute.For<IScopedRuntimeControl>();
             runtimes.EnsureAsync(Arg.Any<ScopedRuntimeRequest>(), ct).Returns(Task.FromException<ScopedRuntimeResult>(new HttpRequestException("Unavailable")));
             var preparation = new LiveSoloRuntimePreparation(fixture.Db, runtimes);
-            await Assert.That(async () => await preparation.PrepareAsync(question.Id, fixture.Now, ct)).Throws<HttpRequestException>();
+            await Assert.That(await preparation.PrepareAsync(question.Id, fixture.Now, ct)).IsEqualTo(LiveSoloFailure.DependencyUnavailable);
             await using var read = new NoCtfDbContext(fixture.Options);
             await Assert.That((await read.LiveSoloRoundQuestions.SingleAsync(x => x.Id == question.Id, ct)).Readiness).IsEqualTo(LiveSoloQuestionReadiness.Failed);
         });

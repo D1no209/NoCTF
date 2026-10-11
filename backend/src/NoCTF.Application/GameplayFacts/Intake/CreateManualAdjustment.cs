@@ -30,7 +30,7 @@ public sealed class CreateManualAdjustment(IGameplayFactIntakeStore store)
             ? OperationResult<GameplayFactAccepted, GameplayFactAdmissionFailureCode>.Success(
                 new(result.GameplayFactId!.Value, result.OccurredAt!.Value))
             : OperationResult<GameplayFactAccepted, GameplayFactAdmissionFailureCode>.Failure(
-                GameplayFactAdmissionFailureCode.GameplayFactScopeNotFound,
+                result.State == GameplayFactAcceptanceState.UnsupportedMode ? GameplayFactAdmissionFailureCode.GameplayFactKindUnsupported : GameplayFactAdmissionFailureCode.GameplayFactScopeNotFound,
                 "The team or competition challenge was not found.");
     }
 }

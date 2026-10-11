@@ -507,7 +507,7 @@ public sealed class ChallengeAttachmentStore(
         bool isAdministrator,
         bool includeDeleted = false)
     {
-        var source = includeDeleted ? db.Challenges.IgnoreQueryFilters() : db.Challenges;
+        var source = (includeDeleted ? db.Challenges.IgnoreQueryFilters() : db.Challenges).Where(x => x.CatalogScope == ChallengeCatalogScope.QuestionBank);
         return
         isAdministrator
             ? source
@@ -572,6 +572,7 @@ public sealed class ChallengeAttachmentStore(
         var challenge = await ChallengeTemplateCriticalSection.AcquireAsync(db, challengeId, ct);
         var allowed = challenge is not null
             && challenge.DeletedAt is null
+            && challenge.CatalogScope == ChallengeCatalogScope.QuestionBank
             && (isAdministrator
                 || challenge.OwnerId == actorId
                 || challenge.Managers.Any(manager => manager.UserId == actorId));

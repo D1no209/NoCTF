@@ -13,7 +13,7 @@ export function useDefinitionRuntime(props: Readonly<{
   const serviceNames = computed(() => props.runtime.definition.kind === 'container' ? props.runtime.definition.services.map(service => service.name) : [])
   const showDynamicFlagInjection = computed(() => (props.mode === 'Ctf' || props.mode === 'LiveSolo') && !isPatchVerification.value)
   const dynamicFlagInjection = computed(() => props.runtime.flagSource === FlagSource.PerTeam)
-  const kindOptions = computed(() => singleServiceOnly.value
+  const kindOptions = computed(() => singleServiceOnly.value || props.mode === 'LiveSolo'
     ? [{ value: 'container', label: translate('runtime.label.runtimeServices') }]
     : [{ value: 'container', label: translate('runtime.label.runtimeServices') }, { value: 'ova', label: translate('runtime.label.virtualMachine') }])
   const exposureOptions = computed(() => props.mode === 'Ctf' || props.mode === 'Awdp' || props.mode === 'LiveSolo'
@@ -32,7 +32,7 @@ export function useDefinitionRuntime(props: Readonly<{
       props.runtime.definition.services[0]!.flagEnvironmentVariableName = 'FLAG'
   }
   function switchKind(kind: string): void {
-    if (kind === props.runtime.definition.kind) return
+    if (kind === props.runtime.definition.kind || kind === 'ova' && props.mode === 'LiveSolo') return
     props.runtime.definition = kind === 'ova' ? emptyOvaDefinition() : emptyContainerDefinition()
     synchronizeFlagInjection()
   }

@@ -51,7 +51,7 @@ public sealed partial class LiveSoloMatchStore
         var fact = new FlagAttemptGameplayFact { Id = Guid.CreateVersion7(admittedAt), CompetitionId = command.CompetitionId,
             CompetitionChallengeId = question.CompetitionChallengeId, TeamId = teamId, ActorUserId = command.ActorId,
             State = GameplayFactState.Queued, Value = command.Flag, ValueSha256 = ManageChallengeFlags.Hash(command.Flag), OccurredAt = admittedAt, UpdatedAt = admittedAt,
-            AcquisitionEvidence = await CaptureEvidenceAsync(question, teamId, admittedAt, ct) };
+            AcquisitionEvidence = await CaptureEvidenceAsync(question, round.StaticFlagEvidenceRequired, teamId, admittedAt, ct) };
         var sequence = checked(round.LastAdmissionSequence + 1); round.LastAdmissionSequence = sequence;
         db.GameplayFacts.Add(fact); db.LiveSoloSubmissions.Add(new() { GameplayFactId = fact.Id, RoundId = round.Id,
             RoundQuestionId = question.Id, AdmissionSequence = sequence });
@@ -60,8 +60,9 @@ public sealed partial class LiveSoloMatchStore
         await db.SaveChangesAsync(ct); return new(fact.Id, sequence, admittedAt);
     }, () => new(null, null, null, LiveSoloFailure.Conflict), ct);
 
-    private async Task<FlagAcquisitionEvidence> CaptureEvidenceAsync(LiveSoloRoundQuestion question, Guid teamId, DateTimeOffset at, CancellationToken ct)
+    private async Task<FlagAcquisitionEvidence> CaptureEvidenceAsync(LiveSoloRoundQuestion question, bool required, Guid teamId, DateTimeOffset at, CancellationToken ct)
     {
+        if (!required) return new FlagAcquisitionEvidence { CapturedAt = at, Source = FlagAcquisitionEvidenceSource.Recorded };
         var templateId = await db.CompetitionChallenges.Where(x => x.Id == question.CompetitionChallengeId).Select(x => x.ChallengeId).SingleAsync(ct);
         var definition = await db.Set<LiveSoloChallengeDefinition>().Include(x => x.Runtime).SingleAsync(x => x.ChallengeId == templateId, ct);
         var evidence = new FlagAcquisitionEvidence { CapturedAt = at, Source = FlagAcquisitionEvidenceSource.Recorded };
@@ -94,20 +95,17 @@ public sealed partial class LiveSoloMatchStore
             || competition.ModeConfiguration is not LiveSoloCompetitionModeConfiguration { Enabled: true }
             || !await db.LiveSoloRounds.AnyAsync(x => x.Id == roundId && x.MatchId == matchId
                 && (x.State == LiveSoloRoundState.Running || x.State == LiveSoloRoundState.ConfirmingResult), ct)) return null;
-        var questions = await db.LiveSoloRoundQuestions.AsNoTracking().Include(x => x.Runtimes)
+        var questions = await db.LiveSoloRoundQuestions.AsNoTracking().Include(x => x.Runtimes).Include(x => x.OpenedContent)
             .Where(x => x.RoundId == roundId && x.OpenedAt != null && x.OpenedAt <= now).OrderBy(x => x.Position).ToArrayAsync(ct);
-        var directory = await db.CompetitionChallenges.AsNoTracking().Where(x => questions.Select(q => q.CompetitionChallengeId).Contains(x.Id))
-            .Join(db.Challenges.AsNoTracking(), x => x.ChallengeId, x => x.Id, (entry, template) => new { Entry = entry, Template = template }).ToDictionaryAsync(x => x.Entry.Id, ct);
         var questionIds = questions.Select(x => x.Id).ToArray();
         var runtimes = await db.RuntimeInstances.AsNoTracking().Where(x => x.TeamId == teamId && x.ExecutionScopeId != null
             && questionIds.Contains(x.ExecutionScopeId.Value)).OrderByDescending(x => x.ActiveSlot != null)
             .ThenByDescending(x => x.CreatedAt).ThenByDescending(x => x.Id)
             .Select(x => new { x.ExecutionScopeId, x.Id }).ToArrayAsync(ct);
         var current = runtimes.GroupBy(x => x.ExecutionScopeId!.Value).ToDictionary(x => x.Key, x => (Guid?)x.First().Id);
-        return questions.Select(x => new LiveSoloQuestionView(x.Id, x.CompetitionChallengeId, x.Position,
-            directory[x.CompetitionChallengeId].Entry.CustomTitle ?? directory[x.CompetitionChallengeId].Template.Title,
-            directory[x.CompetitionChallengeId].Template.Description,
-            directory[x.CompetitionChallengeId].Template.Direction, directory[x.CompetitionChallengeId].Entry.Tags.OrderBy(t => t.Position).Select(t => t.Name).ToArray(),
+        return questions.Where(x => x.OpenedContent != null).Select(x => new LiveSoloQuestionView(x.Id, x.CompetitionChallengeId, x.Position,
+            x.OpenedContent!.Title, x.OpenedContent.Description,
+            x.OpenedContent.Direction, x.OpenedContent.Tags.OrderBy(t => t.Position).Select(t => t.Name).ToArray(),
             x.OpenedAt!.Value, current.GetValueOrDefault(x.Id))).ToArray();
     }
 }

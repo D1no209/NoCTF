@@ -198,6 +198,7 @@ public sealed class CompetitionHardDeleteEndpointTests
     [Test]
     [Arguments(CompetitionForceDeleteState.ActiveCompetition)]
     [Arguments(CompetitionForceDeleteState.NotificationScopeConflict)]
+    [Arguments(CompetitionForceDeleteState.ActiveLiveSoloMediaResource)]
     public async Task Force_delete_conflicts_explain_the_required_action(CompetitionForceDeleteState state)
     {
         var store = Substitute.For<IAdminCompetitionStore>();
@@ -216,6 +217,11 @@ public sealed class CompetitionHardDeleteEndpointTests
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Conflict);
         if (state == CompetitionForceDeleteState.ActiveCompetition)
             await Assert.That(detail).IsEqualTo("Finish the competition before permanently deleting it. Paused competitions cannot be deleted.");
+        else if (state == CompetitionForceDeleteState.ActiveLiveSoloMediaResource)
+        {
+            await Assert.That(body!.Code).IsEqualTo(CompetitionForceDeleteConflictCode.ActiveLiveSoloMediaResource);
+            await Assert.That(detail).Contains("raw recording cleanup");
+        }
         else
         {
             await Assert.That(body!.Code).IsEqualTo(CompetitionForceDeleteConflictCode.NotificationScopeConflict);

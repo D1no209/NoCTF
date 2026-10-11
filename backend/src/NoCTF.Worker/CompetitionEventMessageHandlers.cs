@@ -25,7 +25,7 @@ public sealed class CompetitionEventRealtimeMessageHandler(
 public sealed class CompetitionEventLeaderboardMessageHandler(
     ILeaderboardCache leaderboard,
     LeaderboardProjectionMergeQueue mergeQueue,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider, ICompetitionEventApplicabilityReader applicability)
 {
     public async Task Handle(
         CompetitionEventCommitted message,
@@ -33,6 +33,7 @@ public sealed class CompetitionEventLeaderboardMessageHandler(
     {
         if (!AffectsLeaderboard(message.Kind))
             return;
+        if (!await applicability.HasOrdinaryScoreboardAsync(message.CompetitionId, cancellationToken)) return;
 
         await leaderboard.InvalidateAsync(message.CompetitionId, cancellationToken);
         var startedWindow = mergeQueue.Enqueue(

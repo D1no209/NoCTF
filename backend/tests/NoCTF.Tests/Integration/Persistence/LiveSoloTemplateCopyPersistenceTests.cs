@@ -55,42 +55,38 @@ public sealed class LiveSoloTemplateCopyPersistenceTests
             CopyLiveSoloTemplate Manager(NoCtfDbContext context)
             {
                 var messages = Substitute.For<IPostCommitMessagePublisher>();
-                return new(new LiveSoloTemplateCopyStore(context, new CompetitionModerationAuthorizer(context),
-                    new ChallengeManagementStore(context, messages, new ChallengeRuntimeTemplateCatalog()), new GameModeChallengeConfigurationCatalog(),
-                    new FileReferenceLock(), messages));
+                return new(new LiveSoloTemplateCopyStore(context, new LiveSoloMaterialCloner(context, new FileReferenceLock()), messages));
             }
             var manager = Manager(db);
-            var command = new CopyLiveSoloTemplateCommand(competition.Id, source.Id, actor.Id, true, true, [" Web ", "web"], now);
+            var command = new CopyLiveSoloTemplateCommand(source.Id, actor.Id, source.ConcurrencyStamp, true, true, now);
             await Assert.That((await manager.ExecuteAsync(command, ct)).Failure).IsEqualTo(LiveSoloTemplateCopyFailure.AttachmentsForbidden);
             await Assert.That((await manager.ExecuteAsync(command with { CopyAttachments = false }, ct)).Failure).IsEqualTo(LiveSoloTemplateCopyFailure.FlagsForbidden);
             await Assert.That(await db.Set<LiveSoloChallenge>().CountAsync(ct)).IsEqualTo(0);
             source.Managers.Add(new() { ChallengeId = source.Id, UserId = actor.Id }); db.Set<ChallengeManager>().Add(source.Managers.Single());
             await db.SaveChangesAsync(ct);
+            command = command with { ExpectedSourceStamp = source.ConcurrencyStamp };
             var first = await manager.ExecuteAsync(command, ct);
             await Assert.That(first.Failure).IsNull();
             var copy = await db.Challenges.Include(x => x.Attachments).SingleAsync(x => x.Id == first.Copy!.ChallengeId, ct);
             await Assert.That(copy.Mode).IsEqualTo(GameMode.LiveSolo); await Assert.That(source.Mode).IsEqualTo(GameMode.Ctf);
             await Assert.That(copy.Attachments.Single().FileId).IsEqualTo(file.Id);
             await Assert.That(copy.Attachments.Single().Id).IsNotEqualTo(attachment.Id);
-            await Assert.That((await db.CompetitionChallenges.SingleAsync(x => x.Id == first.Copy!.CompetitionChallengeId, ct)).Tags.Select(x => x.Name)).IsEquivalentTo(["Web"]);
+            await Assert.That(await db.CompetitionChallenges.CountAsync(ct)).IsEqualTo(0);
             await Assert.That((await db.ChallengeFlags.SingleAsync(x => x.ChallengeId == copy.Id, ct)).Flag).IsEqualTo(flag.Flag);
             source.Description = "# changed"; await db.SaveChangesAsync(ct);
             await Assert.That(copy.Description).IsEqualTo("# original");
+            await Assert.That((await manager.ExecuteAsync(command, ct)).Failure).IsEqualTo(LiveSoloTemplateCopyFailure.SourceChanged);
+            command = command with { ExpectedSourceStamp = source.ConcurrencyStamp };
             var second = await manager.ExecuteAsync(command, ct);
-            var reCopy = await manager.ExecuteAsync(command with { SourceChallengeId = first.Copy!.ChallengeId }, ct);
-            await Assert.That(second.Failure).IsNull(); await Assert.That(reCopy.Failure).IsNull();
+            var reCopy = await manager.ExecuteAsync(command with { SourceChallengeId = first.Copy!.ChallengeId, ExpectedSourceStamp = copy.ConcurrencyStamp }, ct);
+            await Assert.That(second.Failure).IsNull(); await Assert.That(reCopy.Failure).IsEqualTo(LiveSoloTemplateCopyFailure.UnsupportedSource);
             await Assert.That(first.Copy.CanonicalChallengeId).IsEqualTo(source.Id);
-            await Assert.That(reCopy.Copy!.CanonicalChallengeId).IsEqualTo(source.Id);
-            var matchStore = new LiveSoloMatchStore(db, new CompetitionModerationAuthorizer(db), Substitute.For<ILiveSoloMediaGateway>(), Substitute.For<ILiveSoloEgressGateway>(),
-                Substitute.For<ILiveSoloRuntimePreparation>(), Substitute.For<IPostCommitMessagePublisher>());
-            var duplicateSource = await matchStore.SaveGroupAsync(competition.Id, actor.Id, new(null, "Duplicate source", false, null, [
-                new(first.Copy.CompetitionChallengeId, null), new(second.Copy!.CompetitionChallengeId, null)], null), now, ct);
-            await Assert.That(duplicateSource.Failure).IsEqualTo(LiveSoloFailure.InvalidConfiguration);
-            await Assert.That(await db.LiveSoloQuestionGroups.CountAsync(ct)).IsEqualTo(0);
+            await Assert.That(second.Copy!.CanonicalChallengeId).IsEqualTo(source.Id);
+            await Assert.That(await db.CompetitionChallenges.CountAsync(ct)).IsEqualTo(0);
             flag.SpecificationKind = SpecificationKind.Attachment; flag.SpecificationId = attachment.Id; await db.SaveChangesAsync(ct);
             var withoutMatchingFile = await manager.ExecuteAsync(command with { CopyAttachments = false }, ct);
             await Assert.That(withoutMatchingFile.Failure).IsEqualTo(LiveSoloTemplateCopyFailure.AttachmentsRequired);
-            await Assert.That(await db.Set<LiveSoloChallenge>().CountAsync(ct)).IsEqualTo(3);
+            await Assert.That(await db.Set<LiveSoloChallenge>().CountAsync(ct)).IsEqualTo(2);
             var random = await manager.ExecuteAsync(command, ct);
             await Assert.That(random.Failure).IsNull();
             var randomAttachment = await db.Set<ChallengeAttachment>().SingleAsync(x => x.ChallengeId == random.Copy!.ChallengeId, ct);
@@ -104,15 +100,15 @@ public sealed class LiveSoloTemplateCopyPersistenceTests
                 failure.Armed = true;
                 await Assert.That(async () => await Manager(failing).ExecuteAsync(command, ct)).Throws<InvalidOperationException>();
             }
-            await Assert.That(await db.Set<LiveSoloChallenge>().CountAsync(ct)).IsEqualTo(4);
-            await Assert.That(await db.CompetitionChallenges.CountAsync(ct)).IsEqualTo(4);
-            await Assert.That(await db.LiveSoloChallengeSources.CountAsync(ct)).IsEqualTo(4);
+            await Assert.That(await db.Set<LiveSoloChallenge>().CountAsync(ct)).IsEqualTo(3);
+            await Assert.That(await db.CompetitionChallenges.CountAsync(ct)).IsEqualTo(0);
+            await Assert.That(await db.LiveSoloChallengeSources.CountAsync(ct)).IsEqualTo(3);
             db.ChallengeFlags.Remove(flag); db.Set<ChallengeAttachment>().Remove(attachment);
             db.Set<ChallengeManager>().RemoveRange(source.Managers); db.Remove(source.Definition!);
             db.Challenges.Remove(source); await db.SaveChangesAsync(ct);
             await Assert.That((await db.LiveSoloChallengeSources.SingleAsync(x => x.ChallengeId == first.Copy.ChallengeId, ct)).CanonicalChallengeId).IsEqualTo(source.Id);
             await Assert.That(await db.Files.CountAsync(ct)).IsEqualTo(1);
-            await Assert.That(await db.Set<LiveSoloChallenge>().CountAsync(ct)).IsEqualTo(4);
+            await Assert.That(await db.Set<LiveSoloChallenge>().CountAsync(ct)).IsEqualTo(3);
         });
     }
     private sealed class FailCommit : DbTransactionInterceptor

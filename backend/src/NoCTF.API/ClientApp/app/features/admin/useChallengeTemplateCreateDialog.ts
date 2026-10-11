@@ -2,7 +2,7 @@ import type { UiMessage } from '../../utils/i18n'
 import { message as describeMessage } from '../../utils/i18n'
 import { markRaw, proxyRefs, toRefs } from 'vue'
 import { toast } from '../../utils/message-toast'
-import { adminChallengeBankCreateTemplate } from '../../api'
+import { adminChallengeBankCreateTemplate, adminChallengeBankListTemplates, adminChallengeBankGetTemplate, copyLiveSoloTemplate } from '../../api'
 import type { NoCtfapiEndpointsAdministrationChallengeBankChallengeDefinitionContract, NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol, NoCtfapiEndpointsCompetitionsGameModeProtocol } from '../../api'
 import { challengeTemplateWriteErrorMessages } from '../../lib/challenge-template-error'
 import { validateChallengeTemplateDraft } from '../../lib/challenge-template-validation'
@@ -21,6 +21,26 @@ export function useChallengeTemplateCreateDialog(
   props: Readonly<{ open: boolean }>,
   emit: Events,
 ) {
+  const variant = ref<'blank' | 'copy'>('blank')
+  const sourceId = ref<string | null>(null), sourceKeyword = ref(''), copyAttachments = ref(true), copyFlags = ref(false)
+  const source = ref<import('../../api').NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse | null>(null)
+  const sources = useOffsetPagination<import('../../api').NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateSummaryResponse>(async ({ offset, limit }) => {
+    const result = await adminChallengeBankListTemplates({ query: { includeDeleted: false, onlyMine: false, desc: false, mode: 'Ctf', offset, limit, keyword: sourceKeyword.value || undefined } })
+    if (result.error || !result.data) throw result.error
+    return result.data
+  })
+  const sourceOptions = computed(() => sources.items.value.filter(x => x.id && x.interactionKind === 'FlagSubmission').map(x => ({ value: x.id!, label: x.title ?? '—' })))
+  const copySupported = computed(() => source.value?.definition?.ctf?.interactionKind !== 'PatchVerification'
+    && !source.value?.definition?.checker && (!source.value?.definition?.runtime || source.value.definition.runtime.kind === 'Container'))
+  async function searchSources() { sources.reset(); await sources.loadPage() }
+  async function setVariant(value: unknown) { if (pending.value || (value !== 'blank' && value !== 'copy')) return; variant.value = value; if (value === 'copy') await searchSources() }
+  async function selectSource(value: string) {
+    sourceId.value = value; source.value = null
+    const result = await adminChallengeBankGetTemplate({ path: { challengeId: value }, query: { includeDeleted: false } })
+    if (sourceId.value !== value) return
+    if (result.error || !result.data) { toast.error(translate('liveSolo.error.load')); return }
+    source.value = result.data
+  }
   const title = ref('')
   const mode = ref<NoCtfapiEndpointsCompetitionsGameModeProtocol>('Ctf')
   const visibility = ref<NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol>('Private')
@@ -38,6 +58,7 @@ export function useChallengeTemplateCreateDialog(
   const directionInvalid = computed(() => saveAttempted.value && !direction.value)
 
   function reset() {
+    variant.value = 'blank'; sourceId.value = null; source.value = null; sourceKeyword.value = ''; copyAttachments.value = true; copyFlags.value = false
     title.value = ''
     mode.value = 'Ctf'
     visibility.value = 'Private'
@@ -58,10 +79,21 @@ export function useChallengeTemplateCreateDialog(
     if (!isGameMode(value)) return
     definition.value = defaultDefinition(value)
     mode.value = value
+    variant.value = 'blank'
   }
 
   async function submit(): Promise<void> {
     if (pending.value) return
+    if (mode.value === 'LiveSolo' && variant.value === 'copy') {
+      if (!source.value?.id || !source.value.concurrencyStamp || !copySupported.value) return
+      pending.value = true
+      try {
+        const result = await copyLiveSoloTemplate({ body: { sourceChallengeId: source.value.id, expectedSourceStamp: source.value.concurrencyStamp, copyAttachments: copyAttachments.value, copyFlags: copyFlags.value } })
+        if (result.error || !result.data?.challengeId) { saveErrors.value = challengeTemplateWriteErrorMessages(result.error); toast.error(saveErrors.value[0] ?? translate('liveSolo.error.operation')); return }
+        const id = result.data.challengeId; reset(); emit('created', id)
+      } catch (cause) { saveErrors.value = challengeTemplateWriteErrorMessages(cause); toast.error(saveErrors.value[0] ?? translate('liveSolo.error.operation')) } finally { pending.value = false }
+      return
+    }
     saveAttempted.value = true
     saveErrors.value = []
     const validationErrors = validateChallengeTemplateDraft({
@@ -110,6 +142,8 @@ export function useChallengeTemplateCreateDialog(
   const DefinitionEditor = markRaw(DefinitionEditorComponent)
   const viewBindings = {
     ...toRefs(props),
+    variant, setVariant, sourceId, sourceKeyword, sourceOptions, source, copySupported, copyAttachments, copyFlags, selectSource, searchSources,
+    sourcePage: sources.page, sourcePageCount: sources.pageCount, sourceTotal: sources.total, sourceLimit: sources.limit, sourceLoading: sources.loading, sourcePageChange: sources.loadPage, sourceLimitChange: sources.setPageSize,
     title,
     mode,
     modeOptions: gameModeOptions,

@@ -13,7 +13,8 @@ public sealed record CreateCompetitionChallengeCommand(
     DateTimeOffset CreatedAt,
     string? CustomTitle = null,
     IReadOnlyList<string>? Tags = null,
-    ChallengeTiming? Timing = null);
+    ChallengeTiming? Timing = null,
+    ChallengeCatalogScope MaterialScope = ChallengeCatalogScope.QuestionBank);
 
 public sealed record UpdateCompetitionChallengeCommand(
     Guid CompetitionId,
@@ -23,7 +24,8 @@ public sealed record UpdateCompetitionChallengeCommand(
     DateTimeOffset UpdatedAt,
     string? CustomTitle = null,
     Guid? DirectionId = null,
-    IReadOnlyList<string>? Tags = null);
+    IReadOnlyList<string>? Tags = null,
+    bool HasPublicationChange = true);
 
 public sealed record ChallengeView(
     Guid Id,
@@ -85,7 +87,7 @@ public enum ChallengeMutationFailure
     LifecycleStateConflict,
     ExperimentalFeatureDisabled,
     InvalidTiming,
-    TimingUnsupported
+    TimingUnsupported, PublicationUnsupported, MaterialEditRequired
 }
 
 public sealed record ChallengeMutationResult(

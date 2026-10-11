@@ -109,7 +109,8 @@ public sealed class CompetitionEventStore(
         }
         db.CompetitionEvents.Add(entity);
         if (draft.Visibility == CompetitionEventVisibility.Public
-            && CompetitionWebhookEventTypes.From(draft.Kind) is not null)
+            && CompetitionWebhookEventTypes.From(draft.Kind) is not null
+            && await new CompetitionEventApplicabilityReader(db).CanPublishAsync(draft.CompetitionId, draft.Kind, cancellationToken))
         {
             var revision = db.Competitions.Local
                 .FirstOrDefault(item => item.Id == draft.CompetitionId)?.ConcurrencyStamp
@@ -368,6 +369,8 @@ public sealed class CompetitionEventStore(
                 .Tracks.Where(track => track.IsInternal)
                 .Select(track => track.Key)
                 .ToArray();
+            if (competition.Mode == GameMode.LiveSolo)
+                query = query.Where(item => !CompetitionEventApplicability.OrdinaryOnly.Contains(item.Kind));
             query = access.TeamId is Guid teamId
                 ? query.Where(item =>
                     item.Visibility == CompetitionEventVisibility.Public

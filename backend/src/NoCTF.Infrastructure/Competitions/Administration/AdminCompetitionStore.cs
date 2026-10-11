@@ -14,6 +14,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
+using NoCTF.Domain.Challenges;
+using NoCTF.Domain.LiveSolo;
 
 namespace NoCTF.Infrastructure.Competitions.Administration;
 
@@ -279,7 +281,7 @@ public sealed class AdminCompetitionStore(
         if (!isAdministrator)
             return new(CompetitionForceDeleteState.NotFound);
 
-        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
+        await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, IsolationLevel.Serializable, ct);
         var competition = await db.Competitions.IgnoreQueryFilters()
             .AsNoTracking()
             .Where(item => item.Id == command.CompetitionId)
@@ -322,6 +324,9 @@ public sealed class AdminCompetitionStore(
         }
         if (notificationScope.ConflictingIds.Length > 0)
             return new(CompetitionForceDeleteState.NotificationScopeConflict, preview, notificationScope.ConflictingIds);
+        if (preview.References.Any(reference =>
+                reference.Kind == CompetitionHardDeleteReferenceKind.ActiveLiveSoloMediaResource))
+            return new(CompetitionForceDeleteState.ActiveLiveSoloMediaResource, preview);
 
         var fileIds = await CollectCompetitionFileIdsAsync(
             command.CompetitionId,
@@ -555,6 +560,14 @@ public sealed class AdminCompetitionStore(
                 item.CompetitionId == competitionId, ct));
         AddReference(references, CompetitionHardDeleteReferenceKind.ChallengeWriteUp,
             await db.ChallengeWriteUps.CountAsync(item => item.CompetitionId == competitionId, ct));
+        AddReference(references, CompetitionHardDeleteReferenceKind.LiveSoloMatch,
+            await db.LiveSoloMatches.CountAsync(item => item.CompetitionId == competitionId, ct));
+        AddReference(references, CompetitionHardDeleteReferenceKind.LiveSoloQuestionGroup,
+            await db.LiveSoloQuestionGroups.CountAsync(item => item.CompetitionId == competitionId, ct));
+        AddReference(references, CompetitionHardDeleteReferenceKind.LiveSoloQuestionMaterial,
+            await db.Set<LiveSoloQuestionMaterial>().CountAsync(item => item.CompetitionId == competitionId, ct));
+        AddReference(references, CompetitionHardDeleteReferenceKind.ActiveLiveSoloMediaResource,
+            await CountActiveLiveSoloMediaResourcesAsync(competitionId, ct));
         AddReference(references, CompetitionHardDeleteReferenceKind.Badge,
             await db.CompetitionBadges.CountAsync(item =>
                 item.CompetitionId == competitionId, ct));
@@ -608,6 +621,7 @@ public sealed class AdminCompetitionStore(
                 && status is not CompetitionStatus.Running and not CompetitionStatus.Paused
                 && references.All(reference =>
                     reference.Kind is not CompetitionHardDeleteReferenceKind.ActiveRuntimeResource
+                        and not CompetitionHardDeleteReferenceKind.ActiveLiveSoloMediaResource
                         and not CompetitionHardDeleteReferenceKind.NotificationScopeConflict),
             references);
     }
@@ -646,7 +660,86 @@ public sealed class AdminCompetitionStore(
                 && item.RelatedId != null)
             .Select(item => item.RelatedId!.Value)
             .ToArrayAsync(ct));
+        var matchIds = db.LiveSoloMatches.Where(item => item.CompetitionId == competitionId).Select(item => item.Id);
+        var sessionIds = db.LiveSoloMediaSessions.Where(item => matchIds.Contains(item.MatchId)).Select(item => item.Id);
+        var roundIds = db.LiveSoloRounds.Where(item => matchIds.Contains(item.MatchId)).Select(item => item.Id);
+        var questionIds = db.LiveSoloRoundQuestions.Where(item => roundIds.Contains(item.RoundId)).Select(item => item.Id);
+        ids.AddRange(await db.LiveSoloRecordings.Where(item => sessionIds.Contains(item.MediaSessionId) && item.FileId != null)
+            .Select(item => item.FileId!.Value).ToArrayAsync(ct));
+        ids.AddRange(await db.LiveSoloProgramSegments.Where(item => sessionIds.Contains(item.MediaSessionId))
+            .Select(item => item.FileId).ToArrayAsync(ct));
+        ids.AddRange(await db.Set<LiveSoloOpenedAttachment>().Where(item => questionIds.Contains(item.RoundQuestionId))
+            .Select(item => item.FileId).ToArrayAsync(ct));
+        var ownedChallengeIds = OwnedLiveSoloChallengeIds(competitionId);
+        ids.AddRange(await db.Set<ChallengeAttachment>().Where(item => ownedChallengeIds.Contains(item.ChallengeId))
+            .Select(item => item.FileId).ToArrayAsync(ct));
         return ids.Distinct().ToArray();
+    }
+
+    private IQueryable<Guid> OwnedLiveSoloChallengeIds(Guid competitionId) =>
+        db.Set<LiveSoloQuestionMaterial>().Where(item => item.CompetitionId == competitionId
+                && db.Challenges.IgnoreQueryFilters().Any(challenge => challenge.Id == item.ChallengeId
+                    && challenge.CatalogScope == ChallengeCatalogScope.CompetitionOwned))
+            .Select(item => item.ChallengeId);
+
+    private async Task<int> CountActiveLiveSoloMediaResourcesAsync(Guid competitionId, CancellationToken ct)
+    {
+        var matchIds = db.LiveSoloMatches.Where(item => item.CompetitionId == competitionId).Select(item => item.Id);
+        var sessionIds = db.LiveSoloMediaSessions.Where(item => matchIds.Contains(item.MatchId)).Select(item => item.Id);
+        var sessions = await db.LiveSoloMediaSessions.CountAsync(item => matchIds.Contains(item.MatchId)
+            && item.State != LiveSoloMediaState.Stopped && item.State != LiveSoloMediaState.Failed, ct);
+        var captures = await db.LiveSoloProgramCaptures.CountAsync(item => sessionIds.Contains(item.MediaSessionId)
+            && (item.State == LiveSoloCaptureState.Pending || item.State == LiveSoloCaptureState.Starting
+                || item.State == LiveSoloCaptureState.Active || item.State == LiveSoloCaptureState.Stopping
+                || item.EgressId != null && item.RawRemovedAt == null), ct);
+        var recordings = await db.LiveSoloRecordings.CountAsync(item => sessionIds.Contains(item.MediaSessionId)
+            && (item.State == LiveSoloRecordingState.Pending || item.State == LiveSoloRecordingState.Starting
+                || item.State == LiveSoloRecordingState.Recording || item.State == LiveSoloRecordingState.Finalizing
+                || item.State == LiveSoloRecordingState.Deleting
+                || item.EgressId != null && item.RawRemovedAt == null), ct);
+        return sessions + captures + recordings;
+    }
+
+    private async Task DeleteLiveSoloScopeAsync(Guid competitionId, CancellationToken ct)
+    {
+        var matchIds = db.LiveSoloMatches.Where(item => item.CompetitionId == competitionId).Select(item => item.Id);
+        var roundIds = db.LiveSoloRounds.Where(item => matchIds.Contains(item.MatchId)).Select(item => item.Id);
+        var questionIds = db.LiveSoloRoundQuestions.Where(item => roundIds.Contains(item.RoundId)).Select(item => item.Id);
+        var sessionIds = db.LiveSoloMediaSessions.Where(item => matchIds.Contains(item.MatchId)).Select(item => item.Id);
+        var correctionIds = db.Set<LiveSoloResultCorrection>().Where(item => item.CompetitionId == competitionId).Select(item => item.Id);
+
+        // Break nullable cycles before deleting their principals; all work remains in the caller's transaction.
+        await db.LiveSoloMatches.Where(item => item.CompetitionId == competitionId).ExecuteUpdateAsync(setters => setters
+            .SetProperty(item => item.CurrentRoundId, (Guid?)null)
+            .SetProperty(item => item.CurrentMediaSessionId, (Guid?)null)
+            .SetProperty(item => item.PendingCorrectionId, (Guid?)null)
+            .SetProperty(item => item.ReplacementMatchId, (Guid?)null), ct);
+        await db.Set<LiveSoloCorrectionMatch>().Where(item => correctionIds.Contains(item.CorrectionId)).ExecuteDeleteAsync(ct);
+        await db.Set<LiveSoloResultCorrection>().Where(item => item.CompetitionId == competitionId).ExecuteDeleteAsync(ct);
+        await db.Set<LiveSoloViewerLease>().Where(item => item.CompetitionId == competitionId).ExecuteDeleteAsync(ct);
+        await db.LiveSoloMediaGrants.Where(item => sessionIds.Contains(item.MediaSessionId)).ExecuteDeleteAsync(ct);
+        await db.LiveSoloProgramSegments.Where(item => sessionIds.Contains(item.MediaSessionId)).ExecuteDeleteAsync(ct);
+        await db.Set<LiveSoloProgramDecision>().Where(item => sessionIds.Contains(item.MediaSessionId)).ExecuteDeleteAsync(ct);
+        await db.LiveSoloRecordingDecisions.Where(item => sessionIds.Contains(item.MediaSessionId)).ExecuteDeleteAsync(ct);
+        await db.LiveSoloRecordings.Where(item => sessionIds.Contains(item.MediaSessionId)).ExecuteDeleteAsync(ct);
+        await db.LiveSoloMediaSessions.Where(item => sessionIds.Contains(item.Id))
+            .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.CurrentProgramCaptureId, (Guid?)null), ct);
+        await db.LiveSoloProgramFrames.Where(item => sessionIds.Contains(item.MediaSessionId)).ExecuteDeleteAsync(ct);
+        await db.LiveSoloProgramCaptures.Where(item => sessionIds.Contains(item.MediaSessionId)).ExecuteDeleteAsync(ct);
+        await db.LiveSoloMediaSessions.Where(item => matchIds.Contains(item.MatchId)).ExecuteDeleteAsync(ct);
+        await db.LiveSoloAdjudications.Where(item => matchIds.Contains(item.MatchId)).ExecuteDeleteAsync(ct);
+        await db.LiveSoloSubmissions.Where(item => roundIds.Contains(item.RoundId)).ExecuteDeleteAsync(ct);
+        await db.LiveSoloDownloadEvidences.Where(item => questionIds.Contains(item.RoundQuestionId)).ExecuteDeleteAsync(ct);
+        await db.LiveSoloAttachmentAssignments.Where(item => questionIds.Contains(item.RoundQuestionId)).ExecuteDeleteAsync(ct);
+        await db.Set<LiveSoloOpenedContent>().Where(item => questionIds.Contains(item.RoundQuestionId)).ExecuteDeleteAsync(ct);
+        // Round cascades remove questions, runtime bindings, pause intervals and selection audits before generic facts/resources.
+        await db.LiveSoloRounds.Where(item => matchIds.Contains(item.MatchId)).ExecuteDeleteAsync(ct);
+        await db.LiveSoloQuestionGroups.Where(item => item.CompetitionId == competitionId).ExecuteDeleteAsync(ct);
+        await db.LiveSoloQuestionExposures.Where(item => item.CompetitionId == competitionId).ExecuteDeleteAsync(ct);
+        await db.LiveSoloActiveTeamSlots.Where(item => item.CompetitionId == competitionId).ExecuteDeleteAsync(ct);
+        await db.Set<LiveSoloMatchSlot>().Where(item => matchIds.Contains(item.MatchId)).ExecuteDeleteAsync(ct);
+        await db.LiveSoloMatches.Where(item => item.CompetitionId == competitionId).ExecuteDeleteAsync(ct);
+        await db.Set<LiveSoloQuestionMaterial>().Where(item => item.CompetitionId == competitionId).ExecuteDeleteAsync(ct);
     }
 
     private async Task DeleteCompetitionScopeAsync(
@@ -654,6 +747,8 @@ public sealed class AdminCompetitionStore(
         Guid[] notificationIds,
         CancellationToken ct)
     {
+        var ownedChallengeIds = await OwnedLiveSoloChallengeIds(competitionId).ToArrayAsync(ct);
+        await DeleteLiveSoloScopeAsync(competitionId, ct);
         await db.Notifications.Where(n => notificationIds.Contains(n.Id)).ExecuteDeleteAsync(ct);
         await db.UserBadgeTransitions.Where(item => item.CompetitionId == competitionId)
             .ExecuteDeleteAsync(ct);
@@ -700,6 +795,10 @@ public sealed class AdminCompetitionStore(
         await db.CompetitionChallenges.IgnoreQueryFilters()
             .Where(item => item.CompetitionId == competitionId)
             .ExecuteDeleteAsync(ct);
+        await db.ChallengeFlags.Where(item => item.ChallengeId != null && ownedChallengeIds.Contains(item.ChallengeId.Value))
+            .ExecuteDeleteAsync(ct);
+        await db.Set<ChallengeAttachment>().Where(item => ownedChallengeIds.Contains(item.ChallengeId)).ExecuteDeleteAsync(ct);
+        await db.Challenges.IgnoreQueryFilters().Where(item => ownedChallengeIds.Contains(item.Id)).ExecuteDeleteAsync(ct);
         await db.Teams.IgnoreQueryFilters().Where(item => item.CompetitionId == competitionId)
             .ExecuteDeleteAsync(ct);
         await db.Competitions.IgnoreQueryFilters().Where(item => item.Id == competitionId)

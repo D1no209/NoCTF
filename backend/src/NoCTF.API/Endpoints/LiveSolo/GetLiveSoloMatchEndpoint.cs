@@ -14,7 +14,18 @@ public sealed record LiveSoloMatchResponse(Guid Id, Guid CompetitionId,
     [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<LiveSoloMatchState>))] LiveSoloMatchState State,
     Guid ConcurrencyStamp, int RequiredWins, int LeftWins, int RightWins, Guid? LeftTeamId, string? LeftTeamName,
     Guid? RightTeamId, string? RightTeamName, Guid? CurrentRoundId, Guid? WinnerTeamId, IReadOnlyList<LiveSoloRosterResponse> Rosters,
-    Guid? PendingCorrectionId = null, Guid? ReplacementMatchId = null, Guid? PendingCorrectionMatchId = null, bool HasMedia = false);
+    Guid? PendingCorrectionId = null, Guid? ReplacementMatchId = null, Guid? PendingCorrectionMatchId = null, bool HasMedia = false)
+{
+    public long ResultRevision { get; init; }
+    [JsonConverter(typeof(StrictPascalCaseEnumConverter<LiveSoloEndReason>))] public LiveSoloEndReason EndReason { get; init; }
+    public int? ResultLeftWins { get; init; }
+    public int? ResultRightWins { get; init; }
+    public DateTimeOffset? ResultUpdatedAt { get; init; }
+    public Guid? LeftAvatarFileId { get; init; }
+    public Guid? RightAvatarFileId { get; init; }
+    public string? LeftAvatarUrl { get; init; }
+    public string? RightAvatarUrl { get; init; }
+}
 public sealed record LiveSoloFailureResponse(
     [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<LiveSoloFailure>))] LiveSoloFailure Code)
 {
@@ -25,11 +36,23 @@ public sealed record LiveSoloFailureResponse(
 
 internal static class LiveSoloProtocol
 {
-    public static LiveSoloMatchResponse Match(LiveSoloMatchView value) => new(value.Id, value.CompetitionId, value.State,
+    public static LiveSoloMatchResponse Match(LiveSoloMatchView value, LinkGenerator? links = null, HttpContext? context = null) => new(value.Id, value.CompetitionId, value.State,
         value.ConcurrencyStamp, value.RequiredWins, value.LeftWins, value.RightWins, value.LeftTeamId, value.LeftTeamName,
         value.RightTeamId, value.RightTeamName, value.CurrentRoundId, value.WinnerTeamId,
         value.Rosters.Select(x => new LiveSoloRosterResponse(x.TeamId, x.UserIds, x.Locked, x.Ready)).ToArray(),
-        value.PendingCorrectionId, value.ReplacementMatchId, value.PendingCorrectionMatchId, value.HasMedia);
+        value.PendingCorrectionId, value.ReplacementMatchId, value.PendingCorrectionMatchId, value.HasMedia)
+        { ResultRevision = value.ResultRevision, EndReason = value.EndReason, ResultLeftWins = value.ResultLeftWins,
+          ResultRightWins = value.ResultRightWins, ResultUpdatedAt = value.ResultUpdatedAt,
+          LeftAvatarFileId = value.LeftAvatarFileId, RightAvatarFileId = value.RightAvatarFileId,
+          LeftAvatarUrl = AvatarUrl(value.CompetitionId, value.LeftTeamId, value.LeftAvatarFileId, links, context),
+          RightAvatarUrl = AvatarUrl(value.CompetitionId, value.RightTeamId, value.RightAvatarFileId, links, context) };
+
+    private static string? AvatarUrl(Guid competitionId, Guid? teamId, Guid? revision, LinkGenerator? links, HttpContext? context)
+    {
+        if (teamId is not Guid team || revision is not Guid file || links is null || context is null) return null;
+        var path = links.GetPathByName(context, "TeamAvatar_Get", new { competitionId, teamId = team });
+        return path is null ? null : $"{path}?revision={file:N}";
+    }
 
     public static Results<Ok<LiveSoloMatchResponse>, NotFound, ForbidHttpResult, Conflict<LiveSoloFailureResponse>,
         UnprocessableEntity<LiveSoloFailureResponse>, ProblemHttpResult> MatchMutation(LiveSoloMatchResult result) => result.Failure switch
@@ -45,7 +68,7 @@ internal static class LiveSoloProtocol
     public static Results<Ok<LiveSoloRoundResponse>, NotFound, ForbidHttpResult, Conflict<LiveSoloFailureResponse>,
         UnprocessableEntity<LiveSoloFailureResponse>, ProblemHttpResult> RoundMutation(LiveSoloRoundResult result) => result.Failure switch
     {
-        null when result.Round is not null => TypedResults.Ok(LiveSoloRoundProtocol.Round(result.Round)),
+        null when result.Round is not null => TypedResults.Ok(LiveSoloRoundProtocol.Round(result.Round, true)),
         LiveSoloFailure.NotFound => TypedResults.NotFound(),
         LiveSoloFailure.Forbidden => TypedResults.Forbid(),
         LiveSoloFailure.InvalidConfiguration => TypedResults.UnprocessableEntity(new LiveSoloFailureResponse(result.Failure.Value)),
@@ -62,7 +85,7 @@ public sealed class GetLiveSoloMatchRequest
     public Guid MatchId { get; set; }
     public bool Staff { get; set; }
 }
-public sealed class GetLiveSoloMatchEndpoint(ILiveSoloMatchStore matches, IUserContext user, TimeProvider clock)
+public sealed class GetLiveSoloMatchEndpoint(ILiveSoloMatchStore matches, IUserContext user, TimeProvider clock, LinkGenerator links)
     : Endpoint<GetLiveSoloMatchRequest, Results<Ok<LiveSoloMatchResponse>, NotFound>>
 {
     public override void Configure()
@@ -75,6 +98,6 @@ public sealed class GetLiveSoloMatchEndpoint(ILiveSoloMatchStore matches, IUserC
     {
         HttpContext.Response.Headers.CacheControl = "private, no-store";
         var result = await matches.FindAsync(req.CompetitionId, req.MatchId, user.UserId, req.Staff, clock.GetUtcNow(), ct);
-        return result is null ? TypedResults.NotFound() : TypedResults.Ok(LiveSoloProtocol.Match(result));
+        return result is null ? TypedResults.NotFound() : TypedResults.Ok(LiveSoloProtocol.Match(result, links, HttpContext));
     }
 }

@@ -83,6 +83,14 @@ public class GameplayFactAdmissionPolicyTests
             .IsEqualTo(GameplayFactAdmissionFailureCode.AchievementAlreadySucceeded);
     }
 
+    [Test]
+    public async Task Solo_ordinary_flag_admission_cannot_bypass_round_and_roster_authorization()
+    {
+        var snapshot = Snapshot(CompetitionStatus.Running) with { Mode = GameMode.LiveSolo, ChallengePublished = true };
+        var result = Check(snapshot, DateTimeOffset.UtcNow);
+        await Assert.That(result.FailureCode).IsEqualTo(GameplayFactAdmissionFailureCode.GameplayFactKindUnsupported);
+    }
+
     private static GameplayFactAdmissionSnapshot Snapshot(CompetitionStatus status) => new(
         Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), GameMode.Ctf,
         CompetitionModeConfigurationDefaults.Create(GameMode.Ctf, Guid.NewGuid()),

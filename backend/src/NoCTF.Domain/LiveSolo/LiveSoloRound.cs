@@ -9,6 +9,7 @@ public enum LiveSoloPauseSource : short { Match, Competition, ResultCorrection }
 
 public sealed class LiveSoloRound : IConcurrencyTracked
 {
+    public bool StaticFlagEvidenceRequired { get; set; }
     public bool PlatformStreamingEnabled { get; set; } = true;
     public Guid Id { get; set; }
     public Guid MatchId { get; set; }
@@ -16,10 +17,20 @@ public sealed class LiveSoloRound : IConcurrencyTracked
     public int Number { get; set; }
     public int Replay { get; set; }
     public LiveSoloRoundState State { get; set; }
+    public Guid? QuestionGroupStamp { get; set; }
+    public Guid? SelectionRevision { get; set; }
+    public LiveSoloQuestionSelectionKind? SelectionKind { get; set; }
+    public Guid? SelectedByUserId { get; set; }
+    public List<LiveSoloRoundSelectionAudit> SelectionAudits { get; set; } = [];
+    public List<LiveSoloRoundSelectionRisk> SelectionRisks { get; set; } = [];
     public Guid QuestionGroupId { get; set; }
     public int LimitSeconds { get; set; } = 900;
     public int CountdownSeconds { get; set; } = 5;
     public long TimelineRevision { get; set; }
+    public long ResultRevision { get; set; }
+    public LiveSoloEndReason EndReason { get; set; }
+    public int? ResultLeftWins { get; set; }
+    public int? ResultRightWins { get; set; }
     public long LastAdmissionSequence { get; set; }
     public long LastResolvedSequence { get; set; }
     public Guid? WinnerTeamId { get; set; }
@@ -41,8 +52,11 @@ public sealed class LiveSoloRoundQuestion : IConcurrencyTracked
     public Guid ConcurrencyStamp { get; set; } = Guid.NewGuid();
     public int Position { get; set; }
     public int OpenOffsetSeconds { get; set; }
+    public LiveSoloResourceFailure PreparationFailure { get; set; }
+    public bool? EnvironmentRequired { get; set; }
     public LiveSoloQuestionReadiness Readiness { get; set; }
     public DateTimeOffset? OpenedAt { get; set; }
+    public LiveSoloOpenedContent? OpenedContent { get; set; }
     public List<LiveSoloRuntimeBinding> Runtimes { get; set; } = [];
 }
 

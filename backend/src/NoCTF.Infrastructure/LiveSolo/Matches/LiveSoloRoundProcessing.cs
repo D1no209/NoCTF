@@ -81,7 +81,8 @@ public sealed partial class LiveSoloMatchStore
             {
                 var outcome = LiveSoloRoundRules.Resolve(round.LastAdmissionSequence, judged);
                 round.LastResolvedSequence = outcome.ResolvedThrough;
-                if (LiveSoloRoundRules.TryVoid(round, outcome, now)) match.State = LiveSoloMatchState.Preparing;
+                if (LiveSoloRoundRules.TryVoid(round, outcome, now))
+                { match.State = LiveSoloMatchState.Preparing; LiveSoloResults.Confirm(round, match, LiveSoloEndReason.TimeLimit); }
             }
             if (match.State == LiveSoloMatchState.Completed)
             {
@@ -124,19 +125,22 @@ public sealed partial class LiveSoloMatchStore
             {
                 if (competition.ModeConfiguration is not LiveSoloCompetitionModeConfiguration { Enabled: true }
                     || !await RosterEligibleAsync(match, ct))
-                { round.State = LiveSoloRoundState.Canceled; match.State = LiveSoloMatchState.AwaitingAdjudication; round.TimelineRevision++; return true; }
-                if (match.StartedAt is null && !await NoNewPublicExposureAsync(match, round, ct))
-                { round.State = LiveSoloRoundState.Canceled; match.State = LiveSoloMatchState.Preparing; round.TimelineRevision++; return true; }
+                { round.State = LiveSoloRoundState.Canceled; round.EndedAt = effectiveAt; match.State = LiveSoloMatchState.AwaitingAdjudication; round.TimelineRevision++;
+                  LiveSoloResults.Confirm(round, match, LiveSoloEndReason.EligibilityChanged); return true; }
+                if (round.SelectionKind != LiveSoloQuestionSelectionKind.StaffSpecified && !await NoNewPublicExposureAsync(match, round, ct))
+                { round.State = LiveSoloRoundState.Canceled; round.EndedAt = effectiveAt; match.State = LiveSoloMatchState.Preparing; round.TimelineRevision++;
+                  LiveSoloResults.Confirm(round, match, LiveSoloEndReason.SelectionChanged); return true; }
                 effectiveAt = (clock ?? TimeProvider.System).GetUtcNow();
                 round.State = LiveSoloRoundState.Running; round.StartedAt = effectiveAt; match.State = LiveSoloMatchState.Running;
-                match.StartedAt ??= effectiveAt; round.Questions.Single(x => x.Position == 0).OpenedAt = effectiveAt; round.TimelineRevision++;
+                match.StartedAt ??= effectiveAt;
+                await OpenQuestionAsync(round.Questions.Single(x => x.Position == 0), effectiveAt, ct); round.TimelineRevision++;
             }
             if (round.State == LiveSoloRoundState.Running)
             {
                 effectiveAt = (clock ?? TimeProvider.System).GetUtcNow();
                 foreach (var question in round.Questions.OrderBy(x => x.Position))
                     if (verifiedQuestions.Contains(question.Id) && LiveSoloRoundRules.CanRelease(round, question, effectiveAt))
-                    { question.OpenedAt = effectiveAt; round.TimelineRevision++; }
+                    { await OpenQuestionAsync(question, effectiveAt, ct); round.TimelineRevision++; }
                 if (round.StartedAt is { } started && LiveSoloActiveClock.Elapsed(started, effectiveAt, round.Pauses) >= TimeSpan.FromSeconds(round.LimitSeconds))
                 { round.State = LiveSoloRoundState.ConfirmingResult; round.TimelineRevision++; return true; }
             }

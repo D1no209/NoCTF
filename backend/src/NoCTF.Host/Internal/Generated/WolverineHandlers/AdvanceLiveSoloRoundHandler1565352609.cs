@@ -57,7 +57,7 @@ namespace Internal.Generated.WolverineHandlers
             var wolverinePostCommitMessagePublisher = new NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher(context, noCtfDbContext, _loggerOfWolverinePostCommitMessagePublisher, postCommitDispatchStatus);
             var transactionalRequestReplay = new NoCTF.Infrastructure.Commands.Idempotency.TransactionalRequestReplay(noCtfDbContext, requestCommandKey, _timeProvider);
             var scopedRuntimeControl = new NoCTF.Infrastructure.Runtime.Instances.ScopedRuntimeControl(noCtfDbContext, _challengeRuntimeTemplateCatalog, _runtimePlacementPolicy1, perTeamRuntimeFlagStore, wolverinePostCommitMessagePublisher, runnerExecutionRuntimeIsolation, liveSoloExecutionAccess, _timeProvider, transactionalRequestReplay);
-            var liveSoloRuntimePreparation = new NoCTF.Infrastructure.LiveSolo.Resources.LiveSoloRuntimePreparation(noCtfDbContext, scopedRuntimeControl);
+            var liveSoloRuntimePreparation = new NoCTF.Infrastructure.LiveSolo.Resources.LiveSoloRuntimePreparation(noCtfDbContext, scopedRuntimeControl, wolverinePostCommitMessagePublisher);
             var competitionModerationAuthorizer = new NoCTF.Infrastructure.Teams.Moderation.CompetitionModerationAuthorizer(noCtfDbContext);
             var liveSoloMatchStore = new NoCTF.Infrastructure.LiveSolo.Matches.LiveSoloMatchStore(noCtfDbContext, competitionModerationAuthorizer, _liveSoloMediaGateway, _liveSoloEgressGateway, liveSoloRuntimePreparation, wolverinePostCommitMessagePublisher, transactionalRequestReplay, _timeProvider);
             // The actual message body

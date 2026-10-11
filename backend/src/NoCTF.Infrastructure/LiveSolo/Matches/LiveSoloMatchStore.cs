@@ -88,18 +88,28 @@ public sealed partial class LiveSoloMatchStore(NoCtfDbContext db, ICompetitionMo
     {
         var ids = match.Slots.Where(x => x.TeamId is not null).Select(x => x.TeamId!.Value).ToArray();
         var names = await db.Teams.IgnoreQueryFilters().Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, ct);
+        var avatars = await db.Teams.IgnoreQueryFilters().Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.AvatarFileId, ct);
+        var leftId = match.Slots.Single(x => x.Side == LiveSoloSide.Left).TeamId;
+        var rightId = match.Slots.Single(x => x.Side == LiveSoloSide.Right).TeamId;
         return Map(match, names, await CorrectionSourcesAsync([match], ct),
-            await db.LiveSoloMediaSessions.AsNoTracking().AnyAsync(x => x.MatchId == match.Id, ct));
+            await db.LiveSoloMediaSessions.AsNoTracking().AnyAsync(x => x.MatchId == match.Id, ct)) with
+        {
+            LeftAvatarFileId = leftId is Guid l ? avatars.GetValueOrDefault(l) : null,
+            RightAvatarFileId = rightId is Guid r ? avatars.GetValueOrDefault(r) : null
+        };
     }
     private static LiveSoloMatchView Map(LiveSoloMatch match, IReadOnlyDictionary<Guid, string> names, IReadOnlyDictionary<Guid, Guid>? corrections = null, bool hasMedia = false)
     {
         var left = match.Slots.Single(x => x.Side == LiveSoloSide.Left); var right = match.Slots.Single(x => x.Side == LiveSoloSide.Right);
         return new(match.Id, match.CompetitionId, match.State, match.ConcurrencyStamp, match.RequiredWins, match.LeftWins, match.RightWins,
             left.TeamId, left.TeamId is Guid l ? names.GetValueOrDefault(l) : null,
-            right.TeamId, right.TeamId is Guid r ? names.GetValueOrDefault(r) : null, match.CurrentRoundId, match.WinnerTeamId,
+            right.TeamId, right.TeamId is Guid r ? names.GetValueOrDefault(r) : null, match.CurrentRoundId,
+            match.State == LiveSoloMatchState.Canceled ? null : match.WinnerTeamId,
             match.Slots.Where(x => x.TeamId is not null).Select(x => new LiveSoloRosterView(x.TeamId!.Value,
                 match.Roster.Where(r => r.TeamId == x.TeamId).Select(r => r.UserId).Order().ToArray(), x.RosterLockedAt is not null, x.ReadyConfirmedAt is not null)).ToArray(),
-            match.PendingCorrectionId, match.ReplacementMatchId, match.PendingCorrectionId is Guid correction ? corrections?.GetValueOrDefault(correction) : null, hasMedia);
+            match.PendingCorrectionId, match.ReplacementMatchId, match.PendingCorrectionId is Guid correction ? corrections?.GetValueOrDefault(correction) : null, hasMedia)
+        { ResultRevision = match.ResultRevision, EndReason = match.EndReason, ResultLeftWins = match.ResultLeftWins,
+          ResultRightWins = match.ResultRightWins, ResultUpdatedAt = match.ResultUpdatedAt };
     }
 
     public async Task<LiveSoloMatchResult> CreateAsync(CreateLiveSoloMatch command, CancellationToken ct) =>
@@ -146,11 +156,14 @@ public sealed partial class LiveSoloMatchStore(NoCtfDbContext db, ICompetitionMo
             .OrderBy(x => x.Lane).ThenBy(x => x.Stage).ThenBy(x => x.Position).ToArrayAsync(ct);
         var teamIds = matches.SelectMany(x => x.Slots).Where(x => x.TeamId != null).Select(x => x.TeamId!.Value).Distinct().ToArray();
         var names = await db.Teams.IgnoreQueryFilters().Where(x => teamIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, ct);
+        var avatars = await db.Teams.IgnoreQueryFilters().Where(x => teamIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.AvatarFileId, ct);
         var corrections = await CorrectionSourcesAsync(matches, ct);
         var matchIds = matches.Select(x => x.Id).ToArray();
         var withMedia = (await db.LiveSoloMediaSessions.AsNoTracking().Where(x => matchIds.Contains(x.MatchId))
             .Select(x => x.MatchId).Distinct().ToArrayAsync(ct)).ToHashSet();
-        return matches.Select(x => Map(x, names, corrections, withMedia.Contains(x.Id))).ToArray();
+        return matches.Select(x => Map(x, names, corrections, withMedia.Contains(x.Id)) with {
+            LeftAvatarFileId = x.Slots.Single(s => s.Side == LiveSoloSide.Left).TeamId is Guid l ? avatars.GetValueOrDefault(l) : null,
+            RightAvatarFileId = x.Slots.Single(s => s.Side == LiveSoloSide.Right).TeamId is Guid r ? avatars.GetValueOrDefault(r) : null }).ToArray();
     }
     private Task<Dictionary<Guid,Guid>> CorrectionSourcesAsync(IEnumerable<LiveSoloMatch> matches,CancellationToken ct)
     {
@@ -177,12 +190,10 @@ public sealed partial class LiveSoloMatchStore(NoCtfDbContext db, ICompetitionMo
             if (LiveSoloConfigurationValidator.ValidateGroup(candidate, config.RoundLimitSeconds, config.QuestionIntervalSeconds).Count != 0
                 || await db.CompetitionChallenges.CountAsync(x => x.CompetitionId == competitionId && entries.Select(e => e.CompetitionChallengeId).Contains(x.Id), ct) != entries.Count)
                 return new(null, LiveSoloFailure.InvalidConfiguration);
-            var templates = await db.CompetitionChallenges.AsNoTracking().Where(x => entries.Select(e => e.CompetitionChallengeId).Contains(x.Id))
-                .Select(x => x.ChallengeId).ToArrayAsync(ct);
-            var sources = await db.LiveSoloChallengeSources.AsNoTracking().Where(x => templates.Contains(x.ChallengeId))
-                .ToDictionaryAsync(x => x.ChallengeId, x => x.CanonicalChallengeId, ct);
-            if (templates.Select(id => sources.GetValueOrDefault(id, id)).Distinct().Count() != entries.Count)
-                return new(null, LiveSoloFailure.InvalidConfiguration);
+            var definitions = await db.CompetitionChallenges.Where(x => entries.Select(e => e.CompetitionChallengeId).Contains(x.Id))
+                .Join(db.Challenges.AsNoTracking(), x => x.ChallengeId, x => x.Id, (_, template) => template.Definition!).AsSplitQuery().ToArrayAsync(ct);
+            if (definitions.Any(x => x is not LiveSoloChallengeDefinition definition || LiveSoloConfigurationValidator.ValidateDefinition(definition).Count != 0))
+                return new(null, LiveSoloFailure.UnsupportedEnvironment);
             group.Name = candidate.Name; group.RoundLimitSeconds = input.LimitSeconds; group.Reserve = input.Reserve;
             group.ConcurrencyStamp = Guid.NewGuid();
             if (input.Id is null) db.LiveSoloQuestionGroups.Add(group);

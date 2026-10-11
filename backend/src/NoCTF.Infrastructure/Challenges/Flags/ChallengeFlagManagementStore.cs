@@ -220,7 +220,7 @@ public sealed class ChallengeFlagManagementStore(
     {
         if (scope.ChallengeId is Guid challengeId)
             return db.Challenges.AnyAsync(challenge =>
-                challenge.Id == challengeId &&
+                challenge.Id == challengeId && challenge.CatalogScope == ChallengeCatalogScope.QuestionBank &&
                 (isAdministrator ||
                  challenge.OwnerId == actorId ||
                  (actorId != null && challenge.Managers.Any(manager => manager.UserId == actorId.Value))), ct);

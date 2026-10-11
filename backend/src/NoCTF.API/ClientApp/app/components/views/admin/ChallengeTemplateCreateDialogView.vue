@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { ChallengeTemplateCreateDialogViewState } from '~/features/admin/useChallengeTemplateCreateDialog'
 
 const viewProps = defineProps<{ state: ChallengeTemplateCreateDialogViewState }>()
-const { open, title, mode, visibility, direction, description, definition, saveErrors, pending, titleInvalid, directionInvalid, directionOptions, changeMode, setOpen, submit, DefinitionEditor } = toRefs(viewProps.state)
+const { variant, setVariant, sourceId, sourceKeyword, sourceOptions, source, copySupported, copyAttachments, copyFlags, selectSource, searchSources, sourcePage, sourcePageCount, sourceTotal, sourceLimit, sourceLoading, sourcePageChange, sourceLimitChange, open, title, mode, visibility, direction, description, definition, saveErrors, pending, titleInvalid, directionInvalid, directionOptions, changeMode, setOpen, submit, DefinitionEditor } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -14,6 +14,7 @@ const { open, title, mode, visibility, direction, description, definition, saveE
         <DialogDescription>{{ $t('administration.challengeTemplate.description.optionalConfigureLaterCreation') }}</DialogDescription>
       </DialogHeader>
 
+      <div v-if="mode === 'LiveSolo'" class="px-6 pt-4"><Tabs :model-value="variant" @update:model-value="setVariant"><TabsList><TabsTrigger value="blank">{{ $t('liveSolo.bank.blank') }}</TabsTrigger><TabsTrigger value="copy">{{ $t('liveSolo.bank.copy') }}</TabsTrigger></TabsList></Tabs></div>
       <UiForm validation="feature" class="flex min-h-0 flex-1 flex-col" @submit.prevent="submit">
         <Alert v-if="saveErrors.length" variant="destructive" class="mx-6 mt-5 shrink-0">
           <AlertTitle>{{ $t('administration.challengesBy.description.unableSaveChallengeTemplate') }}</AlertTitle>
@@ -25,7 +26,7 @@ const { open, title, mode, visibility, direction, description, definition, saveE
           </AlertDescription>
         </Alert>
 
-        <Tabs default-value="basic" class="flex min-h-0 flex-1 flex-col px-6 pt-5">
+        <Tabs v-if="variant === 'blank'" default-value="basic" class="flex min-h-0 flex-1 flex-col px-6 pt-5">
           <TabsList class="shrink-0 self-start">
             <TabsTrigger value="basic">{{ $t('administration.label.basicInformation') }}</TabsTrigger>
             <TabsTrigger value="definition">{{ $t('administration.label.questionDefinition') }}</TabsTrigger>
@@ -81,9 +82,22 @@ const { open, title, mode, visibility, direction, description, definition, saveE
           </ScrollSurface>
         </Tabs>
 
+        <ScrollSurface v-if="variant === 'copy'" class="min-h-0 flex-1 px-6 py-5">
+          <div class="flex flex-col gap-4"><p class="text-sm text-muted-foreground">{{ $t('liveSolo.bank.copyHelp') }}</p>
+            <div class="flex gap-2"><Input v-model="sourceKeyword" :aria-label="$t('liveSolo.groups.searchTemplate')" :placeholder="$t('liveSolo.groups.searchTemplate')" @keydown.enter.prevent="searchSources" /><Button type="button" variant="outline" :disabled="sourceLoading" @click="searchSources">{{ $t('liveSolo.groups.findTemplates') }}</Button></div>
+            <ChoicePicker :model-value="sourceId" :items="sourceOptions" :disabled="sourceLoading || pending" :label="$t('liveSolo.groups.selectTemplate')" :search-label="$t('liveSolo.groups.searchTemplate')" :empty-label="$t('liveSolo.groups.noTemplate')" @update:model-value="selectSource" />
+            <OffsetPagination :page="sourcePage" :page-count="sourcePageCount" :total="sourceTotal" :limit="sourceLimit" :loading="sourceLoading" @update:page="sourcePageChange" @update:limit="sourceLimitChange" />
+            <p v-if="source && !copySupported" class="text-sm text-destructive">{{ $t('liveSolo.bank.unsupported') }}</p>
+            <p v-if="source?.definition?.runtime?.allocation === 'Shared'" class="text-sm text-muted-foreground">{{ $t('liveSolo.bank.allocation') }}</p>
+            <Field orientation="horizontal"><Checkbox id="bank-copy-attachments" v-model="copyAttachments" :disabled="pending" /><FieldLabel for="bank-copy-attachments">{{ $t('liveSolo.groups.copyAttachments') }}</FieldLabel></Field>
+            <Field orientation="horizontal"><Checkbox id="bank-copy-flags" v-model="copyFlags" :disabled="pending" /><FieldLabel for="bank-copy-flags">{{ $t('liveSolo.groups.copyFlags') }}</FieldLabel></Field>
+            <FieldDescription>{{ $t('liveSolo.groups.flagsPermission') }}</FieldDescription>
+          </div>
+        </ScrollSurface>
+
         <DialogFooter class="shrink-0 border-t px-6 py-4">
           <Button type="button" variant="outline" :disabled="pending" @click="setOpen(false)">{{ $t('common.action.cancel') }}</Button>
-          <Button type="submit" :disabled="pending">
+          <Button type="submit" :disabled="pending || variant === 'copy' && (!source || !copySupported)">
             <Spinner v-if="pending" data-icon="inline-start" />{{ $t('administration.label.createTemplate') }}
           </Button>
         </DialogFooter>

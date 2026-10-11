@@ -83,7 +83,7 @@ public sealed class LeaderboardProjectionPersistenceTests
             var cache = new FusionLeaderboardCache(db, new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()), publisher,
                 cacheProvider, new NatsLeaderboardPublicationFence(connection, cacheProvider), clock: clock);
             var queue = new NoCTF.Infrastructure.Messaging.LeaderboardProjectionMergeQueue();
-            var handler = new CompetitionEventLeaderboardMessageHandler(cache, queue, clock);
+            var handler = new CompetitionEventLeaderboardMessageHandler(cache, queue, clock, new NoCTF.Infrastructure.Competitions.Events.CompetitionEventApplicabilityReader(db));
             var outbox = new NoCTF.Infrastructure.Messaging.NoOpPostCommitMessagePublisher();
             var recorder = new NoCTF.Infrastructure.Competitions.Events.CompetitionEventStore(db, outbox);
             var competitionStore = new NoCTF.Infrastructure.Competitions.Configuration.CompetitionConfigurationStore(db, outbox, recorder);
@@ -265,7 +265,7 @@ public sealed class LeaderboardProjectionPersistenceTests
             await store.TryUpdateAsync(fixture.Competition.Id, Configuration(120), true, now, ct);
             var change = await db.CompetitionEvents.AsNoTracking().SingleAsync(ct);
             var queue = new NoCTF.Infrastructure.Messaging.LeaderboardProjectionMergeQueue();
-            await new CompetitionEventLeaderboardMessageHandler(cache, queue, clock).Handle(new(
+            await new CompetitionEventLeaderboardMessageHandler(cache, queue, clock, new NoCTF.Infrastructure.Competitions.Events.CompetitionEventApplicabilityReader(db)).Handle(new(
                 change.CompetitionId, change.Id, change.Kind, change.Level, change.OccurredAt), ct);
             clock.Advance(TimeSpan.FromMilliseconds(500));
             await Assert.That(queue.TakeDue(clock.GetUtcNow())).IsEquivalentTo([fixture.Competition.Id]);

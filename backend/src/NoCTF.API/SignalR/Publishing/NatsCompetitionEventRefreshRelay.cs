@@ -15,6 +15,7 @@ public sealed class NatsCompetitionEventRefreshRelay(
     INatsConnection connection,
     ICompetitionHubAudienceRouter audiences,
     ICompetitionHubAudienceCoordinator coordinator,
+    IServiceScopeFactory scopes,
     ILogger<NatsCompetitionEventRefreshRelay> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -30,6 +31,9 @@ public sealed class NatsCompetitionEventRefreshRelay(
                 var notification = JsonSerializer.Deserialize(message.Data,
                     NoCtfMessageJsonContext.Default.CompetitionEventCommitted);
                 if (notification is null) continue;
+                await using var scope = scopes.CreateAsyncScope();
+                if (!await scope.ServiceProvider.GetRequiredService<ICompetitionEventApplicabilityReader>()
+                    .CanPublishAsync(notification.CompetitionId, notification.Kind, stoppingToken)) continue;
                 var clients = notification.Kind == CompetitionEventKind.CompetitionAudienceChanged
                     ? await audiences.AllKnownAsync(notification.CompetitionId, stoppingToken)
                     : await audiences.CurrentAsync(notification.CompetitionId, stoppingToken);

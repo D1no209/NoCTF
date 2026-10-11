@@ -81,6 +81,9 @@ public sealed partial class ChallengeWriteUpStore(NoCtfDbContext db, ICompetitio
             .ToDictionaryAsync(x => x.Id, x => x.Name, ct);
         var title = context.Challenge.CustomTitle ?? await db.Challenges.AsNoTracking()
             .Where(x => x.Id == context.Challenge.ChallengeId).Select(x => x.Title).SingleAsync(ct);
+        if (context.Competition.Mode == GameMode.LiveSolo && executionScopeId is Guid scopeId)
+            title = await db.LiveSoloRoundQuestions.AsNoTracking().Where(x => x.Id == scopeId)
+                .Select(x => x.OpenedContent != null ? x.OpenedContent.Title : string.Empty).SingleAsync(ct);
         var actors = await ActorNamesAsync(roots, ct);
         foreach (var root in roots)
             items.Add(Map(root, title, root.TeamId is Guid id ? names.GetValueOrDefault(id, string.Empty) : string.Empty,
