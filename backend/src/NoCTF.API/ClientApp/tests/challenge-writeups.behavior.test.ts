@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { computed, effectScope, markRaw, nextTick, reactive, ref, watch } from 'vue'
-import { challengeWriteUpPath, latestWriteUpVersion, needsWriteUpConfirmation, writeUpPublicationVersion, writeUpPublicationLabel, writeUpStatusKey } from '../app/features/writeups/writeup-state'
+import { challengeWriteUpPath, latestWriteUpVersion, matchesMyWriteUpFilter, myWriteUpFilters, needsWriteUpConfirmation, writeUpPublicationVersion, writeUpPublicationLabel, writeUpStatusKey } from '../app/features/writeups/writeup-state'
 
 async function compile(path: string, name: string) {
   const compiled = new Bun.Transpiler({ loader: 'ts' }).transformSync(await Bun.file(new URL(path, import.meta.url)).text())
@@ -11,6 +11,7 @@ async function compile(path: string, name: string) {
 const readerFactory = await compile('../app/features/writeups/useChallengeWriteUpPage.ts', 'useChallengeWriteUpPage')
 const rawEditorFactory = await compile('../app/features/writeups/useChallengeWriteUpEditor.ts', 'useChallengeWriteUpEditor')
 const rawReviewFactory = await compile('../app/features/writeups/useChallengeWriteUpReview.ts', 'useChallengeWriteUpReview')
+const myWriteUpsFactory = await compile('../app/features/writeups/useMySingleWriteUps.ts', 'useMySingleWriteUps')
 const publicationFactory = await compile('../app/features/writeups/writeup-publication.ts', '({ matchesWriteUpTarget, publishWriteUpVersion, writeUpActionTarget })')
 function publicationDeps(deps: Record<string, unknown>) {
   return { ...deps, latestWriteUpVersion, writeUpPublicationVersion, writeUpPublicationLabel, ...publicationFactory(deps) }
@@ -21,6 +22,45 @@ const drain = async () => { await nextTick(); await new Promise(resolve => setTi
 const baseDeps = { getCompetitionEndpoint: async () => ({ data: { status: 'Running' } }), ref, computed, watch, markRaw, nextTick, onMounted: () => {}, onBeforeUnmount: () => {},
   translate: (key: string) => key, message: (key: string) => ({ key }),
   parseApiError: (error: unknown) => ({ displayMessage: error }), toast: { success: () => {}, error: () => {} } }
+
+test('my writeups combine search with current status, including published revisions in progress', async () => {
+  const challenges = ['draft', 'pending', 'rejected', 'published', 'withdrawn', 'new', 'revision', 'published-pending', 'published-rejected']
+    .map(id => ({ id, title: `Challenge ${id}`, direction: id === 'draft' ? 'Web' : 'Pwn' }))
+  const mine = [
+    { competitionChallengeId: 'draft', draft: { state: 'Draft' } },
+    { competitionChallengeId: 'pending', submitted: { state: 'Submitted' } },
+    { competitionChallengeId: 'rejected', submitted: { state: 'Rejected' } },
+    { competitionChallengeId: 'published', publishedVersionId: 'v1' },
+    { competitionChallengeId: 'withdrawn', versions: [{ state: 'Approved' }] },
+    { competitionChallengeId: 'revision', publishedVersionId: 'v1', draft: { state: 'Draft' } },
+    { competitionChallengeId: 'published-pending', publishedVersionId: 'v1', submitted: { state: 'Submitted' } },
+    { competitionChallengeId: 'published-rejected', publishedVersionId: 'v1', submitted: { state: 'Rejected' } },
+  ]
+  const state = myWriteUpsFactory({ ...baseDeps, useRoute: () => ({ query: {} }), useRouter: () => ({}),
+    challengeWriteUpPath, matchesMyWriteUpFilter, myWriteUpFilters, writeUpStatusKey,
+    listChallengesEndpoint: async () => ({ data: { items: challenges } }), listMyChallengeWriteUps: async () => ({ data: mine }) })({ competitionId: 'competition' })
+  await state.load()
+  const ids = () => state.rows.value.map((row: { challenge: { id: string } }) => row.challenge.id)
+  expect(ids()).toHaveLength(9)
+  state.status.value = 'Draft'; expect(ids()).toEqual(['draft', 'revision'])
+  expect(state.rows.value[1].statusKey).toBe('challengeWriteUp.publishedDraft')
+  state.search.value = ' WEB '; expect(ids()).toEqual(['draft'])
+  state.search.value = 'missing'; expect(ids()).toEqual([]); expect(state.filtered.value).toBeTrue()
+  state.clearFilters(); expect(state.filtered.value).toBeFalse(); expect(ids()).toHaveLength(9)
+  for (const [status, expected] of [
+    ['NotSubmitted', ['new']], ['Submitted', ['pending', 'published-pending']], ['Rejected', ['rejected', 'published-rejected']],
+    ['Published', ['published', 'revision', 'published-pending', 'published-rejected']], ['Withdrawn', ['withdrawn']],
+  ]) { state.status.value = status; expect(ids()).toEqual(expected) }
+  state.status.value = 'Draft'
+  mine[0] = { competitionChallengeId: 'draft', submitted: { state: 'Submitted' } }
+  await state.load(); expect(ids()).toEqual(['revision'])
+  state.status.value = 'Submitted'; expect(ids()).toEqual(['draft', 'pending', 'published-pending'])
+  // A withdrawn publication must not hide the review status of a new revision.
+  mine[0] = { competitionChallengeId: 'draft', submitted: { state: 'Submitted' }, versions: [{ state: 'Approved' }] }
+  await state.load()
+  expect(state.rows.value[0].statusKey).toBe('challengeWriteUp.submitted')
+  expect(ids()).toEqual(['draft', 'pending', 'published-pending'])
+})
 function reader() {
   const scope = effectScope(), calls: string[] = []
   const route = reactive({ params: { id: 'competition', competitionChallengeId: 'challenge', writeUpId: 'official' }, query: { tag: ['Web', 'SQL'], hideSolved: 'true' } })

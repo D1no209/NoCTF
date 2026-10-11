@@ -3,14 +3,17 @@ import { toRefs } from 'vue'
 import type { CompetitionsByIdMyWriteUpPageViewState } from '~/features/routes/competitions/[id]/my/useCompetitionsByIdMyWriteUpPage'
 
 const viewProps = defineProps<{ state: CompetitionsByIdMyWriteUpPageViewState }>()
-const { activeTab, singleEnabled, MySingleWriteUps, Download, Eye, FileText, maximumWriteUpBytes, competitionId, submissionRequired, submissionDeadlineAt, submissionClosed, writeUp, selectedFile, uploadInputKey, loading, loadError, uploadError, uploadPending, previewUrl, previewLoading, previewError, downloadPending, load, selectFile, submit, preview, download, CompetitionParticipantWorkspace } = toRefs(viewProps.state)
+const { activeTab, singleEnabled, MySingleWriteUps, BookOpen, Download, Eye, FileText, maximumWriteUpBytes, competitionId, submissionRequired, submissionDeadlineAt, submissionClosed, writeUp, selectedFile, uploadInputKey, loading, loadError, uploadError, uploadPending, previewUrl, previewLoading, previewError, downloadPending, load, selectFile, submit, preview, download, CompetitionParticipantWorkspace } = toRefs(viewProps.state)
 </script>
 
 <template>
   <component :is="CompetitionParticipantWorkspace" :competition-id="competitionId">
-    <Tabs v-model="activeTab">
-      <TabsList><TabsTrigger v-if="singleEnabled" value="single">{{ $t('challengeWriteUp.title') }}</TabsTrigger><TabsTrigger value="whole">{{ $t('challengeWriteUp.whole') }}</TabsTrigger></TabsList>
-      <TabsContent v-if="singleEnabled" value="single"><component :is="MySingleWriteUps" :competition-id="competitionId" /></TabsContent>
+    <Tabs v-model="activeTab" class="gap-4">
+      <TabsList variant="workspace" class="w-full sm:w-fit" :aria-label="$t('writeUp.myWriteUp')">
+        <TabsTrigger v-if="singleEnabled" value="single"><BookOpen aria-hidden="true" />{{ $t('challengeWriteUp.singleTab') }}</TabsTrigger>
+        <TabsTrigger value="whole"><FileText aria-hidden="true" />{{ $t('challengeWriteUp.whole') }}</TabsTrigger>
+      </TabsList>
+      <TabsContent v-if="singleEnabled" v-show="activeTab === 'single'" value="single" force-mount><component :is="MySingleWriteUps" :competition-id="competitionId" /></TabsContent>
       <TabsContent value="whole">
     <Card class="min-h-[38rem]">
       <CardHeader>
