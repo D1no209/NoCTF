@@ -7,11 +7,12 @@ export const endReasonKeys = {
 export function resultPresentation(match: Match, round: Round | null, kind: 'Match' | 'Round') {
   const result = kind === 'Match' ? match : round
   if (!result || (result.resultRevision ?? 0) < 1) return null
-  const winner = result.winnerTeamId
-  const winnerName = winner === match.leftTeamId ? match.leftTeamName : winner === match.rightTeamId ? match.rightTeamName : null
-  const winnerAvatar = winner === match.leftTeamId ? match.leftTeamId : winner === match.rightTeamId ? match.rightTeamId : null
+  const winner = result.winnerTeamId || null
+  const winnerName = winner && winner === match.leftTeamId ? match.leftTeamName : winner && winner === match.rightTeamId ? match.rightTeamName : null
+  const winnerAvatar = winner && winner === match.leftTeamId ? match.leftTeamId : winner && winner === match.rightTeamId ? match.rightTeamId : null
   const left = result.resultLeftWins, right = result.resultRightWins
-  return { kind, winnerName, winnerAvatar, roundNumber: round?.number, revision: result.resultRevision,
+  return { kind, winnerName, winnerAvatar, hasWinner: !!winner,
+    leftName: match.leftTeamName, rightName: match.rightTeamName, leftScore: left, rightScore: right, roundNumber: round?.number, revision: result.resultRevision,
     score: left != null && right != null ? `${left} : ${right}` : null, reasonKey: endReasonKeys[result.endReason ?? 'Unrecorded'],
     corrected: result.endReason === 'ResultCorrected' || result.endReason === 'DownstreamReplaced',
     endedAt: kind === 'Match' ? match.resultUpdatedAt : round?.endedAt }
