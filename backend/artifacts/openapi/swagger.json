@@ -28,6 +28,471 @@
         }
       }
     },
+    "/api/v1/theory/questions/{questionId}/copy": {
+      "post": {
+        "tags": [
+          "Theory"
+        ],
+        "summary": "Copies a theory question into an independent draft.",
+        "description": "Requires source content access and resource creation permission; preserves canonical source identity.",
+        "operationId": "TheoryQuestionsCopy",
+        "parameters": [
+          {
+            "name": "questionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationTheoryQuestionsTheoryQuestionSaved"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/theory/questions": {
+      "post": {
+        "tags": [
+          "Theory"
+        ],
+        "summary": "Creates an independent theory question.",
+        "description": "Only resource managers can create a question; the first immutable version starts as a draft.",
+        "operationId": "TheoryQuestionsCreate",
+        "requestBody": {
+          "x-name": "CreateTheoryQuestionRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsTheoryQuestionsCreateTheoryQuestionRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationTheoryQuestionsTheoryQuestionSaved"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Theory"
+        ],
+        "summary": "Lists authorized theory question metadata.",
+        "description": "Use-only grants expose summaries without question bodies, answer keys or explanations.",
+        "operationId": "TheoryQuestionsList",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "nullable": true,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/NoCTFDomainTheoryQuestionsTheoryQuestionKind"
+                }
+              ]
+            }
+          },
+          {
+            "name": "keyword",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "desc",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationTheoryQuestionsTheoryQuestionPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/theory/questions/{questionId}": {
+      "get": {
+        "tags": [
+          "Theory"
+        ],
+        "summary": "Reads theory question content for an editor.",
+        "description": "Requires editing permission; use-only grantees cannot retrieve answer content.",
+        "operationId": "TheoryQuestionsGet",
+        "parameters": [
+          {
+            "name": "questionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationTheoryQuestionsTheoryQuestionContent"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Theory"
+        ],
+        "summary": "Creates a new theory question version.",
+        "description": "Requires editing permission and preserves all previously issued versions.",
+        "operationId": "TheoryQuestionsUpdate",
+        "parameters": [
+          {
+            "name": "questionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "UpdateTheoryQuestionRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsTheoryQuestionsUpdateTheoryQuestionRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationTheoryQuestionsTheoryQuestionSaved"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/theory/questions/{questionId}/grants/{userId}": {
+      "put": {
+        "tags": [
+          "Theory"
+        ],
+        "summary": "Changes a theory question collaborator grant.",
+        "description": "Requires management permission; an explicit null permission revokes the target grant.",
+        "operationId": "TheoryQuestionsGrant",
+        "parameters": [
+          {
+            "name": "questionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "GrantTheoryQuestionRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsTheoryQuestionsGrantTheoryQuestionRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/theory/questions/{questionId}/state": {
+      "put": {
+        "tags": [
+          "Theory"
+        ],
+        "summary": "Changes a theory question catalog state.",
+        "description": "Retiring a question prevents new selection without mutating published activity versions.",
+        "operationId": "TheoryQuestionsSetState",
+        "parameters": [
+          {
+            "name": "questionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "SetTheoryQuestionStateRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsTheoryQuestionsSetTheoryQuestionStateRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/competitions/{competitionId}/teams/{teamId}/avatar": {
       "delete": {
         "tags": [
@@ -25042,6 +25507,481 @@
           "Ok"
         ]
       },
+      "NoCTFApplicationTheoryQuestionsTheoryQuestionSaved": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "questionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "revisionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sourceId": {
+            "type": "string",
+            "format": "guid"
+          }
+        }
+      },
+      "MicrosoftAspNetCoreMvcValidationProblemDetails": {
+        "properties": {
+          "messageKey": {
+            "type": "string",
+            "description": "Stable semantic message identity. Translate with messageArguments; never infer identity from detail text."
+          },
+          "messageArguments": {
+            "type": "object",
+            "description": "Named interpolation arguments."
+          },
+          "errorMessages": {
+            "type": "object",
+            "description": "Per-field message descriptors, in the same order as errors.",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "arguments": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MicrosoftAspNetCoreHttpHttpValidationProblemDetails"
+          },
+          {
+            "type": "object",
+            "additionalProperties": {
+              "nullable": true
+            },
+            "properties": {
+              "errors": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "MicrosoftAspNetCoreHttpHttpValidationProblemDetails": {
+        "properties": {
+          "messageKey": {
+            "type": "string",
+            "description": "Stable semantic message identity. Translate with messageArguments; never infer identity from detail text."
+          },
+          "messageArguments": {
+            "type": "object",
+            "description": "Named interpolation arguments."
+          }
+        },
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+          },
+          {
+            "type": "object",
+            "additionalProperties": {
+              "nullable": true
+            },
+            "properties": {
+              "errors": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "MicrosoftAspNetCoreMvcProblemDetails": {
+        "type": "object",
+        "additionalProperties": {
+          "nullable": true
+        },
+        "properties": {
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "detail": {
+            "type": "string",
+            "nullable": true
+          },
+          "instance": {
+            "type": "string",
+            "nullable": true
+          },
+          "messageKey": {
+            "type": "string",
+            "description": "Stable semantic message identity. Translate with messageArguments; never infer identity from detail text."
+          },
+          "messageArguments": {
+            "type": "object",
+            "description": "Named interpolation arguments."
+          }
+        }
+      },
+      "NoCTFAPIEndpointsTheoryQuestionsCopyTheoryQuestionRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsTheoryQuestionsCreateTheoryQuestionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "content"
+        ],
+        "properties": {
+          "content": {
+            "nullable": false,
+            "$ref": "#/components/schemas/NoCTFApplicationTheoryQuestionsTheoryQuestionInput"
+          }
+        }
+      },
+      "NoCTFApplicationTheoryQuestionsTheoryQuestionInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "body",
+          "options",
+          "classifications",
+          "fileIds"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 0,
+            "nullable": false
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 64000,
+            "minLength": 0,
+            "nullable": false
+          },
+          "explanation": {
+            "type": "string",
+            "maxLength": 64000,
+            "minLength": 0,
+            "nullable": true
+          },
+          "kind": {
+            "$ref": "#/components/schemas/NoCTFDomainTheoryQuestionsTheoryQuestionKind"
+          },
+          "difficulty": {
+            "$ref": "#/components/schemas/NoCTFDomainTheoryQuestionsTheoryQuestionDifficulty"
+          },
+          "options": {
+            "type": "array",
+            "nullable": false,
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationTheoryQuestionsTheoryOptionInput"
+            }
+          },
+          "classifications": {
+            "type": "array",
+            "nullable": false,
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationTheoryQuestionsTheoryClassificationInput"
+            }
+          },
+          "fileIds": {
+            "type": "array",
+            "nullable": false,
+            "items": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        }
+      },
+      "NoCTFDomainTheoryQuestionsTheoryQuestionKind": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "SingleChoice",
+          "MultipleChoice",
+          "TrueFalse"
+        ],
+        "enum": [
+          0,
+          1,
+          2
+        ]
+      },
+      "NoCTFDomainTheoryQuestionsTheoryQuestionDifficulty": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Basic",
+          "Intermediate",
+          "Advanced"
+        ],
+        "enum": [
+          0,
+          1,
+          2
+        ]
+      },
+      "NoCTFApplicationTheoryQuestionsTheoryOptionInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "content": {
+            "type": "string"
+          },
+          "isCorrect": {
+            "type": "boolean"
+          },
+          "truthValue": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainTheoryQuestionsTheoryTruthValue"
+              }
+            ]
+          }
+        }
+      },
+      "NoCTFDomainTheoryQuestionsTheoryTruthValue": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "True",
+          "False"
+        ],
+        "enum": [
+          0,
+          1
+        ]
+      },
+      "NoCTFApplicationTheoryQuestionsTheoryClassificationInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/NoCTFDomainTheoryQuestionsTheoryClassificationKind"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFDomainTheoryQuestionsTheoryClassificationKind": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Knowledge",
+          "Tag"
+        ],
+        "enum": [
+          0,
+          1
+        ]
+      },
+      "NoCTFApplicationTheoryQuestionsTheoryQuestionContent": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "question": {
+            "$ref": "#/components/schemas/NoCTFApplicationTheoryQuestionsTheoryQuestionSummary"
+          },
+          "revisionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "content": {
+            "$ref": "#/components/schemas/NoCTFApplicationTheoryQuestionsTheoryQuestionInput"
+          }
+        }
+      },
+      "NoCTFApplicationTheoryQuestionsTheoryQuestionSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "ownerId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "sourceId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "title": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/NoCTFDomainTheoryQuestionsTheoryQuestionKind"
+          },
+          "difficulty": {
+            "$ref": "#/components/schemas/NoCTFDomainTheoryQuestionsTheoryQuestionDifficulty"
+          },
+          "state": {
+            "$ref": "#/components/schemas/NoCTFDomainTheoryQuestionsTheoryQuestionState"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "canReadAnswers": {
+            "type": "boolean"
+          },
+          "canManage": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFDomainTheoryQuestionsTheoryQuestionState": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Draft",
+          "Available",
+          "Retired"
+        ],
+        "enum": [
+          0,
+          1,
+          2
+        ]
+      },
+      "NoCTFAPIEndpointsTheoryQuestionsGetTheoryQuestionRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsTheoryQuestionsGrantTheoryQuestionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "permission": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainTheoryQuestionsTheoryQuestionPermission"
+              }
+            ]
+          }
+        }
+      },
+      "NoCTFDomainTheoryQuestionsTheoryQuestionPermission": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Use",
+          "Edit",
+          "Manage"
+        ],
+        "enum": [
+          0,
+          1,
+          2
+        ]
+      },
+      "NoCTFApplicationTheoryQuestionsTheoryQuestionPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationTheoryQuestionsTheoryQuestionSummary"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsTheoryQuestionsListTheoryQuestionsRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFAPIPaginationSearchRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
+      },
+      "NoCTFAPIPaginationSearchRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFAPIPaginationPaginationRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
+      },
+      "NoCTFAPIPaginationPaginationRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsTheoryQuestionsSetTheoryQuestionStateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/NoCTFDomainTheoryQuestionsTheoryQuestionState"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsTheoryQuestionsUpdateTheoryQuestionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "content"
+        ],
+        "properties": {
+          "content": {
+            "nullable": false,
+            "$ref": "#/components/schemas/NoCTFApplicationTheoryQuestionsTheoryQuestionInput"
+          }
+        }
+      },
       "NoCTFAPIEndpointsTeamsTeamRegistrationFailureResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -25379,129 +26319,6 @@
           "CaptainOnly",
           "TrackSsoIdentityRequired"
         ]
-      },
-      "MicrosoftAspNetCoreMvcValidationProblemDetails": {
-        "properties": {
-          "messageKey": {
-            "type": "string",
-            "description": "Stable semantic message identity. Translate with messageArguments; never infer identity from detail text."
-          },
-          "messageArguments": {
-            "type": "object",
-            "description": "Named interpolation arguments."
-          },
-          "errorMessages": {
-            "type": "object",
-            "description": "Per-field message descriptors, in the same order as errors.",
-            "additionalProperties": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "key": {
-                    "type": "string"
-                  },
-                  "arguments": {
-                    "type": "object"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/MicrosoftAspNetCoreHttpHttpValidationProblemDetails"
-          },
-          {
-            "type": "object",
-            "additionalProperties": {
-              "nullable": true
-            },
-            "properties": {
-              "errors": {
-                "type": "object",
-                "additionalProperties": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        ]
-      },
-      "MicrosoftAspNetCoreHttpHttpValidationProblemDetails": {
-        "properties": {
-          "messageKey": {
-            "type": "string",
-            "description": "Stable semantic message identity. Translate with messageArguments; never infer identity from detail text."
-          },
-          "messageArguments": {
-            "type": "object",
-            "description": "Named interpolation arguments."
-          }
-        },
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
-          },
-          {
-            "type": "object",
-            "additionalProperties": {
-              "nullable": true
-            },
-            "properties": {
-              "errors": {
-                "type": "object",
-                "additionalProperties": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        ]
-      },
-      "MicrosoftAspNetCoreMvcProblemDetails": {
-        "type": "object",
-        "additionalProperties": {
-          "nullable": true
-        },
-        "properties": {
-          "type": {
-            "type": "string",
-            "nullable": true
-          },
-          "title": {
-            "type": "string",
-            "nullable": true
-          },
-          "status": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "detail": {
-            "type": "string",
-            "nullable": true
-          },
-          "instance": {
-            "type": "string",
-            "nullable": true
-          },
-          "messageKey": {
-            "type": "string",
-            "description": "Stable semantic message identity. Translate with messageArguments; never infer identity from detail text."
-          },
-          "messageArguments": {
-            "type": "object",
-            "description": "Named interpolation arguments."
-          }
-        }
       },
       "NoCTFAPIEndpointsTeamsJoinTeamByInvitationRequest": {
         "type": "object",
@@ -26564,10 +27381,6 @@
             "additionalProperties": false
           }
         ]
-      },
-      "NoCTFAPIPaginationPaginationRequest": {
-        "type": "object",
-        "additionalProperties": false
       },
       "NoCTFAPIEndpointsRuntimeProbeRuntimeProxyRequest": {
         "type": "object",
@@ -38425,17 +39238,6 @@
         "allOf": [
           {
             "$ref": "#/components/schemas/NoCTFAPIPaginationSearchRequest"
-          },
-          {
-            "type": "object",
-            "additionalProperties": false
-          }
-        ]
-      },
-      "NoCTFAPIPaginationSearchRequest": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/NoCTFAPIPaginationPaginationRequest"
           },
           {
             "type": "object",

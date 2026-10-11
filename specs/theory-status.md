@@ -25,7 +25,7 @@ or CompetitionChallenge records. CTF, AWD and AWDP are the only supported compet
 
 ## Remaining delivery (not yet available to users)
 
-- Question-bank HTTP wiring, authorized new-image uploads/reads and editor.
+- Question-bank authorized new-image uploads/reads and editor.
 - Activity publication/permissions and exposure coordination.
 - Transactional issue/save/submit orchestration, safe participant HTTP contracts, authorization,
   timeout scheduling and live collaboration.
@@ -33,9 +33,10 @@ or CompetitionChallenge records. CTF, AWD and AWDP are the only supported compet
   frozen leaderboards, correction workflows, exports and displays.
 - Participant/administration UI, bilingual catalogs, generated OpenAPI/SDK and browser acceptance.
 
-The foundation must not be described as the completed feature. No theory endpoint or navigation
-entry has been exposed yet. Later stages require HTTP/concurrency/privacy and frontend acceptance,
-in addition to the initial policy and relational tests.
+The foundation must not be described as the completed feature. Seven authenticated question-bank
+endpoints are implemented with generated OpenAPI/SDK and localized failures. No theory navigation,
+activity or participant endpoint has been exposed yet. Later stages require transactional
+concurrency/privacy and frontend acceptance in addition to the initial policy and relational tests.
 
 ## Validation
 
@@ -44,3 +45,20 @@ matching, option permutations, scoring and timing boundaries. The PostgreSQL Tes
 applies the real migration chain and checks independent persistence, unique draw receipts,
 immutable content, transaction rollback and optimistic concurrency. Test evidence is kept in
 ignored `backend/artifacts/theory-*.log`; do not commit production data or the unrelated `audit/` directory.
+
+Question-bank HTTP acceptance uses PostgreSQL plus TestServer: anonymous and ordinary-user creation
+are rejected, use-only readers receive metadata without answers, unauthorized content/update/grant
+requests fail, and banning the owner removes content access. Participant projection tests verify
+that submitted papers contain no question bodies, answer keys or individual results.
+
+Known pre-existing contract issue: `AdminOpenApiRulesTests.Admin_endpoints_publish_complete_stable_metadata`
+expects 151 admin routes while the baseline exports 152. Raising the stale count reveals the existing
+`CopyLiveSoloTemplate` operation lacks the required Admin name/description and declares 422.
+This theory work does not change that existing endpoint's public contract. Route documentation was
+reconciled with the already-exported LiveSolo pool/review routes when adding the seven theory routes.
+
+Validated checkpoint (2026-10-12): 41 theory/HTTP/route-drift tests pass with Docker required;
+3 persistence-model/file-cleanup regression tests pass; Host builds with zero warnings/errors;
+EF reports no pending model changes. Frontend SDK validation: 964 Bun tests pass, typecheck passes,
+architecture audit reports zero violations. The broader OpenAPI suite has the one baseline
+admin-metadata failure above. Browser acceptance has not run because the theory UI is not built.

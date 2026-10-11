@@ -10,6 +10,170 @@ export type NoCtfapiEndpointsHealthResponse = {
 
 export type NoCtfapiEndpointsHealthStatus = 'Ok';
 
+export type NoCtfApplicationTheoryQuestionsTheoryQuestionSaved = {
+    questionId?: string;
+    revisionId?: string;
+    version?: number;
+    sourceId?: string;
+};
+
+export type MicrosoftAspNetCoreMvcValidationProblemDetails = MicrosoftAspNetCoreHttpHttpValidationProblemDetails & {
+    errors?: {
+        [key: string]: Array<string>;
+    };
+    [key: string]: unknown;
+} & {
+    /**
+     * Stable semantic message identity. Translate with messageArguments; never infer identity from detail text.
+     */
+    messageKey?: string;
+    /**
+     * Named interpolation arguments.
+     */
+    messageArguments?: {
+        [key: string]: unknown;
+    };
+    /**
+     * Per-field message descriptors, in the same order as errors.
+     */
+    errorMessages?: {
+        [key: string]: Array<{
+            key?: string;
+            arguments?: {
+                [key: string]: unknown;
+            };
+        }>;
+    };
+};
+
+export type MicrosoftAspNetCoreHttpHttpValidationProblemDetails = MicrosoftAspNetCoreMvcProblemDetails & {
+    errors?: {
+        [key: string]: Array<string>;
+    };
+    [key: string]: unknown;
+} & {
+    /**
+     * Stable semantic message identity. Translate with messageArguments; never infer identity from detail text.
+     */
+    messageKey?: string;
+    /**
+     * Named interpolation arguments.
+     */
+    messageArguments?: {
+        [key: string]: unknown;
+    };
+};
+
+export type MicrosoftAspNetCoreMvcProblemDetails = {
+    type?: string | null;
+    title?: string | null;
+    status?: number | null;
+    detail?: string | null;
+    instance?: string | null;
+    /**
+     * Stable semantic message identity. Translate with messageArguments; never infer identity from detail text.
+     */
+    messageKey?: string;
+    /**
+     * Named interpolation arguments.
+     */
+    messageArguments?: {
+        [key: string]: unknown;
+    };
+    [key: string]: unknown;
+};
+
+export type NoCtfapiEndpointsTheoryQuestionsCopyTheoryQuestionRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsTheoryQuestionsCreateTheoryQuestionRequest = {
+    content: NoCtfApplicationTheoryQuestionsTheoryQuestionInput;
+};
+
+export type NoCtfApplicationTheoryQuestionsTheoryQuestionInput = {
+    title: string;
+    body: string;
+    explanation?: string | null;
+    kind?: NoCtfDomainTheoryQuestionsTheoryQuestionKind;
+    difficulty?: NoCtfDomainTheoryQuestionsTheoryQuestionDifficulty;
+    options: Array<NoCtfApplicationTheoryQuestionsTheoryOptionInput>;
+    classifications: Array<NoCtfApplicationTheoryQuestionsTheoryClassificationInput>;
+    fileIds: Array<string>;
+};
+
+export type NoCtfDomainTheoryQuestionsTheoryQuestionKind = 0 | 1 | 2;
+
+export type NoCtfDomainTheoryQuestionsTheoryQuestionDifficulty = 0 | 1 | 2;
+
+export type NoCtfApplicationTheoryQuestionsTheoryOptionInput = {
+    content?: string;
+    isCorrect?: boolean;
+    truthValue?: NoCtfDomainTheoryQuestionsTheoryTruthValue | null;
+};
+
+export type NoCtfDomainTheoryQuestionsTheoryTruthValue = 0 | 1;
+
+export type NoCtfApplicationTheoryQuestionsTheoryClassificationInput = {
+    kind?: NoCtfDomainTheoryQuestionsTheoryClassificationKind;
+    name?: string;
+};
+
+export type NoCtfDomainTheoryQuestionsTheoryClassificationKind = 0 | 1;
+
+export type NoCtfApplicationTheoryQuestionsTheoryQuestionContent = {
+    question?: NoCtfApplicationTheoryQuestionsTheoryQuestionSummary;
+    revisionId?: string;
+    content?: NoCtfApplicationTheoryQuestionsTheoryQuestionInput;
+};
+
+export type NoCtfApplicationTheoryQuestionsTheoryQuestionSummary = {
+    id?: string;
+    ownerId?: string;
+    sourceId?: string;
+    version?: number;
+    title?: string;
+    kind?: NoCtfDomainTheoryQuestionsTheoryQuestionKind;
+    difficulty?: NoCtfDomainTheoryQuestionsTheoryQuestionDifficulty;
+    state?: NoCtfDomainTheoryQuestionsTheoryQuestionState;
+    updatedAt?: string;
+    canReadAnswers?: boolean;
+    canManage?: boolean;
+};
+
+export type NoCtfDomainTheoryQuestionsTheoryQuestionState = 0 | 1 | 2;
+
+export type NoCtfapiEndpointsTheoryQuestionsGetTheoryQuestionRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsTheoryQuestionsGrantTheoryQuestionRequest = {
+    permission?: NoCtfDomainTheoryQuestionsTheoryQuestionPermission | null;
+};
+
+export type NoCtfDomainTheoryQuestionsTheoryQuestionPermission = 0 | 1 | 2;
+
+export type NoCtfApplicationTheoryQuestionsTheoryQuestionPage = {
+    items?: Array<NoCtfApplicationTheoryQuestionsTheoryQuestionSummary>;
+    total?: number;
+};
+
+export type NoCtfapiEndpointsTheoryQuestionsListTheoryQuestionsRequest = NoCtfapiPaginationSearchRequest & {};
+
+export type NoCtfapiPaginationSearchRequest = NoCtfapiPaginationPaginationRequest & {};
+
+export type NoCtfapiPaginationPaginationRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsTheoryQuestionsSetTheoryQuestionStateRequest = {
+    state?: NoCtfDomainTheoryQuestionsTheoryQuestionState;
+};
+
+export type NoCtfapiEndpointsTheoryQuestionsUpdateTheoryQuestionRequest = {
+    content: NoCtfApplicationTheoryQuestionsTheoryQuestionInput;
+};
+
 export type NoCtfapiEndpointsTeamsTeamRegistrationFailureResponse = {
     code?: NoCtfapiEndpointsTeamsTeamRegistrationFailureCodeProtocol;
     message?: string;
@@ -103,72 +267,6 @@ export type NoCtfapiEndpointsTeamsTeamMembershipFailureResponse = {
 };
 
 export type NoCtfapiEndpointsTeamsTeamMembershipFailureCodeProtocol = 'CompetitionNotFound' | 'TeamNotFound' | 'TeamForbidden' | 'TeamBanned' | 'MembershipLocked' | 'UserAlreadyRegistered' | 'TeamFull' | 'MembershipConflict' | 'CaptainCannotBeRemoved' | 'MemberNotFound' | 'MembershipNotFound' | 'CaptainMustTransfer' | 'CaptainOnly' | 'TrackSsoIdentityRequired';
-
-export type MicrosoftAspNetCoreMvcValidationProblemDetails = MicrosoftAspNetCoreHttpHttpValidationProblemDetails & {
-    errors?: {
-        [key: string]: Array<string>;
-    };
-    [key: string]: unknown;
-} & {
-    /**
-     * Stable semantic message identity. Translate with messageArguments; never infer identity from detail text.
-     */
-    messageKey?: string;
-    /**
-     * Named interpolation arguments.
-     */
-    messageArguments?: {
-        [key: string]: unknown;
-    };
-    /**
-     * Per-field message descriptors, in the same order as errors.
-     */
-    errorMessages?: {
-        [key: string]: Array<{
-            key?: string;
-            arguments?: {
-                [key: string]: unknown;
-            };
-        }>;
-    };
-};
-
-export type MicrosoftAspNetCoreHttpHttpValidationProblemDetails = MicrosoftAspNetCoreMvcProblemDetails & {
-    errors?: {
-        [key: string]: Array<string>;
-    };
-    [key: string]: unknown;
-} & {
-    /**
-     * Stable semantic message identity. Translate with messageArguments; never infer identity from detail text.
-     */
-    messageKey?: string;
-    /**
-     * Named interpolation arguments.
-     */
-    messageArguments?: {
-        [key: string]: unknown;
-    };
-};
-
-export type MicrosoftAspNetCoreMvcProblemDetails = {
-    type?: string | null;
-    title?: string | null;
-    status?: number | null;
-    detail?: string | null;
-    instance?: string | null;
-    /**
-     * Stable semantic message identity. Translate with messageArguments; never infer identity from detail text.
-     */
-    messageKey?: string;
-    /**
-     * Named interpolation arguments.
-     */
-    messageArguments?: {
-        [key: string]: unknown;
-    };
-    [key: string]: unknown;
-};
 
 export type NoCtfapiEndpointsTeamsJoinTeamByInvitationRequest = {
     invitationToken: string;
@@ -443,10 +541,6 @@ export type NoCtfapiEndpointsRuntimeTeamRuntimeListItemResponse = {
 };
 
 export type NoCtfapiEndpointsRuntimeListTeamRuntimesRequest = NoCtfapiPaginationPaginationRequest & {};
-
-export type NoCtfapiPaginationPaginationRequest = {
-    [key: string]: never;
-};
 
 export type NoCtfapiEndpointsRuntimeProbeRuntimeProxyRequest = {
     [key: string]: never;
@@ -3514,8 +3608,6 @@ export type NoCtfapiEndpointsAdministrationPlatformPrivateSsoBindingResponse = {
 
 export type NoCtfapiEndpointsAdministrationTeamsListAdminTeamsRequest = NoCtfapiPaginationSearchRequest & {};
 
-export type NoCtfapiPaginationSearchRequest = NoCtfapiPaginationPaginationRequest & {};
-
 export type NoCtfapiEndpointsAdministrationTeamsAdminTeamBanAppealListResponse = {
     items?: Array<NoCtfapiEndpointsAdministrationTeamsAdminTeamBanCaseResponse>;
 };
@@ -5595,6 +5687,278 @@ export type HealthEndpointResponses = {
 };
 
 export type HealthEndpointResponse = HealthEndpointResponses[keyof HealthEndpointResponses];
+
+export type TheoryQuestionsCopyData = {
+    body?: never;
+    path: {
+        questionId: string;
+    };
+    query?: never;
+    url: '/api/v1/theory/questions/{questionId}/copy';
+};
+
+export type TheoryQuestionsCopyErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type TheoryQuestionsCopyError = TheoryQuestionsCopyErrors[keyof TheoryQuestionsCopyErrors];
+
+export type TheoryQuestionsCopyResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationTheoryQuestionsTheoryQuestionSaved;
+};
+
+export type TheoryQuestionsCopyResponse = TheoryQuestionsCopyResponses[keyof TheoryQuestionsCopyResponses];
+
+export type TheoryQuestionsListData = {
+    body?: never;
+    path?: never;
+    query: {
+        kind?: NoCtfDomainTheoryQuestionsTheoryQuestionKind | null;
+        keyword?: string | null;
+        offset: number;
+        limit: number;
+        desc: boolean;
+    };
+    url: '/api/v1/theory/questions';
+};
+
+export type TheoryQuestionsListErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type TheoryQuestionsListError = TheoryQuestionsListErrors[keyof TheoryQuestionsListErrors];
+
+export type TheoryQuestionsListResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationTheoryQuestionsTheoryQuestionPage;
+};
+
+export type TheoryQuestionsListResponse = TheoryQuestionsListResponses[keyof TheoryQuestionsListResponses];
+
+export type TheoryQuestionsCreateData = {
+    body: NoCtfapiEndpointsTheoryQuestionsCreateTheoryQuestionRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/theory/questions';
+};
+
+export type TheoryQuestionsCreateErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type TheoryQuestionsCreateError = TheoryQuestionsCreateErrors[keyof TheoryQuestionsCreateErrors];
+
+export type TheoryQuestionsCreateResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationTheoryQuestionsTheoryQuestionSaved;
+};
+
+export type TheoryQuestionsCreateResponse = TheoryQuestionsCreateResponses[keyof TheoryQuestionsCreateResponses];
+
+export type TheoryQuestionsGetData = {
+    body?: never;
+    path: {
+        questionId: string;
+    };
+    query?: never;
+    url: '/api/v1/theory/questions/{questionId}';
+};
+
+export type TheoryQuestionsGetErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type TheoryQuestionsGetError = TheoryQuestionsGetErrors[keyof TheoryQuestionsGetErrors];
+
+export type TheoryQuestionsGetResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationTheoryQuestionsTheoryQuestionContent;
+};
+
+export type TheoryQuestionsGetResponse = TheoryQuestionsGetResponses[keyof TheoryQuestionsGetResponses];
+
+export type TheoryQuestionsUpdateData = {
+    body: NoCtfapiEndpointsTheoryQuestionsUpdateTheoryQuestionRequest;
+    path: {
+        questionId: string;
+    };
+    query?: never;
+    url: '/api/v1/theory/questions/{questionId}';
+};
+
+export type TheoryQuestionsUpdateErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type TheoryQuestionsUpdateError = TheoryQuestionsUpdateErrors[keyof TheoryQuestionsUpdateErrors];
+
+export type TheoryQuestionsUpdateResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationTheoryQuestionsTheoryQuestionSaved;
+};
+
+export type TheoryQuestionsUpdateResponse = TheoryQuestionsUpdateResponses[keyof TheoryQuestionsUpdateResponses];
+
+export type TheoryQuestionsGrantData = {
+    body: NoCtfapiEndpointsTheoryQuestionsGrantTheoryQuestionRequest;
+    path: {
+        questionId: string;
+        userId: string;
+    };
+    query?: never;
+    url: '/api/v1/theory/questions/{questionId}/grants/{userId}';
+};
+
+export type TheoryQuestionsGrantErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type TheoryQuestionsGrantError = TheoryQuestionsGrantErrors[keyof TheoryQuestionsGrantErrors];
+
+export type TheoryQuestionsGrantResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type TheoryQuestionsGrantResponse = TheoryQuestionsGrantResponses[keyof TheoryQuestionsGrantResponses];
+
+export type TheoryQuestionsSetStateData = {
+    body: NoCtfapiEndpointsTheoryQuestionsSetTheoryQuestionStateRequest;
+    path: {
+        questionId: string;
+    };
+    query?: never;
+    url: '/api/v1/theory/questions/{questionId}/state';
+};
+
+export type TheoryQuestionsSetStateErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type TheoryQuestionsSetStateError = TheoryQuestionsSetStateErrors[keyof TheoryQuestionsSetStateErrors];
+
+export type TheoryQuestionsSetStateResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type TheoryQuestionsSetStateResponse = TheoryQuestionsSetStateResponses[keyof TheoryQuestionsSetStateResponses];
 
 export type TeamAvatarClearData = {
     body?: never;

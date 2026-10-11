@@ -1,4 +1,5 @@
 using System.Data;
+using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Theory.Questions;
 using NoCTF.Domain.Identity;
@@ -9,7 +10,10 @@ namespace NoCTF.Infrastructure.Theory.Questions;
 
 public sealed class TheoryQuestionBank(NoCtfDbContext db) : ITheoryQuestionBank
 {
-    public async Task<TheoryBankWriteResult> SaveAsync(Guid actorId, Guid? questionId,
+    public Task<TheoryBankWriteResult> SaveAsync(Guid actorId, Guid? questionId, TheoryQuestionRevision revision, CancellationToken ct)
+        => MutateAsync(() => SaveCoreAsync(actorId, questionId, revision, ct), new TheoryBankWriteResult(Failure: TheoryBankFailure.Conflict));
+
+    private async Task<TheoryBankWriteResult> SaveCoreAsync(Guid actorId, Guid? questionId,
         TheoryQuestionRevision revision, CancellationToken ct)
     {
         if (TheoryQuestionPolicy.Validate(revision) is { } invalid)
@@ -52,7 +56,10 @@ public sealed class TheoryQuestionBank(NoCtfDbContext db) : ITheoryQuestionBank
         return new(new(question.Id, revision.Id, revision.Version, question.SourceId));
     }
 
-    public async Task<TheoryBankWriteResult> CopyAsync(Guid actorId, Guid questionId, DateTimeOffset now, CancellationToken ct)
+    public Task<TheoryBankWriteResult> CopyAsync(Guid actorId, Guid questionId, DateTimeOffset now, CancellationToken ct)
+        => MutateAsync(() => CopyCoreAsync(actorId, questionId, now, ct), new TheoryBankWriteResult(Failure: TheoryBankFailure.Conflict));
+
+    private async Task<TheoryBankWriteResult> CopyCoreAsync(Guid actorId, Guid questionId, DateTimeOffset now, CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         var actor = await ActorAsync(actorId, ct);
@@ -91,7 +98,7 @@ public sealed class TheoryQuestionBank(NoCtfDbContext db) : ITheoryQuestionBank
             .Any(revision => revision.Version == question.CurrentVersion && revision.Kind == filter));
         var total = await query.CountAsync(ct);
         var page = await query.OrderByDescending(question => question.UpdatedAt).ThenBy(question => question.Id)
-            .Skip(Math.Max(0, offset)).Take(Math.Clamp(limit, 1, 100))
+            .Skip(Math.Max(0, offset)).Take(Math.Clamp(limit, 1, 200))
             .Select(question => new TheoryQuestionSummary(question.Id, question.OwnerId, question.SourceId, question.CurrentVersion,
                 question.Revisions.Where(revision => revision.Version == question.CurrentVersion).Select(revision => revision.Title).Single(),
                 question.Revisions.Where(revision => revision.Version == question.CurrentVersion).Select(revision => revision.Kind).Single(),
@@ -122,7 +129,11 @@ public sealed class TheoryQuestionBank(NoCtfDbContext db) : ITheoryQuestionBank
                 revision.Files.Select(file => file.FileId).ToArray()));
     }
 
-    public async Task<TheoryBankFailure?> SetStateAsync(Guid actorId, Guid questionId, TheoryQuestionState state,
+    public Task<TheoryBankFailure?> SetStateAsync(Guid actorId, Guid questionId, TheoryQuestionState state,
+        DateTimeOffset now, CancellationToken ct)
+        => MutateAsync<TheoryBankFailure?>(() => SetStateCoreAsync(actorId, questionId, state, now, ct), TheoryBankFailure.Conflict);
+
+    private async Task<TheoryBankFailure?> SetStateCoreAsync(Guid actorId, Guid questionId, TheoryQuestionState state,
         DateTimeOffset now, CancellationToken ct)
     {
         if (!Enum.IsDefined(state)) return TheoryBankFailure.InvalidContent;
@@ -136,7 +147,11 @@ public sealed class TheoryQuestionBank(NoCtfDbContext db) : ITheoryQuestionBank
         return null;
     }
 
-    public async Task<TheoryBankFailure?> GrantAsync(Guid actorId, Guid questionId, Guid userId,
+    public Task<TheoryBankFailure?> GrantAsync(Guid actorId, Guid questionId, Guid userId,
+        TheoryQuestionPermission? permission, CancellationToken ct)
+        => MutateAsync<TheoryBankFailure?>(() => GrantCoreAsync(actorId, questionId, userId, permission, ct), TheoryBankFailure.Conflict);
+
+    private async Task<TheoryBankFailure?> GrantCoreAsync(Guid actorId, Guid questionId, Guid userId,
         TheoryQuestionPermission? permission, CancellationToken ct)
     {
         if (permission is { } value && !Enum.IsDefined(value)) return TheoryBankFailure.InvalidPermission;
@@ -162,6 +177,17 @@ public sealed class TheoryQuestionBank(NoCtfDbContext db) : ITheoryQuestionBank
 
     private Task<User?> ActorAsync(Guid actorId, CancellationToken ct) => db.Users.AsNoTracking()
         .SingleOrDefaultAsync(user => user.Id == actorId && user.AccountStatus == UserAccountStatus.Active, ct);
+
+    private async Task<T> MutateAsync<T>(Func<Task<T>> mutation, T conflict)
+    {
+        try { return await mutation(); }
+        catch (Exception exception) when (exception is DbUpdateConcurrencyException
+            || exception.GetBaseException() is DbException { SqlState: "40001" or "40P01" or "23505" })
+        {
+            db.ChangeTracker.Clear();
+            return conflict;
+        }
+    }
 
     private IQueryable<TheoryQuestion> Authorized(User actor, TheoryQuestionPermission permission) => db.TheoryQuestions
         .Where(question => actor.Role == UserRole.Administrator || question.OwnerId == actor.Id
