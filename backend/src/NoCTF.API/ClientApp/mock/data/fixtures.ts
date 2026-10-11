@@ -134,6 +134,16 @@ export function createFixtures() {
     captainId: index === 0 ? id(1, 3) : id(10, index), memberIds: index === 0 ? users.map(user => user.userId) : [id(10, index)],
     registrationStatus: index === 7 ? 'Pending' : 'Approved', registeredAt: date(-48), isBanned: false,
   })))
+  // Opt-in, repeatable browser stress fixture; never affects normal mock or production data.
+  if (process.env.NOCTF_MOCK_LARGE_SCOREBOARD === '1') {
+    const competitionId = competitions[0]!.id
+    const sourceChallenge = challenges.find(challenge => challenge.competitionId === competitionId)!
+    const sourceTeam = teams.find(team => team.competitionId === competitionId && team.name === 'BlueShift')!
+    for (let index = challenges.filter(challenge => challenge.competitionId === competitionId).length; index < 70; index++)
+      challenges.push({ ...structuredClone(sourceChallenge), id: id(70, index + 1), title: `Stress challenge ${index + 1}`, isPublished: true })
+    for (let index = teams.filter(team => team.competitionId === competitionId && team.registrationStatus === 'Approved').length; index < 500; index++)
+      teams.push({ ...structuredClone(sourceTeam), id: id(71, index + 1), name: index === 20 ? '这是一支用于验证超长队伍名称换行与悬停完整提示的队伍 Stress Team' : `Stress Team ${index + 1}`, registrationStatus: 'Approved' })
+  }
   const runtimes = challenges.map((challenge, index) => {
     const competitionIndex = competitions.findIndex(competition => competition.id === challenge.competitionId)
     return model('RuntimeRuntimeResponse', {

@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { CompetitionsByIdLeaderboardPageViewState } from '~/features/routes/competitions/[id]/useCompetitionsByIdLeaderboardPage'
 
 const viewProps = defineProps<{ state: CompetitionsByIdLeaderboardPageViewState }>()
-const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, medalBloodRankClass, medalRankClass, scoreboardBloodAward, scoreboardEntryKindLabel, scoreboardEntryOutcomeLabel, scoreboardRankingStateLabel, scoreboardSlot, competitionId, competitionReturnPath, board, allTracksKey, selectedTrackKey, tracksEnabled, canViewInternalTracks, showLeaderboardHiddenTeams, availableTracks, selectedAllTracks, trackName, teams, displayRank, visibleTeams, showMoreTeams, displayTeamName, columnGroups, allDirectionsKey, allChallengesKey, selectedDirectionKey, selectedChallengeId, teamSearch, challengeSearch, availableDirections, availableChallenges, filteredColumnGroups, filteredTeams, hasLeaderboardFilters, clearLeaderboardFilters, isCtf, trends, trendsLoading, trendsError, visibleTrendSeries, trendRangeStart, trendRangeEnd, trendRevision, loadTrends, roundWindowLabel, roundLabel, slotTitle, ctfScore, exportCsv, detailOpen, teamDetailOpen, teamDetailTeam, teamDetailTrendSeries, detailLoading, detailLoadingMore, detailError, detail, detailEntries, detailTeam, detailColumn, loadDetailPage, openDetail, openTeamDetail, showOlderRoundWindow, showNewerRoundWindow, showLatestRoundWindow, entryActor, adjustmentOpen, adjustmentLoading, adjustmentLoadingMore, adjustmentError, adjustmentDetail, adjustmentEntries, adjustmentTeam, loadAdjustmentPage, openAdjustments, adjustmentActor, adjustmentKind, ScoreboardSlotStatus, LazyScoreTrendChart, LazyScoreboardTeamDetailDialog } = toRefs(viewProps.state)
+const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, medalBloodRankClass, medalRankClass, scoreboardBloodAward, scoreboardEntryKindLabel, scoreboardEntryOutcomeLabel, scoreboardRankingStateLabel, scoreboardSlot, competitionId, competitionReturnPath, board, allTracksKey, selectedTrackKey, tracksEnabled, canViewInternalTracks, showLeaderboardHiddenTeams, availableTracks, selectedAllTracks, trackName, teams, displayRank, matrixColumns, displayTeamName, columnGroups, allDirectionsKey, allChallengesKey, selectedDirectionKey, selectedChallengeId, teamSearch, challengeSearch, availableDirections, availableChallenges, filteredColumnGroups, filteredTeams, hasLeaderboardFilters, clearLeaderboardFilters, isCtf, trends, trendsLoading, trendsError, visibleTrendSeries, trendRangeStart, trendRangeEnd, trendRevision, loadTrends, roundWindowLabel, roundLabel, slotTitle, ctfScore, exportCsv, detailOpen, teamDetailOpen, teamDetailTeam, teamDetailTrendSeries, detailLoading, detailLoadingMore, detailError, detail, detailEntries, detailTeam, detailColumn, loadDetailPage, openDetail, openTeamDetail, showOlderRoundWindow, showNewerRoundWindow, showLatestRoundWindow, entryActor, adjustmentOpen, adjustmentLoading, adjustmentLoadingMore, adjustmentError, adjustmentDetail, adjustmentEntries, adjustmentTeam, loadAdjustmentPage, openAdjustments, adjustmentActor, adjustmentKind, ScoreboardSlotStatus, LazyScoreTrendChart, LazyScoreboardTeamDetailDialog } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -52,7 +52,7 @@ const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, 
       <template v-else>
         <Alert v-if="isCtf && trendsError" variant="destructive"><AlertDescription class="flex items-center justify-between gap-3"><span>{{ $message(trendsError) }}</span><Button variant="outline" size="sm" @click="loadTrends">{{ $t('common.label.retry') }}</Button></AlertDescription></Alert>
         <div v-if="isCtf" data-slot="leaderboard-trend-panel">
-          <Card class="overflow-visible">
+          <Card class="overflow-visible" surface="static">
             <CardContent class="py-4">
               <Skeleton v-if="trendsLoading && !trends" class="h-[320px] w-full" />
               <Empty v-else-if="!visibleTrendSeries.length" class="h-[320px]"><EmptyHeader><EmptyTitle>{{ $t('leaderboard.scoreboardTeam.label.scoreTrendDataYet') }}</EmptyTitle></EmptyHeader></Empty>
@@ -60,7 +60,7 @@ const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, 
             </CardContent>
           </Card>
         </div>
-      <Card>
+      <Card surface="static">
         <CardContent class="pt-6">
           <div data-slot="leaderboard-matrix-filters" class="mb-4 flex flex-wrap items-center gap-3">
             <Input v-model="teamSearch" type="search" :placeholder="$t('common.label.searchTeam')" :aria-label="$t('common.label.searchTeam')" class="w-full min-w-0 sm:w-44 sm:flex-1" />
@@ -94,31 +94,41 @@ const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, 
           <Empty v-if="!teams.length" class="border py-8"><EmptyHeader><EmptyTitle>{{ $t('common.competitionsBy.label.teamScoredYet') }}</EmptyTitle></EmptyHeader></Empty>
           <Empty v-else-if="!filteredTeams.length || !filteredColumnGroups.length" class="py-8"><EmptyHeader><EmptyTitle>{{ $t(!filteredTeams.length ? 'leaderboard.filters.noTeams' : 'leaderboard.filters.noChallenges') }}</EmptyTitle><EmptyDescription>{{ $t('leaderboard.filters.adjustFilters') }}</EmptyDescription></EmptyHeader></Empty>
           <div v-else class="min-w-0">
-            <Table pin-horizontal-scrollbar class="min-w-max table-auto">
+            <VirtualTable :rows="filteredTeams" :columns="matrixColumns" :fixed-widths="[80, 224, 112]" :row-height="88"
+              v-slot="{ rows: renderedRows, columns: renderedColumns, groups: renderedGroups, afterHeight, afterWidth, renderedColumnCount }">
               <TableHeader>
                 <TableRow>
                   <TableHead :rowspan="isCtf ? 1 : 2" data-scoreboard-frozen-corner="top-start" class="sticky left-0 z-30 w-20 min-w-20 max-w-20 bg-card text-center">{{ $t('leaderboard.label.ranking') }}</TableHead>
                   <TableHead :rowspan="isCtf ? 1 : 2" class="sticky left-20 z-30 w-56 min-w-56 max-w-56 bg-card">{{ $t('common.label.teams') }}</TableHead>
                   <TableHead :rowspan="isCtf ? 1 : 2" data-scoreboard-frozen-corner="top-end" class="sticky left-76 z-30 w-28 min-w-28 max-w-28 border-r bg-card text-right">{{ $t('common.label.totalScore') }}</TableHead>
-                  <TableHead v-for="group in filteredColumnGroups" :key="group.competitionChallengeId" :colspan="group.columns.length" class="border-l px-4 text-center">
-                    <span class="inline-flex items-center gap-1.5 whitespace-nowrap"><LucideIcon v-if="group.challenge?.directionIcon" :name="group.challenge.directionIcon" class="size-4" :class="directionTextClass(group.challenge.direction)" /><component v-else :is="directionIcon(group.challenge?.direction)" class="size-4" :class="directionTextClass(group.challenge?.direction)" />{{ group.challenge?.title ?? $t('common.label.unknownQuestion') }}</span>
-                  </TableHead>
+                  <template v-for="fragment in renderedGroups" :key="fragment.index">
+                    <TableHead v-if="fragment.before" :rowspan="isCtf ? 1 : 2" aria-hidden="true" class="p-0" />
+                    <TableHead :colspan="fragment.count" :aria-colindex="fragment.index + 4" class="px-4 text-center">
+                      <Hint :content="fragment.item.group.challenge?.title ?? $t('common.label.unknownQuestion')">
+                        <span class="flex min-w-0 items-center justify-center gap-1.5"><LucideIcon v-if="fragment.item.group.challenge?.directionIcon" :name="fragment.item.group.challenge.directionIcon" class="size-4 shrink-0" :class="directionTextClass(fragment.item.group.challenge.direction)" /><component v-else :is="directionIcon(fragment.item.group.challenge?.direction)" class="size-4 shrink-0" :class="directionTextClass(fragment.item.group.challenge?.direction)" /><span class="truncate">{{ fragment.item.group.challenge?.title ?? $t('common.label.unknownQuestion') }}</span></span>
+                      </Hint>
+                    </TableHead>
+                  </template>
+                  <TableHead v-if="afterWidth" :rowspan="isCtf ? 1 : 2" aria-hidden="true" class="p-0" />
                 </TableRow>
-                <TableRow v-if="!isCtf"><template v-for="group in filteredColumnGroups" :key="`${group.competitionChallengeId}-rounds`"><TableHead v-for="column in group.columns" :key="column.index" class="min-w-28 border-l px-3 text-center">{{ roundLabel(column) }}</TableHead></template></TableRow>
+                <TableRow v-if="!isCtf"><TableHead v-for="entry in renderedColumns" :key="entry.item.key" :aria-colindex="entry.index + 4" class="px-3 text-center">{{ roundLabel(entry.item.column) }}</TableHead></TableRow>
               </TableHeader>
               <TableBody>
-                <TableRow v-for="(team, teamIndex) in visibleTeams" :key="team.teamId" :class="(displayRank(team) ?? 99) <= 3 ? 'bg-primary/5' : ''">
-                  <TableCell :data-scoreboard-frozen-corner="teamIndex === visibleTeams.length - 1 ? 'bottom-start' : undefined" class="sticky left-0 z-20 w-20 min-w-20 max-w-20 bg-card text-center"><Medal v-if="(displayRank(team) ?? 99) <= 3" class="size-5" :class="medalRankClass[displayRank(team) ?? 0]" /><span v-else class="font-mono tabular-nums">{{ displayRank(team) ?? $t('common.label.symbol') }}</span></TableCell>
-                  <TableCell class="sticky left-20 z-20 w-56 min-w-56 max-w-56 bg-card"><div class="flex min-w-0 flex-col items-start gap-1"><Hint :content="displayTeamName(team)" ><ActionButton type="button" class="w-full whitespace-normal break-words rounded-sm text-left font-medium underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"  :aria-label="$t('leaderboard.label.viewDetailsTeam', { team: displayTeamName(team) })" @click="openTeamDetail(team)">{{ displayTeamName(team) }}</ActionButton></Hint><div v-if="(tracksEnabled && selectedAllTracks && availableTracks.length > 1) || team.rankingState !== 'Eligible'" class="flex flex-wrap items-center gap-1"><Hint v-if="tracksEnabled && selectedAllTracks && availableTracks.length > 1" :content="trackName(team.trackKey)"><Badge variant="outline" class="whitespace-normal break-words text-left">{{ trackName(team.trackKey) }}</Badge></Hint><Badge v-if="team.rankingState !== 'Eligible'" variant="destructive">{{ scoreboardRankingStateLabel(team.rankingState) }}</Badge></div></div></TableCell>
-                  <TableCell :data-scoreboard-frozen-corner="teamIndex === visibleTeams.length - 1 ? 'bottom-end' : undefined" class="sticky left-76 z-20 w-28 min-w-28 max-w-28 border-r bg-card text-right">
+                <template v-for="{ item: team, index: teamIndex, before } in renderedRows" :key="team.teamId">
+                <TableRow v-if="before" aria-hidden="true" data-virtual-spacer><TableCell :colspan="renderedColumnCount" :style="{ height: `${before}px` }" class="p-0" /></TableRow>
+                <TableRow :data-virtual-row="teamIndex" :aria-rowindex="teamIndex + (isCtf ? 2 : 3)" :class="(displayRank(team) ?? 99) <= 3 ? 'bg-primary/5' : ''">
+                  <TableCell :data-scoreboard-frozen-corner="teamIndex === filteredTeams.length - 1 ? 'bottom-start' : undefined" class="sticky left-0 z-20 w-20 min-w-20 max-w-20 bg-card text-center"><Medal v-if="(displayRank(team) ?? 99) <= 3" class="size-5" :class="medalRankClass[displayRank(team) ?? 0]" /><span v-else class="font-mono tabular-nums">{{ displayRank(team) ?? $t('common.label.symbol') }}</span></TableCell>
+                  <TableCell class="sticky left-20 z-20 w-56 min-w-56 max-w-56 bg-card"><div class="flex min-w-0 flex-col items-start gap-1"><Hint :content="displayTeamName(team)" ><ActionButton type="button" class="line-clamp-2 w-full whitespace-normal break-words rounded-sm text-left font-medium underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"  :aria-label="$t('leaderboard.label.viewDetailsTeam', { team: displayTeamName(team) })" @click="openTeamDetail(team)">{{ displayTeamName(team) }}</ActionButton></Hint><div v-if="(tracksEnabled && selectedAllTracks && availableTracks.length > 1) || team.rankingState !== 'Eligible'" class="flex min-w-0 items-center gap-1"><Hint v-if="tracksEnabled && selectedAllTracks && availableTracks.length > 1" :content="trackName(team.trackKey)"><Badge variant="outline" class="max-w-full truncate text-left">{{ trackName(team.trackKey) }}</Badge></Hint><Badge v-if="team.rankingState !== 'Eligible'" variant="destructive">{{ scoreboardRankingStateLabel(team.rankingState) }}</Badge></div></div></TableCell>
+                  <TableCell :data-scoreboard-frozen-corner="teamIndex === filteredTeams.length - 1 ? 'bottom-end' : undefined" class="sticky left-76 z-20 w-28 min-w-28 max-w-28 border-r bg-card text-right">
                     <ActionButton v-if="(team.globalAdjustmentCount ?? 0) > 0" type="button" class="w-full rounded-md px-2 py-1 text-right transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" @click="openAdjustments(team)">
                       <span class="block font-mono font-semibold tabular-nums">{{ team.totalScore ?? 0 }} {{ $t('common.label.pts.scoreTrendChart') }}</span>
                       <span class="mt-1 block text-[0.7rem] text-muted-foreground">{{ $t('leaderboard.label.globalAdjustments.leaderboardPageView', { count: team.globalAdjustmentCount ?? 0 }) }}</span>
                     </ActionButton>
                     <span v-else class="font-mono font-semibold tabular-nums">{{ team.totalScore ?? 0 }} {{ $t('common.label.pts.scoreTrendChart') }}</span>
                   </TableCell>
-                  <template v-for="group in filteredColumnGroups" :key="`${team.teamId}-${group.competitionChallengeId}`">
-                    <TableCell v-for="column in group.columns" :key="column.index" class="border-l p-1 text-center" :class="isCtf ? 'min-w-56' : 'min-w-28'">
+                  <template v-for="{ item: { group, column }, index: columnIndex, before: columnBefore } in renderedColumns" :key="columnIndex">
+                    <TableCell v-if="columnBefore" aria-hidden="true" class="p-0" />
+                    <TableCell :data-virtual-column="columnIndex" :aria-colindex="columnIndex + 4" class="border-l p-1 text-center" :class="isCtf ? 'min-w-56' : 'min-w-28'">
                       <ActionButton v-if="column.index !== undefined && scoreboardSlot(team, column.index)" type="button" class="flex min-h-12 w-full items-center justify-center rounded-md px-1 py-1 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" :aria-label="$t('leaderboard.label.viewSDetails', { team: displayTeamName(team), challenge: group.challenge?.title ?? $t('common.label.unknownQuestion'), round: roundLabel(column) })" @click="openDetail(team, column)">
                         <template v-if="isCtf">
                           <span v-if="ctfScore(scoreboardSlot(team, column.index!)) !== null" class="inline-flex items-center justify-center gap-2 whitespace-nowrap">
@@ -144,11 +154,13 @@ const { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy, 
                       <span v-else class="font-mono text-sm text-muted-foreground/60">-</span>
                     </TableCell>
                   </template>
+                  <TableCell v-if="afterWidth" aria-hidden="true" class="p-0" />
                 </TableRow>
+                </template>
+                <TableRow v-if="afterHeight" aria-hidden="true" data-virtual-spacer><TableCell :colspan="renderedColumnCount" :style="{ height: `${afterHeight}px` }" class="p-0" /></TableRow>
               </TableBody>
-            </Table>
+            </VirtualTable>
           </div>
-          <div v-if="visibleTeams.length < filteredTeams.length" class="mt-4 flex justify-center"><Button variant="outline" @click="showMoreTeams">{{ $t('common.label.load') }}</Button></div>
         </CardContent>
       </Card>
       </template>
