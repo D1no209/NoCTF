@@ -24,6 +24,15 @@ describe('api error localization', () => {
       .toBe('通知线程存在跨作用域或归属不明的引用，未删除任何数据。请检查返回的冲突通知 ID 后重试。')
   })
 
+  test('explains unfinished Solo media cleanup in both languages instead of the generic retry message', async () => {
+    await ensureLocaleDomains(['api'])
+    const response = { code: 'ActiveLiveSoloMediaResource', status: 409, messageKey: 'api.endpoints.competitionForceDelete.activeLiveSoloMediaResource' }
+    setLocale('zh-CN')
+    expect(parseApiError(response).message).toBe('LiveSolo 媒体或录像资源尚未清理。请先停止媒体并完成原始录像清理后重试，未删除任何数据。')
+    setLocale('en')
+    expect(parseApiError(response).message).toBe('LiveSolo media or recording resources still require cleanup. Stop media and finish raw recording cleanup before retrying. No data was deleted.')
+  })
+
   test('localizes known backend problem details in the Chinese locale', () => {
     setLocale('zh-CN')
 

@@ -543,6 +543,7 @@
   "api.endpoints.competitionBadge.badgeInUse": "Badge is referenced by the progression graph.",
   "api.endpoints.competitionForceDelete.activeCompetition": "Finish the competition before permanently deleting it. Paused competitions cannot be deleted.",
   "api.endpoints.competitionForceDelete.activeRuntimeResource": "One or more runtime resources are still active. Terminate them and wait for cleanup before retrying.",
+  "api.endpoints.competitionForceDelete.activeLiveSoloMediaResource": "LiveSolo media or recording resources still require cleanup. Stop media and finish raw recording cleanup before retrying. No data was deleted.",
   "api.endpoints.competitionForceDelete.confirmationMismatch": "The confirmation title does not exactly match the current competition title.",
   "api.endpoints.competitionForceDelete.notificationScopeConflict": "Notification threads contain cross-scope or unproven references. No data was deleted. Review the conflicting notification IDs before retrying.",
   "api.endpoints.missingFlag.competitionNotFound": "Competition was not found.",

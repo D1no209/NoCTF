@@ -80,6 +80,7 @@
   "api.endpoints.competitionQuestion.questionClosed": "该咨询已关闭，不再接受选手消息。",
   "api.endpoints.competitionForceDelete.activeCompetition": "请先结束比赛再永久删除，暂停中的比赛不能删除。",
   "api.endpoints.competitionForceDelete.activeRuntimeResource": "仍有运行环境资源未清理，请终止并等待清理完成。",
+  "api.endpoints.competitionForceDelete.activeLiveSoloMediaResource": "LiveSolo 媒体或录像资源尚未清理。请先停止媒体并完成原始录像清理后重试，未删除任何数据。",
   "api.endpoints.competitionForceDelete.confirmationMismatch": "确认标题与当前比赛标题不完全一致。",
   "api.endpoints.competitionForceDelete.notificationScopeConflict": "通知线程存在跨作用域或归属不明的引用，未删除任何数据。请检查返回的冲突通知 ID 后重试。",
   "api.endpoints.platformUserDeletion.hardDeleteBlocked": "该用户仍被业务记录引用，请查看预览并改用匿名化。",

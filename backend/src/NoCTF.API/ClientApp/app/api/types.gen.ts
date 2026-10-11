@@ -4616,7 +4616,7 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionForceDeleteCon
     };
 };
 
-export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionForceDeleteConflictCode = 'ActiveCompetition' | 'ActiveRuntimeResource' | 'ConfirmationMismatch' | 'NotificationScopeConflict';
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionForceDeleteConflictCode = 'ActiveCompetition' | 'ActiveRuntimeResource' | 'ConfirmationMismatch' | 'NotificationScopeConflict' | 'ActiveLiveSoloMediaResource';
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeletePreviewResponse = {
     competitionId?: string;
@@ -4633,7 +4633,7 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteRefe
     count?: number;
 };
 
-export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode = 'HistoricalEvent' | 'Team' | 'CompetitionChallenge' | 'GameplayFact' | 'RuntimeInstance' | 'PatchUpload' | 'Notification' | 'PosterFile' | 'TeamWriteUp' | 'ActiveRuntimeResource' | 'NotificationScopeConflict' | 'ProgressionGraph' | 'Badge' | 'BadgeGrant' | 'ChallengeWriteUp';
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode = 'HistoricalEvent' | 'Team' | 'CompetitionChallenge' | 'GameplayFact' | 'RuntimeInstance' | 'PatchUpload' | 'Notification' | 'PosterFile' | 'TeamWriteUp' | 'ActiveRuntimeResource' | 'NotificationScopeConflict' | 'ProgressionGraph' | 'Badge' | 'BadgeGrant' | 'ChallengeWriteUp' | 'LiveSoloMatch' | 'LiveSoloQuestionGroup' | 'LiveSoloQuestionMaterial' | 'ActiveLiveSoloMediaResource';
 
 export type NoCtfapiEndpointsAdministrationCompetitionsForceDeleteCompetitionRequest = {
     confirmationTitle: string;

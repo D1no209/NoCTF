@@ -31,7 +31,8 @@ public enum CompetitionForceDeleteConflictCode
     ActiveCompetition,
     ActiveRuntimeResource,
     ConfirmationMismatch,
-    NotificationScopeConflict
+    NotificationScopeConflict,
+    ActiveLiveSoloMediaResource
 }
 
 public sealed record CompetitionForceDeleteConflictResponse(
@@ -62,7 +63,7 @@ public sealed class ForceDeleteCompetitionEndpoint(
         {
             summary.Summary = "Permanently deletes a competition and all scoped data.";
             summary.Description =
-                "Requires the exact competition title and an audit reason. Running or paused competitions and competitions with live Runtime resources are rejected.";
+                "Requires the exact competition title and an audit reason. Running or paused competitions and competitions with live Runtime or uncleaned LiveSolo media resources are rejected.";
         });
     }
 
@@ -87,6 +88,10 @@ public sealed class ForceDeleteCompetitionEndpoint(
             CompetitionForceDeleteState.ActiveRuntimeResource => TypedResults.Conflict<CompetitionForceDeleteConflictResponse>(new(
                 CompetitionForceDeleteConflictCode.ActiveRuntimeResource,
                 "One or more runtime resources are still active. Terminate them and wait for cleanup before retrying.",
+                result.Preview is null ? null : CompetitionHardDeleteMapping.ToResponse(result.Preview))),
+            CompetitionForceDeleteState.ActiveLiveSoloMediaResource => TypedResults.Conflict<CompetitionForceDeleteConflictResponse>(new(
+                CompetitionForceDeleteConflictCode.ActiveLiveSoloMediaResource,
+                "LiveSolo media or recording resources still require cleanup. Stop media and finish raw recording cleanup before retrying. No data was deleted.",
                 result.Preview is null ? null : CompetitionHardDeleteMapping.ToResponse(result.Preview))),
             CompetitionForceDeleteState.ConfirmationMismatch => TypedResults.Conflict<CompetitionForceDeleteConflictResponse>(new(
                 CompetitionForceDeleteConflictCode.ConfirmationMismatch,

@@ -21358,7 +21358,7 @@
           "Admin"
         ],
         "summary": "Permanently deletes a competition and all scoped data.",
-        "description": "Requires the exact competition title and an audit reason. Running or paused competitions and competitions with live Runtime resources are rejected.",
+        "description": "Requires the exact competition title and an audit reason. Running or paused competitions and competitions with live Runtime or uncleaned LiveSolo media resources are rejected.",
         "operationId": "AdminForceDeleteCompetition",
         "parameters": [
           {
@@ -42667,13 +42667,15 @@
           "ActiveCompetition",
           "ActiveRuntimeResource",
           "ConfirmationMismatch",
-          "NotificationScopeConflict"
+          "NotificationScopeConflict",
+          "ActiveLiveSoloMediaResource"
         ],
         "enum": [
           "ActiveCompetition",
           "ActiveRuntimeResource",
           "ConfirmationMismatch",
-          "NotificationScopeConflict"
+          "NotificationScopeConflict",
+          "ActiveLiveSoloMediaResource"
         ]
       },
       "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionHardDeletePreviewResponse": {
@@ -42738,7 +42740,11 @@
           "ProgressionGraph",
           "Badge",
           "BadgeGrant",
-          "ChallengeWriteUp"
+          "ChallengeWriteUp",
+          "LiveSoloMatch",
+          "LiveSoloQuestionGroup",
+          "LiveSoloQuestionMaterial",
+          "ActiveLiveSoloMediaResource"
         ],
         "enum": [
           "HistoricalEvent",
@@ -42755,7 +42761,11 @@
           "ProgressionGraph",
           "Badge",
           "BadgeGrant",
-          "ChallengeWriteUp"
+          "ChallengeWriteUp",
+          "LiveSoloMatch",
+          "LiveSoloQuestionGroup",
+          "LiveSoloQuestionMaterial",
+          "ActiveLiveSoloMediaResource"
         ]
       },
       "NoCTFAPIEndpointsAdministrationCompetitionsForceDeleteCompetitionRequest": {

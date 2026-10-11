@@ -24,7 +24,11 @@ public enum CompetitionHardDeleteReferenceCode
     ProgressionGraph,
     Badge,
     BadgeGrant,
-    ChallengeWriteUp
+    ChallengeWriteUp,
+    LiveSoloMatch,
+    LiveSoloQuestionGroup,
+    LiveSoloQuestionMaterial,
+    ActiveLiveSoloMediaResource
 }
 
 public sealed record CompetitionHardDeleteReferenceResponse(

@@ -413,5 +413,9 @@
   "teamBanScreen.refresh": "刷新封禁状态",
   "teamBanScreen.actions": "封禁后的可用操作",
   "teamBanScreen.loadFailed": "无法加载封禁与申诉信息，请重试。",
-  "teamBanScreen.appealFailed": "申诉提交失败，请重试。"
+  "teamBanScreen.appealFailed": "申诉提交失败，请重试。",
+  "competitions.deletion.soloMatches": "LiveSolo 对局",
+  "competitions.deletion.soloQuestionLists": "LiveSolo 题单",
+  "competitions.deletion.soloOwnedMaterials": "LiveSolo 本场独立题目",
+  "competitions.deletion.activeSoloMediaResources": "待清理的 LiveSolo 媒体资源"
 }

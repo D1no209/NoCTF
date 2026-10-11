@@ -5435,7 +5435,7 @@ export const adminUpdateCompetitionWebhook = <ThrowOnError extends boolean = fal
 /**
  * Permanently deletes a competition and all scoped data.
  *
- * Requires the exact competition title and an audit reason. Running or paused competitions and competitions with live Runtime resources are rejected.
+ * Requires the exact competition title and an audit reason. Running or paused competitions and competitions with live Runtime or uncleaned LiveSolo media resources are rejected.
  */
 export const adminForceDeleteCompetition = <ThrowOnError extends boolean = false>(options: Options<AdminForceDeleteCompetitionData, ThrowOnError>): RequestResult<AdminForceDeleteCompetitionResponses, AdminForceDeleteCompetitionErrors, ThrowOnError> => (options.client ?? client).post<AdminForceDeleteCompetitionResponses, AdminForceDeleteCompetitionErrors, ThrowOnError>({
     security: [{
