@@ -25,13 +25,10 @@ const theme = await sourceFile(
 ).text()
 
 describe('leaderboard progressive display', () => {
-  test('keeps the full snapshot and progressively reveals stable entries', () => {
-    expect(page).toContain('const visibleTeamCount = ref(50)')
-    expect(page).toContain('filteredTeams.value.slice(0, visibleTeamCount.value)')
-    expect(page).toContain('v-for="(team, teamIndex) in visibleTeams"')
-    expect(page).toContain('visibleTeams.length < filteredTeams.length')
-    expect(page).toContain('function showMoreTeams(): void')
-    expect(page).toContain('@click="showMoreTeams"')
+  test('keeps the full filtered snapshot behind a two-axis rendering window', () => {
+    expect(page).toContain('<VirtualTable :rows="filteredTeams" :columns="matrixColumns"')
+    expect(page).not.toContain('visibleTeamCount')
+    expect(page).not.toContain('showMoreTeams')
   })
 
   test('does not recreate numbered client-side pagination', () => {
@@ -42,7 +39,7 @@ describe('leaderboard progressive display', () => {
   })
 
   test('keeps identity columns frozen while every matrix column remains readable', () => {
-    expect(page).toContain('<Table pin-horizontal-scrollbar class="min-w-max table-auto">')
+    expect(page).toContain('<VirtualTable :rows="filteredTeams"')
     expect(page).toContain('sticky left-0 z-30 w-20 min-w-20 max-w-20')
     expect(page).toContain('sticky left-20 z-30 w-56 min-w-56 max-w-56')
     expect(page).toContain('sticky left-76 z-30 w-28 min-w-28 max-w-28')
@@ -113,7 +110,7 @@ describe('leaderboard progressive display', () => {
   })
 
   test('pins the horizontal scrollbar to the visible bottom of a long score matrix', () => {
-    expect(page).toContain('<Table pin-horizontal-scrollbar')
+    expect(page).toContain('<VirtualTable')
     expect(horizontalScrollbarPinPosition(
       { top: 420, right: 1880, bottom: 1600, left: 60 },
       { top: 290, right: 1900, bottom: 1010, left: 40 },

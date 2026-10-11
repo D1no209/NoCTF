@@ -1247,3 +1247,32 @@ body:has([data-modal-scroll-lock]) {
   --qr-code-dark: oklch(0 0 0);
   --qr-code-light: oklch(1 0 0);
 }
+
+/* Dense scrolling surfaces keep theme depth without resampling the backdrop or moving hit targets. */
+.card-surface.card-surface[data-surface='static'],
+.card-surface.card-surface[data-surface='static']:hover {
+  background: var(--card);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  transform: none;
+  transition: none;
+  box-shadow: var(--card-shadow);
+}
+
+[data-virtual-table] [data-virtual-row] {
+  height: var(--virtual-row-height);
+  transition: none;
+}
+[data-virtual-table] [data-virtual-row]:hover {
+  background: transparent;
+}
+[data-virtual-table] [data-virtual-spacer] {
+  background: transparent;
+  box-shadow: none;
+  pointer-events: none;
+}
+
+/* A narrow viewport must be able to scroll past identity columns to reach scores. */
+[data-virtual-table][data-freeze-columns='false'] .sticky {
+  position: static;
+}

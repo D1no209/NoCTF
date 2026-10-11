@@ -33,8 +33,6 @@ export function useCompetitionsByIdLeaderboardPage() {
 
   const tracksEnabled = computed(() => board.snapshot.value?.tracksEnabled ?? true)
 
-  const visibleTeamCount = ref(50)
-
   const showLeaderboardHiddenTeams = ref(false)
 
   const canViewInternalTracks = computed(() => {
@@ -102,10 +100,6 @@ export function useCompetitionsByIdLeaderboardPage() {
   const displayRank = (team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse) =>
     displayRanks.value.get(team.teamId) ?? null
 
-  function showMoreTeams(): void {
-    visibleTeamCount.value += 50
-  }
-
   const teamDisplayNames = computed(() => buildTeamDisplayNames(teams.value))
 
   const displayTeamName = (team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse) =>
@@ -118,8 +112,6 @@ export function useCompetitionsByIdLeaderboardPage() {
 
   const matrixFilters = useLeaderboardMatrixFilters(columnGroups, teams, displayTeamName)
   const { filteredTeams, filteredColumnGroups } = matrixFilters
-  const visibleTeams = computed(() => filteredTeams.value.slice(0, visibleTeamCount.value))
-  watch(filteredTeams, () => { visibleTeamCount.value = 50 })
   const hasLeaderboardFilters = computed(() => matrixFilters.hasMatrixFilters.value || !selectedAllTracks.value)
 
   function clearLeaderboardFilters() {
@@ -128,6 +120,13 @@ export function useCompetitionsByIdLeaderboardPage() {
   }
 
   const isCtf = computed(() => board.schema.value?.mode === 'Ctf')
+  const matrixColumns = computed(() => filteredColumnGroups.value.flatMap(group => group.columns.map(column => ({
+    key: `${group.competitionChallengeId}:${column.index}`,
+    groupKey: group.competitionChallengeId,
+    width: isCtf.value ? 224 : 112,
+    group,
+    column,
+  }))))
 
   const trends = ref<NoCtfapiEndpointsCompetitionsScoreboardTrendsResponse | null>(null)
 
@@ -532,7 +531,6 @@ export function useCompetitionsByIdLeaderboardPage() {
       allTracksKey,
       selectedTrackKey,
       tracksEnabled,
-      visibleTeamCount,
       canViewInternalTracks,
       showLeaderboardHiddenTeams,
       availableTracks,
@@ -540,8 +538,7 @@ export function useCompetitionsByIdLeaderboardPage() {
       trackName,
       teams,
       displayRank,
-      visibleTeams,
-      showMoreTeams,
+      matrixColumns,
       displayTeamName,
       columnGroups,
       ...matrixFilters,

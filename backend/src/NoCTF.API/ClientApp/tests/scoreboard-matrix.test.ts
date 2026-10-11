@@ -121,8 +121,8 @@ describe('normalized scoreboard matrix', () => {
   })
 
   test('pins ranking, team and total score while preserving readable matrix widths', () => {
-    expect(leaderboardPage).toContain('class="min-w-max table-auto"')
-    expect(leaderboardPage).not.toContain('class="table-fixed"')
+    expect(leaderboardPage).toContain('<VirtualTable')
+    expect(leaderboardPage).toContain(':fixed-widths="[80, 224, 112]"')
     expect(leaderboardPage).toContain('sticky left-0 z-30 w-20 min-w-20 max-w-20')
     expect(leaderboardPage).toContain('sticky left-20 z-30 w-56 min-w-56 max-w-56')
     expect(leaderboardPage).toContain('sticky left-76 z-30 w-28 min-w-28 max-w-28')
