@@ -493,7 +493,6 @@
   "liveSolo.navigation.overview": "比赛概览",
   "liveSolo.navigation.authoring": "题目与赛程",
   "liveSolo.navigation.review": "审核与记录",
-  "liveSolo.navigation.configuration": "设置与权限",
   "liveSolo.navigation.postgameReview": "赛后题解审核",
   "liveSolo.navigation.staffTasks": "工作人员任务",
   "liveSolo.navigation.backToWriteUps": "返回题解对局列表",

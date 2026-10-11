@@ -109,6 +109,14 @@ export function useAdminCompetitionsByIdPage() {
         { to: base, label: translate('liveSolo.navigation.overview'), icon: LayoutDashboard, exact: true },
         { to: liveSoloManagementPath(competitionId), label: translate('liveSolo.navigation.matches'), icon: GitBranch },
         { to: `${base}/teams`, label: translate('common.label.teamManagement'), icon: Users },
+        ...(canWrite.value ? [
+          { to: `${base}/configuration`, label: translate('liveSolo.navigation.competitionSettings'), icon: Settings },
+          { to: `${liveSoloManagementPath(competitionId)}/settings`, label: translate('liveSolo.navigation.modeSettings'), icon: Settings },
+          { to: `${base}/tracks`, label: translate('common.label.tracks'), icon: GitBranch },
+          { to: `${base}/directions`, label: translate('directionSettings.title'), icon: Puzzle },
+          { to: `${base}/webhooks`, label: translate('webhook.title'), icon: Webhook },
+          ...(canManagePermissions.value ? [{ to: `${base}/permissions`, label: translate('administration.label.permissions'), icon: KeyRound }] : []),
+        ] : []),
       ],
     },
     {
@@ -136,17 +144,6 @@ export function useAdminCompetitionsByIdPage() {
           { to: `${base}/exports`, label: translate('administration.label.export'), icon: Download },
         ] : []),
       ],
-    },
-    {
-      label: translate('liveSolo.navigation.configuration'),
-      items: canWrite.value ? [
-        { to: `${base}/configuration`, label: translate('liveSolo.navigation.competitionSettings'), icon: Settings },
-        { to: `${liveSoloManagementPath(competitionId)}/settings`, label: translate('liveSolo.navigation.modeSettings'), icon: Settings },
-        { to: `${base}/tracks`, label: translate('common.label.tracks'), icon: GitBranch },
-        { to: `${base}/directions`, label: translate('directionSettings.title'), icon: Puzzle },
-        { to: `${base}/webhooks`, label: translate('webhook.title'), icon: Webhook },
-        ...(canManagePermissions.value ? [{ to: `${base}/permissions`, label: translate('administration.label.permissions'), icon: KeyRound }] : []),
-      ] : [],
     },
   ].filter(group => group.items.length > 0))
 
