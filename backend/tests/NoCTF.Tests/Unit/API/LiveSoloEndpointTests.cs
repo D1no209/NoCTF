@@ -161,6 +161,42 @@ public sealed class LiveSoloEndpointTests
             .Returns(new LiveSoloViewerResult(new(Guid.NewGuid(),DateTimeOffset.UtcNow.AddSeconds(15))));
         return store;
     }
+    [Test]
+    public async Task Review_routes_reject_anonymous_and_unauthorized_staff_without_opening_a_file()
+    {
+        var review = Substitute.For<ILiveSoloReviewStore>(); var objects = Substitute.For<IStore>();
+        await using var app = await HostAsync(Substitute.For<ILiveSoloMatchStore>(), Substitute.For<ILiveSoloAttachmentStore>(), objects, review: review);
+        using var client = app.GetTestClient();
+        var path = $"/api/v1/competitions/{Guid.NewGuid()}/live-solo/matches/{Guid.NewGuid()}/review/questions/{Guid.NewGuid()}";
+        using var anonymous = await client.GetAsync(path + "?staff=true");
+        await Assert.That(anonymous.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "verified-test");
+        using var denied = await client.GetAsync(path + "?staff=true");
+        await Assert.That(denied.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+        using var file = await client.GetAsync(path + "/attachments/" + Guid.NewGuid() + "?staff=true");
+        await Assert.That(file.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+        await objects.DidNotReceiveWithAnyArgs().OpenRead(default!, default);
+        await review.Received().ReadAsync(Arg.Is<LiveSoloReviewRequest>(x => x != null && x.ActorId == Actor && x.Staff), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
+    [Test]
+    public async Task Workspace_operations_and_end_causes_are_typed_and_only_the_authorized_projection_is_returned()
+    {
+        var reader = Substitute.For<ILiveSoloWorkspaceReader>(); var competition = Guid.NewGuid(); var matchId = Guid.NewGuid();
+        var match = new LiveSoloMatchView(matchId, competition, LiveSoloMatchState.Completed, Guid.NewGuid(), 2, 0, 0,
+            Guid.NewGuid(), "Left", Guid.NewGuid(), "Right", null, null, []) { ResultRevision = 2, EndReason = LiveSoloEndReason.Forfeit, ResultLeftWins = 0, ResultRightWins = 0 };
+        reader.ReadAsync(competition, matchId, Actor, true, Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns(new LiveSoloWorkspaceView(match, null, [LiveSoloWorkspaceOperation.CorrectResult], [], [], [], DateTimeOffset.UtcNow, null, true));
+        await using var app = await HostAsync(Substitute.For<ILiveSoloMatchStore>(), Substitute.For<ILiveSoloAttachmentStore>(), Substitute.For<IStore>(), workspace: reader);
+        using var client = app.GetTestClient(); client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "verified-test");
+        using var response = await client.GetAsync($"/api/v1/competitions/{competition}/live-solo/matches/{matchId}/workspace?staff=true");
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        await Assert.That(body.RootElement.GetProperty("allowedOperations")[0].GetString()).IsEqualTo("CorrectResult");
+        await Assert.That(body.RootElement.GetProperty("match").GetProperty("endReason").GetString()).IsEqualTo("Forfeit");
+        await Assert.That(body.RootElement.GetProperty("match").GetProperty("resultRevision").GetInt64()).IsEqualTo(2);
+        await Assert.That(body.RootElement.GetProperty("questions").GetArrayLength()).IsEqualTo(0);
+    }
     private static async Task<WebApplication> HostAsync(ILiveSoloMatchStore store)
         => await HostAsync(store, Substitute.For<ILiveSoloAttachmentStore>(), Substitute.For<IStore>());
 
@@ -482,11 +518,12 @@ public sealed class LiveSoloEndpointTests
         ILiveSoloAdjudicationStore? decisions = null, ILiveSoloRuntimeStore? runtimes = null, ILiveSoloMediaStore? media = null, ILiveSoloProgramReader? programs = null,
         ILiveSoloRecordingStore? recordings = null, ILiveSoloPlayerPolicyReader? policies = null, ManageLiveSoloConfiguration? settings = null, ILiveSoloHintReader? hints = null,
         ManageLiveSoloWriteUps? postgame = null, ILiveSoloViewerStore? viewers = null, ILiveSoloResultCorrectionStore? corrections = null,
-        ILiveSoloRecordingRecovery? recordingRecovery = null, ILiveSoloProgramRecovery? programRecovery = null, ILiveSoloQuestionPoolStore? pool = null)
+        ILiveSoloRecordingRecovery? recordingRecovery = null, ILiveSoloProgramRecovery? programRecovery = null, ILiveSoloQuestionPoolStore? pool = null, ILiveSoloReviewStore? review = null, ILiveSoloWorkspaceReader? workspace = null)
     {
         var builder = WebApplication.CreateBuilder(); builder.WebHost.UseTestServer();
         builder.Services.AddFastEndpoints(options => { options.DisableAutoDiscovery = true; options.Assemblies = [typeof(GetLiveSoloMatchEndpoint).Assembly];
-            options.Filter = x => x == typeof(ListLiveSoloQuestionsEndpoint) || x == typeof(SubmitLiveSoloFlagEndpoint)
+            options.Filter = x => review is not null && (x == typeof(ListLiveSoloReviewQuestionsEndpoint) || x == typeof(GetLiveSoloReviewQuestionEndpoint) || x == typeof(DownloadLiveSoloReviewAttachmentEndpoint))
+                || workspace is not null && x == typeof(GetLiveSoloWorkspaceEndpoint) || x == typeof(ListLiveSoloQuestionsEndpoint) || x == typeof(SubmitLiveSoloFlagEndpoint)
                 || x == typeof(StartLiveSoloCountdownEndpoint) || x == typeof(DownloadLiveSoloAttachmentEndpoint)
                 || x == typeof(AdjudicateLiveSoloMatchEndpoint) || x == typeof(ListLiveSoloAdjudicationsEndpoint)
                 || x == typeof(GetLiveSoloRuntimeEndpoint) || x == typeof(MutateLiveSoloRuntimeEndpoint)
@@ -498,6 +535,8 @@ public sealed class LiveSoloEndpointTests
                 || pool is not null && (x == typeof(ListLiveSoloQuestionPoolEndpoint) || x == typeof(CreateLiveSoloPoolQuestionEndpoint)
                     || x == typeof(DeployLiveSoloPoolQuestionEndpoint) || x == typeof(EditLiveSoloPoolQuestionEndpoint) || x == typeof(ExportLiveSoloPoolQuestionEndpoint)); });
         builder.Services.AddAuthentication("Bearer").AddScheme<AuthenticationSchemeOptions, TestAuthentication>("Bearer", _ => { });
+        if (review is not null) { builder.Services.AddSingleton(review); builder.Services.AddSingleton<ReadLiveSoloReview>(); }
+        if (workspace is not null) builder.Services.AddSingleton(workspace);
         builder.Services.AddAuthorization(); builder.Services.AddSingleton(store); builder.Services.AddSingleton<ManageLiveSoloMatches>();
         builder.Services.AddSingleton(attachmentStore); builder.Services.AddSingleton(objects); builder.Services.AddSingleton<AccessLiveSoloAttachments>();
         builder.Services.AddSingleton(decisions ?? Substitute.For<ILiveSoloAdjudicationStore>()); builder.Services.AddSingleton<ManageLiveSoloAdjudication>();

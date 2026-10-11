@@ -74,7 +74,8 @@ public static class LiveSoloBracketPolicy
                     var final = directory[match.Slots[0].SourceMatchId!.Value];
                     if (final.State != LiveSoloMatchState.Completed) continue;
                     if (final.WinnerTeamId != final.Slots.Single(x => x.Side == LiveSoloSide.Right).TeamId)
-                    { match.State = LiveSoloMatchState.Canceled; match.CompletedAt = now; changed.Add(match.Id); again = true; continue; }
+                    { match.State = LiveSoloMatchState.Canceled; match.CompletedAt = now;
+                      NoCTF.Application.LiveSolo.Rounds.LiveSoloResults.Confirm(match, LiveSoloEndReason.Bye, now); changed.Add(match.Id); again = true; continue; }
                 }
                 foreach (var slot in match.Slots.Where(x => !x.Resolved && x.SourceMatchId != null))
                 {
@@ -94,6 +95,7 @@ public static class LiveSoloBracketPolicy
                 {
                     match.State = LiveSoloMatchState.Completed; match.WinnerTeamId = teams.Length == 1 ? teams[0] : null;
                     match.CompletedAt = now;
+                    NoCTF.Application.LiveSolo.Rounds.LiveSoloResults.Confirm(match, LiveSoloEndReason.Bye, now);
                 }
                 changed.Add(match.Id); again = true;
             }

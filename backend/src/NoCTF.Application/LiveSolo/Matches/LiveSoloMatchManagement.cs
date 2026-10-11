@@ -8,12 +8,26 @@ public sealed record LiveSoloRosterView(Guid TeamId, IReadOnlyList<Guid> UserIds
 public sealed record LiveSoloMatchView(Guid Id, Guid CompetitionId, LiveSoloMatchState State, Guid ConcurrencyStamp,
     int RequiredWins, int LeftWins, int RightWins, Guid? LeftTeamId, string? LeftTeamName, Guid? RightTeamId, string? RightTeamName,
     Guid? CurrentRoundId, Guid? WinnerTeamId, IReadOnlyList<LiveSoloRosterView> Rosters, Guid? PendingCorrectionId = null,
-    Guid? ReplacementMatchId = null, Guid? PendingCorrectionMatchId = null, bool HasMedia = false);
+    Guid? ReplacementMatchId = null, Guid? PendingCorrectionMatchId = null, bool HasMedia = false)
+{
+    public long ResultRevision { get; init; }
+    public LiveSoloEndReason EndReason { get; init; }
+    public int? ResultLeftWins { get; init; }
+    public int? ResultRightWins { get; init; }
+    public DateTimeOffset? ResultUpdatedAt { get; init; }
+    public Guid? LeftAvatarFileId { get; init; }
+    public Guid? RightAvatarFileId { get; init; }
+}
 public sealed record LiveSoloMatchResult(LiveSoloMatchView? Match, LiveSoloFailure? Failure = null);
 public sealed record LiveSoloRoundView(Guid Id, Guid MatchId, int Number, int Replay, LiveSoloRoundState State,
     Guid ConcurrencyStamp, long TimelineRevision, DateTimeOffset? CountdownAt, DateTimeOffset? StartedAt,
     int LimitSeconds, long ActiveElapsedMilliseconds, bool Paused, Guid? WinnerTeamId, Guid? WinningGameplayFactId, bool PlatformStreamingEnabled)
 {
+    public long ResultRevision { get; init; }
+    public LiveSoloEndReason EndReason { get; init; }
+    public int? ResultLeftWins { get; init; }
+    public int? ResultRightWins { get; init; }
+    public DateTimeOffset? EndedAt { get; init; }
     public Guid? QuestionGroupId { get; init; }
     public LiveSoloQuestionSelectionKind? SelectionKind { get; init; }
     public bool StaticFlagEvidenceRequired { get; init; }

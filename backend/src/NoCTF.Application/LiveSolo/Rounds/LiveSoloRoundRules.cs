@@ -65,9 +65,11 @@ public static class LiveSoloRoundRules
         round.LastResolvedSequence = outcome.ResolvedThrough; round.EndedAt = now; round.TimelineRevision++;
         if (side == LiveSoloSide.Left) match.LeftWins = checked(match.LeftWins + 1);
         else match.RightWins = checked(match.RightWins + 1);
+        LiveSoloResults.Confirm(round, match, LiveSoloEndReason.CorrectAnswer);
         if (Math.Max(match.LeftWins, match.RightWins) >= match.RequiredWins)
         {
             match.State = LiveSoloMatchState.Completed; match.WinnerTeamId = winner; match.CompletedAt = now;
+            LiveSoloResults.Confirm(match, LiveSoloEndReason.RequiredWinsReached, now);
         }
         else match.State = LiveSoloMatchState.Preparing;
     }

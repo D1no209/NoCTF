@@ -27,6 +27,10 @@ public sealed class LiveSoloRound : IConcurrencyTracked
     public int LimitSeconds { get; set; } = 900;
     public int CountdownSeconds { get; set; } = 5;
     public long TimelineRevision { get; set; }
+    public long ResultRevision { get; set; }
+    public LiveSoloEndReason EndReason { get; set; }
+    public int? ResultLeftWins { get; set; }
+    public int? ResultRightWins { get; set; }
     public long LastAdmissionSequence { get; set; }
     public long LastResolvedSequence { get; set; }
     public Guid? WinnerTeamId { get; set; }
@@ -52,6 +56,7 @@ public sealed class LiveSoloRoundQuestion : IConcurrencyTracked
     public bool? EnvironmentRequired { get; set; }
     public LiveSoloQuestionReadiness Readiness { get; set; }
     public DateTimeOffset? OpenedAt { get; set; }
+    public LiveSoloOpenedContent? OpenedContent { get; set; }
     public List<LiveSoloRuntimeBinding> Runtimes { get; set; } = [];
 }
 

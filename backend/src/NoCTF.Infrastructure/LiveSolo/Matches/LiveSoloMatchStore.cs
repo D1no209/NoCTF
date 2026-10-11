@@ -88,8 +88,15 @@ public sealed partial class LiveSoloMatchStore(NoCtfDbContext db, ICompetitionMo
     {
         var ids = match.Slots.Where(x => x.TeamId is not null).Select(x => x.TeamId!.Value).ToArray();
         var names = await db.Teams.IgnoreQueryFilters().Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, ct);
+        var avatars = await db.Teams.IgnoreQueryFilters().Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.AvatarFileId, ct);
+        var leftId = match.Slots.Single(x => x.Side == LiveSoloSide.Left).TeamId;
+        var rightId = match.Slots.Single(x => x.Side == LiveSoloSide.Right).TeamId;
         return Map(match, names, await CorrectionSourcesAsync([match], ct),
-            await db.LiveSoloMediaSessions.AsNoTracking().AnyAsync(x => x.MatchId == match.Id, ct));
+            await db.LiveSoloMediaSessions.AsNoTracking().AnyAsync(x => x.MatchId == match.Id, ct)) with
+        {
+            LeftAvatarFileId = leftId is Guid l ? avatars.GetValueOrDefault(l) : null,
+            RightAvatarFileId = rightId is Guid r ? avatars.GetValueOrDefault(r) : null
+        };
     }
     private static LiveSoloMatchView Map(LiveSoloMatch match, IReadOnlyDictionary<Guid, string> names, IReadOnlyDictionary<Guid, Guid>? corrections = null, bool hasMedia = false)
     {
@@ -99,7 +106,9 @@ public sealed partial class LiveSoloMatchStore(NoCtfDbContext db, ICompetitionMo
             right.TeamId, right.TeamId is Guid r ? names.GetValueOrDefault(r) : null, match.CurrentRoundId, match.WinnerTeamId,
             match.Slots.Where(x => x.TeamId is not null).Select(x => new LiveSoloRosterView(x.TeamId!.Value,
                 match.Roster.Where(r => r.TeamId == x.TeamId).Select(r => r.UserId).Order().ToArray(), x.RosterLockedAt is not null, x.ReadyConfirmedAt is not null)).ToArray(),
-            match.PendingCorrectionId, match.ReplacementMatchId, match.PendingCorrectionId is Guid correction ? corrections?.GetValueOrDefault(correction) : null, hasMedia);
+            match.PendingCorrectionId, match.ReplacementMatchId, match.PendingCorrectionId is Guid correction ? corrections?.GetValueOrDefault(correction) : null, hasMedia)
+        { ResultRevision = match.ResultRevision, EndReason = match.EndReason, ResultLeftWins = match.ResultLeftWins,
+          ResultRightWins = match.ResultRightWins, ResultUpdatedAt = match.ResultUpdatedAt };
     }
 
     public async Task<LiveSoloMatchResult> CreateAsync(CreateLiveSoloMatch command, CancellationToken ct) =>
@@ -146,11 +155,14 @@ public sealed partial class LiveSoloMatchStore(NoCtfDbContext db, ICompetitionMo
             .OrderBy(x => x.Lane).ThenBy(x => x.Stage).ThenBy(x => x.Position).ToArrayAsync(ct);
         var teamIds = matches.SelectMany(x => x.Slots).Where(x => x.TeamId != null).Select(x => x.TeamId!.Value).Distinct().ToArray();
         var names = await db.Teams.IgnoreQueryFilters().Where(x => teamIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, ct);
+        var avatars = await db.Teams.IgnoreQueryFilters().Where(x => teamIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.AvatarFileId, ct);
         var corrections = await CorrectionSourcesAsync(matches, ct);
         var matchIds = matches.Select(x => x.Id).ToArray();
         var withMedia = (await db.LiveSoloMediaSessions.AsNoTracking().Where(x => matchIds.Contains(x.MatchId))
             .Select(x => x.MatchId).Distinct().ToArrayAsync(ct)).ToHashSet();
-        return matches.Select(x => Map(x, names, corrections, withMedia.Contains(x.Id))).ToArray();
+        return matches.Select(x => Map(x, names, corrections, withMedia.Contains(x.Id)) with {
+            LeftAvatarFileId = x.Slots.Single(s => s.Side == LiveSoloSide.Left).TeamId is Guid l ? avatars.GetValueOrDefault(l) : null,
+            RightAvatarFileId = x.Slots.Single(s => s.Side == LiveSoloSide.Right).TeamId is Guid r ? avatars.GetValueOrDefault(r) : null }).ToArray();
     }
     private Task<Dictionary<Guid,Guid>> CorrectionSourcesAsync(IEnumerable<LiveSoloMatch> matches,CancellationToken ct)
     {

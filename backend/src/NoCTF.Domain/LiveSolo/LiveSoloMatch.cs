@@ -21,6 +21,11 @@ public sealed class LiveSoloMatch : IConcurrencyTracked
     public int LeftWins { get; set; }
     public int RightWins { get; set; }
     public Guid? WinnerTeamId { get; set; }
+    public long ResultRevision { get; set; }
+    public LiveSoloEndReason EndReason { get; set; }
+    public int? ResultLeftWins { get; set; }
+    public int? ResultRightWins { get; set; }
+    public DateTimeOffset? ResultUpdatedAt { get; set; }
     public Guid? CurrentRoundId { get; set; }
     public Guid? CurrentMediaSessionId { get; set; }
     public Guid? PendingCorrectionId { get; set; }

@@ -3362,6 +3362,10 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("current_round_id");
 
+                    b.Property<short>("EndReason")
+                        .HasColumnType("smallint")
+                        .HasColumnName("end_reason");
+
                     b.Property<short>("Lane")
                         .HasColumnType("smallint")
                         .HasColumnName("lane");
@@ -3385,6 +3389,22 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Property<int>("RequiredWins")
                         .HasColumnType("integer")
                         .HasColumnName("required_wins");
+
+                    b.Property<int?>("ResultLeftWins")
+                        .HasColumnType("integer")
+                        .HasColumnName("result_left_wins");
+
+                    b.Property<long>("ResultRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("result_revision");
+
+                    b.Property<int?>("ResultRightWins")
+                        .HasColumnType("integer")
+                        .HasColumnName("result_right_wins");
+
+                    b.Property<long?>("ResultUpdatedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("result_updated_at");
 
                     b.Property<int>("RightWins")
                         .HasColumnType("integer")
@@ -3697,6 +3717,124 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasDatabaseName("ix_live_solo_media_sessions_match_id_generation");
 
                     b.ToTable("live_solo_media_sessions", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloOpenedAttachment", b =>
+                {
+                    b.Property<Guid>("RoundQuestionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("round_question_id");
+
+                    b.Property<Guid>("AttachmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("attachment_id");
+
+                    b.Property<Guid>("FileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("file_id");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.HasKey("RoundQuestionId", "AttachmentId")
+                        .HasName("pk_live_solo_opened_attachments");
+
+                    b.HasIndex("FileId")
+                        .HasDatabaseName("ix_live_solo_opened_attachments_file_id");
+
+                    b.HasIndex("RoundQuestionId", "Position")
+                        .IsUnique()
+                        .HasDatabaseName("ix_live_solo_opened_attachments_round_question_id_position");
+
+                    b.ToTable("live_solo_opened_attachments", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloOpenedContent", b =>
+                {
+                    b.Property<Guid>("RoundQuestionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("round_question_id");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Direction")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("direction");
+
+                    b.Property<bool>("RandomAttachment")
+                        .HasColumnType("boolean")
+                        .HasColumnName("random_attachment");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("title");
+
+                    b.HasKey("RoundQuestionId")
+                        .HasName("pk_live_solo_opened_contents");
+
+                    b.ToTable("live_solo_opened_contents", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloOpenedHint", b =>
+                {
+                    b.Property<Guid>("RoundQuestionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("round_question_id");
+
+                    b.Property<Guid>("HintId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("hint_id");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("content");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<long>("PublishedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("published_at");
+
+                    b.HasKey("RoundQuestionId", "HintId")
+                        .HasName("pk_live_solo_opened_hints");
+
+                    b.HasIndex("RoundQuestionId", "Position")
+                        .IsUnique()
+                        .HasDatabaseName("ix_live_solo_opened_hints_round_question_id_position");
+
+                    b.ToTable("live_solo_opened_hints", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloOpenedTag", b =>
+                {
+                    b.Property<Guid>("RoundQuestionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("round_question_id");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("name");
+
+                    b.HasKey("RoundQuestionId", "Position")
+                        .HasName("pk_live_solo_opened_tags");
+
+                    b.ToTable("live_solo_opened_tags", (string)null);
                 });
 
             modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloPauseInterval", b =>
@@ -4632,6 +4770,10 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("created_at");
 
+                    b.Property<short>("EndReason")
+                        .HasColumnType("smallint")
+                        .HasColumnName("end_reason");
+
                     b.Property<long?>("EndedAt")
                         .HasColumnType("bigint")
                         .HasColumnName("ended_at");
@@ -4673,6 +4815,18 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Property<int>("Replay")
                         .HasColumnType("integer")
                         .HasColumnName("replay");
+
+                    b.Property<int?>("ResultLeftWins")
+                        .HasColumnType("integer")
+                        .HasColumnName("result_left_wins");
+
+                    b.Property<long>("ResultRevision")
+                        .HasColumnType("bigint")
+                        .HasColumnName("result_revision");
+
+                    b.Property<int?>("ResultRightWins")
+                        .HasColumnType("integer")
+                        .HasColumnName("result_right_wins");
 
                     b.Property<Guid?>("SelectedByUserId")
                         .HasColumnType("uuid")
@@ -10063,6 +10217,53 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasConstraintName("fk_live_solo_media_sessions_live_solo_program_captures_current");
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloOpenedAttachment", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Storage.StoredFile", null)
+                        .WithMany()
+                        .HasForeignKey("FileId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_opened_attachments_files_file_id");
+
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloOpenedContent", null)
+                        .WithMany("Attachments")
+                        .HasForeignKey("RoundQuestionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_opened_attachments_live_solo_opened_content_round");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloOpenedContent", b =>
+                {
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloRoundQuestion", null)
+                        .WithOne("OpenedContent")
+                        .HasForeignKey("NoCTF.Domain.LiveSolo.LiveSoloOpenedContent", "RoundQuestionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_opened_contents_live_solo_round_questions_round_q");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloOpenedHint", b =>
+                {
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloOpenedContent", null)
+                        .WithMany("Hints")
+                        .HasForeignKey("RoundQuestionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_opened_hints_live_solo_opened_contents_round_ques");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloOpenedTag", b =>
+                {
+                    b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloOpenedContent", null)
+                        .WithMany("Tags")
+                        .HasForeignKey("RoundQuestionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_solo_opened_tags_live_solo_opened_contents_round_quest");
+                });
+
             modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloPauseInterval", b =>
                 {
                     b.HasOne("NoCTF.Domain.LiveSolo.LiveSoloRound", null)
@@ -11439,6 +11640,15 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Navigation("Participants");
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloOpenedContent", b =>
+                {
+                    b.Navigation("Attachments");
+
+                    b.Navigation("Hints");
+
+                    b.Navigation("Tags");
+                });
+
             modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloProgramFrame", b =>
                 {
                     b.Navigation("Questions");
@@ -11467,6 +11677,8 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
 
             modelBuilder.Entity("NoCTF.Domain.LiveSolo.LiveSoloRoundQuestion", b =>
                 {
+                    b.Navigation("OpenedContent");
+
                     b.Navigation("Runtimes");
                 });
 

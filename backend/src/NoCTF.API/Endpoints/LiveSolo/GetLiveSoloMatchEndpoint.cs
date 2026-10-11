@@ -14,7 +14,16 @@ public sealed record LiveSoloMatchResponse(Guid Id, Guid CompetitionId,
     [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<LiveSoloMatchState>))] LiveSoloMatchState State,
     Guid ConcurrencyStamp, int RequiredWins, int LeftWins, int RightWins, Guid? LeftTeamId, string? LeftTeamName,
     Guid? RightTeamId, string? RightTeamName, Guid? CurrentRoundId, Guid? WinnerTeamId, IReadOnlyList<LiveSoloRosterResponse> Rosters,
-    Guid? PendingCorrectionId = null, Guid? ReplacementMatchId = null, Guid? PendingCorrectionMatchId = null, bool HasMedia = false);
+    Guid? PendingCorrectionId = null, Guid? ReplacementMatchId = null, Guid? PendingCorrectionMatchId = null, bool HasMedia = false)
+{
+    public long ResultRevision { get; init; }
+    [JsonConverter(typeof(StrictPascalCaseEnumConverter<LiveSoloEndReason>))] public LiveSoloEndReason EndReason { get; init; }
+    public int? ResultLeftWins { get; init; }
+    public int? ResultRightWins { get; init; }
+    public DateTimeOffset? ResultUpdatedAt { get; init; }
+    public Guid? LeftAvatarFileId { get; init; }
+    public Guid? RightAvatarFileId { get; init; }
+}
 public sealed record LiveSoloFailureResponse(
     [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<LiveSoloFailure>))] LiveSoloFailure Code)
 {
@@ -29,7 +38,10 @@ internal static class LiveSoloProtocol
         value.ConcurrencyStamp, value.RequiredWins, value.LeftWins, value.RightWins, value.LeftTeamId, value.LeftTeamName,
         value.RightTeamId, value.RightTeamName, value.CurrentRoundId, value.WinnerTeamId,
         value.Rosters.Select(x => new LiveSoloRosterResponse(x.TeamId, x.UserIds, x.Locked, x.Ready)).ToArray(),
-        value.PendingCorrectionId, value.ReplacementMatchId, value.PendingCorrectionMatchId, value.HasMedia);
+        value.PendingCorrectionId, value.ReplacementMatchId, value.PendingCorrectionMatchId, value.HasMedia)
+        { ResultRevision = value.ResultRevision, EndReason = value.EndReason, ResultLeftWins = value.ResultLeftWins,
+          ResultRightWins = value.ResultRightWins, ResultUpdatedAt = value.ResultUpdatedAt,
+          LeftAvatarFileId = value.LeftAvatarFileId, RightAvatarFileId = value.RightAvatarFileId };
 
     public static Results<Ok<LiveSoloMatchResponse>, NotFound, ForbidHttpResult, Conflict<LiveSoloFailureResponse>,
         UnprocessableEntity<LiveSoloFailureResponse>, ProblemHttpResult> MatchMutation(LiveSoloMatchResult result) => result.Failure switch

@@ -14,7 +14,10 @@ public static class LiveSoloCorrectionPolicy
             && match.WinnerTeamId is not null && match.Slots.Count == 2 && match.Slots.All(x => x.TeamId is not null)
             && proposal.LeftWins >= 0 && proposal.RightWins >= 0
             && (side == LiveSoloSide.Left && proposal.LeftWins == match.RequiredWins && proposal.RightWins < match.RequiredWins
-                || side == LiveSoloSide.Right && proposal.RightWins == match.RequiredWins && proposal.LeftWins < match.RequiredWins)
+                || side == LiveSoloSide.Right && proposal.RightWins == match.RequiredWins && proposal.LeftWins < match.RequiredWins
+                || (match.EndReason == LiveSoloEndReason.Forfeit || match.EndReason == LiveSoloEndReason.ResultCorrected
+                    && Math.Max(match.LeftWins, match.RightWins) < match.RequiredWins)
+                && side != null && proposal.LeftWins < match.RequiredWins && proposal.RightWins < match.RequiredWins)
             && (match.WinnerTeamId != proposal.WinnerTeamId || match.LeftWins != proposal.LeftWins || match.RightWins != proposal.RightWins);
     }
     public static IReadOnlyList<LiveSoloMatch> Downstream(Guid sourceId, IReadOnlyList<LiveSoloMatch> graph)

@@ -82,12 +82,12 @@ public sealed partial class ChallengeWriteUpStore
     public async Task<WriteUpSettingsResult> GetSettingsAsync(Guid competitionId, Guid? challengeId, Guid actorId, DateTimeOffset now, CancellationToken ct)
     {
         var competition = await db.Competitions.AsNoTracking().SingleOrDefaultAsync(x => x.Id == competitionId, ct);
-        if (competition is null || await readAccess.ResolveAsync(actorId, competitionId, now, ct) is null)
+        if (competition is null || (competition.Mode == GameMode.LiveSolo ? !await authorizer.CanObserveAsync(actorId, competitionId, ct) : await readAccess.ResolveAsync(actorId, competitionId, now, ct) is null))
             return new(null, null, ChallengeWriteUpFailure.Forbidden);
         var challenge = challengeId is Guid id ? await db.CompetitionChallenges.AsNoTracking().IgnoreAutoIncludes()
             .SingleOrDefaultAsync(x => x.Id == id && x.CompetitionId == competitionId, ct) : null;
         if (challengeId is not null && challenge is null) return new(null, null, ChallengeWriteUpFailure.NotFound);
-        return new(new(competition.SingleWriteUpsEnabled, challenge?.WriteUpDeductionPercent ?? competition.SingleWriteUpDeductionPercent,
+        return new(new(competition.SingleWriteUpsEnabled, competition.Mode == GameMode.LiveSolo ? 0 : challenge?.WriteUpDeductionPercent ?? competition.SingleWriteUpDeductionPercent,
             competition.SingleWriteUpDeadlineHours, CompetitionWriteUpPolicy.DeadlineAt(competition.EndAt, competition.SingleWriteUpDeadlineHours),
             challenge?.WriteUpDeductionPercent, challenge?.ConcurrencyStamp ?? competition.ConcurrencyStamp),
             challenge?.ConcurrencyStamp ?? competition.ConcurrencyStamp);
@@ -99,6 +99,8 @@ public sealed partial class ChallengeWriteUpStore
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         var competition = await db.Competitions.SingleOrDefaultAsync(x => x.Id == command.CompetitionId, ct);
         if (competition is null) return new(null, null, ChallengeWriteUpFailure.NotFound);
+        if (competition.Mode == GameMode.LiveSolo && (command.DeductionPercent is not null || command.DeductionSpecified))
+            return new(null, null, ChallengeWriteUpFailure.InvalidContent);
         if (command.ChallengeId is Guid challengeId)
         {
             var challenge = await db.CompetitionChallenges.SingleOrDefaultAsync(x => x.Id == challengeId && x.CompetitionId == command.CompetitionId, ct);

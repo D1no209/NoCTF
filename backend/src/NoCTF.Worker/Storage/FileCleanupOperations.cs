@@ -61,6 +61,7 @@ internal static partial class BackendMessageOperations
             || await db.ChallengeWriteUpVersions.AnyAsync(item => item.FileId == file.Id, cancellationToken)
             || await db.LiveSoloProgramSegments.AnyAsync(item => item.FileId == file.Id, cancellationToken)
             || await db.LiveSoloRecordings.AnyAsync(item => item.FileId == file.Id, cancellationToken)
+            || await db.Set<NoCTF.Domain.LiveSolo.LiveSoloOpenedAttachment>().AnyAsync(item => item.FileId == file.Id, cancellationToken)
             || await db.CompetitionEvents.AnyAsync(capture =>
                 capture.Kind == CompetitionEventKind.RuntimeTrafficCaptureStored
                 && capture.RelatedType == EntityReferenceKind.File

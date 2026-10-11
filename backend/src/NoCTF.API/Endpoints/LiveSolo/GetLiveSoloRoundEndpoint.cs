@@ -15,12 +15,21 @@ public sealed record LiveSoloRoundResponse(Guid Id, Guid MatchId, int Number, in
     [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<LiveSoloQuestionReadiness>))] LiveSoloQuestionReadiness ResourceReadiness,
     [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<LiveSoloResourceFailure>))] LiveSoloResourceFailure PreparationFailure,
     bool? EnvironmentRequired, bool StaticFlagEvidenceRequired, Guid? QuestionGroupId,
-    [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<LiveSoloQuestionSelectionKind>))] LiveSoloQuestionSelectionKind? SelectionKind);
+    [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<LiveSoloQuestionSelectionKind>))] LiveSoloQuestionSelectionKind? SelectionKind)
+{
+    public long ResultRevision { get; init; }
+    [JsonConverter(typeof(StrictPascalCaseEnumConverter<LiveSoloEndReason>))] public LiveSoloEndReason EndReason { get; init; }
+    public int? ResultLeftWins { get; init; }
+    public int? ResultRightWins { get; init; }
+    public DateTimeOffset? EndedAt { get; init; }
+}
 internal static class LiveSoloRoundProtocol
 {
     public static LiveSoloRoundResponse Round(LiveSoloRoundView value, bool staff = false) => new(value.Id, value.MatchId, value.Number, value.Replay, value.State,
         value.ConcurrencyStamp, value.TimelineRevision, value.CountdownAt, value.StartedAt, value.LimitSeconds,
-        value.ActiveElapsedMilliseconds, value.Paused, value.WinnerTeamId, value.WinningGameplayFactId, value.PlatformStreamingEnabled, value.ResourceReadiness, value.PreparationFailure, value.EnvironmentRequired, value.StaticFlagEvidenceRequired, staff ? value.QuestionGroupId : null, staff ? value.SelectionKind : null);
+        value.ActiveElapsedMilliseconds, value.Paused, value.WinnerTeamId, value.WinningGameplayFactId, value.PlatformStreamingEnabled, value.ResourceReadiness, value.PreparationFailure, value.EnvironmentRequired, value.StaticFlagEvidenceRequired, staff ? value.QuestionGroupId : null, staff ? value.SelectionKind : null)
+        { ResultRevision = value.ResultRevision, EndReason = value.EndReason, ResultLeftWins = value.ResultLeftWins,
+          ResultRightWins = value.ResultRightWins, EndedAt = value.EndedAt };
 }
 public sealed class GetLiveSoloRoundRequest
 {

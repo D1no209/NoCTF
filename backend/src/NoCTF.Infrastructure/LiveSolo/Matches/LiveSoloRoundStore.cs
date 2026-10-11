@@ -274,7 +274,8 @@ public sealed partial class LiveSoloMatchStore
         round.StartedAt is { } started ? Math.Min(round.LimitSeconds * 1000L,
             (long)LiveSoloActiveClock.Elapsed(started, round.EndedAt is { } ended && ended < now ? ended : now, round.Pauses).TotalMilliseconds) : 0,
         LiveSoloActiveClock.Paused(round.Pauses), round.WinnerTeamId, round.WinningGameplayFactId, round.PlatformStreamingEnabled)
-        { QuestionGroupId = round.QuestionGroupId, SelectionKind = round.SelectionKind, StaticFlagEvidenceRequired = round.StaticFlagEvidenceRequired,
+        { ResultRevision = round.ResultRevision, EndReason = round.EndReason, ResultLeftWins = round.ResultLeftWins,
+          ResultRightWins = round.ResultRightWins, EndedAt = round.EndedAt, QuestionGroupId = round.QuestionGroupId, SelectionKind = round.SelectionKind, StaticFlagEvidenceRequired = round.StaticFlagEvidenceRequired,
           ResourceReadiness = round.Questions.OrderBy(x => x.Position).FirstOrDefault()?.Readiness ?? LiveSoloQuestionReadiness.Waiting,
           PreparationFailure = round.Questions.OrderBy(x => x.Position).FirstOrDefault()?.PreparationFailure ?? LiveSoloResourceFailure.None,
           EnvironmentRequired = round.Questions.OrderBy(x => x.Position).FirstOrDefault()?.EnvironmentRequired };

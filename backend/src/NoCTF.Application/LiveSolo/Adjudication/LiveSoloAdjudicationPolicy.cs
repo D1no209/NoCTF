@@ -47,13 +47,18 @@ public static class LiveSoloAdjudicationPolicy
                 break;
             case LiveSoloJudgeAction.VoidRound:
                 CancelRound(round!, now, command.Reason); match.State = LiveSoloMatchState.Preparing;
+                LiveSoloResults.Confirm(round!, match, LiveSoloEndReason.Voided);
                 foreach (var slot in match.Slots) slot.ReadyConfirmedAt = null;
                 break;
             case LiveSoloJudgeAction.ForfeitMatch:
                 var winner = match.Slots.Single(x => x.TeamId != command.ForfeitingTeamId);
                 if (round?.State is LiveSoloRoundState.Preparing or LiveSoloRoundState.Countdown or LiveSoloRoundState.Running or LiveSoloRoundState.ConfirmingResult)
+                {
                     CancelRound(round, now, command.Reason);
+                    LiveSoloResults.Confirm(round, match, LiveSoloEndReason.Forfeit);
+                }
                 match.WinnerTeamId = winner.TeamId; match.State = LiveSoloMatchState.Completed; match.CompletedAt = now;
+                LiveSoloResults.Confirm(match, LiveSoloEndReason.Forfeit, now);
                 break;
         }
         match.AdjudicationReason = command.Reason; match.ConcurrencyStamp = Guid.NewGuid();
