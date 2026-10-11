@@ -2,13 +2,13 @@
 import { toRefs } from 'vue'
 import type { LiveSoloPostgameWriteUpsState } from '~/features/live-solo/useLiveSoloPostgameWriteUps'
 const props=defineProps<{state:LiveSoloPostgameWriteUpsState}>()
-const {questionOptions,questionId,selectQuestion,mode,tab,staff,manager,loading,busy,error,listing,items,selected,select,root,version,stateKey,content,pdf,
+const {backLabel,questionOptions,questionId,selectQuestion,mode,tab,staff,manager,loading,busy,error,listing,items,selected,select,root,version,stateKey,content,pdf,
   editor,official,format,chooseFormat,markdown,chooseFile,uploadKey,dirty,canSave,canSubmit,save,submit,reviewable,reviewOpen,setReview,reviewAction,reviewCaption,reason,openReview,review,
   download,reload,back,leaveOpen,setLeave,leave,settingEnabled,enable}=toRefs(props.state)
 </script>
 <template>
   <div class="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 px-4 pb-8 pt-4 md:px-8">
-    <div><Button variant="ghost" size="sm" @click="back"><LucideIcon name="arrow-left" data-icon="inline-start" />{{ $t('liveSolo.back') }}</Button></div>
+    <div><Button variant="ghost" size="sm" @click="back"><LucideIcon name="arrow-left" data-icon="inline-start" />{{ $t(backLabel) }}</Button></div>
     <header class="flex flex-wrap items-center gap-4"><h1 class="text-display text-2xl">{{ $t('liveSolo.postgame.title') }}</h1><Badge variant="secondary">{{ $t('liveSolo.postgame.free') }}</Badge><Button class="ml-auto" variant="ghost" :disabled="busy || dirty" @click="reload">{{ $t('common.label.refresh') }}</Button></header>
     <Alert v-if="error" variant="destructive"><AlertDescription>{{ $message(error) }}</AlertDescription></Alert>
     <Button v-if="manager&&!settingEnabled" :disabled="busy" @click="enable">{{ $t('liveSolo.postgame.enable') }}</Button>

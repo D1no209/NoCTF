@@ -1,3 +1,4 @@
+import { liveSoloBasePath } from './navigation'
 import { computed, inject, onMounted, onScopeDispose, ref } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { getLiveSoloConfiguration, getLiveSoloBracket, saveLiveSoloConfiguration } from '~/api'
@@ -62,7 +63,7 @@ export function useLiveSoloSettings() {
     catch (cause) { if (!disposed && generation === request) error.value = parseLiveSoloError(cause, message('liveSolo.error.operation')).displayMessage }
     finally { busy.value = false }
   }
-  async function back() { await router.push(`/competitions/${competitionId.value}/live-solo`) }
+  async function back() { await router.push(`${liveSoloBasePath(competitionId.value, route.path)}`) }
   function setLeave(value: boolean) { if (!busy.value) leaveOpen.value = value }
   async function leave() { if (busy.value || !leaveTo) return; allowLeave = true; leaveOpen.value = false; await router.push(leaveTo) }
   function beforeUnload(event: BeforeUnloadEvent) { if (dirty.value) { event.preventDefault(); event.returnValue = '' } }

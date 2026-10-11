@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AdminCompetitionsByIdIndexPageViewState } from '~/features/routes/admin/competitions/[id]/useAdminCompetitionsByIdIndexPage'
 
 const viewProps = defineProps<{ state: AdminCompetitionsByIdIndexPageViewState }>()
-const { startGateErrorMessage, competitionId, competition, canWrite, canManagePermissions, isAdministrator, pendingAction, actionError, status, isDeleted, posterUrl, posterLoading, posterError, posterPending, posterInputKey, posterSelectionError, posterRemoveOpen, refreshPoster, selectPoster, removePoster, setPosterRemoveOpen, steps, actions, confirmTarget, execute, trigger, validating, validationErrors, validateStart, generating, generateFailures, generateMissingFlags, deleting, restoring, hardDeleting, forceDeleting, deleteConfirm, forceDeleteOpen, forceDeleteTitle, forceDeleteReason, forceDeleteError, forceDeleteConflictingIds, hardDeletePreview, hardDeletePreviewLoading, hardDeletePreviewError, hardDeleteReferenceLabel, restore, forceDeleteValid, beginForceDelete, forceDelete, submitDelete, onClickDeleteConfirm, onClickDeleteConfirm2, onUpdateOpenConfirmTarget, onClickForceDeleteOpen, onUpdateOpenDeleteConfirm } = toRefs(viewProps.state)
+const { startGateErrorMessage, competitionId, competition, canWrite, canManagePermissions, canGenerateMissingFlags, isAdministrator, pendingAction, actionError, status, isDeleted, posterUrl, posterLoading, posterError, posterPending, posterInputKey, posterSelectionError, posterRemoveOpen, refreshPoster, selectPoster, removePoster, setPosterRemoveOpen, steps, actions, confirmTarget, execute, trigger, validating, validationErrors, validateStart, generating, generateFailures, generateMissingFlags, deleting, restoring, hardDeleting, forceDeleting, deleteConfirm, forceDeleteOpen, forceDeleteTitle, forceDeleteReason, forceDeleteError, forceDeleteConflictingIds, hardDeletePreview, hardDeletePreviewLoading, hardDeletePreviewError, hardDeleteReferenceLabel, restore, forceDeleteValid, beginForceDelete, forceDelete, submitDelete, onClickDeleteConfirm, onClickDeleteConfirm2, onUpdateOpenConfirmTarget, onClickForceDeleteOpen, onUpdateOpenDeleteConfirm } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -115,7 +115,7 @@ const { startGateErrorMessage, competitionId, competition, canWrite, canManagePe
       </CardContent>
       </section>
 
-      <template v-if="canWrite && !isDeleted">
+      <template v-if="canGenerateMissingFlags">
       <Separator />
       <section id="competition-flag-management" class="flex flex-col gap-4 py-4 first:pt-0 last:pb-0">
       <CardHeader>

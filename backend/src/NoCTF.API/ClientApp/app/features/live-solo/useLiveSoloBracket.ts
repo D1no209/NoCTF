@@ -1,3 +1,4 @@
+import { liveSoloBasePath } from './navigation'
 import { computed, inject, onMounted, onScopeDispose, ref } from 'vue'
 import { adminListTeams, createLiveSoloMatch, generateLiveSoloBracket, getLiveSoloBracket } from '~/api'
 import type { NoCtfapiEndpointsLiveSoloLiveSoloBracketResponse as Bracket, NoCtfapiEndpointsTeamsTeamResponse as Team } from '~/api'
@@ -65,13 +66,13 @@ export function useLiveSoloBracket() {
         : await createLiveSoloMatch({ path, body: { leftTeamId: target.teamIds[0]!, rightTeamId: target.teamIds[1]!, requiredWins: target.wins } })
       if (result.error || !result.data) throw parseLiveSoloError(result.error, message('liveSolo.error.operation'))
       confirmation.value = null; plan.value = null; seedIds.value = []; left.value = null; right.value = null
-      if (action === 'Create' && 'id' in result.data && result.data.id) await router.push(`/competitions/${competitionId.value}/live-solo/matches/${result.data.id}`)
+      if (action === 'Create' && 'id' in result.data && result.data.id) await router.push(`${liveSoloBasePath(competitionId.value, route.path)}/matches/${result.data.id}`)
     }
     catch (cause) { if (!disposed) { confirmation.value = null; plan.value = null; error.value = parseLiveSoloError(cause, message('liveSolo.error.operation')).displayMessage } }
     finally { busy.value = false; if (!disposed) { const problem = error.value; await load(); if (problem) error.value = problem } }
   }
-  async function enter(id: string) { await router.push(`/competitions/${competitionId.value}/live-solo/matches/${id}`) }
-  async function back() { await router.push(`/competitions/${competitionId.value}/live-solo`) }
+  async function enter(id: string) { await router.push(`${liveSoloBasePath(competitionId.value, route.path)}/matches/${id}`) }
+  async function back() { await router.push(`${liveSoloBasePath(competitionId.value, route.path)}`) }
   onMounted(() => { void load() }); onScopeDispose(() => { disposed = true; request++ })
   return { bracket, teams, loading, busy, error, writable, available, options, addOptions, candidate, seeds, seedIds, left, right, wins, rows,
     seeded, champion, matchNumbers, confirmation, confirmationNames, load, add, remove, move, setWins, open, setOpen, confirm, enter, back }

@@ -1,3 +1,5 @@
+import * as soloNavigation from '../app/features/live-solo/navigation'
+import { competitionChallengeManagementPath } from '../app/features/admin/admin-navigation'
 import { describe, expect, test } from 'bun:test'
 import { computed, effectScope, markRaw, nextTick, proxyRefs, reactive, ref, toRefs, watch } from 'vue'
 import { gameModeOptions, isGameMode } from '../app/utils/game-modes'
@@ -18,7 +20,7 @@ async function harness(path: string, name: string, props?: object) {
   const mounted: Array<() => unknown> = []
   const competition = ref<any>({ id: 'contest', mode: 'LiveSolo', administrationRole: 'Owner' })
   const events: any[] = []
-  const deps: Record<string, any> = {
+  const deps: Record<string, any> = { ...soloNavigation, competitionChallengeManagementPath,
     useOffsetPagination, computed, effectScope, markRaw, proxyRefs, reactive, ref, toRefs, watch,
     gameModeOptions, isGameMode, applyCtfInteraction, CtfInteraction, defaultDefinition, definitionContractToModel,
     definitionModelToContract, FlagSource, RuntimeAllocation, UrlExposure, useDefinitionModel, validateChallengeTemplateDraft,
@@ -29,7 +31,7 @@ async function harness(path: string, name: string, props?: object) {
     useAuth: () => ({ canOrganize: ref(true), isAdministrator: ref(true), user: ref({ userId: 'admin' }) }),
     usePlatform: () => ({ configuration: ref({}) }),
     onMounted: (callback: () => unknown) => mounted.push(callback),
-    provide: () => {}, CompetitionAdminKey: Symbol(), adminWorkspacePath: (x: string) => x,
+    provide: () => {}, competitionContextKey: Symbol(), CompetitionAdminKey: Symbol(), adminWorkspacePath: (x: string) => x,
     localInputToIso: (x: string) => new Date(x).toISOString(),
     toast: { success: () => {}, error: () => {} }, parseApiError: () => ({ displayMessage: 'error' }),
     challengeDirectionOptions: ['Misc'], directionLabel: (x: string) => x,
@@ -177,7 +179,7 @@ describe('LiveSolo authoring entry points', () => {
       expect(badge.state.label.value).toBe('LiveSolo')
       await admin.mounted[0]!()
       const links = admin.state.navGroups.value.flatMap((x: any) => x.items.map((item: any) => item.to))
-      for (const suffix of ['', '/settings', '/groups', '/bracket']) expect(links).toContain(`/competitions/contest/live-solo${suffix}`)
+      for (const suffix of ['', '/settings', '/groups', '/bracket']) expect(links).toContain(`/admin/competitions/contest/live-solo${suffix}`)
       expect(links).not.toContain('/competitions/contest/live')
       expect(links).not.toContain('/competitions/contest/leaderboard')
       expect(links).not.toContain('/admin/competitions/contest/progression')

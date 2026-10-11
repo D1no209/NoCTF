@@ -5,6 +5,7 @@ using NoCTF.Application.Scoring;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Challenges;
 using NoCTF.Application.Challenges.Bank;
+using NoCTF.Application.Competitions.Modes;
 
 namespace NoCTF.Application.Competitions.Lifecycle;
 
@@ -69,6 +70,9 @@ public sealed class CompetitionStartGate(
         if (snapshot is null)
             return null;
         var errors = new List<StartGateError>();
+        var usesChallengePublication = CompetitionModeCapabilities.For(snapshot.Mode).ChallengePublication;
+        // Scoped modes validate their selected content when preparing a Round, not when starting the competition.
+        var startChallenges = snapshot.Challenges.Where(challenge => usesChallengePublication && challenge.Published).ToArray();
         if (snapshot.Status != CompetitionStatus.Published)
             errors.Add(new(
                 StartGateFailureCode.CompetitionNotPublished,
@@ -86,8 +90,7 @@ public sealed class CompetitionStartGate(
                 null,
                 "CTF PatchVerification is disabled in platform settings."));
         }
-        var publishedChallengeConfigurations = snapshot.Challenges
-            .Where(challenge => challenge.Published)
+        var publishedChallengeConfigurations = startChallenges
             .Select(challenge => new ChallengeConfigurationSections(
                 challenge.Rules,
                 challenge.Definition))
@@ -126,7 +129,7 @@ public sealed class CompetitionStartGate(
                 null,
                 exception.Message));
         }
-        if (!snapshot.Challenges.Any(challenge => challenge.Published))
+        if (usesChallengePublication && startChallenges.Length == 0)
             errors.Add(new(
                 StartGateFailureCode.PublishedChallengeRequired,
                 null,
@@ -136,7 +139,7 @@ public sealed class CompetitionStartGate(
                 StartGateFailureCode.ApprovedTeamRequired,
                 null,
                 "At least one approved team is required."));
-        var publishedChallengeCount = snapshot.Challenges.Count(challenge => challenge.Published);
+        var publishedChallengeCount = startChallenges.Length;
         if (snapshot.Mode == GameMode.Awd
             && snapshot.MaxConcurrentRuntimeInstancesPerTeam > 0
             && publishedChallengeCount > snapshot.MaxConcurrentRuntimeInstancesPerTeam)
@@ -146,7 +149,7 @@ public sealed class CompetitionStartGate(
                 null,
                 $"MaxConcurrentRuntimeInstancesPerTeam must be at least {publishedChallengeCount} for the published AWD challenges."));
         }
-        foreach (var challenge in snapshot.Challenges.Where(item => item.Published))
+        foreach (var challenge in startChallenges)
         {
             if (challenge.HintCosts.Any(cost =>
                     cost is < 0 or > ScoreValueLimits.MaximumConfiguredValue))

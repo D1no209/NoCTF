@@ -2,6 +2,7 @@ using NoCTF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Competitions.Lifecycle;
 using NoCTF.Domain.Teams;
+using NoCTF.Application.Competitions.Modes;
 
 namespace NoCTF.Infrastructure.Competitions.Lifecycle;
 
@@ -17,8 +18,10 @@ public sealed class CompetitionStartGateStore(NoCtfDbContext db)
             .SingleOrDefaultAsync(item => item.Id == competitionId && item.DeletedAt == null, ct);
         if (competition?.ModeConfiguration is null)
             return null;
+        var usesChallengePublication = CompetitionModeCapabilities.For(competition.Mode).ChallengePublication;
         var challengeRows = await db.CompetitionChallenges.AsNoTracking()
             .Where(item => item.CompetitionId == competitionId
+                && usesChallengePublication
                 && item.DeletedAt == null)
             .Join(
                 db.Challenges.AsNoTracking(),

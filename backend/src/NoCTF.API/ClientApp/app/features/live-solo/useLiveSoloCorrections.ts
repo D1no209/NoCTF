@@ -1,3 +1,4 @@
+import { liveSoloMatchPath, liveSoloBasePath } from './navigation'
 import { computed, inject, onMounted, onScopeDispose, ref } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { getLiveSoloMatch, listLiveSoloResultCorrections, getLiveSoloResultCorrection, previewLiveSoloResultCorrection,
@@ -34,7 +35,7 @@ export function useLiveSoloCorrections() {
   const dirty = computed(() => correction.value == null && !!reason.value.trim() || pending.value && (!!resolutionReason.value.trim() || selected.value.size > 0))
   let disposed = false, request = 0, allowLeave = false, leaveTo: string | null = null
   function path() { return { competitionId: competitionId.value, matchId: matchId.value } }
-  function entity(id: string, source = matchId.value) { return `/competitions/${competitionId.value}/live-solo/corrections/${source}/${id}` }
+  function entity(id: string, source = matchId.value) { return `${liveSoloBasePath(competitionId.value, route.path)}/corrections/${source}/${id}` }
   async function load() {
     if (disposed || busy.value || dirty.value || decision.value) return
     const generation = ++request; loading.value = true
@@ -132,9 +133,9 @@ export function useLiveSoloCorrections() {
     finally { if (!disposed) busy.value = false }
   }
   async function show(id: string) { await router.push(entity(id)) }
-  async function newProposal() { await router.push(`/competitions/${competitionId.value}/live-solo/corrections/${matchId.value}`) }
-  async function enterMatch(id: string) { await router.push(`/competitions/${competitionId.value}/live-solo/matches/${id}`) }
-  async function back() { await router.push(`/competitions/${competitionId.value}/live-solo/bracket`) }
+  async function newProposal() { await router.push(`${liveSoloBasePath(competitionId.value, route.path)}/corrections/${matchId.value}`) }
+  async function enterMatch(id: string) { await router.push(`${liveSoloBasePath(competitionId.value, route.path)}/matches/${id}`) }
+  async function back() { await router.push(liveSoloMatchPath(competitionId.value, matchId.value, route.path)) }
   function setLeave(value: boolean) { if (!busy.value) leaveOpen.value = value }
   async function leave() { if (busy.value || !leaveTo) return; allowLeave = true; leaveOpen.value = false; await router.push(leaveTo) }
   function beforeUnload(event: BeforeUnloadEvent) { if (dirty.value) { event.preventDefault(); event.returnValue = '' } }

@@ -1,3 +1,4 @@
+import { liveSoloMatchListLocation, liveSoloBasePath, liveSoloManagementPath, isLiveSoloManagementPath } from './navigation'
 import { computed, inject, markRaw, onMounted, onScopeDispose, ref, shallowRef, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { getLiveSoloWorkspace, getLiveSoloMedia, getLiveSoloPlayerPolicy, getMyTeamEndpoint,
@@ -40,7 +41,7 @@ export function useLiveSoloMatch() {
   const selectionRisks = computed(() => (selectedCandidate.value?.risks ?? currentCandidate.value?.risks ?? []).map((risk, index) => ({ ...risk,
     key: `${risk.kind}:${risk.competitionChallengeId ?? index}`, label: riskKeys[risk.kind ?? 'PreviouslyUsed'] })))
   const selectionUses = computed(() => selectedCandidate.value?.uses ?? currentCandidate.value?.uses ?? [])
-  async function openUsage(id: string) { await router.push(`/competitions/${competitionId.value}/live-solo/matches/${id}`) }
+  async function openUsage(id: string) { await router.push(`${liveSoloBasePath(competitionId.value, route.path)}/matches/${id}`) }
   const exclusionKeys = { Empty: 'liveSolo.selection.exclusion.Empty', MissingQuestion: 'liveSolo.selection.exclusion.MissingQuestion',
     DeletedQuestion: 'liveSolo.selection.exclusion.DeletedQuestion', DuplicateQuestion: 'liveSolo.selection.exclusion.DuplicateQuestion',
     InvalidSchedule: 'liveSolo.selection.exclusion.InvalidSchedule', UnsupportedDefinition: 'liveSolo.selection.exclusion.UnsupportedDefinition', ActiveRoundConflict: 'liveSolo.selection.exclusion.ActiveRoundConflict' } as const
@@ -74,16 +75,19 @@ export function useLiveSoloMatch() {
     IsolationVerificationFailed: 'api.liveSolo.isolationVerificationFailed', DependencyUnavailable: 'api.liveSolo.dependencyUnavailable' } as const
   const preparationFailure = computed(() => { const key = preparationFailures[round.value?.preparationFailure ?? 'None']; return key ? message(key) : null })
   const selectedRoster = ref<string[]>([]), memberNames = ref<ReadonlyMap<string, string>>(new Map())
-  const staff = computed(() => ctx?.competition.value?.administrationRole != null)
+  const hasStaffAccess = computed(() => ctx?.competition.value?.administrationRole != null)
+  const staff = computed(() => isLiveSoloManagementPath(route.path) && hasStaffAccess.value)
+  async function manage() { await router.push(`${liveSoloManagementPath(competitionId.value)}/matches/${matchId.value}`) }
+  const backLabel = computed(() => staff.value ? 'liveSolo.navigation.backToMatches' as const : 'liveSolo.back' as const)
   const staffOnlyMedia = computed(() => ctx?.competition.value?.accessMode === 'StaffOnly')
   useLiveSoloHub(competitionId, matchId, staff, load)
-  const judge = computed(() => canJudgeLiveSolo(ctx?.competition.value?.administrationRole) && !match.value?.pendingCorrectionId)
-  const canCorrect = computed(() => canManageLiveSolo(ctx?.competition.value?.administrationRole)
+  const judge = computed(() => staff.value && canJudgeLiveSolo(ctx?.competition.value?.administrationRole) && !match.value?.pendingCorrectionId)
+  const canCorrect = computed(() => staff.value && canManageLiveSolo(ctx?.competition.value?.administrationRole)
     && (match.value?.state === 'Completed' || !!match.value?.pendingCorrectionId))
   async function correct() {
     const source = match.value?.pendingCorrectionMatchId ?? matchId.value
     const suffix = match.value?.pendingCorrectionId ? '/' + match.value.pendingCorrectionId : ''
-    await router.push('/competitions/' + competitionId.value + '/live-solo/corrections/' + source + suffix)
+    await router.push(liveSoloManagementPath(competitionId.value) + '/corrections/' + source + suffix)
   }
   const myRoster = computed(() => match.value?.rosters?.find(x => x.teamId === team.value?.id) ?? null)
   const captain = computed(() => user.value?.userId != null && team.value?.captainId === user.value.userId)
@@ -288,7 +292,7 @@ export function useLiveSoloMatch() {
   const rightAvatar = computed(() => match.value?.rightAvatarUrl ?? null)
   const resultAvatar = computed(() => resultWindow.value?.winnerAvatar === match.value?.leftTeamId ? leftAvatar.value : resultWindow.value?.winnerAvatar === match.value?.rightTeamId ? rightAvatar.value : null)
   watch(dirty, value => { if (!value) void observeResults() })
-  async function back() { await router.push(`/competitions/${competitionId.value}/live-solo`) }
+  async function back() { await router.push(liveSoloMatchListLocation(competitionId.value, route.path, matchId.value)) }
   async function tick() { await load(); if (!disposed) timer = setTimeout(tick, 5000) }
   onMounted(() => {
     void tick(); window.addEventListener('beforeunload', beforeUnload)
@@ -310,7 +314,7 @@ export function useLiveSoloMatch() {
     platformStreaming, configuration, loading, busy, team, myRoster, captain, onRoster, mayReview, staffOnlyMedia,
     canLock, allLocked, rosterOptions, selectedRoster, toggleRoster, lockRoster, ready, prepareMedia, prepareRound, start,
     candidates, groupOptions, groupChoice, chooseGroup, currentCandidate, selectionRisks, selectionUses, openUsage, unavailableCandidates, startAllowed, preparationKey, preparationFailure, retryPreparation, specifyCurrent,
-    staff, readOnlyMedia, judge, canCorrect, correct, screens, myScreen, clock, stateKey: computed(() => loading.value && !match.value ? 'liveSolo.workspace.loading' as const : matchStateKey(match.value?.state)), back, load,
+    staff, hasStaffAccess, manage, backLabel, readOnlyMedia, judge, canCorrect, correct, screens, myScreen, clock, stateKey: computed(() => loading.value && !match.value ? 'liveSolo.workspace.loading' as const : matchStateKey(match.value?.state)), back, load,
     judgeOpen, judgeAction, judgeReason, forfeitingTeam, openDecision, confirmDecision, setJudgeOpen,
     leaveOpen, setLeaveOpen, confirmLeave, Workspace: markRaw(CompetitionParticipantWorkspace),
     ProgramControl: markRaw(LiveSoloProgramControl), Questions: markRaw(LiveSoloQuestions), canSubmit: computed(() => workspace.value?.allowedOperations?.includes('SubmitFlag') === true),

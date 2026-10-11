@@ -2,14 +2,14 @@
 import { toRefs } from 'vue'
 import type { LiveSoloQuestionPoolState } from '~/features/live-solo/useLiveSoloQuestionPool'
 const props = defineProps<{ state: LiveSoloQuestionPoolState }>()
-const { options, current, selected, draft, dirty, writable, canOrganize, loading, busy, error, saved, returning, load, select, create, save, back,
+const { exportedTemplatePath, options, current, selected, draft, dirty, writable, canOrganize, loading, busy, error, saved, returning, load, select, create, save, back,
   attachments, uploadFiles, uploadKey, deliveryPolicy, downloadFileName, addFlag, removeFlag, removeAttachment, chooseFiles, upload, deployOpen, setDeployment, openDeployment, sourceId, sourceOptions, keyword, searchSources, deploy, exportToBank,
   sourcePage, sourcePageCount, sourceTotal, sourceLimit, sourceLoading, sourcePageChange, sourceLimitChange, leaveOpen, setLeave, discard, DefinitionEditor } = toRefs(props.state)
 </script>
 <template>
-  <div class="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 px-4 pb-8 pt-4 md:px-8">
+  <div class="flex w-full min-w-0 flex-col gap-6">
     <header class="flex flex-wrap items-center justify-between gap-4">
-      <div class="flex flex-col gap-3"><Button variant="ghost" size="sm" class="self-start" @click="back"><LucideIcon name="arrow-left" data-icon="inline-start" />{{ $t(returning ? 'liveSolo.pool.returnToGroup' : 'liveSolo.back') }}</Button><h1 class="text-display text-2xl">{{ $t('liveSolo.pool.title') }}</h1></div>
+      <div class="flex flex-col gap-3"><Button v-if="returning" variant="ghost" size="sm" class="self-start" @click="back"><LucideIcon name="arrow-left" data-icon="inline-start" />{{ $t(returning ? 'liveSolo.pool.returnToGroup' : 'liveSolo.back') }}</Button><Button v-if="exportedTemplatePath" as-child variant="outline" size="sm"><NuxtLink :to="exportedTemplatePath" target="_blank" rel="noopener">{{ $t('liveSolo.navigation.bankCopy') }}</NuxtLink></Button><h1 class="text-display text-2xl">{{ $t('liveSolo.pool.title') }}</h1></div>
       <div class="flex flex-wrap gap-2"><Button variant="ghost" :disabled="busy || loading" @click="load">{{ $t('common.label.refresh') }}</Button><Button v-if="writable" variant="outline" :disabled="busy" @click="openDeployment">{{ $t('liveSolo.pool.deploy') }}</Button><Button v-if="writable" :disabled="busy" @click="create">{{ $t('liveSolo.pool.create') }}</Button></div>
     </header>
     <Alert v-if="error" variant="destructive"><AlertDescription>{{ $message(error) }}</AlertDescription></Alert>

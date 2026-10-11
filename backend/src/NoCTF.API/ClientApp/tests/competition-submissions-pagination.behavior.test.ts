@@ -174,6 +174,6 @@ test('LiveSolo general rejudgement opens the authoritative series workspace with
     expect(app.state.canRejudge.value).toBe(false)
     await app.state.rejudgeOne('fact-1'); await app.state.rejudgeBatch()
     expect(app.writes).toHaveLength(0)
-    expect(app.navigations).toEqual(['/competitions/competition/live-solo', '/competitions/competition/live-solo'])
+    expect(app.navigations).toEqual(['/admin/competitions/competition/live-solo', '/admin/competitions/competition/live-solo'])
   } finally { app.stop() }
 })

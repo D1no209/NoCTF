@@ -3,11 +3,10 @@ import { toRefs } from 'vue'
 import type { LiveSoloBracketState } from '~/features/live-solo/useLiveSoloBracket'
 const props = defineProps<{ state: LiveSoloBracketState }>()
 const { bracket, loading, busy, error, writable, options, addOptions, candidate, seeds, seedIds, left, right, wins, rows, seeded, champion,
-  matchNumbers, confirmation, confirmationNames, load, add, remove, move, setWins, open, setOpen, confirm, enter, back } = toRefs(props.state)
+  matchNumbers, confirmation, confirmationNames, load, add, remove, move, setWins, open, setOpen, confirm, enter } = toRefs(props.state)
 </script>
 <template>
-  <div class="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 px-4 pb-8 pt-4 md:px-8">
-    <div><Button variant="ghost" size="sm" @click="back"><LucideIcon name="arrow-left" data-icon="inline-start" />{{ $t('liveSolo.back') }}</Button></div>
+  <div class="flex w-full min-w-0 flex-col gap-6">
     <header class="flex flex-wrap items-center gap-4"><h1 class="text-display text-2xl">{{ $t('liveSolo.bracket.title') }}</h1><Badge v-if="champion">{{ $t('liveSolo.bracket.champion',{team:champion}) }}</Badge><Button class="ml-auto" variant="ghost" :disabled="busy || confirmation !== null" @click="load">{{ $t('common.label.refresh') }}</Button></header>
     <Alert v-if="error" variant="destructive"><AlertDescription>{{ $message(error) }}</AlertDescription></Alert>
     <Card class="min-w-0"><CardContent class="flex min-w-0 flex-col gap-6">

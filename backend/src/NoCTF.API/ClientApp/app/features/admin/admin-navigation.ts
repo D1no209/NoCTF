@@ -1,6 +1,14 @@
 import type { NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse, NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse } from '~/api'
+import type { NoCtfapiEndpointsCompetitionsGameModeProtocol as GameMode } from '~/api'
 
 const segment = (id: string) => encodeURIComponent(id)
+export const competitionChallengeManagementPath = (id: string, mode?: GameMode) => mode === 'LiveSolo'
+  ? `/admin/competitions/${segment(id)}/live-solo/question-pool`
+  : `/admin/competitions/${segment(id)}/challenges`
+
+export const isCompetitionChallengeManagementRoute = (path: string, id: string) =>
+  path === `/admin/competitions/${segment(id)}/challenges`
+  || path.startsWith(`/admin/competitions/${segment(id)}/challenges/`)
 export const adminUserPath = (id?: string | null) => id ? `/admin/platform/users/${segment(id)}` : undefined
 export const adminCompetitionPath = (id?: string | null) => id ? `/admin/competitions/${segment(id)}` : undefined
 export const adminTemplatePath = (id?: string | null) => id ? `/admin/challenges/${segment(id)}` : undefined
@@ -36,5 +44,7 @@ export const validAdminId = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4
 
 /** Opening a detail sheet keeps its list and scroll surfaces mounted. */
 export function adminWorkspacePath(path: string): string {
+  const soloMatch = path.match(/^(\/admin\/competitions\/[^/]+\/live-solo\/matches\/[^/]+)(?:\/.*)?$/)
+  if (soloMatch) return soloMatch[1]!
   return path.match(/^(\/admin\/platform\/(?:users|runtimes)|\/admin\/competitions\/[^/]+\/(?:teams|runtimes))(?:\/[^/]+)?$/)?.[1] ?? path
 }

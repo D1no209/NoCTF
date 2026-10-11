@@ -1,3 +1,4 @@
+import { liveSoloBasePath } from './navigation'
 import { computed, inject, markRaw, onMounted, onScopeDispose, ref, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { listLiveSoloQuestionPool, createLiveSoloPoolQuestion, deployLiveSoloPoolQuestion, editLiveSoloPoolQuestion,
@@ -14,6 +15,8 @@ import DefinitionEditor from '~/features/admin/DefinitionEditor.vue'
 export function useLiveSoloQuestionPool() {
   const route = useRoute(), router = useRouter(), context = inject(competitionContextKey), { canOrganize, user } = useAuth()
   const competitionId = computed(() => route.params.id as string), writable = computed(() => canManageLiveSolo(context?.competition.value?.administrationRole))
+  const exportedTemplateId = ref<string | null>(null)
+  const exportedTemplatePath = computed(() => exportedTemplateId.value ? `/admin/challenges/${exportedTemplateId.value}` : null)
   const questions = ref<Question[]>([]), selected = ref<string | null>(null), draft = ref(poolDraft()), original = ref('')
   const loading = ref(true), busy = ref(false), error = ref<UiMessage | null>(null), saved = ref(false)
   const uploadFiles = ref<File[]>([]), uploadKey = ref(0), deliveryPolicy = ref<'All' | 'RandomOnePerTeam'>('All'), downloadFileName = ref('')
@@ -46,7 +49,7 @@ export function useLiveSoloQuestionPool() {
     } catch (cause) { if (!disposed && epoch === generation && actor === user.value?.userId) error.value = parseLiveSoloError(cause, message('liveSolo.error.operation')).displayMessage }
     finally { busy.value = false; if (epoch !== generation && user.value) void load() }
   }
-  function apply(id: string | null) { selected.value = id; draft.value = poolDraft(questions.value.find(x => x.id === id)); original.value = JSON.stringify(draft.value); saved.value = false; uploadFiles.value = []; uploadKey.value++; deliveryPolicy.value = current.value?.flags?.some(x => x.specificationKind != null) ? 'RandomOnePerTeam' : 'All' }
+  function apply(id: string | null) { exportedTemplateId.value = null; selected.value = id; draft.value = poolDraft(questions.value.find(x => x.id === id)); original.value = JSON.stringify(draft.value); saved.value = false; uploadFiles.value = []; uploadKey.value++; deliveryPolicy.value = current.value?.flags?.some(x => x.specificationKind != null) ? 'RandomOnePerTeam' : 'All' }
   function select(id: string) { if (busy.value) return; if (dirty.value) { nextSelection = id; leaveOpen.value = true } else apply(id) }
   function create() { if (!writable.value || busy.value) return; if (dirty.value) { nextSelection = null; leaveOpen.value = true } else apply(null) }
   async function load() {
@@ -58,7 +61,9 @@ export function useLiveSoloQuestionPool() {
       if (disposed || request !== generation || actor !== user.value?.userId) return
       if (result.error || !result.data) throw parseLiveSoloError(result.error, message('liveSolo.error.load'))
       questions.value = result.data.items ?? []
-      if (!dirty.value || !original.value) apply(selected.value ?? questions.value[0]?.id ?? null)
+      const requestedQuestion = typeof route.query.question === 'string' && questions.value.some(x => x.id === route.query.question)
+        ? route.query.question : null
+      if (!dirty.value || !original.value) apply(selected.value ?? requestedQuestion ?? questions.value[0]?.id ?? null)
       error.value = null
     } catch (cause) { if (!disposed && request === generation) error.value = parseLiveSoloError(cause, message('liveSolo.error.load')).displayMessage }
     finally { if (request === generation) loading.value = false }
@@ -105,13 +110,13 @@ export function useLiveSoloQuestionPool() {
       const result = await exportLiveSoloPoolQuestion({ path: { competitionId: competitionId.value, competitionChallengeId: current.value.id }, body: { expectedStamp: current.value.concurrencyStamp!, expectedMaterialStamp: current.value.materialStamp! } })
       if (result.error || !result.data?.challengeId) throw parseLiveSoloError(result.error, message('liveSolo.error.operation'))
       if (actor !== user.value?.userId || epoch !== generation) return
-      allowLeave = true; await router.push(`/admin/challenges/${result.data.challengeId}`)
+      exportedTemplateId.value = result.data.challengeId; error.value = null
     } catch (cause) { if (!disposed && epoch === generation && actor === user.value?.userId) error.value = parseLiveSoloError(cause, message('liveSolo.error.operation')).displayMessage }
     finally { busy.value = false; if (epoch !== generation && user.value) void load() }
   }
   async function back() {
     const group = typeof route.query.group === 'string' ? route.query.group : null
-    await router.push(group ? { path: `/competitions/${competitionId.value}/live-solo/groups${group === 'new' ? '' : '/' + group}`, query: { added: current.value?.id } } : `/competitions/${competitionId.value}/live-solo`)
+    await router.push(group ? { path: `${liveSoloBasePath(competitionId.value, route.path)}/groups${group === 'new' ? '' : '/' + group}`, query: { added: current.value?.id } } : `${liveSoloBasePath(competitionId.value, route.path)}`)
   }
   function setLeave(value: boolean) { if (!busy.value) leaveOpen.value = value }
   async function discard() { leaveOpen.value = false; if (nextSelection !== undefined) { apply(nextSelection); nextSelection = undefined } else if (leaveTo) { allowLeave = true; await router.push(leaveTo) } }
@@ -121,7 +126,7 @@ export function useLiveSoloQuestionPool() {
   watch(writable, () => { generation++; questions.value = []; apply(null); sources.reset(); if (user.value) void load() })
   onMounted(() => { void load(); window.addEventListener('beforeunload', beforeUnload) })
   onScopeDispose(() => { disposed = true; generation++; window.removeEventListener('beforeunload', beforeUnload) })
-  return { questions, options, current, selected, draft, dirty, writable, canOrganize, loading, busy, error, saved, returning, load, select, create, save, back,
+  return { exportedTemplatePath, questions, options, current, selected, draft, dirty, writable, canOrganize, loading, busy, error, saved, returning, load, select, create, save, back,
     attachments, uploadFiles, uploadKey, deliveryPolicy, downloadFileName, addFlag, removeFlag, removeAttachment, chooseFiles, upload, deployOpen, setDeployment, openDeployment, sourceId, sourceOptions, keyword, searchSources, deploy, exportToBank,
     sourcePage: sources.page, sourcePageCount: sources.pageCount, sourceTotal: sources.total, sourceLimit: sources.limit, sourceLoading: sources.loading,
     sourcePageChange: sources.loadPage, sourceLimitChange: sources.setPageSize, leaveOpen, setLeave, discard, DefinitionEditor: markRaw(DefinitionEditor) }

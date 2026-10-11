@@ -93,3 +93,10 @@ Nuxt 4 SPA(`ssr: false`),Bun 管理依赖,TypeScript strict,Vue 用 `<script set
 - Markdown 统一通过 `lib/markdown.ts` 解析与清洗，Fence 代码使用 `lib/markdown-highlighter.ts` 的 Highlight.js core 按需语言注册；未知语言保持转义纯文本。高亮的 `hljs-*` 类和 `data-language` 必须进入明确清洗白名单。标题、列表、引用、代码、表格、媒体、折叠块与分隔线的装饰集中在 main.css 的 `.markdown-content` 规则中，不在业务页面重复定义。
 - 发布构建由 `NoCTF.API.csproj` 驱动(`bun install --frozen-lockfile` + `bun run generate`),产物在 `.output/public`。
 - 改依赖后提交更新后的 `bun.lock`。
+
+## LiveSolo 工作区导航
+
+- 工作人员的对局、题目池、题单、赛程、赛制设置、结果纠正、录像审核和赛后题解位于 `/admin/competitions/:id/live-solo`，复用竞赛管理侧栏及资源权限门禁。纯管理页面不再注册到选手路由。
+- `/competitions/:id/live-solo` 是独立的选手大厅；工作人员通过明确按钮切换管理／选手视角，共享对局、录像和题解功能根据当前路由请求对应投影，不能只因账号有管理角色就自动显示管理操作。
+- 路径构造集中在 `features/live-solo/navigation.ts`。返回对局列表保留选中对局，录像和结果纠正返回对应对局，题单编辑返回题单列表；题单与题目池之间的草稿交接必须保留。保存到题库后留在当前页面，提供显式查看副本入口。
+- 管理布局统一承担外部宽度、留白、标题和页面滚动。LiveSolo 子页面不再重建另一套导航；切换局内题目不得重建整个对局工作区或停止屏幕共享。

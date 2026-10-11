@@ -31,6 +31,8 @@ export function useAdminCompetitionsByIdIndexPage() {
   const status = computed(() => competition.value?.status)
 
   const isDeleted = computed(() => !!competition.value?.deletedAt)
+  const canGenerateMissingFlags = computed(() => canWrite.value && !isDeleted.value
+    && (competition.value?.mode === 'Ctf' || competition.value?.mode === 'Koh'))
 
   const {
     posterUrl,
@@ -220,6 +222,7 @@ export function useAdminCompetitionsByIdIndexPage() {
   const generateFailures = ref<{ competitionChallengeId?: string; teamId?: string; code?: string; description?: string }[]>([])
 
   async function generateMissingFlags() {
+    if (!canGenerateMissingFlags.value || generating.value) return
     generating.value = true
       generateFailures.value = []
     try {
@@ -447,6 +450,7 @@ export function useAdminCompetitionsByIdIndexPage() {
       actionError,
       status,
       isDeleted,
+      canGenerateMissingFlags,
       posterUrl,
       posterLoading,
       posterError,

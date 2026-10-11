@@ -1,3 +1,4 @@
+import { liveSoloBasePath, liveSoloManagementPath, isLiveSoloManagementPath } from './navigation'
 import { computed, inject, markRaw, onMounted, onScopeDispose, ref, watch } from 'vue'
 import { listLiveSoloMatches, getLiveSoloPlayerPolicy, getLiveSoloWorkspace } from '~/api'
 import type { NoCtfapiEndpointsLiveSoloLiveSoloMatchResponse as Match, NoCtfapiEndpointsLiveSoloLiveSoloPlayerPolicyResponse as Configuration } from '~/api'
@@ -14,6 +15,11 @@ export function useLiveSoloHall() {
   const route = useRoute(), router = useRouter()
   const competitionId = computed(() => route.params.id as string)
   const ctx = inject(competitionContextKey)
+  const management = computed(() => isLiveSoloManagementPath(route.path))
+  const reviewMode = computed(() => route.path.endsWith('/writeups'))
+  const hasStaffAccess = computed(() => ctx?.competition.value?.administrationRole != null)
+  const staff = computed(() => management.value && hasStaffAccess.value)
+  async function manage() { await router.push({ path: liveSoloManagementPath(competitionId.value), query: { match: selected.value ?? undefined } }) }
   const matches = ref<Match[]>([]), configuration = ref<Configuration | null>(null)
   const loading = ref(true), error = ref<UiMessage | null>(null)
   const selected = ref<string | null>(null)
@@ -23,7 +29,7 @@ export function useLiveSoloHall() {
   async function loadActivity() {
     const id = ++activityRequest, match = selected.value, actor = user.value?.userId
     if (!match || !actor) return
-    const response = await getLiveSoloWorkspace({ path: { competitionId: competitionId.value, matchId: match }, query: { staff: ctx?.competition.value?.administrationRole != null } })
+    const response = await getLiveSoloWorkspace({ path: { competitionId: competitionId.value, matchId: match }, query: { staff: staff.value } })
     if (!disposed && id === activityRequest && actor === user.value?.userId && selected.value === match) activity.value = response.data ?? null
   }
   const activityRows = computed(() => (activity.value?.history ?? []).map(x => ({ id: x.id,
@@ -31,7 +37,7 @@ export function useLiveSoloHall() {
     .concat(activity.value?.match?.resultUpdatedAt ? [{ id: activity.value.match.id,
       label: message('liveSolo.activity.ended'), time: activity.value.match.resultUpdatedAt }] : [])
     .sort((a, b) => (b.time ?? '').localeCompare(a.time ?? '')))
-  useLiveSoloHub(competitionId, selected, computed(() => ctx?.competition.value?.administrationRole != null), load)
+  useLiveSoloHub(competitionId, selected, staff, load)
   const options = computed(() => matches.value.filter(x => x.id).map(row => ({
     value: row.id!, label: `${row.leftTeamName ?? '—'} / ${row.rightTeamName ?? '—'}`, row, stateKey: matchStateKey(row.state),
   })))
@@ -47,7 +53,7 @@ export function useLiveSoloHall() {
       if (ctx?.competition.value?.mode !== 'LiveSolo') { matches.value = []; configuration.value = null; return }
       const [config, rows] = await Promise.all([
         getLiveSoloPlayerPolicy({ path: { competitionId: competitionId.value } }),
-        listLiveSoloMatches({ path: { competitionId: competitionId.value }, query: { staff: ctx?.competition.value?.administrationRole != null } }),
+        listLiveSoloMatches({ path: { competitionId: competitionId.value }, query: { staff: staff.value } }),
       ])
       if (disposed || id !== request) return
       if (config.error || rows.error || !config.data || !rows.data) throw parseLiveSoloError(config.error ?? rows.error, message('liveSolo.error.load'))
@@ -66,17 +72,18 @@ export function useLiveSoloHall() {
     await router.replace({ query: { ...route.query, match: id } })
   }
   async function enter() {
-    if (current.value?.id) await router.push(`/competitions/${competitionId.value}/live-solo/matches/${current.value.id}`)
+    if (reviewMode.value) { if (ctx?.competition.value?.status === 'Finished') await postgame(); return }
+    if (current.value?.id) await router.push(`${liveSoloBasePath(competitionId.value, route.path)}/matches/${current.value.id}`)
   }
   async function recordings() {
-    if (current.value?.id) await router.push({ path: `/competitions/${competitionId.value}/live-solo/recordings/${current.value.id}`,
-      query: { ...route.query, staff: ctx?.competition.value?.administrationRole != null ? '1' : undefined } })
+    if (current.value?.id) await router.push({ path: `${liveSoloBasePath(competitionId.value, route.path)}/recordings/${current.value.id}`,
+      query: { ...route.query } })
   }
-  async function settings() { await router.push(`/competitions/${competitionId.value}/live-solo/settings`) }
-  async function bracket() { await router.push(`/competitions/${competitionId.value}/live-solo/bracket`) }
-  async function pool() { await router.push(`/competitions/${competitionId.value}/live-solo/question-pool`) }
-  async function groups() { await router.push(`/competitions/${competitionId.value}/live-solo/groups`) }
-  async function postgame() { if(current.value?.id)await router.push(`/competitions/${competitionId.value}/live-solo/postgame/${current.value.id}`) }
+  async function settings() { await router.push(`${liveSoloManagementPath(competitionId.value)}/settings`) }
+  async function bracket() { await router.push(`${liveSoloManagementPath(competitionId.value)}/bracket`) }
+  async function pool() { await router.push(`${liveSoloManagementPath(competitionId.value)}/question-pool`) }
+  async function groups() { await router.push(`${liveSoloManagementPath(competitionId.value)}/groups`) }
+  async function postgame() { if(current.value?.id)await router.push({ path: `${liveSoloBasePath(competitionId.value, route.path)}/postgame/${current.value.id}`, query: reviewMode.value ? { from: 'writeups' } : {} }) }
   async function tick() {
     await load()
     if (!disposed) timer = setTimeout(tick, 5000)
@@ -88,10 +95,10 @@ export function useLiveSoloHall() {
   })
   onScopeDispose(() => { disposed = true; request++; activityRequest++; if (timer) clearTimeout(timer) })
   return { competitionId, options, selected, current, configuration, loading, error, select, enter, recordings, settings, bracket, groups, pool, postgame, load,
-    activityRows, canManage: computed(() => canManageLiveSolo(ctx?.competition.value?.administrationRole)),
+    management, reviewMode, hasStaffAccess, manage, activityRows, canManage: computed(() => management.value && canManageLiveSolo(ctx?.competition.value?.administrationRole)),
     endReasonKey: computed(() => endReasonKeys[current.value?.endReason ?? 'Unrecorded']),
     finished:computed(()=>ctx?.competition.value?.status==='Finished'),
-    staff: computed(() => ctx?.competition.value?.administrationRole != null),
+    staff,
     stateKey: computed(() => matchStateKey(current.value?.state)), Workspace: markRaw(CompetitionParticipantWorkspace) }
 }
 export type LiveSoloHallState = import('vue').ShallowUnwrapRef<ReturnType<typeof useLiveSoloHall>>

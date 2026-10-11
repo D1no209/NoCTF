@@ -1,3 +1,4 @@
+import * as soloNavigation from '../app/features/live-solo/navigation'
 import { expect, test } from 'bun:test'
 import { computed, effectScope, markRaw, ref, shallowRef, watch } from 'vue'
 import { settingsDraft, settingFields, validSettings } from '../app/features/live-solo/settings-draft'
@@ -10,7 +11,7 @@ const source = await Bun.file(new URL('../app/features/live-solo/useLiveSoloMatc
 const compiled = new Bun.Transpiler({ loader: 'ts' }).transformSync(source)
   .replace(/^import[\s\S]*?from ["'][^"']+["'];?\s*$/gm, '').replace(/export function /g, 'function ')
 
-function fixture(policy: boolean, prepared?: boolean, captainId = 'player') {
+function fixture(policy: boolean, prepared?: boolean, captainId = 'player', management = true) {
   let mediaReads = 0, mediaPreparations = 0, disconnected = 0, readyCalls = 0
   const preparationWrites: any[] = []
   const candidates: any[] = [{ id: 'question-list', name: 'Synthetic list', available: true, concurrencyStamp: 'group-stamp', selectionRevision: 'selection-stamp', risks: [] }]
@@ -21,14 +22,15 @@ function fixture(policy: boolean, prepared?: boolean, captainId = 'player') {
   const screen = { connected: ref(false), connecting: ref(false), publishing: ref(false), capturePending: ref(false),
     error: ref(null), localStream: ref(null), remoteStreams: ref(new Map()),
     disconnect: async () => { disconnected++ } }
-  const deps = { translate, computed, markRaw, ref, shallowRef, watch, message, canJudgeLiveSolo, canLockLiveSoloRoster,
+  const workspaceQueries: boolean[] = []
+  const deps = { ...soloNavigation, translate, computed, markRaw, ref, shallowRef, watch, message, canJudgeLiveSolo, canLockLiveSoloRoster,
     canPlayLiveSolo, formatRoundClock, matchStateKey, roundRemainingSeconds, canManageLiveSolo,
     competitionContextKey: Symbol(), inject: () => ({ competition: ref({ administrationRole: 'Owner', status: 'Running' }) }),
-    useRoute: () => ({ params: { id: 'contest', matchId: 'match' } }), useRouter: () => ({ push: async () => {} }),
+    useRoute: () => ({ path: management ? '/admin/competitions/contest/live-solo/matches/match' : '/competitions/contest/live-solo/matches/match', params: { id: 'contest', matchId: 'match' } }), useRouter: () => ({ push: async () => {} }),
     useAuth: () => ({ user: ref({ userId: 'player', userName: 'Synthetic player' }) }),
     useLiveSoloHub: () => {}, onMounted: () => {}, onBeforeRouteLeave: () => {}, onScopeDispose: () => {},
     useLiveSoloScreen: () => screen, parseLiveSoloError: () => ({ displayMessage: message('liveSolo.error.load') }),
-    getLiveSoloWorkspace: async () => ({ data: { match, round: prepared === undefined ? null : { ...round }, allowedOperations: [], missingConditions: [] } }), getLiveSoloPlayerPolicy: async () => ({ data: config }),
+    getLiveSoloWorkspace: async ({ query }: any) => { workspaceQueries.push(query.staff); return { data: { match, round: prepared === undefined ? null : { ...round }, allowedOperations: [], missingConditions: [] } } }, getLiveSoloPlayerPolicy: async () => ({ data: config }),
     resultPresentation, LiveSoloReview: {},
     getMyTeamEndpoint: async () => ({ data: { id: 'left', captainId, memberIds: ['player'] } }),
     listLiveSoloQuestionGroupCandidates: async () => ({ data: { items: candidates } }),
@@ -43,9 +45,20 @@ function fixture(policy: boolean, prepared?: boolean, captainId = 'player') {
   }
   const factory = new Function('deps', `const { ${Object.keys(deps).join(',')} } = deps; ${compiled}; return useLiveSoloMatch;`)(deps)
   const scope = effectScope(), state = scope.run(() => factory())!
-  return { state, config, round, match, mediaReads: () => mediaReads, mediaPreparations: () => mediaPreparations,
+  return { state, config, round, match, workspaceQueries, mediaReads: () => mediaReads, mediaPreparations: () => mediaPreparations,
     candidates, preparationWrites, readyCalls: () => readyCalls, disconnected: () => disconnected, stop: () => scope.stop() }
 }
+
+test('an organizer opening the player workspace requests player projection and sees no judging controls', async () => {
+  const f = fixture(false, false, 'player', false)
+  try {
+    await f.state.load()
+    expect(f.state.staff.value).toBe(false)
+    expect(f.state.judge.value).toBe(false)
+    expect(f.state.canCorrect.value).toBe(false)
+    expect(f.workspaceQueries).toEqual([false])
+  } finally { f.stop() }
+})
 
 test('non-streaming preparation skips media APIs and cannot prepare a room', async () => {
   const f = fixture(false)
@@ -136,7 +149,7 @@ test('settings save both switch directions and reset previous save feedback', as
     .replace(/^import[\s\S]*?from ["'][^"']+["'];?\s*$/gm, '').replace(/export function /g, 'function ')
   let configuration = settingsDraft({ platformStreamingEnabled: false, recordingEnabled: true })
   const writes: boolean[] = []
-  const deps = { ref, computed, effectScope, message, settingsDraft, settingFields, validSettings, canManageLiveSolo,
+  const deps = { ...soloNavigation, ref, computed, effectScope, message, settingsDraft, settingFields, validSettings, canManageLiveSolo,
     useRoute: () => ({ params: { id: 'contest' } }), useRouter: () => ({ push: async () => {} }),
     competitionContextKey: Symbol(), inject: () => ({ competition: ref({ administrationRole: 'Owner', status: 'Running' }), refresh: async () => {} }),
     onMounted: () => {}, onScopeDispose: () => {}, onBeforeRouteLeave: () => {},

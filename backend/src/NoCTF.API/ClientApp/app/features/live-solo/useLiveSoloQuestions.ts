@@ -1,3 +1,4 @@
+import { liveSoloBasePath } from './navigation'
 import { computed, markRaw, onMounted, onScopeDispose, ref, watch } from 'vue'
 import { listLiveSoloQuestions, listLiveSoloAttachments, prepareLiveSoloAttachmentDownload, prepareLiveSoloRandomAttachmentDownload,
   submitLiveSoloFlag, getGameplayFactStatusEndpoint, getLiveSoloRuntime, mutateLiveSoloRuntime, listLiveSoloHints } from '~/api'
@@ -86,7 +87,7 @@ export function useLiveSoloQuestions(props: Readonly<{ competitionId: string; ma
   async function select(id: string) {
     if (!questions.value.some(x => x.id === id)) return
     selected.value = id
-    await router.replace({ path: `/competitions/${props.competitionId}/live-solo/matches/${props.matchId}/rounds/${props.round.id}/questions/${id}`, query: { ...route.query } })
+    await router.replace({ path: `${liveSoloBasePath(props.competitionId, route.path)}/matches/${props.matchId}/rounds/${props.round.id}/questions/${id}`, query: { ...route.query } })
   }
   async function submit() {
     if (!props.canSubmit || submitting.value || accepted || !current.value?.id || !input.value.trim()) return
