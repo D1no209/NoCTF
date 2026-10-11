@@ -1,6 +1,6 @@
 import { message as describeMessage } from '../../../../utils/i18n'
 import type { UiMessage } from '../../../../utils/i18n'
-import { adminWorkspacePath } from '~/features/admin/admin-navigation'
+import { adminWorkspacePath, competitionChallengeManagementPath } from '~/features/admin/admin-navigation'
 import { markRaw } from 'vue'
 
 import { Activity, ChartNoAxesCombined, ClipboardCheck, Container, Download, FileCheck, GitBranch, KeyRound, LayoutDashboard, Mail, Network, Orbit, Puzzle, Settings, ShieldAlert, Trophy, Users, Webhook } from '@lucide/vue'
@@ -99,7 +99,7 @@ export function useAdminCompetitionsByIdPage() {
           { to: `${base}/tracks`, label: translate("common.label.tracks"), icon: GitBranch },
           { to: `${base}/directions`, label: translate('directionSettings.title'), icon: Puzzle },
         ] : []),
-        { to: `${base}/challenges`, label: translate("common.label.challenge.pageTitle"), icon: Puzzle },
+        { to: competitionChallengeManagementPath(competitionId, competition.value?.mode), label: translate(competition.value?.mode === 'LiveSolo' ? 'liveSolo.pool.title' : 'common.label.challenge.pageTitle'), icon: Puzzle },
         { to: `${base}/teams`, label: translate("common.label.teamManagement"), icon: Users },
       ],
     },
@@ -109,10 +109,9 @@ export function useAdminCompetitionsByIdPage() {
         { to: `/competitions/${competitionId}/live-solo`, label: translate('liveSolo.hall'), icon: GitBranch },
         ...(canWrite.value ? [
           { to: `/competitions/${competitionId}/live-solo/settings`, label: translate('liveSolo.settings.title'), icon: Settings },
-          { to: `/competitions/${competitionId}/live-solo/question-pool`, label: translate('liveSolo.pool.title'), icon: Puzzle },
-          { to: `/competitions/${competitionId}/live-solo/groups`, label: translate('liveSolo.groups.title'), icon: Puzzle },
           { to: `/competitions/${competitionId}/live-solo/bracket`, label: translate('liveSolo.bracket.title'), icon: GitBranch },
         ] : []),
+        { to: `/competitions/${competitionId}/live-solo/groups`, label: translate('liveSolo.groups.title'), icon: Puzzle },
       ],
     }] : []),
     {

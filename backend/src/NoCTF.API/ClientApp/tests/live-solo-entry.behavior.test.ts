@@ -1,3 +1,4 @@
+import { competitionChallengeManagementPath } from '../app/features/admin/admin-navigation'
 import { describe, expect, test } from 'bun:test'
 import { computed, effectScope, markRaw, nextTick, proxyRefs, reactive, ref, toRefs, watch } from 'vue'
 import { gameModeOptions, isGameMode } from '../app/utils/game-modes'
@@ -18,7 +19,7 @@ async function harness(path: string, name: string, props?: object) {
   const mounted: Array<() => unknown> = []
   const competition = ref<any>({ id: 'contest', mode: 'LiveSolo', administrationRole: 'Owner' })
   const events: any[] = []
-  const deps: Record<string, any> = {
+  const deps: Record<string, any> = { competitionChallengeManagementPath,
     useOffsetPagination, computed, effectScope, markRaw, proxyRefs, reactive, ref, toRefs, watch,
     gameModeOptions, isGameMode, applyCtfInteraction, CtfInteraction, defaultDefinition, definitionContractToModel,
     definitionModelToContract, FlagSource, RuntimeAllocation, UrlExposure, useDefinitionModel, validateChallengeTemplateDraft,

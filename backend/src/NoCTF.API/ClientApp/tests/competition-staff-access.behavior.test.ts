@@ -1,15 +1,16 @@
 import { describe, expect, test } from 'bun:test'
-import { computed, effectScope, markRaw, nextTick, reactive, ref, watch } from 'vue'
+import { computed, effectScope, markRaw, nextTick, proxyRefs, reactive, ref, unref, watch } from 'vue'
 import { readdir } from 'node:fs/promises'
 import { resolveCompetitionBrowser } from '../app/features/competitions/competition-browser'
 import { competitionPath, competitionsPath } from '../app/utils/app-routes'
+import { competitionChallengeManagementPath, isCompetitionChallengeManagementRoute } from '../app/features/admin/admin-navigation'
 
 const source = async (path: string) => Bun.file(new URL(`../app/${path}`, import.meta.url)).text()
 async function controller(path: string, name: string, dependencies: Record<string, unknown>, props?: object) {
   const input = await source(path)
   const compiled = new Bun.Transpiler({ loader: 'ts' }).transformSync(input)
     .replace(/^import[\s\S]*?from ["'][^"']+["'];?\s*$/gm, '').replace(/export function /g, 'function ')
-  const deps: Record<string, unknown> = { computed, ref, watch, markRaw, reactive,
+  const deps: Record<string, unknown> = { computed, ref, watch, markRaw, reactive, proxyRefs, competitionChallengeManagementPath,
     translate: (key: string) => key, describeMessage: (key: string) => key,
     onMounted: () => {}, onUnmounted: () => {}, ...dependencies }
   for (const match of input.matchAll(/import (\w+) from '[^']+\.vue'/g)) deps[match[1]!] = {}
@@ -27,14 +28,67 @@ async function middleware(session: ReturnType<typeof auth>, response: any) {
     .replace(/^import[\s\S]*?from ["'][^"']+["'];?\s*$/gm, '').replace('export default ', 'return ')
   const calls: string[] = []
   const deps = { useAuth: () => session, defineNuxtRouteMiddleware: (fn: unknown) => fn,
-    navigateTo: (target: unknown) => target, competitionPath, translate: (key: string) => key,
+    navigateTo: (target: unknown) => target, competitionPath, competitionChallengeManagementPath, isCompetitionChallengeManagementRoute, translate: (key: string) => key,
     createError: (error: object) => Object.assign(new Error('request failed'), error),
     adminGetCompetition: async ({ path }: any) => { calls.push(path.competitionId); return response } }
   const guard = new Function('deps', `const { ${Object.keys(deps).join(', ')} } = deps; ${code}`)(deps)
-  return { guard: (id = 'contest') => guard({ params: { id }, fullPath: `/admin/competitions/${id}/submissions?page=2` }), calls }
+  return { guard: (id = 'contest', section = 'submissions', ccId?: string) => {
+    const path = `/admin/competitions/${id}/${section}${ccId ? '/' + ccId : ''}`
+    return guard({ params: { id, ccId }, path, fullPath: `${path}?page=2`, query: { page: '2' } })
+  }, calls }
 }
 
 describe('competition staff access', () => {
+  test.each(['Owner', 'Manager', 'Judge', 'Observer'])('%s has a single Solo question-pool entry and can find its question lists', async role => {
+    const mounted: Array<() => Promise<void>> = []
+    const app = await controller('features/routes/admin/competitions/useAdminCompetitionsByIdPage.ts', 'useAdminCompetitionsByIdPage', {
+      useAuth: () => auth(), useRoute: () => ({ params: { id: 'contest' }, path: '/admin/competitions/contest' }),
+      adminGetCompetition: async () => ({ data: { competition: { id: 'contest', mode: 'LiveSolo', ownerId: 'owner', administrationRole: role } } }),
+      provide: () => {}, CompetitionAdminKey: Symbol(), adminWorkspacePath: (path: string) => path, gameModeLabel: (mode: string) => mode,
+      onMounted: (fn: () => Promise<void>) => mounted.push(fn),
+    })
+    try {
+      await mounted[0]!()
+      const links = app.state.navGroups.value.flatMap((group: any) => group.items).map((item: any) => item.to)
+      expect(links.filter((path: string) => path === '/competitions/contest/live-solo/question-pool')).toHaveLength(1)
+      expect(links).toContain('/competitions/contest/live-solo/groups')
+      expect(links).not.toContain('/admin/competitions/contest/challenges')
+    } finally { app.stop() }
+  })
+
+  test.each(['Ctf', 'Awd', 'Awdp', 'Koh', 'LiveSolo'])('%s exposes and invokes bulk Flag generation only where supported', async mode => {
+    let calls = 0
+    const app = await controller('features/routes/admin/competitions/[id]/useAdminCompetitionsByIdIndexPage.ts', 'useAdminCompetitionsByIdIndexPage', {
+      useAuth: () => auth(true), useCompetitionAdmin: () => ({ competitionId: 'contest', competition: ref({ mode, status: 'Published' }), canWrite: ref(true), canManagePermissions: ref(true), refresh: async () => {} }),
+      useCompetitionPoster: () => ({ posterUrl: ref(null), posterLoading: ref(false), posterError: ref(null), refreshPoster: async () => {}, clearPoster: async () => {}, cancelPoster: () => {} }),
+      adminGenerateMissingFlags: async () => { calls++; return { data: { failures: [] } } },
+      adminPreviewCompetitionHardDelete: async () => ({ data: { canHardDelete: false, references: [] } }),
+      parseApiError: () => ({ displayMessage: 'failed' }),
+      toast: { success: () => {}, warning: () => {}, error: () => {} }, startGateErrorMessage: () => '',
+    })
+    try {
+      const supported = mode === 'Ctf' || mode === 'Koh'
+      expect(unref(app.state.canGenerateMissingFlags)).toBe(supported)
+      await app.state.generateMissingFlags()
+      expect(calls).toBe(supported ? 1 : 0)
+    } finally { app.stop() }
+  })
+
+  test.each(['Administrator', 'Owner', 'Manager', 'Judge', 'Observer'])('%s enters the Solo pool instead of mounting ordinary publication controls', async role => {
+    const app = await middleware(auth(role === 'Administrator'), { data: { competition: { mode: 'LiveSolo', administrationRole: role } } })
+    expect(await app.guard('contest', 'challenges')).toEqual({ path: '/competitions/contest/live-solo/question-pool', query: { page: '2' } })
+    expect(await app.guard('contest', 'challenges', 'selected-question')).toEqual({ path: '/competitions/contest/live-solo/question-pool', query: { page: '2', question: 'selected-question' } })
+    expect(app.calls).toEqual(['contest', 'contest'])
+  })
+
+  test('ordinary challenge management keeps its own route and publication workflow', async () => {
+    for (const mode of ['Ctf', 'Awd', 'Awdp', 'Koh']) {
+      const app = await middleware(auth(true), { data: { competition: { mode } } })
+      expect(await app.guard('contest', 'challenges')).toBeUndefined()
+      expect(competitionChallengeManagementPath('contest', mode as 'Ctf')).toBe('/admin/competitions/contest/challenges')
+    }
+  })
+
   test.each(['Owner', 'Manager', 'Judge', 'Observer'] as const)('%s sees the management entry and enters its own authorized resource', async role => {
     const session = auth()
     const overview = await controller('features/competitions/useCompetitionOverview.ts', 'useCompetitionOverview', {

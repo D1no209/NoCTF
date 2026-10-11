@@ -58,7 +58,9 @@ export function useLiveSoloQuestionPool() {
       if (disposed || request !== generation || actor !== user.value?.userId) return
       if (result.error || !result.data) throw parseLiveSoloError(result.error, message('liveSolo.error.load'))
       questions.value = result.data.items ?? []
-      if (!dirty.value || !original.value) apply(selected.value ?? questions.value[0]?.id ?? null)
+      const requestedQuestion = typeof route.query.question === 'string' && questions.value.some(x => x.id === route.query.question)
+        ? route.query.question : null
+      if (!dirty.value || !original.value) apply(selected.value ?? requestedQuestion ?? questions.value[0]?.id ?? null)
       error.value = null
     } catch (cause) { if (!disposed && request === generation) error.value = parseLiveSoloError(cause, message('liveSolo.error.load')).displayMessage }
     finally { if (request === generation) loading.value = false }
