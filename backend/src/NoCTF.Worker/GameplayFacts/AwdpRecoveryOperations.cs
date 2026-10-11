@@ -224,7 +224,7 @@ internal static partial class BackendMessageOperations
         {
             await outbox.PublishToRunnerNodeAsync(new RunAwdpFixVerification(
                 fact.Id,
-                fact.CompetitionChallengeId,
+                fact.CompetitionChallengeId!.Value,
                 fact.ReferenceId.Value,
                 runtime.Id,
                 deadline,
@@ -234,7 +234,7 @@ internal static partial class BackendMessageOperations
         {
             await outbox.PublishToRunnerNodeAsync(new RunPatchVerification(
                 fact.Id,
-                fact.CompetitionChallengeId,
+                fact.CompetitionChallengeId!.Value,
                 fact.ReferenceId.Value,
                 runtime.Id,
                 deadline,

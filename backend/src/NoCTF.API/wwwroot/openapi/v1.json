@@ -358,6 +358,63 @@
         ]
       }
     },
+    "/api/v1/theory/questions/{questionId}/images/{fileId}": {
+      "get": {
+        "tags": [
+          "Theory"
+        ],
+        "summary": "Get Theory Question Image",
+        "description": "Executes GET /api/v1/theory/questions/{questionId}/images/{fileId}.",
+        "operationId": "GetTheoryQuestionImage",
+        "parameters": [
+          {
+            "name": "questionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "fileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "404": {
+            "description": "Not Found"
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/theory/questions/{questionId}/grants/{userId}": {
       "put": {
         "tags": [
@@ -456,6 +513,1526 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/NoCTFAPIEndpointsTheoryQuestionsSetTheoryQuestionStateRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/theory/questions/{questionId}/images": {
+      "post": {
+        "tags": [
+          "Theory"
+        ],
+        "summary": "Upload Theory Image",
+        "description": "Executes POST /api/v1/theory/questions/{questionId}/images.",
+        "operationId": "UploadTheoryImage",
+        "parameters": [
+          {
+            "name": "questionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "UploadTheoryImageRequest",
+          "description": "",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsTheoryQuestionsUploadTheoryImageRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationTheoryQuestionsTheoryImageResult"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/theory/activities/{activityId}/papers/{paperId}/answers/{itemId}": {
+      "put": {
+        "tags": [
+          "Theory"
+        ],
+        "summary": "Answer Theory Paper",
+        "description": "Executes PUT /api/v1/theory/activities/{activityId}/papers/{paperId}/answers/{itemId}.",
+        "operationId": "AnswerTheoryPaper",
+        "parameters": [
+          {
+            "name": "activityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "paperId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "AnswerTheoryPaperRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsTheoryActivitiesAnswerTheoryPaperRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationTheoryPapersTheoryPaperView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/theory/activities/{activityId}/corrections": {
+      "post": {
+        "tags": [
+          "Theory"
+        ],
+        "summary": "Apply Theory Correction",
+        "description": "Executes POST /api/v1/theory/activities/{activityId}/corrections.",
+        "operationId": "ApplyTheoryCorrection",
+        "parameters": [
+          {
+            "name": "activityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "ApplyTheoryCorrectionRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsTheoryActivitiesApplyTheoryCorrectionRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsTheoryActivitiesTheoryCorrectionAccepted"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/theory/activities/{activityId}/check": {
+      "post": {
+        "tags": [
+          "Theory"
+        ],
+        "summary": "Check Theory Activity",
+        "description": "Executes POST /api/v1/theory/activities/{activityId}/check.",
+        "operationId": "CheckTheoryActivity",
+        "parameters": [
+          {
+            "name": "activityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationTheoryActivitiesTheoryActivityCheck"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/competitions/{competitionId}/theory": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Get Competition Theory",
+        "description": "Executes GET /api/v1/competitions/{competitionId}/theory.",
+        "operationId": "GetCompetitionTheory",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "staff",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NoCTFApplicationTheoryActivitiesTheoryActivitySummary"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Save Competition Theory",
+        "description": "Executes PUT /api/v1/competitions/{competitionId}/theory.",
+        "operationId": "SaveCompetitionTheory",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "SaveCompetitionTheoryRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsTheoryActivitiesSaveCompetitionTheoryRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationTheoryActivitiesTheoryActivitySummary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/theory/activities/{activityId}/management": {
+      "get": {
+        "tags": [
+          "Theory"
+        ],
+        "summary": "Get Theory Activity Management",
+        "description": "Executes GET /api/v1/theory/activities/{activityId}/management.",
+        "operationId": "GetTheoryActivityManagement",
+        "parameters": [
+          {
+            "name": "activityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationTheoryActivitiesTheoryActivityManagement"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/theory/activities/{activityId}/leaderboard": {
+      "get": {
+        "tags": [
+          "Theory"
+        ],
+        "summary": "Get Theory Exam Leaderboard",
+        "description": "Executes GET /api/v1/theory/activities/{activityId}/leaderboard.",
+        "operationId": "GetTheoryExamLeaderboard",
+        "parameters": [
+          {
+            "name": "activityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "desc",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationTheoryActivitiesTheoryExamLeaderboard"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/theory/activities/{activityId}/papers/{paperId}": {
+      "get": {
+        "tags": [
+          "Theory"
+        ],
+        "summary": "Get Theory Paper",
+        "description": "Executes GET /api/v1/theory/activities/{activityId}/papers/{paperId}.",
+        "operationId": "GetTheoryPaper",
+        "parameters": [
+          {
+            "name": "activityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "paperId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationTheoryPapersTheoryPaperView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/theory/activities/{activityId}/papers/{paperId}/images/{fileId}": {
+      "get": {
+        "tags": [
+          "Theory"
+        ],
+        "summary": "Get Theory Paper Image",
+        "description": "Executes GET /api/v1/theory/activities/{activityId}/papers/{paperId}/images/{fileId}.",
+        "operationId": "GetTheoryPaperImage",
+        "parameters": [
+          {
+            "name": "activityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "paperId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "fileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "staff",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "404": {
+            "description": "Not Found"
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/theory/activities/{activityId}/reviews/{paperId}": {
+      "get": {
+        "tags": [
+          "Theory"
+        ],
+        "summary": "Get Theory Review",
+        "description": "Executes GET /api/v1/theory/activities/{activityId}/reviews/{paperId}.",
+        "operationId": "GetTheoryReview",
+        "parameters": [
+          {
+            "name": "activityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "paperId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationTheoryActivitiesTheoryReviewPaper"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/theory/activities/{activityId}/session": {
+      "get": {
+        "tags": [
+          "Theory"
+        ],
+        "summary": "Get Theory Session",
+        "description": "Executes GET /api/v1/theory/activities/{activityId}/session.",
+        "operationId": "GetTheorySession",
+        "parameters": [
+          {
+            "name": "activityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationTheoryPapersTheoryPaperView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/theory/activities/{activityId}/papers": {
+      "post": {
+        "tags": [
+          "Theory"
+        ],
+        "summary": "Issue Theory Paper",
+        "description": "Executes POST /api/v1/theory/activities/{activityId}/papers.",
+        "operationId": "IssueTheoryPaper",
+        "parameters": [
+          {
+            "name": "activityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "IssueTheoryPaperRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsTheoryActivitiesIssueTheoryPaperRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationTheoryPapersTheoryPaperView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/theory/activities": {
+      "get": {
+        "tags": [
+          "Theory"
+        ],
+        "summary": "List Theory Activities",
+        "description": "Executes GET /api/v1/theory/activities.",
+        "operationId": "ListTheoryActivities",
+        "parameters": [
+          {
+            "name": "staff",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "competitionId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "guid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "keyword",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "desc",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationTheoryActivitiesTheoryActivityPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Theory"
+        ],
+        "summary": "Save Theory Activity",
+        "description": "Executes POST /api/v1/theory/activities.",
+        "operationId": "SaveTheoryActivity",
+        "requestBody": {
+          "x-name": "SaveTheoryActivityRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsTheoryActivitiesSaveTheoryActivityRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationTheoryActivitiesTheoryActivitySummary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/theory/activities/{activityId}/audit": {
+      "get": {
+        "tags": [
+          "Theory"
+        ],
+        "summary": "List Theory Audit",
+        "description": "Executes GET /api/v1/theory/activities/{activityId}/audit.",
+        "operationId": "ListTheoryAudit",
+        "parameters": [
+          {
+            "name": "activityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "desc",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationTheoryActivitiesTheoryAuditPage"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/theory/activities/{activityId}/reviews": {
+      "get": {
+        "tags": [
+          "Theory"
+        ],
+        "summary": "List Theory Reviews",
+        "description": "Executes GET /api/v1/theory/activities/{activityId}/reviews.",
+        "operationId": "ListTheoryReviews",
+        "parameters": [
+          {
+            "name": "activityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "desc",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationTheoryActivitiesTheoryReviewPage"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/theory/activities/{activityId}/corrections/preview": {
+      "post": {
+        "tags": [
+          "Theory"
+        ],
+        "summary": "Preview Theory Correction",
+        "description": "Executes POST /api/v1/theory/activities/{activityId}/corrections/preview.",
+        "operationId": "PreviewTheoryCorrection",
+        "parameters": [
+          {
+            "name": "activityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "PreviewTheoryCorrectionRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsTheoryActivitiesPreviewTheoryCorrectionRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationTheoryActivitiesTheoryCorrectionPreview"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/theory/activities/{activityId}/reviews/{paperId}/consultations": {
+      "post": {
+        "tags": [
+          "Theory"
+        ],
+        "summary": "Start Theory Consultation",
+        "description": "Executes POST /api/v1/theory/activities/{activityId}/reviews/{paperId}/consultations.",
+        "operationId": "StartTheoryConsultation",
+        "parameters": [
+          {
+            "name": "activityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "paperId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "StartTheoryConsultationRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsTheoryActivitiesStartTheoryConsultationRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsTheoryActivitiesTheoryConsultationResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/theory/activities/{activityId}/papers/{paperId}/submit": {
+      "post": {
+        "tags": [
+          "Theory"
+        ],
+        "summary": "Submit Theory Paper",
+        "description": "Executes POST /api/v1/theory/activities/{activityId}/papers/{paperId}/submit.",
+        "operationId": "SubmitTheoryPaper",
+        "parameters": [
+          {
+            "name": "activityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "paperId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "SubmitTheoryPaperRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsTheoryActivitiesSubmitTheoryPaperRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationTheoryPapersTheoryPaperView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/theory/activities/{activityId}/operations": {
+      "post": {
+        "tags": [
+          "Theory"
+        ],
+        "summary": "Transition Theory Activity",
+        "description": "Executes POST /api/v1/theory/activities/{activityId}/operations.",
+        "operationId": "TransitionTheoryActivity",
+        "parameters": [
+          {
+            "name": "activityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "TransitionTheoryActivityRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsTheoryActivitiesTransitionTheoryActivityRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFApplicationTheoryActivitiesTheoryActivitySummary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/theory/activities/{activityId}/reviews/{paperId}/void": {
+      "post": {
+        "tags": [
+          "Theory"
+        ],
+        "summary": "Void Theory Paper",
+        "description": "Executes POST /api/v1/theory/activities/{activityId}/reviews/{paperId}/void.",
+        "operationId": "VoidTheoryPaper",
+        "parameters": [
+          {
+            "name": "activityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "paperId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "VoidTheoryPaperRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsTheoryActivitiesVoidTheoryPaperRequest"
               }
             }
           },
@@ -25825,6 +27402,12 @@
           },
           "content": {
             "$ref": "#/components/schemas/NoCTFApplicationTheoryQuestionsTheoryQuestionInput"
+          },
+          "grants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationTheoryQuestionsTheoryQuestionAccessGrant"
+            }
           }
         }
       },
@@ -25869,6 +27452,11 @@
           },
           "canManage": {
             "type": "boolean"
+          },
+          "firstExposedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         }
       },
@@ -25886,21 +27474,19 @@
           2
         ]
       },
-      "NoCTFAPIEndpointsTheoryQuestionsGetTheoryQuestionRequest": {
-        "type": "object",
-        "additionalProperties": false
-      },
-      "NoCTFAPIEndpointsTheoryQuestionsGrantTheoryQuestionRequest": {
+      "NoCTFApplicationTheoryQuestionsTheoryQuestionAccessGrant": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
+          "userId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "name": {
+            "type": "string"
+          },
           "permission": {
-            "nullable": true,
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/NoCTFDomainTheoryQuestionsTheoryQuestionPermission"
-              }
-            ]
+            "$ref": "#/components/schemas/NoCTFDomainTheoryQuestionsTheoryQuestionPermission"
           }
         }
       },
@@ -25917,6 +27503,28 @@
           1,
           2
         ]
+      },
+      "NoCTFAPIEndpointsTheoryQuestionsGetTheoryQuestionRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsTheoryQuestionsGetTheoryQuestionImageRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsTheoryQuestionsGrantTheoryQuestionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "permission": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainTheoryQuestionsTheoryQuestionPermission"
+              }
+            ]
+          }
+        }
       },
       "NoCTFApplicationTheoryQuestionsTheoryQuestionPage": {
         "type": "object",
@@ -25979,6 +27587,1366 @@
           "content": {
             "nullable": false,
             "$ref": "#/components/schemas/NoCTFApplicationTheoryQuestionsTheoryQuestionInput"
+          }
+        }
+      },
+      "NoCTFApplicationTheoryQuestionsTheoryImageResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "revisionId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "failure": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFApplicationTheoryQuestionsTheoryImageFailure"
+              }
+            ]
+          }
+        }
+      },
+      "NoCTFApplicationTheoryQuestionsTheoryImageFailure": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "NotFoundOrForbidden",
+          "InvalidImage",
+          "TooLarge",
+          "Conflict"
+        ],
+        "enum": [
+          0,
+          1,
+          2,
+          3
+        ]
+      },
+      "NoCTFAPIEndpointsTheoryQuestionsUploadTheoryImageRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "file"
+        ],
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "nullable": false
+          }
+        }
+      },
+      "NoCTFApplicationTheoryPapersTheoryPaperView": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "activity": {
+            "$ref": "#/components/schemas/NoCTFApplicationTheoryActivitiesTheoryActivitySummary"
+          },
+          "deadline": {
+            "$ref": "#/components/schemas/NoCTFApplicationTheoryActivitiesTheoryDeadline"
+          },
+          "paper": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFApplicationTheoryPapersTheoryParticipantPaper"
+              }
+            ]
+          },
+          "issuedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "effectiveScore": {
+            "$ref": "#/components/schemas/NoCTFApplicationTheoryPapersTheoryEffectiveScore"
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationTheoryPapersTheoryPaperHistory"
+            }
+          },
+          "serverTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "canIssue": {
+            "type": "boolean"
+          },
+          "canAnswer": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFApplicationTheoryActivitiesTheoryActivitySummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "competitionId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/NoCTFDomainTheoryActivitiesTheoryActivityKind"
+          },
+          "state": {
+            "$ref": "#/components/schemas/NoCTFDomainTheoryActivitiesTheoryActivityState"
+          },
+          "opensAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "closesAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "durationSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "attemptLimit": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "scoringMode": {
+            "$ref": "#/components/schemas/NoCTFDomainTheoryActivitiesTheoryScoringMode"
+          },
+          "maximumPaperPoints": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "issuanceStopped": {
+            "type": "boolean"
+          },
+          "questionCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFDomainTheoryActivitiesTheoryActivityKind": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Practice",
+          "Examination",
+          "Competition"
+        ],
+        "enum": [
+          0,
+          1,
+          2
+        ]
+      },
+      "NoCTFDomainTheoryActivitiesTheoryActivityState": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Draft",
+          "Published",
+          "Finished",
+          "Voided"
+        ],
+        "enum": [
+          0,
+          1,
+          2,
+          3
+        ]
+      },
+      "NoCTFDomainTheoryActivitiesTheoryScoringMode": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Highest",
+          "Latest",
+          "Cumulative"
+        ],
+        "enum": [
+          0,
+          1,
+          2
+        ]
+      },
+      "NoCTFApplicationTheoryActivitiesTheoryDeadline": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "extension": {
+            "type": "string",
+            "format": "duration"
+          },
+          "paused": {
+            "type": "boolean"
+          },
+          "capped": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFApplicationTheoryPapersTheoryParticipantPaper": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "answerRevision": {
+            "type": "string",
+            "format": "guid"
+          },
+          "attempt": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "state": {
+            "$ref": "#/components/schemas/NoCTFDomainTheoryPapersTheoryPaperState"
+          },
+          "openedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "submissionKind": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainTheoryPapersTheorySubmissionKind"
+              }
+            ]
+          },
+          "maximumPoints": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "score": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationTheoryPapersTheoryParticipantQuestion"
+            }
+          }
+        }
+      },
+      "NoCTFDomainTheoryPapersTheoryPaperState": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Active",
+          "Submitted",
+          "Voided"
+        ],
+        "enum": [
+          0,
+          1,
+          2
+        ]
+      },
+      "NoCTFDomainTheoryPapersTheorySubmissionKind": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Manual",
+          "Timeout",
+          "ActivityFinished"
+        ],
+        "enum": [
+          0,
+          1,
+          2
+        ]
+      },
+      "NoCTFApplicationTheoryPapersTheoryParticipantQuestion": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "answerRevision": {
+            "type": "string",
+            "format": "guid"
+          },
+          "order": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/NoCTFDomainTheoryQuestionsTheoryQuestionKind"
+          },
+          "body": {
+            "type": "string"
+          },
+          "points": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "answeredById": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "answeredAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationTheoryPapersTheoryParticipantOption"
+            }
+          },
+          "answeredByName": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFApplicationTheoryPapersTheoryParticipantOption": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "order": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "content": {
+            "type": "string"
+          },
+          "truthValue": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainTheoryQuestionsTheoryTruthValue"
+              }
+            ]
+          },
+          "selected": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFApplicationTheoryPapersTheoryEffectiveScore": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "points": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "achievedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "hasSubmission": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFApplicationTheoryPapersTheoryPaperHistory": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "paperId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "attempt": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "state": {
+            "$ref": "#/components/schemas/NoCTFDomainTheoryPapersTheoryPaperState"
+          },
+          "score": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsTheoryActivitiesAnswerTheoryPaperRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "optionIds",
+          "expectedRevision",
+          "requestId"
+        ],
+        "properties": {
+          "expectedRevision": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          },
+          "requestId": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          },
+          "optionIds": {
+            "type": "array",
+            "maximum": 8.0,
+            "nullable": false,
+            "items": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsTheoryActivitiesTheoryCorrectionAccepted": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "targetRevision": {
+            "type": "string",
+            "format": "guid"
+          },
+          "statusUrl": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsTheoryActivitiesApplyTheoryCorrectionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "input",
+          "reason",
+          "token"
+        ],
+        "properties": {
+          "input": {
+            "nullable": false,
+            "$ref": "#/components/schemas/NoCTFApplicationTheoryActivitiesTheoryCorrectionInput"
+          },
+          "token": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 0,
+            "nullable": false
+          }
+        }
+      },
+      "NoCTFApplicationTheoryActivitiesTheoryCorrectionInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "revisionId",
+          "correctOptions"
+        ],
+        "properties": {
+          "revisionId": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          },
+          "mode": {
+            "$ref": "#/components/schemas/NoCTFDomainTheoryActivitiesTheoryCorrectionMode"
+          },
+          "correctOptions": {
+            "type": "array",
+            "nullable": false,
+            "items": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        }
+      },
+      "NoCTFDomainTheoryActivitiesTheoryCorrectionMode": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "ReplaceAnswer",
+          "FullCredit"
+        ],
+        "enum": [
+          0,
+          1
+        ]
+      },
+      "NoCTFApplicationTheoryActivitiesTheoryActivityCheck": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "feasible": {
+            "type": "boolean"
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationTheoryActivitiesTheoryRuleCapacity"
+            }
+          },
+          "shortages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationTheoryPapersTheoryAllocationShortage"
+            }
+          }
+        }
+      },
+      "NoCTFApplicationTheoryActivitiesTheoryRuleCapacity": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "order": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "required": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "available": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFApplicationTheoryPapersTheoryAllocationShortage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "ruleId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "required": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "allocated": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsTheoryActivitiesCheckTheoryActivityRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsTheoryActivitiesGetCompetitionTheoryRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFApplicationTheoryActivitiesTheoryActivityManagement": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "activity": {
+            "$ref": "#/components/schemas/NoCTFApplicationTheoryActivitiesTheoryActivitySummary"
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationTheoryActivitiesTheoryRuleInput"
+            }
+          },
+          "allowExposedQuestions": {
+            "type": "boolean"
+          },
+          "canManage": {
+            "type": "boolean"
+          },
+          "canJudge": {
+            "type": "boolean"
+          },
+          "deadline": {
+            "$ref": "#/components/schemas/NoCTFApplicationTheoryActivitiesTheoryDeadline"
+          },
+          "corrections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationTheoryActivitiesTheoryCorrectionProgress"
+            }
+          },
+          "issuedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "competitionEndAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "allowedOperations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationTheoryActivitiesTheoryActivityAction"
+            }
+          }
+        }
+      },
+      "NoCTFApplicationTheoryActivitiesTheoryRuleInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/NoCTFDomainTheoryQuestionsTheoryQuestionKind"
+          },
+          "difficulty": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainTheoryQuestionsTheoryQuestionDifficulty"
+              }
+            ]
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "points": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "filters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationTheoryActivitiesTheoryClassificationFilter"
+            }
+          }
+        }
+      },
+      "NoCTFApplicationTheoryActivitiesTheoryClassificationFilter": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/NoCTFDomainTheoryQuestionsTheoryClassificationKind"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFApplicationTheoryActivitiesTheoryCorrectionProgress": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "revisionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "targetRevision": {
+            "type": "string",
+            "format": "guid"
+          },
+          "completed": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFApplicationTheoryActivitiesTheoryActivityAction": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Publish",
+          "Withdraw",
+          "Pause",
+          "Resume",
+          "StopIssuance",
+          "ExtendDeadline",
+          "Finish",
+          "Void"
+        ],
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ]
+      },
+      "NoCTFAPIEndpointsTheoryActivitiesGetTheoryActivityManagementRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFApplicationTheoryActivitiesTheoryExamLeaderboard": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationTheoryActivitiesTheoryExamRank"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFApplicationTheoryActivitiesTheoryExamRank": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "rank": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "userId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "points": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "achievedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "hasSubmission": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsTheoryActivitiesGetTheoryExamLeaderboardRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFAPIPaginationPaginationRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
+      },
+      "NoCTFAPIEndpointsTheoryActivitiesGetTheoryPaperRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsTheoryActivitiesGetTheoryPaperImageRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFApplicationTheoryActivitiesTheoryReviewPaper": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "paper": {
+            "$ref": "#/components/schemas/NoCTFApplicationTheoryActivitiesTheoryReviewRow"
+          },
+          "questions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationTheoryActivitiesTheoryReviewQuestion"
+            }
+          }
+        }
+      },
+      "NoCTFApplicationTheoryActivitiesTheoryReviewRow": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "paperId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "participantId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "userId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "teamId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "attempt": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "state": {
+            "$ref": "#/components/schemas/NoCTFDomainTheoryPapersTheoryPaperState"
+          },
+          "openedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "score": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "questionCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "answeredCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "submissionKind": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainTheoryPapersTheorySubmissionKind"
+              }
+            ]
+          },
+          "deadline": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFApplicationTheoryActivitiesTheoryDeadline"
+              }
+            ]
+          },
+          "effectiveScore": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFApplicationTheoryPapersTheoryEffectiveScore"
+              }
+            ]
+          }
+        }
+      },
+      "NoCTFApplicationTheoryActivitiesTheoryReviewQuestion": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "question": {
+            "$ref": "#/components/schemas/NoCTFApplicationTheoryPapersTheoryParticipantQuestion"
+          },
+          "revisionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "correctOptions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          "explanation": {
+            "type": "string",
+            "nullable": true
+          },
+          "result": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainTheoryPapersTheoryAnswerResult"
+              }
+            ]
+          }
+        }
+      },
+      "NoCTFDomainTheoryPapersTheoryAnswerResult": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Correct",
+          "Wrong",
+          "Unanswered",
+          "FullCredit"
+        ],
+        "enum": [
+          0,
+          1,
+          2,
+          3
+        ]
+      },
+      "NoCTFAPIEndpointsTheoryActivitiesGetTheoryReviewRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsTheoryActivitiesGetTheorySessionRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsTheoryActivitiesIssueTheoryPaperRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          },
+          "expectedIssuedCount": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0.0
+          }
+        }
+      },
+      "NoCTFApplicationTheoryActivitiesTheoryActivityPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationTheoryActivitiesTheoryActivitySummary"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsTheoryActivitiesListTheoryActivitiesRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFAPIPaginationSearchRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
+      },
+      "NoCTFApplicationTheoryActivitiesTheoryAuditPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationTheoryActivitiesTheoryAuditRow"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFApplicationTheoryActivitiesTheoryAuditRow": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/NoCTFDomainTheoryActivitiesTheoryActivityOperationKind"
+          },
+          "actorName": {
+            "type": "string"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFDomainTheoryActivitiesTheoryActivityOperationKind": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Published",
+          "Withdrawn",
+          "Paused",
+          "Resumed",
+          "DeadlineExtended",
+          "IssuanceStopped",
+          "Finished",
+          "Voided",
+          "ExposureAccepted",
+          "PaperVoided",
+          "AnswerCorrected",
+          "FullCreditGranted"
+        ],
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ]
+      },
+      "NoCTFAPIEndpointsTheoryActivitiesListTheoryAuditRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFAPIPaginationPaginationRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
+      },
+      "NoCTFApplicationTheoryActivitiesTheoryReviewPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationTheoryActivitiesTheoryReviewRow"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsTheoryActivitiesListTheoryReviewsRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/NoCTFAPIPaginationPaginationRequest"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
+      },
+      "NoCTFApplicationTheoryActivitiesTheoryCorrectionPreview": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "type": "string",
+            "format": "guid"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "affectedPapers": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "scores": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationTheoryActivitiesTheoryScoreImpact"
+            }
+          },
+          "participants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationTheoryActivitiesTheoryParticipantScoreImpact"
+            }
+          }
+        }
+      },
+      "NoCTFApplicationTheoryActivitiesTheoryScoreImpact": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "paperId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "participantId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "before": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "after": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "NoCTFApplicationTheoryActivitiesTheoryParticipantScoreImpact": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "participantId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "before": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "after": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsTheoryActivitiesPreviewTheoryCorrectionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "input"
+        ],
+        "properties": {
+          "input": {
+            "nullable": false,
+            "$ref": "#/components/schemas/NoCTFApplicationTheoryActivitiesTheoryCorrectionInput"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsTheoryActivitiesSaveCompetitionTheoryRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "input"
+        ],
+        "properties": {
+          "activityId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "input": {
+            "nullable": false,
+            "$ref": "#/components/schemas/NoCTFApplicationTheoryActivitiesTheoryActivityInput"
+          }
+        }
+      },
+      "NoCTFApplicationTheoryActivitiesTheoryActivityInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "rules"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 0,
+            "nullable": false
+          },
+          "kind": {
+            "$ref": "#/components/schemas/NoCTFDomainTheoryActivitiesTheoryActivityKind"
+          },
+          "opensAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "closesAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "durationSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0.0,
+            "exclusiveMinimum": true
+          },
+          "attemptLimit": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "scoringMode": {
+            "$ref": "#/components/schemas/NoCTFDomainTheoryActivitiesTheoryScoringMode"
+          },
+          "allowExposedQuestions": {
+            "type": "boolean"
+          },
+          "rules": {
+            "type": "array",
+            "minLength": 1,
+            "nullable": false,
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationTheoryActivitiesTheoryRuleInput"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsTheoryActivitiesSaveTheoryActivityRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "input"
+        ],
+        "properties": {
+          "activityId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "competitionId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "input": {
+            "nullable": false,
+            "$ref": "#/components/schemas/NoCTFApplicationTheoryActivitiesTheoryActivityInput"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsTheoryActivitiesTheoryConsultationResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "threadRootId": {
+            "type": "string",
+            "format": "guid"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsTheoryActivitiesStartTheoryConsultationRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "body"
+        ],
+        "properties": {
+          "body": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 0,
+            "nullable": false
+          }
+        }
+      },
+      "NoCTFAPIEndpointsTheoryActivitiesSubmitTheoryPaperRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expectedRevision"
+        ],
+        "properties": {
+          "expectedRevision": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          }
+        }
+      },
+      "NoCTFAPIEndpointsTheoryActivitiesTransitionTheoryActivityRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/NoCTFApplicationTheoryActivitiesTheoryActivityAction"
+          },
+          "deadline": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 0,
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsTheoryActivitiesVoidTheoryPaperRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 0,
+            "nullable": false
           }
         }
       },
@@ -34903,6 +37871,9 @@
               "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardTeamResponse"
             }
           },
+          "theoryEnabled": {
+            "type": "boolean"
+          },
           "tracks": {
             "type": "array",
             "items": {
@@ -35015,6 +37986,13 @@
             "items": {
               "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardSlotResponse"
             }
+          },
+          "theoryScore": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "hasTheorySubmission": {
+            "type": "boolean"
           },
           "achievements": {
             "type": "array",
@@ -43546,7 +46524,8 @@
           "LiveSoloMatch",
           "LiveSoloQuestionGroup",
           "LiveSoloQuestionMaterial",
-          "ActiveLiveSoloMediaResource"
+          "ActiveLiveSoloMediaResource",
+          "TheoryActivity"
         ],
         "enum": [
           "HistoricalEvent",
@@ -43567,7 +46546,8 @@
           "LiveSoloMatch",
           "LiveSoloQuestionGroup",
           "LiveSoloQuestionMaterial",
-          "ActiveLiveSoloMediaResource"
+          "ActiveLiveSoloMediaResource",
+          "TheoryActivity"
         ]
       },
       "NoCTFAPIEndpointsAdministrationCompetitionsForceDeleteCompetitionRequest": {

@@ -370,7 +370,7 @@ internal static class Program
             resourceId = db.GameplayFacts.AsNoTracking()
                 .Where(fact => fact.Id == factId)
                 .Select(fact => fact.CompetitionChallengeId)
-                .Single();
+                .Single() ?? throw new InvalidOperationException("Practical command receipt has no challenge target.");
         }
         else if (result.TryGetProperty("PatchUploadId", out _)
                  || result.TryGetProperty("patchUploadId", out _))
@@ -391,7 +391,7 @@ internal static class Program
             resourceId = db.GameplayFacts.AsNoTracking()
                 .Where(fact => fact.Id == factId)
                 .Select(fact => fact.CompetitionChallengeId)
-                .Single();
+                .Single() ?? throw new InvalidOperationException("Practical command receipt has no challenge target.");
         }
         else if (result.TryGetProperty("RuntimeInstanceId", out _)
                  || result.TryGetProperty("runtimeInstanceId", out _))

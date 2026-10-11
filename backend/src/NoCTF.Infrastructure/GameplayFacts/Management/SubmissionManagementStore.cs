@@ -32,7 +32,7 @@ public sealed class GameplayFactManagementStore(
         if (filter.Kind is GameplayFactKind kind)
             query = query.Where(submission => submission.Kind == kind);
         else
-            query = query.Where(submission => submission.Kind != GameplayFactKind.AttachmentDownload && submission.Kind != GameplayFactKind.WriteUpUnlock);
+            query = query.Where(submission => submission.Kind != GameplayFactKind.AttachmentDownload && submission.Kind != GameplayFactKind.WriteUpUnlock && submission.Kind != GameplayFactKind.TheoryPaperSubmission);
         if (filter.State is GameplayFactState state)
             query = query.Where(submission => submission.State == state);
         if (filter.Result is GameplayFactResult result)
@@ -126,7 +126,7 @@ public sealed class GameplayFactManagementStore(
         if (filter.Kind is GameplayFactKind kind)
             query = query.Where(submission => submission.Kind == kind);
         else
-            query = query.Where(submission => submission.Kind != GameplayFactKind.AttachmentDownload && submission.Kind != GameplayFactKind.WriteUpUnlock);
+            query = query.Where(submission => submission.Kind != GameplayFactKind.AttachmentDownload && submission.Kind != GameplayFactKind.WriteUpUnlock && submission.Kind != GameplayFactKind.TheoryPaperSubmission);
         if (filter.State is GameplayFactState state)
             query = query.Where(submission => submission.State == state);
         if (filter.Result is GameplayFactResult result)
@@ -225,6 +225,8 @@ public sealed class GameplayFactManagementStore(
     {
         var mode = await db.Competitions.AsNoTracking().Where(x => x.Id == competitionId).Select(x => (NoCTF.Domain.Competitions.GameMode?)x.Mode).SingleOrDefaultAsync(ct);
         if (mode is null) return GameplayFactWorkQueueState.NotFound;
+        if (gameplayFactId is { } target && await db.GameplayFacts.AsNoTracking().AnyAsync(fact => fact.Id == target
+            && fact.Kind == GameplayFactKind.TheoryPaperSubmission, ct)) return GameplayFactWorkQueueState.IndependentAdjudicationRequired;
         if (rejudge && !CompetitionModeCapabilities.For(mode.Value).GenericRejudgement)
             return GameplayFactWorkQueueState.IndependentAdjudicationRequired;
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
@@ -258,10 +260,10 @@ public sealed class GameplayFactManagementStore(
     }
 
     private IQueryable<GameplayFactListItem> Project(IQueryable<GameplayFact> submissions) =>
-        submissions.Select(submission => new GameplayFactListItem(
+        submissions.Where(fact => fact.CompetitionChallengeId != null).Select(submission => new GameplayFactListItem(
             submission.Id,
             submission.CompetitionId,
-            submission.CompetitionChallengeId,
+            submission.CompetitionChallengeId!.Value,
             submission.TeamId,
             submission.VictimTeamId,
             submission.ActorUserId,

@@ -9,6 +9,7 @@ public static class EndpointRegistration
 {
     public static WebApplication UseNoCtfEndpoints(this WebApplication app)
     {
+        app.UseMiddleware<NoCTF.API.Endpoints.Theory.TheoryResponsePrivacy>();
         app.UseFastEndpoints(options =>
         {
             options.Endpoints.ShortNames = true;

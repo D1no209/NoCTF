@@ -29,6 +29,7 @@ public sealed class SetTheoryQuestionStateEndpoint(ManageTheoryQuestions manage,
     {
         Put("/theory/questions/{questionId}/state");
         AuthSchemes("Bearer");
+        Options(builder => builder.WithMetadata(new NoCTF.API.Endpoints.Theory.TheoryPrivateResponse()));
         Description(builder => builder.WithName("TheoryQuestionsSetState"));
         Summary(summary =>
         {

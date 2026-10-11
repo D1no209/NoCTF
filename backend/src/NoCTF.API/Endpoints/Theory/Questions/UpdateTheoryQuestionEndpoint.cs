@@ -30,6 +30,7 @@ public sealed class UpdateTheoryQuestionEndpoint(ManageTheoryQuestions manage, I
         Put("/theory/questions/{questionId}");
         MaxRequestBodySize(2 * 1024 * 1024);
         AuthSchemes("Bearer");
+        Options(builder => builder.WithMetadata(new NoCTF.API.Endpoints.Theory.TheoryPrivateResponse()));
         Description(builder => builder.WithName("TheoryQuestionsUpdate"));
         Summary(summary =>
         {

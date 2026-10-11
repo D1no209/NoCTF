@@ -41,7 +41,8 @@ public enum CompetitionHardDeleteReferenceKind
     LiveSoloMatch,
     LiveSoloQuestionGroup,
     LiveSoloQuestionMaterial,
-    ActiveLiveSoloMediaResource
+    ActiveLiveSoloMediaResource,
+    TheoryActivity
 }
 
 public sealed record CompetitionHardDeleteReference(

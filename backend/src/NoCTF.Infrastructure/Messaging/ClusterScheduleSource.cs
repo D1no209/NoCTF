@@ -77,9 +77,9 @@ public sealed class ClusterScheduleSource(
         var observations = challengeIds.Length == 0
             ? []
             : await db.GameplayFacts.AsNoTracking()
-                .Where(fact => challengeIds.Contains(fact.CompetitionChallengeId)
+                .Where(fact => fact.CompetitionChallengeId != null && challengeIds.Contains(fact.CompetitionChallengeId.Value)
                     && fact.Kind == GameplayFactKind.KohControlObservation)
-                .Select(fact => new KohObservation(fact.CompetitionChallengeId, fact.OccurredAt))
+                .Select(fact => new KohObservation(fact.CompetitionChallengeId!.Value, fact.OccurredAt))
                 .ToArrayAsync(cancellationToken);
 
         var challengesByCompetition = challenges

@@ -15,6 +15,21 @@ public sealed class LeaderboardMessageHandler(ILeaderboardCache leaderboard, NoC
         await leaderboard.RefreshAsync(message.CompetitionId, cancellationToken);
         var projection = await leaderboard.GetScoreboardAsync(message.CompetitionId, cancellationToken);
         if (projection is null) return;
+        foreach (var batch in projection.TheoryReceipts.Chunk(128))
+        {
+            var fact = System.Linq.Expressions.Expression.Parameter(typeof(GameplayFact), "fact");
+            System.Linq.Expressions.Expression matches = System.Linq.Expressions.Expression.Constant(false);
+            foreach (var receipt in batch)
+                matches = System.Linq.Expressions.Expression.OrElse(matches, System.Linq.Expressions.Expression.AndAlso(
+                    System.Linq.Expressions.Expression.Equal(System.Linq.Expressions.Expression.Property(fact, nameof(GameplayFact.Id)), System.Linq.Expressions.Expression.Constant(receipt.FactId)),
+                    System.Linq.Expressions.Expression.Equal(System.Linq.Expressions.Expression.Property(fact, nameof(GameplayFact.ConcurrencyStamp)), System.Linq.Expressions.Expression.Constant(receipt.ConcurrencyStamp))));
+            var exact = System.Linq.Expressions.Expression.Lambda<Func<GameplayFact, bool>>(matches, fact);
+            var completionStamp = Guid.NewGuid();
+            await db.GameplayFacts.Where(exact).Where(fact => fact.CompetitionId == message.CompetitionId
+                && fact.Kind == GameplayFactKind.TheoryPaperSubmission && fact.State == GameplayFactState.Queued)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(fact => fact.State, GameplayFactState.Completed)
+                    .SetProperty(fact => fact.ConcurrencyStamp, completionStamp), cancellationToken);
+        }
         var included = projection.Snapshot.Teams.SelectMany(team => team.ChallengeBenefits
             .Where(x => x.WriteUpUnlockedAt is not null).Select(x => (team.TeamId, x.CompetitionChallengeId, x.WriteUpUnlockedAt))).ToHashSet();
         var queued = await db.WriteUpUnlockReceipts.AsNoTracking().Where(x => x.CompetitionId == message.CompetitionId

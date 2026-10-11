@@ -6,7 +6,10 @@ namespace NoCTF.Application.Theory.Papers;
 
 public sealed record TheoryParticipantOption(Guid Id, int Order, string Content, TheoryTruthValue? TruthValue, bool Selected);
 public sealed record TheoryParticipantQuestion(Guid Id, Guid AnswerRevision, int Order, TheoryQuestionKind Kind,
-    string Body, int Points, Guid? AnsweredById, DateTimeOffset? AnsweredAt, IReadOnlyList<TheoryParticipantOption> Options);
+    string Body, int Points, Guid? AnsweredById, DateTimeOffset? AnsweredAt, IReadOnlyList<TheoryParticipantOption> Options)
+{
+    public string? AnsweredByName { get; init; }
+}
 public sealed record TheoryParticipantPaper(Guid Id, Guid AnswerRevision, int Attempt, TheoryPaperState State,
     DateTimeOffset OpenedAt, DateTimeOffset? SubmittedAt, TheorySubmissionKind? SubmissionKind,
     long MaximumPoints, long? Score, IReadOnlyList<TheoryParticipantQuestion> Questions);
@@ -14,7 +17,7 @@ public sealed record TheoryParticipantPaper(Guid Id, Guid AnswerRevision, int At
 /// <summary>Explicit participant projection: neither entities nor correct-answer fields cross this boundary.</summary>
 public static class ReadTheoryPaper
 {
-    public static TheoryParticipantPaper Project(TheoryPaper paper, IReadOnlyDictionary<Guid, TheoryQuestionRevision> versions)
+    public static TheoryParticipantPaper Project(TheoryPaper paper, IReadOnlyDictionary<Guid, TheoryQuestionRevision> versions, IReadOnlyDictionary<Guid, string>? actors = null)
     {
         var questions = paper.State == TheoryPaperState.Active
             ? paper.Items.OrderBy(item => item.Order).Select(item =>
@@ -25,7 +28,8 @@ public static class ReadTheoryPaper
                     version.Body, item.Points, item.AnsweredById, item.AnsweredAt,
                     item.Options.OrderBy(option => option.Order).Select(option => new TheoryParticipantOption(
                         option.OptionId, option.Order, options[option.OptionId].Content,
-                        options[option.OptionId].TruthValue, option.Selected)).ToArray());
+                        options[option.OptionId].TruthValue, option.Selected)).ToArray())
+                { AnsweredByName = item.AnsweredById is { } actorId && actors is not null ? actors.GetValueOrDefault(actorId) : null };
             }).ToArray() : [];
         return new(paper.Id, paper.ConcurrencyStamp, paper.Attempt, paper.State, paper.OpenedAt,
             paper.SubmittedAt, paper.SubmissionKind, paper.Items.Sum(item => (long)item.Points),

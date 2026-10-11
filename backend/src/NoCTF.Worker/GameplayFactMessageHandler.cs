@@ -18,7 +18,7 @@ public sealed class GameplayFactMessageHandler(
         CancellationToken cancellationToken)
     {
         var unlock = await db.GameplayFacts.AsNoTracking().Where(x => x.Id == message.GameplayFactId
-            && x.Kind == NoCTF.Domain.Gameplay.GameplayFactKind.WriteUpUnlock
+            && (x.Kind == NoCTF.Domain.Gameplay.GameplayFactKind.WriteUpUnlock || x.Kind == NoCTF.Domain.Gameplay.GameplayFactKind.TheoryPaperSubmission)
             && x.State == NoCTF.Domain.Gameplay.GameplayFactState.Queued)
             .Select(x => (Guid?)x.CompetitionId).SingleOrDefaultAsync(cancellationToken);
         if (unlock is Guid competitionId)
@@ -38,13 +38,13 @@ public sealed class GameplayFactMessageHandler(
             .SingleOrDefaultAsync(
                 candidate => candidate.Id == message.GameplayFactId,
                 cancellationToken);
-        if (fact?.ActorUserId is not Guid userId || fact.State != message.State)
+        if (fact?.ActorUserId is not Guid userId || fact.State != message.State || fact.CompetitionChallengeId is null)
             return;
         var view = new GameplayFactStatusView(
             fact.Id,
             fact.CompetitionId,
             fact.TeamId,
-            fact.CompetitionChallengeId,
+            fact.CompetitionChallengeId.Value,
             fact.Kind,
             fact.State,
             GameplayFactResultDisclosure.PlayerResult(fact.Result, fact.FailureCode),

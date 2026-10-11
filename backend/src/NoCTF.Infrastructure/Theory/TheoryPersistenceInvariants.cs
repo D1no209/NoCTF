@@ -12,10 +12,17 @@ internal static class TheoryPersistenceInvariants
     {
         if (Mutated<TheoryQuestionRevision>(tracker) || Mutated<TheoryQuestionOption>(tracker)
             || Mutated<TheoryQuestionClassification>(tracker) || Mutated<TheoryQuestionFile>(tracker)
-            || Mutated<TheoryQuestionSource>(tracker) || Mutated<TheoryDrawReceipt>(tracker)
+            || Mutated<TheoryDrawReceipt>(tracker) || Mutated<TheoryIssueReceipt>(tracker)
             || Mutated<TheoryAnswerReceipt>(tracker) || Mutated<TheoryActivityOperation>(tracker)
             || Mutated<TheoryQuestionExposure>(tracker))
             throw new InvalidOperationException("Theory content versions, draw receipts and audit records are immutable.");
+        foreach (var entry in tracker.Entries<TheoryQuestionSource>())
+        {
+            if (entry.State == EntityState.Deleted) throw new InvalidOperationException("Canonical theory sources are retained.");
+            if (entry.State == EntityState.Modified && entry.OriginalValues.GetValue<DateTimeOffset?>(nameof(TheoryQuestionSource.FirstExposedAt)) is { } original
+                && (entry.Entity.FirstExposedAt is null || entry.Entity.FirstExposedAt > original))
+                throw new InvalidOperationException("Theory exposure history cannot be cleared or moved forward.");
+        }
         var newRevisions = tracker.Entries<TheoryQuestionRevision>().Where(entry => entry.State == EntityState.Added)
             .Select(entry => entry.Entity.Id).ToHashSet();
         if (tracker.Entries<TheoryQuestionOption>().Any(entry => entry.State == EntityState.Added && !newRevisions.Contains(entry.Entity.RevisionId))

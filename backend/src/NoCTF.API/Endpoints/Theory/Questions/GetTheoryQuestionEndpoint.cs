@@ -23,6 +23,7 @@ public sealed class GetTheoryQuestionEndpoint(ITheoryQuestionBank bank, IUserCon
     {
         Get("/theory/questions/{questionId}");
         AuthSchemes("Bearer");
+        Options(builder => builder.WithMetadata(new NoCTF.API.Endpoints.Theory.TheoryPrivateResponse()));
         Description(builder => builder.WithName("TheoryQuestionsGet"));
         Summary(summary =>
         {

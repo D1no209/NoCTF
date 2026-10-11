@@ -131,7 +131,7 @@ internal static class WriteUpBenefitProjection
             }));
     }
 
-    private static IOrderedEnumerable<ScoreboardTeam> Rank(LeaderboardProjectionInput input,
+    internal static IOrderedEnumerable<ScoreboardTeam> Rank(LeaderboardProjectionInput input,
         GameModeLeaderboardProjection raw, IEnumerable<ScoreboardTeam> teams)
     {
         var entries = raw.Entries.ToDictionary(x => x.TeamId);
@@ -140,7 +140,7 @@ internal static class WriteUpBenefitProjection
         if (input.Mode == GameMode.Ctf)
             return ordered.ThenBy(x => entries.GetValueOrDefault(x.TeamId)?.LastScoreAt ?? DateTimeOffset.MaxValue)
                 .ThenByDescending(x => entries.GetValueOrDefault(x.TeamId)?.SolveCount ?? 0)
-                .ThenBy(x => facts[x.TeamId].RegisteredAt).ThenBy(x => x.TeamId);
+                .ThenBy(x => x.TheoryAchievedAt ?? DateTimeOffset.MaxValue).ThenBy(x => facts[x.TeamId].RegisteredAt).ThenBy(x => x.TeamId);
         if (input.Mode == GameMode.Awd)
         {
             long AttackPoints(ScoreboardTeam team)
@@ -153,12 +153,12 @@ internal static class WriteUpBenefitProjection
             }
             return ordered.ThenByDescending(AttackPoints).ThenByDescending(x => entries[x.TeamId].UpRoundCount)
                 .ThenByDescending(x => entries[x.TeamId].AttackCount).ThenBy(x => entries[x.TeamId].LastScoreAt ?? DateTimeOffset.MaxValue)
-                .ThenBy(x => facts[x.TeamId].RegisteredAt).ThenBy(x => x.TeamId);
+                .ThenBy(x => x.TheoryAchievedAt ?? DateTimeOffset.MaxValue).ThenBy(x => facts[x.TeamId].RegisteredAt).ThenBy(x => x.TeamId);
         }
         if (input.Mode == GameMode.Awdp)
             return ordered.ThenByDescending(x => entries[x.TeamId].FixCount).ThenByDescending(x => entries[x.TeamId].AttackCount)
                 .ThenBy(x => entries[x.TeamId].PenaltyScore.GetValueOrDefault()).ThenBy(x => entries[x.TeamId].LastFixAt ?? DateTimeOffset.MaxValue)
-                .ThenBy(x => facts[x.TeamId].RegisteredAt).ThenBy(x => x.TeamId);
+                .ThenBy(x => x.TheoryAchievedAt ?? DateTimeOffset.MaxValue).ThenBy(x => facts[x.TeamId].RegisteredAt).ThenBy(x => x.TeamId);
         return ordered.ThenByDescending(x => entries[x.TeamId].SolveCount).ThenByDescending(x => entries[x.TeamId].ControlledChallengeCount)
             .ThenBy(x => entries[x.TeamId].FirstControlAt ?? DateTimeOffset.MaxValue).ThenBy(x => facts[x.TeamId].RegisteredAt).ThenBy(x => x.TeamId);
     }

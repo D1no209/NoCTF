@@ -67,7 +67,7 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db) : IHis
         if (beforeOccurredAt is { } at && beforeId is { } before)
             query = query.Where(fact => fact.OccurredAt < at || fact.OccurredAt == at && fact.Id.CompareTo(before) < 0);
         var facts = await query.OrderByDescending(fact => fact.OccurredAt).ThenByDescending(fact => fact.Id).Take(scanLimit)
-            .Select(fact => new FactCandidate(fact.Id, fact.CompetitionChallengeId, fact.TeamId, fact.Kind, fact.Result,
+            .Select(fact => new FactCandidate(fact.Id, fact.CompetitionChallengeId!.Value, fact.TeamId, fact.Kind, fact.Result,
                 fact.FailureCode, fact.OccurredAt, fact.State, db.WriteUpUnlockReceipts.Any(x => x.TeamId == fact.TeamId && x.CompetitionChallengeId == fact.CompetitionChallengeId && x.UnlockedAt <= fact.OccurredAt))).ToArrayAsync(ct);
         if (facts.Length == 0) return new(HistoricalAdjudicationPreviewReadState.Available, []);
 
@@ -100,9 +100,9 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db) : IHis
                 .Where(fact => fact.CompetitionId == competitionId
                     && fact.TeamId != null && (includeInternalTeams || !hiddenTeams.Contains(fact.TeamId))
                     && (fact.Kind == GameplayFactKind.FlagAttempt
-                        && flagIds.Contains(fact.CompetitionChallengeId)
+                        && fact.CompetitionChallengeId != null && flagIds.Contains(fact.CompetitionChallengeId.Value)
                         || fact.Kind == GameplayFactKind.FixAttempt
-                        && patchIds.Contains(fact.CompetitionChallengeId))
+                        && fact.CompetitionChallengeId != null && patchIds.Contains(fact.CompetitionChallengeId.Value))
                     && (fact.Result == GameplayFactResult.Correct || fact.Result == GameplayFactResult.RightButDue)
                     && db.CompetitionChallenges.IgnoreQueryFilters().Any(challenge => challenge.Id == fact.CompetitionChallengeId
                         && (challenge.AutoOpenAt == null || fact.OccurredAt >= challenge.AutoOpenAt)
@@ -114,7 +114,7 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db) : IHis
                 .ThenBy(fact => fact.Id)
                 .Select(fact => new FirstCorrectFact(
                     fact.Id,
-                    fact.CompetitionChallengeId,
+                    fact.CompetitionChallengeId!.Value,
                     fact.TeamId!.Value,
                     fact.OccurredAt,
                     db.WriteUpUnlockReceipts.Any(x => x.TeamId == fact.TeamId && x.CompetitionChallengeId == fact.CompetitionChallengeId && x.UnlockedAt <= fact.OccurredAt)))

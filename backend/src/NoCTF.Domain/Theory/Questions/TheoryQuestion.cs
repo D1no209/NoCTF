@@ -25,9 +25,11 @@ public sealed class TheoryQuestion : IConcurrencyTracked
 }
 
 /// <summary>Canonical identity shared by copies, including copies of copies.</summary>
-public sealed class TheoryQuestionSource
+public sealed class TheoryQuestionSource : IConcurrencyTracked
 {
     public Guid Id { get; set; }
+    public Guid ConcurrencyStamp { get; set; } = Guid.NewGuid();
+    public DateTimeOffset? FirstExposedAt { get; set; }
 }
 
 /// <summary>Once stored, question content is immutable; changes create another version.</summary>

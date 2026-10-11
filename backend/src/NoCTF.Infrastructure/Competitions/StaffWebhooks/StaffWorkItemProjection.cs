@@ -27,15 +27,15 @@ internal static class StaffWorkItemProjection
     public static async Task<IReadOnlyList<StaffWorkItemSummary>> ReadAsync(NoCtfDbContext db, Guid competitionId, CancellationToken ct)
     {
         var facts = (await db.GameplayFacts.AsNoTracking().Where(value => value.CompetitionId == competitionId
-            && value.FailureCode != null && CheatIncidentFailures.All.Contains(value.FailureCode.Value))
-            .Select(value => new Fact(value.Id, value.TeamId, value.VictimTeamId, value.CompetitionChallengeId,
+            && value.CompetitionChallengeId != null && value.FailureCode != null && CheatIncidentFailures.All.Contains(value.FailureCode.Value))
+            .Select(value => new Fact(value.Id, value.TeamId, value.VictimTeamId, value.CompetitionChallengeId!.Value,
                 value.FailureCode, value.OccurredAt, value.UpdatedAt)).ToArrayAsync(ct)).ToDictionary(value => value.Id);
         foreach (var entry in db.ChangeTracker.Entries<GameplayFact>().Where(value => value.Entity.CompetitionId == competitionId
                      && value.State is EntityState.Added or EntityState.Modified or EntityState.Deleted))
         {
             var value = entry.Entity;
-            if (entry.State == EntityState.Deleted || !CheatIncidentFailures.IsIncident(value.FailureCode)) facts.Remove(value.Id);
-            else facts[value.Id] = new(value.Id, value.TeamId, value.VictimTeamId, value.CompetitionChallengeId, value.FailureCode, value.OccurredAt, value.UpdatedAt);
+            if (value.CompetitionChallengeId is null || entry.State == EntityState.Deleted || !CheatIncidentFailures.IsIncident(value.FailureCode)) facts.Remove(value.Id);
+            else facts[value.Id] = new(value.Id, value.TeamId, value.VictimTeamId, value.CompetitionChallengeId!.Value, value.FailureCode, value.OccurredAt, value.UpdatedAt);
         }
         var events = (await db.CompetitionEvents.AsNoTracking().Where(value => value.CompetitionId == competitionId && RelevantEvents.Contains(value.Kind))
             .Select(value => new Event(value.Id, value.Kind, value.GameplayFactId, value.ParentEventId, value.TeamId, value.ActorUserId, value.OccurredAt))
@@ -46,14 +46,14 @@ internal static class StaffWorkItemProjection
         var nodes = (await db.Notifications.AsNoTracking().Where(value => value.TargetType == NotificationTargetType.CompetitionCollaborators && value.TargetId == competitionId
                 && (value.Kind == NotificationKind.QuestionOpened || value.Kind == NotificationKind.QuestionStatusChanged
                     || value.Kind == NotificationKind.Message && value.ThreadRootId != null))
-            .Select(value => new Node(value.Id, value.ThreadRootId, value.Kind, value.TeamId, value.CompetitionChallengeId,
+            .Select(value => new Node(value.Id, value.ThreadRootId, value.Kind, value.TeamId, value.CompetitionChallengeId!.Value,
                 value.QuestionSubject, value.QuestionStatus, value.QuestionActorRole, value.ActorUserId ?? value.SourceId, value.SentAt))
             .ToArrayAsync(ct)).ToDictionary(value => value.Id);
         foreach (var value in db.ChangeTracker.Entries<Notification>().Where(entry => entry.State == EntityState.Added
                      && entry.Entity.TargetType == NotificationTargetType.CompetitionCollaborators
                      && entry.Entity.TargetId == competitionId && (entry.Entity.Kind == NotificationKind.QuestionOpened
                          || entry.Entity.ThreadRootId != null && entry.Entity.QuestionStatus != null)).Select(entry => entry.Entity))
-            nodes[value.Id] = new(value.Id, value.ThreadRootId, value.Kind, value.TeamId, value.CompetitionChallengeId,
+            nodes[value.Id] = new(value.Id, value.ThreadRootId, value.Kind, value.TeamId, value.CompetitionChallengeId!.Value,
                 value.QuestionSubject, value.QuestionStatus, value.QuestionActorRole, value.ActorUserId ?? value.SourceId, value.SentAt);
         var teams = await db.Teams.IgnoreQueryFilters().AsNoTracking().Where(value => value.CompetitionId == competitionId)
             .Select(value => new { value.Id, value.Name, value.IsBanned }).ToDictionaryAsync(value => value.Id, ct);

@@ -53,6 +53,7 @@ public sealed class CreateTheoryQuestionEndpoint(ManageTheoryQuestions manage, I
         Post("/theory/questions");
         MaxRequestBodySize(2 * 1024 * 1024);
         AuthSchemes("Bearer");
+        Options(builder => builder.WithMetadata(new NoCTF.API.Endpoints.Theory.TheoryPrivateResponse()));
         Description(builder => builder.WithName("TheoryQuestionsCreate"));
         Summary(summary =>
         {

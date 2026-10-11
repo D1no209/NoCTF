@@ -176,7 +176,7 @@ public sealed class TeamWriteUpStore(
             })
             .Select(group => new TeamWriteUpManualAdjustment(
                 group.Key.TeamId,
-                group.Key.CompetitionChallengeId,
+                group.Key.CompetitionChallengeId!.Value,
                 group.Aggregate(
                     0L,
                     (total, row) => checked(total + int.Parse(

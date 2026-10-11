@@ -42,13 +42,13 @@ public sealed class ProgressionPlayerReader(
             : (await db.GameplayFacts.AsNoTracking()
                 .Where(fact => fact.CompetitionId == competitionId
                     && fact.TeamId == team
-                    && challengeIds.Contains(fact.CompetitionChallengeId)
+                    && fact.CompetitionChallengeId != null && challengeIds.Contains(fact.CompetitionChallengeId.Value)
                     && (fact.Kind == GameplayFactKind.FlagAttempt
                         || fact.Kind == GameplayFactKind.FixAttempt)
                     && fact.State == GameplayFactState.Completed
                     && fact.TimeEligibility == NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid
                     && (fact.Result == GameplayFactResult.Correct || fact.Result == GameplayFactResult.RightButDue))
-                .Select(fact => fact.CompetitionChallengeId)
+                .Select(fact => fact.CompetitionChallengeId!.Value)
                 .Distinct().ToArrayAsync(ct)).ToHashSet();
         var visited = teamId is not Guid visitTeam
             ? new Dictionary<Guid, DateTimeOffset>()

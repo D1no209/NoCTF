@@ -314,6 +314,8 @@ public sealed class MaintenanceTickAgent(
             NoCTF.Application.LiveSolo.Media.SnapshotLiveSoloResult value => bus.PublishAsync(value),
             NoCTF.Application.Challenges.Timing.AdvanceChallengeOpening value => bus.PublishAsync(value),
             NoCTF.Application.Challenges.Timing.RecalculateChallengeTiming value => bus.PublishAsync(value),
+            NoCTF.Application.Theory.Papers.SweepTheoryActivity value => bus.PublishAsync(value),
+            NoCTF.Application.Theory.Activities.ApplyTheoryCorrection value => bus.PublishAsync(value),
             _ => throw new ArgumentOutOfRangeException(
                 nameof(message),
                 message.GetType().FullName,
@@ -362,6 +364,7 @@ public sealed class MaintenanceTickAgent(
         ClusterScheduleKind.LiveSoloMedia => "live_solo_media",
         ClusterScheduleKind.LiveSoloCapture => "live_solo_capture",
         ClusterScheduleKind.ChallengeTiming => "challenge_timing",
+        ClusterScheduleKind.Theory => "theory",
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
     };
 }

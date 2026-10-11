@@ -22,7 +22,7 @@ public sealed class PendingGameplayFactDispatchHandler(
                 || fact.Kind == GameplayFactKind.BreakAttempt
                 || fact.Kind == GameplayFactKind.HintUnlock
                 || fact.Kind == GameplayFactKind.ManualAdjustment
-                || fact.Kind == GameplayFactKind.WriteUpUnlock)
+                || fact.Kind == GameplayFactKind.WriteUpUnlock || fact.Kind == GameplayFactKind.TheoryPaperSubmission)
             .Where(fact => fact.State == GameplayFactState.Queued
                     && fact.UpdatedAt <= queuedCutoff
                 || fact.State == GameplayFactState.Processing

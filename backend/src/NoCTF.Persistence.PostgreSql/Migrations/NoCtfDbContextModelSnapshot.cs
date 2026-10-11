@@ -2275,7 +2275,7 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("applied_timing_revision");
 
-                    b.Property<Guid>("CompetitionChallengeId")
+                    b.Property<Guid?>("CompetitionChallengeId")
                         .HasColumnType("uuid")
                         .HasColumnName("competition_challenge_id");
 
@@ -2325,6 +2325,10 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("team_id");
 
+                    b.Property<Guid?>("TheoryPaperId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("theory_paper_id");
+
                     b.Property<short>("TimeEligibility")
                         .HasColumnType("smallint")
                         .HasColumnName("time_eligibility");
@@ -2357,6 +2361,10 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
 
                     b.HasIndex("TeamId")
                         .HasDatabaseName("ix_gameplay_facts_team_id");
+
+                    b.HasIndex("TheoryPaperId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_gameplay_facts_theory_paper_id");
 
                     b.HasIndex("VictimTeamId")
                         .HasDatabaseName("ix_gameplay_facts_victim_team_id");
@@ -6613,6 +6621,65 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.ToTable("theory_draw_rule_filters", (string)null);
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Theory.Activities.TheoryGradingOption", b =>
+                {
+                    b.Property<Guid>("ActivityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("activity_id");
+
+                    b.Property<Guid>("RevisionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("revision_id");
+
+                    b.Property<Guid>("OptionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("option_id");
+
+                    b.HasKey("ActivityId", "RevisionId", "OptionId")
+                        .HasName("pk_theory_grading_options");
+
+                    b.HasIndex("OptionId")
+                        .HasDatabaseName("ix_theory_grading_options_option_id");
+
+                    b.ToTable("theory_grading_options", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Theory.Activities.TheoryGradingOverride", b =>
+                {
+                    b.Property<Guid>("ActivityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("activity_id");
+
+                    b.Property<Guid>("RevisionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("revision_id");
+
+                    b.Property<Guid?>("AppliedRevision")
+                        .HasColumnType("uuid")
+                        .HasColumnName("applied_revision");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<short>("Mode")
+                        .HasColumnType("smallint")
+                        .HasColumnName("mode");
+
+                    b.Property<Guid>("TargetRevision")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_revision");
+
+                    b.HasKey("ActivityId", "RevisionId")
+                        .HasName("pk_theory_grading_overrides");
+
+                    b.HasIndex("RevisionId")
+                        .HasDatabaseName("ix_theory_grading_overrides_revision_id");
+
+                    b.ToTable("theory_grading_overrides", (string)null);
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Theory.Activities.TheoryQuestionExposure", b =>
                 {
                     b.Property<Guid>("SourceId")
@@ -6727,6 +6794,29 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.ToTable("theory_draw_receipts", (string)null);
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Theory.Papers.TheoryIssueReceipt", b =>
+                {
+                    b.Property<Guid>("ParticipantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("participant_id");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("request_id");
+
+                    b.Property<Guid>("PaperId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("paper_id");
+
+                    b.HasKey("ParticipantId", "RequestId")
+                        .HasName("pk_theory_issue_receipts");
+
+                    b.HasIndex("ParticipantId", "PaperId")
+                        .HasDatabaseName("ix_theory_issue_receipts_participant_id_paper_id");
+
+                    b.ToTable("theory_issue_receipts", (string)null);
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Theory.Papers.TheoryPaper", b =>
                 {
                     b.Property<Guid>("Id")
@@ -6800,6 +6890,10 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Property<Guid?>("AnsweredById")
                         .HasColumnType("uuid")
                         .HasColumnName("answered_by_id");
+
+                    b.Property<Guid?>("AppliedGradingRevision")
+                        .HasColumnType("uuid")
+                        .HasColumnName("applied_grading_revision");
 
                     b.Property<Guid>("ConcurrencyStamp")
                         .IsConcurrencyToken()
@@ -7155,6 +7249,15 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
+
+                    b.Property<Guid>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("concurrency_stamp");
+
+                    b.Property<long?>("FirstExposedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("first_exposed_at");
 
                     b.HasKey("Id")
                         .HasName("pk_theory_question_sources");
@@ -9267,6 +9370,15 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.HasDiscriminator().HasValue((short)4);
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Gameplay.TheoryPaperSubmissionGameplayFact", b =>
+                {
+                    b.HasBaseType("NoCTF.Domain.Gameplay.GameplayFact");
+
+                    b.ToTable("gameplay_facts", (string)null);
+
+                    b.HasDiscriminator().HasValue((short)9);
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Gameplay.WriteUpUnlockGameplayFact", b =>
                 {
                     b.HasBaseType("NoCTF.Domain.Gameplay.GameplayFact");
@@ -10562,7 +10674,6 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .WithMany()
                         .HasForeignKey("CompetitionChallengeId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
                         .HasConstraintName("fk_gameplay_facts_competition_challenges_competition_challenge");
 
                     b.HasOne("NoCTF.Domain.Competitions.Competition", null)
@@ -10577,6 +10688,12 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasForeignKey("TeamId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_gameplay_facts_teams_team_id");
+
+                    b.HasOne("NoCTF.Domain.Theory.Papers.TheoryPaper", null)
+                        .WithOne()
+                        .HasForeignKey("NoCTF.Domain.Gameplay.GameplayFact", "TheoryPaperId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_gameplay_facts_theory_papers_theory_paper_id");
 
                     b.HasOne("NoCTF.Domain.Teams.Team", null)
                         .WithMany()
@@ -12158,6 +12275,40 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasConstraintName("fk_theory_draw_rule_filters_theory_draw_rules_rule_id");
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Theory.Activities.TheoryGradingOption", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Theory.Questions.TheoryQuestionOption", null)
+                        .WithMany()
+                        .HasForeignKey("OptionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_theory_grading_options_theory_question_option_option_id");
+
+                    b.HasOne("NoCTF.Domain.Theory.Activities.TheoryGradingOverride", null)
+                        .WithMany("Options")
+                        .HasForeignKey("ActivityId", "RevisionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_theory_grading_options_theory_grading_overrides_activity_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Theory.Activities.TheoryGradingOverride", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Theory.Activities.TheoryActivity", null)
+                        .WithMany()
+                        .HasForeignKey("ActivityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_theory_grading_overrides_theory_activities_activity_id");
+
+                    b.HasOne("NoCTF.Domain.Theory.Questions.TheoryQuestionRevision", null)
+                        .WithMany()
+                        .HasForeignKey("RevisionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_theory_grading_overrides_theory_question_revisions_revision");
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Theory.Activities.TheoryQuestionExposure", b =>
                 {
                     b.HasOne("NoCTF.Domain.Theory.Activities.TheoryActivity", null)
@@ -12219,6 +12370,17 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_theory_draw_receipts_theory_papers_participant_id_paper_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Theory.Papers.TheoryIssueReceipt", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Theory.Papers.TheoryPaper", null)
+                        .WithMany()
+                        .HasForeignKey("ParticipantId", "PaperId")
+                        .HasPrincipalKey("ParticipantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_theory_issue_receipts_theory_papers_participant_id_paper_id");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Theory.Papers.TheoryPaper", b =>
@@ -12904,6 +13066,11 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Navigation("Candidates");
 
                     b.Navigation("Filters");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Theory.Activities.TheoryGradingOverride", b =>
+                {
+                    b.Navigation("Options");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Theory.Papers.TheoryPaper", b =>

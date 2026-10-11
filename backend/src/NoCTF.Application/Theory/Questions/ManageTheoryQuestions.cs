@@ -14,9 +14,16 @@ public sealed record TheoryBankWriteResult(TheoryQuestionSaved? Saved = null, Th
     TheoryQuestionFailure? Validation = null);
 public sealed record TheoryQuestionSummary(Guid Id, Guid OwnerId, Guid SourceId, int Version, string Title,
     TheoryQuestionKind Kind, TheoryQuestionDifficulty Difficulty, TheoryQuestionState State, DateTimeOffset UpdatedAt,
-    bool CanReadAnswers, bool CanManage);
+    bool CanReadAnswers, bool CanManage)
+{
+    public DateTimeOffset? FirstExposedAt { get; init; }
+}
 public sealed record TheoryQuestionPage(IReadOnlyList<TheoryQuestionSummary> Items, int Total);
-public sealed record TheoryQuestionContent(TheoryQuestionSummary Question, Guid RevisionId, TheoryQuestionInput Content);
+public sealed record TheoryQuestionContent(TheoryQuestionSummary Question, Guid RevisionId, TheoryQuestionInput Content)
+{
+    public IReadOnlyList<TheoryQuestionAccessGrant> Grants { get; init; } = [];
+}
+public sealed record TheoryQuestionAccessGrant(Guid UserId, string Name, TheoryQuestionPermission Permission);
 
 public interface ITheoryQuestionBank
 {

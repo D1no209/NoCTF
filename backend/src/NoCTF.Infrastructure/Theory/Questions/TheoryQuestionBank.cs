@@ -107,7 +107,8 @@ public sealed class TheoryQuestionBank(NoCtfDbContext db) : ITheoryQuestionBank
                 actor.Role == UserRole.Administrator || question.OwnerId == actor.Id
                     || question.Grants.Any(grant => grant.UserId == actor.Id && grant.Permission >= TheoryQuestionPermission.Edit),
                 actor.Role == UserRole.Administrator || question.OwnerId == actor.Id
-                    || question.Grants.Any(grant => grant.UserId == actor.Id && grant.Permission == TheoryQuestionPermission.Manage)))
+                    || question.Grants.Any(grant => grant.UserId == actor.Id && grant.Permission == TheoryQuestionPermission.Manage))
+                { FirstExposedAt = db.Set<TheoryQuestionSource>().Where(source => source.Id == question.SourceId).Select(source => source.FirstExposedAt).Single() })
             .ToArrayAsync(ct);
         return new(page, total);
     }
@@ -120,13 +121,17 @@ public sealed class TheoryQuestionBank(NoCtfDbContext db) : ITheoryQuestionBank
             .SingleOrDefaultAsync(item => item.Id == questionId, ct);
         if (question is null) return null;
         var revision = await Revisions().SingleAsync(item => item.QuestionId == question.Id && item.Version == question.CurrentVersion, ct);
+        var canManage = TheoryQuestionPolicy.Allows(question, actorId, actor.Role == UserRole.Administrator, TheoryQuestionPermission.Manage);
+        var grantIds = question.Grants.Select(grant => grant.UserId).ToArray();
+        var names = canManage ? await db.Users.AsNoTracking().Where(user => grantIds.Contains(user.Id)).ToDictionaryAsync(user => user.Id, user => user.UserName, ct) : [];
         return new(new(question.Id, question.OwnerId, question.SourceId, question.CurrentVersion, revision.Title, revision.Kind,
             revision.Difficulty, question.State, question.UpdatedAt, true,
             TheoryQuestionPolicy.Allows(question, actorId, actor.Role == UserRole.Administrator, TheoryQuestionPermission.Manage)),
             revision.Id, new(revision.Title, revision.Body, revision.Explanation, revision.Kind, revision.Difficulty,
                 revision.Options.OrderBy(option => option.Order).Select(option => new TheoryOptionInput(option.Content, option.IsCorrect, option.TruthValue)).ToArray(),
                 revision.Classifications.Select(item => new TheoryClassificationInput(item.Kind, item.Name)).ToArray(),
-                revision.Files.Select(file => file.FileId).ToArray()));
+                revision.Files.Select(file => file.FileId).ToArray()))
+        { Grants = canManage ? question.Grants.Select(grant => new TheoryQuestionAccessGrant(grant.UserId, names.GetValueOrDefault(grant.UserId, grant.UserId.ToString()), grant.Permission)).ToArray() : [] };
     }
 
     public Task<TheoryBankFailure?> SetStateAsync(Guid actorId, Guid questionId, TheoryQuestionState state,

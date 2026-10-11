@@ -833,17 +833,40 @@ POST /api/v1/competitions/{competitionId}/live-solo/matches/{matchId}/rounds/{ro
 
 理论题库使用独立资源和授权，不依赖比赛题库模板。下列接口均要求 Bearer 身份；创建及复制要求组织者或平台管理员，内容读取和更新要求编辑权限。仅使用权限允许列表元数据读取，不能读取答案或再授权。更新内容创建不可变版本，复制保留规范题源但使用独立选项标识。
 
-```http
+```text
+GET /api/v1/competitions/{competitionId}/theory
+GET /api/v1/theory/activities
+GET /api/v1/theory/activities/{activityId}/audit
+GET /api/v1/theory/activities/{activityId}/leaderboard
+GET /api/v1/theory/activities/{activityId}/management
+GET /api/v1/theory/activities/{activityId}/papers/{paperId}
+GET /api/v1/theory/activities/{activityId}/papers/{paperId}/images/{fileId}
+GET /api/v1/theory/activities/{activityId}/reviews
+GET /api/v1/theory/activities/{activityId}/reviews/{paperId}
+GET /api/v1/theory/activities/{activityId}/session
 GET /api/v1/theory/questions
-POST /api/v1/theory/questions
 GET /api/v1/theory/questions/{questionId}
-PUT /api/v1/theory/questions/{questionId}
+GET /api/v1/theory/questions/{questionId}/images/{fileId}
+POST /api/v1/theory/activities
+POST /api/v1/theory/activities/{activityId}/check
+POST /api/v1/theory/activities/{activityId}/corrections
+POST /api/v1/theory/activities/{activityId}/corrections/preview
+POST /api/v1/theory/activities/{activityId}/operations
+POST /api/v1/theory/activities/{activityId}/papers
+POST /api/v1/theory/activities/{activityId}/papers/{paperId}/submit
+POST /api/v1/theory/activities/{activityId}/reviews/{paperId}/consultations
+POST /api/v1/theory/activities/{activityId}/reviews/{paperId}/void
+POST /api/v1/theory/questions
 POST /api/v1/theory/questions/{questionId}/copy
-PUT /api/v1/theory/questions/{questionId}/state
+POST /api/v1/theory/questions/{questionId}/images
+PUT /api/v1/competitions/{competitionId}/theory
+PUT /api/v1/theory/activities/{activityId}/papers/{paperId}/answers/{itemId}
+PUT /api/v1/theory/questions/{questionId}
 PUT /api/v1/theory/questions/{questionId}/grants/{userId}
+PUT /api/v1/theory/questions/{questionId}/state
 ```
 
-授权 PUT 的 `permission=null` 撤销该协作者授权。题库操作响应不表示活动已发布或试卷已生成；理论活动、交卷与计分接口仍在实施中。
+授权 PUT 的 `permission=null` 撤销该协作者授权。活动发布冻结题库版本与计分规则。GET 不发卷；开卷、保存和交卷分别显式写入。参与者交卷仅返回总分；管理纠错需要影响预览、原因及当前策略标识。比赛支持 CTF、AWD、AWDP，首次发布前默认关闭。所有理论响应禁止缓存，图片逐次检查题库／当前试卷权限。
 
 ## 题目时间影响预览
 

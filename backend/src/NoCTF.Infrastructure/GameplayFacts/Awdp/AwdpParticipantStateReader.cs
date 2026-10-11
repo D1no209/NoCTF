@@ -248,7 +248,7 @@ public sealed class AwdpParticipantStateReader(NoCtfDbContext db) : IAwdpPartici
             fact.Id,
             fact.CompetitionId,
             fact.TeamId,
-            fact.CompetitionChallengeId,
+            fact.CompetitionChallengeId!.Value,
             fact.Kind,
             fact.State,
             GameplayFactResultDisclosure.PlayerResult(fact.Result, fact.FailureCode),

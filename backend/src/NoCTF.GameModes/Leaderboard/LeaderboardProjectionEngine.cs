@@ -20,7 +20,7 @@ public sealed class LeaderboardProjectionEngine(
         var projection = projectors.Get(input.Mode).Project(input);
         var aggregate = ProjectAggregate(input, projection);
         var normalized = NormalizedScoreboardProjection.Project(input, aggregate);
-        return WriteUpBenefitProjection.Apply(input, projection, normalized, projectors);
+        return TheoryScoreProjection.Apply(input, projection, WriteUpBenefitProjection.Apply(input, projection, normalized, projectors));
     }
 
     private static LeaderboardAggregateProjection ProjectAggregate(

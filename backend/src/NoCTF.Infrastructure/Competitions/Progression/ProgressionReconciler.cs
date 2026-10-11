@@ -34,13 +34,13 @@ public sealed class ProgressionReconciler(NoCtfDbContext db)
         var completed = await db.GameplayFacts.AsNoTracking()
             .Where(fact => fact.CompetitionId == competitionId
                 && ids.Contains(fact.TeamId!.Value)
-                && challengeIds.Contains(fact.CompetitionChallengeId)
+                && fact.CompetitionChallengeId != null && challengeIds.Contains(fact.CompetitionChallengeId.Value)
                 && (fact.Kind == GameplayFactKind.FlagAttempt
                     || fact.Kind == GameplayFactKind.FixAttempt)
                 && fact.State == GameplayFactState.Completed
                 && fact.TimeEligibility == NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid
                         && (fact.Result == GameplayFactResult.Correct || fact.Result == GameplayFactResult.RightButDue))
-            .Select(fact => new { fact.TeamId, fact.CompetitionChallengeId })
+            .Select(fact => new { fact.TeamId, CompetitionChallengeId = fact.CompetitionChallengeId!.Value })
             .Distinct().ToArrayAsync(ct);
         var nodeStates = await db.TeamProgressionNodeStates
             .Where(state => ids.Contains(state.TeamId)).ToListAsync(ct);
@@ -139,13 +139,13 @@ public sealed class ProgressionReconciler(NoCtfDbContext db)
                     .Where(fact => fact.CompetitionId == competitionId
                         && fact.TeamId == teamId
                         && fact.Id != changedId
-                        && challengeIds.Contains(fact.CompetitionChallengeId)
+                        && fact.CompetitionChallengeId != null && challengeIds.Contains(fact.CompetitionChallengeId.Value)
                         && (fact.Kind == GameplayFactKind.FlagAttempt
                             || fact.Kind == GameplayFactKind.FixAttempt)
                         && fact.State == GameplayFactState.Completed
                         && fact.TimeEligibility == NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid
                         && (fact.Result == GameplayFactResult.Correct || fact.Result == GameplayFactResult.RightButDue))
-                    .Select(fact => fact.CompetitionChallengeId)
+                    .Select(fact => fact.CompetitionChallengeId!.Value)
                     .Distinct()
                     .ToArrayAsync(ct))
                 .ToHashSet();
@@ -157,7 +157,7 @@ public sealed class ProgressionReconciler(NoCtfDbContext db)
                     Kind: GameplayFactKind.FlagAttempt or GameplayFactKind.FixAttempt
                 } && changingFact.CompetitionId == competitionId
                     && changingFact.TeamId == teamId)
-                completed.Add(changingFact.CompetitionChallengeId);
+                completed.Add(changingFact.CompetitionChallengeId!.Value);
             evaluation = ProgressionGraphRules.Evaluate(
                 activeGraph.Nodes, activeGraph.Edges, completed);
         }

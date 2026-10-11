@@ -10,6 +10,9 @@ public sealed record ScoreboardTrendAdjustment(
 
 public interface IScoreboardTrendFactReader
 {
+    Task<IReadOnlyList<ScoreboardTrendAdjustment>> ReadTheoryAdjustmentsAsync(Guid competitionId,
+        IReadOnlyList<Guid> teamIds, DateTimeOffset dataAsOf, CancellationToken cancellationToken)
+        => Task.FromResult<IReadOnlyList<ScoreboardTrendAdjustment>>([]);
     Task<IReadOnlyList<ScoreboardTrendAdjustment>> ReadManualAdjustmentsAsync(
         Guid competitionId,
         IReadOnlyList<Guid> teamIds,
@@ -52,7 +55,8 @@ public sealed class BuildScoreboardTrends(IScoreboardTrendFactReader facts)
                 teamIds,
                 dataAsOf,
                 cancellationToken);
-        var adjustmentsByTeam = adjustments
+        var theory = snapshot.TheoryEnabled ? await facts.ReadTheoryAdjustmentsAsync(snapshot.CompetitionId, teamIds, dataAsOf, cancellationToken) : [];
+        var adjustmentsByTeam = adjustments.Concat(theory)
             .GroupBy(adjustment => adjustment.TeamId)
             .ToDictionary(group => group.Key, group => group.ToArray());
         var allocationsByTeam = projection.EntryAllocations

@@ -325,6 +325,7 @@ public sealed class FusionLeaderboardCache(
         var selectedRoundWindowEnd = competition.Mode == GameMode.Awd
             ? awdWindow.EndRound
             : scoreboardRoundWindowEnd;
+        var theory = await NoCTF.Infrastructure.Theory.Scoring.TheoryScoreReader.ReadAsync(db, competitionId, projectedAt, ct);
         var projectionInput = new LeaderboardProjectionInput(
             competitionId,
             competition.Mode,
@@ -342,7 +343,8 @@ public sealed class FusionLeaderboardCache(
             awdWindow.LatestRound,
             factRows.AwdAggregates,
             await db.WriteUpUnlockReceipts.AsNoTracking().Where(x => x.CompetitionId == competitionId && x.UnlockedAt <= projectedAt)
-                .Select(x => new LeaderboardWriteUpUnlock(x.GameplayFactId, x.TeamId, x.CompetitionChallengeId, x.DeductionPercent, x.UnlockedAt)).ToArrayAsync(ct));
+                .Select(x => new LeaderboardWriteUpUnlock(x.GameplayFactId, x.TeamId, x.CompetitionChallengeId, x.DeductionPercent, x.UnlockedAt)).ToArrayAsync(ct),
+            theory.Scores, theory.Receipts);
         var scoreboard = projectionEngine.Project(projectionInput);
         ScoreboardProjection AddResponseMetadata(ScoreboardProjection value) => value with
         {

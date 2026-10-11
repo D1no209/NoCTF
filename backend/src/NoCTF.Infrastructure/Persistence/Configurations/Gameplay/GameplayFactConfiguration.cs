@@ -19,7 +19,10 @@ internal sealed class GameplayFactConfiguration : IEntityTypeConfiguration<Gamep
             .HasValue<AwdServiceTransitionGameplayFact>(GameplayFactKind.AwdServiceTransition)
             .HasValue<KohControlObservationGameplayFact>(GameplayFactKind.KohControlObservation)
             .HasValue<AttachmentDownloadGameplayFact>(GameplayFactKind.AttachmentDownload)
-            .HasValue<WriteUpUnlockGameplayFact>(GameplayFactKind.WriteUpUnlock);
+            .HasValue<WriteUpUnlockGameplayFact>(GameplayFactKind.WriteUpUnlock)
+            .HasValue<TheoryPaperSubmissionGameplayFact>(GameplayFactKind.TheoryPaperSubmission);
+        builder.HasOne<NoCTF.Domain.Theory.Papers.TheoryPaper>().WithOne()
+            .HasForeignKey<GameplayFact>(fact => fact.TheoryPaperId).OnDelete(DeleteBehavior.Restrict);
         builder.OwnsOne(fact => fact.AcquisitionEvidence, evidence =>
         {
             evidence.ToTable("flag_acquisition_evidence");

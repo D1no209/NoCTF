@@ -187,6 +187,7 @@ public static partial class GameplayFactMapper
         AdmissionFailureCode failureCode);
 
     [MapEnum(EnumMappingStrategy.ByName)]
+    [MapperIgnoreSourceValue(GameplayFactKind.TheoryPaperSubmission)]
     public static partial GameplayFactKindProtocol ToProtocol(GameplayFactKind value);
 
     [MapEnum(EnumMappingStrategy.ByName)]
@@ -200,6 +201,7 @@ public static partial class GameplayFactMapper
     public static partial GameplayFactFailureCodeProtocol ToProtocol(GameplayFactFailureCode value);
 
     [MapEnum(EnumMappingStrategy.ByName)]
+    [MapperIgnoreTargetValue(GameplayFactKind.TheoryPaperSubmission)]
     public static partial GameplayFactKind ToDomain(GameplayFactKindProtocol value);
 
     [MapEnum(EnumMappingStrategy.ByName)]

@@ -6,6 +6,8 @@ namespace NoCTF.API.SignalR.Hubs;
 
 public interface INotificationHubClient
 {
+    [HubMethodName("theoryChanged")]
+    Task TheoryChanged(Guid activityId, CancellationToken cancellationToken);
     [HubMethodName("notificationChanged")]
     Task NotificationChanged(CancellationToken cancellationToken);
 }

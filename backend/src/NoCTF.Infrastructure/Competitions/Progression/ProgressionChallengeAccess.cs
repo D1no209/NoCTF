@@ -35,13 +35,13 @@ public sealed class ProgressionChallengeAccess(
             : (await db.GameplayFacts.AsNoTracking()
                 .Where(fact => fact.CompetitionId == competitionId
                     && fact.TeamId == id
-                    && challengeIds.Contains(fact.CompetitionChallengeId)
+                    && fact.CompetitionChallengeId != null && challengeIds.Contains(fact.CompetitionChallengeId.Value)
                     && (fact.Kind == GameplayFactKind.FlagAttempt
                         || fact.Kind == GameplayFactKind.FixAttempt)
                     && fact.State == GameplayFactState.Completed
                     && fact.TimeEligibility == NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid
                         && (fact.Result == GameplayFactResult.Correct || fact.Result == GameplayFactResult.RightButDue))
-                .Select(fact => fact.CompetitionChallengeId)
+                .Select(fact => fact.CompetitionChallengeId!.Value)
                 .Distinct().ToArrayAsync(ct)).ToHashSet();
         var evaluation = ProgressionGraphRules.Evaluate(
             graph.ToDomainNodes(), graph.ToDomainEdges(), completed);

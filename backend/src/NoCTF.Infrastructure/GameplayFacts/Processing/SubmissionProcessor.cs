@@ -518,7 +518,7 @@ public sealed class GameplayFactProcessor(
                 now,
                 ActorUserId: submission.ActorUserId,
                 TeamId: submission.TeamId,
-                CompetitionChallengeId: submission.CompetitionChallengeId,
+                CompetitionChallengeId: submission.CompetitionChallengeId!.Value,
                 GameplayFactId: submission.Id,
                 GameplayFactKind: submission.Kind,
                 GameplayFactState: submission.State,
@@ -553,7 +553,7 @@ public sealed class GameplayFactProcessor(
                     CompetitionEventVisibility.Staff,
                     now,
                     TeamId: submission.TeamId,
-                    CompetitionChallengeId: submission.CompetitionChallengeId,
+                    CompetitionChallengeId: submission.CompetitionChallengeId!.Value,
                     GameplayFactId: submission.Id,
                     GameplayFactKind: submission.Kind,
                     GameplayFactResult: submission.Result,
@@ -596,13 +596,13 @@ public sealed class GameplayFactProcessor(
                     sourceTeamId,
                     ownerTeamId,
                     actorUserId,
-                    submission.CompetitionChallengeId,
+                    submission.CompetitionChallengeId!.Value,
                     submission.OccurredAt));
             }
             if (submission.FailureCode != GameplayFactFailureCode.ForeignTeamFlagDetected)
                 await outbox.PublishAsync(new StaticFlagAcquisitionViolationDetected(
                     submission.CompetitionId, submission.Id, sourceTeamId, actorUserId,
-                    submission.CompetitionChallengeId, submission.FailureCode!.Value, submission.OccurredAt));
+                    submission.CompetitionChallengeId!.Value, submission.FailureCode!.Value, submission.OccurredAt));
             await events.RecordAsync(new(
                 submission.CompetitionId,
                 CompetitionEventKind.CheatIncidentDetected,
@@ -611,7 +611,7 @@ public sealed class GameplayFactProcessor(
                 submission.OccurredAt,
                 ActorUserId: submission.ActorUserId,
                 TeamId: submission.TeamId,
-                CompetitionChallengeId: submission.CompetitionChallengeId,
+                CompetitionChallengeId: submission.CompetitionChallengeId!.Value,
                 GameplayFactId: submission.Id,
                 GameplayFactKind: submission.Kind,
                 GameplayFactResult: submission.Result), cancellationToken);
@@ -677,7 +677,7 @@ public sealed class GameplayFactProcessor(
             now,
             ActorUserId: submission.ActorUserId,
             TeamId: submission.TeamId,
-            CompetitionChallengeId: submission.CompetitionChallengeId,
+            CompetitionChallengeId: submission.CompetitionChallengeId!.Value,
             GameplayFactId: submission.Id,
             GameplayFactKind: submission.Kind,
             GameplayFactState: submission.State,
@@ -699,7 +699,7 @@ public sealed class GameplayFactProcessor(
                 CompetitionEventVisibility.Public,
                 bloodAward.OccurredAt,
                 TeamId: submission.TeamId,
-                CompetitionChallengeId: submission.CompetitionChallengeId,
+                CompetitionChallengeId: submission.CompetitionChallengeId!.Value,
                 GameplayFactId: submission.Id,
                 GameplayFactKind: submission.Kind,
                 GameplayFactResult: submission.Result,
@@ -752,7 +752,7 @@ public sealed class GameplayFactProcessor(
             CompetitionEventVisibility.Public,
             occurredAt,
             TeamId: submission.TeamId,
-            CompetitionChallengeId: submission.CompetitionChallengeId,
+            CompetitionChallengeId: submission.CompetitionChallengeId!.Value,
             GameplayFactId: submission.Id,
             GameplayFactKind: submission.Kind,
             GameplayFactState: submission.State,
@@ -853,7 +853,7 @@ public sealed class GameplayFactProcessor(
             .SingleAsync(ct);
         return new(
             submission.CompetitionId,
-            submission.CompetitionChallengeId,
+            submission.CompetitionChallengeId!.Value,
             submission.Kind,
             submission.TeamId,
             submission.TeamId is null
@@ -993,7 +993,7 @@ public sealed class GameplayFactProcessor(
             .SingleAsync(ct);
         return new BloodAwarded(
             submission.CompetitionId,
-            submission.CompetitionChallengeId,
+            submission.CompetitionChallengeId!.Value,
             context.Title,
             (LeaderboardBloodRank)(solvedTeamIds.Length + 1),
             submission.TeamId!.Value,

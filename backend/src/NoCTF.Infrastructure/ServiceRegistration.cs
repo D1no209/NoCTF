@@ -52,7 +52,7 @@ public static class ServiceRegistration
         services.AddNoCtfNotifications(development);
         services.AddNoCtfTeams();
         services.AddNoCtfChallenges();
-        services.AddNoCtfTheory();
+        services.AddNoCtfTheory(development || exporting);
         services.AddNoCtfStorage(configuration);
         services.AddNoCtfCompetitions(configuration, development || exporting);
         services.AddNoCtfLiveSolo(configuration);

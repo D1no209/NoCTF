@@ -11,7 +11,7 @@ namespace NoCTF.Infrastructure.Persistence.Configurations.Theory;
 internal sealed class TheoryPaperConfiguration : IEntityTypeConfiguration<TheoryParticipant>,
     IEntityTypeConfiguration<TheoryPaper>, IEntityTypeConfiguration<TheoryActivePaper>,
     IEntityTypeConfiguration<TheoryPaperItem>, IEntityTypeConfiguration<TheoryPaperOption>,
-    IEntityTypeConfiguration<TheoryDrawReceipt>, IEntityTypeConfiguration<TheoryAnswerReceipt>
+    IEntityTypeConfiguration<TheoryDrawReceipt>, IEntityTypeConfiguration<TheoryAnswerReceipt>, IEntityTypeConfiguration<TheoryIssueReceipt>
 {
     public void Configure(EntityTypeBuilder<TheoryParticipant> builder)
     {
@@ -78,5 +78,13 @@ internal sealed class TheoryPaperConfiguration : IEntityTypeConfiguration<Theory
         builder.Property(receipt => receipt.SelectionDigest).HasMaxLength(32).IsRequired();
         builder.HasOne<TheoryPaperItem>().WithMany().HasForeignKey(receipt => receipt.ItemId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<User>().WithMany().HasForeignKey(receipt => receipt.ActorId).OnDelete(DeleteBehavior.Restrict);
+    }
+
+    public void Configure(EntityTypeBuilder<TheoryIssueReceipt> builder)
+    {
+        builder.ToTable("theory_issue_receipts");
+        builder.HasKey(receipt => new { receipt.ParticipantId, receipt.RequestId });
+        builder.HasOne<TheoryPaper>().WithMany().HasForeignKey(receipt => new { receipt.ParticipantId, receipt.PaperId })
+            .HasPrincipalKey(paper => new { paper.ParticipantId, paper.Id }).OnDelete(DeleteBehavior.Restrict);
     }
 }

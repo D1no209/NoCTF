@@ -76,7 +76,7 @@ public sealed class ChallengeTimingPreviewReader(NoCtfDbContext db, ILeaderboard
         int Progression(Guid team)
         {
             if (graph is not { Enabled: true }) return 0;
-            var oldSet = existingCompletion.Where(x => x.Team == team).Select(x => x.CompetitionChallengeId).ToHashSet();
+            var oldSet = existingCompletion.Where(x => x.Team == team).Select(x => x.CompetitionChallengeId!.Value).ToHashSet();
             if (Completion(team, false) > 0) oldSet.Add(challenge.Id); else oldSet.Remove(challenge.Id);
             var newSet = new HashSet<Guid>(oldSet);
             if (Completion(team, true) > 0) newSet.Add(challenge.Id); else newSet.Remove(challenge.Id);

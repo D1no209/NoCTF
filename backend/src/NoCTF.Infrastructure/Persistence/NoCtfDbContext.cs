@@ -183,6 +183,14 @@ public sealed class NoCtfDbContext(
     private void EnsureAppendOnlyFacts()
     {
         NoCTF.Infrastructure.Theory.TheoryPersistenceInvariants.Validate(ChangeTracker);
+        foreach (var entry in ChangeTracker.Entries<GameplayFact>().Where(entry => entry.State is EntityState.Added or EntityState.Modified))
+        {
+            var fact = entry.Entity;
+            if (fact.Kind == GameplayFactKind.TheoryPaperSubmission
+                ? fact.CompetitionChallengeId is not null || fact.TheoryPaperId is null || fact.TheoryPaperId == Guid.Empty
+                : fact.CompetitionChallengeId is null || fact.CompetitionChallengeId == Guid.Empty || fact.TheoryPaperId is not null)
+                throw new InvalidOperationException("Gameplay facts require exactly the target belonging to their fact kind.");
+        }
         SynchronizeTypedConfigurationForeignKeys();
         SynchronizeTeamMemberships();
         SynchronizeNormalizedSearchFields();

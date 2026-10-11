@@ -39,6 +39,13 @@ public sealed class TheoryActivePaper
     public Guid PaperId { get; set; }
 }
 
+public sealed class TheoryIssueReceipt
+{
+    public Guid ParticipantId { get; set; }
+    public Guid RequestId { get; set; }
+    public Guid PaperId { get; set; }
+}
+
 public sealed class TheoryPaperItem : IConcurrencyTracked
 {
     public Guid Id { get; set; }
@@ -49,6 +56,7 @@ public sealed class TheoryPaperItem : IConcurrencyTracked
     public int Order { get; set; }
     public int Points { get; set; }
     public TheoryAnswerResult? Result { get; set; }
+    public Guid? AppliedGradingRevision { get; set; }
     public Guid? AnsweredById { get; set; }
     public DateTimeOffset? AnsweredAt { get; set; }
     public List<TheoryPaperOption> Options { get; set; } = [];

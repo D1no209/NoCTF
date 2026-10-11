@@ -230,6 +230,7 @@ public static class ServiceRegistration
         services.AddSingleton<ICompetitionHubAudienceRouter, CompetitionHubAudienceRouter>();
         services.AddSingleton<ICompetitionHubAudienceCoordinator, CompetitionHubAudienceCoordinator>();
         services.AddScoped<IGameplayFactStatePublisher, SignalRGameplayFactStatePublisher>();
+        services.AddSingleton<LocalTheoryChangePublisher>();
         if (includeInfrastructure && development)
         {
             services.AddSingleton<ILeaderboardRefreshPublisher,
@@ -238,6 +239,7 @@ public static class ServiceRegistration
                 LocalGameplayFactStatePublisher>();
             services.Replace(ServiceDescriptor.Singleton<INotificationChangePublisher,
                 LocalNotificationChangePublisher>());
+            services.Replace(ServiceDescriptor.Singleton<NoCTF.Application.Theory.Realtime.ITheoryChangePublisher, LocalTheoryChangePublisher>());
         }
         services.AddSingleton<NoCTF.API.Pagination.SignedKeysetCursor>();
         services.AddSingleton<TeamWriteUpPreviewTicketCodec>();
@@ -251,6 +253,7 @@ public static class ServiceRegistration
             services.AddHostedService<NoCTF.API.SignalR.Publishing.NatsPlatformLogRelay>();
             services.AddHostedService<NoCTF.API.SignalR.Publishing.NatsCompetitionEventRefreshRelay>();
             services.AddHostedService<NatsNotificationChangeRelay>();
+            services.AddHostedService<NatsTheoryChangeRelay>();
             services.AddHostedService<NatsMfaAuthenticationRelay>();
         }
         services.AddRateLimiter(options =>

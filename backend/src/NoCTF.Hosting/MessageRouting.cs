@@ -24,6 +24,8 @@ public static class MessageRouting
         Route<NoCTF.Application.LiveSolo.Rounds.AdvanceLiveSoloRound>(options, WorkerQueue.Control);
         Route<NoCTF.Application.Challenges.Timing.AdvanceChallengeOpening>(options, WorkerQueue.Control);
         Route<NoCTF.Application.Challenges.Timing.RecalculateChallengeTiming>(options, WorkerQueue.Control);
+        Route<NoCTF.Application.Theory.Papers.SweepTheoryActivity>(options, WorkerQueue.Control);
+        Route<NoCTF.Application.Theory.Activities.ApplyTheoryCorrection>(options, WorkerQueue.Control);
         options.PublishMessage<NoCTF.Application.LiveSolo.Realtime.LiveSoloMatchChanged>()
             .ToNatsSubject(NatsSubjects.RealtimeEvents).UseJetStream(NatsSubjects.EventsStream);
         options.ConfigureNoCtfInfrastructureRetriesFor<NoCTF.Application.LiveSolo.Realtime.LiveSoloMatchChanged>(

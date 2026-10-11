@@ -20,7 +20,12 @@ public sealed record LeaderboardProjectionInput(
     int? ScoreboardRoundWindowEnd = null,
     int? ScoreboardLatestRound = null,
     IReadOnlyList<LeaderboardAwdAggregateFact>? AwdAggregates = null,
-    IReadOnlyList<LeaderboardWriteUpUnlock>? WriteUpUnlocks = null);
+    IReadOnlyList<LeaderboardWriteUpUnlock>? WriteUpUnlocks = null,
+    IReadOnlyList<LeaderboardTheoryScore>? TheoryScores = null,
+    IReadOnlyList<TheoryProjectionReceipt>? TheoryReceipts = null);
+
+public sealed record LeaderboardTheoryScore(Guid TeamId, long Points, DateTimeOffset? AchievedAt, bool HasSubmission);
+public sealed record TheoryProjectionReceipt(Guid FactId, Guid ConcurrencyStamp);
 
 public sealed record LeaderboardWriteUpUnlock(Guid GameplayFactId, Guid TeamId, Guid CompetitionChallengeId,
     int DeductionPercent, DateTimeOffset UnlockedAt);

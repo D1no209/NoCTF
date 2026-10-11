@@ -67,10 +67,10 @@ public sealed partial class LiveSoloMatchStore
                     {
                         if (fact.FailureCode == GameplayFactFailureCode.ForeignTeamFlagDetected && fact.VictimTeamId is Guid owner)
                             await messages.PublishAsync(new ForeignTeamFlagDetected(fact.CompetitionId, fact.Id, sourceTeam, owner, actor,
-                                fact.CompetitionChallengeId, fact.OccurredAt));
+                                fact.CompetitionChallengeId!.Value, fact.OccurredAt));
                         else if (fact.FailureCode != GameplayFactFailureCode.ForeignTeamFlagDetected)
                             await messages.PublishAsync(new StaticFlagAcquisitionViolationDetected(fact.CompetitionId, fact.Id, sourceTeam, actor,
-                                fact.CompetitionChallengeId, fact.FailureCode!.Value, fact.OccurredAt));
+                                fact.CompetitionChallengeId!.Value, fact.FailureCode!.Value, fact.OccurredAt));
                     }
                 }
                 judged.Add(new(association.AdmissionSequence, fact.Id, fact.TeamId!.Value, fact.State, fact.Result));

@@ -11,14 +11,14 @@ public sealed class AdminGameplayFactStatusReader(NoCtfDbContext db) : IAdminGam
         Guid competitionId,
         Guid gameplayFactId,
         CancellationToken cancellationToken) =>
-        db.GameplayFacts.AsNoTracking()
+        db.GameplayFacts.AsNoTracking().Where(fact => fact.CompetitionChallengeId != null)
             .Where(submission =>
                 submission.CompetitionId == competitionId && submission.Id == gameplayFactId)
             .Select(fact => new AdminGameplayFactStatusView(
                 fact.Id,
                 fact.CompetitionId,
                 fact.TeamId,
-                fact.CompetitionChallengeId,
+                fact.CompetitionChallengeId!.Value,
                 fact.ActorUserId,
                 fact.Kind,
                 fact.State,

@@ -12,7 +12,8 @@ public abstract class GameplayFact : IConcurrencyTracked
     public Guid Id { get; set; }
     public Guid ConcurrencyStamp { get; set; } = Guid.NewGuid();
     public Guid CompetitionId { get; set; }
-    public Guid CompetitionChallengeId { get; set; }
+    public Guid? CompetitionChallengeId { get; set; }
+    public Guid? TheoryPaperId { get; set; }
     public Guid? TeamId { get; set; }
     public Guid? VictimTeamId { get; set; }
     public Guid? ActorUserId { get; set; }
@@ -44,7 +45,8 @@ public enum GameplayFactKind : short
     AwdServiceTransition,
     KohControlObservation,
     AttachmentDownload,
-    WriteUpUnlock
+    WriteUpUnlock,
+    TheoryPaperSubmission
 }
 
 public enum GameplayFactReferenceKind : short

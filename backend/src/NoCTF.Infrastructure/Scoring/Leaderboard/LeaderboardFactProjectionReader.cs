@@ -136,7 +136,7 @@ internal static class LeaderboardFactProjectionReader
         IReadOnlyDictionary<Guid, long> hintCosts) => rows.Select(row => new LeaderboardGameplayFact(
                 row.Id,
                 row.TeamId,
-                row.CompetitionChallengeId,
+                row.CompetitionChallengeId!.Value,
                 row.Kind,
                 row.OccurredAt,
                 row.State,
@@ -282,7 +282,7 @@ internal static class LeaderboardFactProjectionReader
         var attackFacts = db.GameplayFacts.AsNoTracking()
             .Where(fact => fact.CompetitionId == competitionId
                 && fact.OccurredAt <= projectedAt
-                && activeChallengeIds.Contains(fact.CompetitionChallengeId)
+                && fact.CompetitionChallengeId != null && activeChallengeIds.Contains(fact.CompetitionChallengeId.Value)
                 && fact.TeamId != null
                 && competitiveTeamIds.Contains(fact.TeamId.Value)
                 && fact.VictimTeamId != null
@@ -353,7 +353,7 @@ internal static class LeaderboardFactProjectionReader
         await foreach (var row in attackGroups.AsAsyncEnumerable().WithCancellation(ct))
         {
             var attack = new AwdAttackTuple(
-                row.CompetitionChallengeId,
+                row.CompetitionChallengeId!.Value,
                 row.AttackerId,
                 row.VictimId,
                 row.RoundId,

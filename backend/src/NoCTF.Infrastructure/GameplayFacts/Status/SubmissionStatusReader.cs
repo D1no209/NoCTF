@@ -26,7 +26,7 @@ public sealed class GameplayFactStatusReader(NoCtfDbContext db) : IGameplayFactS
             .SingleOrDefaultAsync(cancellationToken);
         if (!isStaff && teamId is null)
             return null;
-        return await db.GameplayFacts.AsNoTracking()
+        return await db.GameplayFacts.AsNoTracking().Where(fact => fact.CompetitionChallengeId != null)
             .Where(submission =>
                 submission.Id == gameplayFactId
                 && submission.CompetitionId == competitionId
@@ -40,7 +40,7 @@ public sealed class GameplayFactStatusReader(NoCtfDbContext db) : IGameplayFactS
                 fact.Id,
                 fact.CompetitionId,
                 fact.TeamId,
-                fact.CompetitionChallengeId,
+                fact.CompetitionChallengeId!.Value,
                 fact.Kind,
                 fact.State,
                 GameplayFactResultDisclosure.PlayerResult(fact.Result, fact.FailureCode),

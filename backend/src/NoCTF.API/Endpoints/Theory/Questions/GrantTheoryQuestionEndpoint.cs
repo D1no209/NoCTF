@@ -31,6 +31,7 @@ public sealed class GrantTheoryQuestionEndpoint(ManageTheoryQuestions manage, IU
     {
         Put("/theory/questions/{questionId}/grants/{userId}");
         AuthSchemes("Bearer");
+        Options(builder => builder.WithMetadata(new NoCTF.API.Endpoints.Theory.TheoryPrivateResponse()));
         Description(builder => builder.WithName("TheoryQuestionsGrant"));
         Summary(summary =>
         {

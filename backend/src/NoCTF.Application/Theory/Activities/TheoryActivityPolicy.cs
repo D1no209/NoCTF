@@ -42,6 +42,8 @@ public static class TheoryActivityPolicy
             return TheoryActivityFailure.InvalidFilter;
         try
         {
+            _ = activity.Rules.Aggregate(0, (sum, rule) => checked(sum + rule.Count));
+            foreach (var rule in activity.Rules) _ = checked(rule.Count * (activity.AttemptLimit ?? 1));
             var total = activity.Rules.Aggregate(0L, (sum, rule) => checked(sum + (long)rule.Count * rule.Points));
             _ = checked(total * (activity.ScoringMode == TheoryScoringMode.Cumulative ? activity.AttemptLimit!.Value : 1));
         }

@@ -23,6 +23,7 @@ public sealed class CopyTheoryQuestionEndpoint(ITheoryQuestionBank bank, IUserCo
     {
         Post("/theory/questions/{questionId}/copy");
         AuthSchemes("Bearer");
+        Options(builder => builder.WithMetadata(new NoCTF.API.Endpoints.Theory.TheoryPrivateResponse()));
         Description(builder => builder.WithName("TheoryQuestionsCopy"));
         Summary(summary =>
         {

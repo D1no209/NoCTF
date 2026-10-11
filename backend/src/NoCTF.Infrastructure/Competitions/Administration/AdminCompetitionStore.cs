@@ -558,6 +558,8 @@ public sealed class AdminCompetitionStore(
         AddReference(references, CompetitionHardDeleteReferenceKind.ProgressionGraph,
             await db.CompetitionProgressions.CountAsync(item =>
                 item.CompetitionId == competitionId, ct));
+        AddReference(references, CompetitionHardDeleteReferenceKind.TheoryActivity,
+            await db.CompetitionTheoryActivities.CountAsync(item => item.CompetitionId == competitionId, ct));
         AddReference(references, CompetitionHardDeleteReferenceKind.ChallengeWriteUp,
             await db.ChallengeWriteUps.CountAsync(item => item.CompetitionId == competitionId, ct));
         AddReference(references, CompetitionHardDeleteReferenceKind.LiveSoloMatch,
@@ -777,6 +779,7 @@ public sealed class AdminCompetitionStore(
         await db.ChallengeWriteUps.Where(item => item.CompetitionId == competitionId).ExecuteDeleteAsync(ct);
         await db.GameplayFacts.Where(item => item.CompetitionId == competitionId)
             .ExecuteDeleteAsync(ct);
+        await NoCTF.Infrastructure.Theory.Activities.TheoryCompetitionDeletion.DeleteAsync(db, competitionId, ct);
         var competitionChallengeIds = db.CompetitionChallenges.IgnoreQueryFilters()
             .Where(item => item.CompetitionId == competitionId)
             .Select(item => item.Id);

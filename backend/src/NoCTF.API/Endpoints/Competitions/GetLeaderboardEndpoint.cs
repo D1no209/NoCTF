@@ -129,6 +129,8 @@ public sealed record ScoreboardTeamResponse(
     IReadOnlyList<ScoreboardAdjustmentResponse> GlobalAdjustments,
     IReadOnlyList<ScoreboardSlotResponse> Slots)
 {
+    public long TheoryScore { get; init; }
+    public bool HasTheorySubmission { get; init; }
     public IReadOnlyList<ScoreboardChallengeAchievementResponse>? Achievements { get; init; }
     public IReadOnlyList<ScoreboardChallengeBenefit> ChallengeBenefits { get; init; } = [];
 }
@@ -155,6 +157,7 @@ public sealed record ScoreboardSnapshotResponse(
     IReadOnlyList<ScoreboardActorResponse> Actors,
     IReadOnlyList<ScoreboardTeamResponse> Teams)
 {
+    public bool TheoryEnabled { get; init; }
     public IReadOnlyList<ScoreboardTrackResponse> Tracks { get; init; } = [];
     public bool TracksEnabled { get; init; } = true;
     public IReadOnlyList<ScoreboardCurrentChallengeScoreResponse> CurrentChallengeScores { get; init; } = [];
@@ -185,6 +188,7 @@ internal static partial class ScoreboardProtocolMapper
             track.Key, track.Name, track.IsInternal, track.VisibleOnLeaderboard,
             track.IsViewerTrack)).ToArray(),
         TracksEnabled = value.TracksEnabled,
+        TheoryEnabled = value.TheoryEnabled,
         CurrentChallengeScores = value.CurrentChallengeScores.Select(score =>
             new ScoreboardCurrentChallengeScoreResponse(
                 score.CompetitionChallengeId,
@@ -254,6 +258,8 @@ internal static partial class ScoreboardProtocolMapper
             ToProtocol(slot.DefenseState))).ToArray())
     {
         ChallengeBenefits = value.ChallengeBenefits,
+        TheoryScore = value.TheoryScore,
+        HasTheorySubmission = value.HasTheorySubmission,
         Achievements = value.Achievements?.Select(item => new ScoreboardChallengeAchievementResponse(
             item.CompetitionChallengeId, ToProtocol(item.Kind), item.UserId, item.DisplayName, item.OccurredAt)).ToArray()
     };

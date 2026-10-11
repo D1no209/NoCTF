@@ -14,7 +14,8 @@ public enum ClusterScheduleKind
     LiveSoloRound,
     LiveSoloMedia,
     LiveSoloCapture,
-    ChallengeTiming
+    ChallengeTiming,
+    Theory
 }
 
 public sealed record ClusterScheduleEntry(
@@ -199,6 +200,8 @@ internal static class ClusterScheduleMessageClock
         NoCTF.Application.LiveSolo.Media.SnapshotLiveSoloResult value => value,
         NoCTF.Application.Challenges.Timing.AdvanceChallengeOpening value => value,
         NoCTF.Application.Challenges.Timing.RecalculateChallengeTiming value => value,
+        NoCTF.Application.Theory.Papers.SweepTheoryActivity value => value,
+        NoCTF.Application.Theory.Activities.ApplyTheoryCorrection value => value,
         _ => throw new ArgumentOutOfRangeException(
             nameof(message),
             message.GetType().FullName,
