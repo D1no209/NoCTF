@@ -55,10 +55,12 @@ public sealed class LeaderboardProjectionMergeQueueTests
         var leaderboard = Substitute.For<ILeaderboardCache>();
         var queue = new LeaderboardProjectionMergeQueue();
         var now = DateTimeOffset.Parse("2026-08-24T00:00:00Z");
+        var applicability = Substitute.For<ICompetitionEventApplicabilityReader>();
+        applicability.HasOrdinaryScoreboardAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
         var handler = new CompetitionEventLeaderboardMessageHandler(
             leaderboard,
             queue,
-            new FixedTimeProvider(now));
+            new FixedTimeProvider(now), applicability);
         var competitionId = Guid.CreateVersion7();
 
         await handler.Handle(
@@ -82,7 +84,7 @@ public sealed class LeaderboardProjectionMergeQueueTests
         var handler = new CompetitionEventLeaderboardMessageHandler(
             leaderboard,
             queue,
-            new FixedTimeProvider(DateTimeOffset.Parse("2026-08-24T00:00:00Z")));
+            new FixedTimeProvider(DateTimeOffset.Parse("2026-08-24T00:00:00Z")), Substitute.For<ICompetitionEventApplicabilityReader>());
 
         await handler.Handle(
             CreateEvent(Guid.CreateVersion7(), kind),
@@ -100,6 +102,18 @@ public sealed class LeaderboardProjectionMergeQueueTests
         kind,
         CompetitionEventLevel.Information,
         DateTimeOffset.Parse("2026-08-24T00:00:00Z"));
+
+    [Test]
+    public async Task Independent_mode_events_do_not_enter_the_ordinary_scoreboard_queue()
+    {
+        var leaderboard = Substitute.For<ILeaderboardCache>(); var queue = new LeaderboardProjectionMergeQueue();
+        var applicability = Substitute.For<ICompetitionEventApplicabilityReader>();
+        applicability.HasOrdinaryScoreboardAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
+        var handler = new CompetitionEventLeaderboardMessageHandler(leaderboard, queue, TimeProvider.System, applicability);
+        await handler.Handle(CreateEvent(Guid.NewGuid(), CompetitionEventKind.ChallengeUpdated), CancellationToken.None);
+        await leaderboard.DidNotReceiveWithAnyArgs().InvalidateAsync(default, default);
+        await Assert.That(queue.TakeDue(DateTimeOffset.MaxValue)).IsEmpty();
+    }
 
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {

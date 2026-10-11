@@ -45,13 +45,14 @@ namespace Internal.Generated.WolverineHandlers
         public override async System.Threading.Tasks.Task HandleAsync(Wolverine.Runtime.MessageContext context, System.Threading.CancellationToken cancellation)
         {
             await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider, _notificationChangePublisher, _loggerOfNoCtfDbContext);
+            var competitionEventApplicabilityReader = new NoCTF.Infrastructure.Competitions.Events.CompetitionEventApplicabilityReader(noCtfDbContext);
             var fusionLeaderboardCache = new NoCTF.Infrastructure.Scoring.Leaderboard.FusionLeaderboardCache(noCtfDbContext, _leaderboardProjectionEngine, _leaderboardRefreshPublisher, _fusionCacheProvider, _leaderboardPublicationFence, _leaderboardProjectionKeyedLock, _timeProvider);
             // The actual message body
             var competitionEventCommitted = (NoCTF.Application.Competitions.Events.CompetitionEventCommitted)context.Envelope.Message;
 
             System.Diagnostics.Activity.Current?.SetTag("message.handler", "NoCTF.Worker.CompetitionEventLeaderboardMessageHandler");
             System.Diagnostics.Activity.Current?.SetTag("handler.type", "NoCTF.Worker.CompetitionEventLeaderboardMessageHandler");
-            var competitionEventLeaderboardMessageHandler = new NoCTF.Worker.CompetitionEventLeaderboardMessageHandler(fusionLeaderboardCache, _leaderboardProjectionMergeQueue, _timeProvider);
+            var competitionEventLeaderboardMessageHandler = new NoCTF.Worker.CompetitionEventLeaderboardMessageHandler(fusionLeaderboardCache, _leaderboardProjectionMergeQueue, _timeProvider, competitionEventApplicabilityReader);
             
             // The actual message execution
             await competitionEventLeaderboardMessageHandler.Handle(competitionEventCommitted, cancellation).ConfigureAwait(false);

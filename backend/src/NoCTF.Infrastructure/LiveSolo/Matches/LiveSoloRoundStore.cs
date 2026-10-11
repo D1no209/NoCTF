@@ -16,6 +16,8 @@ public sealed partial class LiveSoloMatchStore
             if (!await ActiveAsync(command.ActorId, ct) || !await authorizer.CanJudgeAsync(command.ActorId, command.CompetitionId, ct)) return new LiveSoloRoundResult(null, LiveSoloFailure.Forbidden);
             var match = await MatchAsync(command.CompetitionId, command.MatchId, ct);
             if (match is null) return new(null, LiveSoloFailure.NotFound);
+            if (await db.Competitions.AnyAsync(x => x.Id == command.CompetitionId && x.Status == CompetitionStatus.Finished, ct))
+                return new(null, LiveSoloFailure.AlreadyEnded);
             if (match.PendingCorrectionId is not null) return new(null, LiveSoloFailure.NotReady);
             if (match.ConcurrencyStamp != command.ExpectedStamp) return new(null, LiveSoloFailure.Conflict);
             if (match.State != LiveSoloMatchState.Preparing || match.Slots.Any(x => x.TeamId is null || x.RosterLockedAt is null)) return new(null, LiveSoloFailure.NotReady);
@@ -116,6 +118,7 @@ public sealed partial class LiveSoloMatchStore
 
     public async Task<LiveSoloRoundResult> RetryPreparationAsync(RetryLiveSoloPreparation command, CancellationToken ct)
     {
+        Guid? targetQuestion = null;
         var result = await TransactionAsync(async () =>
         {
             if (!await ActiveAsync(command.ActorId, ct) || !await authorizer.CanJudgeAsync(command.ActorId, command.CompetitionId, ct)) return new LiveSoloRoundResult(null, LiveSoloFailure.Forbidden);
@@ -123,14 +126,28 @@ public sealed partial class LiveSoloMatchStore
             var round = await db.LiveSoloRounds.Include(x => x.Questions).Include(x => x.Pauses).SingleOrDefaultAsync(x => x.Id == command.RoundId && x.MatchId == command.MatchId, ct);
             if (match is null || round is null || match.CurrentRoundId != round.Id) return new(null, LiveSoloFailure.NotFound);
             if (round.ConcurrencyStamp != command.ExpectedStamp) return new(null, LiveSoloFailure.Conflict);
-            if (match.State != LiveSoloMatchState.Preparing || round.State != LiveSoloRoundState.Preparing || match.PendingCorrectionId != null) return new(null, LiveSoloFailure.NotReady);
-            var first = round.Questions.Single(x => x.Position == 0); first.Readiness = LiveSoloQuestionReadiness.Waiting; first.PreparationFailure = LiveSoloResourceFailure.None;
-            round.ConcurrencyStamp = Guid.NewGuid(); await db.SaveChangesAsync(ct); return new(Round(round, command.Now));
+            if (round.State is not (LiveSoloRoundState.Preparing or LiveSoloRoundState.Countdown or LiveSoloRoundState.Running)
+                || match.PendingCorrectionId != null || match.SupersededAt != null
+                || match.State is LiveSoloMatchState.Completed or LiveSoloMatchState.Canceled) return new(null, LiveSoloFailure.NotReady);
+            if (await db.Competitions.AnyAsync(x => x.Id == command.CompetitionId && x.Status == CompetitionStatus.Finished, ct))
+                return new(null, LiveSoloFailure.AlreadyEnded);
+            var target = command.QuestionId is Guid id ? round.Questions.SingleOrDefault(x => x.Id == id) : round.Questions.Single(x => x.Position == 0);
+            if (target is null) return new(null, LiveSoloFailure.NotFound);
+            if (target.OpenedAt != null) return new(null, LiveSoloFailure.Conflict);
+            if (round.StartedAt is { } start && LiveSoloActiveClock.Elapsed(start, command.Now, round.Pauses) >= TimeSpan.FromSeconds(round.LimitSeconds))
+                return new(null, LiveSoloFailure.DeadlinePassed);
+            targetQuestion = target.Id; target.Readiness = LiveSoloQuestionReadiness.Waiting; target.PreparationFailure = LiveSoloResourceFailure.None;
+            round.TimelineRevision++; round.ConcurrencyStamp = Guid.NewGuid(); await db.SaveChangesAsync(ct); return new(Round(round, command.Now));
         }, () => new(null, LiveSoloFailure.Conflict), ct);
         if (result.Round is null) return result;
-        foreach (var id in await db.LiveSoloRoundQuestions.Where(x => x.RoundId == result.Round.Id && x.Position == 0).Select(x => x.Id).ToArrayAsync(ct))
-            await runtimePreparation.PrepareAsync(id, command.Now, ct);
-        return new(Round(await db.LiveSoloRounds.Include(x => x.Questions).Include(x => x.Pauses).SingleAsync(x => x.Id == result.Round.Id, ct), command.Now));
+        if (targetQuestion is Guid questionId) await runtimePreparation.PrepareAsync(questionId, command.Now, ct);
+        return await TransactionAsync(async () =>
+        {
+            var refreshed = await db.LiveSoloRounds.Include(x => x.Questions).Include(x => x.Pauses).SingleAsync(x => x.Id == result.Round.Id, ct);
+            if (LiveSoloRoundSchedulePolicy.NextWakeup(refreshed, command.Now) is { } next)
+                await messages.ScheduleAsync(new AdvanceLiveSoloRound(refreshed.Id, refreshed.TimelineRevision, next), next);
+            return new LiveSoloRoundResult(Round(refreshed, command.Now));
+        }, () => new(null, LiveSoloFailure.Conflict), ct);
     }
 
     public async Task<LiveSoloRoundResult> StartCountdownAsync(StartLiveSoloCountdown command, CancellationToken ct)

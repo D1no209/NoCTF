@@ -40,6 +40,9 @@ public sealed partial class LiveSoloMatchStore
         var exposed = await db.LiveSoloQuestionExposures.AsNoTracking().Where(x => x.PublicAt <= now).Select(x => x.CanonicalChallengeId).Distinct().ToArrayAsync(ct);
         var seenTeams = entries.Where(x => history.Any(h => h.CompetitionChallengeId == x.Id && h.SeenByTeam)).Select(x => Canonical(x.ChallengeId)).ToHashSet();
         var seenMembers = entries.Where(x => history.Any(h => h.CompetitionChallengeId == x.Id && h.SeenByMember)).Select(x => Canonical(x.ChallengeId)).ToHashSet();
+        var uses = await db.LiveSoloRounds.AsNoTracking().Where(x => db.LiveSoloMatches.Any(m => m.Id == x.MatchId && m.CompetitionId == match.CompetitionId))
+            .OrderByDescending(x => x.CreatedAt).Select(x => new { x.QuestionGroupId, Use = new LiveSoloQuestionUse(x.MatchId, x.Id, x.Number, x.Replay,
+                x.State, x.CreatedAt, x.Questions.Select(q => q.OpenedAt).Min()) }).ToArrayAsync(ct);
         return groups.Select(group =>
         {
             var ordered = group.Items.OrderBy(x => x.Position).ToArray();
@@ -57,7 +60,8 @@ public sealed partial class LiveSoloMatchStore
             return LiveSoloQuestionSelection.Evaluate(group.Id, group.Name, group.Reserve, group.Position, group.ConcurrencyStamp, materials,
                 ordered.Select(x => new LiveSoloQuestionGroupEntry(x.CompetitionChallengeId, x.OpenOffsetSeconds)).ToArray(),
                 LiveSoloConfigurationValidator.ValidateGroup(group, config.RoundLimitSeconds, config.QuestionIntervalSeconds).Count == 0,
-                history.Any(x => x.MatchId == match.Id && x.QuestionGroupId == group.Id), config.QuestionIntervalSeconds, group.RoundLimitSeconds ?? config.RoundLimitSeconds);
+                history.Any(x => x.MatchId == match.Id && x.QuestionGroupId == group.Id), config.QuestionIntervalSeconds, group.RoundLimitSeconds ?? config.RoundLimitSeconds)
+                with { Uses = uses.Where(x => x.QuestionGroupId == group.Id).Take(50).Select(x => x.Use).ToArray() };
         }).ToArray();
     }
 }

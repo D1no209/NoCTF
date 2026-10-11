@@ -15,7 +15,10 @@ public sealed record LiveSoloQuestionCandidate(Guid Id, string Name, bool Reserv
 {
     public bool Available => Exclusions.Count == 0;
     public bool AutomaticEligible => Available && Risks.Count == 0;
+    public IReadOnlyList<LiveSoloQuestionUse> Uses { get; init; } = [];
 }
+public sealed record LiveSoloQuestionUse(Guid MatchId, Guid RoundId, int Number, int Replay,
+    LiveSoloRoundState State, DateTimeOffset PreparedAt, DateTimeOffset? OpenedAt);
 
 public sealed record LiveSoloSelectionMaterial(Guid Id, Guid? CanonicalId, Guid EntryStamp, Guid MaterialStamp,
     bool Exists, bool Deleted, bool Supported, bool Active, bool SeenByTeam, bool SeenByMember, bool Exposed);

@@ -80,7 +80,8 @@ public sealed partial class LiveSoloCaptureStore(NoCtfDbContext db, ILiveSoloEgr
         var right = match.Slots.Single(x => x.Side == LiveSoloSide.Right).TeamId;
         var frame = new LiveSoloProgramFrame { Id = Guid.CreateVersion7(at), MediaSessionId = session.Id, OccurredAt = at,
             Kind=kind,MatchRevision=kind==LiveSoloProgramFrameKind.DelayedResult?match.ConcurrencyStamp:null,
-            PublicAt=kind==LiveSoloProgramFrameKind.DelayedResult?at.AddSeconds(session.PublicDelaySeconds):null,WinnerTeamId=match.WinnerTeamId,
+            PublicAt=kind==LiveSoloProgramFrameKind.DelayedResult?at.AddSeconds(session.PublicDelaySeconds):null,
+            WinnerTeamId=match.State==LiveSoloMatchState.Canceled?null:match.WinnerTeamId,
             MatchState = match.State, RequiredWins = match.RequiredWins, LeftWins = match.LeftWins, RightWins = match.RightWins,
             LeftTeamId = left, RightTeamId = right, LeftTeamName = left is Guid l ? names.GetValueOrDefault(l) : null,
             RightTeamName = right is Guid r ? names.GetValueOrDefault(r) : null, RoundId = round?.Id, RoundNumber = round?.Number,

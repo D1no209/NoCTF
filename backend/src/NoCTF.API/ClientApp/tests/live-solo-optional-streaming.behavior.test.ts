@@ -4,6 +4,7 @@ import { settingsDraft, settingFields, validSettings } from '../app/features/liv
 import { message, translate } from '../app/utils/i18n'
 import { canJudgeLiveSolo, canLockLiveSoloRoster, canPlayLiveSolo, formatRoundClock, matchStateKey, roundRemainingSeconds } from '../app/features/live-solo/live-solo-state'
 import { canManageLiveSolo } from '../app/features/live-solo/settings-draft'
+import { resultPresentation } from '../app/features/live-solo/result-presentation'
 
 const source = await Bun.file(new URL('../app/features/live-solo/useLiveSoloMatch.ts', import.meta.url)).text()
 const compiled = new Bun.Transpiler({ loader: 'ts' }).transformSync(source)
@@ -27,9 +28,12 @@ function fixture(policy: boolean, prepared?: boolean, captainId = 'player') {
     useAuth: () => ({ user: ref({ userId: 'player', userName: 'Synthetic player' }) }),
     useLiveSoloHub: () => {}, onMounted: () => {}, onBeforeRouteLeave: () => {}, onScopeDispose: () => {},
     useLiveSoloScreen: () => screen, parseLiveSoloError: () => ({ displayMessage: message('liveSolo.error.load') }),
-    getLiveSoloMatch: async () => ({ data: match }), getLiveSoloPlayerPolicy: async () => ({ data: config }),
+    getLiveSoloWorkspace: async () => ({ data: { match, round: prepared === undefined ? null : { ...round }, allowedOperations: [], missingConditions: [] } }), getLiveSoloPlayerPolicy: async () => ({ data: config }),
+    resultPresentation, LiveSoloReview: {},
     getMyTeamEndpoint: async () => ({ data: { id: 'left', captainId, memberIds: ['player'] } }),
     listLiveSoloQuestionGroupCandidates: async () => ({ data: { items: candidates } }),
+    listLiveSoloQuestionGroups: async () => ({ data: { items: [{ id: 'question-list', questions: [{ competitionChallengeId: 'entry' }] }] } }),
+    listLiveSoloQuestionPool: async () => ({ data: { items: [{ id: 'entry', title: 'Synthetic preview', description: 'Staff only' }] } }),
     prepareLiveSoloRound: async (options: any) => { preparationWrites.push(options.body); return {} },
     confirmLiveSoloReady: async () => { readyCalls++; return {} },
     getLiveSoloRound: async () => ({ data: { ...round } }), userProfileGet: async () => ({ data: null }),
@@ -68,6 +72,29 @@ test('a locked roster member can confirm readiness without being the captain', a
   const f = fixture(false, false, 'another-captain')
   try { await f.state.load(); expect(f.state.captain.value).toBe(false); expect(f.state.onRoster.value).toBe(true); await f.state.ready(); expect(f.readyCalls()).toBe(1) }
   finally { f.stop() }
+})
+
+test('unavailable browser storage disables automatic prompts while the confirmed result remains manually accessible', async () => {
+  const f = fixture(false)
+  Object.assign(f.match, { state: 'Completed', resultRevision: 1, endReason: 'Forfeit', resultLeftWins: 0, resultRightWins: 0,
+    rightTeamId: 'right', rightTeamName: 'Synthetic Right', winnerTeamId: 'right' })
+  try {
+    await f.state.load()
+    expect(f.state.resultOpen.value).toBe(false)
+    expect(f.state.stableResult.value).toMatchObject({ winnerName: 'Synthetic Right', score: '0 : 0' })
+    f.state.showResult(); expect(f.state.resultOpen.value).toBe(true)
+  } finally { f.stop() }
+})
+
+test('staff can preview a candidate before preparation without silently specifying it or creating a round', async () => {
+  const f = fixture(false)
+  try {
+    await f.state.load(); f.state.chooseGroup('question-list'); await f.state.previewCandidate()
+    expect(f.state.candidatePreviewOpen.value).toBe(true)
+    expect(f.state.candidatePreviewItems.value[0]).toMatchObject({ title: 'Synthetic preview', description: 'Staff only' })
+    expect(f.preparationWrites).toHaveLength(0); expect(f.state.groupChoice.value).toBe('question-list')
+    f.state.setCandidatePreviewOpen(false); expect(f.state.candidatePreviewItems.value).toEqual([])
+  } finally { f.stop() }
 })
 
 test('prepared round policy wins over subsequent competition changes in both directions', async () => {

@@ -25,6 +25,7 @@ public sealed class LiveSoloReviewAndResultsTests
         await DockerIntegrationTest.RunAsync(async () =>
         {
             await using var f = await LiveSoloMatchPersistenceTests.Fixture.CreateAsync(ct, false);
+            f.Templates[0].Direction = new string('d', 96); await f.Db.SaveChangesAsync(ct);
             await f.PrepareAsync(ct); await f.StartAsync(ct);
             var q = f.Round.Questions.Single(x => x.Position == 0); var future = f.Round.Questions.Single(x => x.Position == 1);
             var reader = new LiveSoloReviewStore(f.Db, new CompetitionModerationAuthorizer(f.Db));
@@ -41,6 +42,7 @@ public sealed class LiveSoloReviewAndResultsTests
             var replay = await reader.ReadAsync(request, q.Id, ct);
             await Assert.That(replay!.Question.Description).IsEqualTo("secret body 0");
             await Assert.That(replay.Question.Title).IsEqualTo("Question 0");
+            await Assert.That(replay.Question.Direction).IsEqualTo(new string('d', 96));
             await Assert.That(replay.Question.RuntimeInstanceId).IsNull();
             f.LeftTeam.IsBanned = true; await f.Db.SaveChangesAsync(ct);
             await Assert.That(await reader.ReadAsync(request, q.Id, ct)).IsNull();
@@ -155,6 +157,30 @@ public sealed class LiveSoloReviewAndResultsTests
             await Assert.That(again.Match.ResultLeftWins).IsNull();
             await Assert.That(again.Round!.EndReason).IsEqualTo(LiveSoloEndReason.Unrecorded);
             await Assert.That(again.Round.ResultLeftWins).IsNull();
+        });
+    }
+
+    [Test, Timeout(300_000)]
+    public async Task Failed_future_preparation_stops_automatic_retries_and_staff_can_retry_the_same_question_during_play(CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var f = await LiveSoloMatchPersistenceTests.Fixture.CreateAsync(ct, false); await f.PrepareAsync(ct); await f.StartAsync(ct);
+            var question = f.Round.Questions.Single(x => x.Position == 1);
+            question.Readiness = LiveSoloQuestionReadiness.Failed; question.PreparationFailure = LiveSoloResourceFailure.DependencyUnavailable;
+            await f.Db.SaveChangesAsync(ct); f.Now = f.Now.AddSeconds(12);
+            await Assert.That(NoCTF.Application.LiveSolo.Rounds.LiveSoloRoundSchedulePolicy.PreparationCandidates(f.Round, f.Now)).IsEmpty();
+            var store = f.Store(f.Db);
+            var player = await ((ILiveSoloWorkspaceReader)store).ReadAsync(f.Competition.Id, f.Match.Id, f.Left.Id, false, f.Now, ct);
+            await Assert.That(player!.Resources.Count).IsEqualTo(0);
+            var staff = await ((ILiveSoloWorkspaceReader)store).ReadAsync(f.Competition.Id, f.Match.Id, f.Owner.Id, true, f.Now, ct);
+            await Assert.That(staff!.Resources.Single(x => x.QuestionId == question.Id).Failure).IsEqualTo(LiveSoloResourceFailure.DependencyUnavailable);
+            await Assert.That(staff.AllowedOperations.Contains(LiveSoloWorkspaceOperation.RetryPreparation)).IsTrue();
+            var retried = await store.RetryPreparationAsync(new(f.Competition.Id, f.Match.Id, f.Round.Id, f.Owner.Id, staff.Round!.ConcurrencyStamp, f.Now, question.Id), ct);
+            await Assert.That(retried.Failure).IsNull(); await Assert.That(retried.Round!.Id).IsEqualTo(f.Round.Id);
+            await store.TickAsync(f.Round.Id, retried.Round.TimelineRevision, f.Now, ct);
+            await Assert.That(question.Readiness).IsEqualTo(LiveSoloQuestionReadiness.Ready);
+            await Assert.That(question.OpenedAt).IsNotNull();
         });
     }
 }

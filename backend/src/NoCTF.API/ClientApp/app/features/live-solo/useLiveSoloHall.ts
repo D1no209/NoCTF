@@ -1,5 +1,5 @@
-import { computed, inject, markRaw, onMounted, onScopeDispose, ref } from 'vue'
-import { listLiveSoloMatches, getLiveSoloPlayerPolicy } from '~/api'
+import { computed, inject, markRaw, onMounted, onScopeDispose, ref, watch } from 'vue'
+import { listLiveSoloMatches, getLiveSoloPlayerPolicy, getLiveSoloWorkspace } from '~/api'
 import type { NoCtfapiEndpointsLiveSoloLiveSoloMatchResponse as Match, NoCtfapiEndpointsLiveSoloLiveSoloPlayerPolicyResponse as Configuration } from '~/api'
 import { competitionContextKey } from '~/utils/labels'
 import { message, type UiMessage } from '~/utils/i18n'
@@ -7,6 +7,8 @@ import { parseLiveSoloError } from './live-solo-errors'
 import { matchStateKey } from './live-solo-state'
 import CompetitionParticipantWorkspace from '~/features/competition/CompetitionParticipantWorkspace.vue'
 import { useLiveSoloHub } from './useLiveSoloHub'
+import { endReasonKeys } from './result-presentation'
+import { canManageLiveSolo } from './settings-draft'
 
 export function useLiveSoloHall() {
   const route = useRoute(), router = useRouter()
@@ -15,6 +17,20 @@ export function useLiveSoloHall() {
   const matches = ref<Match[]>([]), configuration = ref<Configuration | null>(null)
   const loading = ref(true), error = ref<UiMessage | null>(null)
   const selected = ref<string | null>(null)
+  const activity = ref<import('~/api').NoCtfapiEndpointsLiveSoloLiveSoloWorkspaceResponse | null>(null)
+  const { user } = useAuth()
+  let activityRequest = 0
+  async function loadActivity() {
+    const id = ++activityRequest, match = selected.value, actor = user.value?.userId
+    if (!match || !actor) return
+    const response = await getLiveSoloWorkspace({ path: { competitionId: competitionId.value, matchId: match }, query: { staff: ctx?.competition.value?.administrationRole != null } })
+    if (!disposed && id === activityRequest && actor === user.value?.userId && selected.value === match) activity.value = response.data ?? null
+  }
+  const activityRows = computed(() => (activity.value?.history ?? []).map(x => ({ id: x.id,
+    label: message('liveSolo.activity.opened', { number: x.roundNumber ?? 1, position: (x.position ?? 0) + 1 }), time: x.openedAt ?? null }))
+    .concat(activity.value?.match?.resultUpdatedAt ? [{ id: activity.value.match.id,
+      label: message('liveSolo.activity.ended'), time: activity.value.match.resultUpdatedAt }] : [])
+    .sort((a, b) => (b.time ?? '').localeCompare(a.time ?? '')))
   useLiveSoloHub(competitionId, selected, computed(() => ctx?.competition.value?.administrationRole != null), load)
   const options = computed(() => matches.value.filter(x => x.id).map(row => ({
     value: row.id!, label: `${row.leftTeamName ?? '—'} / ${row.rightTeamName ?? '—'}`, row, stateKey: matchStateKey(row.state),
@@ -37,10 +53,12 @@ export function useLiveSoloHall() {
       if (config.error || rows.error || !config.data || !rows.data) throw parseLiveSoloError(config.error ?? rows.error, message('liveSolo.error.load'))
       configuration.value = config.data; matches.value = rows.data.items ?? []; error.value = null
       const query = typeof route.query.match === 'string' ? route.query.match : null
+      const previousSelection = selected.value
       selected.value = matches.value.some(x => x.id === query) ? query
         : matches.value.some(x => x.id === selected.value) ? selected.value : matches.value.find(x => x.id)?.id ?? null
+      if (previousSelection === selected.value) void loadActivity()
     }
-    catch (cause) { if (!disposed && id === request) error.value = parseLiveSoloError(cause, message('liveSolo.error.load')).displayMessage }
+    catch (cause) { if (!disposed && id === request) { matches.value = []; activity.value = null; error.value = parseLiveSoloError(cause, message('liveSolo.error.load')).displayMessage } }
     finally { pending = false; loading.value = false; if (refreshQueued && !disposed) { refreshQueued = false; void load() } }
   }
   async function select(id: string) {
@@ -64,8 +82,14 @@ export function useLiveSoloHall() {
     if (!disposed) timer = setTimeout(tick, 5000)
   }
   onMounted(() => { void tick() })
-  onScopeDispose(() => { disposed = true; request++; if (timer) clearTimeout(timer) })
+  watch(selected, () => { activity.value = null; void loadActivity() })
+  watch([() => user.value?.userId, competitionId], () => {
+    request++; activityRequest++; matches.value = []; activity.value = null; configuration.value = null; selected.value = null; void load()
+  })
+  onScopeDispose(() => { disposed = true; request++; activityRequest++; if (timer) clearTimeout(timer) })
   return { competitionId, options, selected, current, configuration, loading, error, select, enter, recordings, settings, bracket, groups, pool, postgame, load,
+    activityRows, canManage: computed(() => canManageLiveSolo(ctx?.competition.value?.administrationRole)),
+    endReasonKey: computed(() => endReasonKeys[current.value?.endReason ?? 'Unrecorded']),
     finished:computed(()=>ctx?.competition.value?.status==='Finished'),
     staff: computed(() => ctx?.competition.value?.administrationRole != null),
     stateKey: computed(() => matchStateKey(current.value?.state)), Workspace: markRaw(CompetitionParticipantWorkspace) }

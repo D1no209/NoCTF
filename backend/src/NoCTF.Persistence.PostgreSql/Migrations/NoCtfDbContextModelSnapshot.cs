@@ -3762,8 +3762,8 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
 
                     b.Property<string>("Direction")
                         .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
+                        .HasMaxLength(96)
+                        .HasColumnType("character varying(96)")
                         .HasColumnName("direction");
 
                     b.Property<bool>("RandomAttachment")

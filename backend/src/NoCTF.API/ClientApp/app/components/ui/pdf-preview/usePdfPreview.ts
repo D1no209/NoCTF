@@ -5,7 +5,7 @@ import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import { capturePdfAnchor, createPdfLayout, pdfCanvasSize, pdfPageAtOffset, pdfPageGap, pdfReadingWindow, restorePdfAnchor } from './pdf-page-window'
 import type { PdfPageLayout, PdfPageSize } from './pdf-page-window'
 
-interface PdfPreviewOptions { source?: string | null; loading?: boolean }
+interface PdfPreviewOptions { source?: string | null; loading?: boolean; httpHeaders?: Record<string, string> }
 interface PageRender {
   canvas: HTMLCanvasElement
   task?: RenderTask
@@ -219,7 +219,7 @@ export function usePdfPreview(props: PdfPreviewOptions) {
       const library = await pdfLibraryPromise
       library.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
       if (request !== documentRequest) return
-      const task = library.getDocument({ url: source, enableXfa: false, disableAutoFetch: true, disableStream: true })
+      const task = library.getDocument({ url: source, httpHeaders: props.httpHeaders, enableXfa: false, disableAutoFetch: true, disableStream: true })
       loadingTask = task
       const document = await task.promise
       if (request !== documentRequest) { await task.destroy().catch(() => undefined); return }

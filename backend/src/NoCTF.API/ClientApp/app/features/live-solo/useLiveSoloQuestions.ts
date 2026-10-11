@@ -13,7 +13,7 @@ import { startAttachmentBrowserDownload } from '~/utils/download'
 import { gameplayFactResultLabel, gameplayFactFailureCodeLabel } from '~/utils/labels'
 import { questionFromWorkspaceRoute } from './live-solo-state'
 
-export function useLiveSoloQuestions(props: Readonly<{ competitionId: string; matchId: string; round: Round; canSubmit: boolean; dockTarget: string }>) {
+export function useLiveSoloQuestions(props: Readonly<{ competitionId: string; matchId: string; round: Round; canSubmit: boolean; dockTarget: string; initialQuestions?: Question[] }>) {
   const route = useRoute(), router = useRouter(), { user } = useAuth()
   const { request: verification } = useHumanVerification()
   const questions = ref<Question[]>([]), selected = ref<string | null>(null), loading = ref(true), error = ref<UiMessage | null>(null)
@@ -67,7 +67,8 @@ export function useLiveSoloQuestions(props: Readonly<{ competitionId: string; ma
     if (disposed || pending || !props.round.id) return
     pending = true; const id = ++request
     try {
-      const result = await listLiveSoloQuestions({ path: { competitionId: props.competitionId, matchId: props.matchId, roundId: props.round.id } })
+      const result = props.initialQuestions !== undefined ? { data: { items: props.initialQuestions }, error: null }
+        : await listLiveSoloQuestions({ path: { competitionId: props.competitionId, matchId: props.matchId, roundId: props.round.id } })
       if (disposed || id !== request) return
       if (result.error || !result.data) throw parseLiveSoloError(result.error, message('liveSolo.error.load'))
       questions.value = result.data.items ?? []; error.value = null
@@ -141,7 +142,11 @@ export function useLiveSoloQuestions(props: Readonly<{ competitionId: string; ma
   async function tick() { await load(); if (!disposed) timer = setTimeout(tick, 5000) }
   watch(selected, () => { runtimePolling.stop(); hints.value = []; hintsError.value = null; void resources(); void refreshHints() })
   watch(() => route.params.workspace, syncSelection)
-  watch(() => user.value?.userId, () => { drafts.value = {}; questions.value = []; selected.value = null; hints.value = [] })
+  watch(() => props.initialQuestions, () => { void load() })
+  watch(() => user.value?.userId, () => {
+    request++; resourceRequest++; hintRequest++; accepted = null; statusPolling.stop(); runtimePolling.stop()
+    drafts.value = {}; questions.value = []; selected.value = null; hints.value = []; attachments.value = null; runtime.value = null; feedback.value = null
+  })
   onMounted(() => { void tick() })
   onScopeDispose(() => { disposed = true; request++; resourceRequest++; hintRequest++; if (timer) clearTimeout(timer); accepted = null })
   return { loading, error, current, selected, options, select, input, submitting, submit, feedback, attachments, runtime, hints,

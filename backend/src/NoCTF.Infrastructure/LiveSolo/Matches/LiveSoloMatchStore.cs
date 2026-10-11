@@ -103,7 +103,8 @@ public sealed partial class LiveSoloMatchStore(NoCtfDbContext db, ICompetitionMo
         var left = match.Slots.Single(x => x.Side == LiveSoloSide.Left); var right = match.Slots.Single(x => x.Side == LiveSoloSide.Right);
         return new(match.Id, match.CompetitionId, match.State, match.ConcurrencyStamp, match.RequiredWins, match.LeftWins, match.RightWins,
             left.TeamId, left.TeamId is Guid l ? names.GetValueOrDefault(l) : null,
-            right.TeamId, right.TeamId is Guid r ? names.GetValueOrDefault(r) : null, match.CurrentRoundId, match.WinnerTeamId,
+            right.TeamId, right.TeamId is Guid r ? names.GetValueOrDefault(r) : null, match.CurrentRoundId,
+            match.State == LiveSoloMatchState.Canceled ? null : match.WinnerTeamId,
             match.Slots.Where(x => x.TeamId is not null).Select(x => new LiveSoloRosterView(x.TeamId!.Value,
                 match.Roster.Where(r => r.TeamId == x.TeamId).Select(r => r.UserId).Order().ToArray(), x.RosterLockedAt is not null, x.ReadyConfirmedAt is not null)).ToArray(),
             match.PendingCorrectionId, match.ReplacementMatchId, match.PendingCorrectionId is Guid correction ? corrections?.GetValueOrDefault(correction) : null, hasMedia)

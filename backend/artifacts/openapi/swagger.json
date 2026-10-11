@@ -28194,6 +28194,14 @@
             "type": "string",
             "format": "guid",
             "nullable": true
+          },
+          "leftAvatarUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "rightAvatarUrl": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -30898,6 +30906,12 @@
           },
           "staff": {
             "type": "boolean"
+          },
+          "resources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloPreparationResponse"
+            }
           }
         }
       },
@@ -31002,6 +31016,39 @@
           },
           "contentRecorded": {
             "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloPreparationResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "questionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "position": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "openOffsetSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "openedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "readiness": {
+            "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloQuestionReadiness"
+          },
+          "failure": {
+            "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloResourceFailure"
+          },
+          "environmentRequired": {
+            "type": "boolean",
+            "nullable": true
           }
         }
       },
@@ -31321,6 +31368,12 @@
             "items": {
               "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloQuestionCandidateRiskResponse"
             }
+          },
+          "uses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsLiveSoloLiveSoloQuestionUseResponse"
+            }
           }
         }
       },
@@ -31382,6 +31435,40 @@
           "PreviouslyUsed",
           "PublicExposure"
         ]
+      },
+      "NoCTFAPIEndpointsLiveSoloLiveSoloQuestionUseResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "matchId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "roundId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "number": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "replay": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "state": {
+            "$ref": "#/components/schemas/NoCTFDomainLiveSoloLiveSoloRoundState"
+          },
+          "preparedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "openedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
       },
       "NoCTFAPIEndpointsLiveSoloListLiveSoloQuestionGroupCandidatesRequest": {
         "type": "object",
@@ -32223,6 +32310,11 @@
             "format": "guid",
             "minLength": 1,
             "nullable": false
+          },
+          "questionId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
           }
         }
       },

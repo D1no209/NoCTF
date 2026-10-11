@@ -47,7 +47,7 @@ public sealed record SetLiveSoloRoster(Guid CompetitionId, Guid MatchId, Guid Ac
     Guid ExpectedStamp, IReadOnlyList<Guid> UserIds, DateTimeOffset Now);
 public sealed record PrepareLiveSoloRound(Guid CompetitionId, Guid MatchId, Guid ActorId, Guid ExpectedStamp, Guid? GroupId, DateTimeOffset Now, Guid? ExpectedGroupStamp = null, Guid? SelectionRevision = null);
 public sealed record SpecifyPreparedLiveSoloGroup(Guid CompetitionId, Guid MatchId, Guid RoundId, Guid QuestionGroupId, Guid ActorId, Guid ExpectedStamp, Guid ExpectedGroupStamp, Guid SelectionRevision, DateTimeOffset Now);
-public sealed record RetryLiveSoloPreparation(Guid CompetitionId, Guid MatchId, Guid RoundId, Guid ActorId, Guid ExpectedStamp, DateTimeOffset Now);
+public sealed record RetryLiveSoloPreparation(Guid CompetitionId, Guid MatchId, Guid RoundId, Guid ActorId, Guid ExpectedStamp, DateTimeOffset Now, Guid? QuestionId = null);
 public sealed record StartLiveSoloCountdown(Guid CompetitionId, Guid MatchId, Guid RoundId, Guid ActorId, Guid ExpectedStamp, DateTimeOffset Now);
 public sealed record LiveSoloAdmission(Guid CompetitionId, Guid MatchId, Guid RoundId, Guid QuestionId, Guid ActorId,
     string Flag, DateTimeOffset Now);

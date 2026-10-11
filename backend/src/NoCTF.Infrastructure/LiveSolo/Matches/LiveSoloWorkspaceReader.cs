@@ -49,13 +49,17 @@ public sealed partial class LiveSoloMatchStore : ILiveSoloWorkspaceReader
         {
             if (judge)
             {
-                if (match.State == LiveSoloMatchState.Preparing && (round is null || round.State is LiveSoloRoundState.Won or LiveSoloRoundState.TimedOut or LiveSoloRoundState.Canceled))
+                if (competition.Status != CompetitionStatus.Finished && match.State == LiveSoloMatchState.Preparing
+                    && (round is null || round.State is LiveSoloRoundState.Won or LiveSoloRoundState.TimedOut or LiveSoloRoundState.Canceled))
                     allowed.Add(LiveSoloWorkspaceOperation.PrepareRound);
                 if (round?.State == LiveSoloRoundState.Preparing)
                 {
                     allowed.Add(LiveSoloWorkspaceOperation.RetryPreparation);
                     if (conditions.Count == 0) allowed.Add(LiveSoloWorkspaceOperation.StartCountdown);
                 }
+                else if (round?.State is LiveSoloRoundState.Countdown or LiveSoloRoundState.Running
+                    && round.Questions.Any(x => x.OpenedAt == null && x.Readiness == LiveSoloQuestionReadiness.Failed))
+                    allowed.Add(LiveSoloWorkspaceOperation.RetryPreparation);
                 if (round?.State is LiveSoloRoundState.Preparing or LiveSoloRoundState.Countdown or LiveSoloRoundState.Running or LiveSoloRoundState.ConfirmingResult)
                     allowed.Add(LiveSoloWorkspaceOperation.VoidRound);
                 if (round?.State is LiveSoloRoundState.Countdown or LiveSoloRoundState.Running)
@@ -79,14 +83,18 @@ public sealed partial class LiveSoloMatchStore : ILiveSoloWorkspaceReader
         // Build metadata inside this same database snapshot; body and file requests authorize separately.
         var teamId = await TeamAsync(competitionId, actorId, ct);
         var historyAllowed = staff || competition.Status == CompetitionStatus.Finished && teamId != null
-            || teamId != null && match.Roster.Any(x => x.UserId == actorId && x.TeamId == teamId);
+            || teamId != null && match.Roster.Any(x => x.UserId == actorId && x.TeamId == teamId)
+                && match.Slots.Any(x => x.TeamId == teamId && x.RosterLockedAt != null);
         var history = historyAllowed ? await db.LiveSoloRoundQuestions.AsNoTracking().Where(x => x.OpenedAt != null)
             .Join(db.LiveSoloRounds.Where(x => x.MatchId == matchId), q => q.RoundId, r => r.Id, (q, r) => new { q, r })
             .OrderBy(x => x.r.Number).ThenBy(x => x.r.Replay).ThenBy(x => x.q.Position)
             .Select(x => new LiveSoloReviewQuestion(x.q.Id, x.r.Id, x.q.CompetitionChallengeId, x.r.Number, x.r.Replay, x.q.Position,
                 x.q.OpenedContent != null ? x.q.OpenedContent.Title : null, x.q.OpenedAt, x.q.OpenedContent != null)).ToArrayAsync(ct) : [];
-        var next = round?.Questions.Where(x => x.OpenedAt == null).OrderBy(x => x.Position).Select(x => (int?)x.OpenOffsetSeconds).FirstOrDefault();
-        return new(view, round != null ? Round(round, now) : null, allowed, conditions, questions, history, now, next, staff);
+        var next = round?.State is LiveSoloRoundState.Preparing or LiveSoloRoundState.Countdown or LiveSoloRoundState.Running
+            ? round.Questions.Where(x => x.OpenedAt == null).OrderBy(x => x.Position).Select(x => (int?)x.OpenOffsetSeconds).FirstOrDefault() : null;
+        return new(view, round != null ? Round(round, now) : null, allowed, conditions, questions, history, now, next, staff)
+        { Resources = staff && round != null ? round.Questions.OrderBy(x => x.Position).Select(x => new LiveSoloPreparationView(x.Id,
+            x.Position, x.OpenOffsetSeconds, x.OpenedAt, x.Readiness, x.PreparationFailure, x.EnvironmentRequired)).ToArray() : [] };
     }
 
     private async Task<bool> PreparedSelectionCurrentAsync(LiveSoloMatch match, LiveSoloRound round, DateTimeOffset now, CancellationToken ct)

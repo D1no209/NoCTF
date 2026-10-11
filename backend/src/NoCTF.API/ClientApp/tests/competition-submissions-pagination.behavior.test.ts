@@ -19,20 +19,22 @@ type Query = {
   offset: number; limit: number; desc: boolean
 }
 
-async function harness() {
+async function harness(mode = 'Ctf') {
   const facts = Array.from({ length: 23 }, (_, index) => ({
     id: `fact-${index + 1}`, competitionChallengeId: index < 12 ? 'challenge-a' : 'challenge-b',
     teamId: 'team-a', kind: 'FlagAttempt', state: 'Completed', result: 'Wrong', value: `flag{${index + 1}}`,
   }))
   const requests: Query[] = []
   const writes: unknown[] = []
+  const navigations: string[] = []
   let failNextRead = false
   let mount!: () => void
   let unmount!: () => void
   const scope = effectScope()
   const state = scope.run(() => factory({
     ...adjudication, ref, computed, watch, proxyRefs, useOffsetPagination, useCursorPagination, parseApiError, Download: {},
-    useCompetitionAdmin: () => ({ competitionId: 'competition', role: ref('Owner'), canWrite: ref(true), canJudge: ref(true) }),
+    useRouter: () => ({ push: async (path: string) => { navigations.push(path) } }),
+    useCompetitionAdmin: () => ({ competitionId: 'competition', competition: ref({ mode }), role: ref('Owner'), canWrite: ref(true), canJudge: ref(true) }),
     useAuth: () => ({ isAdministrator: ref(true) }),
     adminUserPath: (id: string) => `/admin/users/${id}`,
     adminTeamPath: () => '/team', adminChallengePath: () => '/challenge',
@@ -59,7 +61,7 @@ async function harness() {
   })())!
   mount()
   await drain()
-  return { state, facts, requests, writes, failNextRead: () => { failNextRead = true }, stop: () => { unmount(); scope.stop() } }
+  return { state, facts, requests, writes, navigations, failNextRead: () => { failNextRead = true }, stop: () => { unmount(); scope.stop() } }
 }
 
 describe('competition submission pagination', () => {
@@ -163,4 +165,15 @@ describe('competition submission pagination', () => {
     }
     finally { app.stop() }
   })
+})
+
+
+test('LiveSolo general rejudgement opens the authoritative series workspace without queueing ordinary scoring work', async () => {
+  const app = await harness('LiveSolo')
+  try {
+    expect(app.state.canRejudge.value).toBe(false)
+    await app.state.rejudgeOne('fact-1'); await app.state.rejudgeBatch()
+    expect(app.writes).toHaveLength(0)
+    expect(app.navigations).toEqual(['/competitions/competition/live-solo', '/competitions/competition/live-solo'])
+  } finally { app.stop() }
 })

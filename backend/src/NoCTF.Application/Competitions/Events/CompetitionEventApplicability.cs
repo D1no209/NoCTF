@@ -20,4 +20,5 @@ public static class CompetitionEventApplicability
 public interface ICompetitionEventApplicabilityReader
 {
     Task<bool> CanPublishAsync(Guid competitionId, CompetitionEventKind kind, CancellationToken ct);
+    Task<bool> HasOrdinaryScoreboardAsync(Guid competitionId, CancellationToken ct);
 }

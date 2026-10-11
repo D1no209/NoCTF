@@ -21,7 +21,11 @@ interface FilterOption<T extends string> {
 
 /** Owns state, effects and commands for AdminCompetitionsByIdSubmissionsPage. */
 export function useAdminCompetitionsByIdSubmissionsPage() {
-  const { competitionId, role, canWrite, canJudge } = useCompetitionAdmin()
+  const { competitionId, competition, role, canWrite, canJudge } = useCompetitionAdmin()
+  const router = useRouter()
+  const isSolo = computed(() => competition.value?.mode === 'LiveSolo')
+  const canRejudge = computed(() => canWrite.value && !isSolo.value)
+  async function soloResults() { await router.push(`/competitions/${competitionId}/live-solo`) }
 
   const { isAdministrator } = useAuth()
 
@@ -177,6 +181,7 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
         : '-'
 
   async function loadPreview(reset = false) {
+    if (isSolo.value) { await soloResults(); return }
     if (previewLoading.value && !reset) return
     if (reset) {
       previewGeneration++
@@ -301,6 +306,7 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
   const actionPending = ref<string | null>(null)
 
   async function rejudgeOne(gameplayFactId?: string) {
+    if (isSolo.value) { await soloResults(); return }
     if (!gameplayFactId) return
     actionPending.value = gameplayFactId
     try {
@@ -323,6 +329,7 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
   const batchTarget = ref<string>('')
 
   async function rejudgeBatch() {
+    if (isSolo.value) { await soloResults(); return }
     if (!batchTarget.value) return
     actionPending.value = 'batch'
     try {
@@ -343,6 +350,7 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
   }
 
   async function queueEvaluation() {
+    if (isSolo.value) { await soloResults(); return }
     if (!batchTarget.value) return
     actionPending.value = 'queue'
     try {
@@ -417,7 +425,7 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
   })
 
   const viewBindings = {
-      competitionId,
+      competitionId, isSolo, canRejudge, soloResults,
       adminUserPath, adminTeamPath, adminChallengePath,
       previewIncludeInformational, previewScanned, previewCounts,
       evidenceOpen, evidenceTarget, evidenceRows, evidenceCursor, evidenceLoading, evidenceError, openEvidence, loadEvidence,

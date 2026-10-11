@@ -18,7 +18,8 @@ public static class LiveSoloRoundSchedulePolicy
         var elapsed = LiveSoloActiveClock.Elapsed(start, now, round.Pauses).TotalSeconds;
         if (elapsed >= round.LimitSeconds) return [];
         var next = round.Questions.Where(x => x.OpenedAt == null).OrderBy(x => x.Position).FirstOrDefault();
-        return next is not null && elapsed >= Math.Max(0, next.OpenOffsetSeconds - PrewarmLeadSeconds) ? [next.Id] : [];
+        return next is not null && next.Readiness != LiveSoloQuestionReadiness.Failed
+            && elapsed >= Math.Max(0, next.OpenOffsetSeconds - PrewarmLeadSeconds) ? [next.Id] : [];
     }
 
     public static DateTimeOffset? NextWakeup(LiveSoloRound round, DateTimeOffset now)
@@ -28,6 +29,7 @@ public static class LiveSoloRoundSchedulePolicy
             ? now.Add(RecoveryInterval) : null;
         if (round.State == LiveSoloRoundState.Countdown && round.CountdownAt is { } countdown)
         {
+            if (round.Questions.Any(x => x.Position == 0 && x.Readiness == LiveSoloQuestionReadiness.Failed)) return null;
             var remaining = round.CountdownSeconds - LiveSoloActiveClock.Elapsed(countdown, now, round.Pauses).TotalSeconds;
             if (remaining <= 0 && round.Questions.Any(x => x.Position == 0 && x.Readiness is not (LiveSoloQuestionReadiness.Ready or LiveSoloQuestionReadiness.Failed)))
                 return now.Add(RecoveryInterval);
@@ -38,7 +40,7 @@ public static class LiveSoloRoundSchedulePolicy
             var elapsed = LiveSoloActiveClock.Elapsed(start, now, round.Pauses).TotalSeconds;
             var remaining = Math.Max(0, round.LimitSeconds - elapsed);
             var next = round.Questions.Where(x => x.OpenedAt == null).OrderBy(x => x.Position).FirstOrDefault();
-            if (next is not null)
+            if (next is not null && next.Readiness != LiveSoloQuestionReadiness.Failed)
             {
                 var offset = next.Readiness == LiveSoloQuestionReadiness.Waiting ? Math.Max(0, next.OpenOffsetSeconds - PrewarmLeadSeconds) : next.OpenOffsetSeconds;
                 var questionDelay = Math.Max(0, offset - elapsed);

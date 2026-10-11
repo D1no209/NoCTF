@@ -11,6 +11,7 @@ const props = defineProps<{
   error?: UiMessage | null
   fill?: boolean
   retryable?: boolean
+  httpHeaders?: Record<string, string>
 }>()
 const emit = defineEmits<{ retry: [] }>()
 const { pdfDocument, pageNumber, pageCount, zoomFactor, initialLoading, busy, renderPending,

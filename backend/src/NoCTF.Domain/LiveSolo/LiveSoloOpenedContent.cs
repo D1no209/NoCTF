@@ -8,7 +8,7 @@ public sealed class LiveSoloOpenedContent
     [Key] public Guid RoundQuestionId { get; set; }
     [MaxLength(160)] public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
-    [MaxLength(32)] public string Direction { get; set; } = string.Empty;
+    [MaxLength(96)] public string Direction { get; set; } = string.Empty;
     public bool RandomAttachment { get; set; }
     public List<LiveSoloOpenedTag> Tags { get; set; } = [];
     public List<LiveSoloOpenedHint> Hints { get; set; } = [];

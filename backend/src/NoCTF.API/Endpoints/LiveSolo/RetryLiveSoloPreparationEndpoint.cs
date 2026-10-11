@@ -12,6 +12,7 @@ public sealed class RetryLiveSoloPreparationRequest
     public Guid MatchId { get; set; }
     public Guid RoundId { get; set; }
     public Guid ExpectedStamp { get; set; }
+    public Guid? QuestionId { get; set; }
 }
 public sealed class RetryLiveSoloPreparationValidator : Validator<RetryLiveSoloPreparationRequest>
 {
@@ -19,6 +20,7 @@ public sealed class RetryLiveSoloPreparationValidator : Validator<RetryLiveSoloP
     {
         RuleFor(x => x.CompetitionId).NotEmpty(); RuleFor(x => x.MatchId).NotEmpty();
         RuleFor(x => x.RoundId).NotEmpty(); RuleFor(x => x.ExpectedStamp).NotEmpty();
+        RuleFor(x => x.QuestionId).NotEqual(Guid.Empty).When(x => x.QuestionId != null);
     }
 }
 public sealed class RetryLiveSoloPreparationEndpoint(ILiveSoloMatchStore matches, IUserContext user, TimeProvider clock)
@@ -30,5 +32,5 @@ public sealed class RetryLiveSoloPreparationEndpoint(ILiveSoloMatchStore matches
         Description(x => x.WithName("RetryLiveSoloPreparation"));
     }
     public override async Task<Results<Ok<LiveSoloRoundResponse>, NotFound, ForbidHttpResult, Conflict<LiveSoloFailureResponse>, UnprocessableEntity<LiveSoloFailureResponse>, ProblemHttpResult>> ExecuteAsync(RetryLiveSoloPreparationRequest req, CancellationToken ct) =>
-        LiveSoloProtocol.RoundMutation(await matches.RetryPreparationAsync(new(req.CompetitionId, req.MatchId, req.RoundId, user.UserId, req.ExpectedStamp, clock.GetUtcNow()), ct));
+        LiveSoloProtocol.RoundMutation(await matches.RetryPreparationAsync(new(req.CompetitionId, req.MatchId, req.RoundId, user.UserId, req.ExpectedStamp, clock.GetUtcNow(), req.QuestionId), ct));
 }

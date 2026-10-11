@@ -46,6 +46,7 @@ public sealed class LiveSoloEventApplicabilityTests
             await Assert.That(staff.Items!.Any(x => x.Kind == CompetitionEventKind.ChallengePublished)).IsTrue();
             var applicability = new CompetitionEventApplicabilityReader(f.Db);
             await Assert.That(await applicability.CanPublishAsync(f.Competition.Id, CompetitionEventKind.ChallengePublished, ct)).IsFalse();
+            await Assert.That(await applicability.HasOrdinaryScoreboardAsync(f.Competition.Id, ct)).IsFalse();
             await Assert.That(await applicability.CanPublishAsync(f.Competition.Id, CompetitionEventKind.AnnouncementPublished, ct)).IsTrue();
             await Assert.That(await f.Db.CompetitionWebhookOutboxEvents.AnyAsync(x => x.EventId == legacy, ct)).IsFalse();
             var target = Guid.NewGuid();
