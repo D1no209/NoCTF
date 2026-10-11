@@ -1,3 +1,4 @@
+import { liveSoloMatchPath, liveSoloBasePath, isLiveSoloManagementPath } from './navigation'
 import { computed, inject, onMounted, onScopeDispose, ref, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { useNow } from '@vueuse/core'
@@ -22,7 +23,9 @@ export function useLiveSoloPostgameWriteUps() {
   const {t}=useLocale()
   const competitionId=computed(()=>route.params.id as string),matchId=computed(()=>route.params.matchId as string)
   const questionId=computed(()=>typeof route.params.questionId==='string'?route.params.questionId:null)
-  const staff=computed(()=>context?.competition.value?.administrationRole!=null),manager=computed(()=>canManageLiveSolo(context?.competition.value?.administrationRole))
+  const staff=computed(()=>isLiveSoloManagementPath(route.path)&&context?.competition.value?.administrationRole!=null),manager=computed(()=>staff.value&&canManageLiveSolo(context?.competition.value?.administrationRole))
+  const fromWriteUps=computed(()=>route.query?.from==='writeups')
+  const backLabel=computed(()=>fromWriteUps.value?'liveSolo.navigation.backToWriteUps' as const:'liveSolo.navigation.backToMatch' as const)
   const mode=ref<'Public'|'Mine'|'Official'|'Review'>('Public'),questions=ref<Question[]>([]),listing=ref<Listing|null>(null),selected=ref<string|null>(null)
   const loading=ref(true),busy=ref(false),error=ref<UiMessage|null>(null),content=ref<Content|null>(null),pdf=ref<string|null>(null)
   const format=ref<Format>('Markdown'),markdown=ref(''),file=ref<File|null>(null),original=ref(''),uploadKey=ref(0)
@@ -54,7 +57,7 @@ export function useLiveSoloPostgameWriteUps() {
   const reviewable=computed(()=>!!root.value&&!!version.value&&(listing.value?.access?.canJudge||listing.value?.access?.canManage))
   const stateKey=computed(()=>writeUpStatusKey(root.value))
   function path() { const q=currentQuestion.value!;return {competitionId:competitionId.value,matchId:matchId.value,roundId:q.roundId!,questionId:q.id!} }
-  async function selectQuestion(id:string) {const q=questions.value.find(row=>row.id===id);if(q?.roundId)await router.push(`/competitions/${competitionId.value}/live-solo/postgame/${matchId.value}/${q.roundId}/${id}`)}
+  async function selectQuestion(id:string) {const q=questions.value.find(row=>row.id===id);if(q?.roundId)await router.push({path:`${liveSoloBasePath(competitionId.value, route.path)}/postgame/${matchId.value}/${q.roundId}/${id}`,query:{...route.query}})}
   async function read() {
     const sequence=++bodyRequest;content.value=null;previewLease.close()
     const v=version.value;if(!v?.id||!currentQuestion.value)return
@@ -141,7 +144,7 @@ export function useLiveSoloPostgameWriteUps() {
   }catch(cause){error.value=parseApiError(cause,message('challengeWriteUp.saveFailed')).displayMessage}finally{busy.value=false;const problem=error.value;await load();if(problem)error.value=problem}}
   function setLeave(value:boolean){if(!busy.value)leaveOpen.value=value}
   async function leave(){if(!busy.value&&leaveTo){allowLeave=true;leaveOpen.value=false;await router.push(leaveTo)}}
-  async function back(){await router.push(`/competitions/${competitionId.value}/live-solo`)}
+  async function back(){await router.push(fromWriteUps.value?{path:`${liveSoloBasePath(competitionId.value,route.path)}/writeups`,query:{match:matchId.value}}:liveSoloMatchPath(competitionId.value, matchId.value, route.path))}
   function beforeUnload(event:BeforeUnloadEvent){if(dirty.value){event.preventDefault();event.returnValue=''}}
   onBeforeRouteLeave(to=>{if(allowLeave)return true;if(busy.value)return false;if(!dirty.value)return true;leaveTo=to.fullPath;leaveOpen.value=true;return false})
   onMounted(()=>{void load();window.addEventListener('beforeunload',beforeUnload)})
@@ -151,7 +154,7 @@ export function useLiveSoloPostgameWriteUps() {
     settingStamp.value=null;settingEnabled.value=false;initialized=false;mode.value='Public';loading.value=false
   },{flush:'sync'})
   onScopeDispose(()=>{disposed=true;request++;bodyRequest++;previewLease.close();window.removeEventListener('beforeunload',beforeUnload)})
-  return {questionOptions,questionId,selectQuestion,mode,tab,staff,manager,loading,busy,error,listing,items,selected,select,root,version,stateKey,content,pdf,
+  return {backLabel,questionOptions,questionId,selectQuestion,mode,tab,staff,manager,loading,busy,error,listing,items,selected,select,root,version,stateKey,content,pdf,
     editor,official,format,chooseFormat,markdown,chooseFile,uploadKey,dirty,canSave,canSubmit,save,submit,reviewable,reviewOpen,setReview,reviewAction,reviewCaption,reason,openReview,review,
     download,reload,back,leaveOpen,setLeave,leave,settingEnabled,enable}
 }

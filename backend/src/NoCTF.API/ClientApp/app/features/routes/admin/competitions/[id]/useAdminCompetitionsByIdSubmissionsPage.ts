@@ -25,7 +25,7 @@ export function useAdminCompetitionsByIdSubmissionsPage() {
   const router = useRouter()
   const isSolo = computed(() => competition.value?.mode === 'LiveSolo')
   const canRejudge = computed(() => canWrite.value && !isSolo.value)
-  async function soloResults() { await router.push(`/competitions/${competitionId}/live-solo`) }
+  async function soloResults() { await router.push(`/admin/competitions/${competitionId}/live-solo`) }
 
   const { isAdministrator } = useAuth()
 

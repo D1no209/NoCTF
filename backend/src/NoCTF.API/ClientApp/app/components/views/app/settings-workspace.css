@@ -78,6 +78,9 @@
   .settings-workspace-layout { grid-template-columns: minmax(0, 1fr); }
   [data-slot='app-workspace-nav']:has([data-workspace-scroll-content]) .settings-workspace-layout { grid-template-rows: minmax(10rem, 32dvh) minmax(0, 1fr); }
   .settings-workspace-layout > div:first-child { padding-top: 24px; }
+  [data-slot='app-workspace-nav']:not(:has([data-workspace-scroll-content])) .settings-workspace-layout > [data-workspace-nav-sidebar] {
+    height: clamp(12rem, 38dvh, 22rem);
+  }
   .settings-workspace-layout > [data-workspace-nav-sidebar] > [data-slot='floating-sidebar'] { position: relative; top: auto; height: 100%; }
   [data-challenge-editor-workspace] { grid-template-columns: minmax(0, 1fr); }
   [data-challenge-editor-workspace] > [data-side='right'] { grid-column: 1; grid-row: auto; }

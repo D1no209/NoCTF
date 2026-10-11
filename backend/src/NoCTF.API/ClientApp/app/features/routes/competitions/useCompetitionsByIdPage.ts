@@ -300,14 +300,16 @@ export function useCompetitionsByIdPage() {
         items: [
           { to: `${base}/my/team`, label: translate("competitions.label.myTeam"), icon: UserRound },
           ...(hasParticipantChallengeAccess.value
-            ? [{ to: `${base}/my/writeup`, label: translate("writeUp.myWriteUp"), icon: FileText }]
+            ? [{ to: competition.value?.mode === 'LiveSolo' ? `${base}/live-solo/writeups` : `${base}/my/writeup`, label: translate(competition.value?.mode === 'LiveSolo' ? 'liveSolo.postgame.title' : 'writeUp.myWriteUp'), icon: FileText }]
             : []),
         ],
       },
       ...(hasCompetitionStaffAccess.value
         ? [{
             label: translate("common.label.management"),
-            items: [
+            items: competition.value?.mode === 'LiveSolo' ? [
+              { to: `/admin/competitions/${competitionId.value}/live-solo`, label: translate('liveSolo.navigation.manage'), icon: LayoutDashboard },
+            ] : [
               { to: adminCompetitionPath(competitionId.value), label: translate('competitions.label.manageCompetition'), icon: LayoutDashboard },
               { to: `${base}/writeups`, label: translate("writeUp.review"), icon: ClipboardCheck },
               { to: `${base}/staff`, label: translate('staffWebhook.workbench'), icon: ClipboardCheck },

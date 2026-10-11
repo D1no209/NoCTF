@@ -7,8 +7,8 @@ const { options, groupId, draft, loading, busy, error, saved, dirty, writable, q
   pool } = toRefs(props.state)
 </script>
 <template>
-  <div class="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 px-4 pb-8 pt-4 md:px-8">
-    <div><Button variant="ghost" size="sm" @click="back"><LucideIcon name="arrow-left" data-icon="inline-start" />{{ $t('liveSolo.back') }}</Button></div>
+  <div class="flex w-full min-w-0 flex-col gap-6">
+    <div><Button v-if="groupId" variant="ghost" size="sm" @click="back"><LucideIcon name="arrow-left" data-icon="inline-start" />{{ $t('liveSolo.navigation.backToGroups') }}</Button></div>
     <header class="flex flex-wrap items-center justify-between gap-4">
       <h1 class="text-display text-2xl">{{ $t('liveSolo.groups.title') }}</h1>
       <div class="flex flex-wrap gap-3"><Button variant="outline" :disabled="busy" @click="reload">{{ $t('common.label.refresh') }}</Button><Button v-if="writable" :disabled="busy" @click="create"><LucideIcon name="plus" data-icon="inline-start" />{{ $t('liveSolo.groups.new') }}</Button></div>

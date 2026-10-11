@@ -21,14 +21,14 @@ export function useCompetitionsByIdEventsPage() {
 
   const { canOrganize, isAdministrator } = useAuth()
 
-  const competitionReturnPath = computed(() => isAdministrator.value
+  const competitionReturnPath = computed(() => isAdministrator.value || ctx.competition.value?.administrationRole != null
     ? adminCompetitionPath(competitionId)
     : competitionChallengesPath(competitionId))
-  const competitionReturnLabel = computed(() => isAdministrator.value
+  const competitionReturnLabel = computed(() => isAdministrator.value || ctx.competition.value?.administrationRole != null
     ? 'competitions.label.backToAdministration' as const
     : 'common.label.backCompetition' as const)
 
-  const hasStaffHistory = ref(isAdministrator.value)
+  const hasStaffHistory = ref(isAdministrator.value || ctx.competition.value?.administrationRole != null)
 
   const historyScopeResolved = ref(false)
 

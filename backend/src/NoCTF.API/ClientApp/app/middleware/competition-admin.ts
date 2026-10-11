@@ -1,6 +1,7 @@
 import { adminGetCompetition } from '../api'
 import { competitionPath } from '../utils/app-routes'
 import { competitionChallengeManagementPath, isCompetitionChallengeManagementRoute } from '../features/admin/admin-navigation'
+import { isLiveSoloManagementPath } from '../features/live-solo/navigation'
 
 /** Competition staff access is scoped to the resource, independently of platform administration. */
 export default defineNuxtRouteMiddleware(async (to) => {
@@ -10,10 +11,12 @@ export default defineNuxtRouteMiddleware(async (to) => {
   const competitionId = typeof to.params.id === 'string' ? to.params.id : null
   if (!competitionId) return navigateTo('/competitions')
   const challengeManagement = isCompetitionChallengeManagementRoute(to.path, competitionId)
-  if (isAdministrator.value && !challengeManagement) return
+  const soloManagement = isLiveSoloManagementPath(to.path)
+  if (isAdministrator.value && !challengeManagement && !soloManagement) return
 
   const { data, error, response } = await adminGetCompetition({ path: { competitionId } })
   if (!error && data?.competition && (isAdministrator.value || data.competition.administrationRole)) {
+    if (soloManagement && data.competition.mode !== 'LiveSolo') return navigateTo(`/admin/competitions/${competitionId}`, { replace: true })
     if (challengeManagement && data.competition.mode === 'LiveSolo') {
       return navigateTo({
         path: competitionChallengeManagementPath(competitionId, data.competition.mode),

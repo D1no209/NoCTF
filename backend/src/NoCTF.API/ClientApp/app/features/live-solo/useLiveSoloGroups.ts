@@ -1,3 +1,4 @@
+import { liveSoloBasePath } from './navigation'
 import { computed, inject, onMounted, onScopeDispose, ref } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { listLiveSoloQuestionPool, getLiveSoloConfiguration,
@@ -52,9 +53,9 @@ export function useLiveSoloGroups() {
     catch (cause) { if (!disposed && generation === request) error.value = parseLiveSoloError(cause, message('liveSolo.error.load')).displayMessage }
     finally { if (generation === request) loading.value = false }
   }
-  async function select(id: string) { await router.push(`/competitions/${competitionId.value}/live-solo/groups/${id}`) }
+  async function select(id: string) { await router.push(`${liveSoloBasePath(competitionId.value, route.path)}/groups/${id}`) }
   async function create() {
-    if (groupId.value) { await router.push(`/competitions/${competitionId.value}/live-solo/groups`); return }
+    if (groupId.value) { await router.push(`${liveSoloBasePath(competitionId.value, route.path)}/groups`); return }
     if (dirty.value) { newPending = true; reloadPending = false; leaveOpen.value = true; return }
     draft.value = groupDraft(); original.value = JSON.stringify(draft.value)
   }
@@ -78,7 +79,7 @@ export function useLiveSoloGroups() {
       if (disposed) return
       draft.value = groupDraft(result.data); original.value = JSON.stringify(draft.value); saved.value = true; error.value = null
       groups.value = [...groups.value.filter(row => row.id !== result.data!.id), result.data]
-      if (result.data.id !== groupId.value && result.data.id) { allowLeave = true; await router.replace(`/competitions/${competitionId.value}/live-solo/groups/${result.data.id}`) }
+      if (result.data.id !== groupId.value && result.data.id) { allowLeave = true; await router.replace(`${liveSoloBasePath(competitionId.value, route.path)}/groups/${result.data.id}`) }
     }
     catch (cause) { if (!disposed) error.value = parseLiveSoloError(cause,message('liveSolo.error.operation')).displayMessage }
     finally { busy.value = false }
@@ -87,7 +88,7 @@ export function useLiveSoloGroups() {
     if (busy.value) return
     keepGroupDraft(handoffKey.value, draft.value, original.value)
     allowLeave = true
-    await router.push({ path: `/competitions/${competitionId.value}/live-solo/question-pool`, query: { group: groupId.value ?? 'new' } })
+    await router.push({ path: `${liveSoloBasePath(competitionId.value, route.path)}/question-pool`, query: { group: groupId.value ?? 'new' } })
   }
   function setLeave(value: boolean) { if (!busy.value) { leaveOpen.value = value; if (!value) { reloadPending = false; newPending = false } } }
   async function reload() { if (busy.value) return; if (dirty.value) { reloadPending = true; newPending = false; leaveOpen.value = true } else await load() }
@@ -98,7 +99,7 @@ export function useLiveSoloGroups() {
     if (reloadPending) { reloadPending = false; draft.value = groupDraft(); original.value = ''; await load(); return }
     if (leaveTo) { allowLeave = true; await router.push(leaveTo) }
   }
-  async function back() { await router.push(`/competitions/${competitionId.value}/live-solo`) }
+  async function back() { await router.push(`${liveSoloBasePath(competitionId.value, route.path)}/groups`) }
   function beforeUnload(event: BeforeUnloadEvent) { if (dirty.value) { event.preventDefault(); event.returnValue = '' } }
   onBeforeRouteLeave(to => { if (allowLeave) return true; if (busy.value) return false; if (!dirty.value) return true; reloadPending = false; newPending = false; leaveTo = to.fullPath; leaveOpen.value = true; return false })
   onMounted(() => { const restored = takeGroupDraft(handoffKey.value); if (restored) { draft.value = restored.draft; original.value = restored.original } void load(); window.addEventListener('beforeunload',beforeUnload) })

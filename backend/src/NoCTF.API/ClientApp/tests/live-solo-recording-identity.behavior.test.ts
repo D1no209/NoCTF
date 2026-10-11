@@ -1,3 +1,4 @@
+import * as soloNavigation from '../app/features/live-solo/navigation'
 import { expect, test } from 'bun:test'
 import { computed, effectScope, onScopeDispose, ref, watch, nextTick } from 'vue'
 import { useOffsetPagination } from '../app/composables/useOffsetPagination'
@@ -8,8 +9,8 @@ const compiled=new Bun.Transpiler({loader:'ts'}).transformSync(source).replace(/
 function fixture() {
   const user=ref<{userId:string}|null>({userId:'admin'}),scope=effectScope(),downloads:string[]=[]
   let grant=async()=>({data:{downloadUrl:'/download'}})
-  const route={params:{id:'competition',matchId:'match',recordingId:'record'},query:{staff:'1'}}
-  const dependencies={ref,computed,watch,onScopeDispose,onMounted:()=>{},useRoute:()=>route,useRouter:()=>({replace:async()=>{},push:async()=>{}}),useAuth:()=>({user}),useOffsetPagination,
+  const route={path:'/admin/competitions/competition/live-solo/recordings/match/record',params:{id:'competition',matchId:'match',recordingId:'record'},query:{staff:'1'}}
+  const dependencies={ ...soloNavigation,ref,computed,watch,onScopeDispose,onMounted:()=>{},useRoute:()=>route,useRouter:()=>({replace:async()=>{},push:async()=>{}}),useAuth:()=>({user}),useOffsetPagination,
     listLiveSoloRecordings:async()=>({data:{items:[{id:'record',state:'Completed',byteLength:100,concurrencyStamp:'stamp',fileUrl:'/recording'}],total:1,canJudge:true,canPublish:true}}),
     listLiveSoloRecordingDecisions:async()=>({data:{items:[{id:'decision',action:'Hold'}]}}),prepareLiveSoloRecordingPreview:async()=>({data:{previewUrl:'/private-preview'}}),
     prepareLiveSoloRecordingDownload:()=>grant(),startLiveSoloBrowserDownload:(url:string)=>downloads.push(url),

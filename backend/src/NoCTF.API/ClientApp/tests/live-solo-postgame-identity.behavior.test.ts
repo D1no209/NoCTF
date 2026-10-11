@@ -1,3 +1,4 @@
+import * as soloNavigation from '../app/features/live-solo/navigation'
 import { expect, test } from 'bun:test'
 import { computed, effectScope, onScopeDispose, ref, watch } from 'vue'
 import { PostgamePreviewLease } from '../app/features/live-solo/postgame-preview-lease'
@@ -10,8 +11,8 @@ function fixture() {
   const user=ref<{userId:string}|null>({userId:'participant'}),scope=effectScope(),downloads:string[]=[]
   let grant=async()=>({data:{previewUrl:'/private-pdf',downloadUrl:'/download'}})
   const root={id:'root',source:'Official',publishedVersionId:'version',published:{id:'version',number:1,format:'Pdf',state:'Approved'}}
-  const dependencies={ref,computed,watch,onScopeDispose,onMounted:()=>{},onBeforeRouteLeave:()=>{},window:{removeEventListener:()=>{}},useNow:()=>ref(new Date()),useAuth:()=>({user}),useLocale:()=>({t:(key:string)=>key}),
-    useRoute:()=>({params:{id:'competition',matchId:'match',roundId:'round',questionId:'question'}}),useRouter:()=>({push:async()=>{}}),
+  const dependencies={ ...soloNavigation,ref,computed,watch,onScopeDispose,onMounted:()=>{},onBeforeRouteLeave:()=>{},window:{removeEventListener:()=>{}},useNow:()=>ref(new Date()),useAuth:()=>({user}),useLocale:()=>({t:(key:string)=>key}),
+    useRoute:()=>({path:'/competitions/competition/live-solo/postgame/match/round/question',params:{id:'competition',matchId:'match',roundId:'round',questionId:'question'}}),useRouter:()=>({push:async()=>{}}),
     competitionContextKey:Symbol(),inject:()=>({competition:ref({administrationRole:null}),refresh:async()=>{}}),canManageLiveSolo:()=>false,
     listLiveSoloPostgameQuestions:async()=>({data:{items:[{id:'question',roundId:'round',roundNumber:1,title:'Question'}]}}),
     listLiveSoloWriteUps:async()=>({data:{items:[root],access:{settings:{enabled:true}}}}),

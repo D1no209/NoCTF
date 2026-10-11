@@ -7,7 +7,7 @@ const { options, selectedId, current, source, historyRows, actions, failureKey, 
 </script>
 <template>
   <div class="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 px-4 pb-8 pt-4 md:px-8">
-    <div><Button variant="ghost" size="sm" @click="back"><LucideIcon name="arrow-left" data-icon="inline-start" />{{ $t('liveSolo.back') }}</Button></div>
+    <div><Button variant="ghost" size="sm" @click="back"><LucideIcon name="arrow-left" data-icon="inline-start" />{{ $t('liveSolo.navigation.backToMatch') }}</Button></div>
     <header class="flex flex-wrap items-center gap-4"><h1 class="text-display text-2xl">{{ $t(staff ? 'liveSolo.recording.staffTitle' : 'liveSolo.recording.replays') }}</h1><Button class="ml-auto" variant="ghost" :disabled="loading" @click="load">{{ $t('common.label.refresh') }}</Button></header>
     <Alert v-if="error || mediaError || listError" variant="destructive"><AlertDescription>{{ $message(error || mediaError || listError?.displayMessage) }}</AlertDescription></Alert>
     <div class="grid min-w-0 items-start gap-6 xl:grid-cols-[16rem_minmax(0,1fr)]">

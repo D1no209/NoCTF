@@ -1,3 +1,4 @@
+import * as soloNavigation from '../app/features/live-solo/navigation'
 import { describe, expect, test } from 'bun:test'
 import { computed, effectScope, markRaw, nextTick, proxyRefs, reactive, ref, unref, watch } from 'vue'
 import { readdir } from 'node:fs/promises'
@@ -10,7 +11,7 @@ async function controller(path: string, name: string, dependencies: Record<strin
   const input = await source(path)
   const compiled = new Bun.Transpiler({ loader: 'ts' }).transformSync(input)
     .replace(/^import[\s\S]*?from ["'][^"']+["'];?\s*$/gm, '').replace(/export function /g, 'function ')
-  const deps: Record<string, unknown> = { computed, ref, watch, markRaw, reactive, proxyRefs, competitionChallengeManagementPath,
+  const deps: Record<string, unknown> = { ...soloNavigation, computed, ref, watch, markRaw, reactive, proxyRefs, competitionChallengeManagementPath,
     translate: (key: string) => key, describeMessage: (key: string) => key,
     onMounted: () => {}, onUnmounted: () => {}, ...dependencies }
   for (const match of input.matchAll(/import (\w+) from '[^']+\.vue'/g)) deps[match[1]!] = {}
@@ -27,7 +28,7 @@ async function middleware(session: ReturnType<typeof auth>, response: any) {
   const code = new Bun.Transpiler({ loader: 'ts' }).transformSync(await source('middleware/competition-admin.ts'))
     .replace(/^import[\s\S]*?from ["'][^"']+["'];?\s*$/gm, '').replace('export default ', 'return ')
   const calls: string[] = []
-  const deps = { useAuth: () => session, defineNuxtRouteMiddleware: (fn: unknown) => fn,
+  const deps = { ...soloNavigation, useAuth: () => session, defineNuxtRouteMiddleware: (fn: unknown) => fn,
     navigateTo: (target: unknown) => target, competitionPath, competitionChallengeManagementPath, isCompetitionChallengeManagementRoute, translate: (key: string) => key,
     createError: (error: object) => Object.assign(new Error('request failed'), error),
     adminGetCompetition: async ({ path }: any) => { calls.push(path.competitionId); return response } }
@@ -44,14 +45,14 @@ describe('competition staff access', () => {
     const app = await controller('features/routes/admin/competitions/useAdminCompetitionsByIdPage.ts', 'useAdminCompetitionsByIdPage', {
       useAuth: () => auth(), useRoute: () => ({ params: { id: 'contest' }, path: '/admin/competitions/contest' }),
       adminGetCompetition: async () => ({ data: { competition: { id: 'contest', mode: 'LiveSolo', ownerId: 'owner', administrationRole: role } } }),
-      provide: () => {}, CompetitionAdminKey: Symbol(), adminWorkspacePath: (path: string) => path, gameModeLabel: (mode: string) => mode,
+      provide: () => {}, competitionContextKey: Symbol(), CompetitionAdminKey: Symbol(), adminWorkspacePath: (path: string) => path, gameModeLabel: (mode: string) => mode,
       onMounted: (fn: () => Promise<void>) => mounted.push(fn),
     })
     try {
       await mounted[0]!()
       const links = app.state.navGroups.value.flatMap((group: any) => group.items).map((item: any) => item.to)
-      expect(links.filter((path: string) => path === '/competitions/contest/live-solo/question-pool')).toHaveLength(1)
-      expect(links).toContain('/competitions/contest/live-solo/groups')
+      expect(links.filter((path: string) => path === '/admin/competitions/contest/live-solo/question-pool')).toHaveLength(1)
+      expect(links).toContain('/admin/competitions/contest/live-solo/groups')
       expect(links).not.toContain('/admin/competitions/contest/challenges')
     } finally { app.stop() }
   })
@@ -76,8 +77,8 @@ describe('competition staff access', () => {
 
   test.each(['Administrator', 'Owner', 'Manager', 'Judge', 'Observer'])('%s enters the Solo pool instead of mounting ordinary publication controls', async role => {
     const app = await middleware(auth(role === 'Administrator'), { data: { competition: { mode: 'LiveSolo', administrationRole: role } } })
-    expect(await app.guard('contest', 'challenges')).toEqual({ path: '/competitions/contest/live-solo/question-pool', query: { page: '2' } })
-    expect(await app.guard('contest', 'challenges', 'selected-question')).toEqual({ path: '/competitions/contest/live-solo/question-pool', query: { page: '2', question: 'selected-question' } })
+    expect(await app.guard('contest', 'challenges')).toEqual({ path: '/admin/competitions/contest/live-solo/question-pool', query: { page: '2' } })
+    expect(await app.guard('contest', 'challenges', 'selected-question')).toEqual({ path: '/admin/competitions/contest/live-solo/question-pool', query: { page: '2', question: 'selected-question' } })
     expect(app.calls).toEqual(['contest', 'contest'])
   })
 
@@ -87,6 +88,16 @@ describe('competition staff access', () => {
       expect(await app.guard('contest', 'challenges')).toBeUndefined()
       expect(competitionChallengeManagementPath('contest', mode as 'Ctf')).toBe('/admin/competitions/contest/challenges')
     }
+  })
+
+  test('Solo administration routes resolve the actual resource mode even for platform administrators', async () => {
+    const ordinary = await middleware(auth(true), { data: { competition: { mode: 'Ctf' } } })
+    expect(await ordinary.guard('contest', 'live-solo/settings')).toBe('/admin/competitions/contest')
+    expect(ordinary.calls).toEqual(['contest'])
+    const observer = await middleware(auth(), { data: { competition: { mode: 'LiveSolo', administrationRole: 'Observer' } } })
+    expect(await observer.guard('contest', 'live-solo')).toBeUndefined()
+    const outsider = await middleware(auth(), { error: {}, response: { status: 403 } })
+    expect(await outsider.guard('contest', 'live-solo')).toBe('/competitions/contest')
   })
 
   test.each(['Owner', 'Manager', 'Judge', 'Observer'] as const)('%s sees the management entry and enters its own authorized resource', async role => {
@@ -156,7 +167,7 @@ describe('competition staff access', () => {
     let response: any = { data: { competition: { id: 'contest', mode: 'Ctf', ownerId: 'owner', administrationRole: role } } }
     const app = await controller('features/routes/admin/competitions/useAdminCompetitionsByIdPage.ts', 'useAdminCompetitionsByIdPage', {
       useAuth: () => auth(), useRoute: () => ({ params: { id: 'contest' }, path: '/admin/competitions/contest' }),
-      adminGetCompetition: async () => response, provide: (_key: unknown, value: unknown) => { context = value }, CompetitionAdminKey: Symbol(),
+      adminGetCompetition: async () => response, provide: (_key: unknown, value: unknown) => { if (value && typeof value === 'object' && 'canWrite' in value) context = value }, competitionContextKey: Symbol(), CompetitionAdminKey: Symbol(),
       adminWorkspacePath: (path: string) => path, gameModeLabel: (mode: string) => mode,
       parseApiError: () => ({ displayMessage: 'failed' }), onMounted: (fn: () => Promise<void>) => mounted.push(fn),
     })

@@ -174,7 +174,7 @@ const { competitionId, SingleWriteUpSettings, refreshCompetition, competition, c
       </CardHeader>
       <CardContent>
         <Button v-if="competition?.mode === 'LiveSolo'" as-child variant="outline">
-          <NuxtLink :to="`/competitions/${competitionId}/live-solo/settings`">{{ $t('liveSolo.settings.title') }}</NuxtLink>
+          <NuxtLink :to="`/admin/competitions/${competitionId}/live-solo/settings`">{{ $t('liveSolo.navigation.modeSettings') }}</NuxtLink>
         </Button>
         <component :is="CompetitionModeConfigEditor"
           v-else

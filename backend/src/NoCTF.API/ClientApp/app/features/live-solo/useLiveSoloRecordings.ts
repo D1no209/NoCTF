@@ -1,3 +1,4 @@
+import { liveSoloMatchPath, liveSoloBasePath, isLiveSoloManagementPath } from './navigation'
 import { computed, onMounted, onScopeDispose, ref, watch } from 'vue'
 import { changeLiveSoloRecording, listLiveSoloRecordings, listLiveSoloRecordingDecisions, prepareLiveSoloRecordingDownload, prepareLiveSoloRecordingPreview } from '~/api'
 import type { NoCtfapiEndpointsLiveSoloLiveSoloRecordingResponse as Recording, NoCtfapiEndpointsLiveSoloLiveSoloRecordingDecisionResponse as Decision, NoCtfDomainLiveSoloLiveSoloRecordingAction as Action } from '~/api'
@@ -13,7 +14,7 @@ export function useLiveSoloRecordings() {
   const { user } = useAuth()
   const competitionId = computed(() => route.params.id as string), matchId = computed(() => route.params.matchId as string)
   const selectedId = computed(() => typeof route.params.recordingId === 'string' ? route.params.recordingId : null)
-  const staff = computed(() => route.query.staff === '1')
+  const staff = computed(() => isLiveSoloManagementPath(route.path))
   const canJudge = ref(false), canPublish = ref(false), error = ref<UiMessage | null>(null), mediaError = ref<UiMessage | null>(null), busy = ref(false)
   const source = ref<string | null>(null), history = ref<Decision[]>([]), reason = ref(''), dialog = ref(false)
   const decision = ref<{ row: Recording; action: Action } | null>(null)
@@ -34,7 +35,7 @@ export function useLiveSoloRecordings() {
   const failureKey = computed(() => current.value?.failure ? recordingFailureKey[current.value.failure] : null)
   const historyRows = computed(() => history.value.map(entry => ({ entry, actionKey: (entry.action ? recordingActionKey[entry.action] : 'liveSolo.recording.decision') as MessageKey })))
   const actionKey = computed(() => decision.value ? recordingActionKey[decision.value.action] : 'liveSolo.recording.decision')
-  async function select(id: string) { await router.replace({ path: `/competitions/${competitionId.value}/live-solo/recordings/${matchId.value}/${id}`, query: { ...route.query } }) }
+  async function select(id: string) { await router.replace({ path: `${liveSoloBasePath(competitionId.value, route.path)}/recordings/${matchId.value}/${id}`, query: { ...route.query } }) }
   async function openReplacement(id: string) { source.value = null; await pagination.loadPage(1); if (!disposed) await select(id) }
   async function readSelected(renew = false) {
     const row = current.value; const sequence = ++selectedRequest
@@ -105,7 +106,7 @@ export function useLiveSoloRecordings() {
   async function retry() { mediaError.value = null; source.value = null; await readSelected() }
   async function page(value: number) { source.value = null; await pagination.loadPage(value); if (options.value[0]) await select(options.value[0].value) }
   async function pageSize(value: number) { source.value = null; await pagination.setPageSize(value); if (options.value[0]) await select(options.value[0].value) }
-  async function back() { await router.push({ path: `/competitions/${competitionId.value}/live-solo`, query: { match: matchId.value } }) }
+  async function back() { await router.push(liveSoloMatchPath(competitionId.value, matchId.value, route.path)) }
   watch(() => [current.value?.id, current.value?.state, staff.value], () => { void readSelected() })
   watch(() => user.value?.userId, () => {
     selectedRequest++; source.value = null; history.value = []; canJudge.value = false; canPublish.value = false

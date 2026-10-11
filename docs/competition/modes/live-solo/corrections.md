@@ -1,6 +1,6 @@
 # 已完成结果纠正与下游重赛
 
-入口：完成 Match 的纠正按钮，`/competitions/比赛ID/live-solo/corrections/对局ID`；具体提案带 `/纠正ID`。由 Administrator、Owner、Manager 处理。
+入口：完成 Match 的纠正按钮，`/admin/competitions/比赛ID/live-solo/corrections/对局ID`；具体提案带 `/纠正ID`。由 Administrator、Owner、Manager 处理。
 
 ## 提出纠正
 

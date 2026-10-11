@@ -7,8 +7,8 @@ const { match, correction, preview, history, impacts, pending, winnerOptions, wi
   confirm, show, newProposal, enterMatch, back, matchStateKey, leaveOpen, setLeave, leave } = toRefs(props.state)
 </script>
 <template>
-  <div class="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 px-4 pb-8 pt-4 md:px-8">
-    <div><Button variant="ghost" size="sm" @click="back"><LucideIcon name="arrow-left" data-icon="inline-start" />{{ $t('liveSolo.back') }}</Button></div>
+  <div class="flex w-full min-w-0 flex-col gap-6">
+    <div><Button variant="ghost" size="sm" @click="back"><LucideIcon name="arrow-left" data-icon="inline-start" />{{ $t('liveSolo.navigation.backToMatch') }}</Button></div>
     <header class="flex flex-wrap items-center gap-4"><h1 class="text-display text-2xl">{{ $t('liveSolo.correction.title') }}</h1><Badge v-if="!writable" variant="secondary">{{ $t('liveSolo.settings.readOnly') }}</Badge><Button class="ml-auto" variant="ghost" :disabled="busy || dirty" @click="load">{{ $t('common.label.refresh') }}</Button></header>
     <Alert v-if="error" variant="destructive"><AlertDescription>{{ $message(error) }}</AlertDescription></Alert>
     <Card class="min-w-0"><CardContent class="flex min-w-0 flex-col gap-6">

@@ -1,3 +1,4 @@
+import * as soloNavigation from '../app/features/live-solo/navigation'
 import { competitionChallengeManagementPath } from '../app/features/admin/admin-navigation'
 import { describe, expect, test } from 'bun:test'
 import { computed, effectScope, markRaw, nextTick, proxyRefs, reactive, ref, watch } from 'vue'
@@ -18,10 +19,10 @@ const drain = async () => { await nextTick(); await new Promise(resolve => setTi
 test('management review remains discoverable for finished competitions and uses the contained wide workspace', () => {
   const route = reactive({ path: '/admin/competitions/competition/writeups', params: { id: 'competition' } })
   const icons = Object.fromEntries('Activity ChartNoAxesCombined ClipboardCheck Container Download FileCheck GitBranch KeyRound LayoutDashboard Mail Network Orbit Puzzle Settings ShieldAlert Trophy Users Webhook'.split(' ').map(name => [name, {}]))
-  const deps = { ...icons, competitionChallengeManagementPath, computed, ref, proxyRefs, markRaw, useRoute: () => route,
+  const deps = { ...soloNavigation, ...icons, competitionChallengeManagementPath, computed, ref, proxyRefs, markRaw, useRoute: () => route,
     useAuth: () => ({ user: ref(null), isAdministrator: ref(true) }),
     translate: (key: string) => key, provide: () => {}, onMounted: () => {},
-    adminWorkspacePath: (path: string) => path, CompetitionAdminKey: Symbol(),
+    adminWorkspacePath: (path: string) => path, competitionContextKey: Symbol(), CompetitionAdminKey: Symbol(),
     CompetitionStatusBadgeComponent: {}, GameModeBadgeComponent: {}, AppWorkspaceNavComponent: {} }
   const state = shellFactory(deps)()
   state.role.value = 'Owner'
@@ -51,7 +52,7 @@ function harness(canJudge: boolean) {
   const scope = effectScope()
   let observe!: () => Promise<boolean>
   const polling = ref(false)
-  const deps = {
+  const deps = { ...soloNavigation,
     ref, computed, watch, createTrailingRefresh, markRaw, ChallengeWriteUpReviewComponent: {},
     ...Object.fromEntries('ArrowLeft Download FileSearch MessageCircleQuestion MinusCircle RefreshCw Scale'.split(' ').map(name => [name, {}])),
     useRoute: () => route,
@@ -127,7 +128,7 @@ test('the competition staff management route composes the existing PDF review an
   expect(page).toContain("middleware: 'competition-admin'")
   expect(feature).toContain('useCompetitionsByIdWriteUpsPage({ management: true })')
   expect(feature).toContain('CompetitionsByIdWriteUpsPageView.vue')
-  expect(shell).toContain("isProgressionPage || isWriteUpReview ? 'max-w-none'")
+  expect(shell).toContain("isProgressionPage || isWriteUpReview || isSoloWorkspace ? 'max-w-none'")
   expect(shell).toContain('data-admin-writeup-review-workspace')
   expect(css).toContain('[data-admin-writeup-review-workspace] > .noctf-motion-viewport > div')
 })
