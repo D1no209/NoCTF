@@ -111,6 +111,12 @@ public sealed class NoCtfDbContext(
     public DbSet<NoCTF.Domain.Challenges.WriteUps.ChallengeWriteUpVersion> ChallengeWriteUpVersions => Set<NoCTF.Domain.Challenges.WriteUps.ChallengeWriteUpVersion>();
     public DbSet<NoCTF.Domain.Challenges.WriteUps.WriteUpUnlockReceipt> WriteUpUnlockReceipts => Set<NoCTF.Domain.Challenges.WriteUps.WriteUpUnlockReceipt>();
     public DbSet<StoredFile> Files => Set<StoredFile>();
+    public DbSet<NoCTF.Domain.Theory.Questions.TheoryQuestion> TheoryQuestions => Set<NoCTF.Domain.Theory.Questions.TheoryQuestion>();
+    public DbSet<NoCTF.Domain.Theory.Questions.TheoryQuestionRevision> TheoryQuestionRevisions => Set<NoCTF.Domain.Theory.Questions.TheoryQuestionRevision>();
+    public DbSet<NoCTF.Domain.Theory.Activities.TheoryActivity> TheoryActivities => Set<NoCTF.Domain.Theory.Activities.TheoryActivity>();
+    public DbSet<NoCTF.Domain.Theory.Activities.CompetitionTheoryActivity> CompetitionTheoryActivities => Set<NoCTF.Domain.Theory.Activities.CompetitionTheoryActivity>();
+    public DbSet<NoCTF.Domain.Theory.Papers.TheoryParticipant> TheoryParticipants => Set<NoCTF.Domain.Theory.Papers.TheoryParticipant>();
+    public DbSet<NoCTF.Domain.Theory.Papers.TheoryPaper> TheoryPapers => Set<NoCTF.Domain.Theory.Papers.TheoryPaper>();
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -176,6 +182,7 @@ public sealed class NoCtfDbContext(
 
     private void EnsureAppendOnlyFacts()
     {
+        NoCTF.Infrastructure.Theory.TheoryPersistenceInvariants.Validate(ChangeTracker);
         SynchronizeTypedConfigurationForeignKeys();
         SynchronizeTeamMemberships();
         SynchronizeNormalizedSearchFields();
