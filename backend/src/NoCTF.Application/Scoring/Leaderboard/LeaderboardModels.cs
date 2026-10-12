@@ -351,6 +351,7 @@ public sealed record ScoreboardProjection(
     public IReadOnlyList<ScoreboardActor> DetailActors { get; init; } = [];
     public IReadOnlyList<ScoreboardEntryAllocation> EntryAllocations { get; init; } = [];
     public ScoreboardAudienceView? ParticipantView { get; init; }
+    public SpectatorFrame? Spectator { get; init; }
 }
 
 public sealed record ScoreboardAudienceView(

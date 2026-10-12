@@ -38,6 +38,14 @@ public sealed class FusionLeaderboardCache(
     public async Task<ScoreboardProjection?> GetFrozenScoreboardAsync(Guid competitionId, CancellationToken ct)
         => (await GetFrozenBundleAsync(competitionId, ct))?.Scoreboard;
 
+    public async Task<ScoreboardProjection?> GetFrozenSpectatorScoreboardAsync(Guid competitionId, CancellationToken ct)
+    {
+        var frozenAt = await db.Competitions.AsNoTracking().Where(x => x.Id == competitionId)
+            .Select(x => x.FrozenStartAt).SingleOrDefaultAsync(ct);
+        return frozenAt is null ? null
+            : (await GetFrozenWebhookScoreboardAsync(competitionId, frozenAt.Value, ct))?.Projection;
+    }
+
     public async Task<WebhookScoreboardProjection?> GetWebhookScoreboardAsync(
         Guid competitionId, bool frozen, CancellationToken ct)
     {
@@ -400,6 +408,7 @@ public sealed class FusionLeaderboardCache(
         }
         scoreboard = scoreboard with
         {
+            Spectator = await SpectatorFrameReader.ReadAsync(db, competition.Title, projectionInput, ct, timingOverride),
             ParticipantView = ScoreboardAudienceView.From(participantScoreboard)
         };
         return new(
@@ -667,7 +676,8 @@ public sealed class FusionLeaderboardCache(
     {
         // Missing revision metadata makes a cached projection invalid.
         // Rebuild it from current relational facts before serving any score.
-        if (bundle.TimingRevisions is null) return false;
+        if (bundle.TimingRevisions is null
+            || bundle.Scoreboard.Schema.Mode is GameMode.Awd or GameMode.Koh && bundle.Scoreboard.Spectator is null) return false;
         var current = await db.CompetitionChallenges.AsNoTracking().Where(x => x.CompetitionId == competitionId)
             .Select(x => new { x.Id, x.TimingRevision }).ToArrayAsync(ct);
         return current.Length == bundle.TimingRevisions.Count

@@ -27,6 +27,8 @@ public sealed record WebhookScoreboardProjection(
 
 public interface ILeaderboardCache
 {
+    Task<ScoreboardProjection?> GetFrozenSpectatorScoreboardAsync(Guid competitionId, CancellationToken ct) =>
+        GetFrozenScoreboardAsync(competitionId, ct);
     async Task<WebhookScoreboardProjection?> GetWebhookScoreboardAsync(
         Guid competitionId, bool frozen, CancellationToken cancellationToken)
     {

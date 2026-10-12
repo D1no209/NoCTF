@@ -2245,6 +2245,101 @@ export type NoCtfapiEndpointsGameplayFactsUploadPatchVerificationRequest = {
     file: Blob | File;
 };
 
+export type NoCtfapiEndpointsCompetitionsSpectatorScreenResponse = {
+    version?: string;
+    dataAsOf?: string;
+    serverTime?: string;
+    scope?: NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol;
+    mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol;
+    competitionName?: string | null;
+    status?: NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol | null;
+    hardeningEndsAt?: string | null;
+    teams?: Array<NoCtfApplicationScoringLeaderboardSpectatorScreenTeam>;
+    challenges?: Array<NoCtfApplicationScoringLeaderboardScoreboardChallengeCatalogItem>;
+    round?: NoCtfapiEndpointsCompetitionsSpectatorRoundResponse | null;
+    services?: Array<NoCtfapiEndpointsCompetitionsSpectatorServiceResponse>;
+    points?: Array<NoCtfapiEndpointsCompetitionsSpectatorPointResponse>;
+    changes?: Array<NoCtfapiEndpointsCompetitionsSpectatorChangeResponse>;
+    settlements?: Array<NoCtfApplicationScoringLeaderboardSpectatorSettlement>;
+    historyStartsAt?: string | null;
+    historyTruncated?: boolean;
+    nextCursor?: string | null;
+};
+
+export type NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol = 'Live' | 'Frozen' | 'Hidden';
+
+export type NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol = 'Draft' | 'Visible' | 'Published' | 'Running' | 'Paused' | 'Finished';
+
+export type NoCtfApplicationScoringLeaderboardSpectatorScreenTeam = {
+    id?: string;
+    name?: string;
+    rank?: number | null;
+    score?: number;
+};
+
+export type NoCtfApplicationScoringLeaderboardScoreboardChallengeCatalogItem = {
+    competitionChallengeId?: string;
+    title?: string;
+    direction?: string;
+    category?: string;
+    order?: number;
+    isPublished?: boolean;
+    directionIcon?: string | null;
+};
+
+export type NoCtfapiEndpointsCompetitionsSpectatorRoundResponse = {
+    id?: string;
+    number?: number;
+    startAt?: string;
+    endAt?: string;
+};
+
+export type NoCtfapiEndpointsCompetitionsSpectatorServiceResponse = {
+    teamId?: string;
+    challengeId?: string;
+    health?: NoCtfapiEndpointsCompetitionsSpectatorHealthProtocol;
+    checkedAt?: string | null;
+};
+
+export type NoCtfapiEndpointsCompetitionsSpectatorHealthProtocol = 'Unknown' | 'Healthy' | 'Down';
+
+export type NoCtfapiEndpointsCompetitionsSpectatorPointResponse = {
+    challengeId?: string;
+    controllerId?: string | null;
+    observedTeamId?: string | null;
+    health?: NoCtfapiEndpointsCompetitionsSpectatorHealthProtocol;
+    checkedAt?: string | null;
+    intervalSeconds?: number;
+    pointsPerInterval?: number;
+};
+
+export type NoCtfapiEndpointsCompetitionsSpectatorChangeResponse = {
+    id?: string;
+    revision?: string;
+    at?: string;
+    kind?: NoCtfapiEndpointsCompetitionsSpectatorChangeProtocol;
+    challengeId?: string;
+    teamId?: string | null;
+    targetTeamId?: string | null;
+    controllerId?: string | null;
+};
+
+export type NoCtfapiEndpointsCompetitionsSpectatorChangeProtocol = 'Attack' | 'Control' | 'Uncontrolled' | 'DetectionFailed';
+
+export type NoCtfApplicationScoringLeaderboardSpectatorSettlement = {
+    roundId?: string;
+    number?: number;
+    teamId?: string;
+    attack?: number;
+    lost?: number;
+    service?: number;
+    other?: number;
+};
+
+export type NoCtfapiEndpointsCompetitionsGetAwdSpectatorRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsCompetitionsGetCompetitionBadgeImageRequest = {
     [key: string]: never;
 };
@@ -2284,8 +2379,6 @@ export type NoCtfapiEndpointsCompetitionsCompetitionResponse = {
     singleWriteUpDeadlineAt?: string | null;
 };
 
-export type NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol = 'Draft' | 'Visible' | 'Published' | 'Running' | 'Paused' | 'Finished';
-
 export type NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol = 'Normal' | 'Frozen' | 'Blackout';
 
 export type NoCtfapiEndpointsCompetitionsCompetitionAdministrationRoleProtocol = 'Owner' | 'Manager' | 'Judge' | 'Observer';
@@ -2295,6 +2388,10 @@ export type NoCtfapiEndpointsCompetitionsCompetitionAccessModeProtocol = 'Public
 export type NoCtfapiEndpointsCompetitionsRuntimeAccessModeProtocol = 'Direct' | 'DirectAndWsrx' | 'WsrxOnly';
 
 export type NoCtfapiEndpointsCompetitionsGetCompetitionRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsCompetitionsGetKohSpectatorRequest = {
     [key: string]: never;
 };
 
@@ -2445,8 +2542,6 @@ export type NoCtfapiEndpointsCompetitionsScoreboardCurrentChallengeScoreResponse
     breakScore?: number | null;
     fixScore?: number | null;
 };
-
-export type NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol = 'Live' | 'Frozen' | 'Hidden';
 
 export type NoCtfapiEndpointsCompetitionsLeaderboardProcessingProtocolResponse = {
     competitionId?: string;
@@ -10037,6 +10132,45 @@ export type UploadPatchVerificationEndpointResponses = {
 
 export type UploadPatchVerificationEndpointResponse = UploadPatchVerificationEndpointResponses[keyof UploadPatchVerificationEndpointResponses];
 
+export type GetAwdSpectatorEndpointData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query: {
+        minutes: number;
+        cursor?: string | null;
+    };
+    url: '/api/v1/competitions/{competitionId}/awd-spectator';
+};
+
+export type GetAwdSpectatorEndpointErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: unknown;
+};
+
+export type GetAwdSpectatorEndpointError = GetAwdSpectatorEndpointErrors[keyof GetAwdSpectatorEndpointErrors];
+
+export type GetAwdSpectatorEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsCompetitionsSpectatorScreenResponse;
+    /**
+     * Accepted
+     */
+    202: unknown;
+};
+
+export type GetAwdSpectatorEndpointResponse = GetAwdSpectatorEndpointResponses[keyof GetAwdSpectatorEndpointResponses];
+
 export type GetCompetitionBadgeImageData = {
     body?: never;
     path: {
@@ -10094,6 +10228,45 @@ export type CompetitionPosterGetErrors = {
      */
     404: unknown;
 };
+
+export type GetKohSpectatorEndpointData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query: {
+        minutes: number;
+        cursor?: string | null;
+    };
+    url: '/api/v1/competitions/{competitionId}/koh-spectator';
+};
+
+export type GetKohSpectatorEndpointErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: unknown;
+};
+
+export type GetKohSpectatorEndpointError = GetKohSpectatorEndpointErrors[keyof GetKohSpectatorEndpointErrors];
+
+export type GetKohSpectatorEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsCompetitionsSpectatorScreenResponse;
+    /**
+     * Accepted
+     */
+    202: unknown;
+};
+
+export type GetKohSpectatorEndpointResponse = GetKohSpectatorEndpointResponses[keyof GetKohSpectatorEndpointResponses];
 
 export type GetLeaderboardEndpointData = {
     body?: never;
