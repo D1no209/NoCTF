@@ -204,3 +204,39 @@ comparisons so no soak load overlaps the performance measurements.
 
 Until these gates pass, there is no performance conclusion, stability approval,
 default switch or production deployment authorization.
+
+## Clean candidate and active duration run (2026-10-12)
+
+Candidate business source is `bc73cb900c31bfc3e5d72bec533ea4370baaa1c1`.
+Both Windows publications and all four self-contained test publications report
+`applicationDirty=false`. Linux images carry the same exact source revision:
+
+- Satori: `sha256:dfe45b8d5e32dc4c7bb200806421e040cc5aebb6364c006ad47f1a5960d34d77`.
+- Official: `sha256:7c0ea929594a8f2cf3a313a9c26db286a2f9c1eef8c9836900ade372532e8a1e`.
+
+All four Host binaries executed their actual-GC checks. The Windows ZIPs passed
+CRC verification and were extracted into separate directories; those extracted
+executables also passed `--runtime-info`. `release-bc73cb90/` contains both ZIPs,
+the paired Linux image tar, SHA-256 sidecars, `archive-verification.json` and
+`release-manifest.json`. Frontend bundles match except Nuxt-generated build IDs
+and prerender timestamps. A concurrent Windows SPA build hit a shared Nuxt output
+directory conflict; the Satori publication was rerun sequentially and verified.
+
+Clean-commit unit reruns are 1491 pass / 1 fail on **all four** flavor/OS pairs;
+the same previously recorded LiveSolo readiness test is the sole failure.
+The Satori Windows Hosting subset is 72/72. Official Windows database startup
+retests are 3/3, including concurrent migration; the earlier failure is not
+consistently reproduced. The complete clean integration/architecture matrix is
+still pending and the initial matrix above must not be presented as all green.
+
+The campaign is active under `diagnostics/campaign-bc73cb90`. Both Hosts use
+Satori and combined Api+Worker+Runner, with fresh synthetic dependencies and
+exclusive resource domains. Timed business workload started at 09:54:10 UTC on
+Windows and 09:54:35 UTC on Linux, October 12. The earliest 24-hour duration
+completion is therefore October 13 at those times, before rollback and the
+subsequent sequential five-repeat comparisons. The original production image is
+included as Linux group A. All outputs are access restricted. Inspect `state.json`,
+each platform's `01-satori/progress.json`, `events.jsonl`, and raw JSONL samples.
+An hourly follow-up is active in this task to inspect progress and finish the
+remaining acceptance and report. Keep the local machine, Docker and app running.
+No 24-hour duration or repeated performance result is claimed complete here.
