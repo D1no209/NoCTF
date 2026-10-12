@@ -86,7 +86,7 @@ public sealed class TheoryQuestionBank(NoCtfDbContext db) : ITheoryQuestionBank
     }
 
     public async Task<TheoryQuestionPage> ListAsync(Guid actorId, string? search, TheoryQuestionKind? kind,
-        int offset, int limit, CancellationToken ct)
+        int offset, int limit, CancellationToken ct, TheoryQuestionFilter? filters = null)
     {
         var actor = await ActorAsync(actorId, ct);
         if (actor is null) return new([], 0);
@@ -96,6 +96,20 @@ public sealed class TheoryQuestionBank(NoCtfDbContext db) : ITheoryQuestionBank
             .Any(revision => revision.Version == question.CurrentVersion && revision.Title.ToUpper().Contains(keyword)));
         if (kind is { } filter) query = query.Where(question => question.Revisions
             .Any(revision => revision.Version == question.CurrentVersion && revision.Kind == filter));
+        if (filters?.State is { } state) query = query.Where(question => question.State == state);
+        if (filters?.Difficulty is { } difficulty) query = query.Where(question => question.Revisions.Any(revision => revision.Version == question.CurrentVersion && revision.Difficulty == difficulty));
+        if (!string.IsNullOrWhiteSpace(filters?.Knowledge))
+        {
+            var knowledge = TheoryQuestionPolicy.Normalize(filters.Knowledge);
+            query = query.Where(question => question.Revisions.Any(revision => revision.Version == question.CurrentVersion
+                && revision.Classifications.Any(item => item.Kind == TheoryClassificationKind.Knowledge && item.NormalizedName == knowledge)));
+        }
+        if (!string.IsNullOrWhiteSpace(filters?.Tag))
+        {
+            var tag = TheoryQuestionPolicy.Normalize(filters.Tag);
+            query = query.Where(question => question.Revisions.Any(revision => revision.Version == question.CurrentVersion
+                && revision.Classifications.Any(item => item.Kind == TheoryClassificationKind.Tag && item.NormalizedName == tag)));
+        }
         var total = await query.CountAsync(ct);
         var page = await query.OrderByDescending(question => question.UpdatedAt).ThenBy(question => question.Id)
             .Skip(Math.Max(0, offset)).Take(Math.Clamp(limit, 1, 200))
@@ -108,7 +122,10 @@ public sealed class TheoryQuestionBank(NoCtfDbContext db) : ITheoryQuestionBank
                     || question.Grants.Any(grant => grant.UserId == actor.Id && grant.Permission >= TheoryQuestionPermission.Edit),
                 actor.Role == UserRole.Administrator || question.OwnerId == actor.Id
                     || question.Grants.Any(grant => grant.UserId == actor.Id && grant.Permission == TheoryQuestionPermission.Manage))
-                { FirstExposedAt = db.Set<TheoryQuestionSource>().Where(source => source.Id == question.SourceId).Select(source => source.FirstExposedAt).Single() })
+                { Classifications = question.Revisions.Where(revision => revision.Version == question.CurrentVersion).SelectMany(revision => revision.Classifications)
+                    .Select(item => new TheoryClassificationInput(item.Kind, item.Name)).ToArray(),
+                  PaperReferences = db.Set<NoCTF.Domain.Theory.Papers.TheoryPaperItem>().Count(item => question.Revisions.Any(revision => revision.Id == item.RevisionId)),
+                  FirstExposedAt = db.Set<TheoryQuestionSource>().Where(source => source.Id == question.SourceId).Select(source => source.FirstExposedAt).Single() })
             .ToArrayAsync(ct);
         return new(page, total);
     }

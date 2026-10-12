@@ -1,64 +1,49 @@
-# Theory implementation status
+# 理论题库与交卷计分交付记录
 
-The approved design introduces an independent theory question bank, whole-paper grading,
-score-only participant responses, competition-wide team deduplication, personal activities,
-and configurable highest/latest/cumulative scoring. It does not create practical Challenge
-or CompetitionChallenge records. CTF, AWD and AWDP are the only supported competition modes.
+本功能独立于实践题库，支持单选、多选、判断题。比赛关联仅适用于 CTF、AWD、AWDP，所有既有比赛保持关闭；个人练习与限时测验可独立使用。没有推送或生产部署。
 
-## Foundation implemented
+## 入口与操作
 
-- Independent relational question/source/revision/option/permission/file models.
-- Activity rules, frozen candidates, pause facts and audit associations.
-- Personal/team participants, papers, stable option permutations, answer receipts and
-  source-based draw receipts, with a separate unique active-paper identity.
-- Immutable question versions and receipts, optimistic concurrency and protected file references.
-- Question-bank creation/revision/copy/list/content/state/grant use cases and a relational store;
-  use-only grants expose metadata, never answers. Copies preserve source identity with independent options.
-- Complete randomized bipartite matching across remaining attempts, with canonical-source
-  deduplication and no partial paper on allocation failure.
-- Exact-set grading, highest/latest/cumulative aggregation, and pause-union deadline calculation
-  with competition-end caps and no revival of already-expired papers.
-- Paper mutation policies distinguish answer and whole-paper confirmation revisions, never grade
-  during answer saves, reject writes after submission, and assign timeouts their authoritative due time.
-- Explicit participant projections exclude answer keys and return no question content after submission.
-- EF CLI-generated PostgreSQL migration; existing competitions acquire no theory activity.
+- 理论题库：`/admin/theory/questions`。支持题型、状态、难度、知识点、标签筛选，曝光与发卷引用情况，版本编辑、安全 Markdown、图片及使用／编辑／管理授权。
+- 独立活动管理：`/admin/theory/activities`；参与入口：`/theory`。
+- 比赛管理的运营分组 → 理论答题：`/admin/competitions/:id/theory`。提供设置与组卷、答卷与成绩、操作记录；工作人员权限决定写操作和内容读取能力。
+- 比赛参与入口：`/competitions/:id/theory`。全队共用一份试卷，任何有效成员可以作答及交卷。
 
-## Remaining delivery (not yet available to users)
+先保存题库内容并设置为可组卷，配置活动规则后验证容量，最后显式发布。发布冻结候选版本、次数和计分规则。活动尚未发卷时可以撤回；已经发卷后通过暂停、恢复、延期、停止发卷、结束或作废进行运营，不删除原有成绩。
 
-- Question-bank authorized new-image uploads/reads and editor.
-- Activity publication/permissions and exposure coordination.
-- Transactional issue/save/submit orchestration, safe participant HTTP contracts, authorization,
-  timeout scheduling and live collaboration.
-- TheoryPaperSubmission gameplay-fact target extension, existing-query audit, scoring,
-  frozen leaderboards, correction workflows, exports and displays.
-- Participant/administration UI, bilingual catalogs, generated OpenAPI/SDK and browser acceptance.
+理论满分控制其对比赛总分的影响。最高分、最后一次和累计得分均支持；累计及正式测验必须设置有限次数。题库复制和新版本沿用规范题源，不能绕过跨卷去重。
 
-The foundation must not be described as the completed feature. Seven authenticated question-bank
-endpoints are implemented with generated OpenAPI/SDK and localized failures. No theory navigation,
-activity or participant endpoint has been exposed yet. Later stages require transactional
-concurrency/privacy and frontend acceptance in addition to the initial policy and relational tests.
+## 已实现的一致性与保密边界
 
-## Validation
+- 随机完整匹配同时验证剩余次数，事务失败不占次数或题源；并发开卷及响应丢失恢复相同试卷。
+- 选项排列持久化，刷新和换队员均保持。逐题答案带修订与请求回执，冲突保留未同步选择；交卷使用整卷修订确认。
+- 保存答案不判分。只有整卷交卷／超时才保存权威判定；参与者仅见总分、满分、有效成绩、次数和状态，交卷后不再返回题面或图片。
+- 图片访问逐次鉴权，题库使用授权不获得答案或图片读取权限；所有理论响应禁止共享缓存。正文的外部图片不会自动加载。
+- 暂停区间并集合并并冻结时长，活动截止顺延且受比赛结束上限约束；超时使用应交卷时间，Worker 从关系数据恢复调度。
+- 正式交卷关联唯一 TheoryPaperSubmission，理论成绩独立加入排行榜、趋势及导出，封榜按同一截止读取。未交卷和已交卷零分分开显示。
+- 纠错先预览所有受影响队伍，持久化当前覆盖规则并通过 NATS/Wolverine 批量处理；目标修订阻止旧任务覆盖新结果。作废仍保留次数和去重记录。
+- 题库来源保留永久曝光记录，比赛删除不清除曝光或可复用材料。活动结束后释放对练习题源的保护性占用。
+- SignalR 仅发送授权范围内的失效通知，不发送题面、答案键或选项。Observer 不读取答案键及内部赛道试卷；Judge 可预览并发起私密咨询，管理者可正式纠错。
+- PostgreSQL 增量迁移、OpenAPI、前端 SDK 和 Wolverine 静态适配器均由项目官方工具生成。
 
-Initial TUnit coverage includes all 512 three-slot candidate graphs checked against exhaustive
-matching, option permutations, scoring and timing boundaries. The PostgreSQL Testcontainers test
-applies the real migration chain and checks independent persistence, unique draw receipts,
-immutable content, transaction rollback and optimistic concurrency. Test evidence is kept in
-ignored `backend/artifacts/theory-*.log`; do not commit production data or the unrelated `audit/` directory.
+## 验证证据（2026-10-12）
 
-Question-bank HTTP acceptance uses PostgreSQL plus TestServer: anonymous and ordinary-user creation
-are rejected, use-only readers receive metadata without answers, unauthorized content/update/grant
-requests fail, and banning the owner removes content access. Participant projection tests verify
-that submitted papers contain no question bodies, answer keys or individual results.
+- 理论相关 TUnit／真实 PostgreSQL／HTTP：49 项通过，包括并发发卷、同题写入竞争、重复交卷、事务回滚、来源去重、跨队授权、图片访问、暂停、延迟超时、纠错修订、删除图与曝光保留。
+- 排行榜相关回归：61 项通过，包含现有实践赛制与新增理论分投影。
+- 前端：973 项 Bun 测试通过；全量类型检查、架构审计及静态生产构建通过。
+- Host 构建通过；EF 检查无待生成模型差异。
+- 本地浏览器：合成管理员创建题目、发布活动；普通个人开卷、键盘选择、刷新恢复和仅分数结果；合成双队、同队双成员同步、暂停／恢复、交卷及排行榜联动；工作人员预览纠错、真实 Worker 重算和审计记录。检查了中英文、亮暗主题、390px 手机和桌面布局。
+- 实测 Alpha 团队从共享答案交卷得到 40/40，Beta 空卷为 0；活动级统一给分预览 Alpha 40→40、Beta 0→20，执行后监控和权威排行榜一致。
+- 未同步选择、队友冲突、请求重放和过期响应通过功能行为测试覆盖；没有使用生产账号、真实题目或生产数据库。
 
-Known pre-existing contract issue: `AdminOpenApiRulesTests.Admin_endpoints_publish_complete_stable_metadata`
-expects 151 admin routes while the baseline exports 152. Raising the stale count reveals the existing
-`CopyLiveSoloTemplate` operation lacks the required Admin name/description and declares 422.
-This theory work does not change that existing endpoint's public contract. Route documentation was
-reconciled with the already-exported LiveSolo pool/review routes when adding the seven theory routes.
+日志及合成环境截图保存在忽略目录 `backend/artifacts/theory-*` 和 `artifacts/theory-*`，不提交运行凭据。
 
-Validated checkpoint (2026-10-12): 41 theory/HTTP/route-drift tests pass with Docker required;
-3 persistence-model/file-cleanup regression tests pass; Host builds with zero warnings/errors;
-EF reports no pending model changes. Frontend SDK validation: 964 Bun tests pass, typecheck passes,
-architecture audit reports zero violations. The broader OpenAPI suite has the one baseline
-admin-metadata failure above. Browser acceptance has not run because the theory UI is not built.
+## 全仓库已有失败
+
+完整非集成回归为 1607 项：1603 通过、3 失败、1 个需要显式隔离集群的测试跳过。以下相关源码和测试在本次理论改动前已存在，不能将本次验收描述为“全仓库所有测试通过”：
+
+1. `AdminOpenApiRulesTests.Admin_endpoints_publish_complete_stable_metadata`：旧计数为 151，基线实际 152；现有 CopyLiveSoloTemplate 另缺少该测试要求的管理员元数据。
+2. `AbstractionGuardrailTests.Service_locator_usage_is_limited_to_composition_and_hosting_code`：已有 NatsCompetitionEventRefreshRelay 触发规则。
+3. `LiveSoloRoundSchedulePolicyTests.Failed_readiness_after_countdown_uses_bounded_recovery_instead_of_an_immediate_spin`：原有 LiveSolo 恢复时序断言失败。
+
+本次不改动这些 LiveSolo 或既有事件中继行为。未读取、暂存或修改无关 `audit/` 目录。

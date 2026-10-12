@@ -1,4 +1,6 @@
 {
+  "common.label.theoryBank": "Theory question bank",
+  "common.label.theoryActivities": "Theory activities",
   "pagination.cursor.navigation": "Pagination",
   "pagination.cursor.showing": "Showing {count} records",
   "pagination.cursor.page": "Page {page}",

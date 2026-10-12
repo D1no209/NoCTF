@@ -125,6 +125,7 @@ export type NoCtfApplicationTheoryQuestionsTheoryQuestionContent = {
     question?: NoCtfApplicationTheoryQuestionsTheoryQuestionSummary;
     revisionId?: string;
     content?: NoCtfApplicationTheoryQuestionsTheoryQuestionInput;
+    grants?: Array<NoCtfApplicationTheoryQuestionsTheoryQuestionAccessGrant>;
 };
 
 export type NoCtfApplicationTheoryQuestionsTheoryQuestionSummary = {
@@ -139,19 +140,32 @@ export type NoCtfApplicationTheoryQuestionsTheoryQuestionSummary = {
     updatedAt?: string;
     canReadAnswers?: boolean;
     canManage?: boolean;
+    firstExposedAt?: string | null;
+    paperReferences?: number;
+    classifications?: Array<NoCtfApplicationTheoryQuestionsTheoryClassificationInput>;
 };
 
 export type NoCtfDomainTheoryQuestionsTheoryQuestionState = 0 | 1 | 2;
 
+export type NoCtfApplicationTheoryQuestionsTheoryQuestionAccessGrant = {
+    userId?: string;
+    name?: string;
+    permission?: NoCtfDomainTheoryQuestionsTheoryQuestionPermission;
+};
+
+export type NoCtfDomainTheoryQuestionsTheoryQuestionPermission = 0 | 1 | 2;
+
 export type NoCtfapiEndpointsTheoryQuestionsGetTheoryQuestionRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsTheoryQuestionsGetTheoryQuestionImageRequest = {
     [key: string]: never;
 };
 
 export type NoCtfapiEndpointsTheoryQuestionsGrantTheoryQuestionRequest = {
     permission?: NoCtfDomainTheoryQuestionsTheoryQuestionPermission | null;
 };
-
-export type NoCtfDomainTheoryQuestionsTheoryQuestionPermission = 0 | 1 | 2;
 
 export type NoCtfApplicationTheoryQuestionsTheoryQuestionPage = {
     items?: Array<NoCtfApplicationTheoryQuestionsTheoryQuestionSummary>;
@@ -172,6 +186,373 @@ export type NoCtfapiEndpointsTheoryQuestionsSetTheoryQuestionStateRequest = {
 
 export type NoCtfapiEndpointsTheoryQuestionsUpdateTheoryQuestionRequest = {
     content: NoCtfApplicationTheoryQuestionsTheoryQuestionInput;
+};
+
+export type NoCtfApplicationTheoryQuestionsTheoryImageResult = {
+    fileId?: string | null;
+    revisionId?: string | null;
+    failure?: NoCtfApplicationTheoryQuestionsTheoryImageFailure | null;
+};
+
+export type NoCtfApplicationTheoryQuestionsTheoryImageFailure = 0 | 1 | 2 | 3;
+
+export type NoCtfapiEndpointsTheoryQuestionsUploadTheoryImageRequest = {
+    file: Blob | File;
+};
+
+export type NoCtfApplicationTheoryPapersTheoryPaperView = {
+    activity?: NoCtfApplicationTheoryActivitiesTheoryActivitySummary;
+    deadline?: NoCtfApplicationTheoryActivitiesTheoryDeadline;
+    paper?: NoCtfApplicationTheoryPapersTheoryParticipantPaper | null;
+    issuedCount?: number;
+    effectiveScore?: NoCtfApplicationTheoryPapersTheoryEffectiveScore;
+    history?: Array<NoCtfApplicationTheoryPapersTheoryPaperHistory>;
+    serverTime?: string;
+    canIssue?: boolean;
+    canAnswer?: boolean;
+};
+
+export type NoCtfApplicationTheoryActivitiesTheoryActivitySummary = {
+    id?: string;
+    competitionId?: string | null;
+    name?: string;
+    kind?: NoCtfDomainTheoryActivitiesTheoryActivityKind;
+    state?: NoCtfDomainTheoryActivitiesTheoryActivityState;
+    opensAt?: string;
+    closesAt?: string;
+    durationSeconds?: number;
+    attemptLimit?: number | null;
+    scoringMode?: NoCtfDomainTheoryActivitiesTheoryScoringMode;
+    maximumPaperPoints?: number;
+    issuanceStopped?: boolean;
+    questionCount?: number;
+};
+
+export type NoCtfDomainTheoryActivitiesTheoryActivityKind = 0 | 1 | 2;
+
+export type NoCtfDomainTheoryActivitiesTheoryActivityState = 0 | 1 | 2 | 3;
+
+export type NoCtfDomainTheoryActivitiesTheoryScoringMode = 0 | 1 | 2;
+
+export type NoCtfApplicationTheoryActivitiesTheoryDeadline = {
+    at?: string;
+    extension?: string;
+    paused?: boolean;
+    capped?: boolean;
+};
+
+export type NoCtfApplicationTheoryPapersTheoryParticipantPaper = {
+    id?: string;
+    answerRevision?: string;
+    attempt?: number;
+    state?: NoCtfDomainTheoryPapersTheoryPaperState;
+    openedAt?: string;
+    submittedAt?: string | null;
+    submissionKind?: NoCtfDomainTheoryPapersTheorySubmissionKind | null;
+    maximumPoints?: number;
+    score?: number | null;
+    questions?: Array<NoCtfApplicationTheoryPapersTheoryParticipantQuestion>;
+};
+
+export type NoCtfDomainTheoryPapersTheoryPaperState = 0 | 1 | 2;
+
+export type NoCtfDomainTheoryPapersTheorySubmissionKind = 0 | 1 | 2;
+
+export type NoCtfApplicationTheoryPapersTheoryParticipantQuestion = {
+    id?: string;
+    answerRevision?: string;
+    order?: number;
+    kind?: NoCtfDomainTheoryQuestionsTheoryQuestionKind;
+    body?: string;
+    points?: number;
+    answeredById?: string | null;
+    answeredAt?: string | null;
+    options?: Array<NoCtfApplicationTheoryPapersTheoryParticipantOption>;
+    answeredByName?: string | null;
+};
+
+export type NoCtfApplicationTheoryPapersTheoryParticipantOption = {
+    id?: string;
+    order?: number;
+    content?: string;
+    truthValue?: NoCtfDomainTheoryQuestionsTheoryTruthValue | null;
+    selected?: boolean;
+};
+
+export type NoCtfApplicationTheoryPapersTheoryEffectiveScore = {
+    points?: number;
+    achievedAt?: string | null;
+    hasSubmission?: boolean;
+};
+
+export type NoCtfApplicationTheoryPapersTheoryPaperHistory = {
+    paperId?: string;
+    attempt?: number;
+    state?: NoCtfDomainTheoryPapersTheoryPaperState;
+    score?: number | null;
+    submittedAt?: string | null;
+};
+
+export type NoCtfapiEndpointsTheoryActivitiesAnswerTheoryPaperRequest = {
+    expectedRevision: string;
+    requestId: string;
+    optionIds: Array<string>;
+};
+
+export type NoCtfapiEndpointsTheoryActivitiesTheoryCorrectionAccepted = {
+    targetRevision?: string;
+    statusUrl?: string;
+};
+
+export type NoCtfapiEndpointsTheoryActivitiesApplyTheoryCorrectionRequest = {
+    input: NoCtfApplicationTheoryActivitiesTheoryCorrectionInput;
+    token: string;
+    expiresAt?: string;
+    reason: string;
+};
+
+export type NoCtfApplicationTheoryActivitiesTheoryCorrectionInput = {
+    revisionId: string;
+    mode?: NoCtfDomainTheoryActivitiesTheoryCorrectionMode;
+    correctOptions: Array<string>;
+};
+
+export type NoCtfDomainTheoryActivitiesTheoryCorrectionMode = 0 | 1;
+
+export type NoCtfApplicationTheoryActivitiesTheoryActivityCheck = {
+    feasible?: boolean;
+    rules?: Array<NoCtfApplicationTheoryActivitiesTheoryRuleCapacity>;
+    shortages?: Array<NoCtfApplicationTheoryPapersTheoryAllocationShortage>;
+};
+
+export type NoCtfApplicationTheoryActivitiesTheoryRuleCapacity = {
+    order?: number;
+    required?: number;
+    available?: number;
+};
+
+export type NoCtfApplicationTheoryPapersTheoryAllocationShortage = {
+    ruleId?: string;
+    required?: number;
+    allocated?: number;
+};
+
+export type NoCtfapiEndpointsTheoryActivitiesCheckTheoryActivityRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsTheoryActivitiesGetCompetitionTheoryRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfApplicationTheoryActivitiesTheoryActivityManagement = {
+    activity?: NoCtfApplicationTheoryActivitiesTheoryActivitySummary;
+    rules?: Array<NoCtfApplicationTheoryActivitiesTheoryRuleInput>;
+    allowExposedQuestions?: boolean;
+    canManage?: boolean;
+    canJudge?: boolean;
+    deadline?: NoCtfApplicationTheoryActivitiesTheoryDeadline;
+    corrections?: Array<NoCtfApplicationTheoryActivitiesTheoryCorrectionProgress>;
+    issuedCount?: number;
+    competitionEndAt?: string | null;
+    allowedOperations?: Array<NoCtfApplicationTheoryActivitiesTheoryActivityAction>;
+};
+
+export type NoCtfApplicationTheoryActivitiesTheoryRuleInput = {
+    kind?: NoCtfDomainTheoryQuestionsTheoryQuestionKind;
+    difficulty?: NoCtfDomainTheoryQuestionsTheoryQuestionDifficulty | null;
+    count?: number;
+    points?: number;
+    filters?: Array<NoCtfApplicationTheoryActivitiesTheoryClassificationFilter>;
+};
+
+export type NoCtfApplicationTheoryActivitiesTheoryClassificationFilter = {
+    kind?: NoCtfDomainTheoryQuestionsTheoryClassificationKind;
+    name?: string;
+};
+
+export type NoCtfApplicationTheoryActivitiesTheoryCorrectionProgress = {
+    revisionId?: string;
+    targetRevision?: string;
+    completed?: boolean;
+};
+
+export type NoCtfApplicationTheoryActivitiesTheoryActivityAction = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+export type NoCtfapiEndpointsTheoryActivitiesGetTheoryActivityManagementRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfApplicationTheoryActivitiesTheoryExamLeaderboard = {
+    items?: Array<NoCtfApplicationTheoryActivitiesTheoryExamRank>;
+    total?: number;
+};
+
+export type NoCtfApplicationTheoryActivitiesTheoryExamRank = {
+    rank?: number;
+    userId?: string;
+    name?: string;
+    points?: number;
+    achievedAt?: string | null;
+    hasSubmission?: boolean;
+};
+
+export type NoCtfapiEndpointsTheoryActivitiesGetTheoryExamLeaderboardRequest = NoCtfapiPaginationPaginationRequest & {};
+
+export type NoCtfapiEndpointsTheoryActivitiesGetTheoryPaperRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsTheoryActivitiesGetTheoryPaperImageRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfApplicationTheoryActivitiesTheoryReviewPaper = {
+    paper?: NoCtfApplicationTheoryActivitiesTheoryReviewRow;
+    questions?: Array<NoCtfApplicationTheoryActivitiesTheoryReviewQuestion>;
+};
+
+export type NoCtfApplicationTheoryActivitiesTheoryReviewRow = {
+    paperId?: string;
+    participantId?: string;
+    userId?: string | null;
+    teamId?: string | null;
+    name?: string;
+    attempt?: number;
+    state?: NoCtfDomainTheoryPapersTheoryPaperState;
+    openedAt?: string;
+    submittedAt?: string | null;
+    score?: number | null;
+    questionCount?: number;
+    answeredCount?: number;
+    submissionKind?: NoCtfDomainTheoryPapersTheorySubmissionKind | null;
+    deadline?: NoCtfApplicationTheoryActivitiesTheoryDeadline | null;
+    effectiveScore?: NoCtfApplicationTheoryPapersTheoryEffectiveScore | null;
+};
+
+export type NoCtfApplicationTheoryActivitiesTheoryReviewQuestion = {
+    question?: NoCtfApplicationTheoryPapersTheoryParticipantQuestion;
+    revisionId?: string;
+    correctOptions?: Array<string>;
+    explanation?: string | null;
+    result?: NoCtfDomainTheoryPapersTheoryAnswerResult | null;
+};
+
+export type NoCtfDomainTheoryPapersTheoryAnswerResult = 0 | 1 | 2 | 3;
+
+export type NoCtfapiEndpointsTheoryActivitiesGetTheoryReviewRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsTheoryActivitiesGetTheorySessionRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsTheoryActivitiesIssueTheoryPaperRequest = {
+    requestId: string;
+    expectedIssuedCount?: number;
+};
+
+export type NoCtfApplicationTheoryActivitiesTheoryActivityPage = {
+    items?: Array<NoCtfApplicationTheoryActivitiesTheoryActivitySummary>;
+    total?: number;
+};
+
+export type NoCtfapiEndpointsTheoryActivitiesListTheoryActivitiesRequest = NoCtfapiPaginationSearchRequest & {};
+
+export type NoCtfApplicationTheoryActivitiesTheoryAuditPage = {
+    items?: Array<NoCtfApplicationTheoryActivitiesTheoryAuditRow>;
+    total?: number;
+};
+
+export type NoCtfApplicationTheoryActivitiesTheoryAuditRow = {
+    id?: string;
+    kind?: NoCtfDomainTheoryActivitiesTheoryActivityOperationKind;
+    actorName?: string;
+    occurredAt?: string;
+    reason?: string | null;
+};
+
+export type NoCtfDomainTheoryActivitiesTheoryActivityOperationKind = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
+
+export type NoCtfapiEndpointsTheoryActivitiesListTheoryAuditRequest = NoCtfapiPaginationPaginationRequest & {};
+
+export type NoCtfApplicationTheoryActivitiesTheoryReviewPage = {
+    items?: Array<NoCtfApplicationTheoryActivitiesTheoryReviewRow>;
+    total?: number;
+};
+
+export type NoCtfapiEndpointsTheoryActivitiesListTheoryReviewsRequest = NoCtfapiPaginationPaginationRequest & {};
+
+export type NoCtfApplicationTheoryActivitiesTheoryCorrectionPreview = {
+    token?: string;
+    expiresAt?: string;
+    affectedPapers?: number;
+    scores?: Array<NoCtfApplicationTheoryActivitiesTheoryScoreImpact>;
+    participants?: Array<NoCtfApplicationTheoryActivitiesTheoryParticipantScoreImpact>;
+};
+
+export type NoCtfApplicationTheoryActivitiesTheoryScoreImpact = {
+    paperId?: string;
+    participantId?: string;
+    before?: number;
+    after?: number;
+};
+
+export type NoCtfApplicationTheoryActivitiesTheoryParticipantScoreImpact = {
+    participantId?: string;
+    name?: string;
+    before?: number;
+    after?: number;
+};
+
+export type NoCtfapiEndpointsTheoryActivitiesPreviewTheoryCorrectionRequest = {
+    input: NoCtfApplicationTheoryActivitiesTheoryCorrectionInput;
+};
+
+export type NoCtfapiEndpointsTheoryActivitiesSaveCompetitionTheoryRequest = {
+    activityId?: string | null;
+    input: NoCtfApplicationTheoryActivitiesTheoryActivityInput;
+};
+
+export type NoCtfApplicationTheoryActivitiesTheoryActivityInput = {
+    name: string;
+    kind?: NoCtfDomainTheoryActivitiesTheoryActivityKind;
+    opensAt?: string;
+    closesAt?: string;
+    durationSeconds?: number;
+    attemptLimit?: number | null;
+    scoringMode?: NoCtfDomainTheoryActivitiesTheoryScoringMode;
+    allowExposedQuestions?: boolean;
+    rules: Array<NoCtfApplicationTheoryActivitiesTheoryRuleInput>;
+};
+
+export type NoCtfapiEndpointsTheoryActivitiesSaveTheoryActivityRequest = {
+    activityId?: string | null;
+    competitionId?: string | null;
+    input: NoCtfApplicationTheoryActivitiesTheoryActivityInput;
+};
+
+export type NoCtfapiEndpointsTheoryActivitiesTheoryConsultationResponse = {
+    threadRootId?: string;
+};
+
+export type NoCtfapiEndpointsTheoryActivitiesStartTheoryConsultationRequest = {
+    body: string;
+};
+
+export type NoCtfapiEndpointsTheoryActivitiesSubmitTheoryPaperRequest = {
+    expectedRevision: string;
+};
+
+export type NoCtfapiEndpointsTheoryActivitiesTransitionTheoryActivityRequest = {
+    action?: NoCtfApplicationTheoryActivitiesTheoryActivityAction;
+    deadline?: string | null;
+    reason?: string | null;
+};
+
+export type NoCtfapiEndpointsTheoryActivitiesVoidTheoryPaperRequest = {
+    reason: string;
 };
 
 export type NoCtfapiEndpointsTeamsTeamRegistrationFailureResponse = {
@@ -2400,6 +2781,7 @@ export type NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse = {
     currentRoundId?: string | null;
     actors?: Array<NoCtfapiEndpointsCompetitionsScoreboardActorResponse>;
     teams?: Array<NoCtfapiEndpointsCompetitionsScoreboardTeamResponse>;
+    theoryEnabled?: boolean;
     tracks?: Array<NoCtfapiEndpointsCompetitionsScoreboardTrackResponse>;
     tracksEnabled?: boolean;
     currentChallengeScores?: Array<NoCtfapiEndpointsCompetitionsScoreboardCurrentChallengeScoreResponse>;
@@ -2429,6 +2811,8 @@ export type NoCtfapiEndpointsCompetitionsScoreboardTeamResponse = {
     globalAdjustmentCount?: number;
     globalAdjustments?: Array<NoCtfapiEndpointsCompetitionsScoreboardAdjustmentResponse>;
     slots?: Array<NoCtfapiEndpointsCompetitionsScoreboardSlotResponse>;
+    theoryScore?: number;
+    hasTheorySubmission?: boolean;
     achievements?: Array<NoCtfapiEndpointsCompetitionsScoreboardChallengeAchievementResponse> | null;
     challengeBenefits?: Array<NoCtfApplicationScoringLeaderboardScoreboardChallengeBenefit>;
 };
@@ -4725,7 +5109,7 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteRefe
     count?: number;
 };
 
-export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode = 'HistoricalEvent' | 'Team' | 'CompetitionChallenge' | 'GameplayFact' | 'RuntimeInstance' | 'PatchUpload' | 'Notification' | 'PosterFile' | 'TeamWriteUp' | 'ActiveRuntimeResource' | 'NotificationScopeConflict' | 'ProgressionGraph' | 'Badge' | 'BadgeGrant' | 'ChallengeWriteUp' | 'LiveSoloMatch' | 'LiveSoloQuestionGroup' | 'LiveSoloQuestionMaterial' | 'ActiveLiveSoloMediaResource';
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode = 'HistoricalEvent' | 'Team' | 'CompetitionChallenge' | 'GameplayFact' | 'RuntimeInstance' | 'PatchUpload' | 'Notification' | 'PosterFile' | 'TeamWriteUp' | 'ActiveRuntimeResource' | 'NotificationScopeConflict' | 'ProgressionGraph' | 'Badge' | 'BadgeGrant' | 'ChallengeWriteUp' | 'LiveSoloMatch' | 'LiveSoloQuestionGroup' | 'LiveSoloQuestionMaterial' | 'ActiveLiveSoloMediaResource' | 'TheoryActivity';
 
 export type NoCtfapiEndpointsAdministrationCompetitionsForceDeleteCompetitionRequest = {
     confirmationTitle: string;
@@ -5732,6 +6116,10 @@ export type TheoryQuestionsListData = {
     path?: never;
     query: {
         kind?: NoCtfDomainTheoryQuestionsTheoryQuestionKind | null;
+        state?: NoCtfDomainTheoryQuestionsTheoryQuestionState | null;
+        difficulty?: NoCtfDomainTheoryQuestionsTheoryQuestionDifficulty | null;
+        knowledge?: string | null;
+        tag?: string | null;
         keyword?: string | null;
         offset: number;
         limit: number;
@@ -5881,6 +6269,40 @@ export type TheoryQuestionsUpdateResponses = {
 
 export type TheoryQuestionsUpdateResponse = TheoryQuestionsUpdateResponses[keyof TheoryQuestionsUpdateResponses];
 
+export type GetTheoryQuestionImageData = {
+    body?: never;
+    path: {
+        questionId: string;
+        fileId: string;
+    };
+    query?: never;
+    url: '/api/v1/theory/questions/{questionId}/images/{fileId}';
+};
+
+export type GetTheoryQuestionImageErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetTheoryQuestionImageResponses = {
+    /**
+     * Success
+     */
+    200: Blob | File;
+};
+
+export type GetTheoryQuestionImageResponse = GetTheoryQuestionImageResponses[keyof GetTheoryQuestionImageResponses];
+
 export type TheoryQuestionsGrantData = {
     body: NoCtfapiEndpointsTheoryQuestionsGrantTheoryQuestionRequest;
     path: {
@@ -5959,6 +6381,842 @@ export type TheoryQuestionsSetStateResponses = {
 };
 
 export type TheoryQuestionsSetStateResponse = TheoryQuestionsSetStateResponses[keyof TheoryQuestionsSetStateResponses];
+
+export type UploadTheoryImageData = {
+    body: NoCtfapiEndpointsTheoryQuestionsUploadTheoryImageRequest;
+    path: {
+        questionId: string;
+    };
+    query?: never;
+    url: '/api/v1/theory/questions/{questionId}/images';
+};
+
+export type UploadTheoryImageErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type UploadTheoryImageError = UploadTheoryImageErrors[keyof UploadTheoryImageErrors];
+
+export type UploadTheoryImageResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationTheoryQuestionsTheoryImageResult;
+};
+
+export type UploadTheoryImageResponse = UploadTheoryImageResponses[keyof UploadTheoryImageResponses];
+
+export type AnswerTheoryPaperData = {
+    body: NoCtfapiEndpointsTheoryActivitiesAnswerTheoryPaperRequest;
+    path: {
+        activityId: string;
+        paperId: string;
+        itemId: string;
+    };
+    query?: never;
+    url: '/api/v1/theory/activities/{activityId}/papers/{paperId}/answers/{itemId}';
+};
+
+export type AnswerTheoryPaperErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AnswerTheoryPaperError = AnswerTheoryPaperErrors[keyof AnswerTheoryPaperErrors];
+
+export type AnswerTheoryPaperResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationTheoryPapersTheoryPaperView;
+};
+
+export type AnswerTheoryPaperResponse = AnswerTheoryPaperResponses[keyof AnswerTheoryPaperResponses];
+
+export type ApplyTheoryCorrectionData = {
+    body: NoCtfapiEndpointsTheoryActivitiesApplyTheoryCorrectionRequest;
+    path: {
+        activityId: string;
+    };
+    query?: never;
+    url: '/api/v1/theory/activities/{activityId}/corrections';
+};
+
+export type ApplyTheoryCorrectionErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type ApplyTheoryCorrectionError = ApplyTheoryCorrectionErrors[keyof ApplyTheoryCorrectionErrors];
+
+export type ApplyTheoryCorrectionResponses = {
+    /**
+     * Accepted
+     */
+    202: NoCtfapiEndpointsTheoryActivitiesTheoryCorrectionAccepted;
+};
+
+export type ApplyTheoryCorrectionResponse = ApplyTheoryCorrectionResponses[keyof ApplyTheoryCorrectionResponses];
+
+export type CheckTheoryActivityData = {
+    body?: never;
+    path: {
+        activityId: string;
+    };
+    query?: never;
+    url: '/api/v1/theory/activities/{activityId}/check';
+};
+
+export type CheckTheoryActivityErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type CheckTheoryActivityResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationTheoryActivitiesTheoryActivityCheck;
+};
+
+export type CheckTheoryActivityResponse = CheckTheoryActivityResponses[keyof CheckTheoryActivityResponses];
+
+export type GetCompetitionTheoryData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query: {
+        staff: boolean;
+    };
+    url: '/api/v1/competitions/{competitionId}/theory';
+};
+
+export type GetCompetitionTheoryErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type GetCompetitionTheoryResponses = {
+    /**
+     * Success
+     */
+    200: Array<NoCtfApplicationTheoryActivitiesTheoryActivitySummary>;
+};
+
+export type GetCompetitionTheoryResponse = GetCompetitionTheoryResponses[keyof GetCompetitionTheoryResponses];
+
+export type SaveCompetitionTheoryData = {
+    body: NoCtfapiEndpointsTheoryActivitiesSaveCompetitionTheoryRequest;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/theory';
+};
+
+export type SaveCompetitionTheoryErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type SaveCompetitionTheoryError = SaveCompetitionTheoryErrors[keyof SaveCompetitionTheoryErrors];
+
+export type SaveCompetitionTheoryResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationTheoryActivitiesTheoryActivitySummary;
+};
+
+export type SaveCompetitionTheoryResponse = SaveCompetitionTheoryResponses[keyof SaveCompetitionTheoryResponses];
+
+export type GetTheoryActivityManagementData = {
+    body?: never;
+    path: {
+        activityId: string;
+    };
+    query?: never;
+    url: '/api/v1/theory/activities/{activityId}/management';
+};
+
+export type GetTheoryActivityManagementErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetTheoryActivityManagementResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationTheoryActivitiesTheoryActivityManagement;
+};
+
+export type GetTheoryActivityManagementResponse = GetTheoryActivityManagementResponses[keyof GetTheoryActivityManagementResponses];
+
+export type GetTheoryExamLeaderboardData = {
+    body?: never;
+    path: {
+        activityId: string;
+    };
+    query: {
+        offset: number;
+        limit: number;
+        desc: boolean;
+    };
+    url: '/api/v1/theory/activities/{activityId}/leaderboard';
+};
+
+export type GetTheoryExamLeaderboardErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetTheoryExamLeaderboardError = GetTheoryExamLeaderboardErrors[keyof GetTheoryExamLeaderboardErrors];
+
+export type GetTheoryExamLeaderboardResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationTheoryActivitiesTheoryExamLeaderboard;
+};
+
+export type GetTheoryExamLeaderboardResponse = GetTheoryExamLeaderboardResponses[keyof GetTheoryExamLeaderboardResponses];
+
+export type GetTheoryPaperData = {
+    body?: never;
+    path: {
+        activityId: string;
+        paperId: string;
+    };
+    query?: never;
+    url: '/api/v1/theory/activities/{activityId}/papers/{paperId}';
+};
+
+export type GetTheoryPaperErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetTheoryPaperResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationTheoryPapersTheoryPaperView;
+};
+
+export type GetTheoryPaperResponse = GetTheoryPaperResponses[keyof GetTheoryPaperResponses];
+
+export type GetTheoryPaperImageData = {
+    body?: never;
+    path: {
+        activityId: string;
+        paperId: string;
+        fileId: string;
+    };
+    query: {
+        staff: boolean;
+    };
+    url: '/api/v1/theory/activities/{activityId}/papers/{paperId}/images/{fileId}';
+};
+
+export type GetTheoryPaperImageErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetTheoryPaperImageResponses = {
+    /**
+     * Success
+     */
+    200: Blob | File;
+};
+
+export type GetTheoryPaperImageResponse = GetTheoryPaperImageResponses[keyof GetTheoryPaperImageResponses];
+
+export type GetTheoryReviewData = {
+    body?: never;
+    path: {
+        activityId: string;
+        paperId: string;
+    };
+    query?: never;
+    url: '/api/v1/theory/activities/{activityId}/reviews/{paperId}';
+};
+
+export type GetTheoryReviewErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetTheoryReviewResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationTheoryActivitiesTheoryReviewPaper;
+};
+
+export type GetTheoryReviewResponse = GetTheoryReviewResponses[keyof GetTheoryReviewResponses];
+
+export type GetTheorySessionData = {
+    body?: never;
+    path: {
+        activityId: string;
+    };
+    query?: never;
+    url: '/api/v1/theory/activities/{activityId}/session';
+};
+
+export type GetTheorySessionErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetTheorySessionResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationTheoryPapersTheoryPaperView;
+};
+
+export type GetTheorySessionResponse = GetTheorySessionResponses[keyof GetTheorySessionResponses];
+
+export type IssueTheoryPaperData = {
+    body: NoCtfapiEndpointsTheoryActivitiesIssueTheoryPaperRequest;
+    path: {
+        activityId: string;
+    };
+    query?: never;
+    url: '/api/v1/theory/activities/{activityId}/papers';
+};
+
+export type IssueTheoryPaperErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type IssueTheoryPaperError = IssueTheoryPaperErrors[keyof IssueTheoryPaperErrors];
+
+export type IssueTheoryPaperResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationTheoryPapersTheoryPaperView;
+};
+
+export type IssueTheoryPaperResponse = IssueTheoryPaperResponses[keyof IssueTheoryPaperResponses];
+
+export type ListTheoryActivitiesData = {
+    body?: never;
+    path?: never;
+    query: {
+        staff: boolean;
+        competitionId?: string | null;
+        keyword?: string | null;
+        offset: number;
+        limit: number;
+        desc: boolean;
+    };
+    url: '/api/v1/theory/activities';
+};
+
+export type ListTheoryActivitiesErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type ListTheoryActivitiesError = ListTheoryActivitiesErrors[keyof ListTheoryActivitiesErrors];
+
+export type ListTheoryActivitiesResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationTheoryActivitiesTheoryActivityPage;
+};
+
+export type ListTheoryActivitiesResponse = ListTheoryActivitiesResponses[keyof ListTheoryActivitiesResponses];
+
+export type SaveTheoryActivityData = {
+    body: NoCtfapiEndpointsTheoryActivitiesSaveTheoryActivityRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/theory/activities';
+};
+
+export type SaveTheoryActivityErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type SaveTheoryActivityError = SaveTheoryActivityErrors[keyof SaveTheoryActivityErrors];
+
+export type SaveTheoryActivityResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationTheoryActivitiesTheoryActivitySummary;
+};
+
+export type SaveTheoryActivityResponse = SaveTheoryActivityResponses[keyof SaveTheoryActivityResponses];
+
+export type ListTheoryAuditData = {
+    body?: never;
+    path: {
+        activityId: string;
+    };
+    query: {
+        offset: number;
+        limit: number;
+        desc: boolean;
+    };
+    url: '/api/v1/theory/activities/{activityId}/audit';
+};
+
+export type ListTheoryAuditErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type ListTheoryAuditError = ListTheoryAuditErrors[keyof ListTheoryAuditErrors];
+
+export type ListTheoryAuditResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationTheoryActivitiesTheoryAuditPage;
+};
+
+export type ListTheoryAuditResponse = ListTheoryAuditResponses[keyof ListTheoryAuditResponses];
+
+export type ListTheoryReviewsData = {
+    body?: never;
+    path: {
+        activityId: string;
+    };
+    query: {
+        offset: number;
+        limit: number;
+        desc: boolean;
+    };
+    url: '/api/v1/theory/activities/{activityId}/reviews';
+};
+
+export type ListTheoryReviewsErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type ListTheoryReviewsError = ListTheoryReviewsErrors[keyof ListTheoryReviewsErrors];
+
+export type ListTheoryReviewsResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationTheoryActivitiesTheoryReviewPage;
+};
+
+export type ListTheoryReviewsResponse = ListTheoryReviewsResponses[keyof ListTheoryReviewsResponses];
+
+export type PreviewTheoryCorrectionData = {
+    body: NoCtfapiEndpointsTheoryActivitiesPreviewTheoryCorrectionRequest;
+    path: {
+        activityId: string;
+    };
+    query?: never;
+    url: '/api/v1/theory/activities/{activityId}/corrections/preview';
+};
+
+export type PreviewTheoryCorrectionErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type PreviewTheoryCorrectionError = PreviewTheoryCorrectionErrors[keyof PreviewTheoryCorrectionErrors];
+
+export type PreviewTheoryCorrectionResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationTheoryActivitiesTheoryCorrectionPreview;
+};
+
+export type PreviewTheoryCorrectionResponse = PreviewTheoryCorrectionResponses[keyof PreviewTheoryCorrectionResponses];
+
+export type StartTheoryConsultationData = {
+    body: NoCtfapiEndpointsTheoryActivitiesStartTheoryConsultationRequest;
+    path: {
+        activityId: string;
+        paperId: string;
+    };
+    query?: never;
+    url: '/api/v1/theory/activities/{activityId}/reviews/{paperId}/consultations';
+};
+
+export type StartTheoryConsultationErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type StartTheoryConsultationError = StartTheoryConsultationErrors[keyof StartTheoryConsultationErrors];
+
+export type StartTheoryConsultationResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsTheoryActivitiesTheoryConsultationResponse;
+};
+
+export type StartTheoryConsultationResponse = StartTheoryConsultationResponses[keyof StartTheoryConsultationResponses];
+
+export type SubmitTheoryPaperData = {
+    body: NoCtfapiEndpointsTheoryActivitiesSubmitTheoryPaperRequest;
+    path: {
+        activityId: string;
+        paperId: string;
+    };
+    query?: never;
+    url: '/api/v1/theory/activities/{activityId}/papers/{paperId}/submit';
+};
+
+export type SubmitTheoryPaperErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type SubmitTheoryPaperError = SubmitTheoryPaperErrors[keyof SubmitTheoryPaperErrors];
+
+export type SubmitTheoryPaperResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationTheoryPapersTheoryPaperView;
+};
+
+export type SubmitTheoryPaperResponse = SubmitTheoryPaperResponses[keyof SubmitTheoryPaperResponses];
+
+export type TransitionTheoryActivityData = {
+    body: NoCtfapiEndpointsTheoryActivitiesTransitionTheoryActivityRequest;
+    path: {
+        activityId: string;
+    };
+    query?: never;
+    url: '/api/v1/theory/activities/{activityId}/operations';
+};
+
+export type TransitionTheoryActivityErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type TransitionTheoryActivityError = TransitionTheoryActivityErrors[keyof TransitionTheoryActivityErrors];
+
+export type TransitionTheoryActivityResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationTheoryActivitiesTheoryActivitySummary;
+};
+
+export type TransitionTheoryActivityResponse = TransitionTheoryActivityResponses[keyof TransitionTheoryActivityResponses];
+
+export type VoidTheoryPaperData = {
+    body: NoCtfapiEndpointsTheoryActivitiesVoidTheoryPaperRequest;
+    path: {
+        activityId: string;
+        paperId: string;
+    };
+    query?: never;
+    url: '/api/v1/theory/activities/{activityId}/reviews/{paperId}/void';
+};
+
+export type VoidTheoryPaperErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type VoidTheoryPaperError = VoidTheoryPaperErrors[keyof VoidTheoryPaperErrors];
+
+export type VoidTheoryPaperResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type VoidTheoryPaperResponse = VoidTheoryPaperResponses[keyof VoidTheoryPaperResponses];
 
 export type TeamAvatarClearData = {
     body?: never;

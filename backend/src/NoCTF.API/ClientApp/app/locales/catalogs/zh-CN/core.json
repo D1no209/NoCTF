@@ -1,4 +1,6 @@
 {
+  "common.label.theoryBank": "理论题库",
+  "common.label.theoryActivities": "理论答题",
   "pagination.cursor.navigation": "分页导航",
   "pagination.cursor.showing": "当前显示 {count} 条",
   "pagination.cursor.page": "第 {page} 页",

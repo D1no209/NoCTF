@@ -3,7 +3,7 @@ import { computed, nextTick, ref } from 'vue'
 import { useMediaQuery } from '@vueuse/core'
 import { Code, Heading2, Link, List } from '@lucide/vue'
 
-const props = defineProps<{ disabled?: boolean; label: string; placeholder?: string }>()
+const props = defineProps<{ disabled?: boolean; label: string; placeholder?: string; assets?: Readonly<Record<string, string>> }>()
 const model = defineModel<string>({ default: '' })
 const emit = defineEmits<{ save: [] }>()
 const root = ref<HTMLElement | null>(null)
@@ -44,7 +44,7 @@ function keydown(event: KeyboardEvent) {
     </div>
     <div class="grid min-w-0 gap-4" :class="effectiveLayout === 'split' ? 'md:grid-cols-2' : ''">
       <Textarea v-if="effectiveLayout !== 'preview'" v-model="model" :disabled="disabled" :aria-label="label" :placeholder="placeholder" class="min-h-64" />
-      <MarkdownPreview v-if="effectiveLayout !== 'edit'" :source="model" :label="$t('challengeWriteUp.preview')" :empty-label="$t('challengeWriteUp.previewEmpty')" />
+      <MarkdownPreview v-if="effectiveLayout !== 'edit'" :source="model" :assets="assets" :label="$t('challengeWriteUp.preview')" :empty-label="$t('challengeWriteUp.previewEmpty')" />
     </div>
   </section>
 </template>

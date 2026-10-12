@@ -66,9 +66,17 @@ Competition 以普通列 `TracksEnabled` 显式启停赛道，并以带 `Positio
 
 `CompetitionChallenge` 是比赛内实例，链接 CompetitionId 与 ChallengeId，拥有可选的比赛内展示名称、Order、IsPublished、typed mode-specific rules TPH 和关系化 Hint。CTF/AWD/AWDP/KoH 还可配置开放、计分结束与提交截止时间；当前实现与验证见[题目时间配置](challenge-timing-status.md)。题目分值完全由 Rules leaf 与其关系子项决定，不保存独立基础分。展示名称为空时实时回退到 Challenge.Title；比赛内改名不修改全局题库模板。引用时 Challenge.Mode 必须等于 Competition.Mode。模板定义修改不改动正在运行的 Runtime；下一次 Start 或新 UUID Reset 读取最新定义，不保存题目定义版本，也不自动更新存量 Runtime。
 
+### 独立理论答题
+
+理论题、不可变版本、选项、题源及授权独立于 `Challenge`。理论活动冻结候选版本和组卷规则，CTF/AWD/AWDP 可关联一个活动，既有比赛默认没有活动；独立练习和测验不要求比赛。
+
+发卷以规范题源去重，选项排列持久化。队伍共享作答，答案保存不判分，交卷或超时后统一判分。参与者永远只获得总分，不返回逐题判定或解析。理论成绩使用最高／最后／累计策略并作为独立分项加入排行；暂停补时、封榜和资格继续统一生效。完整入口与验证记录见 [理论答题](theory-status.md)。
+
 ### GameplayFact
 
 GameplayFact 是玩家、管理员或系统在比赛中的客观行为及其当前唯一判定。Flag/Break 保存原文和 Hash，Fix/Hint/AWD Round 使用多态 Reference；ManualAdjustment 保存 canonical Int32 Value。重判覆盖同一行的 Result/FailureCode，不保留旧判定，也不保存分数。
+
+实践行为要求 `CompetitionChallengeId` 且不能关联理论试卷；`TheoryPaperSubmission` 要求真实、唯一的 `TheoryPaperId`，同时 `CompetitionChallengeId` 为空。理论逐题权威判定保存在试卷题目，分数从该判定派生；独立活动不产生比赛事实。理论事实不进入 Flag/Fix 列表、次数、作弊证据或通用重判。
 
 ### RuntimeInstance
 

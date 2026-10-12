@@ -1,4 +1,5 @@
 import ChallengeTimingMessages from './catalogs/en/challenge-timing.json'
+import TheoryMessages from './catalogs/en/theory.json'
 import CoreMessages from './catalogs/en/core.json'
 import CompetitionsMessages from './catalogs/en/competitions.json'
 import ChallengesMessages from './catalogs/en/challenges.json'
@@ -16,6 +17,7 @@ import ErrorMessages from './catalogs/en/errors.json'
 
 export const englishMessages = {
   ...CoreMessages,
+  ...TheoryMessages,
   ...ChallengeTimingMessages,
   ...CompetitionsMessages,
   ...ChallengesMessages,

@@ -56,7 +56,7 @@ public sealed class TheoryReviewStore(NoCtfDbContext db, IPostCommitMessagePubli
     public async Task<TheoryAuditPage?> AuditAsync(Guid actorId, Guid activityId, int offset, int limit, DateTimeOffset now, CancellationToken ct)
     {
         var access = await TheoryActivityAccess.ReadAsync(db, activityId, actorId, now, ct);
-        if (access is null || !access.CanObserve) return null;
+        if (access is null || !access.CanJudge) return null;
         var operations = db.Set<TheoryActivityOperation>().AsNoTracking().Where(item => item.ActivityId == activityId);
         return new(await operations.OrderByDescending(item => item.OccurredAt).ThenBy(item => item.Id)
             .Skip(Math.Max(0, offset)).Take(Math.Clamp(limit, 1, 200)).Select(item => new TheoryAuditRow(item.Id, item.Kind,
@@ -85,7 +85,7 @@ public sealed class TheoryReviewStore(NoCtfDbContext db, IPostCommitMessagePubli
     {
         var access = await TheoryActivityAccess.ReadAsync(db, activityId, actorId, now, ct);
         if (access is null || !access.CanObserve) return null;
-        var query = Papers(activityId);
+        var query = VisiblePapers(activityId, access);
         var rows = await Rows(query.OrderByDescending(paper => paper.OpenedAt).ThenBy(paper => paper.Id)
             .Skip(Math.Max(0, offset)).Take(Math.Clamp(limit, 1, 200))).ToArrayAsync(ct);
         var participantIds = rows.Select(row => row.ParticipantId).Distinct().ToArray();
@@ -102,7 +102,7 @@ public sealed class TheoryReviewStore(NoCtfDbContext db, IPostCommitMessagePubli
     {
         var access = await TheoryActivityAccess.ReadAsync(db, activityId, actorId, now, ct);
         if (access is null || !access.CanObserve) return null;
-        var row = await Rows(Papers(activityId).Where(paper => paper.Id == paperId)).SingleOrDefaultAsync(ct);
+        var row = await Rows(VisiblePapers(activityId, access).Where(paper => paper.Id == paperId)).SingleOrDefaultAsync(ct);
         if (row is null) return null;
         if (!access.CanJudge) return new(row, []);
         var paper = await db.TheoryPapers.AsNoTracking().Include(paper => paper.Items).ThenInclude(item => item.Options).SingleAsync(paper => paper.Id == paperId, ct);
@@ -250,6 +250,14 @@ public sealed class TheoryReviewStore(NoCtfDbContext db, IPostCommitMessagePubli
             await publisher.PublishAsync(new ProjectLeaderboard(competitionId.Value)); await publisher.FlushCommittedMessagesAsync();
         }
         if (signals is not null) await signals.PublishAsync(new(activityId, null), ct);
+    }
+    private IQueryable<TheoryPaper> VisiblePapers(Guid activityId, TheoryAccess access)
+    {
+        var query = Papers(activityId);
+        if (access.CanJudge || access.Competition is not { TracksEnabled: true } competition) return query;
+        var internalKeys = competition.Tracks.Where(track => track.IsInternal).Select(track => track.Key).ToArray();
+        return query.Where(paper => db.TheoryParticipants.Any(participant => participant.Id == paper.ParticipantId
+            && db.Teams.IgnoreQueryFilters().Any(team => team.Id == participant.TeamId && !internalKeys.Contains(team.TrackKey))));
     }
     private IQueryable<TheoryPaper> Papers(Guid activityId) => db.TheoryPapers.Where(paper => db.TheoryParticipants.Any(participant => participant.Id == paper.ParticipantId && participant.ActivityId == activityId));
     private IQueryable<TheoryReviewRow> Rows(IQueryable<TheoryPaper> papers) => papers.AsNoTracking()

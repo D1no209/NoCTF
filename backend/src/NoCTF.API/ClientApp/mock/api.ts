@@ -592,7 +592,7 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
         key: 'open', name: '公开赛道 / Open', isDefault: true, isPublicSelectable: true, earnsScore: true, earnsBlood: true,
         affectsDynamicChallengeScore: true, visibleOnLeaderboard: true, affectsCompetitiveResults: true, isViewerTrack: true,
       })] }
-      else if (cleanRoute.includes('/leaderboard')) {
+      else if (cleanRoute.startsWith('/competitions/') && cleanRoute.includes('/leaderboard')) {
         const suffix = cleanRoute.split('/leaderboard')[1]!
         value = leaderboardRead(state, suffix, p.competitionId!)
         if (suffix === '' && value) value = singleWriteUps.decorateLeaderboard(value, p.competitionId!)

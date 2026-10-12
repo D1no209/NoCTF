@@ -96,18 +96,32 @@ const htmlOptions: sanitizeHtml.IOptions = {
 }
 
 /** Sanitize the complete result, including Markdown-generated links and author HTML. */
-export function renderMarkdown(source: string, highlighter?: CodeHighlighter): string {
+export function renderMarkdown(source: string, highlighter?: CodeHighlighter, assets?: Readonly<Record<string, string>>): string {
   if (highlighter && !highlightedMarkdown)
     highlightedMarkdown = createMarkdown(highlighter)
-  return sanitizeHtml((highlighter ? highlightedMarkdown! : plainMarkdown).render(source), htmlOptions)
+  const options: sanitizeHtml.IOptions = assets === undefined ? htmlOptions : {
+    ...htmlOptions,
+    allowedTags: (htmlOptions.allowedTags as string[]).filter(tag => !['audio', 'video', 'source', 'picture'].includes(tag)),
+    allowedSchemesByTag: { img: ['blob'] },
+    transformTags: {
+      ...htmlOptions.transformTags,
+      img: (_tagName, attribs) => {
+        const asset = assets[attribs.src ?? '']
+        return asset?.startsWith('blob:')
+          ? { tagName: 'img', attribs: { src: asset, alt: attribs.alt ?? '', loading: 'lazy', referrerpolicy: 'no-referrer' } }
+          : { tagName: 'span', attribs: {} as Record<string, string> }
+      },
+    },
+  }
+  return sanitizeHtml((highlighter ? highlightedMarkdown! : plainMarkdown).render(source), options)
 }
 
 /** Loads Highlight.js only for documents that contain a code fence. */
-export async function renderMarkdownAsync(source: string): Promise<string> {
+export async function renderMarkdownAsync(source: string, assets?: Readonly<Record<string, string>>): Promise<string> {
   if (!hasMarkdownCodeFence(source))
-    return renderMarkdown(source)
+    return renderMarkdown(source, undefined, assets)
   const { highlightMarkdownCode } = await import('./markdown-highlighter')
-  return renderMarkdown(source, highlightMarkdownCode)
+  return renderMarkdown(source, highlightMarkdownCode, assets)
 }
 
 interface MarkdownCacheEntry {

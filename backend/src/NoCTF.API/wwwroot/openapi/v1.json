@@ -164,6 +164,46 @@
             }
           },
           {
+            "name": "state",
+            "in": "query",
+            "schema": {
+              "nullable": true,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/NoCTFDomainTheoryQuestionsTheoryQuestionState"
+                }
+              ]
+            }
+          },
+          {
+            "name": "difficulty",
+            "in": "query",
+            "schema": {
+              "nullable": true,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/NoCTFDomainTheoryQuestionsTheoryQuestionDifficulty"
+                }
+              ]
+            }
+          },
+          {
+            "name": "knowledge",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "tag",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
             "name": "keyword",
             "in": "query",
             "schema": {
@@ -27457,6 +27497,16 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
+          },
+          "paperReferences": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "classifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFApplicationTheoryQuestionsTheoryClassificationInput"
+            }
           }
         }
       },

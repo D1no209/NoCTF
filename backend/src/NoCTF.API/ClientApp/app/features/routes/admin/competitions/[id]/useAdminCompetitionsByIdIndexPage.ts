@@ -288,6 +288,7 @@ export function useAdminCompetitionsByIdIndexPage() {
     LiveSoloQuestionGroup: 'competitions.deletion.soloQuestionLists',
     LiveSoloQuestionMaterial: 'competitions.deletion.soloOwnedMaterials',
     ActiveLiveSoloMediaResource: 'competitions.deletion.activeSoloMediaResources',
+    TheoryActivity: 'common.label.theoryActivities',
   }
 
   function hardDeleteReferenceLabel(code?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode) {

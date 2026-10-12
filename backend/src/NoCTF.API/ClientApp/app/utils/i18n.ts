@@ -19,6 +19,7 @@ export const localeDomains = [
   'mfa',
   'passkeys',
   'live-solo',
+  'theory',
 ] as const
 export type LocaleDomain = typeof localeDomains[number]
 
@@ -43,6 +44,7 @@ export function mergeLocaleCatalog(english: LocaleCatalog, translated: LocaleCat
 
 const catalogLoaders: Record<AppLocale, Record<LocaleDomain, () => Promise<LocaleCatalog>>> = {
   'zh-CN': {
+    theory: () => import('../locales/catalogs/zh-CN/theory.json').then(chunk => chunk.default),
     core: () => import('../locales/catalogs/zh-CN/core.json').then(chunk => chunk.default),
     errors: () => import('../locales/catalogs/zh-CN/errors.json').then(chunk => chunk.default),
     competitions: () => import('../locales/catalogs/zh-CN/competitions.json').then(chunk => chunk.default),
@@ -60,6 +62,7 @@ const catalogLoaders: Record<AppLocale, Record<LocaleDomain, () => Promise<Local
     'live-solo': () => import('../locales/catalogs/zh-CN/live-solo.json').then(chunk => chunk.default),
   },
   'en': {
+    theory: () => import('../locales/catalogs/en/theory.json').then(chunk => chunk.default),
     core: () => import('../locales/catalogs/en/core.json').then(chunk => chunk.default),
     errors: () => import('../locales/catalogs/en/errors.json').then(chunk => chunk.default),
     competitions: () => import('../locales/catalogs/en/competitions.json').then(chunk => chunk.default),

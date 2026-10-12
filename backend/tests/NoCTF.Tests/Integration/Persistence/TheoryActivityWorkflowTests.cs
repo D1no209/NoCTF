@@ -85,6 +85,13 @@ public sealed class TheoryActivityWorkflowTests
                 .IsEqualTo(TheoryPaperFailure.NotFoundOrForbidden);
             await Assert.That(await db.CompetitionChallenges.CountAsync(ct)).IsEqualTo(0);
             await Assert.That(answered.View.Paper.Questions.Single().AnsweredByName).IsEqualTo(member.UserName);
+            var metadata = await new TheoryQuestionBank(db).ListAsync(owner.Id, null, TheoryQuestionKind.SingleChoice, 0, 20, ct,
+                new(TheoryQuestionState.Available, TheoryQuestionDifficulty.Basic, null, null));
+            await Assert.That(metadata.Total).IsEqualTo(1);
+            await Assert.That(metadata.Items.Single().PaperReferences).IsEqualTo(1);
+            await Assert.That((await new TheoryQuestionBank(db).ListAsync(owner.Id, null, null, 0, 20, ct,
+                new(null, null, null, "missing-tag"))).Total).IsEqualTo(0);
+
             var audience = new NoCTF.Infrastructure.Theory.Realtime.TheoryChangeAudienceResolver(new ContextFactory(options));
             var participant = await db.TheoryParticipants.SingleAsync(ct);
             var recipients = await audience.ResolveAsync(new(activityId, participant.Id), ct);
@@ -108,6 +115,18 @@ public sealed class TheoryActivityWorkflowTests
             await Assert.That(thread).IsNotNull();
             await Assert.That(await review.StartConsultationAsync(owner.Id, activityId, result.View.Paper.Id, "Private synthetic consultation", now.AddSeconds(23), ct)).IsEqualTo(thread);
             await db.Notifications.Where(item => item.Id == thread).ExecuteDeleteAsync(ct);
+            var trackedCompetition = await db.Competitions.Include(item => item.Collaborators).Include(item => item.Tracks).SingleAsync(item => item.Id == competition.Id, ct);
+            trackedCompetition.TracksEnabled = true;
+            if (trackedCompetition.Tracks.Count == 0) trackedCompetition.Tracks = CompetitionTrackConfiguration.EffectiveFor(mode, false, []).Tracks.ToList();
+            trackedCompetition.Tracks.Add(new("internal", "Private", false, false, true, false, false, false, false, false));
+            trackedCompetition.ObserverIds = [outsider.Id];
+            persistedTeam = await db.Teams.SingleAsync(item => item.Id == team.Id, ct);
+            persistedTeam.TrackKey = "internal";
+            await db.SaveChangesAsync(ct); db.ChangeTracker.Clear();
+            await Assert.That((await review.ListAsync(outsider.Id, activityId, 0, 20, now.AddSeconds(25), ct))!.Total).IsEqualTo(0);
+            await Assert.That(await review.ReadAsync(outsider.Id, activityId, result.View.Paper.Id, now.AddSeconds(25), ct)).IsNull();
+            await Assert.That((await review.ListAsync(owner.Id, activityId, 0, 20, now.AddSeconds(25), ct))!.Total).IsEqualTo(1);
+
             var snapshot = await TheoryScoreReader.ReadAsync(db, competition.Id, now.AddSeconds(21), ct);
             await Assert.That(snapshot.Receipts.Single().ConcurrencyStamp).IsEqualTo(fact.ConcurrencyStamp);
             // The deletion graph must be atomic and must never delete reusable bank content.

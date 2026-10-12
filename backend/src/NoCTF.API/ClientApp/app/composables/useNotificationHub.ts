@@ -4,6 +4,7 @@ import { getAccessToken, getRealtimeAccessToken } from '../lib/session'
 import { startRealtimeWithRetry } from '../lib/realtime-retry'
 
 export interface NotificationHubHandlers {
+  theoryChanged?: (activityId: string) => void
   notificationChanged?: () => void
   onReconnected?: () => void
 }
@@ -36,6 +37,7 @@ function ensureConnection(): signalR.HubConnection {
     .build()
 
   hub.on('notificationChanged', notifyChanged)
+  hub.on('theoryChanged', (activityId: string) => { for (const handlers of subscribers.values()) handlers.theoryChanged?.(activityId) })
   hub.onreconnected(() => {
     if (connection === hub) notifyReconnected()
   })

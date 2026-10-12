@@ -17,6 +17,8 @@ public sealed record TheoryQuestionSummary(Guid Id, Guid OwnerId, Guid SourceId,
     bool CanReadAnswers, bool CanManage)
 {
     public DateTimeOffset? FirstExposedAt { get; init; }
+    public int PaperReferences { get; init; }
+    public IReadOnlyList<TheoryClassificationInput> Classifications { get; init; } = [];
 }
 public sealed record TheoryQuestionPage(IReadOnlyList<TheoryQuestionSummary> Items, int Total);
 public sealed record TheoryQuestionContent(TheoryQuestionSummary Question, Guid RevisionId, TheoryQuestionInput Content)
@@ -25,11 +27,12 @@ public sealed record TheoryQuestionContent(TheoryQuestionSummary Question, Guid 
 }
 public sealed record TheoryQuestionAccessGrant(Guid UserId, string Name, TheoryQuestionPermission Permission);
 
+public sealed record TheoryQuestionFilter(TheoryQuestionState? State, TheoryQuestionDifficulty? Difficulty, string? Knowledge, string? Tag);
 public interface ITheoryQuestionBank
 {
     Task<TheoryBankWriteResult> SaveAsync(Guid actorId, Guid? questionId, TheoryQuestionRevision revision, CancellationToken ct);
     Task<TheoryBankWriteResult> CopyAsync(Guid actorId, Guid questionId, DateTimeOffset now, CancellationToken ct);
-    Task<TheoryQuestionPage> ListAsync(Guid actorId, string? search, TheoryQuestionKind? kind, int offset, int limit, CancellationToken ct);
+    Task<TheoryQuestionPage> ListAsync(Guid actorId, string? search, TheoryQuestionKind? kind, int offset, int limit, CancellationToken ct, TheoryQuestionFilter? filters = null);
     Task<TheoryQuestionContent?> ReadAsync(Guid actorId, Guid questionId, CancellationToken ct);
     Task<TheoryBankFailure?> SetStateAsync(Guid actorId, Guid questionId, TheoryQuestionState state, DateTimeOffset now, CancellationToken ct);
     Task<TheoryBankFailure?> GrantAsync(Guid actorId, Guid questionId, Guid userId, TheoryQuestionPermission? permission, CancellationToken ct);

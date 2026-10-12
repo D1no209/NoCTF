@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { prefetchMarkdownHighlighter, renderMarkdownPreview } from '~/lib/markdown-preview-worker.client'
+import { renderMarkdownAsync } from '~/lib/markdown'
 import MarkdownDocument from './MarkdownDocument'
 
-const props = defineProps<{ source: string; label: string; emptyLabel: string }>()
+const props = defineProps<{ source: string; label: string; emptyLabel: string; assets?: Readonly<Record<string, string>> }>()
 
 const html = shallowRef('')
 let pendingSource = props.source
@@ -11,12 +12,12 @@ let renderSequence = 0
 
 async function renderLatest(source: string) {
   const sequence = ++renderSequence
-  const rendered = await renderMarkdownPreview(source)
+  const rendered = props.assets === undefined ? await renderMarkdownPreview(source) : await renderMarkdownAsync(source, props.assets)
   if (sequence === renderSequence)
     html.value = rendered
 }
 
-watch(() => props.source, (source) => {
+watch(() => [props.source, props.assets] as const, ([source]) => {
   pendingSource = source
   if (previewFrame !== undefined) return
   previewFrame = requestAnimationFrame(() => {

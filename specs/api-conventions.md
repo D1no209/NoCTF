@@ -67,9 +67,9 @@ Redis 分布式策略：认证按 IP；普通 API 按 User；Flag 按 Team+题�
 
 ## 幂等
 
-不支持公开 Idempotency-Key。每个通过接入的 GameplayFact 都是新尝试；Patch 上传替换未引用对象；
-Runtime 以全新 UUID、状态和 MessageId 幂等处理重复；配置后写覆盖。内部消息只携带稳定事实/实例 Id，
-消费端依赖 durable inbox，业务事务依赖 transactional outbox，不使用 ProcessingVersion/Sequence。
+普通 Flag/Fix 受理仍各自产生新尝试，不使用公开 Idempotency-Key。理论开卷与逐题保存使用强类型请求中的 RequestId 和关系化回执；整卷提交幂等返回同一结果，每份正式试卷只有一个 TheoryPaperSubmission 事实。Patch 上传替换未引用对象；Runtime 以全新 UUID、状态和 MessageId 幂等处理重复；配置后写覆盖。
+
+内部消息通过 NATS JetStream 持久投递，数据库提交后发布并从关系化待处理状态恢复；不引入数据库 Inbox 或通用 Outbox。Competition Webhook 的专用事务 Outbox 保持现有例外。
 
 ## OpenAPI 验收
 

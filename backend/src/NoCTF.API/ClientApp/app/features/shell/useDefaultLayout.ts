@@ -1,7 +1,8 @@
 import { markRaw } from 'vue'
 import { adminWorkspacePath } from '~/features/admin/admin-navigation'
 
-import { Bell, Database, Flag, ShieldAlert } from '@lucide/vue'
+import { Bell, Database, Flag, ShieldAlert, BookOpen, GraduationCap } from '@lucide/vue'
+import { theoryQuestionsList } from '~/api'
 import PlatformGearIconComponent from '../../components/ui/icons/PlatformGearIcon.vue'
 import AccountPanelComponent from '../account/AccountPanel.vue'
 import LanguageToggleComponent from '../LanguageToggle.vue'
@@ -83,9 +84,21 @@ export function useDefaultLayout() {
       : undefined
   }
 
+  const theoryBankVisible = ref(false)
+  let theoryPermissionEpoch = 0
+  watch(() => [user.value?.userId, canOrganize.value, route.path], async () => {
+    const epoch = ++theoryPermissionEpoch
+    theoryBankVisible.value = canOrganize.value
+    if (!user.value || canOrganize.value) return
+    const response = await theoryQuestionsList({ query: { offset: 0, limit: 1, desc: true } })
+    if (epoch === theoryPermissionEpoch) theoryBankVisible.value = (response.data?.total ?? 0) > 0
+  }, { immediate: true })
+
   const navItems = computed(() => [
     { to: '/competitions', label: t("common.label.competitions"), icon: Flag, show: true, unread: false },
     { to: '/admin/challenges', label: t("common.label.challengeLibrary.useDefaultLayout"), icon: Database, show: canOrganize.value, unread: false },
+    { to: '/admin/theory/questions', label: t('common.label.theoryBank'), icon: BookOpen, show: theoryBankVisible.value, unread: false },
+    { to: '/theory', label: t('common.label.theoryActivities'), icon: GraduationCap, show: isLoggedIn.value, unread: false },
     { to: '/admin/platform', label: t("common.label.platformAdmin"), icon: markRaw(PlatformGearIconComponent), show: isLoggedIn.value && isAdministrator.value, unread: false },
     { to: '/notifications', label: t("common.label.notifications"), icon: Bell, show: isLoggedIn.value, unread: hasUnread.value },
   ])
@@ -121,6 +134,7 @@ export function useDefaultLayout() {
   )
 
   onBeforeUnmount(() => {
+    theoryPermissionEpoch++
     if (notificationTimer) clearInterval(notificationTimer)
     document.removeEventListener('visibilitychange', refreshWhenVisible)
     window.removeEventListener('focus', refreshWhenVisible)

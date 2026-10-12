@@ -11,6 +11,10 @@ namespace NoCTF.API.Endpoints.Theory.Questions;
 public sealed class ListTheoryQuestionsRequest : SearchRequest
 {
     [QueryParam] public TheoryQuestionKind? Kind { get; set; }
+    [QueryParam] public TheoryQuestionState? State { get; set; }
+    [QueryParam] public TheoryQuestionDifficulty? Difficulty { get; set; }
+    [QueryParam] public string? Knowledge { get; set; }
+    [QueryParam] public string? Tag { get; set; }
 }
 
 public sealed class ListTheoryQuestionsValidator : Validator<ListTheoryQuestionsRequest>
@@ -19,6 +23,8 @@ public sealed class ListTheoryQuestionsValidator : Validator<ListTheoryQuestions
     {
         PaginationRules.AddSearch(this);
         RuleFor(request => request.Kind).IsInEnum();
+        RuleFor(request => request.State).IsInEnum(); RuleFor(request => request.Difficulty).IsInEnum();
+        RuleFor(request => request.Knowledge).MaximumLength(80); RuleFor(request => request.Tag).MaximumLength(80);
     }
 }
 
@@ -39,5 +45,5 @@ public sealed class ListTheoryQuestionsEndpoint(ITheoryQuestionBank bank, IUserC
     }
 
     public override async Task<Ok<TheoryQuestionPage>> ExecuteAsync(ListTheoryQuestionsRequest request, CancellationToken ct)
-        => TypedResults.Ok(await bank.ListAsync(user.UserId, request.Keyword, request.Kind, request.Offset, request.Limit, ct));
+        => TypedResults.Ok(await bank.ListAsync(user.UserId, request.Keyword, request.Kind, request.Offset, request.Limit, ct, new(request.State, request.Difficulty, request.Knowledge, request.Tag)));
 }

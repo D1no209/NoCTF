@@ -1,4 +1,5 @@
 import ChallengeTimingMessages from './catalogs/zh-CN/challenge-timing.json'
+import TheoryMessages from './catalogs/zh-CN/theory.json'
 import { englishMessages } from './en'
 import CoreMessages from './catalogs/zh-CN/core.json'
 import CompetitionsMessages from './catalogs/zh-CN/competitions.json'
@@ -17,6 +18,7 @@ import ErrorMessages from './catalogs/zh-CN/errors.json'
 
 const translatedMessages = {
   ...CoreMessages,
+  ...TheoryMessages,
   ...ChallengeTimingMessages,
   ...CompetitionsMessages,
   ...ChallengesMessages,

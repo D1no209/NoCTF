@@ -27,7 +27,7 @@ internal static class TheoryActivityAccess
         var activity = await activities.SingleOrDefaultAsync(activity => activity.Id == activityId, ct);
         if (activity is null) return null;
         var link = await db.CompetitionTheoryActivities.AsNoTracking().SingleOrDefaultAsync(link => link.ActivityId == activityId, ct);
-        var competition = link is null ? null : await db.Competitions.AsNoTracking().Include(competition => competition.Collaborators)
+        var competition = link is null ? null : await db.Competitions.AsNoTracking().Include(competition => competition.Collaborators).Include(competition => competition.Tracks)
             .SingleOrDefaultAsync(competition => competition.Id == link.CompetitionId && competition.DeletedAt == null, ct);
         if (activity.Kind == TheoryActivityKind.Competition && (competition is null || !TheoryActivityPolicy.Supports(competition.Mode))) return null;
         var manage = user?.Role == UserRole.Administrator || (competition is null ? activity.OwnerId == actorId

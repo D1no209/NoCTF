@@ -4,7 +4,8 @@ import type { UiMessage } from '../../../utils/i18n'
 import { markRaw } from 'vue'
 
 import { ArrowLeft, ClipboardCheck, FileText, GitBranch, LayoutDashboard, MessageCircleQuestion, Puzzle, Trophy, UserRound } from '@lucide/vue'
-import { getCompetitionEndpoint, getLeaderboardEndpoint, getMyTeamEndpoint, getPlayerCompetitionProgression } from '../../../api'
+import { getCompetitionEndpoint, getLeaderboardEndpoint, getMyTeamEndpoint, getPlayerCompetitionProgression, getCompetitionTheory } from '../../../api'
+import { watchNotifications } from '~/composables/useNotificationHub'
 import type { NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsCompetitionsScoreboardTeamResponse, NoCtfapiEndpointsTeamsTeamResponse } from '../../../api'
 import { competitionWorkspaceNavigationKey } from '../../app/workspace-nav'
 import type { WorkspaceNavGroup } from '../../app/workspace-nav'
@@ -26,7 +27,7 @@ export function useCompetitionsByIdPage() {
   const isControlScreen = computed(() => [
     `/competitions/${competitionId.value}/live`,
     `/competitions/${competitionId.value}/awdp-live`,
-  ].includes(route.path) || route.path.includes('/live-solo/program/') || route.path.includes('/live-solo/recordings/') || route.path.endsWith('/live-solo/settings') || route.path.endsWith('/live-solo/bracket') || route.path.includes('/live-solo/groups') || route.path.includes('/live-solo/question-pool') || route.path.includes('/live-solo/postgame/'))
+  ].includes(route.path) || route.path.includes('/live-solo/program/') || route.path.includes('/live-solo/recordings/') || route.path.endsWith('/live-solo/settings') || route.path.endsWith('/live-solo/bracket') || route.path.includes('/live-solo/groups') || route.path.includes('/live-solo/question-pool') || route.path.includes('/live-solo/postgame/') || route.path.endsWith('/theory'))
 
   const isWriteUpReview = computed(() =>
     route.path === `/competitions/${competitionId.value}/writeups`,
@@ -94,6 +95,19 @@ export function useCompetitionsByIdPage() {
       || !teamLoading.value && !teamLoadError.value && hasParticipantChallengeAccess.value))
 
   const progressionEnabled = ref(false)
+  const theoryVisible = ref(false)
+  let theoryEpoch = 0
+  async function refreshTheory() {
+    const epoch = ++theoryEpoch
+    theoryVisible.value = false
+    if (!user.value || !hasParticipantChallengeAccess.value || !['Ctf', 'Awd', 'Awdp'].includes(competition.value?.mode ?? '')) return
+    const response = await getCompetitionTheory({ path: { competitionId: competitionId.value }, query: { staff: false } })
+    if (epoch === theoryEpoch) theoryVisible.value = (response.data?.length ?? 0) > 0
+  }
+  watch(() => [competition.value, myTeam.value, user.value?.userId], () => void refreshTheory())
+  let unwatchTheory: (() => void) | undefined
+  onMounted(() => { unwatchTheory = watchNotifications({ theoryChanged: () => void refreshTheory(), onReconnected: () => void refreshTheory() }) })
+  onBeforeUnmount(() => { theoryEpoch++; unwatchTheory?.() })
 
   let progressionRequestId = 0
 
@@ -288,6 +302,7 @@ export function useCompetitionsByIdPage() {
           ...(competition.value?.mode === 'LiveSolo' && canReadChallenges
             ? [{ to: `${base}/live-solo`, label: gameModeLabel('LiveSolo'), icon: GitBranch }] : []),
           ...(challengesVisible && canReadChallenges ? [{ to: `${base}/challenges`, label: translate("common.label.challenge.pageTitle"), icon: Puzzle }] : []),
+          ...(theoryVisible.value ? [{ to: `${base}/theory`, label: translate('common.label.theoryActivities'), icon: FileText }] : []),
           ...(competition.value?.mode === 'Ctf' && canReadChallenges && progressionEnabled.value
             ? [{ to: `${base}/progression`, label: translate('progression.title'), icon: GitBranch }]
             : []),

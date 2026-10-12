@@ -30,10 +30,11 @@ async function shell() {
     useCompetitionAnnouncementCatchUp: () => ({ refreshMissedAnnouncements: async () => {} }),
     getCompetitionEndpoint: async () => competitionReader ? competitionReader() : ({ data: { ...competition, administrationRole: role } }),
     getMyTeamEndpoint: async () => team ? { data: team } : { response: { status: 404 } },
+    watchNotifications: () => () => {}, getCompetitionTheory: async () => ({ data: [] }),
     getLeaderboardEndpoint: async () => ({ data: { teams: [] } }), getPlayerCompetitionProgression: async () => ({ data: { enabled: false } }),
     provide: (key: symbol, value: unknown) => { if (key === contextKey) context = value }, competitionContextKey: contextKey,
     competitionWorkspaceNavigationKey: navigationKey, competitionPath, adminCompetitionPath, isCompetitionOverviewPath,
-    onMounted: (fn: () => void) => mounted.push(fn), onUnmounted: () => {},
+    onMounted: (fn: () => void) => mounted.push(fn), onUnmounted: () => {}, onBeforeUnmount: () => {},
     watchCompetition: (_id: string, handlers: unknown) => { events = handlers; return () => {} },
   })
   const scope = effectScope(), state = scope.run(build)!
