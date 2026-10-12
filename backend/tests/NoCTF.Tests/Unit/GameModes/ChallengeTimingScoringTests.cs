@@ -9,8 +9,8 @@ namespace NoCTF.Tests.Unit.GameModes;
 public sealed class ChallengeTimingScoringTests
 {
     private static readonly DateTimeOffset Start = new(2026, 10, 10, 0, 0, 0, TimeSpan.Zero);
-    [Test, Arguments(60, 100L), Arguments(90, 100L), Arguments(120, 50L)]
-    public async Task Awd_rewards_and_penalties_settle_only_complete_rounds(int cutoff, long score)
+    [Test, Arguments(60), Arguments(90), Arguments(120)]
+    public async Task Awd_legacy_service_transitions_cannot_replace_structured_scoring_evidence(int cutoff)
     {
         var team = Guid.NewGuid(); var question = Guid.NewGuid();
         var input = Input(GameMode.Awd, team, question,
@@ -20,9 +20,9 @@ public sealed class ChallengeTimingScoringTests
                 new(question, team, Guid.NewGuid(), Start, Start.AddSeconds(60)),
                 new(question, team, Guid.NewGuid(), Start.AddSeconds(60), Start.AddSeconds(120))] };
         var projection = new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()).Project(input);
-        await Assert.That(projection.Snapshot.Teams.Single().TotalScore).IsEqualTo(score);
+        await Assert.That(projection.Snapshot.Teams.Single().TotalScore).IsEqualTo(0);
         var row = projection.Snapshot.Teams.Single();
-        await Assert.That(row.Slots.Sum(x => x.NetPoints.GetValueOrDefault()) + row.ScoreOutsideWindow).IsEqualTo(score);
+        await Assert.That(row.Slots.Sum(x => x.NetPoints.GetValueOrDefault()) + row.ScoreOutsideWindow).IsEqualTo(0);
     }
     [Test]
     [Arguments(60, 180, 2)]

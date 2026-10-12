@@ -146,7 +146,8 @@ public enum ScoreboardAdjustmentKind
 {
     ManualAdjustment,
     CompetitionPenalty,
-    BanRecalculation
+    BanRecalculation,
+    ScoreFloor
 }
 
 public sealed record ScoreboardChallengeCatalogItem(
@@ -269,6 +270,7 @@ public sealed record ScoreboardSlot(
 {
     public ScoreboardOperationState OffenseState { get; init; }
     public ScoreboardOperationState DefenseState { get; init; }
+    public IReadOnlyList<AwdScoreComponentProjection> AwdComponents { get; init; } = [];
 }
 
 public sealed record ScoreboardChallengeScore(

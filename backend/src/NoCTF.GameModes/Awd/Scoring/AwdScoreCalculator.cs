@@ -34,13 +34,13 @@ public static class AwdScoreCalculator
     public static AwdScoreFraction DefenseLoss(AwdEffectiveRules rules, AwdScoreFraction share, int captures) => captures <= 0 ? 0 :
         rules.DefensePoints * share * (rules.Options.DefenseMode == AwdDefenseMode.PerCapture ? captures : 1);
 
-    public static decimal? SlaRatio(AwdRuleOptions options, AwdHealth? health, int requiredFlags, int readableFlags)
+    public static AwdScoreFraction? SlaRatio(AwdRuleOptions options, AwdHealth? health, int requiredFlags, int readableFlags)
     {
         if (health is null or AwdHealth.InternalError) return null;
         if (requiredFlags < 0 || readableFlags < 0 || readableFlags > requiredFlags)
             throw new ArgumentOutOfRangeException(nameof(readableFlags));
         if (options.SlaBasis == AwdSlaBasis.ReadableFlags && health is AwdHealth.Ok or AwdHealth.Recovering)
-            return requiredFlags == 0 ? 1 : (decimal)readableFlags / requiredFlags;
+            return requiredFlags == 0 ? 1 : (AwdScoreFraction)readableFlags / requiredFlags;
         return health switch
         {
             AwdHealth.Ok => options.OkRatio,
@@ -78,8 +78,8 @@ public static class AwdScoreCalculator
         return result;
     }
 
-    public static decimal Compose(AwdRuleOptions options, decimal attack, decimal defenseReward, decimal defenseLoss,
-        decimal sla, decimal extraPenalty, decimal availability)
+    public static AwdScoreFraction Compose(AwdRuleOptions options, AwdScoreFraction attack, AwdScoreFraction defenseReward, AwdScoreFraction defenseLoss,
+        AwdScoreFraction sla, AwdScoreFraction extraPenalty, AwdScoreFraction availability)
     {
         return options.Composition switch
         {
@@ -102,8 +102,8 @@ public static class AwdScoreCalculator
         return decimal.Round((decimal)Math.Pow((double)minimum, exponent), 12, MidpointRounding.ToEven);
     }
 
-    private static decimal RankMultiplier(int? rank, int teams, decimal maximum) =>
+    private static AwdScoreFraction RankMultiplier(int? rank, int teams, decimal maximum) =>
         rank is null ? 1 : rank <= 0 || rank > teams
             ? throw new ArgumentOutOfRangeException(nameof(rank))
-            : 1 + (maximum - 1) * (teams - rank.Value) / (teams - 1);
+            : 1 + (AwdScoreFraction)(maximum - 1) * (teams - rank.Value) / (teams - 1);
 }

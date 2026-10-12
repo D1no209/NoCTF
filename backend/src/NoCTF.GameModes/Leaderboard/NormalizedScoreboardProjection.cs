@@ -1,10 +1,10 @@
+using NoCTF.Domain.Competitions.Awd;
 using System.Security.Cryptography;
 using System.Text;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Challenges;
-using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Awd.Scheduling;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Registration;
@@ -200,7 +200,7 @@ internal static class NormalizedScoreboardProjection
             var scoreOutsideWindow = usesRoundWindow
                 ? checked(totalScore - slotNet - globalAdjustmentNet)
                 : 0;
-            var attackScore = scoreboardInput.Mode == GameMode.Awdp
+            var attackScore = scoreboardInput.Mode is GameMode.Awd or GameMode.Awdp
                 ? aggregateRow?.AttackScore ?? 0
                 : (long?)null;
             var defenseScore = scoreboardInput.Mode == GameMode.Awdp
@@ -420,18 +420,18 @@ internal static class NormalizedScoreboardProjection
             var awdWindowStart = facts.Length == 0
                 ? (int?)null
                 : Math.Max(1, awdWindowEnd - facts.Length + 1);
-            var rounds = facts.Select((round, index) => new ScoreboardRound(
-                round.RoundId,
-                awdWindowStart.GetValueOrDefault(1) + index,
-                round.StartsAt,
-                round.EndsAt,
-                round.EndsAt <= projectedAt ? round.EndsAt : null,
-                round.EndsAt <= projectedAt
-                    ? ScoreboardRoundState.Settled
-                    : round.StartsAt <= projectedAt
-                        ? ScoreboardRoundState.Running
-                        : ScoreboardRoundState.Pending))
-                .ToArray();
+            var scoresByRound = (input.AwdRoundScores ?? []).GroupBy(score => score.RoundId).ToDictionary(group => group.Key, group => group.ToArray());
+            var rounds = facts.Select((round, index) =>
+            {
+                var scores = scoresByRound.GetValueOrDefault(round.RoundId, []);
+                var closed = scores.Length > 0 ? scores.All(score => score.RoundClosed) : round.EndsAt <= projectedAt;
+                var settled = closed && scores.All(score => score.Components.All(component => component.Settlement is AwdSettlementState.Final or AwdSettlementState.Exempted));
+                return new ScoreboardRound(round.RoundId,
+                    round.Number > 0 ? round.Number : awdWindowStart.GetValueOrDefault(1) + index,
+                    round.StartsAt, round.EndsAt, settled ? round.EndsAt : null,
+                    closed ? settled ? ScoreboardRoundState.Settled : ScoreboardRoundState.Settling
+                        : round.StartsAt <= projectedAt ? ScoreboardRoundState.Running : ScoreboardRoundState.Pending);
+            }).ToArray();
             return new(
                 rounds,
                 rounds.FirstOrDefault(round => round.State == ScoreboardRoundState.Running)?.Number,
@@ -590,153 +590,39 @@ internal static class NormalizedScoreboardProjection
         IReadOnlyDictionary<Guid, int> actorIndexes,
         IDictionary<(Guid TeamId, int ColumnIndex), SlotAccumulator> slots)
     {
-        var competition = ParseAwdCompetition(input.CompetitionConfiguration);
-        var settingsByChallenge = challenges.ToDictionary(
-            pair => pair.Key,
-            pair => EffectiveAwd(competition, pair.Value.Rules));
-        var validTeams = input.Teams
-            .Where(team => !team.IsBanned && !team.IsDeleted && team.EarnsScore)
-            .Select(team => team.Id)
-            .ToHashSet();
-        var competitiveTeams = input.Teams
-            .Where(team => !team.IsBanned && !team.IsDeleted && team.AffectsCompetitiveResults)
-            .Select(team => team.Id)
-            .ToHashSet();
-        var attackFacts = input.GameplayFacts
-            .Where(fact => fact.TeamId is Guid teamId
-                && competitiveTeams.Contains(teamId)
-                && fact.Kind == GameplayFactKind.FlagAttempt
-                && fact.Result == GameplayFactResult.Correct && ChallengeTimingProjection.CanScore(input, fact)
-                && fact.ReferenceKind == GameplayFactReferenceKind.AwdRound
-                && fact.ReferenceId is Guid roundId
-                && rounds.ContainsKey(roundId)
-                && fact.CompetitionChallengeId is Guid challengeId
-                && challenges.ContainsKey(challengeId)
-                && fact.VictimTeamId is Guid victimId
-                && victimId != teamId
-                && competitiveTeams.Contains(victimId))
-            .OrderBy(fact => fact.OccurredAt)
-            .ThenBy(fact => fact.GameplayFactId)
-            .GroupBy(fact => new
-            {
-                ChallengeId = fact.CompetitionChallengeId!.Value,
-                RoundId = fact.ReferenceId!.Value,
-                VictimId = fact.VictimTeamId!.Value,
-                AttackerId = fact.TeamId!.Value
-            })
-            .Select(group => group.First())
-            .ToArray();
-        var awardedAttackIds = attackFacts
-            .Select(fact => fact.GameplayFactId)
-            .ToHashSet();
-
-        foreach (var victimPool in attackFacts.GroupBy(fact => new
+        var validTeams = input.Teams.Where(team => !team.IsBanned && !team.IsDeleted && team.EarnsScore)
+            .Select(team => team.Id).ToHashSet();
+        foreach (var value in input.AwdRoundScores ?? [])
         {
-            ChallengeId = fact.CompetitionChallengeId!.Value,
-            RoundId = fact.ReferenceId!.Value,
-            VictimId = fact.VictimTeamId!.Value
-        }))
-        {
-            var settings = settingsByChallenge[victimPool.Key.ChallengeId];
-            var attackers = victimPool.Select(fact => fact.TeamId!.Value).Distinct().ToArray();
-            var reward = settings.AttackRewardMode == AttackRewardMode.FixedPerAttack
-                ? settings.AttackPoints
-                : settings.VictimDefensePoolPoints / attackers.Length;
-            var column = columns[(victimPool.Key.ChallengeId, victimPool.Key.RoundId)];
-            var round = rounds[victimPool.Key.RoundId];
-            foreach (var fact in victimPool)
+            if (!validTeams.Contains(value.TeamId) || !challenges.ContainsKey(value.CompetitionChallengeId)
+                || !rounds.TryGetValue(value.RoundId, out var round)
+                || !columns.TryGetValue((value.CompetitionChallengeId, value.RoundId), out var column)) continue;
+            var slot = GetSlot(slots, value.TeamId, column, round);
+            slot.AwdComponents = value.Components;
+            foreach (var component in value.Components)
             {
-                if (!validTeams.Contains(fact.TeamId!.Value))
-                    continue;
-                GetSlot(slots, fact.TeamId.Value, column, round).AddFact(
-                    fact,
-                    ScoreboardEntryKind.Attack,
-                    ScoreboardBreakdownKind.Attack,
-                    actorIndexes,
-                    reward,
-                    0);
-            }
-            if (validTeams.Contains(victimPool.Key.VictimId))
-            {
-                var victimSlot = GetSlot(slots, victimPool.Key.VictimId, column, round);
-                victimSlot.AddSystemAttempt(
-                    StableGuid(victimPool.Key.RoundId, $"defense:{victimPool.Key.ChallengeId:N}:{victimPool.Key.VictimId:N}"),
-                    ScoreboardEntryKind.Defense,
-                    ScoreboardBreakdownKind.Defense,
-                    ScoreboardEntryOutcome.Failed,
-                    round.EndAt,
-                    0,
-                    settings.VictimDefensePoolPoints);
+                var (entry, breakdown) = component.Component switch
+                {
+                    AwdScoreComponent.Attack => (ScoreboardEntryKind.Attack, ScoreboardBreakdownKind.Attack),
+                    AwdScoreComponent.DefenseLoss or AwdScoreComponent.DefenseReward => (ScoreboardEntryKind.Defense, ScoreboardBreakdownKind.Defense),
+                    _ => (ScoreboardEntryKind.Availability, ScoreboardBreakdownKind.Availability)
+                };
+                var points = component.Points.GetValueOrDefault();
+                slot.AddSystemAttempt(StableGuid(value.RoundId,
+                        $"awd:{value.CompetitionChallengeId:N}:{value.TeamId:N}:{component.Component}"),
+                    entry, breakdown, component.Points is null ? ScoreboardEntryOutcome.Pending
+                        : points < 0 ? ScoreboardEntryOutcome.Failed : ScoreboardEntryOutcome.Succeeded,
+                    value.LastAttackAt ?? round.EndAt, Math.Max(0, points), Math.Max(0, -points));
             }
         }
-
-        var serviceStates = input.GameplayFacts
-            .Where(fact => fact.Kind == GameplayFactKind.AwdServiceTransition
-                && fact.TeamId is not null
-                && fact.CompetitionChallengeId is not null
-                && fact.Result is GameplayFactResult.ServiceUp or GameplayFactResult.ServiceDown)
-            .OrderBy(fact => fact.OccurredAt)
-            .ThenBy(fact => fact.GameplayFactId)
-            .GroupBy(fact => (fact.TeamId!.Value, fact.CompetitionChallengeId!.Value))
-            .ToDictionary(group => group.Key, group => group.ToArray());
-        foreach (var roundFact in (input.AwdRounds ?? [])
-                     .Where(item => validTeams.Contains(item.TeamId)
-                         && challenges.ContainsKey(item.CompetitionChallengeId))
-                     .GroupBy(item => (item.TeamId, item.CompetitionChallengeId, item.RoundId))
-                     .Select(group => group.First()))
+        // Submission activity is displayed in its receipt round; score components belong to issuance rounds.
+        foreach (var fact in input.GameplayFacts.Where(fact => fact.Kind == GameplayFactKind.FlagAttempt
+                     && fact.TeamId is Guid team && validTeams.Contains(team)).OrderBy(fact => fact.OccurredAt))
         {
-            if (!rounds.TryGetValue(roundFact.RoundId, out var round)
-                || round.State != ScoreboardRoundState.Settled)
-                continue;
-            if (!ChallengeTimingProjection.CanScoreInterval(input, roundFact.CompetitionChallengeId, roundFact.StartsAt, roundFact.EndsAt)) continue;
-            var settings = settingsByChallenge[roundFact.CompetitionChallengeId];
-            var latest = serviceStates.TryGetValue(
-                (roundFact.TeamId, roundFact.CompetitionChallengeId),
-                out var transitions)
-                ? LatestBefore(transitions, roundFact.EndsAt)
-                : null;
-            var up = latest?.Result != GameplayFactResult.ServiceDown;
-            var slot = GetSlot(
-                slots,
-                roundFact.TeamId,
-                columns[(roundFact.CompetitionChallengeId, roundFact.RoundId)],
-                round);
-            slot.AddSystemAttempt(
-                StableGuid(roundFact.RoundId,
-                    $"availability:{roundFact.CompetitionChallengeId:N}:{roundFact.TeamId:N}"),
-                ScoreboardEntryKind.Availability,
-                ScoreboardBreakdownKind.Availability,
-                up ? ScoreboardEntryOutcome.Succeeded : ScoreboardEntryOutcome.Failed,
-                round.EndAt,
-                up ? settings.ServiceHealthyPoints : 0,
-                up ? 0 : settings.ServiceUnhealthyPenalty);
-        }
-
-        foreach (var fact in input.GameplayFacts
-                     .Where(fact => fact.TeamId is Guid teamId
-                         && validTeams.Contains(teamId)
-                         && fact.CompetitionChallengeId is Guid challengeId
-                         && challenges.ContainsKey(challengeId))
-                     .OrderBy(fact => fact.OccurredAt)
-                     .ThenBy(fact => fact.GameplayFactId))
-        {
-            if (fact.ReferenceKind != GameplayFactReferenceKind.AwdRound
-                || fact.ReferenceId is not Guid roundId
-                || !rounds.TryGetValue(roundId, out var round))
-                continue;
-            var column = columns[(fact.CompetitionChallengeId!.Value, roundId)];
-            var slot = GetSlot(slots, fact.TeamId!.Value, column, round);
-            if (fact.Kind == GameplayFactKind.FlagAttempt
-                && !awardedAttackIds.Contains(fact.GameplayFactId))
-            {
-                slot.AddFact(
-                    fact,
-                    ScoreboardEntryKind.Attack,
-                    ScoreboardBreakdownKind.Attack,
-                    actorIndexes,
-                    0,
-                    0);
-            }
+            if (fact.CompetitionChallengeId is not Guid challenge || fact.ReferenceId is not Guid roundId
+                || !rounds.TryGetValue(roundId, out var round) || !columns.TryGetValue((challenge, roundId), out var column)) continue;
+            GetSlot(slots, fact.TeamId!.Value, column, round).AddFact(fact, ScoreboardEntryKind.Attack,
+                ScoreboardBreakdownKind.Attack, actorIndexes, 0, 0);
         }
     }
 
@@ -1089,27 +975,6 @@ internal static class NormalizedScoreboardProjection
             ? TypedGameModeConfiguration.Ctf(ctf)
             : new(null, null);
 
-    private static AwdConfiguration ParseAwdCompetition(
-        CompetitionModeConfiguration? configuration) =>
-        configuration is AwdCompetitionModeConfiguration awd
-            ? TypedGameModeConfiguration.Awd(awd)
-            : AwdConfiguration.Default;
-
-    private static AwdScoringSettings EffectiveAwd(
-        AwdConfiguration competition,
-        CompetitionChallengeRules? rules)
-    {
-        var challenge = rules is AwdCompetitionChallengeRules awd
-            ? TypedGameModeConfiguration.Awd(awd)
-            : null;
-        return new(
-            challenge?.AttackRewardMode ?? competition.AttackRewardMode,
-            challenge?.AttackPoints ?? competition.AttackPoints,
-            challenge?.VictimDefensePoolPoints ?? competition.VictimDefensePoolPoints,
-            challenge?.ServiceHealthyPoints ?? competition.ServiceHealthyPoints,
-            challenge?.ServiceUnhealthyPenalty ?? competition.ServiceUnhealthyPenalty);
-    }
-
     private static AwdpConfiguration ParseAwdpCompetition(
         CompetitionModeConfiguration? configuration) =>
         configuration is AwdpCompetitionModeConfiguration awdp
@@ -1369,8 +1234,12 @@ internal static class NormalizedScoreboardProjection
                 .ToArray();
         }
 
+        public IReadOnlyList<AwdScoreComponentProjection> AwdComponents { get; set; } = [];
+
         public ScoreboardSlot Build(ScoreboardScoreState state)
         {
+            if (AwdComponents.Count > 0) state = AwdComponents.Any(component => component.Settlement is AwdSettlementState.Provisional or AwdSettlementState.PendingAdjudication)
+                ? ScoreboardScoreState.Provisional : ScoreboardScoreState.Settled;
             var projectedBreakdowns = breakdowns
                 .OrderBy(pair => pair.Key)
                 .Select(pair => new ScoreboardBreakdown(
@@ -1410,7 +1279,8 @@ internal static class NormalizedScoreboardProjection
                 projectedEntries)
             {
                 OffenseState = offenseState,
-                DefenseState = defenseState
+                DefenseState = defenseState,
+                AwdComponents = AwdComponents
             };
         }
     }
@@ -1476,13 +1346,6 @@ internal static class NormalizedScoreboardProjection
                 source.DeductedPointsPerOccurrence);
         }
     }
-
-    private sealed record AwdScoringSettings(
-        AttackRewardMode AttackRewardMode,
-        long AttackPoints,
-        long VictimDefensePoolPoints,
-        long ServiceHealthyPoints,
-        long ServiceUnhealthyPenalty);
 
     private sealed record AwdpActivation(LeaderboardGameplayFact Fact, int Round);
 }

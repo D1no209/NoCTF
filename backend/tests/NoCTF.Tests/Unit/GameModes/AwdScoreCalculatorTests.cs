@@ -7,6 +7,17 @@ namespace NoCTF.Tests.Unit.GameModes;
 
 public sealed class AwdScoreCalculatorTests
 {
+    [Test]
+    public async Task RankMultiplierAndReadableRatioPreserveRepeatingFractions()
+    {
+        var rules = new AwdEffectiveRules(AwdAttackRewardMode.TargetRank, 3, 100, 100, 30, new());
+        var value = AwdScoreCalculator.Attack(rules, AwdScoreCalculator.BudgetShare(1, 1, 3), 1, 4, 3);
+        await Assert.That(AwdScoreCalculator.Aggregate([value, value, value])).IsEqualTo(4);
+        var ratio = AwdScoreCalculator.SlaRatio(new() { SlaBasis = AwdSlaBasis.ReadableFlags }, AwdHealth.Recovering, 3, 1)!.Value;
+        await Assert.That(AwdScoreCalculator.Aggregate([ratio, ratio, ratio])).IsEqualTo(1);
+        await Assert.That(AwdScoreCalculator.Attack(rules, 1, 1, 4, null).Truncate()).IsEqualTo(3);
+    }
+
     private static AwdEffectiveRules Rules(AwdAttackRewardMode mode = AwdAttackRewardMode.FixedPerAttack,
         AwdRuleOptions? options = null) => new(mode, 50, 100, 100, 30, options ?? new());
 

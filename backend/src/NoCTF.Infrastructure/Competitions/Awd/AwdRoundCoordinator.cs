@@ -228,6 +228,9 @@ public sealed class AwdRoundCoordinator(
         if (stores.Count is < 1 or > 64 || stores.Any(store => store.Weight <= 0 || decimal.Round(store.Weight, 6) != store.Weight
                 || store.FlagsPerIssue is < 1 or > 64))
             throw new InvalidOperationException("AWD requires valid store budgets.");
+        var ranks = effective.AttackMode == AwdAttackRewardMode.TargetRank
+            ? await AwdSettledRankingReader.ReadAsync(db, competition, round.Number, teams, now, ct)
+            : new Dictionary<Guid, int>();
         var snapshot = new AwdRoundRules
         {
             Id = Guid.CreateVersion7(), CompetitionId = competition.Id, CompetitionChallengeId = challenge.Id,
@@ -235,7 +238,8 @@ public sealed class AwdRoundCoordinator(
             AttackRewardMode = effective.AttackMode, AttackPoints = effective.AttackPoints,
             VictimDefensePoolPoints = effective.DefensePoints, ServiceHealthyPoints = effective.SlaPoints,
             CheckerIntervalSeconds = effective.CheckerIntervalSeconds, Options = effective.Options with { },
-            EligibleTeamCount = teams.Count, Teams = teams.Select(team => new AwdRoundTeamEligibility { TeamId = team }).ToList(),
+            EligibleTeamCount = teams.Count, Teams = teams.Select(team => new AwdRoundTeamEligibility
+                { TeamId = team, SettledRank = ranks.TryGetValue(team, out var rank) ? rank : null }).ToList(),
             FlagHeader = flagTemplate.Header, FlagBodyTemplate = flagTemplate.BodyTemplate, Stores = stores
         };
         db.AwdRoundRules.Add(snapshot);

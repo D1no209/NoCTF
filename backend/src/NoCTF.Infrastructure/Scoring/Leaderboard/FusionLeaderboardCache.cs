@@ -354,7 +354,12 @@ public sealed class FusionLeaderboardCache(
             awdWindow.LatestRound,
             factRows.AwdAggregates,
             await db.WriteUpUnlockReceipts.AsNoTracking().Where(x => x.CompetitionId == competitionId && x.UnlockedAt <= projectedAt)
-                .Select(x => new LeaderboardWriteUpUnlock(x.GameplayFactId, x.TeamId, x.CompetitionChallengeId, x.DeductionPercent, x.UnlockedAt)).ToArrayAsync(ct));
+                .Select(x => new LeaderboardWriteUpUnlock(x.GameplayFactId, x.TeamId, x.CompetitionChallengeId, x.DeductionPercent, x.UnlockedAt)).ToArrayAsync(ct),
+            factRows.AwdRoundScores,
+            competition.Mode == GameMode.Awd ? await db.AwdRoundRules.AsNoTracking()
+                .Where(rule => rule.CompetitionId == competitionId && rule.EffectiveAt <= projectedAt)
+                .OrderByDescending(rule => rule.EffectiveAt).ThenByDescending(rule => rule.Revision)
+                .Select(rule => rule.Options.MinimumTotalScore).FirstOrDefaultAsync(ct) : null);
         var scoreboard = projectionEngine.Project(projectionInput);
         ScoreboardProjection AddResponseMetadata(ScoreboardProjection value) => value with
         {
@@ -405,6 +410,7 @@ public sealed class FusionLeaderboardCache(
                 AwdAggregates = factRows.AwdAggregates?
                     .Where(fact => publishedChallengeIds.Contains(fact.CompetitionChallengeId))
                     .ToArray(),
+                AwdRoundScores = factRows.AwdRoundScores?.Where(fact => publishedChallengeIds.Contains(fact.CompetitionChallengeId)).ToArray(),
                 WriteUpUnlocks = (projectionInput.WriteUpUnlocks ?? []).Where(fact => publishedChallengeIds.Contains(fact.CompetitionChallengeId)).ToArray()
             };
             participantScoreboard = AddResponseMetadata(
@@ -437,53 +443,23 @@ public sealed class FusionLeaderboardCache(
         if (competitionChallengeIds.Count == 0)
             return AwdScoreboardWindow.Empty;
 
-        var roundMetadata = db.ChallengeFlags.AsNoTracking()
-            .Where(flag => flag.DeletedAt == null
-                && flag.TeamId != null
-                && flag.CompetitionChallengeId != null
-                && competitionChallengeIds.Contains(flag.CompetitionChallengeId.Value)
-                && flag.SpecificationKind == SpecificationKind.AwdRound
-                && flag.SpecificationId != null
-                && flag.ValidStart != null
-                && flag.ValidUntil != null
-                && flag.ValidStart <= projectedAt)
-            .GroupBy(flag => flag.SpecificationId!.Value)
-            .Select(group => new
-            {
-                RoundId = group.Key,
-                StartsAt = group.Min(flag => flag.ValidStart!.Value),
-                EndsAt = group.Max(flag => flag.ValidUntil!.Value)
-            })
-            .OrderBy(round => round.StartsAt)
-            .ThenBy(round => round.RoundId);
-        var latestRound = await roundMetadata.CountAsync(ct);
-        if (latestRound == 0)
-            return AwdScoreboardWindow.Empty;
-
+        var roundMetadata = db.AwdRounds.AsNoTracking().Where(round => round.StartsAt <= projectedAt
+            && db.AwdRoundRules.Any(rule => rule.RoundId == round.Id && competitionChallengeIds.Contains(rule.CompetitionChallengeId)));
+        var latestRound = await roundMetadata.Select(round => (int?)round.Number).MaxAsync(ct) ?? 0;
+        if (latestRound == 0) return AwdScoreboardWindow.Empty;
         var endRound = Math.Clamp(requestedEndingRound ?? latestRound, 1, latestRound);
         var startRound = Math.Max(1, endRound - ScoreboardRoundWindow.DefaultSize + 1);
-        var selected = await roundMetadata
-            .Skip(startRound - 1)
-            .Take(endRound - startRound + 1)
-            .ToListAsync(ct);
-        var selectedRoundIds = selected.Select(round => round.RoundId).ToArray();
-        var rounds = await db.ChallengeFlags.AsNoTracking()
-            .Where(flag => flag.DeletedAt == null
-                && flag.TeamId != null
-                && flag.CompetitionChallengeId != null
-                && competitionChallengeIds.Contains(flag.CompetitionChallengeId.Value)
-                && flag.SpecificationKind == SpecificationKind.AwdRound
-                && flag.SpecificationId != null
-                && selectedRoundIds.Contains(flag.SpecificationId.Value)
-                && flag.ValidStart != null
-                && flag.ValidUntil != null)
-            .Select(flag => new LeaderboardAwdRoundFact(
-                flag.CompetitionChallengeId!.Value,
-                flag.TeamId!.Value,
-                flag.SpecificationId!.Value,
-                flag.ValidStart!.Value,
-                flag.ValidUntil!.Value))
-            .ToListAsync(ct);
+        var selected = await roundMetadata.Where(round => round.Number >= startRound && round.Number <= endRound)
+            .OrderBy(round => round.Number).ToArrayAsync(ct);
+        var selectedRoundIds = selected.Select(round => round.Id).ToArray();
+        var rules = await db.AwdRoundRules.AsNoTracking().Include(rule => rule.Teams)
+            .Where(rule => selectedRoundIds.Contains(rule.RoundId) && competitionChallengeIds.Contains(rule.CompetitionChallengeId))
+            .ToArrayAsync(ct);
+        var byId = selected.ToDictionary(round => round.Id);
+        var rounds = rules.SelectMany(rule => rule.Teams.Select(team => new LeaderboardAwdRoundFact(
+            rule.CompetitionChallengeId, team.TeamId, rule.RoundId, byId[rule.RoundId].StartsAt,
+            byId[rule.RoundId].EndsAt, byId[rule.RoundId].Number)))
+            .DistinctBy(round => (round.CompetitionChallengeId, round.TeamId, round.RoundId)).ToArray();
         return new(rounds, startRound, endRound, latestRound);
     }
 

@@ -20,7 +20,9 @@ public sealed record LeaderboardProjectionInput(
     int? ScoreboardRoundWindowEnd = null,
     int? ScoreboardLatestRound = null,
     IReadOnlyList<LeaderboardAwdAggregateFact>? AwdAggregates = null,
-    IReadOnlyList<LeaderboardWriteUpUnlock>? WriteUpUnlocks = null);
+    IReadOnlyList<LeaderboardWriteUpUnlock>? WriteUpUnlocks = null,
+    IReadOnlyList<AwdRoundScoreProjection>? AwdRoundScores = null,
+    long? AwdMinimumTotalScore = null);
 
 public sealed record LeaderboardWriteUpUnlock(Guid GameplayFactId, Guid TeamId, Guid CompetitionChallengeId,
     int DeductionPercent, DateTimeOffset UnlockedAt);
@@ -74,7 +76,8 @@ public sealed record LeaderboardAwdRoundFact(
     Guid TeamId,
     Guid RoundId,
     DateTimeOffset StartsAt,
-    DateTimeOffset EndsAt);
+    DateTimeOffset EndsAt,
+    int Number = 0);
 
 public sealed record LeaderboardAwdAggregateFact(
     Guid TeamId,

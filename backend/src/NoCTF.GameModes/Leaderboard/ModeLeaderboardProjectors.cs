@@ -2,7 +2,6 @@ using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Gameplay;
 using NoCTF.GameModes.Ctf.Configuration;
-using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Awd.Scheduling;
 using NoCTF.GameModes.Koh.Configuration;
 using NoCTF.GameModes.Scoring;
@@ -279,195 +278,9 @@ internal static class AwdLeaderboardProjection
 {
     public static (IReadOnlyList<LeaderboardEntry> Entries, IReadOnlyList<LeaderboardCellFact> Cells) Project(LeaderboardProjectionInput input)
     {
-        var configuration = input.CompetitionConfiguration is AwdCompetitionModeConfiguration awd
-            ? TypedGameModeConfiguration.Awd(awd)
-            : AwdConfiguration.Default;
-        var challenges = (input.Challenges ?? [])
-            .Where(challenge => !challenge.IsDeleted)
-            .ToDictionary(challenge => challenge.Id);
-        var teams = input.Teams
-            .Where(team => !team.IsBanned && !team.IsDeleted && team.EarnsScore)
-            .ToDictionary(team => team.Id);
-        var competitiveTeams = input.Teams
-            .Where(team => !team.IsBanned && !team.IsDeleted && team.AffectsCompetitiveResults)
-            .ToDictionary(team => team.Id);
-        if (input.AwdAggregates is not null)
-            return ProjectAggregates(input, challenges, teams);
-        var settingsByChallenge = challenges.ToDictionary(
-            pair => pair.Key,
-            pair => Effective(configuration, pair.Value.Rules));
-        var values = teams.Keys.ToDictionary(team => team, _ => 0L);
-        var cellScores = new Dictionary<(Guid TeamId, Guid ChallengeId), long>();
-        var cellSolves = new Dictionary<(Guid TeamId, Guid ChallengeId), (DateTimeOffset At, string? SolverName)>();
-        void AddCell(
-            Guid teamId,
-            Guid challengeId,
-            long delta,
-            DateTimeOffset? solvedAt = null,
-            string? solverName = null)
-        {
-            var key = (teamId, challengeId);
-            cellScores[key] = checked(cellScores.GetValueOrDefault(key) + delta);
-            if (solvedAt is { } at
-                && (!cellSolves.TryGetValue(key, out var current) || at < current.At))
-                cellSolves[key] = (at, string.IsNullOrWhiteSpace(solverName) ? null : solverName);
-        }
-        var attackPoints = teams.Keys.ToDictionary(team => team, _ => 0L);
-        var upRoundCounts = teams.Keys.ToDictionary(team => team, _ => 0);
-        var solves = input.GameplayFacts
-            .Where(fact => fact.TeamId is Guid teamId && competitiveTeams.ContainsKey(teamId)
-                          && fact.Kind == GameplayFactKind.FlagAttempt
-                          && fact is
-                          {
-                              Result: GameplayFactResult.Correct,
-                              ReferenceKind: GameplayFactReferenceKind.AwdRound,
-                              ReferenceId: not null
-                          }
-                          && fact.CompetitionChallengeId is not null
-                          && fact.VictimTeamId is not null
-                          && fact.VictimTeamId != fact.TeamId
-                          && competitiveTeams.ContainsKey(fact.VictimTeamId.Value)
-                          && (challenges.Count == 0 || challenges.ContainsKey(fact.CompetitionChallengeId.Value)))
-            .OrderBy(fact => fact.OccurredAt)
-            .ThenBy(fact => fact.GameplayFactId)
-            .ToList();
-        var attacks = solves
-            .GroupBy(fact => new
-            {
-                ChallengeId = fact.CompetitionChallengeId!.Value,
-                RoundId = fact.ReferenceId!.Value,
-                VictimId = fact.VictimTeamId!.Value,
-                AttackerId = fact.TeamId!.Value
-            })
-            .Select(group => group.First())
-            .ToList();
-        foreach (var pool in attacks.GroupBy(fact => new
-        {
-            ChallengeId = fact.CompetitionChallengeId!.Value,
-            RoundId = fact.ReferenceId!.Value,
-            VictimId = fact.VictimTeamId!.Value
-        }))
-        {
-            var settings = settingsByChallenge[pool.Key.ChallengeId];
-            var attackers = pool.Select(fact => fact.TeamId!.Value).Distinct().ToList();
-            var reward = settings.AttackRewardMode == AttackRewardMode.FixedPerAttack
-                ? settings.AttackPoints
-                : settings.VictimDefensePoolPoints / attackers.Count;
-            foreach (var attacker in attackers)
-            {
-                if (!values.ContainsKey(attacker))
-                    continue;
-                values[attacker] = checked(values[attacker] + reward);
-                attackPoints[attacker] = checked(attackPoints[attacker] + reward);
-                var first = pool.First(fact => fact.TeamId == attacker);
-                AddCell(attacker, pool.Key.ChallengeId, reward, first.OccurredAt, first.SubmitterName);
-            }
-            if (values.ContainsKey(pool.Key.VictimId))
-            {
-                values[pool.Key.VictimId] = checked(
-                    values[pool.Key.VictimId] - settings.VictimDefensePoolPoints);
-                AddCell(pool.Key.VictimId, pool.Key.ChallengeId, -settings.VictimDefensePoolPoints);
-            }
-        }
-        var serviceStates = input.GameplayFacts
-            .Where(fact => fact is
-            {
-                Kind: GameplayFactKind.AwdServiceTransition,
-                TeamId: not null,
-                CompetitionChallengeId: not null,
-                Result: GameplayFactResult.ServiceUp or GameplayFactResult.ServiceDown
-            })
-            .OrderBy(fact => fact.OccurredAt)
-            .ThenBy(fact => fact.GameplayFactId)
-            .GroupBy(fact => (fact.TeamId!.Value, fact.CompetitionChallengeId!.Value))
-            .ToDictionary(group => group.Key, group => group.ToArray());
-        var projectedAt = input.ProjectedAt
-            ?? throw new InvalidOperationException("Leaderboard projection time is required.");
-        foreach (var round in (input.AwdRounds ?? [])
-                     .Where(round => teams.ContainsKey(round.TeamId)
-                         && challenges.ContainsKey(round.CompetitionChallengeId)
-                         && round.StartsAt < round.EndsAt
-                         && round.EndsAt <= projectedAt)
-                     .GroupBy(round => new
-                     {
-                         round.TeamId,
-                         round.CompetitionChallengeId,
-                         round.RoundId
-                     })
-                     .Select(group => group.First()))
-        {
-            var latestState = serviceStates.TryGetValue(
-                (round.TeamId, round.CompetitionChallengeId),
-                out var transitions)
-                ? LatestBefore(transitions, round.EndsAt)
-                : null;
-            var settings = settingsByChallenge[round.CompetitionChallengeId];
-            if (latestState?.Result == GameplayFactResult.ServiceDown)
-            {
-                values[round.TeamId] = checked(
-                    values[round.TeamId] - settings.ServiceUnhealthyPenalty);
-                AddCell(round.TeamId, round.CompetitionChallengeId, -settings.ServiceUnhealthyPenalty);
-            }
-            else
-            {
-                values[round.TeamId] = checked(
-                    values[round.TeamId] + settings.ServiceHealthyPoints);
-                AddCell(round.TeamId, round.CompetitionChallengeId, settings.ServiceHealthyPoints);
-                upRoundCounts[round.TeamId] = checked(upRoundCounts[round.TeamId] + 1);
-            }
-        }
-        foreach (var hint in ProjectionPenalties.HintCosts(input, teams.Keys))
-            values[hint.Key] = checked(values[hint.Key] - hint.Value);
-        foreach (var adjustment in ProjectionPenalties.ManualAdjustments(input, teams.Keys))
-            values[adjustment.Key] = checked(values[adjustment.Key] + adjustment.Value);
-        var attackStatistics = attacks
-            .GroupBy(attack => attack.TeamId!.Value)
-            .ToDictionary(
-                group => group.Key,
-                group => (Count: group.Count(), LastAt: group.Max(attack => attack.OccurredAt)));
-        var rows = teams.Values.Select(team =>
-        {
-            var statistics = attackStatistics.GetValueOrDefault(team.Id);
-            var attackCount = statistics.Count;
-            DateTimeOffset? lastAttackAt = statistics.LastAt == default ? null : statistics.LastAt;
-            return new AwdRankedEntry(
-                new LeaderboardEntry(
-                    0,
-                    team.Id,
-                    team.Name,
-                    values[team.Id],
-                    attackCount,
-                    lastAttackAt,
-                    team.TrackKey) { AttackScore = attackPoints[team.Id], AttackCount = attackCount, UpRoundCount = upRoundCounts[team.Id] },
-                attackPoints[team.Id],
-                upRoundCounts[team.Id],
-                attackCount,
-                lastAttackAt,
-                team.RegisteredAt);
-        });
-        var entries = rows
-            .GroupBy(row => row.Entry.TrackKey, StringComparer.OrdinalIgnoreCase)
-            .SelectMany(track => track
-                .OrderByDescending(row => row.Entry.Score)
-                .ThenByDescending(row => row.AttackPoints)
-                .ThenByDescending(row => row.UpRoundCount)
-                .ThenByDescending(row => row.AttackCount)
-                .ThenBy(row => row.LastAttackAt ?? DateTimeOffset.MaxValue)
-                .ThenBy(row => row.RegisteredAt)
-                .ThenBy(row => row.Entry.TeamId)
-                .Select((row, index) => row.Entry with { Rank = index + 1 }))
-            .ToList();
-        var cells = ProjectionPenalties.ApplyManualAdjustments(input, cellScores.Select(pair =>
-        {
-            var solve = cellSolves.GetValueOrDefault(pair.Key);
-            return new LeaderboardCellFact(
-                pair.Key.TeamId,
-                pair.Key.ChallengeId,
-                pair.Value,
-                solve.At == default ? null : solve.At,
-                solve.SolverName);
-        }).ToList());
-        return (entries, cells);
+        var challenges = (input.Challenges ?? []).Where(challenge => !challenge.IsDeleted).ToDictionary(challenge => challenge.Id);
+        var teams = input.Teams.Where(team => !team.IsBanned && !team.IsDeleted && team.EarnsScore).ToDictionary(team => team.Id);
+        return ProjectAggregates(input, challenges, teams);
     }
 
     private static (IReadOnlyList<LeaderboardEntry> Entries, IReadOnlyList<LeaderboardCellFact> Cells)
@@ -476,7 +289,7 @@ internal static class AwdLeaderboardProjection
             IReadOnlyDictionary<Guid, LeaderboardChallengeFact> challenges,
             IReadOnlyDictionary<Guid, LeaderboardTeamFact> teams)
     {
-        var aggregates = input.AwdAggregates!
+        var aggregates = (input.AwdAggregates ?? [])
             .Where(fact => teams.ContainsKey(fact.TeamId)
                 && challenges.ContainsKey(fact.CompetitionChallengeId))
             .GroupBy(fact => (fact.TeamId, fact.CompetitionChallengeId))
@@ -567,45 +380,6 @@ internal static class AwdLeaderboardProjection
             .ToArray();
         return (entries, cells);
     }
-
-    private static LeaderboardGameplayFact? LatestBefore(
-        IReadOnlyList<LeaderboardGameplayFact> transitions,
-        DateTimeOffset cutoff)
-    {
-        var low = 0;
-        var high = transitions.Count;
-        while (low < high)
-        {
-            var middle = low + (high - low) / 2;
-            if (transitions[middle].OccurredAt < cutoff)
-                low = middle + 1;
-            else
-                high = middle;
-        }
-        return low == 0 ? null : transitions[low - 1];
-    }
-
-    private static AwdScoringSettings Effective(
-        AwdConfiguration competition,
-        CompetitionChallengeRules? rules)
-    {
-        var challenge = rules is AwdCompetitionChallengeRules awd
-            ? TypedGameModeConfiguration.Awd(awd)
-            : null;
-        return new(
-            challenge?.AttackRewardMode ?? competition.AttackRewardMode,
-            challenge?.AttackPoints ?? competition.AttackPoints,
-            challenge?.VictimDefensePoolPoints ?? competition.VictimDefensePoolPoints,
-            challenge?.ServiceHealthyPoints ?? competition.ServiceHealthyPoints,
-            challenge?.ServiceUnhealthyPenalty ?? competition.ServiceUnhealthyPenalty);
-    }
-
-    private sealed record AwdScoringSettings(
-        AttackRewardMode AttackRewardMode,
-        long AttackPoints,
-        long VictimDefensePoolPoints,
-        long ServiceHealthyPoints,
-        long ServiceUnhealthyPenalty);
 
     private sealed record AwdRankedEntry(
         LeaderboardEntry Entry,
