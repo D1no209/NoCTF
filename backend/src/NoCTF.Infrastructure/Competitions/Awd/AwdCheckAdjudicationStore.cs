@@ -14,6 +14,29 @@ namespace NoCTF.Infrastructure.Competitions.Awd;
 public sealed class AwdCheckAdjudicationStore(NoCtfDbContext db, ICompetitionEventRecorder events,
     IPostCommitMessagePublisher publisher) : IAwdCheckAdjudicationStore
 {
+    public async Task<AwdCheckListView> ListAsync(AwdCheckListQuery request, CancellationToken ct)
+    {
+        var query = db.GameplayFacts.AsNoTracking().Where(fact => fact.CompetitionId == request.CompetitionId
+                && fact.Kind == GameplayFactKind.AwdServiceTransition && fact.Awd != null && fact.TeamId != null
+                && (request.Settlement == null || fact.Awd.Settlement == request.Settlement)
+                && (request.TeamId == null || fact.TeamId == request.TeamId)
+                && (request.CompetitionChallengeId == null || fact.CompetitionChallengeId == request.CompetitionChallengeId))
+            .Join(db.AwdRounds.Where(round => round.CompetitionId == request.CompetitionId
+                    && (request.RoundNumber == null || round.Number == request.RoundNumber)),
+                fact => fact.ReferenceId, round => (Guid?)round.Id,
+                (fact, round) => new { Fact = fact, Round = round });
+        var total = await query.CountAsync(ct);
+        var items = await query.OrderByDescending(item => item.Round.Number)
+            .ThenByDescending(item => item.Fact.Awd!.ScheduledAt).ThenBy(item => item.Fact.Id)
+            .Skip(request.Offset).Take(request.Limit)
+            .Select(item => new AwdCheckListItem(item.Fact.Id, item.Fact.CompetitionChallengeId,
+                item.Fact.TeamId!.Value, item.Round.Id, item.Round.Number,
+                item.Fact.Awd!.ScheduledAt ?? item.Fact.OccurredAt, item.Fact.Awd.Health,
+                item.Fact.Awd.Execution, item.Fact.Awd.Settlement, item.Fact.Awd.Reason,
+                item.Fact.Awd.FinalScheduledCheck, item.Fact.Awd.ReceivedAt)).ToArrayAsync(ct);
+        return new(items, total);
+    }
+
     public async Task<AwdCheckEvidenceView?> ReadAsync(Guid competitionId, Guid gameplayFactId, CancellationToken ct)
     {
         var fact = await Query(competitionId, gameplayFactId).AsNoTracking().SingleOrDefaultAsync(ct);

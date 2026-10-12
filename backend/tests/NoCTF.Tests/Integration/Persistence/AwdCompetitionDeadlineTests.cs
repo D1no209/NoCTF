@@ -109,7 +109,19 @@ public sealed partial class AwdRoundCoordinationTests
                 competition.StartAt, competition.EndAt, configuration, clock.UtcNow, ct);
             await Assert.That(unchangedDeadline.AcceptanceEndsAt).IsEqualTo(expectedEnd.AddSeconds(15));
             await Assert.That(last.SubmissionTailSeconds).IsEqualTo(15);
+            var publicRules = (await new AwdPublicRulesReader(db).ReadAsync(fixture.CompetitionId,
+                fixture.CompetitionChallengeId, clock.UtcNow, ct))!;
+            await Assert.That(publicRules.EndsAt).IsEqualTo(expectedEnd);
+            await Assert.That(publicRules.AcceptanceEndsAt).IsEqualTo(expectedEnd.AddSeconds(15));
+            await Assert.That(publicRules.AcceptingSubmissions).IsTrue();
+            await Assert.That(publicRules.RoundNumber).IsEqualTo(3);
+            await Assert.That(publicRules.IssuedPolicies.Single().Options.SubmissionTailSeconds).IsEqualTo(15);
+            await Assert.That(publicRules.NextRound.Options.SubmissionTailSeconds).IsEqualTo(900);
+            await Assert.That(publicRules.IssuedPolicies.Single().Stores.Count).IsEqualTo(1);
+            await Assert.That(publicRules.AttackPointsOverridden).IsFalse();
             clock.UtcNow = expectedEnd.AddSeconds(15);
+            await Assert.That((await new AwdPublicRulesReader(db).ReadAsync(fixture.CompetitionId,
+                fixture.CompetitionChallengeId, clock.UtcNow, ct))!.AcceptingSubmissions).IsFalse();
             await Assert.That((await Submit()).FailureCode).IsEqualTo(GameplayFactAdmissionFailureCode.CompetitionFinished);
             await using var workerDb = new NoCtfDbContext(options);
             var processor = new GameplayFactProcessor(workerDb, new GameModeGameplayFactEvaluatorCatalog(),

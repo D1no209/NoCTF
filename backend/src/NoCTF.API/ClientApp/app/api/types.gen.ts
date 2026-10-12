@@ -2919,6 +2919,199 @@ export type NoCtfDomainCompetitionsAwdAwdRuleChangeTiming = 'NextRound' | 'Immed
 
 export type NoCtfapiEndpointsCompetitionsEventsListCompetitionEventsRequest = NoCtfapiPaginationPaginationRequest & {};
 
+export type NoCtfapiEndpointsChallengesAwdPublicRulesResponse = {
+    serverTime?: string;
+    endsAt?: string;
+    acceptanceEndsAt?: string;
+    paused?: boolean;
+    acceptingSubmissions?: boolean;
+    roundNumber?: number | null;
+    roundId?: string | null;
+    roundStartsAt?: string | null;
+    roundEndsAt?: string | null;
+    roundDurationSeconds?: number;
+    hardeningDurationSeconds?: number;
+    competitionDefaults?: NoCtfapiEndpointsAdministrationCompetitionsAwdRuleOptionsContract;
+    questionOverrides?: NoCtfapiEndpointsAdministrationChallengesAwdRuleOverridesContract;
+    attackPointsOverridden?: boolean;
+    defensePointsOverridden?: boolean;
+    slaPointsOverridden?: boolean;
+    checkerIntervalOverridden?: boolean;
+    attackModeOverridden?: boolean;
+    issuedPolicies?: Array<NoCtfapiEndpointsChallengesAwdPublicRulePolicyResponse>;
+    nextRound?: NoCtfapiEndpointsChallengesAwdPublicRulePolicyResponse;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsAwdRuleOptionsContract = {
+    flagLifetimeUnit?: NoCtfapiEndpointsAdministrationCompetitionsAwdLifetimeUnitProtocol;
+    flagLifetime?: number;
+    linkHistoricalWindow?: boolean;
+    historicalLifetimeUnit?: NoCtfapiEndpointsAdministrationCompetitionsAwdLifetimeUnitProtocol;
+    historicalLifetime?: number;
+    generationPolicy?: NoCtfapiEndpointsAdministrationCompetitionsAwdGenerationPolicyProtocol;
+    generationInterval?: number;
+    flagsPerStore?: number;
+    roundGapSeconds?: number;
+    totalRounds?: number | null;
+    submissionTailSeconds?: number;
+    finalCheckBudgetSeconds?: number;
+    retryCount?: number;
+    retryIntervalSeconds?: number;
+    callbackGraceSeconds?: number;
+    slaSettlement?: NoCtfapiEndpointsAdministrationCompetitionsAwdSlaSettlementProtocol;
+    preset?: NoCtfapiEndpointsAdministrationCompetitionsAwdScoringPresetProtocol;
+    defenseMode?: NoCtfapiEndpointsAdministrationCompetitionsAwdDefenseModeProtocol;
+    slaBasis?: NoCtfapiEndpointsAdministrationCompetitionsAwdSlaBasisProtocol;
+    okRatio?: number;
+    recoveringRatio?: number;
+    mumbleRatio?: number;
+    offlineRatio?: number;
+    penaltyMode?: NoCtfapiEndpointsAdministrationCompetitionsAwdPenaltyModeProtocol;
+    mumblePenalty?: number;
+    offlinePenalty?: number;
+    recoveringPenalty?: number;
+    mumblePenaltyRatio?: number;
+    offlinePenaltyRatio?: number;
+    recoveringPenaltyRatio?: number;
+    consecutiveFailureMultiplier?: number;
+    maximumRoundPenalty?: number | null;
+    minimumTotalScore?: number | null;
+    confidentialityPoints?: number;
+    minimumAttackRatio?: number;
+    scarcityAlpha?: number;
+    maximumRankMultiplier?: number;
+    composition?: NoCtfapiEndpointsAdministrationCompetitionsAwdScoreCompositionProtocol;
+    attackWeight?: number;
+    defenseWeight?: number;
+    slaWeight?: number;
+    attackSettlement?: NoCtfapiEndpointsAdministrationCompetitionsAwdAttackSettlementProtocol;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsAwdLifetimeUnitProtocol = 'Rounds' | 'ActiveSeconds';
+
+export type NoCtfapiEndpointsAdministrationCompetitionsAwdGenerationPolicyProtocol = 'EveryRound' | 'EveryNRounds' | 'ActiveInterval';
+
+export type NoCtfapiEndpointsAdministrationCompetitionsAwdSlaSettlementProtocol = 'FinalScheduledCheck' | 'SampleAverage' | 'TimeWeighted';
+
+export type NoCtfapiEndpointsAdministrationCompetitionsAwdScoringPresetProtocol = 'Fixed' | 'SharedPool' | 'Scarcity' | 'TargetRank' | 'SlaMultiplier' | 'Custom';
+
+export type NoCtfapiEndpointsAdministrationCompetitionsAwdDefenseModeProtocol = 'FirstLeak' | 'PerCapture' | 'SharedPool';
+
+export type NoCtfapiEndpointsAdministrationCompetitionsAwdSlaBasisProtocol = 'StatusRatio' | 'ReadableFlags';
+
+export type NoCtfapiEndpointsAdministrationCompetitionsAwdPenaltyModeProtocol = 'SlaRewardOnly' | 'Fixed' | 'Proportional' | 'Combined';
+
+export type NoCtfapiEndpointsAdministrationCompetitionsAwdScoreCompositionProtocol = 'Additive' | 'Weighted' | 'PositiveSlaMultiplier';
+
+export type NoCtfapiEndpointsAdministrationCompetitionsAwdAttackSettlementProtocol = 'Immediate' | 'RoundEnd' | 'FlagExpiry';
+
+export type NoCtfapiEndpointsAdministrationChallengesAwdRuleOverridesContract = {
+    flagLifetimeUnit?: NoCtfapiEndpointsAdministrationCompetitionsAwdLifetimeUnitProtocol | null;
+    flagLifetime?: number | null;
+    linkHistoricalWindow?: boolean | null;
+    historicalLifetimeUnit?: NoCtfapiEndpointsAdministrationCompetitionsAwdLifetimeUnitProtocol | null;
+    historicalLifetime?: number | null;
+    generationPolicy?: NoCtfapiEndpointsAdministrationCompetitionsAwdGenerationPolicyProtocol | null;
+    generationInterval?: number | null;
+    flagsPerStore?: number | null;
+    finalCheckBudgetSeconds?: number | null;
+    retryCount?: number | null;
+    retryIntervalSeconds?: number | null;
+    callbackGraceSeconds?: number | null;
+    slaSettlement?: NoCtfapiEndpointsAdministrationCompetitionsAwdSlaSettlementProtocol | null;
+    preset?: NoCtfapiEndpointsAdministrationCompetitionsAwdScoringPresetProtocol | null;
+    defenseMode?: NoCtfapiEndpointsAdministrationCompetitionsAwdDefenseModeProtocol | null;
+    slaBasis?: NoCtfapiEndpointsAdministrationCompetitionsAwdSlaBasisProtocol | null;
+    okRatio?: number | null;
+    recoveringRatio?: number | null;
+    mumbleRatio?: number | null;
+    offlineRatio?: number | null;
+    penaltyMode?: NoCtfapiEndpointsAdministrationCompetitionsAwdPenaltyModeProtocol | null;
+    mumblePenalty?: number | null;
+    offlinePenalty?: number | null;
+    recoveringPenalty?: number | null;
+    mumblePenaltyRatio?: number | null;
+    offlinePenaltyRatio?: number | null;
+    recoveringPenaltyRatio?: number | null;
+    consecutiveFailureMultiplier?: number | null;
+    maximumRoundPenalty?: number | null;
+    confidentialityPoints?: number | null;
+    minimumAttackRatio?: number | null;
+    scarcityAlpha?: number | null;
+    maximumRankMultiplier?: number | null;
+    attackSettlement?: NoCtfapiEndpointsAdministrationCompetitionsAwdAttackSettlementProtocol | null;
+};
+
+export type NoCtfapiEndpointsChallengesAwdPublicRulePolicyResponse = {
+    rulesId?: string | null;
+    revision?: number | null;
+    effectiveAt?: string | null;
+    attackMode?: NoCtfapiEndpointsAdministrationCompetitionsAwdAttackRewardModeProtocol;
+    attackPoints?: number;
+    defensePoints?: number;
+    slaPoints?: number;
+    checkerIntervalSeconds?: number;
+    options?: NoCtfapiEndpointsAdministrationCompetitionsAwdRuleOptionsContract;
+    stores?: Array<NoCtfapiEndpointsChallengesAwdPublicStoreRuleResponse>;
+    scoring?: NoCtfapiEndpointsAdministrationCompetitionsAwdScoringPolicyContract;
+    scoringChangeEventId?: string | null;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsAwdAttackRewardModeProtocol = 'FixedPerAttack' | 'SplitVictimDefensePool' | 'Scarcity' | 'TargetRank';
+
+export type NoCtfapiEndpointsChallengesAwdPublicStoreRuleResponse = {
+    storeId?: string;
+    name?: string;
+    weight?: number;
+    flagsPerIssue?: number;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsAwdScoringPolicyContract = {
+    attackRewardMode?: NoCtfDomainCompetitionsAwdAttackRewardMode;
+    attackPoints?: number;
+    victimDefensePoolPoints?: number;
+    serviceHealthyPoints?: number;
+    slaSettlement?: NoCtfDomainCompetitionsAwdAwdSlaSettlement;
+    defenseMode?: NoCtfDomainCompetitionsAwdAwdDefenseMode;
+    slaBasis?: NoCtfDomainCompetitionsAwdAwdSlaBasis;
+    okRatio?: number;
+    recoveringRatio?: number;
+    mumbleRatio?: number;
+    offlineRatio?: number;
+    penaltyMode?: NoCtfDomainCompetitionsAwdAwdPenaltyMode;
+    mumblePenalty?: number;
+    offlinePenalty?: number;
+    recoveringPenalty?: number;
+    mumblePenaltyRatio?: number;
+    offlinePenaltyRatio?: number;
+    recoveringPenaltyRatio?: number;
+    consecutiveFailureMultiplier?: number;
+    maximumRoundPenalty?: number | null;
+    confidentialityPoints?: number;
+    minimumAttackRatio?: number;
+    scarcityAlpha?: number;
+    maximumRankMultiplier?: number;
+    composition?: NoCtfDomainCompetitionsAwdAwdScoreComposition;
+    attackWeight?: number;
+    defenseWeight?: number;
+    slaWeight?: number;
+    attackSettlement?: NoCtfDomainCompetitionsAwdAwdAttackSettlement;
+};
+
+export type NoCtfDomainCompetitionsAwdAttackRewardMode = 'FixedPerAttack' | 'SplitVictimDefensePool' | 'Scarcity' | 'TargetRank';
+
+export type NoCtfDomainCompetitionsAwdAwdSlaSettlement = 'FinalScheduledCheck' | 'SampleAverage' | 'TimeWeighted';
+
+export type NoCtfDomainCompetitionsAwdAwdDefenseMode = 'FirstLeak' | 'PerCapture' | 'SharedPool';
+
+export type NoCtfDomainCompetitionsAwdAwdSlaBasis = 'StatusRatio' | 'ReadableFlags';
+
+export type NoCtfDomainCompetitionsAwdAwdPenaltyMode = 'SlaRewardOnly' | 'Fixed' | 'Proportional' | 'Combined';
+
+export type NoCtfDomainCompetitionsAwdAwdScoreComposition = 'Additive' | 'Weighted' | 'PositiveSlaMultiplier';
+
+export type NoCtfDomainCompetitionsAwdAwdAttackSettlement = 'Immediate' | 'RoundEnd' | 'FlagExpiry';
+
 export type NoCtfapiEndpointsChallengesChallengeResponse = {
     id?: string;
     competitionId?: string;
@@ -4652,6 +4845,30 @@ export type NoCtfapiEndpointsAdministrationGameplayFactsHistoricalAdjudicationEv
 
 export type NoCtfapiEndpointsAdministrationGameplayFactsListAdminGameplayFactsRequest = NoCtfapiPaginationPaginationRequest & {};
 
+export type NoCtfapiPaginationArrayResultOfAwdCheckListItemResponse = {
+    total?: number;
+    items?: Array<NoCtfapiEndpointsAdministrationGameplayFactsAwdCheckListItemResponse>;
+};
+
+export type NoCtfapiEndpointsAdministrationGameplayFactsAwdCheckListItemResponse = {
+    gameplayFactId?: string;
+    competitionChallengeId?: string;
+    teamId?: string;
+    roundId?: string;
+    roundNumber?: number;
+    scheduledAt?: string;
+    health?: NoCtfDomainCompetitionsAwdAwdHealth | null;
+    execution?: NoCtfDomainCompetitionsAwdAwdCheckExecution;
+    settlement?: NoCtfDomainCompetitionsAwdAwdSettlementState;
+    reason?: NoCtfDomainCompetitionsAwdAwdCheckReason;
+    finalScheduledCheck?: boolean;
+    receivedAt?: string | null;
+};
+
+export type NoCtfapiEndpointsAdministrationGameplayFactsListAwdChecksRequest = NoCtfapiPaginationPaginationRequest & {};
+
+export type NoCtfDomainCompetitionsAwdAwdSettlementState2 = 0 | 1 | 2 | 3;
+
 export type NoCtfapiEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferencePageResponse = {
     items?: Array<NoCtfapiEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferenceItemResponse>;
     nextCursor?: string | null;
@@ -4729,52 +4946,6 @@ export type NoCtfapiEndpointsAdministrationCompetitionsApplyAwdScoringRulesReque
     reason: string;
     previewToken: string;
 };
-
-export type NoCtfapiEndpointsAdministrationCompetitionsAwdScoringPolicyContract = {
-    attackRewardMode?: NoCtfDomainCompetitionsAwdAttackRewardMode;
-    attackPoints?: number;
-    victimDefensePoolPoints?: number;
-    serviceHealthyPoints?: number;
-    slaSettlement?: NoCtfDomainCompetitionsAwdAwdSlaSettlement;
-    defenseMode?: NoCtfDomainCompetitionsAwdAwdDefenseMode;
-    slaBasis?: NoCtfDomainCompetitionsAwdAwdSlaBasis;
-    okRatio?: number;
-    recoveringRatio?: number;
-    mumbleRatio?: number;
-    offlineRatio?: number;
-    penaltyMode?: NoCtfDomainCompetitionsAwdAwdPenaltyMode;
-    mumblePenalty?: number;
-    offlinePenalty?: number;
-    recoveringPenalty?: number;
-    mumblePenaltyRatio?: number;
-    offlinePenaltyRatio?: number;
-    recoveringPenaltyRatio?: number;
-    consecutiveFailureMultiplier?: number;
-    maximumRoundPenalty?: number | null;
-    confidentialityPoints?: number;
-    minimumAttackRatio?: number;
-    scarcityAlpha?: number;
-    maximumRankMultiplier?: number;
-    composition?: NoCtfDomainCompetitionsAwdAwdScoreComposition;
-    attackWeight?: number;
-    defenseWeight?: number;
-    slaWeight?: number;
-    attackSettlement?: NoCtfDomainCompetitionsAwdAwdAttackSettlement;
-};
-
-export type NoCtfDomainCompetitionsAwdAttackRewardMode = 'FixedPerAttack' | 'SplitVictimDefensePool' | 'Scarcity' | 'TargetRank';
-
-export type NoCtfDomainCompetitionsAwdAwdSlaSettlement = 'FinalScheduledCheck' | 'SampleAverage' | 'TimeWeighted';
-
-export type NoCtfDomainCompetitionsAwdAwdDefenseMode = 'FirstLeak' | 'PerCapture' | 'SharedPool';
-
-export type NoCtfDomainCompetitionsAwdAwdSlaBasis = 'StatusRatio' | 'ReadableFlags';
-
-export type NoCtfDomainCompetitionsAwdAwdPenaltyMode = 'SlaRewardOnly' | 'Fixed' | 'Proportional' | 'Combined';
-
-export type NoCtfDomainCompetitionsAwdAwdScoreComposition = 'Additive' | 'Weighted' | 'PositiveSlaMultiplier';
-
-export type NoCtfDomainCompetitionsAwdAwdAttackSettlement = 'Immediate' | 'RoundEnd' | 'FlagExpiry';
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCreateCompetitionAnnouncementRequest = {
     title: string;
@@ -5021,71 +5192,6 @@ export type NoCtfapiEndpointsAdministrationCompetitionsAwdCompetitionModeConfigu
     serviceUnhealthyPenalty?: number;
     options?: NoCtfapiEndpointsAdministrationCompetitionsAwdRuleOptionsContract | null;
 };
-
-export type NoCtfapiEndpointsAdministrationCompetitionsAwdAttackRewardModeProtocol = 'FixedPerAttack' | 'SplitVictimDefensePool' | 'Scarcity' | 'TargetRank';
-
-export type NoCtfapiEndpointsAdministrationCompetitionsAwdRuleOptionsContract = {
-    flagLifetimeUnit?: NoCtfapiEndpointsAdministrationCompetitionsAwdLifetimeUnitProtocol;
-    flagLifetime?: number;
-    linkHistoricalWindow?: boolean;
-    historicalLifetimeUnit?: NoCtfapiEndpointsAdministrationCompetitionsAwdLifetimeUnitProtocol;
-    historicalLifetime?: number;
-    generationPolicy?: NoCtfapiEndpointsAdministrationCompetitionsAwdGenerationPolicyProtocol;
-    generationInterval?: number;
-    flagsPerStore?: number;
-    roundGapSeconds?: number;
-    totalRounds?: number | null;
-    submissionTailSeconds?: number;
-    finalCheckBudgetSeconds?: number;
-    retryCount?: number;
-    retryIntervalSeconds?: number;
-    callbackGraceSeconds?: number;
-    slaSettlement?: NoCtfapiEndpointsAdministrationCompetitionsAwdSlaSettlementProtocol;
-    preset?: NoCtfapiEndpointsAdministrationCompetitionsAwdScoringPresetProtocol;
-    defenseMode?: NoCtfapiEndpointsAdministrationCompetitionsAwdDefenseModeProtocol;
-    slaBasis?: NoCtfapiEndpointsAdministrationCompetitionsAwdSlaBasisProtocol;
-    okRatio?: number;
-    recoveringRatio?: number;
-    mumbleRatio?: number;
-    offlineRatio?: number;
-    penaltyMode?: NoCtfapiEndpointsAdministrationCompetitionsAwdPenaltyModeProtocol;
-    mumblePenalty?: number;
-    offlinePenalty?: number;
-    recoveringPenalty?: number;
-    mumblePenaltyRatio?: number;
-    offlinePenaltyRatio?: number;
-    recoveringPenaltyRatio?: number;
-    consecutiveFailureMultiplier?: number;
-    maximumRoundPenalty?: number | null;
-    minimumTotalScore?: number | null;
-    confidentialityPoints?: number;
-    minimumAttackRatio?: number;
-    scarcityAlpha?: number;
-    maximumRankMultiplier?: number;
-    composition?: NoCtfapiEndpointsAdministrationCompetitionsAwdScoreCompositionProtocol;
-    attackWeight?: number;
-    defenseWeight?: number;
-    slaWeight?: number;
-    attackSettlement?: NoCtfapiEndpointsAdministrationCompetitionsAwdAttackSettlementProtocol;
-};
-
-export type NoCtfapiEndpointsAdministrationCompetitionsAwdLifetimeUnitProtocol = 'Rounds' | 'ActiveSeconds';
-
-export type NoCtfapiEndpointsAdministrationCompetitionsAwdGenerationPolicyProtocol = 'EveryRound' | 'EveryNRounds' | 'ActiveInterval';
-
-export type NoCtfapiEndpointsAdministrationCompetitionsAwdSlaSettlementProtocol = 'FinalScheduledCheck' | 'SampleAverage' | 'TimeWeighted';
-
-export type NoCtfapiEndpointsAdministrationCompetitionsAwdScoringPresetProtocol = 'Fixed' | 'SharedPool' | 'Scarcity' | 'TargetRank' | 'SlaMultiplier' | 'Custom';
-
-export type NoCtfapiEndpointsAdministrationCompetitionsAwdDefenseModeProtocol = 'FirstLeak' | 'PerCapture' | 'SharedPool';
-
-export type NoCtfapiEndpointsAdministrationCompetitionsAwdSlaBasisProtocol = 'StatusRatio' | 'ReadableFlags';
-
-export type NoCtfapiEndpointsAdministrationCompetitionsAwdPenaltyModeProtocol = 'SlaRewardOnly' | 'Fixed' | 'Proportional' | 'Combined';
-
-export type NoCtfapiEndpointsAdministrationCompetitionsAwdScoreCompositionProtocol = 'Additive' | 'Weighted' | 'PositiveSlaMultiplier';
-
-export type NoCtfapiEndpointsAdministrationCompetitionsAwdAttackSettlementProtocol = 'Immediate' | 'RoundEnd' | 'FlagExpiry';
 
 export type NoCtfapiEndpointsAdministrationCompetitionsAwdpCompetitionModeConfigurationContract = {
     roundDurationSeconds?: number;
@@ -5698,43 +5804,6 @@ export type NoCtfapiEndpointsAdministrationChallengesAwdCompetitionChallengeRule
     serviceHealthyPoints?: number | null;
     serviceUnhealthyPenalty?: number | null;
     flagTemplate?: NoCtfapiEndpointsAdministrationCompetitionsFlagTemplateContract | null;
-};
-
-export type NoCtfapiEndpointsAdministrationChallengesAwdRuleOverridesContract = {
-    flagLifetimeUnit?: NoCtfapiEndpointsAdministrationCompetitionsAwdLifetimeUnitProtocol | null;
-    flagLifetime?: number | null;
-    linkHistoricalWindow?: boolean | null;
-    historicalLifetimeUnit?: NoCtfapiEndpointsAdministrationCompetitionsAwdLifetimeUnitProtocol | null;
-    historicalLifetime?: number | null;
-    generationPolicy?: NoCtfapiEndpointsAdministrationCompetitionsAwdGenerationPolicyProtocol | null;
-    generationInterval?: number | null;
-    flagsPerStore?: number | null;
-    finalCheckBudgetSeconds?: number | null;
-    retryCount?: number | null;
-    retryIntervalSeconds?: number | null;
-    callbackGraceSeconds?: number | null;
-    slaSettlement?: NoCtfapiEndpointsAdministrationCompetitionsAwdSlaSettlementProtocol | null;
-    preset?: NoCtfapiEndpointsAdministrationCompetitionsAwdScoringPresetProtocol | null;
-    defenseMode?: NoCtfapiEndpointsAdministrationCompetitionsAwdDefenseModeProtocol | null;
-    slaBasis?: NoCtfapiEndpointsAdministrationCompetitionsAwdSlaBasisProtocol | null;
-    okRatio?: number | null;
-    recoveringRatio?: number | null;
-    mumbleRatio?: number | null;
-    offlineRatio?: number | null;
-    penaltyMode?: NoCtfapiEndpointsAdministrationCompetitionsAwdPenaltyModeProtocol | null;
-    mumblePenalty?: number | null;
-    offlinePenalty?: number | null;
-    recoveringPenalty?: number | null;
-    mumblePenaltyRatio?: number | null;
-    offlinePenaltyRatio?: number | null;
-    recoveringPenaltyRatio?: number | null;
-    consecutiveFailureMultiplier?: number | null;
-    maximumRoundPenalty?: number | null;
-    confidentialityPoints?: number | null;
-    minimumAttackRatio?: number | null;
-    scarcityAlpha?: number | null;
-    maximumRankMultiplier?: number | null;
-    attackSettlement?: NoCtfapiEndpointsAdministrationCompetitionsAwdAttackSettlementProtocol | null;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengesAwdStoreRuleContract = {
@@ -11176,6 +11245,32 @@ export type DownloadRandomChallengeAttachmentEndpointErrors = {
     404: unknown;
 };
 
+export type GetAwdRulesData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        competitionChallengeId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awd/rules';
+};
+
+export type GetAwdRulesErrors = {
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetAwdRulesResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsChallengesAwdPublicRulesResponse;
+};
+
+export type GetAwdRulesResponse = GetAwdRulesResponses[keyof GetAwdRulesResponses];
+
 export type GetChallengeEndpointData = {
     body?: never;
     path: {
@@ -16293,6 +16388,50 @@ export type AdminListGameplayFactsResponses = {
 };
 
 export type AdminListGameplayFactsResponse = AdminListGameplayFactsResponses[keyof AdminListGameplayFactsResponses];
+
+export type AdminListAwdChecksData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query: {
+        settlement?: NoCtfDomainCompetitionsAwdAwdSettlementState2 | null;
+        allSettlements: boolean;
+        teamId?: string | null;
+        competitionChallengeId?: string | null;
+        roundNumber?: number | null;
+        offset: number;
+        limit: number;
+        desc: boolean;
+    };
+    url: '/api/v1/admin/competitions/{competitionId}/awd/checks';
+};
+
+export type AdminListAwdChecksErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminListAwdChecksError = AdminListAwdChecksErrors[keyof AdminListAwdChecksErrors];
+
+export type AdminListAwdChecksResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiPaginationArrayResultOfAwdCheckListItemResponse;
+};
+
+export type AdminListAwdChecksResponse = AdminListAwdChecksResponses[keyof AdminListAwdChecksResponses];
 
 export type AdminPreviewHistoricalAdjudicationDifferencesData = {
     body?: never;

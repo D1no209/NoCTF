@@ -16,8 +16,18 @@ public sealed record AwdCheckEvidenceView(Guid GameplayFactId,
 public sealed record AwdCheckAdjudicationResult(AwdCheckAdjudicationState State,
     AwdCheckEvidenceView? View = null);
 
+public sealed record AwdCheckListQuery(Guid CompetitionId, int Offset, int Limit,
+    AwdSettlementState? Settlement = AwdSettlementState.PendingAdjudication,
+    Guid? TeamId = null, Guid? CompetitionChallengeId = null, int? RoundNumber = null);
+public sealed record AwdCheckListItem(Guid GameplayFactId, Guid CompetitionChallengeId, Guid TeamId,
+    Guid RoundId, int RoundNumber, DateTimeOffset ScheduledAt, AwdHealth? Health,
+    AwdCheckExecution Execution, AwdSettlementState Settlement, AwdCheckReason Reason,
+    bool FinalScheduledCheck, DateTimeOffset? ReceivedAt);
+public sealed record AwdCheckListView(IReadOnlyList<AwdCheckListItem> Items, int Total);
+
 public interface IAwdCheckAdjudicationStore
 {
+    Task<AwdCheckListView> ListAsync(AwdCheckListQuery query, CancellationToken ct);
     Task<AwdCheckEvidenceView?> ReadAsync(Guid competitionId, Guid gameplayFactId, CancellationToken ct);
     Task<AwdCheckAdjudicationResult> ApplyAsync(AwdCheckAdjudicationCommand command, CancellationToken ct);
 }

@@ -35,6 +35,22 @@ public sealed partial class AwdRoundCoordinationTests
             return result;
         }
         var late = await Read(lateId);
+        await using (var listDb = new NoCtfDbContext(options))
+        {
+            var publisher = new RecordingOutbox();
+            var reader = new AwdCheckAdjudicationStore(listDb, new CompetitionEventStore(listDb, publisher), publisher);
+            var filter = new AwdCheckListQuery(fixture.CompetitionId, 0, 200,
+                TeamId: late.TeamId, CompetitionChallengeId: late.CompetitionChallengeId);
+            var pending = await reader.ListAsync(filter, ct);
+            await Assert.That(pending.Items.Any(item => item.GameplayFactId == lateId)).IsTrue();
+            await Assert.That(pending.Items.All(item => item.Settlement == AwdSettlementState.PendingAdjudication)).IsTrue();
+            var page = await reader.ListAsync(filter with { Limit = 1, Offset = 1 }, ct);
+            await Assert.That(page.Total).IsEqualTo(pending.Total);
+            await Assert.That(page.Items.Single().GameplayFactId).IsEqualTo(pending.Items[1].GameplayFactId);
+            await Assert.That((await reader.ListAsync(filter with { TeamId = Guid.NewGuid() }, ct)).Total).IsEqualTo(0);
+            await Assert.That((await reader.ListAsync(filter with { CompetitionId = Guid.NewGuid() }, ct)).Total).IsEqualTo(0);
+            await Assert.That((await reader.ListAsync(filter with { RoundNumber = 999 }, ct)).Total).IsEqualTo(0);
+        }
         var command = new AwdCheckAdjudicationCommand(fixture.CompetitionId, lateId,
             late.Evidence.AttemptId, late.Evidence.ReceivedAt, fixture.OwnerId, AwdCheckAdjudicationAction.AcceptEvidence,
             "Reviewed original in-window observation; transport callback was delayed.", at);

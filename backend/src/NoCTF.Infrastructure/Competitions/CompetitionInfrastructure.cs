@@ -60,6 +60,7 @@ internal static class CompetitionInfrastructure
         services.AddScoped<IAwdCheckAdjudicationStore, AwdCheckAdjudicationStore>();
         services.AddScoped<AdjudicateAwdCheck>();
         services.AddScoped<IAwdScoringRuleStore, AwdScoringRuleStore>();
+        services.AddScoped<IAwdPublicRulesReader, AwdPublicRulesReader>();
         services.AddScoped<ManageAwdScoringRules>();
         services.AddScoped<IAwdRuntimeProvisioner, AwdRuntimeProvisioner>();
         services.AddScoped<IKohRuntimeProvisioner, KohRuntimeProvisioner>();

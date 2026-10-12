@@ -41,6 +41,7 @@ public sealed class AwdCheckAdjudicationHttpTests
                 Reason = AwdCheckReason.LateReceipt, AttemptId = Guid.NewGuid(), ReceivedAt = DateTimeOffset.UtcNow,
                 Flags = [new() { FlagId = Guid.NewGuid() }] });
         store.ReadAsync(competitionId, factId, Arg.Any<CancellationToken>()).Returns(view);
+        store.ListAsync(Arg.Any<AwdCheckListQuery>(), Arg.Any<CancellationToken>()).Returns(new AwdCheckListView([], 0));
         store.ApplyAsync(Arg.Any<AwdCheckAdjudicationCommand>(), Arg.Any<CancellationToken>())
             .Returns(new AwdCheckAdjudicationResult(AwdCheckAdjudicationState.Conflict));
         var builder = WebApplication.CreateBuilder();
@@ -56,7 +57,8 @@ public sealed class AwdCheckAdjudicationHttpTests
             options.DisableAutoDiscovery = true;
             options.Assemblies = [typeof(AdjudicateAwdCheckEndpoint).Assembly];
             options.Filter = type => type == typeof(AdjudicateAwdCheckEndpoint)
-                || type == typeof(AdjudicateAwdCheckValidator) || type == typeof(GetAwdCheckEvidenceEndpoint);
+                || type == typeof(AdjudicateAwdCheckValidator) || type == typeof(GetAwdCheckEvidenceEndpoint)
+                || type == typeof(ListAwdChecksEndpoint) || type == typeof(ListAwdChecksValidator);
         });
         builder.Services.SwaggerDocument();
         builder.Services.AddAuthentication("Bearer").AddScheme<AuthenticationSchemeOptions, TestAuthentication>("Bearer", _ => { });
@@ -70,11 +72,18 @@ public sealed class AwdCheckAdjudicationHttpTests
         var path = $"/api/v1/admin/competitions/{competitionId}/awd/checks/{factId}";
         var request = new { action = "AcceptEvidence", expectedAttemptId = view.Evidence.AttemptId, expectedReceivedAt = view.Evidence.ReceivedAt, reason = "Reviewed evidence" };
         using var forbiddenRead = await client.GetAsync(path);
+        using var forbiddenList = await client.GetAsync(path[..path.LastIndexOf('/')]);
+        await Assert.That(forbiddenList.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
         using var forbiddenWrite = await client.PostAsJsonAsync(path + "/adjudication", request);
         await Assert.That(forbiddenRead.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
         await Assert.That(forbiddenWrite.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
         await Assert.That(store.ReceivedCalls()).IsEmpty();
         allowed = true;
+        using var listed = await client.GetAsync(path[..path.LastIndexOf('/')]);
+        await Assert.That(listed.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await store.Received(1).ListAsync(Arg.Is<AwdCheckListQuery>(query => query != null
+            && query.CompetitionId == competitionId && query.Settlement == AwdSettlementState.PendingAdjudication
+            && query.Offset == 0 && query.Limit == 10), Arg.Any<CancellationToken>());
         using var response = await client.GetAsync(path);
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
