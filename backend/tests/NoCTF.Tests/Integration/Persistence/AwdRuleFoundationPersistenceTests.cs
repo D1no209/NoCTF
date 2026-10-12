@@ -97,19 +97,23 @@ public sealed class AwdRuleFoundationPersistenceTests
             await Assert.That(loaded.Stores.Single().FlagsPerIssue).IsEqualTo(2);
             var loadedChallenge = await db.CompetitionChallenges.AsSplitQuery().SingleAsync(ct);
             await Assert.That(((AwdCompetitionChallengeRules)loadedChallenge.Rules!).AwdOverrides.MumbleRatio).IsEqualTo(0m);
-            var modeStore = new CompetitionConfigurationStore(db, new NoOpPostCommitMessagePublisher(), NullCompetitionEventRecorder.Instance);
+            var audit = new NoCTF.Application.Competitions.Awd.AwdConfigurationChangeAudit(user.Id, "Update next-round AWD defaults");
+            var eventRecorder = new NoCTF.Infrastructure.Competitions.Events.CompetitionEventStore(db, new NoOpPostCommitMessagePublisher());
+            var modeStore = new CompetitionConfigurationStore(db, new NoOpPostCommitMessagePublisher(), eventRecorder);
             var requested = (AwdCompetitionModeConfiguration)CompetitionModeConfigurationDefaults.Create(GameMode.Awd, awd.Id);
             requested.AwdOptions = new() { Preset = AwdScoringPreset.Custom, FlagLifetime = 9,
                 RecoveringRatio = .125m, MumblePenalty = 0, RetryCount = 0, Composition = AwdScoreComposition.Weighted,
                 AttackWeight = .75m, TotalRounds = 123, SubmissionTailSeconds = 45 };
+            await Assert.That((await modeStore.TryUpdateAsync(awd.Id, requested, true, now, ct)).Failure)
+                .IsEqualTo(NoCTF.Application.Competitions.Configuration.CompetitionConfigurationUpdateFailure.RuleChangeReasonRequired);
             var contract = CompetitionModeConfigurationContractMapper.FromDomain(requested);
             var saved = await modeStore.TryUpdateAsync(awd.Id,
-                CompetitionModeConfigurationContractMapper.ToDomain(awd.Id, GameMode.Awd, contract), true, now.AddSeconds(1), ct);
+                CompetitionModeConfigurationContractMapper.ToDomain(awd.Id, GameMode.Awd, contract), true, now.AddSeconds(1), ct, audit);
             await Assert.That(saved.Failure).IsNull();
             db.ChangeTracker.Clear();
             var reloaded = await modeStore.FindAsync(awd.Id, ct);
             await Assert.That(((AwdCompetitionModeConfiguration)reloaded!.Configuration).AwdOptions).IsEqualTo(requested.AwdOptions);
-            var challengeStore = new ChallengeConfigurationStore(db, new NoOpPostCommitMessagePublisher(), NullCompetitionEventRecorder.Instance);
+            var challengeStore = new ChallengeConfigurationStore(db, new NoOpPostCommitMessagePublisher(), eventRecorder);
             var requestedRules = new AwdCompetitionChallengeRules
             {
                 AwdOverrides = new() { RecoveringRatio = 0m, RetryCount = 0, AttackSettlement = AwdAttackSettlement.RoundEnd },
@@ -117,7 +121,7 @@ public sealed class AwdRuleFoundationPersistenceTests
             };
             var ruleContract = CompetitionChallengeRulesContractMapper.FromDomain(requestedRules);
             var savedRules = await challengeStore.TryUpdateAsync(awd.Id, challenge.Id,
-                CompetitionChallengeRulesContractMapper.ToDomain(challenge.Id, GameMode.Awd, ruleContract), now.AddSeconds(2), ct);
+                CompetitionChallengeRulesContractMapper.ToDomain(challenge.Id, GameMode.Awd, ruleContract), now.AddSeconds(2), ct, audit);
             await Assert.That(savedRules.Failure).IsNull();
             db.ChangeTracker.Clear();
             var reloadedRules = (AwdCompetitionChallengeRules)(await challengeStore.FindAsync(awd.Id, challenge.Id, ct))!.Rules;
@@ -126,10 +130,14 @@ public sealed class AwdRuleFoundationPersistenceTests
             await Assert.That(reloadedRules.StoreRules.Single().FlagsPerIssue).IsEqualTo(3);
             await Assert.That(reloadedRules.StoreRules.Single().Weight).IsEqualTo(.25m);
             var removedRules = await challengeStore.TryUpdateAsync(awd.Id, challenge.Id,
-                new AwdCompetitionChallengeRules(), now.AddSeconds(3), ct);
+                new AwdCompetitionChallengeRules(), now.AddSeconds(3), ct, audit);
             await Assert.That(removedRules.Failure).IsNull();
             db.ChangeTracker.Clear();
             await Assert.That(((AwdCompetitionChallengeRules)(await challengeStore.FindAsync(awd.Id, challenge.Id, ct))!.Rules).StoreRules.Count).IsEqualTo(0);
+            var auditEvents = await db.CompetitionEvents.Where(entry => entry.CompetitionId == awd.Id).ToArrayAsync(ct);
+            await Assert.That(auditEvents.Length).IsEqualTo(3);
+            await Assert.That(auditEvents.All(entry => entry.ActorUserId == user.Id && entry.Reason == audit.Reason
+                && entry.AwdRuleTiming == AwdRuleChangeTiming.NextRound && entry.AwdEffectiveFromRound == 2)).IsTrue();
             loaded = await db.AwdRoundRules.AsSplitQuery().SingleAsync(ct);
             await Assert.That(loaded.Options.RecoveringRatio).IsEqualTo(.75m);
             await Assert.That(loaded.Stores.Single().Weight).IsEqualTo(3.25m);

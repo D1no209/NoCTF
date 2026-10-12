@@ -1,4 +1,5 @@
 {
+  "api.awd.ruleChangeReasonRequired": "Provide an operator and a reason of 1–512 characters to change active AWD rules. The new defaults apply to the next round.",
   "api.awd.scoringConflict": "The scoring inputs changed. Preview the rule change again.",
   "api.awd.scoringInvalidRequest": "Select an existing AWD round range and a valid scoring policy. Immediate changes apply only to the current round.",
   "api.awd.scoringPreviewExpired": "The scoring preview expired or its inputs changed. Generate a new preview before applying.",

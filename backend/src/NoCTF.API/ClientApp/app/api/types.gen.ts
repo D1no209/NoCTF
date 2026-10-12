@@ -2902,6 +2902,9 @@ export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse = {
     trackKey?: string | null;
     previousTrackKey?: string | null;
     occurredAt?: string;
+    awdRuleTiming?: NoCtfDomainCompetitionsAwdAwdRuleChangeTiming | null;
+    awdEffectiveFromRound?: number | null;
+    awdEffectiveThroughRound?: number | null;
 };
 
 export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventVisibilityProtocol = 'Public' | 'Team' | 'Staff';
@@ -2911,6 +2914,8 @@ export type NoCtfapiEndpointsCompetitionsEventsCompetitionAudienceChangeKindProt
 export type NoCtfapiEndpointsCompetitionsEventsRuntimeCleanupResultProtocol = 'Pending' | 'ResourcesAbsent' | 'ResourcesRemain' | 'CleanupFailed' | 'CapacityOwnershipConflict';
 
 export type NoCtfapiEndpointsCompetitionsEventsCompetitionQuestionStatusProtocol = 'Pending' | 'Replied' | 'Resolved' | 'Closed';
+
+export type NoCtfDomainCompetitionsAwdAwdRuleChangeTiming = 'NextRound' | 'Immediately' | 'RecalculateHistory';
 
 export type NoCtfapiEndpointsCompetitionsEventsListCompetitionEventsRequest = NoCtfapiPaginationPaginationRequest & {};
 
@@ -4725,8 +4730,6 @@ export type NoCtfapiEndpointsAdministrationCompetitionsApplyAwdScoringRulesReque
     previewToken: string;
 };
 
-export type NoCtfDomainCompetitionsAwdAwdRuleChangeTiming = 'NextRound' | 'Immediately' | 'RecalculateHistory';
-
 export type NoCtfapiEndpointsAdministrationCompetitionsAwdScoringPolicyContract = {
     attackRewardMode?: NoCtfDomainCompetitionsAwdAttackRewardMode;
     attackPoints?: number;
@@ -5360,6 +5363,7 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionMetadataPatchR
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionConfigurationPatchRequest = {
+    reason?: string | null;
     configuration: NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract;
 };
 
@@ -5810,6 +5814,7 @@ export type NoCtfapiEndpointsAdministrationChallengesCompetitionChallengePresent
 };
 
 export type NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesPatchRequest = {
+    reason?: string | null;
     configuration: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract;
 };
 

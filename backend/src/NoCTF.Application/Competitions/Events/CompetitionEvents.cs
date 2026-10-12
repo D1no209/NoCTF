@@ -65,7 +65,9 @@ public sealed record CompetitionEventDraft(
     DateTimeOffset? FrozenStartAt = null,
     DateTimeOffset? HiddenStartAt = null,
     RuntimeTrafficCaptureEventData? TrafficCapture = null,
-    AwdCheckAdjudicationEventData? AwdAdjudication = null);
+    AwdCheckAdjudicationEventData? AwdAdjudication = null,
+    NoCTF.Domain.Competitions.Awd.AwdRuleChangeTiming? AwdRuleTiming = null,
+    int? AwdEffectiveFromRound = null, int? AwdEffectiveThroughRound = null);
 
 public sealed record AwdCheckAdjudicationEventData(
     NoCTF.Domain.Competitions.Awd.AwdCheckAdjudicationAction Action,
@@ -173,7 +175,9 @@ public sealed record CompetitionEventView(
     string? Reason,
     string? TrackKey,
     string? PreviousTrackKey,
-    DateTimeOffset OccurredAt);
+    DateTimeOffset OccurredAt,
+    NoCTF.Domain.Competitions.Awd.AwdRuleChangeTiming? AwdRuleTiming = null,
+    int? AwdEffectiveFromRound = null, int? AwdEffectiveThroughRound = null);
 
 public enum CompetitionEventReadState : short
 {

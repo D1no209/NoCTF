@@ -1,3 +1,4 @@
+using NoCTF.Application.Competitions.Awd;
 using NoCTF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Competitions.Configuration;
@@ -52,7 +53,7 @@ public sealed class CompetitionConfigurationStore(
         CompetitionModeConfiguration configuration,
         bool allowWhileRunning,
         DateTimeOffset now,
-        CancellationToken ct)
+        CancellationToken ct, AwdConfigurationChangeAudit? audit = null)
     {
         await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
         var status = await CompetitionStateReader.ReadAsync(db, competitionId, ct);
@@ -64,6 +65,11 @@ public sealed class CompetitionConfigurationStore(
         if (tracked.Mode != configuration.Mode
             || tracked.ModeConfiguration.GetType() != configuration.GetType())
             throw new InvalidOperationException("Competition configuration type does not match its mode.");
+        var nextAwdRound = tracked.Mode == GameMode.Awd
+            ? (await db.AwdRounds.Where(round => round.CompetitionId == competitionId).MaxAsync(round => (int?)round.Number, ct) ?? 0) + 1
+            : (int?)null;
+        if (nextAwdRound > 1 && audit?.HasValidReason != true)
+            return new(null, CompetitionConfigurationUpdateFailure.RuleChangeReasonRequired);
         configuration.CompetitionId = competitionId;
         if (tracked.ModeConfiguration is AwdCompetitionModeConfiguration existingAwd
             && configuration is AwdCompetitionModeConfiguration requestedAwd
@@ -131,7 +137,9 @@ public sealed class CompetitionConfigurationStore(
             CompetitionEventLevel.Information,
             CompetitionEventVisibility.Staff,
             now,
-            CompetitionStatus: status), ct);
+            CompetitionStatus: status, ActorUserId: audit?.ActorUserId, Reason: audit?.Reason?.Trim(),
+            AwdRuleTiming: nextAwdRound is null ? null : NoCTF.Domain.Competitions.Awd.AwdRuleChangeTiming.NextRound,
+            AwdEffectiveFromRound: nextAwdRound), ct);
         await db.SaveChangesAsync(ct);
         var result = await FindAsync(competitionId, ct);
         await transaction.CommitAsync(ct);

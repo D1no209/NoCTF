@@ -158,6 +158,9 @@ public abstract class CompetitionEvent
     public long? TrafficRuntimeToClientBytes { get; set; }
     public long? TrafficCapturedBytes { get; set; }
     public bool? TrafficTruncated { get; set; }
+    public Awd.AwdRuleChangeTiming? AwdRuleTiming { get; set; }
+    public int? AwdEffectiveFromRound { get; set; }
+    public int? AwdEffectiveThroughRound { get; set; }
     public Awd.AwdCheckAdjudicationAction? AwdAdjudicationAction { get; set; }
     public Awd.AwdHealth? PreviousAwdHealth { get; set; }
     public Awd.AwdHealth? AwdHealth { get; set; }

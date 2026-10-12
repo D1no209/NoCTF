@@ -73,6 +73,9 @@ public sealed class CompetitionEventStore(
         entity.Reason = SanitizeReason(draft.Reason);
         entity.TrackKey = draft.TrackKey;
         entity.PreviousTrackKey = draft.PreviousTrackKey;
+        entity.AwdRuleTiming = draft.AwdRuleTiming;
+        entity.AwdEffectiveFromRound = draft.AwdEffectiveFromRound;
+        entity.AwdEffectiveThroughRound = draft.AwdEffectiveThroughRound;
         entity.Automatic = draft.Automatic;
         entity.PatchUploadId = draft.PatchUploadId;
         entity.AwdpFixOutcome = draft.AwdpFixOutcome;
@@ -534,7 +537,7 @@ public sealed class CompetitionEventStore(
             item.Reason,
             item.TrackKey,
             item.PreviousTrackKey,
-            item.OccurredAt);
+            item.OccurredAt, item.AwdRuleTiming, item.AwdEffectiveFromRound, item.AwdEffectiveThroughRound);
         }).ToArray();
     }
 

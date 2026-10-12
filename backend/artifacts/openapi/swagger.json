@@ -37076,6 +37076,24 @@
           "occurredAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "awdRuleTiming": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdRuleChangeTiming"
+              }
+            ]
+          },
+          "awdEffectiveFromRound": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "awdEffectiveThroughRound": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
           }
         }
       },
@@ -37139,6 +37157,20 @@
           "Replied",
           "Resolved",
           "Closed"
+        ]
+      },
+      "NoCTFDomainCompetitionsAwdAwdRuleChangeTiming": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "NextRound",
+          "Immediately",
+          "RecalculateHistory"
+        ],
+        "enum": [
+          "NextRound",
+          "Immediately",
+          "RecalculateHistory"
         ]
       },
       "NoCTFAPIEndpointsCompetitionsEventsListCompetitionEventsRequest": {
@@ -43813,20 +43845,6 @@
           }
         }
       },
-      "NoCTFDomainCompetitionsAwdAwdRuleChangeTiming": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "NextRound",
-          "Immediately",
-          "RecalculateHistory"
-        ],
-        "enum": [
-          "NextRound",
-          "Immediately",
-          "RecalculateHistory"
-        ]
-      },
       "NoCTFAPIEndpointsAdministrationCompetitionsAwdScoringPolicyContract": {
         "type": "object",
         "additionalProperties": false,
@@ -46240,6 +46258,12 @@
           "configuration"
         ],
         "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 0,
+            "nullable": true
+          },
           "configuration": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract"
           }
@@ -47964,6 +47988,12 @@
           "configuration"
         ],
         "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 0,
+            "nullable": true
+          },
           "configuration": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeRulesContract"
           }

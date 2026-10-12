@@ -78,7 +78,8 @@ public sealed class AwdScoringRuleStore(NoCtfDbContext db, ILeaderboardSnapshotF
         var eventId = await events.RecordAsync(new(candidate.CompetitionId, CompetitionEventKind.AwdScoringRulesChanged,
             CompetitionEventLevel.Warning, CompetitionEventVisibility.Staff, candidate.Now,
             ActorUserId: candidate.ActorUserId, CompetitionChallengeId: candidate.CompetitionChallengeId,
-            Reason: candidate.Reason), ct);
+            Reason: candidate.Reason, AwdRuleTiming: candidate.Timing,
+            AwdEffectiveFromRound: candidate.FirstRound, AwdEffectiveThroughRound: candidate.LastRound), ct);
         db.Set<AwdScoringRuleChange>().Add(new()
         {
             EventId = eventId, CompetitionId = candidate.CompetitionId,

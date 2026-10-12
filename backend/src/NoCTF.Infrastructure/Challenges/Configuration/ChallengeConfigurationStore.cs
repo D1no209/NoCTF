@@ -1,3 +1,4 @@
+using NoCTF.Application.Competitions.Awd;
 using NoCTF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Challenges.Configuration;
@@ -58,7 +59,7 @@ public sealed class ChallengeConfigurationStore(
         Guid challengeId,
         CompetitionChallengeRules rules,
         DateTimeOffset updatedAt,
-        CancellationToken ct)
+        CancellationToken ct, AwdConfigurationChangeAudit? audit = null)
     {
         await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, ct);
         var status = await CompetitionStateReader.ReadAsync(db, competitionId, ct);
@@ -77,6 +78,11 @@ public sealed class ChallengeConfigurationStore(
             return new(null, ChallengeConfigurationUpdateFailure.ChallengeNotFound);
         if (tracked.Mode != rules.Mode || tracked.Rules.GetType() != rules.GetType())
             throw new InvalidOperationException("Challenge rules type does not match its mode.");
+        var nextAwdRound = tracked.Mode == GameMode.Awd
+            ? (await db.AwdRounds.Where(round => round.CompetitionId == competitionId).MaxAsync(round => (int?)round.Number, ct) ?? 0) + 1
+            : (int?)null;
+        if (nextAwdRound > 1 && audit?.HasValidReason != true)
+            return new(null, ChallengeConfigurationUpdateFailure.RuleChangeReasonRequired);
         rules.CompetitionChallengeId = challengeId;
         var bloodChanged = !tracked.Rules.BloodRewards.OrderBy(item => item.Position).Select(item => (item.Policy, item.Value))
             .SequenceEqual(rules.BloodRewards.OrderBy(item => item.Position).Select(item => (item.Policy, item.Value)));
@@ -152,7 +158,9 @@ public sealed class ChallengeConfigurationStore(
             CompetitionEventVisibility.Staff,
             updatedAt,
             CompetitionChallengeId: challengeId,
-            CompetitionStatus: status), ct);
+            CompetitionStatus: status, ActorUserId: audit?.ActorUserId, Reason: audit?.Reason?.Trim(),
+            AwdRuleTiming: nextAwdRound is null ? null : NoCTF.Domain.Competitions.Awd.AwdRuleChangeTiming.NextRound,
+            AwdEffectiveFromRound: nextAwdRound), ct);
         await db.SaveChangesAsync(ct);
         var result = await FindAsync(competitionId, challengeId, ct);
         await transaction.CommitAsync(ct);

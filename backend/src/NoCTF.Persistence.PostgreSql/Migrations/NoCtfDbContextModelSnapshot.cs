@@ -2578,9 +2578,21 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("smallint")
                         .HasColumnName("awd_adjudication_action");
 
+                    b.Property<int?>("AwdEffectiveFromRound")
+                        .HasColumnType("integer")
+                        .HasColumnName("awd_effective_from_round");
+
+                    b.Property<int?>("AwdEffectiveThroughRound")
+                        .HasColumnType("integer")
+                        .HasColumnName("awd_effective_through_round");
+
                     b.Property<short?>("AwdHealth")
                         .HasColumnType("smallint")
                         .HasColumnName("awd_health");
+
+                    b.Property<short?>("AwdRuleTiming")
+                        .HasColumnType("smallint")
+                        .HasColumnName("awd_rule_timing");
 
                     b.Property<short?>("AwdSettlement")
                         .HasColumnType("smallint")

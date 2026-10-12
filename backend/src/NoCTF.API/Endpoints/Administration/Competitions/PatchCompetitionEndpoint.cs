@@ -61,6 +61,7 @@ public sealed class CompetitionMetadataPatchRequest
 
 public sealed class CompetitionConfigurationPatchRequest
 {
+    public string? Reason { get; set; }
     public required CompetitionModeConfigurationContract Configuration { get; set; }
 }
 
@@ -186,6 +187,7 @@ public sealed class PatchCompetitionValidator : Validator<PatchCompetitionReques
                 || metadata.RuntimeAccessMode is RuntimeAccessModeProtocol.DirectAndWsrx
                     or RuntimeAccessModeProtocol.WsrxOnly)
             .WithMessage(_ => ApiMessages.Text(ApiMessageId.PatchCompetitionValidationTrafficCaptureRequiresWsrx)).WithErrorCode(ApiMessages.Key(ApiMessageId.PatchCompetitionValidationTrafficCaptureRequiresWsrx));
+        RuleFor(request => request.ModeConfiguration!.Reason).MaximumLength(512).When(request => request.ModeConfiguration is not null);
         RuleFor(request => request.ModeConfiguration!.Configuration).NotNull()
             .When(request => request.ModeConfiguration is not null);
         RuleFor(request => request.ModeConfiguration!.Configuration)
@@ -266,6 +268,7 @@ public static partial class CompetitionPatchMapper
         CompetitionMetadataPatchRequest request,
         [MappingTarget] Competition target);
 
+    [MapperIgnoreSource(nameof(CompetitionConfigurationPatchRequest.Reason))]
     [MapperIgnoreSource(nameof(CompetitionConfigurationPatchRequest.Configuration))]
     [MapperIgnoreTarget(nameof(Competition.ModeConfiguration))]
     [MapperIgnoreTarget(nameof(Competition.WebhookConfiguration))]
@@ -621,7 +624,11 @@ public sealed class PatchCompetitionEndpoint(
                     competitionId,
                     target.ModeConfiguration!,
                     timeProvider.GetUtcNow(),
-                    transactionCt);
+                    transactionCt, current.Mode == GameMode.Awd
+                        ? new NoCTF.Application.Competitions.Awd.AwdConfigurationChangeAudit(user.UserId, request.ModeConfiguration!.Reason) : null);
+                if (result.FailureCode == CompetitionConfigurationFailureCode.RuleChangeReasonRequired)
+                    return Reject(ApiProblems.Problem(statusCode: 422, detail: ApiMessages.For(result.FailureCode),
+                        extensions: new Dictionary<string, object?> { ["code"] = result.FailureCode.ToString() }));
                 if (!result.Succeeded)
                     return Reject(Failure(
                         result.ErrorMessage ?? "Competition configuration is invalid."));

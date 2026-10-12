@@ -1,4 +1,5 @@
 {
+  "api.awd.ruleChangeReasonRequired": "修改已开始的 AWD 规则须记录操作者并填写 1–512 字的理由，新默认值从下一轮生效。",
   "api.awd.scoringConflict": "计分依据已变更，请重新预览规则修改。",
   "api.awd.scoringInvalidRequest": "请选择已有的 AWD 轮次范围和有效计分策略；立即变更仅适用于当前轮。",
   "api.awd.scoringPreviewExpired": "计分预览已过期或其依据已变更，请重新预览后应用。",
