@@ -256,7 +256,7 @@ def nuget_config(path, runtime_dir, package_ids):
 
 
 def publish(args):
-    runtime_dir = args.runtime_dir.resolve() if args.runtime_dir else None
+    runtime_dir = args.runtime_dir.resolve() if args.flavor == "Satori" and args.runtime_dir else None
     manifest = verify_manifest(runtime_dir, args.rid) if args.flavor == "Satori" and runtime_dir else None
     if args.flavor == "Satori" and manifest is None:
         raise ValueError("--runtime-dir is required for Satori; no official fallback is allowed")
