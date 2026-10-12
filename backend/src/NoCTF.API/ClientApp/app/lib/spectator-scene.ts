@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import { themeColor } from '../utils/theme-color'
 import { createSpectatorRibbon } from '../motion/spectator-ribbon'
 import { setFlagTransfer } from '../motion/spectator-flag'
-import { createTerrain, terrainHeight } from './spectator-terrain'
+import { createTerrain, terrainHeight, terrainFragments } from './spectator-terrain'
 import { createSpectatorRock } from './spectator-rock'
 import rockTextureUrl from '../assets/images/spectator/koh-stratified-rock.png'
 
@@ -19,7 +19,10 @@ export class SpectatorScene {
   private keyLight!: THREE.DirectionalLight
   private fillLight!: THREE.DirectionalLight
   private scene = new THREE.Scene()
-  private camera = new THREE.PerspectiveCamera(39, 1, .1, 200)
+  private perspective = new THREE.PerspectiveCamera(39, 1, .1, 200)
+  private orthographic = new THREE.OrthographicCamera(-16, 16, 8, -8, .1, 200)
+  private camera: THREE.PerspectiveCamera | THREE.OrthographicCamera = this.perspective
+  private aspect = 1
   private world = new THREE.Group()
   private geometries: THREE.BufferGeometry[] = []
   private materials: THREE.Material[] = []
@@ -112,7 +115,7 @@ export class SpectatorScene {
       const peaks: THREE.Vector3[] = []
       state.nodes.forEach((node, index) => {
         const group = new THREE.Group()
-        group.position.set((index % columns - (columns - 1) / 2) * 7, 0, (Math.floor(index / columns) - (rows - 1) / 2) * 7.8)
+        group.position.set((index % columns - (columns - 1) / 2) * (state.mode === 'Koh' ? 9.5 : 7), 0, (Math.floor(index / columns) - (rows - 1) / 2) * (state.mode === 'Koh' ? 9 : 7.8))
         if (state.mode === 'Koh' && count === 3 && index === 2) group.position.x = 0
         group.userData.id = node.id
         group.userData.servicePositions = []
@@ -137,7 +140,7 @@ export class SpectatorScene {
         label.dataset.nodeId = node.id; this.element.append(label); this.labels.push(label)
       })
       if (state.mode === 'Koh' && peaks.length) {
-        const { geometry, contours, controlContours } = createTerrain(peaks, columns * 7 + 5, rows * 7.8 + 5)
+        const { geometry, contours, controlContours } = createTerrain(peaks, columns * 9.5 + 96, rows * 9 + 96)
         this.geometries.push(geometry, contours, ...controlContours)
         const ready = { value: 0 }
         const texture = new THREE.TextureLoader().load(rockTextureUrl, loaded => {
@@ -150,12 +153,25 @@ export class SpectatorScene {
         const rock = createSpectatorRock(texture, this.colors['rock-lit']!.clone().lerp(this.colors.rock!, .18), this.colors.rock!, ready)
         this.materials.push(rock)
         const terrain = new THREE.Mesh(geometry, rock); terrain.castShadow = true; terrain.receiveShadow = true; this.world.add(terrain)
+        const fragments = terrainFragments(peaks)
+        const rubbleGeometry = new THREE.IcosahedronGeometry(1, 0)
+        this.geometries.push(rubbleGeometry)
+        const rubbleMaterial = this.material(this.colors.rock!.clone().multiplyScalar(.85))
+        rubbleMaterial.flatShading = true; rubbleMaterial.roughness = 1
+        const rubble = new THREE.InstancedMesh(rubbleGeometry, rubbleMaterial, fragments.length)
+        fragments.forEach((fragment, i) => {
+          rubble.setMatrixAt(i, new THREE.Matrix4().compose(fragment.position,
+            new THREE.Quaternion().setFromEuler(new THREE.Euler(.15, fragment.rotation, .1)), fragment.scale))
+          rubble.setColorAt(i, new THREE.Color(fragment.shade, fragment.shade, fragment.shade))
+        })
+        rubble.instanceMatrix.needsUpdate = true
+        rubble.castShadow = true; rubble.receiveShadow = true; this.world.add(rubble)
         this.renderer.shadowMap.needsUpdate = true
         controlContours.forEach((g, i) => {
-          const m = new THREE.LineBasicMaterial({ color: this.colors.edge, transparent: true, opacity: .68 })
+          const m = new THREE.LineBasicMaterial({ color: this.colors.edge, transparent: true, depthWrite: false, opacity: .68 })
           this.materials.push(m); const line = new THREE.LineSegments(g, m); this.world.add(line); this.controlLines.set(state.nodes[i]!.id, line)
         })
-        const contourMaterial = new THREE.LineBasicMaterial({ color: this.colors.snow!.clone().lerp(this.colors.rock!, .4), transparent: true, opacity: .19 })
+        const contourMaterial = new THREE.LineBasicMaterial({ color: this.colors.snow!.clone().lerp(this.colors.rock!, .4), transparent: true, depthWrite: false, opacity: .29, vertexColors: true })
         this.materials.push(contourMaterial); this.world.add(new THREE.LineSegments(contours, contourMaterial))
         for (const node of state.nodes) {
           const group = this.nodes.get(node.id)!, y = terrainHeight(group.position.x, group.position.z, peaks)
@@ -229,8 +245,20 @@ export class SpectatorScene {
     const focused = this.nodes.get(this.state?.focus)?.position
     const selected = (this.state?.highlighted ?? []).map(id => this.nodes.get(id)?.position).filter((p): p is THREE.Vector3 => !!p)
     const target = focused?.clone() ?? (selected.length ? selected.reduce((a, p) => a.add(p), new THREE.Vector3()).divideScalar(selected.length) : new THREE.Vector3())
-    const size = focused ? 12 : Math.max(17, Math.sqrt(this.nodes.size) * 6.5) * Math.max(1, 1.65 / this.camera.aspect)
-    this.camera.position.set(target.x + Math.sin(this.angle) * size, size * .95, target.z + Math.cos(this.angle) * size)
+    if (this.state?.mode === 'Koh') {
+      this.camera = this.orthographic
+      target.y = 1.3
+      if (!focused) target.z += 1
+      const height = (focused ? 10 : Math.max(15, Math.sqrt(this.nodes.size) * 6.6)) * Math.max(1, 1.65 / this.aspect)
+      this.orthographic.left = -height * this.aspect / 2; this.orthographic.right = height * this.aspect / 2
+      this.orthographic.top = height / 2; this.orthographic.bottom = -height / 2
+      this.orthographic.updateProjectionMatrix()
+      this.camera.position.set(target.x + Math.sin(this.angle) * 36, target.y + 30, target.z + Math.cos(this.angle) * 36)
+    } else {
+      this.camera = this.perspective
+      const size = focused ? 12 : Math.max(17, Math.sqrt(this.nodes.size) * 6.5) * Math.max(1, 1.65 / this.aspect)
+      this.camera.position.set(target.x + Math.sin(this.angle) * size, size * .95, target.z + Math.cos(this.angle) * size)
+    }
     this.camera.lookAt(target); this.camera.updateMatrixWorld(); this.placeLabels()
   }
   private placeLabels() {
@@ -246,7 +274,7 @@ export class SpectatorScene {
   private resize() {
     const w = this.element.clientWidth, h = this.element.clientHeight
     if (!w || !h) return
-    this.renderer.setSize(w, h); this.camera.aspect = w / h; this.camera.updateProjectionMatrix()
+    this.renderer.setSize(w, h); this.aspect = w / h; this.perspective.aspect = this.aspect; this.perspective.updateProjectionMatrix()
     this.positionCamera(); this.invalidate()
   }
   private invalidate() { if (!this.disposed && !this.raf && !document.hidden) this.raf = requestAnimationFrame(this.draw) }
