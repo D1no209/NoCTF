@@ -13,7 +13,8 @@ internal static class SpectatorFrameReader
     private const int HistoryLimit = 2000;
 
     public static async Task<SpectatorFrame?> ReadAsync(NoCtfDbContext db, string title,
-        LeaderboardProjectionInput input, CancellationToken ct, ChallengeTimingProjectionOverride? timingOverride = null)
+        LeaderboardProjectionInput input, CancellationToken ct, ChallengeTimingProjectionOverride? timingOverride = null,
+        Guid? currentRoundId = null)
     {
         if (input.Mode is not (GameMode.Awd or GameMode.Koh)) return null;
         var cutoff = input.ProjectedAt!.Value;
@@ -86,6 +87,16 @@ internal static class SpectatorFrameReader
                 && x.State == GameplayFactState.Completed && x.ReferenceKind == GameplayFactReferenceKind.AwdRound
                 && x.ReferenceId != null && x.TeamId != null && competitive.Contains(x.TeamId.Value)
                 && x.VictimTeamId != null && competitive.Contains(x.VictimTeamId.Value) && x.TeamId != x.VictimTeamId);
+            // Current service compromise is independent of the bounded event feed.
+            // The round id comes from the same canonical scoreboard generation.
+            var currentAttacks = await attacks.Where(x => currentRoundId != null && x.ReferenceId == currentRoundId)
+                .Select(x => new { Attacker = x.TeamId!.Value, Victim = x.VictimTeamId!.Value, Challenge = x.CompetitionChallengeId })
+                .Distinct().ToArrayAsync(ct);
+            var compromised = currentAttacks.ToLookup(x => (x.Victim, x.Challenge), x => x.Attacker);
+            services = services.Select(service => service with
+            {
+                CompromisedBy = compromised[(service.TeamId, service.ChallengeId)].ToArray()
+            }).ToList();
             changes = await attacks.Where(x => x.OccurredAt >= start && !attacks.Any(prior =>
                     prior.ReferenceId == x.ReferenceId && prior.TeamId == x.TeamId && prior.VictimTeamId == x.VictimTeamId
                     && prior.CompetitionChallengeId == x.CompetitionChallengeId

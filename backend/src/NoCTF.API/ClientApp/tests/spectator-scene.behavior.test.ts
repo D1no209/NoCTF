@@ -3,7 +3,7 @@ import * as Three from 'three'
 import { createSpectatorRibbon } from '../app/motion/spectator-ribbon'
 import { createTerrain, terrainHeight } from '../app/lib/spectator-terrain'
 import { setFlagTransfer } from '../app/motion/spectator-flag'
-import { awdTeamLayout } from '../app/lib/spectator-awd-layout'
+import { awdTeamLayout, awdOverviewRadius } from '../app/lib/spectator-awd-layout'
 import type { SpectatorScene } from '../app/lib/spectator-scene'
 
 const source = await Bun.file(new URL('../app/lib/spectator-scene.ts', import.meta.url)).text()
@@ -27,14 +27,16 @@ function harness() {
     domElement = new Element(); shadowMap = { enabled: false, autoUpdate: false }; pixelRatio = 0; disposed = false
     capabilities = { maxTextureSize: 8192 }
     width = 0; height = 0
+    lastScene?: Three.Scene
     info = { memory: { geometries: 0, textures: 0 }, render: { calls: 0, triangles: 0 } }
     constructor() { renderer = this }
     setPixelRatio(value: number) { this.pixelRatio = value }
     getPixelRatio() { return this.pixelRatio }
     setClearColor() {} setSize(w: number, h: number) { this.width = Math.floor(w * this.pixelRatio); this.height = Math.floor(h * this.pixelRatio) }
-    render() { this.info.render.calls++ } dispose() { this.disposed = true }
+    render(scene: Three.Scene) { this.lastScene = scene; this.info.render.calls++ } dispose() { this.disposed = true }
   }
-  const deps = { THREE: { ...Three, WebGLRenderer: Renderer }, themeColor: () => '#aabbcc', createSpectatorRibbon, createTerrain, terrainHeight, setFlagTransfer, awdTeamLayout,
+  const palette: Record<string, string> = { '--spectator-healthy': '#50dfbd', '--spectator-attack': '#ff3858', '--spectator-down': '#f5a34b', '--spectator-unknown': '#7a8896' }
+  const deps = { THREE: { ...Three, WebGLRenderer: Renderer }, themeColor: (key: string) => palette[key] ?? '#aabbcc', createSpectatorRibbon, createTerrain, terrainHeight, setFlagTransfer, awdTeamLayout, awdOverviewRadius,
     document, window, ResizeObserver: class { constructor(callback: () => void) { resized = callback } observe() {} disconnect() {} },
     requestAnimationFrame: (callback: FrameRequestCallback) => { frames.set(++id, callback); return id }, cancelAnimationFrame: (key: number) => frames.delete(key) }
   const Scene = new Function('deps', `const { ${Object.keys(deps).join(', ')} } = deps; ${compiled}; return SpectatorScene;`)(deps)
@@ -77,6 +79,25 @@ test('native density survives 4K resize and monitor changes without exceeding pi
   expect(h.renderer.pixelRatio).toBe(2)
   h.scene.dispose()
   expect(h.queries.every(query => query.events.size === 0)).toBe(true)
+})
+
+test('four service states color only existing lamps while cabinet materials remain unchanged', () => {
+  const h = harness()
+  h.scene.update({ mode: 'Awd', nodes: [{ id: 'a', name: 'A', services: ['Healthy', 'Compromised', 'Down', 'Unknown'] }],
+    focus: '', reduced: false, fps: 60, locked: true })
+  h.pump(17)
+  const meshes: Three.InstancedMesh[] = []
+  h.renderer.lastScene!.traverse(object => { if (object instanceof Three.InstancedMesh) meshes.push(object) })
+  const colored = meshes.filter(mesh => mesh.instanceColor !== null)
+  expect(colored).toHaveLength(1)
+  expect(colored[0]!.count).toBe(4)
+  const color = new Three.Color()
+  expect(Array.from({ length: 4 }, (_, i) => { colored[0]!.getColorAt(i, color); return color.getHexString() }))
+    .toEqual(['50dfbd', 'ff3858', 'f5a34b', '7a8896'])
+  const bodies = meshes.filter(mesh => mesh.instanceColor === null)
+  expect(bodies.length).toBeGreaterThan(0)
+  expect(bodies.every(mesh => (mesh.material as Three.MeshStandardMaterial).color.getHexString() === 'aabbcc')).toBe(true)
+  h.scene.dispose()
 })
 
 test('context loss requests fallback, disposal releases event listeners and renderer', () => {

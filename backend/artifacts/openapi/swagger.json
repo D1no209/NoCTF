@@ -34222,6 +34222,9 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
+          },
+          "isCompromised": {
+            "type": "boolean"
           }
         }
       },

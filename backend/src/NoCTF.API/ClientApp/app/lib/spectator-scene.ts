@@ -4,10 +4,11 @@ import { createSpectatorRibbon } from '../motion/spectator-ribbon'
 import { setFlagTransfer } from '../motion/spectator-flag'
 import { createTerrain, terrainHeight, terrainFragments } from './spectator-terrain'
 import { createSpectatorRock } from './spectator-rock'
-import { awdTeamLayout } from './spectator-awd-layout'
+import { awdTeamLayout, awdOverviewRadius } from './spectator-awd-layout'
 import rockTextureUrl from '../assets/images/spectator/koh-stratified-rock.png'
+import type { SpectatorServiceState } from '../features/spectator/spectator-service-state'
 
-export interface SpectatorNode { id: string; name: string; owner?: number; ownerName?: string; controllerName?: string; health?: 'Healthy' | 'Down' | 'Unknown'; services?: ('Healthy' | 'Down' | 'Unknown')[] }
+export interface SpectatorNode { id: string; name: string; owner?: number; ownerName?: string; controllerName?: string; health?: 'Healthy' | 'Down' | 'Unknown'; services?: SpectatorServiceState[] }
 export interface SpectatorBeam { id: string; source: string; target: string; service: number }
 export interface SpectatorSceneState { mode: 'Awd' | 'Koh'; nodes: SpectatorNode[]; focus: string; highlighted?: string[]; serviceFocus?: number; reduced: boolean; fps: 30 | 60; locked: boolean }
 export interface SpectatorSceneMetrics { frames: number; p95: number; active: number; queued: number; geometries: number; textures: number; calls: number; triangles: number; cpuP95: number; renderDuty: number }
@@ -61,7 +62,7 @@ export class SpectatorScene {
     this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = THREE.PCFShadowMap
     this.renderer.shadowMap.autoUpdate = false
     this.renderer.setClearColor(themeColor('--spectator-ground', element))
-    this.colors = Object.fromEntries(['metal', 'edge', 'attack', 'healthy', 'unknown', 'rock', 'rock-lit', 'snow', 'flag-a', 'flag-b', 'flag-c', 'flag-d'].map(key => [key, new THREE.Color(themeColor(`--spectator-${key}`, element))]))
+    this.colors = Object.fromEntries(['metal', 'edge', 'attack', 'down', 'healthy', 'unknown', 'rock', 'rock-lit', 'snow', 'flag-a', 'flag-b', 'flag-c', 'flag-d'].map(key => [key, new THREE.Color(themeColor(`--spectator-${key}`, element))]))
     element.append(this.renderer.domElement)
     this.renderer.domElement.addEventListener('webglcontextlost', this.contextLost)
     this.scene.add(this.world)
@@ -213,7 +214,7 @@ export class SpectatorScene {
     const byId = new Map(state.nodes.map(n => [n.id, n]))
     for (const lamp of this.lamps) {
       const status = byId.get(lamp.node)?.services?.[lamp.service]
-      const color = (status === 'Healthy' ? this.colors.healthy : status === 'Down' ? this.colors.attack : this.colors.unknown)!.clone()
+      const color = (status === 'Healthy' ? this.colors.healthy : status === 'Compromised' ? this.colors.attack : status === 'Down' ? this.colors.down : this.colors.unknown)!.clone()
       if (state.serviceFocus !== undefined && state.serviceFocus >= 0 && lamp.service !== state.serviceFocus) color.multiplyScalar(.2)
       lamp.mesh.setColorAt(lamp.index, color); lamp.mesh.instanceColor!.needsUpdate = true
     }
@@ -266,9 +267,7 @@ export class SpectatorScene {
       this.camera.position.set(target.x + Math.sin(this.angle) * 36, target.y + 30, target.z + Math.cos(this.angle) * 36)
     } else {
       this.camera = this.perspective
-      const depth = Math.abs(Math.sin(this.angle)) * this.awdSpan.x + Math.abs(Math.cos(this.angle)) * this.awdSpan.y
-      const width = Math.abs(Math.cos(this.angle)) * this.awdSpan.x + Math.abs(Math.sin(this.angle)) * this.awdSpan.y
-      const size = focused ? 12 : Math.max(17, depth * 1.18, width / (this.aspect * .85))
+      const size = focused ? 12 : awdOverviewRadius(this.awdSpan.x, this.awdSpan.y + 1, this.aspect, this.angle)
       this.camera.position.set(target.x + Math.sin(this.angle) * size, size * .95, target.z + Math.cos(this.angle) * size)
     }
     this.camera.lookAt(target); this.camera.updateMatrixWorld(); this.placeLabels()

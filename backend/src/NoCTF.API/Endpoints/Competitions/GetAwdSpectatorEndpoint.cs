@@ -15,7 +15,8 @@ public enum SpectatorHealthProtocol { Unknown, Healthy, Down }
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<SpectatorChangeProtocol>))]
 public enum SpectatorChangeProtocol { Attack, Control, Uncontrolled, DetectionFailed }
 
-public sealed record SpectatorServiceResponse(Guid TeamId, Guid ChallengeId, SpectatorHealthProtocol Health, DateTimeOffset? CheckedAt);
+public sealed record SpectatorServiceResponse(Guid TeamId, Guid ChallengeId, SpectatorHealthProtocol Health, DateTimeOffset? CheckedAt,
+    bool IsCompromised);
 public sealed record SpectatorPointResponse(Guid ChallengeId, Guid? ControllerId, Guid? ObservedTeamId,
     SpectatorHealthProtocol Health, DateTimeOffset? CheckedAt, int IntervalSeconds, long PointsPerInterval);
 public sealed record SpectatorChangeResponse(Guid Id, Guid Revision, DateTimeOffset At,
@@ -73,7 +74,7 @@ internal static class SpectatorProtocol
             ScoreboardProtocolMapper.ToProtocol(x.Scope), CompetitionProtocolMapper.ToProtocol(x.Mode),
             f?.CompetitionName, f is null ? null : CompetitionProtocolMapper.ToProtocol(f.Status), f?.HardeningEndsAt,
             x.Teams, x.Challenges, x.Round is { } r ? new(r.Id, r.Number, r.StartAt, r.EndAt) : null,
-            f?.Services.Select(s => new SpectatorServiceResponse(s.TeamId, s.ChallengeId, Health(s.Health), s.CheckedAt)).ToArray() ?? [],
+            f?.Services.Select(s => new SpectatorServiceResponse(s.TeamId, s.ChallengeId, Health(s.Health), s.CheckedAt, s.CompromisedBy.Count > 0)).ToArray() ?? [],
             f?.Points.Select(p => new SpectatorPointResponse(p.ChallengeId, p.ControllerId, p.ObservedTeamId, Health(p.Health), p.CheckedAt, p.IntervalSeconds, p.PointsPerInterval)).ToArray() ?? [],
             f?.Changes.Select(c => new SpectatorChangeResponse(c.Id, c.Revision, c.At, Kind(c.Kind), c.ChallengeId, c.TeamId, c.TargetTeamId, c.ControllerId)).ToArray() ?? [],
             x.Settlements, f?.HistoryStartsAt, f?.HistoryTruncated ?? false, x.NextCursor));

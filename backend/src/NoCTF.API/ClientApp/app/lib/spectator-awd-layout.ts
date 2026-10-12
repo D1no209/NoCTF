@@ -12,3 +12,18 @@ export function awdTeamLayout(serviceCount: number) {
     }),
   }
 }
+
+/** Fit all team bounds through the perspective camera, including the near row. */
+export function awdOverviewRadius(width: number, depth: number, aspect: number, angle: number) {
+  const s = Math.sin(angle), c = Math.cos(angle), length = Math.hypot(1, .95)
+  const tangent = Math.tan(39 * Math.PI / 360)
+  let distance = 17 * length
+  for (const x of [-width / 2, width / 2]) for (const z of [-depth / 2, depth / 2]) for (const y of [0, 2.1]) {
+    const horizontal = x * c - z * s
+    const vertical = (-.95 * (x * s + z * c) + y) / length
+    const towardCamera = (x * s + z * c + y * .95) / length
+    distance = Math.max(distance, towardCamera + Math.abs(horizontal) / (tangent * aspect * .88),
+      towardCamera + Math.abs(vertical) / (tangent * .8))
+  }
+  return distance / length
+}

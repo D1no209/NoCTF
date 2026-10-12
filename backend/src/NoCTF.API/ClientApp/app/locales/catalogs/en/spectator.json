@@ -35,6 +35,8 @@
   "spectator.serviceCount": "{count} services",
   "spectator.healthy": "Healthy",
   "spectator.down": "Down",
+  "spectator.compromised": "Compromised",
+  "spectator.situation": "LIVE SITUATION",
   "spectator.unknown": "Unknown",
   "spectator.confirmed": "Confirmed",
   "spectator.controlChange": "Ownership change",

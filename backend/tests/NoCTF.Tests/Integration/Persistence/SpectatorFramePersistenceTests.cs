@@ -41,6 +41,7 @@ public sealed class SpectatorFramePersistenceTests
             var now = DateTimeOffset.Parse("2026-10-12T00:00:00Z");
             var userId = Guid.NewGuid(); var competitionId = Guid.NewGuid(); var challengeId = Guid.NewGuid();
             var instanceId = Guid.NewGuid(); var teamId = Guid.NewGuid(); var exhibitionId = Guid.NewGuid(); var defenderId = Guid.NewGuid();
+            var round = Guid.NewGuid();
             db.Users.Add(new User { Id = userId, UserName = "spectator", NormalizedUserName = "SPECTATOR", Email = "test@example.test", PasswordHash = "test", Kind = UserKind.Human, Role = UserRole.Administrator, CreatedAt = now, UpdatedAt = now });
             Competition competition = mode == GameMode.Awd ? new AwdCompetition() : new KohCompetition();
             competition.Id = competitionId; competition.OwnerId = userId; competition.Title = "Broadcast";
@@ -73,7 +74,6 @@ public sealed class SpectatorFramePersistenceTests
                 Fact(teamId, now.AddMinutes(1), mode == GameMode.Awd ? GameplayFactResult.ServiceUp : GameplayFactResult.Uncontrolled));
             if (mode == GameMode.Awd)
             {
-                var round = Guid.NewGuid();
                 FlagAttemptGameplayFact Attack(Guid source, Guid victim, int minute) => new()
                 {
                     Id = Guid.CreateVersion7(), CompetitionId = competitionId, CompetitionChallengeId = instanceId,
@@ -81,7 +81,8 @@ public sealed class SpectatorFramePersistenceTests
                     OccurredAt = now.AddMinutes(minute), UpdatedAt = now, State = GameplayFactState.Completed, Result = GameplayFactResult.Correct
                 };
                 db.GameplayFacts.AddRange(Attack(teamId, defenderId, -3), Attack(teamId, defenderId, -2),
-                    Attack(exhibitionId, defenderId, -2), Attack(teamId, teamId, -2));
+                    Attack(exhibitionId, defenderId, -2), Attack(teamId, teamId, -2),
+                    Attack(defenderId, teamId, -35), Attack(defenderId, teamId, 1));
                 ((AwdCompetitionModeConfiguration)competition.ModeConfiguration).HardeningDurationSeconds = 600;
             }
             await db.SaveChangesAsync(ct);
@@ -93,17 +94,24 @@ public sealed class SpectatorFramePersistenceTests
                     new() { Id = Guid.NewGuid(), OccurredAt = now.AddMinutes(-55), From = CompetitionStatus.Running, To = CompetitionStatus.Paused },
                     new() { Id = Guid.NewGuid(), OccurredAt = now.AddMinutes(-2), From = CompetitionStatus.Paused, To = CompetitionStatus.Running }
                 ], ProjectedAt: now, CompetitionStatus: CompetitionStatus.Running);
-            var frame = (await SpectatorFrameReader.ReadAsync(db, "Broadcast", input, ct))!;
+            var frame = (await SpectatorFrameReader.ReadAsync(db, "Broadcast", input, ct, currentRoundId: round))!;
             if (mode == GameMode.Awd)
             {
                 await Assert.That(frame.Services.Single(x => x.TeamId == teamId).Health).IsEqualTo(SpectatorHealth.Unknown);
                 await Assert.That(frame.Services.Single(x => x.TeamId == exhibitionId).CheckedAt).IsNull();
+                await Assert.That(frame.Services.Single(x => x.TeamId == defenderId).CompromisedBy).IsEquivalentTo([teamId]);
+                // An attack outside the entire history window still marks the current round.
+                await Assert.That(frame.Services.Single(x => x.TeamId == teamId).CompromisedBy).IsEquivalentTo([defenderId]);
+                await Assert.That(frame.Services.Single(x => x.TeamId == exhibitionId).CompromisedBy).IsEmpty();
                 await Assert.That(frame.Changes.Count).IsEqualTo(1);
                 await Assert.That(frame.Changes.Single().At).IsEqualTo(now.AddMinutes(-3));
                 await Assert.That(frame.HardeningEndsAt).IsEqualTo(now.AddMinutes(3));
                 var preview = await SpectatorFrameReader.ReadAsync(db, "Broadcast", input, ct,
-                    new ChallengeTimingProjectionOverride(instanceId, new ChallengeTiming(now.AddMinutes(-1), null, null)));
+                    new ChallengeTimingProjectionOverride(instanceId, new ChallengeTiming(now.AddMinutes(-1), null, null)), round);
                 await Assert.That(preview!.Changes).IsEmpty();
+                await Assert.That(preview.Services.All(x => x.CompromisedBy.Count == 0)).IsTrue();
+                var nextRound = (await SpectatorFrameReader.ReadAsync(db, "Broadcast", input, ct, currentRoundId: Guid.NewGuid()))!;
+                await Assert.That(nextRound.Services.All(x => x.CompromisedBy.Count == 0)).IsTrue();
             }
             else
             {

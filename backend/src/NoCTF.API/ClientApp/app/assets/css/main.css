@@ -1279,7 +1279,7 @@ body:has([data-modal-scroll-lock]) {
 /* AWD / KoH broadcast palette is independent of operator theme and brand. */
 .spectator-screen {
   --spectator-ground: #070f18; --spectator-metal: #465362; --spectator-edge: #4a9bb5;
-  --spectator-attack: #ff3858; --spectator-healthy: #50dfbd; --spectator-unknown: #7a8896;
+  --spectator-attack: #ff3858; --spectator-down: #f5a34b; --spectator-healthy: #50dfbd; --spectator-unknown: #7a8896;
   --spectator-rock: #79786e; --spectator-rock-lit: #e6e3dc; --spectator-snow: #d9e8ed;
   --spectator-flag-a: #4db6ff; --spectator-flag-b: #ff657d; --spectator-flag-c: #c2a6ff; --spectator-flag-d: #f2c974;
   --background: var(--spectator-ground); --foreground: #e3f2f5; --muted-foreground: #8cabb8;
@@ -1312,7 +1312,8 @@ body:has([data-modal-scroll-lock]) {
 .spectator-dot { display: inline-block; width: 6px; height: 6px; background: currentColor; flex-shrink: 0; }
 .spectator-dot:not(:first-child) { margin-left: 16px; }
 .spectator-screen [data-health='Healthy'] { color: var(--spectator-healthy); }
-.spectator-screen [data-health='Down'] { color: var(--spectator-attack); }
+.spectator-screen [data-health='Compromised'] { color: var(--spectator-attack); }
+.spectator-screen [data-health='Down'] { color: var(--spectator-down); }
 .spectator-screen [data-health='Unknown'] { color: var(--spectator-unknown); }
 .spectator-field-pages { position: absolute; bottom: 16px; right: 16px; display: flex; gap: 8px; }
 .spectator-burst { position: absolute; top: 54px; left: 22px; color: var(--spectator-flag-d); font-size: 12px; }
@@ -1418,3 +1419,17 @@ body:has([data-modal-scroll-lock]) {
 .spectator-point-content { flex: 1; min-height: 0; }
 
 .spectator-page-scroll { height: 100dvh; width: 100%; }
+
+@media (min-width: 1101px) {
+ .spectator-screen[data-mode='Awd'] .spectator-body { grid-template-columns: clamp(210px, 16vw, 320px) minmax(0, 1fr) clamp(240px, 18vw, 360px); grid-template-areas: 'ranking field services' 'bottom bottom bottom'; }
+ .spectator-screen[data-mode='Awd'] .spectator-sidebar { display: contents; }
+ .spectator-screen[data-mode='Awd'] .spectator-ranking { grid-area: ranking; }
+ .spectator-screen[data-mode='Awd'] .spectator-field { grid-area: field; }
+ .spectator-screen[data-mode='Awd'] .spectator-services { grid-area: services; }
+ .spectator-screen[data-mode='Awd'] .spectator-bottom { grid-area: bottom; }
+ .spectator-screen[data-mode='Awd'] .spectator-ranking li { font-size: clamp(12px, .9vw, 18px); gap: 8px; }
+ .spectator-screen[data-mode='Awd'] .spectator-ranking ol { padding-inline: 12px; }
+ .spectator-screen[data-mode='Awd'] .spectator-panel h2 { padding-inline: 12px; }
+ .spectator-screen[data-mode='Awd'] .spectator-service-row { margin-inline: 12px; }
+ .spectator-screen[data-mode='Awd'] .spectator-service-team { padding-inline: 12px; }
+}

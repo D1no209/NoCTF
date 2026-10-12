@@ -11,6 +11,20 @@ namespace NoCTF.Tests.Unit.Application;
 public sealed class SpectatorScreenTests
 {
     [Test]
+    public async Task Compromise_filters_hidden_attackers_without_changing_independent_service_health()
+    {
+        var team = Guid.NewGuid(); var attacker = Guid.NewGuid(); var hidden = Guid.NewGuid(); var challenge = Guid.NewGuid();
+        var frame = new SpectatorFrame("Test", CompetitionStatus.Running, null,
+            [new(team, challenge, SpectatorHealth.Down, null) { CompromisedBy = [hidden, attacker] }], [], [], DateTimeOffset.UtcNow, true);
+        var filtered = SpectatorAudience.Filter(frame, new HashSet<Guid> { team, attacker }, new HashSet<Guid> { challenge });
+        await Assert.That(filtered.Services.Single().CompromisedBy).IsEquivalentTo([attacker]);
+        await Assert.That(filtered.Services.Single().Health).IsEqualTo(SpectatorHealth.Down);
+        var redacted = SpectatorAudience.Filter(frame, new HashSet<Guid> { team }, new HashSet<Guid> { challenge });
+        await Assert.That(redacted.Services.Single().CompromisedBy).IsEmpty();
+        await Assert.That(frame.Services.Single().CompromisedBy.Count).IsEqualTo(2);
+    }
+
+    [Test]
     public async Task Redacted_control_is_unknown_and_never_fabricated_as_uncontrolled()
     {
         var challenge = Guid.NewGuid(); var hidden = Guid.NewGuid(); var publicTeam = Guid.NewGuid(); var now = DateTimeOffset.UtcNow;

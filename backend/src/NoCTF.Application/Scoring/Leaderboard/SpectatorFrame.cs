@@ -6,7 +6,11 @@ public enum SpectatorHealth { Unknown, Healthy, Down }
 public enum SpectatorChangeKind { Attack, Control, Uncontrolled, DetectionFailed }
 
 // Cached alongside the canonical scoreboard, never reconstructed from live facts when frozen.
-public sealed record SpectatorService(Guid TeamId, Guid ChallengeId, SpectatorHealth Health, DateTimeOffset? CheckedAt);
+public sealed record SpectatorService(Guid TeamId, Guid ChallengeId, SpectatorHealth Health, DateTimeOffset? CheckedAt)
+{
+    // Keep provenance in the cached frame so public track filtering cannot leak hidden attacks.
+    public IReadOnlyList<Guid> CompromisedBy { get; init; } = [];
+}
 public sealed record SpectatorPoint(Guid ChallengeId, Guid? ControllerId, Guid? ObservedTeamId,
     SpectatorHealth Health, DateTimeOffset? CheckedAt, int IntervalSeconds, long PointsPerInterval);
 public sealed record SpectatorChange(Guid Id, Guid Revision, DateTimeOffset At,
@@ -20,7 +24,8 @@ public static class SpectatorAudience
 {
     public static SpectatorFrame Filter(SpectatorFrame frame, IReadOnlySet<Guid> teams, IReadOnlySet<Guid> challenges) => frame with
     {
-        Services = frame.Services.Where(x => teams.Contains(x.TeamId) && challenges.Contains(x.ChallengeId)).ToArray(),
+        Services = frame.Services.Where(x => teams.Contains(x.TeamId) && challenges.Contains(x.ChallengeId))
+            .Select(x => x with { CompromisedBy = x.CompromisedBy.Where(teams.Contains).ToArray() }).ToArray(),
         Points = frame.Points.Where(x => challenges.Contains(x.ChallengeId)).Select(x => x with
         {
             Health = x.ControllerId is Guid hidden && !teams.Contains(hidden) ? SpectatorHealth.Unknown : x.Health,

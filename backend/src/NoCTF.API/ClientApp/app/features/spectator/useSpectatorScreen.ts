@@ -6,6 +6,7 @@ import { SpectatorScene } from '../../lib/spectator-scene'
 import type { SpectatorSceneState, SpectatorNode } from '../../lib/spectator-scene'
 import { SpectatorChangeWindow } from './spectator-sync'
 import { controlIntervals } from './spectator-timeline'
+import { spectatorServiceState } from './spectator-service-state'
 
 export function useSpectatorScreen(mode: 'Awd' | 'Koh') {
   const route = useRoute(), { t } = useLocale()
@@ -29,8 +30,8 @@ export function useSpectatorScreen(mode: 'Awd' | 'Koh') {
   const rankTeams = computed(() => [...teams.value].sort((a, b) => (a.rank ?? Infinity) - (b.rank ?? Infinity)))
   const stableTeams = computed(() => [...teams.value].sort((a, b) => (a.id ?? '').localeCompare(b.id ?? '')))
   const nodes = computed<SpectatorNode[]>(() => mode === 'Awd' ? stableTeams.value.map(team => ({
-    id: team.id!, name: team.name ?? '', services: challenges.value.map(c =>
-      snapshot.value?.services?.find(s => s.teamId === team.id && s.challengeId === c.competitionChallengeId)?.health ?? 'Unknown'),
+    id: team.id!, name: team.name ?? '', services: challenges.value.map(c => spectatorServiceState(
+      snapshot.value?.services?.find(s => s.teamId === team.id && s.challengeId === c.competitionChallengeId))),
   })) : challenges.value.map(c => {
     const point = snapshot.value?.points?.find(p => p.challengeId === c.competitionChallengeId)
     const owner = stableTeams.value.findIndex(team => team.id === point?.controllerId)
@@ -47,9 +48,10 @@ export function useSpectatorScreen(mode: 'Awd' | 'Koh') {
   const team = computed(() => focus.value === 'team' && teamFocus.value !== 'all'
     ? stableTeams.value.find(t => t.id === teamFocus.value)
     : stableTeams.value[carouselIndex.value % Math.max(1, teams.value.length)])
-  const services = computed(() => challenges.value.map(c => ({ ...c,
-    ...snapshot.value?.services?.find(s => s.teamId === team.value?.id && s.challengeId === c.competitionChallengeId),
-  })))
+  const services = computed(() => challenges.value.map(c => {
+    const service = snapshot.value?.services?.find(s => s.teamId === team.value?.id && s.challengeId === c.competitionChallengeId)
+    return { ...c, ...service, state: spectatorServiceState(service) }
+  }))
   const point = computed(() => snapshot.value?.points?.find(p => p.challengeId === challengeFocus.value) ?? snapshot.value?.points?.[0])
   const pointTitle = computed(() => challenges.value.find(c => c.competitionChallengeId === point.value?.challengeId)?.title)
   const serverNow = computed(() => Date.parse(snapshot.value?.serverTime ?? '') + time.value - receivedAt.value)
@@ -99,7 +101,7 @@ export function useSpectatorScreen(mode: 'Awd' | 'Koh') {
   }
   function challengeName(challengeId: string | undefined) { return challenges.value.find(x => x.competitionChallengeId === challengeId)?.title ?? '—' }
   function formatTime(value: string | null | undefined) { return value ? new Date(value).toLocaleTimeString() : t('spectator.noCheck') }
-  function healthText(value: string | undefined) { return t(value === 'Healthy' ? 'spectator.healthy' : value === 'Down' ? 'spectator.down' : 'spectator.unknown') }
+  function healthText(value: string | undefined) { return t(value === 'Healthy' ? 'spectator.healthy' : value === 'Compromised' ? 'spectator.compromised' : value === 'Down' ? 'spectator.down' : 'spectator.unknown') }
   function eventText(value: Change) {
     return value.kind === 'Attack' ? `${teamName(value.teamId)} → ${teamName(value.targetTeamId)}`
       : value.kind === 'DetectionFailed' ? t('spectator.detectionFailed')

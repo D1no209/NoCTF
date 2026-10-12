@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { computed, effectScope, nextTick, ref, shallowRef, watch } from 'vue'
 import { SpectatorChangeWindow } from '../app/features/spectator/spectator-sync'
 import { controlIntervals } from '../app/features/spectator/spectator-timeline'
+import { spectatorServiceState } from '../app/features/spectator/spectator-service-state'
 import type { NoCtfapiEndpointsCompetitionsSpectatorScreenResponse as Screen } from '../app/api'
 import type { useSpectatorScreen } from '../app/features/spectator/useSpectatorScreen'
 import type { SpectatorSceneState, SpectatorBeam } from '../app/lib/spectator-scene'
@@ -29,7 +30,7 @@ function harness() {
   let scene: Scene
   const endpoint = (options: { query: { cursor?: string }; signal: AbortSignal }) => new Promise(resolve => requests.push({ ...options, resolve }))
   const deps = {
-    computed, ref, shallowRef, watch, SpectatorChangeWindow, controlIntervals,
+    computed, ref, shallowRef, watch, SpectatorChangeWindow, controlIntervals, spectatorServiceState,
     SpectatorScene: class extends Scene { constructor() { super(); scene = this } },
     getAwdSpectatorEndpoint: endpoint, getKohSpectatorEndpoint: endpoint,
     useRoute: () => ({ params: { id: 'competition' }, query: {} }),
@@ -48,6 +49,24 @@ function harness() {
 }
 
 describe('spectator snapshot controller', () => {
+  test('one server per question uses authoritative compromise even with empty history, and resets with the next snapshot', async () => {
+    const h = harness(), first = h.state.refresh()
+    const screen = { ...data(1), challenges: ['c', 'd', 'e'].map(competitionChallengeId => ({ competitionChallengeId })),
+      services: [{ teamId: 'a', challengeId: 'c', health: 'Healthy' as const, isCompromised: true },
+        { teamId: 'a', challengeId: 'd', health: 'Down' as const, isCompromised: true }] }
+    h.respond(0, screen); await first; await drain()
+    expect(h.scene.states.at(-1)!.nodes.map(node => node.services?.length)).toEqual([3, 3])
+    expect(h.scene.states.at(-1)!.nodes[0]!.services).toEqual(['Compromised', 'Down', 'Unknown'])
+    expect(h.scene.states.at(-1)!.nodes[1]!.services).toEqual(['Unknown', 'Unknown', 'Unknown'])
+    expect(h.state.services.value.map(service => service.state)).toEqual(['Compromised', 'Down', 'Unknown'])
+    expect(h.state.healthText(h.state.services.value[0]!.state)).toBe('spectator.compromised')
+    expect(h.state.fallbackRows.value[0]!.services.map(service => service.health)).toEqual(['Compromised', 'Down', 'Unknown'])
+    const second = h.state.refresh()
+    h.respond(1, { ...screen, version: '2', services: [{ teamId: 'a', challengeId: 'c', health: 'Healthy', isCompromised: false }] })
+    await second; await drain()
+    expect(h.scene.states.at(-1)!.nodes[0]!.services).toEqual(['Healthy', 'Unknown', 'Unknown'])
+    h.stop()
+  })
   test('coalesces bursts into a single trailing request and never overlaps reads', async () => {
     const h = harness()
     const first = h.state.refresh()

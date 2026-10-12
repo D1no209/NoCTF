@@ -35,6 +35,8 @@
   "spectator.serviceCount": "{count} 个服务",
   "spectator.healthy": "正常",
   "spectator.down": "宕机",
+  "spectator.compromised": "被攻陷",
+  "spectator.situation": "实时态势",
   "spectator.unknown": "未知",
   "spectator.confirmed": "已确认",
   "spectator.controlChange": "控制权变化",

@@ -2299,6 +2299,7 @@ export type NoCtfapiEndpointsCompetitionsSpectatorServiceResponse = {
     challengeId?: string;
     health?: NoCtfapiEndpointsCompetitionsSpectatorHealthProtocol;
     checkedAt?: string | null;
+    isCompromised?: boolean;
 };
 
 export type NoCtfapiEndpointsCompetitionsSpectatorHealthProtocol = 'Unknown' | 'Healthy' | 'Down';

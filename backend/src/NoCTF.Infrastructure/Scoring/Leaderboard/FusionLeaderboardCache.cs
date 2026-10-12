@@ -412,7 +412,8 @@ public sealed class FusionLeaderboardCache(
         }
         scoreboard = scoreboard with
         {
-            Spectator = await SpectatorFrameReader.ReadAsync(db, competition.Title, projectionInput, ct, timingOverride),
+            Spectator = await SpectatorFrameReader.ReadAsync(db, competition.Title, projectionInput, ct, timingOverride,
+                participantScoreboard.Snapshot.CurrentRoundId),
             ParticipantView = ScoreboardAudienceView.From(participantScoreboard)
         };
         return new(
