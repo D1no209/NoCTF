@@ -4,11 +4,68 @@ using NoCTF.Domain.Competitions.Awd;
 using NoCTF.GameModes.Awd.Scoring;
 using NoCTF.GameModes.Leaderboard;
 using NoCTF.Domain.Gameplay;
+using NoCTF.GameModes.Awd.Checking;
 
 namespace NoCTF.Tests.Unit.GameModes;
 
 public sealed class AwdRoundScoreProjectorTests
 {
+    [Test]
+    public async Task Confidentiality_uses_the_acceptance_window_and_requires_every_planned_sample()
+    {
+        var fixture = new Fixture(1);
+        fixture.Rules.Options = new() { ConfidentialityPoints = 100 };
+        fixture.Issues[0].ExpiryRound = 2;
+        fixture.Issues[0].HistoricalExpiryRound = 6;
+        foreach (var sample in AwdCheckPlan.Create(fixture.Round, fixture.Rules, 0))
+        {
+            fixture.AddCheck(fixture.Defender, AwdHealth.Ok);
+            fixture.Checks[^1].Evidence.SampleActiveTicks = sample.ActiveTicks;
+            fixture.Checks[^1].Evidence.FinalScheduledCheck = sample.Final;
+        }
+        var second = new AwdRound { Id = Guid.NewGuid(), Number = 2,
+            ActiveStartTicks = fixture.Round.ActiveEndTicks, ActiveEndTicks = fixture.Round.ActiveEndTicks * 2 };
+        var future = new AwdScoringCheck(fixture.Defender, fixture.Rules.CompetitionChallengeId, second.Id,
+            new() { SampleActiveTicks = second.ActiveStartTicks }, null);
+        AwdScoreComponentProjection Reward() => AwdRoundScoreProjector.Project([fixture.Round, second], [fixture.Rules],
+            fixture.Issues, [], fixture.Checks.Append(future).ToArray(), new HashSet<Guid> { fixture.Defender },
+            second.ActiveStartTicks, 2, false).Single().Components.Single(x => x.Component == AwdScoreComponent.DefenseReward);
+        await Assert.That(Reward().Points).IsEqualTo(100L);
+        await Assert.That(Reward().Settlement).IsEqualTo(AwdSettlementState.Final);
+        fixture.Checks.RemoveAt(0);
+        await Assert.That(Reward().Points).IsNull();
+        await Assert.That(Reward().Settlement).IsEqualTo(AwdSettlementState.PendingAdjudication);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task Confidentiality_clips_active_expiry_and_competition_stop_without_extending_into_tail(bool stopped)
+    {
+        var fixture = new Fixture(1);
+        fixture.Rules.Options = new() { ConfidentialityPoints = 100 };
+        if (!stopped) fixture.Issues[0].ActiveExpiryTicks = TimeSpan.FromSeconds(60).Ticks;
+        foreach (var sample in AwdCheckPlan.Create(fixture.Round, fixture.Rules, 0))
+        {
+            fixture.AddCheck(fixture.Defender, sample.ActiveTicks < TimeSpan.FromSeconds(60).Ticks ? AwdHealth.Ok : AwdHealth.InternalError);
+            fixture.Checks[^1].Evidence.SampleActiveTicks = sample.ActiveTicks;
+            fixture.Checks[^1].Evidence.SampleDeadlineActiveTicks = sample.DeadlineActiveTicks;
+            fixture.Checks[^1].Evidence.FinalScheduledCheck = sample.Final;
+        }
+        if (stopped)
+        {
+            fixture.Round.ActiveEndTicks = TimeSpan.FromSeconds(55).Ticks;
+            fixture.Round.Partial = true;
+        }
+        fixture.Checks[0].Evidence.Flags[0].Read = AwdProbeOutcome.TargetFailure;
+        var reward = AwdRoundScoreProjector.Project([fixture.Round], [fixture.Rules], fixture.Issues, [], fixture.Checks,
+            new HashSet<Guid> { fixture.Defender }, TimeSpan.FromSeconds(60).Ticks, 1, stopped,
+            competitionStoppedActiveTicks: stopped ? TimeSpan.FromSeconds(55).Ticks : null)
+            .Single().Components.Single(x => x.Component == AwdScoreComponent.DefenseReward);
+        await Assert.That(reward.Points).IsEqualTo(50L);
+        await Assert.That(reward.Settlement).IsEqualTo(AwdSettlementState.Final);
+    }
+
     [Test]
     public async Task ExplicitExemptionRemainsVisibleAndDoesNotAwardHealthyPoints()
     {

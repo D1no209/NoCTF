@@ -175,6 +175,7 @@ internal static class NormalizedScoreboardProjection
                     Slot = accumulator.Build(ScoreState(scoreboardInput, accumulator.Round))
                 })
                 .Where(item => item.Slot.EntryCount > 0
+                    || item.Slot.AwdComponents.Count > 0
                     || item.Slot.NetPoints.GetValueOrDefault() != 0
                     || item.Slot.OffenseState != ScoreboardOperationState.None
                     || item.Slot.DefenseState != ScoreboardOperationState.None)

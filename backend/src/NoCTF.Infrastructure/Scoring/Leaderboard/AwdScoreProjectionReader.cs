@@ -55,6 +55,7 @@ internal static class AwdScoreProjectionReader
             if (evidence.ReceivedAt > projectedAt || evidence.ObservedAt > projectedAt
                 || evidence.AdjudicatedAt > projectedAt)
                 evidence = new AwdFactDetails { RulesId = evidence.RulesId, SampleActiveTicks = evidence.SampleActiveTicks,
+                    SampleDeadlineActiveTicks = evidence.SampleDeadlineActiveTicks,
                     FinalScheduledCheck = evidence.FinalScheduledCheck, Settlement = AwdSettlementState.Provisional };
             return new AwdScoringCheck(fact.TeamId!.Value, fact.CompetitionChallengeId, fact.ReferenceId!.Value,
                 evidence, evidence.ObservedAt is { } at ? ActiveAt(roundById[fact.ReferenceId.Value], at) : null);
@@ -67,7 +68,8 @@ internal static class AwdScoreProjectionReader
         var scores = AwdRoundScoreProjector.Project(rounds, rules, issues, eligibleCaptures, checks,
             teams.Where(x => !x.IsBanned && !x.IsDeleted && x.EarnsScore).Select(x => x.Id).ToHashSet(),
             activeTicks, latest.Number, closed,
-            rules.ToDictionary(x => x.Id, x => ActiveAt(roundById[x.RoundId], x.EffectiveAt)));
+            rules.ToDictionary(x => x.Id, x => ActiveAt(roundById[x.RoundId], x.EffectiveAt)),
+            projectedAt >= deadline.EndsAt ? ActiveAt(latest, deadline.EndsAt) : null);
         return scores.Select(score => timing[score.CompetitionChallengeId]?.CanScoreInterval(
                 roundById[score.RoundId].StartsAt, roundById[score.RoundId].EndsAt) != false ? score
             : score with { Components = score.Components.Where(x => x.Component is not

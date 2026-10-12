@@ -18,7 +18,8 @@ public static class AwdRoundScoreProjector
         IReadOnlyList<AwdFlagIssue> issues, IReadOnlyList<AwdScoringCapture> captures,
         IReadOnlyList<AwdScoringCheck> checks, IReadOnlySet<Guid> scoringTeams,
         long activeTicks, int currentRound, bool acceptanceClosed,
-        IReadOnlyDictionary<Guid, long>? ruleEnabledActiveTicks = null)
+        IReadOnlyDictionary<Guid, long>? ruleEnabledActiveTicks = null,
+        long? competitionStoppedActiveTicks = null)
     {
         var roundById = rounds.ToDictionary(x => x.Id);
         var ruleById = rules.ToDictionary(x => x.Id);
@@ -129,7 +130,8 @@ public static class AwdRoundScoreProjector
                 defender.Add(AwdScoreComponent.DefenseReward, 0, AwdSettlementState.Final);
                 continue;
             }
-            var coverage = closed ? ReadableCoverage(issue, checks, roundById) : null;
+            var coverage = closed ? ReadableCoverage(issue, checks, rounds, rules,
+                ruleEnabledActiveTicks, competitionStoppedActiveTicks, currentRound) : null;
             var rewardState = closed ? coverage is null ? AwdSettlementState.PendingAdjudication : AwdSettlementState.Final
                 : AwdSettlementState.Provisional;
             var confidentiality = coverage is { } readable ? effective.Options.ConfidentialityPoints * share * readable : (AwdScoreFraction?)null;
@@ -230,17 +232,55 @@ public static class AwdRoundScoreProjector
     }
 
     private static AwdScoreFraction? ReadableCoverage(AwdFlagIssue issue, IReadOnlyList<AwdScoringCheck> checks,
-        IReadOnlyDictionary<Guid, AwdRound> rounds)
+        IReadOnlyList<AwdRound> rounds, IReadOnlyList<AwdRoundRules> rules,
+        IReadOnlyDictionary<Guid, long>? enabledAt, long? stoppedActiveTicks, int currentRound)
     {
-        var evidence = checks.Where(x => x.TeamId == issue.TeamId && x.CompetitionChallengeId == issue.CompetitionChallengeId
-            && x.Evidence.SampleActiveTicks >= issue.ActiveStartTicks
-            && (issue.HistoricalActiveExpiryTicks == null || x.Evidence.SampleActiveTicks < issue.HistoricalActiveExpiryTicks)
-            && (issue.HistoricalExpiryRound == null || rounds[x.RoundId].Number < issue.HistoricalExpiryRound)).ToArray();
-        if (evidence.Length == 0 || evidence.Any(x => x.Evidence.Settlement != AwdSettlementState.Final
-            || x.Evidence.Health is null or AwdHealth.InternalError || !x.Evidence.ManifestComplete
-            || !x.Evidence.Flags.Any(flag => flag.FlagId == issue.FlagId))) return null;
-        return (AwdScoreFraction)evidence.Count(x => x.Evidence.Flags.Any(flag => flag.FlagId == issue.FlagId
-            && flag.Obligation == AwdFlagObligation.PlayerRequired && flag.Read == AwdProbeOutcome.Passed)) / evidence.Length;
+        var endTicks = Math.Min(issue.ActiveExpiryTicks ?? long.MaxValue,
+            Math.Min(issue.HistoricalActiveExpiryTicks ?? long.MaxValue, stoppedActiveTicks ?? long.MaxValue));
+        var endRound = Math.Min(issue.ExpiryRound ?? int.MaxValue,
+            Math.Min(issue.HistoricalExpiryRound ?? int.MaxValue, checked(currentRound + 1)));
+        var window = rounds.Where(x => x.Number >= issue.RoundNumber && x.Number < endRound
+                && x.ActiveEndTicks > issue.ActiveStartTicks && x.ActiveStartTicks < endTicks)
+            .OrderBy(x => x.Number).ToArray();
+        if (window.Length == 0 || window[0].Number != issue.RoundNumber
+            || window[^1].Number - window[0].Number + 1 != window.Length || window.Any(x => x.Missed)) return null;
+        if (window[^1].Number < endRound - 1 && window[^1].ActiveEndTicks < endTicks) return null;
+        var readable = 0;
+        var required = 0;
+        foreach (var round in window)
+        {
+            // A missing schedule is missing evidence, not a smaller denominator.
+            var schedule = rules.Where(x => x.RoundId == round.Id
+                    && x.CompetitionChallengeId == issue.CompetitionChallengeId && x.Teams.Any(team => team.TeamId == issue.TeamId))
+                .OrderBy(x => x.Revision).FirstOrDefault();
+            if (schedule is null) return null;
+            // An early manual finish shortens the actual round; it must not invent a
+            // replacement final sample. Persisted sample deadlines retain its original plan.
+            var plannedEnd = Math.Max(round.ActiveEndTicks, checks.Where(x => x.RoundId == round.Id
+                    && x.Evidence.RulesId == schedule.Id).Select(x => x.Evidence.SampleDeadlineActiveTicks ?? 0)
+                .DefaultIfEmpty(0).Max());
+            var plannedRound = new AwdRound { ActiveStartTicks = round.ActiveStartTicks,
+                ActiveEndTicks = plannedEnd, Partial = round.Partial };
+            var planned = AwdCheckPlan.Create(plannedRound, schedule, enabledAt?.GetValueOrDefault(schedule.Id) ?? round.ActiveStartTicks)
+                .Where(x => x.ActiveTicks >= issue.ActiveStartTicks && x.ActiveTicks < endTicks);
+            foreach (var sample in planned)
+            {
+                var matches = checks.Where(x => x.TeamId == issue.TeamId && x.CompetitionChallengeId == issue.CompetitionChallengeId
+                    && x.RoundId == round.Id && x.Evidence.RulesId == schedule.Id
+                    && x.Evidence.SampleActiveTicks == sample.ActiveTicks).ToArray();
+                if (matches.Length != 1) return null;
+                var evidence = matches[0].Evidence;
+                if (evidence.Settlement == AwdSettlementState.Exempted) continue;
+                var flag = evidence.Flags.SingleOrDefault(x => x.FlagId == issue.FlagId);
+                if (evidence.Settlement != AwdSettlementState.Final || !evidence.ManifestComplete
+                    || evidence.Health is null or AwdHealth.InternalError || flag is null
+                    || flag.Obligation != AwdFlagObligation.PlayerRequired
+                    || flag.Read is not (AwdProbeOutcome.Passed or AwdProbeOutcome.TargetFailure)) return null;
+                required++;
+                if (flag.Read == AwdProbeOutcome.Passed) readable++;
+            }
+        }
+        return required == 0 ? null : (AwdScoreFraction)readable / required;
     }
 
     private static AwdSettlementState Merge(AwdSettlementState left, AwdSettlementState right) =>
