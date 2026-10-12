@@ -21,7 +21,7 @@ public sealed class GetSpectatorScreen(ILeaderboardCache cache, ICompetitionVisi
     GetCompetitionTracks tracks, IBackendMessagePublisher messages, TimeProvider clock)
 {
     public async Task<SpectatorReadResult> ExecuteAsync(Guid id, GameMode mode, int minutes,
-        string? cursor, CancellationToken ct)
+        string? cursor, CancellationToken ct, int limit = 256)
     {
         var now = clock.GetUtcNow();
         // Broadcasting never inherits the operator's privileged leaderboard scope.
@@ -56,7 +56,7 @@ public sealed class GetSpectatorScreen(ILeaderboardCache cache, ICompetitionVisi
         frame = SpectatorAudience.Filter(frame, view.Snapshot.Teams.Select(x => x.TeamId).ToHashSet(),
             view.ChallengeCatalog.Challenges.Select(x => x.CompetitionChallengeId).ToHashSet());
         var history = frame.Changes.Where(x => x.At >= cutoff.AddMinutes(-minutes)).ToArray();
-        const int pageSize = 256;
+        var pageSize = Math.Clamp(limit, 1, 2000);
         var next = offset + pageSize < history.Length ? Cursor(version, minutes, offset + pageSize) : null;
         frame = frame with { Changes = history.Skip(offset).Take(pageSize).ToArray() };
         var settled = view.Schema.Rounds.Where(x => x.State == ScoreboardRoundState.Settled)

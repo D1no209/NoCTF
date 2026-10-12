@@ -10,6 +10,7 @@ public sealed class GetKohSpectatorRequest
 {
     public Guid CompetitionId { get; set; }
     [QueryParam] public int Minutes { get; set; } = 10;
+    [QueryParam] public int Limit { get; set; } = 256;
     [QueryParam] public string? Cursor { get; set; }
 }
 public sealed class GetKohSpectatorValidator : Validator<GetKohSpectatorRequest>
@@ -17,6 +18,7 @@ public sealed class GetKohSpectatorValidator : Validator<GetKohSpectatorRequest>
     public GetKohSpectatorValidator()
     {
         RuleFor(x => x.Minutes).Must(x => x is 5 or 10 or 30);
+        RuleFor(x => x.Limit).InclusiveBetween(1, 2000);
         RuleFor(x => x.Cursor).MaximumLength(100);
     }
 }
@@ -31,5 +33,5 @@ public sealed class GetKohSpectatorEndpoint(GetSpectatorScreen query)
     }
     public override async Task<Results<Ok<SpectatorScreenResponse>, Accepted, NotFound, Conflict>> ExecuteAsync(
         GetKohSpectatorRequest request, CancellationToken ct) => SpectatorProtocol.Map(await query.ExecuteAsync(
-            Route<Guid>("competitionId"), GameMode.Koh, request.Minutes, request.Cursor, ct));
+            Route<Guid>("competitionId"), GameMode.Koh, request.Minutes, request.Cursor, ct, request.Limit));
 }

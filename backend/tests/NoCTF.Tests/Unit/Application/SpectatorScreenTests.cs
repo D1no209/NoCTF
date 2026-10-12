@@ -90,6 +90,15 @@ public sealed class SpectatorScreenTests
     }
 
     [Test]
+    public async Task Broadcast_can_read_the_entire_bounded_window_without_racing_live_cursor_versions()
+    {
+        var f = new Fixture();
+        var result = await f.Query.ExecuteAsync(f.Id, GameMode.Koh, 10, null, default, 2000);
+        await Assert.That(result.Screen!.Frame!.Changes.Count).IsEqualTo(300);
+        await Assert.That(result.Screen.NextCursor).IsNull();
+    }
+
+    [Test]
     public async Task History_cursor_is_bound_to_version_and_window_and_wrong_mode_is_not_found()
     {
         var f = new Fixture();

@@ -112,7 +112,7 @@ export function useSpectatorScreen(mode: 'Awd' | 'Koh') {
     inFlight = true; const generation = epoch; abort = new AbortController()
     try {
       const endpoint = mode === 'Awd' ? getAwdSpectatorEndpoint : getKohSpectatorEndpoint
-      const response = await endpoint({ path: { competitionId: id }, query: { minutes: Number(minutes.value) }, signal: abort.signal })
+      const response = await endpoint({ path: { competitionId: id }, query: { limit: 2000, minutes: Number(minutes.value) }, signal: abort.signal })
       if (disposed || generation !== epoch) return
       if (response.response?.status === 404 || response.response?.status === 403 || response.response?.status === 401) {
         snapshot.value = null; pinnedHistory.value = null; historyPaused.value = false; changes.reset(); failed.value = true; scene?.update({ ...sceneState.value, nodes: [] }); return
@@ -124,7 +124,7 @@ export function useSpectatorScreen(mode: 'Awd' | 'Koh') {
       // This also supplies the initial identity baseline, so old pages never replay.
       let cursor = data.nextCursor
       for (let page = 0; cursor && page < 8; page++) {
-        const more = await endpoint({ path: { competitionId: id }, query: { minutes: Number(minutes.value), cursor }, signal: abort.signal })
+        const more = await endpoint({ path: { competitionId: id }, query: { limit: 2000, minutes: Number(minutes.value), cursor }, signal: abort.signal })
         if (disposed || generation !== epoch) return
         if (more.response?.status === 401 || more.response?.status === 403 || more.response?.status === 404 || (more.data as Screen | undefined)?.scope === 'Hidden') {
           snapshot.value = null; pinnedHistory.value = null; historyPaused.value = false; changes.reset(); failed.value = true; return

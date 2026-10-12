@@ -10139,6 +10139,7 @@ export type GetAwdSpectatorEndpointData = {
     };
     query: {
         minutes: number;
+        limit: number;
         cursor?: string | null;
     };
     url: '/api/v1/competitions/{competitionId}/awd-spectator';
@@ -10236,6 +10237,7 @@ export type GetKohSpectatorEndpointData = {
     };
     query: {
         minutes: number;
+        limit: number;
         cursor?: string | null;
     };
     url: '/api/v1/competitions/{competitionId}/koh-spectator';

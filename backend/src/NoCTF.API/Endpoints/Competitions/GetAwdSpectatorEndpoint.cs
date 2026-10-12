@@ -33,6 +33,7 @@ public class GetAwdSpectatorRequest
 {
     public Guid CompetitionId { get; set; }
     [QueryParam] public int Minutes { get; set; } = 10;
+    [QueryParam] public int Limit { get; set; } = 256;
     [QueryParam] public string? Cursor { get; set; }
 }
 public sealed class GetAwdSpectatorValidator : Validator<GetAwdSpectatorRequest>
@@ -40,6 +41,7 @@ public sealed class GetAwdSpectatorValidator : Validator<GetAwdSpectatorRequest>
     public GetAwdSpectatorValidator()
     {
         RuleFor(x => x.Minutes).Must(x => x is 5 or 10 or 30);
+        RuleFor(x => x.Limit).InclusiveBetween(1, 2000);
         RuleFor(x => x.Cursor).MaximumLength(100);
     }
 }
@@ -56,7 +58,7 @@ public sealed class GetAwdSpectatorEndpoint(GetSpectatorScreen query)
 
     public override async Task<Results<Ok<SpectatorScreenResponse>, Accepted, NotFound, Conflict>> ExecuteAsync(
         GetAwdSpectatorRequest request, CancellationToken ct) => SpectatorProtocol.Map(await query.ExecuteAsync(
-            Route<Guid>("competitionId"), GameMode.Awd, request.Minutes, request.Cursor, ct));
+            Route<Guid>("competitionId"), GameMode.Awd, request.Minutes, request.Cursor, ct, request.Limit));
 }
 
 internal static class SpectatorProtocol

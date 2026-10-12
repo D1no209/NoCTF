@@ -9290,6 +9290,15 @@
             }
           },
           {
+            "name": "limit",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
             "name": "cursor",
             "in": "query",
             "schema": {
@@ -9447,6 +9456,15 @@
           },
           {
             "name": "minutes",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "limit",
             "in": "query",
             "required": true,
             "schema": {

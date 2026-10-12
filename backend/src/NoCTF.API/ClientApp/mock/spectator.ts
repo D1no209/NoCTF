@@ -26,9 +26,10 @@ export function spectatorMock(request: Request): Response | null {
   const rate = mode === 'Awd' ? 20 : 1
   const total = Math.max(1, elapsed * rate), minutes = Number(url.searchParams.get('minutes') ?? 10)
   const count = Math.min(total, 2000, minutes * 60 * rate)
+  const limit = Math.min(2000, Math.max(1, Number(url.searchParams.get('limit') ?? 256)))
   const offset = Number(url.searchParams.get('cursor')?.split(':')[1] ?? 0)
   const controlAt = (n: number) => n <= 0 || n % 7 === 0 ? null : teams[Math.floor(n / challengeCount) % teams.length]!.id
-  const changes = Array.from({ length: Math.min(256, Math.max(0, count - offset)) }, (_, i) => {
+  const changes = Array.from({ length: Math.min(limit, Math.max(0, count - offset)) }, (_, i) => {
     const n = total - offset - i, source = n % teamCount, target = (source + 1 + n % (teamCount - 1)) % teamCount
     return { id: id(93, n), revision: id(94, n), at: new Date(started + n / rate * 1000).toISOString(), kind: mode === 'Awd' ? 'Attack' as const : n % 11 === 0 ? 'DetectionFailed' as const : n % 7 === 0 ? 'Uncontrolled' as const : 'Control' as const, challengeId: challenges[n % challengeCount]!.competitionChallengeId, teamId: teams[source]!.id, targetTeamId: mode === 'Awd' ? teams[target]!.id : null, controllerId: mode === 'Koh' ? controlAt(n % 11 === 0 ? n - challengeCount : n) : null }
   })
@@ -43,7 +44,7 @@ export function spectatorMock(request: Request): Response | null {
         checkedAt: n > 0 ? new Date(started + n * 1000).toISOString() : null, intervalSeconds: challengeCount, pointsPerInterval: 10 }
     }) : [],
     changes, settlements: mode === 'Awd' ? [23, 22, 21].flatMap(number => teams.map(team => ({ roundId: id(95, number), number, teamId: team.id, attack: 200, lost: 50, service: 800, other: 0 }))) : [],
-    historyStartsAt: new Date(now - minutes * 60000).toISOString(), historyTruncated: total > 2000, nextCursor: offset + 256 < count ? `${now}:${offset + 256}` : null }
+    historyStartsAt: new Date(now - minutes * 60000).toISOString(), historyTruncated: total > 2000, nextCursor: offset + limit < count ? `${now}:${offset + limit}` : null }
   if (scope === 'Hidden') Object.assign(data, { teams: [], challenges: [], services: [], points: [], changes: [], settlements: [], round: null, nextCursor: null, historyTruncated: false, historyStartsAt: null })
   return Response.json(data)
 }
