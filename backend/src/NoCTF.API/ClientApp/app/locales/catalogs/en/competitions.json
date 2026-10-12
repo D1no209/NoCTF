@@ -1,4 +1,5 @@
 {
+  "awd.rules.changedEvent": "{actor} changed scoring rules for {challenge}",
   "competitions.competitionBroadcast.description.liveSolo": "Competition notices appear here",
   "competitions.label.backToAdministration": "Back to administration",
   "progression.title": "Progression & badges",

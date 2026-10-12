@@ -139,6 +139,10 @@ public sealed class FusionLeaderboardCache(
         CancellationToken ct) =>
         (await ProjectBundleAsync(competitionId, null, projectedAt, null, ct))?.Scoreboard;
 
+    public async Task<ScoreboardProjection?> CreateAwdScoringPreviewAsync(Guid competitionId, DateTimeOffset projectedAt,
+        NoCTF.Application.Competitions.Awd.AwdScoringProjectionOverride candidate, CancellationToken ct) =>
+        (await ProjectBundleAsync(competitionId, null, projectedAt, null, ct, awdScoringOverride: candidate))?.Scoreboard;
+
     public async Task<ScoreboardProjection?> CreateTimingPreviewAsync(Guid competitionId, DateTimeOffset projectedAt,
         NoCTF.Application.Challenges.Timing.ChallengeTimingProjectionOverride candidate, CancellationToken ct) =>
         (await ProjectBundleAsync(competitionId, null, projectedAt, null, ct, candidate))?.Scoreboard;
@@ -168,7 +172,8 @@ public sealed class FusionLeaderboardCache(
         DateTimeOffset projectedAt,
         int? scoreboardRoundWindowEnd,
         CancellationToken ct,
-        NoCTF.Application.Challenges.Timing.ChallengeTimingProjectionOverride? timingOverride = null)
+        NoCTF.Application.Challenges.Timing.ChallengeTimingProjectionOverride? timingOverride = null,
+        NoCTF.Application.Competitions.Awd.AwdScoringProjectionOverride? awdScoringOverride = null)
     {
         var competition = await db.Competitions.AsNoTracking().AsSplitQuery()
             .SingleOrDefaultAsync(candidate => candidate.Id == competitionId, ct);
@@ -313,7 +318,7 @@ public sealed class FusionLeaderboardCache(
             scoreboardRoundWindowEnd,
             awdWindow.Rounds,
             challenges,
-            ct, timingOverride);
+            ct, timingOverride, awdScoringOverride);
         var actorIds = factRows.Aggregate
             .Concat(factRows.Scoreboard)
             .Where(fact => fact.ActorUserId is not null)

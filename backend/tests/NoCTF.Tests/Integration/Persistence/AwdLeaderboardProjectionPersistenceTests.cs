@@ -171,6 +171,67 @@ public sealed partial class LeaderboardProjectionPersistenceTests
                 await Assert.That(receipt.Breakdowns.Single(x => x.Kind == ScoreboardBreakdownKind.Attack).SuccessfulCount).IsEqualTo(3);
                 await Assert.That(row.ScoreOutsideWindow + row.Slots.Sum(x => x.NetPoints.GetValueOrDefault())).IsEqualTo(row.TotalScore);
             }
+            var messages = Substitute.For<NoCTF.Application.Messaging.IPostCommitMessagePublisher>();
+            var eventStore = new NoCTF.Infrastructure.Competitions.Events.CompetitionEventStore(db, messages);
+            var secret = new NoCTF.Infrastructure.Authentication.PlatformSecretProtector(
+                Microsoft.Extensions.Options.Options.Create(new NoCTF.Infrastructure.Authentication.EmailVerificationProtectionOptions
+                { EncryptionKey = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)) }));
+            var governance = new NoCTF.Application.Competitions.Awd.ManageAwdScoringRules(
+                new AwdScoringRuleStore(db, cache, secret, eventStore, messages));
+            var policy = AwdScoringPolicy.From(firstRule) with { AttackRewardMode = AwdAttackRewardMode.FixedPerAttack,
+                AttackPoints = 80, VictimDefensePoolPoints = 60, ServiceHealthyPoints = 200,
+                DefenseMode = AwdDefenseMode.FirstLeak, AttackSettlement = AwdAttackSettlement.Immediate };
+            var candidate = new NoCTF.Application.Competitions.Awd.AwdScoringRuleCandidate(fixture.Competition.Id,
+                fixture.CompetitionChallenge.Id, 1, 1, AwdRuleChangeTiming.RecalculateHistory, policy, owner.Id,
+                "Correct the published first-round scoring budget", now);
+            var preview = (await governance.PreviewAsync(candidate, ct)).Preview!;
+            await Assert.That(preview.AffectedFlags).IsEqualTo(3);
+            await Assert.That(preview.AffectedRuleSnapshots).IsEqualTo(1);
+            await Assert.That(preview.Teams.Single(x => x.TeamId == fixture.Team.Id).ScoreBefore).IsEqualTo(5900);
+            await Assert.That(preview.Teams.Single(x => x.TeamId == fixture.Team.Id).ScoreAfter).IsEqualTo(6040);
+            await Assert.That(preview.Teams.Where(x => x.TeamId != fixture.Team.Id).All(x => x.ScoreAfter == 80)).IsTrue();
+            await Assert.That((await governance.ApplyAsync(candidate with { Reason = "Different reason" }, preview.Token, ct)).Failure)
+                .IsEqualTo(NoCTF.Application.Competitions.Awd.AwdScoringRuleFailure.PreviewExpired);
+            await Assert.That((await governance.ApplyAsync(candidate with { ActorUserId = attackers[0].CaptainId }, preview.Token, ct)).Failure)
+                .IsEqualTo(NoCTF.Application.Competitions.Awd.AwdScoringRuleFailure.PreviewExpired);
+            await Assert.That((await governance.ApplyAsync(candidate with { Now = now.AddMinutes(2) }, preview.Token, ct)).Failure)
+                .IsEqualTo(NoCTF.Application.Competitions.Awd.AwdScoringRuleFailure.PreviewExpired);
+            var check = await db.GameplayFacts.FirstAsync(x => x.Kind == GameplayFactKind.AwdServiceTransition, ct);
+            check.ConcurrencyStamp = Guid.NewGuid();
+            await db.SaveChangesAsync(ct);
+            await Assert.That((await governance.ApplyAsync(candidate, preview.Token, ct)).Failure)
+                .IsEqualTo(NoCTF.Application.Competitions.Awd.AwdScoringRuleFailure.PreviewExpired);
+            preview = (await governance.PreviewAsync(candidate, ct)).Preview!;
+            var applied = await governance.ApplyAsync(candidate with { Now = now.AddSeconds(1) }, preview.Token, ct);
+            await Assert.That(applied.Failure).IsNull();
+            await Assert.That(applied.EventId).IsNotNull();
+            var changed = (await cache.CreateScoreboardAsync(fixture.Competition.Id, now.AddSeconds(2), ct))!;
+            await Assert.That(changed.Snapshot.Teams.Single(x => x.TeamId == fixture.Team.Id).TotalScore).IsEqualTo(6040);
+            var unchangedPast = (await cache.CreateScoreboardAsync(fixture.Competition.Id, now, ct))!;
+            await Assert.That(unchangedPast.Snapshot.Teams.Single(x => x.TeamId == fixture.Team.Id).TotalScore).IsEqualTo(5900);
+            await Assert.That((await governance.ApplyAsync(candidate with { Now = now.AddSeconds(2) }, preview.Token, ct)).Failure)
+                .IsEqualTo(NoCTF.Application.Competitions.Awd.AwdScoringRuleFailure.PreviewExpired);
+            var audit = await db.CompetitionEvents.SingleAsync(x => x.Id == applied.EventId, ct);
+            await Assert.That(audit.ActorUserId).IsEqualTo(owner.Id);
+            await Assert.That(audit.Reason).IsEqualTo(candidate.Reason);
+            await Assert.That(audit.Visibility).IsEqualTo(CompetitionEventVisibility.Staff);
+            var auditView = (await new AwdScoringRuleStore(db, cache, secret, eventStore, messages)
+                .ReadAsync(fixture.Competition.Id, fixture.CompetitionChallenge.Id, 1, ct))!;
+            await Assert.That(auditView.Policies.Single().IssuedPolicy.ServiceHealthyPoints).IsEqualTo(100L);
+            await Assert.That(auditView.Policies.Single().EffectivePolicy.ServiceHealthyPoints).IsEqualTo(200L);
+            await Assert.That(auditView.RecentChanges.Single().EventId).IsEqualTo(applied.EventId!.Value);
+            var issuedPolicy = await db.AwdRoundRules.AsNoTracking().SingleAsync(x => x.Id == firstRule.Id, ct);
+            await Assert.That(issuedPolicy.ServiceHealthyPoints).IsEqualTo(100L);
+            await Assert.That(issuedPolicy.Options.FlagLifetime).IsEqualTo(5);
+            await Assert.That(await db.AwdFlagIssues.CountAsync(x => x.ExpiryRound == 6, ct)).IsEqualTo(3);
+            var savedChange = await db.Set<AwdScoringRuleChange>().SingleAsync(ct);
+            savedChange.FirstRound = 2;
+            await Assert.That(async () => await db.SaveChangesAsync(ct)).Throws<InvalidOperationException>();
+            db.Entry(savedChange).State = EntityState.Detached;
+            var restoredCandidate = candidate with { Policy = AwdScoringPolicy.From(firstRule), Now = now.AddSeconds(3), Reason = "Restore budget after review" };
+            var restorePreview = (await governance.PreviewAsync(restoredCandidate, ct)).Preview!;
+            await Assert.That((await governance.ApplyAsync(restoredCandidate, restorePreview.Token, ct)).Failure).IsNull();
+            now = now.AddSeconds(4);
             fixture.CompetitionChallenge.ScoringEndsAt = start.AddMinutes(2).AddSeconds(5);
             await db.SaveChangesAsync(ct);
             var narrowed = (await cache.CreateScoreboardWindowAsync(fixture.Competition.Id, 50, now, ct))!;

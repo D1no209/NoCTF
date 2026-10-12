@@ -1,4 +1,7 @@
 {
+  "api.awd.scoringConflict": "The scoring inputs changed. Preview the rule change again.",
+  "api.awd.scoringInvalidRequest": "Select an existing AWD round range and a valid scoring policy. Immediate changes apply only to the current round.",
+  "api.awd.scoringPreviewExpired": "The scoring preview expired or its inputs changed. Generate a new preview before applying.",
   "api.awd.manualAdjustmentReasonInvalid": "AWD manual score adjustments require an audit reason of up to 512 characters.",
   "api.awd.adjudicationConflict": "The check changed or is no longer pending adjudication. Reload its evidence.",
   "api.awd.adjudicationInvalidEvidence": "This check lacks complete, trustworthy evidence within the original execution window. It cannot be confirmed.",

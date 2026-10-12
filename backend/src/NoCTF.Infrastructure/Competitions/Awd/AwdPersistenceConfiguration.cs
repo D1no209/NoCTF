@@ -175,3 +175,23 @@ internal static class AwdPolicyColumns
         }
     }
 }
+
+internal sealed class AwdScoringRuleChangeConfiguration : IEntityTypeConfiguration<AwdScoringRuleChange>
+{
+    public void Configure(EntityTypeBuilder<AwdScoringRuleChange> builder)
+    {
+        builder.HasOne<NoCTF.Domain.Competitions.Events.CompetitionEvent>().WithMany()
+            .HasForeignKey(change => change.EventId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<CompetitionChallenge>().WithMany()
+            .HasForeignKey(change => new { change.CompetitionChallengeId, change.CompetitionId })
+            .HasPrincipalKey(challenge => new { challenge.Id, challenge.CompetitionId }).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(change => new { change.CompetitionId, change.AppliedAt });
+        builder.HasIndex(change => new { change.CompetitionChallengeId, change.Sequence }).IsUnique();
+        var policy = builder.ComplexProperty(change => change.Policy);
+        foreach (var property in policy.Metadata.ComplexType.GetProperties().Where(property => property.ClrType == typeof(decimal)))
+        {
+            property.SetPrecision(18);
+            property.SetScale(6);
+        }
+    }
+}

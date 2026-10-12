@@ -72,7 +72,8 @@ public enum CompetitionEventKind : short
     ChallengeWriteUpPublished,
     ChallengeWriteUpWithdrawn,
     ChallengeWriteUpRejected,
-    ChallengeWriteUpUnlocked
+    ChallengeWriteUpUnlocked,
+    AwdScoringRulesChanged
 }
 
 public enum CompetitionEventLevel : short

@@ -2850,7 +2850,7 @@ export type NoCtfapiEndpointsCompetitionsEventsExportCompetitionEventsRequest = 
     [key: string]: never;
 };
 
-export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol = 'CompetitionCreated' | 'CompetitionUpdated' | 'CompetitionDeleted' | 'CompetitionLifecycleChanged' | 'LeaderboardVisibilityChanged' | 'ChallengeCreated' | 'ChallengeUpdated' | 'ChallengePublished' | 'ChallengeUnpublished' | 'ChallengeDeleted' | 'HintPublished' | 'HintUnlocked' | 'TeamRegistered' | 'TeamRegistrationChanged' | 'TeamUpdated' | 'TeamDeleted' | 'TeamMemberJoined' | 'TeamMemberRemoved' | 'TeamCaptainTransferred' | 'TeamBanned' | 'TeamUnbanned' | 'GameplayFactReceived' | 'GameplayFactAdjudicated' | 'ScoringRecorded' | 'FirstBloodAwarded' | 'SecondBloodAwarded' | 'ThirdBloodAwarded' | 'RuntimeCreated' | 'RuntimeStateChanged' | 'RuntimeExtended' | 'RuntimeReset' | 'RuntimePortAllocated' | 'ProtectedGameplayFactValueAccessed' | 'CheatIncidentDetected' | 'CheatIncidentConfirmed' | 'CheatIncidentDismissed' | 'CheatIncidentSuperseded' | 'CheatIncidentCorrected' | 'CompetitionArchiveExported' | 'TeamBanAppealSubmitted' | 'TeamBanAppealUpheld' | 'TeamBanAppealAccepted' | 'TeamBanCorrectionPublished' | 'RuntimeForceTerminationRequested' | 'RuntimeForceTerminationCompleted' | 'RuntimeForceTerminationFailed' | 'AnnouncementPublished' | 'QuestionOpened' | 'QuestionReplied' | 'QuestionStatusChanged' | 'ChallengeDescriptionUpdated' | 'TrackConfigurationUpdated' | 'TeamTrackChanged' | 'TrackRegistrationPolicyUpdated' | 'AwdpBreakAttempted' | 'AwdpFixAttempted' | 'AwdpBreakResolved' | 'AwdpFixResolved' | 'GameplayFactPatchDownloaded' | 'CompetitionAudienceChanged' | 'TeamWriteUpSubmitted' | 'RuntimeTrafficCaptureStored' | 'RuntimeTrafficCaptureDeleted' | 'ChallengeWriteUpSubmitted' | 'ChallengeWriteUpPublished' | 'ChallengeWriteUpWithdrawn' | 'ChallengeWriteUpRejected' | 'ChallengeWriteUpUnlocked';
+export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol = 'CompetitionCreated' | 'CompetitionUpdated' | 'CompetitionDeleted' | 'CompetitionLifecycleChanged' | 'LeaderboardVisibilityChanged' | 'ChallengeCreated' | 'ChallengeUpdated' | 'ChallengePublished' | 'ChallengeUnpublished' | 'ChallengeDeleted' | 'HintPublished' | 'HintUnlocked' | 'TeamRegistered' | 'TeamRegistrationChanged' | 'TeamUpdated' | 'TeamDeleted' | 'TeamMemberJoined' | 'TeamMemberRemoved' | 'TeamCaptainTransferred' | 'TeamBanned' | 'TeamUnbanned' | 'GameplayFactReceived' | 'GameplayFactAdjudicated' | 'ScoringRecorded' | 'FirstBloodAwarded' | 'SecondBloodAwarded' | 'ThirdBloodAwarded' | 'RuntimeCreated' | 'RuntimeStateChanged' | 'RuntimeExtended' | 'RuntimeReset' | 'RuntimePortAllocated' | 'ProtectedGameplayFactValueAccessed' | 'CheatIncidentDetected' | 'CheatIncidentConfirmed' | 'CheatIncidentDismissed' | 'CheatIncidentSuperseded' | 'CheatIncidentCorrected' | 'CompetitionArchiveExported' | 'TeamBanAppealSubmitted' | 'TeamBanAppealUpheld' | 'TeamBanAppealAccepted' | 'TeamBanCorrectionPublished' | 'RuntimeForceTerminationRequested' | 'RuntimeForceTerminationCompleted' | 'RuntimeForceTerminationFailed' | 'AnnouncementPublished' | 'QuestionOpened' | 'QuestionReplied' | 'QuestionStatusChanged' | 'ChallengeDescriptionUpdated' | 'TrackConfigurationUpdated' | 'TeamTrackChanged' | 'TrackRegistrationPolicyUpdated' | 'AwdpBreakAttempted' | 'AwdpFixAttempted' | 'AwdpBreakResolved' | 'AwdpFixResolved' | 'GameplayFactPatchDownloaded' | 'CompetitionAudienceChanged' | 'TeamWriteUpSubmitted' | 'RuntimeTrafficCaptureStored' | 'RuntimeTrafficCaptureDeleted' | 'ChallengeWriteUpSubmitted' | 'ChallengeWriteUpPublished' | 'ChallengeWriteUpWithdrawn' | 'ChallengeWriteUpRejected' | 'ChallengeWriteUpUnlocked' | 'AwdScoringRulesChanged';
 
 export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol = 'Information' | 'Warning' | 'Error';
 
@@ -4712,6 +4712,67 @@ export type NoCtfapiEndpointsAdministrationGameplayFactsQueueGameplayFactWorkReq
     competitionChallengeId: string;
 };
 
+export type NoCtfapiEndpointsAdministrationCompetitionsApplyAwdScoringRulesResponse = {
+    eventId?: string;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsApplyAwdScoringRulesRequest = {
+    firstRound?: number;
+    lastRound?: number;
+    timing?: NoCtfDomainCompetitionsAwdAwdRuleChangeTiming;
+    policy: NoCtfapiEndpointsAdministrationCompetitionsAwdScoringPolicyContract;
+    reason: string;
+    previewToken: string;
+};
+
+export type NoCtfDomainCompetitionsAwdAwdRuleChangeTiming = 'NextRound' | 'Immediately' | 'RecalculateHistory';
+
+export type NoCtfapiEndpointsAdministrationCompetitionsAwdScoringPolicyContract = {
+    attackRewardMode?: NoCtfDomainCompetitionsAwdAttackRewardMode;
+    attackPoints?: number;
+    victimDefensePoolPoints?: number;
+    serviceHealthyPoints?: number;
+    slaSettlement?: NoCtfDomainCompetitionsAwdAwdSlaSettlement;
+    defenseMode?: NoCtfDomainCompetitionsAwdAwdDefenseMode;
+    slaBasis?: NoCtfDomainCompetitionsAwdAwdSlaBasis;
+    okRatio?: number;
+    recoveringRatio?: number;
+    mumbleRatio?: number;
+    offlineRatio?: number;
+    penaltyMode?: NoCtfDomainCompetitionsAwdAwdPenaltyMode;
+    mumblePenalty?: number;
+    offlinePenalty?: number;
+    recoveringPenalty?: number;
+    mumblePenaltyRatio?: number;
+    offlinePenaltyRatio?: number;
+    recoveringPenaltyRatio?: number;
+    consecutiveFailureMultiplier?: number;
+    maximumRoundPenalty?: number | null;
+    confidentialityPoints?: number;
+    minimumAttackRatio?: number;
+    scarcityAlpha?: number;
+    maximumRankMultiplier?: number;
+    composition?: NoCtfDomainCompetitionsAwdAwdScoreComposition;
+    attackWeight?: number;
+    defenseWeight?: number;
+    slaWeight?: number;
+    attackSettlement?: NoCtfDomainCompetitionsAwdAwdAttackSettlement;
+};
+
+export type NoCtfDomainCompetitionsAwdAttackRewardMode = 'FixedPerAttack' | 'SplitVictimDefensePool' | 'Scarcity' | 'TargetRank';
+
+export type NoCtfDomainCompetitionsAwdAwdSlaSettlement = 'FinalScheduledCheck' | 'SampleAverage' | 'TimeWeighted';
+
+export type NoCtfDomainCompetitionsAwdAwdDefenseMode = 'FirstLeak' | 'PerCapture' | 'SharedPool';
+
+export type NoCtfDomainCompetitionsAwdAwdSlaBasis = 'StatusRatio' | 'ReadableFlags';
+
+export type NoCtfDomainCompetitionsAwdAwdPenaltyMode = 'SlaRewardOnly' | 'Fixed' | 'Proportional' | 'Combined';
+
+export type NoCtfDomainCompetitionsAwdAwdScoreComposition = 'Additive' | 'Weighted' | 'PositiveSlaMultiplier';
+
+export type NoCtfDomainCompetitionsAwdAwdAttackSettlement = 'Immediate' | 'RoundEnd' | 'FlagExpiry';
+
 export type NoCtfapiEndpointsAdministrationCompetitionsCreateCompetitionAnnouncementRequest = {
     title: string;
     body: string;
@@ -5073,6 +5134,37 @@ export type NoCtfapiEndpointsAdministrationCompetitionsAdminCompetitionCapabilit
     canManagePermissions?: boolean;
 };
 
+export type NoCtfapiEndpointsAdministrationCompetitionsAwdScoringRulesResponse = {
+    roundNumber?: number;
+    roundId?: string;
+    policies?: Array<NoCtfapiEndpointsAdministrationCompetitionsAwdRoundScoringPolicyResponse>;
+    recentChanges?: Array<NoCtfapiEndpointsAdministrationCompetitionsAwdScoringRuleAuditResponse>;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsAwdRoundScoringPolicyResponse = {
+    rulesId?: string;
+    revision?: number;
+    enabledAt?: string;
+    issuedPolicy?: NoCtfapiEndpointsAdministrationCompetitionsAwdScoringPolicyContract;
+    effectivePolicy?: NoCtfapiEndpointsAdministrationCompetitionsAwdScoringPolicyContract;
+    appliedChangeEventId?: string | null;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsAwdScoringRuleAuditResponse = {
+    eventId?: string;
+    actorUserId?: string | null;
+    reason?: string | null;
+    firstRound?: number;
+    lastRound?: number;
+    timing?: NoCtfDomainCompetitionsAwdAwdRuleChangeTiming;
+    appliedAt?: string;
+    policy?: NoCtfapiEndpointsAdministrationCompetitionsAwdScoringPolicyContract;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsGetAwdScoringRulesRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionDirectionsResponse = {
     items?: Array<NoCtfapiEndpointsAdministrationCompetitionsCompetitionDirectionResponse>;
 };
@@ -5309,6 +5401,30 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionLeaderboardPat
     frozenStartAt: string | null;
     hiddenStartAt: string | null;
     reason?: string | null;
+};
+
+export type NoCtfApplicationCompetitionsAwdAwdScoringRulePreview = {
+    token?: string;
+    projectedAt?: string;
+    expiresAt?: string;
+    affectedFlags?: number;
+    affectedRuleSnapshots?: number;
+    teams?: Array<NoCtfApplicationCompetitionsAwdAwdScoringTeamImpact>;
+};
+
+export type NoCtfApplicationCompetitionsAwdAwdScoringTeamImpact = {
+    teamId?: string;
+    teamName?: string;
+    scoreBefore?: number;
+    scoreAfter?: number;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsPreviewAwdScoringRulesRequest = {
+    firstRound?: number;
+    lastRound?: number;
+    timing?: NoCtfDomainCompetitionsAwdAwdRuleChangeTiming;
+    policy: NoCtfapiEndpointsAdministrationCompetitionsAwdScoringPolicyContract;
+    reason: string;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsRotateCompetitionWebhookSecretResponse = {
@@ -16252,6 +16368,46 @@ export type AdminQueueGameplayFactEvaluationResponses = {
 
 export type AdminQueueGameplayFactEvaluationResponse = AdminQueueGameplayFactEvaluationResponses[keyof AdminQueueGameplayFactEvaluationResponses];
 
+export type AdminApplyAwdScoringRulesData = {
+    body: NoCtfapiEndpointsAdministrationCompetitionsApplyAwdScoringRulesRequest;
+    path: {
+        competitionId: string;
+        competitionChallengeId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/awd/scoring';
+};
+
+export type AdminApplyAwdScoringRulesErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminApplyAwdScoringRulesError = AdminApplyAwdScoringRulesErrors[keyof AdminApplyAwdScoringRulesErrors];
+
+export type AdminApplyAwdScoringRulesResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationCompetitionsApplyAwdScoringRulesResponse;
+};
+
+export type AdminApplyAwdScoringRulesResponse = AdminApplyAwdScoringRulesResponses[keyof AdminApplyAwdScoringRulesResponses];
+
 export type AdminCompetitionPosterClearData = {
     body?: never;
     path: {
@@ -17067,6 +17223,48 @@ export type AdminGenerateMissingFlagsResponses = {
 
 export type AdminGenerateMissingFlagsResponse = AdminGenerateMissingFlagsResponses[keyof AdminGenerateMissingFlagsResponses];
 
+export type AdminGetAwdScoringRulesData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        competitionChallengeId: string;
+    };
+    query?: {
+        roundNumber?: number | null;
+    };
+    url: '/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/awd/scoring-rules';
+};
+
+export type AdminGetAwdScoringRulesErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminGetAwdScoringRulesError = AdminGetAwdScoringRulesErrors[keyof AdminGetAwdScoringRulesErrors];
+
+export type AdminGetAwdScoringRulesResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationCompetitionsAwdScoringRulesResponse;
+};
+
+export type AdminGetAwdScoringRulesResponse = AdminGetAwdScoringRulesResponses[keyof AdminGetAwdScoringRulesResponses];
+
 export type AdminGetCompetitionDirectionsData = {
     body?: never;
     path: {
@@ -17359,6 +17557,46 @@ export type AdminListCompetitionWebhookDeliveriesResponses = {
 };
 
 export type AdminListCompetitionWebhookDeliveriesResponse = AdminListCompetitionWebhookDeliveriesResponses[keyof AdminListCompetitionWebhookDeliveriesResponses];
+
+export type AdminPreviewAwdScoringRulesData = {
+    body: NoCtfapiEndpointsAdministrationCompetitionsPreviewAwdScoringRulesRequest;
+    path: {
+        competitionId: string;
+        competitionChallengeId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/awd/scoring-preview';
+};
+
+export type AdminPreviewAwdScoringRulesErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminPreviewAwdScoringRulesError = AdminPreviewAwdScoringRulesErrors[keyof AdminPreviewAwdScoringRulesErrors];
+
+export type AdminPreviewAwdScoringRulesResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfApplicationCompetitionsAwdAwdScoringRulePreview;
+};
+
+export type AdminPreviewAwdScoringRulesResponse = AdminPreviewAwdScoringRulesResponses[keyof AdminPreviewAwdScoringRulesResponses];
 
 export type AdminPreviewCompetitionHardDeleteData = {
     body?: never;

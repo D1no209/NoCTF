@@ -27,6 +27,36 @@ public sealed class AwdRuleConfigurationProtocolTests
     }
 
     [Test]
+    public async Task Scoring_policy_cannot_change_issuance_or_execution_parameters()
+    {
+        var issued = new AwdRoundRules { Id = Guid.NewGuid(), RoundId = Guid.NewGuid(), Revision = 3,
+            FlagBodyTemplate = "[SECURE:20]", CheckerIntervalSeconds = 42, EligibleTeamCount = 7,
+            Options = new() { FlagLifetime = 8, HistoricalLifetime = 9, LinkHistoricalWindow = false,
+                FinalCheckBudgetSeconds = 19, RetryCount = 4, TotalRounds = 17, MinimumTotalScore = -900 },
+            Stores = [new() { StoreId = Guid.NewGuid(), Weight = 2, FlagsPerIssue = 3 }],
+            Teams = [new() { TeamId = Guid.NewGuid(), SettledRank = 5 }] };
+        var policy = new AwdScoringPolicy { AttackPoints = 80, RecoveringRatio = 0, SlaSettlement = AwdSlaSettlement.SampleAverage };
+        var wire = AwdScoringPolicyContract.From(policy);
+        await Assert.That(JsonSerializer.Deserialize<AwdScoringPolicyContract>(JsonSerializer.Serialize(wire))!.ToDomain()).IsEqualTo(policy);
+        await Assert.That(() => JsonSerializer.Deserialize<AwdScoringPolicyContract>("{\"AttackRewardMode\":3}")).Throws<JsonException>();
+        await Assert.That(() => JsonSerializer.Deserialize<AwdScoringPolicyContract>("{\"FlagLifetime\":30}")).Throws<JsonException>();
+        var projected = policy.Apply(issued);
+        await Assert.That(projected.Id).IsEqualTo(issued.Id);
+        await Assert.That(projected.Options.FlagLifetime).IsEqualTo(8);
+        await Assert.That(projected.Options.HistoricalLifetime).IsEqualTo(9);
+        await Assert.That(projected.Options.FinalCheckBudgetSeconds).IsEqualTo(19);
+        await Assert.That(projected.Options.RetryCount).IsEqualTo(4);
+        await Assert.That(projected.Options.TotalRounds).IsEqualTo(17);
+        await Assert.That(projected.Options.MinimumTotalScore).IsEqualTo(-900L);
+        await Assert.That(projected.CheckerIntervalSeconds).IsEqualTo(42);
+        await Assert.That(projected.Stores.Single().FlagsPerIssue).IsEqualTo(3);
+        await Assert.That(projected.Teams.Single().SettledRank).IsEqualTo(5);
+        await Assert.That(projected.Options.RecoveringRatio).IsEqualTo(0m);
+        await Assert.That(issued.Options.RecoveringRatio).IsEqualTo(.5m);
+        await Assert.That(projected.Options.SlaSettlement).IsEqualTo(AwdSlaSettlement.SampleAverage);
+    }
+
+    [Test]
     public async Task Competition_validation_rejects_invalid_advanced_policy_before_any_round_exists()
     {
         var configuration = (AwdCompetitionModeConfiguration)CompetitionModeConfigurationDefaults.Create(GameMode.Awd, Guid.NewGuid());

@@ -31,7 +31,8 @@ internal static class LeaderboardFactProjectionReader
         IReadOnlyList<LeaderboardAwdRoundFact>? awdWindowRounds,
         IReadOnlyList<LeaderboardChallengeFact> challenges,
         CancellationToken ct,
-        NoCTF.Application.Challenges.Timing.ChallengeTimingProjectionOverride? timingOverride = null)
+        NoCTF.Application.Challenges.Timing.ChallengeTimingProjectionOverride? timingOverride = null,
+        NoCTF.Application.Competitions.Awd.AwdScoringProjectionOverride? awdScoringOverride = null)
     {
         var query = db.GameplayFacts.AsNoTracking()
             .Where(fact => fact.CompetitionId == competitionId && fact.OccurredAt <= projectedAt);
@@ -82,7 +83,7 @@ internal static class LeaderboardFactProjectionReader
 
         if (mode == GameMode.Awd)
         {
-            var roundScores = await AwdScoreProjectionReader.ReadAsync(db, competitionId, challenges, teams, projectedAt, ct);
+            var roundScores = await AwdScoreProjectionReader.ReadAsync(db, competitionId, challenges, teams, projectedAt, ct, awdScoringOverride);
             var aggregates = AwdScoreProjectionReader.Aggregate(roundScores);
             var aggregateRows = await ReadAwdManualAdjustmentsAsync(query, ct);
             var windowRows = await ReadAwdWindowAsync(displayQuery, awdWindowRounds ?? [], ct);

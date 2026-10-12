@@ -1,4 +1,7 @@
 {
+  "api.awd.scoringConflict": "计分依据已变更，请重新预览规则修改。",
+  "api.awd.scoringInvalidRequest": "请选择已有的 AWD 轮次范围和有效计分策略；立即变更仅适用于当前轮。",
+  "api.awd.scoringPreviewExpired": "计分预览已过期或其依据已变更，请重新预览后应用。",
   "api.awd.manualAdjustmentReasonInvalid": "AWD 人工加减分必须填写不超过 512 字的审计理由。",
   "api.awd.adjudicationConflict": "检测证据已变更或已完成裁定，请重新读取。",
   "api.awd.adjudicationInvalidEvidence": "本次检测缺少原执行窗口内的完整可信证据，不能确认结果。",

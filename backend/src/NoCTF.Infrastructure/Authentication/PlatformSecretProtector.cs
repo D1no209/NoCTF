@@ -19,7 +19,8 @@ public enum PlatformSecretPurpose
     StaffWebhookSecret,
     ChallengeTimingPreview,
     AwdFlagKey,
-    AwdFlagReadContext
+    AwdFlagReadContext,
+    AwdScoringPreview
 }
 
 public sealed class PlatformSecretProtector
@@ -209,6 +210,7 @@ public sealed class PlatformSecretProtector
             PlatformSecretPurpose.StaffWebhookSecret => "NoCTF.Competition.StaffWebhookSecret.v1",
             PlatformSecretPurpose.ChallengeTimingPreview => "NoCTF.Challenge.TimingPreview.v1",
             PlatformSecretPurpose.AwdFlagKey => "NoCTF.AWD.FlagKey.v1",
+            PlatformSecretPurpose.AwdScoringPreview => "NoCTF.AWD.ScoringPreview.v1",
             PlatformSecretPurpose.AwdFlagReadContext => "NoCTF.AWD.FlagReadContext.v1",
             _ => throw new ArgumentOutOfRangeException(nameof(purpose), purpose, null)
         };

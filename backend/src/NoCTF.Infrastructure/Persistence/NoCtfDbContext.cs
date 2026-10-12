@@ -216,6 +216,9 @@ public sealed class NoCtfDbContext(
         if (ChangeTracker.Entries<NoCTF.Domain.Competitions.Awd.AwdFlagKey>().Any(entry => entry.State == EntityState.Modified))
             throw new InvalidOperationException("AWD key versions are immutable; create a new protected version.");
 
+        if (ChangeTracker.Entries<NoCTF.Domain.Competitions.Awd.AwdScoringRuleChange>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
+            throw new InvalidOperationException("AWD scoring rule changes are immutable.");
+
         if (ChangeTracker.Entries<NoCTF.Domain.Competitions.Awd.AwdRoundRules>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted)
             || ChangeTracker.Entries<NoCTF.Domain.Competitions.Awd.AwdRoundStoreBudget>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted)
             || ChangeTracker.Entries<NoCTF.Domain.Competitions.Awd.AwdRoundTeamEligibility>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))

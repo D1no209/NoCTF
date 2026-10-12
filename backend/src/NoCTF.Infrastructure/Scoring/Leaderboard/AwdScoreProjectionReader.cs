@@ -13,7 +13,8 @@ internal static class AwdScoreProjectionReader
 {
     public static async Task<IReadOnlyList<AwdRoundScoreProjection>> ReadAsync(NoCtfDbContext db,
         Guid competitionId, IReadOnlyList<LeaderboardChallengeFact> challenges,
-        IReadOnlyList<LeaderboardTeamFact> teams, DateTimeOffset projectedAt, CancellationToken ct)
+        IReadOnlyList<LeaderboardTeamFact> teams, DateTimeOffset projectedAt, CancellationToken ct,
+        NoCTF.Application.Competitions.Awd.AwdScoringProjectionOverride? candidate = null)
     {
         var challengeIds = challenges.Where(x => !x.IsDeleted).Select(x => x.Id).ToArray();
         var competition = await db.Competitions.AsNoTracking().SingleAsync(x => x.Id == competitionId, ct);
@@ -24,6 +25,19 @@ internal static class AwdScoreProjectionReader
         var rules = await db.AwdRoundRules.AsNoTracking().Include(x => x.Stores).Include(x => x.Teams).AsSplitQuery()
             .Where(x => x.CompetitionId == competitionId && challengeIds.Contains(x.CompetitionChallengeId)
                 && roundIds.Contains(x.RoundId) && x.EffectiveAt <= projectedAt).ToArrayAsync(ct);
+        var roundNumbers = rounds.ToDictionary(round => round.Id, round => round.Number);
+        var changes = await db.Set<AwdScoringRuleChange>().AsNoTracking()
+            .Where(change => change.CompetitionId == competitionId && change.AppliedAt <= projectedAt)
+            .OrderBy(change => change.Sequence).ToArrayAsync(ct);
+        rules = rules.Select(rule =>
+        {
+            var number = roundNumbers[rule.RoundId];
+            var change = changes.LastOrDefault(item => item.CompetitionChallengeId == rule.CompetitionChallengeId
+                && number >= item.FirstRound && number <= item.LastRound);
+            var policy = candidate is not null && candidate.CompetitionChallengeId == rule.CompetitionChallengeId
+                && number >= candidate.FirstRound && number <= candidate.LastRound ? candidate.Policy : change?.Policy;
+            return policy?.Apply(rule) ?? rule;
+        }).ToArray();
         var issues = await db.AwdFlagIssues.AsNoTracking().Where(x => x.CompetitionId == competitionId
             && challengeIds.Contains(x.CompetitionChallengeId) && x.IssuedAt <= projectedAt
             && db.ChallengeFlags.Any(flag => flag.Id == x.FlagId && flag.DeletedAt == null)).ToArrayAsync(ct);

@@ -195,6 +195,7 @@ export function competitionEventText(
       : translate('common.error.teamPatchVerificationFailed', { team, challenge })
   }
   const templates: Partial<Record<NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol, string>> = {
+    AwdScoringRulesChanged: translate("awd.rules.changedEvent", { actor, challenge }),
     GameplayFactPatchDownloaded: translate("common.description.downloadedPatchArchiveTeam", { actor, team }),
     CompetitionAudienceChanged: translate("competitionAccess.changed"),
     TeamWriteUpSubmitted: translate("writeUp.submittedEvent"),
