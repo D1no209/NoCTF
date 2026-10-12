@@ -4,10 +4,10 @@ import * as THREE from 'three'
  * a top-down texture over them. One shared tile and no extra terrain draw calls. */
 export function createSpectatorRock(texture: THREE.Texture, tint: THREE.Color, dust: THREE.Color, ready: { value: number }) {
   const material = new THREE.MeshStandardMaterial({
-    color: tint, roughness: .96, metalness: 0, vertexColors: true, flatShading: true, side: THREE.DoubleSide,
+    color: tint, roughness: .96, metalness: 0, vertexColors: true, side: THREE.DoubleSide,
     polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
   })
-  material.customProgramCacheKey = () => 'spectator-eroded-mesa-v2'
+  material.customProgramCacheKey = () => 'spectator-eroded-mesa-v3'
   material.onBeforeCompile = shader => {
     shader.uniforms.rockTexture = { value: texture }
     shader.uniforms.rockReady = ready
@@ -52,7 +52,9 @@ export function createSpectatorRock(texture: THREE.Texture, tint: THREE.Color, d
         // Long erosion runnels are coherent down the wall, not stone-wall tiles.
         float runnels = stoneNoise(vRockPosition.xz * 4.8 + vec2(vRockPosition.y * .06));
         float fissure = smoothstep(.38, .56, runnels);
-        float layers = .5 + .5*sin(vRockPosition.y*43.0 + broad*1.4);
+        float layerPhase = vRockPosition.y*43.0 + broad*1.4;
+        // Fade subpixel strata instead of letting them shimmer during orbit/zoom.
+        float layers = .5 + .5*sin(layerPhase) * (1.0-smoothstep(.7, 3.0, fwidth(layerPhase)));
         vec3 ledge = rockDust * (1.45 + broad*.4);
         vec3 wall = rockDust * (.68 + fissure*.38) * (.91 + layers*.09);
         vec3 rockAlbedo = mix(ledge, wall, cliff);

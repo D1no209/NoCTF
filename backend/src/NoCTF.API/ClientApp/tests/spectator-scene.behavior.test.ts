@@ -18,22 +18,31 @@ class Element {
 function harness() {
   const element = new Element(), document = Object.assign(new Element(), { hidden: false, createElement: () => new Element() })
   const frames = new Map<number, FrameRequestCallback>(); let id = 0, lost = false
+  const queries: Element[] = []
+  let resized = () => {}
+  const window = { devicePixelRatio: 3, matchMedia: () => { const query = new Element(); queries.push(query); return query } }
   let renderer: Renderer
   class Renderer {
     domElement = new Element(); shadowMap = { enabled: false, autoUpdate: false }; pixelRatio = 0; disposed = false
+    capabilities = { maxTextureSize: 8192 }
+    width = 0; height = 0
     info = { memory: { geometries: 0, textures: 0 }, render: { calls: 0, triangles: 0 } }
     constructor() { renderer = this }
     setPixelRatio(value: number) { this.pixelRatio = value }
-    setClearColor() {} setSize() {} render() { this.info.render.calls++ } dispose() { this.disposed = true }
+    getPixelRatio() { return this.pixelRatio }
+    setClearColor() {} setSize(w: number, h: number) { this.width = Math.floor(w * this.pixelRatio); this.height = Math.floor(h * this.pixelRatio) }
+    render() { this.info.render.calls++ } dispose() { this.disposed = true }
   }
   const deps = { THREE: { ...Three, WebGLRenderer: Renderer }, themeColor: () => '#aabbcc', createSpectatorRibbon, createTerrain, terrainHeight, setFlagTransfer,
-    document, devicePixelRatio: 3, ResizeObserver: class { observe() {} disconnect() {} },
+    document, window, ResizeObserver: class { constructor(callback: () => void) { resized = callback } observe() {} disconnect() {} },
     requestAnimationFrame: (callback: FrameRequestCallback) => { frames.set(++id, callback); return id }, cancelAnimationFrame: (key: number) => frames.delete(key) }
   const Scene = new Function('deps', `const { ${Object.keys(deps).join(', ')} } = deps; ${compiled}; return SpectatorScene;`)(deps)
   const scene = new Scene(element, () => { lost = true }) as SpectatorScene
   scene.update({ mode: 'Awd', nodes: [{ id: 'a', name: 'A', services: ['Healthy'] }, { id: 'b', name: 'B', services: ['Down'] }],
     focus: '', reduced: false, fps: 60, locked: true })
-  return { scene, document, frames, element, renderer: renderer!, lost: () => lost,
+  return { scene, document, window, queries, frames, element, renderer: renderer!, lost: () => lost,
+    resize(w: number, h: number) { element.clientWidth = w; element.clientHeight = h; resized() },
+    density(ratio: number) { window.devicePixelRatio = ratio; queries.at(-1)!.events.get('change')!({}) },
     pump(time: number) { const work = [...frames.values()]; frames.clear(); work.forEach(callback => callback(time)) } }
 }
 
@@ -52,8 +61,25 @@ test('idle rendering stops and browser visibility clears animations before resum
   h.scene.dispose()
 })
 
-test('DPR is bounded, context loss requests fallback, disposal releases event listeners and renderer', () => {
-  const h = harness(); expect(h.renderer.pixelRatio).toBe(1.5)
+test('native density survives 4K resize and monitor changes without exceeding pixel or GPU limits', () => {
+  const h = harness(); expect(h.renderer.pixelRatio).toBe(3)
+  h.density(1); h.resize(2750, 1395)
+  expect([h.renderer.width, h.renderer.height]).toEqual([2750, 1395])
+  h.density(2)
+  expect([h.renderer.width, h.renderer.height]).toEqual([5500, 2790])
+  expect(h.queries.at(-2)!.events.size).toBe(0)
+  h.resize(7680, 4320)
+  expect(h.renderer.width * h.renderer.height).toBeLessThanOrEqual(16_777_216)
+  h.resize(10000, 100)
+  expect(h.renderer.width).toBeLessThanOrEqual(8192)
+  h.resize(1200, 600)
+  expect(h.renderer.pixelRatio).toBe(2)
+  h.scene.dispose()
+  expect(h.queries.every(query => query.events.size === 0)).toBe(true)
+})
+
+test('context loss requests fallback, disposal releases event listeners and renderer', () => {
+  const h = harness()
   let prevented = false
   h.renderer.domElement.events.get('webglcontextlost')!({ preventDefault() { prevented = true } })
   expect(prevented && h.lost()).toBe(true)

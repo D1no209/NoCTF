@@ -67,11 +67,14 @@ export function terrainHeight(x: number, z: number, peaks: THREE.Vector3[]) {
 }
 
 export function createTerrain(peaks: THREE.Vector3[], width: number, depth: number) {
+  // The overview camera scales with node count. Keep comparable screen-space
+  // detail without multiplying dense triangles for smaller, distant mesas.
+  const summitStep = Math.min(.095, .055 * Math.max(1, Math.sqrt(peaks.length / 3)))
   const axis = (size: number, extent: number) => {
     const coordinates: number[] = [-size / 2]
     while (coordinates[coordinates.length - 1]! < size / 2) {
       const last = coordinates[coordinates.length - 1]!
-      const step = Math.abs(last) < extent ? .095 : Math.abs(last) < extent + 10 ? .32 : 1.1
+      const step = Math.abs(last) < extent ? summitStep : Math.abs(last) < extent + 10 ? .22 : 1.1
       coordinates.push(Math.min(size / 2, last + step))
     }
     return coordinates

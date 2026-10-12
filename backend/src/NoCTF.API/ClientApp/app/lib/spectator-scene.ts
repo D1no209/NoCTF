@@ -47,14 +47,14 @@ export class SpectatorScene {
   private state!: SpectatorSceneState
   private colors: Record<string, THREE.Color>
   private resizeObserver: ResizeObserver
+  private densityQuery?: MediaQueryList
   private angle = 0
   private dragging = false
   private lastX = 0
   private labels: HTMLDivElement[] = []
 
   constructor(private element: HTMLElement, private onContextLost?: () => void) {
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'low-power' })
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5))
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' })
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = THREE.PCFShadowMap
     this.renderer.shadowMap.autoUpdate = false
@@ -67,7 +67,8 @@ export class SpectatorScene {
     this.scene.add(this.ambient)
     const light = new THREE.DirectionalLight(this.colors.snow!, 2.4)
     light.position.set(-18, 24, 12); light.castShadow = true
-    light.shadow.mapSize.set(2048, 2048); light.shadow.camera.left = -32; light.shadow.camera.right = 32
+    const shadowSize = Math.min(4096, this.renderer.capabilities.maxTextureSize)
+    light.shadow.mapSize.set(shadowSize, shadowSize); light.shadow.camera.left = -32; light.shadow.camera.right = 32
     light.shadow.camera.top = 32; light.shadow.camera.bottom = -32; light.shadow.normalBias = .04
     this.scene.add(light); this.keyLight = light
     const fill = new THREE.DirectionalLight(this.colors.edge!, .9)
@@ -78,6 +79,7 @@ export class SpectatorScene {
     this.scene.add(grid); this.grid = grid
     this.resizeObserver = new ResizeObserver(() => this.resize())
     this.resizeObserver.observe(element)
+    this.observeDensity()
     document.addEventListener('visibilitychange', this.visibility)
     element.addEventListener('pointerdown', this.down)
     element.addEventListener('pointermove', this.move)
@@ -185,6 +187,7 @@ export class SpectatorScene {
           cloth.computeVertexNormals(); this.geometries.push(cloth)
           const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 192
           const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace
+          texture.anisotropy = Math.min(8, this.renderer.capabilities.getMaxAnisotropy())
           this.textures.push(texture); material.map = texture; material.side = THREE.DoubleSide; material.color.setRGB(1, 1, 1)
           const flag = new THREE.Mesh(cloth, material)
           flag.position.set(.825, 1.52, 0); flagGroup.add(flag)
@@ -274,9 +277,20 @@ export class SpectatorScene {
   private resize() {
     const w = this.element.clientWidth, h = this.element.clientHeight
     if (!w || !h) return
+    // Preserve native density at 4K/Retina sizes, while bounding the allocation
+    // on very large displays and respecting the device's texture limit.
+    const limit = this.renderer.capabilities.maxTextureSize
+    const ratio = Math.min(window.devicePixelRatio || 1, Math.sqrt(16_777_216 / (w * h)), limit / w, limit / h)
+    if (this.renderer.getPixelRatio() !== ratio) this.renderer.setPixelRatio(ratio)
     this.renderer.setSize(w, h); this.aspect = w / h; this.perspective.aspect = this.aspect; this.perspective.updateProjectionMatrix()
     this.positionCamera(); this.invalidate()
   }
+  private observeDensity() {
+    this.densityQuery?.removeEventListener('change', this.densityChanged)
+    this.densityQuery = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`)
+    this.densityQuery.addEventListener('change', this.densityChanged)
+  }
+  private densityChanged = () => { this.observeDensity(); this.resize() }
   private invalidate() { if (!this.disposed && !this.raf && !document.hidden) this.raf = requestAnimationFrame(this.draw) }
   private draw = (time: number) => {
     this.raf = 0
@@ -330,6 +344,7 @@ export class SpectatorScene {
   }
   dispose() {
     this.disposed = true
+    this.densityQuery?.removeEventListener('change', this.densityChanged)
     cancelAnimationFrame(this.raf); this.resizeObserver.disconnect(); this.clearWorld()
     document.removeEventListener('visibilitychange', this.visibility)
     this.element.removeEventListener('pointerdown', this.down); this.element.removeEventListener('pointermove', this.move)
