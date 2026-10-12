@@ -27,7 +27,6 @@ public sealed class OpenApiMetadataTests
         }
     }
 
-    private static string OpenApiPath() => Path.GetFullPath(Path.Combine(
-        AppContext.BaseDirectory,
-        "..", "..", "..", "..", "..", "src", "NoCTF.API", "wwwroot", "openapi", "v1.json"));
+    private static string OpenApiPath() => Path.Combine(
+        ArchitectureTestPaths.BackendRoot(), "src", "NoCTF.API", "wwwroot", "openapi", "v1.json");
 }

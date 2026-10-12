@@ -262,7 +262,9 @@ def publish(args):
         raise ValueError("--runtime-dir is required for Satori; no official fallback is allowed")
     project = PROJECTS[args.project]
     key = LOCK["source"]["commit"] if manifest else LOCK["officialRuntime"]
-    cache = (BACKEND / "artifacts/managed-runtime" / args.flavor / key / args.rid).resolve()
+    # Keep the cache prefix short: Windows MSBuild copy tasks still encounter
+    # MAX_PATH for long ASP.NET assembly names in cross-platform runtime packs.
+    cache = (BACKEND / "artifacts/mr" / args.flavor / key / args.rid).resolve()
     cache.mkdir(parents=True, exist_ok=True)
     config = cache / "NuGet.Config"
     nuget_config(config, runtime_dir, required_ids(args.rid))
@@ -305,9 +307,8 @@ def image(args):
             raise ValueError("Satori images require --runtime-dir")
         verify_manifest(args.runtime_dir, "linux-x64")
     repository = BACKEND.parent
-    if run(["git", "diff", "HEAD", "--name-only"], repository, capture=True).strip():
-        raise ValueError("Image publication requires an atomic committed source checkpoint")
     revision = run(["git", "rev-parse", "HEAD"], repository, capture=True).strip()
+    print("Building committed source checkpoint " + revision + "; local edits are excluded.", flush=True)
     parent = BACKEND / "artifacts/managed-runtime/contexts"
     parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=revision[:12] + "-", dir=parent) as temporary:
@@ -381,8 +382,11 @@ def test(args):
     log = args.log.resolve()
     log.parent.mkdir(parents=True, exist_ok=True)
     started = time.time()
-    command = [str(executable), "--treenode-filter", args.filter, "--maximum-parallel-tests", str(args.parallel)]
-    identity_path = log.with_name(log.stem + "-" + uuid.uuid4().hex + ".identity.json")
+    results = log.parent / (log.stem + "-" + uuid.uuid4().hex)
+    results.mkdir()
+    command = [str(executable), "--treenode-filter", args.filter, "--maximum-parallel-tests", str(args.parallel),
+               "--minimum-expected-tests", "1", "--results-directory", str(results)]
+    identity_path = results / "identity.json"
     with log.open("w", encoding="utf-8") as stream:
         result = subprocess.run(command, cwd=BACKEND, stdout=stream, stderr=subprocess.STDOUT,
                                 env=dict(os.environ, NOCTF_REQUIRE_DOCKER_INTEGRATION="true",
@@ -393,6 +397,7 @@ def test(args):
               "applicationDirty": manifest["applicationDirty"], "rid": manifest["rid"], "flavor": args.flavor,
               "runtimeIdentityVerified": valid, "filter": args.filter, "maximumParallelTests": args.parallel, "exitCode": result.returncode,
               "elapsedSeconds": time.time() - started, "logSha256": digest(log), "log": log.name,
+              "resultsDirectory": results.name,
               "runtimeIdentity": identities[0] if identities else None,
               "status": "passed" if valid and result.returncode == 0 else "failed"}
     write_json(log.with_suffix(".json"), record)

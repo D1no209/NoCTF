@@ -8,12 +8,15 @@ COPY backend/scripts/Validate-Translations.ts /src/backend/scripts/Validate-Tran
 RUN bun run postinstall
 RUN bun --bun run generate
 
-FROM mcr.microsoft.com/dotnet/sdk:10.0.302@sha256:72dd743782f2ae7e5476fd64f6a460045e3998dc862218b80e6944cba79a01b0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0.401@sha256:e70cdb7f80b0348f5cb85f19a8f670fca061f033d57eed12fa003d58b0e06317 AS build
+ARG NOCTF_RUNTIME_FLAVOR=Official
+ARG NOCTF_APPLICATION_REVISION
+RUN apt-get update && apt-get install -y --no-install-recommends python3 && rm -rf /var/lib/apt/lists/*
 WORKDIR /src
 COPY backend/ ./backend/
 WORKDIR /src/backend
-RUN dotnet restore src/NoCTF.Host/NoCTF.Host.csproj
-RUN dotnet build src/NoCTF.Host/NoCTF.Host.csproj -c Release --no-restore -p:NoCtfGenerateWolverineHandlers=true
+RUN dotnet restore src/NoCTF.Host/NoCTF.Host.csproj -p:NoCtfRuntimeFlavor=Official
+RUN dotnet build src/NoCTF.Host/NoCTF.Host.csproj -c Release --no-restore -p:NoCtfRuntimeFlavor=Official -p:NoCtfGenerateWolverineHandlers=true
 RUN export ASPNETCORE_ENVIRONMENT=Production \
     Authentication__SigningKey="$(head -c 32 /dev/urandom | base64)" \
     ConnectionStrings__Redis=localhost:6379 \
@@ -30,9 +33,10 @@ RUN export ASPNETCORE_ENVIRONMENT=Production \
     > /tmp/noctf-codegen.log 2>&1 \
     && cat /tmp/noctf-codegen.log \
     && ! grep -q '^ERROR:' /tmp/noctf-codegen.log
-RUN dotnet publish src/NoCTF.Host/NoCTF.Host.csproj -c Release -o /app/host /p:BuildSpaOnPublish=false
+RUN python3 runtime/runtime.py publish --flavor "$NOCTF_RUNTIME_FLAVOR" --rid linux-x64 --runtime-dir runtime/inputs --output /app/host --application-revision "$NOCTF_APPLICATION_REVISION"
+RUN /app/host/NoCTF.Host --runtime-info
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0.10@sha256:f1126d438ccc359f51cc6d4701a8deae513856cf10f5fe645d29ea6403dcac6b AS runtime
+FROM mcr.microsoft.com/dotnet/runtime-deps:10.0.12-noble@sha256:12dd273c196e92aa91542749b8df0996f497f812811abba9e6613b484f681dd0 AS runtime
 RUN sed -i 's|http://archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g; s|http://security.ubuntu.com/ubuntu|https://security.ubuntu.com/ubuntu|g' \
         /etc/apt/sources.list.d/ubuntu.sources \
     && apt-get update \
@@ -50,4 +54,4 @@ COPY --from=frontend-build /src/backend/src/NoCTF.API/ClientApp/.output/public .
 RUN mkdir -p /app/uploads && chown -R 1654:1654 /app/uploads
 # The combined Host includes Runner and accesses the mounted Docker socket.
 USER 0
-ENTRYPOINT ["dotnet", "NoCTF.Host.dll"]
+ENTRYPOINT ["/app/NoCTF.Host"]

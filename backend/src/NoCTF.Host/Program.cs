@@ -18,8 +18,17 @@ using NoCTF.Runner;
 using NoCTF.Runner.Composition;
 using NoCTF.Worker;
 using Wolverine;
+using NoCTF.Hosting.ManagedRuntime;
 
+var managedRuntime = ManagedRuntimeIdentity.Read(typeof(Program).Assembly);
+managedRuntime.Validate();
+if (args.Contains("--runtime-info", StringComparer.Ordinal))
+{
+    Console.WriteLine(managedRuntime.ToJson());
+    return;
+}
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddSingleton(managedRuntime);
 var exportOpenApi = args.Contains("--export-openapi", StringComparer.OrdinalIgnoreCase)
     || args.Contains("--export-swagger-docs", StringComparer.OrdinalIgnoreCase);
 var generateHandlers = args.Contains("codegen", StringComparer.OrdinalIgnoreCase);
@@ -120,9 +129,12 @@ if (!exportOpenApi)
     builder.Services.AddNoCtfObservability(
         builder.Configuration,
         $"noctf-host-{string.Join('-', roles.Values).ToLowerInvariant()}",
-        roles);
+        roles,
+        managedRuntime);
 
 var app = builder.Build();
+app.Logger.LogInformation("Managed runtime {RuntimeFlavor}, version {RuntimeVersion}, RID {RuntimeIdentifier}, source {RuntimeSource}",
+    managedRuntime.ActualFlavor, managedRuntime.Version, managedRuntime.RuntimeIdentifier, managedRuntime.SourceRevision);
 if (mfaRecoveryOnly)
 {
     await using var recoveryScope = app.Services.CreateAsyncScope();

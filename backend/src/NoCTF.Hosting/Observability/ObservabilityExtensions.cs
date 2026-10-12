@@ -18,6 +18,7 @@ using NoCTF.Infrastructure.Observability;
 using NoCTF.Infrastructure.Caching;
 using ZiggyCreatures.Caching.Fusion;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Hosting.ManagedRuntime;
 using Microsoft.EntityFrameworkCore;
 
 namespace NoCTF.Hosting.Observability;
@@ -28,7 +29,8 @@ public static class ObservabilityExtensions
         this IServiceCollection services,
         IConfiguration configuration,
         string serviceName,
-        HostRoles? roles = null)
+        HostRoles? roles = null,
+        ManagedRuntimeIdentity? managedRuntime = null)
     {
         if (!configuration.GetValue("Observability:Enabled", true))
             return services;
@@ -69,6 +71,23 @@ public static class ObservabilityExtensions
                 })
                 .AddHttpClientInstrumentation(options => options.RecordException = true)
                 .AddSource("Npgsql"));
+
+        if (managedRuntime is not null)
+        {
+            openTelemetry.ConfigureResource(resource => resource.AddAttributes([
+                new KeyValuePair<string, object>("noctf.runtime.flavor", managedRuntime.ActualFlavor.ToString()),
+                new KeyValuePair<string, object>("noctf.runtime.version", managedRuntime.Version),
+                new KeyValuePair<string, object>("noctf.runtime.rid", managedRuntime.RuntimeIdentifier)
+            ]));
+            if (managedRuntime.ActualFlavor == ManagedRuntimeFlavor.Satori)
+            {
+                // This pinned Satori implementation does not populate GenerationInfo.
+                // Suppress the dependent meters instead of presenting placeholder zeroes.
+                openTelemetry.WithMetrics(metrics => metrics
+                    .AddView("dotnet.gc.last_collection.heap.size", MetricStreamConfiguration.Drop)
+                    .AddView("dotnet.gc.last_collection.heap.fragmentation.size", MetricStreamConfiguration.Drop));
+            }
+        }
 
         if (!string.IsNullOrWhiteSpace(configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]))
             openTelemetry.WithTracing(tracing => tracing.AddOtlpExporter());

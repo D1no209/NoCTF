@@ -40,7 +40,7 @@ try {
             [IO.File]::ReadAllBytes($generatedAttributesPath)
         } else { $null }
         dotnet build .\src\NoCTF.Host\NoCTF.Host.csproj `
-            -c $Configuration --no-restore -p:NoCtfGenerateWolverineHandlers=true -v:q
+            -c $Configuration --no-restore -p:NoCtfRuntimeFlavor=Official -p:NoCtfGenerateWolverineHandlers=true -v:q
         if ($LASTEXITCODE -ne 0) {
             throw "Wolverine codegen bootstrap build failed (exit code $LASTEXITCODE)."
         }
