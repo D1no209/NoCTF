@@ -608,7 +608,7 @@ internal static class NormalizedScoreboardProjection
                     _ => (ScoreboardEntryKind.Availability, ScoreboardBreakdownKind.Availability)
                 };
                 var points = component.Points.GetValueOrDefault();
-                slot.AddSystemAttempt(StableGuid(value.RoundId,
+                slot.AddScoreComponent(StableGuid(value.RoundId,
                         $"awd:{value.CompetitionChallengeId:N}:{value.TeamId:N}:{component.Component}"),
                     entry, breakdown, component.Points is null ? ScoreboardEntryOutcome.Pending
                         : points < 0 ? ScoreboardEntryOutcome.Failed : ScoreboardEntryOutcome.Succeeded,
@@ -1108,7 +1108,7 @@ internal static class NormalizedScoreboardProjection
                 deductedPointsPerOccurrence));
         }
 
-        public void AddSystemAttempt(
+        public void AddScoreComponent(
             Guid id,
             ScoreboardEntryKind entryKind,
             ScoreboardBreakdownKind breakdownKind,
@@ -1117,8 +1117,6 @@ internal static class NormalizedScoreboardProjection
             long earned,
             long deducted)
         {
-            entryCount++;
-            AddAttempt(breakdownKind, outcome == ScoreboardEntryOutcome.Succeeded, 1);
             AddBreakdownScore(breakdownKind, earned, deducted);
             entries.Add(new(
                 id,

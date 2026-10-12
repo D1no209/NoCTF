@@ -163,8 +163,12 @@ public sealed partial class LeaderboardProjectionPersistenceTests
                 await Assert.That(row.AttackScore).IsEqualTo(50L);
                 var generation = row.Slots.Single(slot => scored.Schema.Columns[slot.ColumnIndex].RoundId == rounds[0].Id);
                 await Assert.That(generation.AwdComponents.Single(x => x.Component == AwdScoreComponent.Attack).Points).IsEqualTo(50L);
+                await Assert.That(generation.Breakdowns.Single(x => x.Kind == ScoreboardBreakdownKind.Attack).AttemptCount).IsEqualTo(0);
+                await Assert.That(generation.Breakdowns.Single(x => x.Kind == ScoreboardBreakdownKind.Attack).SuccessfulCount).IsEqualTo(0);
                 var receipt = row.Slots.Single(slot => scored.Schema.Columns[slot.ColumnIndex].RoundId == rounds[2].Id);
                 await Assert.That(receipt.Entries.Count(x => x.Kind == ScoreboardEntryKind.Attack)).IsEqualTo(3);
+                await Assert.That(receipt.Breakdowns.Single(x => x.Kind == ScoreboardBreakdownKind.Attack).AttemptCount).IsEqualTo(3);
+                await Assert.That(receipt.Breakdowns.Single(x => x.Kind == ScoreboardBreakdownKind.Attack).SuccessfulCount).IsEqualTo(3);
                 await Assert.That(row.ScoreOutsideWindow + row.Slots.Sum(x => x.NetPoints.GetValueOrDefault())).IsEqualTo(row.TotalScore);
             }
             fixture.CompetitionChallenge.ScoringEndsAt = start.AddMinutes(2).AddSeconds(5);
