@@ -1,6 +1,7 @@
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Competitions.Awd;
 
 namespace NoCTF.Application.GameplayFacts.Processing;
 
@@ -10,7 +11,11 @@ public sealed record GameplayFactDecision(
     DateTimeOffset OccurredAt,
     Guid? VictimTeamId = null,
     GameplayFactReferenceKind? ReferenceKind = null,
-    Guid? ReferenceId = null);
+    Guid? ReferenceId = null,
+    AwdAttackDecision? AwdAttack = null);
+
+public sealed record AwdAttackDecision(AwdAttackOutcome Outcome, Guid? FlagId = null,
+    Guid? GenerationRoundId = null, Guid? RulesId = null);
 
 public sealed record GameplayFactProcessingContext(
     GameplayFact GameplayFact,

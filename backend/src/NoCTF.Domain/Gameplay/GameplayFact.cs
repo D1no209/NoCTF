@@ -128,5 +128,12 @@ public enum GameplayFactFailureCode : short
     PatchVerificationPlatformFailed,
     StaticFlagWithoutContainer,
     StaticFlagWithoutAttachment,
-    StaticFlagWithoutContainerAndAttachment
+    StaticFlagWithoutContainerAndAttachment,
+    FlagInvalid,
+    FlagUnknown,
+    FlagRevoked,
+    FlagNotIssued,
+    FlagNotYetActive,
+    FlagNotScorable,
+    AwdReceiptUnavailable
 }

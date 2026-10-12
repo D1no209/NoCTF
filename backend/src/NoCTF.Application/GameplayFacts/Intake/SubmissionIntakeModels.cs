@@ -67,7 +67,8 @@ public enum GameplayFactAcceptanceState
 public sealed record GameplayFactAcceptanceResult(
     GameplayFactAcceptanceState State,
     Guid? GameplayFactId = null,
-    DateTimeOffset? OccurredAt = null);
+    DateTimeOffset? OccurredAt = null,
+    GameplayFactAdmissionFailureCode? FailureCode = null);
 
 public sealed record GameplayFactAccepted(Guid GameplayFactId, DateTimeOffset OccurredAt);
 

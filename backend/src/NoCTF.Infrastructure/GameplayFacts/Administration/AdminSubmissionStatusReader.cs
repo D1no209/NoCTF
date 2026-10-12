@@ -25,6 +25,12 @@ public sealed class AdminGameplayFactStatusReader(NoCtfDbContext db) : IAdminGam
                 fact.Result,
                 fact.FailureCode,
                 fact.OccurredAt,
-                fact.UpdatedAt, fact.TimeEligibility))
+                fact.UpdatedAt, fact.TimeEligibility,
+                fact.Kind != GameplayFactKind.FlagAttempt || fact.Awd == null ? null : new AwdAttackStatusView(
+                    fact.Awd.FlagId, fact.Awd.GenerationRoundId,
+                    db.AwdFlagIssues.Where(issue => issue.FlagId == fact.Awd.FlagId).Select(issue => (int?)issue.RoundNumber).SingleOrDefault(),
+                    fact.Awd.ReceivedRoundId, fact.Awd.ReceivedRoundNumber,
+                    db.AwdFlagIssues.Where(issue => issue.FlagId == fact.Awd.FlagId).Select(issue => (Guid?)issue.StoreId).SingleOrDefault(),
+                    fact.Awd.AttackOutcome, fact.Awd.Settlement)))
             .SingleOrDefaultAsync(cancellationToken);
 }

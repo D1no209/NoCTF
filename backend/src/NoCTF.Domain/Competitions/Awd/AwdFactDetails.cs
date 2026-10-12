@@ -11,6 +11,10 @@ public sealed class AwdFactDetails
     public Guid? FlagId { get; set; }
     public Guid? GenerationRoundId { get; set; }
     public Guid? ReceivedRoundId { get; set; }
+    public int? ReceivedRoundNumber { get; set; }
+    public long? ReceivedActiveTicks { get; set; }
+    public bool? ReceiptScorable { get; set; }
+    public AwdAttackOutcome? AttackOutcome { get; set; }
     public Guid? RulesId { get; set; }
     public Guid? RuntimeId { get; set; }
     public AwdCheckExecution Execution { get; set; }
@@ -31,6 +35,11 @@ public sealed class AwdFactDetails
     public int RequiredFlags { get; set; }
     public int ReadableFlags { get; set; }
     public List<AwdFactFlagEvidence> Flags { get; set; } = [];
+}
+
+public enum AwdAttackOutcome : short
+{
+    Accepted, Invalid, Expired, Duplicate, OwnFlag, UnknownFlag, NotScorable, SystemError
 }
 
 public sealed class AwdFactFlagEvidence

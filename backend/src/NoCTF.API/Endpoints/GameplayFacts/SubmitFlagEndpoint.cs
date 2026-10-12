@@ -97,13 +97,27 @@ public enum GameplayFactFailureCodeProtocol
     PatchVerificationPlatformFailed,
     StaticFlagWithoutContainer,
     StaticFlagWithoutAttachment,
-    StaticFlagWithoutContainerAndAttachment
+    StaticFlagWithoutContainerAndAttachment,
+    FlagInvalid,
+    FlagUnknown,
+    FlagRevoked,
+    FlagNotIssued,
+    FlagNotYetActive,
+    FlagNotScorable,
+    AwdReceiptUnavailable
 }
 
 public sealed record AcceptedGameplayFactResponse(
     Guid GameplayFactId,
     GameplayFactStateProtocol State,
     string StatusUrl);
+
+public sealed record AwdAttackStatusResponse(Guid? FlagId, Guid? GenerationRoundId, int? GenerationRoundNumber,
+    Guid? ReceivedRoundId, int? ReceivedRoundNumber, Guid? StoreId,
+    [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<NoCTF.Domain.Competitions.Awd.AwdAttackOutcome>))]
+    NoCTF.Domain.Competitions.Awd.AwdAttackOutcome? Outcome,
+    [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<NoCTF.Domain.Competitions.Awd.AwdSettlementState>))]
+    NoCTF.Domain.Competitions.Awd.AwdSettlementState Settlement);
 
 public sealed record GameplayFactStatusResponse(
     Guid GameplayFactId,
@@ -117,7 +131,8 @@ public sealed record GameplayFactStatusResponse(
     DateTimeOffset OccurredAt,
     DateTimeOffset UpdatedAt,
     [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<NoCTF.Domain.Challenges.GameplayFactTimeEligibility>))]
-    NoCTF.Domain.Challenges.GameplayFactTimeEligibility TimeEligibility = NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid);
+    NoCTF.Domain.Challenges.GameplayFactTimeEligibility TimeEligibility = NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid,
+    AwdAttackStatusResponse? AwdAttack = null);
 
 public sealed record AdminGameplayFactStatusResponse(
     Guid GameplayFactId,
@@ -135,7 +150,8 @@ public sealed record AdminGameplayFactStatusResponse(
     NoCTF.API.Endpoints.Administration.GameplayFacts.AdminPatchFailureCode? PatchFailure = null,
     bool CanDownloadPatch = false,
     [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<NoCTF.Domain.Challenges.GameplayFactTimeEligibility>))]
-    NoCTF.Domain.Challenges.GameplayFactTimeEligibility TimeEligibility = NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid);
+    NoCTF.Domain.Challenges.GameplayFactTimeEligibility TimeEligibility = NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid,
+    AwdAttackStatusResponse? AwdAttack = null);
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<GameplayFactAdmissionFailureCodeProtocol>))]
 public enum GameplayFactAdmissionFailureCodeProtocol
@@ -160,7 +176,10 @@ public enum GameplayFactAdmissionFailureCodeProtocol
     GameplayFactConcurrency,
     PatchUploadNotFound,
     ChallengeNotOpened,
-    ChallengeSubmissionClosed
+    ChallengeSubmissionClosed,
+    AwdHardeningActive,
+    AwdRoundGap,
+    AwdRoundUnavailable
 }
 
 public sealed record GameplayFactAdmissionFailureResponse(

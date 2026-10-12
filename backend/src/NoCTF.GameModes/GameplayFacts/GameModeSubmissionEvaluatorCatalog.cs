@@ -3,6 +3,8 @@ using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Gameplay;
 using NoCTF.GameModes.Awd.Configuration;
+using NoCTF.GameModes.Awd.Flags;
+using NoCTF.Domain.Competitions.Awd;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.GameModes.Ctf.Configuration;
 using NoCTF.GameModes.Registration;
@@ -150,49 +152,51 @@ public sealed class AwdGameplayFactEvaluator : IGameplayFactEvaluator
         if (submission.Kind != GameplayFactKind.FlagAttempt)
             return ModeGameplayFactEvaluatorRules.Reject(submission, GameplayFactFailureCode.FixNotSupported);
 
-        var configuration = context.CompetitionConfiguration is AwdCompetitionModeConfiguration awd
-            ? awd
-            : throw new InvalidOperationException("AWD competition configuration is required.");
-        if (context.EffectiveRunningTime is TimeSpan effectiveRunningTime
-            && effectiveRunningTime < TimeSpan.FromSeconds(configuration.HardeningDurationSeconds))
-            return ModeGameplayFactEvaluatorRules.Reject(submission, GameplayFactFailureCode.HardeningActive);
-
+        if (submission.Awd is not { ReceivedRoundNumber: { } round, ReceivedActiveTicks: { } ticks,
+                ReceivedRoundId: not null, ReceiptScorable: not null } receipt)
+            return Decision(null, AwdAttackOutcome.SystemError, GameplayFactFailureCode.AwdReceiptUnavailable);
+        if (submission.Value is not { Length: > 0 and <= 4096 } value
+            || value.Any(character => character is < '!' or > '~'))
+            return Decision(GameplayFactResult.Wrong, AwdAttackOutcome.Invalid, GameplayFactFailureCode.FlagInvalid);
         var candidates = context.ApplicableFlags
             .Where(flag => flag.MatchKind == ChallengeFlagMatchKind.Exact)
-            .Where(flag => flag.TeamId is not null && DefaultEfGameplayFactEvaluator.Matches(submission, flag))
+            .Where(flag => flag.CompetitionChallengeId == submission.CompetitionChallengeId
+                && flag.TeamId is not null && string.Equals(flag.Flag, value, StringComparison.Ordinal))
             .OrderBy(flag => flag.Id)
             .ToList();
         if (candidates.Count == 0)
-            return Decision(GameplayFactResult.Wrong);
-
-        var valid = candidates.FirstOrDefault(flag =>
-            (flag.ValidStart is null || flag.ValidStart <= submission.OccurredAt)
-            && (flag.ValidUntil is null || submission.OccurredAt < flag.ValidUntil));
-        if (valid is null)
-            return Decision(GameplayFactResult.Wrong, GameplayFactFailureCode.FlagExpired);
-        if (valid.TeamId == submission.TeamId)
-            return ModeGameplayFactEvaluatorRules.Reject(submission, GameplayFactFailureCode.SelfAttackRejected);
-
-        var duplicate = context.PriorFacts.Any(fact =>
-            fact.TeamId == submission.TeamId
-            && fact.VictimTeamId == valid.TeamId
-            && fact.CompetitionChallengeId == submission.CompetitionChallengeId
-            && fact.ReferenceKind == GameplayFactReferenceKind.AwdRound
-            && fact.ReferenceId == valid.SpecificationId
-            && fact.Result == GameplayFactResult.Correct);
-        return duplicate
-            ? Decision(GameplayFactResult.Duplicate, GameplayFactFailureCode.DuplicateAttack, valid)
-            : Decision(GameplayFactResult.Correct, null, valid);
+            return Decision(GameplayFactResult.Wrong, AwdAttackOutcome.UnknownFlag, GameplayFactFailureCode.FlagUnknown);
+        if (candidates.Count != 1)
+            return Decision(null, AwdAttackOutcome.SystemError, GameplayFactFailureCode.AmbiguousFlagMatch);
+        var matched = candidates[0];
+        if (matched.AwdIssue is not { } issue || issue.CompetitionId != submission.CompetitionId
+            || issue.CompetitionChallengeId != submission.CompetitionChallengeId || issue.TeamId != matched.TeamId)
+            return Decision(GameplayFactResult.Rejected, AwdAttackOutcome.NotScorable, GameplayFactFailureCode.FlagNotIssued);
+        if (issue.State != AwdFlagIssueState.Issued || matched.DeletedAt is not null)
+            return Decision(GameplayFactResult.Rejected, AwdAttackOutcome.NotScorable,
+                issue.State == AwdFlagIssueState.Revoked ? GameplayFactFailureCode.FlagRevoked : GameplayFactFailureCode.FlagNotIssued, matched);
+        if (issue.IssuedAt > submission.OccurredAt || issue.RoundNumber > round || issue.ActiveStartTicks > ticks)
+            return Decision(GameplayFactResult.Rejected, AwdAttackOutcome.NotScorable, GameplayFactFailureCode.FlagNotYetActive, matched);
+        if (!AwdFlagLifetime.Accepts(issue, round, ticks))
+            return Decision(GameplayFactResult.Wrong, AwdAttackOutcome.Expired, GameplayFactFailureCode.FlagExpired, matched);
+        if (matched.TeamId == submission.TeamId)
+            return Decision(GameplayFactResult.Rejected, AwdAttackOutcome.OwnFlag, GameplayFactFailureCode.SelfAttackRejected, matched);
+        if (receipt.ReceiptScorable != true || submission.TimeEligibility != GameplayFactTimeEligibility.Valid)
+            return Decision(GameplayFactResult.Rejected, AwdAttackOutcome.NotScorable, GameplayFactFailureCode.FlagNotScorable, matched);
+        // Success uniqueness is checked under the completion transaction by FlagId + attacking team.
+        return Decision(GameplayFactResult.Correct, AwdAttackOutcome.Accepted, null, matched);
 
         GameplayFactDecision Decision(
-            GameplayFactResult result,
+            GameplayFactResult? result,
+            AwdAttackOutcome outcome,
             GameplayFactFailureCode? failure = null,
             ChallengeFlag? matched = null) =>
             new(result, failure, submission.OccurredAt, matched?.TeamId,
                 matched?.SpecificationKind == SpecificationKind.AwdRound
                     ? GameplayFactReferenceKind.AwdRound
                     : null,
-                matched?.SpecificationId);
+                matched?.SpecificationId,
+                new(outcome, matched?.Id, matched?.AwdIssue?.RoundId, matched?.AwdIssue?.RulesId));
     }
 }
 

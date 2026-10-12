@@ -1297,6 +1297,10 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("gameplay_fact_id");
 
+                    b.Property<short?>("AttackOutcome")
+                        .HasColumnType("smallint")
+                        .HasColumnName("attack_outcome");
+
                     b.Property<int>("Attempt")
                         .HasColumnType("integer")
                         .HasColumnName("attempt");
@@ -1361,9 +1365,21 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("receipt_deadline");
 
+                    b.Property<bool?>("ReceiptScorable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("receipt_scorable");
+
+                    b.Property<long?>("ReceivedActiveTicks")
+                        .HasColumnType("bigint")
+                        .HasColumnName("received_active_ticks");
+
                     b.Property<Guid?>("ReceivedRoundId")
                         .HasColumnType("uuid")
                         .HasColumnName("received_round_id");
+
+                    b.Property<int?>("ReceivedRoundNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("received_round_number");
 
                     b.Property<int>("RequiredFlags")
                         .HasColumnType("integer")

@@ -13,6 +13,8 @@ using NoCTF.Domain.Commands;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Application.Observability;
 using NoCTF.GameModes.Registration;
+using NoCTF.Domain.Competitions.Awd;
+using NoCTF.Infrastructure.Competitions.Awd;
 
 namespace NoCTF.Infrastructure.GameplayFacts.Intake;
 
@@ -162,6 +164,21 @@ public sealed class GameplayFactIntakeStore(
             return received.Select(_ => new GameplayFactAcceptanceResult(
                 GameplayFactAcceptanceState.AttemptsExhausted)).ToArray();
 
+        AwdFactDetails? awdReceipt = null;
+        if (current.Mode == GameMode.Awd)
+        {
+            var admission = GameplayFactAdmissionPolicy.Check(current, received[0].Kind, currentRules,
+                received[0].OccurredAt);
+            if (!admission.Succeeded)
+                return received.Select(_ => new GameplayFactAcceptanceResult(
+                    GameplayFactAcceptanceState.AdmissionRejected, FailureCode: admission.FailureCode)).ToArray();
+            var receipt = await AwdAttackReceiptReader.ReadAsync(db, current, received[0].OccurredAt, cancellationToken);
+            if (receipt.Failure is { } failure)
+                return received.Select(_ => new GameplayFactAcceptanceResult(
+                    GameplayFactAcceptanceState.AdmissionRejected, FailureCode: failure)).ToArray();
+            awdReceipt = receipt.Receipt!;
+        }
+
         var acquisitionEvidence = received[0].Kind == GameplayFactKind.FlagAttempt
             ? await FlagAcquisitionEvidenceReader.CaptureAsync(db, current, templates,
                 received[0].OccurredAt, practice, cancellationToken)
@@ -180,6 +197,20 @@ public sealed class GameplayFactIntakeStore(
             entity.OccurredAt = item.OccurredAt;
             entity.State = GameplayFactState.Queued;
             entity.AcquisitionEvidence = acquisitionEvidence?.Copy();
+            if (awdReceipt is not null)
+            {
+                entity.Awd = new AwdFactDetails
+                {
+                    GameplayFactId = entity.Id,
+                    ReceivedRoundId = awdReceipt.ReceivedRoundId,
+                    ReceivedRoundNumber = awdReceipt.ReceivedRoundNumber,
+                    ReceivedActiveTicks = awdReceipt.ReceivedActiveTicks,
+                    ReceiptScorable = current.Timing?.CanScore(item.OccurredAt) ?? true,
+                    Settlement = awdReceipt.Settlement
+                };
+                entity.TimeEligibility = current.Timing?.Eligibility(item.OccurredAt)
+                    ?? NoCTF.Domain.Challenges.GameplayFactTimeEligibility.Valid;
+            }
             entity.UpdatedAt = item.OccurredAt;
             return entity;
         }).ToArray();

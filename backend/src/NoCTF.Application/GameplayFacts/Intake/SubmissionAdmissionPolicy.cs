@@ -26,7 +26,10 @@ public enum GameplayFactAdmissionFailureCode
     GameplayFactConcurrency,
     PatchUploadNotFound,
     ChallengeNotOpened,
-    ChallengeSubmissionClosed
+    ChallengeSubmissionClosed,
+    AwdHardeningActive,
+    AwdRoundGap,
+    AwdRoundUnavailable
 }
 
 /// <summary>Applies transport-independent admission rules using the trusted receive time.</summary>

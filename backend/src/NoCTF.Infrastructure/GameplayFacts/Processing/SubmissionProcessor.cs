@@ -11,7 +11,6 @@ using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Gameplay;
-using NoCTF.GameModes.Awd.Scheduling;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Shared;
@@ -21,6 +20,7 @@ using System.Text.Json;
 using NoCTF.Infrastructure.Competitions.Lifecycle;
 using NoCTF.Application.Observability;
 using NoCTF.Infrastructure.Competitions.Progression;
+using NoCTF.Domain.Competitions.Awd;
 
 namespace NoCTF.Infrastructure.GameplayFacts.Processing;
 
@@ -202,6 +202,7 @@ public sealed class GameplayFactProcessor(
     private async Task<Evaluation> EvaluateAsync(Guid gameplayFactId, CancellationToken cancellationToken)
     {
         var submission = await db.GameplayFacts.AsNoTracking()
+            .Include(fact => fact.Awd)
             .SingleAsync(item => item.Id == gameplayFactId, cancellationToken);
         var configuration = await db.Competitions.AsNoTracking()
             .Where(competition => competition.Id == submission.CompetitionId)
@@ -252,6 +253,14 @@ public sealed class GameplayFactProcessor(
                 timeProvider.GetUtcNow(),
                 cancellationToken);
             return new(special, officialWindow);
+        }
+        if (configuration.Competition.Mode == GameMode.Awd)
+        {
+            var issued = await db.ChallengeFlags.AsNoTracking()
+                .Where(flag => flag.CompetitionChallengeId == submission.CompetitionChallengeId
+                    && flag.Flag == submission.Value).ToArrayAsync(cancellationToken);
+            return new(evaluatorCatalog.Get(GameMode.Awd).Evaluate(new(submission, [], issued, null,
+                configuration.Competition.ModeConfiguration!, configuration.CompetitionChallenge.Rules!)), null);
         }
         var maxAttempts = practiceFact
             ? null
@@ -325,32 +334,6 @@ public sealed class GameplayFactProcessor(
             ? await db.PatchUploads.AsNoTracking()
                 .SingleOrDefaultAsync(item => item.Id == patchUploadId, cancellationToken)
             : null;
-        TimeSpan? effectiveRunningTime = null;
-        if (configuration.Competition.Mode == GameMode.Awd)
-        {
-            var lifecycleEvents = await db.CompetitionEvents.AsNoTracking()
-                .Where(@event => @event.CompetitionId == submission.CompetitionId
-                    && @event.Kind == CompetitionEventKind.CompetitionLifecycleChanged
-                    && @event.OccurredAt <= submission.OccurredAt)
-                .OrderBy(@event => @event.OccurredAt)
-                .ToListAsync(cancellationToken);
-            effectiveRunningTime = AwdEffectiveRunningClock.Calculate(
-                lifecycleEvents.Select(@event =>
-                {
-                    return new CompetitionLifecycleTransition
-                    {
-                        Id = @event.Id,
-                        CompetitionId = @event.CompetitionId,
-                        From = @event.PreviousCompetitionStatus
-                            ?? throw new InvalidOperationException("Lifecycle event has no previous status."),
-                        To = @event.CompetitionStatus
-                            ?? throw new InvalidOperationException("Lifecycle event has no current status."),
-                        ActorId = @event.ActorUserId,
-                        OccurredAt = @event.OccurredAt
-                    };
-                }).ToList(),
-                submission.OccurredAt);
-        }
         var decision = evaluatorCatalog.Get(configuration.Competition.Mode).Evaluate(new(
             submission,
             priorSubmissions,
@@ -359,7 +342,7 @@ public sealed class GameplayFactProcessor(
             configuration.Competition.ModeConfiguration!,
             configuration.CompetitionChallenge.Rules!,
             configuration.Competition.StartAt,
-            effectiveRunningTime,
+            null,
             configuration.Challenge.Definition));
         return new(decision, officialWindow);
     }
@@ -463,7 +446,7 @@ public sealed class GameplayFactProcessor(
     {
         await using var transaction = await db.Database.BeginTransactionAsync(
             IsolationLevel.Serializable, cancellationToken);
-        var submission = await db.GameplayFacts.SingleOrDefaultAsync(
+        var submission = await db.GameplayFacts.Include(fact => fact.Awd).SingleOrDefaultAsync(
             item => item.Id == gameplayFactId, cancellationToken);
         if (submission is null
             || submission.State != GameplayFactState.Processing)
@@ -502,6 +485,9 @@ public sealed class GameplayFactProcessor(
                     cancellationToken)
             };
         }
+
+        if (evaluation.Decision.AwdAttack is not null)
+            evaluation = evaluation with { Decision = await ApplyAwdAttackAsync(submission, evaluation.Decision, cancellationToken) };
 
         if (evaluation.Decision.Result is null)
         {
@@ -565,7 +551,7 @@ public sealed class GameplayFactProcessor(
         {
             var timingChallenge = await db.CompetitionChallenges.AsNoTracking().Where(x => x.Id == submission.CompetitionChallengeId)
                 .Select(x => new { x.Mode, x.AutoOpenAt, x.ScoringEndsAt, x.SubmissionDeadlineAt, x.TimingRevision }).SingleAsync(cancellationToken);
-            if (timingChallenge.Mode != GameMode.LiveSolo)
+            if (timingChallenge.Mode is not (GameMode.LiveSolo or GameMode.Awd))
             {
                 var timing = new NoCTF.Domain.Challenges.ChallengeTiming(timingChallenge.AutoOpenAt, timingChallenge.ScoringEndsAt, timingChallenge.SubmissionDeadlineAt);
                 var practice = timingChallenge.Mode == GameMode.Ctf && submission.Kind == GameplayFactKind.FlagAttempt
@@ -725,6 +711,63 @@ public sealed class GameplayFactProcessor(
             submission.State,
             submission.Result,
             (completedAt - submission.OccurredAt).TotalSeconds);
+
+    private async Task<GameplayFactDecision> ApplyAwdAttackAsync(GameplayFact fact,
+        GameplayFactDecision decision, CancellationToken ct)
+    {
+        var attack = decision.AwdAttack!;
+        var details = fact.Awd ??= new AwdFactDetails { GameplayFactId = fact.Id };
+        if (attack.FlagId is { } flagId && attack.Outcome == AwdAttackOutcome.Accepted)
+        {
+            var issue = await db.AwdFlagIssues.AsNoTracking().SingleAsync(item => item.FlagId == flagId, ct);
+            if (issue.CompetitionId != fact.CompetitionId || issue.CompetitionChallengeId != fact.CompetitionChallengeId
+                || issue.TeamId != decision.VictimTeamId || issue.RoundId != attack.GenerationRoundId
+                || issue.RulesId != attack.RulesId || fact.TeamId is null || fact.TeamId == issue.TeamId)
+                throw new InvalidOperationException("AWD capture scope does not match its issued Flag.");
+            if (issue.State != AwdFlagIssueState.Issued)
+            {
+                attack = attack with { Outcome = AwdAttackOutcome.NotScorable };
+                decision = decision with { Result = GameplayFactResult.Rejected,
+                    FailureCode = issue.State == AwdFlagIssueState.Revoked
+                        ? GameplayFactFailureCode.FlagRevoked : GameplayFactFailureCode.FlagNotIssued };
+            }
+            else
+            {
+                var capture = await db.AwdCaptureIdentities.SingleOrDefaultAsync(item =>
+                    item.FlagId == flagId && item.AttackingTeamId == fact.TeamId, ct);
+                if (capture is not null && capture.GameplayFactId != fact.Id)
+                {
+                    attack = attack with { Outcome = AwdAttackOutcome.Duplicate };
+                    decision = decision with { Result = GameplayFactResult.Duplicate, FailureCode = GameplayFactFailureCode.DuplicateAttack };
+                }
+                else if (capture is null)
+                    db.AwdCaptureIdentities.Add(new AwdCaptureIdentity
+                    {
+                        CompetitionId = fact.CompetitionId, FlagId = flagId,
+                        AttackingTeamId = fact.TeamId.Value, GameplayFactId = fact.Id
+                    });
+            }
+        }
+        if (attack.Outcome != AwdAttackOutcome.Accepted)
+        {
+            var previous = await db.AwdCaptureIdentities.SingleOrDefaultAsync(item => item.GameplayFactId == fact.Id, ct);
+            if (previous is not null) db.AwdCaptureIdentities.Remove(previous);
+        }
+        details.AttackOutcome = attack.Outcome;
+        details.FlagId = attack.FlagId;
+        details.GenerationRoundId = attack.GenerationRoundId;
+        details.RulesId = attack.RulesId;
+        details.Settlement = attack.Outcome == AwdAttackOutcome.SystemError
+            ? AwdSettlementState.PendingAdjudication : AwdSettlementState.Final;
+        if (attack.Outcome == AwdAttackOutcome.Accepted && attack.RulesId is { } rulesId)
+        {
+            var settlement = await db.AwdRoundRules.AsNoTracking().Where(rules => rules.Id == rulesId)
+                .Select(rules => rules.Options.AttackSettlement).SingleAsync(ct);
+            details.Settlement = settlement == AwdAttackSettlement.Immediate
+                ? AwdSettlementState.Final : AwdSettlementState.Provisional;
+        }
+        return decision with { AwdAttack = attack };
+    }
 
     private async Task RecordAwdpBreakResolutionAsync(
         GameplayFact submission,

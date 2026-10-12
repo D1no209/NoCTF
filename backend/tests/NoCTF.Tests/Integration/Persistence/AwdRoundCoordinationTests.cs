@@ -30,7 +30,7 @@ using Testcontainers.PostgreSql;
 namespace NoCTF.Tests.Integration.Persistence;
 
 [Category("Integration")]
-public sealed class AwdRoundCoordinationTests
+public sealed partial class AwdRoundCoordinationTests
 {
     [Test]
     [Timeout(300_000)]
