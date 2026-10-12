@@ -13,6 +13,7 @@ export const tabsListVariants = cva(
       variant: {
         default: 'bg-muted',
         line: 'gap-1 bg-transparent',
+        workspace: 'group-data-horizontal/tabs:h-14 gap-1.5 bg-muted p-1',
       },
     },
     defaultVariants: {

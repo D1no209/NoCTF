@@ -41,6 +41,19 @@ test('separate round ids and increasing result revisions are independent of dupl
 test('forfeit displays the actual zero tally and timeout does not fabricate a winner', () => {
   const match = { id: 'match', leftTeamId: 'left', leftTeamName: 'FS', rightTeamId: 'right', rightTeamName: 'Blue',
     winnerTeamId: 'right', resultRevision: 1, endReason: 'Forfeit' as const, resultLeftWins: 0, resultRightWins: 0 }
-  expect(resultPresentation(match, null, 'Match')).toMatchObject({ winnerName: 'Blue', score: '0 : 0', reasonKey: 'liveSolo.result.reason.Forfeit' })
-  expect(resultPresentation(match, { id: 'round', resultRevision: 1, endReason: 'TimeLimit' }, 'Round')).toMatchObject({ winnerName: null, score: null })
+  expect(resultPresentation(match, null, 'Match')).toMatchObject({ hasWinner: true, winnerName: 'Blue', leftName: 'FS', rightName: 'Blue', leftScore: 0, rightScore: 0, score: '0 : 0', reasonKey: 'liveSolo.result.reason.Forfeit' })
+  expect(resultPresentation(match, { id: 'round', resultRevision: 1, endReason: 'TimeLimit' }, 'Round')).toMatchObject({ hasWinner: false, winnerName: null, score: null })
+})
+
+test('round presentation keeps its winner and frozen scores independent of the current match tally', () => {
+  const match = { leftTeamId: 'left', leftTeamName: 'FS', rightTeamId: 'right', rightTeamName: 'Blue',
+    winnerTeamId: 'right', leftWins: 2, rightWins: 3 }
+  const round = { number: 1, resultRevision: 1, winnerTeamId: 'left', resultLeftWins: 1, resultRightWins: 0, endReason: 'CorrectAnswer' as const }
+  expect(resultPresentation(match, round, 'Round')).toMatchObject({ kind: 'Round', roundNumber: 1,
+    hasWinner: true, winnerName: 'FS', winnerAvatar: 'left', leftScore: 1, rightScore: 0 })
+})
+
+test('a missing winner never matches an unassigned side', () => {
+  expect(resultPresentation({ resultRevision: 1, endReason: 'Voided', leftTeamName: 'Unassigned' }, null, 'Match'))
+    .toMatchObject({ hasWinner: false, winnerName: null, winnerAvatar: null })
 })

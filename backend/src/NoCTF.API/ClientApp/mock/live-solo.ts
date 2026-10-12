@@ -31,6 +31,9 @@ export function createMockLiveSolo(state: ReturnType<typeof createFixtures>) {
       state: ['Preparing', 'Running', 'Completed'][index], requiredWins: 2, leftWins: index === 2 ? 2 : 0, rightWins: index ? 1 : 0,
       leftTeamId: pair[0]?.id, leftTeamName: pair[0]?.name,
       rightTeamId: pair[1]?.id, rightTeamName: pair[1]?.name,
+      resultRevision: index === 2 ? 1 : 0, winnerTeamId: index === 2 ? pair[0]?.id : null,
+      resultLeftWins: index === 2 ? 2 : null, resultRightWins: index === 2 ? 1 : null,
+      endReason: index === 2 ? 'RequiredWinsReached' : 'Unrecorded', resultUpdatedAt: index === 2 ? date(-1) : null,
       currentRoundId: index === 1 ? id(32) : null,
       rosters: pair.map(team => ({ teamId: team.id, userIds: team.memberIds.slice(0, 2), locked: true, ready: true })) })
   })
@@ -48,6 +51,9 @@ export function createMockLiveSolo(state: ReturnType<typeof createFixtures>) {
     if (suffix === 'bracket') return model('LiveSoloLiveSoloBracketResponse', { competitionId, format: 'SingleElimination', matches: [] })
     if (suffix === 'matches') return { items: matches }
     if (suffix === 'matches/{matchId}') return match
+    if (suffix === 'matches/{matchId}/workspace') return model('LiveSoloLiveSoloWorkspaceResponse', {
+      match, round: match?.currentRoundId ? round : null, staff: true, serverTime: date(0),
+      allowedOperations: [], missingConditions: [], questions: [], history: [], resources: [] })
     if (suffix === 'matches/{matchId}/rounds/{roundId}') return round
     if (suffix === 'matches/{matchId}/media') return model('LiveSoloLiveSoloMediaResponse', { matchId: params.matchId,
       state: 'Preparing', recordingEnabled: true, publicDelaySeconds: 60,

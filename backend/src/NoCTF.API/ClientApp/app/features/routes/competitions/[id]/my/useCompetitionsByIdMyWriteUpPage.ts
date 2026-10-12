@@ -2,7 +2,7 @@ import { message as describeMessage } from '../../../../../utils/i18n'
 import type { UiMessage } from '../../../../../utils/i18n'
 import { markRaw } from 'vue'
 import { useNow } from '@vueuse/core'
-import { Download, Eye, FileText } from '@lucide/vue'
+import { BookOpen, Download, Eye, FileText } from '@lucide/vue'
 import { toast } from '../../../../../utils/message-toast'
 
 import { downloadMyTeamWriteUp, getMyTeamWriteUp, replaceMyTeamWriteUp } from '../../../../../api'
@@ -179,6 +179,7 @@ export function useCompetitionsByIdMyWriteUpPage() {
   const CompetitionParticipantWorkspace = markRaw(CompetitionParticipantWorkspaceComponent)
   const viewBindings = {
     activeTab, singleEnabled, MySingleWriteUps,
+    BookOpen,
     Download,
     Eye,
     FileText,
