@@ -232,7 +232,9 @@ export function useCompetitionsByIdPage() {
 
   let unwatch: (() => void) | undefined
 
-  onMounted(() => {
+  function subscribeWorkspace() {
+    unwatch?.()
+    unwatch = undefined
     if (isOverview.value || isPublicSpectator.value) return
     unwatch = watchCompetition(competitionId.value, {
       competitionLifecycleChanged: () => {
@@ -265,7 +267,18 @@ export function useCompetitionsByIdPage() {
         void refreshMissedAnnouncements()
       },
     })
-  })
+  }
+  onMounted(subscribeWorkspace)
+  watch(isPublicSpectator, enabled => {
+    if (enabled) {
+      unwatch?.(); unwatch = undefined
+      competitionRequestId++; teamRequestId++; progressionRequestId++
+      competition.value = null; competitionActorId.value = null; myTeam.value = null; myStanding.value = null
+    } else {
+      subscribeWorkspace()
+      void initialize()
+    }
+  }, { flush: 'sync' })
 
   onUnmounted(() => {
     competitionRequestId++
