@@ -9,6 +9,7 @@ namespace NoCTF.Infrastructure.Competitions.Awd;
 /// inside a round. Future positions assume the current running interval continues.</summary>
 internal sealed class AwdRunningClock(IReadOnlyList<(DateTimeOffset Start, DateTimeOffset? End)> segments)
 {
+    public bool HasIntervals => segments.Count > 0;
     public TimeSpan ElapsedAt(DateTimeOffset at) => TimeSpan.FromTicks(segments.Sum(segment =>
     {
         var end = segment.End is { } stopped && stopped < at ? stopped : at;

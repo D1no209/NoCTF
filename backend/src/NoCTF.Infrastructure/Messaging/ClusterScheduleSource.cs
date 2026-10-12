@@ -10,6 +10,7 @@ using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Awd.Scheduling;
 using NoCTF.GameModes.Koh.Configuration;
 using NoCTF.Infrastructure.Competitions.Lifecycle;
+using NoCTF.Infrastructure.Competitions.Awd;
 using NoCTF.Infrastructure.Persistence;
 
 namespace NoCTF.Infrastructure.Messaging;
@@ -63,8 +64,6 @@ public sealed class ClusterScheduleSource(
             .AsSplitQuery()
             .ToArrayAsync(cancellationToken);
         var challengeIds = challenges.Select(challenge => challenge.Id).ToArray();
-        var rounds = await db.AwdRounds.AsNoTracking()
-            .Where(round => competitionIds.Contains(round.CompetitionId)).ToArrayAsync(cancellationToken);
         var observations = challengeIds.Length == 0
             ? []
             : await db.GameplayFacts.AsNoTracking()
@@ -81,6 +80,14 @@ public sealed class ClusterScheduleSource(
             .ToDictionary(group => group.Key, group => group.Max(item => item.OccurredAt));
         foreach (var competition in competitions)
         {
+            if (competition.Mode == GameMode.Awd)
+            {
+                var deadline = await AwdCompetitionDeadline.ReadAsync(db, competition.Id, competition.StartAt,
+                    competition.EndAt, (AwdCompetitionModeConfiguration)competition.Configuration, now, cancellationToken);
+                if (deadline.Clock.HasIntervals)
+                    AddAwdEntries(competition, deadline, now, entries);
+                continue;
+            }
             var competitionChallenges = challengesByCompetition.GetValueOrDefault(competition.Id, []);
             var effectiveRuntime = await CompetitionEffectiveRuntimeReader.ReadAsync(
                 db,
@@ -92,25 +99,13 @@ public sealed class ClusterScheduleSource(
             if (effectiveRuntime.RunningSince is not { } runningSince)
                 continue;
 
-            if (competition.Mode == GameMode.Awd)
-            {
-                AddAwdEntries(
-                    competition,
-                    rounds,
-                    effectiveRuntime.Elapsed,
-                    now,
-                    entries);
-            }
-            else
-            {
-                AddKohEntries(
-                    competition,
-                    competitionChallenges,
-                    latestObservations,
-                    runningSince,
-                    now,
-                    entries);
-            }
+            AddKohEntries(
+                competition,
+                competitionChallenges,
+                latestObservations,
+                runningSince,
+                now,
+                entries);
         }
 
         return entries;
@@ -118,17 +113,17 @@ public sealed class ClusterScheduleSource(
 
     private void AddAwdEntries(
         ActiveCompetition competition,
-        IReadOnlyList<AwdRound> rounds,
-        TimeSpan effectiveElapsed,
+        AwdCompetitionDeadline deadline,
         DateTimeOffset now,
         ICollection<ClusterScheduleEntry> entries)
     {
         var configuration = (AwdCompetitionModeConfiguration)competition.Configuration;
         var settings = awdConfigurations.Get(configuration);
-        var plan = AwdRoundTimeline.Plan(rounds.Where(round => round.CompetitionId == competition.Id).ToArray(),
+        var effectiveElapsed = deadline.Clock.ElapsedAt(now);
+        var plan = AwdRoundTimeline.Plan(deadline.Rounds,
             effectiveElapsed, TimeSpan.FromSeconds(settings.HardeningDurationSeconds),
             TimeSpan.FromSeconds(settings.RoundDurationSeconds), configuration.AwdOptions.RoundGapSeconds,
-            configuration.AwdOptions.TotalRounds);
+            configuration.AwdOptions.TotalRounds, deadline.ActiveTimeLimit);
         if (plan.NextRunningPosition is null && plan.NewRounds.Count == 0)
             return;
         // Periodic current-round redispatch repairs a lost post-commit publication without
@@ -138,7 +133,7 @@ public sealed class ClusterScheduleSource(
         if (plan.Current is not null && delay > TimeSpan.FromSeconds(5))
             delay = TimeSpan.FromSeconds(5);
         var dueAt = now + delay;
-        if (dueAt >= competition.EndAt)
+        if (dueAt >= deadline.EndsAt)
             return;
         logger.LogDebug("AWD competition {CompetitionId} next round coordination is due at {DueAt}.",
             competition.Id, dueAt);

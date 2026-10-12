@@ -44,7 +44,7 @@ public enum CompetitionTransitionFailureCode
     LifecycleConflict
 }
 
-/// <summary>Advances published and running competitions using wall-clock deadlines without extending pauses.</summary>
+/// <summary>Advances competitions using the store's mode-specific effective deadlines.</summary>
 public sealed class AdvanceCompetitionLifecycleUseCase(
     ICompetitionLifecycleStore store,
     CompetitionStartGate? startGate = null)

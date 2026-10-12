@@ -64,10 +64,13 @@ public sealed class AwdRoundCoordinator(
             || !target.Challenge.IsPublished)
             return MessageExecutionOutcome.RejectedBusiness;
         var handledAt = timeProvider.GetUtcNow();
+        var deadline = await AwdCompetitionDeadline.ReadAsync(db, target.Competition.Id,
+            target.Competition.StartAt, target.Competition.EndAt,
+            (AwdCompetitionModeConfiguration)target.Competition.ModeConfiguration!, handledAt, cancellationToken);
         var round = await db.AwdRounds.AsNoTracking()
             .SingleOrDefaultAsync(item => item.CompetitionId == message.CompetitionId
                 && item.Number == message.Round.Round, cancellationToken);
-        if (round is null || round.Missed || handledAt >= target.Competition.EndAt
+        if (round is null || round.Missed || handledAt >= deadline.EndsAt
             || handledAt < round.StartsAt || handledAt >= round.EndsAt
             || round.StartsAt != message.ValidStart || round.EndsAt != message.ValidUntil)
         {
@@ -273,9 +276,9 @@ public sealed class AwdRoundCoordinator(
             || competition.ModeConfiguration is not AwdCompetitionModeConfiguration configuration)
             return MessageExecutionOutcome.RejectedBusiness;
         var now = timeProvider.GetUtcNow();
-        if (now >= competition.EndAt)
-            return MessageExecutionOutcome.RejectedBusiness;
-        var clock = await AwdRunningClock.ReadAsync(db, competition.Id, competition.StartAt, now, cancellationToken);
+        var deadline = await AwdCompetitionDeadline.ReadAsync(db, competition.Id, competition.StartAt,
+            competition.EndAt, configuration, now, cancellationToken);
+        var clock = deadline.Clock;
         var elapsed = clock.ElapsedAt(now);
         var rounds = await db.AwdRounds.Where(round => round.CompetitionId == competition.Id)
             .OrderBy(round => round.Number).ToListAsync(cancellationToken);
@@ -283,19 +286,18 @@ public sealed class AwdRoundCoordinator(
         var plan = AwdRoundTimeline.Plan(rounds, elapsed,
             TimeSpan.FromSeconds(settings.HardeningDurationSeconds),
             TimeSpan.FromSeconds(settings.RoundDurationSeconds), configuration.AwdOptions.RoundGapSeconds,
-            configuration.AwdOptions.TotalRounds);
+            configuration.AwdOptions.TotalRounds, deadline.ActiveTimeLimit);
         foreach (var planned in plan.NewRounds)
         {
             var endsAt = clock.At(TimeSpan.FromTicks(planned.RunningEndTicks), intervalStart: false);
-            var partial = endsAt > competition.EndAt;
             var round = new AwdRound
             {
                 Id = Guid.CreateVersion7(), CompetitionId = competition.Id, Number = planned.Number,
                 StartsAt = clock.At(TimeSpan.FromTicks(planned.RunningStartTicks), intervalStart: true),
-                EndsAt = partial ? competition.EndAt : endsAt,
+                EndsAt = endsAt,
                 ActiveStartTicks = planned.ActiveStartTicks,
-                ActiveEndTicks = partial ? planned.ActiveEndTicks - (endsAt - competition.EndAt).Ticks : planned.ActiveEndTicks,
-                GapSeconds = planned.GapSeconds, Missed = planned.Missed, Partial = partial
+                ActiveEndTicks = planned.ActiveEndTicks,
+                GapSeconds = planned.GapSeconds, Missed = planned.Missed, Partial = planned.Partial
             };
             db.AwdRounds.Add(round);
             rounds.Add(round);

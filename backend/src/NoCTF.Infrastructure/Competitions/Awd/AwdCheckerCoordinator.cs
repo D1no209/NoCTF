@@ -117,8 +117,11 @@ public sealed class AwdCheckerCoordinator(NoCtfDbContext db, IPostCommitMessageP
                 applied = true;
                 continue;
             }
-            if (competition.Status != CompetitionStatus.Running || now >= round.EndsAt || now >= competition.EndAt)
+            if (competition.Status != CompetitionStatus.Running || now >= round.EndsAt)
                 continue;
+            var competitionDeadline = await AwdCompetitionDeadline.ReadAsync(db, competition.Id, competition.StartAt,
+                competition.EndAt, (AwdCompetitionModeConfiguration)competition.ModeConfiguration!, now, ct);
+            if (now >= competitionDeadline.EndsAt) continue;
             if (AwdCheckPlan.CanRetry(details, rules.Options, now))
             {
                 details.Execution = AwdCheckExecution.Pending;

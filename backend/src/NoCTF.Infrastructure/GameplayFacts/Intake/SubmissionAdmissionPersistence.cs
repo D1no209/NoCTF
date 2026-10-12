@@ -10,6 +10,7 @@ using NoCTF.Domain.Challenges;
 using NoCTF.Infrastructure.Competitions.Lifecycle;
 using NoCTF.GameModes.Registration;
 using NoCTF.Infrastructure.Competitions.Progression;
+using NoCTF.Infrastructure.Competitions.Awd;
 
 namespace NoCTF.Infrastructure.GameplayFacts.Intake;
 
@@ -156,6 +157,9 @@ internal static class GameplayFactAdmissionPersistence
             }
         }
 
+        var awdDeadline = scope.Mode == GameMode.Awd
+            ? await AwdCompetitionDeadline.ReadAsync(db, competitionId, scope.StartAt, scope.EndAt,
+                (AwdCompetitionModeConfiguration)scope.CompetitionConfiguration!, observedAt, cancellationToken) : null;
         return new(
             competitionId,
             scope.TeamId,
@@ -180,11 +184,12 @@ internal static class GameplayFactAdmissionPersistence
             breakAttempts?.HasCorrect == true,
             fixAttempts?.HasCorrect == true,
             flagAttempts?.HasCorrect == true,
-            officialWindow.EndAt,
+            awdDeadline?.EndsAt ?? officialWindow.EndAt,
             scope.PracticeModeEnabled,
             practiceRuntimeState,
             scope.ChallengeDefinition,
-            new ChallengeTiming(scope.AutoOpenAt, scope.ScoringEndsAt, scope.SubmissionDeadlineAt));
+            new ChallengeTiming(scope.AutoOpenAt, scope.ScoringEndsAt, scope.SubmissionDeadlineAt),
+            awdDeadline?.AcceptanceEndsAt);
     }
 
     public static bool Matches(
@@ -199,6 +204,7 @@ internal static class GameplayFactAdmissionPersistence
         && current.StartAt == expected.StartAt
         && current.EndAt == expected.EndAt
         && current.OfficialEndAt == expected.OfficialEndAt
+        && current.AwdAcceptanceEndsAt == expected.AwdAcceptanceEndsAt
         && current.PracticeModeEnabled == expected.PracticeModeEnabled
         && current.PracticeRuntimeState == expected.PracticeRuntimeState
         && ChallengeDefinitionStructuralComparer.Equals(

@@ -6,6 +6,33 @@ namespace NoCTF.Tests.Unit.GameModes;
 public sealed class AwdRoundTimelineTests
 {
     [Test]
+    public async Task Duration_limit_excludes_gaps_and_keeps_a_partial_final_round()
+    {
+        var first = Round(1, 60, 120, 30);
+        var second = Round(2, 120, 180, 30);
+        var plan = AwdRoundTimeline.Plan([first, second], TimeSpan.FromSeconds(240),
+            TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(60), 30, activeTimeLimit: TimeSpan.FromSeconds(185));
+        var last = plan.NewRounds.Single();
+        await Assert.That(last.Partial).IsTrue();
+        await Assert.That(last.ActiveEndTicks).IsEqualTo(TimeSpan.FromSeconds(185).Ticks);
+        await Assert.That(last.RunningEndTicks).IsEqualTo(TimeSpan.FromSeconds(245).Ticks);
+        await Assert.That(AwdRoundTimeline.EndPosition([first, second], TimeSpan.FromSeconds(60),
+            TimeSpan.FromSeconds(60), 30, null, TimeSpan.FromSeconds(185))).IsEqualTo(TimeSpan.FromSeconds(245));
+        var closed = AwdRoundTimeline.Plan([first, second], TimeSpan.FromSeconds(500),
+            TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(60), 30, activeTimeLimit: TimeSpan.FromSeconds(185));
+        await Assert.That(closed.NewRounds.Single().Missed).IsTrue();
+        await Assert.That(closed.NextRunningPosition).IsNull();
+    }
+
+    [Test]
+    public async Task Round_limit_ignores_duration_budget_and_never_adds_a_final_gap()
+    {
+        var end = AwdRoundTimeline.EndPosition([Round(1, 60, 120, 30)], TimeSpan.FromSeconds(60),
+            TimeSpan.FromSeconds(60), 20, 3, TimeSpan.FromSeconds(125));
+        await Assert.That(end).IsEqualTo(TimeSpan.FromSeconds(290));
+    }
+
+    [Test]
     public async Task Gaps_freeze_active_time_and_boundaries_start_the_next_round()
     {
         var first = Round(1, 60, 240, 30);

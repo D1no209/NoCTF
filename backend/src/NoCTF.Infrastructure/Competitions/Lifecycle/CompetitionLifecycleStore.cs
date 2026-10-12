@@ -7,6 +7,7 @@ using NoCTF.Domain.Challenges;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
 using System.Text.Json;
+using NoCTF.Infrastructure.Competitions.Awd;
 
 namespace NoCTF.Infrastructure.Competitions.Lifecycle;
 
@@ -34,16 +35,29 @@ public sealed class CompetitionLifecycleStore(
 
     public async Task<IReadOnlyList<CompetitionLifecycleSnapshot>> GetDueAsync(
         DateTimeOffset now,
-        CancellationToken cancellationToken) =>
-        await db.Competitions.AsNoTracking()
+        CancellationToken cancellationToken)
+    {
+        var due = await db.Competitions.AsNoTracking()
             .Where(item => item.DeletedAt == null
                 && ((item.Status == CompetitionStatus.Published && item.StartAt <= now)
                     || (item.Status != CompetitionStatus.Draft
                         && item.Status != CompetitionStatus.Finished
-                        && !(item.Mode == GameMode.Awd && item.Status == CompetitionStatus.Paused)
+                        && item.Mode != GameMode.Awd
                         && item.EndAt <= now)))
             .Select(item => new CompetitionLifecycleSnapshot(item.Id, item.Status, item.StartAt, item.EndAt))
             .ToListAsync(cancellationToken);
+        var awd = await db.Competitions.AsNoTracking().AsSplitQuery()
+            .Where(item => item.DeletedAt == null && item.Mode == GameMode.Awd
+                && item.Status == CompetitionStatus.Running).ToArrayAsync(cancellationToken);
+        foreach (var competition in awd)
+        {
+            var deadline = await AwdCompetitionDeadline.ReadAsync(db, competition.Id, competition.StartAt,
+                competition.EndAt, (AwdCompetitionModeConfiguration)competition.ModeConfiguration!, now, cancellationToken);
+            if (now >= deadline.EndsAt)
+                due.Add(new(competition.Id, competition.Status, competition.StartAt, deadline.EndsAt));
+        }
+        return due;
+    }
 
     public async Task<bool> TryTransitionAsync(
         Guid competitionId,
@@ -105,6 +119,27 @@ public sealed class CompetitionLifecycleStore(
         var now = timeProvider.GetUtcNow();
         if (competition.Mode == GameMode.Awd)
         {
+            if (automatic && to == CompetitionStatus.Finished)
+            {
+                var deadline = await AwdCompetitionDeadline.ReadAsync(db, competition.Id, competition.StartAt,
+                    competition.EndAt, (AwdCompetitionModeConfiguration)competition.ModeConfiguration!, now, cancellationToken);
+                if (now < deadline.EndsAt) return false;
+                // A delayed scheduler must not extend acceptance or observation time.
+                now = deadline.EndsAt;
+            }
+            if (to == CompetitionStatus.Finished)
+            {
+                var timeline = await AwdRunningClock.ReadAsync(db, competition.Id, competition.StartAt, now, cancellationToken);
+                var interrupted = await db.AwdRounds.Where(round => round.CompetitionId == competitionId
+                    && round.StartsAt <= now && round.EndsAt > now).ToArrayAsync(cancellationToken);
+                foreach (var round in interrupted)
+                {
+                    round.ActiveEndTicks = round.ActiveStartTicks
+                        + (timeline.ElapsedAt(now) - timeline.ElapsedAt(round.StartsAt)).Ticks;
+                    round.EndsAt = now;
+                    round.Partial = true;
+                }
+            }
             if (from == CompetitionStatus.Paused && to == CompetitionStatus.Running)
             {
                 var pauseEvent = await db.CompetitionEvents.AsNoTracking()

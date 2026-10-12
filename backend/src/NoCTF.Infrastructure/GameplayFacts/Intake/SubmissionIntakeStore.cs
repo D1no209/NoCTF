@@ -156,7 +156,8 @@ public sealed class GameplayFactIntakeStore(
             || currentRules is null
             || currentRules.AllowsFlag != expectedRules.AllowsFlag
             || currentRules.MaxFlagAttempts != expectedRules.MaxFlagAttempts
-            || current!.CompetitionStatus != CompetitionStatus.Running && !practice)
+            || current!.CompetitionStatus != CompetitionStatus.Running && !practice
+                && !GameplayFactAdmissionPolicy.IsAwdAcceptanceWindow(current, received[0].Kind, received[0].OccurredAt))
             return received.Select(_ => new GameplayFactAcceptanceResult(
                 GameplayFactAcceptanceState.AdmissionRejected)).ToArray();
         if (!practice && maxAttempts is > 0

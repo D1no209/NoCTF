@@ -59,11 +59,9 @@ internal static class AwdScoreProjectionReader
             return new AwdScoringCheck(fact.TeamId!.Value, fact.CompetitionChallengeId, fact.ReferenceId!.Value,
                 evidence, evidence.ObservedAt is { } at ? ActiveAt(roundById[fact.ReferenceId.Value], at) : null);
         }).ToArray();
-        var finishedAt = await db.CompetitionEvents.AsNoTracking().Where(x => x.CompetitionId == competitionId
-                && x.CompetitionStatus == CompetitionStatus.Finished && x.OccurredAt <= projectedAt)
-            .Select(x => (DateTimeOffset?)x.OccurredAt).MaxAsync(ct);
-        var tail = rules.OrderBy(x => x.EffectiveAt).LastOrDefault()?.Options.SubmissionTailSeconds ?? 0;
-        var closed = finishedAt is { } end && projectedAt >= end.AddSeconds(tail);
+        var deadline = await AwdCompetitionDeadline.ReadAsync(db, competitionId, competition.StartAt,
+            competition.EndAt, (AwdCompetitionModeConfiguration)competition.ModeConfiguration!, projectedAt, ct);
+        var closed = projectedAt >= deadline.AcceptanceEndsAt;
         var eligibleCaptures = captures.Where(x => issueById.TryGetValue(x.FlagId, out var issue)
             && (timing[issue.CompetitionChallengeId]?.CanScore(x.ReceivedAt) ?? true)).ToArray();
         var scores = AwdRoundScoreProjector.Project(rounds, rules, issues, eligibleCaptures, checks,

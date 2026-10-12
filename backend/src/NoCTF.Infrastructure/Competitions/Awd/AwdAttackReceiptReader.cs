@@ -12,10 +12,13 @@ internal static class AwdAttackReceiptReader
         NoCtfDbContext db, GameplayFactAdmissionSnapshot scope, DateTimeOffset receivedAt, CancellationToken ct)
     {
         var configuration = (AwdCompetitionModeConfiguration)scope.CompetitionConfiguration;
-        var clock = await AwdRunningClock.ReadAsync(db, scope.CompetitionId, scope.StartAt, receivedAt, ct);
-        var runningTicks = clock.ElapsedAt(receivedAt).Ticks;
-        var rounds = await db.AwdRounds.AsNoTracking().Where(round => round.CompetitionId == scope.CompetitionId)
-            .OrderBy(round => round.Number).ToArrayAsync(ct);
+        var deadline = await AwdCompetitionDeadline.ReadAsync(db, scope.CompetitionId, scope.StartAt,
+            scope.EndAt, configuration, receivedAt, ct);
+        if (receivedAt >= deadline.AcceptanceEndsAt)
+            return (null, GameplayFactAdmissionFailureCode.CompetitionFinished);
+        var inTail = receivedAt >= deadline.EndsAt;
+        var runningTicks = deadline.Clock.ElapsedAt(inTail ? deadline.EndsAt : receivedAt).Ticks;
+        var rounds = deadline.Rounds;
         var hardeningTicks = rounds.FirstOrDefault()?.ActiveStartTicks
             ?? TimeSpan.FromSeconds(configuration.HardeningDurationSeconds).Ticks;
         if (runningTicks < hardeningTicks)
@@ -27,14 +30,16 @@ internal static class AwdAttackReceiptReader
             var end = checked(round.ActiveEndTicks + gaps);
             if (runningTicks < start)
                 return (null, GameplayFactAdmissionFailureCode.AwdRoundUnavailable);
-            if (runningTicks < end)
+            var followingStart = checked(end + TimeSpan.FromSeconds(round.GapSeconds).Ticks);
+            if (runningTicks < end || inTail && (runningTicks < followingStart
+                    || round == rounds.Last()))
                 return round.Missed
                     ? (null, GameplayFactAdmissionFailureCode.AwdRoundUnavailable)
                     : (new AwdFactDetails
                     {
                         ReceivedRoundId = round.Id,
                         ReceivedRoundNumber = round.Number,
-                        ReceivedActiveTicks = runningTicks - gaps,
+                        ReceivedActiveTicks = Math.Min(runningTicks - gaps, round.ActiveEndTicks),
                         Settlement = AwdSettlementState.Provisional
                     }, null);
             if (configuration.AwdOptions.TotalRounds is { } limit && round.Number >= limit)

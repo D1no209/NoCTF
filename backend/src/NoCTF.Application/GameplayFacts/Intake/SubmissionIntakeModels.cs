@@ -30,7 +30,8 @@ public sealed record GameplayFactAdmissionSnapshot(
     bool PracticeModeEnabled = false,
     PracticeRuntimeAdmissionState PracticeRuntimeState = PracticeRuntimeAdmissionState.NotRequired,
     ChallengeDefinition? ChallengeDefinition = null,
-    ChallengeTiming? Timing = null);
+    ChallengeTiming? Timing = null,
+    DateTimeOffset? AwdAcceptanceEndsAt = null);
 
 public enum PracticeRuntimeAdmissionState
 {
