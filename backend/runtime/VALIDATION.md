@@ -269,3 +269,14 @@ workload, not proof of a leak or GC attribution. Preserve
 `hour-01-inspection.json` and the full OS sample streams for comparison.
 The replacement campaign must start a fresh full 86,400-second interval. The
 earlier October 13 09:54 UTC estimate is superseded; Official remains the default.
+
+The correction is committed as `ffa51c2c351ccc4411e76e54bdda919ba7c897eb`;
+the Host binaries remain the same clean `bc73cb90` candidates. Replacement
+`diagnostics/campaign-bc73cb90-v2` began timed workload at **11:09:04 UTC on
+Windows and 11:09:30 UTC on Linux, October 12**. Both reported Satori and ready
+HTTP 200. The earliest new duration completion is October 13 at those times
+(19:09 Taipei), before rollback and comparisons. Hourly follow-up now targets v2.
+The interrupted run's Hosts and dependency containers were stopped with ownership
+verification; their data and logs were retained. A 156-second idle observation
+before stopping showed approximately flat private/cgroup memory, without a return
+to initial levels; it does not establish a long-term memory bound.
