@@ -84,7 +84,8 @@ public static class TypedGameModeConfiguration
                 value.FlagInjectionCommand,
                 value.FlagInjectionTimeoutSeconds ?? 30,
                 value.FlagInjectionServiceName),
-        FlagTemplate: value.HasFlagTemplate ? Flag(value.FlagTemplate) : null);
+        FlagTemplate: value.HasFlagTemplate ? Flag(value.FlagTemplate) : null,
+        FlagStores: value.FlagStores);
 
     public static AwdpConfiguration Awdp(AwdpCompetitionModeConfiguration value) => new(
         value.RoundDurationSeconds,

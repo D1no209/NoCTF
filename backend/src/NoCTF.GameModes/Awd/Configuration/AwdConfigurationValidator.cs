@@ -5,6 +5,7 @@ using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Application.Runtime.Configuration;
 using NoCTF.Application.Scoring;
 using NoCTF.Domain.Runtime;
+using NoCTF.Domain.Competitions.Awd;
 using NoCTF.GameModes.Flags;
 
 public static class AwdConfigurationValidator
@@ -66,9 +67,10 @@ public static class AwdConfigurationValidator
             "Checker"));
         if (configuration.Checker is { } checker)
             ValidateChecker(configuration.Runtime, checker, errors);
-        if (configuration.Runtime is not null && configuration.FlagInjection is null)
+        if (configuration.Runtime is not null && configuration.FlagInjection is null && configuration.FlagStores is not { Count: > 0 })
             errors.Add("FlagInjection is required when Runtime is configured.");
-        if (configuration.FlagInjection is { } injection)
+        ValidateStores(configuration, errors);
+        if (configuration.FlagInjection is { } injection && configuration.FlagStores is not { Count: > 0 })
         {
             if (string.IsNullOrWhiteSpace(injection.Command)
                 || !injection.Command.Contains("${FLAG}", StringComparison.Ordinal))
@@ -86,6 +88,36 @@ public static class AwdConfigurationValidator
                 errors.Add("FlagInjection.ServiceName must reference an existing service.");
         }
         return errors;
+    }
+
+    private static void ValidateStores(AwdChallengeConfiguration configuration, List<string> errors)
+    {
+        if (configuration.FlagStores is not { Count: > 0 } stores) return;
+        if (stores.Count > 64 || stores.Select(item => item.Id).Distinct().Count() != stores.Count
+            || stores.Select(item => item.Name).Distinct(StringComparer.Ordinal).Count() != stores.Count)
+            errors.Add("AWD requires at most 64 stores with unique ids and names.");
+        foreach (var store in stores)
+        {
+            if (store.Id == Guid.Empty || string.IsNullOrWhiteSpace(store.Name) || store.Name.Length > 64
+                || store.Name != store.Name.Trim() || !Enum.IsDefined(store.DeliveryMode)
+                || store.InjectionTimeoutSeconds is <= 0 or > AwdFlagInjectionExecutionBudget.MaximumCommandTimeoutSeconds)
+                errors.Add("AWD store identity, delivery mode or timeout is invalid.");
+            if (store.TargetServiceName is { Length: > 64 } || store.InjectionCommand is { Length: > 8192 })
+                errors.Add("AWD store service name or injection command exceeds its maximum length.");
+            if (store.DeliveryMode == AwdFlagDeliveryMode.BusinessChecker)
+            {
+                if (configuration.Checker is null) errors.Add("Business-checker flag delivery requires a Checker.");
+                if (!string.IsNullOrWhiteSpace(store.InjectionCommand)) errors.Add("Business-checker stores cannot configure an injection command.");
+            }
+            else if (store.DeliveryMode == AwdFlagDeliveryMode.RunnerCommand && configuration.Runtime is not null)
+            {
+                if (string.IsNullOrWhiteSpace(store.InjectionCommand) || !store.InjectionCommand.Contains("${FLAG}", StringComparison.Ordinal))
+                    errors.Add("AWD store injection commands must contain ${FLAG}.");
+                if (configuration.Runtime?.Definition is not ContainerRuntimeDefinition container
+                    || !container.Services.Any(service => service.Name == store.TargetServiceName))
+                    errors.Add("AWD store injection must reference an existing container service.");
+            }
+        }
     }
 
     private static void ValidateChecker(

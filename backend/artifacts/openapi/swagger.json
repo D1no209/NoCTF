@@ -29960,6 +29960,12 @@
           "flagInjection"
         ],
         "properties": {
+          "flagStores": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankAwdFlagStoreContract"
+            }
+          },
           "flagInjection": {
             "nullable": true,
             "oneOf": [
@@ -29969,6 +29975,49 @@
             ]
           }
         }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankAwdFlagStoreContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "deliveryMode": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankAwdFlagDeliveryModeProtocol"
+          },
+          "targetServiceName": {
+            "type": "string",
+            "nullable": true
+          },
+          "injectionCommand": {
+            "type": "string",
+            "nullable": true
+          },
+          "injectionTimeoutSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "preservesHistoricalFlags": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankAwdFlagDeliveryModeProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "RunnerCommand",
+          "BusinessChecker"
+        ],
+        "enum": [
+          "RunnerCommand",
+          "BusinessChecker"
+        ]
       },
       "NoCTFAPIEndpointsAdministrationChallengeBankFlagInjectionContract": {
         "type": "object",
@@ -44384,6 +44433,14 @@
           "serviceUnhealthyPenalty": {
             "type": "integer",
             "format": "int64"
+          },
+          "options": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdRuleOptionsContract"
+              }
+            ]
           }
         }
       },
@@ -44392,11 +44449,311 @@
         "description": "",
         "x-enumNames": [
           "FixedPerAttack",
-          "SplitVictimDefensePool"
+          "SplitVictimDefensePool",
+          "Scarcity",
+          "TargetRank"
         ],
         "enum": [
           "FixedPerAttack",
-          "SplitVictimDefensePool"
+          "SplitVictimDefensePool",
+          "Scarcity",
+          "TargetRank"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsAwdRuleOptionsContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "flagLifetimeUnit": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdLifetimeUnitProtocol"
+          },
+          "flagLifetime": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "linkHistoricalWindow": {
+            "type": "boolean"
+          },
+          "historicalLifetimeUnit": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdLifetimeUnitProtocol"
+          },
+          "historicalLifetime": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "generationPolicy": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdGenerationPolicyProtocol"
+          },
+          "generationInterval": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "flagsPerStore": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "roundGapSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalRounds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "submissionTailSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "finalCheckBudgetSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "retryCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "retryIntervalSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "callbackGraceSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "slaSettlement": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdSlaSettlementProtocol"
+          },
+          "preset": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdScoringPresetProtocol"
+          },
+          "defenseMode": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdDefenseModeProtocol"
+          },
+          "slaBasis": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdSlaBasisProtocol"
+          },
+          "okRatio": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "recoveringRatio": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "mumbleRatio": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "offlineRatio": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "penaltyMode": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdPenaltyModeProtocol"
+          },
+          "mumblePenalty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "offlinePenalty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "recoveringPenalty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "mumblePenaltyRatio": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "offlinePenaltyRatio": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "recoveringPenaltyRatio": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "consecutiveFailureMultiplier": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "maximumRoundPenalty": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "minimumTotalScore": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "confidentialityPoints": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "minimumAttackRatio": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "scarcityAlpha": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "maximumRankMultiplier": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "composition": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdScoreCompositionProtocol"
+          },
+          "attackWeight": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "defenseWeight": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "slaWeight": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "attackSettlement": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdAttackSettlementProtocol"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsAwdLifetimeUnitProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Rounds",
+          "ActiveSeconds"
+        ],
+        "enum": [
+          "Rounds",
+          "ActiveSeconds"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsAwdGenerationPolicyProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "EveryRound",
+          "EveryNRounds",
+          "ActiveInterval"
+        ],
+        "enum": [
+          "EveryRound",
+          "EveryNRounds",
+          "ActiveInterval"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsAwdSlaSettlementProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "FinalScheduledCheck",
+          "SampleAverage",
+          "TimeWeighted"
+        ],
+        "enum": [
+          "FinalScheduledCheck",
+          "SampleAverage",
+          "TimeWeighted"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsAwdScoringPresetProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Fixed",
+          "SharedPool",
+          "Scarcity",
+          "TargetRank",
+          "SlaMultiplier",
+          "Custom"
+        ],
+        "enum": [
+          "Fixed",
+          "SharedPool",
+          "Scarcity",
+          "TargetRank",
+          "SlaMultiplier",
+          "Custom"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsAwdDefenseModeProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "FirstLeak",
+          "PerCapture",
+          "SharedPool"
+        ],
+        "enum": [
+          "FirstLeak",
+          "PerCapture",
+          "SharedPool"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsAwdSlaBasisProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "StatusRatio",
+          "ReadableFlags"
+        ],
+        "enum": [
+          "StatusRatio",
+          "ReadableFlags"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsAwdPenaltyModeProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "SlaRewardOnly",
+          "Fixed",
+          "Proportional",
+          "Combined"
+        ],
+        "enum": [
+          "SlaRewardOnly",
+          "Fixed",
+          "Proportional",
+          "Combined"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsAwdScoreCompositionProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Additive",
+          "Weighted",
+          "PositiveSlaMultiplier"
+        ],
+        "enum": [
+          "Additive",
+          "Weighted",
+          "PositiveSlaMultiplier"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsAwdAttackSettlementProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Immediate",
+          "RoundEnd",
+          "FlagExpiry"
+        ],
+        "enum": [
+          "Immediate",
+          "RoundEnd",
+          "FlagExpiry"
         ]
       },
       "NoCTFAPIEndpointsAdministrationCompetitionsAwdpCompetitionModeConfigurationContract": {
@@ -46423,6 +46780,20 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
+          "overrides": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesAwdRuleOverridesContract"
+              }
+            ]
+          },
+          "storeRules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesAwdStoreRuleContract"
+            }
+          },
           "attackRewardMode": {
             "nullable": true,
             "oneOf": [
@@ -46463,6 +46834,227 @@
                 "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsFlagTemplateContract"
               }
             ]
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengesAwdRuleOverridesContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "flagLifetimeUnit": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdLifetimeUnitProtocol"
+              }
+            ]
+          },
+          "flagLifetime": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "linkHistoricalWindow": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "historicalLifetimeUnit": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdLifetimeUnitProtocol"
+              }
+            ]
+          },
+          "historicalLifetime": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "generationPolicy": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdGenerationPolicyProtocol"
+              }
+            ]
+          },
+          "generationInterval": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "flagsPerStore": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "finalCheckBudgetSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "retryCount": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "retryIntervalSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "callbackGraceSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "slaSettlement": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdSlaSettlementProtocol"
+              }
+            ]
+          },
+          "preset": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdScoringPresetProtocol"
+              }
+            ]
+          },
+          "defenseMode": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdDefenseModeProtocol"
+              }
+            ]
+          },
+          "slaBasis": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdSlaBasisProtocol"
+              }
+            ]
+          },
+          "okRatio": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true
+          },
+          "recoveringRatio": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true
+          },
+          "mumbleRatio": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true
+          },
+          "offlineRatio": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true
+          },
+          "penaltyMode": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdPenaltyModeProtocol"
+              }
+            ]
+          },
+          "mumblePenalty": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "offlinePenalty": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "recoveringPenalty": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "mumblePenaltyRatio": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true
+          },
+          "offlinePenaltyRatio": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true
+          },
+          "recoveringPenaltyRatio": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true
+          },
+          "consecutiveFailureMultiplier": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true
+          },
+          "maximumRoundPenalty": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "confidentialityPoints": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "minimumAttackRatio": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true
+          },
+          "scarcityAlpha": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true
+          },
+          "maximumRankMultiplier": {
+            "type": "number",
+            "format": "decimal",
+            "nullable": true
+          },
+          "attackSettlement": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdAttackSettlementProtocol"
+              }
+            ]
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengesAwdStoreRuleContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "storeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "weight": {
+            "type": "number",
+            "format": "decimal"
+          },
+          "flagsPerIssue": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
           }
         }
       },

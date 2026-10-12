@@ -32,7 +32,9 @@ public sealed record AwdConfiguration(
 public enum AttackRewardMode
 {
     FixedPerAttack,
-    SplitVictimDefensePool
+    SplitVictimDefensePool,
+    Scarcity,
+    TargetRank
 }
 
 public sealed class AttackRewardModeJsonConverter()
@@ -48,7 +50,8 @@ public sealed record AwdChallengeConfiguration(
     ChallengeRuntimeTemplate? Runtime = null,
     AwdCheckerConfiguration? Checker = null,
     AwdFlagInjectionConfiguration? FlagInjection = null,
-    PerTeamFlagTemplate? FlagTemplate = null)
+    PerTeamFlagTemplate? FlagTemplate = null,
+    IReadOnlyList<NoCTF.Domain.Competitions.Awd.AwdFlagStore>? FlagStores = null)
 ;
 
 public sealed record AwdCheckerConfiguration(

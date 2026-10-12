@@ -65,6 +65,16 @@ public sealed class CompetitionConfigurationStore(
             || tracked.ModeConfiguration.GetType() != configuration.GetType())
             throw new InvalidOperationException("Competition configuration type does not match its mode.");
         configuration.CompetitionId = competitionId;
+        if (tracked.ModeConfiguration is AwdCompetitionModeConfiguration existingAwd
+            && configuration is AwdCompetitionModeConfiguration requestedAwd
+            && status is CompetitionStatus.Running or CompetitionStatus.Paused or CompetitionStatus.Finished)
+        {
+            var latestRound = await db.AwdRounds.Where(round => round.CompetitionId == competitionId)
+                .MaxAsync(round => (int?)round.Number, ct) ?? 0;
+            if (requestedAwd.HardeningDurationSeconds != existingAwd.HardeningDurationSeconds
+                || requestedAwd.AwdOptions.TotalRounds is { } total && total < latestRound)
+                return new(null, CompetitionConfigurationUpdateFailure.ConfigurationLocked);
+        }
         if (tracked.ModeConfiguration is LiveSoloCompetitionModeConfiguration existingLive
             && configuration is LiveSoloCompetitionModeConfiguration nextLive && existingLive.BracketFormat != nextLive.BracketFormat
             && await db.LiveSoloMatches.AnyAsync(x => x.CompetitionId == competitionId, ct))
@@ -78,6 +88,9 @@ public sealed class CompetitionConfigurationStore(
             && !beforeCtf.BloodRewards.OrderBy(item => item.Position).Select(item => (item.Policy, item.Value))
                 .SequenceEqual(afterCtf.BloodRewards.OrderBy(item => item.Position).Select(item => (item.Policy, item.Value)));
         db.Entry(tracked.ModeConfiguration).CurrentValues.SetValues(configuration);
+        if (tracked.ModeConfiguration is AwdCompetitionModeConfiguration currentAwd
+            && configuration is AwdCompetitionModeConfiguration nextAwd)
+            currentAwd.AwdOptions = nextAwd.AwdOptions with { };
         db.ChangeTracker.DetectChanges();
         if (db.Entry(tracked.ModeConfiguration).State == EntityState.Unchanged && !bloodChanged && !stagesChanged)
         {

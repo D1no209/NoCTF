@@ -7,6 +7,12 @@ using NoCTF.Domain.Competitions.Awd;
 using NoCTF.Domain.Identity;
 using NoCTF.Infrastructure.Persistence;
 using Testcontainers.PostgreSql;
+using NoCTF.Infrastructure.Competitions.Configuration;
+using NoCTF.Infrastructure.Challenges.Configuration;
+using NoCTF.Application.Competitions.Events;
+using NoCTF.Infrastructure.Messaging;
+using NoCTF.API.Endpoints.Administration.Competitions;
+using NoCTF.API.Endpoints.Administration.Challenges;
 
 namespace NoCTF.Tests.Integration.Persistence;
 
@@ -91,6 +97,42 @@ public sealed class AwdRuleFoundationPersistenceTests
             await Assert.That(loaded.Stores.Single().FlagsPerIssue).IsEqualTo(2);
             var loadedChallenge = await db.CompetitionChallenges.AsSplitQuery().SingleAsync(ct);
             await Assert.That(((AwdCompetitionChallengeRules)loadedChallenge.Rules!).AwdOverrides.MumbleRatio).IsEqualTo(0m);
+            var modeStore = new CompetitionConfigurationStore(db, new NoOpPostCommitMessagePublisher(), NullCompetitionEventRecorder.Instance);
+            var requested = (AwdCompetitionModeConfiguration)CompetitionModeConfigurationDefaults.Create(GameMode.Awd, awd.Id);
+            requested.AwdOptions = new() { Preset = AwdScoringPreset.Custom, FlagLifetime = 9,
+                RecoveringRatio = .125m, MumblePenalty = 0, RetryCount = 0, Composition = AwdScoreComposition.Weighted,
+                AttackWeight = .75m, TotalRounds = 123, SubmissionTailSeconds = 45 };
+            var contract = CompetitionModeConfigurationContractMapper.FromDomain(requested);
+            var saved = await modeStore.TryUpdateAsync(awd.Id,
+                CompetitionModeConfigurationContractMapper.ToDomain(awd.Id, GameMode.Awd, contract), true, now.AddSeconds(1), ct);
+            await Assert.That(saved.Failure).IsNull();
+            db.ChangeTracker.Clear();
+            var reloaded = await modeStore.FindAsync(awd.Id, ct);
+            await Assert.That(((AwdCompetitionModeConfiguration)reloaded!.Configuration).AwdOptions).IsEqualTo(requested.AwdOptions);
+            var challengeStore = new ChallengeConfigurationStore(db, new NoOpPostCommitMessagePublisher(), NullCompetitionEventRecorder.Instance);
+            var requestedRules = new AwdCompetitionChallengeRules
+            {
+                AwdOverrides = new() { RecoveringRatio = 0m, RetryCount = 0, AttackSettlement = AwdAttackSettlement.RoundEnd },
+                StoreRules = [new() { StoreId = storeId, Weight = .25m, FlagsPerIssue = 3 }]
+            };
+            var ruleContract = CompetitionChallengeRulesContractMapper.FromDomain(requestedRules);
+            var savedRules = await challengeStore.TryUpdateAsync(awd.Id, challenge.Id,
+                CompetitionChallengeRulesContractMapper.ToDomain(challenge.Id, GameMode.Awd, ruleContract), now.AddSeconds(2), ct);
+            await Assert.That(savedRules.Failure).IsNull();
+            db.ChangeTracker.Clear();
+            var reloadedRules = (AwdCompetitionChallengeRules)(await challengeStore.FindAsync(awd.Id, challenge.Id, ct))!.Rules;
+            await Assert.That(reloadedRules.AwdOverrides.RecoveringRatio).IsEqualTo(0m);
+            await Assert.That(reloadedRules.AwdOverrides.FlagLifetime).IsNull();
+            await Assert.That(reloadedRules.StoreRules.Single().FlagsPerIssue).IsEqualTo(3);
+            await Assert.That(reloadedRules.StoreRules.Single().Weight).IsEqualTo(.25m);
+            var removedRules = await challengeStore.TryUpdateAsync(awd.Id, challenge.Id,
+                new AwdCompetitionChallengeRules(), now.AddSeconds(3), ct);
+            await Assert.That(removedRules.Failure).IsNull();
+            db.ChangeTracker.Clear();
+            await Assert.That(((AwdCompetitionChallengeRules)(await challengeStore.FindAsync(awd.Id, challenge.Id, ct))!.Rules).StoreRules.Count).IsEqualTo(0);
+            loaded = await db.AwdRoundRules.AsSplitQuery().SingleAsync(ct);
+            await Assert.That(loaded.Options.RecoveringRatio).IsEqualTo(.75m);
+            await Assert.That(loaded.Stores.Single().Weight).IsEqualTo(3.25m);
             await using var duplicate = new NoCtfDbContext(options);
             duplicate.AwdRounds.Add(new()
             {
