@@ -35,7 +35,8 @@ public sealed partial class InternalResultStore
             return InternalResultDisposition.NotFound;
         if (details.RuntimeId != result.RuntimeInstanceId || details.AttemptId != result.AttemptId)
             return InternalResultDisposition.Superseded;
-        if (details.ReceivedAt is not null || details.Execution == AwdCheckExecution.Completed)
+        if (details.ReceivedAt is not null || details.Execution == AwdCheckExecution.Completed
+            || details.Settlement is AwdSettlementState.Final or AwdSettlementState.Exempted)
             return InternalResultDisposition.Duplicate;
         if (details.Execution is not (AwdCheckExecution.Running or AwdCheckExecution.FailedToDetermine) || details.AttemptStartedAt is not { } started
             || details.AttemptDeadline is not { } deadline || details.ReceiptDeadline is not { } receiptDeadline)
@@ -51,6 +52,7 @@ public sealed partial class InternalResultStore
         var expected = details.Flags.Select(flag => new AwdExpectedFlag(flag.FlagId, flag.Historical,
             flag.Obligation, flag.RequiresWrite)).ToArray();
         var validated = AwdHealthEvaluator.ValidateManifest(result.Connection, result.Functionality, expected, result.Flags);
+        details.EvidenceComplete = validated.Evidence is not null;
         var conclusion = validated.Conclusion;
         if (validated.Evidence is not null)
         {

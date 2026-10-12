@@ -91,6 +91,14 @@ public sealed class CompetitionEventStore(
         entity.IncludesProtectedFlags = draft.IncludesProtectedFlags;
         entity.FrozenStartAt = draft.FrozenStartAt;
         entity.HiddenStartAt = draft.HiddenStartAt;
+        if (draft.AwdAdjudication is { } adjudication)
+        {
+            entity.AwdAdjudicationAction = adjudication.Action;
+            entity.PreviousAwdHealth = adjudication.PreviousHealth;
+            entity.AwdHealth = adjudication.Health;
+            entity.PreviousAwdSettlement = adjudication.PreviousSettlement;
+            entity.AwdSettlement = adjudication.Settlement;
+        }
         if (draft.TrafficCapture is { } traffic)
         {
             entity.TrafficSegmentId = traffic.SegmentId;

@@ -1,4 +1,6 @@
 {
+  "administration.label.adjustmentReason": "Adjustment reason",
+  "administration.description.awdAdjustmentReason": "Required for AWD. This reason is retained in the staff audit log.",
   "administration.platformLogs.newLogs": "{count} new logs · View latest",
   "challengeLibrary.filterDirection": "Filter by direction",
   "announcements.title": "Notifications",

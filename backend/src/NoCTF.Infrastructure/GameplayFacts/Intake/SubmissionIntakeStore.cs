@@ -318,9 +318,12 @@ public sealed class GameplayFactIntakeStore(
         var mode = await db.Competitions.AsNoTracking().Where(x => x.Id == received.CompetitionId).Select(x => (NoCTF.Domain.Competitions.GameMode?)x.Mode).SingleOrDefaultAsync(cancellationToken);
         if (mode is not null && !NoCTF.Application.Competitions.Modes.CompetitionModeCapabilities.For(mode.Value).ManualScoreAdjustment)
             return new(GameplayFactAcceptanceState.UnsupportedMode);
+        if (mode is not null && !CreateManualAdjustment.IsReasonValid(mode.Value, received.Reason))
+            return new(GameplayFactAcceptanceState.AdmissionRejected,
+                FailureCode: GameplayFactAdmissionFailureCode.ManualAdjustmentReasonInvalid);
         var previous = replay is null ? null : await replay.FindAsync<GameplayFactAcceptanceResult>(
             new(received.UserId, ReplayOperation.ManualAdjustment, received.CompetitionId, received.CompetitionChallengeId),
-            new ManualAdjustmentReplayFingerprint(received.TeamId, received.Delta), cancellationToken);
+            new ManualAdjustmentReplayFingerprint(received.TeamId, received.Delta, received.Reason), cancellationToken);
         if (previous is not null) return previous;
         var valid = await db.CompetitionChallenges.AnyAsync(item =>
             item.Id == received.CompetitionChallengeId
@@ -357,7 +360,7 @@ public sealed class GameplayFactIntakeStore(
             GameplayFactId: entity.Id,
             GameplayFactKind: entity.Kind,
             GameplayFactState: entity.State,
-            GameplayFactResult: entity.Result), cancellationToken);
+            GameplayFactResult: entity.Result, Reason: received.Reason), cancellationToken);
         replay?.Store(new GameplayFactAcceptanceResult(GameplayFactAcceptanceState.Created, entity.Id, entity.OccurredAt));
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);

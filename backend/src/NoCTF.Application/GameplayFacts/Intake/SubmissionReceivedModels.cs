@@ -33,4 +33,5 @@ public sealed record ManualAdjustmentGameplayFactReceived(
     Guid CompetitionChallengeId,
     Guid UserId,
     int Delta,
-    DateTimeOffset OccurredAt);
+    DateTimeOffset OccurredAt,
+    string? Reason = null);

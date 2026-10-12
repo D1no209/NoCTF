@@ -27,7 +27,8 @@ public sealed record RuntimeReplayFingerprint(RuntimeAction Action, TimeSpan? Ex
 public sealed record ScopedRuntimeReplayFingerprint(RuntimeAction Action, Guid TeamId, Guid? ExpectedRuntimeInstanceId) : ReplayFingerprintInput;
 public sealed record FlagReplayFingerprint(IReadOnlyList<string> Flags)
     : ReplayFingerprintInput;
-public sealed record ManualAdjustmentReplayFingerprint(Guid TeamId, int Delta)
+public sealed record ManualAdjustmentReplayFingerprint(Guid TeamId, int Delta,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Reason = null)
     : ReplayFingerprintInput;
 public sealed record AdminRuntimeReplayFingerprint(
     [property: JsonPropertyName("teamId")] Guid? TeamId,

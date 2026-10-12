@@ -1,4 +1,8 @@
 {
+  "api.awd.manualAdjustmentReasonInvalid": "AWD 人工加减分必须填写不超过 512 字的审计理由。",
+  "api.awd.adjudicationConflict": "检测证据已变更或已完成裁定，请重新读取。",
+  "api.awd.adjudicationInvalidEvidence": "本次检测缺少原执行窗口内的完整可信证据，不能确认结果。",
+  "api.awd.adjudicationInvalidRequest": "请选择裁定操作，并填写不超过 512 字的理由。",
   "api.awd.flagInvalid": "Flag 格式无效。",
   "api.awd.flagUnknown": "该 Flag 不属于本题的正式发行。",
   "api.awd.flagRevoked": "该 Flag 已撤销。",

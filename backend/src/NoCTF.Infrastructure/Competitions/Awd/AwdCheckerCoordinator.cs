@@ -126,6 +126,7 @@ public sealed class AwdCheckerCoordinator(NoCtfDbContext db, IPostCommitMessageP
                 details.AttemptStartedAt = null;
                 details.AttemptDeadline = null;
                 details.ReceivedAt = null;
+                details.EvidenceComplete = false;
             }
             if (details.Execution != AwdCheckExecution.Pending || now >= details.Deadline) continue;
             var runtime = await db.RuntimeInstances.SingleOrDefaultAsync(instance => instance.CompetitionChallengeId == fact.CompetitionChallengeId

@@ -157,6 +157,11 @@ public abstract class CompetitionEvent
     public long? TrafficRuntimeToClientBytes { get; set; }
     public long? TrafficCapturedBytes { get; set; }
     public bool? TrafficTruncated { get; set; }
+    public Awd.AwdCheckAdjudicationAction? AwdAdjudicationAction { get; set; }
+    public Awd.AwdHealth? PreviousAwdHealth { get; set; }
+    public Awd.AwdHealth? AwdHealth { get; set; }
+    public Awd.AwdSettlementState? PreviousAwdSettlement { get; set; }
+    public Awd.AwdSettlementState? AwdSettlement { get; set; }
 }
 
 public sealed class CompetitionEventTrackKey

@@ -52,7 +52,8 @@ internal static class AwdScoreProjectionReader
         {
             var evidence = fact.Awd!;
             // A historical freeze must not expose evidence observed or received after its cutoff.
-            if (evidence.ReceivedAt > projectedAt || evidence.ObservedAt > projectedAt)
+            if (evidence.ReceivedAt > projectedAt || evidence.ObservedAt > projectedAt
+                || evidence.AdjudicatedAt > projectedAt)
                 evidence = new AwdFactDetails { RulesId = evidence.RulesId, SampleActiveTicks = evidence.SampleActiveTicks,
                     FinalScheduledCheck = evidence.FinalScheduledCheck, Settlement = AwdSettlementState.Provisional };
             return new AwdScoringCheck(fact.TeamId!.Value, fact.CompetitionChallengeId, fact.ReferenceId!.Value,

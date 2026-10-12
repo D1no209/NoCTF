@@ -151,6 +151,10 @@ public sealed partial class AwdRoundCoordinationTests
             await Dispatch();
             var late = outbox.RunnerNodeMessages.OfType<RunAwdChecker>().Last();
             var lateDetails = await Claim(late);
+            clock.UtcNow = fixture.Now.AddSeconds(90);
+            await Dispatch();
+            var exemptCandidate = outbox.RunnerNodeMessages.OfType<RunAwdChecker>().Last();
+            var exemptDetails = await Claim(exemptCandidate);
             clock.UtcNow = fixture.Now.AddSeconds(121);
             await Dispatch();
             await Assert.That(await Record(Pass(late, lateDetails, fixture.Now.AddSeconds(65), clock.UtcNow)))
@@ -240,6 +244,10 @@ public sealed partial class AwdRoundCoordinationTests
             await Assert.That(missingTarget.Awd!.Reason).IsEqualTo(AwdCheckReason.TaskNotExecuted);
             await Assert.That(missingTarget.Awd.Settlement).IsEqualTo(AwdSettlementState.PendingAdjudication);
             await Assert.That(missingTarget.Result).IsNull();
+            await VerifyAdjudicationsAsync(options, fixture, late.GameplayFactId, exemptCandidate.GameplayFactId,
+                missingTarget.Id, clock.UtcNow, ct);
+            await Assert.That(await Record(Pass(exemptCandidate, exemptDetails, fixture.Now.AddSeconds(95), clock.UtcNow)))
+                .IsEqualTo(InternalResultDisposition.Duplicate);
         });
     }
 }

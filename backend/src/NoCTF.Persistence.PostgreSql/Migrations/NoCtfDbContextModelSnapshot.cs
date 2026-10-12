@@ -1297,6 +1297,10 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("gameplay_fact_id");
 
+                    b.Property<long?>("AdjudicatedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("adjudicated_at");
+
                     b.Property<short?>("AttackOutcome")
                         .HasColumnType("smallint")
                         .HasColumnName("attack_outcome");
@@ -1328,6 +1332,10 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Property<long?>("Deadline")
                         .HasColumnType("bigint")
                         .HasColumnName("deadline");
+
+                    b.Property<bool>("EvidenceComplete")
+                        .HasColumnType("boolean")
+                        .HasColumnName("evidence_complete");
 
                     b.Property<short>("Execution")
                         .HasColumnType("smallint")
@@ -2377,6 +2385,18 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("automatic");
 
+                    b.Property<short?>("AwdAdjudicationAction")
+                        .HasColumnType("smallint")
+                        .HasColumnName("awd_adjudication_action");
+
+                    b.Property<short?>("AwdHealth")
+                        .HasColumnType("smallint")
+                        .HasColumnName("awd_health");
+
+                    b.Property<short?>("AwdSettlement")
+                        .HasColumnType("smallint")
+                        .HasColumnName("awd_settlement");
+
                     b.Property<short?>("AwdpFixOutcome")
                         .HasColumnType("smallint")
                         .HasColumnName("awdp_fix_outcome");
@@ -2469,6 +2489,14 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Property<Guid?>("PatchUploadId")
                         .HasColumnType("uuid")
                         .HasColumnName("patch_upload_id");
+
+                    b.Property<short?>("PreviousAwdHealth")
+                        .HasColumnType("smallint")
+                        .HasColumnName("previous_awd_health");
+
+                    b.Property<short?>("PreviousAwdSettlement")
+                        .HasColumnType("smallint")
+                        .HasColumnName("previous_awd_settlement");
 
                     b.Property<short?>("PreviousCompetitionAccessMode")
                         .HasColumnType("smallint")

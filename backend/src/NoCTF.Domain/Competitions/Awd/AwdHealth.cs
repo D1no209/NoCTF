@@ -14,6 +14,7 @@ public enum AwdCheckExecution : short { Pending, Running, Completed, FailedToDet
 public enum AwdSettlementState : short { Provisional, Final, PendingAdjudication, Exempted }
 public enum AwdProbeOutcome : short { Unknown, Passed, TargetFailure, PlatformFailure, NotRequired }
 public enum AwdFlagObligation : short { PlatformPending, PlayerRequired, Exempted }
+public enum AwdCheckAdjudicationAction : short { AcceptEvidence, Exempt }
 
 public enum AwdCheckReason : short
 {

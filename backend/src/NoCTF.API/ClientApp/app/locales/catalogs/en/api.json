@@ -1,4 +1,8 @@
 {
+  "api.awd.manualAdjustmentReasonInvalid": "AWD manual score adjustments require an audit reason of up to 512 characters.",
+  "api.awd.adjudicationConflict": "The check changed or is no longer pending adjudication. Reload its evidence.",
+  "api.awd.adjudicationInvalidEvidence": "This check lacks complete, trustworthy evidence within the original execution window. It cannot be confirmed.",
+  "api.awd.adjudicationInvalidRequest": "Select an adjudication action and provide a reason of up to 512 characters.",
   "api.awd.flagInvalid": "Flag format is invalid.",
   "api.awd.flagUnknown": "This Flag has not been issued for this challenge.",
   "api.awd.flagRevoked": "This Flag has been revoked.",

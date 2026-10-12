@@ -1,4 +1,6 @@
 {
+  "administration.label.adjustmentReason": "调整理由",
+  "administration.description.awdAdjustmentReason": "AWD 必填，理由将保留在工作人员审计日志中。",
   "administration.platformLogs.newLogs": "{count} 条新日志 · 查看最新",
   "challengeLibrary.filterDirection": "按方向筛选",
   "announcements.title": "通知",

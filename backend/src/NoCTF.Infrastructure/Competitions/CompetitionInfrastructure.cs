@@ -57,6 +57,8 @@ internal static class CompetitionInfrastructure
         services.AddScoped<IAwdRoundCoordinator, AwdRoundCoordinator>();
         services.AddScoped<IAwdCheckerCoordinator, AwdCheckerCoordinator>();
         services.AddScoped<IAwdCheckerTaskReader, AwdCheckerTaskReader>();
+        services.AddScoped<IAwdCheckAdjudicationStore, AwdCheckAdjudicationStore>();
+        services.AddScoped<AdjudicateAwdCheck>();
         services.AddScoped<IAwdRuntimeProvisioner, AwdRuntimeProvisioner>();
         services.AddScoped<IKohRuntimeProvisioner, KohRuntimeProvisioner>();
         services.AddScoped<IKohChallengeAccessReader, KohChallengeAccessReader>();

@@ -179,7 +179,8 @@ public enum GameplayFactAdmissionFailureCodeProtocol
     ChallengeSubmissionClosed,
     AwdHardeningActive,
     AwdRoundGap,
-    AwdRoundUnavailable
+    AwdRoundUnavailable,
+    ManualAdjustmentReasonInvalid
 }
 
 public sealed record GameplayFactAdmissionFailureResponse(

@@ -1,5 +1,5 @@
-using System.Globalization;
 using NoCTF.Application.Common;
+using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.Application.GameplayFacts.Intake;
@@ -10,10 +10,14 @@ public sealed record ManualAdjustmentCommand(
     Guid CompetitionChallengeId,
     int Delta,
     Guid UserId,
-    DateTimeOffset OccurredAt);
+    DateTimeOffset OccurredAt,
+    string? Reason = null);
 
 public sealed class CreateManualAdjustment(IGameplayFactIntakeStore store)
 {
+    public static bool IsReasonValid(GameMode mode, string? reason) => reason?.Length is not > 512
+        && (mode != GameMode.Awd || !string.IsNullOrWhiteSpace(reason));
+
     public async Task<OperationResult<GameplayFactAccepted, GameplayFactAdmissionFailureCode>> ExecuteAsync(
         ManualAdjustmentCommand command,
         CancellationToken ct = default)
@@ -25,12 +29,13 @@ public sealed class CreateManualAdjustment(IGameplayFactIntakeStore store)
         var result = await store.TryAcceptManualAdjustmentAsync(
             new(gameplayFactId, command.CompetitionId, command.TeamId,
                 command.CompetitionChallengeId, command.UserId, command.Delta,
-                command.OccurredAt), ct);
+                command.OccurredAt, command.Reason?.Trim()), ct);
         return result.State == GameplayFactAcceptanceState.Created
             ? OperationResult<GameplayFactAccepted, GameplayFactAdmissionFailureCode>.Success(
                 new(result.GameplayFactId!.Value, result.OccurredAt!.Value))
             : OperationResult<GameplayFactAccepted, GameplayFactAdmissionFailureCode>.Failure(
-                result.State == GameplayFactAcceptanceState.UnsupportedMode ? GameplayFactAdmissionFailureCode.GameplayFactKindUnsupported : GameplayFactAdmissionFailureCode.GameplayFactScopeNotFound,
+                result.FailureCode ?? (result.State == GameplayFactAcceptanceState.UnsupportedMode
+                    ? GameplayFactAdmissionFailureCode.GameplayFactKindUnsupported : GameplayFactAdmissionFailureCode.GameplayFactScopeNotFound),
                 "The team or competition challenge was not found.");
     }
 }

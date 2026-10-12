@@ -482,16 +482,21 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
   const adjustmentTarget = ref<ChallengeTeamScoringRow | null>(null)
 
   const adjustmentDelta = ref(0)
+  const adjustmentReason = ref('')
+  const adjustmentReasonRequired = computed(() => competition.value?.mode === 'Awd')
 
   const adjustmentPending = ref(false)
 
   const adjustmentError = ref<UiMessage | null>(null)
 
-  const adjustmentValid = computed(() => Number.isInteger(adjustmentDelta.value) && adjustmentDelta.value !== 0)
+  const adjustmentValid = computed(() => Number.isInteger(adjustmentDelta.value) && adjustmentDelta.value !== 0
+    && (!adjustmentReasonRequired.value || adjustmentReason.value.trim().length > 0)
+    && adjustmentReason.value.length <= 512)
 
   function openAdjustment(row: ChallengeTeamScoringRow): void {
     adjustmentTarget.value = row
     adjustmentDelta.value = 0
+    adjustmentReason.value = ''
     adjustmentError.value = null
   }
 
@@ -507,7 +512,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
     try {
       const { error } = await adminCreateManualAdjustment({
         path: { competitionId },
-        body: { teamId, competitionChallengeId: ccId, delta: adjustmentDelta.value },
+        body: { teamId, competitionChallengeId: ccId, delta: adjustmentDelta.value, reason: adjustmentReason.value.trim() || undefined },
       })
       if (error) throw error
       toast.success(describeMessage("administration.label.challengeScoringCorrected"))
@@ -592,6 +597,8 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
       scoringRows,
       adjustmentTarget,
       adjustmentDelta,
+      adjustmentReason,
+      adjustmentReasonRequired,
       adjustmentPending,
       adjustmentError,
       adjustmentValid,

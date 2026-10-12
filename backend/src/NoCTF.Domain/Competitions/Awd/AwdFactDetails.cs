@@ -39,6 +39,8 @@ public sealed class AwdFactDetails
     public long? SampleActiveTicks { get; set; }
     public long? SampleDeadlineActiveTicks { get; set; }
     public bool ManifestComplete { get; set; }
+    public bool EvidenceComplete { get; set; }
+    public DateTimeOffset? AdjudicatedAt { get; set; }
     public int RequiredFlags { get; set; }
     public int ReadableFlags { get; set; }
     public List<AwdFactFlagEvidence> Flags { get; set; } = [];

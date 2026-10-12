@@ -29,7 +29,8 @@ public enum GameplayFactAdmissionFailureCode
     ChallengeSubmissionClosed,
     AwdHardeningActive,
     AwdRoundGap,
-    AwdRoundUnavailable
+    AwdRoundUnavailable,
+    ManualAdjustmentReasonInvalid
 }
 
 /// <summary>Applies transport-independent admission rules using the trusted receive time.</summary>

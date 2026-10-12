@@ -17,7 +17,7 @@ import { useOffsetPagination } from '../../../../../composables/useOffsetPaginat
 /** Owns state, effects and commands for AdminCompetitionsByIdTeamsPage. */
 export function useAdminCompetitionsByIdTeamsPage(options: { appealsOnly?: boolean } = {}) {
   const appealsOnly = options.appealsOnly === true
-  const { competitionId, canJudge, canWrite } = useCompetitionAdmin()
+  const { competitionId, competition, canJudge, canWrite } = useCompetitionAdmin()
 
   const route = useRoute()
 
@@ -140,6 +140,8 @@ export function useAdminCompetitionsByIdTeamsPage(options: { appealsOnly?: boole
   const scoreAdjustmentChallengeId = ref('')
 
   const scoreAdjustmentDelta = ref(0)
+  const scoreAdjustmentReason = ref('')
+  const scoreAdjustmentReasonRequired = computed(() => competition.value?.mode === 'Awd')
 
   const scoreAdjustmentLoading = ref(false)
 
@@ -151,7 +153,9 @@ export function useAdminCompetitionsByIdTeamsPage(options: { appealsOnly?: boole
     Boolean(scoreAdjustmentTeam.value?.id)
     && Boolean(scoreAdjustmentChallengeId.value)
     && Number.isInteger(scoreAdjustmentDelta.value)
-    && scoreAdjustmentDelta.value !== 0,
+    && scoreAdjustmentDelta.value !== 0
+    && (!scoreAdjustmentReasonRequired.value || scoreAdjustmentReason.value.trim().length > 0)
+    && scoreAdjustmentReason.value.length <= 512,
   )
 
   async function openScoreAdjustment(team: NoCtfapiEndpointsTeamsTeamResponse): Promise<void> {
@@ -160,6 +164,7 @@ export function useAdminCompetitionsByIdTeamsPage(options: { appealsOnly?: boole
     scoreAdjustmentChallenges.value = []
     scoreAdjustmentChallengeId.value = ''
     scoreAdjustmentDelta.value = 0
+    scoreAdjustmentReason.value = ''
     scoreAdjustmentError.value = null
     scoreAdjustmentLoading.value = true
     try {
@@ -198,6 +203,7 @@ export function useAdminCompetitionsByIdTeamsPage(options: { appealsOnly?: boole
           teamId,
           competitionChallengeId: scoreAdjustmentChallengeId.value,
           delta: scoreAdjustmentDelta.value,
+          reason: scoreAdjustmentReason.value.trim() || undefined,
         },
       })
       if (requestError) throw requestError
@@ -477,6 +483,8 @@ export function useAdminCompetitionsByIdTeamsPage(options: { appealsOnly?: boole
       scoreAdjustmentChallenges,
       scoreAdjustmentChallengeId,
       scoreAdjustmentDelta,
+      scoreAdjustmentReason,
+      scoreAdjustmentReasonRequired,
       scoreAdjustmentLoading,
       scoreAdjustmentPending,
       scoreAdjustmentError,
