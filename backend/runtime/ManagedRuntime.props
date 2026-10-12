@@ -1,0 +1,10 @@
+<Project>
+  <!-- Official remains the default until both platform acceptance gates pass. -->
+  <PropertyGroup>
+    <NoCtfRuntimeFlavor Condition="'$(NoCtfRuntimeFlavor)' == ''">Official</NoCtfRuntimeFlavor>
+    <NoCtfManagedRuntimeVersion>10.0.12</NoCtfManagedRuntimeVersion>
+    <NoCtfAspNetCoreRuntimeVersion>10.0.12</NoCtfAspNetCoreRuntimeVersion>
+    <NoCtfRuntimePython Condition="'$(NoCtfRuntimePython)' == '' and $([MSBuild]::IsOSPlatform('Windows'))">python</NoCtfRuntimePython>
+    <NoCtfRuntimePython Condition="'$(NoCtfRuntimePython)' == ''">python3</NoCtfRuntimePython>
+  </PropertyGroup>
+</Project>

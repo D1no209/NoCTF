@@ -1,0 +1,22 @@
+{
+  "format": 1,
+  "applicationSdk": "10.0.401",
+  "officialRuntime": "10.0.12",
+  "aspNetCoreRuntime": "10.0.12",
+  "defaultFlavor": "Official",
+  "source": {
+    "repository": "https://github.com/VSadov/Satori.git",
+    "commit": "07c917bdeea06c8eecd1a65a28e171c72713cdfb",
+    "productVersion": "10.0.12",
+    "upstreamRepository": "https://github.com/dotnet/runtime.git",
+    "upstreamTag": "v10.0.12",
+    "upstreamCommit": "4271d88e0aebf3d04f188f1334c2220d80555ef6"
+  },
+  "runtimeIdentifiers": ["linux-x64", "win-x64"],
+  "buildSubsets": "clr+libs+packs+host",
+  "configuration": "Release",
+  "linuxBuildImage": "mcr.microsoft.com/dotnet-buildtools/prereqs:ubuntu-22.04@sha256:542995bf2df5bd153444df2c82431b59fe9394446d6fc75235d184095013c993",
+  "sdkImage": "mcr.microsoft.com/dotnet/sdk:10.0.401@sha256:e70cdb7f80b0348f5cb85f19a8f670fca061f033d57eed12fa003d58b0e06317",
+  "runtimeDepsImage": "mcr.microsoft.com/dotnet/runtime-deps:10.0.12-noble@sha256:12dd273c196e92aa91542749b8df0996f497f812811abba9e6613b484f681dd0",
+  "minimumSoakSeconds": 86400
+}
