@@ -321,3 +321,65 @@ original October 12 11:09 UTC start. The old paired controller will stop with
 `duration-incomplete` because its Linux child failed; the separate replacement
 must be evaluated alongside the continuing Windows result before comparisons
 can start. Hourly follow-up has been updated to monitor both locations.
+
+## Root-cause investigation without interrupting Windows acceptance
+
+Read-only investigation on October 13 Taipei time collected bounded EventPipe
+counters and a VirtualQueryEx region inventory; no dump, forced GC, manual Host
+restart or business change was used. The Windows supervisor performed its already
+scheduled six-hour restart at cycle 92. The replacement Host (PID 20520 at this
+checkpoint) passed Runtime cycle 100092 and score verification without resetting
+the database. The supervisor's original ownership PID is consequently stale.
+
+Before that planned restart, a 60-second sample recorded median GC committed
+memory of 3,746,660,352 bytes (about 3.49 GiB). A separate 45-second legacy counter
+sample reported about 2,105 decimal MB of heap occupancy. The pinned fork maps
+these to `m_heap->GetBytesCommitted()` and recycler generation occupancy totals;
+they must not be confused with the unsupported fragmentation/generation-size
+diagnostics, nor with a precise retained-object graph. The native region scan
+reported 3,844,472,832 committed private-region bytes versus 3,866,603,520 OS private
+bytes, consistent with GC commitment being a major contributor. Reserved virtual
+address space is excluded from these totals.
+
+Several minutes after the planned restart, with the same database, the bounded
+sample reported 301,367,296 committed GC bytes (about 287 MiB) and approximately
+147 decimal MB occupancy. Assembly count stayed at 293. The sampled EF workload
+had 3,067 compiled-query cache hits, zero misses, and 8–13 active DbContexts;
+this short window does not rule out other retention paths. Compare these across
+equivalent workload phases before attributing a leak. Counter files are
+`diagnostics/windows-{memory-investigation-6h,occupancy-investigation-6h,post-restart-meters,post-restart-occupancy}.csv`;
+region inventory is `windows-memory-regions-6h.json`, and aggregate receipts are
+in `root-cause-investigation-summary.json`. A rejected mixed-provider counter
+invocation produced no measurements and is superseded by the separate captures.
+
+Normal-load `TransactionBusy` has a concrete database path: logs contain PostgreSQL
+SQLSTATE `40001`, and `RequestSafetyExceptionHandler` maps retryable transaction
+failures to this HTTP 503 response. Request admission uses serializable EF
+transactions with three bounded retries before returning `DependencyUnavailable`.
+A read-only snapshot found all 32,969 gameplay facts in Completed state, not a
+pending-fact backlog at that instant. Steady leaderboard P95 in cycle 91 was
+approximately 2,427 ms; after the planned restart cycle 93 was approximately
+2,599 ms despite the much smaller heap. This is a diagnostic observation, not a
+controlled causal comparison. The bounded scoreboard reader does not materialize
+the entire raw fact history; database query cost and contention remain candidates.
+
+For Node, the original controller had no NODE_OPTIONS, OPENSSL_CONF, or related
+Node overrides. Installed Node is 24.11.0 with libuv 1.51.0. Scoped Application,
+resource-exhaustion, Code Integrity and Defender event queries found no matching
+failure record; Sysmon is unavailable. Upstream reports
+[a Windows TCP-connect silent crash](https://github.com/nodejs/node/issues/63620)
+in this broad version range and
+[a different long-lived child-process case](https://github.com/nodejs/node/issues/62125).
+These are leads, not confirmation: our failure returned code 1 in under one second,
+has no dump, and the workload did not launch child processes. Do not claim the
+upstream bug is our root cause or replace the machine's Node installation mid-run.
+After ongoing measurements finish, use an isolated reproducer and per-process
+debugging with matching symbols to distinguish this hypothesis from launcher or
+resource failures.
+
+The final Official comparison must include the required five independent macro
+runs and an additional six-hour Official control per OS for the observed
+multi-hour memory/error trend. The latter is a duration control, not five
+independent repeats. Run controls only after both valid candidate soaks finish;
+record environmental differences and keep the application revision fixed. Until
+then, neither a Satori-specific leak nor an Official advantage is established.
