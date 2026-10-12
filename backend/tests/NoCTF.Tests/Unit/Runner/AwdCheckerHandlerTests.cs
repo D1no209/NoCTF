@@ -33,7 +33,7 @@ public sealed class AwdCheckerHandlerTests
             new StubHttpClientFactory());
         var deadline = DateTimeOffset.Parse("2026-07-24T00:01:00Z");
         var work = new AwdCheckerWork(Guid.Parse("11111111-1111-1111-1111-111111111111"), Guid.Parse("77777777-7777-7777-7777-777777777777"), RuntimeProvider.Docker, RuntimeKind.Container, ContainerReceiptJson(
-                Guid.Parse("11111111-1111-1111-1111-111111111111")), "target.internal", "checker:latest", ["/checker"], new Dictionary<string, string> { ["MODE"] = "awd" }, new Uri("https://api.example/api/internal/v1/awd/check-results"), "claim-bound-token", deadline, TimeSpan.FromMinutes(1), "main");
+                Guid.Parse("11111111-1111-1111-1111-111111111111")), "target.internal", "checker:latest", ["/checker"], new Dictionary<string, string> { ["MODE"] = "awd" }, new Uri("https://api.example/api/internal/v1/awd/check-results"), "claim-bound-token", deadline, TimeSpan.FromMinutes(1), "main", Guid.NewGuid(), [], new Uri("https://api.example/api/internal/v1/awd/check-task"), new Dictionary<string, string> { ["main"] = "target.internal" });
 
         await executor.ExecuteAsync(work, CancellationToken.None);
 
@@ -45,6 +45,10 @@ public sealed class AwdCheckerHandlerTests
             .IsEqualTo("https://api.example/api/internal/v1/awd/check-results");
         await Assert.That(request.Environment["NOCTF_CALLBACK_TOKEN"])
             .IsEqualTo("claim-bound-token");
+        await Assert.That(request.Environment["NOCTF_AWD_TASK_URL"])
+            .IsEqualTo("https://api.example/api/internal/v1/awd/check-task");
+        await Assert.That(request.Environment.ContainsKey("NOCTF_AWD_FLAGS")).IsFalse();
+        await Assert.That(request.OperationId).IsEqualTo(work.AttemptId);
         await Assert.That(request.Labels).IsEmpty();
         await Assert.That(request.NetworkPurpose)
             .IsEqualTo(ContainerNetworkPurpose.AwdChecker);
@@ -60,7 +64,7 @@ public sealed class AwdCheckerHandlerTests
             new StubProviderCatalog(runner),
             new StubHttpClientFactory());
         var work = new AwdCheckerWork(Guid.Parse("11111111-1111-1111-1111-111111111111"), Guid.Parse("88888888-8888-8888-8888-888888888888"), RuntimeProvider.Docker, RuntimeKind.Container, ContainerReceiptJson(
-                Guid.Parse("11111111-1111-1111-1111-111111111111")), "target.internal", "checker:latest", ["/checker"], new Dictionary<string, string>(), new Uri("https://api.example/api/internal/v1/awd/check-results"), "claim-bound-token", DateTimeOffset.UtcNow.AddMinutes(1), TimeSpan.FromMilliseconds(20), "main");
+                Guid.Parse("11111111-1111-1111-1111-111111111111")), "target.internal", "checker:latest", ["/checker"], new Dictionary<string, string>(), new Uri("https://api.example/api/internal/v1/awd/check-results"), "claim-bound-token", DateTimeOffset.UtcNow.AddMinutes(1), TimeSpan.FromMilliseconds(20), "main", Guid.NewGuid(), [], new Uri("https://api.example/api/internal/v1/awd/check-task"), new Dictionary<string, string> { ["main"] = "target.internal" });
 
         var outcome = await executor.ExecuteAsync(work, CancellationToken.None);
 
@@ -76,7 +80,7 @@ public sealed class AwdCheckerHandlerTests
             new StubProviderCatalog(runner),
             new StubHttpClientFactory());
         var runtimeId = Guid.Parse("11111111-1111-1111-1111-111111111111");
-        var work = new AwdCheckerWork(runtimeId, Guid.Parse("99999999-9999-9999-9999-999999999999"), RuntimeProvider.Docker, RuntimeKind.Container, ContainerReceiptJson(Guid.Parse("22222222-2222-2222-2222-222222222222")), "target.internal", "checker:latest", ["/checker"], new Dictionary<string, string>(), new Uri("https://api.example/api/internal/v1/awd/check-results"), "claim-bound-token", DateTimeOffset.UtcNow.AddMinutes(1), TimeSpan.FromSeconds(10), "main");
+        var work = new AwdCheckerWork(runtimeId, Guid.Parse("99999999-9999-9999-9999-999999999999"), RuntimeProvider.Docker, RuntimeKind.Container, ContainerReceiptJson(Guid.Parse("22222222-2222-2222-2222-222222222222")), "target.internal", "checker:latest", ["/checker"], new Dictionary<string, string>(), new Uri("https://api.example/api/internal/v1/awd/check-results"), "claim-bound-token", DateTimeOffset.UtcNow.AddMinutes(1), TimeSpan.FromSeconds(10), "main", Guid.NewGuid(), [], new Uri("https://api.example/api/internal/v1/awd/check-task"), new Dictionary<string, string> { ["main"] = "target.internal" });
 
         var outcome = await executor.ExecuteAsync(work, CancellationToken.None);
 

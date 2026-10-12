@@ -18,45 +18,44 @@ namespace Internal.Generated.WolverineHandlers
         private readonly Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> _loggerOfNoCtfDbContext;
         private readonly Microsoft.Extensions.Logging.ILogger<NoCTF.Worker.AwdMessageHandler> _loggerOfAwdMessageHandler;
         private readonly NoCTF.Application.Notifications.INotificationChangePublisher _notificationChangePublisher;
-        private readonly NoCTF.GameModes.Awd.Configuration.AwdCheckerConfigurationCatalog _awdCheckerConfigurationCatalog;
         private readonly NoCTF.GameModes.Awd.Configuration.IAwdRoundConfigurationCatalog _awdRoundConfigurationCatalog;
         private readonly NoCTF.Infrastructure.Authentication.PlatformSecretProtector _platformSecretProtector;
         private readonly System.TimeProvider _timeProvider1;
         private readonly System.TimeProvider _timeProvider2;
         private readonly System.TimeProvider _timeProvider3;
+        private readonly System.TimeProvider _timeProvider4;
 
-        public AwdFlagInjectionFailedHandler541375746(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Worker.AwdMessageHandler> loggerOfAwdMessageHandler, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.GameModes.Awd.Configuration.AwdCheckerConfigurationCatalog awdCheckerConfigurationCatalog, NoCTF.GameModes.Awd.Configuration.IAwdRoundConfigurationCatalog awdRoundConfigurationCatalog, NoCTF.Infrastructure.Authentication.PlatformSecretProtector platformSecretProtector, System.TimeProvider __timeProvider1, System.TimeProvider __timeProvider2, System.TimeProvider __timeProvider3)
+        public AwdFlagInjectionFailedHandler541375746(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Worker.AwdMessageHandler> loggerOfAwdMessageHandler, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.GameModes.Awd.Configuration.IAwdRoundConfigurationCatalog awdRoundConfigurationCatalog, NoCTF.Infrastructure.Authentication.PlatformSecretProtector platformSecretProtector, System.TimeProvider __timeProvider1, System.TimeProvider __timeProvider2, System.TimeProvider __timeProvider3, System.TimeProvider __timeProvider4)
         {
             _dbContextOptionsOfNoCtfDbContext = dbContextOptionsOfNoCtfDbContext;
             _loggerOfWolverinePostCommitMessagePublisher = loggerOfWolverinePostCommitMessagePublisher;
             _loggerOfNoCtfDbContext = loggerOfNoCtfDbContext;
             _loggerOfAwdMessageHandler = loggerOfAwdMessageHandler;
             _notificationChangePublisher = notificationChangePublisher;
-            _awdCheckerConfigurationCatalog = awdCheckerConfigurationCatalog;
             _awdRoundConfigurationCatalog = awdRoundConfigurationCatalog;
             _platformSecretProtector = platformSecretProtector;
             _timeProvider1 = __timeProvider1;
             _timeProvider2 = __timeProvider2;
             _timeProvider3 = __timeProvider3;
+            _timeProvider4 = __timeProvider4;
         }
 
 
 
         public override async System.Threading.Tasks.Task HandleAsync(Wolverine.Runtime.MessageContext context, System.Threading.CancellationToken cancellation)
         {
-            await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider1, _notificationChangePublisher, _loggerOfNoCtfDbContext);
-            var progressionReconciler = new NoCTF.Infrastructure.Competitions.Progression.ProgressionReconciler(noCtfDbContext);
             var postCommitDispatchStatus = new NoCTF.Application.Messaging.PostCommitDispatchStatus();
+            await using var noCtfDbContext = new NoCTF.Infrastructure.Persistence.NoCtfDbContext(_dbContextOptionsOfNoCtfDbContext, _timeProvider1, _notificationChangePublisher, _loggerOfNoCtfDbContext);
             var wolverinePostCommitMessagePublisher = new NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher(context, noCtfDbContext, _loggerOfWolverinePostCommitMessagePublisher, postCommitDispatchStatus);
             var competitionEventStore = new NoCTF.Infrastructure.Competitions.Events.CompetitionEventStore(noCtfDbContext, wolverinePostCommitMessagePublisher, _timeProvider3);
-            var internalResultStore = new NoCTF.Infrastructure.GameplayFacts.Processing.InternalResultStore(noCtfDbContext, wolverinePostCommitMessagePublisher, competitionEventStore, progressionReconciler);
-            var awdRoundCoordinator = new NoCTF.Infrastructure.Competitions.Awd.AwdRoundCoordinator(noCtfDbContext, _awdRoundConfigurationCatalog, wolverinePostCommitMessagePublisher, _timeProvider2, _platformSecretProtector);
+            var awdRoundCoordinator = new NoCTF.Infrastructure.Competitions.Awd.AwdRoundCoordinator(noCtfDbContext, _awdRoundConfigurationCatalog, wolverinePostCommitMessagePublisher, _timeProvider4, _platformSecretProtector);
+            var awdCheckerCoordinator = new NoCTF.Infrastructure.Competitions.Awd.AwdCheckerCoordinator(noCtfDbContext, wolverinePostCommitMessagePublisher, _timeProvider2, competitionEventStore);
             // The actual message body
             var awdFlagInjectionFailed = (NoCTF.Application.Messaging.AwdFlagInjectionFailed)context.Envelope.Message;
 
             System.Diagnostics.Activity.Current?.SetTag("message.handler", "NoCTF.Worker.AwdMessageHandler");
             System.Diagnostics.Activity.Current?.SetTag("handler.type", "NoCTF.Worker.AwdMessageHandler");
-            var awdMessageHandler = new NoCTF.Worker.AwdMessageHandler(noCtfDbContext, _awdCheckerConfigurationCatalog, wolverinePostCommitMessagePublisher, awdRoundCoordinator, internalResultStore, _loggerOfAwdMessageHandler);
+            var awdMessageHandler = new NoCTF.Worker.AwdMessageHandler(noCtfDbContext, awdCheckerCoordinator, awdRoundCoordinator, _loggerOfAwdMessageHandler);
             
             // The actual message execution
             await awdMessageHandler.Handle(awdFlagInjectionFailed, cancellation).ConfigureAwait(false);

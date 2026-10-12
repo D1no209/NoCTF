@@ -1305,6 +1305,18 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("attempt");
 
+                    b.Property<long?>("AttemptDeadline")
+                        .HasColumnType("bigint")
+                        .HasColumnName("attempt_deadline");
+
+                    b.Property<Guid?>("AttemptId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("attempt_id");
+
+                    b.Property<long?>("AttemptStartedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("attempt_started_at");
+
                     b.Property<short>("Connection")
                         .HasColumnType("smallint")
                         .HasColumnName("connection");
@@ -1349,6 +1361,10 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("smallint")
                         .HasColumnName("known_target_failure");
 
+                    b.Property<bool>("ManifestComplete")
+                        .HasColumnType("boolean")
+                        .HasColumnName("manifest_complete");
+
                     b.Property<long?>("ObservedAt")
                         .HasColumnType("bigint")
                         .HasColumnName("observed_at");
@@ -1373,6 +1389,10 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("received_active_ticks");
 
+                    b.Property<long?>("ReceivedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("received_at");
+
                     b.Property<Guid?>("ReceivedRoundId")
                         .HasColumnType("uuid")
                         .HasColumnName("received_round_id");
@@ -1392,6 +1412,14 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Property<Guid?>("RuntimeId")
                         .HasColumnType("uuid")
                         .HasColumnName("runtime_id");
+
+                    b.Property<long?>("SampleActiveTicks")
+                        .HasColumnType("bigint")
+                        .HasColumnName("sample_active_ticks");
+
+                    b.Property<long?>("SampleDeadlineActiveTicks")
+                        .HasColumnType("bigint")
+                        .HasColumnName("sample_deadline_active_ticks");
 
                     b.Property<long?>("ScheduledAt")
                         .HasColumnType("bigint")
@@ -1971,6 +1999,12 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Property<int>("InjectionTimeoutSeconds")
                         .HasColumnType("integer")
                         .HasColumnName("injection_timeout_seconds");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("name");
 
                     b.Property<bool>("PreservesHistoricalFlags")
                         .HasColumnType("boolean")

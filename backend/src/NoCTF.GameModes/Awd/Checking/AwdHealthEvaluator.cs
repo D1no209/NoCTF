@@ -25,7 +25,21 @@ public static class AwdHealthEvaluator
         return (Evaluate(evidence), evidence);
     }
 
-    private static bool Valid(AwdProbe probe) => Enum.IsDefined(probe.Outcome) && Enum.IsDefined(probe.Reason);
+    private static bool Valid(AwdProbe probe) => Enum.IsDefined(probe.Outcome) && Enum.IsDefined(probe.Reason)
+        && (probe.Outcome switch
+        {
+            AwdProbeOutcome.Passed or AwdProbeOutcome.NotRequired => probe.Reason == AwdCheckReason.None,
+            AwdProbeOutcome.TargetFailure => probe.Reason is AwdCheckReason.ConnectionRefused or AwdCheckReason.ConnectTimeout
+                or AwdCheckReason.RequestTimeout or AwdCheckReason.FunctionalCheckFailed or AwdCheckReason.FlagStoreFailed
+                or AwdCheckReason.CurrentFlagMissing or AwdCheckReason.HistoricalFlagMissing,
+            AwdProbeOutcome.PlatformFailure => IsPlatformReason(probe.Reason),
+            _ => true
+        });
+
+    private static bool IsPlatformReason(AwdCheckReason reason) => reason is AwdCheckReason.CheckerCrashed
+        or AwdCheckReason.CheckerTimedOut or AwdCheckReason.TaskNotExecuted or AwdCheckReason.CallbackMissing
+        or AwdCheckReason.InfrastructureFailure or AwdCheckReason.IncompleteEvidence or AwdCheckReason.InvalidEvidence
+        or AwdCheckReason.RuntimeSuperseded or AwdCheckReason.LateReceipt;
 
     public static AwdHealthConclusion Evaluate(AwdHealthEvidence evidence)
     {
@@ -37,13 +51,23 @@ public static class AwdHealthEvaluator
                 ? new[] { flag.Read }
                 : new[] { flag.Write, flag.Read }));
         // Preserve a proven target failure even when another required probe was lost to the platform.
-        var platformFailure = probes.FirstOrDefault(probe => probe.Outcome == AwdProbeOutcome.PlatformFailure);
+        var platformFailure = probes.FirstOrDefault(probe => probe.Outcome == AwdProbeOutcome.PlatformFailure
+            || probe.Outcome == AwdProbeOutcome.Unknown && IsPlatformReason(probe.Reason));
         if (platformFailure is not null)
             return new(AwdHealth.InternalError, platformFailure.Reason, targetFailure, required.Length, readable);
+
+        // A pending platform delivery is independent of a proven target failure.
+        // Neither failure discharges the unresolved evidence from another store.
+        if (evidence.Flags.Any(flag => flag.Obligation == AwdFlagObligation.PlatformPending))
+            return Incomplete(targetFailure, required.Length, readable);
 
         if (evidence.Connection.Outcome == AwdProbeOutcome.TargetFailure)
             return new(AwdHealth.Offline, evidence.Connection.Reason, AwdHealth.Offline, required.Length, readable);
         if (evidence.Connection.Outcome != AwdProbeOutcome.Passed)
+            return Incomplete(targetFailure, required.Length, readable);
+
+        if (required.Any(flag => flag.Read.Outcome is AwdProbeOutcome.Unknown or AwdProbeOutcome.NotRequired
+                || !flag.Historical && flag.Write.Outcome == AwdProbeOutcome.Unknown))
             return Incomplete(targetFailure, required.Length, readable);
 
         if (evidence.Functionality.Outcome == AwdProbeOutcome.TargetFailure)
@@ -55,7 +79,6 @@ public static class AwdHealthEvaluator
             return new(AwdHealth.Mumble, currentFailure.Reason, AwdHealth.Mumble, required.Length, readable);
 
         if (evidence.Functionality.Outcome != AwdProbeOutcome.Passed
-            || evidence.Flags.Any(flag => flag.Obligation == AwdFlagObligation.PlatformPending)
             || required.Any(flag => !flag.Historical
                 && (flag.Read.Outcome != AwdProbeOutcome.Passed
                     || flag.Write.Outcome is not (AwdProbeOutcome.Passed or AwdProbeOutcome.NotRequired))))

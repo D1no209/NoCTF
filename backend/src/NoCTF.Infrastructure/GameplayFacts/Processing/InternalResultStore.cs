@@ -19,96 +19,14 @@ using NoCTF.Infrastructure.Competitions.Progression;
 
 namespace NoCTF.Infrastructure.GameplayFacts.Processing;
 
-public sealed class InternalResultStore(
+public sealed partial class InternalResultStore(
     NoCtfDbContext db,
     IPostCommitMessagePublisher outbox,
     ICompetitionEventRecorder? eventRecorder = null,
-    ProgressionReconciler? progressionReconciler = null) : IInternalResultStore
+    ProgressionReconciler? progressionReconciler = null, NoCTF.Infrastructure.Authentication.PlatformSecretProtector? secrets = null) : IInternalResultStore
 {
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
-
-    public async Task<InternalResultDisposition> RecordAwdAsync(
-        AwdCheckResult result,
-        CancellationToken ct)
-    {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var fact = await db.GameplayFacts.SingleOrDefaultAsync(
-            item => item.Id == result.GameplayFactId,
-            ct);
-        if (fact is null)
-            return InternalResultDisposition.NotFound;
-        var runtime = await db.RuntimeInstances.SingleOrDefaultAsync(
-            item => item.Id == result.RuntimeInstanceId,
-            ct);
-        if (runtime is null)
-            return InternalResultDisposition.NotFound;
-        if (fact.State is GameplayFactState.Completed or GameplayFactState.PlatformFailed)
-            return InternalResultDisposition.Duplicate;
-        var appliedAt = ToPostgresPrecision(result.OccurredAt);
-
-        var context = await db.CompetitionChallenges
-            .Where(challenge => challenge.Id == runtime.CompetitionChallengeId)
-            .Join(
-                db.Competitions,
-                challenge => challenge.CompetitionId,
-                competition => competition.Id,
-                (challenge, competition) => new
-                {
-                    Competition = competition
-                })
-            .SingleAsync(ct);
-        if (context.Competition.Mode != GameMode.Awd
-            || runtime.TeamId is null
-            || fact.Kind != GameplayFactKind.AwdServiceTransition
-            || fact.CompetitionId != runtime.CompetitionId
-            || fact.CompetitionChallengeId != runtime.CompetitionChallengeId
-            || fact.TeamId != runtime.TeamId)
-            return InternalResultDisposition.NotFound;
-        var scoringResult = AwdCheckerOutcomeMapper.ToGameplayFactResult(result.State);
-        fact.State = GameplayFactState.Completed;
-        fact.Result = scoringResult;
-        fact.FailureCode = result.State is AwdServiceState.CheckerAbnormalExit
-            or AwdServiceState.CheckerTimedOut
-                ? GameplayFactFailureCode.CheckerPlatformError
-                : null;
-        fact.UpdatedAt = appliedAt;
-        await events.RecordAsync(new(
-            runtime.CompetitionId!.Value,
-            CompetitionEventKind.ScoringRecorded,
-            scoringResult == GameplayFactResult.ServiceDown
-                ? CompetitionEventLevel.Warning
-                : CompetitionEventLevel.Information,
-            CompetitionEventVisibility.Team,
-            appliedAt,
-            TeamId: fact.TeamId,
-            CompetitionChallengeId: fact.CompetitionChallengeId,
-            RuntimeInstanceId: runtime.Id,
-            GameplayFactId: fact.Id,
-            GameplayFactKind: GameplayFactKind.AwdServiceTransition,
-            GameplayFactState: fact.State,
-            GameplayFactResult: fact.Result,
-            RuntimeState: runtime.State), ct);
-        try
-        {
-            await db.SaveChangesAsync(ct);
-            await transaction.CommitAsync(ct);
-            await outbox.FlushCommittedMessagesAsync();
-            return InternalResultDisposition.Applied;
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            await transaction.RollbackAsync(ct);
-            outbox.DiscardPendingMessages();
-            db.ChangeTracker.Clear();
-            if (await db.GameplayFacts.AsNoTracking().AnyAsync(item =>
-                    item.Id == result.GameplayFactId
-                    && (item.State == GameplayFactState.Completed
-                        || item.State == GameplayFactState.PlatformFailed), ct))
-                return InternalResultDisposition.Duplicate;
-            throw;
-        }
-    }
 
     public async Task<InternalResultDisposition> RecordAwdpAsync(
         AwdpFixResult result,

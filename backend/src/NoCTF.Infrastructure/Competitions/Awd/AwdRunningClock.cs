@@ -15,7 +15,7 @@ internal sealed class AwdRunningClock(IReadOnlyList<(DateTimeOffset Start, DateT
         return end > segment.Start ? (end - segment.Start).Ticks : 0;
     }));
 
-    public DateTimeOffset At(TimeSpan position, bool intervalStart)
+    public DateTimeOffset At(TimeSpan position, bool intervalStart, bool clampClosed = false)
     {
         var remaining = position;
         foreach (var segment in segments)
@@ -27,6 +27,7 @@ internal sealed class AwdRunningClock(IReadOnlyList<(DateTimeOffset Start, DateT
                 return segment.Start + remaining;
             remaining -= length;
         }
+        if (clampClosed && segments.LastOrDefault().End is { } stopped) return stopped;
         throw new InvalidOperationException("An AWD running position has no lifecycle interval.");
     }
 

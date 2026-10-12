@@ -16,6 +16,8 @@ using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Authentication;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Competitions.Awd;
+using NoCTF.Domain.Gameplay;
 using Wolverine.Attributes;
 
 namespace NoCTF.Runner.Messages;
@@ -34,7 +36,14 @@ public sealed record AwdCheckerWork(
     string CallbackToken,
     DateTimeOffset Deadline,
     TimeSpan Timeout,
-    string TargetServiceName);
+    string TargetServiceName,
+    Guid AttemptId,
+    IReadOnlyList<AwdExpectedFlag> Flags,
+    Uri TaskUrl,
+    IReadOnlyDictionary<string, string> Targets)
+{
+    public override string ToString() => $"AwdCheckerWork {{ RuntimeInstanceId = {RuntimeInstanceId}, GameplayFactId = {GameplayFactId}, AttemptId = {AttemptId}, CallbackToken = [REDACTED], Flags = [REDACTED] }}";
+}
 
 public interface IAwdCheckerWorkReader
 {
@@ -69,6 +78,13 @@ public sealed class AwdCheckerWorkReader(
         CancellationToken cancellationToken)
     {
         await using var db = await contexts.CreateDbContextAsync(cancellationToken);
+        var fact = await db.GameplayFacts.Include(item => item.Awd).ThenInclude(details => details!.Flags)
+            .SingleOrDefaultAsync(item => item.Id == message.GameplayFactId, cancellationToken);
+        if (fact is not { Kind: GameplayFactKind.AwdServiceTransition, Awd: { } attempt }
+            || attempt.Execution != AwdCheckExecution.Pending || attempt.AttemptId != message.AttemptId
+            || attempt.RuntimeId != message.RuntimeInstanceId || attempt.Deadline != message.Deadline
+            || attempt.ReceiptDeadline != message.ReceiptDeadline)
+            return null;
         var target = await db.RuntimeInstances.AsNoTracking()
             .Where(runtime => runtime.Id == message.RuntimeInstanceId
                 && runtime.CompetitionChallengeId == message.CompetitionChallengeId
@@ -133,35 +149,59 @@ public sealed class AwdCheckerWorkReader(
             ?? throw new InvalidOperationException(
                 "RunnerScoring:CallbackBaseUrl must be configured as an absolute HTTP(S) URI.");
         var callbackUrl = new Uri(baseUri, "/api/internal/v1/awd/check-results");
+        var flags = attempt.Flags.Select(flag => new AwdExpectedFlag(flag.FlagId, flag.Historical,
+            flag.Obligation, flag.RequiresWrite)).ToArray();
+        await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken);
+        // Recheck after provider discovery: a pause/reset may have committed while that read was in flight.
+        if (!await db.RuntimeInstances.AnyAsync(runtime => runtime.Id == message.RuntimeInstanceId
+                && runtime.State == RuntimeState.Running && runtime.RunnerId == message.RunnerId
+                && db.Competitions.Any(competition => competition.Id == runtime.CompetitionId
+                    && competition.Status == CompetitionStatus.Running)
+                && db.CompetitionChallenges.Any(challenge => challenge.Id == runtime.CompetitionChallengeId
+                    && challenge.IsPublished && challenge.DeletedAt == null), cancellationToken))
+            return null;
         var issuedAt = timeProvider.GetUtcNow();
         var remaining = message.Deadline - issuedAt;
-        if (remaining <= TimeSpan.Zero)
-            return null;
+        if (remaining <= TimeSpan.Zero) return null;
+        var timeout = TimeSpan.FromSeconds(checker.TimeoutSeconds) < remaining
+            ? TimeSpan.FromSeconds(checker.TimeoutSeconds) : remaining;
+        attempt.Execution = AwdCheckExecution.Running;
+        attempt.AttemptStartedAt = issuedAt;
+        attempt.AttemptDeadline = issuedAt + timeout;
+        var snapshot = await db.AwdRoundRules.AsNoTracking().SingleAsync(rule => rule.Id == attempt.RulesId, cancellationToken);
+        attempt.ReceiptDeadline = attempt.AttemptDeadline.Value.AddSeconds(snapshot.Options.CallbackGraceSeconds);
+        fact.State = GameplayFactState.Processing;
+        fact.UpdatedAt = issuedAt;
+        fact.ConcurrencyStamp = Guid.NewGuid();
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch (Exception exception) when (TransactionFailureClassifier.IsRetryable(exception)) { return null; }
         var token = tokens.IssueAwdChecker(new(
             message.RunnerId,
             message.RuntimeInstanceId,
             message.GameplayFactId,
-            message.Deadline,
-            issuedAt));
+            attempt.AttemptDeadline.Value,
+            issuedAt, message.AttemptId, attempt.ReceiptDeadline.Value));
         return new(
             message.RuntimeInstanceId,
             message.GameplayFactId,
             target.Runtime.RuntimeProvider,
             target.Runtime.RuntimeKind,
             target.Runtime.ProviderReceipt!.ToData(),
-            targetHost,
+            targetHost.Value.Host,
             checker.Image,
             checker.Command ?? [],
             checker.Environment ?? new Dictionary<string, string>(),
             callbackUrl,
             token,
-            message.Deadline,
-            TimeSpan.FromSeconds(checker.TimeoutSeconds) < remaining
-                ? TimeSpan.FromSeconds(checker.TimeoutSeconds)
-                : remaining, settings.TargetServiceName!);
+            attempt.AttemptDeadline.Value, timeout, settings.TargetServiceName!, message.AttemptId, flags,
+            new Uri(baseUri, "/api/internal/v1/awd/check-task"), targetHost.Value.Services);
     }
 
-    private static async Task<string?> ResolveTargetHostAsync(
+    private static async Task<(string Host, IReadOnlyDictionary<string, string> Services)?> ResolveTargetHostAsync(
         RuntimeKind kind,
         RuntimeProvider provider,
         RuntimeReceiptData providerReceipt,
@@ -173,7 +213,9 @@ public sealed class AwdCheckerWorkReader(
         if (kind != RuntimeKind.Container || providerReceipt is not ContainerRuntimeReceiptData receipt
             || receipt.Provider != provider || receipt.OperationId != runtimeInstanceId || targetServiceName is null) return null;
         var status = await providers.Runtime(provider).GetStatusAsync(receipt.ToReceipt(), cancellationToken);
-        return status?.Services.SingleOrDefault(service => service.Name == targetServiceName)?.InternalHost;
+        if (status?.Services.SingleOrDefault(service => service.Name == targetServiceName)?.InternalHost is not { } host) return null;
+        return (host, status.Services.Where(service => service.InternalHost is not null)
+            .ToDictionary(service => service.Name, service => service.InternalHost!, StringComparer.Ordinal));
     }
 
 }
@@ -182,7 +224,8 @@ public sealed class AwdCheckerExecutor(
     IOneShotRuntimeProviderCatalog providers,
     IHttpClientFactory httpClients,
     AuxiliaryRuntimeCapacity? capacity = null,
-    RuntimeExecutionOptions? executionOptions = null)
+    RuntimeExecutionOptions? executionOptions = null,
+    TimeProvider? timeProvider = null)
     : IAwdCheckerExecutor
 {
     public async Task<AwdCheckerExecutionOutcome> ExecuteAsync(
@@ -193,10 +236,13 @@ public sealed class AwdCheckerExecutor(
         {
             ["NOCTF_TARGET_HOST"] = work.TargetHost,
             ["NOCTF_CALLBACK_URL"] = work.CallbackUrl.AbsoluteUri,
-            ["NOCTF_CALLBACK_TOKEN"] = work.CallbackToken
+            ["NOCTF_CALLBACK_TOKEN"] = work.CallbackToken,
+            ["NOCTF_AWD_TASK_URL"] = work.TaskUrl.AbsoluteUri,
+            ["NOCTF_AWD_TARGETS"] = JsonSerializer.Serialize(work.Targets),
+            ["NOCTF_AWD_DEADLINE"] = work.Deadline.ToString("O")
         };
         var request = new ContainerRequest(
-            CreateOperationId(work.RuntimeInstanceId, work.GameplayFactId),
+            work.AttemptId,
             work.Provider,
             work.Image,
             work.Command,
@@ -225,21 +271,21 @@ public sealed class AwdCheckerExecutor(
                 return AwdCheckerExecutionOutcome.Completed;
             await ReportPlatformStatusAsync(
                 work,
-                AwdServiceState.CheckerAbnormalExit,
+                AwdCheckReason.CheckerCrashed,
                 cancellationToken);
             return AwdCheckerExecutionOutcome.AbnormalExit;
         }
         catch (RunnerCapacityUnavailableException) when (capacity is not null)
         {
-            await capacity.RecordAwdAdmissionFailureAsync(work.GameplayFactId, cancellationToken);
-            return AwdCheckerExecutionOutcome.Superseded;
+            await ReportPlatformStatusAsync(work, AwdCheckReason.InfrastructureFailure, cancellationToken);
+            return AwdCheckerExecutionOutcome.AbnormalExit;
         }
         catch (OperationCanceledException) when (
             !cancellationToken.IsCancellationRequested && timeoutSource.IsCancellationRequested)
         {
             await ReportPlatformStatusAsync(
                 work,
-                AwdServiceState.CheckerTimedOut,
+                AwdCheckReason.CheckerTimedOut,
                 cancellationToken);
             return AwdCheckerExecutionOutcome.TimedOut;
         }
@@ -247,12 +293,21 @@ public sealed class AwdCheckerExecutor(
 
     private async Task ReportPlatformStatusAsync(
         AwdCheckerWork work,
-        AwdServiceState status,
+        AwdCheckReason reason,
         CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, work.CallbackUrl)
         {
-            Content = JsonContent.Create(new { State = status.ToString() })
+            Content = JsonContent.Create(new
+            {
+                Connection = new { Outcome = AwdProbeOutcome.PlatformFailure.ToString(), Reason = reason.ToString() },
+                Functionality = new { Outcome = AwdProbeOutcome.Unknown.ToString(), Reason = reason.ToString() },
+                Flags = work.Flags.Select(flag => new { flag.FlagId,
+                    Write = new { Outcome = (flag.RequiresWrite ? AwdProbeOutcome.Unknown : AwdProbeOutcome.NotRequired).ToString(), Reason = (flag.RequiresWrite ? reason : AwdCheckReason.None).ToString() },
+                    Read = new { Outcome = AwdProbeOutcome.Unknown.ToString(), Reason = reason.ToString() } }),
+                ObservedAt = (timeProvider ?? TimeProvider.System).GetUtcNow() < work.Deadline
+                    ? (timeProvider ?? TimeProvider.System).GetUtcNow() : work.Deadline
+            })
         };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", work.CallbackToken);
         using var response = await httpClients.CreateClient().SendAsync(request, cancellationToken);
@@ -266,15 +321,6 @@ public sealed class AwdCheckerExecutor(
         return new AttachedContainerRuntimeTarget(new(work.RuntimeInstanceId), receipt.ServiceReceipt(work.TargetServiceName));
     }
 
-    private static Guid CreateOperationId(Guid runtimeInstanceId, Guid gameplayFactId)
-    {
-        Span<byte> input = stackalloc byte[32];
-        runtimeInstanceId.TryWriteBytes(input[..16]);
-        gameplayFactId.TryWriteBytes(input[16..]);
-        Span<byte> hash = stackalloc byte[32];
-        SHA256.HashData(input, hash);
-        return new Guid(hash[..16]);
-    }
 }
 
 [NonTransactional]

@@ -15,12 +15,31 @@ using Microsoft.Extensions.Options;
 using NoCTF.API.Composition;
 using NoCTF.API.Endpoints.Internal;
 using NoCTF.Application.GameplayFacts.Processing;
+using NoCTF.Application.Competitions.Awd;
 
 namespace NoCTF.Tests.Unit.API;
 
 public sealed class AwdCheckerCallbackHttpTests
 {
     private const string InternalScheme = "Internal";
+
+    [Test]
+    public async Task Task_material_uses_only_token_scope_and_disables_caching()
+    {
+        var runtimeId = Guid.NewGuid();
+        var factId = Guid.NewGuid();
+        var reader = new CapturingTaskReader();
+        await using var app = await CreateApplicationAsync(Claims(runtimeId, factId.ToString("D")), new CapturingInternalResultStore(), reader);
+        using var client = app.GetTestClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(InternalScheme, "test-token");
+        using var response = await client.GetAsync($"/api/internal/v1/awd/check-task?gameplayFactId={Guid.NewGuid()}");
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(response.Headers.CacheControl!.NoStore).IsTrue();
+        await Assert.That(reader.RuntimeId).IsEqualTo(runtimeId);
+        await Assert.That(reader.FactId).IsEqualTo(factId);
+        var body = await response.Content.ReadFromJsonAsync<AwdCheckTaskResponse>();
+        await Assert.That(body!.GameplayFactId).IsEqualTo(factId);
+    }
 
     [Test]
     public async Task Claims_are_forwarded_to_the_persistence_fence()
@@ -37,7 +56,7 @@ public sealed class AwdCheckerCallbackHttpTests
 
         using var response = await client.PostAsJsonAsync(
             "/api/internal/v1/awd/check-results",
-            new { state = "Down" });
+            new { connection = new { outcome = "TargetFailure", reason = "ConnectionRefused" }, functionality = new { outcome = "Unknown", reason = "None" }, flags = Array.Empty<object>(), observedAt = DateTimeOffset.UtcNow });
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(store.AwdCalls).IsEqualTo(1);
@@ -60,7 +79,7 @@ public sealed class AwdCheckerCallbackHttpTests
 
         using var response = await client.PostAsJsonAsync(
             "/api/internal/v1/awd/check-results",
-            new { state = "Down" });
+            new { connection = new { outcome = "TargetFailure", reason = "ConnectionRefused" }, functionality = new { outcome = "Unknown", reason = "None" }, flags = Array.Empty<object>(), observedAt = DateTimeOffset.UtcNow });
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Unauthorized);
         await Assert.That(store.AwdCalls).IsEqualTo(0);
@@ -87,7 +106,7 @@ public sealed class AwdCheckerCallbackHttpTests
 
         using var response = await client.PostAsJsonAsync(
             "/api/internal/v1/awd/check-results",
-            new { state = "Down" });
+            new { connection = new { outcome = "TargetFailure", reason = "ConnectionRefused" }, functionality = new { outcome = "Unknown", reason = "None" }, flags = Array.Empty<object>(), observedAt = DateTimeOffset.UtcNow });
 
         await Assert.That(response.StatusCode).IsEqualTo(expectedStatus);
         await Assert.That(store.AwdCalls).IsEqualTo(1);
@@ -95,7 +114,8 @@ public sealed class AwdCheckerCallbackHttpTests
 
     private static async Task<WebApplication> CreateApplicationAsync(
         IReadOnlyList<Claim> claims,
-        IInternalResultStore store)
+        IInternalResultStore store,
+        IAwdCheckerTaskReader? tasks = null)
     {
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
@@ -107,6 +127,7 @@ public sealed class AwdCheckerCallbackHttpTests
             options.Assemblies = [typeof(RecordAwdCheckResultEndpoint).Assembly];
             options.Filter = type =>
                 type == typeof(RecordAwdCheckResultEndpoint)
+                || type == typeof(ReadAwdCheckTaskEndpoint)
                 || type == typeof(RecordAwdCheckResultValidator);
         });
         builder.Services.SwaggerDocument();
@@ -122,6 +143,8 @@ public sealed class AwdCheckerCallbackHttpTests
                 _ => { });
         builder.Services.AddAuthorization(options =>
         {
+            options.AddPolicy("AwdCheckTask", policy => policy.AddAuthenticationSchemes(InternalScheme)
+                .RequireAuthenticatedUser().RequireClaim("permission", "awd:check-task:read"));
             options.AddPolicy("AwdCheckResult", policy => policy
                 .AddAuthenticationSchemes(InternalScheme)
                 .RequireAuthenticatedUser()
@@ -133,6 +156,7 @@ public sealed class AwdCheckerCallbackHttpTests
                 .RequireClaim("deadline"));
         });
         builder.Services.AddSingleton(store);
+        builder.Services.AddSingleton(tasks ?? new CapturingTaskReader());
         builder.Services.AddScoped<RecordInternalResult>();
 
         var app = builder.Build();
@@ -149,15 +173,28 @@ public sealed class AwdCheckerCallbackHttpTests
     [
         new("token_type", "internal"),
         new("permission", "awd:check-result:write"),
+        new("permission", "awd:check-task:read"),
         new("resource", $"runtime:{runtimeId:D}"),
         new("runtime_instance_id", runtimeId.ToString("D")),
-        new("gameplay_fact_id", gameplayFactId),
+        new("gameplay_fact_id", gameplayFactId), new("attempt_id", Guid.NewGuid().ToString("D")), new("receipt_deadline", DateTimeOffset.UtcNow.AddMinutes(5).UtcTicks.ToString()),
         new(
             "deadline",
             DateTimeOffset.UtcNow.AddMinutes(5).ToUnixTimeSeconds().ToString())
     ];
 
     private sealed record TestClaims(IReadOnlyList<Claim> Values);
+
+    private sealed class CapturingTaskReader : IAwdCheckerTaskReader
+    {
+        public Guid RuntimeId { get; private set; }
+        public Guid FactId { get; private set; }
+        public Task<AwdCheckerTask?> ReadAsync(Guid runtimeId, Guid factId, Guid attemptId, DateTimeOffset at, CancellationToken ct)
+        {
+            RuntimeId = runtimeId;
+            FactId = factId;
+            return Task.FromResult<AwdCheckerTask?>(new(factId, attemptId, at.AddSeconds(30), []));
+        }
+    }
 
     private sealed class TestInternalHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,

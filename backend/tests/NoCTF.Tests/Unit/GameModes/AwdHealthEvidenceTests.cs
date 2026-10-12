@@ -61,6 +61,27 @@ public sealed class AwdHealthEvidenceTests
     }
 
     [Test]
+    public async Task PendingPlatformDeliveryAndProvenOfflineKeepBothPiecesOfEvidence()
+    {
+        var result = AwdHealthEvaluator.Evaluate(new(
+            new(AwdProbeOutcome.TargetFailure, AwdCheckReason.ConnectionRefused),
+            new(AwdProbeOutcome.Unknown),
+            [Flag(true, new(AwdProbeOutcome.Unknown), AwdFlagObligation.PlatformPending)]));
+        await Assert.That(result.Health).IsEqualTo(AwdHealth.InternalError);
+        await Assert.That(result.KnownTargetFailure).IsEqualTo(AwdHealth.Offline);
+    }
+
+    [Test]
+    public async Task ProvenFunctionalityFailureDoesNotSilentlyDiscardUnobservedHistoricalStore()
+    {
+        var result = AwdHealthEvaluator.Evaluate(new(Pass,
+            new(AwdProbeOutcome.TargetFailure, AwdCheckReason.FunctionalCheckFailed),
+            [Flag(true, new(AwdProbeOutcome.Unknown))]));
+        await Assert.That(result.Health).IsEqualTo(AwdHealth.InternalError);
+        await Assert.That(result.KnownTargetFailure).IsEqualTo(AwdHealth.Mumble);
+    }
+
+    [Test]
     [Arguments(AwdProbeOutcome.TargetFailure, AwdHealth.Offline)]
     [Arguments(AwdProbeOutcome.Unknown, AwdHealth.InternalError)]
     [Arguments(AwdProbeOutcome.PlatformFailure, AwdHealth.InternalError)]
@@ -102,5 +123,12 @@ public sealed class AwdHealthEvidenceTests
         await Assert.That(invalid.Conclusion.Reason).IsEqualTo(AwdCheckReason.InvalidEvidence);
         var currentMissing = AwdHealthEvaluator.ValidateManifest(Pass, Pass, expected, [new(id, Pass, Missing)]);
         await Assert.That(currentMissing.Conclusion.Health).IsEqualTo(AwdHealth.Mumble);
+    }
+
+    [Test]
+    public async Task Passed_probe_cannot_also_claim_checker_timeout()
+    {
+        var invalid = AwdHealthEvaluator.ValidateManifest(new(AwdProbeOutcome.Passed, AwdCheckReason.CheckerTimedOut), Pass, [], []);
+        await Assert.That(invalid.Conclusion.Reason).IsEqualTo(AwdCheckReason.InvalidEvidence);
     }
 }

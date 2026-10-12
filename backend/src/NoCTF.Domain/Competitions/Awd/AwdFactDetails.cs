@@ -32,6 +32,13 @@ public sealed class AwdFactDetails
     public DateTimeOffset? ObservedAt { get; set; }
     public bool FinalScheduledCheck { get; set; }
     public int Attempt { get; set; }
+    public Guid? AttemptId { get; set; }
+    public DateTimeOffset? AttemptStartedAt { get; set; }
+    public DateTimeOffset? AttemptDeadline { get; set; }
+    public DateTimeOffset? ReceivedAt { get; set; }
+    public long? SampleActiveTicks { get; set; }
+    public long? SampleDeadlineActiveTicks { get; set; }
+    public bool ManifestComplete { get; set; }
     public int RequiredFlags { get; set; }
     public int ReadableFlags { get; set; }
     public List<AwdFactFlagEvidence> Flags { get; set; } = [];

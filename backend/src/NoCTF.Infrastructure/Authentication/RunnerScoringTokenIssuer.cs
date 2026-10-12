@@ -29,12 +29,15 @@ public sealed class RunnerScoringTokenIssuer(IOptions<RunnerScoringOptions> conf
         ]);
 
     public string IssueAwdChecker(AwdCheckerTokenRequest request) =>
-        Write(request.RunnerId, request.IssuedAt, request.Deadline.AddHours(24),
+        Write(request.RunnerId, request.IssuedAt, request.ReceiptDeadline.AddHours(24),
         [
             new("permission", "awd:check-result:write"),
+            new("permission", "awd:check-task:read"),
             new("resource", $"runtime:{request.RuntimeInstanceId:D}"),
             new("runtime_instance_id", request.RuntimeInstanceId.ToString("D")),
             new("gameplay_fact_id", request.GameplayFactId.ToString("D")),
+            new("attempt_id", request.AttemptId.ToString("D")),
+            new("receipt_deadline", request.ReceiptDeadline.UtcTicks.ToString(), ClaimValueTypes.Integer64),
             new("deadline", request.Deadline.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
         ]);
 

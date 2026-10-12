@@ -211,7 +211,7 @@ public sealed class AwdRoundCoordinator(
                 var overrideRule = ((AwdCompetitionChallengeRules)challenge.Rules!).StoreRules.SingleOrDefault(rule => rule.StoreId == store.Id);
                 return new AwdRoundStoreBudget
                 {
-                    StoreId = store.Id, Weight = overrideRule?.Weight ?? 1m,
+                    StoreId = store.Id, Name = store.Name, Weight = overrideRule?.Weight ?? 1m,
                     FlagsPerIssue = overrideRule?.FlagsPerIssue ?? effective.Options.FlagsPerStore,
                     DeliveryMode = store.DeliveryMode, InjectionCommand = store.InjectionCommand,
                     TargetServiceName = store.TargetServiceName, InjectionTimeoutSeconds = store.InjectionTimeoutSeconds,
@@ -220,7 +220,7 @@ public sealed class AwdRoundCoordinator(
             }).ToList()
             : previous.Stores.Select(store => new AwdRoundStoreBudget
             {
-                StoreId = store.StoreId, Weight = store.Weight, FlagsPerIssue = store.FlagsPerIssue,
+                StoreId = store.StoreId, Name = store.Name, Weight = store.Weight, FlagsPerIssue = store.FlagsPerIssue,
                 DeliveryMode = store.DeliveryMode, InjectionCommand = store.InjectionCommand,
                 TargetServiceName = store.TargetServiceName, InjectionTimeoutSeconds = store.InjectionTimeoutSeconds,
                 PreservesHistoricalFlags = store.PreservesHistoricalFlags

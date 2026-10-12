@@ -48,6 +48,15 @@ public sealed class PlatformLogRedactorTests
     }
 
     [Test]
+    public async Task Checker_private_read_context_is_redacted()
+    {
+        const string credential = "checker-record-read-credential";
+        var result = PlatformLogRedactor.Redact($"PrivateReadContext={credential}",
+            new Dictionary<string, object?> { ["PrivateReadContext"] = credential });
+        await Assert.That(result).DoesNotContain(credential);
+    }
+
+    [Test]
     public async Task Bearer_jwt_uri_credentials_and_unstructured_assignments_are_redacted()
     {
         const string jwt =

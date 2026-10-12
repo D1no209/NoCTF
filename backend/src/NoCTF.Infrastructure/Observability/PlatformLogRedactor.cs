@@ -51,6 +51,7 @@ public static partial class PlatformLogRedactor
             || normalized.Contains("token", StringComparison.Ordinal)
             || normalized.Contains("secret", StringComparison.Ordinal)
             || normalized.Contains("credential", StringComparison.Ordinal)
+            || normalized.Contains("readcontext", StringComparison.Ordinal)
             || normalized.Contains("authorization", StringComparison.Ordinal)
             || normalized.Contains("cookie", StringComparison.Ordinal)
             || normalized.Contains("userid", StringComparison.Ordinal)

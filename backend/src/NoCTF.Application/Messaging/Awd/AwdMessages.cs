@@ -42,15 +42,18 @@ public sealed record RunAwdChecker(
     Guid CompetitionChallengeId,
     Guid GameplayFactId,
     string RunnerId,
-    DateTimeOffset Deadline) : IRunnerNodeMessage;
+    DateTimeOffset Deadline,
+    Guid AttemptId,
+    DateTimeOffset ReceiptDeadline) : IRunnerNodeMessage;
 
 public sealed record DispatchAwdCheckers(
     DateTimeOffset At,
-    Guid? AfterRuntimeInstanceId = null);
+    Guid? AfterGameplayFactId = null);
 
 public sealed record AwdCheckerCallbackMissing(
     Guid CompetitionId,
     Guid CompetitionChallengeId,
     Guid RuntimeInstanceId,
     Guid GameplayFactId,
-    DateTimeOffset OccurredAt);
+    DateTimeOffset OccurredAt,
+    Guid AttemptId);

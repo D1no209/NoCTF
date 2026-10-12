@@ -32,7 +32,8 @@ public enum AwdCheckReason : short
     InfrastructureFailure,
     IncompleteEvidence,
     InvalidEvidence,
-    RuntimeSuperseded
+    RuntimeSuperseded,
+    LateReceipt
 }
 
 public sealed record AwdProbe(AwdProbeOutcome Outcome, AwdCheckReason Reason = AwdCheckReason.None);
@@ -41,7 +42,11 @@ public sealed record AwdProbe(AwdProbeOutcome Outcome, AwdCheckReason Reason = A
 public sealed record AwdExpectedFlag(Guid FlagId, bool Historical, AwdFlagObligation Obligation, bool RequiresWrite);
 
 /// <summary>The only per-flag evidence a checker can submit; it cannot choose its obligation or round.</summary>
-public sealed record AwdReportedFlag(Guid FlagId, AwdProbe Write, AwdProbe Read);
+public sealed record AwdReportedFlag(Guid FlagId, AwdProbe Write, AwdProbe Read,
+    string? PrivateReadContext = null, string? PublicLocator = null)
+{
+    public override string ToString() => $"AwdReportedFlag {{ FlagId = {FlagId}, Write = {Write}, Read = {Read}, PrivateReadContext = [REDACTED], PublicLocator = [REDACTED] }}";
+}
 
 public sealed record AwdFlagObservation(
     Guid FlagId,

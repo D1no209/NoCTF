@@ -22,15 +22,12 @@ public sealed class FileCleanupMessageHandler(NoCtfDbContext db, IStore objects)
 
 public sealed class AwdMessageHandler(
     NoCtfDbContext db,
-    AwdCheckerConfigurationCatalog configurations,
-    IPostCommitMessagePublisher outbox,
+    IAwdCheckerCoordinator checkers,
     IAwdRoundCoordinator rounds,
-    IInternalResultStore results,
     ILogger<AwdMessageHandler> logger)
 {
-    public Task Handle(DispatchAwdCheckers message, CancellationToken cancellationToken) =>
-        BackendMessageOperations.DispatchAwdCheckersAsync(
-            message, db, configurations, outbox, cancellationToken);
+    public async Task Handle(DispatchAwdCheckers message, CancellationToken cancellationToken) =>
+        _ = await checkers.DispatchAsync(message, cancellationToken);
 
     public async Task Handle(AdvanceAwdRound message, CancellationToken cancellationToken)
     {
@@ -50,8 +47,7 @@ public sealed class AwdMessageHandler(
         BackendMessageOperations.AwdFlagInjectionFailedAsync(message, db, cancellationToken);
 
     public Task Handle(AwdCheckerCallbackMissing message, CancellationToken cancellationToken) =>
-        BackendMessageOperations.AwdCheckerCallbackMissingAsync(
-            message, results, db, cancellationToken);
+        checkers.ExpireAsync(message, cancellationToken);
 }
 
 public sealed class CompetitionLifecycleMessageHandler(

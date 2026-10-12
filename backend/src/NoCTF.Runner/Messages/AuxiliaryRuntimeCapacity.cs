@@ -24,10 +24,6 @@ public sealed class AuxiliaryRuntimeCapacity(
     IOptions<RunnerOptions> runnerOptions,
     IEnumerable<IRuntimeManagedResourceReconciler> reconcilers,
     RunnerResourceMutationCoordinator mutations,
-    NoCtfDbContext db,
-    IPostCommitMessagePublisher outbox,
-    ICompetitionEventRecorder events,
-    TimeProvider clock,
     ILogger<AuxiliaryRuntimeCapacity> logger,
     RuntimeExecutionOptions? executionOptions = null)
 {
@@ -67,24 +63,4 @@ public sealed class AuxiliaryRuntimeCapacity(
         }
     }
 
-    public async Task RecordAwdAdmissionFailureAsync(Guid factId, CancellationToken ct)
-    {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var fact = await db.GameplayFacts.SingleOrDefaultAsync(item => item.Id == factId, ct);
-        if (fact is null || fact.Kind != GameplayFactKind.AwdServiceTransition
-            || fact.State != GameplayFactState.Processing)
-            return;
-        fact.State = GameplayFactState.PlatformFailed;
-        fact.FailureCode = GameplayFactFailureCode.CheckerPlatformError;
-        fact.UpdatedAt = clock.GetUtcNow();
-        await events.RecordAsync(new(fact.CompetitionId, CompetitionEventKind.GameplayFactAdjudicated,
-            CompetitionEventLevel.Error, CompetitionEventVisibility.Staff, fact.UpdatedAt,
-            TeamId: fact.TeamId, CompetitionChallengeId: fact.CompetitionChallengeId,
-            GameplayFactId: fact.Id, GameplayFactKind: fact.Kind, GameplayFactState: fact.State,
-            GameplayFactResult: fact.Result), ct);
-        await outbox.PublishAsync(new GameplayFactStateChanged(fact.Id, fact.State));
-        await db.SaveChangesAsync(ct);
-        await transaction.CommitAsync(ct);
-        await outbox.FlushCommittedMessagesAsync();
-    }
 }

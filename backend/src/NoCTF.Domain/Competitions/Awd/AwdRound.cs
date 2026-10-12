@@ -47,6 +47,7 @@ public sealed class AwdRoundStoreBudget
 {
     public Guid RulesId { get; set; }
     public Guid StoreId { get; set; }
+    [MaxLength(64)] public string Name { get; set; } = "main";
     public decimal Weight { get; set; }
     public int FlagsPerIssue { get; set; }
     public AwdFlagDeliveryMode DeliveryMode { get; set; }

@@ -28,6 +28,14 @@ public sealed class ClusterScheduleSource(
         var entries = new List<ClusterScheduleEntry>();
         foreach (var contributor in contributors)
             entries.AddRange(await contributor.RebuildAsync(now, cancellationToken));
+        // Pending check facts survive the competition ending and do not require a running target.
+        if (await db.Competitions.AnyAsync(competition => competition.Mode == GameMode.Awd
+                && competition.DeletedAt == null && competition.Status == CompetitionStatus.Running, cancellationToken)
+            || await db.AwdFactDetails.AnyAsync(details => details.SampleActiveTicks != null
+                && details.Settlement == AwdSettlementState.Provisional
+                && details.Execution != AwdCheckExecution.Completed, cancellationToken))
+            entries.Add(new("awd-checkers", ClusterScheduleKind.AwdChecker, now,
+                TimeSpan.FromSeconds(1), new DispatchAwdCheckers(now)));
         var competitions = await db.Competitions.AsNoTracking()
             .Where(competition => competition.Status == CompetitionStatus.Running
                 && competition.DeletedAt == null
@@ -71,25 +79,6 @@ public sealed class ClusterScheduleSource(
         var latestObservations = observations
             .GroupBy(observation => observation.CompetitionChallengeId)
             .ToDictionary(group => group.Key, group => group.Max(item => item.OccurredAt));
-        var awdCompetitionIds = competitions
-            .Where(competition => competition.Mode == GameMode.Awd)
-            .Select(competition => competition.Id)
-            .ToArray();
-        if (awdCompetitionIds.Length > 0
-            && await db.RuntimeInstances.AsNoTracking().AnyAsync(runtime =>
-                runtime.CompetitionId != null
-                && awdCompetitionIds.Contains(runtime.CompetitionId.Value)
-                && runtime.State == NoCTF.Domain.Runtime.RuntimeState.Running,
-                cancellationToken))
-        {
-            entries.Add(new(
-                "awd-checkers",
-                ClusterScheduleKind.AwdChecker,
-                now,
-                TimeSpan.FromSeconds(1),
-                new DispatchAwdCheckers(now)));
-        }
-
         foreach (var competition in competitions)
         {
             var competitionChallenges = challengesByCompetition.GetValueOrDefault(competition.Id, []);
