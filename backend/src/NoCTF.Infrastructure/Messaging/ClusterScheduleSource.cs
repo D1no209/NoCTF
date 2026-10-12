@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using NoCTF.Application.Messaging;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Competitions.Awd;
 using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Teams;
 using NoCTF.GameModes.Awd.Configuration;
@@ -30,12 +31,7 @@ public sealed class ClusterScheduleSource(
         var competitions = await db.Competitions.AsNoTracking()
             .Where(competition => competition.Status == CompetitionStatus.Running
                 && competition.DeletedAt == null
-                && (competition.Mode == GameMode.Awd || competition.Mode == GameMode.Koh)
-                && (competition.Mode != GameMode.Awd
-                    || db.Teams.Any(team => team.CompetitionId == competition.Id
-                        && team.RegistrationStatus == TeamRegistrationStatus.Approved
-                        && !team.IsBanned
-                        && team.DeletedAt == null)))
+                && (competition.Mode == GameMode.Awd || competition.Mode == GameMode.Koh))
             .Select(competition => new ActiveCompetition(
                 competition.Id,
                 competition.Mode,
@@ -59,21 +55,8 @@ public sealed class ClusterScheduleSource(
             .AsSplitQuery()
             .ToArrayAsync(cancellationToken);
         var challengeIds = challenges.Select(challenge => challenge.Id).ToArray();
-        var flags = challengeIds.Length == 0
-            ? []
-            : await db.ChallengeFlags.AsNoTracking()
-                .Where(flag => flag.CompetitionChallengeId != null
-                    && challengeIds.Contains(flag.CompetitionChallengeId.Value)
-                    && flag.SpecificationKind == SpecificationKind.AwdRound
-                    && flag.SpecificationId != null
-                    && flag.ValidStart != null
-                    && flag.ValidUntil != null)
-                .Select(flag => new AwdFlagWindow(
-                    flag.CompetitionChallengeId!.Value,
-                    flag.SpecificationId!.Value,
-                    flag.ValidStart!.Value,
-                    flag.ValidUntil!.Value))
-                .ToArrayAsync(cancellationToken);
+        var rounds = await db.AwdRounds.AsNoTracking()
+            .Where(round => competitionIds.Contains(round.CompetitionId)).ToArrayAsync(cancellationToken);
         var observations = challengeIds.Length == 0
             ? []
             : await db.GameplayFacts.AsNoTracking()
@@ -109,8 +92,7 @@ public sealed class ClusterScheduleSource(
 
         foreach (var competition in competitions)
         {
-            if (!challengesByCompetition.TryGetValue(competition.Id, out var competitionChallenges))
-                continue;
+            var competitionChallenges = challengesByCompetition.GetValueOrDefault(competition.Id, []);
             var effectiveRuntime = await CompetitionEffectiveRuntimeReader.ReadAsync(
                 db,
                 competition.Id,
@@ -125,8 +107,7 @@ public sealed class ClusterScheduleSource(
             {
                 AddAwdEntries(
                     competition,
-                    competitionChallenges,
-                    flags,
+                    rounds,
                     effectiveRuntime.Elapsed,
                     now,
                     entries);
@@ -148,48 +129,33 @@ public sealed class ClusterScheduleSource(
 
     private void AddAwdEntries(
         ActiveCompetition competition,
-        IReadOnlyList<ActiveChallenge> challenges,
-        IReadOnlyList<AwdFlagWindow> flags,
+        IReadOnlyList<AwdRound> rounds,
         TimeSpan effectiveElapsed,
         DateTimeOffset now,
         ICollection<ClusterScheduleEntry> entries)
     {
-        var settings = awdConfigurations.Get(
-            (AwdCompetitionModeConfiguration)competition.Configuration);
-        var hardening = TimeSpan.FromSeconds(settings.HardeningDurationSeconds);
-        var interval = TimeSpan.FromSeconds(settings.RoundDurationSeconds);
-        foreach (var challenge in challenges)
-        {
-            var latest = LatestWindow(challenge.Id, flags);
-            var plan = AwdRoundScheduler.PlanCurrentRound(
-                now,
-                competition.EndAt,
-                effectiveElapsed,
-                hardening,
-                interval,
-                latest);
-            var intendedDueAt = plan.Kind switch
-            {
-                AwdRoundPlanKind.WaitingForHardening => now + (hardening - effectiveElapsed),
-                AwdRoundPlanKind.Current => plan.Window!.Value.ValidUntil,
-                AwdRoundPlanKind.Create => now,
-                AwdRoundPlanKind.Finished => competition.EndAt,
-                _ => throw new ArgumentOutOfRangeException(nameof(plan.Kind), plan.Kind, null)
-            };
-            if (intendedDueAt >= competition.EndAt)
-                continue;
-            var clamped = ClusterScheduleClock.ClampWithoutCatchUp(intendedDueAt, now, interval);
-            logger.LogDebug(
-                "AWD round schedule for {CompetitionChallengeId}: elapsed={Elapsed}, plan={Plan}, due={DueAt}.",
-                challenge.Id, effectiveElapsed, plan.Kind, clamped.DueAt);
-            entries.Add(new(
-                $"awd-round:{challenge.Id:N}",
-                ClusterScheduleKind.AwdRound,
-                clamped.DueAt,
-                interval,
-                new AdvanceAwdRound(competition.Id, challenge.Id, clamped.DueAt),
-                clamped.SkippedTicks));
-        }
+        var configuration = (AwdCompetitionModeConfiguration)competition.Configuration;
+        var settings = awdConfigurations.Get(configuration);
+        var plan = AwdRoundTimeline.Plan(rounds.Where(round => round.CompetitionId == competition.Id).ToArray(),
+            effectiveElapsed, TimeSpan.FromSeconds(settings.HardeningDurationSeconds),
+            TimeSpan.FromSeconds(settings.RoundDurationSeconds), configuration.AwdOptions.RoundGapSeconds,
+            configuration.AwdOptions.TotalRounds);
+        if (plan.NextRunningPosition is null && plan.NewRounds.Count == 0)
+            return;
+        // Periodic current-round redispatch repairs a lost post-commit publication without
+        // inventing historical flag deliveries. The durable round remains the schedule source.
+        var delay = plan.NewRounds.Count > 0 ? TimeSpan.Zero
+            : plan.NextRunningPosition!.Value - effectiveElapsed;
+        if (plan.Current is not null && delay > TimeSpan.FromSeconds(5))
+            delay = TimeSpan.FromSeconds(5);
+        var dueAt = now + delay;
+        if (dueAt >= competition.EndAt)
+            return;
+        logger.LogDebug("AWD competition {CompetitionId} next round coordination is due at {DueAt}.",
+            competition.Id, dueAt);
+        entries.Add(new($"awd-round:{competition.Id:N}", ClusterScheduleKind.AwdRound,
+            dueAt, TimeSpan.FromSeconds(5),
+            new AdvanceAwdRound(competition.Id, dueAt)));
     }
 
     private void AddKohEntries(
@@ -226,32 +192,6 @@ public sealed class ClusterScheduleSource(
         }
     }
 
-    private static AwdPersistedRoundWindow? LatestWindow(
-        Guid competitionChallengeId,
-        IReadOnlyList<AwdFlagWindow> flags)
-    {
-        var parsed = flags
-            .Where(flag => flag.CompetitionChallengeId == competitionChallengeId)
-            .Select(flag => new
-            {
-                Round = AwdRoundSpecificationId.Parse(flag.SpecificationId).Round,
-                flag.ValidStart,
-                flag.ValidUntil
-            })
-            .ToArray();
-        if (parsed.Length == 0)
-            return null;
-        var latestRound = parsed.Max(flag => flag.Round);
-        var windows = parsed
-            .Where(flag => flag.Round == latestRound)
-            .Select(flag => new { flag.ValidStart, flag.ValidUntil })
-            .Distinct()
-            .ToArray();
-        return windows.Length == 1
-            ? new(latestRound, windows[0].ValidStart, windows[0].ValidUntil)
-            : null;
-    }
-
     private sealed record ActiveCompetition(
         Guid Id,
         GameMode Mode,
@@ -263,12 +203,6 @@ public sealed class ClusterScheduleSource(
         Guid Id,
         Guid CompetitionId,
         CompetitionChallengeRules Rules);
-
-    private sealed record AwdFlagWindow(
-        Guid CompetitionChallengeId,
-        Guid SpecificationId,
-        DateTimeOffset ValidStart,
-        DateTimeOffset ValidUntil);
 
     private sealed record KohObservation(
         Guid CompetitionChallengeId,

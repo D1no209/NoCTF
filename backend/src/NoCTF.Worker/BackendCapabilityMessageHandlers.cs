@@ -35,8 +35,8 @@ public sealed class AwdMessageHandler(
     public async Task Handle(AdvanceAwdRound message, CancellationToken cancellationToken)
     {
         var outcome = await rounds.AdvanceAsync(message, cancellationToken);
-        logger.LogDebug("AWD round advance for {CompetitionChallengeId} ended with {Outcome}.",
-            message.CompetitionChallengeId, outcome);
+        logger.LogDebug("AWD round advance for {CompetitionId} ended with {Outcome}.",
+            message.CompetitionId, outcome);
     }
 
     public async Task Handle(GenerateAwdFlags message, CancellationToken cancellationToken)

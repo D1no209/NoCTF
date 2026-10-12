@@ -13,7 +13,6 @@ public static class AwdFlagInjectionExecutionBudget
 
 public sealed record AdvanceAwdRound(
     Guid CompetitionId,
-    Guid CompetitionChallengeId,
     DateTimeOffset At);
 
 public sealed record GenerateAwdFlags(

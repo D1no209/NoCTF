@@ -110,19 +110,7 @@ public sealed class CompetitionConfigurationStore(
         tracked.UpdatedAt = now;
         if (tracked.Mode == GameMode.Awd && status == CompetitionStatus.Running)
         {
-            var challenges = await db.CompetitionChallenges.AsNoTracking()
-                .Where(challenge => challenge.CompetitionId == competitionId
-                    && challenge.IsPublished
-                    && challenge.DeletedAt == null)
-                .Select(challenge => challenge.Id)
-                .ToListAsync(ct);
-            foreach (var challengeId in challenges)
-            {
-                await outbox.PublishAsync(new AdvanceAwdRound(
-                    competitionId,
-                    challengeId,
-                    now));
-            }
+            await outbox.PublishAsync(new AdvanceAwdRound(competitionId, now));
         }
         await events.RecordAsync(new(
             competitionId,

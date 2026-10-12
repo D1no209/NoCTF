@@ -106,7 +106,6 @@ public sealed class ChallengeConfigurationStore(
         {
             await outbox.PublishAsync(new AdvanceAwdRound(
                 competitionId,
-                challengeId,
                 updatedAt));
         }
         await events.RecordAsync(new(

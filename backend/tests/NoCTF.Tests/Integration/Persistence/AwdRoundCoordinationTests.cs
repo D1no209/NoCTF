@@ -15,6 +15,9 @@ using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Koh.Configuration;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Competitions.Awd;
+using NoCTF.Infrastructure.Competitions.Lifecycle;
+using NoCTF.Infrastructure.Competitions.Events;
+using NoCTF.Application.Competitions.Lifecycle;
 using NoCTF.Infrastructure.GameplayFacts.Processing;
 using NoCTF.Infrastructure.Messaging;
 using NoCTF.Worker;
@@ -28,7 +31,7 @@ public sealed class AwdRoundCoordinationTests
 {
     [Test]
     [Timeout(300_000)]
-    public async Task Rebuilt_schedule_resumes_at_current_round_without_historical_ticks(
+    public async Task Rebuilt_schedule_records_missed_rounds_even_without_eligible_teams(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -47,6 +50,7 @@ public sealed class AwdRoundCoordinationTests
             var resumedAt = fixture.Now.AddMinutes(17);
 
             await using var db = new NoCtfDbContext(options);
+            await db.Teams.ExecuteUpdateAsync(setters => setters.SetProperty(team => team.IsBanned, true), cancellationToken);
             var source = new ClusterScheduleSource(
                 db,
                 new AwdRoundConfigurationCatalog(),
@@ -74,7 +78,35 @@ public sealed class AwdRoundCoordinationTests
             await Assert.That(generate.Round).IsEqualTo(AwdRoundSpecificationId.FromRound(4));
             await Assert.That(generate.ValidStart).IsLessThan(resumedAt);
             await Assert.That(generate.ValidUntil).IsGreaterThan(resumedAt);
+            await Assert.That(await db.AwdRounds.CountAsync(cancellationToken)).IsEqualTo(4);
+            await Assert.That(await db.AwdRounds.CountAsync(round => round.Missed, cancellationToken)).IsEqualTo(3);
+            await Assert.That(await db.ChallengeFlags.CountAsync(cancellationToken)).IsEqualTo(0);
             await Assert.That(outbox.Scheduled).IsEmpty();
+            // A competition clock also survives disabling its last question.
+            await db.CompetitionChallenges.ExecuteUpdateAsync(setters => setters.SetProperty(challenge => challenge.IsPublished, false), cancellationToken);
+            var emptySchedule = await source.RebuildAsync(fixture.Now.AddMinutes(20), cancellationToken);
+            await Assert.That(emptySchedule.Count(item => item.Kind == ClusterScheduleKind.AwdRound)).IsEqualTo(1);
+            var lifecycleClock = new MutableTimeProvider(fixture.Now.AddMinutes(18));
+            var lifecycle = new CompetitionLifecycleStore(db, null!, outbox,
+                new CompetitionEventStore(db, outbox), clock: lifecycleClock);
+            await Assert.That(await lifecycle.TryTransitionWithAuditAsync(fixture.CompetitionId,
+                CompetitionStatus.Running, CompetitionStatus.Paused, fixture.OwnerId, "pause test", false,
+                CompetitionLifecycleEffects.None, cancellationToken)).IsTrue();
+            // A paused AWD competition must not be automatically finished at its old wall deadline.
+            await Assert.That(await lifecycle.GetDueAsync(fixture.Now.AddHours(2), cancellationToken)).IsEmpty();
+            lifecycleClock.UtcNow = fixture.Now.AddMinutes(28);
+            await Assert.That(await lifecycle.TryTransitionWithAuditAsync(fixture.CompetitionId,
+                CompetitionStatus.Paused, CompetitionStatus.Running, fixture.OwnerId, "resume test", false,
+                CompetitionLifecycleEffects.None, cancellationToken)).IsTrue();
+            var resumedRound = await db.AwdRounds.SingleAsync(round => round.Number == 4, cancellationToken);
+            await Assert.That(resumedRound.StartsAt).IsEqualTo(fixture.Now.AddMinutes(15));
+            await Assert.That(resumedRound.EndsAt).IsEqualTo(fixture.Now.AddMinutes(30));
+            lifecycleClock.UtcNow = fixture.Now.AddMinutes(30);
+            var resumedCoordinator = new AwdRoundCoordinator(db, new AwdRoundConfigurationCatalog(), outbox, lifecycleClock);
+            await resumedCoordinator.AdvanceAsync(new AdvanceAwdRound(fixture.CompetitionId, lifecycleClock.UtcNow), cancellationToken);
+            var nextRound = await db.AwdRounds.SingleAsync(round => round.Number == 5, cancellationToken);
+            await Assert.That(nextRound.StartsAt).IsEqualTo(fixture.Now.AddMinutes(30));
+            await Assert.That(nextRound.EndsAt).IsEqualTo(fixture.Now.AddMinutes(35));
         });
     }
 
@@ -238,8 +270,7 @@ public sealed class AwdRoundCoordinationTests
                 clock);
             var advance = await coordinator.AdvanceAsync(
                 new AdvanceAwdRound(
-                    fixture.CompetitionId,
-                    fixture.CompetitionChallengeId,
+                fixture.CompetitionId,
                     fixture.Now),
                 cancellationToken);
             await Assert.That(advance).IsEqualTo(MessageExecutionOutcome.Applied);
@@ -268,13 +299,15 @@ public sealed class AwdRoundCoordinationTests
                 cancellationToken);
             var resumeReplacement = await coordinator.AdvanceAsync(
                 new AdvanceAwdRound(
-                    fixture.CompetitionId,
-                    fixture.CompetitionChallengeId,
+                fixture.CompetitionId,
                     fixture.Now),
                 cancellationToken);
             await Assert.That(resumeReplacement).IsEqualTo(MessageExecutionOutcome.DeferredSchedule);
             await Assert.That(outbox.Scheduled).IsEmpty();
-            var currentRoundGenerate = generate with { ValidUntil = extendedUntil };
+            // A flag lifetime cannot mutate the competition round window.
+            var currentRoundGenerate = generate;
+            var persistedRound = await db.AwdRounds.AsNoTracking().SingleAsync(cancellationToken);
+            await Assert.That(persistedRound.EndsAt).IsEqualTo(generate.ValidUntil);
 
             var greenTeamId = Guid.CreateVersion7();
             var greenRuntimeId = Guid.CreateVersion7();
@@ -352,13 +385,12 @@ public sealed class AwdRoundCoordinationTests
             clock.UtcNow = fixture.Now.AddMinutes(17);
             var delayedAdvance = await coordinator.AdvanceAsync(
                 new AdvanceAwdRound(
-                    fixture.CompetitionId,
-                    fixture.CompetitionChallengeId,
+                fixture.CompetitionId,
                     currentRoundGenerate.ValidUntil),
                 cancellationToken);
             await Assert.That(delayedAdvance).IsEqualTo(MessageExecutionOutcome.Applied);
             var currentGenerate = outbox.Published.OfType<GenerateAwdFlags>().Last();
-            await Assert.That(currentGenerate.Round).IsEqualTo(AwdRoundSpecificationId.FromRound(2));
+            await Assert.That(currentGenerate.Round).IsEqualTo(AwdRoundSpecificationId.FromRound(4));
             var roundProjection = outbox.Published.OfType<ProjectLeaderboard>().Single();
             await Assert.That(roundProjection.CompetitionId).IsEqualTo(fixture.CompetitionId);
             await Assert.That(currentGenerate.ValidStart).IsLessThanOrEqualTo(clock.UtcNow);
@@ -376,20 +408,19 @@ public sealed class AwdRoundCoordinationTests
             clock.UtcNow = currentGenerate.ValidUntil;
             await coordinator.AdvanceAsync(
                 new AdvanceAwdRound(
-                    fixture.CompetitionId,
-                    fixture.CompetitionChallengeId,
+                fixture.CompetitionId,
                     currentGenerate.ValidUntil),
                 cancellationToken);
-            await Assert.That(outbox.Published.OfType<GenerateAwdFlags>().Count()).IsEqualTo(2);
+            await Assert.That(await db.AwdRounds.CountAsync(cancellationToken)).IsEqualTo(5);
+            await Assert.That(await db.AwdRounds.CountAsync(round => round.Missed, cancellationToken)).IsEqualTo(2);
             await Assert.That(outbox.Scheduled).IsEmpty();
 
             var stale = await coordinator.AdvanceAsync(
                 new AdvanceAwdRound(
-                    fixture.CompetitionId,
-                    fixture.CompetitionChallengeId,
+                fixture.CompetitionId,
                     fixture.Now),
                 cancellationToken);
-            await Assert.That(stale).IsEqualTo(MessageExecutionOutcome.Idempotent);
+            await Assert.That(stale).IsEqualTo(MessageExecutionOutcome.DeferredSchedule);
         });
     }
 

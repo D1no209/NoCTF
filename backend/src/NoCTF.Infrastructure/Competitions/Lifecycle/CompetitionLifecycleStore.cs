@@ -40,6 +40,7 @@ public sealed class CompetitionLifecycleStore(
                 && ((item.Status == CompetitionStatus.Published && item.StartAt <= now)
                     || (item.Status != CompetitionStatus.Draft
                         && item.Status != CompetitionStatus.Finished
+                        && !(item.Mode == GameMode.Awd && item.Status == CompetitionStatus.Paused)
                         && item.EndAt <= now)))
             .Select(item => new CompetitionLifecycleSnapshot(item.Id, item.Status, item.StartAt, item.EndAt))
             .ToListAsync(cancellationToken);
@@ -122,6 +123,12 @@ public sealed class CompetitionLifecycleStore(
                 if (pauseStartedAt is DateTimeOffset pausedAt)
                 {
                     var pauseDuration = now - pausedAt;
+                    competition.EndAt = competition.EndAt.Add(pauseDuration);
+                    var currentRounds = await db.AwdRounds.Where(round => round.CompetitionId == competitionId
+                        && round.StartsAt <= pausedAt && round.EndsAt > pausedAt)
+                        .ToListAsync(cancellationToken);
+                    foreach (var round in currentRounds)
+                        round.EndsAt = round.EndsAt.Add(pauseDuration);
                     var currentFlags = await db.ChallengeFlags
                         .Join(
                             db.CompetitionChallenges,
