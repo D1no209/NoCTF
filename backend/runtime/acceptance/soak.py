@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import pathlib
+import shutil
 import subprocess
 import sys
 import time
@@ -85,16 +86,47 @@ class Soak(Run):
 
     def driver(self, kind, cycle):
         output = self.path / f"cycle-{cycle:05d}-{kind}.json"
-        arguments = ["node", HERE / "workload.mjs", "--command", kind, "--fixture", self.path / "fixture.json",
-                     "--output", output]
+        arguments = ["--command", kind, "--fixture", self.path / "fixture.json", "--output", output]
         if kind == "runtime":
             arguments += ["--runtime-image", self.args.runtime_image]
         else:
             arguments += ["--seconds", str(self.args.seconds)]
-        with (self.path / f"cycle-{cycle:05d}-{kind}.log").open("w", encoding="utf-8") as log:
-            result = subprocess.run([str(item) for item in arguments], stdout=log, stderr=subprocess.STDOUT, timeout=1800)
-        self.event("workload", cycle=cycle, scenario=kind, exitCode=result.returncode, report=output.name)
-        return result.returncode
+        executable = shutil.which("node")
+        if executable is None:
+            raise RuntimeError("Node executable is unavailable")
+        for attempt in range(1, 4):
+            prefix = self.path / f"cycle-{cycle:05d}-{kind}-attempt-{attempt}"
+            started_receipt = prefix.with_suffix(".started.json")
+            log_path = prefix.with_suffix(".log")
+            started = time.time()
+            timed_out = False
+            with log_path.open("w", encoding="utf-8") as log:
+                process = subprocess.Popen([executable, str(HERE / "bootstrap.mjs"), str(started_receipt),
+                    *[str(item) for item in arguments]], stdout=log, stderr=subprocess.STDOUT)
+                try:
+                    process.wait(timeout=1800)
+                except subprocess.TimeoutExpired:
+                    timed_out = True
+                    process.kill()
+                    process.wait(timeout=30)
+            elapsed = time.time() - started
+            entered = started_receipt.exists()
+            exists = output.exists()
+            write(prefix.with_suffix(".process.json"), {"node": executable, "pid": process.pid,
+                "startedAt": started, "elapsedSeconds": elapsed, "exitCode": process.returncode,
+                "timedOut": timed_out, "enteredWorkload": entered, "reportExists": exists,
+                "logBytes": log_path.stat().st_size})
+            if exists and not timed_out:
+                self.event("workload", cycle=cycle, scenario=kind, exitCode=process.returncode,
+                           report=output.name, attempt=attempt)
+                return process.returncode
+            if not entered and not timed_out and elapsed < 10 and process.returncode != 0 and attempt < 3:
+                self.event("driver-start-retry", cycle=cycle, scenario=kind, attempt=attempt,
+                           exitCode=process.returncode, reason="No bootstrap receipt; business code was not entered")
+                time.sleep(attempt)
+                continue
+            raise RuntimeError(f"Node driver exited without a complete report: {prefix.name}; "
+                               f"enteredWorkload={entered}, exitCode={process.returncode}")
 
     def restart_host(self, force):
         self.event("host-restart-start", forced=force or self.args.platform == "windows")
@@ -116,7 +148,11 @@ class Soak(Run):
             time.sleep(35)
             command(["docker", "start", self.host_container])
         self.wait_ready()
-        self.event("host-restart-ready")
+        if self.process and (self.path / "ownership.json").exists():
+            ownership = json.loads((self.path / "ownership.json").read_text())
+            ownership["pid"] = self.process.pid
+            write(self.path / "ownership.json", ownership)
+        self.event("host-restart-ready", pid=self.process.pid if self.process else None)
 
     def wait_ready(self):
         for _ in range(120):
@@ -161,7 +197,7 @@ class Soak(Run):
     def execute(self):
         write(self.path / "harness.json", {"applicationFlavor": self.flavor,
               "scripts": {name: hashlib.sha256((HERE / name).read_bytes()).hexdigest()
-                          for name in ["soak.py", "compare.py", "workload.mjs"]}})
+                          for name in ["soak.py", "compare.py", "bootstrap.mjs", "workload.mjs"]}})
         self.dependencies()
         self.dependency_ids = list(self.containers)
         self.prepare_runner()
@@ -224,8 +260,12 @@ class Soak(Run):
               "cycles": cycle, "workloadsWithErrors": failures, "releaseApproval": False})
         return 1 if failures else 0
 
-    def cleanup(self):
-        self.close()
+    def cleanup(self, retain=False):
+        self.close(retain=retain)
+        if retain:
+            write(self.path / "retained-resources.json", {"id": self.id, "containers": self.containers,
+                  "volumes": self.volumes, "reason": "Failed acceptance; stopped resources retained for investigation"})
+            return
         for volume in self.volumes:
             owner = command(["docker", "volume", "inspect", "--format", '{{index .Labels "io.noctf.acceptance"}}', volume])
             if owner != self.id:
@@ -261,14 +301,16 @@ def main():
     args.output = args.output.resolve()
     private_directory(args.output)
     run = Soak(args)
+    failed = False
     try:
         return run.execute()
     except Exception as error:
+        failed = True
         run.event("fatal", error=str(error))
         write(run.path / "result.json", {"status": "failed", "failure": str(error), "durationGateMet": False})
         return 1
     finally:
-        run.cleanup()
+        run.cleanup(retain=failed)
 
 
 if __name__ == "__main__":

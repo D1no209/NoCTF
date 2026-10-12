@@ -241,7 +241,7 @@ class Run:
                                     stdout=log, stderr=subprocess.STDOUT, timeout=3600)
         return result.returncode
 
-    def close(self):
+    def close(self, retain=False):
         self.stop_sampling.set()
         if self.sampler:
             self.sampler.join(timeout=15)
@@ -272,7 +272,8 @@ class Run:
             owner = command(["docker", "inspect", "--format", '{{index .Config.Labels "io.noctf.acceptance"}}', container])
             if owner != self.id:
                 raise RuntimeError("Refusing cleanup of an unowned container")
-            subprocess.run(["docker", "rm", "-f", "-v", container], capture_output=True, check=True)
+            arguments = ["docker", "stop", "--time", "30", container] if retain else ["docker", "rm", "-f", "-v", container]
+            subprocess.run(arguments, capture_output=True, check=True)
 
 
 def main():

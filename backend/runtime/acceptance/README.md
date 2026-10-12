@@ -56,6 +56,14 @@ one activity; `allowExposedQuestions` does not reset that inventory. Exhaustion 
 an incomplete workload stops duration qualification instead of silently spending
 the remaining soak time on rejected theory requests. Per-run reports retain the
 activity ID and each soak records its harness file hashes.
+Node workload processes enter through `bootstrap.mjs`, which writes a startup
+receipt before importing any business workload code. The supervisor records PID,
+exit status, duration and report presence for every attempt. Only a quick failed
+start with no bootstrap receipt may retry (at most three attempts). A process that
+entered the workload but did not produce a report fails the run without replay.
+On an exceptional soak failure, owned resources are stopped and retained for
+investigation; their receipt identifies the exact IDs. Successful completion uses
+the normal verified cleanup path.
 
 Windows requires a synthetic JSON `--runner-environment` containing `KUBECONFIG`
 and `Runtime__Kubernetes__*` settings for an exclusively owned test cluster.

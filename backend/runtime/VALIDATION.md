@@ -280,3 +280,33 @@ The interrupted run's Hosts and dependency containers were stopped with ownershi
 verification; their data and logs were retained. A 156-second idle observation
 before stopping showed approximately flat private/cgroup memory, without a return
 to initial levels; it does not establish a long-term memory bound.
+
+## Linux driver exit after approximately five hours
+
+Both platforms passed their first PostgreSQL/Redis/NATS restart and score
+verification (Windows cycle 61, Linux cycle 62). Linux subsequently completed 76
+workload and Runtime cycles. At 16:08:28 UTC on October 12, the Node process for
+cycle 77 returned exit code 1 in less than one second, left an empty process log,
+and produced no workload report. The supervisor therefore failed the duration
+run. Host readiness was still HTTP 200 immediately beforehand; cgroup `oom` and
+`oom_kill` were zero, and the Host then shut down normally during supervisor
+cleanup. There is no evidence here of a CoreCLR crash. The Node exit's root cause
+is unresolved; no matching Node Application Error event was found.
+
+The Linux 24-hour gate is not satisfied. Its reports and shutdown log remain under
+`diagnostics/campaign-bc73cb90-v2/soak-linux`; this supervisor version removed its
+owned dependency containers during cleanup. The older interrupted campaign's
+retained containers were not touched. Windows remains active in v2 and has not
+been restarted for this investigation.
+
+A new bootstrap receipt and per-attempt process diagnostics distinguish failures
+before workload entry from failures after business code could run. Lightweight
+fault checks confirmed that an entered workload without a report is attempted
+only once, while a pre-bootstrap failure is bounded to three attempts. No HTTP
+business calls were made by those checks. Future exceptional failures retain
+stopped owned resources. The unmodified scripts already loaded by the continuing
+Windows supervisor are preserved in `campaign-bc73cb90-v2/harness-source`, with
+hashes verified against its original `harness.json`; its workload script and Host
+binary are unchanged. Linux will be restarted separately for a full new interval.
+The paired campaign must not proceed to performance comparisons until both valid
+platform durations and rollback checks have completed.
