@@ -18,13 +18,14 @@ public sealed record AwdConfiguration(
 {
     public static AwdConfiguration Default { get; } = new(
         HardeningDurationSeconds: 0,
-        RoundDurationSeconds: 300,
+        RoundDurationSeconds: 180,
         AttackRewardMode: AttackRewardMode.FixedPerAttack,
         AttackPoints: 50,
         VictimDefensePoolPoints: 100,
         CheckerIntervalSeconds: 30,
         ServiceHealthyPoints: 100,
-        ServiceUnhealthyPenalty: 50);
+        ServiceUnhealthyPenalty: 0,
+        FlagTemplate: Flags.AwdFlagGenerator.Default);
 }
 
 [JsonConverter(typeof(AttackRewardModeJsonConverter))]

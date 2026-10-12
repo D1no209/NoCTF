@@ -1430,6 +1430,10 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("concurrency_stamp");
 
+                    b.Property<Guid?>("DeliveryAttemptId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("delivery_attempt_id");
+
                     b.Property<int>("DeliveryAttempts")
                         .HasColumnType("integer")
                         .HasColumnName("delivery_attempts");
@@ -1536,6 +1540,9 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_awd_flag_issues_digest");
 
+                    b.HasIndex("CompetitionId", "KeyVersion")
+                        .HasDatabaseName("ix_awd_flag_issues_competition_id_key_version");
+
                     b.HasIndex("RulesId", "StoreId")
                         .HasDatabaseName("ix_awd_flag_issues_rules_id_store_id");
 
@@ -1553,6 +1560,40 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasDatabaseName("ix_awd_flag_issues_competition_id_competition_challenge_id_tea");
 
                     b.ToTable("awd_flag_issues", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdFlagKey", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_at");
+
+                    b.Property<byte[]>("ProtectedSecret")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("bytea")
+                        .HasColumnName("protected_secret");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_awd_flag_keys");
+
+                    b.HasAlternateKey("CompetitionId", "Version")
+                        .HasName("ak_awd_flag_keys_competition_id_version");
+
+                    b.ToTable("awd_flag_keys", (string)null);
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdRound", b =>
@@ -1653,6 +1694,18 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Property<int>("EligibleTeamCount")
                         .HasColumnType("integer")
                         .HasColumnName("eligible_team_count");
+
+                    b.Property<string>("FlagBodyTemplate")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("flag_body_template");
+
+                    b.Property<string>("FlagHeader")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("flag_header");
 
                     b.Property<int>("Revision")
                         .HasColumnType("integer")
@@ -1886,9 +1939,31 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("store_id");
 
+                    b.Property<short>("DeliveryMode")
+                        .HasColumnType("smallint")
+                        .HasColumnName("delivery_mode");
+
                     b.Property<int>("FlagsPerIssue")
                         .HasColumnType("integer")
                         .HasColumnName("flags_per_issue");
+
+                    b.Property<string>("InjectionCommand")
+                        .HasMaxLength(8192)
+                        .HasColumnType("character varying(8192)")
+                        .HasColumnName("injection_command");
+
+                    b.Property<int>("InjectionTimeoutSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("injection_timeout_seconds");
+
+                    b.Property<bool>("PreservesHistoricalFlags")
+                        .HasColumnType("boolean")
+                        .HasColumnName("preserves_historical_flags");
+
+                    b.Property<string>("TargetServiceName")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("target_service_name");
 
                     b.Property<decimal>("Weight")
                         .HasPrecision(18, 6)
@@ -10410,6 +10485,14 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_awd_flag_issues_challenge_flags_flag_id");
 
+                    b.HasOne("NoCTF.Domain.Competitions.Awd.AwdFlagKey", null)
+                        .WithMany()
+                        .HasForeignKey("CompetitionId", "KeyVersion")
+                        .HasPrincipalKey("CompetitionId", "Version")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_awd_flag_issues_awd_flag_keys_competition_id_key_version");
+
                     b.HasOne("NoCTF.Domain.Competitions.Awd.AwdRoundStoreBudget", null)
                         .WithMany()
                         .HasForeignKey("RulesId", "StoreId")
@@ -10432,6 +10515,16 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_awd_flag_issues_awd_round_rules_rules_id_round_id_competiti");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdFlagKey", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Competitions.Competition", null)
+                        .WithMany()
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_awd_flag_keys_competitions_competition_id");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdRound", b =>

@@ -4,6 +4,7 @@ using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Domain.Runtime;
+using NoCTF.Domain.Competitions.Awd;
 using NoCTF.Runner.Composition;
 using NoCTF.Runner.Messages;
 using Wolverine.Attributes;
@@ -22,7 +23,7 @@ public sealed class AwdFlagInjectionHandlerTests
     }
 
     [Test]
-    public async Task Nonzero_exit_retries_the_same_flag_on_the_original_node_queue()
+    public async Task Uncertain_write_is_not_repeated_and_keeps_the_issuance_for_verification()
     {
         var now = DateTimeOffset.Parse("2026-07-24T00:00:00Z");
         var work = CreateWork();
@@ -37,11 +38,9 @@ public sealed class AwdFlagInjectionHandlerTests
 
         var outcome = await handler.Handle(message, CancellationToken.None);
 
-        await Assert.That(outcome).IsEqualTo(MessageExecutionOutcome.DeferredSchedule);
-        var retry = outbox.ScheduledNodes.Single();
-        await Assert.That(retry.At).IsEqualTo(now.AddSeconds(1));
-        await Assert.That(retry.Message).IsEqualTo(message with { FailedAttempts = 1 });
-        await Assert.That(outbox.Published).IsEmpty();
+        await Assert.That(outcome).IsEqualTo(MessageExecutionOutcome.Applied);
+        await Assert.That(outbox.ScheduledNodes).IsEmpty();
+        await Assert.That(outbox.Published.OfType<AwdFlagInjectionFailed>().Single().ChallengeFlagId).IsEqualTo(message.ChallengeFlagId);
     }
 
     [Test]
@@ -67,7 +66,7 @@ public sealed class AwdFlagInjectionHandlerTests
     }
 
     [Test]
-    public async Task Named_service_receipt_uses_service_exec_and_expands_the_raw_template_outside_the_message()
+    public async Task Named_service_exec_passes_secret_as_argument_instead_of_shell_source()
     {
         var runtime = new RecordingNamedRuntime();
         var catalog = new StubProviderCatalog(runtime);
@@ -86,8 +85,9 @@ public sealed class AwdFlagInjectionHandlerTests
 
         await Assert.That(result.ExitCode).IsEqualTo(0);
         await Assert.That(runtime.ServiceName).IsEqualTo("web");
-        await Assert.That(runtime.Command).IsEquivalentTo([
-            "/bin/sh", "-c", "set-flag flag{a'b}"]);
+        await Assert.That(runtime.Command![2]).DoesNotContain(work.Flag);
+        await Assert.That(runtime.Command[4]).IsEqualTo(work.Flag);
+        await Assert.That(runtime.Command[2]).Contains("FLAG=$1;");
     }
 
     [Test]
@@ -160,6 +160,9 @@ public sealed class AwdFlagInjectionHandlerTests
         public Task<AwdFlagInjectionWork?> ReadAsync(
             InjectAwdFlag message,
             CancellationToken cancellationToken) => Task.FromResult<AwdFlagInjectionWork?>(work);
+        public Task CompleteAsync(InjectAwdFlag message, AwdFlagInjectionWork work, AwdFlagDeliveryState state,
+            AwdCheckReason reason, CancellationToken cancellationToken) => Task.CompletedTask;
+
     }
 
     private sealed class StubExecutor(ContainerExecResult result) : IAwdFlagInjectionExecutor

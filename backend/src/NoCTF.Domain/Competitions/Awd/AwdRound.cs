@@ -37,6 +37,8 @@ public sealed class AwdRoundRules
     public int CheckerIntervalSeconds { get; set; }
     public AwdRuleOptions Options { get; set; } = new();
     public int EligibleTeamCount { get; set; }
+    [MaxLength(64)] public string FlagHeader { get; set; } = "flag";
+    [MaxLength(512)] public string FlagBodyTemplate { get; set; } = "[SECURE]";
     public List<AwdRoundStoreBudget> Stores { get; set; } = [];
     public List<AwdRoundTeamEligibility> Teams { get; set; } = [];
 }
@@ -47,6 +49,11 @@ public sealed class AwdRoundStoreBudget
     public Guid StoreId { get; set; }
     public decimal Weight { get; set; }
     public int FlagsPerIssue { get; set; }
+    public AwdFlagDeliveryMode DeliveryMode { get; set; }
+    [MaxLength(64)] public string? TargetServiceName { get; set; }
+    [MaxLength(8192)] public string? InjectionCommand { get; set; }
+    public int InjectionTimeoutSeconds { get; set; } = 30;
+    public bool PreservesHistoricalFlags { get; set; }
 }
 
 public sealed class AwdRoundTeamEligibility

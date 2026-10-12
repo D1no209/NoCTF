@@ -11,6 +11,9 @@ using NoCTF.Domain.Teams;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Awd.Scheduling;
 using NoCTF.GameModes.Flags;
+using NoCTF.GameModes.Awd.Flags;
+using NoCTF.Infrastructure.Authentication;
+using System.Security.Cryptography;
 using NoCTF.Infrastructure.Challenges;
 using NoCTF.Infrastructure.Competitions.Lifecycle;
 
@@ -21,21 +24,8 @@ public sealed class AwdRoundCoordinator(
     IAwdRoundConfigurationCatalog configurations,
     IPostCommitMessagePublisher outbox,
     TimeProvider timeProvider,
-    TeamChallengeCriticalSection teamChallengeCriticalSection) : IAwdRoundCoordinator
+    PlatformSecretProtector secrets) : IAwdRoundCoordinator
 {
-    public AwdRoundCoordinator(
-        NoCtfDbContext db,
-        IAwdRoundConfigurationCatalog configurations,
-        IPostCommitMessagePublisher outbox,
-        TimeProvider timeProvider)
-        : this(
-            db,
-            configurations,
-            outbox,
-            timeProvider,
-            new TeamChallengeCriticalSection())
-    { }
-
     public async Task<MessageExecutionOutcome> GenerateFlagsAsync(
         GenerateAwdFlags message,
         CancellationToken cancellationToken)
@@ -44,7 +34,7 @@ public sealed class AwdRoundCoordinator(
             return MessageExecutionOutcome.RejectedBusiness;
         var ownsTransaction = db.Database.CurrentTransaction is null;
         await using var transaction = ownsTransaction
-            ? await db.Database.BeginTransactionAsync(cancellationToken)
+            ? await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken)
             : null;
         var status = await CompetitionStateReader.ReadAsync(
             db,
@@ -97,88 +87,159 @@ public sealed class AwdRoundCoordinator(
             .OrderBy(team => team.Id)
             .Select(team => team.Id)
             .ToListAsync(cancellationToken);
-        var existingFlags = await db.ChallengeFlags.AsNoTracking()
-            .Where(flag => flag.CompetitionChallengeId == message.CompetitionChallengeId
-                && flag.SpecificationKind == SpecificationKind.AwdRound
-                && flag.SpecificationId == message.Round.Value
-                && flag.TeamId != null)
-            .Select(flag => new { TeamId = flag.TeamId!.Value, flag.Flag })
-            .ToListAsync(cancellationToken);
-        var missing = teamIds.Except(existingFlags.Select(flag => flag.TeamId)).ToArray();
+        var rules = await ResolveRoundRulesAsync(target.Competition, target.Challenge, target.Template,
+            round, teamIds, handledAt, cancellationToken);
+        // Pauses within this round do not count towards an active-time issuance slot.
+        var clock = await AwdRunningClock.ReadAsync(db, target.Competition.Id, target.Competition.StartAt,
+            handledAt, cancellationToken);
+        var activeTicks = round.ActiveStartTicks + (clock.ElapsedAt(handledAt) - clock.ElapsedAt(round.StartsAt)).Ticks;
+        var slot = rules.Options.GenerationPolicy switch
+        {
+            AwdGenerationPolicy.EveryRound => round.Number - 1L,
+            AwdGenerationPolicy.EveryNRounds => (round.Number - 1L) / rules.Options.GenerationInterval,
+            AwdGenerationPolicy.ActiveInterval => activeTicks / TimeSpan.FromSeconds(rules.Options.GenerationInterval).Ticks,
+            _ => throw new InvalidOperationException("Unknown AWD generation policy.")
+        };
+        if (rules.Options.GenerationPolicy == AwdGenerationPolicy.EveryNRounds
+            && (round.Number - 1) % rules.Options.GenerationInterval != 0)
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            await CommitAndFlushIfOwnedAsync(transaction, cancellationToken);
+            return MessageExecutionOutcome.Idempotent;
+        }
+        var existing = await db.AwdFlagIssues.Where(issue => issue.CompetitionChallengeId == message.CompetitionChallengeId
+            && issue.GenerationSlot == slot
+            && db.AwdRoundRules.Any(snapshot => snapshot.Id == issue.RulesId
+                && snapshot.Options.GenerationPolicy == rules.Options.GenerationPolicy)).ToListAsync(cancellationToken);
+        var identities = existing.Select(issue => (issue.TeamId, issue.StoreId, issue.Ordinal)).ToHashSet();
         var runtimes = await db.RuntimeInstances.AsNoTracking()
             .Where(instance => instance.CompetitionChallengeId == message.CompetitionChallengeId
-                && instance.TeamId != null
-                && missing.Contains(instance.TeamId.Value)
+                && instance.TeamId != null && teamIds.Contains(instance.TeamId.Value)
                 && instance.State == NoCTF.Domain.Runtime.RuntimeState.Running
-                && instance.RunnerId != null
-                && instance.ProviderReceipt != null)
-            .Select(instance => new
-            {
-                TeamId = instance.TeamId!.Value,
-                instance.Id,
-                RunnerId = instance.RunnerId!
-            })
+                && instance.RunnerId != null && instance.ProviderReceipt != null)
+            .Select(instance => new { TeamId = instance.TeamId!.Value, instance.Id, RunnerId = instance.RunnerId! })
             .ToListAsync(cancellationToken);
         var runtimeByTeam = runtimes.ToDictionary(instance => instance.TeamId);
-        var template = AwdFlagTemplateResolver.Resolve(
-            (AwdCompetitionModeConfiguration)target.Competition.ModeConfiguration!,
-            (AwdCompetitionChallengeRules)target.Challenge.Rules!);
-        var candidates = existingFlags.Select(flag => flag.Flag).ToHashSet(StringComparer.Ordinal);
-        foreach (var teamId in missing)
+        var keyRecord = await db.AwdFlagKeys.Where(key => key.CompetitionId == message.CompetitionId)
+            .OrderByDescending(key => key.Version).FirstOrDefaultAsync(cancellationToken);
+        byte[] key;
+        if (keyRecord is null)
         {
-            using var teamLease = await teamChallengeCriticalSection.AcquireAsync(
-                db,
-                teamId,
-                message.CompetitionChallengeId,
-                cancellationToken);
-            if (await db.ChallengeFlags.AsNoTracking().AnyAsync(flag =>
-                    flag.CompetitionChallengeId == message.CompetitionChallengeId
-                    && flag.TeamId == teamId
-                    && flag.SpecificationKind == SpecificationKind.AwdRound
-                    && flag.SpecificationId == message.Round.Value,
-                    cancellationToken))
-                continue;
-            var context = new PerTeamFlagContext(
-                target.Competition.FlagDerivationSecret,
-                message.CompetitionId,
-                target.Challenge.ChallengeId,
-                message.CompetitionChallengeId,
-                teamId,
-                message.Round.Value);
-            var flag = GenerateCandidate(template, context, candidates);
-            var flagId = Guid.CreateVersion7();
-            db.ChallengeFlags.Add(new AwdRoundChallengeFlag
+            key = RandomNumberGenerator.GetBytes(32);
+            keyRecord = new AwdFlagKey
             {
-                Id = flagId,
-                CompetitionChallengeId = message.CompetitionChallengeId,
-                TeamId = teamId,
-                Flag = flag,
-                FlagSha256 = ManageChallengeFlags.Hash(flag),
-                SpecificationKind = SpecificationKind.AwdRound,
-                SpecificationId = message.Round.Value,
-                ValidStart = message.ValidStart,
-                ValidUntil = message.ValidUntil,
-                CreatedAt = handledAt
-            });
-            candidates.Add(flag);
-            if (runtimeByTeam.TryGetValue(teamId, out var runtime))
-            {
-                await outbox.PublishToRunnerNodeAsync(new InjectAwdFlag(
-                    runtime.Id,
-                    message.CompetitionChallengeId,
-                    flagId,
-                    message.ValidUntil,
-                    runtime.RunnerId));
-            }
-            await db.SaveChangesAsync(cancellationToken);
+                Id = Guid.CreateVersion7(), CompetitionId = message.CompetitionId, Version = 1, CreatedAt = handledAt
+            };
+            keyRecord.ProtectedSecret = secrets.Protect(Convert.ToBase64String(key), PlatformSecretPurpose.AwdFlagKey,
+                keyRecord.CompetitionId, keyRecord.Id);
+            db.AwdFlagKeys.Add(keyRecord);
         }
-        // The Singular Agent rebuilds due work from independent persisted competition rounds.
-        // Do not persist a recursive scheduled message as a second scheduling source.
-        if (missing.Length == 0)
-            return MessageExecutionOutcome.Idempotent;
+        else key = Convert.FromBase64String(secrets.Unprotect(keyRecord.ProtectedSecret, PlatformSecretPurpose.AwdFlagKey,
+            keyRecord.CompetitionId, keyRecord.Id));
+        var added = 0;
+        try
+        {
+            var template = new PerTeamFlagTemplate(rules.FlagHeader, rules.FlagBodyTemplate, false);
+            foreach (var teamId in teamIds)
+            foreach (var store in rules.Stores)
+            for (var ordinal = 0; ordinal < store.FlagsPerIssue; ordinal++)
+            {
+                if (identities.Contains((teamId, store.StoreId, ordinal))) continue;
+                var value = AwdFlagGenerator.Generate(template, key, new(message.CompetitionId,
+                    message.CompetitionChallengeId, teamId, round.Id, store.StoreId, slot, ordinal, keyRecord.Version));
+                var flagId = Guid.CreateVersion7();
+                var issue = new AwdFlagIssue
+                {
+                    FlagId = flagId, CompetitionId = message.CompetitionId,
+                    CompetitionChallengeId = message.CompetitionChallengeId, TeamId = teamId,
+                    RoundId = round.Id, RoundNumber = round.Number, RulesId = rules.Id, StoreId = store.StoreId,
+                    GenerationSlot = slot, Ordinal = ordinal, KeyVersion = keyRecord.Version,
+                    Digest = Convert.ToHexString(ManageChallengeFlags.Hash(value)), State = AwdFlagIssueState.Issued,
+                    DeliveryState = AwdFlagDeliveryState.Pending, Obligation = AwdFlagObligation.PlatformPending,
+                    IssuedAt = handledAt, UpdatedAt = handledAt
+                };
+                AwdFlagLifetime.Assign(issue, rules.Options, round.Number, activeTicks);
+                db.ChallengeFlags.Add(new AwdRoundChallengeFlag
+                {
+                    Id = flagId, CompetitionChallengeId = message.CompetitionChallengeId, TeamId = teamId,
+                    Flag = value, FlagSha256 = Convert.FromHexString(issue.Digest), SpecificationKind = SpecificationKind.AwdRound,
+                    SpecificationId = message.Round.Value, ValidStart = handledAt, ValidUntil = round.EndsAt,
+                    CreatedAt = handledAt, AwdIssue = issue
+                });
+                existing.Add(issue);
+                added++;
+            }
+        }
+        finally { CryptographicOperations.ZeroMemory(key); }
+        foreach (var issue in existing.Where(issue => issue.RoundId == round.Id
+                     && issue.State == AwdFlagIssueState.Issued && issue.DeliveryState == AwdFlagDeliveryState.Pending))
+        {
+            var store = rules.Stores.SingleOrDefault(store => store.StoreId == issue.StoreId);
+            if (store?.DeliveryMode != AwdFlagDeliveryMode.RunnerCommand
+                || !runtimeByTeam.TryGetValue(issue.TeamId, out var runtime)
+                || (issue.DeliveryRuntimeId is not null && handledAt - issue.UpdatedAt < TimeSpan.FromSeconds(5))) continue;
+            // Redispatch the same durable issuance after commit/publish failures; never derive a replacement.
+            issue.DeliveryRuntimeId = runtime.Id;
+            issue.UpdatedAt = handledAt;
+            await outbox.PublishToRunnerNodeAsync(new InjectAwdFlag(runtime.Id, message.CompetitionChallengeId,
+                issue.FlagId, round.EndsAt, runtime.RunnerId));
+        }
         await db.SaveChangesAsync(cancellationToken);
         await CommitAndFlushIfOwnedAsync(transaction, cancellationToken);
-        return MessageExecutionOutcome.Applied;
+        return added == 0 ? MessageExecutionOutcome.Idempotent : MessageExecutionOutcome.Applied;
+    }
+
+    private async Task<AwdRoundRules> ResolveRoundRulesAsync(Competition competition, CompetitionChallenge challenge,
+        Challenge template, AwdRound round, IReadOnlyList<Guid> teams, DateTimeOffset now, CancellationToken ct)
+    {
+        var previous = await db.AwdRoundRules.AsSplitQuery()
+            .Where(rules => rules.RoundId == round.Id && rules.CompetitionChallengeId == challenge.Id)
+            .OrderByDescending(rules => rules.Revision).FirstOrDefaultAsync(ct);
+        if (previous is not null && teams.All(team => previous.Teams.Any(entry => entry.TeamId == team))) return previous;
+        var effective = previous is null
+            ? AwdEffectiveRules.Resolve((AwdCompetitionModeConfiguration)competition.ModeConfiguration!,
+                (AwdCompetitionChallengeRules)challenge.Rules!) : AwdEffectiveRules.FromSnapshot(previous);
+        if (effective.Validate().Count > 0) throw new InvalidOperationException("AWD effective rules are invalid.");
+        var flagTemplate = previous is null
+            ? AwdFlagTemplateResolver.Resolve((AwdCompetitionModeConfiguration)competition.ModeConfiguration!,
+                (AwdCompetitionChallengeRules)challenge.Rules!)
+            : new PerTeamFlagTemplate(previous.FlagHeader, previous.FlagBodyTemplate, false);
+        if (!AwdFlagGenerator.IsValidTemplate(flagTemplate)) throw new InvalidOperationException("AWD flag template is insecure.");
+        var stores = previous is null
+            ? ((AwdChallengeDefinition)template.Definition!).FlagStores.Select(store =>
+            {
+                var overrideRule = ((AwdCompetitionChallengeRules)challenge.Rules!).StoreRules.SingleOrDefault(rule => rule.StoreId == store.Id);
+                return new AwdRoundStoreBudget
+                {
+                    StoreId = store.Id, Weight = overrideRule?.Weight ?? 1m,
+                    FlagsPerIssue = overrideRule?.FlagsPerIssue ?? effective.Options.FlagsPerStore,
+                    DeliveryMode = store.DeliveryMode, InjectionCommand = store.InjectionCommand,
+                    TargetServiceName = store.TargetServiceName, InjectionTimeoutSeconds = store.InjectionTimeoutSeconds,
+                    PreservesHistoricalFlags = store.PreservesHistoricalFlags
+                };
+            }).ToList()
+            : previous.Stores.Select(store => new AwdRoundStoreBudget
+            {
+                StoreId = store.StoreId, Weight = store.Weight, FlagsPerIssue = store.FlagsPerIssue,
+                DeliveryMode = store.DeliveryMode, InjectionCommand = store.InjectionCommand,
+                TargetServiceName = store.TargetServiceName, InjectionTimeoutSeconds = store.InjectionTimeoutSeconds,
+                PreservesHistoricalFlags = store.PreservesHistoricalFlags
+            }).ToList();
+        if (stores.Count is < 1 or > 64 || stores.Any(store => store.Weight <= 0 || decimal.Round(store.Weight, 6) != store.Weight
+                || store.FlagsPerIssue is < 1 or > 64))
+            throw new InvalidOperationException("AWD requires valid store budgets.");
+        var snapshot = new AwdRoundRules
+        {
+            Id = Guid.CreateVersion7(), CompetitionId = competition.Id, CompetitionChallengeId = challenge.Id,
+            RoundId = round.Id, Revision = (previous?.Revision ?? 0) + 1, EffectiveAt = now,
+            AttackRewardMode = effective.AttackMode, AttackPoints = effective.AttackPoints,
+            VictimDefensePoolPoints = effective.DefensePoints, ServiceHealthyPoints = effective.SlaPoints,
+            CheckerIntervalSeconds = effective.CheckerIntervalSeconds, Options = effective.Options with { },
+            EligibleTeamCount = teams.Count, Teams = teams.Select(team => new AwdRoundTeamEligibility { TeamId = team }).ToList(),
+            FlagHeader = flagTemplate.Header, FlagBodyTemplate = flagTemplate.BodyTemplate, Stores = stores
+        };
+        db.AwdRoundRules.Add(snapshot);
+        return snapshot;
     }
 
     public async Task<MessageExecutionOutcome> AdvanceAsync(
@@ -244,21 +305,6 @@ public sealed class AwdRoundCoordinator(
         return plan.NewRounds.Count > 0 ? MessageExecutionOutcome.Applied
             : plan.NextRunningPosition is null ? MessageExecutionOutcome.Idempotent
             : MessageExecutionOutcome.DeferredSchedule;
-    }
-
-    private static string GenerateCandidate(
-        PerTeamFlagTemplate template,
-        PerTeamFlagContext context,
-        IReadOnlySet<string> candidates)
-    {
-        for (var attempt = 1; attempt <= 10; attempt++)
-        {
-            var candidate = PerTeamFlagGenerator.Generate(template, context);
-            if (attempt == 10
-                || !candidates.Contains(candidate))
-                return candidate;
-        }
-        throw new InvalidOperationException("Flag candidate loop did not return a value.");
     }
 
     private async Task CommitAndFlushIfOwnedAsync(

@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using NoCTF.Application.Notifications;
 using NoCTF.GameModes.Awd.Configuration;
+using NoCTF.Infrastructure.Authentication;
 using System;
 
 namespace Internal.Generated.WolverineHandlers
@@ -19,11 +20,12 @@ namespace Internal.Generated.WolverineHandlers
         private readonly NoCTF.Application.Notifications.INotificationChangePublisher _notificationChangePublisher;
         private readonly NoCTF.GameModes.Awd.Configuration.AwdCheckerConfigurationCatalog _awdCheckerConfigurationCatalog;
         private readonly NoCTF.GameModes.Awd.Configuration.IAwdRoundConfigurationCatalog _awdRoundConfigurationCatalog;
+        private readonly NoCTF.Infrastructure.Authentication.PlatformSecretProtector _platformSecretProtector;
         private readonly System.TimeProvider _timeProvider1;
         private readonly System.TimeProvider _timeProvider2;
         private readonly System.TimeProvider _timeProvider3;
 
-        public GenerateAwdFlagsHandler174337860(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Worker.AwdMessageHandler> loggerOfAwdMessageHandler, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.GameModes.Awd.Configuration.AwdCheckerConfigurationCatalog awdCheckerConfigurationCatalog, NoCTF.GameModes.Awd.Configuration.IAwdRoundConfigurationCatalog awdRoundConfigurationCatalog, System.TimeProvider __timeProvider1, System.TimeProvider __timeProvider2, System.TimeProvider __timeProvider3)
+        public GenerateAwdFlagsHandler174337860(Microsoft.EntityFrameworkCore.DbContextOptions<NoCTF.Infrastructure.Persistence.NoCtfDbContext> dbContextOptionsOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher> loggerOfWolverinePostCommitMessagePublisher, Microsoft.Extensions.Logging.ILogger<NoCTF.Infrastructure.Persistence.NoCtfDbContext> loggerOfNoCtfDbContext, Microsoft.Extensions.Logging.ILogger<NoCTF.Worker.AwdMessageHandler> loggerOfAwdMessageHandler, NoCTF.Application.Notifications.INotificationChangePublisher notificationChangePublisher, NoCTF.GameModes.Awd.Configuration.AwdCheckerConfigurationCatalog awdCheckerConfigurationCatalog, NoCTF.GameModes.Awd.Configuration.IAwdRoundConfigurationCatalog awdRoundConfigurationCatalog, NoCTF.Infrastructure.Authentication.PlatformSecretProtector platformSecretProtector, System.TimeProvider __timeProvider1, System.TimeProvider __timeProvider2, System.TimeProvider __timeProvider3)
         {
             _dbContextOptionsOfNoCtfDbContext = dbContextOptionsOfNoCtfDbContext;
             _loggerOfWolverinePostCommitMessagePublisher = loggerOfWolverinePostCommitMessagePublisher;
@@ -32,6 +34,7 @@ namespace Internal.Generated.WolverineHandlers
             _notificationChangePublisher = notificationChangePublisher;
             _awdCheckerConfigurationCatalog = awdCheckerConfigurationCatalog;
             _awdRoundConfigurationCatalog = awdRoundConfigurationCatalog;
+            _platformSecretProtector = platformSecretProtector;
             _timeProvider1 = __timeProvider1;
             _timeProvider2 = __timeProvider2;
             _timeProvider3 = __timeProvider3;
@@ -47,7 +50,7 @@ namespace Internal.Generated.WolverineHandlers
             var wolverinePostCommitMessagePublisher = new NoCTF.Infrastructure.Messaging.WolverinePostCommitMessagePublisher(context, noCtfDbContext, _loggerOfWolverinePostCommitMessagePublisher, postCommitDispatchStatus);
             var competitionEventStore = new NoCTF.Infrastructure.Competitions.Events.CompetitionEventStore(noCtfDbContext, wolverinePostCommitMessagePublisher, _timeProvider3);
             var internalResultStore = new NoCTF.Infrastructure.GameplayFacts.Processing.InternalResultStore(noCtfDbContext, wolverinePostCommitMessagePublisher, competitionEventStore, progressionReconciler);
-            var awdRoundCoordinator = new NoCTF.Infrastructure.Competitions.Awd.AwdRoundCoordinator(noCtfDbContext, _awdRoundConfigurationCatalog, wolverinePostCommitMessagePublisher, _timeProvider2);
+            var awdRoundCoordinator = new NoCTF.Infrastructure.Competitions.Awd.AwdRoundCoordinator(noCtfDbContext, _awdRoundConfigurationCatalog, wolverinePostCommitMessagePublisher, _timeProvider2, _platformSecretProtector);
             // The actual message body
             var generateAwdFlags = (NoCTF.Application.Messaging.GenerateAwdFlags)context.Envelope.Message;
 

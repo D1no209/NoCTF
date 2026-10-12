@@ -24,7 +24,7 @@ public static class AwdConfigurationValidator
             || configuration.ServiceUnhealthyPenalty > ScoreValueLimits.MaximumConfiguredValue)
             errors.Add($"Scoring values cannot exceed {ScoreValueLimits.MaximumConfiguredValue}.");
         if (configuration.FlagTemplate is { } flagTemplate
-            && !PerTeamFlagGenerator.IsValidTemplate(flagTemplate))
+            && !Flags.AwdFlagGenerator.IsValidTemplate(flagTemplate))
             errors.Add("FlagTemplate is invalid.");
         return errors;
     }
@@ -43,7 +43,7 @@ public static class AwdConfigurationValidator
         if (configuration.CheckerIntervalSeconds is <= 0)
             errors.Add("CheckerIntervalSeconds must be positive when configured.");
         if (configuration.FlagTemplate is { } flagTemplate
-            && !PerTeamFlagGenerator.IsValidTemplate(flagTemplate))
+            && !Flags.AwdFlagGenerator.IsValidTemplate(flagTemplate))
             errors.Add("FlagTemplate is invalid.");
         errors.AddRange(Registration.ChallengeRuntimeTemplateValidator.Validate(
             configuration.Runtime));

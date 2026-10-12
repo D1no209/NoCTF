@@ -35,6 +35,7 @@ public sealed class AwdFlagIssue : IConcurrencyTracked
     public long? HistoricalActiveExpiryTicks { get; set; }
     public int? HistoricalExpiryRound { get; set; }
     public Guid? DeliveryRuntimeId { get; set; }
+    public Guid? DeliveryAttemptId { get; set; }
     [MaxLength(2048)] public string? PublicLocator { get; set; }
     [MaxLength(32768)] public string? ProtectedReadContext { get; set; }
 }

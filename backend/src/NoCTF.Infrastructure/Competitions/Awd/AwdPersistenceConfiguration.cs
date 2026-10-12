@@ -8,6 +8,16 @@ using NoCTF.Domain.Teams;
 
 namespace NoCTF.Infrastructure.Competitions.Awd;
 
+internal sealed class AwdFlagKeyConfiguration : IEntityTypeConfiguration<AwdFlagKey>
+{
+    public void Configure(EntityTypeBuilder<AwdFlagKey> builder)
+    {
+        builder.HasAlternateKey(key => new { key.CompetitionId, key.Version });
+        builder.HasOne<Competition>().WithMany().HasForeignKey(key => key.CompetitionId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
 internal sealed class AwdRoundConfiguration : IEntityTypeConfiguration<AwdRound>
 {
     public void Configure(EntityTypeBuilder<AwdRound> builder)
@@ -66,6 +76,8 @@ internal sealed class AwdFlagIssueConfiguration : IEntityTypeConfiguration<AwdFl
             issue.RoundId, issue.StoreId, issue.GenerationSlot, issue.Ordinal
         }).IsUnique();
         builder.HasIndex(issue => issue.Digest).IsUnique();
+        builder.HasOne<AwdFlagKey>().WithMany().HasForeignKey(issue => new { issue.CompetitionId, issue.KeyVersion })
+            .HasPrincipalKey(key => new { key.CompetitionId, key.Version }).OnDelete(DeleteBehavior.Restrict);
         builder.HasAlternateKey(issue => new { issue.FlagId, issue.CompetitionId });
         builder.HasIndex(issue => new { issue.CompetitionId, issue.State, issue.DeliveryState });
         builder.HasOne<AwdRoundRules>().WithMany()
