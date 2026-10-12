@@ -10,6 +10,7 @@ export function createMockRealtime(api: ReturnType<typeof createMockApi>) {
   }
   api.changes.add(competitionId => {
     for (const client of connections.values()) if (client.groups.has(competitionId)) {
+      if (client.hub === 'spectators') { send(client, { type: 1, target: 'spectatorChanged', arguments: [competitionId] }); continue }
       send(client, { type: 1, target: 'scoreboardUpdated', arguments: [{ competitionId, version: String(api.state.facts.length + 1), schemaRevision: 'mock-1', challengeCatalogRevision: 'mock-1' }] })
     }
   })
@@ -19,9 +20,9 @@ export function createMockRealtime(api: ReturnType<typeof createMockApi>) {
   })
   return async function handle(request: Request) {
     const url = new URL(request.url)
-    if (!/^\/hubs\/v1\/(competitions|notifications|admin\/platform-logs)(\/negotiate)?$/.test(url.pathname)) return new Response(null, { status: 404 })
+    if (!/^\/hubs\/v1\/(competitions|spectators|notifications|admin\/platform-logs)(\/negotiate)?$/.test(url.pathname)) return new Response(null, { status: 404 })
     if (url.pathname.endsWith('/negotiate') && request.method === 'POST') {
-      if (!api.userFor(request)) return new Response(null, { status: 401 })
+      if (!url.pathname.includes('/spectators/') && !api.userFor(request)) return new Response(null, { status: 401 })
       const token = crypto.randomUUID()
       connections.set(token, { queue: [], groups: new Set(), hub: url.pathname.split('/')[3]!, fresh: true })
       return Response.json({ negotiateVersion: 1, connectionId: token, connectionToken: token, availableTransports: [{ transport: 'LongPolling', transferFormats: ['Text'] }] })
@@ -36,7 +37,7 @@ export function createMockRealtime(api: ReturnType<typeof createMockApi>) {
         try { message = JSON.parse(chunk) } catch { return new Response(null, { status: 400 }) }
         if (message.protocol === 'json') send(client, {})
         else if (message.type === 1) {
-          if (message.target === 'JoinCompetition') client.groups.add(message.arguments?.[0])
+          if (message.target === 'JoinCompetition' || message.target === 'JoinSpectator') client.groups.add(message.arguments?.[0])
           if (message.target === 'LeaveCompetition') client.groups.delete(message.arguments?.[0])
           if (message.invocationId !== undefined) send(client, { type: 3, invocationId: message.invocationId, result: null })
         }

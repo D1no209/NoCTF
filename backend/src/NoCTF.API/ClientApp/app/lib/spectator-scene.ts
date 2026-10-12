@@ -172,7 +172,7 @@ export class SpectatorScene {
     for (const [id, flag] of this.flags) {
       const node = byId.get(id)!
       if (node.owner !== flag.owner) {
-        flag.leaving = node.owner === undefined; flag.start = rebuilt || state.reduced ? 0 : performance.now()
+        flag.leaving = node.owner === undefined; flag.start = rebuilt || state.reduced || node.health === 'Unknown' && node.owner === undefined ? 0 : performance.now()
         flag.owner = node.owner
 
       }
@@ -285,6 +285,7 @@ export class SpectatorScene {
     this.element.removeEventListener('pointerup', this.up); this.element.removeEventListener('pointercancel', this.up)
     this.geometries.forEach(x => x.dispose()); this.materials.forEach(x => x.dispose()); this.box.dispose()
     this.renderer.domElement.removeEventListener('webglcontextlost', this.contextLost)
+    this.scene.traverse(object => { if (object instanceof THREE.DirectionalLight) object.shadow.dispose() })
     this.renderer.dispose(); this.renderer.domElement.remove()
   }
 }

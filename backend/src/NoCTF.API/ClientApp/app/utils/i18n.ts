@@ -19,6 +19,7 @@ export const localeDomains = [
   'mfa',
   'passkeys',
   'live-solo',
+  'spectator',
 ] as const
 export type LocaleDomain = typeof localeDomains[number]
 
@@ -58,6 +59,7 @@ const catalogLoaders: Record<AppLocale, Record<LocaleDomain, () => Promise<Local
     mfa: () => import('../locales/catalogs/zh-CN/mfa.json').then(chunk => chunk.default),
     passkeys: () => import('../locales/catalogs/zh-CN/passkeys.json').then(chunk => chunk.default),
     'live-solo': () => import('../locales/catalogs/zh-CN/live-solo.json').then(chunk => chunk.default),
+    spectator: () => import('../locales/catalogs/zh-CN/spectator.json').then(chunk => chunk.default),
   },
   'en': {
     core: () => import('../locales/catalogs/en/core.json').then(chunk => chunk.default),
@@ -75,6 +77,7 @@ const catalogLoaders: Record<AppLocale, Record<LocaleDomain, () => Promise<Local
     mfa: () => import('../locales/catalogs/en/mfa.json').then(chunk => chunk.default),
     passkeys: () => import('../locales/catalogs/en/passkeys.json').then(chunk => chunk.default),
     'live-solo': () => import('../locales/catalogs/en/live-solo.json').then(chunk => chunk.default),
+    spectator: () => import('../locales/catalogs/en/spectator.json').then(chunk => chunk.default),
   },
 }
 

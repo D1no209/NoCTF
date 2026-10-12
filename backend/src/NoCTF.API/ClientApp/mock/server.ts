@@ -1,3 +1,4 @@
+import { spectatorMock } from './spectator'
 import { createMockApi } from './api'
 import { createMockRealtime } from './realtime'
 
@@ -8,6 +9,11 @@ const server = Bun.serve({
   hostname: '127.0.0.1', port: Number(process.env.NOCTF_MOCK_API_PORT ?? 5081), idleTimeout: 30,
   async fetch(request) {
     try {
+      const spectator = spectatorMock(request)
+      if (spectator) {
+        if (request.method === 'POST') for (const notify of api.changes) { notify('00000002-0000-4000-8000-000000000002'); notify('00000002-0000-4000-8000-000000000004') }
+        return spectator
+      }
       if (new URL(request.url).pathname.startsWith('/hubs/')) return await realtime(request)
       return await api.handle(request)
     }

@@ -21,6 +21,9 @@ export function useCompetitionOverview(
   const competition = ref(props.competition)
   const canManageCompetition = computed(() => isLoggedIn.value
     && (isAdministrator.value || competition.value.administrationRole != null))
+  const spectatorPath = computed(() => competition.value.accessMode !== 'StaffOnly' && competition.value.status !== 'Draft' && !competition.value.deletedAt
+    && (competition.value.mode === 'Awd' || competition.value.mode === 'Koh')
+    ? `/competitions/${competitionId}/${competition.value.mode === 'Awd' ? 'awd' : 'koh'}-live` : null)
   const managementOnly = computed(() => canManageCompetition.value && (competition.value.status === 'Draft' || Boolean(competition.value.deletedAt)))
   const detailError = ref<UiMessage | null>(null)
   const reads = new AbortController()
@@ -435,6 +438,7 @@ export function useCompetitionOverview(
       isAdministrator,
       canManageCompetition,
       managementOnly,
+      spectatorPath,
       competition,
       myTeam,
       teamLoaded,

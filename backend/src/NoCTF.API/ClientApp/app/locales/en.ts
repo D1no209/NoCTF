@@ -1,3 +1,4 @@
+import SpectatorMessages from './catalogs/en/spectator.json'
 import ChallengeTimingMessages from './catalogs/en/challenge-timing.json'
 import CoreMessages from './catalogs/en/core.json'
 import CompetitionsMessages from './catalogs/en/competitions.json'
@@ -16,6 +17,7 @@ import ErrorMessages from './catalogs/en/errors.json'
 
 export const englishMessages = {
   ...CoreMessages,
+  ...SpectatorMessages,
   ...ChallengeTimingMessages,
   ...CompetitionsMessages,
   ...ChallengesMessages,
