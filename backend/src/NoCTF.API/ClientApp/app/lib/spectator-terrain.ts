@@ -65,10 +65,15 @@ export function createTerrain(peaks: THREE.Vector3[], width: number, depth: numb
   }
   const contours = new THREE.BufferGeometry()
   contours.setAttribute('position', new THREE.Float32BufferAttribute(segments, 3))
-  const colors: number[] = []
+  const colors: number[] = [], stride = geometry.parameters.widthSegments + 1
   for (let i = 0; i < p.count; i++) {
-    const variation = .42 + rockNoise(p.getX(i) * 3, p.getZ(i) * 3) * .6
-    colors.push(variation, variation * .98, variation * .9)
+    // Baked local cavity shading, rather than coarse per-vertex color noise.
+    const neighbors = [i % stride > 0 ? i - 1 : i, i % stride < stride - 1 ? i + 1 : i, i - stride, i + stride]
+      .filter(n => n >= 0 && n < p.count)
+    const surrounding = neighbors.reduce((sum, n) => sum + p.getY(n), 0) / neighbors.length
+    const cavity = Math.min(.38, Math.max(0, surrounding - p.getY(i)) * 1.8)
+    const shade = .86 + rockNoise(p.getX(i) * .28, p.getZ(i) * .28) * .12 - cavity
+    colors.push(shade, shade, shade)
   }
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
   const controlContours = highlights.map(values => new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(values, 3)))

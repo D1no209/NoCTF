@@ -3,6 +3,8 @@ import { themeColor } from '../utils/theme-color'
 import { createSpectatorRibbon } from '../motion/spectator-ribbon'
 import { setFlagTransfer } from '../motion/spectator-flag'
 import { createTerrain, terrainHeight } from './spectator-terrain'
+import { createSpectatorRock } from './spectator-rock'
+import rockTextureUrl from '../assets/images/spectator/koh-stratified-rock.png'
 
 export interface SpectatorNode { id: string; name: string; owner?: number; ownerName?: string; controllerName?: string; health?: 'Healthy' | 'Down' | 'Unknown'; services?: ('Healthy' | 'Down' | 'Unknown')[] }
 export interface SpectatorBeam { id: string; source: string; target: string; service: number }
@@ -12,6 +14,10 @@ export interface SpectatorSceneMetrics { frames: number; p95: number; active: nu
 /** WebGL owns its frame loop. Vue receives no per-frame mutations. */
 export class SpectatorScene {
   private renderer: THREE.WebGLRenderer
+  private disposed = false
+  private ambient!: THREE.HemisphereLight
+  private keyLight!: THREE.DirectionalLight
+  private fillLight!: THREE.DirectionalLight
   private scene = new THREE.Scene()
   private camera = new THREE.PerspectiveCamera(39, 1, .1, 200)
   private world = new THREE.Group()
@@ -50,18 +56,19 @@ export class SpectatorScene {
     this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = THREE.PCFShadowMap
     this.renderer.shadowMap.autoUpdate = false
     this.renderer.setClearColor(themeColor('--spectator-ground', element))
-    this.colors = Object.fromEntries(['metal', 'edge', 'attack', 'healthy', 'unknown', 'rock', 'snow', 'flag-a', 'flag-b', 'flag-c', 'flag-d'].map(key => [key, new THREE.Color(themeColor(`--spectator-${key}`, element))]))
+    this.colors = Object.fromEntries(['metal', 'edge', 'attack', 'healthy', 'unknown', 'rock', 'rock-lit', 'snow', 'flag-a', 'flag-b', 'flag-c', 'flag-d'].map(key => [key, new THREE.Color(themeColor(`--spectator-${key}`, element))]))
     element.append(this.renderer.domElement)
     this.renderer.domElement.addEventListener('webglcontextlost', this.contextLost)
     this.scene.add(this.world)
-    this.scene.add(new THREE.HemisphereLight(this.colors.snow!, this.colors.metal!, 1.15))
+    this.ambient = new THREE.HemisphereLight(this.colors.snow!, this.colors.metal!, 1.15)
+    this.scene.add(this.ambient)
     const light = new THREE.DirectionalLight(this.colors.snow!, 2.4)
     light.position.set(-18, 24, 12); light.castShadow = true
     light.shadow.mapSize.set(2048, 2048); light.shadow.camera.left = -32; light.shadow.camera.right = 32
     light.shadow.camera.top = 32; light.shadow.camera.bottom = -32; light.shadow.normalBias = .04
-    this.scene.add(light)
+    this.scene.add(light); this.keyLight = light
     const fill = new THREE.DirectionalLight(this.colors.edge!, .9)
-    fill.position.set(10, 3, -10); this.scene.add(fill)
+    fill.position.set(10, 3, -10); this.scene.add(fill); this.fillLight = fill
     const grid = new THREE.GridHelper(55, 44, this.colors.edge!, this.colors.metal!)
     grid.material.transparent = true; grid.material.opacity = .23
     this.geometries.push(grid.geometry); this.materials.push(grid.material)
@@ -92,6 +99,12 @@ export class SpectatorScene {
       this.signature = signature; this.clearWorld()
       this.grid.visible = state.mode === 'Awd'
       this.renderer.shadowMap.enabled = state.mode === 'Koh'
+      this.ambient.intensity = state.mode === 'Koh' ? .75 : 1.15
+      this.ambient.groundColor.copy(state.mode === 'Koh' ? this.colors.rock! : this.colors.metal!)
+      this.keyLight.intensity = state.mode === 'Koh' ? 2.8 : 2.4
+      this.keyLight.color.copy(state.mode === 'Koh' ? this.colors['rock-lit']! : this.colors.snow!)
+      this.fillLight.intensity = state.mode === 'Koh' ? .35 : .9
+      this.fillLight.color.copy(state.mode === 'Koh' ? this.colors['rock-lit']! : this.colors.edge!)
       const metal = this.material(this.colors.metal!, .5), edge = this.material(this.colors.edge!, .3)
       const lampMaterial = this.material(new THREE.Color(1, 1, 1))
       const count = state.nodes.length, columns = Math.ceil(Math.sqrt(count * (state.mode === 'Koh' ? 1 : 1.5))), rows = Math.ceil(count / columns)
@@ -126,14 +139,23 @@ export class SpectatorScene {
       if (state.mode === 'Koh' && peaks.length) {
         const { geometry, contours, controlContours } = createTerrain(peaks, columns * 7 + 5, rows * 7.8 + 5)
         this.geometries.push(geometry, contours, ...controlContours)
-        const rock = this.material(this.colors.rock!); rock.side = THREE.DoubleSide; rock.flatShading = true; rock.vertexColors = true
+        const ready = { value: 0 }
+        const texture = new THREE.TextureLoader().load(rockTextureUrl, loaded => {
+          if (!this.disposed && this.textures.includes(loaded)) { ready.value = 1; this.invalidate() }
+        })
+        texture.wrapS = texture.wrapT = THREE.RepeatWrapping
+        texture.colorSpace = THREE.SRGBColorSpace
+        texture.anisotropy = Math.min(8, this.renderer.capabilities.getMaxAnisotropy())
+        this.textures.push(texture)
+        const rock = createSpectatorRock(texture, this.colors['rock-lit']!.clone().lerp(this.colors.rock!, .18), this.colors.rock!, ready)
+        this.materials.push(rock)
         const terrain = new THREE.Mesh(geometry, rock); terrain.castShadow = true; terrain.receiveShadow = true; this.world.add(terrain)
         this.renderer.shadowMap.needsUpdate = true
         controlContours.forEach((g, i) => {
-          const m = new THREE.LineBasicMaterial({ color: this.colors.edge, transparent: true, opacity: .85 })
+          const m = new THREE.LineBasicMaterial({ color: this.colors.edge, transparent: true, opacity: .68 })
           this.materials.push(m); const line = new THREE.LineSegments(g, m); this.world.add(line); this.controlLines.set(state.nodes[i]!.id, line)
         })
-        const contourMaterial = new THREE.LineBasicMaterial({ color: this.colors.snow, transparent: true, opacity: .3 })
+        const contourMaterial = new THREE.LineBasicMaterial({ color: this.colors.snow!.clone().lerp(this.colors.rock!, .4), transparent: true, opacity: .19 })
         this.materials.push(contourMaterial); this.world.add(new THREE.LineSegments(contours, contourMaterial))
         for (const node of state.nodes) {
           const group = this.nodes.get(node.id)!, y = terrainHeight(group.position.x, group.position.z, peaks)
@@ -227,7 +249,7 @@ export class SpectatorScene {
     this.renderer.setSize(w, h); this.camera.aspect = w / h; this.camera.updateProjectionMatrix()
     this.positionCamera(); this.invalidate()
   }
-  private invalidate() { if (!this.raf && !document.hidden) this.raf = requestAnimationFrame(this.draw) }
+  private invalidate() { if (!this.disposed && !this.raf && !document.hidden) this.raf = requestAnimationFrame(this.draw) }
   private draw = (time: number) => {
     this.raf = 0
     if (document.hidden) return
@@ -279,6 +301,7 @@ export class SpectatorScene {
     while (this.materials.length > 1) this.materials.pop()!.dispose()
   }
   dispose() {
+    this.disposed = true
     cancelAnimationFrame(this.raf); this.resizeObserver.disconnect(); this.clearWorld()
     document.removeEventListener('visibilitychange', this.visibility)
     this.element.removeEventListener('pointerdown', this.down); this.element.removeEventListener('pointermove', this.move)

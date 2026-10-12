@@ -1280,7 +1280,7 @@ body:has([data-modal-scroll-lock]) {
 .spectator-screen {
   --spectator-ground: #070f18; --spectator-metal: #465362; --spectator-edge: #4a9bb5;
   --spectator-attack: #ff3858; --spectator-healthy: #50dfbd; --spectator-unknown: #7a8896;
-  --spectator-rock: #68675c; --spectator-snow: #d9e8ed;
+  --spectator-rock: #777166; --spectator-rock-lit: #e6e3dc; --spectator-snow: #d9e8ed;
   --spectator-flag-a: #4db6ff; --spectator-flag-b: #ff657d; --spectator-flag-c: #c2a6ff; --spectator-flag-d: #f2c974;
   --background: var(--spectator-ground); --foreground: #e3f2f5; --muted-foreground: #8cabb8;
   --primary: #55dfeb; --primary-foreground: #071820; --card: #102532; --accent: #183845;
