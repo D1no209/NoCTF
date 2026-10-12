@@ -310,3 +310,14 @@ hashes verified against its original `harness.json`; its workload script and Hos
 binary are unchanged. Linux will be restarted separately for a full new interval.
 The paired campaign must not proceed to performance comparisons until both valid
 platform durations and rollback checks have completed.
+
+The supervisor changes are committed as `010bd667`. Linux now runs separately
+under `diagnostics/soak-linux-bc73cb90-v3/01-satori`, with timed workload beginning
+at **16:22:31 UTC on October 12** (October 13 00:22:31 Taipei). Its Host reported
+Satori, readiness HTTP 200, and its first Node v24.11.0 bootstrap receipt was
+observed. Its earliest replacement duration completion is October 14 00:22 Taipei.
+Windows continues under `campaign-bc73cb90-v2/soak-windows/01-satori` with its
+original October 12 11:09 UTC start. The old paired controller will stop with
+`duration-incomplete` because its Linux child failed; the separate replacement
+must be evaluated alongside the continuing Windows result before comparisons
+can start. Hourly follow-up has been updated to monitor both locations.
