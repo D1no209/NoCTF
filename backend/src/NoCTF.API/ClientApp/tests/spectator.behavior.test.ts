@@ -28,6 +28,12 @@ describe('public spectator change window', () => {
     window.reset()
     expect(window.accept([event(4)], cutoff, true)).toEqual([])
   })
+  test('retracting and restoring a corrected fact does not announce a second attack', () => {
+    const window = new SpectatorChangeWindow()
+    window.accept([event(1)], cutoff, true)
+    window.accept([], cutoff, true)
+    expect(window.accept([{ ...event(1), revision: '3' }], cutoff, true)).toEqual([])
+  })
   test('loads the spectator catalog only on its two routes', () => {
     for (const mode of ['awd', 'koh']) expect(localeDomainsForPath(`/competitions/id/${mode}-live`)).toContain('spectator')
     expect(localeDomainsForPath('/competitions/id/live')).not.toContain('spectator')

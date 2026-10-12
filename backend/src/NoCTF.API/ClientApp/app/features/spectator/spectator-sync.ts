@@ -8,7 +8,15 @@ export class SpectatorChangeWindow<T extends IdentifiedChange> {
   accept(changes: T[], _cutoff: string, live: boolean): T[] {
     const incoming = [...new Map(changes.filter(x => x.id).map(x => [x.id!, x])).values()].slice(0, 2000)
     const next = this.baseline && live ? incoming.filter(x => !this.seen.has(x.id!)) : []
-    this.seen = new Map(incoming.map(change => [change.id!, change.revision ?? '']))
+    // Keep one extra window of tombstones: retracting and restoring a corrected
+    // fact must not turn it into a newly announced attack. Never evict a fact
+    // still present in the current window when trimming the identity cache.
+    for (const change of [...incoming].reverse()) this.seen.set(change.id!, change.revision ?? '')
+    const currentIds = new Set(incoming.map(change => change.id!))
+    for (const id of this.seen.keys()) {
+      if (this.seen.size <= 4000) break
+      if (!currentIds.has(id)) this.seen.delete(id)
+    }
     this.baseline = live
     return next.reverse()
   }
