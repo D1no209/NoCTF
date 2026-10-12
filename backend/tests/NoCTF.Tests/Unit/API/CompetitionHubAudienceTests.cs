@@ -31,7 +31,8 @@ public sealed class CompetitionHubAudienceTests
         registry.Set(new("public", publicUser, competitionId, CompetitionHubGroups.Public(competitionId), false));
         registry.Set(new("staff", staffUser, competitionId, CompetitionHubGroups.Staff(competitionId), true));
         var router = new CompetitionHubAudienceRouter(access, context, registry,
-            MfaHubTestSupport.Guard(("public", publicUser, MfaHubKind.Competition), ("staff", staffUser, MfaHubKind.Competition)));
+            MfaHubTestSupport.Guard(("public", publicUser, MfaHubKind.Competition), ("staff", staffUser, MfaHubKind.Competition)),
+            Substitute.For<IHubContext<SpectatorHub, ISpectatorHubClient>>());
 
         _ = await router.CurrentAsync(competitionId, CancellationToken.None);
         _ = await router.CurrentAsync(competitionId, CancellationToken.None);

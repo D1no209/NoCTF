@@ -121,14 +121,16 @@ public interface ICompetitionHubAudienceAccess
 public sealed class CompetitionHubAudienceRouter(
     ICompetitionHubAudienceAccess access,
     IHubContext<CompetitionHub, ICompetitionHubClient> hub,
-    CompetitionHubSubscriptionRegistry subscriptions, MfaConnectionGuard guard)
+    CompetitionHubSubscriptionRegistry subscriptions, MfaConnectionGuard guard,
+    IHubContext<SpectatorHub, ISpectatorHubClient> spectators)
     : ICompetitionHubAudienceRouter
 {
     public async Task<ICompetitionHubClient> AllKnownAsync(Guid competitionId, CancellationToken ct)
     {
         var eligible = await guard.EligibleAsync(MfaHubKind.Competition, null, ct);
         var subscribed = subscriptions.Get(competitionId).Select(value => value.ConnectionId).ToHashSet();
-        return hub.Clients.Clients(eligible.Where(subscribed.Contains).ToArray());
+        return new SpectatorInvalidatingClient(hub.Clients.Clients(eligible.Where(subscribed.Contains).ToArray()),
+            spectators.Clients.Group(SpectatorHub.Group(competitionId)));
     }
 
     public async Task<ICompetitionHubClient?> CurrentAsync(

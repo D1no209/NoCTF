@@ -55,6 +55,7 @@ public sealed class MfaHubFilter(MfaConnectionGuard guard) : IHubFilter
 {
     public async Task OnConnectedAsync(HubLifetimeContext context, Func<HubLifetimeContext, Task> next)
     {
+        if (context.Hub is SpectatorHub) { await next(context); return; }
         var kind = context.Hub switch { CompetitionHub => MfaHubKind.Competition, NotificationHub => MfaHubKind.Notifications,
             NoCTF.API.LiveSolo.Realtime.LiveSoloHub => MfaHubKind.LiveSolo, _ => MfaHubKind.PlatformLogs };
         guard.Register(context.Context, kind); await guard.RevalidateAsync(context.Context.ConnectionAborted);
@@ -63,6 +64,7 @@ public sealed class MfaHubFilter(MfaConnectionGuard guard) : IHubFilter
     }
     public async ValueTask<object?> InvokeMethodAsync(HubInvocationContext context, Func<HubInvocationContext, ValueTask<object?>> next)
     {
+        if (context.Hub is SpectatorHub) return await next(context);
         await guard.RevalidateAsync(context.Context.ConnectionAborted);
         if (!guard.IsRegistered(context.Context.ConnectionId)) throw new HubException("Authentication is no longer sufficient.");
         context.Context.ConnectionAborted.ThrowIfCancellationRequested(); return await next(context);
