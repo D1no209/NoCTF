@@ -89,6 +89,11 @@ public sealed class NoCtfDbContext(
     public DbSet<Challenge> Challenges => Set<Challenge>();
     public DbSet<CompetitionChallenge> CompetitionChallenges => Set<CompetitionChallenge>();
     public DbSet<ChallengeFlag> ChallengeFlags => Set<ChallengeFlag>();
+    public DbSet<NoCTF.Domain.Competitions.Awd.AwdRound> AwdRounds => Set<NoCTF.Domain.Competitions.Awd.AwdRound>();
+    public DbSet<NoCTF.Domain.Competitions.Awd.AwdRoundRules> AwdRoundRules => Set<NoCTF.Domain.Competitions.Awd.AwdRoundRules>();
+    public DbSet<NoCTF.Domain.Competitions.Awd.AwdFlagIssue> AwdFlagIssues => Set<NoCTF.Domain.Competitions.Awd.AwdFlagIssue>();
+    public DbSet<NoCTF.Domain.Competitions.Awd.AwdFactDetails> AwdFactDetails => Set<NoCTF.Domain.Competitions.Awd.AwdFactDetails>();
+    public DbSet<NoCTF.Domain.Competitions.Awd.AwdCaptureIdentity> AwdCaptureIdentities => Set<NoCTF.Domain.Competitions.Awd.AwdCaptureIdentity>();
     public DbSet<RuntimeInstance> RuntimeInstances => Set<RuntimeInstance>();
     public DbSet<ActiveRuntimeSlot> ActiveRuntimeSlots => Set<ActiveRuntimeSlot>();
     public DbSet<RuntimeReceipt> RuntimeReceipts => Set<RuntimeReceipt>();
@@ -206,6 +211,11 @@ public sealed class NoCtfDbContext(
             throw new InvalidOperationException(
                 "Competition events are immutable and cannot be updated or deleted.");
         }
+
+        if (ChangeTracker.Entries<NoCTF.Domain.Competitions.Awd.AwdRoundRules>().Any(entry => entry.State == EntityState.Modified)
+            || ChangeTracker.Entries<NoCTF.Domain.Competitions.Awd.AwdRoundStoreBudget>().Any(entry => entry.State == EntityState.Modified)
+            || ChangeTracker.Entries<NoCTF.Domain.Competitions.Awd.AwdRoundTeamEligibility>().Any(entry => entry.State == EntityState.Modified))
+            throw new InvalidOperationException("Issued AWD rule snapshots are immutable; create an explicit rule revision.");
 
         if (ChangeTracker.Entries<Notification>().Any(entry =>
                 entry.State is EntityState.Modified or EntityState.Deleted))

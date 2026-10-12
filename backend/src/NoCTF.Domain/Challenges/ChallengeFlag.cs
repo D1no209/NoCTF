@@ -32,6 +32,7 @@ public abstract class ChallengeFlag : IConcurrencyTracked
     public DateTimeOffset? ValidUntil { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? DeletedAt { get; set; }
+    public NoCTF.Domain.Competitions.Awd.AwdFlagIssue? AwdIssue { get; set; }
 }
 
 public enum ChallengeFlagMatchKind : short

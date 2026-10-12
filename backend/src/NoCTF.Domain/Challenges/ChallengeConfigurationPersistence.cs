@@ -32,6 +32,7 @@ public sealed class CtfChallengeDefinition() : ChallengeDefinition(GameMode.Ctf)
 [PersistentDiscriminator("awd")]
 public sealed class AwdChallengeDefinition() : ChallengeDefinition(GameMode.Awd)
 {
+    public List<NoCTF.Domain.Competitions.Awd.AwdFlagStore> FlagStores { get; set; } = [];
     public string? FlagInjectionCommand { get; set; }
     public int? FlagInjectionTimeoutSeconds { get; set; }
     public string? FlagInjectionServiceName { get; set; }
@@ -202,7 +203,11 @@ public sealed class CtfCompetitionChallengeRules() : CompetitionChallengeRules(G
     public CtfScoreSettlementMode? ScoreSettlementMode { get; set; }
 }
 [PersistentDiscriminator("awd")]
-public sealed class AwdCompetitionChallengeRules() : CompetitionChallengeRules(GameMode.Awd);
+public sealed class AwdCompetitionChallengeRules() : CompetitionChallengeRules(GameMode.Awd)
+{
+    public NoCTF.Domain.Competitions.Awd.AwdRuleOverrides AwdOverrides { get; set; } = new();
+    public List<NoCTF.Domain.Competitions.Awd.AwdStoreRule> StoreRules { get; set; } = [];
+}
 [PersistentDiscriminator("awdp")]
 public sealed class AwdpCompetitionChallengeRules() : CompetitionChallengeRules(GameMode.Awdp);
 [PersistentDiscriminator("koh")]

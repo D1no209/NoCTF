@@ -24,6 +24,7 @@
 17. [比赛题目仓库与 GitOps 管理设计](challenge-repository-gitops.md)
 18. [容器命名服务](runtime-services.md)、[CTF 计分结算](ctf-score-settlement.md)、[题目时间配置实施记录](challenge-timing-status.md)
 19. [AWD、AWDP 出题规范](challenge-authoring-awd-awdp.md) 与 [可复制出题模板](challenge-authoring-templates/README.md)
+20. [AWD 规则修正与实施规范](awd-rules-2026.zh-CN.md)：仅 AWD，覆盖独立轮次、Flag Store、结构化检测、可配置计分和待裁定。
 
 已被当前规范取代的数据模型/Wolverine 阶段计划和一次性切换文档已移除，可从 Git 历史查阅。
 保留的 `*-audit*`、`*-status*`、`*-worklog*` 与 HANDOFF 文件只保存限定日期、范围的决策和验收记录，

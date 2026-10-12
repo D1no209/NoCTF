@@ -1,5 +1,7 @@
 # AWD
 
+AWD 的修正目标与分阶段验收以[规则修正与实施规范](../awd-rules-2026.zh-CN.md)为准。下面记录现有接入契约，随各阶段接通同步更新；其中轮次依赖 Flag 窗口、二值 Checker 和缺失检测奖励属于待替换行为，不能作为新功能设计依据。AWDP 不在修正范围内。
+
 ## 配置契约
 
 Competition 必须配置 `HardeningDurationSeconds >= 0`、`RoundDurationSeconds > 0`，并提供以下比赛默认规则；CompetitionChallenge 的 `Rules` 可用 nullable 字段逐项覆盖：

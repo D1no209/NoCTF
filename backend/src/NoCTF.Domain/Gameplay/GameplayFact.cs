@@ -31,6 +31,7 @@ public abstract class GameplayFact : IConcurrencyTracked
     public Guid AppliedTimingRevision { get; set; }
     public GameplayFactFailureCode? FailureCode { get; set; }
     public FlagAcquisitionEvidence? AcquisitionEvidence { get; set; }
+    public NoCTF.Domain.Competitions.Awd.AwdFactDetails? Awd { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 }
 

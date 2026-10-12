@@ -120,6 +120,8 @@ internal sealed class AwdCompetitionModeConfigurationEntityConfiguration
     public void Configure(EntityTypeBuilder<AwdCompetitionModeConfiguration> builder)
     {
         builder.Property(configuration => configuration.AttackRewardMode).HasConversion<short>();
+        NoCTF.Infrastructure.Competitions.Awd.AwdPolicyColumns.Configure(
+            builder.ComplexProperty(configuration => configuration.AwdOptions));
     }
 }
 
