@@ -383,3 +383,39 @@ multi-hour memory/error trend. The latter is a duration control, not five
 independent repeats. Run controls only after both valid candidate soaks finish;
 record environmental differences and keep the application revision fixed. Until
 then, neither a Satori-specific leak nor an Official advantage is established.
+
+## Confirmed Linux OOM failure in the 2 GiB profile
+
+Linux v3 was killed at **2026-10-12 21:25:29 UTC** (October 13 05:25 Taipei),
+approximately five hours into its replacement run. Docker records
+`OOMKilled=true`, exit code 137, memory limit 2,147,483,648 bytes, memory-plus-swap
+limit 4,294,967,296 bytes, and a four-CPU quota. It completed 76 mixed workload and
+Runtime cycles. Cycle 77 completed warmup and steady before connection failures
+interrupted the burst phase. Its Node process entered the workload, ran for
+97.8 seconds, and wrote the expected report and process receipt before exiting 1.
+This is a Host/container memory failure, not another missing Node report.
+
+The duration gate failed. All v3 containers and the owned socket volume were
+stopped and retained by the new failure policy. Evidence includes Docker state,
+limits, final raw samples, Node receipt, and workload errors in
+`diagnostics/soak-linux-bc73cb90-v3/01-satori/oom-investigation.json`, plus
+`retained-resources.json` and `host.log`. Preserve this configuration as a failed
+case; do not raise its limit and relabel the same case successful. The original
+v2 silent Node exit remains a separate unresolved event.
+
+Windows acceptance is still running and must not be interrupted for this
+investigation. The pinned Satori source uses a default high-memory threshold of
+99 percent and reserves at least five percent in its available-memory heuristic;
+whether the failure reflects GC policy, application retention, or insufficient
+capacity for this workload requires the same-limit Official control. No runtime
+tuning or business change has been made.
+
+Because Linux failed, waiting for both candidate duration gates before starting
+all controls would prevent diagnosis indefinitely. After the existing Windows
+run and rollback finish, prioritize the six-hour Official Linux control with the
+same four-CPU/2 GiB settings and workload. Then complete the remaining Official
+controls, independent comparisons and authorized unrestricted Linux profile as
+appropriate. Any unrestricted run is a separate result and cannot erase the
+limited-profile failure. Do not repeatedly restart the unchanged failing case or
+claim that Linux has completed 24 hours. The default remains Official, with the
+candidate's memory/capacity gate explicitly unqualified.
