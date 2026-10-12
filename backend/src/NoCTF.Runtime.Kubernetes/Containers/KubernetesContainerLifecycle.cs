@@ -40,7 +40,7 @@ public sealed class KubernetesContainerLifecycle(
     private const string OneShotInputVolumeName = "noctf-fix-input";
     private const string OneShotInputInitializerName = "noctf-fix-input-preparer";
     private const string OneShotInputReadyFile = "/input/noctf/.input-complete";
-    private const string ExecTimeoutScript = """
+    private static readonly string ExecTimeoutScript = """
         duration=$1
         shift
         timed_out=0
@@ -62,7 +62,7 @@ public sealed class KubernetesContainerLifecycle(
           wait "$watchdog" 2>/dev/null
         fi
         exit "$status"
-        """;
+        """.ReplaceLineEndings("\n");
 
     public Task<ContainerReceipt> CreateAsync(
         ContainerRequest request,

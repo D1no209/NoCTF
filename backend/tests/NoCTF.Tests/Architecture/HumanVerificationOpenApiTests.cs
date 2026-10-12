@@ -81,5 +81,5 @@ public sealed class HumanVerificationOpenApiTests
         BackendRoot(),
         "src", "NoCTF.API", "wwwroot", "openapi", "v1.json");
 
-    private static string BackendRoot() => ArchitectureTestPaths.BackendRoot();
+    private static string BackendRoot() => TestSourcePaths.BackendRoot();
 }

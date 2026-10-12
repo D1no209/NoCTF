@@ -1,5 +1,4 @@
 using DotNet.Testcontainers.Builders;
-using DotNet.Testcontainers.Configurations;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
@@ -24,7 +23,7 @@ public sealed class LokiOtlpIntegrationTests
             var config = FindConfig();
             await using var loki = new ContainerBuilder(
                     "grafana/loki:3.6.0@sha256:6a705de65df88aa0d90a44779606b0042722c86637335a73858f65f9fe9f9557")
-                .WithBindMount(config, "/etc/loki/loki.yml", AccessMode.ReadOnly)
+                .WithResourceMapping(new FileInfo(config), "/etc/loki/")
                 .WithCreateParameterModifier(parameters => parameters.User = "0")
                 .WithPortBinding(3100, assignRandomHostPort: true)
                 .WithCommand("-config.file=/etc/loki/loki.yml")

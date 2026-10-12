@@ -1,6 +1,6 @@
-namespace NoCTF.Tests.Architecture;
+namespace NoCTF.Tests;
 
-internal static class ArchitectureTestPaths
+internal static class TestSourcePaths
 {
     internal static string BackendRoot()
     {
@@ -9,6 +9,6 @@ internal static class ArchitectureTestPaths
             if (File.Exists(Path.Combine(directory.FullName, "NoCTF.slnx")))
                 return directory.FullName;
         }
-        throw new DirectoryNotFoundException("The architecture tests require a NoCTF source checkout.");
+        throw new DirectoryNotFoundException("These tests require a NoCTF source checkout.");
     }
 }
