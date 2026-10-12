@@ -61,5 +61,6 @@ public sealed class AwdRoundTeamEligibility
 {
     public Guid RulesId { get; set; }
     public Guid TeamId { get; set; }
+    public bool Competitive { get; set; } = true;
     public int? SettledRank { get; set; }
 }

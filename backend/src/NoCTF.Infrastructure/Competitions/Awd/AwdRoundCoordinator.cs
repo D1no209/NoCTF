@@ -79,16 +79,22 @@ public sealed class AwdRoundCoordinator(
             return MessageExecutionOutcome.Superseded;
         }
 
-        var teamIds = await db.Teams.AsNoTracking()
+        var teams = await db.Teams.AsNoTracking()
             .Where(team => team.CompetitionId == message.CompetitionId
                 && team.RegistrationStatus == TeamRegistrationStatus.Approved
                 && !team.IsBanned
                 && team.DeletedAt == null)
             .OrderBy(team => team.Id)
-            .Select(team => team.Id)
+            .Select(team => new { team.Id, team.TrackKey })
             .ToListAsync(cancellationToken);
+        var teamIds = teams.Select(team => team.Id).ToArray();
+        var tracks = CompetitionTrackConfiguration.EffectiveFor(target.Competition.Mode,
+            target.Competition.TracksEnabled, target.Competition.Tracks);
+        var competitiveTeams = teams.Where(team => (target.Competition.TracksEnabled
+                ? tracks.Find(team.TrackKey) : tracks.DefaultTrack) is { EarnsScore: true, AffectsCompetitiveResults: true })
+            .Select(team => team.Id).ToHashSet();
         var rules = await ResolveRoundRulesAsync(target.Competition, target.Challenge, target.Template,
-            round, teamIds, handledAt, cancellationToken);
+            round, teamIds, competitiveTeams, handledAt, cancellationToken);
         // Pauses within this round do not count towards an active-time issuance slot.
         var clock = await AwdRunningClock.ReadAsync(db, target.Competition.Id, target.Competition.StartAt,
             handledAt, cancellationToken);
@@ -190,7 +196,8 @@ public sealed class AwdRoundCoordinator(
     }
 
     private async Task<AwdRoundRules> ResolveRoundRulesAsync(Competition competition, CompetitionChallenge challenge,
-        Challenge template, AwdRound round, IReadOnlyList<Guid> teams, DateTimeOffset now, CancellationToken ct)
+        Challenge template, AwdRound round, IReadOnlyList<Guid> teams, IReadOnlySet<Guid> competitiveTeams,
+        DateTimeOffset now, CancellationToken ct)
     {
         var previous = await db.AwdRoundRules.AsSplitQuery()
             .Where(rules => rules.RoundId == round.Id && rules.CompetitionChallengeId == challenge.Id)
@@ -228,9 +235,16 @@ public sealed class AwdRoundCoordinator(
         if (stores.Count is < 1 or > 64 || stores.Any(store => store.Weight <= 0 || decimal.Round(store.Weight, 6) != store.Weight
                 || store.FlagsPerIssue is < 1 or > 64))
             throw new InvalidOperationException("AWD requires valid store budgets.");
+        // Existing members retain their round qualification when a newly admitted team adds a revision.
+        var eligibility = teams.Select(team => new AwdRoundTeamEligibility { TeamId = team,
+            Competitive = previous?.Teams.SingleOrDefault(entry => entry.TeamId == team)?.Competitive
+                ?? competitiveTeams.Contains(team) }).ToList();
+        var qualifiedTeams = eligibility.Where(team => team.Competitive).Select(team => team.TeamId).ToArray();
         var ranks = effective.AttackMode == AwdAttackRewardMode.TargetRank
-            ? await AwdSettledRankingReader.ReadAsync(db, competition, round.Number, teams, now, ct)
+            ? await AwdSettledRankingReader.ReadAsync(db, competition, round.Number, qualifiedTeams, now, ct)
             : new Dictionary<Guid, int>();
+        foreach (var team in eligibility)
+            team.SettledRank = ranks.TryGetValue(team.TeamId, out var rank) ? rank : null;
         var snapshot = new AwdRoundRules
         {
             Id = Guid.CreateVersion7(), CompetitionId = competition.Id, CompetitionChallengeId = challenge.Id,
@@ -238,8 +252,7 @@ public sealed class AwdRoundCoordinator(
             AttackRewardMode = effective.AttackMode, AttackPoints = effective.AttackPoints,
             VictimDefensePoolPoints = effective.DefensePoints, ServiceHealthyPoints = effective.SlaPoints,
             CheckerIntervalSeconds = effective.CheckerIntervalSeconds, Options = effective.Options with { },
-            EligibleTeamCount = teams.Count, Teams = teams.Select(team => new AwdRoundTeamEligibility
-                { TeamId = team, SettledRank = ranks.TryGetValue(team, out var rank) ? rank : null }).ToList(),
+            EligibleTeamCount = qualifiedTeams.Length, Teams = eligibility,
             FlagHeader = flagTemplate.Header, FlagBodyTemplate = flagTemplate.BodyTemplate, Stores = stores
         };
         db.AwdRoundRules.Add(snapshot);

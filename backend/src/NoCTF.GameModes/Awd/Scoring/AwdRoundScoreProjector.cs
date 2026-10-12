@@ -39,7 +39,8 @@ public static class AwdRoundScoreProjector
         }
 
         // SLA belongs to a question/round, independent of the number of issued flags or containers.
-        foreach (var scope in rules.SelectMany(rule => rule.Teams.Select(team => (Rule: rule, Team: team.TeamId)))
+        foreach (var scope in rules.SelectMany(rule => rule.Teams.Where(team => team.Competitive)
+                     .Select(team => (Rule: rule, Team: team.TeamId)))
                      .Where(x => scoringTeams.Contains(x.Team) && roundById.ContainsKey(x.Rule.RoundId))
                      .GroupBy(x => (x.Team, x.Rule.CompetitionChallengeId, x.Rule.RoundId))
                      .OrderBy(x => roundById[x.Key.RoundId].Number))
@@ -90,7 +91,8 @@ public static class AwdRoundScoreProjector
             var store = snapshot.Stores.Single(x => x.StoreId == issue.StoreId);
             var share = AwdScoreCalculator.BudgetShare(store.Weight, snapshot.Stores.Sum(x => x.Weight), store.FlagsPerIssue);
             var effective = AwdEffectiveRules.FromSnapshot(snapshot);
-            var eligible = snapshot.Teams.Select(x => x.TeamId).ToHashSet();
+            var eligible = snapshot.Teams.Where(x => x.Competitive).Select(x => x.TeamId).ToHashSet();
+            if (!eligible.Contains(issue.TeamId)) continue;
             var attacks = capturesByFlag.GetValueOrDefault(issue.FlagId, [])
                 .Where(x => x.TeamId != issue.TeamId && eligible.Contains(x.TeamId) && eligible.Contains(issue.TeamId)).ToArray();
             var closed = acceptanceClosed || issue.ExpiryRound is { } expiresRound && currentRound >= expiresRound

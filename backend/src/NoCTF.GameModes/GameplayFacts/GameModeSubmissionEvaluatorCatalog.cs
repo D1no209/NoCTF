@@ -183,6 +183,13 @@ public sealed class AwdGameplayFactEvaluator : IGameplayFactEvaluator
             return Decision(GameplayFactResult.Rejected, AwdAttackOutcome.OwnFlag, GameplayFactFailureCode.SelfAttackRejected, matched);
         if (receipt.ReceiptScorable != true || submission.TimeEligibility != GameplayFactTimeEligibility.Valid)
             return Decision(GameplayFactResult.Rejected, AwdAttackOutcome.NotScorable, GameplayFactFailureCode.FlagNotScorable, matched);
+        var issuanceRules = context.AwdIssuanceRules?.SingleOrDefault(rules => rules.Id == issue.RulesId
+            && rules.CompetitionId == issue.CompetitionId && rules.CompetitionChallengeId == issue.CompetitionChallengeId);
+        if (issuanceRules is null)
+            return Decision(null, AwdAttackOutcome.SystemError, GameplayFactFailureCode.AwdReceiptUnavailable, matched);
+        if (!issuanceRules.Teams.Any(team => team.TeamId == submission.TeamId && team.Competitive)
+            || !issuanceRules.Teams.Any(team => team.TeamId == issue.TeamId && team.Competitive))
+            return Decision(GameplayFactResult.Rejected, AwdAttackOutcome.NotScorable, GameplayFactFailureCode.FlagNotScorable, matched);
         // Success uniqueness is checked under the completion transaction by FlagId + attacking team.
         return Decision(GameplayFactResult.Correct, AwdAttackOutcome.Accepted, null, matched);
 

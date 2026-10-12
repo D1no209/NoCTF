@@ -54,9 +54,34 @@ public sealed class AwdAttackEvaluationTests
         await Assert.That(failure.AwdAttack!.Outcome).IsEqualTo(AwdAttackOutcome.SystemError);
     }
 
-    private static GameplayFactDecision Evaluate(FlagAttemptGameplayFact fact, ChallengeFlag flag) =>
-        new AwdGameplayFactEvaluator().Evaluate(new(fact, [], [flag], null,
+    [Test]
+    public async Task Issuance_qualification_is_required_for_both_attacker_and_defender()
+    {
+        var (fact, flag) = Pair();
+        var rules = IssuanceRules(fact, flag);
+        rules.Teams[0].Competitive = false;
+        await Assert.That(Evaluate(fact, flag, rules).AwdAttack!.Outcome).IsEqualTo(AwdAttackOutcome.NotScorable);
+        rules.Teams[0].Competitive = true;
+        rules.Teams[1].Competitive = false;
+        await Assert.That(Evaluate(fact, flag, rules).AwdAttack!.Outcome).IsEqualTo(AwdAttackOutcome.NotScorable);
+        rules.Teams.RemoveAt(1);
+        await Assert.That(Evaluate(fact, flag, rules).AwdAttack!.Outcome).IsEqualTo(AwdAttackOutcome.NotScorable);
+        var missing = new AwdGameplayFactEvaluator().Evaluate(new(fact, [], [flag], null,
             new AwdCompetitionModeConfiguration(), new AwdCompetitionChallengeRules()));
+        await Assert.That(missing.AwdAttack!.Outcome).IsEqualTo(AwdAttackOutcome.SystemError);
+    }
+
+    private static AwdRoundRules IssuanceRules(FlagAttemptGameplayFact fact, ChallengeFlag flag) => new()
+    {
+        Id = flag.AwdIssue?.RulesId ?? Guid.NewGuid(), CompetitionId = fact.CompetitionId,
+        CompetitionChallengeId = fact.CompetitionChallengeId,
+        Teams = [new() { TeamId = flag.TeamId!.Value }, new() { TeamId = fact.TeamId!.Value }]
+    };
+
+    private static GameplayFactDecision Evaluate(FlagAttemptGameplayFact fact, ChallengeFlag flag, AwdRoundRules? rules = null) =>
+        new AwdGameplayFactEvaluator().Evaluate(new(fact, [], [flag], null,
+            new AwdCompetitionModeConfiguration(), new AwdCompetitionChallengeRules(),
+            AwdIssuanceRules: [rules ?? IssuanceRules(fact, flag)]));
 
     private static (FlagAttemptGameplayFact Fact, ChallengeFlag Flag) Pair()
     {

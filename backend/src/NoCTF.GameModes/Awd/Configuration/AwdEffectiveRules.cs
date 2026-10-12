@@ -82,6 +82,8 @@ public sealed record AwdEffectiveRules(
                 value.RecoveringPenalty, value.ConfidentialityPoints, value.MaximumRoundPenalty ?? 0 }
             .Any(points => points < 0 || points > ScoreValueLimits.MaximumConfiguredValue))
             errors.Add("AWD scoring values exceed the configured score limit.");
+        if (value.MinimumTotalScore is < -ScoreValueLimits.MaximumConfiguredValue or > ScoreValueLimits.MaximumConfiguredValue)
+            errors.Add("AWD minimum total score exceeds the configured score limit.");
         if (value.MinimumAttackRatio is <= 0 or > 1 || value.ScarcityAlpha is <= 0 or > 10
             || value.MaximumRankMultiplier is < 1 or > 100 || value.ConsecutiveFailureMultiplier is < 1 or > 10
             || new[] { value.AttackWeight, value.DefenseWeight, value.SlaWeight }.Any(weight => weight is < 0 or > 100))

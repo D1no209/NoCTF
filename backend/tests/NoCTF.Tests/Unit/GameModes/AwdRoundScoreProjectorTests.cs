@@ -182,6 +182,25 @@ public sealed class AwdRoundScoreProjectorTests
         await Assert.That(fixture.Project().Single(x => x.TeamId == fixture.Defender).Score).IsEqualTo(0);
     }
 
+    [Test]
+    public async Task Noncompetitive_issuance_cannot_earn_sla_or_change_shared_capture_budget()
+    {
+        var fixture = new Fixture(1);
+        fixture.Rules.AttackRewardMode = AwdAttackRewardMode.SplitVictimDefensePool;
+        fixture.Rules.Options = new() { DefenseMode = AwdDefenseMode.SharedPool, AttackSettlement = AwdAttackSettlement.FlagExpiry };
+        fixture.Rules.Teams.Single(x => x.TeamId == fixture.OtherAttacker).Competitive = false;
+        fixture.Rules.EligibleTeamCount = 2;
+        fixture.AddCheck(fixture.OtherAttacker, AwdHealth.Ok);
+        fixture.Captures.Add(new(fixture.Issues[0].FlagId, fixture.OtherAttacker, fixture.Start.AddSeconds(40)));
+        fixture.Captures.Add(new(fixture.Issues[0].FlagId, fixture.Attacker, fixture.Start.AddSeconds(41)));
+        var scores = fixture.Project(currentRound: 6);
+        await Assert.That(scores.Any(x => x.TeamId == fixture.OtherAttacker)).IsFalse();
+        await Assert.That(scores.Single(x => x.TeamId == fixture.Attacker).AttackPoints).IsEqualTo(100);
+        fixture.Rules.Teams.Single(x => x.TeamId == fixture.Defender).Competitive = false;
+        scores = fixture.Project(currentRound: 6);
+        await Assert.That(scores.Any(x => x.AttackCount > 0 || x.Score != 0)).IsFalse();
+    }
+
     private sealed class Fixture
     {
         public DateTimeOffset Start { get; } = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);

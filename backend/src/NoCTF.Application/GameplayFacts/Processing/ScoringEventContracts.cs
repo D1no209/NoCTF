@@ -26,7 +26,8 @@ public sealed record GameplayFactProcessingContext(
     CompetitionChallengeRules ChallengeRules,
     DateTimeOffset? CompetitionStartTime = null,
     TimeSpan? EffectiveRunningTime = null,
-    ChallengeDefinition? ChallengeDefinition = null);
+    ChallengeDefinition? ChallengeDefinition = null,
+    IReadOnlyList<AwdRoundRules>? AwdIssuanceRules = null);
 
 public interface IGameplayFactEvaluator
 {

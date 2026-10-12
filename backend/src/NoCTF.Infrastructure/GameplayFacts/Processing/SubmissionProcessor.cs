@@ -259,8 +259,12 @@ public sealed class GameplayFactProcessor(
             var issued = await db.ChallengeFlags.AsNoTracking()
                 .Where(flag => flag.CompetitionChallengeId == submission.CompetitionChallengeId
                     && flag.Flag == submission.Value).ToArrayAsync(cancellationToken);
+            var rulesIds = issued.Where(flag => flag.AwdIssue != null).Select(flag => flag.AwdIssue!.RulesId).ToArray();
+            var issuanceRules = await db.AwdRoundRules.AsNoTracking().AsSplitQuery()
+                .Where(snapshot => rulesIds.Contains(snapshot.Id)).ToArrayAsync(cancellationToken);
             return new(evaluatorCatalog.Get(GameMode.Awd).Evaluate(new(submission, [], issued, null,
-                configuration.Competition.ModeConfiguration!, configuration.CompetitionChallenge.Rules!)), null);
+                configuration.Competition.ModeConfiguration!, configuration.CompetitionChallenge.Rules!,
+                AwdIssuanceRules: issuanceRules)), null);
         }
         var maxAttempts = practiceFact
             ? null

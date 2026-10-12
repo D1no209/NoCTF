@@ -8,6 +8,19 @@ namespace NoCTF.Tests.Unit.GameModes;
 public sealed class AwdEffectiveRulesTests
 {
     [Test]
+    [Arguments(-1_000_001L, false)]
+    [Arguments(-1_000_000L, true)]
+    [Arguments(0L, true)]
+    [Arguments(1_000_000L, true)]
+    [Arguments(1_000_001L, false)]
+    public async Task Total_score_floor_has_explicit_signed_bounds(long floor, bool valid)
+    {
+        var rules = new AwdEffectiveRules(AwdAttackRewardMode.FixedPerAttack, 50, 100, 100, 30,
+            new() { MinimumTotalScore = floor });
+        await Assert.That(rules.Validate().Count == 0).IsEqualTo(valid);
+    }
+
+    [Test]
     public async Task PresetReplacesItsStructuralFormulaAndNeverInheritsOldMultiplier()
     {
         var defaults = (AwdCompetitionModeConfiguration)CompetitionModeConfigurationDefaults.Create(GameMode.Awd, Guid.NewGuid());

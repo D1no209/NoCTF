@@ -10616,6 +10616,12 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                                 .HasColumnType("uuid")
                                 .HasColumnName("team_id");
 
+                            b1.Property<bool>("Competitive")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("boolean")
+                                .HasDefaultValue(true)
+                                .HasColumnName("competitive");
+
                             b1.Property<int?>("SettledRank")
                                 .HasColumnType("integer")
                                 .HasColumnName("settled_rank");

@@ -50,6 +50,7 @@ internal sealed class AwdRoundRulesConfiguration : IEntityTypeConfiguration<AwdR
             teams.ToTable("awd_round_team_eligibility");
             teams.WithOwner().HasForeignKey(team => team.RulesId);
             teams.HasKey(team => new { team.RulesId, team.TeamId });
+            teams.Property(team => team.Competitive).HasDefaultValue(true);
         });
     }
 }
