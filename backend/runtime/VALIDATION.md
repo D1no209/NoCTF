@@ -229,7 +229,7 @@ retests are 3/3, including concurrent migration; the earlier failure is not
 consistently reproduced. The complete clean integration/architecture matrix is
 still pending and the initial matrix above must not be presented as all green.
 
-The campaign is active under `diagnostics/campaign-bc73cb90`. Both Hosts use
+The initial campaign was started under `diagnostics/campaign-bc73cb90`. Both Hosts use
 Satori and combined Api+Worker+Runner, with fresh synthetic dependencies and
 exclusive resource domains. Timed business workload started at 09:54:10 UTC on
 Windows and 09:54:35 UTC on Linux, October 12. The earliest 24-hour duration
@@ -240,3 +240,32 @@ each platform's `01-satori/progress.json`, `events.jsonl`, and raw JSONL samples
 An hourly follow-up is active in this task to inspect progress and finish the
 remaining acceptance and report. Keep the local machine, Docker and app running.
 No 24-hour duration or repeated performance result is claimed complete here.
+
+## First hourly inspection and harness correction (2026-10-12)
+
+At approximately 10:57 UTC, both Hosts were healthy with 16 successful Runtime
+lifecycle cycles, unchanged 500-point score proofs, and no observed process exit
+or Docker OOM kill. However, repeated theory draws exhausted the eight-question
+inventory of the single practice activity. `allowExposedQuestions` does not allow
+the same participant to draw the same source twice within that activity. This is
+a workload fixture defect, not evidence of a GC regression. The campaign and load
+drivers were stopped; the original evidence is retained with
+`interrupted-harness-defect` and cannot satisfy the 24-hour gate.
+
+The driver now creates a fresh practice activity from the existing synthetic
+question bank for each subsequent run. Both operating systems then completed two
+consecutive five-phase runs against the existing data: every phase successfully
+submitted theory papers, no `InsufficientQuestions` remained, and warmup, steady
+and recovery had zero measured errors. Burst/overload failures remain recorded.
+Reports are `soak-{windows,linux}/01-satori/repair-cycle-{1,2}.json` beneath the
+interrupted campaign. A guard now rejects incomplete or exhausted workloads, and
+the campaign does not advance to comparisons if a duration run ends early.
+
+Memory remains an open concern. In the initial run, Windows ten-minute median
+private memory rose from 433 MiB near startup to 1,481 MiB in the 50-minute window.
+Linux cgroup memory rose toward its 2 GiB limit before falling; the hourly sample
+was about 1,654 MiB. These are observations under a changing, partially invalid
+workload, not proof of a leak or GC attribution. Preserve
+`hour-01-inspection.json` and the full OS sample streams for comparison.
+The replacement campaign must start a fresh full 86,400-second interval. The
+earlier October 13 09:54 UTC estimate is superseded; Official remains the default.

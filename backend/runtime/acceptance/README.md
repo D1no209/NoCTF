@@ -50,6 +50,12 @@ private Docker-in-Docker daemon and owned socket volume. It never gives Runner
 the developer daemon's socket. This nested topology tests lifecycle and recovery;
 its challenge public ports are not mapped through the outer daemon. Public access
 is separately tested by the existing Docker/Kubernetes integration fixtures.
+Each repeated workload creates a new practice activity from the same eight
+synthetic source questions. A participant cannot draw the same source twice in
+one activity; `allowExposedQuestions` does not reset that inventory. Exhaustion or
+an incomplete workload stops duration qualification instead of silently spending
+the remaining soak time on rejected theory requests. Per-run reports retain the
+activity ID and each soak records its harness file hashes.
 
 Windows requires a synthetic JSON `--runner-environment` containing `KUBECONFIG`
 and `Runtime__Kubernetes__*` settings for an exclusively owned test cluster.
@@ -94,3 +100,5 @@ contains `synthetic: true`, `satoriWindows`, `officialWindows`, `satoriImage`,
 and immutable image references. The controller writes `state.json` and never
 switches a default or approves a release. Review every workload error and actual
 duration even if the campaign reaches `completed-for-review`.
+If either duration run ends before satisfying its duration gate, the campaign
+stops with `duration-incomplete` instead of starting the performance comparisons.

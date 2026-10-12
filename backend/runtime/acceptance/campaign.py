@@ -57,6 +57,11 @@ def main():
             soak_handles.append(launch("soak-" + platform, "soak.py", arguments))
         for handle in soak_handles:
             complete(handle)
+        for _, _, job in soak_handles:
+            result_path = pathlib.Path(job["output"]) / "01-satori" / "result.json"
+            if not result_path.exists() or json.loads(result_path.read_text()).get("durationGateMet") is not True:
+                state["status"] = "duration-incomplete"
+                return 1
         for name, platform, limits in [("comparison-windows", "windows", ["--cpus", "4"]),
                 ("comparison-linux-limited", "linux", ["--cpus", "4", "--memory", "2g"]),
                 ("comparison-linux-unlimited", "linux", ["--cpus", "0"])]:

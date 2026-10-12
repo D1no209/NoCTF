@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import pathlib
@@ -158,6 +159,9 @@ class Soak(Run):
         self.event("rollback-verified", actualFlavor=identity["actualFlavor"])
 
     def execute(self):
+        write(self.path / "harness.json", {"applicationFlavor": self.flavor,
+              "scripts": {name: hashlib.sha256((HERE / name).read_bytes()).hexdigest()
+                          for name in ["soak.py", "compare.py", "workload.mjs"]}})
         self.dependencies()
         self.dependency_ids = list(self.containers)
         self.prepare_runner()
@@ -186,6 +190,9 @@ class Soak(Run):
                 raise RuntimeError("Host exited outside an intentional restart")
             cycle += 1
             failures += self.driver("run", cycle) != 0
+            workload = json.loads((self.path / f"cycle-{cycle:05d}-run.json").read_text())
+            if len(workload["phases"]) != 5 or any("InsufficientQuestions" in error["message"] for error in workload["errors"]):
+                raise RuntimeError("Incomplete synthetic workload or exhausted theory inventory; duration is not qualified")
             failures += self.driver("runtime", cycle) != 0
             elapsed = time.monotonic() - started
             if elapsed >= next_dependency:

@@ -141,15 +141,19 @@ async function extendFixture(fixture) {
     } }, fixture.admin.token);
     await request("PUT", `/theory/questions/${question.questionId}/state`, { state: theoryProtocol.available }, fixture.admin.token, [204]);
     }
-    const activity = await request("POST", "/theory/activities", { input: {
-      name: "Synthetic runtime theory " + fixture.runId, kind: theoryProtocol.practice,
-      opensAt: new Date(Date.now() - 60_000).toISOString(), closesAt: new Date(Date.now() + 3 * 86_400_000).toISOString(),
-      durationSeconds: 600, attemptLimit: null, scoringMode: theoryProtocol.highest, allowExposedQuestions: true,
-      rules: [{ kind: theoryProtocol.singleChoice, difficulty: theoryProtocol.basic, count: 1, points: 10, filters: [{ kind: theoryProtocol.tag, name: fixture.runId }] }],
-    } }, fixture.admin.token);
-    await request("POST", `/theory/activities/${activity.id}/operations`, { action: theoryProtocol.publish }, fixture.admin.token);
-    fixture.theoryActivityId = activity.id;
+    await createTheoryActivity(fixture);
   }
+}
+
+async function createTheoryActivity(fixture) {
+  const activity = await request("POST", "/theory/activities", { input: {
+    name: "Synthetic runtime theory " + fixture.runId, kind: theoryProtocol.practice,
+    opensAt: new Date(Date.now() - 60_000).toISOString(), closesAt: new Date(Date.now() + 3 * 86_400_000).toISOString(),
+    durationSeconds: 600, attemptLimit: null, scoringMode: theoryProtocol.highest, allowExposedQuestions: true,
+    rules: [{ kind: theoryProtocol.singleChoice, difficulty: theoryProtocol.basic, count: 1, points: 10, filters: [{ kind: theoryProtocol.tag, name: fixture.runId }] }],
+  } }, fixture.admin.token);
+  await request("POST", `/theory/activities/${activity.id}/operations`, { action: theoryProtocol.publish }, fixture.admin.token);
+  fixture.theoryActivityId = activity.id;
 }
 
 async function transfer(fixture, account, cancel) {
@@ -388,6 +392,13 @@ async function run() {
   const startedAt = new Date().toISOString();
   try {
     await login(fixture.admin);
+    // Each participant draws a source question only once per activity. Renew the
+    // practice activity between runs; allowExposedQuestions does not reset draws.
+    if (fixture.theoryWorkloadStarted) {
+      await createTheoryActivity(fixture);
+    }
+    fixture.theoryWorkloadStarted = true;
+    await writeFile(fixturePath, JSON.stringify(fixture, null, 2), { mode: 0o600 });
     for (const account of fixture.participants) await login(account);
     await verifyScore(fixture);
     for (const account of fixture.participants.slice(0, 8)) {
@@ -447,7 +458,7 @@ async function run() {
   } finally {
     for (const connection of connections) connection.close();
     const report = { format: 1, kind: "application-workload", synthetic: true, startedAt, finishedAt: new Date().toISOString(),
-      competitionId: fixture.competitionId, scoreProof: fixture.scoreProof, phases, signalrEvents: connections.reduce((total, connection) => total + connection.events, 0), errors,
+      competitionId: fixture.competitionId, theoryActivityId: fixture.theoryActivityId, scoreProof: fixture.scoreProof, phases, signalrEvents: connections.reduce((total, connection) => total + connection.events, 0), errors,
       driver: { node: process.version, phaseSeconds: seconds, cooldownSeconds: cooldown, participants: fixture.participants.length },
       scope: ["password-login", "challenge-read", "flag-intake", "worker-completion", "leaderboard-read", "signalr-connect-reconnect", "file-download-sha256", "file-download-cancel", "theory-submit"],
       status: errors.length === 0 && phases.length === 5 ? "passed" : "failed" };
