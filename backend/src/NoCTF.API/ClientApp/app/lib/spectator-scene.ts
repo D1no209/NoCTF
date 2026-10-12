@@ -4,6 +4,7 @@ import { createSpectatorRibbon } from '../motion/spectator-ribbon'
 import { setFlagTransfer } from '../motion/spectator-flag'
 import { createTerrain, terrainHeight, terrainFragments } from './spectator-terrain'
 import { createSpectatorRock } from './spectator-rock'
+import { awdTeamLayout } from './spectator-awd-layout'
 import rockTextureUrl from '../assets/images/spectator/koh-stratified-rock.png'
 
 export interface SpectatorNode { id: string; name: string; owner?: number; ownerName?: string; controllerName?: string; health?: 'Healthy' | 'Down' | 'Unknown'; services?: ('Healthy' | 'Down' | 'Unknown')[] }
@@ -23,6 +24,7 @@ export class SpectatorScene {
   private orthographic = new THREE.OrthographicCamera(-16, 16, 8, -8, .1, 200)
   private camera: THREE.PerspectiveCamera | THREE.OrthographicCamera = this.perspective
   private aspect = 1
+  private awdSpan = new THREE.Vector2(1, 1)
   private world = new THREE.Group()
   private geometries: THREE.BufferGeometry[] = []
   private materials: THREE.Material[] = []
@@ -113,25 +115,30 @@ export class SpectatorScene {
       const metal = this.material(this.colors.metal!, .5), edge = this.material(this.colors.edge!, .3)
       const lampMaterial = this.material(new THREE.Color(1, 1, 1))
       const count = state.nodes.length, columns = Math.ceil(Math.sqrt(count * (state.mode === 'Koh' ? 1 : 1.5))), rows = Math.ceil(count / columns)
-      const compact = state.mode === 'Awd' && count > 12
+      const teamLayout = awdTeamLayout(Math.max(0, ...state.nodes.map(node => node.services?.length ?? 0)))
+      const teamSpacingX = teamLayout.width + 2.2, teamSpacingZ = teamLayout.depth + 2.8
+      this.awdSpan.set(Math.max(1, columns - 1) * teamSpacingX + teamLayout.width, Math.max(1, rows - 1) * teamSpacingZ + teamLayout.depth)
       const peaks: THREE.Vector3[] = []
       state.nodes.forEach((node, index) => {
         const group = new THREE.Group()
-        group.position.set((index % columns - (columns - 1) / 2) * (state.mode === 'Koh' ? 9.5 : 7), 0, (Math.floor(index / columns) - (rows - 1) / 2) * (state.mode === 'Koh' ? 9 : 7.8))
+        group.position.set((index % columns - (columns - 1) / 2) * (state.mode === 'Koh' ? 9.5 : teamSpacingX), 0, (Math.floor(index / columns) - (rows - 1) / 2) * (state.mode === 'Koh' ? 9 : teamSpacingZ))
         if (state.mode === 'Koh' && count === 3 && index === 2) group.position.x = 0
         group.userData.id = node.id
         group.userData.servicePositions = []
         if (state.mode === 'Awd') {
-          this.addBox(group, metal, 0, .2, 0, compact ? 3.6 : 4.3, .4, compact ? 1.8 : 3.3)
-          this.addBox(group, edge, 0, .43, compact ? .88 : 1.62, compact ? 3.5 : 4.2, .035, .03)
-          const services = node.services ?? []
-          services.forEach((_, i) => {
-            const cols = compact ? 8 : 4
-            const x = (i % cols - (Math.min(cols, services.length) - 1) / 2) * (compact ? .4 : .95)
-            const z = Math.floor(i / cols) * (compact ? .32 : 1.4) - (compact ? .2 : .65)
-            if (!compact) this.addBox(group, metal, x, 1, z, .7, 1.4, .85)
-            ;(group.userData.servicePositions as THREE.Vector3[]).push(new THREE.Vector3(x, compact ? .5 : 1.1, z).add(group.position))
-            const matrix = new THREE.Matrix4().compose(new THREE.Vector3(x, compact ? .48 : 1.1, z + (compact ? 0 : .43)).add(group.position), new THREE.Quaternion(), new THREE.Vector3(compact ? .25 : .5, compact ? .08 : .055, compact ? .19 : .018))
+          const layout = awdTeamLayout(node.services?.length ?? 0)
+          group.userData.labelDepth = layout.depth / 2 + .4
+          this.addBox(group, metal, 0, .2, 0, layout.width, .4, layout.depth)
+          this.addBox(group, edge, 0, .42, layout.depth / 2 - .06, layout.width - .12, .035, .06)
+          for (const x of [-layout.width / 2 + .03, layout.width / 2 - .03])
+            this.addBox(group, edge, x, .42, 0, .06, .035, layout.depth)
+          layout.services.forEach(({ x, y, z }, i) => {
+            this.addBox(group, metal, x, y, z, .66, 1.2, .76)
+            // A common front face and two drive slots keep racks legible in overview.
+            this.addBox(group, edge, x, .7, z + .39, .48, .045, .025)
+            this.addBox(group, edge, x, .9, z + .39, .48, .045, .025)
+            ;(group.userData.servicePositions as THREE.Vector3[]).push(new THREE.Vector3(x, 1.3, z + .4).add(group.position))
+            const matrix = new THREE.Matrix4().compose(new THREE.Vector3(x, 1.3, z + .39).add(group.position), new THREE.Quaternion(), new THREE.Vector3(.48, .10, .025))
             const index = this.batch.get(lampMaterial)?.length ?? 0
             const matrices = this.batch.get(lampMaterial) ?? []; matrices.push(matrix); this.batch.set(lampMaterial, matrices)
             this.lamps.push({ mesh: null!, node: node.id, service: i, index })
@@ -259,7 +266,9 @@ export class SpectatorScene {
       this.camera.position.set(target.x + Math.sin(this.angle) * 36, target.y + 30, target.z + Math.cos(this.angle) * 36)
     } else {
       this.camera = this.perspective
-      const size = focused ? 12 : Math.max(17, Math.sqrt(this.nodes.size) * 6.5) * Math.max(1, 1.65 / this.aspect)
+      const depth = Math.abs(Math.sin(this.angle)) * this.awdSpan.x + Math.abs(Math.cos(this.angle)) * this.awdSpan.y
+      const width = Math.abs(Math.cos(this.angle)) * this.awdSpan.x + Math.abs(Math.sin(this.angle)) * this.awdSpan.y
+      const size = focused ? 12 : Math.max(17, depth * 1.18, width / (this.aspect * .85))
       this.camera.position.set(target.x + Math.sin(this.angle) * size, size * .95, target.z + Math.cos(this.angle) * size)
     }
     this.camera.lookAt(target); this.camera.updateMatrixWorld(); this.placeLabels()
@@ -267,7 +276,7 @@ export class SpectatorScene {
   private placeLabels() {
     for (const label of this.labels) {
       const node = this.nodes.get(label.dataset.nodeId!)!
-      const point = node.position.clone().add(new THREE.Vector3(0, this.state?.mode === 'Koh' ? (node.userData.height as number) + 1.95 : .2, this.state?.mode === 'Koh' ? 0 : 1.45)).project(this.camera)
+      const point = node.position.clone().add(new THREE.Vector3(0, this.state?.mode === 'Koh' ? (node.userData.height as number) + 1.95 : .2, this.state?.mode === 'Koh' ? 0 : node.userData.labelDepth as number)).project(this.camera)
       const neighbor = node.position.clone().add(new THREE.Vector3(5.5, .2, 2.1)).project(this.camera)
       label.style.maxWidth = `${Math.max(45, Math.abs(neighbor.x - point.x) * this.element.clientWidth / 2)}px`
       label.style.left = `${(point.x + 1) * 50}%`; label.style.top = `${(1 - point.y) * 50}%`

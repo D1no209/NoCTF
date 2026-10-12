@@ -3,6 +3,7 @@ import * as Three from 'three'
 import { createSpectatorRibbon } from '../app/motion/spectator-ribbon'
 import { createTerrain, terrainHeight } from '../app/lib/spectator-terrain'
 import { setFlagTransfer } from '../app/motion/spectator-flag'
+import { awdTeamLayout } from '../app/lib/spectator-awd-layout'
 import type { SpectatorScene } from '../app/lib/spectator-scene'
 
 const source = await Bun.file(new URL('../app/lib/spectator-scene.ts', import.meta.url)).text()
@@ -33,7 +34,7 @@ function harness() {
     setClearColor() {} setSize(w: number, h: number) { this.width = Math.floor(w * this.pixelRatio); this.height = Math.floor(h * this.pixelRatio) }
     render() { this.info.render.calls++ } dispose() { this.disposed = true }
   }
-  const deps = { THREE: { ...Three, WebGLRenderer: Renderer }, themeColor: () => '#aabbcc', createSpectatorRibbon, createTerrain, terrainHeight, setFlagTransfer,
+  const deps = { THREE: { ...Three, WebGLRenderer: Renderer }, themeColor: () => '#aabbcc', createSpectatorRibbon, createTerrain, terrainHeight, setFlagTransfer, awdTeamLayout,
     document, window, ResizeObserver: class { constructor(callback: () => void) { resized = callback } observe() {} disconnect() {} },
     requestAnimationFrame: (callback: FrameRequestCallback) => { frames.set(++id, callback); return id }, cancelAnimationFrame: (key: number) => frames.delete(key) }
   const Scene = new Function('deps', `const { ${Object.keys(deps).join(', ')} } = deps; ${compiled}; return SpectatorScene;`)(deps)
