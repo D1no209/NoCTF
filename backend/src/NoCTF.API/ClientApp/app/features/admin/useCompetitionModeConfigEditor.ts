@@ -1,3 +1,6 @@
+import { awdPresetConstraints, resolveAwdPresetValues } from '../../utils/awd-config-fields'
+import { useAwdRuleEditor } from './useAwdRuleEditor'
+import type { NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol } from '../../api'
 import { markRaw, toRefs } from 'vue'
 
 import { RotateCcw } from '@lucide/vue'
@@ -7,20 +10,15 @@ import { buildConfigValues, competitionConfigFields, fieldDefaultValue, readConf
 import ConfigFieldInputComponent from './ConfigFieldInput.vue'
 
 /** Owns state, effects and commands for CompetitionModeConfigEditor. */
-export function useCompetitionModeConfigEditor(props: Readonly<Omit<{
+export function useCompetitionModeConfigEditor(props: Readonly<{
   mode: GameModeValue
-  configuration?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract | null
-  readonly?: boolean
-  loading?: boolean
-  saving?: boolean
-}, "configuration" | "readonly" | "loading" | "saving"> & Required<Pick<{
-  mode: GameModeValue
-  configuration?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract | null
-  readonly?: boolean
-  loading?: boolean
-  saving?: boolean
-}, "configuration" | "readonly" | "loading" | "saving">>>,
-emit: { (event: "save", ...args: [configuration: NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract]): void }) {
+  competitionStatus?: NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol
+  configuration: NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract | null
+  readonly: boolean
+  loading: boolean
+  saving: boolean
+}>,
+emit: { (event: "save", ...args: [configuration: NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract, reason?: string]): void }) {
   const fields = computed(() => competitionConfigFields(props.mode))
 
   const values = ref<ConfigValues>({})
@@ -48,6 +46,7 @@ emit: { (event: "save", ...args: [configuration: NoCtfapiEndpointsAdministration
   )
 
   function updateField(key: string, value: unknown) {
+    if (awdEditor.updateAwdField(key, value)) return
     values.value = { ...values.value, [key]: value }
   }
 
@@ -57,6 +56,12 @@ emit: { (event: "save", ...args: [configuration: NoCtfapiEndpointsAdministration
     )
     parseFailed.value = false
   }
+
+  const effectiveValues = computed(() => props.mode === 'Awd' ? resolveAwdPresetValues(values.value) : values.value)
+  const awdEditor = useAwdRuleEditor(props, fields, effectiveValues, patch => {
+    const baseline = patch.preset === 'Custom' ? awdPresetConstraints(effectiveValues.value) : {}
+    values.value = { ...values.value, ...baseline, ...patch }
+  })
 
   function canonicalize(value: unknown): unknown {
     if (Array.isArray(value)) return value.map(canonicalize)
@@ -89,16 +94,18 @@ emit: { (event: "save", ...args: [configuration: NoCtfapiEndpointsAdministration
   })
 
   function save() {
-    emit('save', serialized.value)
+    if (!awdEditor.canSaveRules.value) return
+    emit('save', serialized.value, awdEditor.changeReason.value.trim() || undefined)
   }
 
   const ConfigFieldInput = markRaw(ConfigFieldInputComponent)
 
   return {
       ...toRefs(props),
+      ...awdEditor,
       RotateCcw,
       fields,
-      values,
+      values: effectiveValues,
       parseFailed,
       updateField,
       resetToCurrentDefaults,

@@ -170,13 +170,13 @@ export function useAdminCompetitionsByIdConfigurationPage() {
     configLoading.value = false
   }
 
-  async function saveConfig(configuration: NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract) {
+  async function saveConfig(configuration: NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract, reason?: string) {
     if (!config.value) return
     savingConfig.value = true
     try {
       const { data, error } = await adminPatchCompetition({
         path: { competitionId },
-        body: { modeConfiguration: { configuration } },
+        body: { modeConfiguration: { configuration, reason } },
       })
       if (error) throw error
       config.value = data?.modeConfiguration ?? config.value

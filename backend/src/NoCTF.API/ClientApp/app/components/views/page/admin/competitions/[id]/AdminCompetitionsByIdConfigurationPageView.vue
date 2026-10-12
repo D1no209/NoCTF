@@ -177,6 +177,7 @@ const { competitionId, SingleWriteUpSettings, refreshCompetition, competition, c
           <NuxtLink :to="`/admin/competitions/${competitionId}/live-solo/settings`">{{ $t('liveSolo.navigation.modeSettings') }}</NuxtLink>
         </Button>
         <component :is="CompetitionModeConfigEditor"
+          :competition-status="competition?.status"
           v-else
           :mode="(config?.mode ?? competition?.mode ?? 'Ctf') as GameModeValue"
           :configuration="config?.configuration"

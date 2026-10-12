@@ -1,3 +1,4 @@
+import { getAwdRules } from '~/api'
 import ChallengeTimingSettingsComponent from '~/features/challenges/timing/ChallengeTimingSettings.vue'
 import { message as describeMessage } from '../../../../../../utils/i18n'
 import type { UiMessage } from '../../../../../../utils/i18n'
@@ -148,6 +149,8 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
 
   const savingConfig = ref(false)
 
+  const awdStores = ref<import('~/api').NoCtfapiEndpointsChallengesAwdPublicStoreRuleResponse[]>([])
+
   const inheritedConfiguration = ref<NoCtfapiEndpointsAdministrationCompetitionsCompetitionModeConfigurationContract | null>(null)
 
   async function loadConfig() {
@@ -168,16 +171,21 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
     if (!competitionResult.error && competitionResult.data) {
       inheritedConfiguration.value = competitionResult.data.modeConfiguration?.configuration ?? null
     }
+    if (challengeResult.data?.mode === 'Awd') {
+      const result = await getAwdRules({ path: { competitionId, competitionChallengeId: ccId } })
+      if (result.data) awdStores.value = result.data.nextRound?.stores ?? []
+      else if (result.error) toast.error(parseApiError(result.error).displayMessage)
+    }
     configLoading.value = false
   }
 
-  async function saveConfig(rules: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract) {
+  async function saveConfig(rules: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeRulesContract, reason?: string) {
     if (!config.value) return
     savingConfig.value = true
     try {
       const { data, error } = await adminPatchCompetitionChallenge({
         path: { competitionId, competitionChallengeId: ccId },
-        body: { rules: { configuration: rules } },
+        body: { rules: { configuration: rules, reason } },
       })
       if (error) throw error
       config.value = data
@@ -567,6 +575,7 @@ export function useAdminCompetitionsByIdChallengesByCcIdPage() {
       configLoading,
       savingConfig,
       inheritedConfiguration,
+      awdStores,
       saveConfig,
       hints,
       hintsLoading,
