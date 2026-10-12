@@ -42,8 +42,12 @@ public sealed class FusionLeaderboardCache(
     {
         var frozenAt = await db.Competitions.AsNoTracking().Where(x => x.Id == competitionId)
             .Select(x => x.FrozenStartAt).SingleOrDefaultAsync(ct);
-        return frozenAt is null ? null
-            : (await GetFrozenWebhookScoreboardAsync(competitionId, frozenAt.Value, ct))?.Projection;
+        if (frozenAt is null) return null;
+        // A public read never reconstructs a past freeze from mutable current facts.
+        // Visibility processing captures the immutable generation transactionally.
+        var frozen = await db.CompetitionWebhookFrozenProjections.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.CompetitionId == competitionId && x.FrozenAt == frozenAt.Value, ct);
+        return frozen is null ? null : ReadFrozen(frozen).Projection;
     }
 
     public async Task<WebhookScoreboardProjection?> GetWebhookScoreboardAsync(

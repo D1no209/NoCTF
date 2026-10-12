@@ -23,13 +23,17 @@ public static class SpectatorAudience
         Services = frame.Services.Where(x => teams.Contains(x.TeamId) && challenges.Contains(x.ChallengeId)).ToArray(),
         Points = frame.Points.Where(x => challenges.Contains(x.ChallengeId)).Select(x => x with
         {
+            Health = x.ControllerId is Guid hidden && !teams.Contains(hidden) ? SpectatorHealth.Unknown : x.Health,
             ControllerId = x.ControllerId is Guid controller && teams.Contains(controller) ? controller : null,
             ObservedTeamId = x.ObservedTeamId is Guid observed && teams.Contains(observed) ? observed : null
         }).ToArray(),
         Changes = frame.Changes.Where(x => challenges.Contains(x.ChallengeId)
-            && (x.TeamId is null || teams.Contains(x.TeamId.Value))
-            && (x.TargetTeamId is null || teams.Contains(x.TargetTeamId.Value))).Select(x => x with
+            && (x.Kind != SpectatorChangeKind.Attack || (x.TeamId is Guid attacker && teams.Contains(attacker)
+                && x.TargetTeamId is Guid victim && teams.Contains(victim)))).Select(x => x with
             {
+                Kind = x.ControllerId is Guid hidden && !teams.Contains(hidden) ? SpectatorChangeKind.DetectionFailed : x.Kind,
+                TeamId = x.TeamId is Guid observed && teams.Contains(observed) ? observed : null,
+                TargetTeamId = x.TargetTeamId is Guid target && teams.Contains(target) ? target : null,
                 ControllerId = x.ControllerId is Guid controller && teams.Contains(controller) ? controller : null
             }).ToArray()
     };

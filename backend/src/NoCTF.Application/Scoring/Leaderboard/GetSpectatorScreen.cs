@@ -40,6 +40,12 @@ public sealed class GetSpectatorScreen(ILeaderboardCache cache, ICompetitionVisi
         }
         var publicTracks = await tracks.ExecuteAsync(id, null, false, false, ct);
         if (publicTracks is null) return new(SpectatorReadState.NotFound);
+        if (permission.DataScope == LeaderboardDataScope.Frozen)
+            publicTracks = publicTracks with
+            {
+                Tracks = publicTracks.Tracks.Where(track => projection.Snapshot.Tracks.Any(saved =>
+                    saved.Key == track.Key && !saved.IsInternal && saved.VisibleOnLeaderboard)).ToArray()
+            };
         var view = ScoreboardAudienceProjection.FilterTracks(
             ScoreboardAudienceProjection.ForPublishedChallenges(projection), publicTracks, false);
         var cutoff = projection.Snapshot.DataAsOf ?? projection.Snapshot.GeneratedAt;

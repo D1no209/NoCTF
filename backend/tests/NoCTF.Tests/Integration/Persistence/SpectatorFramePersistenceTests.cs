@@ -7,6 +7,7 @@ using NoCTF.Application.Notifications;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.GameModes.Leaderboard;
 using NoCTF.Infrastructure.Caching;
+using NoCTF.Infrastructure.Competitions.Visibility;
 using ZiggyCreatures.Caching.Fusion;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Challenges;
@@ -126,6 +127,8 @@ public sealed class SpectatorFramePersistenceTests
             using var services = new ServiceCollection().AddFusionCache(NoCtfCacheNames.Leaderboards).Services.BuildServiceProvider();
             var cache = new FusionLeaderboardCache(db, new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()),
                 Substitute.For<ILeaderboardRefreshPublisher>(), services.GetRequiredService<IFusionCacheProvider>(), clock: new FakeTimeProvider(now));
+            await Assert.That(await cache.GetFrozenSpectatorScoreboardAsync(competitionId, ct)).IsNull();
+            await cache.GetFrozenWebhookScoreboardAsync(competitionId, now, ct);
             var captured = await cache.GetFrozenSpectatorScoreboardAsync(competitionId, ct);
             await Assert.That(captured!.Spectator).IsNotNull();
             var before = System.Text.Json.JsonSerializer.Serialize(captured.Spectator);
@@ -136,6 +139,15 @@ public sealed class SpectatorFramePersistenceTests
             db.ChangeTracker.Clear();
             var after = await cache.GetFrozenSpectatorScoreboardAsync(competitionId, ct);
             await Assert.That(System.Text.Json.JsonSerializer.Serialize(after!.Spectator)).IsEqualTo(before);
+
+            var access = new CompetitionVisibilityAccess(db);
+            await Assert.That((await access.ResolveAsync(Guid.Empty, competitionId, now, ct))!.DataScope).IsEqualTo(LeaderboardDataScope.Frozen);
+            await Assert.That((await access.ResolveAsync(userId, competitionId, now, ct))!.DataScope).IsEqualTo(LeaderboardDataScope.Live);
+            var persisted = await db.Competitions.SingleAsync(x => x.Id == competitionId, ct);
+            persisted.AccessMode = CompetitionAccessMode.StaffOnly;
+            await db.SaveChangesAsync(ct);
+            await Assert.That(await access.ResolveAsync(Guid.Empty, competitionId, now, ct)).IsNull();
+            await Assert.That(await access.ResolveAsync(userId, competitionId, now, ct)).IsNotNull();
         });
     }
 }

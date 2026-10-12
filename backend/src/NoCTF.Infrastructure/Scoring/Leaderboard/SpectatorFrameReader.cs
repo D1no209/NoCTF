@@ -99,7 +99,8 @@ internal static class SpectatorFrameReader
             changes = await eligible.Where(x => x.Kind == GameplayFactKind.KohControlObservation && x.OccurredAt >= start)
                 .OrderByDescending(x => x.OccurredAt).ThenByDescending(x => x.Id).Take(HistoryLimit + 1)
                 .Select(x => new SpectatorChange(x.Id, x.ConcurrencyStamp, x.OccurredAt,
-                    x.State != GameplayFactState.Completed ? SpectatorChangeKind.DetectionFailed
+                    x.State != GameplayFactState.Completed || x.Result != GameplayFactResult.Controlled && x.Result != GameplayFactResult.Uncontrolled
+                        ? SpectatorChangeKind.DetectionFailed
                         : x.Result == GameplayFactResult.Uncontrolled ? SpectatorChangeKind.Uncontrolled : SpectatorChangeKind.Control,
                     x.CompetitionChallengeId, x.TeamId, null,
                     eligible.Where(c => c.Kind == GameplayFactKind.KohControlObservation
