@@ -16,6 +16,7 @@ public sealed class AwdRound : IConcurrencyTracked
     public long ActiveStartTicks { get; set; }
     public long ActiveEndTicks { get; set; }
     public int GapSeconds { get; set; }
+    public int SubmissionTailSeconds { get; set; }
     public bool Missed { get; set; }
     public bool Partial { get; set; }
 }

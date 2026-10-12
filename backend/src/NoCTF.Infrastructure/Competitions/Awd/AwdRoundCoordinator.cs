@@ -297,7 +297,8 @@ public sealed class AwdRoundCoordinator(
                 EndsAt = endsAt,
                 ActiveStartTicks = planned.ActiveStartTicks,
                 ActiveEndTicks = planned.ActiveEndTicks,
-                GapSeconds = planned.GapSeconds, Missed = planned.Missed, Partial = planned.Partial
+                GapSeconds = planned.GapSeconds, SubmissionTailSeconds = configuration.AwdOptions.SubmissionTailSeconds,
+                Missed = planned.Missed, Partial = planned.Partial
             };
             db.AwdRounds.Add(round);
             rounds.Add(round);

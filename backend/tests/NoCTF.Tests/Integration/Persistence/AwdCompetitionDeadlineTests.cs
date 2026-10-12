@@ -103,6 +103,12 @@ public sealed partial class AwdRoundCoordinationTests
             var fact = await db.GameplayFacts.AsNoTracking().Include(x => x.Awd).SingleAsync(x => x.Kind == GameplayFactKind.FlagAttempt, ct);
             await Assert.That(fact.Awd!.ReceivedRoundId).IsEqualTo(last.Id);
             await Assert.That(fact.Awd.ReceivedActiveTicks).IsEqualTo(last.ActiveEndTicks);
+            configuration.AwdOptions = configuration.AwdOptions with { SubmissionTailSeconds = 900 };
+            await db.SaveChangesAsync(ct);
+            var unchangedDeadline = await AwdCompetitionDeadline.ReadAsync(db, fixture.CompetitionId,
+                competition.StartAt, competition.EndAt, configuration, clock.UtcNow, ct);
+            await Assert.That(unchangedDeadline.AcceptanceEndsAt).IsEqualTo(expectedEnd.AddSeconds(15));
+            await Assert.That(last.SubmissionTailSeconds).IsEqualTo(15);
             clock.UtcNow = expectedEnd.AddSeconds(15);
             await Assert.That((await Submit()).FailureCode).IsEqualTo(GameplayFactAdmissionFailureCode.CompetitionFinished);
             await using var workerDb = new NoCtfDbContext(options);

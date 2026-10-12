@@ -1696,6 +1696,10 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("starts_at");
 
+                    b.Property<int>("SubmissionTailSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("submission_tail_seconds");
+
                     b.HasKey("Id")
                         .HasName("pk_awd_rounds");
 

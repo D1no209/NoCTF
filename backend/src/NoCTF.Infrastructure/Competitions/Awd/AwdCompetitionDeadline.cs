@@ -31,6 +31,12 @@ internal sealed record AwdCompetitionDeadline(AwdRunningClock Clock, IReadOnlyLi
             configuration.AwdOptions.TotalRounds, budget);
         var end = finishedAt ?? (clock.HasIntervals
             ? clock.At(endPosition, intervalStart: false, clampClosed: true) : scheduledEndAt);
-        return new(clock, rounds, limit, end, end.AddSeconds(configuration.AwdOptions.SubmissionTailSeconds));
+        var last = rounds.LastOrDefault(round => round.StartsAt <= end);
+        // Once the terminal round exists (or the match has stopped), future defaults
+        // cannot reopen intake. A round without enabled questions still owns this policy.
+        var tail = last is not null && (finishedAt is not null || observedAt >= end || end <= last.EndsAt)
+            ? last.SubmissionTailSeconds
+            : finishedAt is not null ? 0 : configuration.AwdOptions.SubmissionTailSeconds;
+        return new(clock, rounds, limit, end, end.AddSeconds(tail));
     }
 }
