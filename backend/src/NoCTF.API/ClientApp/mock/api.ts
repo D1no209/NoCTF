@@ -1,3 +1,4 @@
+import { createMockAwdChecks } from './awd-checks'
 import { createMockMfa } from './mfa'
 import { createMockChallengeWriteUps } from './challenge-writeups'
 import { accounts, createFixtures, mockModeConfiguration, mockRules } from './data/fixtures'
@@ -53,6 +54,7 @@ function mockWriteUpPdf(teamName: string): Blob {
 
 export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'ManualModeration'; mfa?: boolean } = {}) {
   const state = createFixtures()
+  const awdChecks = createMockAwdChecks(state)
   const liveSolo = createMockLiveSolo(state)
   const broadcastHistory = createMockBroadcastHistory(state)
   const platformLogHistory = createMockPlatformLogHistory()
@@ -293,6 +295,8 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
     const team = state.teams.find(t => t.id === p.teamId && t.competitionId === p.competitionId)
     const myTeam = state.teams.find(t => t.competitionId === p.competitionId && t.memberIds.includes(user?.userId))
     const cleanRoute = route.replace('/admin/competitions', '/competitions')
+    const awdCheckResponse = awdChecks.handle(request, route, p, body)
+    if (awdCheckResponse) return awdCheckResponse
     const liveSoloRead = request.method === 'GET' ? liveSolo.read(cleanRoute, p) : undefined
     if (liveSoloRead !== undefined) return json(shape(responseSchema(operation), liveSoloRead))
     if (route.startsWith('/admin/competitions/{competitionId}/announcements') && !competitionStaff)
