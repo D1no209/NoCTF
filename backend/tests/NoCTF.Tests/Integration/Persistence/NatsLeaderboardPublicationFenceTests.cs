@@ -33,6 +33,8 @@ public sealed class NatsLeaderboardPublicationFenceTests
                 .Services.BuildServiceProvider();
             var fence = new NatsLeaderboardPublicationFence(connection,
                 cacheServices.GetRequiredService<IFusionCacheProvider>());
+            var cache = cacheServices.GetRequiredService<IFusionCacheProvider>()
+                .GetCache(NoCtfCacheNames.Leaderboards);
             var competitionId = Guid.NewGuid();
             const long floor = 638_916_123_456_789_012;
 
@@ -44,6 +46,9 @@ public sealed class NatsLeaderboardPublicationFenceTests
                 competitionId, newer, "newer", ct)).IsTrue();
             await Assert.That(await fence.TryCommitAsync(
                 competitionId, older, "older", ct)).IsFalse();
+            await Assert.That(await cache.GetOrDefaultAsync<string?>(
+                NatsLeaderboardPublicationFence.PayloadKey(competitionId, older), null, token: ct))
+                .IsNull();
             await Assert.That(await fence.GetAsync(competitionId, ct))
                 .IsEqualTo(new LeaderboardFencedPayload(newer, "newer"));
             await Assert.That(await fence.IsCurrentAsync(
@@ -51,6 +56,9 @@ public sealed class NatsLeaderboardPublicationFenceTests
 
             await fence.InvalidateAsync(competitionId, newer + 1, ct);
             await Assert.That(await fence.GetAsync(competitionId, ct)).IsNull();
+            await Assert.That(await cache.GetOrDefaultAsync<string?>(
+                NatsLeaderboardPublicationFence.PayloadKey(competitionId, newer), null, token: ct))
+                .IsNull();
             var current = await fence.IssueAsync(competitionId, newer + 1, ct);
             await Assert.That(await fence.TryCommitAsync(
                 competitionId, current, "current", ct)).IsTrue();
@@ -67,6 +75,30 @@ public sealed class NatsLeaderboardPublicationFenceTests
                 competitionId, rebuilt, "rebuilt", ct)).IsTrue();
             await Assert.That(await fence.GetAsync(competitionId, ct))
                 .IsEqualTo(new LeaderboardFencedPayload(rebuilt, "rebuilt"));
+
+            // Issuing a new version deliberately retains the previous published snapshot.
+            // Duplicate old commits may be rejected, but cannot retire that current payload.
+            var replacement = await fence.IssueAsync(competitionId, rebuilt + 1, ct);
+            await Assert.That(await fence.TryCommitAsync(
+                competitionId, rebuilt, "rebuilt", ct)).IsFalse();
+            await Assert.That(await fence.GetAsync(competitionId, ct))
+                .IsEqualTo(new LeaderboardFencedPayload(rebuilt, "rebuilt"));
+            var duplicateCommits = await Task.WhenAll(Enumerable.Range(0, 8).Select(_ =>
+                fence.TryCommitAsync(competitionId, replacement, "replacement", ct)));
+            await Assert.That(duplicateCommits.All(committed => committed)).IsTrue();
+            await Assert.That(await fence.GetAsync(competitionId, ct))
+                .IsEqualTo(new LeaderboardFencedPayload(replacement, "replacement"));
+            await Assert.That(await cache.GetOrDefaultAsync<string?>(
+                NatsLeaderboardPublicationFence.PayloadKey(competitionId, rebuilt), null, token: ct))
+                .IsNull();
+
+            await fence.InvalidateAsync(competitionId, replacement + 1, ct);
+            await Assert.That(await fence.TryCommitAsync(
+                competitionId, replacement, "late duplicate", ct)).IsFalse();
+            await Assert.That(await cache.GetOrDefaultAsync<string?>(
+                NatsLeaderboardPublicationFence.PayloadKey(competitionId, replacement), null, token: ct))
+                .IsNull();
+            await Assert.That(await fence.GetAsync(competitionId, ct)).IsNull();
         });
     }
 }
