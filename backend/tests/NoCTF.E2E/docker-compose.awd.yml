@@ -167,6 +167,7 @@ services:
       Runner__Provider: ${NOCTF_E2E_RUNTIME_PROVIDER}
       Runner__Pool: ${NOCTF_E2E_RUNNER_POOL}
       Runner__Id: awd-e2e-runner-1
+      Logging__LogLevel__NoCTF.Runner.Messages.AuxiliaryRuntimeCapacity: Debug
       Runner__Heartbeat__IntervalSeconds: "2"
       Runner__Heartbeat__TtlSeconds: "8"
       RunnerScoring__SigningKey: ${NOCTF_E2E_JWT_SECRET}

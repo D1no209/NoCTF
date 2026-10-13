@@ -44,6 +44,7 @@ public sealed class AwdFullBoundaryTests
             HttpStatusCode.Created,
             cancellationToken);
         var competitionId = competition.GetProperty("id").GetGuid();
+        await using var evidence = new AwdEvidenceRecorder(admin, competitionId, cancellationToken);
 
         var competitionConfiguration = new
         {
@@ -376,6 +377,12 @@ public sealed class AwdFullBoundaryTests
             .Where(item => item.GetProperty("kind").GetString() == "Attack")
             .Sum(item => item.GetProperty("successfulCount").GetInt32());
         await Assert.That(successfulAttacks).IsEqualTo(1);
+
+        // A later successful round must not hide a checker that failed during an earlier round.
+        // Inspect before finishing, which intentionally holds unstarted future samples.
+        var pendingChecks = await GetJsonAsync(admin,
+            $"/api/v1/admin/competitions/{competitionId}/awd/checks?Limit=200", cancellationToken);
+        await Assert.That(pendingChecks.GetProperty("total").GetInt32()).IsEqualTo(0);
 
         await E2ELifecycle.SetStatusAsync(
             admin, competitionId, "Finished", cancellationToken);
