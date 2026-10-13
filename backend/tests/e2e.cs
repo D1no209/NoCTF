@@ -146,7 +146,6 @@ internal sealed class ModeEnvironment(
                     "tests",
                     "NoCTF.E2E",
                     "NoCTF.E2E.csproj"),
-                "--no-restore",
                 "--",
                 "--treenode-filter",
                 $"/*/*/*/*[Category={mode}E2E]",
@@ -474,6 +473,7 @@ internal sealed class ModeEnvironment(
         using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(2));
         try
         {
+            await compose.RunAsync(["stop", "worker", "runner", "backend"], timeout.Token);
             var managed = await runner.RunAsync(
                 "docker",
                 ["ps", "-aq", "--filter", "label=noctf.io/managed=true"],
@@ -522,6 +522,9 @@ internal sealed class ModeEnvironment(
                         ["inspect", "--format", "{{json .NetworkSettings.Networks}}", id],
                         timeout.Token,
                         displayOutput: false);
+                    // A completed checker can disappear between listing and inspection.
+                    if (networkResult.ExitCode != 0 || string.IsNullOrWhiteSpace(networkResult.StandardOutput))
+                        continue;
                     using var networks = JsonDocument.Parse(networkResult.StandardOutput);
                     foreach (var network in networks.RootElement.EnumerateObject())
                     {
