@@ -24,6 +24,33 @@ namespace NoCTF.Tests.Integration.Persistence;
 
 public sealed partial class AwdRoundCoordinationTests
 {
+    [Test, Timeout(300_000), Arguments(-300), Arguments(300)]
+    public Task Open_pause_preserves_budget_before_play_and_at_an_exact_round_boundary(int pauseOffset, CancellationToken ct) => DockerIntegrationTest.RunAsync(async () =>
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193").Build();
+        await postgres.StartAsync(ct);
+        var options = new DbContextOptionsBuilder<NoCtfDbContext>().UseNpgsql(postgres.GetConnectionString()).UseSnakeCaseNamingConvention().Options;
+        var fixture = await SeedAsync(options, ct);
+        await using var db = new NoCtfDbContext(options);
+        if (pauseOffset > 0)
+            await new AwdRoundCoordinator(db, new AwdRoundConfigurationCatalog(), new RecordingOutbox(),
+                new MutableTimeProvider(fixture.Now), Secrets()).AdvanceAsync(new(fixture.CompetitionId, fixture.Now), ct);
+        var competition = await db.Competitions.SingleAsync(ct);
+        competition.Status = CompetitionStatus.Paused;
+        db.CompetitionEvents.Add(new NoCTF.Domain.Competitions.Events.CompetitionLifecycleChangedEvent
+        {
+            Id = Guid.NewGuid(), CompetitionId = fixture.CompetitionId,
+            PreviousCompetitionStatus = CompetitionStatus.Running, CompetitionStatus = CompetitionStatus.Paused,
+            OccurredAt = fixture.Now.AddSeconds(pauseOffset)
+        });
+        await db.SaveChangesAsync(ct);
+        var deadline = await AwdCompetitionDeadline.ReadAsync(db, fixture.CompetitionId, competition.StartAt,
+            competition.EndAt, (AwdCompetitionModeConfiguration)competition.ModeConfiguration!, fixture.Now.AddHours(2), ct);
+        await Assert.That(deadline.EndIsProvisional).IsTrue();
+        await Assert.That(deadline.ActiveTimeLimit).IsEqualTo(TimeSpan.FromMinutes(70));
+        await Assert.That(deadline.Clock.ElapsedAt(fixture.Now.AddHours(2))).IsEqualTo(TimeSpan.FromSeconds(600 + pauseOffset));
+    });
+
     [Test]
     [Arguments(false)]
     [Arguments(true)]
