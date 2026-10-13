@@ -9,6 +9,5 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="BenchmarkDotNet" />
-    <Compile Include="../../src/NoCTF.Hosting/ManagedRuntime/ManagedRuntimeIdentity.cs" Link="ManagedRuntimeIdentity.cs" />
   </ItemGroup>
 </Project>

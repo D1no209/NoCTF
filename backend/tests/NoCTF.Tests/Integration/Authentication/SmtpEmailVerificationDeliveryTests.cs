@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using DotNet.Testcontainers.Builders;
+using DotNet.Testcontainers.Configurations;
 using DotNet.Testcontainers.Containers;
 using MailKit;
 using MailKit.Net.Imap;
@@ -34,7 +35,7 @@ public sealed class SmtpEmailVerificationDeliveryTests
         await DockerIntegrationTest.RunAsync(async () =>
         {
             await using var mail = BuildGreenMail(authenticationDisabled: false); await mail.StartAsync(ct);
-            var configuration = Configuration(mail.GetMappedPublicPort(SmtpsPort), SmtpSecurityMode.SslOnConnect, "mailer", "secret") with { Enabled = false, SmtpHost = mail.Hostname };
+            var configuration = Configuration(mail.GetMappedPublicPort(SmtpsPort), SmtpSecurityMode.SslOnConnect, "mailer", "secret") with { Enabled = false };
             var delivery = CreateDelivery(configuration); var token = new string('x', 43);
             await Assert.That(await delivery.SendRecoveryAsync(UserId, token, ct)).IsEqualTo(NoCTF.Application.Authentication.Mfa.MfaMailDeliveryState.Sent);
             await Assert.That(await delivery.SendSecurityNotificationAsync(UserId, NoCTF.Domain.Identity.Mfa.MfaOperation.RebindTotp, ct)).IsEqualTo(NoCTF.Application.Authentication.Mfa.MfaMailDeliveryState.Sent);
@@ -61,7 +62,7 @@ public sealed class SmtpEmailVerificationDeliveryTests
                 greenMail.GetMappedPublicPort(SmtpsPort),
                 SmtpSecurityMode.SslOnConnect,
                 "mailer",
-                "secret") with { Enabled = false, SmtpHost = greenMail.Hostname };
+                "secret") with { Enabled = false };
             var delivery = CreateDelivery(configuration);
 
             var resetState = await delivery.SendResetAsync(
@@ -103,7 +104,7 @@ public sealed class SmtpEmailVerificationDeliveryTests
                 mailpit.GetMappedPublicPort(MailpitSmtpPort),
                 SmtpSecurityMode.StartTls,
                 string.Empty,
-                null) with { SmtpHost = mailpit.Hostname };
+                null);
             var firstState = await CreateDelivery(startTls).SendVerificationAsync(
                 UserId,
                 "token-one",
@@ -116,7 +117,7 @@ public sealed class SmtpEmailVerificationDeliveryTests
                 greenMail.GetMappedPublicPort(SmtpsPort),
                 SmtpSecurityMode.SslOnConnect,
                 "mailer",
-                "secret") with { SmtpHost = greenMail.Hostname };
+                "secret");
             var secondState = await CreateDelivery(sslOnConnect).SendVerificationAsync(
                 UserId,
                 "token-two",
@@ -152,7 +153,7 @@ public sealed class SmtpEmailVerificationDeliveryTests
                     openRelay.GetMappedPublicPort(SmtpPort),
                     SmtpSecurityMode.None,
                     string.Empty,
-                    null) with { SmtpHost = openRelay.Hostname };
+                    null);
 
                 var state = await CreateDelivery(configuration).SendTestAsync(
                     UserId,
@@ -167,7 +168,7 @@ public sealed class SmtpEmailVerificationDeliveryTests
                 authenticated.GetMappedPublicPort(SmtpsPort),
                 SmtpSecurityMode.SslOnConnect,
                 "mailer",
-                "wrong-secret") with { SmtpHost = authenticated.Hostname };
+                "wrong-secret");
 
             var exception = await CaptureDeliveryFailureAsync(() =>
                 CreateDelivery(invalidCredentials).SendTestAsync(UserId, cancellationToken));
@@ -278,8 +279,7 @@ public sealed class SmtpEmailVerificationDeliveryTests
             .WithEnvironment("MP_SMTP_TLS_CERT", "/certs/cert.pem")
             .WithEnvironment("MP_SMTP_TLS_KEY", "/certs/key.pem")
             .WithEnvironment("MP_SMTP_REQUIRE_STARTTLS", "true")
-            .WithResourceMapping(new FileInfo(Path.Combine(tlsDirectory, "cert.pem")), "/certs/")
-            .WithResourceMapping(new FileInfo(Path.Combine(tlsDirectory, "key.pem")), "/certs/")
+            .WithBindMount(tlsDirectory, "/certs", AccessMode.ReadOnly)
             .WithPortBinding(MailpitSmtpPort, true)
             .WithWaitStrategy(Wait.ForUnixContainer()
                 .UntilInternalTcpPortIsAvailable(MailpitSmtpPort))
@@ -322,7 +322,7 @@ public sealed class SmtpEmailVerificationDeliveryTests
             ServerCertificateValidationCallback = static (_, _, _, _) => true
         };
         await client.ConnectAsync(
-            greenMail.Hostname,
+            "127.0.0.1",
             greenMail.GetMappedPublicPort(ImapPort),
             SecureSocketOptions.None,
             cancellationToken);

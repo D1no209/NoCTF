@@ -46,7 +46,7 @@ public sealed class LiveKitEgressIntegrationTests
             await Assert.That(await gateway.ListAsync(room, ct)).IsEmpty();
             var token = await gateway.AuthorizeAsync(new(Guid.NewGuid(), Guid.NewGuid(), room, Guid.NewGuid().ToString("N"),
                 LiveSoloMediaRole.Publisher, false, DateTimeOffset.UtcNow.AddMinutes(2)), ct);
-            var fixtures = Path.Combine(TestSourcePaths.BackendRoot(), "tests", "fixtures", "live-solo-media");
+            var fixtures = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../fixtures/live-solo-media"));
             await using var publisher = new ContainerBuilder("node:24-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20")
                 .WithNetwork(network).WithWorkingDirectory("/app")
                 .WithResourceMapping(new FileInfo(Path.Combine(fixtures, "package.json")), "/app/")
@@ -86,7 +86,7 @@ public sealed class LiveKitEgressIntegrationTests
             if (!string.IsNullOrWhiteSpace(evidence))
             {
                 var resolved = Path.GetFullPath(evidence);
-                var allowed = Path.Combine(TestSourcePaths.BackendRoot(), "artifacts");
+                var allowed = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../artifacts"));
                 if (!resolved.StartsWith(allowed.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
                     throw new InvalidOperationException("Media evidence must remain inside backend artifacts.");
                 Directory.CreateDirectory(resolved);

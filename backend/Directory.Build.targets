@@ -1,3 +1,0 @@
-<Project>
-  <Import Project="runtime/ManagedRuntime.targets" />
-</Project>

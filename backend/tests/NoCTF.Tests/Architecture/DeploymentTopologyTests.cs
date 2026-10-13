@@ -37,9 +37,7 @@ public sealed class DeploymentTopologyTests
         await Assert.That(dockerfile).Contains("AS runtime");
         await Assert.That(dockerfile).Contains("libgssapi-krb5-2");
         await Assert.That(dockerfile).Contains("FROM runtime AS host");
-        await Assert.That(dockerfile).Contains("ENTRYPOINT [\"/app/NoCTF.Host\"]");
-        await Assert.That(dockerfile).Contains("dotnet/runtime-deps:10.0.12");
-        await Assert.That(dockerfile).Contains("NOCTF_RUNTIME_FLAVOR");
+        await Assert.That(dockerfile).Contains("NoCTF.Host.dll");
         await Assert.That(dockerfile).Contains("codegen write");
         await Assert.That(dockerfile).DoesNotContain("NoCTF.API.dll");
         await Assert.That(dockerfile).DoesNotContain("NoCTF.Worker.dll");

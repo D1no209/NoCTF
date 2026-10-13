@@ -151,9 +151,6 @@ jobs:
           context: .
           file: backend/Dockerfile
           target: host
-          build-args: |
-            NOCTF_APPLICATION_REVISION=${{ github.sha }}
-            NOCTF_RUNTIME_FLAVOR=Official
           push: true
           provenance: false
           sbom: false
