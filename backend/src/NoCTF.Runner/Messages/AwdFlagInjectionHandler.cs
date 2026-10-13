@@ -8,6 +8,7 @@ using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Awd;
 using NoCTF.Domain.Runtime;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Infrastructure.Competitions.Awd;
 using NoCTF.Runner.Composition;
 using Wolverine.Attributes;
 
@@ -64,12 +65,15 @@ public sealed class AwdFlagInjectionWorkReader(
             .Join(db.Competitions, item => item.Issue.CompetitionId, competition => competition.Id,
                 (item, competition) => new { item.Runtime, item.Flag, item.Issue, item.Rules, item.Round, Competition = competition })
             .Where(item => item.Competition.Status == CompetitionStatus.Running
-                && item.Competition.EndAt > now && item.Round.StartsAt <= now && item.Round.EndsAt > now
+                && item.Round.StartsAt <= now && item.Round.EndsAt > now
                 && item.Round.EndsAt == message.ValidUntil && item.Issue.State == AwdFlagIssueState.Issued
                 && item.Issue.DeliveryState == AwdFlagDeliveryState.Pending
                 && item.Issue.DeliveryRuntimeId == message.RuntimeInstanceId)
             .AsSplitQuery().SingleOrDefaultAsync(cancellationToken);
         if (target is null) return null;
+        var competitionEndsAt = await AwdFlagDeliveryWindow.EndsAtAsync(db, target.Competition, now, cancellationToken);
+        if (now >= competitionEndsAt) return null;
+        var deliveryEndsAt = competitionEndsAt < message.ValidUntil ? competitionEndsAt : message.ValidUntil;
         var store = target.Rules.Stores.Single(store => store.StoreId == target.Issue.StoreId);
         if (store.DeliveryMode != AwdFlagDeliveryMode.RunnerCommand || string.IsNullOrWhiteSpace(store.InjectionCommand))
             return null;
@@ -87,7 +91,7 @@ public sealed class AwdFlagInjectionWorkReader(
         return new(target.Issue.CompetitionId, target.Runtime.RuntimeKind, target.Runtime.RuntimeProvider,
             target.Runtime.ProviderReceipt!.ToData(), target.Flag.Flag, store.InjectionCommand,
             store.TargetServiceName, TimeSpan.FromSeconds(Math.Min(store.InjectionTimeoutSeconds,
-                (message.ValidUntil - now).TotalSeconds)), target.Flag.Id, store.StoreId, attemptId);
+                (deliveryEndsAt - now).TotalSeconds)), target.Flag.Id, store.StoreId, attemptId);
     }
 
     public async Task CompleteAsync(InjectAwdFlag message, AwdFlagInjectionWork work, AwdFlagDeliveryState state,
