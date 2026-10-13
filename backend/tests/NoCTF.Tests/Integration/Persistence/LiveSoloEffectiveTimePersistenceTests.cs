@@ -114,7 +114,7 @@ public sealed class LiveSoloEffectiveTimePersistenceTests
                 template.Definition!.Runtime = new ContainerChallengeRuntimeTemplate { Allocation = PersistedRuntimeAllocation.PerTeam,
                     FlagSource = PersistedRuntimeFlagSource.Static, Services = [new() { Name = "web", Image = "example/web:test" }] };
             fixture.Competition.MaxConcurrentRuntimeInstancesPerTeam = 1; await fixture.Db.SaveChangesAsync(ct);
-            await fixture.PrepareAsync(ct, expectedPreparationFailure: NoCTF.Application.LiveSolo.Rounds.LiveSoloFailure.InvalidConfiguration);
+            await fixture.PrepareAsync(ct, expectedPreparationFailure: NoCTF.Application.LiveSolo.Rounds.LiveSoloFailure.ResourceCapacityExceeded);
             await Assert.That(await fixture.Db.LiveSoloRounds.CountAsync(ct)).IsEqualTo(0);
             await Assert.That(await fixture.Db.RuntimeInstances.CountAsync(ct)).IsEqualTo(0);
         });
