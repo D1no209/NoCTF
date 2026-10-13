@@ -64,20 +64,18 @@ public sealed class ClusterScheduleSource(
             .AsSplitQuery()
             .ToArrayAsync(cancellationToken);
         var challengeIds = challenges.Select(challenge => challenge.Id).ToArray();
-        var observations = challengeIds.Length == 0
-            ? []
+        var latestObservations = challengeIds.Length == 0
+            ? new Dictionary<Guid, DateTimeOffset>()
             : await db.GameplayFacts.AsNoTracking()
                 .Where(fact => fact.CompetitionChallengeId != null && challengeIds.Contains(fact.CompetitionChallengeId.Value)
                     && fact.Kind == GameplayFactKind.KohControlObservation)
-                .Select(fact => new KohObservation(fact.CompetitionChallengeId!.Value, fact.OccurredAt))
-                .ToArrayAsync(cancellationToken);
+                .GroupBy(fact => fact.CompetitionChallengeId!.Value)
+                .Select(group => new { CompetitionChallengeId = group.Key, ObservedAt = group.Max(fact => fact.OccurredAt) })
+                .ToDictionaryAsync(item => item.CompetitionChallengeId, item => item.ObservedAt, cancellationToken);
 
         var challengesByCompetition = challenges
             .GroupBy(challenge => challenge.CompetitionId)
             .ToDictionary(group => group.Key, group => group.ToArray());
-        var latestObservations = observations
-            .GroupBy(observation => observation.CompetitionChallengeId)
-            .ToDictionary(group => group.Key, group => group.Max(item => item.OccurredAt));
         foreach (var competition in competitions)
         {
             if (competition.Mode == GameMode.Awd)
@@ -189,7 +187,4 @@ public sealed class ClusterScheduleSource(
         Guid CompetitionId,
         CompetitionChallengeRules Rules);
 
-    private sealed record KohObservation(
-        Guid CompetitionChallengeId,
-        DateTimeOffset OccurredAt);
 }
