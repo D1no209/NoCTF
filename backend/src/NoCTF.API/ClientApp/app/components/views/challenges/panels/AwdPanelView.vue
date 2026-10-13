@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { AwdPanelViewState } from '~/features/challenges/panels/useAwdPanel'
 
 const viewProps = defineProps<{ state: AwdPanelViewState }>()
-const { emit, targets, targetsError, targetsLoaded, FlagSubmit, RuntimeAccessUrl, RuntimeCard, competition, challenge, flagDockTarget, runtimeDockTarget } = toRefs(viewProps.state)
+const { emit, targets, targetsError, targetsLoaded, FlagSubmit, AwdPublicRules, RuntimeAccessUrl, RuntimeCard, competition, challenge, flagDockTarget, runtimeDockTarget } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -15,6 +15,8 @@ const { emit, targets, targetsError, targetsLoaded, FlagSubmit, RuntimeAccessUrl
       controls="reset-only"
       :dock-target="runtimeDockTarget"
     />
+
+    <component :is="AwdPublicRules" :competition-id="competition.id!" :competition-challenge-id="challenge.id!" />
 
     <section class="py-5" aria-labelledby="awd-targets-title">
       <h3 id="awd-targets-title" class="mb-4 text-sm font-semibold">{{ $t('challenges.label.attackTarget') }}</h3>

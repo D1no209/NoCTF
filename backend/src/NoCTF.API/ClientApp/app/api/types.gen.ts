@@ -2949,6 +2949,7 @@ export type NoCtfapiEndpointsChallengesAwdPublicRulesResponse = {
     attackModeOverridden?: boolean;
     issuedPolicies?: Array<NoCtfapiEndpointsChallengesAwdPublicRulePolicyResponse>;
     nextRound?: NoCtfapiEndpointsChallengesAwdPublicRulePolicyResponse;
+    ownService?: NoCtfapiEndpointsChallengesAwdPublicTeamHealthResponse | null;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsAwdRuleOptionsContract = {
@@ -3120,6 +3121,16 @@ export type NoCtfDomainCompetitionsAwdAwdPenaltyMode = 'SlaRewardOnly' | 'Fixed'
 export type NoCtfDomainCompetitionsAwdAwdScoreComposition = 'Additive' | 'Weighted' | 'PositiveSlaMultiplier';
 
 export type NoCtfDomainCompetitionsAwdAwdAttackSettlement = 'Immediate' | 'RoundEnd' | 'FlagExpiry';
+
+export type NoCtfapiEndpointsChallengesAwdPublicTeamHealthResponse = {
+    enabled?: boolean;
+    health?: NoCtfDomainCompetitionsAwdAwdHealth | null;
+    execution?: NoCtfDomainCompetitionsAwdAwdCheckExecution;
+    settlement?: NoCtfDomainCompetitionsAwdAwdSettlementState;
+    observedAt?: string | null;
+    lastTrustedHealth?: NoCtfDomainCompetitionsAwdAwdHealth | null;
+    lastTrustedAt?: string | null;
+};
 
 export type NoCtfapiEndpointsChallengesChallengeResponse = {
     id?: string;

@@ -1,3 +1,4 @@
+import { createMockAwdPublicRules } from './awd-public-rules'
 import { createMockAwdScoring } from './awd-scoring'
 import { createMockAwdChecks } from './awd-checks'
 import { createMockMfa } from './mfa'
@@ -57,6 +58,7 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
   const state = createFixtures()
   const awdChecks = createMockAwdChecks(state)
   const awdScoring = createMockAwdScoring(state)
+  const awdPublicRules = createMockAwdPublicRules()
   const liveSolo = createMockLiveSolo(state)
   const broadcastHistory = createMockBroadcastHistory(state)
   const platformLogHistory = createMockPlatformLogHistory()
@@ -509,27 +511,9 @@ export function createMockApi(options: { teamBanSource?: 'CheatIncident' | 'Manu
       }
       else if (route === '/competitions/{competitionId}/challenges/{competitionChallengeId}/awd/rules') {
         if (competition?.mode !== 'Awd' || !challenge) return problem(404, 'AWD question not found')
-        const config = (state.settings.get(`mode-configuration:${p.competitionId}`) ?? mockModeConfiguration('Awd')) as Data
-        const rules = (state.settings.get(`challenge-rules:${p.competitionChallengeId}`) ?? mockRules('Awd')) as Data
-        const options = { ...config.awd.options, ...Object.fromEntries(Object.entries(rules.awd.overrides ?? {}).filter(([, value]) => value != null)) }
         const template = state.templates.find(template => template.id === challenge.challengeId)
-        value = { competitionId: p.competitionId, competitionChallengeId: p.competitionChallengeId,
-          lastRoundNumber: 1, paused: competition.status === 'Paused', acceptingSubmissions: competition.status === 'Running',
-          actualEndAt: competition.endTime, acceptanceEndAt: competition.endTime,
-          roundDurationSeconds: config.awd.roundDurationSeconds, hardeningDurationSeconds: config.awd.hardeningDurationSeconds,
-          competitionDefaults: config.awd.options, questionOverrides: rules.awd.overrides ?? {}, issuedPolicies: [],
-          attackPointsOverridden: rules.awd.attackPoints != null, defensePointsOverridden: rules.awd.victimDefensePoolPoints != null,
-          slaPointsOverridden: rules.awd.serviceHealthyPoints != null, checkerIntervalOverridden: rules.awd.checkerIntervalSeconds != null,
-          attackModeOverridden: rules.awd.attackRewardMode != null,
-          nextRound: { attackMode: rules.awd.attackRewardMode ?? config.awd.attackRewardMode,
-            attackPoints: rules.awd.attackPoints ?? config.awd.attackPoints, defensePoints: rules.awd.victimDefensePoolPoints ?? config.awd.victimDefensePoolPoints,
-            slaPoints: rules.awd.serviceHealthyPoints ?? config.awd.serviceHealthyPoints,
-            checkerIntervalSeconds: rules.awd.checkerIntervalSeconds ?? config.awd.checkerIntervalSeconds, options,
-            stores: (template?.definition?.awd?.flagStores ?? []).map((store: Data) => {
-              const override = rules.awd.storeRules?.find((rule: Data) => rule.storeId === store.id)
-              return { storeId: store.id, name: store.name, weight: override?.weight ?? 1, flagsPerIssue: override?.flagsPerIssue ?? options.flagsPerStore }
-            }) }
-        }
+        return json(awdPublicRules(competition, challenge, template, state.settings, myTeam,
+          awdScoring.publicAmendment(challenge.id, 4)))
       }
       else if (route === '/admin/competitions/{competitionId}/staff-webhooks') value = {
         canManage: user?.role === 'Administrator' || user?.role === 'Organizer', total: 1,

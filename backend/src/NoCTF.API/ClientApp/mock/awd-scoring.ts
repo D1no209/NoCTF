@@ -10,7 +10,10 @@ export function createMockAwdScoring(state: { competitions: Data[]; challenges: 
   const policy = (challenge: string, round: number): Policy => changes.get(challenge)?.find(change => change.firstRound! <= round && change.lastRound! >= round)?.policy ?? issued
   const signature = (competition: string, challenge: string, body: Data) => JSON.stringify({ competition, challenge, firstRound: body.firstRound, lastRound: body.lastRound, timing: body.timing, reason: body.reason, policy: body.policy })
   const problem = (status: number, detail: string) => Response.json({ status, detail }, { status })
-  return { handle(request: Request, route: string, p: Record<string, string>, body: Data, actor?: string): Response | undefined {
+  return { publicAmendment(challenge: string, round: number) {
+    const change = changes.get(challenge)?.find(item => item.firstRound! <= round && item.lastRound! >= round)
+    return change ? { scoring: change.policy, scoringChangeEventId: change.eventId ?? null } : undefined
+  }, handle(request: Request, route: string, p: Record<string, string>, body: Data, actor?: string): Response | undefined {
     const base = '/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/awd/'
     if (![base + 'scoring-rules', base + 'scoring-preview', base + 'scoring'].includes(route)) return
     const challenge = p.competitionChallengeId!, competition = p.competitionId!

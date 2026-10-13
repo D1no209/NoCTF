@@ -1,17 +1,27 @@
 using FastEndpoints;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Endpoints.Administration.Challenges;
 using NoCTF.API.Endpoints.Administration.Competitions;
 using NoCTF.API.Security;
+using NoCTF.API.Serialization;
 using NoCTF.Application.Challenges.Management;
 using NoCTF.Application.Competitions.Awd;
 using NoCTF.Application.Competitions.Visibility;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Competitions.Awd;
 
 namespace NoCTF.API.Endpoints.Challenges;
 
 public sealed record AwdPublicStoreRuleResponse(Guid StoreId, string Name, decimal Weight, int FlagsPerIssue);
+public sealed record AwdPublicTeamHealthResponse(bool Enabled,
+    [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<AwdHealth>))] AwdHealth? Health,
+    [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<AwdCheckExecution>))] AwdCheckExecution Execution,
+    [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<AwdSettlementState>))] AwdSettlementState Settlement,
+    DateTimeOffset? ObservedAt,
+    [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<AwdHealth>))] AwdHealth? LastTrustedHealth,
+    DateTimeOffset? LastTrustedAt);
 public sealed record AwdPublicRulePolicyResponse(Guid? RulesId, int? Revision, DateTimeOffset? EffectiveAt,
     AwdAttackRewardModeProtocol AttackMode, long AttackPoints, long DefensePoints, long SlaPoints,
     int CheckerIntervalSeconds, AwdRuleOptionsContract Options, IReadOnlyList<AwdPublicStoreRuleResponse> Stores,
@@ -30,7 +40,8 @@ public sealed record AwdPublicRulesResponse(DateTimeOffset ServerTime, DateTimeO
     int RoundDurationSeconds, int HardeningDurationSeconds, AwdRuleOptionsContract CompetitionDefaults,
     AwdRuleOverridesContract QuestionOverrides, bool AttackPointsOverridden, bool DefensePointsOverridden,
     bool SlaPointsOverridden, bool CheckerIntervalOverridden, bool AttackModeOverridden,
-    IReadOnlyList<AwdPublicRulePolicyResponse> IssuedPolicies, AwdPublicRulePolicyResponse NextRound);
+    IReadOnlyList<AwdPublicRulePolicyResponse> IssuedPolicies, AwdPublicRulePolicyResponse NextRound,
+    AwdPublicTeamHealthResponse? OwnService);
 
 public sealed class GetAwdRulesEndpoint(IAwdPublicRulesReader reader, ICompetitionChallengeReadAccess access,
     IUserContext user, TimeProvider time) : EndpointWithoutRequest<Results<Ok<AwdPublicRulesResponse>, NotFound>>
@@ -51,13 +62,15 @@ public sealed class GetAwdRulesEndpoint(IAwdPublicRulesReader reader, ICompetiti
         var decision = await access.ResolveAsync(user.UserId, competitionId, now, ct);
         if (decision is null || decision.Visibility.GameMode != GameMode.Awd
             || !ParticipantChallengeVisibilityPolicy.CanView(decision.Visibility.CompetitionStatus)) return TypedResults.NotFound();
-        var view = await reader.ReadAsync(competitionId, Route<Guid>("competitionChallengeId"), now, ct);
+        var view = await reader.ReadAsync(competitionId, Route<Guid>("competitionChallengeId"), now, ct, decision.TeamId);
         return view is null ? TypedResults.NotFound() : TypedResults.Ok(new AwdPublicRulesResponse(
             view.ServerTime, view.EndsAt, view.AcceptanceEndsAt, view.Paused, view.AcceptingSubmissions,
             view.RoundNumber, view.RoundId, view.RoundStartsAt, view.RoundEndsAt, view.RoundDurationSeconds,
             view.HardeningDurationSeconds, AwdRuleOptionsContract.FromDomain(view.CompetitionDefaults),
             AwdRuleOverridesContract.FromDomain(view.QuestionOverrides), view.AttackPointsOverridden,
             view.DefensePointsOverridden, view.SlaPointsOverridden, view.CheckerIntervalOverridden, view.AttackModeOverridden,
-            view.IssuedPolicies.Select(AwdPublicRulePolicyResponse.From).ToArray(), AwdPublicRulePolicyResponse.From(view.NextRound)));
+            view.IssuedPolicies.Select(AwdPublicRulePolicyResponse.From).ToArray(), AwdPublicRulePolicyResponse.From(view.NextRound),
+            view.OwnService is { } health ? new(health.Enabled, health.Health, health.Execution, health.Settlement,
+                health.ObservedAt, health.LastTrustedHealth, health.LastTrustedAt) : null));
     }
 }

@@ -37493,6 +37493,14 @@
           },
           "nextRound": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesAwdPublicRulePolicyResponse"
+          },
+          "ownService": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesAwdPublicTeamHealthResponse"
+              }
+            ]
           }
         }
       },
@@ -38303,6 +38311,47 @@
           "RoundEnd",
           "FlagExpiry"
         ]
+      },
+      "NoCTFAPIEndpointsChallengesAwdPublicTeamHealthResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "health": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdHealth"
+              }
+            ]
+          },
+          "execution": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdCheckExecution"
+          },
+          "settlement": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdSettlementState"
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastTrustedHealth": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdHealth"
+              }
+            ]
+          },
+          "lastTrustedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
       },
       "NoCTFAPIEndpointsChallengesChallengeResponse": {
         "type": "object",

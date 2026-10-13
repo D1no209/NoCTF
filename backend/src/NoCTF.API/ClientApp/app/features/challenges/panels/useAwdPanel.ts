@@ -5,6 +5,7 @@ import { markRaw, toRefs } from 'vue'
 import { listRuntimeTargetsEndpoint } from '../../../api'
 import type { NoCtfapiEndpointsChallengesChallengeResponse, NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsRuntimeRuntimeTargetResponse } from '../../../api'
 import FlagSubmitComponent from '../FlagSubmit.vue'
+import AwdPublicRulesComponent from '../awd/AwdPublicRules.vue'
 import RuntimeAccessUrlComponent from '../RuntimeAccessUrl.vue'
 import RuntimeCardComponent from '../RuntimeCard.vue'
 
@@ -47,6 +48,7 @@ emit: { (event: "submitted", ...args: []): void; (event: "remainingChanged", ...
       targetsError,
       targetsLoaded,
       FlagSubmit,
+      AwdPublicRules: markRaw(AwdPublicRulesComponent),
       RuntimeAccessUrl,
       RuntimeCard
     }

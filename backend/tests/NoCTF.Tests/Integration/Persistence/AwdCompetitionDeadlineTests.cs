@@ -62,6 +62,11 @@ public sealed partial class AwdRoundCoordinationTests
             var flag = await db.ChallengeFlags.AsNoTracking().SingleAsync(x => x.TeamId == fixture.TeamId, ct);
             var lifecycle = new CompetitionLifecycleStore(db, null!, outbox,
                 new CompetitionEventStore(db, outbox), clock: clock);
+            clock.UtcNow = fixture.Now.AddSeconds(65);
+            var gapRules = (await new AwdPublicRulesReader(db).ReadAsync(fixture.CompetitionId,
+                fixture.CompetitionChallengeId, clock.UtcNow, ct))!;
+            await Assert.That(gapRules.AcceptingSubmissions).IsFalse();
+            await Assert.That(gapRules.RoundNumber).IsEqualTo(1);
             clock.UtcNow = fixture.Now.AddSeconds(90);
             await coordinator.AdvanceAsync(new(fixture.CompetitionId, clock.UtcNow), ct);
             // A pause inside round two extends both the current round and the match boundary.

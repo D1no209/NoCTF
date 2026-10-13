@@ -4,6 +4,7 @@ using NoCTF.Application.Competitions.Awd;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Awd;
+using NoCTF.Domain.Gameplay;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.Infrastructure.Persistence;
 
@@ -11,7 +12,7 @@ namespace NoCTF.Infrastructure.Competitions.Awd;
 
 public sealed class AwdPublicRulesReader(NoCtfDbContext db) : IAwdPublicRulesReader
 {
-    public async Task<AwdPublicRulesView?> ReadAsync(Guid competitionId, Guid challengeId, DateTimeOffset now, CancellationToken ct)
+    public async Task<AwdPublicRulesView?> ReadAsync(Guid competitionId, Guid challengeId, DateTimeOffset now, CancellationToken ct, Guid? teamId = null)
     {
         await using var transaction = await AggregateCompatibleTransaction.BeginAsync(db, IsolationLevel.RepeatableRead, ct);
         var competition = await db.Competitions.AsNoTracking().Include(item => item.ModeConfiguration)
@@ -25,7 +26,7 @@ public sealed class AwdPublicRulesReader(NoCtfDbContext db) : IAwdPublicRulesRea
             .SingleAsync(item => item.Id == challenge.ChallengeId, ct);
         var deadline = await AwdCompetitionDeadline.ReadAsync(db, competitionId, competition.StartAt,
             competition.EndAt, defaults, now, ct);
-        var round = deadline.Rounds.LastOrDefault();
+        var round = deadline.Rounds.LastOrDefault(item => item.StartsAt <= now);
         var issued = round is null ? [] : await db.AwdRoundRules.AsNoTracking()
             .Where(item => item.RoundId == round.Id && item.CompetitionChallengeId == challengeId)
             .OrderBy(item => item.Revision).ToArrayAsync(ct);
@@ -41,10 +42,14 @@ public sealed class AwdPublicRulesReader(NoCtfDbContext db) : IAwdPublicRulesRea
         var nextSnapshot = new AwdRoundRules { AttackRewardMode = resolved.AttackMode, AttackPoints = resolved.AttackPoints,
             VictimDefensePoolPoints = resolved.DefensePoints, ServiceHealthyPoints = resolved.SlaPoints,
             CheckerIntervalSeconds = resolved.CheckerIntervalSeconds, Options = resolved.Options };
+        var ownService = teamId is Guid ownTeam
+            ? await ReadOwnHealthAsync(competitionId, challengeId, ownTeam, round?.Id, now, ct) : null;
+        var accepting = competition.Status is CompetitionStatus.Running or CompetitionStatus.Finished
+            && round is not null && now < deadline.AcceptanceEndsAt
+            && (now >= deadline.EndsAt || competition.Status == CompetitionStatus.Running && now < round.EndsAt);
         await transaction.CommitAsync(ct);
         return new(now, deadline.EndsAt, deadline.AcceptanceEndsAt, competition.Status == CompetitionStatus.Paused,
-            competition.Status is CompetitionStatus.Running or CompetitionStatus.Finished && now < deadline.AcceptanceEndsAt
-                && round is not null && now >= round.StartsAt,
+            accepting,
             round?.Number, round?.Id, round?.StartsAt, round?.EndsAt,
             defaults.RoundDurationSeconds, defaults.HardeningDurationSeconds, defaults.AwdOptions,
             overrides.AwdOverrides, overrides.AttackPoints != null, overrides.VictimDefensePoolPoints != null,
@@ -55,6 +60,26 @@ public sealed class AwdPublicRulesReader(NoCtfDbContext db) : IAwdPublicRulesRea
                     new AwdPublicStoreRule(store.StoreId, store.Name, store.Weight, store.FlagsPerIssue)).ToArray(),
                 latest?.Policy ?? AwdScoringPolicy.From(rule), latest?.EventId)).ToArray(),
             new(null, null, null, resolved.AttackMode, resolved.AttackPoints, resolved.DefensePoints,
-                resolved.SlaPoints, resolved.CheckerIntervalSeconds, resolved.Options, nextStores, AwdScoringPolicy.From(nextSnapshot), null));
+                resolved.SlaPoints, resolved.CheckerIntervalSeconds, resolved.Options, nextStores, AwdScoringPolicy.From(nextSnapshot), null), ownService);
+    }
+
+    private async Task<AwdPublicTeamHealth> ReadOwnHealthAsync(Guid competitionId, Guid challengeId,
+        Guid teamId, Guid? roundId, DateTimeOffset now, CancellationToken ct)
+    {
+        var checks = db.GameplayFacts.AsNoTracking().Where(fact => fact.CompetitionId == competitionId
+            && fact.CompetitionChallengeId == challengeId && fact.TeamId == teamId
+            && fact.Kind == GameplayFactKind.AwdServiceTransition && fact.OccurredAt <= now && fact.Awd != null)
+            .Select(fact => new { fact.Id, fact.Awd!.ReceivedRoundId, fact.Awd.Health, fact.Awd.Execution,
+                fact.Awd.Settlement, fact.Awd.ScheduledAt, fact.Awd.ObservedAt });
+        var current = await checks.Where(check => roundId != null && check.ReceivedRoundId == roundId)
+            .OrderByDescending(check => check.ScheduledAt).ThenByDescending(check => check.Id).FirstOrDefaultAsync(ct);
+        var trusted = await checks.Where(check => check.Health != null && check.Health != AwdHealth.InternalError
+                && check.Execution == AwdCheckExecution.Completed && check.Settlement == AwdSettlementState.Final)
+            .OrderByDescending(check => check.ObservedAt).ThenByDescending(check => check.Id).FirstOrDefaultAsync(ct);
+        var enabled = await db.AwdRoundRules.AnyAsync(rule => rule.CompetitionId == competitionId
+            && rule.CompetitionChallengeId == challengeId && rule.RoundId == roundId && rule.EffectiveAt <= now
+            && rule.Teams.Any(team => team.TeamId == teamId), ct);
+        return new(enabled, current?.Health, current?.Execution ?? AwdCheckExecution.Pending,
+            current?.Settlement ?? AwdSettlementState.Provisional, current?.ObservedAt, trusted?.Health, trusted?.ObservedAt);
     }
 }

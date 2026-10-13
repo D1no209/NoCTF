@@ -17,6 +17,7 @@ using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Infrastructure.Competitions.Awd;
 using NoCTF.Infrastructure.Scoring.Leaderboard;
 using Testcontainers.PostgreSql;
 
@@ -135,6 +136,16 @@ public sealed class SpectatorFramePersistenceTests
                 var recovered = (await SpectatorFrameReader.ReadAsync(db, "Broadcast", input, ct, currentRoundId: round))!;
                 await Assert.That(recovered.Services.Single(x => x.TeamId == teamId).Health).IsEqualTo(AwdHealth.Recovering);
                 await Assert.That(recovered.Services.Single(x => x.TeamId == teamId).CompromisedBy).IsEquivalentTo([defenderId]);
+                var reader = new AwdPublicRulesReader(db);
+                var own = await reader.ReadAsync(competitionId, instanceId, now, ct, teamId);
+                await Assert.That(own!.OwnService!.Health).IsEqualTo(AwdHealth.Recovering);
+                await Assert.That(own.OwnService.Settlement).IsEqualTo(AwdSettlementState.Final);
+                await Assert.That(own.OwnService.Enabled).IsTrue();
+                await Assert.That((await reader.ReadAsync(competitionId, instanceId, now, ct))!.OwnService).IsNull();
+                var other = (await reader.ReadAsync(competitionId, instanceId, now, ct, exhibitionId))!.OwnService!;
+                await Assert.That(other.Health).IsNull();
+                await Assert.That(other.LastTrustedHealth).IsNull();
+                await Assert.That(other.Enabled).IsFalse();
             }
             else
             {
