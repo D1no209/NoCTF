@@ -208,6 +208,8 @@ internal sealed class ModeEnvironment(
                 RandomNumberGenerator.GetBytes(32)),
             ["NOCTF_E2E_ADMIN_PASSWORD"] = $"admin-{RandomToken(20)}",
             ["NOCTF_E2E_SUITE"] = options.Suite.ToString().ToLowerInvariant(),
+            // Compose fixtures intentionally omit Loki; log reads must fail explicitly, not fabricate an empty result.
+            ["NOCTF_E2E_EXPECT_LOGS_UNAVAILABLE"] = "true",
             ["NOCTF_E2E_BUILD_HTTP_PROXY"] = string.Empty,
             ["NOCTF_E2E_BUILD_HTTPS_PROXY"] = string.Empty,
             ["ALL_PROXY"] = string.Empty
