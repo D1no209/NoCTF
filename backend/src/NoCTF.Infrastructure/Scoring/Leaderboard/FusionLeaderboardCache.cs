@@ -29,7 +29,8 @@ public sealed class FusionLeaderboardCache(
     ILeaderboardPublicationFence? publicationFence = null,
     LeaderboardProjectionKeyedLock? projectionKeyedLock = null,
     TimeProvider? clock = null,
-    LeaderboardSnapshotDeserializer? snapshotDeserializer = null) : ILeaderboardCache, ILeaderboardSnapshotFactory
+    LeaderboardSnapshotDeserializer? snapshotDeserializer = null,
+    LeaderboardRebuildCoordinator? rebuildCoordinator = null) : ILeaderboardCache, ILeaderboardSnapshotFactory
 {
     private readonly IFusionCache cache = caches.GetCache(NoCtfCacheNames.Leaderboards);
     private readonly LeaderboardProjectionKeyedLock keyedLock = projectionKeyedLock ?? new();
@@ -480,10 +481,30 @@ public sealed class FusionLeaderboardCache(
     public async Task RefreshAsync(Guid competitionId, CancellationToken ct)
     {
         using var projectionLock = await keyedLock.EnterAsync(competitionId, ct);
-        await RefreshCoreAsync(competitionId, ct);
+        await RebuildAsync(competitionId, onlyIfMissing: false, ct);
     }
 
-    private async Task RefreshCoreAsync(Guid competitionId, CancellationToken ct)
+    private async Task RebuildAsync(Guid competitionId, bool onlyIfMissing, CancellationToken ct)
+    {
+        if (rebuildCoordinator is null)
+        {
+            await RefreshCoreAsync(competitionId, ct);
+            return;
+        }
+        await using var lease = await rebuildCoordinator.AcquireAsync(competitionId, ct);
+        // Another process may have completed this missing generation while this process waited.
+        // Explicit refreshes keep their stronger contract, including crash recovery of queued facts.
+        if (onlyIfMissing && await GetPublishedBundleAsync(competitionId, lease.Token) is not null) return;
+        try { await RefreshCoreAsync(competitionId, lease.Token, lease); }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            lease.ThrowIfLost();
+            throw;
+        }
+    }
+
+    private async Task RefreshCoreAsync(Guid competitionId, CancellationToken ct,
+        LeaderboardRebuildCoordinator.RebuildLease? lease = null)
     {
         var publicationPhase = false;
         CachedScoreboardProjection? response = null;
@@ -544,6 +565,7 @@ public sealed class FusionLeaderboardCache(
 
             if (publicationFence is not null)
             {
+                if (lease is not null) await lease.ConfirmOwnershipAsync();
                 var payload = JsonSerializer.Serialize(response,
                     CachedScoreboardJsonContext.Default.CachedScoreboardProjection);
                 var accepted = await publicationFence.TryCommitAsync(
@@ -632,7 +654,7 @@ public sealed class FusionLeaderboardCache(
 
         try
         {
-            await RefreshCoreAsync(competitionId, ct);
+            await RebuildAsync(competitionId, onlyIfMissing: true, ct);
             published = await GetPublishedBundleAsync(competitionId, ct);
             NoCtfTelemetry.RecordLeaderboardCacheMissRebuild(
                 published is null ? "not_found" : "success");

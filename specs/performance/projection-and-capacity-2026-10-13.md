@@ -45,3 +45,33 @@ $env:NOCTF_REQUIRE_DOCKER_INTEGRATION = 'true'
 $env:NOCTF_AWD_PROJECTION_MEASUREMENTS = 'backend/artifacts/performance/optimization-next-20261013/awd'
 dotnet backend/tests/NoCTF.Tests/bin/Release/net10.0/NoCTF.Tests.dll --treenode-filter '/*/*/AwdScoreProjectionReaderPersistenceTests/*' --maximum-parallel-tests 1 --report-trx --results-directory backend/artifacts/performance/optimization-next-20261013/awd-tests --no-ansi --progress off
 ```
+
+## Shared leaderboard rebuilds
+
+Four independent NATS connections, Redis-backed cache providers and process-local
+lock instances model four nodes in one test process. PostgreSQL contains 250 facts;
+16 readers start together after invalidation. The same cache reader runs with the
+cluster computation coordinator disabled/enabled in three alternating repetitions.
+
+| Repetition | Uncoordinated projections | Coordinated projections | Coordinated ready responses |
+| --- | ---: | ---: | ---: |
+| 1 | 4 | 1 | 16/16 |
+| 2 | 16 | 1 | 16/16 |
+| 3 | 16 | 1 | 16/16 |
+
+These are computation counts, not latency or throughput measurements. Concurrent
+publication fences can reject an uncoordinated result and cause another local reader
+to rebuild; the count can therefore exceed the node count. With the shared lease,
+all readers returned the same complete version. Four invalidation-triggered Worker
+messages also produced one projection. Explicit refresh after a database change
+without invalidation still recomputed and exposed the new score.
+
+Real NATS tests revoke a lease, acquire a successor, verify that old ownership cannot
+publish or release the successor, and exercise waiting cancellation and an unrelated
+competition. Fake-clock tests cover periodic renewal failure and simultaneous timer/
+publication renewal without CAS races. The existing publication fence remains the
+authority for accepted versions; lease confirmation and publication are not one
+atomic transaction. Wolverine adapters were regenerated using `codegen write`.
+
+Validation: 20 leaderboard persistence tests, 2 lease-renewal tests and 8 event-merge
+tests passed. Raw counts: `leaderboard/leaderboard-rebuild-contention.json`.

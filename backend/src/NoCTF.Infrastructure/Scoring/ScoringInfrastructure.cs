@@ -23,7 +23,10 @@ internal static class ScoringInfrastructure
         services.AddScoped<BuildScoreboardTrends>();
         services.AddScoped<GetSpectatorScreen>();
         if (!development)
+        {
             services.AddSingleton<ILeaderboardPublicationFence, NatsLeaderboardPublicationFence>();
+            services.AddSingleton<LeaderboardRebuildCoordinator>();
+        }
         return services;
     }
 }

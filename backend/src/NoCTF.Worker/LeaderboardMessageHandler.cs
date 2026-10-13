@@ -12,9 +12,19 @@ public sealed class LeaderboardMessageHandler(ILeaderboardCache leaderboard, NoC
         ProjectLeaderboard message,
         CancellationToken cancellationToken)
     {
-        await leaderboard.RefreshAsync(message.CompetitionId, cancellationToken);
+        if (message.Mode == LeaderboardRefreshMode.Force)
+            await leaderboard.RefreshAsync(message.CompetitionId, cancellationToken);
+        else if (message.Mode != LeaderboardRefreshMode.IfMissing)
+            throw new ArgumentOutOfRangeException(nameof(message));
         var projection = await leaderboard.GetScoreboardAsync(message.CompetitionId, cancellationToken);
-        if (projection is null) return;
+        if (projection is null)
+        {
+            if (message.Mode == LeaderboardRefreshMode.IfMissing
+                && await db.Competitions.AnyAsync(item => item.Id == message.CompetitionId
+                    && item.Mode != NoCTF.Domain.Competitions.GameMode.LiveSolo, cancellationToken))
+                throw new TimeoutException("The invalidated leaderboard is not published yet.");
+            return;
+        }
         foreach (var batch in projection.TheoryReceipts.Chunk(128))
         {
             var fact = System.Linq.Expressions.Expression.Parameter(typeof(GameplayFact), "fact");
