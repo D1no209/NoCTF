@@ -19,7 +19,9 @@ public static class CompetitionModeConfigurationDefaults
                 VictimDefensePoolPoints = 100,
                 CheckerIntervalSeconds = 30,
                 ServiceHealthyPoints = 100,
-                ServiceUnhealthyPenalty = 0
+                ServiceUnhealthyPenalty = 0,
+                TieBreakers = Awd.AwdTieBreakPolicy.Default.Select((item, position) => new Awd.AwdCompetitionTieBreak
+                    { CompetitionId = competitionId, Position = position, Field = item.Field, Direction = item.Direction }).ToList()
             },
             GameMode.Awdp => new AwdpCompetitionModeConfiguration
             {

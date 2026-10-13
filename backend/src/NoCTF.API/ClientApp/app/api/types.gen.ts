@@ -2950,6 +2950,8 @@ export type NoCtfapiEndpointsChallengesAwdPublicRulesResponse = {
     issuedPolicies?: Array<NoCtfapiEndpointsChallengesAwdPublicRulePolicyResponse>;
     nextRound?: NoCtfapiEndpointsChallengesAwdPublicRulePolicyResponse;
     ownService?: NoCtfapiEndpointsChallengesAwdPublicTeamHealthResponse | null;
+    currentTieBreakers?: Array<NoCtfapiEndpointsAdministrationCompetitionsAwdTieBreakContract>;
+    nextTieBreakers?: Array<NoCtfapiEndpointsAdministrationCompetitionsAwdTieBreakContract>;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsAwdRuleOptionsContract = {
@@ -3131,6 +3133,15 @@ export type NoCtfapiEndpointsChallengesAwdPublicTeamHealthResponse = {
     lastTrustedHealth?: NoCtfDomainCompetitionsAwdAwdHealth | null;
     lastTrustedAt?: string | null;
 };
+
+export type NoCtfapiEndpointsAdministrationCompetitionsAwdTieBreakContract = {
+    field?: NoCtfDomainCompetitionsAwdAwdTieBreakField;
+    direction?: NoCtfDomainCompetitionsAwdAwdSortDirection;
+};
+
+export type NoCtfDomainCompetitionsAwdAwdTieBreakField = 'AttackPoints' | 'HealthyRounds' | 'AttackCount' | 'LastAttackAt' | 'RegistrationTime';
+
+export type NoCtfDomainCompetitionsAwdAwdSortDirection = 'Descending' | 'Ascending';
 
 export type NoCtfapiEndpointsChallengesChallengeResponse = {
     id?: string;
@@ -5207,6 +5218,7 @@ export type NoCtfapiEndpointsAdministrationCompetitionsAwdCompetitionModeConfigu
     serviceHealthyPoints?: number;
     serviceUnhealthyPenalty?: number;
     options?: NoCtfapiEndpointsAdministrationCompetitionsAwdRuleOptionsContract | null;
+    tieBreakers?: Array<NoCtfapiEndpointsAdministrationCompetitionsAwdTieBreakContract> | null;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsAwdpCompetitionModeConfigurationContract = {

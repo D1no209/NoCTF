@@ -1,6 +1,7 @@
 using NoCTF.Application.Competitions.Configuration;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Competitions.Awd;
 using NoCTF.Domain.LiveSolo;
 using NoCTF.GameModes.LiveSolo.Configuration;
 
@@ -142,6 +143,10 @@ public sealed class GameModeCompetitionConfigurationValidator : ICompetitionConf
         AwdCompetitionModeConfiguration configuration, IReadOnlyList<CompetitionChallengeRules> challengeRules)
     {
         var errors = Awd.Configuration.AwdConfigurationValidator.Validate(TypedGameModeConfiguration.Awd(configuration)).ToList();
+        if (!AwdTieBreakPolicy.IsValid(AwdTieBreakPolicy.Resolve(
+                configuration.TieBreakers.OrderBy(item => item.Position).Select(item =>
+                    new AwdTieBreakCriterion(item.Field, item.Direction)))))
+            errors.Add("AWD tie-break rules require 1..5 distinct supported fields and valid directions.");
         errors.AddRange(Awd.Configuration.AwdEffectiveRules.ValidateConfiguration(configuration, new AwdCompetitionChallengeRules()));
         foreach (var rules in challengeRules)
         {

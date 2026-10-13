@@ -220,6 +220,7 @@ public sealed class NoCtfDbContext(
             throw new InvalidOperationException("AWD scoring rule changes are immutable.");
 
         if (ChangeTracker.Entries<NoCTF.Domain.Competitions.Awd.AwdRoundRules>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted)
+            || ChangeTracker.Entries<NoCTF.Domain.Competitions.Awd.AwdRoundTieBreak>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted)
             || ChangeTracker.Entries<NoCTF.Domain.Competitions.Awd.AwdRoundStoreBudget>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted)
             || ChangeTracker.Entries<NoCTF.Domain.Competitions.Awd.AwdRoundTeamEligibility>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
             throw new InvalidOperationException("Issued AWD rule snapshots are immutable; create an explicit rule revision.");

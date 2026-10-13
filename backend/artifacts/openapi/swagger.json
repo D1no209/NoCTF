@@ -37501,6 +37501,18 @@
                 "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesAwdPublicTeamHealthResponse"
               }
             ]
+          },
+          "currentTieBreakers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdTieBreakContract"
+            }
+          },
+          "nextTieBreakers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdTieBreakContract"
+            }
           }
         }
       },
@@ -38352,6 +38364,48 @@
             "nullable": true
           }
         }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsAwdTieBreakContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdTieBreakField"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsAwdAwdSortDirection"
+          }
+        }
+      },
+      "NoCTFDomainCompetitionsAwdAwdTieBreakField": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "AttackPoints",
+          "HealthyRounds",
+          "AttackCount",
+          "LastAttackAt",
+          "RegistrationTime"
+        ],
+        "enum": [
+          "AttackPoints",
+          "HealthyRounds",
+          "AttackCount",
+          "LastAttackAt",
+          "RegistrationTime"
+        ]
+      },
+      "NoCTFDomainCompetitionsAwdAwdSortDirection": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Descending",
+          "Ascending"
+        ],
+        "enum": [
+          "Descending",
+          "Ascending"
+        ]
       },
       "NoCTFAPIEndpointsChallengesChallengeResponse": {
         "type": "object",
@@ -45985,6 +46039,13 @@
                 "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdRuleOptionsContract"
               }
             ]
+          },
+          "tieBreakers": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAwdTieBreakContract"
+            }
           }
         }
       },

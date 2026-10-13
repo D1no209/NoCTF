@@ -251,5 +251,6 @@
   "challenges.awdRules.settlement.Exempted": "已豁免",
   "challenges.awdRules.noCap": "不设上限",
   "challenges.awdRules.noFloor": "不设下限",
-  "challenges.awdRules.durationBased": "按比赛时长结束"
+  "challenges.awdRules.durationBased": "按比赛时长结束",
+  "challenges.awdRules.rankingNotice": "先按总分降序，再依次使用下列字段，最后按 Team ID 升序。同分仅比较最终整数分量，没有有效攻击时间时该项排后。"
 }

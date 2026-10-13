@@ -22,7 +22,8 @@ public sealed record LeaderboardProjectionInput(
     IReadOnlyList<LeaderboardAwdAggregateFact>? AwdAggregates = null,
     IReadOnlyList<LeaderboardWriteUpUnlock>? WriteUpUnlocks = null,
     IReadOnlyList<AwdRoundScoreProjection>? AwdRoundScores = null,
-    long? AwdMinimumTotalScore = null);
+    long? AwdMinimumTotalScore = null,
+    IReadOnlyList<NoCTF.Domain.Competitions.Awd.AwdTieBreakCriterion>? AwdTieBreakers = null);
 
 public sealed record LeaderboardWriteUpUnlock(Guid GameplayFactId, Guid TeamId, Guid CompetitionChallengeId,
     int DeductionPercent, DateTimeOffset UnlockedAt);

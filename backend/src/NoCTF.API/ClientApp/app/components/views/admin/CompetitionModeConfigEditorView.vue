@@ -3,7 +3,7 @@ import { toRefs } from 'vue'
 import type { CompetitionModeConfigEditorViewState } from '~/features/admin/useCompetitionModeConfigEditor'
 
 const viewProps = defineProps<{ state: CompetitionModeConfigEditorViewState }>()
-const { isAwd, changeReason, reasonRequired, invalidFields, canSaveRules, groups, DefinitionSection, presetOpen, presetChanges, applyPreset, closePreset, RotateCcw, values, parseFailed, updateField, resetToCurrentDefaults, dirty, save, ConfigFieldInput, readonly, loading, saving } = toRefs(viewProps.state)
+const { tieBreakers, updateTieBreakers, AwdTieBreakEditor, isAwd, changeReason, reasonRequired, invalidFields, canSaveRules, groups, DefinitionSection, presetOpen, presetChanges, applyPreset, closePreset, RotateCcw, values, parseFailed, updateField, resetToCurrentDefaults, dirty, save, ConfigFieldInput, readonly, loading, saving } = toRefs(viewProps.state)
 </script>
 
 <template>
@@ -37,6 +37,7 @@ const { isAwd, changeReason, reasonRequired, invalidFields, canSaveRules, groups
         </Field>
       </FieldGroup>
       </component>
+      <component :is="AwdTieBreakEditor" v-if="isAwd" :model-value="tieBreakers" :disabled="readonly || saving" @update:model-value="updateTieBreakers" />
       <Alert v-if="invalidFields.length" variant="destructive"><AlertDescription>{{ $t('administration.awd.invalidField') }}</AlertDescription></Alert>
       <Field v-if="isAwd && !readonly">
         <FieldLabel for="awd-rule-change-reason">{{ $t('administration.awd.changeReason') }}</FieldLabel>

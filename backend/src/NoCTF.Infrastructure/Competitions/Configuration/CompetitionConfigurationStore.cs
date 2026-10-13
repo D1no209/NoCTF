@@ -3,6 +3,7 @@ using NoCTF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Competitions.Configuration;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Competitions.Awd;
 using NoCTF.Domain.Teams;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Competitions.Events;
@@ -93,12 +94,16 @@ public sealed class CompetitionConfigurationStore(
             && configuration is CtfCompetitionModeConfiguration afterCtf
             && !beforeCtf.BloodRewards.OrderBy(item => item.Position).Select(item => (item.Policy, item.Value))
                 .SequenceEqual(afterCtf.BloodRewards.OrderBy(item => item.Position).Select(item => (item.Policy, item.Value)));
+        var tieBreaksChanged = tracked.ModeConfiguration is AwdCompetitionModeConfiguration beforeAwd
+            && configuration is AwdCompetitionModeConfiguration afterAwd
+            && !beforeAwd.TieBreakers.OrderBy(item => item.Position).Select(item => (item.Field, item.Direction))
+                .SequenceEqual(afterAwd.TieBreakers.OrderBy(item => item.Position).Select(item => (item.Field, item.Direction)));
         db.Entry(tracked.ModeConfiguration).CurrentValues.SetValues(configuration);
         if (tracked.ModeConfiguration is AwdCompetitionModeConfiguration currentAwd
             && configuration is AwdCompetitionModeConfiguration nextAwd)
             currentAwd.AwdOptions = nextAwd.AwdOptions with { };
         db.ChangeTracker.DetectChanges();
-        if (db.Entry(tracked.ModeConfiguration).State == EntityState.Unchanged && !bloodChanged && !stagesChanged)
+        if (db.Entry(tracked.ModeConfiguration).State == EntityState.Unchanged && !bloodChanged && !stagesChanged && !tieBreaksChanged)
         {
             var unchanged = await FindAsync(competitionId, ct);
             await transaction.CommitAsync(ct);
@@ -125,6 +130,18 @@ public sealed class CompetitionConfigurationStore(
             await db.SaveChangesAsync(ct);
             currentLive.StageRules = requestedLive.StageRules.Select(x => new LiveSoloStageRule {
                 CompetitionId = competitionId, Lane = x.Lane, Stage = x.Stage, RequiredWins = x.RequiredWins }).ToList();
+        }
+        if (tieBreaksChanged && tracked.ModeConfiguration is AwdCompetitionModeConfiguration ranking
+            && configuration is AwdCompetitionModeConfiguration requestedRanking)
+        {
+            db.Set<AwdCompetitionTieBreak>().RemoveRange(ranking.TieBreakers);
+            ranking.TieBreakers.Clear();
+            // Release both position and field uniqueness before replacing the ordered list.
+            // This remains inside the aggregate transaction with its audit and publication.
+            await db.SaveChangesAsync(ct);
+            ranking.TieBreakers = requestedRanking.TieBreakers.OrderBy(item => item.Position).Select((item, position) =>
+                new AwdCompetitionTieBreak { CompetitionId = competitionId, Position = position,
+                    Field = item.Field, Direction = item.Direction }).ToList();
         }
         tracked.UpdatedAt = now;
         if (tracked.Mode == GameMode.Awd && status == CompetitionStatus.Running)

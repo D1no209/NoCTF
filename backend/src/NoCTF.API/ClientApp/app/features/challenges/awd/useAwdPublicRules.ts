@@ -15,6 +15,9 @@ export function useAwdPublicRules(props: AwdPublicRulesProps) {
   const current = computed(() => rules.value?.issuedPolicies?.find(policy => policy.rulesId === selectedRulesId.value))
   const policy = computed(() => tab.value === 'next' ? rules.value?.nextRound : current.value)
   const groups = computed(() => rules.value && policy.value ? publicRuleGroups(rules.value, policy.value, tab.value === 'next') : [])
+  const rankingRows = computed(() => (tab.value === 'next' ? rules.value?.nextTieBreakers : rules.value?.currentTieBreakers)?.map((rule, index) => ({
+    index, field: translate(`administration.awd.tieBreak.field.${rule.field}`), direction: translate(`administration.awd.tieBreak.${rule.direction}`),
+  })) ?? [])
   const flagWindow = computed(() => publicFlagWindow(policy.value, false))
   const historyWindow = computed(() => publicFlagWindow(policy.value, true))
   const health = computed(() => rules.value?.ownService)
@@ -59,6 +62,6 @@ export function useAwdPublicRules(props: AwdPublicRulesProps) {
   const visibility = () => { if (!document.hidden) void loadRules() }
   onMounted(() => { mounted = true; subscribe(); timer = setInterval(visibility, 30000); document.addEventListener('visibilitychange', visibility) })
   onBeforeUnmount(() => { disposed = true; generation++; abort?.abort(); stopHub?.(); clearInterval(timer); document.removeEventListener('visibilitychange', visibility) })
-  return { rules, loading, error, open, tab, selectedRulesId, policy, groups, flagWindow, historyWindow, health, serviceText, settlementText, observedAt, healthText, formatDate, loadRules }
+  return { rules, loading, error, open, tab, selectedRulesId, policy, groups, rankingRows, flagWindow, historyWindow, health, serviceText, settlementText, observedAt, healthText, formatDate, loadRules }
 }
 export type AwdPublicRulesViewState = import('vue').ShallowUnwrapRef<ReturnType<typeof useAwdPublicRules>>

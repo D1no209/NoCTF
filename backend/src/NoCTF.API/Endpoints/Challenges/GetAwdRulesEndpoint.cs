@@ -41,7 +41,8 @@ public sealed record AwdPublicRulesResponse(DateTimeOffset ServerTime, DateTimeO
     AwdRuleOverridesContract QuestionOverrides, bool AttackPointsOverridden, bool DefensePointsOverridden,
     bool SlaPointsOverridden, bool CheckerIntervalOverridden, bool AttackModeOverridden,
     IReadOnlyList<AwdPublicRulePolicyResponse> IssuedPolicies, AwdPublicRulePolicyResponse NextRound,
-    AwdPublicTeamHealthResponse? OwnService);
+    AwdPublicTeamHealthResponse? OwnService,
+    IReadOnlyList<AwdTieBreakContract> CurrentTieBreakers, IReadOnlyList<AwdTieBreakContract> NextTieBreakers);
 
 public sealed class GetAwdRulesEndpoint(IAwdPublicRulesReader reader, ICompetitionChallengeReadAccess access,
     IUserContext user, TimeProvider time) : EndpointWithoutRequest<Results<Ok<AwdPublicRulesResponse>, NotFound>>
@@ -71,6 +72,8 @@ public sealed class GetAwdRulesEndpoint(IAwdPublicRulesReader reader, ICompetiti
             view.DefensePointsOverridden, view.SlaPointsOverridden, view.CheckerIntervalOverridden, view.AttackModeOverridden,
             view.IssuedPolicies.Select(AwdPublicRulePolicyResponse.From).ToArray(), AwdPublicRulePolicyResponse.From(view.NextRound),
             view.OwnService is { } health ? new(health.Enabled, health.Health, health.Execution, health.Settlement,
-                health.ObservedAt, health.LastTrustedHealth, health.LastTrustedAt) : null));
+                health.ObservedAt, health.LastTrustedHealth, health.LastTrustedAt) : null,
+            (view.CurrentTieBreakers ?? []).Select(item => new AwdTieBreakContract(item.Field, item.Direction)).ToArray(),
+            (view.NextTieBreakers ?? []).Select(item => new AwdTieBreakContract(item.Field, item.Direction)).ToArray()));
     }
 }

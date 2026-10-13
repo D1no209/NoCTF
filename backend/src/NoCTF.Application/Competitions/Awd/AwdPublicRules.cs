@@ -16,7 +16,8 @@ public sealed record AwdPublicRulesView(DateTimeOffset ServerTime, DateTimeOffse
     int RoundDurationSeconds, int HardeningDurationSeconds, AwdRuleOptions CompetitionDefaults,
     AwdRuleOverrides QuestionOverrides, bool AttackPointsOverridden, bool DefensePointsOverridden,
     bool SlaPointsOverridden, bool CheckerIntervalOverridden, bool AttackModeOverridden,
-    IReadOnlyList<AwdPublicRulePolicy> IssuedPolicies, AwdPublicRulePolicy NextRound, AwdPublicTeamHealth? OwnService = null);
+    IReadOnlyList<AwdPublicRulePolicy> IssuedPolicies, AwdPublicRulePolicy NextRound, AwdPublicTeamHealth? OwnService = null,
+    IReadOnlyList<AwdTieBreakCriterion>? CurrentTieBreakers = null, IReadOnlyList<AwdTieBreakCriterion>? NextTieBreakers = null);
 
 public interface IAwdPublicRulesReader
 {

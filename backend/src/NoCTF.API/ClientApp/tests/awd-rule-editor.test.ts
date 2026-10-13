@@ -1,3 +1,4 @@
+import { defaultAwdTieBreaks } from '../app/utils/awd-tie-breaks'
 import { describe, expect, test } from 'bun:test'
 import { reactive } from 'vue'
 import { awdFieldVisible, awdInvalidFields, awdPresetValues, awdPresetConstraints, resolveAwdPresetValues } from '../app/utils/awd-config-fields'
@@ -20,7 +21,7 @@ describe('AWD rule editor', () => {
     const contract = buildConfigValues('Awd', fields, values, { rules: false })
     expect(contract.awd).toMatchObject({ options: { flagLifetime: 5, retryCount: 2, recoveringRatio: 0.5 } })
     const loaded = readConfigValues(contract, fields, { rules: false })!
-    expect(loaded.values).toEqual(values)
+    expect(loaded.values).toEqual({ ...values, awdTieBreakers: defaultAwdTieBreaks() })
     expect(buildConfigValues('Awd', fields, loaded.values, { rules: false })).toEqual(contract)
     expect(fields.some(field => field.key === 'serviceUnhealthyPenalty')).toBeFalse()
   })

@@ -4,6 +4,7 @@ using NoCTF.Application.Challenges.WriteUps;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Gameplay;
+using NoCTF.GameModes.Awd.Scoring;
 
 namespace NoCTF.GameModes.Leaderboard;
 
@@ -166,9 +167,9 @@ internal static class WriteUpBenefitProjection
                         (input.WriteUpUnlocks ?? []).SingleOrDefault(x => x.TeamId == row.TeamId
                             && x.CompetitionChallengeId == row.CompetitionChallengeId)?.DeductionPercent ?? 0)));
             }
-            return ordered.ThenByDescending(AttackPoints).ThenByDescending(x => entries[x.TeamId].UpRoundCount)
-                .ThenByDescending(x => entries[x.TeamId].AttackCount).ThenBy(x => entries[x.TeamId].LastScoreAt ?? DateTimeOffset.MaxValue)
-                .ThenBy(x => facts[x.TeamId].RegisteredAt).ThenBy(x => x.TeamId);
+            return AwdTeamRanking.Order(teams, input, team => new(team.TeamId, team.TotalScore, AttackPoints(team),
+                entries[team.TeamId].UpRoundCount, entries[team.TeamId].AttackCount,
+                entries[team.TeamId].LastScoreAt, facts[team.TeamId].RegisteredAt));
         }
         if (input.Mode == GameMode.Awdp)
             return ordered.ThenByDescending(x => entries[x.TeamId].FixCount).ThenByDescending(x => entries[x.TeamId].AttackCount)

@@ -19,6 +19,7 @@ public sealed class AwdRound : IConcurrencyTracked
     public int SubmissionTailSeconds { get; set; }
     public bool Missed { get; set; }
     public bool Partial { get; set; }
+    public List<AwdRoundTieBreak> TieBreakers { get; set; } = [];
 }
 
 /// <summary>Immutable resolved policy for a question in a round, shared by its flags and checks.</summary>

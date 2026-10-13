@@ -9,6 +9,7 @@ using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Application.Competitions.Modes;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Competitions.Awd;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Teams;
@@ -342,6 +343,9 @@ public sealed class FusionLeaderboardCache(
         var selectedRoundWindowEnd = competition.Mode == GameMode.Awd
             ? awdWindow.EndRound
             : scoreboardRoundWindowEnd;
+        var rankingRound = competition.Mode == GameMode.Awd
+            ? await db.AwdRounds.AsNoTracking().Where(round => round.CompetitionId == competitionId && round.StartsAt <= projectedAt)
+                .OrderByDescending(round => round.Number).FirstOrDefaultAsync(ct) : null;
         var projectionInput = new LeaderboardProjectionInput(
             competitionId,
             competition.Mode,
@@ -364,7 +368,9 @@ public sealed class FusionLeaderboardCache(
             competition.Mode == GameMode.Awd ? await db.AwdRoundRules.AsNoTracking()
                 .Where(rule => rule.CompetitionId == competitionId && rule.EffectiveAt <= projectedAt)
                 .OrderByDescending(rule => rule.EffectiveAt).ThenByDescending(rule => rule.Revision)
-                .Select(rule => rule.Options.MinimumTotalScore).FirstOrDefaultAsync(ct) : null);
+                .Select(rule => rule.Options.MinimumTotalScore).FirstOrDefaultAsync(ct) : null,
+            rankingRound is null ? null : AwdTieBreakPolicy.Resolve(rankingRound.TieBreakers.OrderBy(item => item.Position)
+                .Select(item => new AwdTieBreakCriterion(item.Field, item.Direction))));
         var scoreboard = projectionEngine.Project(projectionInput);
         ScoreboardProjection AddResponseMetadata(ScoreboardProjection value) => value with
         {

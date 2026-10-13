@@ -2,6 +2,7 @@ using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Endpoints.Competitions;
 using NoCTF.API.Security;
+using NoCTF.API.Serialization;
 using NoCTF.Application.Competitions.Management;
 using NoCTF.Application.Competitions.Configuration;
 using NoCTF.Application.Competitions.Permissions;
@@ -211,6 +212,10 @@ public sealed record CtfCompetitionModeConfigurationContract(
     IReadOnlyList<BloodRewardContract> BloodRewards,
     long WrongSubmissionPenalty,
     CtfScoreSettlementModeProtocol ScoreSettlementMode = CtfScoreSettlementModeProtocol.DynamicRecalculation);
+public sealed record AwdTieBreakContract(
+    [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<AwdTieBreakField>))] AwdTieBreakField Field,
+    [property: JsonConverter(typeof(StrictPascalCaseEnumConverter<AwdSortDirection>))] AwdSortDirection Direction);
+
 public sealed record AwdCompetitionModeConfigurationContract(
     int HardeningDurationSeconds,
     int RoundDurationSeconds,
@@ -220,7 +225,8 @@ public sealed record AwdCompetitionModeConfigurationContract(
     int CheckerIntervalSeconds,
     long ServiceHealthyPoints,
     long ServiceUnhealthyPenalty,
-    AwdRuleOptionsContract? Options = null);
+    AwdRuleOptionsContract? Options = null,
+    IReadOnlyList<AwdTieBreakContract>? TieBreakers = null);
 public sealed record AwdpCompetitionModeConfigurationContract(
     int RoundDurationSeconds,
     ScoreCurveContract BreakScoreCurve,
@@ -272,7 +278,9 @@ public static class CompetitionModeConfigurationContractMapper
                 { DefaultScoreCurve: not null, BloodRewards: not null }
                 && Enum.IsDefined(contract.Ctf.ScoreSettlementMode)
                 && contract.Ctf.BloodRewards.All(item => item is not null),
-            GameModeProtocol.Awd => contract.Awd is not null,
+            GameModeProtocol.Awd => contract.Awd is not null && (contract.Awd.TieBreakers is null
+                || contract.Awd.TieBreakers.All(item => item is not null) && AwdTieBreakPolicy.IsValid(
+                    contract.Awd.TieBreakers.Select(item => new AwdTieBreakCriterion(item.Field, item.Direction)).ToArray())),
             GameModeProtocol.Awdp => contract.Awdp is
                 { BreakScoreCurve: not null, FixScoreCurve: not null },
             GameModeProtocol.Koh => contract.Koh is not null,
@@ -320,7 +328,10 @@ public static class CompetitionModeConfigurationContractMapper
                     (AwdAttackRewardModeProtocol)awd.AttackRewardMode, awd.AttackPoints,
                     awd.VictimDefensePoolPoints, awd.CheckerIntervalSeconds,
                     awd.ServiceHealthyPoints, awd.ServiceUnhealthyPenalty,
-                    AwdRuleOptionsContract.FromDomain(awd.AwdOptions));
+                    AwdRuleOptionsContract.FromDomain(awd.AwdOptions),
+                    AwdTieBreakPolicy.Resolve(awd.TieBreakers.OrderBy(item => item.Position)
+                        .Select(item => new AwdTieBreakCriterion(item.Field, item.Direction)))
+                        .Select(item => new AwdTieBreakContract(item.Field, item.Direction)).ToArray());
                 break;
             case AwdpCompetitionModeConfiguration awdp:
                 result.Awdp = new(
@@ -374,7 +385,10 @@ public static class CompetitionModeConfigurationContractMapper
                 CheckerIntervalSeconds = value.Awd.CheckerIntervalSeconds,
                 ServiceHealthyPoints = value.Awd.ServiceHealthyPoints,
                 ServiceUnhealthyPenalty = value.Awd.ServiceUnhealthyPenalty,
-                AwdOptions = value.Awd.Options?.ToDomain() ?? new()
+                AwdOptions = value.Awd.Options?.ToDomain() ?? new(),
+                TieBreakers = (value.Awd.TieBreakers?.Select(item => new AwdTieBreakCriterion(item.Field, item.Direction))
+                    ?? AwdTieBreakPolicy.Default).Select((item, position) => new AwdCompetitionTieBreak
+                    { CompetitionId = competitionId, Position = position, Field = item.Field, Direction = item.Direction }).ToList()
             },
             GameModeProtocol.Awdp => new AwdpCompetitionModeConfiguration
             {

@@ -60,7 +60,11 @@ public sealed class AwdPublicRulesReader(NoCtfDbContext db) : IAwdPublicRulesRea
                     new AwdPublicStoreRule(store.StoreId, store.Name, store.Weight, store.FlagsPerIssue)).ToArray(),
                 latest?.Policy ?? AwdScoringPolicy.From(rule), latest?.EventId)).ToArray(),
             new(null, null, null, resolved.AttackMode, resolved.AttackPoints, resolved.DefensePoints,
-                resolved.SlaPoints, resolved.CheckerIntervalSeconds, resolved.Options, nextStores, AwdScoringPolicy.From(nextSnapshot), null), ownService);
+                resolved.SlaPoints, resolved.CheckerIntervalSeconds, resolved.Options, nextStores, AwdScoringPolicy.From(nextSnapshot), null), ownService,
+            round is null ? [] : AwdTieBreakPolicy.Resolve(round.TieBreakers.OrderBy(item => item.Position)
+                .Select(item => new AwdTieBreakCriterion(item.Field, item.Direction))),
+            AwdTieBreakPolicy.Resolve(defaults.TieBreakers.OrderBy(item => item.Position)
+                .Select(item => new AwdTieBreakCriterion(item.Field, item.Direction))));
     }
 
     private async Task<AwdPublicTeamHealth> ReadOwnHealthAsync(Guid competitionId, Guid challengeId,

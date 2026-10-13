@@ -298,7 +298,10 @@ public sealed class AwdRoundCoordinator(
                 ActiveStartTicks = planned.ActiveStartTicks,
                 ActiveEndTicks = planned.ActiveEndTicks,
                 GapSeconds = planned.GapSeconds, SubmissionTailSeconds = configuration.AwdOptions.SubmissionTailSeconds,
-                Missed = planned.Missed, Partial = planned.Partial
+                Missed = planned.Missed, Partial = planned.Partial,
+                TieBreakers = AwdTieBreakPolicy.Resolve(configuration.TieBreakers.OrderBy(item => item.Position)
+                    .Select(item => new AwdTieBreakCriterion(item.Field, item.Direction))).Select((item, position) =>
+                    new AwdRoundTieBreak { Position = position, Field = item.Field, Direction = item.Direction }).ToList()
             };
             db.AwdRounds.Add(round);
             rounds.Add(round);

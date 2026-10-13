@@ -1291,6 +1291,34 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.ToTable("awd_capture_identities", (string)null);
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdCompetitionTieBreak", b =>
+                {
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<short>("Direction")
+                        .HasColumnType("smallint")
+                        .HasColumnName("direction");
+
+                    b.Property<short>("Field")
+                        .HasColumnType("smallint")
+                        .HasColumnName("field");
+
+                    b.HasKey("CompetitionId", "Position")
+                        .HasName("pk_awd_competition_tie_breaks");
+
+                    b.HasIndex("CompetitionId", "Field")
+                        .IsUnique()
+                        .HasDatabaseName("ix_awd_competition_tie_breaks_competition_id_field");
+
+                    b.ToTable("awd_competition_tie_breaks", (string)null);
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdFactDetails", b =>
                 {
                     b.Property<Guid>("GameplayFactId")
@@ -2036,6 +2064,34 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasName("ak_awd_round_store_budget_rules_id_store_id");
 
                     b.ToTable("awd_round_store_budgets", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdRoundTieBreak", b =>
+                {
+                    b.Property<Guid>("RoundId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("round_id");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<short>("Direction")
+                        .HasColumnType("smallint")
+                        .HasColumnName("direction");
+
+                    b.Property<short>("Field")
+                        .HasColumnType("smallint")
+                        .HasColumnName("field");
+
+                    b.HasKey("RoundId", "Position")
+                        .HasName("pk_awd_round_tie_breaks");
+
+                    b.HasIndex("RoundId", "Field")
+                        .IsUnique()
+                        .HasDatabaseName("ix_awd_round_tie_breaks_round_id_field");
+
+                    b.ToTable("awd_round_tie_breaks", (string)null);
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdScoringRuleChange", b =>
@@ -10670,6 +10726,16 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .HasConstraintName("fk_awd_capture_identities_awd_flag_issues_flag_id_competition_");
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdCompetitionTieBreak", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Competitions.AwdCompetitionModeConfiguration", null)
+                        .WithMany("TieBreakers")
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_awd_competition_tie_breaks_competition_mode_configuration_c");
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdFactDetails", b =>
                 {
                     b.HasOne("NoCTF.Domain.Challenges.ChallengeFlag", null)
@@ -10885,6 +10951,16 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_awd_round_store_budgets_awd_round_rules_rules_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdRoundTieBreak", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Competitions.Awd.AwdRound", null)
+                        .WithMany("TieBreakers")
+                        .HasForeignKey("RoundId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_awd_round_tie_breaks_awd_rounds_round_id");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdScoringRuleChange", b =>
@@ -13319,6 +13395,11 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
                     b.Navigation("GameplayFactResults");
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdRound", b =>
+                {
+                    b.Navigation("TieBreakers");
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Competitions.Awd.AwdRoundRules", b =>
                 {
                     b.Navigation("Stores");
@@ -13465,6 +13546,11 @@ namespace NoCTF.Persistence.PostgreSql.Migrations
             modelBuilder.Entity("NoCTF.Domain.Challenges.ContainerChallengeRuntimeTemplate", b =>
                 {
                     b.Navigation("Services");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Competitions.AwdCompetitionModeConfiguration", b =>
+                {
+                    b.Navigation("TieBreakers");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Competitions.CtfCompetitionModeConfiguration", b =>

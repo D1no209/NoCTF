@@ -2,7 +2,7 @@
 import { toRefs } from 'vue'
 import type { AwdPublicRulesViewState } from '~/features/challenges/awd/useAwdPublicRules'
 const props = defineProps<{ state: AwdPublicRulesViewState }>()
-const { rules, loading, error, open, tab, selectedRulesId, policy, groups, flagWindow, historyWindow, health, serviceText, settlementText, observedAt, healthText, formatDate, loadRules } = toRefs(props.state)
+const { rules, loading, error, open, tab, selectedRulesId, policy, groups, rankingRows, flagWindow, historyWindow, health, serviceText, settlementText, observedAt, healthText, formatDate, loadRules } = toRefs(props.state)
 </script>
 
 <template>
@@ -29,6 +29,7 @@ const { rules, loading, error, open, tab, selectedRulesId, policy, groups, flagW
               <Table><TableHeader><TableRow><TableHead>{{ $t('challenges.awdRules.storeName') }}</TableHead><TableHead>{{ $t('challenges.awdRules.storeWeight') }}</TableHead><TableHead>{{ $t('challenges.awdRules.flagsPerIssue') }}</TableHead></TableRow></TableHeader><TableBody><TableRow v-for="store in policy?.stores" :key="store.storeId"><TableCell>{{ store.name }}</TableCell><TableCell class="font-mono tabular-nums">{{ store.weight }}</TableCell><TableCell class="font-mono tabular-nums">{{ store.flagsPerIssue }}</TableCell></TableRow></TableBody></Table>
               <FieldDescription>{{ $t('challenges.awdRules.storeNotice') }}</FieldDescription>
             </DefinitionSection>
+            <DefinitionSection :title="$t('administration.awd.tieBreak.title')"><FieldDescription>{{ $t('challenges.awdRules.rankingNotice') }}</FieldDescription><ol class="flex list-inside list-decimal flex-col gap-2 text-sm"><li v-for="row in rankingRows" :key="row.index">{{ row.field }} · {{ row.direction }}</li></ol></DefinitionSection>
             <FieldDescription>{{ $t('challenges.awdRules.scoreNotice') }}</FieldDescription>
           </template>
           <DialogFooter><DialogClose as-child><Button variant="outline">{{ $t('common.action.close') }}</Button></DialogClose></DialogFooter>

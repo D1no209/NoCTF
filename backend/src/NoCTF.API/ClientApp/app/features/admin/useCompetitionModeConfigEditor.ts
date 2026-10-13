@@ -1,3 +1,5 @@
+import AwdTieBreakEditorComponent from './awd/AwdTieBreakEditor.vue'
+import { defaultAwdTieBreaks, validAwdTieBreaks, type AwdTieBreak } from '../../utils/awd-tie-breaks'
 import { awdPresetConstraints, resolveAwdPresetValues } from '../../utils/awd-config-fields'
 import { useAwdRuleEditor } from './useAwdRuleEditor'
 import type { NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol } from '../../api'
@@ -54,6 +56,7 @@ emit: { (event: "save", ...args: [configuration: NoCtfapiEndpointsAdministration
     values.value = Object.fromEntries(
       fields.value.map(field => [field.key, fieldDefaultValue(field)]),
     )
+    if (props.mode === 'Awd') values.value.awdTieBreakers = defaultAwdTieBreaks()
     parseFailed.value = false
   }
 
@@ -93,8 +96,11 @@ emit: { (event: "save", ...args: [configuration: NoCtfapiEndpointsAdministration
     return normalize(serialized.value) !== original
   })
 
+  const tieBreakers = computed(() => (values.value.awdTieBreakers ?? defaultAwdTieBreaks()) as AwdTieBreak[])
+  const canSaveRules = computed(() => awdEditor.canSaveRules.value && (props.mode !== 'Awd' || validAwdTieBreaks(tieBreakers.value)))
+  function updateTieBreakers(value: AwdTieBreak[]) { if (!props.readonly && !props.saving) values.value = { ...values.value, awdTieBreakers: value.map(rule => ({ ...rule })) } }
   function save() {
-    if (!awdEditor.canSaveRules.value) return
+    if (!canSaveRules.value) return
     emit('save', serialized.value, awdEditor.changeReason.value.trim() || undefined)
   }
 
@@ -103,6 +109,7 @@ emit: { (event: "save", ...args: [configuration: NoCtfapiEndpointsAdministration
   return {
       ...toRefs(props),
       ...awdEditor,
+      canSaveRules, tieBreakers, updateTieBreakers, AwdTieBreakEditor: markRaw(AwdTieBreakEditorComponent),
       RotateCcw,
       fields,
       values: effectiveValues,

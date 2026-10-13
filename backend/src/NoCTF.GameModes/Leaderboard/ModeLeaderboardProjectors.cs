@@ -3,6 +3,7 @@ using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Gameplay;
 using NoCTF.GameModes.Ctf.Configuration;
 using NoCTF.GameModes.Awd.Scheduling;
+using NoCTF.GameModes.Awd.Scoring;
 using NoCTF.GameModes.Koh.Configuration;
 using NoCTF.GameModes.Scoring;
 using System.Globalization;
@@ -354,14 +355,8 @@ internal static class AwdLeaderboardProjection
         });
         var entries = rows
             .GroupBy(row => row.Entry.TrackKey, StringComparer.OrdinalIgnoreCase)
-            .SelectMany(track => track
-                .OrderByDescending(row => row.Entry.Score)
-                .ThenByDescending(row => row.AttackPoints)
-                .ThenByDescending(row => row.UpRoundCount)
-                .ThenByDescending(row => row.AttackCount)
-                .ThenBy(row => row.LastAttackAt ?? DateTimeOffset.MaxValue)
-                .ThenBy(row => row.RegisteredAt)
-                .ThenBy(row => row.Entry.TeamId)
+            .SelectMany(track => AwdTeamRanking.Order(track, input, row => new(row.Entry.TeamId,
+                row.Entry.Score, row.AttackPoints, row.UpRoundCount, row.AttackCount, row.LastAttackAt, row.RegisteredAt))
                 .Select((row, index) => row.Entry with
                 {
                     Rank = index + 1,

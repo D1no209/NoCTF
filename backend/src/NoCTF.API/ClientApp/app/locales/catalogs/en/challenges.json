@@ -251,5 +251,6 @@
   "challenges.awdRules.settlement.Exempted": "Exempted",
   "challenges.awdRules.noCap": "No cap",
   "challenges.awdRules.noFloor": "No floor",
-  "challenges.awdRules.durationBased": "Competition duration"
+  "challenges.awdRules.durationBased": "Competition duration",
+  "challenges.awdRules.rankingNotice": "Total score descending → the criteria below in order → Team ID ascending. Only final integer components break ties; missing attack timestamps sort last."
 }

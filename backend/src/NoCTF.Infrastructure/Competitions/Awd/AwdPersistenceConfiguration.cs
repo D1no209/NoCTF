@@ -27,6 +27,32 @@ internal sealed class AwdRoundConfiguration : IEntityTypeConfiguration<AwdRound>
         builder.HasIndex(round => new { round.CompetitionId, round.StartsAt, round.EndsAt });
         builder.HasOne<Competition>().WithMany().HasForeignKey(round => round.CompetitionId)
             .OnDelete(DeleteBehavior.Restrict);
+        builder.HasMany(round => round.TieBreakers).WithOne().HasForeignKey(item => item.RoundId).OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(round => round.TieBreakers).AutoInclude();
+    }
+}
+
+internal sealed class AwdRoundTieBreakConfiguration : IEntityTypeConfiguration<AwdRoundTieBreak>
+{
+    public void Configure(EntityTypeBuilder<AwdRoundTieBreak> builder)
+    {
+        builder.HasKey(item => new { item.RoundId, item.Position });
+        builder.Property(item => item.Position).ValueGeneratedNever();
+        builder.HasIndex(item => new { item.RoundId, item.Field }).IsUnique();
+        builder.Property(item => item.Field).HasConversion<short>();
+        builder.Property(item => item.Direction).HasConversion<short>();
+    }
+}
+
+internal sealed class AwdCompetitionTieBreakConfiguration : IEntityTypeConfiguration<AwdCompetitionTieBreak>
+{
+    public void Configure(EntityTypeBuilder<AwdCompetitionTieBreak> builder)
+    {
+        builder.HasKey(item => new { item.CompetitionId, item.Position });
+        builder.Property(item => item.Position).ValueGeneratedNever();
+        builder.HasIndex(item => new { item.CompetitionId, item.Field }).IsUnique();
+        builder.Property(item => item.Field).HasConversion<short>();
+        builder.Property(item => item.Direction).HasConversion<short>();
     }
 }
 

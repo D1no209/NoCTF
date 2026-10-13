@@ -1,3 +1,4 @@
+import { defaultAwdTieBreaks } from './awd-tie-breaks'
 import { createAwdFlagStore } from './awd-flag-stores'
 import { toRaw } from 'vue'
 import { awdOptionFields } from './awd-config-fields'
@@ -871,6 +872,7 @@ export function readConfigValues(
       overridden[field.key] = false
     }
   }
+  if (mode === 'Awd' && !options.rules) values.awdTieBreakers = structuredClone(toRaw(branch.tieBreakers ?? defaultAwdTieBreaks()))
   if (mode === 'Awd' && options.rules) values.awdStoreRules = structuredClone(toRaw(branch.storeRules ?? []))
   return { values, overridden }
 }
@@ -953,7 +955,7 @@ export function buildConfigValues(
       : values[field.key]
     writeFieldValue(target, field, value)
   }
-  if (mode === 'Awd' && !options.rules) branch.serviceUnhealthyPenalty = 0
+  if (mode === 'Awd' && !options.rules) { branch.serviceUnhealthyPenalty = 0; branch.tieBreakers = structuredClone(toRaw(values.awdTieBreakers ?? defaultAwdTieBreaks())) }
   if (mode === 'Awd' && options.rules) branch.storeRules = structuredClone(toRaw(values.awdStoreRules ?? []))
   if (!options.rules && !out.flagTemplate)
     writeFieldValue(out, { key: 'flagTemplate', label: '', type: 'flagTemplate' }, mode === 'Awd' ? { ...emptyFlagTemplate(), bodyTemplate: '[SECURE]' } : emptyFlagTemplate())
