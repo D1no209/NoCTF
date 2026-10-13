@@ -75,3 +75,45 @@ atomic transaction. Wolverine adapters were regenerated using `codegen write`.
 
 Validation: 20 leaderboard persistence tests, 2 lease-renewal tests and 8 event-merge
 tests passed. Raw counts: `leaderboard/leaderboard-rebuild-contention.json`.
+
+## Staff Webhook capture
+
+An ordinary reply previously read every consultation's history and every incident in
+the competition before capturing its event. Existing baselines now scope ordinary
+question/incident changes to affected items. Initial capture, subscription rebuilds,
+metadata changes, ban/appeal operations and explicit resync retain full projection.
+A relational catch-up check preserves updates committed in another context or through
+bulk fact changes. Closed historical tombstones cannot force permanent full capture.
+The source mutation, projection and event sequence still commit together.
+
+The equivalent retained full-capture path is the reference, not a historical binary.
+Each corpus has 32 replies per consultation and half as many incidents as consultations.
+The experiment captures one participant reply, rolls back the transaction, alternates
+variants for 3 warmup and 10 measured pairs, and compares canonical event contents.
+
+| Consultations | Variant | Median elapsed (observed range) | Median allocated bytes | Read rows / cells |
+| ---: | --- | ---: | ---: | ---: |
+| 32 | Full capture | 10.96 ms (10.29–16.66) | 2,485,876 | 1,138 / 11,962 |
+| 32 | Scoped capture | 10.36 ms (9.90–11.32) | 1,459,660 | 41 / 396 |
+| 512 | Full capture | 137.96 ms (127.43–176.59) | 26,817,852 | 18,058 / 190,162 |
+| 512 | Scoped capture | 24.93 ms (23.49–36.56) | 1,465,440 | 41 / 396 |
+
+Full/scoped reads issue 10/9 SQL commands. Small-corpus elapsed times are close;
+the large-corpus result supports lower history transfer, materialization and capture
+cost. The catch-up EXISTS still examines existing competition work items, and the
+competition stream remains sequential. This is not constant total database work.
+Timing excludes transaction creation, source preparation, SaveChanges/commit and
+delivery. Allocation counters are process-wide. SQL diagnostics run separately from
+timing; both variants receive the same subscription probe and pending mutation.
+
+Six PostgreSQL correctness tests cover full/scoped event equivalence and commit,
+unaffected pending items, first capture, cross-context metadata edits, bulk incident
+changes/removal, recovery from tombstones, and nullable platform-question roots/replies.
+The nullable cases exposed and fixed an existing `.Value` access on reply notifications
+that legitimately carry no question target. Raw samples: `staff-v3/staff-webhook-capture.json`.
+
+```powershell
+$env:NOCTF_REQUIRE_DOCKER_INTEGRATION = 'true'
+$env:NOCTF_STAFF_CAPTURE_MEASUREMENTS = 'backend/artifacts/performance/optimization-next-20261013/staff-v3'
+dotnet backend/tests/NoCTF.Tests/bin/Release/net10.0/NoCTF.Tests.dll --treenode-filter '/*/*/StaffWebhookCaptureScopeTests/*' --maximum-parallel-tests 1 --report-trx --results-directory backend/artifacts/performance/optimization-next-20261013/staff-tests-v3 --no-ansi --progress off
+```
