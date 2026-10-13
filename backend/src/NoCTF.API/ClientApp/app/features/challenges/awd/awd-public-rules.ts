@@ -31,6 +31,7 @@ export function publicRuleGroups(rules: Rules, policy: Policy | undefined, next:
     if (value === null && field.key === 'totalRounds') return translate('challenges.awdRules.durationBased')
     if (value == null) return '—'
     if (typeof value === 'boolean') return translate(value ? 'challenges.awdRules.yes' : 'challenges.awdRules.no')
+    if (field.key === 'slaSettlement' && value === 'TimeWeighted') return translate('administration.awd.option.TimeWeighted')
     const option = field.options?.find(option => option.value === value)
     return option ? translate(option.label) : String(value)
   }

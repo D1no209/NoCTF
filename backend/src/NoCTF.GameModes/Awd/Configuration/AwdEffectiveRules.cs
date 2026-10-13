@@ -46,6 +46,8 @@ public sealed record AwdEffectiveRules(
         var options = challenge.AwdOverrides.Resolve(competition.AwdOptions);
         if (!Enum.IsDefined(options.Preset)) return ["Unknown AWD scoring preset."];
         var errors = Resolve(competition, challenge).Validate().ToList();
+        if (options.SlaSettlement == AwdSlaSettlement.TimeWeighted)
+            errors.Add("Time-weighted AWD settlement is unavailable; use FinalScheduledCheck or SampleAverage.");
         if (challenge.StoreRules.Select(item => item.StoreId).Distinct().Count() != challenge.StoreRules.Count
             || challenge.StoreRules.Any(item => item.StoreId == Guid.Empty || item.Weight is <= 0 or > 100
                 || decimal.Round(item.Weight, 6) != item.Weight || item.FlagsPerIssue is < 1 or > 64))

@@ -1205,7 +1205,7 @@
   "administration.awd.option.ActiveInterval": "按有效比赛时间间隔",
   "administration.awd.option.FinalScheduledCheck": "轮末计划检查",
   "administration.awd.option.SampleAverage": "样本均值",
-  "administration.awd.option.TimeWeighted": "按持续时间加权",
+  "administration.awd.option.TimeWeighted": "按持续时间加权（暂不可用）",
   "administration.awd.option.Fixed": "固定值",
   "administration.awd.option.SharedPool": "共享池",
   "administration.awd.option.Scarcity": "稀缺奖励",

@@ -8,6 +8,20 @@ namespace NoCTF.Tests.Unit.GameModes;
 public sealed class AwdEffectiveRulesTests
 {
     [Test]
+    [Arguments(AwdSlaSettlement.FinalScheduledCheck, true)]
+    [Arguments(AwdSlaSettlement.SampleAverage, true)]
+    [Arguments(AwdSlaSettlement.TimeWeighted, false)]
+    public async Task Configuration_only_accepts_available_settlement_modes(AwdSlaSettlement settlement, bool supported)
+    {
+        var defaults = (AwdCompetitionModeConfiguration)CompetitionModeConfigurationDefaults.Create(GameMode.Awd, Guid.NewGuid());
+        defaults.AwdOptions = defaults.AwdOptions with { SlaSettlement = settlement };
+        await Assert.That(AwdEffectiveRules.ValidateConfiguration(defaults, new()).Count == 0).IsEqualTo(supported);
+        defaults.AwdOptions = defaults.AwdOptions with { SlaSettlement = AwdSlaSettlement.FinalScheduledCheck };
+        await Assert.That(AwdEffectiveRules.ValidateConfiguration(defaults,
+            new() { AwdOverrides = new() { SlaSettlement = settlement } }).Count == 0).IsEqualTo(supported);
+    }
+
+    [Test]
     [Arguments(-1_000_001L, false)]
     [Arguments(-1_000_000L, true)]
     [Arguments(0L, true)]

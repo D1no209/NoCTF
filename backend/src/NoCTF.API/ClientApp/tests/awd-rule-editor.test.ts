@@ -12,6 +12,15 @@ const fields = competitionConfigFields('Awd')
 const defaults = () => Object.fromEntries(fields.map(field => [field.key, fieldDefaultValue(field)]))
 
 describe('AWD rule editor', () => {
+  test('unavailable time weighting cannot be selected or saved and is not silently converted', () => {
+    expect(fields.find(field => field.key === 'slaSettlement')?.options?.map(option => option.value))
+      .toEqual(['FinalScheduledCheck', 'SampleAverage'])
+    const contract = buildConfigValues('Awd', fields, { ...defaults(), slaSettlement: 'TimeWeighted' }, { rules: false })
+    const legacy = readConfigValues(contract, fields, { rules: false })!
+    expect(legacy.values.slaSettlement).toBe('TimeWeighted')
+    expect(awdInvalidFields(fields, legacy.values)).toContain('slaSettlement')
+  })
+
   test('safe defaults and all nested options survive a read and save', () => {
     const values = defaults()
     expect(values).toMatchObject({ roundDurationSeconds: 180, attackPoints: 50, victimDefensePoolPoints: 100,

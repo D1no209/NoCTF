@@ -1205,7 +1205,7 @@
   "administration.awd.option.ActiveInterval": "Active-time interval",
   "administration.awd.option.FinalScheduledCheck": "Final scheduled check",
   "administration.awd.option.SampleAverage": "Sample average",
-  "administration.awd.option.TimeWeighted": "Time weighted",
+  "administration.awd.option.TimeWeighted": "Time weighted (unavailable)",
   "administration.awd.option.Fixed": "Fixed",
   "administration.awd.option.SharedPool": "Shared pool",
   "administration.awd.option.Scarcity": "Scarcity",

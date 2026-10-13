@@ -109,6 +109,8 @@ public sealed class AwdScoringRuleStore(NoCtfDbContext db, ILeaderboardSnapshotF
 
     private async Task<AwdScoringRuleFailure?> ValidateAsync(AwdScoringRuleCandidate candidate, CancellationToken ct)
     {
+        if (candidate.Policy.SlaSettlement == AwdSlaSettlement.TimeWeighted)
+            return AwdScoringRuleFailure.InvalidRequest;
         if (!await db.CompetitionChallenges.AnyAsync(challenge => challenge.Id == candidate.CompetitionChallengeId
                 && challenge.CompetitionId == candidate.CompetitionId && challenge.Mode == GameMode.Awd
                 && challenge.DeletedAt == null, ct)) return AwdScoringRuleFailure.NotFound;
