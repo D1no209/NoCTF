@@ -82,12 +82,12 @@ public sealed partial class AwdRoundCoordinationTests
                 var accepted = await new SubmitFlag(intake, new GameModeGameplayFactAdmissionPolicy()).ExecuteBatchAsync(
                     fixture.CompetitionId, fixture.CompetitionChallengeId, team.CaptainId, [flag], clock.UtcNow, ct);
                 await Assert.That(accepted.Succeeded).IsTrue();
-                var fact = await intakeDb.GameplayFacts.OrderByDescending(x => x.Id).FirstAsync(ct);
+                var factId = accepted.Value!.Single().GameplayFactId;
                 await using var workerDb = new NoCtfDbContext(options);
                 var processor = new GameplayFactProcessor(workerDb, new GameModeGameplayFactEvaluatorCatalog(),
                     new GameModeGameplayFactAdmissionPolicy(), new RecordingOutbox(), Substitute.For<ILeaderboardSnapshotFactory>());
-                await processor.ProcessAsync(fact.Id, ct);
-                return await workerDb.GameplayFacts.AsNoTracking().Include(x => x.Awd).SingleAsync(x => x.Id == fact.Id, ct);
+                await processor.ProcessAsync(factId, ct);
+                return await workerDb.GameplayFacts.AsNoTracking().Include(x => x.Awd).SingleAsync(x => x.Id == factId, ct);
             }
             var qualified = await SubmitAndProcess(teams[0], defenderFlag.Flag);
             await Assert.That(qualified.Result).IsEqualTo(GameplayFactResult.Correct);
